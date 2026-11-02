@@ -570,8 +570,8 @@ class SidecarDraft:
     and ``program_check`` read them back with the typed accessors.
     """
 
-    def __init__(self, alias: str, task_family: str, instance_id: str = "draft"):
-        self.alias = alias
+    def __init__(self, variant: str, task_family: str, instance_id: str = "draft"):
+        self.variant = variant
         self.task_family = task_family
         self.instance_id = instance_id
         self.path_bucket_m: Optional[float] = None
@@ -640,7 +640,7 @@ class SidecarDraft:
     # -- serialisation ------------------------------------------------------------------------------------------
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {"schema": SIDECAR_SCHEMA, "instance_id": self.instance_id, "tro_sha256": self.tro_sha256, "task_family": self.task_family,
-                             "alias": self.alias, "path_bucket_m": self.path_bucket_m,
+                             "variant": self.variant, "path_bucket_m": self.path_bucket_m,
                              "stances": {k: v.to_sidecar() for k, v in self.stances.items()}}
         if self.transitions:
             d["transitions"] = [t.to_sidecar() for t in self.transitions]

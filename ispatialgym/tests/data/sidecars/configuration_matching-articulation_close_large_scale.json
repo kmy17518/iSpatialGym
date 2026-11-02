@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-articulation_close_large_scale-dishwasher__house_single_floor__target-dishwasher-ynrhuk__0000",
   "tro_sha256": "451c5bc62c811b270724d53d162b7353525e43387d1948a45f8bc8ffa0e39331",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+  "variant": "configuration_matching-articulation_close_large_scale-dishwasher",
   "path_bucket_m": null,
   "stances": {
     "init": {

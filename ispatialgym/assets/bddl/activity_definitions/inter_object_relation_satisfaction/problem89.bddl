@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-89)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor)
+    (:variant inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor)
 
     ; hand-grounded probe (owner 2026-09-19 20:14): inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor
     ; (inter_object_relation_satisfaction/under_large_scale.iddl; fallback 1 (init_surface) of

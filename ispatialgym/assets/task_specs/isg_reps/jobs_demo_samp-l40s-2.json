@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-sandal",
+  "variant": "mental_rotation-sandal",
   "source_job": "mental_rotation-sandal__representative__target-uhzfis"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-ginger_root",
+  "variant": "mental_rotation-ginger_root",
   "source_job": "mental_rotation-ginger_root__representative__target-wqcasl"
  },
  {
@@ -23,7 +23,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-canned_food",
+  "variant": "object_scaling-canned_food",
   "source_job": "object_scaling-canned_food__representative__target-ycbspm"
  }
 ]

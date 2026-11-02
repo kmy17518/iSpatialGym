@@ -1,6 +1,6 @@
 (define (problem object_scaling-4)
     (:domain ispatialgym)
-    (:alias object_scaling-pack_of_cigarettes)
+    (:variant object_scaling-pack_of_cigarettes)
 
     ; ground_isg 2.0.0: object_scaling-pack_of_cigarettes (object_scaling/object_scaling.iddl; object_scaling#05/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of

@@ -290,7 +290,7 @@ class Attachment(SamplerV2):
 
     # ------------------------------------------------------------------ roles
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         out = {}
         if self.t_role != "male":
             out["male"] = self.t_role
@@ -303,7 +303,7 @@ class Attachment(SamplerV2):
         req = self.choice.bindings.get("support")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names")
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def spawn_roles(self):
@@ -359,9 +359,9 @@ class Attachment(SamplerV2):
             flip = {"flipped": False, "disabled": "generation.male_rest_by_stability false"}
         self.template_facts["male_rest_orientation"] = flip
         if flip.get("flipped"):
-            log.info("%s: %s turned onto its other end - %s", self.gp.alias, male.name, flip.get("reason"))
+            log.info("%s: %s turned onto its other end - %s", self.gp.variant, male.name, flip.get("reason"))
         else:
-            log.info("%s: %s keeps the library rest orientation (tipping margin %.2f, other end %.2f; %s)", self.gp.alias, male.name,
+            log.info("%s: %s keeps the library rest orientation (tipping margin %.2f, other end %.2f; %s)", self.gp.variant, male.name,
                      flip.get("margin_canonical", float("nan")), flip.get("margin_flipped", float("nan")), flip.get("reason", flip.get("disabled")))
         for role in (self.t_role, self.p_role):
             self.height[role] = TT.height_of(self.hull[role], self.rest[role])
@@ -396,7 +396,7 @@ class Attachment(SamplerV2):
                 facts["source"] = "centroid->female"
                 facts["axis"] = facts["centroid_to_female"]
         self.template_facts["insertion_axis"] = facts
-        log.info("%s: insertion axis %s", self.gp.alias, json.dumps(facts))
+        log.info("%s: insertion axis %s", self.gp.variant, json.dumps(facts))
         self.symmetry = self._symmetry_equivalences(male, child_link)
         support = self.obj("support")
         self.top = self.support_top(support)
@@ -442,7 +442,7 @@ class Attachment(SamplerV2):
                 break
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -627,7 +627,7 @@ class Attachment(SamplerV2):
         facts = {"survivors": len(cands), "kept": len(kept), "dropped": dropped, "male_radius_m": round(r_m, 4), "yaws": PARTNER_ROOM_YAWS,
                  "cells_tried": PARTNER_CELLS_TRIED}
         log.info("%s: partner room: %d of %d Phase-2 survivors leave the partner a cell on the free top at the required gap (dropped %s)",
-                 self.gp.alias, len(kept), len(cands), dropped)
+                 self.gp.variant, len(kept), len(cands), dropped)
         return kept, facts
 
     # ------------------------------------------------------------------ geometry
@@ -699,7 +699,7 @@ class Attachment(SamplerV2):
                 key = self._candidate_key(cand)
                 rejects[key] = rejects.get(key, 0) + 1
                 errors.append(f"candidate {int(k)}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _check_deadline(self):
@@ -724,7 +724,7 @@ class Attachment(SamplerV2):
             except Reject as e:
                 if label == "all":
                     raise
-                log.info("%s: no %s grasp confirmed at the focus (%s); every library grasp is screened next", self.gp.alias, label, e)
+                log.info("%s: no %s grasp confirmed at the focus (%s); every library grasp is screened next", self.gp.variant, label, e)
         grasp.place_on = pname
         male.set_position_orientation(*m_pose)
         male.keep_still()
@@ -748,7 +748,7 @@ class Attachment(SamplerV2):
         if att is None:
             self._check_deadline()
             if brace_search:
-                log.info("%s: BRACE_FALLBACK no joint placement from the grasp stance or a second base pose: %s", self.gp.alias, json.dumps(self._att_fails, default=str))
+                log.info("%s: BRACE_FALLBACK no joint placement from the grasp stance or a second base pose: %s", self.gp.variant, json.dumps(self._att_fails, default=str))
             att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=False, brace=brace_search)
             work_st, brace_state = manip, "none"
             if att is None and not brace_search:
@@ -873,10 +873,10 @@ class Attachment(SamplerV2):
                 moved[g.name] = round(off, 4)
                 out.append(shifted)
             else:
-                log.info("%s: grasp %s pinch %+.1f mm off the male's centre; the re-centred pose is not attachable - kept", self.gp.alias, g.name, off * 1000)
+                log.info("%s: grasp %s pinch %+.1f mm off the male's centre; the re-centred pose is not attachable - kept", self.gp.variant, g.name, off * 1000)
                 out.append(g)
         if moved:
-            log.info("%s: %d asymmetric library grasps re-centred along the closing axis (offsets m): %s", self.gp.alias, len(moved), moved)
+            log.info("%s: %d asymmetric library grasps re-centred along the closing axis (offsets m): %s", self.gp.variant, len(moved), moved)
         self.template_facts["recentred_grasps"] = moved
         return out
 
@@ -918,7 +918,7 @@ class Attachment(SamplerV2):
         except Exception:  # noqa: BLE001
             pass
         grasp.extras.update({"pinch_width_m": round(width, 4), "pinch_width_library_m": lib, "pinch_width_band_points": int(band.sum())})
-        log.info("%s: pinch width at the pads %.1f mm from the male's hull (library %s mm)", self.gp.alias, width * 1000, None if lib is None else round(lib * 1000, 1))
+        log.info("%s: pinch width at the pads %.1f mm from the male's hull (library %s mm)", self.gp.variant, width * 1000, None if lib is None else round(lib * 1000, 1))
 
     # ------------------------------------------------------------------ over-the-top pre-grasp approach (owner 2026-09-19 20:42)
 
@@ -949,12 +949,12 @@ class Attachment(SamplerV2):
                 grasp.extras["approach_standoff_m"] = dist
                 if reasons:
                     grasp.extras["approach_standoff_ladder"] = reasons
-                log.info("%s: partner %.2f m from the grasp -> over-the-top pre-grasp approach recorded (standoff %.2f m%s)", self.gp.alias, d_xy, dist,
+                log.info("%s: partner %.2f m from the grasp -> over-the-top pre-grasp approach recorded (standoff %.2f m%s)", self.gp.variant, d_xy, dist,
                          f"; {len(reasons)} longer standoff(s) had no IK" if reasons else "")
                 return
             reasons.append(f"{dist:.2f} m: {res.reason}")
         grasp.extras["approach_standoff_reason"] = "; ".join(reasons)
-        log.info("%s: partner %.2f m from the grasp but no standoff of %s has IK (%s): direct approach kept", self.gp.alias, d_xy, ladder, reasons[-1][:120])
+        log.info("%s: partner %.2f m from the grasp but no standoff of %s has IK (%s): direct approach kept", self.gp.variant, d_xy, ladder, reasons[-1][:120])
 
     # ------------------------------------------------------------------ hand envelope vs the partner (0919-160750)
 
@@ -1005,7 +1005,7 @@ class Attachment(SamplerV2):
         tilted = [g for g in grasps if self._grasp_tilt_deg(g) >= THIN_PART_TILT_MIN_DEG]
         if not tilted or len(tilted) == len(grasps):
             return [(grasps, "all")]
-        log.info("%s: thin male (%.1f cm): %d tilted rim pinch(es) screened before the %d vertical one(s)", self.gp.alias,
+        log.info("%s: thin male (%.1f cm): %d tilted rim pinch(es) screened before the %d vertical one(s)", self.gp.variant,
                  self.height[self.t_role] * 100, len(tilted), len(grasps) - len(tilted))
         return [(tilted, "tilted"), (grasps, "all")]
 
@@ -1197,7 +1197,7 @@ class Attachment(SamplerV2):
             grasp.extras["attach_clearance"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in clr.items()}
             grasp.extras["attach_clearance"]["partner_floor"] = "none: no partner hull under the fingertips"
             log.info("%s: no partner hull within %.0f mm of the fingertips' radius %s mm (rim within the male's radius at depth %.1f mm): no partner-top floor",
-                     self.gp.alias, TIP_RADIAL_BAND_M * 1000, [round(r * 1000, 1) for r in clr["r_tips_m"]], clr["depth_within_male_radius_m"] * 1000)
+                     self.gp.variant, TIP_RADIAL_BAND_M * 1000, [round(r * 1000, 1) for r in clr["r_tips_m"]], clr["depth_within_male_radius_m"] * 1000)
         elif clr is not None and clr["lift_sign"] < -0.5 and clr.get("h_tip_m") is not None:
             # the male is inserted the other way up than it rests (its rest flipped onto its stable end, item 5: the cork stands on
             # its wide end, the narrow end goes into the neck): a HIGHER grasp at rest brings the fingertips DOWN toward the rim at
@@ -1210,9 +1210,9 @@ class Attachment(SamplerV2):
                 raise Reject("fingers_in_partner", f"the fingertips end {-clr['h_tip_m'] * 1000:.1f} mm below the partner's top at the attach for the unlifted grasp "
                                                    f"(inserted the other way up than it rests; attach clearance {grasp.extras['attach_clearance']})")
             room_pad, room_tip = min(room_pad, ceiling), min(room_tip, ceiling)
-            log.info("%s: the male is inserted the other way up than it rests (lift sign %.2f): the partner clearance caps the grasp lift at %.1f mm", self.gp.alias, clr["lift_sign"], ceiling * 1000)
+            log.info("%s: the male is inserted the other way up than it rests (lift sign %.2f): the partner clearance caps the grasp lift at %.1f mm", self.gp.variant, clr["lift_sign"], ceiling * 1000)
         elif clr is not None:
-            log.info("%s: the male is not inserted along its rest up axis (lift sign %.2f): no partner-clearance floor", self.gp.alias, clr["lift_sign"])
+            log.info("%s: the male is not inserted along its rest up axis (lift sign %.2f): no partner-clearance floor", self.gp.variant, clr["lift_sign"])
         need_pad = max(floors_pad.values()) if floors_pad else 0.0
         need_tip = max(floors_tip.values()) if floors_tip else 0.0
         if room_pad > 0.0 and need_pad <= room_pad:
@@ -1233,7 +1233,7 @@ class Attachment(SamplerV2):
         needed = max(floors.values()) if floors else 0.0
         if floors and needed > x:
             which = max(floors.items(), key=lambda kv: kv[1])[0]
-            log.info("%s: lift raised from %.1f to %.1f mm by the %s floor (%s regime; floors %s mm)", self.gp.alias, x * 1000, needed * 1000, which, regime,
+            log.info("%s: lift raised from %.1f to %.1f mm by the %s floor (%s regime; floors %s mm)", self.gp.variant, x * 1000, needed * 1000, which, regime,
                      {k: round(v * 1000, 1) for k, v in floors.items()})
             x = needed
         grasp.extras["grasp_height_floors_m"] = {k: round(v, 4) for k, v in floors.items()}
@@ -1269,7 +1269,7 @@ class Attachment(SamplerV2):
                 if float(th.linalg.norm(shift_w)) > 1e-4:
                     grasp.extras["pinch_recentre_m"] = [round(float(v), 4) for v in shift_w.tolist()]
                     log.info("%s: pinch re-centred: the contact band moved %.1f mm along the fingers with the lift -> hand moved %.1f mm horizontally "
-                             "so the band's centre stays on the male's axis", self.gp.alias, (s1 - s0) * 1000, float(th.linalg.norm(shift_w)) * 1000)
+                             "so the band's centre stays on the male's axis", self.gp.variant, (s1 - s0) * 1000, float(th.linalg.norm(shift_w)) * 1000)
             else:
                 if floors and needed > 0.0:
                     # owner 2026-09-25 (cork 0925-195316 / 205211, replays 213602 / 215043: 'IK failed with the lift (ik_joint_limit:
@@ -1283,7 +1283,7 @@ class Attachment(SamplerV2):
                                                      f"({res.reason}); the library height would leave the fingers in the support / partner "
                                                      f"(floors {grasp.extras['grasp_height_floors_m']}, attach clearance {grasp.extras.get('attach_clearance')})")
                 eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept (no floor asked for it)"
-        log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.alias, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
+        log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.variant, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
         grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": round(eff, 4), "grasp_height_extra_reason": why})
 
     # ------------------------------------------------------------------ program check (brace-less attachment)
@@ -1298,7 +1298,7 @@ class Attachment(SamplerV2):
             msg = str(e)
             if not (getattr(self, "brace_missing", False) and "brace" in msg and TT.program_check_stub()):
                 raise
-            log.warning("%s: program check asks for contacts.brace on a brace-less attachment (%s); recorded as stub-brace-optional", self.gp.alias, msg[:200])
+            log.warning("%s: program check asks for contacts.brace on a brace-less attachment (%s); recorded as stub-brace-optional", self.gp.variant, msg[:200])
             report = {"mode": "stub-brace-optional", "problems": [], "note": "brace-less attachment not yet accepted by the oracle program", "error": msg[:300]}
             self.last_program_check = report
             draft.summary["program_check"] = report
@@ -1388,7 +1388,7 @@ class Attachment(SamplerV2):
                 why = self._fingers_in_partner(res.q, eef_attach, support, male, female)
                 if why is not None:
                     fails["fingers"] += 1
-                    log.info("%s: partner cell rejected: %s", self.gp.alias, why)
+                    log.info("%s: partner cell rejected: %s", self.gp.variant, why)
                     continue
                 with attached(self.kit, "right", male):
                     # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
@@ -1397,7 +1397,7 @@ class Attachment(SamplerV2):
                     if not r_w.ok:
                         fails["slerp"] += 1
                         seq = [lift] + wps
-                        log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.alias, st.name, plan.ladder, r_w.reason,
+                        log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.variant, st.name, plan.ladder, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
@@ -1430,7 +1430,7 @@ class Attachment(SamplerV2):
 
         Default: the lift ladder ``CARRY_HEIGHTS`` (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK),
         each followed by the straight SLERP line of ``reorientation_waypoints`` + 1 poses to the pre-attach. ``generation.
-        carry_over_partner_m`` (owner 2026-10-12 attachment#04 3b, the lid-stockpot aliases: the straight line from a 5-12 cm lift
+        carry_over_partner_m`` (owner 2026-10-12 attachment#04 3b, the lid-stockpot variants: the straight line from a 5-12 cm lift
         clipped the stockpot's rim): the 12 cm lift, then straight up until the male's lowest point is that clearance above the
         partner's highest point (:meth:`_carry_rise_z`; a list is a ladder tried in order), then the line to the pre-attach; a carry
         whose fingertip point leaves the stance camera's image (``program_check.fingertips_in_frame``, the program check's rule) is
@@ -1495,7 +1495,7 @@ class Attachment(SamplerV2):
         what = "attach + brace" if brace else "the one-arm attach"
         for dlat, trunk, st in self._second_base_stances(manip):
             if tried >= SECOND_BASE_MAX_TRIES:
-                log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
+                log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.variant, tried, what, skipped)
                 return None, manip
             self._check_deadline()
             st.focus = manip.focus
@@ -1512,9 +1512,9 @@ class Attachment(SamplerV2):
             tried += 1
             att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=require_joint, brace=brace)
             if att is not None:
-                log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches %s", self.gp.alias, dlat, trunk[0], trunk[1], what)
+                log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches %s", self.gp.variant, dlat, trunk[0], trunk[1], what)
                 return att, st
-        log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
+        log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.variant, tried, what, skipped)
         return None, manip
 
     @staticmethod
@@ -1640,10 +1640,10 @@ class Attachment(SamplerV2):
                 # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
                 # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
                 self._rest_flip_forced = True
-                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.alias, male.name, bad[male.name])
+                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.variant, male.name, bad[male.name])
             raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
                                           f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
-        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.alias, REST_NUDGE_DEG, tilts)
+        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.variant, REST_NUDGE_DEG, tilts)
 
     def after_settle(self, draft: Draft):
         tname, pname = self.tname, self.pname

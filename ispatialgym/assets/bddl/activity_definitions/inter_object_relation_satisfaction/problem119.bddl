@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-119)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table)
+    (:variant inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table)
 
     ; hand-grounded (owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c1, sheet ~T2): inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table
     ; (inter_object_relation_satisfaction/touching_large_scale.iddl; registry mode test). The tray storage_box/eicujj starts on coffee_table_osroux_0 (top 0.36 m) in house_double_floor_upper/living_room_0

@@ -1,6 +1,6 @@
 # ground_isg (v1 bridge) output
 
-190 grounded problems (slots: representative); one spec per alias under `specs/`, jobs in `jobs.json`.
+190 grounded problems (slots: representative); one spec per variant under `specs/`, jobs in `jobs.json`.
 
 | subtask | problems |
 |---|---|

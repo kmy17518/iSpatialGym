@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-16)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor)
+    (:variant inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#03/representative)
     ; IORS - ontop (large-scale). The target starts on a support (a table within 3 m of the partner, or the floor beside it -

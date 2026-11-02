@@ -1,6 +1,6 @@
 (define (problem configuration_matching-84)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_large_scale-bottom_cabinet_push)
+    (:variant configuration_matching-articulation_close_large_scale-bottom_cabinet_push)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_large_scale-bottom_cabinet (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#03/representative)
     ; owner 2026-10-12 ~08:50: close_large#03's c2 (push close, generation.close_by_push) - problem5 copied for configuration_matching-articulation_close_large_scale-bottom_cabinet_push

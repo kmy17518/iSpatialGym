@@ -1,6 +1,6 @@
 (define (problem alignment-23)
     (:domain ispatialgym)
-    (:alias alignment-axial-magazine_s070-coffee_table)
+    (:variant alignment-axial-magazine_s070-coffee_table)
 
     ; ground_isg 2.0.0: alignment-axial-magazine_s070-coffee_table (alignment/axial.iddl; alignment-axial#04~T5/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-axial-magazine-coffee_table: scale = 0.7, scale_source = default_step

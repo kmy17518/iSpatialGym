@@ -29,12 +29,12 @@ local GPU: free (reserved for ontop large-scale; runs in flight: 0)
 | disembedding | valid demo on the board (pre-bcc937d,166005f,de4e723,ab60baa,dde4f11: blanket fixes, final sweep) |
 | configuration_matching-block_design | run in flight (pid 2699972, run configuration_matching-block_design-block_4-breakfast_table) |
 | configuration_matching-attachment | last run (01:54 PDT) already carried every fix and did not pass - waiting for a fix: re-run 0916-205838: each attempt burns the 360 s budget in the second-base-pose search — the SLERP's first waypoint (carried lift, 0.70–0.82 m base-forward) fai (owner: tabletop) |
-| configuration_matching-articulation_open_small_scale | last run (02:19 PDT) already carried every fix and did not pass - waiting for a fix: D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) — handle-only loop runs next tick (owner: loop) |
-| configuration_matching-articulation_close_small_scale | hold: owner D-012 (01:00): the close alias follows the first open unit that yields (toolbox / carton / laptop) - no close run until then |
+| configuration_matching-articulation_open_small_scale | last run (02:19 PDT) already carried every fix and did not pass - waiting for a fix: D-008 A applied (e5fbced: brace_optional on the hinged_jar variants; program 59f6426f) — handle-only loop runs next tick (owner: loop) |
+| configuration_matching-articulation_close_small_scale | hold: owner D-012 (01:00): the close variant follows the first open unit that yields (toolbox / carton / laptop) - no close run until then |
 | configuration_matching-articulation_open_large_scale | last run (02:01 PDT) already carried every fix and did not pass - waiting for a fix: first instance + demo through grasp(handle) on the Rs_int drawer bamfsz_1 (probe; pick applied 0589d9d) — needs core program_check (handle grasp must not set ca (owner: core / oracle / owner (D-011)) |
 | configuration_matching-articulation_close_large_scale | last run (01:49 PDT) already carried every fix and did not pass - waiting for a fix: same pick (bamfsz_1); close waits on the open fixes (owner: loop) |
 | alignment-world_vertical | last run (00:23 PDT) already carried every fix and did not pass - waiting for a fix: painting demo in tolerance, not_settled (undamped hook) → large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only  (owner: large-scale-B) |
-| alignment-world_horizontal | last run (00:18 PDT) already carried every fix and did not pass - waiting for a fix: owner 22:55: hang frame bug — no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hangs table-flat; large- (owner: large-scale-B) |
+| alignment-world_horizontal | last run (00:18 PDT) already carried every fix and did not pass - waiting for a fix: owner 22:55: hang frame bug — no wall variant carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hangs table-flat; large- (owner: large-scale-B) |
 | alignment-axial | valid demo on the board |
 | inter_object_relation_satisfaction-ontop_small_scale | valid demo on the board |
 | inter_object_relation_satisfaction-under_small_scale | valid demo on the board (pre-de4e723,ab60baa,dde4f11: blanket fixes, final sweep) |
@@ -46,6 +46,6 @@ local GPU: free (reserved for ontop large-scale; runs in flight: 0)
 
 ## Ready queue
 
-| prio | state | subtask | kind | alias | note |
+| prio | state | subtask | kind | variant | note |
 |---|---|---|---|---|---|
 | 55 | running | configuration_matching-block_design | run | configuration_matching-block_design-block_4-breakfast_table | auto: new fix(es) dde4f11, 99251f9 since the last run |

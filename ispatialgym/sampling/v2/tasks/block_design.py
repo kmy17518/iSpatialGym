@@ -123,7 +123,7 @@ FLIP_CELL_MAX_LATERAL = -0.10
 FLIP_CELL_MIN_EDGE_DEPTH = 0.10  # 0.22 (0919-090517 / 091857) left every region with a single flip cell; the pool's 0.40 / 0.50 stand-offs put the 13 cm cell at the proven base depth
 #: step (m) of the flip-room move of the init along the edge when the minimum move leaves the board off the top (owner 2026-10-12)
 FLIP_ROOM_STEP = 0.01
-#: the puzzle board's (base depth, lateral) positions of the manipulation stance when the alias has no ``board_base_xy_candidates``
+#: the puzzle board's (base depth, lateral) positions of the manipulation stance when the variant has no ``board_base_xy_candidates``
 BOARD_BASE_XY = ((0.46, -0.02), (0.44, -0.10), (0.50, 0.04), (0.60, 0.05))
 #: head-camera margin (fraction of the image) of the fingertips along the chain (the oracle's FOV monitor uses 5 %)
 CHAIN_FOV_MARGIN = 0.06
@@ -187,7 +187,7 @@ class BlockDesign(SamplerV2):
 
     # ------------------------------------------------------------------ roles
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         return {"blocks": self.role} if self.role != "blocks" else {}
 
     def bind_scene_roles(self):
@@ -195,7 +195,7 @@ class BlockDesign(SamplerV2):
         req = self.choice.bindings.get("support")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names")
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def n_blocks(self) -> int:
@@ -209,7 +209,7 @@ class BlockDesign(SamplerV2):
         # v1 facade: the block role is a single sampleable role; spawn the group's size copies of its model
         choice = self.choice.models.get(self.role)
         if choice is None:
-            raise Reject("spec", f"{self.gp.alias}: no block model in the template choice")
+            raise Reject("spec", f"{self.gp.variant}: no block model in the template choice")
         for _ in range(self.n_blocks()):
             self.spawn_role(self.role, choice)
 
@@ -292,7 +292,7 @@ class BlockDesign(SamplerV2):
                 break
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -315,7 +315,7 @@ class BlockDesign(SamplerV2):
         patterns = self.g("patterns") or {}
         if not patterns:
             return 0
-        pats = [list(patterns[self.variant])] if self.variant and self.variant in patterns else [list(p) for p in patterns.values()]
+        pats = [list(patterns[self.sub_variant])] if self.sub_variant and self.sub_variant in patterns else [list(p) for p in patterns.values()]
         return max(len(p) - len(set(p)) for p in pats)
 
     def _flips_expected(self) -> bool:
@@ -471,7 +471,7 @@ class BlockDesign(SamplerV2):
             if half is None or n_fit == len(TT.STAND_OFFS):
                 break
         if best is None:
-            log.info("%s: init lateral %.2f leaves no room for the %.2f m manipulation shift and cannot be moved (off the free floor)", self.gp.alias, init.lateral, need)
+            log.info("%s: init lateral %.2f leaves no room for the %.2f m manipulation shift and cannot be moved (off the free floor)", self.gp.variant, init.lateral, need)
             self._flip_room = {**rec, "lateral": rec["lateral_drawn"], "move_m": 0.0,
                                "reason": f"the {need:+.2f} m manipulation shift leaves the lateral range and every move puts the init off the free floor"}
             return init
@@ -496,7 +496,7 @@ class BlockDesign(SamplerV2):
                            + ("every Phase 2 stand-off has one" if n_fit == len(TT.STAND_OFFS) else f"{n_fit} of {len(TT.STAND_OFFS)} stand-offs have one, the most any move gives"))
         self._flip_room = {**rec, "lateral": round(float(moved.lateral), 4), "move_m": round(float(moved.lateral - init.lateral), 4),
                            "minimum_move_m": round(-sign * excess, 4) + 0.0, "reason": reason, **({"board_fit": fit, "board_fit_at_minimum_move": fit0} if half is not None else {})}
-        log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s%s", self.gp.alias,
+        log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s%s", self.gp.variant,
                  -sign * m, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)], "" if half is None else f"; board on the top: {fit} ({reason})")
         return moved
 
@@ -618,8 +618,8 @@ class BlockDesign(SamplerV2):
         patterns = self.g("patterns") or {}
         if not patterns:
             raise Reject("spec", "generation.patterns is empty")
-        if self.variant and self.variant in patterns:
-            return self.variant, list(patterns[self.variant])
+        if self.sub_variant and self.sub_variant in patterns:
+            return self.sub_variant, list(patterns[self.sub_variant])
         pid = list(patterns)[int(rng.integers(len(patterns)))]
         return pid, list(patterns[pid])
 
@@ -650,14 +650,14 @@ class BlockDesign(SamplerV2):
 
         order.sort(key=score)
         if self._flips_expected():
-            log.info("%s: %d manipulation candidates; flip cells per candidate (first 12 by score): %s", self.gp.alias, len(order),
+            log.info("%s: %d manipulation candidates; flip cells per candidate (first 12 by score): %s", self.gp.variant, len(order),
                      ", ".join(f"{k}:{self._n_flip_cells(self.manip_candidates[k], init)}/{len(self.manip_candidates[k].extras.get('focus_info', {}).get('cells', []))}"
                                f"@sh{float(self.manip_candidates[k].extras.get('lateral_shift_m', 0.0)):+.2f}/t{float(self.manip_candidates[k].translate):.2f}"
                                for k in order[:12]))
             for k in order[:2]:
                 c = self.manip_candidates[k]
                 so = float(c.stand_off if c.stand_off is not None else 0.35)
-                log.info("%s: candidate %d region cells (base depth|lateral; edge depth = base depth - %.2f): %s", self.gp.alias, k, so,
+                log.info("%s: candidate %d region cells (base depth|lateral; edge depth = base depth - %.2f): %s", self.gp.variant, k, so,
                          " ".join(f"({float(c.world_to_base(xy)[0]):.2f}|{float(c.world_to_base(xy)[1]):+.2f})" for xy in c.extras.get("focus_info", {}).get("cells", [])))
         for k in order[: int(self.gen("manipulation_candidates_tried", 6))]:
             cand = self.manip_candidates[k]
@@ -675,7 +675,7 @@ class BlockDesign(SamplerV2):
                 if e.reason == "second_stance_needed":
                     raise  # generation.block_single_stance: the attempt ends here (owner 2026-10-12 item 3)
                 errors.append(f"candidate {int(k)}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
@@ -806,7 +806,7 @@ class BlockDesign(SamplerV2):
             if best is not None:
                 chosen = list(best[1])
                 flip_set = flip_plan_for(chosen)
-                log.info("%s: exhaustive cell-set search: %d flip-eligible of %d cells in the set", self.gp.alias, -best[0][0], n)
+                log.info("%s: exhaustive cell-set search: %d flip-eligible of %d cells in the set", self.gp.variant, -best[0][0], n)
         if len(chosen) < n:
             if n_sets:
                 raise Reject("layout", f"{n_sets} cell sets keep the gaps but none lets every repeated-colour block flip from a cell <= {FLIP_CELL_MAX_LATERAL:+.2f} m of the "
@@ -814,7 +814,7 @@ class BlockDesign(SamplerV2):
                                        f"(manipulation stance shift {float(manip.extras.get('lateral_shift_m', 0.0)):+.2f} m; sets as (manip|init lateral): {' '.join(set_diag)})")
             raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps right of / nearer than an anchor")
         b_anchor = manip.world_to_base(th.stack(grid_cells(chosen[0])).mean(dim=0))
-        log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.alias, float(b_anchor[0]), float(b_anchor[1]), arm_score(chosen[0]))
+        log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.variant, float(b_anchor[0]), float(b_anchor[1]), arm_score(chosen[0]))
         # --- anchor (top-left in the init image) and slot assignment -----------------------------------------------
         score = [img_score(c) for c in chosen]
         order_img = sorted(range(n), key=lambda i: score[i])  # image order (top-left first)
@@ -987,7 +987,7 @@ class BlockDesign(SamplerV2):
                 self.sidecar.add_stance(st_pack)
                 self._teleport({rec["instance"]: (th.tensor([float(v) for v in rec["goal_pose"]["position"]]), th.tensor([float(v) for v in rec["goal_pose"]["orientation"]])) for rec in records})
                 self._travel_between(current, st_pack)
-                log.info("%s: packing from a stance of its own %s (trunk %.2f/%+.2f, stand-off %.2f)", self.gp.alias, st_pack.name, st_pack.translate, st_pack.tilt, float(st_pack.stand_off or 0.0))
+                log.info("%s: packing from a stance of its own %s (trunk %.2f/%+.2f, stand-off %.2f)", self.gp.variant, st_pack.name, st_pack.translate, st_pack.tilt, float(st_pack.stand_off or 0.0))
             else:
                 st_pack.arms = ["right", "left"]
                 self.sidecar.stances[st_pack.name] = st_pack
@@ -1072,13 +1072,13 @@ class BlockDesign(SamplerV2):
                     self.record_path(frm, to, trunk=travel, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(frm, dep.stand_off),
                                      max_length_m=float(self.gen("stance_path_max_m", 3.0)))
                     self.record_transition(frm, to, trunk_from=travel)
-                    log.info("%s: travel %s -> %s straightened first (departure s_T %.2f, drive at trunk %.2f/%+.2f)", self.gp.alias, frm.name, to.name, dep.stand_off,
+                    log.info("%s: travel %s -> %s straightened first (departure s_T %.2f, drive at trunk %.2f/%+.2f)", self.gp.variant, frm.name, to.name, dep.stand_off,
                              travel[0], travel[1])
                     return
                 except Reject as e:
                     whys.append(f"trunk {travel[0]:.2f}/{travel[1]:+.2f}: {e}")
                     self._drop_travel_records(frm.name, to.name)
-            log.info("%s: travel %s -> %s: straighten-first impossible (%s); driving at the departing trunk", self.gp.alias, frm.name, to.name, "; ".join(whys)[:600])
+            log.info("%s: travel %s -> %s: straighten-first impossible (%s); driving at the departing trunk", self.gp.variant, frm.name, to.name, "; ".join(whys)[:600])
         P0.connect(self, frm, to, path_max_m=float(self.gen("stance_path_max_m", 3.0)))
 
     def _drop_travel_records(self, frm: str, to: str) -> None:
@@ -1162,7 +1162,7 @@ class BlockDesign(SamplerV2):
             k_ = f"so{float(st.stand_off or 0):.2f}/sh{float(st.extras.get('block_stance_shift_m', 0.0)):+.2f}"
             by_key[k_] = by_key.get(k_, 0) + 1
         log.info("%s: stance pool: %d candidates, %d collision-free (%d with the right arm re-posed) over shifts %s, stand-offs %s, %d trunks; per (stand-off, shift): %s",
-                 self.gp.alias, len(raw), len(pool), n_reposed, shifts, stand_offs, len(trunks), by_key)
+                 self.gp.variant, len(raw), len(pool), n_reposed, shifts, stand_offs, len(trunks), by_key)
         if retry:
             # diagnostic: what the failing stances collide with - the blocks (parked away -> free) or the scene / self
             for o in objects:
@@ -1173,7 +1173,7 @@ class BlockDesign(SamplerV2):
             self._teleport(objects)
             sample = [f"so{float(st.stand_off or 0):.2f}/sh{float(st.extras.get('block_stance_shift_m', 0.0)):+.2f}/t{st.translate:.2f}/{st.tilt:+.2f}" for st in retry[:6]]
             log.info("%s: stance pool: %d stances rejected; %d of them collide only through the blocks (free with the blocks parked), the rest with the scene or "
-                     "themselves; e.g. %s", self.gp.alias, len(retry), n_blocks_only, sample)
+                     "themselves; e.g. %s", self.gp.variant, len(retry), n_blocks_only, sample)
         return pool
 
     def _rank_stances(self, pool: List[Stance], current: Stance, pick_pose: TT.Pose, place_pose: TT.Pose, flipping: bool) -> List[Stance]:
@@ -1302,7 +1302,7 @@ class BlockDesign(SamplerV2):
             rp = records[step].get("repose")
             if isinstance(rp, dict):
                 if prev is None or st1 is prev:
-                    log.warning("%s: block %d recorded a re-pose but no base move precedes it: dropped", self.gp.alias, step)
+                    log.warning("%s: block %d recorded a re-pose but no base move precedes it: dropped", self.gp.variant, step)
                     records[step].pop("repose")
                 else:
                     rp["from_stance"] = prev.name
@@ -1310,7 +1310,7 @@ class BlockDesign(SamplerV2):
                 if prev is not None and st is not prev and not self.sidecar_has_travel(prev.name, st.name):
                     self._teleport(world_before)
                     self._travel_between(prev, st)
-                    log.info("%s: block %d moves the base %s -> %s (%.2f m along the edge)", self.gp.alias, step, prev.name, st.name,
+                    log.info("%s: block %d moves the base %s -> %s (%.2f m along the edge)", self.gp.variant, step, prev.name, st.name,
                              float(th.dot(st.base_xy - prev.base_xy, prev.tangent)))
                 prev = st
         self._teleport({names[bi]: poses[bi] for bi in range(len(names))})
@@ -1386,7 +1386,7 @@ class BlockDesign(SamplerV2):
             b_cell = st.world_to_base(self._centre(poses[bi])[0][:2])
             b_slot = st.world_to_base(self._centre(goal_pose[bi])[0][:2])
             log.info("%s: block %s (%s) solved from stance %d of %d (shift %+.2f m, stand-off %.2f, trunk %.2f/%+.2f; cell base (%.2f, %+.2f), slot base (%.2f, %+.2f)) with %s",
-                     self.gp.alias, names[bi], "flip" if plans[bi]["flips"] else "pick", j, len(cands), float(st.extras.get("block_stance_shift_m", 0.0)), float(st.stand_off or 0.0),
+                     self.gp.variant, names[bi], "flip" if plans[bi]["flips"] else "pick", j, len(cands), float(st.extras.get("block_stance_shift_m", 0.0)), float(st.stand_off or 0.0),
                      st.translate, st.tilt, float(b_cell[0]), float(b_cell[1]), float(b_slot[0]), float(b_slot[1]), rec.get("grasp_class"))
             return rec, st
         kind = "flip" if plans[bi]["flips"] else "pick"
@@ -1429,7 +1429,7 @@ class BlockDesign(SamplerV2):
             raise Reject("repose_unplannable", f"block {names[bi]}: no joint-space plan from the {label} to the pre-grasp configuration "
                                                f"({getattr(res, 'status', '?')})")
         log.info("%s: block %s re-poses after the base move: joint-space plan from the %s to its pre-grasp configuration (%d waypoints)",
-                 self.gp.alias, names[bi], label, len(res.q_traj))
+                 self.gp.variant, names[bi], label, len(res.q_traj))
         return {"arm": "right", "target": "pre_grasp", "q": [round(float(v), 5) for v in q7], "pose": rec["pre_pick"], "planned_from": label}
 
     def _flip_classes(self, block, pick_pose: TT.Pose, place_pose: TT.Pose, plan: Dict[str, Any], table_yaw: float) -> List[Tuple[Any, ...]]:
@@ -1864,7 +1864,7 @@ class BlockDesign(SamplerV2):
                 key = d_.split(" ")[0] if d_.startswith(("in-place", "re-grasp", "direct")) else "direct"
                 stages.setdefault(key, []).append(d_)
             summary = "; ".join(f"{k_}: {len(v_)} failed, e.g. {' | '.join(x[:150] for x in v_[:3])}" for k_, v_ in stages.items())
-            log.info("%s: block %s from trunk %.2f/%+.2f so %.2f (shift %+.2f, left arm %s; cell base (%.2f, %+.2f), slot base (%.2f, %+.2f)%s): %d direct classes; %s", self.gp.alias,
+            log.info("%s: block %s from trunk %.2f/%+.2f so %.2f (shift %+.2f, left arm %s; cell base (%.2f, %+.2f), slot base (%.2f, %+.2f)%s): %d direct classes; %s", self.gp.variant,
                      names[bi], manip.translate, manip.tilt, float(manip.stand_off or 0.0), float(manip.extras.get("block_stance_shift_m", 0.0)), manip.idle_posture or "untucked",
                      float(b_cell[0]), float(b_cell[1]), float(b_slot[0]), float(b_slot[1]), f", yaw-align {plan['yaw_deg']:+.0f} deg" if plan["flips"] else "", len(screened), summary)
             raise Reject("place_unreachable" if any("place" in d_ or "carry" in d_ or "flip" in d_ for d_ in diag) else "grasp_unreachable",
@@ -2067,7 +2067,7 @@ class BlockDesign(SamplerV2):
         label1, pair1, g1, place1, pre_place1, wps1, clr1, lam1, own_xy, own_goal = leg1
         label2, pair2, g2, place2m, pre_pick2, pre_place2, clr2 = leg2
         if st_leg2 is not manip:
-            log.info("%s: block %s re-grasped from another stance (trunk %.2f/%+.2f, shift %+.2f)", self.gp.alias, names[bi], st_leg2.translate, st_leg2.tilt,
+            log.info("%s: block %s re-grasped from another stance (trunk %.2f/%+.2f, shift %+.2f)", self.gp.variant, names[bi], st_leg2.translate, st_leg2.tilt,
                      float(st_leg2.extras.get("block_stance_shift_m", 0.0)))
         rec = self._flip_in_place_record(manip, st_leg2, names, bi, block, plan, pick_pose, place_pose, own_goal, leg1, leg2, d_pick, carry, surface_z, step, goal_pose)
         rec["ignore_place"] = self._bddl_names([o for o in place_ignore if o is not support])
@@ -2250,7 +2250,7 @@ class BlockDesign(SamplerV2):
                                                           "pick_q": getattr(self, "_leg2_pick_q", None)}}}
         if st_leg2 is not manip:
             rec["_regrasp_stance_obj"] = st_leg2  # named + travel recorded by _register_stances, removed before the sidecar is written
-        log.info("%s: block %s flips in place with %s, re-grasped with %s (trunk %.2f/%+.2f, shift %+.2f)", self.gp.alias, names[bi], label1, label2, manip.translate, manip.tilt,
+        log.info("%s: block %s flips in place with %s, re-grasped with %s (trunk %.2f/%+.2f, shift %+.2f)", self.gp.variant, names[bi], label1, label2, manip.translate, manip.tilt,
                  float(manip.extras.get("block_stance_shift_m", 0.0)))
         return rec
 
@@ -2279,9 +2279,9 @@ class BlockDesign(SamplerV2):
                 out["not attached: plain ik pre (block ignored)"] = self.kit.ik(pre_place, q0, arm="right") is not None
                 with self.ikc.ignoring(others):
                     out["not attached: plain ik pre, all blocks ignored"] = self.kit.ik(pre_place, q0, arm="right") is not None
-            log.info("%s: PLACE_FACTORS %s", self.gp.alias, json.dumps(out))
+            log.info("%s: PLACE_FACTORS %s", self.gp.variant, json.dumps(out))
         except Exception as e:  # diagnostics only
-            log.info("%s: PLACE_FACTORS failed: %r", self.gp.alias, e)
+            log.info("%s: PLACE_FACTORS failed: %r", self.gp.variant, e)
 
     def _class_attachable(self, block, pair: str, tilt: float, clearance: float, eef_in_block: TT.Pose) -> bool:
         """Once per template per (face pair, tilt, tip clearance): whether the cube attached per this class's rigid
@@ -2294,7 +2294,7 @@ class BlockDesign(SamplerV2):
             cache[key] = bool(self.ikc.attachable(block, eef_in_block, "right"))
             if not cache[key]:
                 self.template_facts.setdefault("cube_classes_not_attachable", []).append(f"{pair}/t{tilt:+.0f}/c{clearance * 1000:.0f}mm")
-                log.info("%s: cube class %s/t%+.0f at %.0f mm tip clearance: attached cube self-collides with the gripper; dropped", self.gp.alias, pair, tilt, clearance * 1000)
+                log.info("%s: cube class %s/t%+.0f at %.0f mm tip clearance: attached cube self-collides with the gripper; dropped", self.gp.variant, pair, tilt, clearance * 1000)
         return cache[key]
 
     # ------------------------------------------------------------------ §6.5 flip-on-the-table (prep, ``generation.block_table_flip``)
@@ -2420,7 +2420,7 @@ class BlockDesign(SamplerV2):
                     if leg2 is None:
                         continue
                     goal_pose[bi] = (goal_pose[bi][0], q_end)
-                    log.info("%s: table flip for %s: yaw %+.0f deg then quarter turn about %s (%+.0f), intermediate cell base %s", self.gp.alias, names[bi],
+                    log.info("%s: table flip for %s: yaw %+.0f deg then quarter turn about %s (%+.0f), intermediate cell base %s", self.gp.variant, names[bi],
                              math.degrees(psi) + k * 90.0, ax, sgn * 90.0, [round(float(v), 2) for v in manip.world_to_base(cell).tolist()])
                     leg1["kind"], leg2["kind"] = "intermediate (yaw first)", "slot (quarter turn)"
                     return [leg1, leg2]
@@ -2473,9 +2473,9 @@ class BlockDesign(SamplerV2):
                 rec["grasp_ok_without_neighbours"] = int(ok_g_nn.sum())
             if extra:
                 rec.update(extra)
-            log.info("%s: PICK_FAILURE %s", self.gp.alias, json.dumps(rec, default=str))
+            log.info("%s: PICK_FAILURE %s", self.gp.variant, json.dumps(rec, default=str))
         except Exception as e:  # noqa: BLE001 - diagnostics must never change the sampling outcome
-            log.info("%s: PICK_FAILURE logging failed: %r", self.gp.alias, e)
+            log.info("%s: PICK_FAILURE logging failed: %r", self.gp.variant, e)
 
     def _carry_height(self) -> float:
         return 2.0 * self.edge + 0.03
@@ -2645,7 +2645,7 @@ class BlockDesign(SamplerV2):
                 why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
                 continue
             log.info("%s: puzzle board %s at base (%.2f, %+.2f): pitch %.1f mm, seat %.1f mm, rim %.0f mm over the floor, release bias %.1f mm; %d cells clear (%s)",
-                     self.gp.alias, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,
+                     self.gp.variant, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,
                      float(geo["rim_top_above_floor_m"]) * 1000, float(self.gen("board_release_bias_m", 0.0035)) * 1000, len(kept), "; ".join(why) or "first candidate")
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
@@ -2758,7 +2758,7 @@ class BlockDesign(SamplerV2):
         ranked = self._rank_stances(pool, current, grid_root, grid_root, False)
         stances = [current] + [manip] + [st for st in ranked if st is not current and st is not manip]
         if self._has_board():
-            raise Reject("spec", "the puzzle board seats the blocks in its pockets - generation.block_pack_tail must be false for the board alias")
+            raise Reject("spec", "the puzzle board seats the blocks in its pockets - generation.block_pack_tail must be false for the board variant")
         seen = set()
         tried: List[str] = []
         for st in stances[: int(self.gen("pack_max_stances", 6))]:
@@ -2783,7 +2783,7 @@ class BlockDesign(SamplerV2):
                 why1 = f"{why1}; mirrored: {why1b}"
             if st1 is None:
                 tried.append(f"{tag_st}: columns: {why1}")
-                log.info("%s: pack @ %s: columns failed: %s", self.gp.alias, tag_st, why1[:700])
+                log.info("%s: pack @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:700])
                 continue
             for nm, dxy in moved1:  # the world after stage 1: the pushed cubes moved
                 world[nm] = (world[nm][0] + dxy, world[nm][1])
@@ -2805,9 +2805,9 @@ class BlockDesign(SamplerV2):
                     why2 = f"{why2}; mirrored far: {why2c}; mirrored near: {why2d}"
             if st2 is None:
                 tried.append(f"{tag_st}: rows: {why2}")
-                log.info("%s: pack @ %s: columns ok (%s), rows failed: %s", self.gp.alias, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", why2[:900])
+                log.info("%s: pack @ %s: columns ok (%s), rows failed: %s", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", why2[:900])
                 continue
-            log.info("%s: packing tail from %s: columns %s; rows: %s (%s)", self.gp.alias, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", which,
+            log.info("%s: packing tail from %s: columns %s; rows: %s (%s)", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", which,
                      st2["brace"]["pose_class"] if st2.get("brace") else "push only")
             self._teleport(world0)
             return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "far" if which.startswith("far") else "near"}, st
@@ -2820,7 +2820,7 @@ class BlockDesign(SamplerV2):
                 tag_st = f"{st.name} (trunk {st.translate:.2f}/{st.tilt:+.2f}, so {float(st.stand_off or 0.0):.2f}, shift {float(st.extras.get('block_stance_shift_m', 0.0)):+.2f})"
                 st1, why1 = self._pack_stage("columns_push_only", world, [], pushes, -right, right, st, support)
                 if st1 is None:
-                    log.info("%s: pack (push only) @ %s: columns failed: %s", self.gp.alias, tag_st, why1[:500])
+                    log.info("%s: pack (push only) @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:500])
                     continue
                 for nm, dist in pushes:
                     world[nm] = (world[nm][0] - _xy3(right) * dist, world[nm][1])
@@ -2831,9 +2831,9 @@ class BlockDesign(SamplerV2):
                     st2, why2b = self._pack_stage("rows_push_only_pull", world, [], far_pushes, toward, -toward, st, support)
                     which = "far row pulled toward the robot, no brace"
                     if st2 is None:
-                        log.info("%s: pack (push only) @ %s: rows failed: %s; pull: %s", self.gp.alias, tag_st, why2[:400], why2b[:400])
+                        log.info("%s: pack (push only) @ %s: rows failed: %s; pull: %s", self.gp.variant, tag_st, why2[:400], why2b[:400])
                         continue
-                log.info("%s: packing tail (push only) from %s: %s", self.gp.alias, tag_st, which)
+                log.info("%s: packing tail (push only) from %s: %s", self.gp.variant, tag_st, which)
                 self._teleport(world0)
                 return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "none", "push_only": True}, st
         self._teleport(world0)
@@ -3110,7 +3110,7 @@ class BlockDesign(SamplerV2):
             chosen = (p_chosen.proposal.chain[0], push_init, push_goal, b_chosen.proposal.chain[0], b, b_a_vec, f"{p_name}+{b_name}", p_half, b_half)
             p_orient, b_orient = _orient_extra(p_dec), _orient_extra(b_dec)
         if chosen is None:
-            log.info("%s: %s brace / push of %s skipped: %s", self.gp.alias, kind, pushed, (sorted(set(brace_fails)) or sorted(set(push_fails)))[:2])
+            log.info("%s: %s brace / push of %s skipped: %s", self.gp.variant, kind, pushed, (sorted(set(brace_fails)) or sorted(set(push_fails)))[:2])
             return "brace_ik_failed" if brace_fails else "push_ik_failed"
         push_pre, push_init, push_goal, brace_pre, brace, brace_a, used, p_half, b_half = chosen
         rec[f"push_{kind}"] = annotate_height_extra(ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed), self).to_sidecar()
@@ -3136,7 +3136,7 @@ class BlockDesign(SamplerV2):
             if not optional:
                 raise
             log.warning("%s: program check asks for the brace / push tail of a brace-less block (%s); recorded as stub-brace-optional (ISG_PROGRAM_CHECK=stub)",
-                        self.gp.alias, msg[:200])
+                        self.gp.variant, msg[:200])
             report = {"mode": "stub-brace-optional", "problems": [], "note": "brace-less blocks not yet accepted by the oracle program; structural check skipped", "error": msg[:300]}
             self.last_program_check = report
             draft.summary["program_check"] = report

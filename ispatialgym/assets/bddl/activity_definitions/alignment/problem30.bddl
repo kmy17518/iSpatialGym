@@ -1,6 +1,6 @@
 (define (problem alignment-30)
     (:domain ispatialgym)
-    (:alias alignment-world_vertical-paper_towel_dispenser-walls)
+    (:variant alignment-world_vertical-paper_towel_dispenser-walls)
 
     ; ground_isg 2.0.0: alignment-world_vertical-paper_towel_dispenser-walls (alignment/world_vertical.iddl; alignment-world_vertical#03~T5/representative)
     ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute

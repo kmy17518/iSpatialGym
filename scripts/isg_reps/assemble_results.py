@@ -6,9 +6,9 @@
 Reads every collected pod directory (``<src>/<pod name>/<job id>/...`` from ``collect.py``; falls back to
 ``<src>/live/<pod>`` for jobs not collected yet) and writes into ``<out>``:
 
-* ``instances.csv`` - one row per written instance: subtask, alias, pick, slot, job id, pod, instance id, template id,
+* ``instances.csv`` - one row per written instance: subtask, variant, pick, slot, job id, pod, instance id, template id,
   scene, path (relative to ``<src>``), demo status / reason / errors when a run_isg run exists;
-* ``jobs.csv`` - one row per job: subtask, alias, job id, pod, rc, wall s, n_written, rejections (JSON), error;
+* ``jobs.csv`` - one row per job: subtask, variant, job id, pod, rc, wall s, n_written, rejections (JSON), error;
 * ``demos.csv`` - one row per run_isg run (meta.json): instance, status, success, reason, steps, wall, video path;
 * ``summary.md`` - per-subtask table (jobs, jobs with instances, instances, demos success / QA-failed / no_oracle,
   top rejections) + the list of picks without any instance (with the rejection reasons).
@@ -69,12 +69,12 @@ def main():
                                 err = str(t["error"])[:300]
             prev = job_rows.get(jid)
             if prev is None or nw > int(prev["n_written"]):
-                job_rows[jid] = {"subtask": j.get("subtask", ""), "alias": j.get("alias", ""), "job": jid, "pod": pod, "rc": rc, "wall_s": wall,
+                job_rows[jid] = {"subtask": j.get("subtask", ""), "variant": j.get("variant", ""), "job": jid, "pod": pod, "rc": rc, "wall_s": wall,
                                  "n_written": nw, "rejections": json.dumps(rej, sort_keys=True), "error": err}
             for tro in glob.glob(os.path.join(pod_dir, jid, "*", "*", "instances", "*-tro_state.json")):
                 iid = os.path.basename(tro)[: -len("-tro_state.json")]
                 tdir = os.path.dirname(os.path.dirname(tro))
-                inst_rows[iid] = {"subtask": j.get("subtask", ""), "alias": j.get("alias", ""), "pick": "", "slot": j.get("slot", ""), "job": jid, "pod": pod,
+                inst_rows[iid] = {"subtask": j.get("subtask", ""), "variant": j.get("variant", ""), "pick": "", "slot": j.get("slot", ""), "job": jid, "pod": pod,
                                   "instance": iid, "template": os.path.basename(tdir), "scene": os.path.basename(tdir).split("__")[0],
                                   "path": os.path.relpath(tro, args.src), "demo_status": "", "demo_reason": "", "demo_success": "", "demo_errors": ""}
         for meta in glob.glob(os.path.join(pod_dir, "demo__*", "*", "meta.json")) + glob.glob(os.path.join(pod_dir, "*", "*", "*", "runs", "*", "meta.json")):
@@ -102,9 +102,9 @@ def main():
             for r in rows:
                 w.writerow({k: r.get(k, "") for k in cols})
 
-    write("jobs.csv", sorted(job_rows.values(), key=lambda r: (r["subtask"], r["job"])), ["subtask", "alias", "job", "pod", "rc", "wall_s", "n_written", "rejections", "error"])
+    write("jobs.csv", sorted(job_rows.values(), key=lambda r: (r["subtask"], r["job"])), ["subtask", "variant", "job", "pod", "rc", "wall_s", "n_written", "rejections", "error"])
     write("instances.csv", sorted(inst_rows.values(), key=lambda r: (r["subtask"], r["instance"])),
-          ["subtask", "alias", "pick", "slot", "job", "pod", "instance", "template", "scene", "path", "demo_status", "demo_success", "demo_reason", "demo_errors"])
+          ["subtask", "variant", "pick", "slot", "job", "pod", "instance", "template", "scene", "path", "demo_status", "demo_success", "demo_reason", "demo_errors"])
     write("demos.csv", sorted(demo_rows.values(), key=lambda r: r["instance"]), ["instance", "status", "success", "reason", "n_steps", "wall_s", "oracle", "video", "meta"])
     # summary
     by = collections.defaultdict(lambda: collections.Counter())

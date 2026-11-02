@@ -8,7 +8,7 @@ simulator; nothing is imported, the sources are parsed).
 2. Lab-owned files (failure when they differ from ``--base`` in the working tree): the vectorized modules come from
    ``lab-vec-eval`` only; a merge must not change them.
 3. Drift (report): every function / method / class the vectorized modules and the evaluation-path lab tools take from
-   ``ispatialgym`` (their imports and ``alias.attr`` uses, plus the patched / re-implemented methods), compared between
+   ``ispatialgym`` (their imports and ``variant.attr`` uses, plus the patched / re-implemented methods), compared between
    ``--base`` (default ``origin/lab-vec-eval``) and the target (the working tree, or ``--target REF``) on the AST with
    docstrings stripped. A changed method that a vectorized class overrides (``VecISpatialGymTask``, ``SlotLoader``) or
    re-implements (``VecStreamExecutor``, ``VecInstanceLoader``, the patches' ``Monitors.check`` / ``Executor.epilogue``) is

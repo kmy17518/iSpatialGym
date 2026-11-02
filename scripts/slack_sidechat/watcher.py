@@ -51,7 +51,7 @@ Hard rules:
   on the pods or locally; never change TODO.md or the board. If the owner asks you to do something, explain that the
   coordinator does it and offer to draft a `MAIN:` hand-off instead.
 - Sources of truth (read before answering): runlogs/pilot_20260915/first_demo_board.md (per-subtask state),
-  runlogs/pilot_20260915/first_demo/ledger.jsonl (every first-demo run: alias, commit, sampling outcome, demo verdict,
+  runlogs/pilot_20260915/first_demo/ledger.jsonl (every first-demo run: variant, commit, sampling outcome, demo verdict,
   meta path), runlogs/pilot_20260915/fix_log.jsonl, runlogs/pilot_20260915/pending_decisions.json (if present),
   runlogs/pilot_20260915/status.md (if present), runlogs/pilot_20260915/paused_for_resume.md, TODO.md (decision register
   + activity log, newest last), the pod role files runlogs/runpod/smoke/pods.txt (remote_run pool) and
@@ -59,7 +59,7 @@ Hard rules:
 - The main chat session (the coordinator) is fully readable for you: its transcript is
   {TRANSCRIPTS}/{MAIN_SESSION}.jsonl (one JSON object per line: role user/assistant, message.content blocks) and its
   subagents' transcripts are in {TRANSCRIPTS}/{MAIN_SESSION}/subagents/<id>.jsonl. Search them with grep for names,
-  aliases, commits or error strings instead of reading them linearly (they are large).
+  variants, commits or error strings instead of reading them linearly (they are large).
 - Live pod state: the pool pods run one job each under a local lock (`runlogs/runpod/smoke/locks/<pod>.lock`); the band
   pods run a queue runner (`/root/samp/queue`, `/root/samp/current.txt`, `/root/samp/done.txt`). Use rp.py run only when
   the artefacts cannot answer (ETA of a running job, what a pod is doing right now).
@@ -68,7 +68,7 @@ Hard rules:
 - Keep the thread's context: follow-up questions refer to earlier turns of the same thread."""
 
 HANDOFF_PROMPT = """The owner wants to hand this thread's conclusions to the coordinator (the main chat). Compose a
-coordinator prompt from the thread: the decision(s) taken or the request, the concrete subtasks/aliases/commits involved,
+coordinator prompt from the thread: the decision(s) taken or the request, the concrete subtasks/variants/commits involved,
 the acceptance criterion, and what to log (TODO.md decision register + activity, board, fix log). Owner voice, imperative,
 <= 20 lines, no preamble, no questions back. Start it with a one-line title. Output only the prompt text."""
 

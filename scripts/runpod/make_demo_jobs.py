@@ -65,7 +65,7 @@ def main():
         did = f"demo__{jid}"
         if did in known:
             continue
-        per_pod[d["pod"]].append({"id": did, "cmd": CMD.format(jid=jid), "weight": 1.0, "subtask": j["subtask"], "slot": j["slot"], "alias": j["alias"],
+        per_pod[d["pod"]].append({"id": did, "cmd": CMD.format(jid=jid), "weight": 1.0, "subtask": j["subtask"], "slot": j["slot"], "variant": j["variant"],
                                   "source_job": jid})
     total = 0
     for pod, js in per_pod.items():

@@ -127,8 +127,8 @@ def main(argv=None) -> int:
                 loader.share(shared)
             shared["loader"] = loader
             loader.restore()
-            rec["alias"] = loader.tmeta.get("alias")
-            if GO.exempt(rec["alias"]):
+            rec["variant"] = loader.tmeta.get("variant")
+            if GO.exempt(rec["variant"]):
                 rec["skipped"] = "no target / partner"
             else:
                 rec.update(predict(loader, summary, raw))

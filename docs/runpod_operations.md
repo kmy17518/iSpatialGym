@@ -61,7 +61,7 @@ never put the word `watchdog` after `rp.py` in the same command line as that `pg
 
 ```bash
 python scripts/runpod/remote_run.py --timeout 5400 --pull '$SMOKE_OUT' runlogs/<experiment>/<run>/ -- \
-  'python -m ispatialgym.sampling.sample_isg --alias <A> --templates 1 --instances-per-template 1 --max-attempts 8 --seed 0 --no-write-back --out $SMOKE_OUT/inst; \
+  'python -m ispatialgym.sampling.sample_isg --variant <A> --templates 1 --instances-per-template 1 --max-attempts 8 --seed 0 --no-write-back --out $SMOKE_OUT/inst; \
    tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json | head -1); python -m ispatialgym.oracle.run_isg --instance "$tro" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540'
 ```
 
@@ -78,7 +78,7 @@ ssh before releasing the lock — so cancelling a run means signalling `remote_r
 
 ## 5. `first_demo.py` and `pod_scheduler.py`
 
-`first_demo.py run --alias A [--scene S] [--max-attempts 8] [--timeout 7200] [--local] [--note ..]` = sample one instance + oracle demo on a
+`first_demo.py run --variant A [--scene S] [--max-attempts 8] [--timeout 7200] [--local] [--note ..]` = sample one instance + oracle demo on a
 pool pod (or `--local` on the 4090: one at a time, ≥ 12 GB free), ledger row in `runlogs/pilot_20260915/first_demo/ledger.jsonl`, board
 regenerated; `demo-only --tro <tro>`; `fix --commit <sha> --subtasks .. --what .. --owner .. [--kind fix|facts|note|icl]`; `board`.
 Validity = success + every *targeted* fix (< 6 subtasks) affecting the subtask in the run's commit (D-005; blanket entries → `valid (pre-<sha>)`,
@@ -86,7 +86,7 @@ final sweep at the end).
 
 `pod_scheduler.py loop --interval 300` (one instance; `tick [--dry-run]` for one pass) keeps pods busy: reads the pool locks and the band
 pods' state (`/root/samp/running/*.job` = in progress), maintains `runlogs/pilot_20260915/ready_queue.json` (a subtask enters when every fix
-affecting it is in HEAD and its last run lacks the newest targeted one; `add --alias .. --priority N [--scene S] [--local] [--kind demo-only --tro ..]`
+affecting it is in HEAD and its last run lacks the newest targeted one; `add --variant .. --priority N [--scene S] [--local] [--kind demo-only --tro ..]`
 adds explicitly; `hold --subtask S --reason ..` / `release` for owner decisions — a targeted fix logged after a hold lifts it), launches one
 `first_demo.py` per free pool pod (one per subtask per tick; in-flight runs of any agent are detected by `pgrep`), refills idle band pods from
 `runlogs/reach_bands_20260915/active_manifests.txt` (one job per pod, via `fleet_remaining.py` + `dispatch_samp.py`, never `--rebalance`),
@@ -123,7 +123,7 @@ runners exit when their queue is empty → `/root/JOB_DONE` → `collect.py --pu
 - Band: `/root/samp/running/*.job` exists ⇔ a job is in progress. **`current.txt` is stale between jobs** (written at start, cleared only
   at `CLOSE`) and `done.txt` keeps earlier attempts of a re-queued job — never read idleness from them.
 - On the pod: `ps -eo pid,etimes,args | grep -E 'sample_is[g]|run_is[g]|reach_band[s]'`, `nvidia-smi --query-compute-apps=pid,used_memory --format=csv`.
-- An orphan = a pod-side simulator with no live local `remote_run` holding that pod's lock; kill it with `pkill -KILL -f '<run id or alias>[x]'`
+- An orphan = a pod-side simulator with no live local `remote_run` holding that pod's lock; kill it with `pkill -KILL -f '<run id or variant>[x]'`
   using the bracket trick, after pulling its `/root/smoke/<run id>`.
 
 ## 8. Terminate safely

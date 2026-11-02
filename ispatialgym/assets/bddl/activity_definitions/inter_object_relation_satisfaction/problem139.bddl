@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-139)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat)
+    (:variant inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat)
 
     ; owner 2026-10-12 ~20:55: under_large push-under variant 'flat' - problem117 copied for inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#02/representative)

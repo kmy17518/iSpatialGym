@@ -8,12 +8,12 @@ saving) is the next stage and needs the resets listed in the engineering notes. 
 (``run_isg`` ``meta.start_state``), and a pristine copy of the TRO and its sidecar is kept before the demo (a successful demo
 rewrites the TRO's targets and the sidecar's sha): ``<iid>_pristine-tro_state.json`` / ``<iid>_pristine.oracle.json`` next to them,
 which a fresh process loads with ``run_isg --load-only`` for the comparison (``scripts/isg/start_state_compare.py``). Release evidence
-stays on the two-process chain until that comparison has passed on a representative alias set.
+stays on the two-process chain until that comparison has passed on a representative variant set.
 
 The stdout markers are the chain's (``SAMPLING_REPORT``, ``SAMPLE_EXIT``, ``TRO=``, ``RUN_ISG_RESULT``, ``DEMO_EXIT``); the output
 layout under ``$SMOKE_OUT`` is the chain's plus ``warm_timings.json``.
 
-usage: SMOKE_OUT=<dir> python scripts/isg/warm_task.py --alias A [--scene S] [--customs C] [--max-attempts N] [--seed 0]
+usage: SMOKE_OUT=<dir> python scripts/isg/warm_task.py --variant A [--scene S] [--customs C] [--max-attempts N] [--seed 0]
                                                        [--run-isg-args "--dev"] [--sample-only]
 """
 import argparse
@@ -43,7 +43,7 @@ def pristine_copy(tro: str) -> str:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--alias", required=True)
+    p.add_argument("--variant", required=True)
     p.add_argument("--scene", default=None)
     p.add_argument("--customs", default=None)
     p.add_argument("--max-attempts", type=int, default=8)
@@ -56,7 +56,7 @@ def main(argv=None) -> int:
     t0 = time.time()
     from ispatialgym.sampling import sample_isg
 
-    s_argv = ["--alias", args.alias, "--templates", "1", "--instances-per-template", "1", "--max-attempts", str(args.max_attempts), "--seed", str(args.seed),
+    s_argv = ["--variant", args.variant, "--templates", "1", "--instances-per-template", "1", "--max-attempts", str(args.max_attempts), "--seed", str(args.seed),
               "--no-write-back", "--out", os.path.join(out, "inst"), "--log-level", "INFO"]
     if args.scene:
         s_argv += ["--scene", args.scene]

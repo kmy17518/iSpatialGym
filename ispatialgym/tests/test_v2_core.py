@@ -21,7 +21,7 @@ from ispatialgym.sampling.v2.problem import (
     draw_group,
     iter_template_choices,
     new_run_summary,
-    subtask_of_alias,
+    subtask_of_variant,
     template_summary,
 )
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, PathRecord, SidecarDraft, Stance, Transition, path_length
@@ -60,10 +60,10 @@ def _problem(entry, lookalikes=None):
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def test_subtask_of_alias():
-    assert subtask_of_alias("inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table") == "inter_object_relation_satisfaction-ontop_small_scale"
-    assert subtask_of_alias("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
-    assert subtask_of_alias("x", "inter_object_relation_satisfaction/nextto.iddl") == "inter_object_relation_satisfaction-nextto"
+def test_subtask_of_variant():
+    assert subtask_of_variant("inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table") == "inter_object_relation_satisfaction-ontop_small_scale"
+    assert subtask_of_variant("configuration_matching-block_design-block_4-breakfast_table") == "configuration_matching-block_design"
+    assert subtask_of_variant("x", "inter_object_relation_satisfaction/nextto.iddl") == "inter_object_relation_satisfaction-nextto"
 
 
 def test_cycler_iterates_all_models_before_reuse():
@@ -142,7 +142,7 @@ def test_group_draw_same_model_and_unique():
     assert "targets[0]" in t.choices
 
 
-def test_group_members_per_category_follow_the_alias():
+def test_group_members_per_category_follow_the_variant():
     # D1 mixed-category groups: ``members`` fixes the count per category (the grounded BDDL declares exactly those)
     entry = _entry(["a"], ["p"], groups={"distractors": {"size": 3, "draw": "unique", "members": {"bottle_of_beer": 2, "bottle_of_sake": 1}}})
     entry["roles"]["distractors"] = {"category": ["bottle_of_beer", "bottle_of_sake"], "sampleable": True}
@@ -156,7 +156,7 @@ def test_group_members_per_category_follow_the_alias():
         assert len({m.model for m in members}) == 3
     t = next(iter_template_choices(gp, "house_single_floor", rng))
     assert "distractors-bottle_of_beer_2-bottle_of_sake_1" in t.template_id
-    assert subtask_of_alias("configuration_matching-articulation_open_large_scale-bottom_cabinet") == "configuration_matching-articulation_open_large_scale"
+    assert subtask_of_variant("configuration_matching-articulation_open_large_scale-bottom_cabinet") == "configuration_matching-articulation_open_large_scale"
 
 
 def test_stance_sidecar_keeps_extras_and_recorded_configuration():
@@ -184,7 +184,7 @@ def test_constraint_records_and_scope_query():
 
 def test_v1_facade_roles_and_scene_view():
     gp = _problem(_entry(["a"], ["p"]))
-    assert gp.activity == "inter_object_relation_satisfaction" and gp.name == gp.alias
+    assert gp.activity == "inter_object_relation_satisfaction" and gp.name == gp.variant
     assert {r.name for r in gp.spawned_roles()} == {"target", "partner"}
     assert {r.name for r in gp.fixed_roles()} == {"support", "floor"}
     ss = gp.scenes["house_single_floor"]
@@ -523,7 +523,7 @@ def test_edge_frame_and_stance_local_world_roundtrip():
 
 
 def test_sidecar_draft_layout(tmp_path):
-    sd = SidecarDraft("alias-x", "inter_object_relation_satisfaction")
+    sd = SidecarDraft("variant-x", "inter_object_relation_satisfaction")
     edge = EdgeFrame.from_edge("+u", [1.0, 0.0], [1.0, 0.0], 1.6)
     init = Stance("init", (1.45, 0.0, math.pi), 0.5, 0.0, 0.45, edge)
     manip = Stance("manipulation", (1.35, 0.0, math.pi), 0.75, -0.4, 0.35, edge, focus=th.tensor([0.7, 0.0, 0.83]), arms=["right"])
@@ -631,7 +631,7 @@ def test_program_check_held_start_heads_the_chain():
 def test_program_check_tracker_handle_grasp_carries_nothing():
     """Large articulation (Rs_int drawer bamfsz_1): a kind="handle" grasp must not set ``carried`` - the cabinet stays in the
     world, only its handle link follows the hand; library / cube grasps carry their object until the place."""
-    sd = SidecarDraft("alias", "configuration_matching")
+    sd = SidecarDraft("variant", "configuration_matching")
     sd.add_stance(Stance("init", (0.0, 0.0, 0.0), 0.5))
     tr = PC._Tracker(sd)
 
@@ -654,7 +654,7 @@ def test_program_check_tracker_locks_the_brace_arm_until_its_retreat():
     """Owner 2026‑09‑16 22:55 item 3 (wall horizontal 0916‑212037: push witnesses solved with the brace arm at zeros ran the
     push arm through the braced arm): after a ``brace`` the bracing arm is locked at its contact witness for every action
     of the other arm (push, the push arm's retreat); its own retreat releases it; the acting arm is never locked."""
-    sd = SidecarDraft("alias", "alignment")
+    sd = SidecarDraft("variant", "alignment")
     sd.add_stance(Stance("init", (0.0, 0.0, 0.0), 0.5))
     tr = PC._Tracker(sd)
 
@@ -929,7 +929,7 @@ def test_transition_resweep_never_lowers_the_recorded_standoff():
     to = Stance("manipulation", (1.5, 0.5, math.pi / 2), 0.5, 0.0, 0.5, edge=edge)  # base 0.5 m in front of the edge
 
     class Fake:
-        sidecar = SidecarDraft("alias", "alignment")
+        sidecar = SidecarDraft("variant", "alignment")
 
     # no path recorded: the path ends at the stance -> s
     assert SamplerV2.path_end_standoff(Fake, Stance("init", (0.0, 0.0, 0.0), 0.5), to) == 0.5
@@ -962,7 +962,7 @@ def test_sample_isg_blacklist_after_failure_and_exclusion(tmp_path):
     out2 = blacklist_after_failure(gp, choice, {"rejections": {}, "reject_reason": "no_free_edge"})
     assert len(out2) == 2 and gp.whitelist("house_single_floor", "partner") == {"plate": [m for m in ["p", "q"] if m != choice.models["partner"].model]}
     # templates already on disk are excluded from the draw
-    d = tmp_path / gp.alias / choice.template_id
+    d = tmp_path / gp.variant / choice.template_id
     d.mkdir(parents=True)
     (d / "template_meta.json").write_text(json.dumps({"scene": "house_single_floor", "choice": choice.to_json()}))
     excl = _existing_templates(str(tmp_path), gp, "house_single_floor")
@@ -1054,7 +1054,7 @@ def test_rejection_log_and_summary_layout():
     entry2 = template_summary(0, 1.0, rl)
     assert entry2["counters"] == {"scene_reset": 3} and "scene_reset" not in entry2["rejections"]
     run = new_run_summary("2.0.0-dev", "customs.json", "/tmp/out")
-    run["problems"].setdefault("alias", {})["scene__target-apple-a"] = entry
+    run["problems"].setdefault("variant", {})["scene__target-apple-a"] = entry
     # the layout bench_report.py reads: problems.<problem>.<template>.{n_written, time_s}
     for temps in run["problems"].values():
         for e in temps.values():
@@ -1473,7 +1473,7 @@ def test_choose_departure_arms_records_the_first_free_candidate_on_every_leg(mon
     """The empty-handed travel after a retreat: the arm as left is tried first, then lifted 5 / 10 cm; the first candidate that
     sweeps every leg free is written as ``arms_q`` on the path and the transitions (sampler records + the oracle-side objects)
     and the tracker keeps the arm's configuration through the travel."""
-    sd = SidecarDraft("alias", "configuration_matching")
+    sd = SidecarDraft("variant", "configuration_matching")
     sd.add_stance(Stance("manipulation_2", (0.0, 0.0, 0.0), 0.75, -0.3, 0.45))
     sd.add_stance(Stance("manipulation_3", (0.0, -0.07, 0.0), 0.75, -0.3, 0.45))
     dep = sd.add_transition(Transition("manipulation_2", "manipulation_3", 0.55, trunk_from=(0.75, -0.3), trunk_to=(0.75, 0.0), at="departure"))
@@ -1530,7 +1530,7 @@ def test_choose_departure_arms_records_the_first_free_candidate_on_every_leg(mon
     tracker.note_arm_end(Side(name="navigate", path=Side(frm="x", to="y", extra={})), None)
     assert tracker.arm_end_q == {}
     # no candidate free: the records stay as swept (no arms_q), the choice says so
-    sd2 = SidecarDraft("alias", "configuration_matching")
+    sd2 = SidecarDraft("variant", "configuration_matching")
     sd2.add_stance(Stance("manipulation_2", (0.0, 0.0, 0.0), 0.75, -0.3, 0.45))
     sd2.add_stance(Stance("manipulation_3", (0.0, -0.07, 0.0), 0.75, -0.3, 0.45))
     path2 = sd2.add_path(PathRecord("manipulation_2", "manipulation_3", "local", [(-0.1, 0.0, 0.0), (-0.1, -0.07, 0.0)], 0.07))
@@ -1553,7 +1553,7 @@ def test_choose_departure_arms_keeps_an_arriving_stance_that_holds_the_next_pre_
     """A push-close re-stance records the fist at its next pre-contact (``stance.q``): the travel arriving there keeps the stance's
     recorded arms (no departure candidate, the records untouched), so the arm goes straight to the next contact; arriving arms that
     do not reach the next push's pre-contact (a posture) leave the departure choice as it was."""
-    sd = SidecarDraft("alias", "configuration_matching")
+    sd = SidecarDraft("variant", "configuration_matching")
     sd.add_stance(Stance("manipulation", (0.0, 0.0, 0.0), 0.25, -0.3, 0.45))
     st2 = sd.add_stance(Stance("manipulation2", (0.0, 0.1, 0.0), 0.25, -0.3, 0.45))
     tr = sd.add_transition(Transition("manipulation", "manipulation2", 0.45))
@@ -1605,15 +1605,15 @@ def test_record_arms_q_reads_the_oracle_side_record():
 def test_instance_id_stays_within_the_file_name_limit():
     from ispatialgym.sampling.tasks.base import INSTANCE_ID_MAX, make_instance_id
 
-    alias = "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-breakfast_table"
+    variant = "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_coconut_milk_1-breakfast_table"
     tpl = "house_single_floor__destination-tray-hvlfig__source-tray-uekqey__target-bottle_of_milk-mrejrs__distractors-bottle_of_coconut_milk_1-bottle_of_milk_2"
-    short = make_instance_id("alias", "tpl", 3)
-    assert short == "alias__tpl__0003"
-    iid = make_instance_id(alias, tpl, 0)
+    short = make_instance_id("variant", "tpl", 3)
+    assert short == "variant__tpl__0003"
+    iid = make_instance_id(variant, tpl, 0)
     assert len(iid.encode()) <= INSTANCE_ID_MAX and len((iid + "-tro_state.json").encode()) <= 255
-    assert iid.split("__")[0] == alias and iid.endswith("__0000")
-    assert iid == make_instance_id(alias, tpl, 0)  # deterministic
-    assert make_instance_id(alias, tpl + "-bottle_of_milk_3", 0) != iid  # distinct templates keep distinct ids
+    assert iid.split("__")[0] == variant and iid.endswith("__0000")
+    assert iid == make_instance_id(variant, tpl, 0)  # deterministic
+    assert make_instance_id(variant, tpl + "-bottle_of_milk_3", 0) != iid  # distinct templates keep distinct ids
 
 
 def test_flipped_push_chain_check_rejects_only_a_witness_in_another_branch():
@@ -1671,7 +1671,7 @@ def _budget_sampler(outcomes):
     s.objects, s.counters, s.template_meta, s.rejections, s.instance_seeds = {}, {}, {}, {}, []
     s.template_paths = None
     s.ikc = SimpleNamespace(solutions={}, attempt=None)
-    s.gp = SimpleNamespace(alias="alias-test")
+    s.gp = SimpleNamespace(variant="variant-test")
     s.rejection_log = SimpleNamespace(add=noop, counts={})
     s.sample = sample
     for name in ("park_robot", "apply_draft", "settle_and_validate", "check_stances_with_objects", "check_goal_feasible", "after_goal_check",

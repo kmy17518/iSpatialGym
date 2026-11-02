@@ -1,6 +1,6 @@
 (define (problem object_scaling-1)
     (:domain ispatialgym)
-    (:alias object_scaling-bottle_of_pop)
+    (:variant object_scaling-bottle_of_pop)
 
     ; ground_isg 2.0.0: object_scaling-bottle_of_pop (object_scaling/object_scaling.iddl; object_scaling#02/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of

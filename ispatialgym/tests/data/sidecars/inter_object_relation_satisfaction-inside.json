@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__house_single_floor__target-brussels_sprouts-mbkrxe__partner-bowl-belcml__0000",
   "tro_sha256": "8a7e641e2f69757787c804fb256eea42e7cef3ed2640ebc6443fd39725f9f2e8",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

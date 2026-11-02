@@ -84,7 +84,7 @@ def _sampler(gen=None, partner=None, **extra):
     g = dict(gen or {})
     fields = dict(shelf_start=None, relation="touching", hull={"target": IUCSHM_S080, "partner": DKHGXN if partner is None else partner},
                   world=SimpleNamespace(hull_at=_hull_at), gen=lambda key, default=None: g.get(key, default), tol=lambda key, default=None: default,
-                  pair={"g_NT": 0.0584}, gp=SimpleNamespace(alias=BAR))
+                  pair={"g_NT": 0.0584}, gp=SimpleNamespace(variant=BAR))
     fields.update(extra)
     s = SimpleNamespace(**fields)
     for name in ("touching_points", "touching_brace_candidates", "wide_stop_spread", "brace_tip_heights", "brace_open_rule", "_open_brace_candidates",
@@ -308,7 +308,7 @@ def test_touching_contacts_rejects_a_wide_face_without_the_open_stop():
     assert draft3.summary["brace"]["present"] is False and draft3.summary["touching"]["brace_open_when_wide"]["required"] is False
 
 
-def test_customs_set_the_keys_on_touching02s_bar_alias_only():
+def test_customs_set_the_keys_on_touching02s_bar_variant_only():
     with open(CUSTOMS) as f:
         customs = json.load(f)
     gen = customs[BAR]["generation"]

@@ -1,6 +1,6 @@
 (define (problem alignment-33)
     (:domain ispatialgym)
-    (:alias alignment-world_vertical-signpost_s070-walls)
+    (:variant alignment-world_vertical-signpost_s070-walls)
 
     ; ground_isg 2.0.0: alignment-world_vertical-signpost_s070-walls (alignment/world_vertical.iddl; alignment-world_vertical#04~T5/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-world_vertical-signpost-walls: scale = 0.7, scale_source = default_step

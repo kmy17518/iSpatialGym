@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: alignment-axial-catalog-breakfast_table (alignment-axial#10, slot representative)",
  "world_alignment-0": {
-  "alias": "table_surface",
+  "variant": "table_surface",
   "roles": {
    "target": {
     "models": {
@@ -52,7 +52,7 @@
   },
   "_isg": {
    "subtask": "alignment-axial",
-   "alias": "alignment-axial-catalog-breakfast_table",
+   "variant": "alignment-axial-catalog-breakfast_table",
    "pick": "alignment-axial#10",
    "slot": "representative",
    "iddl": "alignment/axial.iddl",

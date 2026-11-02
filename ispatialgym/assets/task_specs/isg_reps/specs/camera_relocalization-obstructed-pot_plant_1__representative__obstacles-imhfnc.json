@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: camera_relocalization-obstructed-pot_plant_1 (camera_relocalization-obstructed#02, slot representative)",
  "camera_relocalization-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -50,7 +50,7 @@
   },
   "_isg": {
    "subtask": "camera_relocalization-obstructed",
-   "alias": "camera_relocalization-obstructed-pot_plant_1",
+   "variant": "camera_relocalization-obstructed-pot_plant_1",
    "pick": "camera_relocalization-obstructed#02",
    "slot": "representative",
    "iddl": "camera_relocalization/obstructed.iddl",

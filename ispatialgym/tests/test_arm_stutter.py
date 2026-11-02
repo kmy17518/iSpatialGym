@@ -160,7 +160,7 @@ def test_arm_stutter_gate_discards_a_demo_whose_arm_stutters(tmp_path, gated, mo
         real(self, step, action, segment, action_name)
 
     monkeypatch.setattr(ArmStutter, "observe", observe)
-    result = ex.run_program(expand(sc.alias, sc))
+    result = ex.run_program(expand(sc.variant, sc))
     assert result["arm_stutter"]["flagged"] and result["arm_stutter"]["worst"]["action"] == "place"
     if gated:
         assert not result["success"] and result["reason"] == "robot_stutter"
@@ -173,6 +173,6 @@ def test_an_unremarkable_program_is_not_a_stutter(tmp_path):
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("arm_stutter",)))
-    result = ex.run_program(expand(sc.alias, sc))
+    result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
     assert result["arm_stutter"]["flagged"] is False and result["arm_stutter"]["stutters"] == []

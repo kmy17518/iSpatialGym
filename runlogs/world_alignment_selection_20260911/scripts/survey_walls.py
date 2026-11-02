@@ -78,7 +78,7 @@ def spec_for_room(pspec: ProblemSpec, scene: str, room: str, target: Dict[str, L
     roles = copy.deepcopy(pspec.roles)
     roles["target"].models = {k: list(v) for k, v in target.items()}
     scene_spec = SceneSpec(scene, [room], {"floor": {"room": room}}, {})
-    return ProblemSpec(name=pspec.name, alias=pspec.alias, roles=roles, scenes={scene: scene_spec}, generation=copy.deepcopy(pspec.generation), raw=raw)
+    return ProblemSpec(name=pspec.name, variant=pspec.variant, roles=roles, scenes={scene: scene_spec}, generation=copy.deepcopy(pspec.generation), raw=raw)
 
 
 def make_sampler_class():

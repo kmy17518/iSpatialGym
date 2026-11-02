@@ -1,10 +1,10 @@
 ; Camera relocalization - standard. Navigate from a random init pose to the base / trunk configuration whose head-camera
 ; pose is the goal (goal image). No manipulated object. Path length buckets (MAX LENGTH 3 / 5 / 10 m) are a generation
-; parameter of the customs list (generation.path_buckets), not part of the alias. The scene / room is bounded by the
+; parameter of the customs list (generation.path_buckets), not part of the variant. The scene / room is bounded by the
 ; icl (roles/candidates.csv `room` rows: house_single_floor living_room_0 for now).
 (define (iddl camera_relocalization-standard)
     (:family camera_relocalization)
-    (:alias camera_relocalization-standard)
+    (:variant camera_relocalization-standard)
     (:init
         (ontop agent floor)
     )

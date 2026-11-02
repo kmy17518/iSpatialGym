@@ -99,11 +99,11 @@ class IORSSampler(TaskSampler):
             try:
                 self._try_support(table)
                 if self.big_partner and table is self.obj("partner"):
-                    self.alias_role("table", self.bindings.one("partner"))
+                    self.variant_role("table", self.bindings.one("partner"))
                 else:
                     b = self.bind_scene_object("table", table)
                     if not self.big_partner:
-                        self.alias_role("partner_support", b)
+                        self.variant_role("partner_support", b)
                 return
             except Reject as e:
                 errors.append(f"{table.name}: {e}")

@@ -6,8 +6,8 @@ Roles: ``target`` (spawned at ``roles.target.scale``), the wall (scene role ``su
 wall names, ``bindings.support_regions`` = surveyed wall segments; the v1 facade calls them ``wall`` / ``wall_regions``),
 ``floor``. Prompt 0 with the wall as the face (n = wall normal, P = the hinge point on the wall at hang height).
 
-Template (:meth:`AlignmentWall.prepare_bindings` / :meth:`sample_template`): the target's §5.5 frame from the alias'
-per-model ``generation.front_axis`` / ``up_axis`` record — the reviewed icl frame ``ground_isg`` writes; an alias
+Template (:meth:`AlignmentWall.prepare_bindings` / :meth:`sample_template`): the target's §5.5 frame from the variant'
+per-model ``generation.front_axis`` / ``up_axis`` record — the reviewed icl frame ``ground_isg`` writes; a variant
 without it is ``Reject("missing_frame")``, never a default (owner 2026‑09‑16 22:55) —, wall spots from the regions
 (0.25 m seeding) or the 24-ray search, flat 5 × 5 patch within 1 cm over (w + 0.10) × (h + 0.10),
 front clearance 0.35 m, in-room test 0.8 m in front, one wall per template (most spots); per spot the Phase-2 step-1
@@ -94,7 +94,7 @@ def axis_vec(name: str) -> th.Tensor:
 
 def frame_axes(front: str, up: str) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
     """Object-frame (front, side, up) unit vectors from the reviewed axis names (``front_axis`` / ``up_axis``; the side
-    axis is the axis along the wall implied by the two). No defaults: the sampler passes the alias' per-model record
+    axis is the axis along the wall implied by the two). No defaults: the sampler passes the variant' per-model record
     (:meth:`AlignmentWall.reviewed_frame`)."""
     f, u = axis_vec(front), axis_vec(up)
     if abs(float(th.dot(f, u))) > 1e-6:
@@ -376,7 +376,7 @@ class AlignmentWall(SamplerV2):
 
     # ------------------------------------------------------------------ parameters
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         return {"wall": "support"} if self.wall_role == "support" else {}
 
     def param(self, key: str, default=None, v1_key: Optional[str] = None):
@@ -419,15 +419,15 @@ class AlignmentWall(SamplerV2):
         return bool(self.target_param("symmetric_180", False))
 
     def reviewed_frame(self) -> Dict[str, str]:
-        """§5.5 frame of the target from the alias: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
+        """§5.5 frame of the target from the variant: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
         ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
-        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — an alias without the keys
-        for the spawned model is ``Reject("missing_frame")`` (re-ground the alias)."""
+        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — a variant without the keys
+        for the spawned model is ``Reject("missing_frame")`` (re-ground the variant)."""
         c = self.choice.models["target"]
         front, up = self.target_param("front_axis"), self.target_param("up_axis")
         missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
         if missing:
-            raise Reject("missing_frame", f"{self.gp.alias}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
+            raise Reject("missing_frame", f"{self.gp.variant}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
                                           f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
         return {"front_axis": str(front), "up_axis": str(up)}
 
@@ -853,7 +853,7 @@ class AlignmentWall(SamplerV2):
             spots = [s for s in spots if s["wall_name"] in allowed]
         _, excluded = SR.split_supports(self.subtask, self.scene, sorted({s["wall_name"] for s in spots}))
         if excluded:
-            log.info("%s: spots on %s dropped by the support rule: %s", self.gp.alias, sorted(excluded), excluded)
+            log.info("%s: spots on %s dropped by the support rule: %s", self.gp.variant, sorted(excluded), excluded)
             spots = [s for s in spots if s["wall_name"] not in excluded]
         for i, s in enumerate(spots):
             s["id"] = i
@@ -873,12 +873,12 @@ class AlignmentWall(SamplerV2):
         try:
             self.front, self.side, self.up = frame_axes(frame["front_axis"], frame["up_axis"])
         except (ValueError, KeyError) as e:
-            raise Reject("missing_frame", f"{self.gp.alias}: the recorded frame {frame} is not a valid §5.5 frame: {e}")
+            raise Reject("missing_frame", f"{self.gp.variant}: the recorded frame {frame} is not a valid §5.5 frame: {e}")
         self.frame = frame
         self.kit.sync_world()
         spots = self.find_spots()
         if not spots:
-            raise Reject("no_wall", f"{self.gp.alias}: no flat, free wall patch ({self.template_facts['spot_search']})")
+            raise Reject("no_wall", f"{self.gp.variant}: no flat, free wall patch ({self.template_facts['spot_search']})")
         counts: Dict[str, int] = {}
         for s in spots:
             counts[s["wall_name"]] = counts.get(s["wall_name"], 0) + 1
@@ -886,7 +886,7 @@ class AlignmentWall(SamplerV2):
         self.spots = [s for s in spots if s["wall_name"] == wall_name]
         self.bind_scene_object(self.wall_role, self.world.obj(wall_name))
         t, w, h = self.dims()
-        # the frame used (the alias' per-model record, never a default) with the derived level axis for the record
+        # the frame used (the variant' per-model record, never a default) with the derived level axis for the record
         self.template_facts.update({"frame": {**frame, "level_axis_derived": "+" + "xyz"[int(th.argmax(self.side.abs()))] if float(self.side.sum()) > 0
                                               else "-" + "xyz"[int(th.argmax(self.side.abs()))], "symmetric_180": self.symmetric_180(), "source": "customs"},
                                     "dims": {"thickness": t, "width": w, "height": h}, "scale": self.choice.models["target"].scale, "wall": wall_name,
@@ -931,7 +931,7 @@ class AlignmentWall(SamplerV2):
         if not kept:
             hint = self.scale_hint(filt)
             self.template_meta["scale_hint"] = hint
-            raise Reject("no_stance", f"{self.gp.alias}: no wall spot passes Phase 2 steps 1–3 for δ = ±{filt_deg}° at scale {self.choice.models['target'].scale} "
+            raise Reject("no_stance", f"{self.gp.variant}: no wall spot passes Phase 2 steps 1–3 for δ = ±{filt_deg}° at scale {self.choice.models['target'].scale} "
                                       f"(arms {posture}; {[s.get('n_survivors') for s in self.spots]}); scale_hint = {hint}")
         self.spots = kept
 

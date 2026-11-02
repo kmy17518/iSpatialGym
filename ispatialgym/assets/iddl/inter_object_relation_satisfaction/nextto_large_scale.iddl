@@ -3,7 +3,7 @@
 ; floor by driving the base with the closed hand on it (oracle base_push), so no library grasps are required.
 (define (iddl inter_object_relation_satisfaction-nextto_large_scale)
     (:family inter_object_relation_satisfaction)
-    (:alias inter_object_relation_satisfaction-nextto_large_scale-{target}-{partner}-{support})
+    (:variant inter_object_relation_satisfaction-nextto_large_scale-{target}-{partner}-{support})
     (:init
         (ontop target support)
         (not (nextto target partner))

@@ -181,9 +181,9 @@ def test_reset_scene_objects_names_what_it_puts_back(caplog):
     w.robot, w.spawned = NS(name="robot_r1"), {}
     w.scene = NS(objects=[Obj("ottoman_hnmndv_1", [0.33, 0.0, 0.29]), Obj("bed_0", [-1.0, 0.0, 0.2]), Obj("chair_0", [1.0, 1.0025, 0.4])])
     with caplog.at_level(logging.INFO, logger="ispatialgym.sampling"):
-        assert w.reset_scene_objects(context="alias-x: instance 0 attempt 2") == 2
+        assert w.reset_scene_objects(context="variant-x: instance 0 attempt 2") == 2
     assert loaded == ["ottoman_hnmndv_1", "chair_0"] and [n for n, _, _ in w.last_reset] == ["ottoman_hnmndv_1", "chair_0"]
-    assert ("alias-x: instance 0 attempt 2: 2 scene objects put back to the scene file: ottoman_hnmndv_1 130.0 mm / 0.0 deg, "
+    assert ("variant-x: instance 0 attempt 2: 2 scene objects put back to the scene file: ottoman_hnmndv_1 130.0 mm / 0.0 deg, "
             "chair_0 2.5 mm / 0.0 deg") in caplog.text
     caplog.clear()
     with caplog.at_level(logging.INFO, logger="ispatialgym.sampling"):

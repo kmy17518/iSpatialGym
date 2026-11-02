@@ -1,6 +1,6 @@
 (define (problem configuration_matching-87)
     (:domain ispatialgym)
-    (:alias configuration_matching-block_design-block_4-breakfast_table_board_single)
+    (:variant configuration_matching-block_design-block_4-breakfast_table_board_single)
 
     ; owner 2026-10-12 ~15:25: block_design#01's attempt 3 (generation.block_single_stance) - problem83 copied for configuration_matching-block_design-block_4-breakfast_table_board_single
     ; hand-grounded 2026-09-19 23:xx (owner 21:47 request, option 2 of the packing experiment): the four Kohs blocks are placed

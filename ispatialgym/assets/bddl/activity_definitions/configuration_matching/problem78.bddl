@@ -1,6 +1,6 @@
 (define (problem configuration_matching-78)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_large_scale-top_cabinet)
+    (:variant configuration_matching-articulation_close_large_scale-top_cabinet)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_large_scale-top_cabinet (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#03/representative)
     ; Configuration matching - articulation (large-scale, close). Scene articulated object (roles/candidates.csv kind scene, bound per

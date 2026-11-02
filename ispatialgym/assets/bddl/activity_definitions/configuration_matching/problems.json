@@ -2,22 +2,22 @@
  "activity": "configuration_matching",
  "problems": [
   {
-   "alias": "block_design",
+   "variant": "block_design",
    "id": 0,
    "legacy": true
   },
   {
-   "alias": "articulation",
+   "variant": "articulation",
    "id": 1,
    "legacy": true
   },
   {
-   "alias": "attachment",
+   "variant": "attachment",
    "id": 3,
    "legacy": true
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-door",
+   "variant": "configuration_matching-articulation_close_large_scale-door",
    "id": 4,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -28,7 +28,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "variant": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
    "id": 5,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -39,7 +39,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-desk",
+   "variant": "configuration_matching-block_design-block_4-desk",
    "id": 6,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -50,7 +50,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-coffee_table",
+   "variant": "configuration_matching-block_design-block_4-coffee_table",
    "id": 7,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -61,7 +61,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-bar",
+   "variant": "configuration_matching-attachment-lid-teapot-bar",
    "id": 8,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -72,7 +72,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+   "variant": "configuration_matching-articulation_close_large_scale-dishwasher",
    "id": 9,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -83,7 +83,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+   "variant": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
    "id": 10,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -94,7 +94,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-commercial_kitchen_table",
+   "variant": "configuration_matching-attachment-lid-teapot-commercial_kitchen_table",
    "id": 11,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -105,7 +105,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-coffee_table",
+   "variant": "configuration_matching-attachment-lid-teapot-coffee_table",
    "id": 12,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -116,7 +116,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-bar",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-bar",
    "id": 13,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -127,7 +127,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-metal_bottom_cabinet",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-metal_bottom_cabinet",
    "id": 14,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -138,7 +138,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-door",
+   "variant": "configuration_matching-articulation_open_large_scale-door",
    "id": 15,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -149,7 +149,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+   "variant": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
    "id": 16,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -160,7 +160,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-wine_bottle-countertop",
+   "variant": "configuration_matching-attachment-cork-wine_bottle-countertop",
    "id": 17,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -171,7 +171,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-wine_bottle-commercial_kitchen_table",
+   "variant": "configuration_matching-attachment-cork-wine_bottle-commercial_kitchen_table",
    "id": 18,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -182,7 +182,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-wine_bottle-bar",
+   "variant": "configuration_matching-attachment-cork-wine_bottle-bar",
    "id": 19,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -193,7 +193,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "variant": "configuration_matching-articulation_open_large_scale-dishwasher",
    "id": 20,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -204,7 +204,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
    "id": 21,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -215,7 +215,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-stockpot-countertop",
+   "variant": "configuration_matching-attachment-lid-stockpot-countertop",
    "id": 22,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -226,7 +226,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-stockpot-bar",
+   "variant": "configuration_matching-attachment-lid-stockpot-bar",
    "id": 23,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -237,7 +237,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-stockpot-commercial_kitchen_table",
+   "variant": "configuration_matching-attachment-lid-stockpot-commercial_kitchen_table",
    "id": 24,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -248,7 +248,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_cwkvib-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_cwkvib-breakfast_table",
    "id": 25,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -262,7 +262,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_cwkvib-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_cwkvib-countertop",
    "id": 26,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -276,7 +276,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender-bar",
+   "variant": "configuration_matching-articulation_open_small_scale-blender-bar",
    "id": 27,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -287,7 +287,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_cwkvib-bar",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_cwkvib-bar",
    "id": 28,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -301,7 +301,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender-commercial_kitchen_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender-commercial_kitchen_table",
    "id": 29,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -312,7 +312,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "variant": "configuration_matching-attachment-lid-teapot-breakfast_table",
    "id": 30,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -323,7 +323,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
    "id": 31,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -334,7 +334,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-breakfast_table",
+   "variant": "configuration_matching-block_design-block_4-breakfast_table",
    "id": 32,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -345,7 +345,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender-countertop",
+   "variant": "configuration_matching-articulation_close_small_scale-blender-countertop",
    "id": 33,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -356,7 +356,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender_eyedvd-countertop",
+   "variant": "configuration_matching-articulation_close_small_scale-blender_eyedvd-countertop",
    "id": 34,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -370,7 +370,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_cwkvib-commercial_kitchen_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_cwkvib-commercial_kitchen_table",
    "id": 35,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -384,7 +384,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-carton-breakfast_table",
    "id": 36,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -395,7 +395,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender_eyedvd-breakfast_table",
+   "variant": "configuration_matching-articulation_close_small_scale-blender_eyedvd-breakfast_table",
    "id": 37,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -409,7 +409,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-carton-countertop",
    "id": 38,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -420,7 +420,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton-conference_table",
+   "variant": "configuration_matching-articulation_open_small_scale-carton-conference_table",
    "id": 39,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -431,7 +431,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton-bottom_cabinet",
+   "variant": "configuration_matching-articulation_open_small_scale-carton-bottom_cabinet",
    "id": 40,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -442,7 +442,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton-desk",
+   "variant": "configuration_matching-articulation_open_small_scale-carton-desk",
    "id": 41,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -453,7 +453,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender-bar",
+   "variant": "configuration_matching-articulation_close_small_scale-blender-bar",
    "id": 42,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -464,7 +464,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender_eyedvd-bar",
+   "variant": "configuration_matching-articulation_close_small_scale-blender_eyedvd-bar",
    "id": 43,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -478,7 +478,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender-commercial_kitchen_table",
+   "variant": "configuration_matching-articulation_close_small_scale-blender-commercial_kitchen_table",
    "id": 44,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -489,7 +489,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender_eyedvd-commercial_kitchen_table",
+   "variant": "configuration_matching-articulation_close_small_scale-blender_eyedvd-commercial_kitchen_table",
    "id": 45,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -503,7 +503,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton-breakfast_table",
+   "variant": "configuration_matching-articulation_close_small_scale-carton-breakfast_table",
    "id": 46,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -514,7 +514,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton-countertop",
+   "variant": "configuration_matching-articulation_close_small_scale-carton-countertop",
    "id": 47,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -525,7 +525,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-blender-countertop",
    "id": 48,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -536,7 +536,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton-conference_table",
+   "variant": "configuration_matching-articulation_close_small_scale-carton-conference_table",
    "id": 49,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -547,7 +547,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton-bottom_cabinet",
+   "variant": "configuration_matching-articulation_close_small_scale-carton-bottom_cabinet",
    "id": 50,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -558,7 +558,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton-desk",
+   "variant": "configuration_matching-articulation_close_small_scale-carton-desk",
    "id": 51,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -569,7 +569,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
    "id": 52,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -583,7 +583,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar-countertop",
    "id": 53,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -594,7 +594,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-countertop",
    "id": 54,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -608,7 +608,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-conference_table",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar-conference_table",
    "id": 55,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -619,7 +619,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-conference_table",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-conference_table",
    "id": 56,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -633,7 +633,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-breakfast_table",
    "id": 57,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -647,7 +647,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-laptop-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-laptop-countertop",
    "id": 58,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -658,7 +658,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-laptop-conference_table",
+   "variant": "configuration_matching-articulation_open_small_scale-laptop-conference_table",
    "id": 59,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -669,7 +669,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-toolbox-countertop",
+   "variant": "configuration_matching-articulation_open_small_scale-toolbox-countertop",
    "id": 60,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -680,7 +680,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-toolbox-conference_table",
+   "variant": "configuration_matching-articulation_open_small_scale-toolbox-conference_table",
    "id": 61,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -691,7 +691,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton_msfzpz-floor",
+   "variant": "configuration_matching-articulation_open_small_scale-carton_msfzpz-floor",
    "id": 62,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -705,7 +705,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "configuration_matching-attachment-dip_candle-candle_holder-countertop",
+   "variant": "configuration_matching-attachment-dip_candle-candle_holder-countertop",
    "id": 63,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -716,7 +716,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-dip_candle-candle_holder-conference_table",
+   "variant": "configuration_matching-attachment-dip_candle-candle_holder-conference_table",
    "id": 64,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -727,7 +727,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-vinegar_bottle-countertop",
+   "variant": "configuration_matching-attachment-cork-vinegar_bottle-countertop",
    "id": 65,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -738,7 +738,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-vinegar_bottle-conference_table",
+   "variant": "configuration_matching-attachment-cork-vinegar_bottle-conference_table",
    "id": 66,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -749,7 +749,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-light_bulb-table_lamp-countertop",
+   "variant": "configuration_matching-attachment-light_bulb-table_lamp-countertop",
    "id": 67,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -760,7 +760,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-light_bulb-table_lamp-conference_table",
+   "variant": "configuration_matching-attachment-light_bulb-table_lamp-conference_table",
    "id": 68,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -771,7 +771,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-countertop",
+   "variant": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-countertop",
    "id": 69,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -782,7 +782,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-conference_table",
+   "variant": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-conference_table",
    "id": 70,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -793,7 +793,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-countertop",
+   "variant": "configuration_matching-attachment-lid-teapot-countertop",
    "id": 71,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -804,7 +804,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-conference_table",
+   "variant": "configuration_matching-attachment-lid-teapot-conference_table",
    "id": 72,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -815,7 +815,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-countertop",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-countertop",
    "id": 73,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -826,7 +826,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-conference_table",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-conference_table",
    "id": 74,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -837,7 +837,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-countertop",
+   "variant": "configuration_matching-block_design-block_4-countertop",
    "id": 75,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -848,7 +848,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-conference_table",
+   "variant": "configuration_matching-block_design-block_4-conference_table",
    "id": 76,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -859,7 +859,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-top_cabinet",
+   "variant": "configuration_matching-articulation_open_large_scale-top_cabinet",
    "id": 77,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -870,7 +870,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-top_cabinet",
+   "variant": "configuration_matching-articulation_close_large_scale-top_cabinet",
    "id": 78,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -881,7 +881,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-cork-wine_bottle-desk",
+   "variant": "configuration_matching-attachment-cork-wine_bottle-desk",
    "id": 82,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -892,7 +892,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+   "variant": "configuration_matching-block_design-block_4-breakfast_table_board",
    "id": 83,
    "grounded": "2026-09-19",
    "by": "hand-grounded (agent-blockflip, owner 21:47 option 2)",
@@ -903,7 +903,7 @@
    "mode": "test"
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet_push",
+   "variant": "configuration_matching-articulation_close_large_scale-bottom_cabinet_push",
    "id": 84,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of configuration_matching-5 with close_by_push, owner ~08:50 close_large#03 c2)",
@@ -914,7 +914,7 @@
    "mode": "test"
   },
   {
-   "alias": "configuration_matching-attachment-lid-stockpot-breakfast_table",
+   "variant": "configuration_matching-attachment-lid-stockpot-breakfast_table",
    "id": 85,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -925,7 +925,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-attachment-lid-stockpot-desk",
+   "variant": "configuration_matching-attachment-lid-stockpot-desk",
    "id": 86,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -936,7 +936,7 @@
    "mode": "representative"
   },
   {
-   "alias": "configuration_matching-block_design-block_4-breakfast_table_board_single",
+   "variant": "configuration_matching-block_design-block_4-breakfast_table_board_single",
    "id": 87,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of configuration_matching-83 with block_single_stance, owner ~15:25 block_design#01 attempt 3)",
@@ -950,7 +950,7 @@
  "unregistered": [
   {
    "id": 2,
-   "alias": "articulation",
+   "variant": "articulation",
    "why": "duplicate alias of problem1"
   }
  ]

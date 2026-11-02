@@ -33,7 +33,7 @@ def test_iddls_are_ontop_large_with_the_relation_as_goal():
     o = iddls[ONTOP]
     for rel, st in NEW.items():
         d = iddls[st]
-        assert d.family == IORS and d.alias_template == st + "-{target}-{partner}-{support}"
+        assert d.family == IORS and d.variant_template == st + "-{target}-{partner}-{support}"
         assert [rel, "?target", "?partner"] in d.goal and ["not", [rel, "target", "partner"]] in d.init
         assert d.roles == o.roles and d.measure == o.measure
         assert d.require == ([] if rel == "nextto" else o.require)  # nextto's target is pushed by the base: no grasp
@@ -42,13 +42,13 @@ def test_iddls_are_ontop_large_with_the_relation_as_goal():
 
 def test_subtask_lookups():
     for st in NEW.values():
-        alias = f"{st}-apple-sink-floor"
-        assert PB.SUBTASK_FAMILY[st] == (IORS, IORS) and PB.subtask_of_alias(alias) == st
-        assert SC.subtask_of_alias(alias) == st and SC.family_of_subtask(st) == IORS and st in SC.REQUIRED_BLOCKS
+        variant = f"{st}-apple-sink-floor"
+        assert PB.SUBTASK_FAMILY[st] == (IORS, IORS) and PB.subtask_of_variant(variant) == st
+        assert SC.subtask_of_variant(variant) == st and SC.family_of_subtask(st) == IORS and st in SC.REQUIRED_BLOCKS
         assert VB.V1_KEY[st][1] == f"{IORS}/{st.split('-', 1)[1]}.iddl"
     # the small-scale subtasks still resolve to themselves
-    assert PB.subtask_of_alias(f"{IORS}-inside-apple-bowl-breakfast_table") == f"{IORS}-inside"
-    assert SC.subtask_of_alias(f"{IORS}-nextto-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto"
+    assert PB.subtask_of_variant(f"{IORS}-inside-apple-bowl-breakfast_table") == f"{IORS}-inside"
+    assert SC.subtask_of_variant(f"{IORS}-nextto-spatula-soup_ladle-breakfast_table") == f"{IORS}-nextto"
 
 
 def test_program_check_stance_lists():

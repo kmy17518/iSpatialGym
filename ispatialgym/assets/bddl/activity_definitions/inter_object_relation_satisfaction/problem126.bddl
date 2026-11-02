@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-126)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table)
+    (:variant inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#04~T4/representative)
     ; owner 2026-10-12 ~16:05 touching#04 with spray_bottle/wegawe (~W4): hand-made from this grounding - target spray_bottle/wegawe (spray_bottle__wegawe__t), registry mode test

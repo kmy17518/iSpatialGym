@@ -102,7 +102,7 @@ the BDDL writer maps roles to instance names.
 ```json
 {
   "object_scaling-0": {
-    "alias": null,
+    "variant": null,
     "roles": {
       "target": {"models": {"bottle_of_beer": ["gxxbhh"]}, "grasps": "library"}
     },
@@ -775,7 +775,7 @@ objects are measured only (`:measure`), tolerances 0.03 m / 0.20 rad.
   spec's table categories within 3 m geodesic of the bed's near side such that from its
   canonical stance both the target (on the receptacle) and the bed are inside the image and the
   target is reachable; (b) the top of the bed itself (target `ontop` the bed; the `table` role
-  aliases the bed). Stand-offs (`stand_offs`) and, with `try_all_edges`, every edge of the
+  variants the bed). Stand-offs (`stand_offs`) and, with `try_all_edges`, every edge of the
   support are tried until reachable cells exist; the stand-off is measured from the support's
   AABB when its top raster is inset (bed frames), and the usable surface is the support's
   largest horizontal face (mattress), not its AABB top (headboard). Measured on

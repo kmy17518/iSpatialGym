@@ -2,7 +2,7 @@
  "activity": "disembedding",
  "problems": [
   {
-   "alias": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-breakfast_table",
+   "variant": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-breakfast_table",
    "id": 1,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -13,7 +13,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-coffee_table",
+   "variant": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-coffee_table",
    "id": 2,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -24,7 +24,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-desk",
+   "variant": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-desk",
    "id": 3,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -35,7 +35,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-booth",
+   "variant": "disembedding-jigsaw_puzzle_piece-jigsaw_puzzle_piece_3-booth",
    "id": 4,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -46,7 +46,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-countertop",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-countertop",
    "id": 5,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -57,7 +57,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bottom_cabinet",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bottom_cabinet",
    "id": 6,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -68,7 +68,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-shelf",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-shelf",
    "id": 7,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -79,7 +79,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-video_game-video_game_2_board_game_1-bottom_cabinet",
+   "variant": "disembedding-video_game-video_game_2_board_game_1-bottom_cabinet",
    "id": 8,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -90,7 +90,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-video_game-video_game_2_board_game_1-desk",
+   "variant": "disembedding-video_game-video_game_2_board_game_1-desk",
    "id": 9,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -101,7 +101,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-video_game-video_game_2_board_game_1-coffee_table",
+   "variant": "disembedding-video_game-video_game_2_board_game_1-coffee_table",
    "id": 10,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -112,7 +112,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-bottle_of_milk-carton_of_milk_1_carton_of_soy_milk_1_box_of_almond_milk_1-breakfast_table",
+   "variant": "disembedding-bottle_of_milk-carton_of_milk_1_carton_of_soy_milk_1_box_of_almond_milk_1-breakfast_table",
    "id": 11,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -123,7 +123,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-bottle_of_milk-bottle_of_milk_1_carton_of_milk_1_box_of_almond_milk_1-countertop",
+   "variant": "disembedding-bottle_of_milk-bottle_of_milk_1_carton_of_milk_1_box_of_almond_milk_1-countertop",
    "id": 12,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -134,7 +134,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-bottle_of_milk-bottle_of_milk_1_bottle_of_soy_milk_1_carton_of_soy_milk_1-bar",
+   "variant": "disembedding-bottle_of_milk-bottle_of_milk_1_bottle_of_soy_milk_1_carton_of_soy_milk_1-bar",
    "id": 13,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -145,7 +145,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-bottle_of_milk-bottle_of_milk_1_bottle_of_soy_milk_1_carton_of_milk_1-commercial_kitchen_table",
+   "variant": "disembedding-bottle_of_milk-bottle_of_milk_1_bottle_of_soy_milk_1_carton_of_milk_1-commercial_kitchen_table",
    "id": 14,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -156,7 +156,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-beaker-beaker_1_soda_cup_1_water_glass_1-countertop",
+   "variant": "disembedding-beaker-beaker_1_soda_cup_1_water_glass_1-countertop",
    "id": 15,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -167,7 +167,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-beaker-beaker_2_soda_cup_1-bar",
+   "variant": "disembedding-beaker-beaker_2_soda_cup_1-bar",
    "id": 16,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -178,7 +178,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-beaker-beaker_1_soda_cup_1_water_glass_1-commercial_kitchen_table",
+   "variant": "disembedding-beaker-beaker_1_soda_cup_1_water_glass_1-commercial_kitchen_table",
    "id": 17,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -189,7 +189,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-carton_of_milk-bottle_of_milk_1_bottle_of_coconut_milk_1_bottle_of_soy_milk_1-countertop",
+   "variant": "disembedding-carton_of_milk-bottle_of_milk_1_bottle_of_coconut_milk_1_bottle_of_soy_milk_1-countertop",
    "id": 18,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -200,7 +200,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-carton_of_milk-carton_of_milk_1_bottle_of_coconut_milk_1_carton_of_soy_milk_1-breakfast_table",
+   "variant": "disembedding-carton_of_milk-carton_of_milk_1_bottle_of_coconut_milk_1_carton_of_soy_milk_1-breakfast_table",
    "id": 19,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -211,7 +211,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-carton_of_milk-carton_of_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-bar",
+   "variant": "disembedding-carton_of_milk-carton_of_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-bar",
    "id": 20,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -222,7 +222,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-cellulose_tape-cookie_cutter_1_cork_1_coaster_1-desk",
+   "variant": "disembedding-cellulose_tape-cookie_cutter_1_cork_1_coaster_1-desk",
    "id": 21,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -233,7 +233,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-cellulose_tape-cork_1_coaster_1_cap_1-conference_table",
+   "variant": "disembedding-cellulose_tape-cork_1_coaster_1_cap_1-conference_table",
    "id": 22,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -244,7 +244,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-cellulose_tape-cookie_cutter_1_cork_1_cap_1-bottom_cabinet",
+   "variant": "disembedding-cellulose_tape-cookie_cutter_1_cork_1_cap_1-bottom_cabinet",
    "id": 23,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -255,7 +255,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-cellulose_tape-cookie_cutter_1_coaster_1_cap_1-cubicle",
+   "variant": "disembedding-cellulose_tape-cookie_cutter_1_coaster_1_cap_1-cubicle",
    "id": 24,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -266,7 +266,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk",
+   "variant": "disembedding-pencil_case-sunglasses_1_pencil_1_pen_1-desk",
    "id": 25,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -277,7 +277,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-pencil_case-sunglasses_1_pencil_1_ruler_1-conference_table",
+   "variant": "disembedding-pencil_case-sunglasses_1_pencil_1_ruler_1-conference_table",
    "id": 26,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -288,7 +288,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-pencil_case-stapler_1_ruler_1_pen_1-bottom_cabinet",
+   "variant": "disembedding-pencil_case-stapler_1_ruler_1_pen_1-bottom_cabinet",
    "id": 27,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -299,7 +299,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-toy_dice-toy_dice_2_toy_figure_1-breakfast_table",
+   "variant": "disembedding-toy_dice-toy_dice_2_toy_figure_1-breakfast_table",
    "id": 28,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -310,7 +310,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-toy_dice-toy_dice_2_toy_figure_1-coffee_table",
+   "variant": "disembedding-toy_dice-toy_dice_2_toy_figure_1-coffee_table",
    "id": 29,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -321,7 +321,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-toy_dice-toy_dice_2_toy_figure_1-desk",
+   "variant": "disembedding-toy_dice-toy_dice_2_toy_figure_1-desk",
    "id": 30,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -332,7 +332,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-toy_dice-toy_dice_2_toy_figure_1-booth",
+   "variant": "disembedding-toy_dice-toy_dice_2_toy_figure_1-booth",
    "id": 31,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -343,7 +343,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table",
+   "variant": "disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table",
    "id": 32,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -354,7 +354,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-tablefork-tablefork_1_table_knife_1_teaspoon_1-bar",
+   "variant": "disembedding-tablefork-tablefork_1_table_knife_1_teaspoon_1-bar",
    "id": 33,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -365,7 +365,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-tablefork-tablefork_1_table_knife_1_teaspoon_1-countertop",
+   "variant": "disembedding-tablefork-tablefork_1_table_knife_1_teaspoon_1-countertop",
    "id": 34,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -376,7 +376,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-commercial_kitchen_table",
+   "variant": "disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-commercial_kitchen_table",
    "id": 35,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -387,7 +387,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-desk",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-desk",
    "id": 36,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -398,7 +398,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-conference_table",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-conference_table",
    "id": 37,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -409,7 +409,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bar",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-bar",
    "id": 38,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -420,7 +420,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-commercial_kitchen_table",
+   "variant": "disembedding-box_of_shampoo-box_of_shampoo_1_box_of_sanitary_napkins_1_box_of_tissues_1-commercial_kitchen_table",
    "id": 39,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -431,7 +431,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-video_game-video_game_2_board_game_1-conference_table",
+   "variant": "disembedding-video_game-video_game_2_board_game_1-conference_table",
    "id": 40,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -442,7 +442,7 @@
    "mode": "representative"
   },
   {
-   "alias": "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_soy_milk_1_carton_of_soy_milk_1-commercial_kitchen_table",
+   "variant": "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_soy_milk_1_carton_of_soy_milk_1-commercial_kitchen_table",
    "id": 41,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -456,7 +456,7 @@
  "unregistered": [
   {
    "id": 0,
-   "alias": null,
+   "variant": null,
    "why": "the problem declares no alias"
   }
  ]

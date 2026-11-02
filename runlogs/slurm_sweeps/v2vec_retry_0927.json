@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "camera_relocalization-standard",
+   "variant": "camera_relocalization-standard",
    "subtask": "camera_relocalization-standard",
    "run_id": "0927-173655-s00",
    "out": "runlogs/pilot_20260915/first_demo/camera_relocalization-standard/0927-173655-s00",

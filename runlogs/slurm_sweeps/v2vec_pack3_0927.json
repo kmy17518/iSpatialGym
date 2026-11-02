@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "mental_rotation-banana",
+   "variant": "mental_rotation-banana",
    "subtask": "mental_rotation",
    "run_id": "0927-174149-s00",
    "out": "runlogs/pilot_20260915/first_demo/mental_rotation/0927-174149-s00",
@@ -28,7 +28,7 @@
    "collected": true
   },
   {
-   "alias": "object_scaling-canned_food",
+   "variant": "object_scaling-canned_food",
    "subtask": "object_scaling",
    "run_id": "0927-174149-s01",
    "out": "runlogs/pilot_20260915/first_demo/object_scaling/0927-174149-s01",
@@ -40,7 +40,7 @@
    "collected": true
   },
   {
-   "alias": "camera_relocalization-obstructed-footstool_1",
+   "variant": "camera_relocalization-obstructed-footstool_1",
    "subtask": "camera_relocalization-obstructed",
    "run_id": "0927-174149-s02",
    "out": "runlogs/pilot_20260915/first_demo/camera_relocalization-obstructed/0927-174149-s02",

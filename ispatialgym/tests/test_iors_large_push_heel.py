@@ -17,7 +17,7 @@ from ispatialgym.sampling.v2.stances import Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
-ALIAS = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl"
+VARIANT = "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl"
 HEEL, TOE = 0.128, 0.117
 YAWS = [k * 2.0 * math.pi / 16 for k in range(16)]
 PUSH = (1.0, 0.0)  # the push along +x: the robot behind the target at -x
@@ -37,7 +37,7 @@ def _sandal() -> th.Tensor:
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = ALIAS, dict(gen)
+        self.variant, self.generation = VARIANT, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

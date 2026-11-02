@@ -14,7 +14,7 @@ applies them through a ``UsdPhysics.DriveAPI`` angular drive on the joint (stiff
 implicit force-limited damped spring gives torque = clamp(−damping · ω, ±friction) — Coulomb friction above
 ω = friction / damping, viscous creep below it. ``physxJoint:jointFriction`` is not used: it applies to articulation
 joints only and the hinge is a plain joint (``excludeFromArticulation``). The sampler sets both from the target's
-inertia about the hinge axis (:func:`hinge_resistance`); the axial table hinge records them only when its alias sets the
+inertia about the hinge axis (:func:`hinge_resistance`); the axial table hinge records them only when its variant sets the
 resistance keys (``AlignmentAxial.hinge_resistance``, owner 2026-10-12), else neither (frictionless).
 
 **Brake** (2026-09-22, alignment-world_vertical 0922-180242): below ω = friction / damping the drive is a plain damper,
@@ -298,7 +298,7 @@ def create_hinge(child_obj, anchor_world, axis_world, parent_link=None, name: st
 
     ``parent_link``: a link (RigidPrim) of the parent object; None anchors to the world frame. ``friction`` (N·m) /
     ``damping`` (N·m·s/rad): the hinge resistance of the record (:func:`apply_hinge_drive`); both None = the frictionless
-    hinge (the axial table hinge of an alias without the resistance keys).
+    hinge (the axial table hinge of a variant without the resistance keys).
     """
     anchor = G.t(anchor_world)
     axis = G.t(axis_world)
@@ -355,7 +355,7 @@ def apply_mass(target, mass_kg: float, link_name: Optional[str] = None) -> Dict[
     Owner 2026-09-25 (disembedding): the dataset gives a tray its category mass (0.39 kg for the tray/uekqey base link) and
     four bottles of milk 1 kg each, a 10:1 inverted mass ratio in the table-tray-bottle stack that PhysX (TGS, 32 position
     iterations) resolves with contact chatter - the bottles hopped 1-7 mm seconds after their release in 8 of 8 attempts
-    of the 3-distractor alias (0925-034257). Headless A/B on identical layouts: tray 0.39 kg 3 of 12 layouts moving,
+    of the 3-distractor variant (0925-034257). Headless A/B on identical layouts: tray 0.39 kg 3 of 12 layouts moving,
     tray 2 kg 0 of 6 with every body within 0.01 mm per frame (bottles at 0.3 kg, the mass-ratio probe, 0 of 6 too).
     Recorded per instance as the TRO ``constraints`` record ``{"type": "mass", "object", "mass_kg"}`` the loader
     re-applies, so the sampler's stillness gate and the demo run the same physics. ``mass_kg <= 0`` leaves the mass

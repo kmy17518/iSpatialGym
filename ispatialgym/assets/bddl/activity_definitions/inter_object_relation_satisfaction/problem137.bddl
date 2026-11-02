@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-137)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table)
 
     ; owner 2026-10-12 ~21:10: inside_large#03 V4b - problem136 copied for inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table (drop_height_m 0.22, inside_stance_postures)
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V4a/representative)

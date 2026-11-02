@@ -26,7 +26,7 @@ from ispatialgym.sampling.v2.stances import GraspRecord, PathRecord, Stance, Tra
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "sidecars")
 IORS = "inter_object_relation_satisfaction-ontop_small_scale"
-ALIAS = "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table"
+VARIANT = "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table"
 
 
 def _fixture(subtask: str) -> dict:
@@ -41,9 +41,9 @@ def _write(path, data):
     return path
 
 
-def _v2_template(root, alias=ALIAS, tid="house_single_floor__target-apple-a__partner-plate-b", n=2, sidecar=True, meta_extra=None):
-    tdir = os.path.join(root, alias, tid)
-    meta = {"alias": alias, "template_id": tid, "subtask": IORS, "scene": "house_single_floor", "sampler_version": "2.0.0-dev", "spec_hash": "abc",
+def _v2_template(root, variant=VARIANT, tid="house_single_floor__target-apple-a__partner-plate-b", n=2, sidecar=True, meta_extra=None):
+    tdir = os.path.join(root, variant, tid)
+    meta = {"variant": variant, "template_id": tid, "subtask": IORS, "scene": "house_single_floor", "sampler_version": "2.0.0-dev", "spec_hash": "abc",
             "problem": "inter_object_relation_satisfaction-20", "rooms": ["dining_room_0"],
             "bindings": [{"role": "target", "name": "apple.n.01_1"}, {"role": "partner", "name": "plate.n.04_1"},
                          {"role": "support", "name": "breakfast_table.n.01_1"}, {"role": "floor", "name": "floor.n.01_1"}]}
@@ -51,7 +51,7 @@ def _v2_template(root, alias=ALIAS, tid="house_single_floor__target-apple-a__par
     _write(os.path.join(tdir, "template_meta.json"), meta)
     _write(os.path.join(tdir, "template.json"), {"state": {}})
     for i in range(n):
-        iid = f"{alias}__{tid}__{i:04d}"
+        iid = f"{variant}__{tid}__{i:04d}"
         _write(os.path.join(tdir, "instances", f"{iid}-tro_state.json"), {"ispatialgym": {}})
         if sidecar:
             _write(os.path.join(tdir, "instances", f"{iid}.oracle.json"), {"schema": "isg-oracle-v1"})
@@ -99,16 +99,16 @@ def test_list_instances_and_files(tmp_path):
 def test_discover_templates_filters(tmp_path):
     root = str(tmp_path)
     a = _v2_template(root, n=1)
-    b = _v2_template(root, alias="alignment-axial-keyboard-breakfast_table", tid="house_single_floor__target-keyboard-x", n=1)
+    b = _v2_template(root, variant="alignment-axial-keyboard-breakfast_table", tid="house_single_floor__target-keyboard-x", n=1)
     v1 = _v1_template(root)
     # bookkeeping directories are not templates
     os.makedirs(os.path.join(root, "renders"))
-    os.makedirs(os.path.join(root, ALIAS, "activity_definitions", "inter_object_relation_satisfaction"))
+    os.makedirs(os.path.join(root, VARIANT, "activity_definitions", "inter_object_relation_satisfaction"))
     _write(os.path.join(root, "scene_variants", "x.json"), {})
     _write(os.path.join(root, "task_custom_lists.json"), {})
     found = V.discover_templates(root)
     assert found == sorted([os.path.abspath(a), os.path.abspath(b), os.path.abspath(v1)], key=lambda p: (os.path.dirname(p), p)) or set(found) == {os.path.abspath(a), os.path.abspath(b), os.path.abspath(v1)}
-    assert V.discover_templates(root, aliases=[ALIAS]) == [os.path.abspath(a)]
+    assert V.discover_templates(root, variants=[VARIANT]) == [os.path.abspath(a)]
     assert V.discover_templates(root, templates=[os.path.basename(b)]) == [os.path.abspath(b)]
     # a template directory given directly is taken as is, even outside the root
     assert V.discover_templates(str(tmp_path / "nowhere"), templates=[a]) == [os.path.abspath(a)]
@@ -119,10 +119,10 @@ def test_template_identity_and_support_instances(tmp_path):
     tdir = _v2_template(str(tmp_path), n=1)
     meta = V._read_json(os.path.join(tdir, "template_meta.json"))
     ident = V.template_identity(tdir, meta)
-    assert ident["alias"] == ALIAS and ident["template_id"] == os.path.basename(tdir) and ident["subtask"] == IORS
-    # alias / template id fall back to the directory names (v1 meta)
+    assert ident["variant"] == VARIANT and ident["template_id"] == os.path.basename(tdir) and ident["subtask"] == IORS
+    # variant / template id fall back to the directory names (v1 meta)
     ident1 = V.template_identity(tdir, {"problem": "x-0"})
-    assert ident1["alias"] == ALIAS and ident1["template_id"] == os.path.basename(tdir)
+    assert ident1["variant"] == VARIANT and ident1["template_id"] == os.path.basename(tdir)
     # the supports program_check ignores for the final grasp / contact pose = SamplerV2.support_objects roles
     assert V.support_instances(meta) == ["breakfast_table.n.01_1"]
     assert V.support_instances({"bindings": [{"role": "wall", "name": "wall.n.01_1"}, {"role": "tray_dest", "name": "tray.n.01_2"}, {"role": "target", "name": "x"}]}) == ["wall.n.01_1", "tray.n.01_2"]
@@ -235,7 +235,7 @@ def test_report_schema_and_counts(tmp_path):
     tdir = _v2_template(str(tmp_path), n=3)
     meta = V._read_json(os.path.join(tdir, "template_meta.json"))
     rep = V.new_template_report(tdir, meta, "v2", 60)
-    for key in ("schema", "layout", "alias", "template_id", "subtask", "scene", "settle_steps", "goal_settle_steps", "tolerances", "joint_tolerance_floor",
+    for key in ("schema", "layout", "variant", "template_id", "subtask", "scene", "settle_steps", "goal_settle_steps", "tolerances", "joint_tolerance_floor",
                 "loader", "instances", "n_instances", "n_ok", "reload_failed", "n_error", "deleted", "error", "started", "finished", "time_s"):
         assert key in rep
     assert rep["schema"] == V.REPORT_SCHEMA == "isg-validation-v1" and rep["tolerances"] == V.RELOAD_TOLERANCES and rep["settle_steps"] == 60
@@ -259,7 +259,7 @@ def test_report_schema_and_counts(tmp_path):
     line = V.summary_line(rep)
     assert line.startswith("VALIDATION_TEMPLATE ")
     body = json.loads(line[len("VALIDATION_TEMPLATE "):])
-    assert body["alias"] == ALIAS and body["reload_failed"] == 1 and body["n_error"] == 1 and set(body["fails"]) == {iids[1], iids[2]}
+    assert body["variant"] == VARIANT and body["reload_failed"] == 1 and body["n_error"] == 1 and set(body["fails"]) == {iids[1], iids[2]}
     # the report is JSON-serialisable
     json.dumps(rep, default=str)
 
@@ -337,8 +337,8 @@ def test_run_program_check_calls_program_check_run(monkeypatch):
     d = _fixture(IORS)
     calls = []
 
-    def fake_run(alias, sidecar, sampler, subtask=None):
-        calls.append((alias, sidecar, sampler, subtask))
+    def fake_run(variant, sidecar, sampler, subtask=None):
+        calls.append((variant, sidecar, sampler, subtask))
         # the hook hands program_check exactly what it reads from the sampler (its docstring)
         assert sampler.ikc is ikc and sampler.kit is kit and sampler.subtask == IORS
         assert sampler.objects == objects and sampler.support_objects() == ["TABLE"]
@@ -350,8 +350,8 @@ def test_run_program_check_calls_program_check_run(monkeypatch):
     kit, ikc = _FakeKit(), object()
     objects = {"apple.n.01_1": "APPLE", "plate.n.04_1": "PLATE", "breakfast_table.n.01_1": "TABLE"}
     sampler = V.ValidationSampler(kit, ikc, objects, [objects["breakfast_table.n.01_1"]], IORS)
-    out = V.run_program_check(ALIAS, V.draft_from_sidecar(d), sampler, IORS)
-    assert len(calls) == 1 and calls[0][0] == ALIAS and calls[0][3] == IORS
+    out = V.run_program_check(VARIANT, V.draft_from_sidecar(d), sampler, IORS)
+    assert len(calls) == 1 and calls[0][0] == VARIANT and calls[0][3] == IORS
     assert out["ok"] and out["mode"] == "expand" and [a["name"] for a in out["actions"]] == ["transition", "grasp"] and out["failed_action"] is None
     assert out["time_s"] is not None
 
@@ -363,26 +363,26 @@ def test_run_program_check_reports_failing_action(monkeypatch):
             self.reason = reason
             self.details = details
 
-    def failing(alias, sidecar, sampler, subtask=None):
+    def failing(variant, sidecar, sampler, subtask=None):
         raise FakeReject("program_check_failed", "grasp: exact IK failed (stance manipulation, arm right)", action="grasp")
 
     monkeypatch.setattr(PC, "run", failing)
     sampler = V.ValidationSampler(_FakeKit(), object(), {}, [], IORS)
-    out = V.run_program_check(ALIAS, V.draft_from_sidecar(_fixture(IORS)), sampler, IORS)
+    out = V.run_program_check(VARIANT, V.draft_from_sidecar(_fixture(IORS)), sampler, IORS)
     assert not out["ok"] and out["failed_action"] == "grasp" and "exact IK failed" in out["reason"] and out["actions"] == []
 
-    def crashing(alias, sidecar, sampler, subtask=None):
+    def crashing(variant, sidecar, sampler, subtask=None):
         raise RuntimeError("cuRobo exploded")
 
     monkeypatch.setattr(PC, "run", crashing)
-    out = V.run_program_check(ALIAS, V.draft_from_sidecar(_fixture(IORS)), sampler, IORS)
+    out = V.run_program_check(VARIANT, V.draft_from_sidecar(_fixture(IORS)), sampler, IORS)
     assert not out["ok"] and out["failed_action"] == "run" and "cuRobo exploded" in out["reason"]
 
 
 def test_program_arms_from_sidecars():
     arms = V._program_arms([_fixture(IORS), _fixture("alignment-axial")])
     assert arms == ["left", "right"]
-    assert V._program_arms([{"alias": "nonsense"}]) == ["right"]
+    assert V._program_arms([{"variant": "nonsense"}]) == ["right"]
 
 
 def test_check_sidecar_validates_and_verifies_the_tro(tmp_path):
@@ -393,7 +393,7 @@ def test_check_sidecar_validates_and_verifies_the_tro(tmp_path):
     path = _write(str(tmp_path / "x.oracle.json"), d)
     rec, raw = V.check_sidecar(path, str(tro))
     assert rec["ok"] and rec["loaded"] and rec["valid"] and rec["tro_sha256_ok"] and rec["problems"] == []
-    assert rec["subtask"] == IORS and rec["alias"] == ALIAS and raw == d
+    assert rec["subtask"] == IORS and rec["variant"] == VARIANT and raw == d
     # sha mismatch
     tro.write_text('{"ispatialgym": {"changed": 1}}')
     rec, raw = V.check_sidecar(path, str(tro))
@@ -655,12 +655,12 @@ def test_montage_grid():
 
 def test_cli_parser_and_worker_argv(tmp_path):
     p = V.build_parser()
-    args = p.parse_args(["--root", str(tmp_path), "--alias", ALIAS, "--template", "t1", "--delete-failed", "--no-render", "--fresh-process-per-instance"])
-    assert args.root == str(tmp_path) and args.alias == [ALIAS] and args.template == ["t1"] and args.delete_failed and args.no_render and args.fresh_process_per_instance
+    args = p.parse_args(["--root", str(tmp_path), "--variant", VARIANT, "--template", "t1", "--delete-failed", "--no-render", "--fresh-process-per-instance"])
+    assert args.root == str(tmp_path) and args.variant == [VARIANT] and args.template == ["t1"] and args.delete_failed and args.no_render and args.fresh_process_per_instance
     assert args.settle_steps == V.DEFAULT_SETTLE_STEPS == 60 and not args.worker
-    argv = V._worker_argv(args, "/x/alias/t1", "iid-0")
+    argv = V._worker_argv(args, "/x/variant/t1", "iid-0")
     assert argv[:3] == [os.sys.executable, "-m", "ispatialgym.sampling.validate_instances"]
-    assert "--worker" in argv and argv[argv.index("--template") + 1] == "/x/alias/t1" and argv[argv.index("--instance") + 1] == "iid-0" and "--no-render" in argv
+    assert "--worker" in argv and argv[argv.index("--template") + 1] == "/x/variant/t1" and argv[argv.index("--instance") + 1] == "iid-0" and "--no-render" in argv
     assert "--no-goal" not in argv and argv[argv.index("--root") + 1] == str(tmp_path)
     assert V._worker_report_path("/x/t", None).endswith("validation/report.json") and V._worker_report_path("/x/t", "i").endswith("validation/report-i.json")
     with pytest.raises(SystemExit):
@@ -729,11 +729,11 @@ def test_exact_checks_thresholds_and_sidecar_comparison():
     assert V.quat_angle64(q_id, [0.0, 0.0, math.sin(0.0005), math.cos(0.0005)]) == pytest.approx(0.001, rel=1e-6)
 
 
-def test_validation_sampler_carries_the_alias_generation():
+def test_validation_sampler_carries_the_variant_generation():
     """The program check reads per-problem witness overrides through ``sampler.gp.gen`` (``'ValidationSampler' object has
-    no attribute 'gp'`` failed every held-object reload); unknown aliases fall back to the defaults."""
+    no attribute 'gp'`` failed every held-object reload); unknown variants fall back to the defaults."""
     s = V.ValidationSampler(None, None, {}, [], "object_scaling", {"witness_residual_max_m": 0.004})
     assert s.gp.gen("witness_residual_max_m", 0.002) == 0.004 and s.gp.gen("witness_residual_pre_m", 0.002) == 0.002
     assert s.grasp_ignore_objects() == [] and V.ValidationSampler(None, None, {}, [], "x").gp.gen("k", 1) == 1
     assert V.customs_generation("object_scaling-canned_food")["min_depth_change_m"] == 0.05
-    assert V.customs_generation("no-such-alias") == {}
+    assert V.customs_generation("no-such-variant") == {}

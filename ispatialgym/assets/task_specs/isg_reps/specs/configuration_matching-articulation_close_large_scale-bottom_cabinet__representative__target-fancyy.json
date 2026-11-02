@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: configuration_matching-articulation_close_large_scale-bottom_cabinet (configuration_matching-articulation_close_large_scale#02, slot representative)",
  "configuration_matching-2": {
-  "alias": "articulation",
+  "variant": "articulation",
   "roles": {
    "artic": {
     "fixed": true,
@@ -41,7 +41,7 @@
   },
   "_isg": {
    "subtask": "configuration_matching-articulation_close_large_scale",
-   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "variant": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
    "pick": "configuration_matching-articulation_close_large_scale#02",
    "slot": "representative",
    "iddl": "configuration_matching/articulation_close_large_scale.iddl",

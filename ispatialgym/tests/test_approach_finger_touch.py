@@ -246,7 +246,7 @@ def test_iors_large_setup_and_preshape_opening():
     from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
 
     def stub(gen, widths):
-        s = SimpleNamespace(gp=SimpleNamespace(alias="a", gen=lambda k, d=None: gen.get(k, d)), ikc=IKChecker(_TouchKit([_Obstacle("bar", 0.0)])),
+        s = SimpleNamespace(gp=SimpleNamespace(variant="a", gen=lambda k, d=None: gen.get(k, d)), ikc=IKChecker(_TouchKit([_Obstacle("bar", 0.0)])),
                             grasps=[SimpleNamespace(meta={} if w is None else {"width": w}) for w in widths], surface={"kind": "furniture"})
         s.grasp_ignore_objects = lambda: ["bar"]
         s.preshape_opening = lambda: IORSLarge.preshape_opening(s)

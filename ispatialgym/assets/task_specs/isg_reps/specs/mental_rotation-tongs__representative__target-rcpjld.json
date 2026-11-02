@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: mental_rotation-tongs (mental_rotation#23, slot representative)",
  "mental_rotation-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -41,7 +41,7 @@
   },
   "_isg": {
    "subtask": "mental_rotation",
-   "alias": "mental_rotation-tongs",
+   "variant": "mental_rotation-tongs",
    "pick": "mental_rotation#23",
    "slot": "representative",
    "iddl": "mental_rotation/mental_rotation.iddl",

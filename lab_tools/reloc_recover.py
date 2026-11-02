@@ -38,7 +38,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 WT = os.path.dirname(HERE)
 sys.path.insert(0, WT)
-ALIAS = "camera_relocalization-standard"
+VARIANT = "camera_relocalization-standard"
 
 
 def downsample(rgb: np.ndarray, size: int = 720) -> np.ndarray:
@@ -71,25 +71,25 @@ def main(argv=None) -> int:
 
     from lab_tools.match_instances import dataset_episodes, first_frame
 
-    # episode of each instance index (the dataset's CSV; the training CSV also lists the obstructed task - alias rows only)
+    # episode of each instance index (the dataset's CSV; the training CSV also lists the obstructed task - variant rows only)
     ep_of_index = {}
     bucket_of_episode = {}
     csv_rows = {}
     with open(os.path.join(args.dataset, "isg_meta", "camera_relocalization_distances.csv")) as f:
         for r in csv.DictReader(f):
-            if r.get("task") and r["task"] != ALIAS:
+            if r.get("task") and r["task"] != VARIANT:
                 continue
             ep_of_index[int(r["instance"].rsplit("__", 1)[1])] = int(r["episode_index"])
             bucket_of_episode[int(r["episode_index"])] = (float(r["bucket_lo_m"]), float(r["bucket_hi_m"]))
             csv_rows[int(r["episode_index"])] = r
     if args.manifest:
-        man = json.load(open(args.manifest))["tasks"][ALIAS]
+        man = json.load(open(args.manifest))["tasks"][VARIANT]
         chosen = sorted(int(c["index"]) for c in man["chosen"])
     elif args.episodes is not None:
         index_of_ep = {e: i for i, e in ep_of_index.items()}
         missing = [e for e in args.episodes if e not in index_of_ep]
         if missing:
-            raise SystemExit(f"episodes {missing} are not {ALIAS} episodes of {args.dataset}")
+            raise SystemExit(f"episodes {missing} are not {VARIANT} episodes of {args.dataset}")
         chosen = sorted(index_of_ep[e] for e in args.episodes)
     else:
         raise SystemExit("one of --manifest / --episodes")
@@ -117,7 +117,7 @@ def main(argv=None) -> int:
     print(f"RELOC_RECOVER chosen={len(chosen)} done={len(done)} todo={len(todo)}", flush=True)
     if not todo:
         return 0
-    strict_templates = glob.glob(os.path.join(job_dir, "inst*", ALIAS, "*", "template_meta.json"))
+    strict_templates = glob.glob(os.path.join(job_dir, "inst*", VARIANT, "*", "template_meta.json"))
     strict_template_dir = os.path.dirname(strict_templates[0]) if strict_templates else None
 
     from PIL import Image
@@ -136,7 +136,7 @@ def main(argv=None) -> int:
         from ispatialgym.sampling.v2.stances import Stance
         from ispatialgym.sampling.v2.tasks import camera_relocalization as CR
 
-        out_dir = os.path.join(out_root, problem.alias, choice.template_id)
+        out_dir = os.path.join(out_root, problem.variant, choice.template_id)
         os.makedirs(out_dir, exist_ok=True)
         t0 = time.time()
         ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, variant=variant)
@@ -383,7 +383,7 @@ def main(argv=None) -> int:
     S._existing_templates = lambda *a, **k: []
     root = os.path.join(job_dir, "recover_scratch")
     shutil.rmtree(root, ignore_errors=True)
-    argv_s = ["--alias", ALIAS, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]), "--seed", str(args.seed),
+    argv_s = ["--variant", VARIANT, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]), "--seed", str(args.seed),
               "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", root, "--log-level", "INFO"]
     print("RELOC_RECOVER sample_isg " + " ".join(argv_s), flush=True)
     try:

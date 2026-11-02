@@ -18,7 +18,7 @@ shoulder camera) per instance next to the TRO and one contact sheet per problem 
 
 Examples::
 
-    OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.render_instances --root /tmp/isg_v2 [--goal] [--alias ...] [--template ...]
+    OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.render_instances --root /tmp/isg_v2 [--goal] [--variant ...] [--template ...]
     OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.render_instances --out /tmp/isg_full11      # v1 layout
 """
 
@@ -447,11 +447,11 @@ def render_template(template_dir: str, robot_name: str = "robot_r1", res: int = 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=None, help="v2 output root (<root>/<alias>/<template_id>/...)")
+    parser.add_argument("--root", default=None, help="v2 output root (<root>/<variant>/<template_id>/...)")
     parser.add_argument("--out", default=None, help="v1 sampler output directory; same as --root for the v1 layout")
-    parser.add_argument("--alias", action="append", default=None, help="restrict to these aliases / problem directories; repeatable")
+    parser.add_argument("--variant", action="append", default=None, help="restrict to these variants / problem directories; repeatable")
     parser.add_argument("--template", action="append", default=None, help="restrict to these template ids or directories; repeatable")
-    parser.add_argument("--problem", action="append", default=None, help="(v1) problem directories; alias of --alias")
+    parser.add_argument("--problem", action="append", default=None, help="(v1) problem directories; same as --variant")
     parser.add_argument("--goal", action="store_true", help="(v2) also render the goal configuration (teleport as the sampler's goal check)")
     parser.add_argument("--no-topdown", action="store_true", help="(v2) skip the top-down stance overlay")
     parser.add_argument("--tile", type=int, default=MONTAGE_TILE, help="(v2) montage tile side")
@@ -464,8 +464,8 @@ def main(argv=None):
     root = args.root or args.out
     if not root:
         raise SystemExit("--root (v2) or --out (v1) is required")
-    aliases = list(args.alias or []) + list(args.problem or []) or None
-    templates = V.discover_templates(root, aliases, args.template)
+    variants = list(args.variant or []) + list(args.problem or []) or None
+    templates = V.discover_templates(root, variants, args.template)
     v2 = [t for t in templates if V.detect_layout(t) == "v2"]
     v1 = [t for t in templates if t not in v2]
     log.info("%d templates under %s (%d v2, %d v1)", len(templates), root, len(v2), len(v1))

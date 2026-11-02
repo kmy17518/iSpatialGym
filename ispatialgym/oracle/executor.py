@@ -1546,7 +1546,7 @@ class Executor:
             ctx["next_place_kind"] = self.next_place_kind(index, action)
         ctx["sidecar"] = self.sidecar  # attachment: the hover alignment's regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         ctx["braces_held"] = self.braces_held(index)  # execute_push holds them in the world during a base nudge
-        ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "alias", None) if self.sidecar is not None else None,
+        ctx["protect"] = {"goal": list(self.protected_goal), "force": index in self._protect_force, "task": getattr(self.sidecar, "variant", None) if self.sidecar is not None else None,
                           "index": index}
         if self.support_surface is not None:
             ctx["support_surface"] = self.support_surface
@@ -2473,7 +2473,7 @@ class Executor:
 
     def goal_occlusion_report(self) -> Dict[str, Any]:
         """The demo gate ``goal_occlusion`` (``ispatialgym.eval.goal_occlusion``) on the settled last frame: the head camera's
-        depth, the box screen of every tracked target / partner (an inside goal's target measured, not judged: the sidecar's alias
+        depth, the box screen of every tracked target / partner (an inside goal's target measured, not judged: the sidecar's variant
         names the subtask) and the panel screen of a tracked fixture (a second depth render with the robot hidden; the panel = the
         links its revolute joints move, at the final joint state). Runs after the last recorded frame (``ispatialgym.oracle.head_depth``:
         the camera's observations stay as loaded) and leaves the robot visible."""
@@ -2500,7 +2500,7 @@ class Executor:
                     self.sim.render()
         cam = (cp.float().tolist(), cq.float().tolist())
         objects = GO.screen_scene(depth, cam, intr, judged, depth_without_robot=depth_without, revolute=JointType.JOINT_REVOLUTE,
-                                  subtask=getattr(self.sidecar, "alias", None))
+                                  subtask=getattr(self.sidecar, "variant", None))
         return GO.report(objects, method="live head-camera depth", step=self.n, camera_key=self.cam_key, resolution=[intr[0], intr[1]])
 
     # ------------------------------------------------------------------ TRO goal override (§3.8, spec §8)

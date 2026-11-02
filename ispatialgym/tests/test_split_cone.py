@@ -106,7 +106,7 @@ def test_split_cone_travel_records_the_move(monkeypatch):
         return SimpleNamespace(stand_off=0.65)
 
     old = [SimpleNamespace(frm="init", to="manipulation"), SimpleNamespace(frm="manipulation", to="placement")]
-    fake = SimpleNamespace(sidecar=SimpleNamespace(paths=list(old), transitions=list(old)), gen=lambda k, d=None: d, kit=None, gp=SimpleNamespace(alias="a"),
+    fake = SimpleNamespace(sidecar=SimpleNamespace(paths=list(old), transitions=list(old)), gen=lambda k, d=None: d, kit=None, gp=SimpleNamespace(variant="a"),
                            record_transition=lambda frm, to, trunk_from=None: calls.append(("transition", trunk_from)) or SimpleNamespace(stand_off=0.45),
                            record_departure_transition=departure,
                            record_path=lambda frm, to, **kw: calls.append(("path", kw["trunk"], tuple(round(v, 6) for v in kw["start_pose2d"]))) or SimpleNamespace(length_m=0.5))
@@ -231,8 +231,8 @@ def test_split_cone_d009b_admits_the_loose_class_per_position_when_every_tight_f
 
 
 def test_split_cone_on_from_the_subtask_defaults():
-    """Owner 2026-10-11 (variant C in every tabletop subtask): the keys come from the subtask's generation_defaults when the alias's
-    customs lack them; an alias's own keys still win (``phase2_split_cone: false`` turns it off); the other subtasks stay off."""
+    """Owner 2026-10-11 (variant C in every tabletop subtask): the keys come from the subtask's generation_defaults when the variant's
+    customs lack them; a variant's own keys still win (``phase2_split_cone: false`` turns it off); the other subtasks stay off."""
     def sampler(subtask, gen):
         return SimpleNamespace(subtask=subtask, gen=lambda k, d=None: gen.get(k, d))
 
@@ -251,7 +251,7 @@ def test_split_cone_on_from_the_subtask_defaults():
 
 def test_split_cone_draw_reads_the_subtask_defaults():
     """The per-attempt position draw is on when C comes from the subtask's generation_defaults (504df81e left it reading the
-    alias's customs only, so the launched jobs kept every position's stances in the task's own order)."""
+    variant's customs only, so the launched jobs kept every position's stances in the task's own order)."""
     edge = EdgeFrame.from_edge("+x", th.tensor([1.0, 0.0]), th.tensor([-1.0, 0.0]), 1.6)
 
     def cand(pos):
@@ -320,8 +320,8 @@ def test_block_design_candidates_record_their_shift_from_the_init(monkeypatch):
         corners = th.tensor([[x, y, z] for x in (-0.0127, 0.0127) for y in (-0.0127, 0.0127) for z in (0.0, 0.0254)])
         s.spec = SimpleNamespace(generation={"patterns": {"test_rbbr": ["red", "blue", "blue", "red"]}, "block_no_flip": True, "flip_directions": ["right"],
                                              "manip_lateral_shifts_m": [0.35, 0.45, 0.25], **gen})
-        s.subtask, s.defaults, s.variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
-        s.gp = SimpleNamespace(alias="configuration_matching-block_design-block_4-breakfast_table_board", roles={"targets": None})
+        s.subtask, s.defaults, s.sub_variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
+        s.gp = SimpleNamespace(variant="configuration_matching-block_design-block_4-breakfast_table_board", roles={"targets": None})
         s.ctx = SimpleNamespace(base_seed=0)
         s.kit = SimpleNamespace(trav_free=lambda xy: True)
         s.world = SimpleNamespace(local_hull=lambda obj: corners)

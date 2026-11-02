@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: mental_rotation-toy_figure (mental_rotation#06, slot representative)",
  "mental_rotation-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -41,7 +41,7 @@
   },
   "_isg": {
    "subtask": "mental_rotation",
-   "alias": "mental_rotation-toy_figure",
+   "variant": "mental_rotation-toy_figure",
    "pick": "mental_rotation#06",
    "slot": "representative",
    "iddl": "mental_rotation/mental_rotation.iddl",

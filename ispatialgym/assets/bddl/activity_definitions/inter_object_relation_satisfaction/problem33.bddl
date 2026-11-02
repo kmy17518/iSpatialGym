@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-33)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet)
+    (:variant inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#03~T5/representative/fallback1:next_model)
     ; fallback 1 (next_model) of inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet: model = utgixp, slot = variation_geometry, primary_model = ofargb

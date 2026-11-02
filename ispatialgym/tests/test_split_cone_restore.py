@@ -22,7 +22,7 @@ class _Stub:
     def __init__(self):
         self.manip_candidates = [_cand(p, k) for p in range(6) for k in range(2)]
         self.sidecar = SimpleNamespace(reset_instance=lambda: None, stances={})
-        self.gp = SimpleNamespace(alias="stub")
+        self.gp = SimpleNamespace(variant="stub")
         self.seen = []
 
     def gen(self, key, default=None):

@@ -1,6 +1,6 @@
 (define (problem configuration_matching-44)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_small_scale-blender-commercial_kitchen_table)
+    (:variant configuration_matching-articulation_close_small_scale-blender-commercial_kitchen_table)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-blender-commercial_kitchen_table (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#01~T5/representative)
     ; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open

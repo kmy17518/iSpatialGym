@@ -37,7 +37,7 @@ def _world():
 def _sampler(relation="touching", gen=None, **extra):
     """An ``IORSSmall`` without a simulator: the two touching#02 boxes standing upright, the generation of ``gen``."""
     s = IS.IORSSmall.__new__(IS.IORSSmall)
-    s.relation, s.gp, s.spec = relation, SimpleNamespace(alias="a"), SimpleNamespace(generation=dict(gen or {}))
+    s.relation, s.gp, s.spec = relation, SimpleNamespace(variant="a"), SimpleNamespace(generation=dict(gen or {}))
     s.hull = {"target": _box(*TARGET), "partner": _box(*PARTNER)}
     s.rest = {"target": C.IDENTITY_QUAT.clone(), "partner": C.IDENTITY_QUAT.clone()}
     s.pair, s.shelf_start, s.world = {"g_NT": 0.0554}, None, _world()

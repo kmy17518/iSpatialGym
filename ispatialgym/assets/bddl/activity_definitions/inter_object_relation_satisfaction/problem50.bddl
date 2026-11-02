@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-50)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-metal_bottom_cabinet)
+    (:variant inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-metal_bottom_cabinet)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-metal_bottom_cabinet (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#04~T5/representative)
     ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set

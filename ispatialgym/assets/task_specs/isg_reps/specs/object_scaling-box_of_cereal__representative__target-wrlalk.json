@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: object_scaling-box_of_cereal (object_scaling#11, slot representative)",
  "object_scaling-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -42,7 +42,7 @@
   },
   "_isg": {
    "subtask": "object_scaling",
-   "alias": "object_scaling-box_of_cereal",
+   "variant": "object_scaling-box_of_cereal",
    "pick": "object_scaling#11",
    "slot": "representative",
    "iddl": "object_scaling/object_scaling.iddl",

@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: configuration_matching-attachment-lid-teapot-breakfast_table (configuration_matching-attachment#05, slot representative)",
  "configuration_matching-3": {
-  "alias": "attachment",
+  "variant": "attachment",
   "roles": {
    "male": {
     "models": {
@@ -52,7 +52,7 @@
   },
   "_isg": {
    "subtask": "configuration_matching-attachment",
-   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "variant": "configuration_matching-attachment-lid-teapot-breakfast_table",
    "pick": "configuration_matching-attachment#05",
    "slot": "representative",
    "iddl": "configuration_matching/attachment.iddl",

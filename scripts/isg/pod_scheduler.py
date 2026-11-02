@@ -4,7 +4,7 @@
     python scripts/isg/pod_scheduler.py loop [--interval 300] [--dry-run]     # the guard (nohup it)
     python scripts/isg/pod_scheduler.py tick [--dry-run]                      # one pass
     python scripts/isg/pod_scheduler.py status                                # queue + idle report to stdout
-    python scripts/isg/pod_scheduler.py add --alias A [--scene S] [--priority 40] [--kind run|demo-only] [--tro P] [--local] [--note ..]
+    python scripts/isg/pod_scheduler.py add --variant A [--scene S] [--priority 40] [--kind run|demo-only] [--tro P] [--local] [--note ..]
     python scripts/isg/pod_scheduler.py hold --subtask S --reason "awaiting owner decision: ..."   # no auto entry
     python scripts/isg/pod_scheduler.py release --subtask S
 
@@ -71,8 +71,8 @@ PRIORITY = {
     "inter_object_relation_satisfaction-ontop_small_scale": 20, "disembedding": 21, "inter_object_relation_satisfaction-under_small_scale": 22,
     "inter_object_relation_satisfaction-touching": 30, "alignment-world_vertical": 31,
 }
-# default loop alias per subtask (the first-demo alias) and the sample_isg scene restriction where one is needed
-DEFAULT_ALIAS = {
+# default loop variant per subtask (the first-demo variant) and the sample_isg scene restriction where one is needed
+DEFAULT_VARIANT = {
     "camera_relocalization-standard": "camera_relocalization-standard", "camera_relocalization-obstructed": "camera_relocalization-obstructed-footstool_1",
     "object_scaling": "object_scaling-banana", "mental_rotation": "mental_rotation-banana",
     "disembedding": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
@@ -92,7 +92,7 @@ DEFAULT_ALIAS = {
     "inter_object_relation_satisfaction-ontop_large_scale": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
     "inter_object_relation_satisfaction-under_large_scale": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
 }
-DEFAULT_SCENE = {}  # office_cubicles_right was the bottom_cabinet scene until D-004 (18:30) blacklisted rvunhj_0; the alias is Rs_int-only now
+DEFAULT_SCENE = {}  # office_cubicles_right was the bottom_cabinet scene until D-004 (18:30) blacklisted rvunhj_0; the variant is Rs_int-only now
 LOCAL_ONLY = {"inter_object_relation_satisfaction-ontop_large_scale"}  # owner 08:19: ontop large-scale on the local GPU
 MOVE_CAP = 6  # pool -> band moves per tick (each dispatch syncs HEAD to the pod)
 ORACLE_ONLY_OWNERS = {"oracle"}  # fixes by these owners re-enter a subtask as demo-only on its last instance
@@ -225,7 +225,7 @@ def survey_band(api, pods):
 
 
 def inflight_runs(customs):
-    """first_demo runs alive on this machine (any agent's): subtask -> [(pid, kind, alias, local)]."""
+    """first_demo runs alive on this machine (any agent's): subtask -> [(pid, kind, variant, local)]."""
     out = {}
     try:
         ps = subprocess.run(["pgrep", "-af", "first_demo.py (run|demo-only)"], capture_output=True, text=True).stdout
@@ -237,15 +237,15 @@ def inflight_runs(customs):
         if line.split(None, 1)[1].startswith("/bin/bash") or "bash -c" in line:
             continue
         pid = int(line.split()[0])
-        m = re.search(r"--alias (\S+)", line)
-        alias = m.group(1) if m else None
-        if alias is None:
+        m = re.search(r"--variant (\S+)", line)
+        variant = m.group(1) if m else None
+        if variant is None:
             m = re.search(r"--tro (\S+)", line)
-            alias = os.path.basename(m.group(1)).split("__")[0] if m else None
-        if not alias:
+            variant = os.path.basename(m.group(1)).split("__")[0] if m else None
+        if not variant:
             continue
-        st = fd.subtask_of(alias, customs)
-        out.setdefault(st, []).append({"pid": pid, "kind": "demo-only" if "demo-only" in line else "run", "alias": alias, "local": "--local" in line})
+        st = fd.subtask_of(variant, customs)
+        out.setdefault(st, []).append({"pid": pid, "kind": "demo-only" if "demo-only" in line else "run", "variant": variant, "local": "--local" in line})
     return out
 
 
@@ -289,7 +289,7 @@ def auto_enter(q, customs, inflight, head):
             explain[st] = "valid demo on the board" + (f" (pre-{','.join(pre)}: blanket fixes, final sweep)" if pre else "")
             continue
         if st in inflight:
-            explain[st] = f"run in flight (pid {inflight[st][0]['pid']}, {inflight[st][0]['kind']} {inflight[st][0]['alias']})"
+            explain[st] = f"run in flight (pid {inflight[st][0]['pid']}, {inflight[st][0]['kind']} {inflight[st][0]['variant']})"
             continue
         if st in queued:
             explain[st] = "already in the ready queue"
@@ -301,33 +301,33 @@ def auto_enter(q, customs, inflight, head):
             owner = (manual.get(st) or {}).get("owner", "")
             explain[st] = f"last run ({last['time'][-9:]}) already carried every fix and did not pass - waiting for a fix: {block[:160] or '-'} (owner: {owner or '-'})"
             continue
-        # enters: pick the alias / kind
-        alias = (last or {}).get("alias") or DEFAULT_ALIAS.get(st)
-        if not alias:
-            explain[st] = "no alias known"
+        # enters: pick the variant / kind
+        variant = (last or {}).get("variant") or DEFAULT_VARIANT.get(st)
+        if not variant:
+            explain[st] = "no variant known"
             continue
         kind = "run"
         tro = None
         if last and last.get("tro") and os.path.exists(os.path.join(REPO, last["tro"])) and all((f.get("owner") or "") in ORACLE_ONLY_OWNERS for f in missing):
             kind, tro = "demo-only", last["tro"]
-        e = {"id": f"{st}:{time.strftime('%m%d-%H%M%S')}", "priority": PRIORITY.get(st, 50 + fd.SUBTASKS.index(st)), "subtask": st, "alias": alias, "kind": kind, "tro": tro,
-             "scene": DEFAULT_SCENE.get(alias), "local": st in LOCAL_ONLY, "state": "ready", "added_by": "rule",
+        e = {"id": f"{st}:{time.strftime('%m%d-%H%M%S')}", "priority": PRIORITY.get(st, 50 + fd.SUBTASKS.index(st)), "subtask": st, "variant": variant, "kind": kind, "tro": tro,
+             "scene": DEFAULT_SCENE.get(variant), "local": st in LOCAL_ONLY, "state": "ready", "added_by": "rule",
              "added_at": now(), "note": f"auto: new fix(es) {', '.join(f['commit'][:7] for f in missing)} since the last run" if last else "auto: no run yet",
              "missing_fixes": [f["commit"][:7] for f in missing]}
         q["entries"].append(e)
         queued.add(st)
-        log(f"queue += {st} ({kind} {alias}{' local' if e['local'] else ''}) prio {e['priority']}: {e['note']}")
+        log(f"queue += {st} ({kind} {variant}{' local' if e['local'] else ''}) prio {e['priority']}: {e['note']}")
     return explain
 
 
 def launch(e, dry):
     os.makedirs(FD_LOGS, exist_ok=True)
     tag = time.strftime("%H%M%S")
-    logf = os.path.join(FD_LOGS, f"{e['alias'][:90]}.sched-{tag}.log")
+    logf = os.path.join(FD_LOGS, f"{e['variant'][:90]}.sched-{tag}.log")
     if e["kind"] == "demo-only":
         cmd = [sys.executable, os.path.join(HERE, "first_demo.py"), "demo-only", "--tro", os.path.join(REPO, e["tro"]), "--timeout", "3600", "--note", f"scheduler: {e.get('note', '')}"]
     else:
-        cmd = [sys.executable, os.path.join(HERE, "first_demo.py"), "run", "--alias", e["alias"], "--max-attempts", str(e.get("max_attempts", 8)), "--timeout", str(e.get("timeout", 7200)),
+        cmd = [sys.executable, os.path.join(HERE, "first_demo.py"), "run", "--variant", e["variant"], "--max-attempts", str(e.get("max_attempts", 8)), "--timeout", str(e.get("timeout", 7200)),
                "--note", f"scheduler: {e.get('note', '')}"]
         if e.get("scene"):
             cmd += ["--scene", e["scene"]]
@@ -339,7 +339,7 @@ def launch(e, dry):
     with open(logf, "w") as lf:
         p = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=REPO, start_new_session=True, env=dict(os.environ, PYTHONWARNINGS="ignore"))
     e.update(state="running", launched_at=now(), pid=p.pid, log=os.path.relpath(logf, REPO))
-    log(f"launched {e['subtask']} {e['kind']} {e['alias']} pid {p.pid} ({'local' if e.get('local') else 'pool'}) -> {e['log']}")
+    log(f"launched {e['subtask']} {e['kind']} {e['variant']} pid {p.pid} ({'local' if e.get('local') else 'pool'}) -> {e['log']}")
     return p.pid
 
 
@@ -507,7 +507,7 @@ def tick(dry=False):
             if local_gpu_free() and not any(r["local"] for rs in inflight.values() for r in rs):
                 launch(e, dry)
                 launched.append(e)
-                inflight.setdefault(e["subtask"], []).append({"pid": e.get("pid"), "kind": e["kind"], "alias": e["alias"], "local": True})
+                inflight.setdefault(e["subtask"], []).append({"pid": e.get("pid"), "kind": e["kind"], "variant": e["variant"], "local": True})
             continue
         if slots <= 0:
             continue
@@ -590,10 +590,10 @@ def tick(dry=False):
     lines += ["", "## Subtasks not in the queue", "", "| subtask | why |", "|---|---|"]
     for st, ex in explain.items():
         lines.append(f"| {st} | {ex.replace('|', '/')} |")
-    lines += ["", "## Ready queue", "", "| prio | state | subtask | kind | alias | note |", "|---|---|---|---|---|---|"]
+    lines += ["", "## Ready queue", "", "| prio | state | subtask | kind | variant | note |", "|---|---|---|---|---|---|"]
     for e in q["entries"]:
         if e.get("state") in ("ready", "running"):
-            lines.append(f"| {e.get('priority')} | {e.get('state')} | {e['subtask']} | {e['kind']}{' (local)' if e.get('local') else ''} | {e['alias']} | {(e.get('note') or '')[:80]} |")
+            lines.append(f"| {e.get('priority')} | {e.get('state')} | {e['subtask']} | {e['kind']}{' (local)' if e.get('local') else ''} | {e['variant']} | {(e.get('note') or '')[:80]} |")
     with open(IDLE_MD, "w") as f:
         f.write("\n".join(lines) + "\n")
     log(f"tick: pool {len(pool)} ({len(pool_free_now)} free), bands {len(band)} ({len(band_idle)} idle), inflight {sum(len(v) for v in inflight.values())}, "
@@ -616,13 +616,13 @@ def cmd_loop(args):
 def cmd_add(args):
     q = load_queue()
     customs = json.load(open(fd.CUSTOMS))
-    st = fd.subtask_of(args.alias, customs)
-    e = {"id": f"{st}:{time.strftime('%m%d-%H%M%S')}", "priority": args.priority, "subtask": st, "alias": args.alias, "kind": args.kind, "tro": args.tro,
-         "scene": args.scene or DEFAULT_SCENE.get(args.alias), "local": args.local or st in LOCAL_ONLY, "state": "ready", "added_by": args.by, "added_at": now(), "note": args.note,
+    st = fd.subtask_of(args.variant, customs)
+    e = {"id": f"{st}:{time.strftime('%m%d-%H%M%S')}", "priority": args.priority, "subtask": st, "variant": args.variant, "kind": args.kind, "tro": args.tro,
+         "scene": args.scene or DEFAULT_SCENE.get(args.variant), "local": args.local or st in LOCAL_ONLY, "state": "ready", "added_by": args.by, "added_at": now(), "note": args.note,
          "max_attempts": args.max_attempts, "timeout": args.timeout}
     q["entries"].append(e)
     save_queue(q)
-    log(f"queue += {st} ({args.kind} {args.alias}) prio {args.priority} by {args.by}: {args.note}")
+    log(f"queue += {st} ({args.kind} {args.variant}) prio {args.priority} by {args.by}: {args.note}")
 
 
 def cancel_pid_tree(pid, wait_s=90):
@@ -701,7 +701,7 @@ def main():
     s = sub.add_parser("status")
     s.set_defaults(fn=lambda a: print(open(IDLE_MD).read() if os.path.exists(IDLE_MD) else "no report yet"))
     s = sub.add_parser("add")
-    s.add_argument("--alias", required=True)
+    s.add_argument("--variant", required=True)
     s.add_argument("--kind", choices=["run", "demo-only"], default="run")
     s.add_argument("--tro", default=None)
     s.add_argument("--scene", default=None)

@@ -128,7 +128,7 @@ def main(argv=None) -> int:
         "horizon_history": [{"phase": "wave1", "tasks": TASKS, "horizon_steps": 3000, "until": "2026-10-07"}, {"phase": "relocalization", "tasks": [TASKS[0]], "horizon_steps": args.horizon, "from": "2026-10-07"}],
         "success_criterion": {
             TASKS[0]: {
-                "goal": "BDDL (:goal (and (pose_reached ?agent.n.01_1) (pose_settled ?agent.n.01_1))) of camera_relocalization problem18 (alias camera_relocalization-standard)",
+                "goal": "BDDL (:goal (and (pose_reached ?agent.n.01_1) (pose_settled ?agent.n.01_1))) of camera_relocalization problem18 (variant camera_relocalization-standard)",
                 "binary_goal": "pose_reached(agent): OmniGibson PoseReached on the robot's head camera sensor `robot_r1:zed_link:Camera:0`, world frame, against the TRO pose target "
                                "(ispatialgym.pose_targets['agent.n.01_1']: the goal camera pose = the camera pose of the demo's goal view)",
                 "position_error_m": "full 3-D Euclidean norm |p_camera - p_goal| (position_metric 'full', pos_axes None)",

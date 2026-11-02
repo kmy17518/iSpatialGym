@@ -14,11 +14,11 @@ the argument order of every predicate is the iddl's (``(under ?partner ?target)`
 ``(under ?target ?partner)`` for under(large-scale)). The text is parsed and compiled with
 :func:`ispatialgym.activity.problem.parse_problem_string` before anything is written.
 
-Definition ids are allocated per alias in ``activity_definitions/<activity>/problems.json`` (:class:`ProblemRegistry`:
-alias <-> id, contiguous with the ``problemN.bddl`` files, never reused; the shape is the record list the
-``activity.problem`` registry reader accepts). :func:`bddl_alias` writes the alias with the characters the parser
-accepts (``ALIAS_RE``): the full v2 alias when it matches, otherwise ``-`` -> ``__`` and the full alias is recorded
-in the registry (``full_alias``).
+Definition ids are allocated per variant in ``activity_definitions/<activity>/problems.json`` (:class:`ProblemRegistry`:
+variant <-> id, contiguous with the ``problemN.bddl`` files, never reused; the shape is the record list the
+``activity.problem`` registry reader accepts). :func:`bddl_variant` writes the variant with the characters the parser
+accepts (``VARIANT_RE``): the full v2 variant when it matches, otherwise ``-`` -> ``__`` and the full variant is recorded
+in the registry (``full_variant``).
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from ispatialgym.activity import problem as _problem
 from ispatialgym.activity.problem import (
     AGENT_INSTANCE,
-    ALIAS_RE,
+    VARIANT_RE,
     PROBLEM_FILE_RE,
     ISGProblem,
     parse_problem_string,
@@ -57,19 +57,19 @@ def group_symbol(role: str) -> str:
     return f"{role}{GROUP_SUFFIX}"
 
 
-def bddl_alias(alias: str) -> str:
-    """The alias as the parser accepts it: ``alias`` itself when ``ALIAS_RE`` matches, else ``-`` -> ``__``."""
-    if ALIAS_RE.match(alias):
-        return alias
-    candidate = alias.replace("-", "__")
-    if not ALIAS_RE.match(candidate):
-        raise GroundingError(f"alias {alias!r} cannot be written in a form the parser accepts ({ALIAS_RE.pattern})")
+def bddl_variant(variant: str) -> str:
+    """The variant as the parser accepts it: ``variant`` itself when ``VARIANT_RE`` matches, else ``-`` -> ``__``."""
+    if VARIANT_RE.match(variant):
+        return variant
+    candidate = variant.replace("-", "__")
+    if not VARIANT_RE.match(candidate):
+        raise GroundingError(f"variant {variant!r} cannot be written in a form the parser accepts ({VARIANT_RE.pattern})")
     return candidate
 
 
-def full_alias_of(bddl_alias_text: str) -> str:
-    """Inverse of :func:`bddl_alias` for the ``__`` spelling (categories never contain a double underscore)."""
-    return bddl_alias_text.replace("__", "-") if "__" in bddl_alias_text and "-" not in bddl_alias_text else bddl_alias_text
+def full_variant_of(bddl_variant_text: str) -> str:
+    """Inverse of :func:`bddl_variant` for the ``__`` spelling (categories never contain a double underscore)."""
+    return bddl_variant_text.replace("__", "-") if "__" in bddl_variant_text and "-" not in bddl_variant_text else bddl_variant_text
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -115,8 +115,8 @@ def agent_grounding() -> RoleGrounding:
 class RenderedProblem:
     text: str
     problem: ISGProblem
-    alias: str  # as written in the BDDL
-    full_alias: str
+    variant: str  # as written in the BDDL
+    full_variant: str
     activity: str
     definition_id: int
     instances: Dict[str, Union[str, List[str]]]  # role -> instance / group symbol; group role -> also members under "<role>.members"
@@ -172,7 +172,7 @@ def render(
     iddl: IDDL,
     groundings: Dict[str, RoleGrounding],
     definition_id: int,
-    alias: str,
+    variant: str,
     activity: str,
     comment: Optional[str] = None,
     validate: bool = True,
@@ -181,7 +181,7 @@ def render(
     """Render the grounded BDDL of ``iddl`` and validate it (parse + compile).
 
     ``groundings`` maps every explicit role of the iddl (``iddl.roles``) to a :class:`RoleGrounding`; ``floor`` and
-    ``agent`` are added when absent. ``alias`` is the full v2 alias (``bddl_alias`` decides the written spelling).
+    ``agent`` are added when absent. ``variant`` is the full v2 variant (``bddl_variant`` decides the written spelling).
     ``init_predicates`` rewrites ``:init`` literals (:func:`rewrite_init`).
     """
     groundings = dict(groundings)
@@ -199,7 +199,7 @@ def render(
     members_of: Dict[str, List[str]] = {}
     groups: Dict[str, List[str]] = {}
 
-    # Declaration order: explicit roles as the iddl lists them (alias slots, :groups members, literals), then the
+    # Declaration order: explicit roles as the iddl lists them (variant slots, :groups members, literals), then the
     # floor, then the agent (matches the shipped templates).
     order = [r for r in iddl.roles] + [r for r in ("floor", "agent") if r in groundings]
     deferred: List[str] = []
@@ -243,8 +243,8 @@ def render(
         mapping[comp] = sym
         groups[sym] = names
 
-    written_alias = bddl_alias(alias)
-    lines = [f"(define (problem {activity}-{definition_id})", "    (:domain ispatialgym)", f"    (:alias {written_alias})"]
+    written_variant = bddl_variant(variant)
+    lines = [f"(define (problem {activity}-{definition_id})", "    (:domain ispatialgym)", f"    (:variant {written_variant})"]
     if comment:
         lines.append("")
         lines.extend(f"    ; {c}" if c else "    ;" for c in comment.splitlines())
@@ -283,7 +283,7 @@ def render(
     instances: Dict[str, Union[str, List[str]]] = dict(mapping)
     for role, names in members_of.items():
         instances[f"{role}.members"] = list(names)
-    return RenderedProblem(text, problem, written_alias, alias, activity, int(definition_id), instances, dict(decl.objects), groups)
+    return RenderedProblem(text, problem, written_variant, variant, activity, int(definition_id), instances, dict(decl.objects), groups)
 
 
 def validate_text(text: str, activity: str, definition_id: int) -> ISGProblem:
@@ -299,18 +299,18 @@ def validate_text(text: str, activity: str, definition_id: int) -> ISGProblem:
 
 
 class ProblemRegistry:
-    """``activity_definitions/<activity>/problems.json``: alias <-> definition id, contiguous, never reused.
+    """``activity_definitions/<activity>/problems.json``: variant <-> definition id, contiguous, never reused.
 
     Shape (accepted by ``ispatialgym.activity.problem.load_problem_registry``)::
 
         {"activity": "alignment",
-         "problems": [{"alias": "table_surface", "id": 0, "legacy": true},
-                      {"alias": "alignment-axial-paperback_book-breakfast_table", "id": 3, "subtask": "alignment-axial",
+         "problems": [{"variant": "table_surface", "id": 0, "legacy": true},
+                      {"variant": "alignment-axial-paperback_book-breakfast_table", "id": 3, "subtask": "alignment-axial",
                        "iddl": "alignment/axial.iddl", "grounded": "2026-09-15", "by": "ground_isg 2.0.0", ...}],
-         "unregistered": [{"id": 2, "alias": "articulation", "why": "duplicate alias of problem1"}]}
+         "unregistered": [{"id": 2, "variant": "articulation", "why": "duplicate variant of problem1"}]}
 
-    Legacy template problems (no registry entry yet) are registered from their ``(:alias ...)`` on first use so the
-    ids stay contiguous; a file whose alias repeats another file's is listed under ``unregistered`` (one alias = one
+    Legacy template problems (no registry entry yet) are registered from their ``(:variant ...)`` on first use so the
+    ids stay contiguous; a file whose variant repeats another file's is listed under ``unregistered`` (one variant = one
     BDDL; the registry reader rejects duplicates).
     """
 
@@ -331,12 +331,12 @@ class ProblemRegistry:
                 data = json.load(f)
             recs = data.get("problems", data) if isinstance(data, dict) else data
             if isinstance(recs, dict):
-                recs = [{"alias": a, "id": i} for a, i in recs.items()]
+                recs = [{"variant": a, "id": i} for a, i in recs.items()]
             for rec in recs:
-                if not isinstance(rec, dict) or "alias" not in rec or ("id" not in rec and "definition_id" not in rec):
+                if not isinstance(rec, dict) or "variant" not in rec or ("id" not in rec and "definition_id" not in rec):
                     raise GroundingError(f"{reg.path}: malformed record {rec!r}")
                 pid = rec.get("id", rec.get("definition_id"))
-                rec = {"alias": rec["alias"], "id": int(pid), **{k: v for k, v in rec.items() if k not in ("alias", "id", "definition_id")}}
+                rec = {"variant": rec["variant"], "id": int(pid), **{k: v for k, v in rec.items() if k not in ("variant", "id", "definition_id")}}
                 reg.records.append(rec)
             if isinstance(data, dict):
                 reg.unregistered = list(data.get("unregistered") or [])
@@ -353,28 +353,28 @@ class ProblemRegistry:
         return ids
 
     def _absorb_files(self) -> None:
-        """Register legacy problem files (present on disk, absent from the registry) from their ``(:alias ...)``."""
+        """Register legacy problem files (present on disk, absent from the registry) from their ``(:variant ...)``."""
         known_ids = {r["id"] for r in self.records} | {u["id"] for u in self.unregistered}
         for pid in self._existing_ids():
             if pid in known_ids:
                 continue
-            alias = _read_alias(os.path.join(self.activity_dir, f"problem{pid}.bddl"))
-            if alias is None:
-                self.unregistered.append({"id": pid, "alias": None, "why": "the problem declares no alias"})
-            elif any(r["alias"] == alias for r in self.records):
-                other = next(r["id"] for r in self.records if r["alias"] == alias)
-                self.unregistered.append({"id": pid, "alias": alias, "why": f"duplicate alias of problem{other}"})
+            variant = _read_variant(os.path.join(self.activity_dir, f"problem{pid}.bddl"))
+            if variant is None:
+                self.unregistered.append({"id": pid, "variant": None, "why": "the problem declares no variant"})
+            elif any(r["variant"] == variant for r in self.records):
+                other = next(r["id"] for r in self.records if r["variant"] == variant)
+                self.unregistered.append({"id": pid, "variant": variant, "why": f"duplicate variant of problem{other}"})
             else:
-                self.records.append({"alias": alias, "id": pid, "legacy": True})
+                self.records.append({"variant": variant, "id": pid, "legacy": True})
         self.records.sort(key=lambda r: r["id"])
 
     def _check(self) -> None:
         ids = [r["id"] for r in self.records]
         if len(set(ids)) != len(ids):
             raise GroundingError(f"{self.path}: an id is registered twice: {sorted(i for i in ids if ids.count(i) > 1)}")
-        aliases = [r["alias"] for r in self.records]
-        if len(set(aliases)) != len(aliases):
-            raise GroundingError(f"{self.path}: an alias is registered twice: {sorted(a for a in aliases if aliases.count(a) > 1)}")
+        variants = [r["variant"] for r in self.records]
+        if len(set(variants)) != len(variants):
+            raise GroundingError(f"{self.path}: a variant is registered twice: {sorted(a for a in variants if variants.count(a) > 1)}")
 
     def save(self) -> str:
         os.makedirs(self.activity_dir, exist_ok=True)
@@ -389,56 +389,56 @@ class ProblemRegistry:
         return self.path
 
     # -- lookups ------------------------------------------------------------------------------------------------------
-    def record(self, alias: str) -> Optional[Dict[str, Any]]:
+    def record(self, variant: str) -> Optional[Dict[str, Any]]:
         for r in self.records:
-            if r["alias"] == alias or r.get("full_alias") == alias:
+            if r["variant"] == variant or r.get("full_variant") == variant:
                 return r
         return None
 
-    def id_of(self, alias: str) -> Optional[int]:
-        r = self.record(alias)
+    def id_of(self, variant: str) -> Optional[int]:
+        r = self.record(variant)
         return None if r is None else int(r["id"])
 
     def next_id(self) -> int:
         ids = [r["id"] for r in self.records] + [u["id"] for u in self.unregistered] + self._existing_ids()
         return (max(ids) + 1) if ids else 0
 
-    def allocate(self, alias: str, bddl_alias_text: Optional[str] = None, **meta) -> int:
-        """The id of ``alias`` (existing record reused and its metadata refreshed; else the next free id)."""
-        rec = self.record(alias)
-        written = bddl_alias_text or alias
+    def allocate(self, variant: str, bddl_variant_text: Optional[str] = None, **meta) -> int:
+        """The id of ``variant`` (existing record reused and its metadata refreshed; else the next free id)."""
+        rec = self.record(variant)
+        written = bddl_variant_text or variant
         if rec is None:
-            rec = {"alias": written, "id": self.next_id()}
+            rec = {"variant": written, "id": self.next_id()}
             self.records.append(rec)
         else:
-            rec["alias"] = written
-        if written != alias:
-            rec["full_alias"] = alias
+            rec["variant"] = written
+        if written != variant:
+            rec["full_variant"] = variant
         else:
-            rec.pop("full_alias", None)
+            rec.pop("full_variant", None)
         rec.pop("legacy", None)
         for k, v in meta.items():
             if v is None:
                 rec.pop(k, None)
             else:
                 rec[k] = v
-        ordered = {"alias": rec["alias"], "id": int(rec["id"])}
+        ordered = {"variant": rec["variant"], "id": int(rec["id"])}
         ordered.update({k: v for k, v in rec.items() if k not in ordered})
         self.records[self.records.index(rec)] = ordered
         self.records.sort(key=lambda r: r["id"])
         self._check()
         return int(ordered["id"])
 
-    def aliases(self) -> Dict[str, int]:
-        return {r.get("full_alias", r["alias"]): int(r["id"]) for r in self.records}
+    def variants(self) -> Dict[str, int]:
+        return {r.get("full_variant", r["variant"]): int(r["id"]) for r in self.records}
 
 
-def _read_alias(path: str) -> Optional[str]:
-    """``(:alias X)`` of a problem file, without parsing the rest (comments stripped)."""
+def _read_variant(path: str) -> Optional[str]:
+    """``(:variant X)`` of a problem file, without parsing the rest (comments stripped)."""
     with open(path) as f:
         text = f.read()
     text = "\n".join(line.split(";", 1)[0] for line in text.splitlines())
-    m = re.search(r"\(:alias\s+([^\s()]+)\s*\)", text)
+    m = re.search(r"\(:variant\s+([^\s()]+)\s*\)", text)
     return m.group(1) if m else None
 
 
@@ -452,24 +452,24 @@ def write_problem(
     activity: str,
     iddl: IDDL,
     groundings: Dict[str, RoleGrounding],
-    alias: str,
+    variant: str,
     comment: Optional[str] = None,
     meta: Optional[Dict[str, Any]] = None,
     dry_run: bool = False,
     init_predicates: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> RenderedProblem:
-    """Allocate the id of ``alias`` in ``<bddl_root>/<activity>/problems.json``, render, validate and write
-    ``problem<N>.bddl`` (an existing problem of the same alias is rewritten under its id). ``meta`` is recorded in
+    """Allocate the id of ``variant`` in ``<bddl_root>/<activity>/problems.json``, render, validate and write
+    ``problem<N>.bddl`` (an existing problem of the same variant is rewritten under its id). ``meta`` is recorded in
     the registry record (subtask, iddl, pick, slot, ...); ``init_predicates`` see :func:`rewrite_init`."""
     activity_dir = os.path.join(bddl_root, activity)
     registry = ProblemRegistry.load(activity_dir, activity)
-    written_alias = bddl_alias(alias)
-    existing = registry.record(alias)
-    # ``grounded`` = the first grounding date of the alias (a re-grounding keeps it, so the registry only changes
+    written_variant = bddl_variant(variant)
+    existing = registry.record(variant)
+    # ``grounded`` = the first grounding date of the variant (a re-grounding keeps it, so the registry only changes
     # where the grounding changed)
     grounded = existing.get("grounded") if existing else None
-    definition_id = registry.allocate(alias, written_alias, grounded=grounded or _dt.date.today().isoformat(), by=GROUNDER, **(meta or {}))
-    rendered = render(iddl, groundings, definition_id, alias, activity, comment=comment, init_predicates=init_predicates)
+    definition_id = registry.allocate(variant, written_variant, grounded=grounded or _dt.date.today().isoformat(), by=GROUNDER, **(meta or {}))
+    rendered = render(iddl, groundings, definition_id, variant, activity, comment=comment, init_predicates=init_predicates)
     if not dry_run:
         os.makedirs(activity_dir, exist_ok=True)
         path = os.path.join(activity_dir, f"problem{definition_id}.bddl")
@@ -492,9 +492,9 @@ __all__ = [
     "RenderedProblem",
     "RoleGrounding",
     "agent_grounding",
-    "bddl_alias",
+    "bddl_variant",
     "floor_grounding",
-    "full_alias_of",
+    "full_variant_of",
     "group_symbol",
     "render",
     "validate_text",

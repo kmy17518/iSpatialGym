@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: disembedding-mug-distractors-breakfast_table (disembedding#25, slot representative)",
  "disembedding-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "target": {
     "models": {
@@ -1261,7 +1261,7 @@
   },
   "_isg": {
    "subtask": "disembedding",
-   "alias": "disembedding-mug-distractors-breakfast_table",
+   "variant": "disembedding-mug-distractors-breakfast_table",
    "pick": "disembedding#25",
    "slot": "representative",
    "iddl": "disembedding/disembedding.iddl",

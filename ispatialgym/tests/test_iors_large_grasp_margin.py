@@ -18,14 +18,14 @@ from ispatialgym.sampling.v2.stances import Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
-ALIAS = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched"
+VARIANT = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched"
 FLOOR = SimpleNamespace(name="floors_jluwuz_0")
 DOWN = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))  # top-down: the approach axis -z
 
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = ALIAS, dict(gen)
+        self.variant, self.generation = VARIANT, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

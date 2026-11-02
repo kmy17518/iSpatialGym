@@ -1,6 +1,6 @@
 (define (problem alignment-22)
     (:domain ispatialgym)
-    (:alias alignment-axial-magazine-coffee_table)
+    (:variant alignment-axial-magazine-coffee_table)
 
     ; ground_isg 2.0.0: alignment-axial-magazine-coffee_table (alignment/axial.iddl; alignment-axial#04~T5/representative)
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a

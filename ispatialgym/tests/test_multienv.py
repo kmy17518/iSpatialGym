@@ -39,7 +39,7 @@ def _run(tmp_path, per_scene: bool, async_frames: bool, video: bool = False, cap
         capture(rec)
     rec.start(env.get_obs()[0], {}, state0=state0)
     ex.recorder = rec
-    result = ex.run_program(expand(sc.alias, sc))
+    result = ex.run_program(expand(sc.variant, sc))
     paths = rec.close({"instance_id": sc.instance_id, "success": bool(result["success"])}, qa=result["qa"]["stats"], success=bool(result["success"]))
     return result, rec, paths
 

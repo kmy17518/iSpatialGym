@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table (inter_object_relation_satisfaction-nextto#03, slot representative)",
  "inter_object_relation_satisfaction-3": {
-  "alias": "nextto",
+  "variant": "nextto",
   "roles": {
    "target": {
     "models": {
@@ -52,7 +52,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-nextto",
-   "alias": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
    "pick": "inter_object_relation_satisfaction-nextto#03",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/nextto.iddl",

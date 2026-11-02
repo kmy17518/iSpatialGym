@@ -53,7 +53,7 @@ Layer 1   motions        decision-free executors of one recorded target each (3.
 Layer 2   actions        the unit of checkpoint / annotation / QA (3.6): Navigate, Transition, SetTorso, Grasp,
                          Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat — targets() from a sidecar block
                          via the conventions; execute() yields 23-D actions via Layer 1; postcondition(); annotate()
-Layer 3   programs       one pure function per row of 6.2: expand(alias, sidecar) -> list[Action] (3.7); no simulator
+Layer 3   programs       one pure function per row of 6.2: expand(variant, sidecar) -> list[Action] (3.7); no simulator
 Executor  run_isg        one loop for the oracle / replay / policy modes (3.8): load -> expand -> per action:
                          checkpoint -> execute under the QA monitors -> postcondition -> one retry -> annotate;
                          then the epilogue (success, no-op window, settled, goal image, TRO goal override) -> record
@@ -227,7 +227,7 @@ postcondition and to close the loop on tracking error; they never choose between
 
 ### 3.7 Layer 3: programs and `expand`
 
-`expand(alias, sidecar) -> list[Action]` (`ispatialgym/oracle/programs.py`, TODO F6) dispatches on the alias's
+`expand(variant, sidecar) -> list[Action]` (`ispatialgym/oracle/programs.py`, TODO F6) dispatches on the variant's
 subtask to one function per row of 6.2 (`program_block_design(sidecar)`, `program_iors_touching(sidecar)`, …).
 Each returns the action list with the loops and conditionals of its row resolved from the sidecar (block order,
 `brace_col` present or not, `passive_from`, `follow_mode`, the placement stance of disembedding / IORS large-scale).
@@ -252,7 +252,7 @@ One loop serves the three modes of 6.5; only the action source differs (a progra
 
 ```
 load TRO + sidecar + scene variant (loader contract, spec §3.14); verify sidecar.tro_sha256
-actions = expand(alias, sidecar)
+actions = expand(variant, sidecar)
 for action in actions:
     checkpoint = snapshot(simulator state, executor state)
     for attempt in (0, 1):
@@ -565,7 +565,7 @@ the sampler's `seg_instance` renders, no prim is hidden anywhere).
 ## 7. Running it
 
 The snippet below is the **v1** API and still runs. The v2 entry point is `run_isg --mode oracle <instance>` (TODO
-F1), which loads the TRO + sidecar, expands the alias's program and runs it through the executor (3.8); none of the
+F1), which loads the TRO + sidecar, expands the variant's program and runs it through the executor (3.8); none of the
 v2 modules (`robot/conventions.py`, `oracle/actions.py`, `oracle/programs.py`, `run_isg`) exists yet.
 
 ```bash

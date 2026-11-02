@@ -120,7 +120,7 @@ def test_palm_spheres_are_the_gripper_collision_model():
 
 class _GP:
     def __init__(self, **gen):
-        self.alias, self.generation = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor", dict(gen)
+        self.variant, self.generation = "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor", dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)

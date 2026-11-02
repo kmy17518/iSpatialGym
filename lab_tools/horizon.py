@@ -2,7 +2,7 @@
 vec_eval.py.
 
 * ``--horizon auto`` (the default): a ground-truth replay streams its whole demo (the episode's ``length`` in the dataset's
-  episode metadata); a policy rollout gets twice the longest training demo of its alias (``datasets/isg-init``'s episode
+  episode metadata); a policy rollout gets twice the longest training demo of its variant (``datasets/isg-init``'s episode
   metadata, columns ``tasks`` and ``length``; never the test set). A number is the fixed protocol (the sanity battery
   passes 1500).
 * ``--max-steps auto`` = ceil(1.6 x horizon) + 100: the settle windows add up to 60 % of the streamed steps. Without
@@ -56,7 +56,7 @@ def demo_length(root: str, episode: int) -> int:
 
 
 def policy_horizon(task: str, train_root: str = TRAIN_ROOT) -> int:
-    """Twice the longest training demo of the alias ``task``."""
+    """Twice the longest training demo of the variant ``task``."""
     df = _episodes(os.path.abspath(train_root))
     lengths = [int(n) for tasks, n in zip(df["tasks"], df["length"]) if task in list(tasks)]
     if not lengths:
@@ -73,7 +73,7 @@ def budget(horizon: Spec, max_steps: Optional[Spec], kind: str, task: Optional[s
            train_root: str = TRAIN_ROOT) -> Dict[str, Any]:
     """The budget of one stream as written into its record: ``horizon``, ``horizon_rule``, ``max_steps``,
     ``max_steps_rule``. ``kind``: ``replay`` (``demo_len`` = the episode's recorded length) or ``policy`` (``task`` = the
-    alias)."""
+    variant)."""
     if horizon == "auto":
         if kind == "replay":
             h, rule = int(demo_len), "demo_length"

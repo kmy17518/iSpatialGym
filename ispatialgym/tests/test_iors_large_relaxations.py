@@ -14,8 +14,8 @@ IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
 
 class _GP:
-    def __init__(self, alias: str = "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor", **gen):
-        self.alias, self.generation = alias, dict(gen)
+    def __init__(self, variant: str = "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor", **gen):
+        self.variant, self.generation = variant, dict(gen)
 
     def gen(self, key, default=None):
         return self.generation.get(key, default)
@@ -88,7 +88,7 @@ class _SurfaceStub:
     def __init__(self, relation, support, distances, categories=None, **gen):
         self.subtask = f"inter_object_relation_satisfaction-{relation}_large_scale"
         self.relation = relation
-        self.gp = _GP(alias=f"{self.subtask}-mouse-desk-countertop", **gen)
+        self.gp = _GP(variant=f"{self.subtask}-mouse-desk-countertop", **gen)
         self.partner = SimpleNamespace(name="desk_iotfzl_0", category="desk", in_rooms=["living_room_0"])
         self.floor = SimpleNamespace(name="floors_abc_0", aabb=(th.zeros(3), th.zeros(3)))
         self.target = SimpleNamespace(name="mouse.n.01_1")
@@ -122,7 +122,7 @@ class _SurfaceStub:
     def try_surface(self, kind, cand, rng):
         self.tried.append((kind, cand.name))
 
-    def alias_role(self, role, bound):
+    def variant_role(self, role, bound):
         self.roles[role] = bound
 
     def bind_scene_object(self, role, obj):
@@ -276,7 +276,7 @@ def test_a_place_under_plans_around_the_partner_and_leaves_out_the_floor(tmp_pat
         ex, motions, backend, _ = make_executor(env, sc, tmp_path / relation)
         floor = SimpleNamespace(name="floors_x_0", category="floors")
         ex.state.contact_supports = lambda name, margin=0.10, depth=2, _f=floor: [_f]
-        actions = [replace(a, relation=relation) if isinstance(a, Place) else a for a in expand(sc.alias, sc)]
+        actions = [replace(a, relation=relation) if isinstance(a, Place) else a for a in expand(sc.variant, sc)]
         result = ex.run_program(actions)
         assert result["success"], result["verdict"]
         ignored[relation] = ex.action_records[[a.name for a in actions].index("place")].notes["plan_ignored"]
@@ -308,7 +308,7 @@ class _PlaceUnderStub:
     band_cells_world = IL.IORSLarge.band_cells_world
 
     def __init__(self, **gen):
-        self.gp = _GP(alias="inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor", under_mode="place", **gen)
+        self.gp = _GP(variant="inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor", under_mode="place", **gen)
         self.relation, self.seg_arm, self.push_under, self.floor_z = "under", "right", False, 0.0
         self.partner = SimpleNamespace(name="desk_mdhelw_1", aabb=(th.tensor([0.0, 0.0, 0.0]), th.tensor([1.2, 0.6, 0.75])))
         self.place = {"half": 0.15, "height": 0.28, "cells": th.tensor([[0.6, 0.3]])}

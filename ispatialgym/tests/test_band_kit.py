@@ -224,7 +224,7 @@ def test_iors_large_floor_band_runs_on_the_band_kit(band_kit_of_fakes):
     world, kit = _setup()
     world.spawned = {"target_apple_0": NS(name="target_apple_0")}
     s = NS(choice=NS(models={"target": NS(category="apple", model="agveuv", scale=None)}), world=world, kit=kit, target=NS(name="target_apple_0"),
-           floor_z=0.0, gp=NS(rooms=lambda scene: ["living_room_0"], alias="iors-large-test"), scene="house_single_floor", obj=lambda role: NS(name="floors_0"),
+           floor_z=0.0, gp=NS(rooms=lambda scene: ["living_room_0"], variant="iors-large-test"), scene="house_single_floor", obj=lambda role: NS(name="floors_0"),
            hull=th.zeros(8, 3), rest=th.tensor([0.0, 0.0, 0.0, 1.0]), grasps=[NS(name="grasp_0", position=th.tensor([0.0, 0.0, 0.1]))],
            grasp_key="apple__agveuv__t", relation="ontop", place={})
     rb = IL.IORSLarge.compute_band(s, "floor")
@@ -238,7 +238,7 @@ def _handle_sampler(world, kit, band_trunks):
     return NS(world=world, kit=kit, top=NS(name="bottom_cabinet_0", z=0.9, cells=lambda free_only=True: th.zeros(3, 2), to_json=lambda: {}),
               choice=NS(models={"target": NS(category="microwave", model="abzvij")}), role="target", joint_name="j_link_0", _support=lambda: NS(name="bottom_cabinet_0"),
               face_yaw=1.57, handle={"contact": [0.1, 0.0, 0.2], "approach_dir": [1.0, 0.0, 0.0], "pinch_axis": [0.0, 0.0, 1.0]}, obj=lambda role: NS(scale=None),
-              _band_q_values=lambda: [0.0, 1.2], gp=NS(alias="articulation-test"), _stage2_enabled=lambda: False, required=0.5, passive_from=0.8,
+              _band_q_values=lambda: [0.0, 1.2], gp=NS(variant="articulation-test"), _stage2_enabled=lambda: False, required=0.5, passive_from=0.8,
               gen=lambda key, default=None: band_trunks if key == "band_trunks" else default, handle_arm="right", brace_arm="left", hull=th.zeros(8, 3))
 
 
@@ -476,7 +476,7 @@ def test_iors_large_idle_arm_floor_bands_are_keyed_named_and_recorded_like_the_c
     world, kit = _setup()
     world.spawned = {"target_mouse_0": NS(name="target_mouse_0")}
     s = NS(choice=NS(models={"target": NS(category="mouse", model="pljjtu", scale=None)}), world=world, kit=kit, target=NS(name="target_mouse_0"),
-           floor_z=0.0, gp=NS(rooms=lambda scene: ["living_room_0"], alias="iors-large-test"), scene="house_single_floor", obj=lambda role: NS(name="floors_0"),
+           floor_z=0.0, gp=NS(rooms=lambda scene: ["living_room_0"], variant="iors-large-test"), scene="house_single_floor", obj=lambda role: NS(name="floors_0"),
            hull=th.zeros(8, 3), rest=th.tensor([0.0, 0.0, 0.0, 1.0]), grasps=[NS(name="grasp_0", position=th.tensor([0.0, 0.0, 0.1]))],
            grasp_key="mouse__pljjtu__t", relation="ontop", place={})
     whole = IL.IORSLarge.compute_band(s, "floor")

@@ -2,7 +2,7 @@
  "activity": "object_scaling",
  "problems": [
   {
-   "alias": "object_scaling-canned_food",
+   "variant": "object_scaling-canned_food",
    "id": 0,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -13,7 +13,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-bottle_of_pop",
+   "variant": "object_scaling-bottle_of_pop",
    "id": 1,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -24,7 +24,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-bottle_of_medicine",
+   "variant": "object_scaling-bottle_of_medicine",
    "id": 2,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -35,7 +35,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-apple",
+   "variant": "object_scaling-apple",
    "id": 3,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -46,7 +46,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-pack_of_cigarettes",
+   "variant": "object_scaling-pack_of_cigarettes",
    "id": 4,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -57,7 +57,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-can_of_soda",
+   "variant": "object_scaling-can_of_soda",
    "id": 5,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -68,7 +68,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-beeswax_candle",
+   "variant": "object_scaling-beeswax_candle",
    "id": 6,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -79,7 +79,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-bell_pepper",
+   "variant": "object_scaling-bell_pepper",
    "id": 7,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -90,7 +90,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-beefsteak_tomato",
+   "variant": "object_scaling-beefsteak_tomato",
    "id": 8,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -101,7 +101,7 @@
    "mode": "representative"
   },
   {
-   "alias": "object_scaling-bottle_of_catsup",
+   "variant": "object_scaling-bottle_of_catsup",
    "id": 9,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",

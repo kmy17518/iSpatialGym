@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-66)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk)
+    (:variant inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#01~T4/representative)
     ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the

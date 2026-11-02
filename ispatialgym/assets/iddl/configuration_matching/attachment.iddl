@@ -4,7 +4,7 @@
 ; roles/constraints_compatible.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
 (define (iddl configuration_matching-attachment)
     (:family configuration_matching)
-    (:alias configuration_matching-attachment-{target}-{partner}-{support})
+    (:variant configuration_matching-attachment-{target}-{partner}-{support})
     (:groups
         target partner - assembly
     )

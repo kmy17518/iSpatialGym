@@ -1,4 +1,4 @@
-subtask,alias,job,pod,rc,wall_s,n_written,rejections,error
+subtask,variant,job,pod,rc,wall_s,n_written,rejections,error
 alignment-axial,alignment-axial-bag_of_chips-breakfast_table,alignment-axial-bag_of_chips-breakfast_table__representative__target-dwkdko,samp-l40s-1,0,2218,0,"{""goal_infeasible"": 56, ""grasp_unreachable"": 4, ""scene_reset"": 177}",
 alignment-axial,alignment-axial-board_game-breakfast_table,alignment-axial-board_game-breakfast_table__representative__target-qgvsnb,samp-a40-3,0,912,2,"{""scene_reset"": 3}",
 alignment-axial,alignment-axial-catalog-breakfast_table,alignment-axial-catalog-breakfast_table__representative__target-aygcnt,samp-l40s-2,0,191,2,{},

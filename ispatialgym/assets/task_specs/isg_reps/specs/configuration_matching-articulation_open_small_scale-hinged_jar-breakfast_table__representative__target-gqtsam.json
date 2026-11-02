@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table (configuration_matching-articulation_open_small_scale#02, slot representative)",
  "configuration_matching-1": {
-  "alias": "articulation",
+  "variant": "articulation",
   "roles": {
    "artic": {
     "models": {
@@ -47,7 +47,7 @@
   },
   "_isg": {
    "subtask": "configuration_matching-articulation_open_small_scale",
-   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
    "pick": "configuration_matching-articulation_open_small_scale#02",
    "slot": "representative",
    "iddl": "configuration_matching/articulation_open_small_scale.iddl",

@@ -124,8 +124,8 @@ runs `*-door_wedgepush` / `*-door_hookclose` after 18:46 and the report below.
   tracker rejects base poses from which the fingertips leave the head camera frame (`check_fov`, `fov_margin`) — the
   first dishwasher-close demo failed QA `gripper_out_of_fov`.
 * `run_isg.py`: `ISG_PROGRAM_HOOK=path.py:callable` rewrites the expanded program (experiments only; recorded in meta).
-* Experiment customs `runlogs/smoke_inputs/artic_large_exp/customs.json`: aliases `dishwasher_wide` (hybrid,
-  S = 27/31.5/36°), close dishwasher (q_init 16–19°, init tilts) and close door (d_max 3.5 m, init tilts); door aliases
+* Experiment customs `runlogs/smoke_inputs/artic_large_exp/customs.json`: variants `dishwasher_wide` (hybrid,
+  S = 27/31.5/36°), close dishwasher (q_init 16–19°, init tilts) and close door (d_max 3.5 m, init tilts); door variants
   carry `joint_limit_margin_rad 0.025`, `hybrid_follow.hard_margin_rad 0.025`, `remove_objects` (garden armchairs,
   coffee table, plant) — none of this is in the shared `isg_customs.json` yet.
 

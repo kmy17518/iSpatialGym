@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: object_scaling-can_of_soda (object_scaling#12, slot representative)",
  "object_scaling-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -42,7 +42,7 @@
   },
   "_isg": {
    "subtask": "object_scaling",
-   "alias": "object_scaling-can_of_soda",
+   "variant": "object_scaling-can_of_soda",
    "pick": "object_scaling#12",
    "slot": "representative",
    "iddl": "object_scaling/object_scaling.iddl",

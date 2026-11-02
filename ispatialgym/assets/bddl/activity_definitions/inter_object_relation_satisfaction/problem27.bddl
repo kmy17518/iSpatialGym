@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-27)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk)
+    (:variant inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#01/representative)
     ; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the

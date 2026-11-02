@@ -68,7 +68,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   Applies to the uncarried legs (`core.record_path`: IORS large init -> B; `prompt0.connect`: the large-articulation and
   wall-alignment approach); carried legs stay recorded, their schedule only probed at 1 cm and tallied
   (`FACE_TRAVEL_CARRIED_PROBE`, log `FACE_TRAVEL carried-leg probe`); transitions, base-follow and the drive with an arm
-  schedule are untouched. `first_demo.py run --sample-only` re-samples an alias for the sidecar comparison.
+  schedule are untouched. `first_demo.py run --sample-only` re-samples a variant for the sidecar comparison.
 - **IORS large: the A -> B drive is re-swept with the target placed** (owner 2026-09-26; shampoo 0926-015905, wave 8 phase 1:
   navigate[0] failed twice, 'wheel_motor_link1 in contact with the shampoo dispenser' - the recorded A -> B line passed 5.6 cm
   from the dispenser standing on the floor). `record_leg_a_b` runs before the target has a pose (it is parked), so the drive
@@ -86,7 +86,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   tried within the attempt. An instance whose C was in frame is unchanged.
 - **Joint-limit re-solves from random configurations** (owner 2026-09-26; bar soap 0926-011542, wave 7 phase 1: no instance in 8
   attempts - every solution of the place pose within 2-12 mrad of `right_arm_joint6`'s limit - while copy 0926-011544 of the
-  same alias and seed sampled at attempt 0 and waves 3 / 6 passed; wave 5's 8/8 failure was the same flakiness). The four
+  same variant and seed sampled at attempt 0 and waves 3 / 6 passed; wave 5's 8/8 failure was the same flakiness). The four
   re-solves of `IKChecker.away_from_limits` start from the remembered seeds and `q0` - near-identical starts; when they all stay
   within `JOINT_LIMIT_MARGIN`, up to `LIMIT_RETRY_RANDOM` 12 more re-solves start from random arm configurations (a generator
   seeded by the pose, so reproducible). Runs only where the candidate would otherwise be rejected `ik_joint_limit`.
@@ -105,7 +105,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `iors_small.reselect_grasp`): feasibility, then the joint-limit margin (capped at 0.30 rad, deciding beyond a 0.10 rad gain),
   then continuity (the pre-grasp witness closer to the stance posture by more than 0.30 rad); ties keep the row. A twin must
   keep the wrist camera 5 mm above the support top at the grasp pose. It is recorded as `<row>~r180` with its own
-  `eef_in_object` (the oracle executes it unchanged; `conventions.grasp_entry` resolves the alias), `grasps[].wrist_flip` /
+  `eef_in_object` (the oracle executes it unchanged; `conventions.grasp_entry` resolves the variant), `grasps[].wrist_flip` /
   `twin_choice`, and the instance summary's `kit` counts the choices and the joint-limit re-solves. `generation.grasp_twins`
   (default on; off = the previous behaviour exactly).
 - **The wrist turn of every contact by one rule** (owner 2026-09-27, first-demo v2.1; replaces B2's capped-margin rule). The
@@ -224,7 +224,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   for the whole action, transit included. **Protected** = the objects the goal refers to in positive atoms that the task
   placed (teacup -> saucer and cup, disembedding -> the destination tray, block design -> the blocks and the board) plus the
   action's own target until its intended contact begins; distractors (negated atoms only), source containers and furniture
-  (scene names `<category>_<model>_<k>`: tables, doors, walls) keep today's handling; per-alias override
+  (scene names `<category>_<model>_<k>`: tables, doors, walls) keep today's handling; per-variant override
   `isg_customs.json` `"protection": {"exclude"/"include": [bddl names]}` + `_protection_note`. **Plan-time**
   (`Motions.protecting`, oracle only): every trajectory `arm_to` plans inside a transit (to the pre-grasp, the pre-place, the
   pre-contact) and the carry's tracked path are checked with the moving arm's spheres - a carried object's included
@@ -256,7 +256,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
 - **Path sweeps cover the tracker's yaw lag** (owner 2026-09-25; shampoo 0925-211757 / 222156: the idle left finger
   brushed `wardrobe_pyuwgc_0` for 2 steps 38 steps into the carried 36 cm shuffle to the countertop stance - a 57 deg
   turn then 90 deg in place - with the base 4 mm off the path line and its yaw 6 deg BEHIND the interpolated one; the
-  carried drive had been swept at the alias's 3 cm `carry_path_margin_m` along the interpolated yaws and passed).
+  carried drive had been swept at the variant's 3 cm `carry_path_margin_m` along the interpolated yaws and passed).
   `navigation.stride_poses(yaw_envelope=True)` repeats every stride pose at the yaws the reference held over the last
   `YAW_LAG_LOOKBACK_M` 0.25 m of path (the angular hull of those yaws and the interpolated one, every
   `YAW_ENVELOPE_STEP_RAD` 10 deg), and `plan_path` / the program check's travel re-sweep (`_sweep_travel_record`) sweep
@@ -272,7 +272,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   1 cm `collision_activation_distance` swept the TCP 2.7 cm over the table through the 1.5 cm saucer 30 cm beside the teacup
   and pushed it 20 cm - `under(saucer, teacup)` was lost before the grasp). 2 cm was tried in wave 5 (f52992eb / 4ec17e77) and
   reverted the same night: one `MotionPlannerCfg` configures the IK solvers and the trajopt alike, so the sampler's IK
-  solutions changed too (bar soap 0925-235551: 8/8 attempts `place_unreachable: ik_joint_limit`, an alias green in waves
+  solutions changed too (bar soap 0925-235551: 8/8 attempts `place_unreachable: ik_joint_limit`, a variant green in waves
   2 and 3), and the transit still brushed the saucer (0925-235559: 12 cm). Open: the transit needs a via-above leg (or the
   partner kept out of the arm's approach corridor), not a margin.
 - **Rejected manipulation candidates move down the order** (owner 2026-09-25; cap 0925-220515: 45 phase-2 survivors,
@@ -311,7 +311,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   below the link than the male's own length AND the fingers' reach (`TIP_REACH_BELOW_LINK_M` 6 cm - a wide cap's tips do hang
   over a shoulder 3-5 cm under the mouth, further than the 11 mm cap is long): then the rim floor again. Class and numbers on
   `template_facts.attach_pair_class` (r_male, r_rim, r_opening, male length, depth under the tips / rim, the rule used) for
-  every attachment alias. The cork's library end topples in ~half of PhysX's settles (probe: 3/6 baseline, 0/6 on its other
+  every attachment variant. The cork's library end topples in ~half of PhysX's settles (probe: 3/6 baseline, 0/6 on its other
   end; a self-excited rock 4 -> 6 -> 8 -> 10 -> 110 deg): the rest stays the library's and the cork runs with 20 attempts.
 - **Male rest orientation: the library's, unless physics toppled it** (owner 2026-09-25; cap 0925-144739: the geometry-only
   flip of 2026-09-24 turned the flat cap open side up for a 1.6x "better" tipping margin and 8/8 draws had no reachable
@@ -358,13 +358,13 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   shortcut (2026-09-22) its polyline is up to ~8 % shorter than the grid geodesic the pilot's dense records had, so an
   instance near a bound could change bucket. `path_length_m` stays in the summary as information; the goal candidate's
   bucket is now checked before its path is collision-checked.
-- **World horizontal retired** (2026-09-23). The `alignment-world_horizontal` subtask (v1 `world_alignment-2`, alias
+- **World horizontal retired** (2026-09-23). The `alignment-world_horizontal` subtask (v1 `world_alignment-2`, variant
   `world_horizontal`) is removed everywhere: the v2 sampler `alignment_wall.py` registers world vertical only (the
   horizontal `swept_patch` extents, `level_axis` frame key and the `V1_DEFINITION_ID` 2 are gone), the v1
   `WorldHorizontalSampler` / `bddl_writer` definition 2, the oracle program / sidecar / program-check registries,
   `generation_defaults`, `v2.problem.SUBTASK_FAMILY`, `v1_bridge`, `ground_isg` (`WALL_SUBTASKS`,
   `SCALE_FALLBACK_SUBTASKS`, `frame_level` is no longer read), the iddl file, the 22 alignment BDDL problems
-  (legacy `problem2` + 21 grounded aliases; the remaining alignment problems are renumbered contiguously and the
+  (legacy `problem2` + 21 grounded variants; the remaining alignment problems are renumbered contiguously and the
   customs `definition_id`s follow), the 21 customs entries, the `isg_reps` v1-bridge snapshot, the icl candidate /
   representative rows (+ report) and the revolution-axes table entries only that subtask used. 20 subtasks remain.
 - **Neighbouring rooms loaded while sampling, nothing hidden for renders** (B10). `SimWorld.load_adjacent` defaults
@@ -384,7 +384,7 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   `seg_instance` now renders >= 4 frames and continues one frame at a time until two consecutive raw-buffer fetches
   are identical (cap 8), then reads; `rgb()` reads after the same settling. ~0.3 s per measurement instead of
   ~0.17 s. Same-pose measurements are now identical across repeats and across room sets. Spec 3.4.
-- **World horizontal (`world_alignment-2`, alias `world_horizontal`)**: new problem (BDDL template
+- **World horizontal (`world_alignment-2`, variant `world_horizontal`)**: new problem (BDDL template
   `world_alignment/problem2.bddl`, `bddl_writer`, `WorldHorizontalSampler` in `tasks/world_alignment.py`, spec entry,
   docs spec §5.9 / `task_bddl_formats.md` §6c). Same wall hinge, arc and pushing rules as world vertical; the target
   is an elongated wall item whose long axis / reference edge must end up **level**. Differences: the optional

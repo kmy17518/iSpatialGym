@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-97)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching-hardback-hardback-shelf)
+    (:variant inter_object_relation_satisfaction-touching-hardback-hardback-shelf)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-hardback-hardback-shelf (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#03~T2/representative)
     ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it

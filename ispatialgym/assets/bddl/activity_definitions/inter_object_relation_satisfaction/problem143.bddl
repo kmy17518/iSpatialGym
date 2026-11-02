@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-143)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070)
 
     ; owner 2026-10-12 ~21:15: inside_large#02 on the fridge's lower shelf (0.70 m) - problem128 copied for inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#02~T3/representative)

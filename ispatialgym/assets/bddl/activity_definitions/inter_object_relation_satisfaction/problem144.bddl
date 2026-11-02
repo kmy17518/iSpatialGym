@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-144)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched)
+    (:variant inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched)
 
     ; owner 2026-10-12 ~20:55: under_large variant 'pitched' - problem115 copied for inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#03/representative)

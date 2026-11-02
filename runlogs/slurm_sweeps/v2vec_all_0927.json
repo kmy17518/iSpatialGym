@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "alignment-axial-board_game-breakfast_table",
+   "variant": "alignment-axial-board_game-breakfast_table",
    "subtask": "alignment-axial",
    "run_id": "0927-170139-s00",
    "out": "runlogs/pilot_20260915/first_demo/alignment-axial/0927-170139-s00",
@@ -28,7 +28,7 @@
    "collected": true
   },
   {
-   "alias": "alignment-world_vertical-painting_s070-walls",
+   "variant": "alignment-world_vertical-painting_s070-walls",
    "subtask": "alignment-world_vertical",
    "run_id": "0927-170139-s01",
    "out": "runlogs/pilot_20260915/first_demo/alignment-world_vertical/0927-170139-s01",
@@ -40,7 +40,7 @@
    "collected": true
   },
   {
-   "alias": "camera_relocalization-obstructed-footstool_1",
+   "variant": "camera_relocalization-obstructed-footstool_1",
    "subtask": "camera_relocalization-obstructed",
    "run_id": "0927-170139-s02",
    "out": "runlogs/pilot_20260915/first_demo/camera_relocalization-obstructed/0927-170139-s02",
@@ -52,7 +52,7 @@
    "collected": true
   },
   {
-   "alias": "camera_relocalization-standard",
+   "variant": "camera_relocalization-standard",
    "subtask": "camera_relocalization-standard",
    "run_id": "0927-170139-s03",
    "out": "runlogs/pilot_20260915/first_demo/camera_relocalization-standard/0927-170139-s03",
@@ -64,7 +64,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+   "variant": "configuration_matching-articulation_close_large_scale-dishwasher",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "run_id": "0927-170139-s04",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_large_scale/0927-170139-s04",
@@ -76,7 +76,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_close_large_scale-door",
+   "variant": "configuration_matching-articulation_close_large_scale-door",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "run_id": "0927-170139-s05",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_large_scale/0927-170139-s05",
@@ -88,7 +88,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+   "variant": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
    "subtask": "configuration_matching-articulation_close_small_scale",
    "run_id": "0927-170139-s06",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_small_scale/0927-170139-s06",
@@ -100,7 +100,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
+   "variant": "configuration_matching-articulation_close_small_scale-carton_cdmmwy-breakfast_table",
    "subtask": "configuration_matching-articulation_close_small_scale",
    "run_id": "0927-170139-s07",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_small_scale/0927-170139-s07",
@@ -112,7 +112,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "variant": "configuration_matching-articulation_open_large_scale-dishwasher",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "run_id": "0927-170139-s08",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/0927-170139-s08",
@@ -124,7 +124,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_open_large_scale-door",
+   "variant": "configuration_matching-articulation_open_large_scale-door",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "run_id": "0927-170139-s09",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/0927-170139-s09",
@@ -136,7 +136,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table",
    "subtask": "configuration_matching-articulation_open_small_scale",
    "run_id": "0927-170139-s10",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0927-170139-s10",
@@ -148,7 +148,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
    "subtask": "configuration_matching-articulation_open_small_scale",
    "run_id": "0927-170139-s11",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0927-170139-s11",
@@ -160,7 +160,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+   "variant": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
    "subtask": "configuration_matching-attachment",
    "run_id": "0927-170139-s12",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-attachment/0927-170139-s12",
@@ -172,7 +172,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
+   "variant": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
    "subtask": "configuration_matching-attachment",
    "run_id": "0927-170139-s13",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-attachment/0927-170139-s13",
@@ -184,7 +184,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "variant": "configuration_matching-attachment-lid-teapot-breakfast_table",
    "subtask": "configuration_matching-attachment",
    "run_id": "0927-170139-s14",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-attachment/0927-170139-s14",
@@ -196,7 +196,7 @@
    "collected": true
   },
   {
-   "alias": "configuration_matching-block_design-block_4-breakfast_table_board",
+   "variant": "configuration_matching-block_design-block_4-breakfast_table_board",
    "subtask": "configuration_matching-block_design",
    "run_id": "0927-170139-s15",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-block_design/0927-170139-s15",
@@ -208,7 +208,7 @@
    "collected": true
   },
   {
-   "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+   "variant": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
    "subtask": "disembedding",
    "run_id": "0927-170139-s16",
    "out": "runlogs/pilot_20260915/first_demo/disembedding/0927-170139-s16",
@@ -220,7 +220,7 @@
    "collected": true
   },
   {
-   "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+   "variant": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
    "subtask": "disembedding",
    "run_id": "0927-170139-s17",
    "out": "runlogs/pilot_20260915/first_demo/disembedding/0927-170139-s17",
@@ -232,7 +232,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-inside",
    "run_id": "0927-170139-s18",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-inside/0927-170139-s18",
@@ -244,7 +244,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-nextto",
    "run_id": "0927-170139-s19",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-nextto/0927-170139-s19",
@@ -256,7 +256,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
    "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
    "run_id": "0927-170139-s20",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-ontop_large_scale/0927-170139-s20",
@@ -268,7 +268,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "run_id": "0927-170139-s21",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-ontop_small_scale/0927-170139-s21",
@@ -280,7 +280,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
    "run_id": "0927-170139-s22",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-ontop_small_scale/0927-170139-s22",
@@ -292,7 +292,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-touching",
    "run_id": "0927-170139-s23",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-touching/0927-170139-s23",
@@ -304,7 +304,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-under_large_scale",
    "run_id": "0927-170139-s24",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_large_scale/0927-170139-s24",
@@ -316,7 +316,7 @@
    "collected": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
    "subtask": "inter_object_relation_satisfaction-under_small_scale",
    "run_id": "0927-170139-s25",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_small_scale/0927-170139-s25",
@@ -328,7 +328,7 @@
    "collected": true
   },
   {
-   "alias": "mental_rotation-banana",
+   "variant": "mental_rotation-banana",
    "subtask": "mental_rotation",
    "run_id": "0927-170139-s26",
    "out": "runlogs/pilot_20260915/first_demo/mental_rotation/0927-170139-s26",
@@ -340,7 +340,7 @@
    "collected": true
   },
   {
-   "alias": "object_scaling-canned_food",
+   "variant": "object_scaling-canned_food",
    "subtask": "object_scaling",
    "run_id": "0927-170139-s27",
    "out": "runlogs/pilot_20260915/first_demo/object_scaling/0927-170139-s27",

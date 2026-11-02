@@ -168,10 +168,10 @@ def follow_mode_by_class(cls: str, joint_type: str, axis_world) -> str:
 
 
 def base_follow_policy(configured: Any, direction: str, cls: str, pushed: bool = False) -> str:
-    """Policy of a hybrid follow that has to move the base (the arm alone cannot do it from the stance): the alias's
+    """Policy of a hybrid follow that has to move the base (the arm alone cannot do it from the stance): the variant's
     ``generation.hybrid_follow.policy`` when it names one; else ``sequential`` - pull with the arm, move the base with the
     door stationary and the hand off the handle, pull again (owner 2026-09-27, dishwasher close 0926-065206: arm -> base ->
-    arm as the open large-scale aliases, never the base driving while the hand pulls / pushes the door) - wherever the
+    arm as the open large-scale variants, never the base driving while the hand pulls / pushes the door) - wherever the
     oracle drives the recorded follow with the hand on the handle. A room door's close - and a cabinet door's close with
     ``generation.close_by_push`` (``pushed``) - is pushed shut instead (``programs.program_articulation_large`` ->
     ``push_close``): its follow is a sampling gate only and keeps the knob's default."""
@@ -527,7 +527,7 @@ PUSH_CLOSINGS = ("leaf", "vertical")
 
 
 def push_finish_config(raw: Any) -> Optional[Dict[str, Any]]:
-    """``generation.push_finish`` -> its options (:data:`PUSH_FINISH_DEFAULTS` with the alias's overrides); None when off (absent,
+    """``generation.push_finish`` -> its options (:data:`PUSH_FINISH_DEFAULTS` with the variant's overrides); None when off (absent,
     ``false``, ``{"enabled": false}``). ``Reject("spec")`` for another type, an unknown key or an unknown closing."""
     if raw is None or raw is False:
         return None
@@ -719,7 +719,7 @@ CLOSE_BY_PUSH_DEFAULTS: Dict[str, Any] = {
 
 
 def close_by_push_config(raw: Any) -> Optional[Dict[str, float]]:
-    """``generation.close_by_push`` -> its options (:data:`CLOSE_BY_PUSH_DEFAULTS` with the alias's overrides); None when off (absent,
+    """``generation.close_by_push`` -> its options (:data:`CLOSE_BY_PUSH_DEFAULTS` with the variant's overrides); None when off (absent,
     ``false``, ``{"enabled": false}``). ``Reject("spec")`` for another type, an unknown key or a value out of range."""
     if raw is None or raw is False:
         return None
@@ -807,14 +807,14 @@ class ArticulationLarge(SamplerV2):
 
     # ------------------------------------------------------------------ roles / bindings
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         return {"artic": "target"} if self.target_role == "target" else {}
 
     def bind_scene_roles(self):
         req = self.choice.bindings.get(self.target_role)
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.{self.target_role} must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.{self.target_role} must list scene object names")
         obj = self.world.obj(names[0])
         self.bind_scene_object(self.target_role, obj)
         # the floor the robot will stand on: the ``floors`` object under the approach in front of the target's face (the
@@ -837,7 +837,7 @@ class ArticulationLarge(SamplerV2):
                     xy = (c + 1.5 * n)[:2]
                     chosen = self.world.floor_object_under(xy) if hasattr(self.world, "floor_object_under") else None
                     if chosen is not None:
-                        log.info("%s: floor role bound to %s (under the approach at (%.2f, %.2f), rooms %s)", self.gp.alias, chosen.name, float(xy[0]), float(xy[1]),
+                        log.info("%s: floor role bound to %s (under the approach at (%.2f, %.2f), rooms %s)", self.gp.variant, chosen.name, float(xy[0]), float(xy[1]),
                                  getattr(chosen, "in_rooms", None))
             except Exception as e:  # noqa: BLE001 — fall back to the room's floor
                 log.debug("floor-under-approach lookup failed: %r", e)
@@ -898,7 +898,7 @@ class ArticulationLarge(SamplerV2):
             raise Reject("spec", f"joint {joint_name!r} not in the handle annotation {os.path.relpath(path, REPO_ROOT)}")
         if joint_name is None:
             if not joints:
-                raise Reject("spec", f"{self.gp.alias}: roles.{self.target_role}.joint is required (no annotation to pick the joint from)")
+                raise Reject("spec", f"{self.gp.variant}: roles.{self.target_role}.joint is required (no annotation to pick the joint from)")
             # no joint pinned: the joint with a handle whose height is nearest the arm's band (0.75 m) first — the
             # record order put the bottom drawer (handle 0.33 m) first for Rs_int bamfsz_1 and the reach volume covers
             # no fwd pinch that low from the Phase-2 trunks (19:48: 822 step-1 survivors, 0 reach the contact set)
@@ -915,7 +915,7 @@ class ArticulationLarge(SamplerV2):
         rows += icl_handle_rows(key, joint_name, self.world.scene_model, obj.name, instance_scale=None if frame == "instance" else scale.tolist())
         if joint_excluded(rows):
             raise Reject("missing_handle", f"{obj.name}/{joint_name}: icl verdict skip / ungraspable and no admissible pinch")
-        # generation.handle_row / pinch_width_min_m (owner 2026-10-12 02:20): the alias's own handle row and width floor
+        # generation.handle_row / pinch_width_min_m (owner 2026-10-12 02:20): the variant's own handle row and width floor
         named = self.role_option("handle_row")
         width_range = (float(self.gp.gen("pinch_width_min_m", PINCH_WIDTH_RANGE[0])), PINCH_WIDTH_RANGE[1])
         row, ranked = pick_handle_row(rows, named, width_range, where=f"{obj.name}/{joint_name}",
@@ -937,7 +937,7 @@ class ArticulationLarge(SamplerV2):
         jinfo["hinge_point_obj"] = sane_hinge_point(jinfo, self._hinge_from_prim(obj, joint_name))
         repaired = leaf_plane_approach(handle, jinfo)
         if repaired is not None:
-            log.info("%s: %s/%s edge pinch: recorded approach %s is parallel to the pinch axis %s — replaced by the leaf-plane approach %s", self.gp.alias, obj.name,
+            log.info("%s: %s/%s edge pinch: recorded approach %s is parallel to the pinch axis %s — replaced by the leaf-plane approach %s", self.gp.variant, obj.name,
                      joint_name, handle.get("approach_dir"), handle.get("pinch_axis"), [round(v, 3) for v in repaired])
             handle["approach_dir_recorded"] = list(handle.get("approach_dir", []))
             handle["approach_dir"] = repaired
@@ -952,7 +952,7 @@ class ArticulationLarge(SamplerV2):
             self.template_facts["handle"]["handle_row"] = str(named)
         if width_range[0] != PINCH_WIDTH_RANGE[0]:
             self.template_facts["handle"]["pinch_width_range_mm"] = [round(1000 * w, 1) for w in width_range]
-        log.info("%s: handle of %s/%s from %s (%s%s): %s", self.gp.alias, obj.name, joint_name, self.template_facts["handle"]["source"], row.source,
+        log.info("%s: handle of %s/%s from %s (%s%s): %s", self.gp.variant, obj.name, joint_name, self.template_facts["handle"]["source"], row.source,
                  ", generation.handle_row" if named else "", handle)
 
     def _hinge_from_prim(self, obj, joint_name: str) -> Optional[th.Tensor]:
@@ -1090,7 +1090,7 @@ class ArticulationLarge(SamplerV2):
             damping = float(self.gp.gen("counterbalance_damping", 5.0))
             applied = CS.apply_counterbalance(obj, self.joint, names, damping)
             self.counterbalance = {"links": applied["links"], "damping": damping}
-            log.info("%s: counterbalance on %s/%s: gravity off on %s, joint damping %.2f (axis %s)", self.gp.alias, obj.name, self.joint_name, applied["links"], damping,
+            log.info("%s: counterbalance on %s/%s: gravity off on %s, joint damping %.2f (axis %s)", self.gp.variant, obj.name, self.joint_name, applied["links"], damping,
                      [round(float(v), 3) for v in axis_world0.tolist()])
         self.template_facts["counterbalance"] = self.counterbalance
         # generation.joint_friction (2026-09-18; as articulation_small): the PhysX articulation joint friction of the moved
@@ -1105,7 +1105,7 @@ class ArticulationLarge(SamplerV2):
                 self.joint.friction = cand
                 self.joint_friction = cand
             self.stable = self.stable_set()
-            log.info("%s: stable set of %s/%s at joint friction %s: %s", self.gp.alias, obj.name, self.joint_name, "stock" if cand is None else cand,
+            log.info("%s: stable set of %s/%s at joint friction %s: %s", self.gp.variant, obj.name, self.joint_name, "stock" if cand is None else cand,
                      [round(s, 3) for s in self.stable])
             if self.stable:
                 break
@@ -1156,17 +1156,17 @@ class ArticulationLarge(SamplerV2):
                 self.close_by_push_cfg = cfg
             elif cfg is not None:
                 log.info("%s: generation.close_by_push ignored for %s/%s (%s, class %s): it serves the closing of a revolute cabinet door on "
-                         "a vertical hinge", self.gp.alias, obj.name, self.joint_name, self.direction, self.door_class)
+                         "a vertical hinge", self.gp.variant, obj.name, self.joint_name, self.direction, self.door_class)
         # generation.push_finish (owner 2026-10-12 ~04:20): a closing the arm follows only part of the way is pushed shut
         self.push_finish_cfg = None
         if self.gp.gen("push_finish") is not None and self.close_by_push_cfg is not None:
-            log.info("%s: generation.push_finish ignored for %s/%s: generation.close_by_push pushes the whole closing", self.gp.alias, obj.name, self.joint_name)
+            log.info("%s: generation.push_finish ignored for %s/%s: generation.close_by_push pushes the whole closing", self.gp.variant, obj.name, self.joint_name)
         elif self.gp.gen("push_finish") is not None:
             if push_finish_applies(self.direction, self.jinfo["type"], self.door_class, self.mode, axis_is_vertical(axis_world)):
                 self.push_finish_cfg = push_finish_config(self.gp.gen("push_finish"))
             else:
                 log.info("%s: generation.push_finish ignored for %s/%s (%s, class %s, follow_mode %s): it serves the closing of a cabinet door on "
-                         "a vertical hinge", self.gp.alias, obj.name, self.joint_name, self.direction, self.door_class, self.mode)
+                         "a vertical hinge", self.gp.variant, obj.name, self.joint_name, self.direction, self.door_class, self.mode)
         # the Phase-2 lattice check (prompt0.phase2_step1) re-postures the IDLE arm of the checker's default working arm
         # (A6) - with the generic default "right" a left-handed door (door_crtrpa_0 0919-031559: handle 0.38 m left of the
         # face centre -> arm left) had its survivors validated with the LEFT arm tucked as idle, and every draw of the
@@ -1181,7 +1181,7 @@ class ArticulationLarge(SamplerV2):
             self.template_facts["push_finish"] = dict(self.push_finish_cfg)
         if self.close_by_push_cfg is not None:
             self.template_facts["close_by_push"] = dict(self.close_by_push_cfg)
-        log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s%s", self.gp.alias, obj.name,
+        log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s%s", self.gp.variant, obj.name,
                  self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range,
                  ", push finish on" if self.push_finish_cfg is not None else (", close by push on" if self.close_by_push_cfg is not None else ""))
 
@@ -1204,7 +1204,7 @@ class ArticulationLarge(SamplerV2):
                 self.world.step_physics(steps, still=[self.robot])
                 q_after = self.joint_value()
                 ok = abs(q_after - q) <= drift_frac * self.probe_tol
-                log.info("%s: %s at fraction %.2f (%.3f) -> %.3f after %d steps: %s", self.gp.alias, self.joint_name, f, q, q_after, steps, "stable" if ok else "drifts")
+                log.info("%s: %s at fraction %.2f (%.3f) -> %.3f after %d steps: %s", self.gp.variant, self.joint_name, f, q, q_after, steps, "stable" if ok else "drifts")
                 if ok and all(abs(q - s) > 1e-6 for s in out):
                     out.append(q)
         finally:
@@ -1238,7 +1238,7 @@ class ArticulationLarge(SamplerV2):
                 q_after = self.joint_value()
                 ok = passive_reaches(qk, q_after, q_goal, tol, min_progress)
                 probes.append({"k": k, "q_k": round(qk, 4), "q_after": round(q_after, 4), "ok": ok})
-                log.info("%s: %s released at k=%.2f (%.3f) -> %.3f after %d steps (goal %.3f, band %.3f): %s", self.gp.alias, self.joint_name, k, qk, q_after,
+                log.info("%s: %s released at k=%.2f (%.3f) -> %.3f after %d steps (goal %.3f, band %.3f): %s", self.gp.variant, self.joint_name, k, qk, q_after,
                          steps, q_goal, tol, "swings on to the goal" if ok else "does not reach the goal on its own")
                 if ok:
                     found = k
@@ -1277,7 +1277,7 @@ class ArticulationLarge(SamplerV2):
             a_h[2] = 0.0
             if float(a_h.norm()) > 0.3:
                 self.face_manip = P0.make_face("face", -a_h / a_h.norm(), h_init.contact.clone())
-                log.info("%s: close from %.3f: manipulation face re-aimed at the open handle (normal %s, P %s)", self.gp.alias, q_init,
+                log.info("%s: close from %.3f: manipulation face re-aimed at the open handle (normal %s, P %s)", self.gp.variant, q_init,
                          [round(float(v), 3) for v in self.face_manip.n.tolist()], [round(float(v), 3) for v in h_init.contact.tolist()])
         gen_p0 = dict(self.gp.gen("prompt0") or {})
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 20.0)))
@@ -1321,7 +1321,7 @@ class ArticulationLarge(SamplerV2):
             pool += list(survivors)
         self.bar_offset = 0.0
         if len(offsets) > 1:
-            log.info("%s: Phase 2 survivors per bar offset: %s", self.gp.alias, {k: sum(1 for st in pool if st.extras.get("bar_offset_m") == k) for k in offsets})
+            log.info("%s: Phase 2 survivors per bar offset: %s", self.gp.variant, {k: sum(1 for st in pool if st.extras.get("bar_offset_m") == k) for k in offsets})
         if not pool:
             raise Reject("no_manipulation_stance", f"Phase 2 left no survivor for {obj.name}/{self.joint_name} at q_init {q_init:.3f} ({stats_by})")
         errors: List[str] = []
@@ -1389,7 +1389,7 @@ class ArticulationLarge(SamplerV2):
                     errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
                     # a stance that got as far as a full hybrid follow (5 min) and then fell at step 6 was invisible until the
                     # attempt's summary (door 0919-122043: 5 complete follows, no draft, no line in between)
-                    log.info("%s: stance %s pinch %+.0f rejected: %s: %s", self.gp.alias, self._stance_key(manip), sign, e.reason, str(e)[:300])
+                    log.info("%s: stance %s pinch %+.0f rejected: %s: %s", self.gp.variant, self._stance_key(manip), sign, e.reason, str(e)[:300])
                     self.sidecar.stances.pop("manipulation", None)
                     self.sidecar.transitions.clear()
                     self.sidecar.paths.clear()
@@ -1471,7 +1471,7 @@ class ArticulationLarge(SamplerV2):
                 if not back.ok:
                     if self.reach_retreat_miss is None:
                         self.reach_retreat_miss = float(q)
-                    log.info("%s: the retreat pose from the handle at %.3f is not reachable from %s (%s): reach boundary", self.gp.alias, q, self._stance_key(manip), back.reason)
+                    log.info("%s: the retreat pose from the handle at %.3f is not reachable from %s (%s): reach boundary", self.gp.variant, q, self._stance_key(manip), back.reason)
                     return False
             return True
 
@@ -1515,10 +1515,10 @@ class ArticulationLarge(SamplerV2):
             rv_ok = contact.volume_ok(P0.reach_volume(), manip, P0.base_z(self))
             culprits = self._penetrating_objects(r_free.q, [obj]) if (r_free.ok and r_free.q is not None and not r_g.ok) else None
             log.info("%s: handle IK debug at %s (arm %s, pinch %+.0f): grasp alone %s, pre alone %s, grasp without the world %s, other arm [pre, grasp] %s; "
-                     "pad in base %s, classes %s, volume %s; the world-free solution penetrates %s", self.gp.alias, self._stance_key(manip), self.arm, self.pinch_sign,
+                     "pad in base %s, classes %s, volume %s; the world-free solution penetrates %s", self.gp.variant, self._stance_key(manip), self.arm, self.pinch_sign,
                      r_g.ok, r_p.ok, r_free.ok, r_o.ok, [round(float(v), 3) for v in p_base.tolist()], list(contact.classes or ()), rv_ok, culprits)
         except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
-            log.info("%s: handle IK debug failed: %s", self.gp.alias, e)
+            log.info("%s: handle IK debug failed: %s", self.gp.variant, e)
 
     def _penetrating_objects(self, q: th.Tensor, ignore: Sequence[Any]) -> Dict[str, Any]:
         """Diagnostic: the robot spheres of configuration ``q`` that penetrate the collision world (``ignore`` removed)
@@ -1590,7 +1590,7 @@ class ArticulationLarge(SamplerV2):
             rf[key] = round(frac, 4)
             self.template_meta["reachable_fraction_max"] = max(float(v) for v in rf.values())
             info = {"reachable_fraction": frac, "q_reach": q_low, "goal_set": [float(self.lower)]}
-            log.info("%s: stance %s follows %s from %.3f down to %.3f (fraction %.2f of the closing)", self.gp.alias, key, self.joint_name, q_init, q_low, frac)
+            log.info("%s: stance %s follows %s from %.3f down to %.3f (fraction %.2f of the closing)", self.gp.variant, key, self.joint_name, q_init, q_low, frac)
             if q_low > self.lower + 1e-6:
                 short = f"closing from {q_init:.3f}: the arm follows the handle only down to {q_low:.3f} (fraction {frac:.2f}) from stance {key}"
                 if self.push_finish_cfg is None:
@@ -1622,7 +1622,7 @@ class ArticulationLarge(SamplerV2):
         if goal_set and goal_set[0] not in self.stable and not self.holds_passively(goal_set[0]):
             goal_set = []
         info = {"reachable_fraction": frac, "q_reach": q_reach, "q_reach_boundary": q_bound, "reach_margin": margin if at_miss else 0.0, "goal_set": list(goal_set)}
-        log.info("%s: stance %s reaches %s up to %.3f (boundary %.3f%s, margin %.3f; fraction %.2f); goal set %s", self.gp.alias, key, self.joint_name, q_reach, q_bound,
+        log.info("%s: stance %s reaches %s up to %.3f (boundary %.3f%s, margin %.3f; fraction %.2f); goal set %s", self.gp.variant, key, self.joint_name, q_reach, q_bound,
                  "" if at_miss else " = the sweep's end", margin if at_miss else 0.0, frac, [round(s, 3) for s in goal_set])
         if not goal_set:
             raise Reject("handle_unreachable", f"the arm reaches {self.joint_name} only up to {q_reach:.3f} (fraction {frac:.2f}) from stance {key}: no goal opens ≥ {min_open:.2f}")
@@ -1710,7 +1710,7 @@ class ArticulationLarge(SamplerV2):
                        "object_pose": {"position": [float(v) for v in p_o.tolist()], "orientation": [float(v) for v in q_o.tolist()]},
                        "screen": {"candidates": n, "passed": len(screened), "checked": checked}}
                 log.info("%s: stance %s: push finish %s from %.3f to %.3f (handle fraction %.2f + push %.2f; band %.3f): %s arm, contact %s, %d arc poses",
-                         self.gp.alias, key, self.joint_name, q_rel, q_to, k_rel, rec["push_fraction"], band, self.arm, tag, len(arc_q))
+                         self.gp.variant, key, self.joint_name, q_rel, q_to, k_rel, rec["push_fraction"], band, self.arm, tag, len(arc_q))
                 return rec
         finally:
             self.pose_joint(q_now)
@@ -1797,14 +1797,14 @@ class ArticulationLarge(SamplerV2):
             arm_alone = {"feasible": feasible, "why_not": why_not or None}
             if feasible:
                 mode = "arm"
-                log.info("%s: stance %s: the arm alone follows every required waypoint %s and retreats -> follow_mode arm (no base motion)", self.gp.alias,
+                log.info("%s: stance %s: the arm alone follows every required waypoint %s and retreats -> follow_mode arm (no base motion)", self.gp.variant,
                          self._stance_key(manip), [fraction_key(k) for k in required])
         if mode in ("base", "hybrid"):
             try:
                 if mode == "hybrid":
                     policy = base_follow_policy((self.gp.gen("hybrid_follow") or {}).get("policy"), self.direction, self.door_class,
                                                 pushed=self.close_by_push_cfg is not None)
-                    log.info("%s: stance %s: the follow needs the base (%s) -> %s follow search", self.gp.alias, self._stance_key(manip), (arm_alone or {}).get("why_not"), policy)
+                    log.info("%s: stance %s: the follow needs the base (%s) -> %s follow search", self.gp.variant, self._stance_key(manip), (arm_alone or {}).get("why_not"), policy)
                     hp = AH.search_follow_path(self, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key, policy=policy)
                     base_follow, follow_path = hp.base_follow, hp.to_sidecar(bool(self.gp.gen("hybrid_follow_record_eef", True)))
                 else:
@@ -1815,7 +1815,7 @@ class ArticulationLarge(SamplerV2):
                 # "arm-only IK at each waypoint ... as the oracle's secondary mode"); otherwise the candidate is rejected
                 if all(arm_reach.get(fraction_key(k), False) for k in required):
                     mode, base_follow, base_follow_reason = "arm", None, f"{e.reason}: {e}"
-                    log.info("%s: %s-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.alias, self.mode, e)
+                    log.info("%s: %s-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.variant, self.mode, e)
                 else:
                     raise
         if mode in ("base", "hybrid"):

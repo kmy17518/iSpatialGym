@@ -6,7 +6,7 @@
 ; are required.
 (define (iddl configuration_matching-block_design)
     (:family configuration_matching)
-    (:alias configuration_matching-block_design-{targets}-{support})
+    (:variant configuration_matching-block_design-{targets}-{support})
     (:init
         (ontop targets support)
         (ontop agent floor)

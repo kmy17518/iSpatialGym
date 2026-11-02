@@ -31,9 +31,9 @@ def test_support_surface_entry_carries_the_edges_and_is_unchanged_without():
 
 
 def _problem(surfaces):
-    from ispatialgym.sampling.v2.problem import GroundedProblem, subtask_of_alias
+    from ispatialgym.sampling.v2.problem import GroundedProblem, subtask_of_variant
 
-    alias = "configuration_matching-attachment-lid-stockpot-bar"
+    variant = "configuration_matching-attachment-lid-stockpot-bar"
     entry = {"iddl": "configuration_matching/attachment.iddl", "definition_id": 23,
              "roles": {"target": {"category": "lid", "sampleable": True}, "partner": {"category": "stockpot", "sampleable": True},
                        "support": {"category": "bar", "sampleable": False}, "floor": {"sampleable": False}},
@@ -41,7 +41,7 @@ def _problem(surfaces):
                                                                                    "floor": {"room": "kitchen_0"}},
                                                "whitelist": {}, "blacklist": {}}},
              "generation": {}, "constraints": []}
-    return GroundedProblem(alias, copy.deepcopy(entry), subtask=subtask_of_alias(alias))
+    return GroundedProblem(variant, copy.deepcopy(entry), subtask=subtask_of_variant(variant))
 
 
 def test_the_candidate_record_names_the_edges_only_when_the_entry_has_them():

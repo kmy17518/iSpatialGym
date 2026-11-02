@@ -313,7 +313,7 @@ def test_phase3_two_tier_screens_the_pair_target_yaws_without_jitter(monkeypatch
     assert s.phase3_two_tier(manip, np.random.default_rng(0)) == ("pose", "grasp")
     assert seen[0]["jitter"] == 0.0 and seen[0]["yaws"] == pytest.approx(s.pair_target_yaws(manip)) and len(seen[0]["yaws"]) == 1
     assert seen[0]["margin"] == TT.SUPPORT_MARGIN  # support_margin's default: the start's usual 2 cm
-    # nextto#04's bench is 0.36 m deep across its long edge, the shoes 0.31 m long: the alias's support_margin goes to the target's start too
+    # nextto#04's bench is 0.36 m deep across its long edge, the shoes 0.31 m long: the variant's support_margin goes to the target's start too
     narrow = _pair_sampler(monkeypatch, "nextto04", gen={"support_margin": 0.005})
     narrow.grasps = narrow.grasps_flush = ["g"]
     narrow.support_objects = lambda: []
@@ -347,7 +347,7 @@ def test_touching_push_candidates_above_the_cap_are_not_tried(monkeypatch):
 # ---------------------------------------------------------------------------------------------------------------- the customs
 
 
-def test_the_four_aliases_carry_the_key_and_every_use_is_valid():
+def test_the_four_variants_carry_the_key_and_every_use_is_valid():
     with open(CUSTOMS) as f:
         customs = json.load(f)
     want = {"inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar": "touching02",
@@ -356,16 +356,16 @@ def test_the_four_aliases_carry_the_key_and_every_use_is_valid():
             "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench": "nextto04"}
     have = {k for k, e in customs.items() if isinstance(e, dict) and (e.get("generation") or {}).get("pair_goal_align") is not None}
     assert have == set(want)
-    for alias, name in want.items():
-        g = customs[alias]["generation"]
+    for variant, name in want.items():
+        g = customs[variant]["generation"]
         assert g["pair_goal_align"] == KEYS[name]
-        roles = customs[alias]["roles"]
+        roles = customs[variant]["roles"]
         for role in ("target", "partner"):
             assert f"{roles[role]['category']}/{roles[role]['representative']}" in g["pair_goal_align"]["front"]
         assert g["pair_goal_align"]["facing"] in IS.PAIR_FACINGS
         assert all(v in IS.PAIR_FRONT_AXES for v in g["pair_goal_align"]["front"].values())
     assert customs["inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["widest_faces"] == "parallel"
     assert customs["inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["touching_place_gap_m"] == 0.05
-    for alias in list(want)[1:]:
-        assert customs[alias]["generation"]["init_align_support"] is True
+    for variant in list(want)[1:]:
+        assert customs[variant]["generation"]["init_align_support"] is True
     assert customs["inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench"]["generation"]["support_margin"] == 0.005

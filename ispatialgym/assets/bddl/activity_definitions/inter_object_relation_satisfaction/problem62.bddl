@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-62)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop)
+    (:variant inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#04~T2/representative)
     ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is

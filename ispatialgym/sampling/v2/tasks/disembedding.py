@@ -17,7 +17,7 @@ the feasible set F (footprint on the tray floor, 0.5 cm); the destination tray o
 position where exactly 4 cm of it is inside the init image (>= 4 cm from the source tray, footprint on the top);
 distractors on the source floor, footprints >= 1 cm from each other and from the target and <= ``tray_budget`` of the floor
 (owner 2026-10-12 A2b: no spacing along the grasp's pinch axis, no pad-clearance growth), each at its rest orientation - the
-target's pose when the alias says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff
+target's pose when the variant says so (``generation.distractor_pose`` lying / standing, the milk picks of the handoff
 2026-10-10) - or, for the puzzle (``generation.fixed_layout``), every part of the embedded figure at its layout position with
 the target held there too, the whole figure turned by a yaw drawn among those whose grasp screening keeps a reachable grasp
 (owner 2026-10-12, ``_layout_pick``; recorded in the TRO's ``scene.fixed_layout``); every object but the destination in frame
@@ -178,7 +178,7 @@ def layout_origins(assembly: Dict[str, Any]) -> Dict[str, Tuple[float, float]]:
 def repark_spawned(s) -> None:
     """Teleport every spawned object back onto its parking slot before any of its geometry is read.
 
-    Why (E1 pilot, every disembedding alias): ``SimWorld.park`` disables gravity through the PhysX view only, and the
+    Why (E1 pilot, every disembedding variant): ``SimWorld.park`` disables gravity through the PhysX view only, and the
     ``og.sim.stop()`` / ``play()`` of every later ``spawn`` rebuilds PhysX from USD, so the objects parked earlier fall
     again (no floor under the parking slots) during the following simulator steps. ``SimWorld.local_hull`` then mixes
     the *render-side* (Fabric) link transforms, which physics-only steps leave at the last rendered pose, with the
@@ -440,7 +440,7 @@ class Disembedding(SamplerV2):
 
     # ------------------------------------------------------------------ roles
 
-    def v1_role_aliases(self) -> Dict[str, str]:
+    def v1_role_variants(self) -> Dict[str, str]:
         out = {}
         if self.src_role != "tray_source":
             out["tray_source"] = self.src_role
@@ -453,7 +453,7 @@ class Disembedding(SamplerV2):
         req = self.choice.bindings.get("support")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names")
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def support_objects(self) -> List[Any]:
@@ -531,7 +531,7 @@ class Disembedding(SamplerV2):
         target = self.choice.models["target"]
         dspec = v1.distractor_spec() if v1 is not None else None
         if dspec is None:
-            raise Reject("spec", f"{self.gp.alias}: no distractors group in the template choice and no v1 distractor pools")
+            raise Reject("spec", f"{self.gp.variant}: no distractors group in the template choice and no v1 distractor pools")
         rng = np.random.default_rng(self.ctx.base_seed * 31 + 17)
         same = rng.random() < float(self.gen("same_category_prob", 0.5))
         pools = {"same_category": dspec.same_category_choices(target), "other_category": dspec.other_category_choices(target)}
@@ -569,7 +569,7 @@ class Disembedding(SamplerV2):
         for key, o in ((self.src_role, src), (self.dst_role, dst)):
             self.tray_mass[o.name] = apply_mass(o, float(self.g("tray_mass_kg") or 0.0))
             if abs(self.tray_mass[o.name]["after_kg"] - self.tray_mass[o.name]["before_kg"]) > 1e-6:
-                log.info("%s: %s (%s) mass %.3f -> %.3f kg (generation.tray_mass_kg)", self.gp.alias, o.name, key, self.tray_mass[o.name]["before_kg"], self.tray_mass[o.name]["after_kg"])
+                log.info("%s: %s (%s) mass %.3f -> %.3f kg (generation.tray_mass_kg)", self.gp.variant, o.name, key, self.tray_mass[o.name]["before_kg"], self.tray_mass[o.name]["after_kg"])
         self.template_facts["tray_mass_kg"] = {n: round(v["after_kg"], 4) for n, v in self.tray_mass.items()}
         self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target", "tabletop")
         self.layout = self._load_layout()
@@ -585,7 +585,7 @@ class Disembedding(SamplerV2):
             # mass centre and tipped ~7 deg at every release, then kept rolling
             self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
             if roll:
-                log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.alias, math.degrees(roll))
+                log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.variant, math.degrees(roll))
         for key in ("target", self.src_role, self.dst_role):
             self.height[key] = TT.height_of(self.hull[key], self.rest[key])
         # handoff 2026-10-10: on the milk picks the distractors take the target's pose (generation.distractor_pose, one pose or
@@ -602,10 +602,10 @@ class Disembedding(SamplerV2):
                 base, how = pose_rest_quat(self.hull[b.name], pose)
                 self.rest[b.name], roll = TT.prism_rest_quat(self.hull[b.name], base)
             if roll:
-                log.info("%s: %s rests on a hull facet at roll %+.2f deg", self.gp.alias, b.name, math.degrees(roll))
+                log.info("%s: %s rests on a hull facet at roll %+.2f deg", self.gp.variant, b.name, math.degrees(roll))
             if how != "canonical":
                 rests[b.name] = how
-                log.info("%s: %s (%s/%s) rests %s", self.gp.alias, b.name, b.category, b.model, how)
+                log.info("%s: %s (%s/%s) rests %s", self.gp.variant, b.name, b.category, b.model, how)
             self.height[b.name] = TT.height_of(self.hull[b.name], self.rest[b.name])
         if rests:
             self.template_facts["distractor_rest"] = rests
@@ -629,7 +629,7 @@ class Disembedding(SamplerV2):
         src_mc = self.choice.models[self.src_role]
         # band key (item 9, B3's ``reach_bands.PlacedSpec`` grammar ``CATEGORY/MODEL[*SCALE][@MODE]``): the source tray at
         # its spawn scale, mode ``focus_centred_edge_aligned`` = inner-floor centroid on the manipulation focus cell, long
-        # axis along the edge — stance-relative, so every template of the alias hits the same band
+        # axis along the edge — stance-relative, so every template of the variant hits the same band
         src_scale = float(src_mc.scale[0]) if src_mc.scale else 1.0
         mode = getattr(TT.RB, "PLACED_MODE_FOCUS", "focus_centred_edge_aligned")
         spec_obj = getattr(TT.RB, "PlacedSpec", None)
@@ -661,7 +661,7 @@ class Disembedding(SamplerV2):
             n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(st.stand_off, lat)))
             if n_free < max(1, len(lats) // 3):
                 errors.append(f"edge {edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
-                log.info("%s: %s", self.gp.alias, errors[-1])
+                log.info("%s: %s", self.gp.variant, errors[-1])
                 continue
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
@@ -685,7 +685,7 @@ class Disembedding(SamplerV2):
                 break
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -696,14 +696,14 @@ class Disembedding(SamplerV2):
 
     def _destination_side(self, rng) -> str:
         """Owner 2026-10-12 (A2a): the destination tray's side, chosen before the Phase-1c margins - ``generation.destination_side``
-        ("left" / "right", the eval aliases' assignment), else drawn from the template's ``rng`` (train)."""
+        ("left" / "right", the eval variants' assignment), else drawn from the template's ``rng`` (train)."""
         want = self.g("destination_side")
         if want is None:
             side, source = ("left" if rng.random() < 0.5 else "right"), "drawn"
         elif str(want).lower() in ("left", "right"):
             side, source = str(want).lower(), "generation.destination_side"
         else:
-            raise Reject("spec", f"{self.gp.alias}: generation.destination_side must be 'left' or 'right', got {want!r}")
+            raise Reject("spec", f"{self.gp.variant}: generation.destination_side must be 'left' or 'right', got {want!r}")
         self.template_facts["destination_side"] = {"side": side, "source": source}
         return side
 
@@ -733,7 +733,7 @@ class Disembedding(SamplerV2):
         fact = {"edge": init.edge.name, "positions": len(verdict), "fit": len(verdict) - len(failed), "candidates_before": len(cands),
                 "candidates_after": len(keep), "examples": failed[:3]}
         self.template_facts.setdefault("destination_fit", []).append(fact)
-        log.info("%s: destination fit (%s side, edge %s): %d of %d positions, %d of %d (stance, position) candidates kept%s", self.gp.alias,
+        log.info("%s: destination fit (%s side, edge %s): %d of %d positions, %d of %d (stance, position) candidates kept%s", self.gp.variant,
                  "left" if self.dest_side > 0 else "right", init.edge.name, fact["fit"], fact["positions"], len(keep), len(cands),
                  f" (e.g. {failed[0][:240]})" if failed else "")
         return keep
@@ -781,23 +781,23 @@ class Disembedding(SamplerV2):
 
     def _load_layout(self) -> Optional[Dict[str, Tuple[float, float]]]:
         """The figure-frame (x, y) of the target and of every distractor by bddl instance, from the layout file of
-        ``generation.fixed_layout`` (ground_isg writes it from the sheet's ``fixed_layout`` rows); None for an alias without one."""
+        ``generation.fixed_layout`` (ground_isg writes it from the sheet's ``fixed_layout`` rows); None for a variant without one."""
         spec = self.gen("fixed_layout", None)
         if not spec:
             return None
         rel = spec.get("file") or ""
         path = rel if os.path.isabs(rel) else os.path.join(REPO_ROOT, rel)
         if not os.path.isfile(path):
-            raise Reject("spec", f"{self.gp.alias}: fixed layout file {rel!r} is missing")
+            raise Reject("spec", f"{self.gp.variant}: fixed layout file {rel!r} is missing")
         with open(path, "rb") as f:
             raw = f.read()
         if spec.get("sha256") and hashlib.sha256(raw).hexdigest() != spec["sha256"]:
-            log.warning("%s: %s changed since the grounding (sha256 %s...); its current layout is used", self.gp.alias, rel, str(spec["sha256"])[:12])
+            log.warning("%s: %s changed since the grounding (sha256 %s...); its current layout is used", self.gp.variant, rel, str(spec["sha256"])[:12])
         origins = layout_origins(json.loads(raw.decode("utf-8")))
         want = {self.tname: self.choice.models["target"].model, **{b.name: b.model for b in self.bindings.many("distractors")}}
         missing = sorted({m for m in want.values() if m not in origins})
         if missing:
-            raise Reject("spec", f"{self.gp.alias}: {rel} places no part {missing}")
+            raise Reject("spec", f"{self.gp.variant}: {rel} places no part {missing}")
         layout = {name: origins[m] for name, m in want.items()}
         self.template_facts["fixed_layout"] = {"file": rel, "origin_in_figure_m": {name: list(xy) for name, xy in layout.items()}}
         return layout
@@ -875,7 +875,7 @@ class Disembedding(SamplerV2):
         deg = lambda v: round(math.degrees(v), 2)  # noqa: E731
         rec = {"file": (self.template_facts.get("fixed_layout") or {}).get("file"), "yaws_screened": len(options),
                "yaws_reachable_deg": [deg(v) for v in kept], "pairs_per_yaw": {str(deg(v)): pairs[v] for v in options}}
-        log.info("%s: layout yaws with a reachable grasp: %d of %d %s", self.gp.alias, len(kept), len(options), rec["yaws_reachable_deg"])
+        log.info("%s: layout yaws with a reachable grasp: %d of %d %s", self.gp.variant, len(kept), len(options), rec["yaws_reachable_deg"])
         if not kept:
             with self.pick_world(), self.ikc.ignoring(self.support_objects()):
                 reach = self._layout_yaw_screen(manip, arms_here, targets)
@@ -934,7 +934,7 @@ class Disembedding(SamplerV2):
                 return d
             except Reject as e:
                 errors.append(f"candidate {int(k)}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, tname: str, sname: str, dname: str, dnames: List[str], k: int) -> Draft:
@@ -1225,7 +1225,7 @@ class Disembedding(SamplerV2):
     def apply_draft(self, draft: Draft):
         """The trays land first, the objects after (owner 2026-09-24). The base ``apply_draft`` releases every object 3 mm
         above its support at once, so the bottles landed on trays that were themselves still dropping / rocking and rolled
-        away (a lying cylinder has no restoring torque): 5 of 8 attempts of the 3-distractor milk alias (0924-233604) were
+        away (a lying cylinder has no restoring torque): 5 of 8 attempts of the 3-distractor milk variant (0924-233604) were
         ``unstable_init`` with v ≈ r·ω. Here the trays get ``TRAY_LANDING_STEPS`` physics steps by themselves, then the
         objects are released at their recorded heights **above the settled source tray** (its landing shifted it by up to
         the 3 mm drop); the trays' settled poses are recorded by ``settle_and_validate`` as before."""
@@ -1284,7 +1284,7 @@ class Disembedding(SamplerV2):
             names = list(fps)
             gaps = {f"{a}|{b}": round(float(polygon_gap(fps[a], fps[b])) * 1000.0, 1) for i, a in enumerate(names) for b in names[i + 1:]}
             draft.summary["release_geometry"] = {"bottom_above_floor_mm": bottoms, "footprint_gap_mm": gaps, "tray_dz_mm": round(dz * 1000.0, 2)}
-            log.info("%s: release geometry: bottoms above the source floor %s mm; footprint gaps %s mm; tray dz %.2f mm", self.gp.alias, bottoms, gaps, dz * 1000.0)
+            log.info("%s: release geometry: bottoms above the source floor %s mm; footprint gaps %s mm; tray dz %.2f mm", self.gp.variant, bottoms, gaps, dz * 1000.0)
         except Exception as e:  # noqa: BLE001 - a diagnostic must never fail the attempt
             log.debug("release geometry diagnostic failed: %r", e)
         self.apply_draft_extras(draft)

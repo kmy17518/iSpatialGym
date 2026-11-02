@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-88)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table)
+    (:variant inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table)
 
     ; hand-grounded probe (owner 2026-09-19 20:14): inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table
     ; (inter_object_relation_satisfaction/under_large_scale.iddl; init_surface = partner's own top). The sandal starts on

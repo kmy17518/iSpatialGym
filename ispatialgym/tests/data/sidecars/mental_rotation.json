@@ -3,7 +3,7 @@
   "instance_id": "mental_rotation-mug__house_single_floor__target-mug-ppzttc__0000",
   "tro_sha256": "25ba1273ba7b71ecdc2bbc3d0edefed0f5cf2d1e85f5a5efb96029972d2f9003",
   "task_family": "mental_rotation",
-  "alias": "mental_rotation-mug",
+  "variant": "mental_rotation-mug",
   "path_bucket_m": null,
   "grasps": [
     {

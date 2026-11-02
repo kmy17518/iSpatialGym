@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-bell_pepper",
+  "variant": "mental_rotation-bell_pepper",
   "source_job": "mental_rotation-bell_pepper__representative__target-ihctxa"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-cap",
+  "variant": "object_scaling-cap",
   "source_job": "object_scaling-cap__representative__target-rgtedj"
  }
 ]

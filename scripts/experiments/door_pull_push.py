@@ -579,7 +579,7 @@ def hook_close(actions: List[Action], sidecar, loader) -> List[Action]:
     from ispatialgym.oracle.actions import PushClose
     from ispatialgym.oracle.programs import expand
 
-    program = expand(sidecar.alias, sidecar)
+    program = expand(sidecar.variant, sidecar)
     push = program[-1] if program else None
     if not isinstance(push, PushClose):
         raise RuntimeError(f"door_pull_push.hook_close: the registry's program is {[a.name for a in program]}, not a push-close")

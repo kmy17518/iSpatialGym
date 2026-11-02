@@ -45,7 +45,7 @@ def test_margins_iors_row_draws_over_the_whole_edge_and_skips_edges_too_short_fo
     # R_img caps D_p; the edge rule depends on neither D_p nor the band's extent (the old margins carried both, twice)
     _, _, info2 = TT.lateral_margins(row, -0.56, 0.16, b=0.9, R_img=0.10)
     assert info2["D_p"] == pytest.approx(0.10) and info2["L_min"] == pytest.approx(info["L_min"])
-    # generation.table_end_margin_m / footprint_gap_min_m of the alias; nextto's smallest gap is g_NT + 0.03
+    # generation.table_end_margin_m / footprint_gap_min_m of the variant; nextto's smallest gap is g_NT + 0.03
     assert TT.lateral_margins(dict(row, m_end=0.05, g_min=0.04), -0.3, 0.4, 0.9, 0.6)[2]["L_min"] == pytest.approx(0.10 + 0.04 + 0.20 + 0.10)
     nt = TT.lateral_margins(dict(row, relation="nextto", g_NT=0.063), -0.3, 0.4, 0.9, 0.6)[2]
     assert nt["g_min"] == pytest.approx(0.093) and nt["L_min"] == pytest.approx(0.10 + 0.093 + 0.20 + 0.20)
@@ -548,7 +548,7 @@ def test_disembedding_figure_frame_and_layout_origins():
 
 
 def test_disembedding_destination_side_comes_before_the_margins():
-    """Owner 2026-10-12 (A2a): eval aliases name the side (``generation.destination_side``), train draws it from the template seed;
+    """Owner 2026-10-12 (A2a): eval variants name the side (``generation.destination_side``), train draws it from the template seed;
     multiply_isg --split train drops the eval key and the default is the draw."""
     from types import SimpleNamespace
 
@@ -559,7 +559,7 @@ def test_disembedding_destination_side_comes_before_the_margins():
     D = _disembedding()
 
     def sampler(value):
-        return SimpleNamespace(g=lambda k: value if k == "destination_side" else None, gp=SimpleNamespace(alias="disembedding-x"), template_facts={})
+        return SimpleNamespace(g=lambda k: value if k == "destination_side" else None, gp=SimpleNamespace(variant="disembedding-x"), template_facts={})
 
     s = sampler("Right")
     assert D.Disembedding._destination_side(s, np.random.default_rng(0)) == "right"
@@ -571,9 +571,9 @@ def test_disembedding_destination_side_comes_before_the_margins():
     assert GD.defaults_for("disembedding")["destination_side"] is None and "destination_side" in MI.EVAL_ONLY_GENERATION_KEYS
 
 
-def test_disembedding_eval_aliases_split_the_destination_side_half_and_half():
-    """Owner 2026-10-12 (A2a): every disembedding alias of the customs names its destination side, one side per pick (a pick's
-    aliases share the target category), five picks each: the six picks with an accepted instance keep the side measured on it
+def test_disembedding_eval_variants_split_the_destination_side_half_and_half():
+    """Owner 2026-10-12 (A2a): every disembedding variant of the customs names its destination side, one side per pick (a pick's
+    variants share the target category), five picks each: the six picks with an accepted instance keep the side measured on it
     (#04 #05 #07 #09 #10 left, #08 right), the four open ones (#01 #02 #03 #06) take the right."""
     import json
     import os
@@ -583,9 +583,9 @@ def test_disembedding_eval_aliases_split_the_destination_side_half_and_half():
     with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
         customs = json.load(f)
     by_target: dict = {}
-    for alias, entry in customs.items():
-        if alias.startswith("disembedding-"):
-            by_target.setdefault(alias.split("-")[1], set()).add(entry["generation"].get("destination_side"))
+    for variant, entry in customs.items():
+        if variant.startswith("disembedding-"):
+            by_target.setdefault(variant.split("-")[1], set()).add(entry["generation"].get("destination_side"))
     assert len(by_target) == 10 and all(len(s) == 1 for s in by_target.values()), by_target
     side = {t: next(iter(s)) for t, s in by_target.items()}
     assert sorted(t for t, v in side.items() if v == "right") == ["box_of_shampoo", "carton_of_milk", "jigsaw_puzzle_piece", "pencil_case", "video_game"]
@@ -622,7 +622,7 @@ def _puzzle_sampler(D, floor_xy=(0.47, 0.35)):
     s.src_floor = D.TrayFloor(cells, z_local=0.002, res=0.01, rim_local=0.02)
     s.g = lambda k: {"tray_footprint_margin_m": 0.01, "fixed_layout_yaw_step_deg": 22.5}[k]
     s.layout_yaws, s.tray_turns = D.layout_yaws(22.5), []
-    s.gp, s.template_facts = SimpleNamespace(alias="disembedding-jigsaw_puzzle_piece-x"), {"fixed_layout": {"file": "assembly.json"}}
+    s.gp, s.template_facts = SimpleNamespace(variant="disembedding-jigsaw_puzzle_piece-x"), {"fixed_layout": {"file": "assembly.json"}}
     return s
 
 
@@ -836,7 +836,7 @@ def _destination_fit_sampler(D):
     cells = th.stack(th.meshgrid(th.arange(-0.25, 0.26, 0.01), th.arange(-0.17, 0.18, 0.01), indexing="ij"), dim=-1).reshape(-1, 2)
     s.src_floor = D.TrayFloor(cells, z_local=0.002, res=0.01, rim_local=0.02)
     s.g = lambda k: {"destination_visible_width_m": 0.04, "destination_gap_min_m": 0.04}[k]
-    s.gp, s.template_facts = SimpleNamespace(alias="disembedding-x"), {}
+    s.gp, s.template_facts = SimpleNamespace(variant="disembedding-x"), {}
     s.camera_pose_at = lambda stance: None
     edge = EdgeFrame.from_edge("-x", th.tensor([0.0, 0.0]), th.tensor([-1.0, 0.0]), 1.95)
     init = Stance("init", (-0.45, 0.0, 0.0), 0.5, 0.0, 0.45, edge)
@@ -943,10 +943,10 @@ def _pose(x, y, z, quat=None):
     return th.tensor([x, y, z]), (C.IDENTITY_QUAT.clone() if quat is None else quat)
 
 
-def _draft(alias, family):
+def _draft(variant, family):
     from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance, Transition
 
-    sd = SidecarDraft(alias, family)
+    sd = SidecarDraft(variant, family)
     edge = EdgeFrame("e0", th.tensor([1.0, 0.0]), th.tensor([1.0, 0.0]), 1.6)
     init = Stance("init", (0.55, 0.0, 0.0), 0.5, 0.0, 0.45, edge)
     manip = Stance("manipulation", (0.65, 0.0, 0.0), 0.75, -0.3, 0.35, edge, focus=th.tensor([1.0, 0.0, 0.85]), arms=["right"])
@@ -982,7 +982,7 @@ def test_disembedding_sidecar_blocks_expand():
     assert sc.problems(check_program=True) == []
     from ispatialgym.oracle.programs import expand
 
-    names = [a.name for a in expand(sc.alias, sc)]
+    names = [a.name for a in expand(sc.variant, sc)]
     assert names == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
 
 
@@ -1409,7 +1409,7 @@ def test_a_grasp_lift_a_floor_demands_is_not_optional():
 
     def stub(extra_m, clearance):
         s = SimpleNamespace()
-        s.gp = SimpleNamespace(alias="cork-test")
+        s.gp = SimpleNamespace(variant="cork-test")
         s.gen = lambda key, default=None: extra_m if key == "grasp_height_extra_m" else default
         s.hull, s.t_role = {"male": cork}, "male"
         s.world = SimpleNamespace(hull_at=lambda hull, pose: hull.clone())
@@ -1565,7 +1565,7 @@ def _surface_sampler(surfaces, top_z, interior=None, top_raises=False):
     from ispatialgym.sampling.sim_utils import SupportTop
 
     top = SupportTop("bookcase_x_0", th.arange(10) * 0.02, th.arange(10) * 0.02, th.ones(10, 10, dtype=th.bool), th.zeros(10, 10, dtype=th.bool), top_z, 0.0)
-    s = types.SimpleNamespace(choice=types.SimpleNamespace(bindings={"support_surfaces": surfaces}), gp=types.SimpleNamespace(alias="a"), template_facts={},
+    s = types.SimpleNamespace(choice=types.SimpleNamespace(bindings={"support_surfaces": surfaces}), gp=types.SimpleNamespace(variant="a"), template_facts={},
                               interior_calls=[], gen=lambda k, d=None: d)
 
     def support_top(support, ignore=()):

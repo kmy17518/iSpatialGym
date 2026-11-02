@@ -1,6 +1,6 @@
 (define (problem configuration_matching-15)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_large_scale-door)
+    (:variant configuration_matching-articulation_open_large_scale-door)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_open_large_scale-door (configuration_matching/articulation_open_large_scale.iddl; configuration_matching-articulation_open_large_scale#01/representative)
     ; Configuration matching - articulation (large-scale, open). The target is a scene articulated object (cabinet, fridge,

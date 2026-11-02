@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""First head-camera frame (and proprioception) of every regenerated instance of one alias, as the collector would have
+"""First head-camera frame (and proprioception) of every regenerated instance of one variant, as the collector would have
 recorded it: ``run_isg``'s ``InstanceLoader`` with BEHAVIOR's sensor set (``behavior_output``: head 720 px, 40 mm), one world
-per alias, every instance attached / restored in turn (the ``--queue`` path). Writes ``<out>/<iid>.png`` (720 x 720 RGB),
+per variant, every instance attached / restored in turn (the ``--queue`` path). Writes ``<out>/<iid>.png`` (720 x 720 RGB),
 ``<out>/<iid>.proprio.npy`` (61) and ``<out>/index.json``.
 
-    python lab_tools/first_frames.py --alias <alias> --inst-root <job dir> --out datasets/first_frames/<alias>
+    python lab_tools/first_frames.py --variant <variant> --inst-root <job dir> --out datasets/first_frames/<variant>
 
 Runs inside the ``ispatialgym-v2.0-vectorized`` conda env (Isaac Sim).
 """
@@ -37,7 +37,7 @@ def tro_paths(inst_root: str):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--alias", required=True)
+    ap.add_argument("--variant", required=True)
     ap.add_argument("--inst-root", required=True, help="job dir of lab_tools/sample_chosen.py (inst*/ roots)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--only", nargs="*", default=None, help="instance ids to (re)do")
@@ -61,7 +61,7 @@ def main(argv=None) -> int:
         if done and not args.only:
             continue
         todo.append((iid, p))
-    print(f"FIRST_FRAMES alias={args.alias} instances={len(paths)} todo={len(todo)}", flush=True)
+    print(f"FIRST_FRAMES variant={args.variant} instances={len(paths)} todo={len(todo)}", flush=True)
     if not todo:
         return 0
 

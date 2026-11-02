@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-56)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-floor)
+    (:variant inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-floor)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#04/representative/fallback1:init_surface)
     ; fallback 1 (init_surface) of inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar: init_surface = floor

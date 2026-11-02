@@ -530,7 +530,7 @@ class FollowSearch:
             lo, hi = aabb.min(dim=0).values - 0.10, aabb.max(dim=0).values + 0.10
             if not bool(((c >= lo) & (c <= hi)).all()):
                 if not self._fp_warned:
-                    log.warning("%s: hybrid follow: the analytic leaf footprint at q = %.3f (centroid %s) leaves the leaf's AABB %s..%s; using the AABB", self.s.gp.alias, q,
+                    log.warning("%s: hybrid follow: the analytic leaf footprint at q = %.3f (centroid %s) leaves the leaf's AABB %s..%s; using the AABB", self.s.gp.variant, q,
                                 [round(float(v), 3) for v in c.tolist()], [round(float(v), 2) for v in lo.tolist()], [round(float(v), 2) for v in hi.tolist()])
                     self._fp_warned = True
                 return aabb
@@ -575,7 +575,7 @@ class FollowSearch:
                 if n_sc < 3:
                     self._n_selfclear_debug = n_sc + 1
                     worst = self.kit.backend.self_collision_pairs(sols[0], f"{self.arm}_arm", margin=clear)[:2]
-                    log.info("%s: hybrid IK rejected by the self-collision clearance (%d solutions, none %.0f mm clear of the padding; e.g. %s)", self.s.gp.alias, len(sols),
+                    log.info("%s: hybrid IK rejected by the self-collision clearance (%d solutions, none %.0f mm clear of the padding; e.g. %s)", self.s.gp.variant, len(sols),
                              1000 * clear, [(p["links"], round(1000 * float(p["penetration"]) - 1000 * clear, 1)) for p in worst])
                 return None
             sols = sols[keep]
@@ -594,7 +594,7 @@ class FollowSearch:
         if n < 3:
             self._n_margin_debug = n + 1
             nearest = [self.ikc.joint_limit_margin(q, self.arm)[1] for q in sols]
-            log.info("%s: hybrid IK rejected by the joint-limit margin (%d solutions, best %.3f rad < %.3f at %s; nearest limits %s)", self.s.gp.alias, len(sols),
+            log.info("%s: hybrid IK rejected by the joint-limit margin (%d solutions, best %.3f rad < %.3f at %s; nearest limits %s)", self.s.gp.variant, len(sols),
                      float(margins[j]), hard, nearest[j], sorted(set(nearest)))
         return None
 
@@ -635,9 +635,9 @@ class FollowSearch:
                 info["nearest_limit_joint"] = j
                 if not info["polished_free_margin0"]:
                     info["culprits"] = P0.debug_collision_q(self.s, G.t(cand), "hybrid polish", margin=0.0).get("objects_at_spheres")
-            log.info("%s: hybrid polish failure %d (residual %.1f mm): %s", self.s.gp.alias, self._n_polish_debug, 1000 * residual, info)
+            log.info("%s: hybrid polish failure %d (residual %.1f mm): %s", self.s.gp.variant, self._n_polish_debug, 1000 * residual, info)
         except Exception as e:  # noqa: BLE001 — diagnostics never fail the search
-            log.info("%s: hybrid polish debug failed: %r", self.s.gp.alias, e)
+            log.info("%s: hybrid polish debug failed: %r", self.s.gp.variant, e)
 
     def solve(self, b: Sequence[float], eef: Tuple[th.Tensor, th.Tensor], q_prev: th.Tensor, leaf_pts, retreat: bool = False) -> Optional[_Sol]:
         """Exact arm IK of ``eef`` from base ``b`` seeded with the previous configuration (:meth:`_ik`: margin-aware),
@@ -726,7 +726,7 @@ class FollowSearch:
                             self.ikc.fk_residual(q_prev, self.h0.eef, self.arm), margin0, chosen="stance")]
         ok0, why0 = self.footprint_ok(b_prev, leaf_prev)
         if not ok0:
-            log.info("%s: hybrid follow: the manipulation stance itself fails the planar %s stand-in (kept: the stance passed the whole-body check)", s.gp.alias, why0)
+            log.info("%s: hybrid follow: the manipulation stance itself fails the planar %s stand-in (kept: the stance passed the whole-body check)", s.gp.variant, why0)
         try:
             for i_q, q_i in enumerate(q_values):
                 if time.time() - self.t0 > float(self.k["budget_s"]):
@@ -778,7 +778,7 @@ class FollowSearch:
                             n_dbg = getattr(self, "_n_path_debug", 0)
                             if n_dbg < 3:
                                 self._n_path_debug = n_dbg + 1
-                                log.info("%s: hybrid candidate %s (%s) rejected by the base path: %s", s.gp.alias, [round(v, 3) for v in b], tag, why)
+                                log.info("%s: hybrid candidate %s (%s) rejected by the base path: %s", s.gp.variant, [round(v, 3) for v in b], tag, why)
                             continue
                         if str(self.k["base_move_policy"]) == "lookahead":
                             # score = how many of the following dense poses the arm reaches from this base without moving it
@@ -810,7 +810,7 @@ class FollowSearch:
                                         d_m, d_yaw, chosen, self.n_ik - n_before))
                 self.log.append({"q": round(float(q_i), 4), "k": round(k_i, 3), "chosen": chosen, "base_step_m": round(d_m, 3), "base_step_rad": round(d_yaw, 3),
                                  "n_ik": self.n_ik - n_before, "rejected": tried, "b_rigid": [round(v, 3) for v in b_rigid]})
-                log.info("%s: hybrid follow q = %.3f (k %.2f): %s, base step %.3f m / %.3f rad, %d IK calls%s", s.gp.alias, q_i, k_i, chosen, d_m, d_yaw,
+                log.info("%s: hybrid follow q = %.3f (k %.2f): %s, base step %.3f m / %.3f rad, %d IK calls%s", s.gp.variant, q_i, k_i, chosen, d_m, d_yaw,
                          self.n_ik - n_before, f", rejected {tried}" if tried else "")
                 b_prev, q_prev, leaf_prev = b_new, sol.q, leaf_now
         finally:
@@ -1014,11 +1014,11 @@ class FollowSearch:
                             q_cur = float(poses[-1].q)
                             s.pose_joint(q_cur)
                             w_cur = s.h([q_cur])[0]
-                        log.info("%s: sequential: arm segment truncated by %d pose(s) to the last pose with a reachable retreat (q = %.3f, retreat %.2f m)", s.gp.alias, dropped, q_cur, retreat_m_cur)
+                        log.info("%s: sequential: arm segment truncated by %d pose(s) to the last pose with a reachable retreat (q = %.3f, retreat %.2f m)", s.gp.variant, dropped, q_cur, retreat_m_cur)
                 if seg:
                     segments.append({"type": "arm", "q_from": float(q_from), "q_to": float(q_cur), "base_pose2d": [float(v) for v in b], "arm_q_from": [round(v, 6) for v in arm_from],
                                      "arm_q_to": [round(v, 6) for v in self._arm_q(q_prev)], "poses": [p.to_sidecar(True) for p in seg]})
-                    log.info("%s: sequential: arm segment %.3f -> %.3f (%d poses) from base %s, retreat %.2f m", s.gp.alias, q_from, q_cur, len(seg), [round(v, 3) for v in b], retreat_m_cur)
+                    log.info("%s: sequential: arm segment %.3f -> %.3f (%d poses) from base %s, retreat %.2f m", s.gp.variant, q_from, q_cur, len(seg), [round(v, 3) for v in b], retreat_m_cur)
                 elif not segments:
                     # the stance itself admits no arm pull that can be released (door 0921-022828 / 030920: the arm reached 10 deg
                     # but the retreat from there folded the elbow past its limit) - a grasp followed by an immediate release and a
@@ -1049,7 +1049,7 @@ class FollowSearch:
                     n_cand += 1
                     if time.time() - t_note > 60.0:  # door 0921-030920: 30 min of silence inside this loop - say where the time goes
                         t_note = time.time()
-                        log.info("%s: sequential: base-move search at q = %.3f running %.0f s: %d / %d candidates, %d IK calls, %d scored, rejected %s", s.gp.alias, q_cur,
+                        log.info("%s: sequential: base-move search at q = %.3f running %.0f s: %d / %d candidates, %d IK calls, %d scored, rejected %s", s.gp.variant, q_cur,
                                  time.time() - t_move, n_cand, len(cands), self.n_ik - n_before, len(scored), tried)
                     if self.n_ik - n_before >= int(self.k["max_ik_per_step"]):
                         tried["ik_cap"] = tried.get("ik_cap", 0) + 1
@@ -1096,7 +1096,7 @@ class FollowSearch:
                     if rec is None:
                         why_m = getattr(self, "last_move_fail", None) or "move"
                         tried["move_" + why_m.split(":")[0]] = tried.get("move_" + why_m.split(":")[0], 0) + 1
-                        log.info("%s: sequential: release/move/re-grasp %s -> %s at q = %.3f rejected: %s", s.gp.alias, [round(v, 3) for v in b], [round(v, 3) for v in b_c], q_cur, why_m)
+                        log.info("%s: sequential: release/move/re-grasp %s -> %s at q = %.3f rejected: %s", s.gp.variant, [round(v, 3) for v in b], [round(v, 3) for v in b_c], q_cur, why_m)
                     if rec is not None:
                         rec.update({"q": float(q_cur), "lookahead": int(score), "base_from": [float(v) for v in b], "base_to": [float(v) for v in b_c], "candidate": tag})
                         move, b_new = rec, b_c
@@ -1111,7 +1111,7 @@ class FollowSearch:
                 segments.append(move)
                 self.log.append({"q": round(float(q_cur), 4), "chosen": move["type"], "base_step_m": round(d_m, 3), "base_step_rad": round(d_yaw, 3), "lookahead": int(move["lookahead"]),
                                  "n_ik": self.n_ik - n_before, "rejected": tried})
-                log.info("%s: sequential: %s at q = %.3f, base %s -> %s (%.2f m / %.2f rad, look-ahead %d, %d IK calls, rejected %s)", s.gp.alias, move["type"], q_cur,
+                log.info("%s: sequential: %s at q = %.3f, base %s -> %s (%.2f m / %.2f rad, look-ahead %d, %d IK calls, rejected %s)", s.gp.variant, move["type"], q_cur,
                          [round(v, 3) for v in b], [round(v, 3) for v in b_new], d_m, d_yaw, move["lookahead"], self.n_ik - n_before, tried)
                 b, q_prev = b_new, q_end
         finally:
@@ -1158,7 +1158,7 @@ def search_follow_path(s, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint
     fs = FollowSearch(s, manip, q_star, h0, q_init, q_goal, gen=gen)
     step = math.radians(float(fs.k["step_revolute_deg"])) if s.joint.is_revolute else float(fs.k["step_prismatic_m"])
     q_values = dense_values(q_init, q_last, list(marks.values()), step)
-    log.info("%s: %s follow search %s from %.3f to %.3f (%d dense steps of <= %.3f, fractions %s), arm %s, leaf links %s, %d body boxes, reach <= %.2f m", s.gp.alias,
+    log.info("%s: %s follow search %s from %.3f to %.3f (%d dense steps of <= %.3f, fractions %s), arm %s, leaf links %s, %d body boxes, reach <= %.2f m", s.gp.variant,
              fs.k["policy"], s.joint_name, q_init, q_last, len(q_values), step, sorted(marks), fs.arm, sorted(fs.leaf), len(fs.boxes), fs.r_max)
     if str(fs.k["policy"]) == "sequential":
         return fs.run_sequential(q_values, marks)

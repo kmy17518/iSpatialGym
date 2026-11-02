@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "camera_relocalization-obstructed",
   "slot": "representative",
-  "alias": "camera_relocalization-obstructed-hamper_1",
+  "variant": "camera_relocalization-obstructed-hamper_1",
   "source_job": "camera_relocalization-obstructed-hamper_1__representative__obstacles-clziqw"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-mug",
+  "variant": "mental_rotation-mug",
   "source_job": "mental_rotation-mug__representative__target-ppzttc"
  },
  {
@@ -23,7 +23,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-tablespoon",
+  "variant": "mental_rotation-tablespoon",
   "source_job": "mental_rotation-tablespoon__representative__target-tqqwys"
  },
  {
@@ -32,7 +32,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_wine",
+  "variant": "object_scaling-bottle_of_wine",
   "source_job": "object_scaling-bottle_of_wine__representative__target-nhmtvt"
  },
  {
@@ -41,7 +41,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_sake",
+  "variant": "object_scaling-bottle_of_sake",
   "source_job": "object_scaling-bottle_of_sake__representative__target-swlykk"
  }
 ]

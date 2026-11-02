@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the chosen ``eval_1003`` instances of one alias on the lab machine.
+"""Regenerate the chosen ``eval_1003`` instances of one variant on the lab machine.
 
 The test set ``kmy17518/isg-init-eval`` was collected on the cluster (sweep ``isg_prod/eval_1003``: ``sample_isg`` with
 ``--seed 1003``, instance indices from 50000). Its selection manifest lists the chosen instance indices per task but the
@@ -9,9 +9,9 @@ own. Everything else (world, template choice = the first draw of ``default_rng(s
 only ``run_template`` is replaced by a loop over the chosen indices, and a resumed run keeps the template of the first
 root (``_existing_templates`` is disabled so the same model combination is drawn again under a new ``inst_r<k>`` root).
 
-    python lab_tools/sample_chosen.py --alias <alias> --manifest <isg-init-eval.manifest.json> --out <job dir> [--seed 1003]
+    python lab_tools/sample_chosen.py --variant <variant> --manifest <isg-init-eval.manifest.json> --out <job dir> [--seed 1003]
 
-Writes ``<job dir>/inst*/<alias>/<template_id>/instances/<iid>-tro_state.json`` (+ sidecar, summary) like a production job;
+Writes ``<job dir>/inst*/<variant>/<template_id>/instances/<iid>-tro_state.json`` (+ sidecar, summary) like a production job;
 ``<job dir>/chosen_progress.jsonl`` gets one line per index (written / failed, attempts, seconds).
 """
 
@@ -28,10 +28,10 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def chosen_indices(manifest_path: str, alias: str):
+def chosen_indices(manifest_path: str, variant: str):
     with open(manifest_path) as f:
         man = json.load(f)
-    task = man["tasks"][alias]
+    task = man["tasks"][variant]
     return sorted(int(c["index"]) for c in task["chosen"]), [c["instance"] for c in task["chosen"]]
 
 
@@ -56,7 +56,7 @@ def next_root(job_dir: str) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--alias", required=True)
+    ap.add_argument("--variant", required=True)
     ap.add_argument("--manifest", required=True, help="isg_meta/isg-init-eval.manifest.json of the test set")
     ap.add_argument("--out", required=True, help="job directory (inst*/ roots, chosen_progress.jsonl)")
     ap.add_argument("--seed", type=int, default=1003)
@@ -78,7 +78,7 @@ def main(argv=None) -> int:
                          "indices whose candidates/<index>/ exists are skipped")
     args = ap.parse_args(argv)
 
-    indices, names = chosen_indices(args.manifest, args.alias)
+    indices, names = chosen_indices(args.manifest, args.variant)
     if args.only:
         indices = [i for i in indices if i in set(args.only)]
     job_dir = os.path.abspath(args.out)
@@ -90,7 +90,7 @@ def main(argv=None) -> int:
     else:
         todo = [i for i in indices if i not in done]
     progress_path = os.path.join(job_dir, "chosen_progress.jsonl")
-    print(f"SAMPLE_CHOSEN alias={args.alias} chosen={len(indices)} written={len(done)} todo={len(todo)} seed={args.seed} lenient={args.lenient_candidates}", flush=True)
+    print(f"SAMPLE_CHOSEN variant={args.variant} chosen={len(indices)} written={len(done)} todo={len(todo)} seed={args.seed} lenient={args.lenient_candidates}", flush=True)
     if not todo:
         return 0
     if args.lenient_candidates:
@@ -102,7 +102,7 @@ def main(argv=None) -> int:
     from ispatialgym.sampling.v2.core import ContextV2, get_sampler
 
     def run_template(problem, choice, world, kit, out_root, n_instances, seed, max_attempts, variant=None, customs_sha256=None, start_index=None):
-        out_dir = os.path.join(out_root, problem.alias, choice.template_id)
+        out_dir = os.path.join(out_root, problem.variant, choice.template_id)
         os.makedirs(out_dir, exist_ok=True)
         t0 = time.time()
         ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, variant=variant)
@@ -144,7 +144,7 @@ def main(argv=None) -> int:
 
     S.run_template = run_template
     S._existing_templates = lambda *a, **k: []  # a resumed run draws the same first template again under the new root
-    argv_s = ["--alias", args.alias, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]),
+    argv_s = ["--variant", args.variant, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]),
               "--seed", str(args.seed), "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", root, "--log-level", "INFO"]
     print("SAMPLE_CHOSEN sample_isg " + " ".join(argv_s), flush=True)
     try:
@@ -169,14 +169,14 @@ def lenient_candidates(args, todo, job_dir: str) -> int:
     progress_path = os.path.join(job_dir, "candidates_progress.jsonl")
     cand_root = os.path.join(job_dir, "candidates")
     os.makedirs(cand_root, exist_ok=True)
-    strict_templates = glob.glob(os.path.join(job_dir, "inst*", args.alias, "*", "template_meta.json"))
+    strict_templates = glob.glob(os.path.join(job_dir, "inst*", args.variant, "*", "template_meta.json"))
     if not strict_templates:
         print("SAMPLE_CHOSEN lenient: no strict template to copy from", flush=True)
         return 2
     strict_template_dir = os.path.dirname(strict_templates[0])
 
     def run_template(problem, choice, world, kit, out_root, n_instances, seed, max_attempts, variant=None, customs_sha256=None, start_index=None):
-        out_dir = os.path.join(out_root, problem.alias, choice.template_id)
+        out_dir = os.path.join(out_root, problem.variant, choice.template_id)
         os.makedirs(out_dir, exist_ok=True)
         t0 = time.time()
         ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, variant=variant)
@@ -198,7 +198,7 @@ def lenient_candidates(args, todo, job_dir: str) -> int:
 
             eps_all = dataset_episodes(args.dataset)
             for e, d in eps_all.items():
-                if d["task"] == args.alias:
+                if d["task"] == args.variant:
                     ep_frames[e] = (first_frame(args.dataset, d), first_depth(args.dataset, d))
             try:
                 sampler.world.cam.add_modality("depth_linear")
@@ -327,7 +327,7 @@ def lenient_candidates(args, todo, job_dir: str) -> int:
     S._existing_templates = lambda *a, **k: []
     root = os.path.join(job_dir, "lenient_scratch")
     shutil.rmtree(root, ignore_errors=True)
-    argv_s = ["--alias", args.alias, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]),
+    argv_s = ["--variant", args.variant, "--templates", "1", "--instances-per-template", "1", "--start-index", str(todo[0]),
               "--seed", str(args.seed), "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", root, "--log-level", "INFO"]
     print("SAMPLE_CHOSEN lenient sample_isg " + " ".join(argv_s), flush=True)
     try:

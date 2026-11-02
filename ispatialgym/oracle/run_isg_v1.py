@@ -23,7 +23,7 @@ What it does
 4. Records per step into ``<out>/<iid>/demo.hdf5`` (actions, joint positions / velocities, base / eef / head-camera
    poses, task-object poses, evaluator flags and errors, phase) and, with ``--video``, the head camera
    (``<robot>:zed_link:Camera:0``) RGB as ``<out>/<iid>/head_rgb.mp4``; ``init_rgb.png`` / ``final_rgb.png`` are
-   always written. ``meta.json`` carries the summary (instance id, alias, success flag, errors, wall times, step
+   always written. ``meta.json`` carries the summary (instance id, variant, success flag, errors, wall times, step
    counts, oracle name, QA reason, traceback on error).
 5. Prints one line ``RUN_ISG_RESULT {...}`` and exits with
 
@@ -718,11 +718,11 @@ def main(argv=None) -> int:
         oracle_name = ORACLES.get(activity)
         meta.update({
             "instance_id": iid, "template_dir": template_dir, "template_id": tmeta.get("template_id"), "problem": tmeta["problem"],
-            "activity": activity, "activity_definition_id": did, "alias": tmeta.get("alias") or tro.meta.task_variant,
+            "activity": activity, "activity_definition_id": did, "variant": tmeta.get("variant") or tro.meta.task_variant,
             "scene": tmeta.get("scene"), "load_room_instances": tmeta.get("load_room_instances"), "tro_path": tro_path,
             "oracle": oracle_name, "robot_name": robot_name, "out_dir": out_dir,
         })
-        result.update({"instance": iid, "activity": activity, "alias": meta["alias"], "oracle": oracle_name, "out": out_dir})
+        result.update({"instance": iid, "activity": activity, "variant": meta["variant"], "oracle": oracle_name, "out": out_dir})
         log.info("run_isg: %s (%s, oracle %s) -> %s", iid, activity, oracle_name, out_dir)
 
         # ---------------------------------------------------------------- environment

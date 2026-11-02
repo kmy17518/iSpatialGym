@@ -61,24 +61,24 @@ def load_entries(src, views):
         for view in views:
             folder, key = VIEWS[view]
             if key not in e:
-                raise SystemExit(f"manifest has no {key!r} for {e['alias']}")
+                raise SystemExit(f"manifest has no {key!r} for {e['variant']}")
             video = src / folder / f"{e['dir']}.mp4"
             if video.resolve() != (src / e[key]).resolve():
-                raise SystemExit(f"{folder}/ link and manifest disagree for {e['alias']}:\n"
+                raise SystemExit(f"{folder}/ link and manifest disagree for {e['variant']}:\n"
                                  f"  {video.resolve()}\n  {(src / e[key]).resolve()}")
             paths.append(video)
         probes = [probe(p) for p in paths]
         if len(set(probes)) != 1:
-            raise SystemExit(f"{e['alias']}: views differ in size, fps or length: {probes}")
+            raise SystemExit(f"{e['variant']}: views differ in size, fps or length: {probes}")
         w, h, fps, frames = probes[0]
         if e.get("n_steps") not in (None, frames):
-            print(f"note: {e['alias']}: {frames} video frames vs n_steps={e['n_steps']}")
-        alias, subtask = e["alias"], e["subtask"]
-        if alias.startswith(subtask + "-"):
-            rest = alias[len(subtask) + 1:]
+            print(f"note: {e['variant']}: {frames} video frames vs n_steps={e['n_steps']}")
+        variant, subtask = e["variant"], e["subtask"]
+        if variant.startswith(subtask + "-"):
+            rest = variant[len(subtask) + 1:]
         else:
-            rest = "" if alias == subtask else alias
-        entries.append(dict(idx=i, alias=alias, subtask=subtask, rest=rest, run=e["run_id"],
+            rest = "" if variant == subtask else variant
+        entries.append(dict(idx=i, variant=variant, subtask=subtask, rest=rest, run=e["run_id"],
                             made=made(e.get("made_on")), arm=arm_of(e), videos=paths,
                             size=(w, h), fps=fps, frames=frames))
     if len({(e["size"], e["fps"]) for e in entries}) != 1:
@@ -170,7 +170,7 @@ def main():
     meta = [";FFMETADATA1", "title=" + ffmeta_escape(f"{tag} ({commit}): all {n} demos, {' + '.join(views)}"), ""]
     for e, s in zip(entries, starts):
         meta += ["[CHAPTER]", "TIMEBASE=1/1000", f"START={ms(s)}", f"END={ms(s + e['frames'])}",
-                 "title=" + ffmeta_escape(f"{e['idx'] + 1:02d} {e['alias']}"), ""]
+                 "title=" + ffmeta_escape(f"{e['idx'] + 1:02d} {e['variant']}"), ""]
     chapters = args.work / "chapters.txt"
     chapters.write_text("\n".join(meta))
 
@@ -191,7 +191,7 @@ def main():
 
     picture = (f"{w}x{h} head camera" if k == 1
                else f"head camera (left) and overhead camera (right), {w}x{h} each,")
-    width = max(len(e["alias"]) for e in entries)
+    width = max(len(e["variant"]) for e in entries)
     lines = [f"{tag} ({commit}): {n} demos in {out.name}, {clock(total_frames)} total",
              f"{fps:g} fps, {picture} with a {BAR} px label bar on top; "
              "'step i/N' in the bar is the 0-based frame index within that demo.",
@@ -200,7 +200,7 @@ def main():
              f"{'start':<8}  {'length':>7}  {'#':>2}  {'demo':<{width}}  {'run':<11}  {'made':<8}  arm"]
     for e, s in zip(entries, starts):
         lines.append(f"{clock(s, up=True):<8}  {e['frames'] / fps:>6.1f}s  {e['idx'] + 1:>2}  "
-                     f"{e['alias']:<{width}}  {e['run']:<11}  {e['made'][1]:<8}  {e['arm'] or '-'}")
+                     f"{e['variant']:<{width}}  {e['run']:<11}  {e['made'][1]:<8}  {e['arm'] or '-'}")
     index = out.with_suffix(".txt")
     index.write_text("\n".join(lines) + "\n")
     print(out)

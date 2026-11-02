@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-hard_candy",
+  "variant": "object_scaling-hard_candy",
   "source_job": "object_scaling-hard_candy__representative__target-qptjgv"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-potato",
+  "variant": "object_scaling-potato",
   "source_job": "object_scaling-potato__representative__target-lqjear"
  }
 ]

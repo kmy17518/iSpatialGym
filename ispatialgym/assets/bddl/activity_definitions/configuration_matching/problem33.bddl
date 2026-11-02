@@ -1,6 +1,6 @@
 (define (problem configuration_matching-33)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_small_scale-blender-countertop)
+    (:variant configuration_matching-articulation_close_small_scale-blender-countertop)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-blender-countertop (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#01~T3/representative)
     ; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open

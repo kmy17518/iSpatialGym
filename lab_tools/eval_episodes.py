@@ -19,7 +19,7 @@ Evaluator settings that differ from the oracle's QA (recorded in every episode a
   goal never held during the stream the second window is skipped (the verdict is ``not_reached`` either way).
 
     python lab_tools/eval_episodes.py --run R --step 50000 --ckpt-repo ... --ckpt-file ... --ckpt-sha256 ... \
-        --server ws://127.0.0.1:8000 --task <alias> --instances lab/instances.json --dataset datasets/isg-init-eval \
+        --server ws://127.0.0.1:8000 --task <variant> --instances lab/instances.json --dataset datasets/isg-init-eval \
         --lab-out lab/tierB/R/step_00050000 --raw-out runlogs/tierB/R/step_00050000 [--episodes 0 1 ...] [--horizon 3000]
 """
 
@@ -293,7 +293,7 @@ def main(argv=None) -> int:
     ap.add_argument("--episodes", type=int, nargs="*", default=None, help="episode indices (default: every episode of the task)")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--horizon", type=_spec, default="auto",
-                    help="policy steps: auto (default) = twice the longest training demo of the alias (datasets/isg-init); a number: the fixed protocol")
+                    help="policy steps: auto (default) = twice the longest training demo of the variant (datasets/isg-init); a number: the fixed protocol")
     ap.add_argument("--max-steps", type=_spec, default=None,
                     help="auto = ceil(1.6 x horizon) + 100 (the default with --horizon auto); a number (the default with a fixed horizon: 6000)")
     ap.add_argument("--settle-steps", type=int, default=50)

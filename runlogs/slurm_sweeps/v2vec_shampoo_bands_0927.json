@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
    "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
    "run_id": "0927-183620-s00",
    "out": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-ontop_large_scale/0927-183620-s00",

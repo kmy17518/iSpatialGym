@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-crab",
+  "variant": "mental_rotation-crab",
   "source_job": "mental_rotation-crab__representative__target-ohjsdr"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-beaker",
+  "variant": "object_scaling-beaker",
   "source_job": "object_scaling-beaker__representative__target-rhohgs"
  },
  {
@@ -23,7 +23,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-shampoo_dispenser",
+  "variant": "object_scaling-shampoo_dispenser",
   "source_job": "object_scaling-shampoo_dispenser__representative__target-thurmw"
  }
 ]

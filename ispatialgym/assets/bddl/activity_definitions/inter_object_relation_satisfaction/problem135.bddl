@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-135)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V3c/representative)
     ; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into drop_in_sink_lkklqs_0 from breakfast_table_xftrki_0 (0.68 m, ~4.0 m across kitchen_0); registry mode test

@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__house_single_floor__target-cap-xxqyrt__partner-lemonade_bottle-yprkek__0000",
   "tro_sha256": "c0a7dcc9cd822c65e67c5c8ff4cdfab0eb9730825ddc1c4c38e09fc2be844702",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+  "variant": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

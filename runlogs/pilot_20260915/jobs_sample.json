@@ -4,7 +4,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-bag_of_chips-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-bag_of_chips-breakfast_table",
+  "variant": "alignment-axial-bag_of_chips-breakfast_table",
   "slot": "representative"
  },
  {
@@ -12,7 +12,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-board_game-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-board_game-breakfast_table",
+  "variant": "alignment-axial-board_game-breakfast_table",
   "slot": "representative"
  },
  {
@@ -20,7 +20,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-catalog-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-catalog-breakfast_table",
+  "variant": "alignment-axial-catalog-breakfast_table",
   "slot": "representative"
  },
  {
@@ -28,7 +28,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-frying_pan-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-frying_pan-breakfast_table",
+  "variant": "alignment-axial-frying_pan-breakfast_table",
   "slot": "representative"
  },
  {
@@ -36,7 +36,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-gym_shoe-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-gym_shoe-breakfast_table",
+  "variant": "alignment-axial-gym_shoe-breakfast_table",
   "slot": "representative"
  },
  {
@@ -44,7 +44,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-hardback-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-hardback-breakfast_table",
+  "variant": "alignment-axial-hardback-breakfast_table",
   "slot": "representative"
  },
  {
@@ -52,7 +52,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-keyboard-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-keyboard-breakfast_table",
+  "variant": "alignment-axial-keyboard-breakfast_table",
   "slot": "representative"
  },
  {
@@ -60,7 +60,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-letter-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-letter-breakfast_table",
+  "variant": "alignment-axial-letter-breakfast_table",
   "slot": "representative"
  },
  {
@@ -68,7 +68,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-magazine-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-magazine-breakfast_table",
+  "variant": "alignment-axial-magazine-breakfast_table",
   "slot": "representative"
  },
  {
@@ -76,7 +76,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-axial-paperback_book-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 0.5,
   "subtask": "alignment-axial",
-  "alias": "alignment-axial-paperback_book-breakfast_table",
+  "variant": "alignment-axial-paperback_book-breakfast_table",
   "slot": "representative"
  },
  {
@@ -84,7 +84,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-decorative_sign-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-decorative_sign-walls",
+  "variant": "alignment-world_horizontal-decorative_sign-walls",
   "slot": "representative"
  },
  {
@@ -92,7 +92,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-hanger-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-hanger-walls",
+  "variant": "alignment-world_horizontal-hanger-walls",
   "slot": "representative"
  },
  {
@@ -100,7 +100,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-license_plate-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-license_plate-walls",
+  "variant": "alignment-world_horizontal-license_plate-walls",
   "slot": "representative"
  },
  {
@@ -108,7 +108,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-picture-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-picture-walls",
+  "variant": "alignment-world_horizontal-picture-walls",
   "slot": "representative"
  },
  {
@@ -116,7 +116,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-radiator-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-radiator-walls",
+  "variant": "alignment-world_horizontal-radiator-walls",
   "slot": "representative"
  },
  {
@@ -124,7 +124,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-shelf-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-shelf-walls",
+  "variant": "alignment-world_horizontal-shelf-walls",
   "slot": "representative"
  },
  {
@@ -132,7 +132,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-signpost-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-signpost-walls",
+  "variant": "alignment-world_horizontal-signpost-walls",
   "slot": "representative"
  },
  {
@@ -140,7 +140,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-towel_rack-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-towel_rack-walls",
+  "variant": "alignment-world_horizontal-towel_rack-walls",
   "slot": "representative"
  },
  {
@@ -148,7 +148,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-umbrella-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-umbrella-walls",
+  "variant": "alignment-world_horizontal-umbrella-walls",
   "slot": "representative"
  },
  {
@@ -156,7 +156,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-wall_mounted_tv-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_horizontal",
-  "alias": "alignment-world_horizontal-wall_mounted_tv-walls",
+  "variant": "alignment-world_horizontal-wall_mounted_tv-walls",
   "slot": "representative"
  },
  {
@@ -164,7 +164,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-fire_extinguisher-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-fire_extinguisher-walls",
+  "variant": "alignment-world_vertical-fire_extinguisher-walls",
   "slot": "representative"
  },
  {
@@ -172,7 +172,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-guitar-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-guitar-walls",
+  "variant": "alignment-world_vertical-guitar-walls",
   "slot": "representative"
  },
  {
@@ -180,7 +180,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-hanger-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-hanger-walls",
+  "variant": "alignment-world_vertical-hanger-walls",
   "slot": "representative"
  },
  {
@@ -188,7 +188,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-license_plate-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-license_plate-walls",
+  "variant": "alignment-world_vertical-license_plate-walls",
   "slot": "representative"
  },
  {
@@ -196,7 +196,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-painting-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-painting-walls",
+  "variant": "alignment-world_vertical-painting-walls",
   "slot": "representative"
  },
  {
@@ -204,7 +204,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-paper_towel_dispenser-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-paper_towel_dispenser-walls",
+  "variant": "alignment-world_vertical-paper_towel_dispenser-walls",
   "slot": "representative"
  },
  {
@@ -212,7 +212,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-picture-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-picture-walls",
+  "variant": "alignment-world_vertical-picture-walls",
   "slot": "representative"
  },
  {
@@ -220,7 +220,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-picture_frame-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-picture_frame-walls",
+  "variant": "alignment-world_vertical-picture_frame-walls",
   "slot": "representative"
  },
  {
@@ -228,7 +228,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-signpost-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-signpost-walls",
+  "variant": "alignment-world_vertical-signpost-walls",
   "slot": "representative"
  },
  {
@@ -236,7 +236,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-wall_clock-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
-  "alias": "alignment-world_vertical-wall_clock-walls",
+  "variant": "alignment-world_vertical-wall_clock-walls",
   "slot": "representative"
  },
  {
@@ -244,7 +244,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-carton_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-carton_1",
+  "variant": "camera_relocalization-obstructed-carton_1",
   "slot": "representative"
  },
  {
@@ -252,7 +252,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-footstool_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-footstool_1",
+  "variant": "camera_relocalization-obstructed-footstool_1",
   "slot": "representative"
  },
  {
@@ -260,7 +260,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-hamper_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-hamper_1",
+  "variant": "camera_relocalization-obstructed-hamper_1",
   "slot": "representative"
  },
  {
@@ -268,7 +268,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-music_stool_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-music_stool_1",
+  "variant": "camera_relocalization-obstructed-music_stool_1",
   "slot": "representative"
  },
  {
@@ -276,7 +276,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-ottoman_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-ottoman_1",
+  "variant": "camera_relocalization-obstructed-ottoman_1",
   "slot": "representative"
  },
  {
@@ -284,7 +284,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-poinsettia_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-poinsettia_1",
+  "variant": "camera_relocalization-obstructed-poinsettia_1",
   "slot": "representative"
  },
  {
@@ -292,7 +292,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-pot_plant_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-pot_plant_1",
+  "variant": "camera_relocalization-obstructed-pot_plant_1",
   "slot": "representative"
  },
  {
@@ -300,7 +300,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-public_trash_can_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-public_trash_can_1",
+  "variant": "camera_relocalization-obstructed-public_trash_can_1",
   "slot": "representative"
  },
  {
@@ -308,7 +308,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-serving_cart_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-serving_cart_1",
+  "variant": "camera_relocalization-obstructed-serving_cart_1",
   "slot": "representative"
  },
  {
@@ -316,7 +316,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-straight_chair_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-straight_chair_1",
+  "variant": "camera_relocalization-obstructed-straight_chair_1",
   "slot": "representative"
  },
  {
@@ -324,7 +324,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-swivel_chair_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-swivel_chair_1",
+  "variant": "camera_relocalization-obstructed-swivel_chair_1",
   "slot": "representative"
  },
  {
@@ -332,7 +332,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-taboret_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-taboret_1",
+  "variant": "camera_relocalization-obstructed-taboret_1",
   "slot": "representative"
  },
  {
@@ -340,7 +340,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-teddy_bear_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-teddy_bear_1",
+  "variant": "camera_relocalization-obstructed-teddy_bear_1",
   "slot": "representative"
  },
  {
@@ -348,7 +348,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-toy_car_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-toy_car_1",
+  "variant": "camera_relocalization-obstructed-toy_car_1",
   "slot": "representative"
  },
  {
@@ -356,7 +356,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-trash_can_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-trash_can_1",
+  "variant": "camera_relocalization-obstructed-trash_can_1",
   "slot": "representative"
  },
  {
@@ -364,7 +364,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-vacuum_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-vacuum_1",
+  "variant": "camera_relocalization-obstructed-vacuum_1",
   "slot": "representative"
  },
  {
@@ -372,7 +372,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-obstructed-wicker_basket_1 --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-obstructed",
-  "alias": "camera_relocalization-obstructed-wicker_basket_1",
+  "variant": "camera_relocalization-obstructed-wicker_basket_1",
   "slot": "representative"
  },
  {
@@ -380,7 +380,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias camera_relocalization-standard --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "camera_relocalization-standard",
-  "alias": "camera_relocalization-standard",
+  "variant": "camera_relocalization-standard",
   "slot": "representative"
  },
  {
@@ -388,7 +388,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-bottom_cabinet --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+  "variant": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
   "slot": "representative"
  },
  {
@@ -396,7 +396,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top",
+  "variant": "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top",
   "slot": "representative"
  },
  {
@@ -404,7 +404,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-dishwasher --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+  "variant": "configuration_matching-articulation_close_large_scale-dishwasher",
   "slot": "representative"
  },
  {
@@ -412,7 +412,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-door --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-door",
+  "variant": "configuration_matching-articulation_close_large_scale-door",
   "slot": "representative"
  },
  {
@@ -420,7 +420,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-fridge --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-fridge",
+  "variant": "configuration_matching-articulation_close_large_scale-fridge",
   "slot": "representative"
  },
  {
@@ -428,7 +428,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-oven --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_close_large_scale",
-  "alias": "configuration_matching-articulation_close_large_scale-oven",
+  "variant": "configuration_matching-articulation_close_large_scale-oven",
   "slot": "representative"
  },
  {
@@ -436,7 +436,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_small_scale-blender-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_close_small_scale",
-  "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+  "variant": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
   "slot": "representative"
  },
  {
@@ -444,7 +444,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_small_scale-carton-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_close_small_scale",
-  "alias": "configuration_matching-articulation_close_small_scale-carton-floor",
+  "variant": "configuration_matching-articulation_close_small_scale-carton-floor",
   "slot": "representative"
  },
  {
@@ -452,7 +452,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_close_small_scale",
-  "alias": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table",
+  "variant": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table",
   "slot": "representative"
  },
  {
@@ -460,7 +460,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_small_scale-laptop-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_close_small_scale",
-  "alias": "configuration_matching-articulation_close_small_scale-laptop-breakfast_table",
+  "variant": "configuration_matching-articulation_close_small_scale-laptop-breakfast_table",
   "slot": "representative"
  },
  {
@@ -468,7 +468,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_small_scale-toolbox-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_close_small_scale",
-  "alias": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table",
+  "variant": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table",
   "slot": "representative"
  },
  {
@@ -476,7 +476,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-bottom_cabinet --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+  "variant": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
   "slot": "representative"
  },
  {
@@ -484,7 +484,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top",
+  "variant": "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top",
   "slot": "representative"
  },
  {
@@ -492,7 +492,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-dishwasher --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+  "variant": "configuration_matching-articulation_open_large_scale-dishwasher",
   "slot": "representative"
  },
  {
@@ -500,7 +500,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-door --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-door",
+  "variant": "configuration_matching-articulation_open_large_scale-door",
   "slot": "representative"
  },
  {
@@ -508,7 +508,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-fridge --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-fridge",
+  "variant": "configuration_matching-articulation_open_large_scale-fridge",
   "slot": "representative"
  },
  {
@@ -516,7 +516,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_large_scale-oven --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.5,
   "subtask": "configuration_matching-articulation_open_large_scale",
-  "alias": "configuration_matching-articulation_open_large_scale-oven",
+  "variant": "configuration_matching-articulation_open_large_scale-oven",
   "slot": "representative"
  },
  {
@@ -524,7 +524,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_small_scale-blender-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_open_small_scale",
-  "alias": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
+  "variant": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
   "slot": "representative"
  },
  {
@@ -532,7 +532,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_small_scale-carton-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_open_small_scale",
-  "alias": "configuration_matching-articulation_open_small_scale-carton-floor",
+  "variant": "configuration_matching-articulation_open_small_scale-carton-floor",
   "slot": "representative"
  },
  {
@@ -540,7 +540,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_open_small_scale",
-  "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+  "variant": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
   "slot": "representative"
  },
  {
@@ -548,7 +548,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_small_scale-laptop-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_open_small_scale",
-  "alias": "configuration_matching-articulation_open_small_scale-laptop-breakfast_table",
+  "variant": "configuration_matching-articulation_open_small_scale-laptop-breakfast_table",
   "slot": "representative"
  },
  {
@@ -556,7 +556,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_open_small_scale-toolbox-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "configuration_matching-articulation_open_small_scale",
-  "alias": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
+  "variant": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
   "slot": "representative"
  },
  {
@@ -564,7 +564,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-cap-lemonade_bottle-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+  "variant": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
   "slot": "representative"
  },
  {
@@ -572,7 +572,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-cork-vinegar_bottle-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table",
+  "variant": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table",
   "slot": "representative"
  },
  {
@@ -580,7 +580,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-dip_candle-candle_holder-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table",
+  "variant": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table",
   "slot": "representative"
  },
  {
@@ -588,7 +588,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-lid-teapot-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+  "variant": "configuration_matching-attachment-lid-teapot-breakfast_table",
   "slot": "representative"
  },
  {
@@ -596,7 +596,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-light_bulb-table_lamp-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-light_bulb-table_lamp-breakfast_table",
+  "variant": "configuration_matching-attachment-light_bulb-table_lamp-breakfast_table",
   "slot": "representative"
  },
  {
@@ -604,7 +604,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
-  "alias": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table",
+  "variant": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table",
   "slot": "representative"
  },
  {
@@ -612,7 +612,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-block_design-block_4-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 3.0,
   "subtask": "configuration_matching-block_design",
-  "alias": "configuration_matching-block_design-block_4-breakfast_table",
+  "variant": "configuration_matching-block_design-block_4-breakfast_table",
   "slot": "representative"
  },
  {
@@ -620,7 +620,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+  "variant": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -628,7 +628,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-beaker-beaker_2_beer_glass_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-beaker-beaker_2_beer_glass_1-breakfast_table",
+  "variant": "disembedding-beaker-beaker_2_beer_glass_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -636,7 +636,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_beer-bottle_of_beer_2_bottle_of_champagne_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bottle_of_beer-bottle_of_beer_2_bottle_of_champagne_1-breakfast_table",
+  "variant": "disembedding-bottle_of_beer-bottle_of_beer_2_bottle_of_champagne_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -644,7 +644,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table",
+  "variant": "disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -652,7 +652,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_apple_juice_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_apple_juice_1-breakfast_table",
+  "variant": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_apple_juice_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -660,7 +660,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table",
+  "variant": "disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -668,7 +668,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table",
+  "variant": "disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -676,7 +676,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table",
+  "variant": "disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -684,7 +684,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_cane_sugar-box_of_cane_sugar_2_bag_of_flour_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_cane_sugar-box_of_cane_sugar_2_bag_of_flour_1-breakfast_table",
+  "variant": "disembedding-box_of_cane_sugar-box_of_cane_sugar_2_bag_of_flour_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -692,7 +692,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_cereal-box_of_cereal_2_box_of_baking_mix_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_cereal-box_of_cereal_2_box_of_baking_mix_1-breakfast_table",
+  "variant": "disembedding-box_of_cereal-box_of_cereal_2_box_of_baking_mix_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -700,7 +700,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table",
+  "variant": "disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -708,7 +708,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table",
+  "variant": "disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -716,7 +716,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table",
+  "variant": "disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -724,7 +724,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table",
+  "variant": "disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -732,7 +732,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_tissues-bag_of_cookies_1_bag_of_cream_cheese_1_bag_of_ice_cream_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-box_of_tissues-bag_of_cookies_1_bag_of_cream_cheese_1_bag_of_ice_cream_1-breakfast_table",
+  "variant": "disembedding-box_of_tissues-bag_of_cookies_1_bag_of_cream_cheese_1_bag_of_ice_cream_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -740,7 +740,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table",
+  "variant": "disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -748,7 +748,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table",
+  "variant": "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -756,7 +756,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table",
+  "variant": "disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -764,7 +764,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table",
+  "variant": "disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -772,7 +772,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-conditioner_dispenser-bottle_of_cologne_1_bottle_of_dish_soap_1_bottle_of_lotion_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-conditioner_dispenser-bottle_of_cologne_1_bottle_of_dish_soap_1_bottle_of_lotion_1-breakfast_table",
+  "variant": "disembedding-conditioner_dispenser-bottle_of_cologne_1_bottle_of_dish_soap_1_bottle_of_lotion_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -780,7 +780,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-mouse-mouse_2_bar_soap_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-mouse-mouse_2_bar_soap_1-breakfast_table",
+  "variant": "disembedding-mouse-mouse_2_bar_soap_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -788,7 +788,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-mug-mug_2_beaker_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-mug-mug_2_beaker_1-breakfast_table",
+  "variant": "disembedding-mug-mug_2_beaker_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -796,7 +796,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-notebook-notebook_2_board_game_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-notebook-notebook_2_board_game_1-breakfast_table",
+  "variant": "disembedding-notebook-notebook_2_board_game_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -804,7 +804,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-pack_of_cigarettes-pack_of_cigarettes_2_bandage_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-pack_of_cigarettes-pack_of_cigarettes_2_bandage_1-breakfast_table",
+  "variant": "disembedding-pack_of_cigarettes-pack_of_cigarettes_2_bandage_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -812,7 +812,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table",
+  "variant": "disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -820,7 +820,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table",
+  "variant": "disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -828,7 +828,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table",
+  "variant": "disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -836,7 +836,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table",
+  "variant": "disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -844,7 +844,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-toy_dice-toy_dice_2_bar_soap_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-toy_dice-toy_dice_2_bar_soap_1-breakfast_table",
+  "variant": "disembedding-toy_dice-toy_dice_2_bar_soap_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -852,7 +852,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias disembedding-video_game-video_game_2_board_game_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "disembedding",
-  "alias": "disembedding-video_game-video_game_2_board_game_1-breakfast_table",
+  "variant": "disembedding-video_game-video_game_2_board_game_1-breakfast_table",
   "slot": "representative"
  },
  {
@@ -860,7 +860,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-inside",
-  "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
   "slot": "representative"
  },
  {
@@ -868,7 +868,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-inside",
-  "alias": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table",
   "slot": "representative"
  },
  {
@@ -876,7 +876,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-inside",
-  "alias": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
   "slot": "representative"
  },
  {
@@ -884,7 +884,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-inside",
-  "alias": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
   "slot": "representative"
  },
  {
@@ -892,7 +892,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-inside",
-  "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
   "slot": "representative"
  },
  {
@@ -900,7 +900,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
-  "alias": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table",
   "slot": "representative"
  },
  {
@@ -908,7 +908,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
-  "alias": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table",
   "slot": "representative"
  },
  {
@@ -916,7 +916,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
-  "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
   "slot": "representative"
  },
  {
@@ -924,7 +924,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
-  "alias": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
   "slot": "representative"
  },
  {
@@ -932,7 +932,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
-  "alias": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
   "slot": "representative"
  },
  {
@@ -940,7 +940,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
+  "variant": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
   "slot": "representative"
  },
  {
@@ -948,7 +948,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+  "variant": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
   "slot": "representative"
  },
  {
@@ -956,7 +956,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
+  "variant": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
   "slot": "representative"
  },
  {
@@ -964,7 +964,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
+  "variant": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
   "slot": "representative"
  },
  {
@@ -972,7 +972,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
   "slot": "representative"
  },
  {
@@ -980,7 +980,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table",
   "slot": "representative"
  },
  {
@@ -988,7 +988,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table",
   "slot": "representative"
  },
  {
@@ -996,7 +996,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1004,7 +1004,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-  "alias": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1012,7 +1012,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-touching",
-  "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1020,7 +1020,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-touching",
-  "alias": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1028,7 +1028,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-touching",
-  "alias": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1036,7 +1036,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_large_scale-apple-desk-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-under_large_scale",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
+  "variant": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
   "slot": "representative"
  },
  {
@@ -1044,7 +1044,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_large_scale-marker-desk-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-under_large_scale",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
+  "variant": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
   "slot": "representative"
  },
  {
@@ -1052,7 +1052,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-under_large_scale",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
+  "variant": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
   "slot": "representative"
  },
  {
@@ -1060,7 +1060,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 4.0,
   "subtask": "inter_object_relation_satisfaction-under_large_scale",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+  "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
   "slot": "representative"
  },
  {
@@ -1068,7 +1068,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-under_small_scale",
-  "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1076,7 +1076,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-under_small_scale",
-  "alias": "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1084,7 +1084,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-under_small_scale",
-  "alias": "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1092,7 +1092,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "inter_object_relation_satisfaction-under_small_scale",
-  "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
   "slot": "representative"
  },
  {
@@ -1100,7 +1100,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-baby_shoe --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-baby_shoe",
+  "variant": "mental_rotation-baby_shoe",
   "slot": "representative"
  },
  {
@@ -1108,7 +1108,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-banana --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-banana",
+  "variant": "mental_rotation-banana",
   "slot": "representative"
  },
  {
@@ -1116,7 +1116,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-bell_pepper --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-bell_pepper",
+  "variant": "mental_rotation-bell_pepper",
   "slot": "representative"
  },
  {
@@ -1124,7 +1124,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-briefcase --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-briefcase",
+  "variant": "mental_rotation-briefcase",
   "slot": "representative"
  },
  {
@@ -1132,7 +1132,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-carving_knife --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-carving_knife",
+  "variant": "mental_rotation-carving_knife",
   "slot": "representative"
  },
  {
@@ -1140,7 +1140,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-cellulose_tape_dispenser --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-cellulose_tape_dispenser",
+  "variant": "mental_rotation-cellulose_tape_dispenser",
   "slot": "representative"
  },
  {
@@ -1148,7 +1148,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-coffee_cup --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-coffee_cup",
+  "variant": "mental_rotation-coffee_cup",
   "slot": "representative"
  },
  {
@@ -1156,7 +1156,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-cookie_cutter --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-cookie_cutter",
+  "variant": "mental_rotation-cookie_cutter",
   "slot": "representative"
  },
  {
@@ -1164,7 +1164,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-crab --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-crab",
+  "variant": "mental_rotation-crab",
   "slot": "representative"
  },
  {
@@ -1172,7 +1172,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-garlic_clove --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-garlic_clove",
+  "variant": "mental_rotation-garlic_clove",
   "slot": "representative"
  },
  {
@@ -1180,7 +1180,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-ginger_root --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-ginger_root",
+  "variant": "mental_rotation-ginger_root",
   "slot": "representative"
  },
  {
@@ -1188,7 +1188,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-hammer --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-hammer",
+  "variant": "mental_rotation-hammer",
   "slot": "representative"
  },
  {
@@ -1196,7 +1196,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-hook --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-hook",
+  "variant": "mental_rotation-hook",
   "slot": "representative"
  },
  {
@@ -1204,7 +1204,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-mouse --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-mouse",
+  "variant": "mental_rotation-mouse",
   "slot": "representative"
  },
  {
@@ -1212,7 +1212,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-mug --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-mug",
+  "variant": "mental_rotation-mug",
   "slot": "representative"
  },
  {
@@ -1220,7 +1220,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-pickle --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-pickle",
+  "variant": "mental_rotation-pickle",
   "slot": "representative"
  },
  {
@@ -1228,7 +1228,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-potato --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-potato",
+  "variant": "mental_rotation-potato",
   "slot": "representative"
  },
  {
@@ -1236,7 +1236,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-quartz --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-quartz",
+  "variant": "mental_rotation-quartz",
   "slot": "representative"
  },
  {
@@ -1244,7 +1244,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-sandal --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-sandal",
+  "variant": "mental_rotation-sandal",
   "slot": "representative"
  },
  {
@@ -1252,7 +1252,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-soup_ladle --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-soup_ladle",
+  "variant": "mental_rotation-soup_ladle",
   "slot": "representative"
  },
  {
@@ -1260,7 +1260,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-spatula --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-spatula",
+  "variant": "mental_rotation-spatula",
   "slot": "representative"
  },
  {
@@ -1268,7 +1268,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-statue --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-statue",
+  "variant": "mental_rotation-statue",
   "slot": "representative"
  },
  {
@@ -1276,7 +1276,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-sunflower --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-sunflower",
+  "variant": "mental_rotation-sunflower",
   "slot": "representative"
  },
  {
@@ -1284,7 +1284,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-tablefork --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-tablefork",
+  "variant": "mental_rotation-tablefork",
   "slot": "representative"
  },
  {
@@ -1292,7 +1292,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-tablespoon --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-tablespoon",
+  "variant": "mental_rotation-tablespoon",
   "slot": "representative"
  },
  {
@@ -1300,7 +1300,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-teacup --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-teacup",
+  "variant": "mental_rotation-teacup",
   "slot": "representative"
  },
  {
@@ -1308,7 +1308,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-teaspoon --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-teaspoon",
+  "variant": "mental_rotation-teaspoon",
   "slot": "representative"
  },
  {
@@ -1316,7 +1316,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-toothbrush --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-toothbrush",
+  "variant": "mental_rotation-toothbrush",
   "slot": "representative"
  },
  {
@@ -1324,7 +1324,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-toy_figure --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-toy_figure",
+  "variant": "mental_rotation-toy_figure",
   "slot": "representative"
  },
  {
@@ -1332,7 +1332,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias mental_rotation-walker --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "mental_rotation",
-  "alias": "mental_rotation-walker",
+  "variant": "mental_rotation-walker",
   "slot": "representative"
  },
  {
@@ -1340,7 +1340,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-apple --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-apple",
+  "variant": "object_scaling-apple",
   "slot": "representative"
  },
  {
@@ -1348,7 +1348,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bar_soap --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bar_soap",
+  "variant": "object_scaling-bar_soap",
   "slot": "representative"
  },
  {
@@ -1356,7 +1356,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-beaker --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-beaker",
+  "variant": "object_scaling-beaker",
   "slot": "representative"
  },
  {
@@ -1364,7 +1364,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-beefsteak_tomato --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-beefsteak_tomato",
+  "variant": "object_scaling-beefsteak_tomato",
   "slot": "representative"
  },
  {
@@ -1372,7 +1372,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-beeswax_candle --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-beeswax_candle",
+  "variant": "object_scaling-beeswax_candle",
   "slot": "representative"
  },
  {
@@ -1380,7 +1380,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bell_pepper --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bell_pepper",
+  "variant": "object_scaling-bell_pepper",
   "slot": "representative"
  },
  {
@@ -1388,7 +1388,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_beer --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_beer",
+  "variant": "object_scaling-bottle_of_beer",
   "slot": "representative"
  },
  {
@@ -1396,7 +1396,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_catsup --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_catsup",
+  "variant": "object_scaling-bottle_of_catsup",
   "slot": "representative"
  },
  {
@@ -1404,7 +1404,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_medicine --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_medicine",
+  "variant": "object_scaling-bottle_of_medicine",
   "slot": "representative"
  },
  {
@@ -1412,7 +1412,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_olive_oil --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_olive_oil",
+  "variant": "object_scaling-bottle_of_olive_oil",
   "slot": "representative"
  },
  {
@@ -1420,7 +1420,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_pop --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_pop",
+  "variant": "object_scaling-bottle_of_pop",
   "slot": "representative"
  },
  {
@@ -1428,7 +1428,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_sake --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_sake",
+  "variant": "object_scaling-bottle_of_sake",
   "slot": "representative"
  },
  {
@@ -1436,7 +1436,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_water --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_water",
+  "variant": "object_scaling-bottle_of_water",
   "slot": "representative"
  },
  {
@@ -1444,7 +1444,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_wine --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-bottle_of_wine",
+  "variant": "object_scaling-bottle_of_wine",
   "slot": "representative"
  },
  {
@@ -1452,7 +1452,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-box_of_cereal --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-box_of_cereal",
+  "variant": "object_scaling-box_of_cereal",
   "slot": "representative"
  },
  {
@@ -1460,7 +1460,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-can_of_soda --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-can_of_soda",
+  "variant": "object_scaling-can_of_soda",
   "slot": "representative"
  },
  {
@@ -1468,7 +1468,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-canned_food --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-canned_food",
+  "variant": "object_scaling-canned_food",
   "slot": "representative"
  },
  {
@@ -1476,7 +1476,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-cap --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-cap",
+  "variant": "object_scaling-cap",
   "slot": "representative"
  },
  {
@@ -1484,7 +1484,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-cherry_tomato --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-cherry_tomato",
+  "variant": "object_scaling-cherry_tomato",
   "slot": "representative"
  },
  {
@@ -1492,7 +1492,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-hard_candy --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-hard_candy",
+  "variant": "object_scaling-hard_candy",
   "slot": "representative"
  },
  {
@@ -1500,7 +1500,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-jar_of_spaghetti_sauce --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-jar_of_spaghetti_sauce",
+  "variant": "object_scaling-jar_of_spaghetti_sauce",
   "slot": "representative"
  },
  {
@@ -1508,7 +1508,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-lemon --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-lemon",
+  "variant": "object_scaling-lemon",
   "slot": "representative"
  },
  {
@@ -1516,7 +1516,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-lid --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-lid",
+  "variant": "object_scaling-lid",
   "slot": "representative"
  },
  {
@@ -1524,7 +1524,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-marker --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-marker",
+  "variant": "object_scaling-marker",
   "slot": "representative"
  },
  {
@@ -1532,7 +1532,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-pack_of_cigarettes --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-pack_of_cigarettes",
+  "variant": "object_scaling-pack_of_cigarettes",
   "slot": "representative"
  },
  {
@@ -1540,7 +1540,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-potato --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-potato",
+  "variant": "object_scaling-potato",
   "slot": "representative"
  },
  {
@@ -1548,7 +1548,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-shampoo_dispenser --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-shampoo_dispenser",
+  "variant": "object_scaling-shampoo_dispenser",
   "slot": "representative"
  },
  {
@@ -1556,7 +1556,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-soda_cup --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-soda_cup",
+  "variant": "object_scaling-soda_cup",
   "slot": "representative"
  },
  {
@@ -1564,7 +1564,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-toy_dice --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-toy_dice",
+  "variant": "object_scaling-toy_dice",
   "slot": "representative"
  },
  {
@@ -1572,7 +1572,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5400 python -m ispatialgym.sampling.sample_isg --alias object_scaling-wineglass --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 2.0,
   "subtask": "object_scaling",
-  "alias": "object_scaling-wineglass",
+  "variant": "object_scaling-wineglass",
   "slot": "representative"
  }
 ]

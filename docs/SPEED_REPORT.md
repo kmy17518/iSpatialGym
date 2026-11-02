@@ -23,7 +23,7 @@ Written for: the owner of the isg-1020 scale-up (who knows the sampler / oracle 
    1 retry), band feasible-set reuse, attach geometry cache. Instrumentation: per-attempt stage times and cuRobo counters (IK, batched
    IK, differential IK, collision, world sync, attach) in the sample log and summaries; straight-arm counters in meta.json.
 
-## Fleets (same 14 aliases, TITAN RTX, `-A vision -p svl`)
+## Fleets (same 14 variants, TITAN RTX, `-A vision -p svl`)
 
 | tag | code | flow | n per job | notes |
 |---|---|---|---|---|
@@ -33,17 +33,17 @@ Written for: the owner of the isg-1020 scale-up (who knows the sampler / oracle 
 | fast2 | train-fast branch | round 2: 5 cm start-draw cells, 8 screening seeds, band reuse, via ramps | 12 | |
 | fast_k1 / fast_split | train-fast branch | one collector per GPU / sampler and collector on separate GPUs | 12 | packing tests |
 
-Four aliases (alignment-axial_01, attachment_02, block_design_01, iors-inside_02) produced no instance in any tag (50-140 rejections
+Four variants (alignment-axial_01, attachment_02, block_design_01, iors-inside_02) produced no instance in any tag (50-140 rejections
 each): a sampler-yield problem, not a speed one; they were dropped from the later rounds.
 
 ## Results (interim, `scripts/fleet_summary.py`, `scripts/stage_summary.py`)
 
 TBD - filled from the final summaries. Interim at 20:30 PDT: steady-state successes per GPU-hour (after each job's world load and
-collector start) fast 23.6 over the 10 productive aliases (IORS 10-23, mug 25, wall clock 59, bell pepper 246); whole-job rates at
+collector start) fast 23.6 over the 10 productive variants (IORS 10-23, mug 25, wall clock 59, bell pepper 246); whole-job rates at
 n = 12 are about a third of that because a 12-instance job spends its first 10-20 minutes loading worlds (sampler 400-500 s, each
 collector another 420-580 s, started only when the first instance lands).
 
-Per attempt (sampler): base 90 s -> fast 48-59 s over all aliases; IORS nextto 110 -> 78-100, ontop 114 -> 95-138, under 136 -> 103-175
+Per attempt (sampler): base 90 s -> fast 48-59 s over all variants; IORS nextto 110 -> 78-100, ontop 114 -> 95-138, under 136 -> 103-175
 (the fast samplers share their GPU with two collectors; the flags samplers on the same hardware were 1.3-1.5x slower than base).
 
 Per demo (collector): rendered base alone 0.45-0.5 s/step; physics-only under 3-process contention 0.3-0.4 s/step; alignment-world_vertical
@@ -73,5 +73,5 @@ At most 78 GPUs at once for this account. py-spy segfaults on the Isaac Sim proc
 ## Projection and recommendation
 
 TBD after the packing tests: whether sampler + 2 collectors per GPU (contended), sampler + 1 collector, or sampler and collector GPUs
-split over a shared NFS queue gives the most successes per GPU-hour; then jobs of 50+ instances per (alias, scene, room) so the
+split over a shared NFS queue gives the most successes per GPU-hour; then jobs of 50+ instances per (variant, scene, room) so the
 7-8 min loads and the per-template caches amortise.

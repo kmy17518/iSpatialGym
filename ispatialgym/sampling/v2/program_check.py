@@ -1,14 +1,14 @@
 """Program check (spec §3.5, principle 4; oracle doc §3.7): the last stage of every attempt.
 
-``run(alias, sidecar, sampler)`` expands the oracle's program for the alias from the completed draft sidecar
-(``ispatialgym.oracle.programs.expand(alias, sidecar_dict)``, F6), asks every action for its ``targets()`` and IK- /
+``run(variant, sidecar, sampler)`` expands the oracle's program for the variant from the completed draft sidecar
+(``ispatialgym.oracle.programs.expand(variant, sidecar_dict)``, F6), asks every action for its ``targets()`` and IK- /
 collision-checks every pose and waypoint it returns — in the recorded posture, trunk and stance, with the carried
 object attached where the action carries one (screening IK at waypoints, exact IK at end poses, §3.6 / §3.9). A failing
 pose is a bug in the rule that recorded it: the attempt is rejected with ``Reject("program_check_failed", action=<name>)``
 and nothing is patched. ``validate_instances.py`` (D5) runs the same expansion on written instances.
 
 Until F6 lands (``git log`` shows ``oracle: sidecar schema ... (F6)``), :func:`run` falls back to :func:`check_blocks`,
-a structural stub that validates the sidecar blocks the alias's program will consume exist and are well-formed
+a structural stub that validates the sidecar blocks the variant's program will consume exist and are well-formed
 (stances, transitions, paths, grasps, contacts), so that the pipeline stage is exercised end to end.
 
 ``targets()`` contract we code against (oracle doc §3.6): a dict whose values are eef poses ``(pos, quat)`` /
@@ -909,7 +909,7 @@ def choose_departure_arms(sidecar: SidecarDraft, sampler, actions: Sequence[Any]
     return {"arms": sorted(ends), "choice": "stance posture (re-pose)", "legs": [int(j) for j in group], "tried": whys}
 
 
-def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = None) -> Dict[str, Any]:
+def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = None) -> Dict[str, Any]:
     """§3.5 program check. ``sampler`` supplies ``ikc`` (``IKChecker``), ``kit``, ``objects`` (bddl instance -> sim
     object), ``support_objects()`` (ignored for final grasp / contact poses) and ``subtask``. Returns a report
     ``{"mode": "expand"|"stub", "actions": [{"name", "stance", "carried", "n_poses"}], ...}``; raises
@@ -920,7 +920,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
 
     global _STATS, last_stats
 
-    subtask = subtask or getattr(sampler, "subtask", alias)
+    subtask = subtask or getattr(sampler, "subtask", variant)
     sd = sidecar.to_dict()
     problems = check_blocks(subtask, sd)
     if problems:
@@ -931,7 +931,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
         return {"mode": "stub", "problems": [], "blocks": list(subtask_blocks(subtask))}
     try:
         sc = _sidecar_object(sd)
-        actions = expand(alias, sc)
+        actions = expand(variant, sc)
     except Exception as e:  # a program that cannot expand is a sampler-side bug too
         raise Reject("program_check_failed", f"expand failed: {e!r}", action="expand")
     report: Dict[str, Any] = {"mode": "expand", "actions": []}

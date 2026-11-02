@@ -1,7 +1,7 @@
 (define (problem configuration_matching-3)
     (:domain ispatialgym)
 
-    (:alias attachment)
+    (:variant attachment)
 
     (:objects
         digital_camera.n.01_1 - digital_camera.n.01

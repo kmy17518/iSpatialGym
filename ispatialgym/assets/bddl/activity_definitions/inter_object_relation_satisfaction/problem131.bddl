@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-131)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl)
+    (:variant inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl)
 
     ; owner 2026-10-12 ~19:20: under_large#01 in the iors_large tag - problem75 copied for inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#01/representative/fallback2:init_surface)

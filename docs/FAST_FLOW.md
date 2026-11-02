@@ -23,7 +23,7 @@ spa2still patch (start per attempt, oracle still exit). Cluster worktree `/visio
 
 ## The flow
 
-One job = one (alias, scene, room) template on one GPU: the sampler (`multiply_isg --split train`) and `KCOLLECT` physics-only
+One job = one (variant, scene, room) template on one GPU: the sampler (`multiply_isg --split train`) and `KCOLLECT` physics-only
 collectors (`run_isg --queue ... --record hdf5`) run **concurrently**; collectors claim instances as they land (O_EXCL claim files),
 each in its own Kit app-data copy. `scripts/job_fast.sh` (campaign root) does this; `submit_fast.py submit <key> <n> --flow fast
 --code <worktree> --kcollect 2`. Jobs are long (n >= 12) so the 5-8 min world load and the per-template caches amortise.
@@ -55,7 +55,7 @@ same code). Each logs once when first consulted. Off = the base code's behaviour
 | BAND_FEASIBLE_REUSE (**off** since 2026-11-01) | v2/tabletop.py | the feasible set a sampler stored in the band for the same (trunk, focus cell) instead of the two padded IK screens (round 2); superseded by BAND_EVIDENCE (a reused set that ran dry was never re-screened) |
 | BAND_EVIDENCE (BAND_PAIR_FAIL_K 3, BAND_CELL_EMPTY_M 3, BAND_RESCREEN_P 0.25) | v2/band_evidence.py, v2/tabletop.py | counts per (world, trunk, cell, yaw, grasp) instead of verdicts: F = union of every pair a screen passed minus pairs the exact IK demoted (3 failures and > 2x its confirmations); a cell dies only after 3 empty screens with no pair ever; 1 attempt in 4 re-screens a known cell (F grows); a reused F that runs dry is re-screened once; the band itself is no longer rewritten (2026-11-01) |
 | BAND_JOB_LOCAL | sampling/reach_bands.py | a band found outside `ISPATIALGYM_REACH_BANDS` is copied into the job's band directory and the copy loaded, and the job's copy wins over the same file elsewhere (the newest-first order let one committed band, rewritten by a job, become every job's shared file) (2026-11-01) |
-| BAND_SHARE (**off**) | scripts/job_fast.sh, v2/band_evidence.py | opt-in sharing between the campaign's jobs: the campaign's published bands copied in, the band evidence fetched at job start / published per job at its end (`$F/band_evidence/<alias>/<band>.evidence.<job>.json`, merged by summing; no file written by two jobs) (2026-11-01) |
+| BAND_SHARE (**off**) | scripts/job_fast.sh, v2/band_evidence.py | opt-in sharing between the campaign's jobs: the campaign's published bands copied in, the band evidence fetched at job start / published per job at its end (`$F/band_evidence/<variant>/<band>.evidence.<job>.json`, merged by summing; no file written by two jobs) (2026-11-01) |
 | IK_FRESH_P (0.2), IK_CACHE_GROW (IK_BRANCH_MIN_RAD 0.2, IK_CACHE_MAX_CHAINS 6) | v2/ik.py | one exact-IK call in 5 with a cache entry solves afresh; an entry keeps every distinct branch found (verified hits tried in a random order) (2026-11-01) |
 | BAND_REFINE (BAND_REFINE_K 2, BAND_REFINE_ADD_P 0.1, BAND_REFINE_INIT bracket) | v2/band_refine.py, reach_bands.py, v2/tabletop.py | bands refined per ACTUAL stance trunk (0.01 rad key) from the bracketing grid tilts' common cells; only verified reachability failures (re-checked with the task-spawned objects out of the collision world, K = 2) blacklist cells / pairs; lattice neighbours found reachable are added; world-independent sidecar `<band>.refine.json` (supersedes BAND_EVIDENCE's counting while on) (2026-11-01) |
 | BAND_VERIFY_STORE | v2/tabletop.py | the base band write-back deletes a cell on an empty screen only when the screen is still empty with the task objects out (2026-11-01) |
@@ -92,4 +92,4 @@ in the sample log and the instance summary; `program_check.last_stats`; meta.jso
 ## Measuring
 
 `scripts/fleet_summary.py --tag base --tag fast` (campaign root): successes per GPU-hour, s per attempt, attempts per written instance,
-s per demo, per alias and overall. The A side is `out/base/` (train85's job flow on the frozen `code_base_43ad206a_spa2still`).
+s per demo, per variant and overall. The A side is `out/base/` (train85's job flow on the frozen `code_base_43ad206a_spa2still`).

@@ -15,11 +15,11 @@ owner's shutdown request; no probe launched after 02:09).
 Not landed on purpose (owner rule: executor changes only if a pure read): `oracle/execute.py` — see "Next step".
 
 Probe inputs: `runlogs/smoke_inputs/hybrid_follow/customs_hybrid.json` = TEMP copy of `assets/task_specs/isg_customs.json` with
-`generation.follow_mode_override: "hybrid"` on all 14 `configuration_matching-articulation_{open,close}_large_scale-*` aliases
-(used via `export ISG_CUSTOMS=...` in the remote command). Launcher used: `/tmp/launch_hybrid_probe.sh <alias> <seed> <max_attempts>`
+`generation.follow_mode_override: "hybrid"` on all 14 `configuration_matching-articulation_{open,close}_large_scale-*` variants
+(used via `export ISG_CUSTOMS=...` in the remote command). Launcher used: `/tmp/launch_hybrid_probe.sh <variant> <seed> <max_attempts>`
 (not in the repo; it ran `remote_run.py --timeout 5400 --pull '$SMOKE_OUT' runlogs/hybrid_follow_20260917/<unit>/<run id>` with
 `sample_isg --templates 1 --instances-per-template 1 --no-write-back --out $SMOKE_OUT/inst; then run_isg --mode oracle --video` on
-the first written TRO). `launches.txt` lists run id → alias → local dir.
+the first written TRO). `launches.txt` lists run id → variant → local dir.
 
 ## How the hybrid follow works (module `articulation_hybrid.py`)
 
@@ -95,7 +95,7 @@ Knobs (`generation.hybrid_follow`): `step_revolute_deg` 10, `step_prismatic_m` 0
 streamed pod stdout; the pod-side `/root/smoke/<remote run id>` dirs are collected by the coordinator to
 `runlogs/runpod/collected_20260917/<pod>/smoke/`)
 
-| unit (alias suffix) | pod / remote run id | local run id | code | state at 02:28 | follow fraction |
+| unit (variant suffix) | pod / remote run id | local run id | code | state at 02:28 | follow fraction |
 |---|---|---|---|---|---|
 | open top_cabinet (house_double_floor_lower tynnnw_1, j_rightdoor, arm left) | `h4enpm19l0t3ng` / `014216-867a08` | `0917-014213` | `7445ea71` tree (no margin / retreat fix) | attempts 0, 1, 2, 3 each **followed the whole swing** (k 1.00 = q_goal 1.824 rad ≈ 104.5°, 12 dense steps, 7–8 base moves of 0.10–0.20 m / 15° yaw, ≈ 0.9 m base path) and **passed the follow's program check**; each was rejected at the **retreat** from the path's end: `ik_joint_limit` left_arm_joint7 within 14 / 18 / 7 mrad, attempt 3 left_arm_joint6 within 46 mrad (`stance manipulation -> follow_end [7.06, -0.01, -1.571]`). Attempt 4 in the search (k 0.33) when this was written. No instance. | **1.00** (search); instance blocked by the retreat |
 | open top_cabinet, seed 1 | `pjf6451ahyqxll` / `020829-0dd28f` | `0917-020825` | `35940ba8` (margin-aware IK + retreat at the last pose) | attempt 0 in the search, k 0.50 of q_goal 1.920 rad at 02:28 (11 Phase-2 survivors, class 1). The run that would tell whether the retreat fix yields an instance. | ≥ 0.50 so far |
@@ -145,7 +145,7 @@ Timing seen: scene load 220–450 s; template (stable set + passive probes) ≈ 
    configuration_matching-articulation_close_large_scale --what "..." --owner hybrid-follow`.
 3. Read the collected `/root/smoke/{014216-867a08, 020829-0dd28f, 014218-5d7d3d, 020851-f1e671}` dirs (`inst/.../summary.json`,
    `template_meta.hybrid_follow` in the template dir) for the per-step logs of the searches that were cut off.
-4. Decide with the owner whether the hybrid becomes the default for the `cabinet` class (customs `follow_mode_override` per alias, or
+4. Decide with the owner whether the hybrid becomes the default for the `cabinet` class (customs `follow_mode_override` per variant, or
    `follow_mode_by_class("cabinet") → "hybrid"` in `articulation_large.py`), and whether the trunk DoF (finding 3) is worth it for
    dishwasher / oven.
 
@@ -159,7 +159,7 @@ Timing seen: scene load 220–450 s; template (stable set + passive probes) ≈ 
   `ispatialgym/tests/test_sidecar_programs.py` (targets keys incl. `follow_path`).
 - To probe: pods via `scripts/runpod/remote_run.py` (pool `runlogs/runpod/smoke/pods.txt`; the fleet is shut down as of 02:15 — do not
   launch until the owner reopens the pool); the customs copy with the override is `runlogs/smoke_inputs/hybrid_follow/customs_hybrid.json`
-  (`export ISG_CUSTOMS=<that path>` before `python -m ispatialgym.sampling.sample_isg --alias <alias> ...`).
+  (`export ISG_CUSTOMS=<that path>` before `python -m ispatialgym.sampling.sample_isg --variant <variant> ...`).
 - Reading a run: `grep "hybrid follow" remote.log` gives one line per dense step (`chosen`, base step, IK calls, rejected candidates
   by reason `floor / body / leaf / reach / ik / path / ik_cap`); a search that fails leaves `hybrid_follow_infeasible` in the
   attempt's `handle_unreachable` summary (the last 4 errors) and the reached fraction in `template_meta.hybrid_follow`.

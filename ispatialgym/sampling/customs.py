@@ -1,9 +1,9 @@
 """Task customs list (iSpatialGym's task-custom list) — the schema of ``docs/instance_sampling_spec.md`` §2.3.
 
-One entry per grounded alias::
+One entry per grounded variant::
 
     {
-      "<alias>": {
+      "<variant>": {
         "iddl": "inter_object_relation_satisfaction/nextto.iddl",
         "definition_id": 3,
         "roles": {
@@ -33,24 +33,24 @@ spawn scale per model; ``default`` is the spec §5.5 dict form for a role-wide s
 assets), ``orientation_equivalences`` (§3.13: ``{"<category>/<model>": [symmetry tags]}`` — the rotation group is
 enumerated with :func:`equivalence_group`), ``grasp_keys`` (``{"<category>/<model>": "<require/grasps.csv key>"}``,
 the explicit library key of the pipeline so no sampler guesses a suffix). ``category`` is a string, or a list for a
-group role whose members come from several categories (the alias token lists them).
+group role whose members come from several categories (the variant token lists them).
 
 ``scenes.<scene>.bindings.<role>`` of a scene role is a list of scene object names, or — when the role is bound to the
 **floor** of the task room (large-scale IORS floor init, §5.6; small-scale articulation targets taller than 0.6 m,
-§5.4; the implicit ``floor`` role) — ``{"room": "<room instance>"}``: the alias carries the token ``floor`` and
+§5.4; the implicit ``floor`` role) — ``{"room": "<room instance>"}``: the variant carries the token ``floor`` and
 ``roles.<role>.category`` is ``floors``. Wall regions add ``bindings.<role>_regions`` (§5.5).
 
-**Fallback aliases** (owner decision 2026-09-16 B): a fallback entry is a full entry of its own (BDDL, id, scenes)
-plus ``fallback_of`` (the primary alias), ``fallback_rank`` (1 = tried first after the primary yielded nothing),
+**Fallback variants** (owner decision 2026-09-16 B): a fallback entry is a full entry of its own (BDDL, id, scenes)
+plus ``fallback_of`` (the primary variant), ``fallback_rank`` (1 = tried first after the primary yielded nothing),
 ``fallback_kind`` (``init_surface`` — large-scale IORS init surface class under: support → partner's own top → floor,
 ontop: support → floor; ``scale`` — wall / axial alignment target spawned at ``roles.target.scale``; ``next_model`` —
 small-scale articulation: the next candidate model of the category) and ``fallback_params`` (kind-specific facts, e.g.
 ``{"scale": 0.7, "scale_source": "template_meta.scale_hint" | "override" | "default_step"}``). The primary lists its
 **live** fallbacks in rank order under ``fallbacks``. An entry an earlier grounding produced and the current one does
 not -- a fallback at another scale after a new hint, a primary whose distractor token changed with the tray budget --
-keeps its entry / id / BDDL (ids are never reused) but carries ``superseded_by`` (the alias that replaced it, or
+keeps its entry / id / BDDL (ids are never reused) but carries ``superseded_by`` (the variant that replaced it, or
 ``true``) and leaves every live list. A scheduler skips entries with ``superseded_by``, queues primaries, and queues the
-aliases of ``primary.fallbacks`` only after the primary produced nothing; the sampler itself never falls back (spec
+variants of ``primary.fallbacks`` only after the primary produced nothing; the sampler itself never falls back (spec
 principle 2).
 
 Dataclasses here are thin, typed views over that JSON; :class:`Customs` loads / saves the file and hands out entries.
@@ -97,7 +97,7 @@ SCOPE_KEYS = ("scene", "support", "partner", "target", "model", "support_height"
 HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach", "closing", "right_arm_q", "idle_arms")
 #: Keys of a customs entry, in the order they are written (the fallback keys only when set). Any other top-level key of
 #: an entry is a hand-written owner / agent record (D-004 ``f8e9aa7`` ``blacklisted``: the office_cubicles_right cabinets
-#: removed from the alias; ``pick_note`` of the Rs_int drawer pick) — kept verbatim in ``CustomsEntry.notes`` and written
+#: removed from the variant; ``pick_note`` of the Rs_int drawer pick) — kept verbatim in ``CustomsEntry.notes`` and written
 #: back after the schema keys, never interpreted here.
 ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "superseded_by",
               "roles", "scenes", "generation", "constraints")
@@ -220,7 +220,7 @@ class SceneEntry:
     bindings: Dict[str, Any] = field(default_factory=dict)  # role -> [scene object names] | {"room": ...} | {"category": [...]}
     whitelist: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)  # role -> category -> [models]
     blacklist: Dict[str, Dict[str, Dict[str, str]]] = field(default_factory=dict)  # role -> category -> model -> reason
-    # hand-written comments of the scene block (keys starting with ``_``, e.g. the sandal aliases' ``_note``): kept verbatim
+    # hand-written comments of the scene block (keys starting with ``_``, e.g. the sandal variants' ``_note``): kept verbatim
     notes: Dict[str, Any] = field(default_factory=dict)
 
     def whitelist_add(self, role: str, category: str, model: str) -> None:
@@ -340,23 +340,23 @@ def constraint_source(tool: str = "ground_isg", version: str = "2.0.0", instance
 
 @dataclass
 class CustomsEntry:
-    """One alias of the customs list."""
+    """One variant of the customs list."""
 
-    alias: str
+    variant: str
     iddl: Optional[str] = None  # "<family>/<subtask>.iddl" relative to the iddl root
     definition_id: Optional[int] = None
     roles: Dict[str, RoleEntry] = field(default_factory=dict)
     scenes: Dict[str, SceneEntry] = field(default_factory=dict)
     generation: Dict[str, Any] = field(default_factory=dict)
     constraints: List[Constraint] = field(default_factory=list)
-    # fallback aliases (module docstring): set on a fallback entry ...
+    # fallback variants (module docstring): set on a fallback entry ...
     fallback_of: Optional[str] = None
     fallback_rank: Optional[int] = None
     fallback_kind: Optional[str] = None
     fallback_params: Dict[str, Any] = field(default_factory=dict)
     # ... and, on a primary, its fallbacks in rank order
     fallbacks: List[str] = field(default_factory=list)
-    # set when a later grounding replaced this alias (the replacing alias, or True): dormant, never queued
+    # set when a later grounding replaced this variant (the replacing variant, or True): dormant, never queued
     superseded_by: Union[None, str, bool] = None
     # hand-written owner / agent records outside the schema (``blacklisted``, ``pick_note``, ...): kept verbatim
     notes: Dict[str, Any] = field(default_factory=dict)
@@ -443,13 +443,13 @@ class CustomsEntry:
         return d
 
     @classmethod
-    def from_dict(cls, alias: str, d: Dict[str, Any]) -> "CustomsEntry":
+    def from_dict(cls, variant: str, d: Dict[str, Any]) -> "CustomsEntry":
         unknown = sorted(set(d) - set(ENTRY_KEYS))
         if unknown:
             # hand-written records (owner blacklists, pick notes) ride along; a schema key misspelt by hand would too, so say so
-            log.info("customs entry %r: keys outside the schema kept verbatim: %s", alias, unknown)
+            log.info("customs entry %r: keys outside the schema kept verbatim: %s", variant, unknown)
         entry = cls(
-            alias=alias,
+            variant=variant,
             iddl=d.get("iddl"),
             definition_id=None if d.get("definition_id") is None else int(d["definition_id"]),
             roles={r: RoleEntry.from_dict(e) for r, e in (d.get("roles") or {}).items()},
@@ -469,7 +469,7 @@ class CustomsEntry:
 
 
 class Customs:
-    """The customs list file: ``{alias: entry}`` (a leading ``_comment`` string is kept)."""
+    """The customs list file: ``{variant: entry}`` (a leading ``_comment`` string is kept)."""
 
     def __init__(self, path: Optional[str] = None, entries: Optional[Dict[str, CustomsEntry]] = None, comment: Optional[str] = None):
         self.path = path
@@ -486,9 +486,9 @@ class Customs:
         with open(path) as f:
             data = json.load(f)
         if not isinstance(data, dict):
-            raise CustomsError(f"{path}: the customs list must be a JSON object keyed by alias")
+            raise CustomsError(f"{path}: the customs list must be a JSON object keyed by variant")
         comment = data.pop("_comment", None)
-        entries = {alias: CustomsEntry.from_dict(alias, d) for alias, d in data.items()}
+        entries = {variant: CustomsEntry.from_dict(variant, d) for variant, d in data.items()}
         return cls(path=path, entries=entries, comment=comment)
 
     def save(self, path: Optional[str] = None) -> str:
@@ -497,8 +497,8 @@ class Customs:
         data: Dict[str, Any] = {}
         if self.comment:
             data["_comment"] = self.comment
-        for alias in sorted(self.entries):
-            data[alias] = self.entries[alias].to_dict()
+        for variant in sorted(self.entries):
+            data[variant] = self.entries[variant].to_dict()
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f, indent=1)
@@ -507,21 +507,21 @@ class Customs:
         self.path = path
         return path
 
-    def __contains__(self, alias: str) -> bool:
-        return alias in self.entries
+    def __contains__(self, variant: str) -> bool:
+        return variant in self.entries
 
-    def __getitem__(self, alias: str) -> CustomsEntry:
-        return self.entries[alias]
+    def __getitem__(self, variant: str) -> CustomsEntry:
+        return self.entries[variant]
 
     def __len__(self) -> int:
         return len(self.entries)
 
-    def get_or_create_entry(self, alias: str, iddl: Optional[str] = None, definition_id: Optional[int] = None) -> CustomsEntry:
-        """The entry of ``alias`` (created empty when absent; ``iddl`` / ``definition_id`` are set when given)."""
-        entry = self.entries.get(alias)
+    def get_or_create_entry(self, variant: str, iddl: Optional[str] = None, definition_id: Optional[int] = None) -> CustomsEntry:
+        """The entry of ``variant`` (created empty when absent; ``iddl`` / ``definition_id`` are set when given)."""
+        entry = self.entries.get(variant)
         if entry is None:
-            entry = CustomsEntry(alias=alias)
-            self.entries[alias] = entry
+            entry = CustomsEntry(variant=variant)
+            self.entries[variant] = entry
         if iddl is not None:
             entry.iddl = iddl
         if definition_id is not None:
@@ -529,7 +529,7 @@ class Customs:
         return entry
 
     def to_dict(self) -> Dict[str, Any]:
-        return {alias: e.to_dict() for alias, e in sorted(self.entries.items())}
+        return {variant: e.to_dict() for variant, e in sorted(self.entries.items())}
 
 
 # ----------------------------------------------------------------------------------------------------------------

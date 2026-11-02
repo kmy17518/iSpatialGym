@@ -1,6 +1,6 @@
 # World-horizontal object selection (2026-09-12)
 
-Goal: create `world_alignment-2` (alias `world_horizontal`), the sibling of world vertical (`world_alignment-1`,
+Goal: create `world_alignment-2` (variant `world_horizontal`), the sibling of world vertical (`world_alignment-1`,
 `runlogs/world_alignment_selection_20260911`): an object hinged flat on a wall at its centre of mass starts tilted in
 the wall plane and is pushed back to **level**. This run selects the target categories / models of rounds 1-3, reuses
 the world-vertical wall regions, records both in `runlogs/grasp_library_20260905/select/task_object_selection.csv`
@@ -86,7 +86,7 @@ target does not necessarily admit a 1 m rail (the annotation says which do).
 ## Sampler and smoke test
 
 `WorldHorizontalSampler` (`ispatialgym/sampling/tasks/world_alignment.py`, registered for `world_alignment-2`,
-`bddl_writer` alias `world_horizontal`, template `assets/bddl/activity_definitions/world_alignment/problem2.bddl`)
+`bddl_writer` variant `world_horizontal`, template `assets/bddl/activity_definitions/world_alignment/problem2.bddl`)
 subclasses the world-vertical sampler: `generation.level_axis` is checked against the frame derived from
 `front_axis` / `up_axis`, `generation.symmetric_180` adds the half turn about the front axis to the goal's
 `orientation_equivalences`, and the wall patch tests use the swept extents (`generation.swept_patch`, default true;
@@ -113,7 +113,7 @@ items into `select/legend_extra.json` and regenerates the xlsx / html with the s
 
 ## Decisions taken without a check-in (adjust if wanted)
 
-* Problem id `world_alignment-2`, alias `world_horizontal`; hanging height, arc, deviation range (15-45 deg),
+* Problem id `world_alignment-2`, variant `world_horizontal`; hanging height, arc, deviation range (15-45 deg),
   tolerance (0.08 rad) and `min_visible_objects` copied from world vertical.
 * 180-degree-symmetric models are accepted (flagged `symmetric 180`, evaluated with the flip as an equivalence);
   the level goal for models with a readable top keeps them upright.

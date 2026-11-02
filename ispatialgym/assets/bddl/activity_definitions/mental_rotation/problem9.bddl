@@ -1,6 +1,6 @@
 (define (problem mental_rotation-9)
     (:domain ispatialgym)
-    (:alias mental_rotation-statue)
+    (:variant mental_rotation-statue)
 
     ; ground_isg 2.0.0: mental_rotation-statue (mental_rotation/mental_rotation.iddl; mental_rotation#10/representative)
     ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame

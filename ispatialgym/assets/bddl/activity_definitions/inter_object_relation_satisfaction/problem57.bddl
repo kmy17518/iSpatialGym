@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-57)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-floor)
+    (:variant inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-floor)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#05/representative/fallback1:init_surface)
     ; fallback 1 (init_surface) of inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk: init_surface = floor

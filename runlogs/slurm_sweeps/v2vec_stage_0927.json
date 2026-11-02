@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "mental_rotation-banana",
+   "variant": "mental_rotation-banana",
    "subtask": "mental_rotation",
    "run_id": "0927-182659-s00",
    "out": "runlogs/pilot_20260915/first_demo/mental_rotation/0927-182659-s00",

@@ -1,6 +1,6 @@
 (define (problem object_scaling-9)
     (:domain ispatialgym)
-    (:alias object_scaling-bottle_of_catsup)
+    (:variant object_scaling-bottle_of_catsup)
 
     ; ground_isg 2.0.0: object_scaling-bottle_of_catsup (object_scaling/object_scaling.iddl; object_scaling#10/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of

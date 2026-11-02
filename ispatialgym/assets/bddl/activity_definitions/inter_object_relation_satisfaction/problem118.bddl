@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-118)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor)
+    (:variant inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#02/representative)
     ; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2: hand-made from this grounding - briefcase/lwbctq under desk_mdhelw_0 (the held-out desk) from the floor of private_office_3; registry mode test

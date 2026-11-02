@@ -139,7 +139,7 @@ def cmd_reopen(a):
 
 # --------------------------------------------------------------------------------------------------------- status
 def pool_runs():
-    """pod -> (alias, kind, pid) for every remote_run holding a pool lock (via its open lock fd)."""
+    """pod -> (variant, kind, pid) for every remote_run holding a pool lock (via its open lock fd)."""
     out = {}
     try:
         pids = subprocess.run(["pgrep", "-f", "remote_run.py"], capture_output=True, text=True).stdout.split()
@@ -162,9 +162,9 @@ def pool_runs():
             continue
         ppid = subprocess.run(["ps", "-o", "ppid=", "-p", pid], capture_output=True, text=True).stdout.strip()
         cmd = subprocess.run(["ps", "-o", "args=", "-p", ppid], capture_output=True, text=True).stdout.strip() if ppid else ""
-        m = re.search(r"--alias (\S+)", cmd) or re.search(r"--tro (\S+)", cmd)
-        alias = (m.group(1) if m and "--alias" in m.group(0) else (os.path.basename(m.group(1)).split("__")[0] if m else "?"))
-        out[pod] = (alias, "demo-only" if "demo-only" in cmd else "run", int(pid))
+        m = re.search(r"--variant (\S+)", cmd) or re.search(r"--tro (\S+)", cmd)
+        variant = (m.group(1) if m and "--variant" in m.group(0) else (os.path.basename(m.group(1)).split("__")[0] if m else "?"))
+        out[pod] = (variant, "demo-only" if "demo-only" in cmd else "run", int(pid))
     return out
 
 
@@ -173,7 +173,7 @@ def local_run():
     for line in ps.splitlines():
         if "bash" in line.split(None, 2)[1:2] or "pgrep" in line:
             continue
-        m = re.search(r"--alias (\S+)", line)
+        m = re.search(r"--variant (\S+)", line)
         if m:
             return m.group(1)
     return None
@@ -235,15 +235,15 @@ def cmd_status(a):
     t = dt.datetime.now()
     # ---- status.md (full)
     lines = [f"# Status {now()}", "", f"**{n_valid} / 21 subtasks with a valid demo.** {bal}", "", "## Runs in flight", "", "| pod | name | role | run | since | ETA |", "|---|---|---|---|---|---|"]
-    for pod, (alias, kind, pid) in sorted(runs.items(), key=lambda kv: kv[1][0]):
-        since = next((e.get("launched_at", "") for e in running if e.get("alias") == alias), "")
+    for pod, (variant, kind, pid) in sorted(runs.items(), key=lambda kv: kv[1][0]):
+        since = next((e.get("launched_at", "") for e in running if e.get("variant") == variant), "")
         eta = ""
         if since:
             try:
                 eta = (dt.datetime.strptime(since, "%Y-%m-%d %H:%M PDT") + dt.timedelta(minutes=RUN_MINUTES)).strftime("~%H:%M")
             except Exception:  # noqa: BLE001
                 eta = ""
-        lines.append(f"| {pod} | {names.get(pod, '?')} | pool | {kind} {alias} ({short(fd.subtask_of(alias, customs))}) | {since[-9:] if since else 'agent run'} | {eta} |")
+        lines.append(f"| {pod} | {names.get(pod, '?')} | pool | {kind} {variant} ({short(fd.subtask_of(variant, customs))}) | {since[-9:] if since else 'agent run'} | {eta} |")
     if loc:
         lines.append(f"| local GPU | 4090 | local | run {loc} | | |")
     if band_busy:
@@ -260,7 +260,7 @@ def cmd_status(a):
             lines.append("holds: " + "; ".join(f"{short(s)}: {h['reason'][:100]}" for s, h in holds.items()))
     lines += ["", f"## Queued runs: {len(ready)}", ""]
     for e in ready:
-        lines.append(f"- prio {e.get('priority')} {e['kind']} {e['alias']} — next scheduler tick (≤ 5 min), ETA ~{RUN_MINUTES} min after launch")
+        lines.append(f"- prio {e.get('priority')} {e['kind']} {e['variant']} — next scheduler tick (≤ 5 min), ETA ~{RUN_MINUTES} min after launch")
     lines += ["", "## Board", "", "| subtask | state | blocking | owner |", "|---|---|---|---|"]
     for st in fd.SUBTASKS:
         s = states.get(st, {})
@@ -273,8 +273,8 @@ def cmd_status(a):
         f.write("\n".join(lines) + "\n")
     # ---- compact Slack post (<= 12 lines)
     by_role = {}
-    for pod, (alias, kind, pid) in runs.items():
-        by_role.setdefault("pool", []).append(f"{short(fd.subtask_of(alias, customs))}@{names.get(pod, pod)[-9:]}")
+    for pod, (variant, kind, pid) in runs.items():
+        by_role.setdefault("pool", []).append(f"{short(fd.subtask_of(variant, customs))}@{names.get(pod, pod)[-9:]}")
     post = [f"[STATUS {t.strftime('%H:%M')}] valid {n_valid}/21 · {bal.replace('   ', ' · ')}",
             f"pool {len(pool)} pods: {len(runs)} running, {len(idle_pool)} idle · band {len(band)} pod(s), {band_busy} running · local GPU: {('run ' + short(fd.subtask_of(loc, customs))) if loc else 'free'}"]
     if by_role.get("pool"):
@@ -305,9 +305,9 @@ def cmd_valid(a):
             continue
         rec = [r for r in ledger if r["subtask"] == s and (r.get("demo") or {}).get("success") and (r.get("code_commit") or "").startswith(v.get("commit") or "")]
         r = rec[-1] if rec else None
-        alias = r["alias"] if r else "?"
+        variant = r["variant"] if r else "?"
         meta = (r.get("demo") or {}).get("meta") if r else v.get("artefact")
-        print(f"[DEMO-VALID] {short(s)} — {alias} @{v.get('commit')} — meta: {meta}")
+        print(f"[DEMO-VALID] {short(s)} — {variant} @{v.get('commit')} — meta: {meta}")
         print(f"::key {key}")
 
 
@@ -340,7 +340,7 @@ def parse_reply(text):
         args = m.group(2)
         ma = re.search(r"--max-attempts\s+(\d+)", args)
         ms = re.search(r"--scene\s+(\S+)", args)
-        return {"kind": "run", "alias": m.group(1), "max_attempts": int(ma.group(1)) if ma else 8, "scene": ms.group(1) if ms else None}
+        return {"kind": "run", "variant": m.group(1), "max_attempts": int(ma.group(1)) if ma else 8, "scene": ms.group(1) if ms else None}
     return {"kind": "note", "text": t}
 
 

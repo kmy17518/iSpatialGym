@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""First-valid-demo loop (owner decisions 2026-09-16 06:50): fix -> sample one alias (1 template x 1 instance) ->
+"""First-valid-demo loop (owner decisions 2026-09-16 06:50): fix -> sample one variant (1 template x 1 instance) ->
 ``run_isg --mode oracle --video`` -> read meta.json -> board + ledgers.
 
-    python scripts/isg/first_demo.py run --alias <alias> [--max-attempts 8] [--timeout 5400] [--run-isg-args=--dev] [--note "..."]
+    python scripts/isg/first_demo.py run --variant <variant> [--max-attempts 8] [--timeout 5400] [--run-isg-args=--dev] [--note "..."]
     python scripts/isg/first_demo.py demo-only --tro <local tro path> [--note "..."]      # existing instance, re-run only
     python scripts/isg/first_demo.py board                                                # regenerate the board files
     python scripts/isg/first_demo.py fix --commit <sha> --subtasks A B ... --what "..."    # append to the fix log
@@ -63,22 +63,22 @@ def git(*args):
     return subprocess.run(["git", "-C", REPO] + list(args), capture_output=True, text=True).stdout.strip()
 
 
-def subtask_of(alias, customs):
-    e = customs.get(alias) or {}
+def subtask_of(variant, customs):
+    e = customs.get(variant) or {}
     if e.get("subtask"):
         return e["subtask"]
     iddl = e.get("iddl", "")
     if not e:
-        # an alias that is not (or no longer) in the customs - an experiment alias such as
-        # configuration_matching-articulation_open_large_scale-dishwasher_wide (0921-050314): resolve it from the iddl alias
+        # a variant that is not (or no longer) in the customs - an experiment variant such as
+        # configuration_matching-articulation_open_large_scale-dishwasher_wide (0921-050314): resolve it from the iddl variant
         # templates the way run_isg does (Sidecar.subtask), instead of filing the run under first_demo/<empty>/<run id>
         try:
             sys.path.insert(0, REPO)
-            from ispatialgym.oracle.sidecar import subtask_of_alias
+            from ispatialgym.oracle.sidecar import subtask_of_variant
 
-            return subtask_of_alias(alias)
+            return subtask_of_variant(variant)
         except Exception as ex:  # noqa: BLE001
-            print(f"first_demo: alias {alias!r} is not in the customs and does not match an iddl alias template ({ex})", file=sys.stderr)
+            print(f"first_demo: variant {variant!r} is not in the customs and does not match an iddl variant template ({ex})", file=sys.stderr)
     fam, fn = iddl.split("/", 1) if "/" in iddl else ("", iddl)
     fn = os.path.splitext(fn)[0]
     return fam if fam in ("object_scaling", "mental_rotation", "disembedding") and fn == fam else (f"{fam}-{fn}" if fam else fn)
@@ -175,7 +175,7 @@ def run_remote(cmd, out_dir, timeout):
 
 def cmd_run(args):
     customs = json.load(open(CUSTOMS))
-    st = subtask_of(args.alias, customs)
+    st = subtask_of(args.variant, customs)
     run_id = time.strftime("%m%d-%H%M%S")
     # warm runs live outside first_demo/: the latest-success manifest takes every successful demo under it, and a warm demo is not
     # evidence until the warm-vs-fresh start states are proven equal
@@ -187,7 +187,7 @@ def cmd_run(args):
     # template keeps its own copy, so run_isg reads the same list
     customs_opt = f" --customs {os.path.relpath(os.path.abspath(args.customs), REPO)}" if getattr(args, "customs", None) else ""
     extra = (" " + args.run_isg_args.strip()) if getattr(args, "run_isg_args", "") else ""
-    cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene}{customs_opt} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
+    cmd = (f"python -m ispatialgym.sampling.sample_isg --variant {args.variant}{scene}{customs_opt} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            + ("if [ -n \"$tro\" ]; then echo TRO=$tro; fi" if getattr(args, "sample_only", False) else
@@ -195,7 +195,7 @@ def cmd_run(args):
     if getattr(args, "warm", False):
         # engineering track (owner 2026-09-27): the sampler and the demo in one warm Isaac process (scripts/isg/warm_task.py); the
         # demo records its start state and a pristine TRO copy stays for the fresh-load comparison. Not release evidence until proven.
-        cmd = (f"python scripts/isg/warm_task.py --alias {args.alias}{scene}{customs_opt} --max-attempts {args.max_attempts} --seed {args.seed}"
+        cmd = (f"python scripts/isg/warm_task.py --variant {args.variant}{scene}{customs_opt} --max-attempts {args.max_attempts} --seed {args.seed}"
                + (" --sample-only" if getattr(args, "sample_only", False) else "") + (f" --run-isg-args={shlex.quote(args.run_isg_args.strip())}" if extra else ""))
         if not getattr(args, "sample_only", False):
             # the comparison pair on the same pod: the pristine TRO copy loaded by a fresh process (start_state_compare.py
@@ -206,7 +206,7 @@ def cmd_run(args):
     rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
-    rec = {"time": now(), "kind": ("sample-only" if getattr(args, "sample_only", False) else "sample+demo") + (" (warm)" if getattr(args, "warm", False) else "") + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": ("sample-only" if getattr(args, "sample_only", False) else "sample+demo") + (" (warm)" if getattr(args, "warm", False) else "") + (" (local)" if args.local else ""), "subtask": st, "variant": args.variant, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": samp["sampler_version"],
            "sampling": {k: samp[k] for k in ("n_written", "rejections", "error", "time_s")}, "tro": samp["tro"] and os.path.relpath(samp["tro"], REPO),
            "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
@@ -218,19 +218,19 @@ def cmd_run(args):
 def cmd_demo_only(args):
     customs = json.load(open(CUSTOMS))
     tro = os.path.abspath(args.tro)
-    alias = os.path.basename(tro).split("__")[0]
-    st = subtask_of(alias, customs)
+    variant = os.path.basename(tro).split("__")[0]
+    st = subtask_of(variant, customs)
     run_id = time.strftime("%m%d-%H%M%S")
     out_dir = os.path.join(FD, st, run_id)
     # stage the template dir under the synced inputs
     tdir = os.path.dirname(os.path.dirname(tro))
-    # staged per source run: two instances of the same alias share the template basename, and the stale staged copy
+    # staged per source run: two instances of the same variant share the template basename, and the stale staged copy
     # shadowed the new one (2026-09-18 15:01: the demo loaded the old TRO while the ledger named the new)
-    # tdir = <run>/inst/<alias>/<template>: the run id is three levels up (the earlier key took 'inst', so every run staged to the
+    # tdir = <run>/inst/<variant>/<template>: the run id is three levels up (the earlier key took 'inst', so every run staged to the
     # same directory and the first copy won - 0918-202215 replayed an old instance without the push stance); the copy is
     # refreshed every time (cheap) so a staged directory can never shadow its source
     run_key = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(tdir)))) or "run"
-    stage = os.path.join(REPO, "runlogs", "smoke_inputs", "first_demo", alias, f"{run_key}__{os.path.basename(tdir)}")
+    stage = os.path.join(REPO, "runlogs", "smoke_inputs", "first_demo", variant, f"{run_key}__{os.path.basename(tdir)}")
     import shutil
 
     shutil.copytree(tdir, stage, ignore=shutil.ignore_patterns("renders", "validation", "*.png"), dirs_exist_ok=True)
@@ -249,7 +249,7 @@ def cmd_demo_only(args):
             sv = json.load(open(sc)).get("sampler_version")
         except Exception:
             pass
-    rec = {"time": now(), "kind": "demo-only" + (" (local)" if getattr(args, "local", False) else ""), "subtask": st, "alias": alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": "demo-only" + (" (local)" if getattr(args, "local", False) else ""), "subtask": st, "variant": variant, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": sv, "sampling": None,
            "tro": os.path.relpath(tro, REPO), "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
     append_jsonl(LEDGER, rec)
@@ -403,7 +403,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("run")
-    s.add_argument("--alias", required=True)
+    s.add_argument("--variant", required=True)
     s.add_argument("--max-attempts", type=int, default=8)
     s.add_argument("--scene", default=None, help="restrict sample_isg to one candidate scene")
     s.add_argument("--local", action="store_true", help="run on this machine's GPU instead of the pool (one at a time, >= 12 GB free)")

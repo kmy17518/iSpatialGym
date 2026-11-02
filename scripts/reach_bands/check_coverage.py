@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """A2 coverage check: does a committed right-hand reach band exist for every (support, object, grasp set) the pilot
-manifest's aliases need? (owner decision 2026-09-16 A2)
+manifest's variants need? (owner decision 2026-09-16 A2)
 
     python scripts/reach_bands/check_coverage.py --manifest runlogs/pilot_20260915/jobs_sample.json \
         [--customs ispatialgym/assets/task_specs/isg_customs.json] [--out runlogs/reach_bands_20260915/coverage.json] [--jobs-out <manifest for the misses>]
 
-For every alias: the representative target model (customs ``roles.<target>.representative`` / whitelist), the support
+For every variant: the representative target model (customs ``roles.<target>.representative`` / whitelist), the support
 bindings per scene, the grasp set of the subtask (disembedding: tabletop grasps with the source tray placed; IORS small:
 tabletop / insert; attachment: attachment grasps; axial / block design: generic pinch; small articulation: brace band
 of (target, joint); IORS large: placement band (partner as support / floor under the partner) + init band). Subtasks
@@ -56,7 +56,7 @@ def grasp_keys():
 
 def normalize_scale(scale, obj: str):
     """Customs ``scale`` field -> ``[sx, sy, sz]`` or None: a list, a scalar (uniform), or a per-model dict
-    (``{"cat/model": 0.7, "default": 0.7}`` of the D1 fallback aliases) whose entry for ``obj`` (else ``default``, else
+    (``{"cat/model": 0.7, "default": 0.7}`` of the D1 fallback variants) whose entry for ``obj`` (else ``default``, else
     the first value) is taken."""
     if isinstance(scale, dict):
         scale = scale.get(obj, scale.get("default", next(iter(scale.values()), None)))
@@ -68,7 +68,7 @@ def normalize_scale(scale, obj: str):
     return vals * 3 if len(vals) == 1 else vals
 
 
-def subtask_of(alias: str, customs: dict) -> str:
+def subtask_of(variant: str, customs: dict) -> str:
     """Subtask id from the customs ``iddl`` path (``alignment/axial.iddl`` -> ``alignment-axial``, ``disembedding/disembedding.iddl``
     -> ``disembedding``)."""
     iddl = customs.get("iddl", "")
@@ -88,23 +88,23 @@ def main():
     args = ap.parse_args()
     customs = json.load(open(args.customs))
     keys = grasp_keys()
-    aliases = sorted({j["alias"] for j in json.load(open(args.manifest)) if j.get("alias")})
+    variants = sorted({j["variant"] for j in json.load(open(args.manifest)) if j.get("variant")})
     rows, jobs, status = [], {}, Counter()
-    for alias in aliases:
-        c = customs.get(alias)
+    for variant in variants:
+        c = customs.get(variant)
         if c is None:
-            rows.append({"alias": alias, "status": "no_customs_entry"})
+            rows.append({"variant": variant, "status": "no_customs_entry"})
             status["no_customs_entry"] += 1
             continue
-        sub = subtask_of(alias, c)
+        sub = subtask_of(variant, c)
         if sub.startswith(NO_BAND):
-            rows.append({"alias": alias, "subtask": sub, "status": "no_band_needed"})
+            rows.append({"variant": variant, "subtask": sub, "status": "no_band_needed"})
             status["no_band_needed"] += 1
             continue
         roles = c["roles"]
         trole = "targets" if "targets" in roles else "target"
         if trole not in roles:
-            rows.append({"alias": alias, "subtask": sub, "status": "no_band_needed"})
+            rows.append({"variant": variant, "subtask": sub, "status": "no_band_needed"})
             status["no_band_needed"] += 1
             continue
         tgt = roles[trole]
@@ -158,10 +158,10 @@ def main():
                     for s in supports:
                         needs.append((f"{s}:{pipe}", dict(scene=scene, support=s, object=obj, grasp_key=gk, placed=placed, scale=scale), ["--scene", scene, "--support", s] + base_args))
                 if not gk:
-                    rows.append({"alias": alias, "subtask": sub, "scene": scene, "status": "no_grasp_key", "object": obj, "pipeline": pipe})
+                    rows.append({"variant": variant, "subtask": sub, "scene": scene, "status": "no_grasp_key", "object": obj, "pipeline": pipe})
                     status["no_grasp_key"] += 1
             else:
-                rows.append({"alias": alias, "subtask": sub, "status": "unknown_subtask"})
+                rows.append({"variant": variant, "subtask": sub, "status": "unknown_subtask"})
                 status["unknown_subtask"] += 1
                 continue
             for label, kw, cli in needs:
@@ -169,21 +169,21 @@ def main():
                 if paths:
                     m = json.load(open(paths[0][:-4] + ".json"))
                     st = "covered" if m.get("n_reachable_total", 0) > 0 else "covered_empty"
-                    rows.append({"alias": alias, "subtask": sub, "scene": scene, "need": label, "object": obj, "status": st, "band": os.path.basename(paths[0]),
+                    rows.append({"variant": variant, "subtask": sub, "scene": scene, "need": label, "object": obj, "status": st, "band": os.path.basename(paths[0]),
                                  "cells": m.get("n_reachable_total"), "union_extent": m.get("union_extent"), "classes": bool(m.get("classes"))})
                 else:
-                    rows.append({"alias": alias, "subtask": sub, "scene": scene, "need": label, "object": obj, "status": "missing", "cli": cli})
+                    rows.append({"variant": variant, "subtask": sub, "scene": scene, "need": label, "object": obj, "status": "missing", "cli": cli})
                     if cli:
                         jid = "rb__cov__" + "__".join(a.replace("/", "-") for a in cli if not a.startswith("--"))[:150]
-                        jobs.setdefault(json.dumps(cli), {"id": jid, "kind": "floor" if "floor" in cli else "tabletop", "subtasks": [sub], "picks": [alias], "slot": "coverage",
+                        jobs.setdefault(json.dumps(cli), {"id": jid, "kind": "floor" if "floor" in cli else "tabletop", "subtasks": [sub], "picks": [variant], "slot": "coverage",
                                                           "scene": scene, "weight": 3.0, "args": cli, "cmd": POD_PREFIX + " ".join(shlex.quote(a) for a in cli) + " --out $OUT"})
                 status[rows[-1]["status"]] += 1
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     json.dump({"status": dict(status), "rows": rows}, open(args.out, "w"), indent=1)
-    print(f"{len(aliases)} aliases: {dict(status)} -> {args.out}")
+    print(f"{len(variants)} variants: {dict(status)} -> {args.out}")
     for r in rows:
         if r["status"] in ("missing", "no_grasp_key", "unknown_subtask", "no_customs_entry"):
-            print("  ", r["status"], r["alias"], r.get("need", ""), r.get("object", ""))
+            print("  ", r["status"], r["variant"], r.get("need", ""), r.get("object", ""))
     if args.jobs_out:
         json.dump(list(jobs.values()), open(args.jobs_out, "w"), indent=1)
         print(f"{len(jobs)} jobs for the misses -> {args.jobs_out}")

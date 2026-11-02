@@ -1,6 +1,6 @@
 (define (problem object_scaling-8)
     (:domain ispatialgym)
-    (:alias object_scaling-beefsteak_tomato)
+    (:variant object_scaling-beefsteak_tomato)
 
     ; ground_isg 2.0.0: object_scaling-beefsteak_tomato (object_scaling/object_scaling.iddl; object_scaling#09/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of

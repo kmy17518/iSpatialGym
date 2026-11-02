@@ -1,6 +1,6 @@
 (define (problem configuration_matching-43)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_small_scale-blender_eyedvd-bar)
+    (:variant configuration_matching-articulation_close_small_scale-blender_eyedvd-bar)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_small_scale-blender_eyedvd-bar (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#01~T4/representative/fallback1:next_model)
     ; fallback 1 (next_model) of configuration_matching-articulation_close_small_scale-blender-bar: model = eyedvd, slot = variation_geometry, primary_model = cwkvib

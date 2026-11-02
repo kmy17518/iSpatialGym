@@ -1,6 +1,6 @@
 (define (problem configuration_matching-57)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-breakfast_table)
+    (:variant configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-breakfast_table)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-breakfast_table (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#02~T1/representative/fallback1:next_model)
     ; fallback 1 (next_model) of configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table: model = vzwhbg, slot = variation_geometry, primary_model = gqtsam

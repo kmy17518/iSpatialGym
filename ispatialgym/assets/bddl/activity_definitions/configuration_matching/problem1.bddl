@@ -1,7 +1,7 @@
 (define (problem configuration_matching-1)
     (:domain ispatialgym)
 
-    (:alias articulation)
+    (:variant articulation)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01

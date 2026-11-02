@@ -130,7 +130,7 @@ keep working (`BraceCandidate` unpacks as `(kind, pair)`, `.q_prefix` carries th
   Straight-down pushes die beyond 0.9 m; 31–43 % of the cells at 0.9–1.1 m are reachable **only** with the 45° / 60°
   pitches — placement should pick the shallowest passing pitch per cell (`classes_at`).
 * Coverage (`scripts/reach_bands/check_coverage.py`, pilot manifest `runlogs/pilot_20260915/jobs_sample.json`, 197
-  aliases): 110 aliases need no tabletop band, 74 (support, object, grasp set) needs are covered by a band with cells, 16
+  variants): 110 variants need no tabletop band, 74 (support, object, grasp set) needs are covered by a band with cells, 16
   by an **empty** band (8 small-articulation brace bands — see below —, 3 `desk_xhjsub_0` init / placement bands, 4
   `--under` bands, the `sofa_lugrhk_1` placement band), **0 missing** (`coverage.json`).
 * Toolbox `no_workspace`: `brace__…toolbox-redmtl__f7a311f9f055b593` was computed at the right height (z = top 0.8126 m,
@@ -178,9 +178,9 @@ exists with cells (coverage 74 covered / 0 missing for the pilot manifest, `cove
 | IORS touching | box_of_sanitary_napkins 0.109→0.10, carton_of_milk 0.218→0.22, teacup 0.072→0.08 | all 3 covered |
 | small articulation (brace band empty, §5.4; left band of the target's height class is the replacement) | blender 0.394→0.40 (base link 0.23→0.22), hinged_jar 0.204→0.20 (base 0.086→0.08), laptop 0.020→0.02, toolbox 0.352→0.36 (base 0.21→0.22) | laptop covered; blender / hinged_jar / toolbox: nearest class 0.22 (the brace contact is on the base link, so the base-link height applies: 0.22 / 0.08 / 0.22 all exist); the sampler's `load_left_contact_band` accepts a class within 4 cm |
 
-→ every alias of the five left-brace subtasks on the breakfast table can enter the demo loop now as far as bands are
+→ every variant of the five left-brace subtasks on the breakfast table can enter the demo loop now as far as bands are
 concerned (20 of 20 objects + the 4 small-articulation targets). Missing bands elsewhere (all deferred): the D1 fallback
-aliases (`*_s070` axial at scale 0.7: 10 generic bands per support; `blender/eyedvd`, `hinged_jar/vzwhbg` brace bands),
+variants (`*_s070` axial at scale 0.7: 10 generic bands per support; `blender/eyedvd`, `hinged_jar/vzwhbg` brace bands),
 `check_coverage.py` now writes their `--scale` into the miss jobs.
 
 **Placed-tray band keying (item 9).** `--placed` specs are `CATEGORY/MODEL[*SCALE][@MODE]` (`reach_bands.PlacedSpec`,

@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-134)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V3a/representative)
     ; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; registry mode test

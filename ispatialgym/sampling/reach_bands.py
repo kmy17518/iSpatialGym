@@ -2255,7 +2255,7 @@ def band_arms(args) -> Tuple[str, ...]:
 
 def band_world_key(args, stable: Optional[Dict[str, Any]] = None) -> Tuple[str, Tuple[str, ...], Tuple[str, ...]]:
     """The **world key** of a band job - ``(scene, loaded rooms, removed chairs)`` - what decides whether two jobs can
-    share one loaded world in the ``--jobs`` worker (the sampler's ``sample_isg.world_key`` for aliases). Needs only the
+    share one loaded world in the ``--jobs`` worker (the sampler's ``sample_isg.world_key`` for variants). Needs only the
     stable scene json (``stable``; loaded from the dataset when omitted)."""
     stable = _stable_scene(args.scene) if stable is None else stable
     floor_mode, rooms = band_rooms(args, stable)

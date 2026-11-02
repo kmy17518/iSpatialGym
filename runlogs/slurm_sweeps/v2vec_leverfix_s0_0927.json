@@ -16,7 +16,7 @@
  },
  "runs": [
   {
-   "alias": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
+   "variant": "configuration_matching-articulation_open_small_scale-carton_cdmmwy_lever-breakfast_table",
    "subtask": "configuration_matching-articulation_open_small_scale",
    "run_id": "0927-191744-s00",
    "out": "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0927-191744-s00",

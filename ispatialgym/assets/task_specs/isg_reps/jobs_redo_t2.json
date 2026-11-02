@@ -9,7 +9,7 @@
   "weight": 3.0,
   "subtask": "alignment-world_vertical",
   "slot": "representative",
-  "alias": "alignment-world_vertical-fire_extinguisher-walls"
+  "variant": "alignment-world_vertical-fire_extinguisher-walls"
  },
  {
   "id": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table__representative__target-poexjo__partner-wiufnv",
@@ -21,7 +21,7 @@
   "weight": 3.0,
   "subtask": "configuration_matching-attachment",
   "slot": "representative",
-  "alias": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table"
+  "variant": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table"
  },
  {
   "id": "disembedding-box_of_shampoo-distractors-breakfast_table__representative__target-bclpiq",
@@ -33,7 +33,7 @@
   "weight": 4.0,
   "subtask": "disembedding",
   "slot": "representative",
-  "alias": "disembedding-box_of_shampoo-distractors-breakfast_table"
+  "variant": "disembedding-box_of_shampoo-distractors-breakfast_table"
  },
  {
   "id": "disembedding-pack_of_cigarettes-distractors-breakfast_table__representative__target-ghbqav",
@@ -45,7 +45,7 @@
   "weight": 4.0,
   "subtask": "disembedding",
   "slot": "representative",
-  "alias": "disembedding-pack_of_cigarettes-distractors-breakfast_table"
+  "variant": "disembedding-pack_of_cigarettes-distractors-breakfast_table"
  },
  {
   "id": "disembedding-tablefork-distractors-breakfast_table__representative__target-pqrtkc",
@@ -57,7 +57,7 @@
   "weight": 4.0,
   "subtask": "disembedding",
   "slot": "representative",
-  "alias": "disembedding-tablefork-distractors-breakfast_table"
+  "variant": "disembedding-tablefork-distractors-breakfast_table"
  },
  {
   "id": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
@@ -69,7 +69,7 @@
   "weight": 3.0,
   "subtask": "inter_object_relation_satisfaction-nextto",
   "slot": "representative",
-  "alias": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table"
  },
  {
   "id": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk__representative__target-lykqoh__partner-ukfaaz",
@@ -81,7 +81,7 @@
   "weight": 3.0,
   "subtask": "inter_object_relation_satisfaction-under_large_scale",
   "slot": "representative",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk"
+  "variant": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk"
  },
  {
   "id": "mental_rotation-carving_knife__representative__target-alekva",
@@ -93,7 +93,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-carving_knife"
+  "variant": "mental_rotation-carving_knife"
  },
  {
   "id": "mental_rotation-potato__representative__target-ljfitc",
@@ -105,7 +105,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-potato"
+  "variant": "mental_rotation-potato"
  },
  {
   "id": "object_scaling-bottle_of_water__representative__target-sxffiv",
@@ -117,7 +117,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_water"
+  "variant": "object_scaling-bottle_of_water"
  },
  {
   "id": "object_scaling-bell_pepper__representative__target-ukkycp",
@@ -129,6 +129,6 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bell_pepper"
+  "variant": "object_scaling-bell_pepper"
  }
 ]

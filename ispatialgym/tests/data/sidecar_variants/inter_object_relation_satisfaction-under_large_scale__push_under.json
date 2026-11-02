@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-under_large_scale-briefcase-breakfast_table-floor__house_single_floor__target-briefcase-lwbctq__push_under__0000",
   "tro_sha256": "dd3a52849c9e53199a949e2d455b2af496daa885e71b4516d552d8e6245dbba8",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-breakfast_table-floor",
+  "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-breakfast_table-floor",
   "path_bucket_m": null,
   "stances": {
     "init": {

@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-8)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop)
+    (:variant inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#02~T1/representative)
     ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with

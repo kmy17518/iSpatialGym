@@ -1,4 +1,4 @@
-"""2026-11-01 train-fast (PARTIAL_SCENE): a demo collected in the sampler's cropped world, replayed in the full alias scene - the
+"""2026-11-01 train-fast (PARTIAL_SCENE): a demo collected in the sampler's cropped world, replayed in the full variant scene - the
 collector's world choice (``run_isg.scene_crop_of`` / ``build_env_config`` / ``template_key`` / ``_scene_leaves``), the recorder's hdf5
 attrs (``recorder.scene_crop_attrs``) and the replayer's ``--scene`` decision and merged scene file
 (``multienv.replay.merge_partial_scene_file``). Simulator-free."""

@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table (inter_object_relation_satisfaction-touching#02, slot representative)",
  "inter_object_relation_satisfaction-4": {
-  "alias": "touching",
+  "variant": "touching",
   "roles": {
    "target": {
     "models": {
@@ -51,7 +51,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-touching",
-   "alias": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
    "pick": "inter_object_relation_satisfaction-touching#02",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/touching.iddl",

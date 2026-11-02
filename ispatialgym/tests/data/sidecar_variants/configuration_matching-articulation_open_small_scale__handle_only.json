@@ -3,7 +3,7 @@
   "instance_id": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table__house_single_floor__target-toolbox-redmtl__0000",
   "tro_sha256": "655828d18aad96e82d19efedcd97f8793b4af761c17725451fc750a01d8fbb05",
   "task_family": "configuration_matching",
-  "alias": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
+  "variant": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

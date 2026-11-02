@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-40)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar)
+    (:variant inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#02~T2/representative)
     ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set

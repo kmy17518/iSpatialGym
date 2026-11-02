@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table (inter_object_relation_satisfaction-ontop_small_scale#04, slot representative)",
  "inter_object_relation_satisfaction-0": {
-  "alias": "ontop",
+  "variant": "ontop",
   "roles": {
    "target": {
     "models": {
@@ -51,7 +51,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
    "pick": "inter_object_relation_satisfaction-ontop_small_scale#04",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",

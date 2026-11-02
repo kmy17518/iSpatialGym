@@ -41,7 +41,7 @@ def _sampler(monkeypatch, top, rel_cells):
     s.hull = {"target": _box(0.05, 0.05, 0.03), "partner": _box(0.10, 0.10, 0.14)}
     s.rest = {"target": C.IDENTITY_QUAT.clone()}
     s.g = lambda key: {"partner_gap_min_m": 0.04, "partner_centre_distance_min_m": 0.08}[key]
-    s.gp, s.template_facts = NS(alias="a"), {}
+    s.gp, s.template_facts = NS(variant="a"), {}
     rel = th.tensor(rel_cells, dtype=th.float32).reshape(-1, 2)
 
     def band_cells_world(bands, st):

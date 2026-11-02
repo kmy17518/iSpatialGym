@@ -1,7 +1,7 @@
 (define (problem alignment-1)
     (:domain ispatialgym)
 
-    (:alias world_vertical)
+    (:variant world_vertical)
 
     (:objects
         painting.n.01_1 - painting.n.01

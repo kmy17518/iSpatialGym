@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-121)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~T1/representative)
     ; owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into drop_in_sink_awvzkn_0 from countertop_kelzer_0 (0.6 m, sheet ~T1) / countertop_kelker_0 (1.6 m, ~T3); the order pins one per step; registry mode test

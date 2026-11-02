@@ -1,6 +1,6 @@
 {
- "requested_per_alias": 2,
- "aliases": {
+ "requested_per_variant": 2,
+ "variants": {
   "alignment-world_horizontal-decorative_sign-walls": {
    "job": "v2__alignment-world_horizontal-decorative_sign-walls",
    "subtask": "alignment-world_horizontal",

@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-136)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#03~V4a/representative)
     ; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V4: hand-made (rendered from the iddl; the subtask has no candidates rows) - plate/luhkiz into commercial_kitchen_sink_xecfyh_0 from commercial_kitchen_table_nisnrl_0 (the table beside the sink, ~1.3 m) / commercial_kitchen_table_vxvtec_0 (the prep table, ~4.7 m); the order pins one per step; registry mode test

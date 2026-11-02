@@ -47,7 +47,7 @@ class DisembeddingSampler(TaskSampler):
         self.grasps = []
         self.combos = {}
         self.cells = None
-        self.variant_overrides: List[str] = []
+        self.sub_variant_overrides: List[str] = []
 
     # ------------------------------------------------------------------ template
 
@@ -62,10 +62,10 @@ class DisembeddingSampler(TaskSampler):
         dspec = self.spec.distractor_spec()
         if dspec is None or target.category not in dspec.pools:
             raise Reject("spec", f"no 'distractors' pool for target category {target.category!r} (spec section distractors.pools)")
-        # which pool: the spec probability, unless --variant same_category / other_category forces it
-        if "same_category" in self.variant_overrides:
+        # which pool: the spec probability, unless --sub-variant same_category / other_category forces it
+        if "same_category" in self.sub_variant_overrides:
             same = True
-        elif "other_category" in self.variant_overrides:
+        elif "other_category" in self.sub_variant_overrides:
             same = False
         else:
             same = rng.random() < float(self.gen("same_category_prob", 0.5))
@@ -548,9 +548,9 @@ class DisembeddingSampler(TaskSampler):
     # ------------------------------------------------------------------ instance
 
     def _occluded_variant(self, rng) -> bool:
-        if "occluded" in self.variant_overrides:
+        if "occluded" in self.sub_variant_overrides:
             return True
-        if "unoccluded" in self.variant_overrides:
+        if "unoccluded" in self.sub_variant_overrides:
             return False
         return bool(rng.random() < float((self.gen("occlusion") or {}).get("prob", 0.5)))
 
@@ -614,7 +614,7 @@ class DisembeddingSampler(TaskSampler):
             o_yaw = float(rng.uniform(-math.pi, math.pi))
             base_xy, dist = self._front_position(occluder, o_yaw, t_pose, t_fp, to_cam)
             if base_xy is None:
-                if "occluded" in self.variant_overrides:
+                if "occluded" in self.sub_variant_overrides:
                     raise Reject("occlusion", "no supported position on the camera ray in front of the target")
                 # no room in front of the target on this tray: produce an unoccluded instance instead of wasting the attempt
                 occluded, occluder = False, None

@@ -103,7 +103,7 @@ class BlockDesignSampler(TaskSampler):
 
     def pattern(self, rng) -> Tuple[str, List[str]]:
         patterns = self.gen("patterns", {"default": ["red", "blue", "blue", "red"]})
-        override = getattr(self, "variant_overrides", None)
+        override = getattr(self, "sub_variant_overrides", None)
         if override:
             for v in override:
                 if v in patterns:

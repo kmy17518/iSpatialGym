@@ -1,7 +1,7 @@
 (define (problem inter_object_relation_satisfaction-1)
     (:domain ispatialgym)
 
-    (:alias under)
+    (:variant under)
 
     (:objects
         apple.n.01_1 - apple.n.01

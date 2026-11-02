@@ -1,6 +1,6 @@
 (define (problem configuration_matching-9)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_close_large_scale-dishwasher)
+    (:variant configuration_matching-articulation_close_large_scale-dishwasher)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_close_large_scale-dishwasher (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#02/representative)
     ; Configuration matching - articulation (large-scale, close). Scene articulated object (roles/candidates.csv kind scene, bound per

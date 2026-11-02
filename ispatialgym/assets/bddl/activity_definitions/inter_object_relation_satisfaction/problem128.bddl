@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-128)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table (inter_object_relation_satisfaction/inside_large_scale.iddl; inter_object_relation_satisfaction-inside_large_scale#02~T3/representative)
     ; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: hand-made (rendered from the iddl; the subtask has no candidates rows) - jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); registry mode test

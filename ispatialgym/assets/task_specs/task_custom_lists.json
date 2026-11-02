@@ -2,7 +2,7 @@
   "_comment": "iSpatialGym task spec (test round). Keys are <activity>-<def_id>; see docs/instance_sampling_spec.md section 2.2.",
 
   "disembedding-0": {
-    "alias": null,
+    "variant": null,
     "roles": {
       "target": {"models": {"box_of_cereal": ["iucshm"]}, "grasps": {"key": "box_of_cereal__iucshm"}},
       "tray_source": {"models": {"tray": ["gsxbym"]}},
@@ -131,7 +131,7 @@
   },
 
   "configuration_matching-0": {
-    "alias": "block_design",
+    "variant": "block_design",
     "roles": {
       "blocks": {"models": {"toy_dice": ["isgblk"]}, "dataset": "ispatialgym-assets", "count": 4},
       "table": {"fixed": true},
@@ -149,7 +149,7 @@
   },
 
   "configuration_matching-1": {
-    "alias": "articulation",
+    "variant": "articulation",
     "roles": {
       "artic": {"models": {"toolbox": ["redmtl"]}, "joint": "j_lid", "handle_key": "toolbox__redmtl"},
       "table": {"fixed": true},
@@ -162,7 +162,7 @@
   },
 
   "configuration_matching-2": {
-    "alias": "articulation",
+    "variant": "articulation",
     "roles": {
       "artic": {"models": {"toolbox": ["redmtl"]}, "joint": "j_lid", "handle_key": "toolbox__redmtl"},
       "table": {"fixed": true},
@@ -175,7 +175,7 @@
   },
 
   "configuration_matching-3": {
-    "alias": "attachment",
+    "variant": "attachment",
     "roles": {
       "male": {"models": {"cap": ["xxqyrt"]}, "grasps": {"key": "cap__xxqyrt"}},
       "female": {"models": {"lemonade_bottle": ["yprkek"]}},
@@ -189,7 +189,7 @@
   },
 
   "world_alignment-0": {
-    "alias": "table_surface",
+    "variant": "table_surface",
     "roles": {
       "target": {"models": {"keyboard": ["hgtbot", "injrgc"]}},
       "table": {"fixed": true},
@@ -206,7 +206,7 @@
   },
 
   "world_alignment-1": {
-    "alias": "world_vertical",
+    "variant": "world_vertical",
     "roles": {
       "target": {"models": {"painting": ["dacihj", "ljabhq"]}},
       "wall": {"fixed": true},
@@ -223,7 +223,7 @@
   },
 
   "inter_object_relation_satisfaction-0": {
-    "alias": "ontop",
+    "variant": "ontop",
     "roles": {
       "target": {"models": {"pack_of_kielbasa": ["dgodnn"]}, "grasps": {"key": "pack_of_kielbasa__dgodnn__t"}},
       "partner": {"models": {"platter": ["csanbr"]}},
@@ -236,7 +236,7 @@
   },
 
   "inter_object_relation_satisfaction-1": {
-    "alias": "under",
+    "variant": "under",
     "roles": {
       "target": {"models": {"toy_figure": ["cobfpg"]}, "grasps": {"key": "toy_figure__cobfpg__t"}},
       "partner": {"fixed": true},
@@ -251,7 +251,7 @@
   },
 
   "inter_object_relation_satisfaction-2": {
-    "alias": "inside",
+    "variant": "inside",
     "roles": {
       "target": {"models": {"lemon": ["ovbcff"]}, "grasps": {"key": "lemon__ovbcff__i"}},
       "partner": {"models": {"bowl": ["belcml"]}},
@@ -264,7 +264,7 @@
   },
 
   "inter_object_relation_satisfaction-3": {
-    "alias": "nextto",
+    "variant": "nextto",
     "roles": {
       "target": {"models": {"spatula": ["hkvsep"]}, "grasps": {"key": "spatula__hkvsep__t"}},
       "partner": {"models": {"soup_ladle": ["cfzneb"]}},
@@ -277,7 +277,7 @@
   },
 
   "inter_object_relation_satisfaction-4": {
-    "alias": "touching",
+    "variant": "touching",
     "roles": {
       "target": {"models": {"can_of_baking_mix": ["blrqqz", "orwvfx"]}},
       "partner": {"models": {"board_game": ["eoywpy", "gcfkqa"]}},

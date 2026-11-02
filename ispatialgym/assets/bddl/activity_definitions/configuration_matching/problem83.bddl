@@ -1,6 +1,6 @@
 (define (problem configuration_matching-83)
     (:domain ispatialgym)
-    (:alias configuration_matching-block_design-block_4-breakfast_table_board)
+    (:variant configuration_matching-block_design-block_4-breakfast_table_board)
 
     ; hand-grounded 2026-09-19 23:xx (owner 21:47 request, option 2 of the packing experiment): the four Kohs blocks are placed
     ; into the pocket of a wooden board (tray/isgboard, ispatialgym-assets: a plate with a 12 mm rim around a 9 cm square

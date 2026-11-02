@@ -38,12 +38,12 @@ reason: ready queue empty for the pool: 0 valid; 7 in flight; coverage paused
 | disembedding | valid demo (pre-bcc937d,166005f,de4e723,ab60baa,dde4f11) | - | - |
 | CM block_design | no instance | D-006 default A applied 21:17 (block_gap_m 0.006, 8c2a2bc) — loop runs next tick; flip-on-table prep 0ec0153d (sampler) + 0ee927f6 (program) | loop / tabletop |
 | CM attachment | demo run | re-run 0916-205838: each attempt burns the 360 s budget in the second-base-pose search — the SLERP's first waypoint (carried lift, 0.70–0.82 | tabletop |
-| CM articulation_open_small_scale | no instance | D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) — handle-only loop runs next tick | loop |
+| CM articulation_open_small_scale | no instance | D-008 A applied (e5fbced: brace_optional on the hinged_jar variants; program 59f6426f) — handle-only loop runs next tick | loop |
 | CM articulation_close_small_scale | no instance | same as open | loop |
 | CM articulation_open_large_scale | no instance | first instance + demo through grasp(handle) on the Rs_int drawer bamfsz_1 (probe; pick applied 0589d9d) — needs core program_check (handle g | core / oracle / owner (D-011) |
 | CM articulation_close_large_scale | no instance | same pick (bamfsz_1); close waits on the open fixes | loop |
 | alignment-world_vertical | demo run | painting demo in tolerance, not_settled (undamped hook) → large-scale-B: hinge friction/damping in the constraints record + TRO loader (owne | large-scale-B |
-| alignment-world_horizontal | demo run | owner 22:55: hang frame bug — no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hang | large-scale-B |
+| alignment-world_horizontal | demo run | owner 22:55: hang frame bug — no wall variant carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hang | large-scale-B |
 | alignment-axial | valid demo (pre-dde4f11) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | valid demo (pre-de4e723,ab60baa,dde4f11) | valid (a6d7123, 21:46). D-007 branch: mechanism verified (2e889f3), a passing re-run pending the primary oracle's carry-leg regression (30-w | oracle |

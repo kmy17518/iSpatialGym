@@ -4,7 +4,7 @@
 ; by the upper stem) is required.
 (define (iddl inter_object_relation_satisfaction-inside)
     (:family inter_object_relation_satisfaction)
-    (:alias inter_object_relation_satisfaction-inside-{target}-{partner}-{support})
+    (:variant inter_object_relation_satisfaction-inside-{target}-{partner}-{support})
     (:require
         (grasps target insert)
     )

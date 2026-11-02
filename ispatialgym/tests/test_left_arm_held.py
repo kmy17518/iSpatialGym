@@ -173,7 +173,7 @@ def _hold_sampler(tmp_path, monkeypatch, hc=None):
     s.kit = _HoldKit()
     s.robot = SimpleNamespace(arm_control_idx={"right": R_IDX, "left": L_IDX})
     s.world = SimpleNamespace(scene=SimpleNamespace(objects=[]))
-    s.gp = SimpleNamespace(alias="mental_rotation-test")
+    s.gp = SimpleNamespace(variant="mental_rotation-test")
     hc = hc or HO.HoldConstants()
     base3 = (th.tensor([1.0, 2.0, 0.3]), C.quat_from_yaw(0.3))
     s.hold_start = lambda: (hc, (1.0, 2.0, 0.3), base3, th.zeros(28), _camera(0.3))
@@ -416,7 +416,7 @@ def _template(tmp_path, monkeypatch, holds, goal_ok, default_arms=("right",), ge
     s.kit = s.ikc.kit
     s.robot, s.world = s.kit.robot, SimpleNamespace(scene=SimpleNamespace(objects=["table"]))
     s.spec = SimpleNamespace(generation=dict(generation or {}))
-    s.gp = SimpleNamespace(alias="mental_rotation-test")
+    s.gp = SimpleNamespace(variant="mental_rotation-test")
     s.template_meta, s.template_facts = {"init_arms": "untucked"}, {}
     s.arm, s.hold_arm, s.hold, s.prior = HO.ARM, {}, HO.HoldConstants(), {}
     pose = (th.zeros(3), C.IDENTITY_QUAT.clone())

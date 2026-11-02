@@ -4,7 +4,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-license_plate-walls --alias alignment-world_vertical-painting-walls --alias camera_relocalization-obstructed-music_stool_1 --alias mental_rotation-mug --alias object_scaling-bell_pepper --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 10.0,
   "world_key": "house_single_floor|living_room_0|",
-  "aliases": [
+  "variants": [
    "alignment-world_horizontal-license_plate-walls",
    "alignment-world_vertical-painting-walls",
    "camera_relocalization-obstructed-music_stool_1",
@@ -26,7 +26,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 13500 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-picture-walls --alias alignment-world_vertical-paper_towel_dispenser-walls --alias mental_rotation-quartz --alias object_scaling-bottle_of_medicine --alias alignment-world_horizontal-shelf-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.999,
   "world_key": "house_single_floor|living_room_0|",
-  "aliases": [
+  "variants": [
    "alignment-world_horizontal-picture-walls",
    "alignment-world_vertical-paper_towel_dispenser-walls",
    "mental_rotation-quartz",
@@ -47,7 +47,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 14700 python -m ispatialgym.sampling.sample_isg --alias alignment-world_vertical-picture-walls --alias mental_rotation-sandal --alias object_scaling-bottle_of_olive_oil --alias alignment-world_horizontal-umbrella-walls --alias alignment-world_vertical-signpost-walls --alias mental_rotation-soup_ladle --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.998,
   "world_key": "house_single_floor|living_room_0|",
-  "aliases": [
+  "variants": [
    "alignment-world_vertical-picture-walls",
    "mental_rotation-sandal",
    "object_scaling-bottle_of_olive_oil",
@@ -69,7 +69,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 11850 python -m ispatialgym.sampling.sample_isg --alias object_scaling-bottle_of_pop --alias alignment-world_horizontal-wall_mounted_tv-walls --alias alignment-world_vertical-wall_clock-walls --alias mental_rotation-walker --alias object_scaling-jar_of_spaghetti_sauce --alias object_scaling-lemon --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.997,
   "world_key": "house_single_floor|living_room_0|",
-  "aliases": [
+  "variants": [
    "object_scaling-bottle_of_pop",
    "alignment-world_horizontal-wall_mounted_tv-walls",
    "alignment-world_vertical-wall_clock-walls",
@@ -91,7 +91,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 5250 python -m ispatialgym.sampling.sample_isg --alias object_scaling-shampoo_dispenser --alias object_scaling-wineglass --alias object_scaling-apple --alias object_scaling-box_of_cereal --alias object_scaling-marker --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.996,
   "world_key": "house_single_floor|living_room_0|",
-  "aliases": [
+  "variants": [
    "object_scaling-shampoo_dispenser",
    "object_scaling-wineglass",
    "object_scaling-apple",
@@ -109,7 +109,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-door --alias configuration_matching-articulation_open_large_scale-door --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.995,
   "world_key": "house_single_floor|garden_0,sauna_0|",
-  "aliases": [
+  "variants": [
    "configuration_matching-articulation_close_large_scale-door",
    "configuration_matching-articulation_open_large_scale-door"
   ],
@@ -125,7 +125,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table --alias disembedding-mouse-mouse_2_bar_soap_1-breakfast_table --alias disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table --alias disembedding-bottle_of_beer-bottle_of_beer_2_bottle_of_champagne_1-breakfast_table --alias disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_apple_juice_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.994,
   "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
-  "aliases": [
+  "variants": [
    "disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table",
    "disembedding-mouse-mouse_2_bar_soap_1-breakfast_table",
    "disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table",
@@ -143,7 +143,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table --alias disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table --alias disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table --alias disembedding-box_of_cane_sugar-box_of_cane_sugar_2_bag_of_flour_1-breakfast_table --alias disembedding-box_of_cereal-box_of_cereal_2_box_of_baking_mix_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.993,
   "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
-  "aliases": [
+  "variants": [
    "disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table",
    "disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table",
    "disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table",
@@ -161,7 +161,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table --alias disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table --alias disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table --alias disembedding-box_of_tissues-bag_of_cookies_1_bag_of_cream_cheese_1_bag_of_ice_cream_1-breakfast_table --alias disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.992,
   "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
-  "aliases": [
+  "variants": [
    "disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table",
    "disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table",
    "disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table",
@@ -179,7 +179,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table --alias disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table --alias disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table --alias disembedding-conditioner_dispenser-bottle_of_cologne_1_bottle_of_dish_soap_1_bottle_of_lotion_1-breakfast_table --alias disembedding-pack_of_cigarettes-pack_of_cigarettes_2_bandage_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.991,
   "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
-  "aliases": [
+  "variants": [
    "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table",
    "disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table",
    "disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table",
@@ -197,7 +197,7 @@
   "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table --alias disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table --alias disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table --alias disembedding-toy_dice-toy_dice_2_bar_soap_1-breakfast_table --alias disembedding-video_game-video_game_2_board_game_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
   "weight": 9.99,
   "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
-  "aliases": [
+  "variants": [
    "disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table",
    "disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table",
    "disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table",

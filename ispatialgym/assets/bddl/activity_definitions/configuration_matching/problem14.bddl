@@ -1,6 +1,6 @@
 (define (problem configuration_matching-14)
     (:domain ispatialgym)
-    (:alias configuration_matching-attachment-cap-lemonade_bottle-metal_bottom_cabinet)
+    (:variant configuration_matching-attachment-cap-lemonade_bottle-metal_bottom_cabinet)
 
     ; ground_isg 2.0.0: configuration_matching-attachment-cap-lemonade_bottle-metal_bottom_cabinet (configuration_matching/attachment.iddl; configuration_matching-attachment#02~T5/representative)
     ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced

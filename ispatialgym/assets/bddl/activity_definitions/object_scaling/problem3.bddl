@@ -1,6 +1,6 @@
 (define (problem object_scaling-3)
     (:domain ispatialgym)
-    (:alias object_scaling-apple)
+    (:variant object_scaling-apple)
 
     ; ground_isg 2.0.0: object_scaling-apple (object_scaling/object_scaling.iddl; object_scaling#04/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of

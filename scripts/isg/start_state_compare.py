@@ -48,10 +48,10 @@ def main() -> int:
             ok_all = False
             continue
         rep = S.compare(a["start_state"], b["start_state"])
-        rows.append({"warm": warm, "fresh": fresh, "alias": a.get("alias"), **rep})
+        rows.append({"warm": warm, "fresh": fresh, "variant": a.get("variant"), **rep})
         ok_all = ok_all and rep["ok"]
         if out != "-":
-            print(f"{'OK ' if rep['ok'] else 'BAD'} {str(a.get('alias'))[:70]:70s} identical {rep['identical']} max {rep['max']} {rep['fails'][:3]}")
+            print(f"{'OK ' if rep['ok'] else 'BAD'} {str(a.get('variant'))[:70]:70s} identical {rep['identical']} max {rep['max']} {rep['fails'][:3]}")
     if out == "-":
         print(json.dumps(rows, indent=1))
     elif out:

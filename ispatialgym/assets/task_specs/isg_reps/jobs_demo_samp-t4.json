@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-coffee_cup",
+  "variant": "mental_rotation-coffee_cup",
   "source_job": "mental_rotation-coffee_cup__representative__target-dkxddg"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-briefcase",
+  "variant": "mental_rotation-briefcase",
   "source_job": "mental_rotation-briefcase__representative__target-uquevd"
  },
  {
@@ -23,7 +23,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_water",
+  "variant": "object_scaling-bottle_of_water",
   "source_job": "object_scaling-bottle_of_water__representative__target-sxffiv"
  },
  {
@@ -32,7 +32,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_olive_oil",
+  "variant": "object_scaling-bottle_of_olive_oil",
   "source_job": "object_scaling-bottle_of_olive_oil__representative__target-cqycjk"
  }
 ]

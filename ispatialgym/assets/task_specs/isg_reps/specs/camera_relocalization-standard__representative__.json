@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: camera_relocalization-standard (camera_relocalization-standard#01, slot representative)",
  "camera_relocalization-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -42,7 +42,7 @@
   },
   "_isg": {
    "subtask": "camera_relocalization-standard",
-   "alias": "camera_relocalization-standard",
+   "variant": "camera_relocalization-standard",
    "pick": "camera_relocalization-standard#01",
    "slot": "representative",
    "iddl": "camera_relocalization/standard.iddl",

@@ -217,7 +217,7 @@ def test_robot_wobble_gate_discards_a_demo_whose_torso_a_load_bent_visibly(tmp_p
             self.steps[int(step)] = (deg, name)  # the place's contact bent the torso this far at three steps
 
     monkeypatch.setattr(TorsoLoad, "observe", observe)
-    result = ex.run_program(expand(sc.alias, sc))
+    result = ex.run_program(expand(sc.variant, sc))
     assert result["torso_load"]["max_deg"] == pytest.approx(deg, abs=1e-6) and result["torso_load"]["action"] == "place"
     if gated:
         assert not result["success"] and result["reason"] == "robot_wobble"
@@ -233,5 +233,5 @@ def test_goal_occlusion_gate_discards_with_its_own_verdict(tmp_path, monkeypatch
     ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("goal_occlusion",)))
     rep = {"method": "live head-camera depth", "threshold": 0.5, "objects": {}, "max_occluded": 0.62, "worst": "target_apple_0", "occluded": True}
     monkeypatch.setattr(Executor, "goal_occlusion_report", lambda self: dict(rep))
-    result = ex.run_program(expand(sc.alias, sc))
+    result = ex.run_program(expand(sc.variant, sc))
     assert not result["success"] and result["reason"] == "goal_occluded" and result["goal_occlusion"]["worst"] == "target_apple_0"

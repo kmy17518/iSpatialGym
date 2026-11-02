@@ -1542,7 +1542,7 @@ class Selector:
                     for sb, b in u["slots"].items():
                         if a["category"] == b["category"]:
                             notes.append(f"category `{a['category']}` appears in T{t['triplet']} {sa} (`{a['name']}`) and T{u['triplet']} {sb} "
-                                         f"(`{b['name']}`): category-based alias names need the triplet / instance to stay distinct")
+                                         f"(`{b['name']}`): category-based variant names need the triplet / instance to stay distinct")
         if any(len(t["slots"]) >= 2 for t in triplets):
             for t in triplets:
                 r, v = t["slots"].get("representative"), t["slots"].get("variation_geometry")
@@ -1621,8 +1621,8 @@ class Selector:
                         verdict = "rejected: " + "; ".join(c["reasons"])
                     lines.append(f"| {pin['class']} | {slot} | `{scene}/{name}` | {joint} | {c['kind'] or '-'} | {c['class'] or '-'} | {free} | {hrow} | "
                                  f"{'yes' if c['annotated'] else 'B4 heuristic'} | {verdict} |")
-        lines += ["", "- The two `bottom_cabinet` picks (cabinet doors / drawers) share the category-based alias token; the follow class differs per joint "
-                  "kind (A4), so the grounder / sampler must keep the class per bound object (or split the alias by joint kind).",
+        lines += ["", "- The two `bottom_cabinet` picks (cabinet doors / drawers) share the category-based variant token; the follow class differs per joint "
+                  "kind (A4), so the grounder / sampler must keep the class per bound object (or split the variant by joint kind).",
                   "- `bottom_cabinet_rvunhj_*`: the protruding handles are 7-8 mm wide after the 1.6x instance scale (below the 15 mm pinch filter); the "
                   "admissible pinch is the exposed door-leaf edge (`j_link_2#F`, 39 mm, verdict `edge`); the other three doors of each unit have no "
                   "exposed edge (`edge_blocked`) and `rvunhj_0` j_link_0 / j_link_1 have 0.0 m eroded free run.",

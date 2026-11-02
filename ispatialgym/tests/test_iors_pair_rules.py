@@ -292,9 +292,9 @@ def test_grounding_never_shrinks_a_target_that_fits(tmp_path):
     assert soap.roles["target"].grasp_keys["bar_soap/ofargb"] == "bar_soap__ofargb" and "bar_soap/ofargb" not in soap.roles["target"].scale
 
 
-def test_grounding_fits_every_partner_of_the_alias_across_slots(tmp_path):
+def test_grounding_fits_every_partner_of_the_variant_across_slots(tmp_path):
     """The sampler draws any whitelisted target with any whitelisted partner: with the variation pair grounded into the same
-    alias the representative soap must fit the variation dish too (x0.58), and its record survives the later slot."""
+    variant the representative soap must fit the variation dish too (x0.58), and its record survives the later slot."""
     g = _ground(tmp_path, slots=("representative", "variation_geometry"), subtasks=(ONTOP,))
     soap = _entry(g, ONTOP, "bar_soap", "soap_dish")
     sc = soap.scenes["house_single_floor"]
@@ -320,7 +320,7 @@ def test_grounding_writes_the_hands_of_a_nextto_mirror_pair(tmp_path):
 def test_grounding_measures_a_standing_target_on_its_up_axis(tmp_path):
     """inside#03: without ``generation.target_up_axis`` the lying sunflower is withheld (x0.42); the key written into the grounded
     entry (``generation`` is seeded from it) makes the re-grounding measure it standing - it fits as is, own key, unit scale. The key
-    names models one by one, and an ontop alias does not read it."""
+    names models one by one, and an ontop variant does not read it."""
     g = _ground(tmp_path, subtasks=(ONTOP, INSIDE))
     flower, soap = _entry(g, INSIDE, "sunflower", "vase"), _entry(g, ONTOP, "bar_soap", "soap_dish")
     rec = flower.generation["target_fit"]["sunflower/dkajbh"]
@@ -382,7 +382,7 @@ FACING_Y = Stance("manipulation", (0.0, -0.6, math.pi / 2), 0.5, 0.0, 0.45, None
 
 def _flower_sampler(gen, relation="inside", eef_in_object=TOP_DOWN):
     """An ``IORSSmall`` without a simulator: the sunflower's collision boxes (stem x -0.146..-0.03, head x -0.03..0.048), the tube
-    vase, a world that only projects hulls, ``gen`` as the alias's generation."""
+    vase, a world that only projects hulls, ``gen`` as the variant's generation."""
     from ispatialgym.sampling.v2.tasks import iors_small as IS
 
     s = IS.IORSSmall.__new__(IS.IORSSmall)
@@ -392,7 +392,7 @@ def _flower_sampler(gen, relation="inside", eef_in_object=TOP_DOWN):
     s.spec = types.SimpleNamespace(generation=gen)
     s.choice = types.SimpleNamespace(models={"target": types.SimpleNamespace(category="sunflower", model="dkajbh"),
                                              "partner": types.SimpleNamespace(category="vase", model="gopbrh")})
-    s.gp = types.SimpleNamespace(alias=f"{INSIDE}-sunflower-vase-breakfast_table")
+    s.gp = types.SimpleNamespace(variant=f"{INSIDE}-sunflower-vase-breakfast_table")
     s.world = types.SimpleNamespace(footprint=lambda h, pose: G.convex_hull_2d(G.local_points_world(h, pose)[:, :2]), hull_at=G.local_points_world)
     grasp = None if eef_in_object is None else types.SimpleNamespace(eef_in_object=eef_in_object)
     s.sidecar = types.SimpleNamespace(grasp_of=lambda name: grasp)

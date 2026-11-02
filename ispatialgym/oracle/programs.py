@@ -1,6 +1,6 @@
 """Layer 3 of the v2 oracle: the per-subtask programs and ``expand`` (``oracle_primitives_design.md`` §3.7, §6.2).
 
-``expand(alias, sidecar) -> list[Action]`` dispatches on the alias's subtask to one ``program_<row>(sidecar)`` per
+``expand(variant, sidecar) -> list[Action]`` dispatches on the variant's subtask to one ``program_<row>(sidecar)`` per
 row of §6.2 and returns the action list with the row's loops and conditionals resolved from the sidecar facts
 (block order, ``brace_row`` / ``brace_col`` present or not, ``passive_from``, ``follow_mode``, the placement stance,
 ``goal.arms``, whether a path and / or a transition is recorded between two stances). The sidecar carries facts, not
@@ -51,7 +51,7 @@ from ispatialgym.oracle.actions import (
     Transition,
     block_reorients,
 )
-from ispatialgym.oracle.sidecar import ARMS, BraceContact, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_alias
+from ispatialgym.oracle.sidecar import ARMS, BraceContact, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_variant
 from ispatialgym.robot import base_path as BP
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -640,7 +640,7 @@ def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Act
     pushed = close_by_push(art)
     if pushed:
         if direction != "close":
-            raise SidecarError(f"articulation.close_by_push: a close pushes the leaf shut, the alias is a {direction!r}")
+            raise SidecarError(f"articulation.close_by_push: a close pushes the leaf shut, the variant is a {direction!r}")
         if art.joint_type != "revolute":
             raise SidecarError(f"articulation.joint_type: a door leaf pushed shut is revolute, got {art.joint_type!r}")
         if (art.extra or {}).get("push_finish") is not None:
@@ -1303,12 +1303,12 @@ def program_for(subtask: str) -> Tuple[Callable[..., List[Action]], Dict[str, ob
         raise SidecarError(f"no oracle program for subtask {subtask!r}") from None
 
 
-def expand(alias: str, sidecar: Sidecar) -> List[Action]:
-    """The action list of ``alias``'s program for ``sidecar`` (§3.7). ``alias`` must be the sidecar's own alias (or
+def expand(variant: str, sidecar: Sidecar) -> List[Action]:
+    """The action list of ``variant``'s program for ``sidecar`` (§3.7). ``variant`` must be the sidecar's own variant (or
     resolve to the same subtask); the executor's epilogue (§3.8) is not an action."""
-    subtask = subtask_of_alias(alias)
-    if alias != sidecar.alias and subtask_of_alias(sidecar.alias) != subtask:
-        raise SidecarError(f"alias {alias!r} is not the sidecar's alias {sidecar.alias!r}")
+    subtask = subtask_of_variant(variant)
+    if variant != sidecar.variant and subtask_of_variant(sidecar.variant) != subtask:
+        raise SidecarError(f"variant {variant!r} is not the sidecar's variant {sidecar.variant!r}")
     fn, kwargs = program_for(subtask)
     actions = fn(sidecar, **kwargs)
     for action in actions:

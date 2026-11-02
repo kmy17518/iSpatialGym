@@ -1,6 +1,6 @@
 (define (problem configuration_matching-27)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_small_scale-blender-bar)
+    (:variant configuration_matching-articulation_open_small_scale-blender-bar)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-blender-bar (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#01~T4/representative)
     ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on

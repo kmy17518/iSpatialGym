@@ -25,7 +25,7 @@ iSpatialGym:  ground_isg   : iddl + icl               ─ground→   bddl per ca
 - **icl** (`ispatialgym/assets/icl/`): candidate categories and models per role, how roles correlate (partner for
   this target, distractor pools for this target, female for this male), which combinations are *test* combinations,
   supports and wall regions per scene, per-model frame axes / scale / grasp keys.
-- **task customs list** (`task_custom_lists.json`, section 2.3): per alias, per-scene whitelists and blacklists of
+- **task customs list** (`task_custom_lists.json`, section 2.3): per variant, per-scene whitelists and blacklists of
   models, bindings of the scene roles, generation parameters (group sizes and draw mode, scales, joints, counts,
   tolerances) and the *constraints* every successful sampling run adds.
 
@@ -46,7 +46,7 @@ Principles, in the order they are traded off:
    place, push and brace contacts, articulation waypoints, in-hand reorientations, base-follow poses) is IK- and
    collision-checked during sampling and recorded for the oracle (section 7). Whatever the oracle does, the sampler
    has checked — by construction, not by two code bases agreeing: the oracle's program for the instance
-   (`expand(alias, sidecar)`, `oracle_primitives_design.md` §3.7) is expanded from the completed draft sidecar at
+   (`expand(variant, sidecar)`, `oracle_primitives_design.md` §3.7) is expanded from the completed draft sidecar at
    the end of sampling and every pose and waypoint of every action is checked once more (the program check, 3.5),
    and sampler and oracle derive those poses from one conventions module (oracle doc §3.5).
 5. **Identical robot configuration across instances** except where a rule samples it (base pose, trunk when the
@@ -59,8 +59,8 @@ Principles, in the order they are traded off:
 ```text
 <out_root>/
   task_custom_lists.json                          the customs list used (copied; ground_isg / sample_isg append to the source)
-  <alias>/                                        e.g. inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table
-    activity_definitions/<activity>/problem<N>.bddl  the grounded BDDL (one per alias; N from problems.json)
+  <variant>/                                        e.g. inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table
+    activity_definitions/<activity>/problem<N>.bddl  the grounded BDDL (one per variant; N from problems.json)
     <template_id>/                                e.g. house_single_floor__target-apple-omzprq__partner-plate-kkjiko
       template.json / template-partial_rooms.json
       template_meta.json                          bindings, rooms, cached geometry, spec hash, timings, stances
@@ -71,21 +71,21 @@ Principles, in the order they are traded off:
 ```
 
 - `template_id = <scene>__<role>-<category>-<model>[__...]` for the spawned roles; scene roles are recorded in
-  `template_meta.json` and in the alias.
-- `instance_id = <alias>__<template_id>__<NNNN>`.
+  `template_meta.json` and in the variant.
+- `instance_id = <variant>__<template_id>__<NNNN>`.
 - The TRO keeps BEHAVIOR's layout and the `isg-tro-v1` block exactly as in `task_bddl_formats.md`. Everything the
   oracle needs but the evaluator does not is in the **oracle sidecar**, a sibling file that carries the TRO's sha256;
   the public release may omit it.
 - The activity directories are `camera_relocalization`, `object_scaling`, `mental_rotation`, `disembedding`,
-  `configuration_matching`, `alignment`, `inter_object_relation_satisfaction`. Definition ids are allocated per alias
-  in `activity_definitions/<activity>/problems.json` (alias ↔ id, contiguous), because the BEHAVIOR knowledge base
+  `configuration_matching`, `alignment`, `inter_object_relation_satisfaction`. Definition ids are allocated per variant
+  in `activity_definitions/<activity>/problems.json` (variant ↔ id, contiguous), because the BEHAVIOR knowledge base
   enumerates `problemN.bddl`.
 
 ## 2. Inputs
 
 ### 2.1 iddl
 
-See `ispatialgym/assets/iddl/README.md`. An iddl file is the BDDL skeleton over bare role names (`:alias`, optional
+See `ispatialgym/assets/iddl/README.md`. An iddl file is the BDDL skeleton over bare role names (`:variant`, optional
 `:groups` composites, `:init`, `:goal`, `:measure`) plus a `:require` block naming the icl artefacts a role's models
 must have — `(grasps <role> floating|tabletop|insert|attachment)`, `(contacts <role>)`, `(handle <role>)` — which
 `ground_isg` applies as admissibility filters. It declares no roles, kinds, categories, counts or scales: role kinds
@@ -140,7 +140,7 @@ the reason in parentheses; the selection runlogs applied these by hand, here the
 
 ### 2.3 Task customs list
 
-One entry per alias. Scene-independent model pools are the icl's job; the customs list holds **how models are drawn**
+One entry per variant. Scene-independent model pools are the icl's job; the customs list holds **how models are drawn**
 (`generation`: group sizes and draw mode, spawn scales, chosen joints, counts, tolerances), what a scene changes
 (`scenes`: bindings of the scene roles, per-scene whitelists / blacklists) and what sampling learned (`constraints`).
 
@@ -207,10 +207,10 @@ One entry per alias. Scene-independent model pools are the icl's job; the custom
 - `generation.groups.<role>` for every group role: `size` (an integer or `[min, max]`, drawn per template) and
   `draw` — `unique` (pairwise distinct models, look-alike exclusions of section 3.12 on top; the default) or
   `same_model` (all members one model). Current values: `targets` `{size: 4, draw: same_model}` (block design),
-  `distractors` `{size: [1, 3], draw: unique}`, `obstacles` `{size: 1, draw: unique}`. The size is part of the alias
+  `distractors` `{size: [1, 3], draw: unique}`, `obstacles` `{size: 1, draw: unique}`. The size is part of the variant
   (`block_4`, `bottle_of_beer_3_…`), so changing it grounds a new problem instead of re-grounding the old one.
 - **Seeding.** `ground_isg` creates the entry: `generation` (and the `roles.<role>.scale` / `joint` values) is
-  copied from the existing entry when the alias was grounded before, otherwise from the per-subtask defaults in
+  copied from the existing entry when the variant was grounded before, otherwise from the per-subtask defaults in
   `ispatialgym/sampling/generation_defaults.py`, whose values are the numbers written in this document (4 blocks, 1–3
   distractors, one obstacle, tolerances of section 8, path buckets below, `require_goal_handle: auto`, `arm: auto`).
   There are no defaults hidden in the samplers.
@@ -280,7 +280,7 @@ footprint as `blocked_footprints` in the same structure.
   (reason `excluded_support`, which `support_candidates` / eval85 `pick_candidates.py` show as the candidate's status
   `not_grounded: excluded_support: <support>@<scene>: <why>`) and binds no excluded scene object; `sample_isg --support` of an
   excluded support is an error (`GroundedProblem.override_support`); without `--support` the excluded supports leave each scene
-  block before its first template (`GroundedProblem.apply_support_rules`, summary `aliases.<alias>.excluded_supports`; a block
+  block before its first template (`GroundedProblem.apply_support_rules`, summary `variants.<variant>.excluded_supports`; a block
   left without a support is an error of that scene); `multiply_isg` refuses a template bound to an excluded support; the axial
   sampler refuses to bind one and the wall sampler drops spots on excluded walls (`template_facts.spot_search.excluded_walls`).
 - **Neighbouring supports** (owner decision 2026-10-12 A4). A support may be paired with the support(s) it touches, at
@@ -388,7 +388,7 @@ every template starts from the stable scene (`reset_scene_objects`, robot parked
 template is saved.
 
 **Program check** (new in v2, TODO D2 / F6): once the draft sidecar is complete, the sampler expands the oracle's
-program for the alias (`expand(alias, sidecar)`, `oracle_primitives_design.md` §3.7) and IK- and collision-checks
+program for the variant (`expand(variant, sidecar)`, `oracle_primitives_design.md` §3.7) and IK- and collision-checks
 every pose and waypoint that every action's `targets()` returns — in the recorded posture, trunk and stance, with the
 carried object attached where the action carries one (screening IK at waypoints, exact IK at end poses, 3.6). This is
 the check principle 4 refers to. A pose that fails here is a bug in the rule that recorded it; the attempt is
@@ -633,7 +633,7 @@ Rules that use them:
    model in `m`'s look-alike group; the other-category pool likewise (groups may cross categories). The distractor set
    of a template contains **at most one model per look-alike group** and no exact duplicates: no distractor is a
    look-alike of the target, and no two distractors are look-alikes of each other (a look-alike group counts as one
-   candidate when the set is drawn). An empty pool for the requested kind is not a fallback case: the alias fixes the
+   candidate when the set is drawn). An empty pool for the requested kind is not a fallback case: the variant fixes the
    distractor categories, so `ground_isg` only grounds category combinations whose pools are non-empty after the
    exclusions.
 2. **Same-category or look-alike target–partner pairs** (IORS nextto / touching / ontop, e.g. salt shaker – pepper
@@ -705,7 +705,7 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
 
 - `constraints` — the COM hinges of the alignment tasks (revolute joint parent = support root link or wall, child =
   target, anchor and axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
-  `damping` of the wall hinge, or of an axial hinge whose alias sets the resistance keys (6.10), as the joint's angular
+  `damping` of the wall hinge, or of an axial hinge whose variant sets the resistance keys (6.10), as the joint's angular
   drive; absent = frictionless, the other axial table hinges); the wall
   hinge's anchor is the COM, the table hinge's lies on the COM's vertical axis `hinge_sink_m` = 1 mm below the support
   top so the object cannot rock (6.10; an instance written before 2026‑10‑12 keeps its recorded anchor, the COM of a
@@ -853,7 +853,7 @@ border at the source-tray depth) and R_img (surface distance from the target to 
    (block design: half edge + one pitch to the robot's right of the anchor; disembedding: 0.437 = the two fixed trays'
    half lengths along the edge + gap, recompute if the trays change; h_s = half the source tray's length along the edge.)
    *Owner decision 2026‑10‑12 (A2a):* the destination side is chosen first — eval: `generation.destination_side` of the
-   alias (`left` / `right`, half of the 10 eval picks each), train: drawn per template from its seed (`multiply_isg
+   variant (`left` / `right`, half of the 10 eval picks each), train: drawn per template from its seed (`multiply_isg
    --split train` drops the eval key) — and only that side keeps the destination margin; the other side needs room for
    the source tray alone. Until then both sides carried b + 0.437 + 0.02 and short edges failed `edge_too_short`.
 
@@ -888,8 +888,8 @@ limit (same edge and lateral as the init stance):
    the 8° class, which put the target 0.80–0.88 m ahead of the base and 0–8 cm right of its centre line, within ~60 px of
    the manipulation image's centre and nearly fixed in the start image (std ~20 px across, 30–40 px down). At fx = 459 px a
    20° focus lies within 167 px of the image centre and a 30° one within 265 px (the 5 % border is 46.6° off‑axis).
-   `generation.phase2_tight_class_deg` / `phase2_loose_class_deg` override the two classes per alias (the small‑articulation
-   aliases tuned with their own loose class keep 8°, §6.7). Sampling only: oracle and evaluator are unaffected.
+   `generation.phase2_tight_class_deg` / `phase2_loose_class_deg` override the two classes per variant (the small‑articulation
+   variants tuned with their own loose class keep 8°, §6.7). Sampling only: oracle and evaluator are unaffected.
 4. Draw uniformly among the survivors in the best angle class (never always the smallest angle: the target would land
    on the same cell every instance); sample tilt continuously within the surviving band. Record
    `manipulation_stance = {stand_off, translate, tilt, focus, base_pose2d}`.
@@ -984,8 +984,8 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
    - **Side first.** The partner's side (of the target, robot frame) is fixed before the target is placed. Train: uniform
      among the sides the pair admits — touching the robot's left (its shelf layout, §6.11, the side opposite the target's
      lean, where the partner leans against the other board: the right for touching#03's key, which leans left; that is the
-     side recorded in `template_facts.partner_sides` and the alias's `partner_side`), a handed nextto pair the side that
-     leaves the target on its own hand's side, otherwise left / right — whose start region has a cell. Eval: the alias's
+     side recorded in `template_facts.partner_sides` and the variant's `partner_side`), a handed nextto pair the side that
+     leaves the target on its own hand's side, otherwise left / right — whose start region has a cell. Eval: the variant's
      `generation.partner_side` (`left` / `right`; `multiply_isg --split train` drops it), assigned so that each
      subtask's eval picks are half left / half right where both sides are allowed; a side the pair does not admit
      rejects the template (`partner_side`).
@@ -1029,7 +1029,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      start region above keeps those foci, and step 1 draws the target there (footprint on neighbour cells,
      `grasps[].grasp_from` = the neighbour, 7). A support with no neighbour top united to it rejects the template
      (`no_start_region`); the key without `partner_on_meta_link` is a spec error. Recorded:
-     `template_facts.start_region.on_neighbors` / `off_neighbors`. Aliases without the key are sampled as before.
+     `template_facts.start_region.on_neighbors` / `off_neighbors`. Variants without the key are sampled as before.
    - **Support-aligned init** (owner decision 2026‑10‑13, nextto#01 / #03 / #04; `generation.init_align_support: true`,
      default false; any small-scale relation). The target and the partner start with their long axes along the support
      top's edges: the init yaw (about the vertical, applied to the rest orientation) is one of the 4 that put the object's
@@ -1044,7 +1044,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      2 edge-aligned ones; on a meta link the 4 in random order per spot; touching aligns it as with `edge_aligned`. The goal
      is not drawn anew: a nextto target keeps its init orientation (a free orientation's release turn is a multiple of
      90°), so it ends aligned too. Recorded: the instance summary's `init_align_support` (edge yaw, both drafted residuals,
-     the axis each used). Aliases without the key are sampled as before.
+     the axis each used). Variants without the key are sampled as before.
    - **Partner along the target** (owner decision 2026‑10‑13, under_small#04 "align the spatula with the paper sheet";
      `generation.partner_aligned_to_target: true`; the plain partner draw of ontop / under / inside / nextto — touching and
      `partner_on_meta_link` reject it as a spec error). The attempt draws the partner only at the yaws that lay the longer
@@ -1054,7 +1054,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      the partner's edges at init and at the goal; ontop / under centre the target's footprint rectangle, not its origin, on
      the partner's at the goal (equal margins at both ends of the aligned long axes). Recorded: `partner_draw.long_axes_deg`
      (0 = parallel). With `init_align_support` too, this key decides the partner's yaw (the edge-aligned
-     target makes it edge-aligned as well). Aliases without the key keep the random partner yaws.
+     target makes it edge-aligned as well). Variants without the key keep the random partner yaws.
    - **Pair goal alignment** (owner decision 2026‑10‑13 ~22:23, touching#02 / nextto#01 / #03 / #04: the target ends in a set
      orientation relative to its partner, the way a person would put the pair down; `generation.pair_goal_align`, nextto /
      touching only, default off; §6.11). The partner is drawn at the one yaw that puts its front at the required turn from the
@@ -1076,7 +1076,7 @@ axial stop is at the robot's limit there (0 / 8 with both bands).
      while its render shows a 7.8 mm seam between its two table units (y −3.583 / −3.576, chamfered) that c3_k1's sheet lay
      across. A support without a flat cell rejects the template (`support_flat`). Recorded: `template_facts.partner_flat_top`
      (cells, flat cells, `z_ref`, faces, build time) and `partner_draw.flat_top` (clearance up to 0.10 m, the seen height range
-     under the footprint relative to `z_ref`). Aliases without the key are sampled as before.
+     under the footprint relative to `z_ref`). Variants without the key are sampled as before.
 3. **Distractors** (disembedding) on the source tray, footprints ≥ 1 cm from each other and from the target, within
    `tray_budget` (6.4); they may occlude the target up to **30 %** of its visible area (segmentation render, distractors
    visible vs hidden); no other occlusion bucket exists. *Owner decision 2026‑10‑12 (A2b):* no spacing along the drawn
@@ -1177,7 +1177,7 @@ instance: the draw, step 5, step 6. Variety comes from β, the step-4 draw and t
 ### 5.3 Prompt 1 — articulation, large-scale (open / close)
 
 **First‑demo opening (owner D‑011 B, 2026‑09‑17 01:00).** `generation.min_reachable_opening` (`{"revolute_deg", "prismatic_m"}`, default
-50° / 0.10 m) is lowered per alias to the arm‑reachable opening — 20° on the door units fridge / dishwasher / oven / top_cabinet /
+50° / 0.10 m) is lowered per variant to the arm‑reachable opening — 20° on the door units fridge / dishwasher / oven / top_cabinet /
 bottom_cabinet_no_top — as a first‑demo setting only: the arm‑only follow from a fixed stance reaches 9–33 % of a door swing
 (oven 0 %). The 50° minimum returns for those units with the chained open (grasp → pull → release → re‑stance → push the leaf)
 or the hybrid base‑follow (A4 door rule), both in progress in parallel; nothing is blacklisted.
@@ -1244,7 +1244,7 @@ within 15–80 mm after scaling). Single arm; the object holds itself, no brace 
   into the kitchen). Record `door_class`, `hinge_side`, `follow_mode ∈ {arm, base, hybrid}`, `goal_set`, `q_reach`,
   `base_follow` (base / hybrid), `base_follow_path` (hybrid). *Owner decision 2026‑10‑12 (~08:50):* open_large#03's
   bottom cabinet (bottom_cabinet_rvunhj_0 / j_link_2) is the first bottom cabinet on the hybrid follow, with the dishwasher
-  open alias's `hybrid_follow` block (sequential policy): the arm‑only follow from one hinge‑side stance reached only
+  open variant's `hybrid_follow` block (sequential policy): the arm‑only follow from one hinge‑side stance reached only
   0.013–0.057 rad of its 0.785–1.571 rad goal, the 10 cm release retreat failing IK or nearing an arm joint limit past
   0.13–0.22 rad.
 - **Phase 3**: nothing is spawned. Joints at q_init, `settle_free = []`, the moving link held at q_init during
@@ -1268,8 +1268,8 @@ same 1.2 cm eef offset and 10 cm pre-grasp; `edge_blocked` rows are not admissib
 instance) is rescaled by the instance's per-axis scale before use and its `width_m` re-checked against the 15–80 mm
 pinch range. Rows with verdict `skip` or `ungraspable` exclude the joint.
 
-**The alias's handle row and pinch floor (owner 2026‑10‑12 02:20).** Two optional `generation` keys of the large-scale
-aliases; unset, the rules above apply unchanged. `handle_row` names the pinch of the bound joint — an icl
+**The variant's handle row and pinch floor (owner 2026‑10‑12 02:20).** Two optional `generation` keys of the large-scale
+variants; unset, the rules above apply unchanged. `handle_row` names the pinch of the bound joint — an icl
 `require/handles.csv` row name (`"j_link_2#C"`) or a candidate's full source (`"<key>:<name>"`, `"record:bar"`; also
 accepted as `roles.target.handle_row`, keyed like `joint`) — and is taken before the ranking (reviewer's choice → bar →
 knob → reviewer pinch → edge pinch); a name that no admissible row of the joint carries rejects the template (`spec`), a
@@ -1282,7 +1282,7 @@ the office cabinet door `bottom_cabinet_rvunhj_0` / `j_link_2` (open / close #03
 pinch `#F` had no reachable stance from the shut door and the arm followed it only 11–63 % of a closing.
 
 **Close: a cabinet door's push finish (owner 2026‑10‑12 ~04:20).** Optional `generation.push_finish` (`true`, or a dict
-overriding the options below; absent = off, so room doors and every other alias are unchanged) serves the closing of a
+overriding the options below; absent = off, so room doors and every other variant are unchanged) serves the closing of a
 revolute `cabinet` door on a vertical hinge followed by the arm (A4). Without it a stance whose downward reach sweep
 (10° grid from q_init, see above) stops above the lower limit is rejected (`handle_unreachable`, "the rest needs a push
 on the leaf"); with it the hand holds the handle as far as the arm reaches, lets go, retreats, and the closed hand of the
@@ -1323,10 +1323,10 @@ same arm pushes the leaf's outer face the rest of the way shut from the same man
 
 **Close: a cabinet door pushed shut room-door style (owner 2026‑10‑12).** Optional `generation.close_by_push` (`true`, or a
 dict overriding `push_inset_m` 0.15, `push_height_drop_m` 0.05, `chunk_deg` 45, `drag_m` 0.08, `contact_clearance_m`
-0.0307; absent = off, so room doors and every other alias are unchanged) closes a revolute `cabinet` door on a vertical
+0.0307; absent = off, so room doors and every other variant are unchanged) closes a revolute `cabinet` door on a vertical
 hinge the way a room door is closed: no grasp, the closed hand pushes the leaf's outer face shut from q_init. On any other
 joint or direction the key is ignored (logged); `generation.push_finish` is ignored alongside it.
-- **Sampling** as for the alias's follow mode, except that a hybrid follow (`follow_mode_override: "hybrid"`) runs with the
+- **Sampling** as for the variant's follow mode, except that a hybrid follow (`follow_mode_override: "hybrid"`) runs with the
   room door's close policy (the `hybrid_follow.policy` default) instead of `sequential`: the follow is a sampling gate only.
 - **Record**: `articulation.close_by_push` = `true` and `articulation.push_close` = the five options plus the closed leaf
   (joint record + link box, as for the push finish): `leaf_width_m` (hinge line → free edge), `face_offset_m` (the outer
@@ -1348,7 +1348,7 @@ joint or direction the key is ignored (logged); `generation.push_finish` is igno
   handle 6 cm in front of the face, no clearance, 20° chunks, a 0.20 m drag. The cabinet defaults scale the room door's to
   the contact radius (0.25 m on a 0.40 m leaf, ≈ 0.68 m on the test room door): a 45° chunk is 0.20 m of fist travel (the
   room door's 20°: 0.24 m), 8 cm of drag turns the leaf ≈ 18° (the room door's 0.20 m: ≈ 17°). First use: close_large#03's
-  push alias (`bottom_cabinet_rvunhj_0` / `j_link_2`: 0.398 m leaf, outer face 8.6 mm and bar contact 20.6 mm in front of
+  push variant (`bottom_cabinet_rvunhj_0` / `j_link_2`: 0.398 m leaf, outer face 8.6 mm and bar contact 20.6 mm in front of
   the hinge line, s = −1; the contact 0.25 m from the hinge line, 0.11 m from the bar, 0.68 m high).
 
 ### 5.4 Prompt 2 — articulation, small-scale (open / close)
@@ -1425,10 +1425,10 @@ one-stroke push of the R1Pro; a two-stroke push for larger tilts is recommended 
 at init (5 %).
 
 **Frame** (reviewed, never defaulted; owner 2026‑09‑16 22:55): `ground_isg` writes the icl frame of every whitelisted
-wall target (`roles/candidates.csv` `frame_front` / `frame_up`) into the alias as
+wall target (`roles/candidates.csv` `frame_front` / `frame_up`) into the variant as
 `generation.front_axis` / `up_axis` in the per-model dict form (`{"license_plate/hjdaqn": "+z", …}`;
-dormant / superseded aliases of the subtask included). The sampler builds the hang pose from that record only —
-`Reject("missing_frame")` when the alias carries no entry for the spawned model (no default frame inside the sampler:
+dormant / superseded variants of the subtask included). The sampler builds the hang pose from that record only —
+`Reject("missing_frame")` when the variant carries no entry for the spawned model (no default frame inside the sampler:
 the painting-shaped `+x` / `+z` default hung the `+z` / `+y` / `+x` license plate table-flat, run 0916‑212037) — and
 records the frame used in `template_facts.frame` and the instance summary (`frame`). Unit test: for every reviewed wall
 target the hang quaternion puts the up axis along world +z and the front axis along n; a flat object's thickness axis
@@ -1513,7 +1513,7 @@ the wall at either wrist turn); the brace / push approach is pitched 30° / 45°
 with the approach in the wall plane the forearm lies along the wall 2 cm from it and penetrates it). Brace / push key
 poses require the fingertips in the head camera frame (5 %) from the manipulation stance. The loose angle class stays
 as the step‑5 fall‑back pool behind the best class. `[pilot]`: `painting_s070` writes an instance in 2 attempts
-(the retired horizontal `license_plate` alias did at attempt 0).
+(the retired horizontal `license_plate` variant did at attempt 0).
 
 **Two-arm stance posture (A6).** The manipulation stance records the idle-arm / drive-in posture it was checked with
 (`arms_q`, `idle_posture`, `fingers`; the wall uses `tucked` with closed pads: hanging arms clear the wall at
@@ -1572,14 +1572,14 @@ locked at its contact, both hands at contact collision-free); the sweep with bot
 check verifies the second hand the same way (witnesses `second.*`). A face without two spots falls back to the one hand
 (`two_hand_fallback`). The program is travel → `base_push` (both arms) → retreat (first hand) → retreat (second hand).
 
-**Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback. Selection order
+**Init surface** — an explicit choice of `ground_isg` (it is in the variant), never a runtime fallback. Selection order
 (owner decision 2026‑09‑16, A5; minimise floor inits): under — (a) a support object whose near AABB side lies within
 `max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side → (b) **the partner's own top** ("take it
-from the bed and put it under the bed"; alias `…-<partner>-<partner>`, `bindings.support == bindings.partner`) → (c)
+from the bed and put it under the bed"; variant `…-<partner>-<partner>`, `bindings.support == bindings.partner`) → (c)
 **the floor** beside the partner (`support = floor`); ontop — (a) support → (c) floor (the own top would hold at
-init). `ground_isg` emits the later classes as fallback aliases (`fallback_of`, `fallback_rank`); the scheduler queues
-a fallback only after the primary yields nothing; within an alias the candidates stay in the same class (no runtime
-class switching; cross-category init surfaces are separate aliases, VB-ISC). Own top: A/B by the tabletop phases with
+init). `ground_isg` emits the later classes as fallback variants (`fallback_of`, `fallback_rank`); the scheduler queues
+a fallback only after the primary yields nothing; within a variant the candidates stay in the same class (no runtime
+class switching; cross-category init surfaces are separate variants, VB-ISC). Own top: A/B by the tabletop phases with
 the partner as the support (the partner-visibility redraw does not apply), C at the same partner. Per template one
 candidate of the grounded class is drawn uniformly; if A–C cannot be built on it, the remaining candidates *of the
 same class* are tried in random order; none → reject the template.
@@ -1698,8 +1698,8 @@ partner unchanged ≤ 5 mm at the goal, tolerances, init surface = largest horiz
 a reachable band cell from a recorded placement stance; the name-sorted candidate order → uniform draw within the
 grounded init-surface class.
 
-**Relaxation keys (owner 2026‑10‑12 item 2, the large-scale eval picks).** Generation keys an alias may set; unset, the rule
-stays as above. The keys an alias sets are recorded in `template_facts.relaxations`.
+**Relaxation keys (owner 2026‑10‑12 item 2, the large-scale eval picks).** Generation keys a variant may set; unset, the rule
+stays as above. The keys a variant sets are recorded in `template_facts.relaxations`.
 - `partner_view_min_points` (int, default unset = every point): the partner's region is "in frame" when at least this many of
   its points are inside the image with the 5 % margin (every point when the region has fewer) — stance A's goal region (ontop:
   5 top-patch + 3 bottom-edge points; under: the 3 edge points, tabletop and floor init) and the place-under stance C's
@@ -1714,7 +1714,7 @@ stays as above. The keys an alias sets are recorded in `template_facts.relaxatio
   recorded as `template_facts.init_surface.fallback = {from, to, reason}` (and in the instance summary's `init_surface`).
   A support that is in range but admits no stance A–C still rejects the template. A far support needs the B → C drive cap
   raised with it: `max_partner_geodesic` 10 gives max(10 + 1, 2 × 10) = 20 m; `floor_init.max_geodesic_m` defaults to
-  `max_partner_geodesic`, so an alias raising the latter sets the former explicitly (3.0 keeps the floor cells near the partner).
+  `max_partner_geodesic`, so a variant raising the latter sets the former explicitly (3.0 keeps the floor cells near the partner).
 - Place-under (`under_mode` other than `"push"`, e.g. `"place"`; fix, no key): the oracle's place under the partner keeps the
   partner in the planner's world and leaves out its support (the floor the object is set on) — it left out the partner and kept
   the floor before; the sampler takes the floor mesh out of its stance / leg / program checks for every under variant (before:
@@ -1872,7 +1872,7 @@ must stay connected). The obstacle is not a look-alike of any object the init vi
   not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
   checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
   Mental rotation with `generation.orbit_limit_margin_rad` set (owner 2026-10-13, mental_rotation-walker: "the robot
-  seems to stutter"; set for that alias only, 0.02 rad): the start configuration must keep that much room to every arm
+  seems to stutter"; set for that variant only, 0.02 rad): the start configuration must keep that much room to every arm
   joint limit, and the orbit is also tracked densely from it as the oracle's `arm_along` tracks it (1 cm / 0.05 rad
   steps, differential IK with the oracle's soft tolerances, once more at half spacing on a joint jump); a goal whose
   tracked configurations come closer than the margin to an arm joint limit, or whose tracking fails, is not drawn.
@@ -1909,8 +1909,8 @@ Numbers and records kept from v1 §5.3:
 - Representative sheet (handoff 2026-10-10, owner 2026-10-11): a pick's `distractors` rows with slot `same_category` /
   `other_category` are its pools (minus the target, its look-alikes and the held-out models). A draw takes at most 2
   models of the target's category, at most 1 of each other category and at most one per look-alike group; the member
-  count is the largest size whose *every* admissible draw fits `tray_budget` (footprints in the pick's pose). The alias's
-  member set (part of the alias and the BDDL) is one such draw, fixed per pick, target and support category; the sampler
+  count is the largest size whose *every* admissible draw fits `tray_budget` (footprints in the pick's pose). The variant's
+  member set (part of the variant and the BDDL) is one such draw, fixed per pick, target and support category; the sampler
   draws the models of each category per template. Pool notes `pose: lying` / `pose: standing` (the two milk picks) make
   every distractor take the target's pose (`generation.distractor_pose`: lying = smallest extent vertical, standing =
   largest extent vertical with the wider end down). The puzzle's `fixed_layout` rows are placed with the target at the
@@ -1977,7 +1977,7 @@ present (grasp → place(intermediate) → grasp → place). Braces are not atte
 (`brace: none`).
 
 
-- Goal pattern from `generation.patterns` (or `--variant`); the top-left block in the init image is the anchor: its
+- Goal pattern from `generation.patterns` (or `--sub-variant`); the top-left block in the init image is the anchor: its
   position stays, its goal orientation is the table-aligned orientation with the pattern's top face up reached by the
   **smallest rotation** from its init orientation — yaw-align (|ψ| ≤ 45°) then one flip about a horizontal table axis
   a that brings the goal face up (adjacent face; the init up-face is never the opposite of the goal face, enforced in
@@ -2063,12 +2063,12 @@ class is 25° / focus‑in‑frame (the same shape as the ontop‑large C rule; 
 optical axis and 25° admits 42 foci over 3 stand‑offs).
 
 *Implementation (`articulation_small.py`, `aea6bd0a`):* `phase2_manipulation_stance(..., angle_classes_deg=(8°, 25°))` with
-`generation.phase2_tight_class_deg` / `phase2_loose_class_deg` overriding the two classes per alias; the in‑frame hook stays
+`generation.phase2_tight_class_deg` / `phase2_loose_class_deg` overriding the two classes per variant; the in‑frame hook stays
 the small‑articulation one (target hull + handle contact + at least one near / own‑side brace point in frame), i.e. the
 loose class is "focus within 25° of the optical axis and the target in frame", the same shape as the ontop‑large C rule.
 
 **Owner decision 2026‑10‑11.** Small articulation takes the tabletop classes of §4.5 step 3, 20° / 30° (were 8° / 25°). The
-aliases tuned with their own loose class keep the 8° tight class in their customs (`phase2_tight_class_deg: 8`): blender
+variants tuned with their own loose class keep the 8° tight class in their customs (`phase2_tight_class_deg: 8`): blender
 and `blender_eyedvd` close (loose 45°), `carton_cdmmwy` open, `_rightfirst` and `_lever` (40°), `carton_cdmmwy` close (60°);
 `carton_cdmmwy_near` keeps its own 25° / 60°.
 
@@ -2117,13 +2117,13 @@ no partner cell satisfies the joint placement from any of these stances is the a
 *Follow‑ups (`bd30c0cf`, `deb0093c`):* brace face candidates for a vertical insertion = the partner's near, robot‑left and
 far faces (the near face alone left 22/40 partner cells off the left band); manipulation candidates ordered by the focus
 depth (≤ 0.62 m base‑forward first) and the lift's carry height laddered 12 / 8 / 5 cm. *D‑009 (prepared, default off):*
-every class‑0 (8°) focus of the lid–teapot alias lies 0.77–0.81 m base‑forward, where the lift / SLERP have no IK —
+every class‑0 (8°) focus of the lid–teapot variant lies 0.77–0.81 m base‑forward, where the lift / SLERP have no IK —
 A `generation.phase2_loose_class_deg` (20–25°) or B `generation.phase2_class1_when_deep_m` (0.65: `phase2_manipulation_
 stance(class1_when_deep_m=…)` admits the class‑1 survivors when every class‑0 focus is deeper than that; §4.5 general rule).
 Since the owner decision of 2026‑10‑11 the plain Phase 2's attachment classes are the tabletop 20° / 30° of §4.5 step 3
 (were 8° / 20°); rule B (0.65 m, set in the attachment customs) stays and there compares the 20° class: the ≤ 30° survivors
-are admitted when every ≤ 20° focus is deeper than 0.65 m base‑forward. That does not hold for the split‑cone aliases (every
-attachment alias since the subtask default of 2026‑10‑11, variant C, 532cfd10): the work stance keeps 8° / 20° by design
+are admitted when every ≤ 20° focus is deeper than 0.65 m base‑forward. That does not hold for the split‑cone variants (every
+attachment variant since the subtask default of 2026‑10‑11, variant C, 532cfd10): the work stance keeps 8° / 20° by design
 (`phase2_tight_class_deg` / `phase2_loose_class_deg`), the start position 20° / 30° of the init view, and 20° / 30° only in the
 plain fallback (`phase2_split_fallback_classes_deg`); rule B then compares the 8° class (`split_cone_positions`: a position's
 ≤ 20° work stances are admitted when every ≤ 8° focus is deeper than 0.65 m).
@@ -2133,9 +2133,9 @@ carry was a straight SLERP line from the 5–12 cm lift to the pre‑attach; wit
 pot 14.3 cm tall) that line ran through the pot's rim (12 tracked carries `collides with partner_stockpot_oshwps_0` in the
 05:10–06:10 runs). With the key the lift is the 12 cm one, the first recorded waypoint rises straight up until the carried
 part's lowest point is the key's clearance above the partner's highest point (a list is tried in order: the lid–stockpot
-aliases carry [0.20, 0.12, 0.06] m), then the SLERP line runs to the pre‑attach. A carry whose fingertip point leaves the
+variants carry [0.20, 0.12, 0.06] m), then the SLERP line runs to the pre‑attach. A carry whose fingertip point leaves the
 stance camera's image (the program check's fingertip rule) is not tried. The oracle tracks the recorded waypoints as before;
-`grasps[].extras.carry_over` records the clearance, the partner's top and the rise. The other attachment aliases (lid–teapot,
+`grasps[].extras.carry_over` records the clearance, the partner's top and the rise. The other attachment variants (lid–teapot,
 cork, cap) keep the straight carry.
 
 *Partner room at the template (owner decision 2026‑10‑12, attachment 7h).* A Phase‑2 survivor needed one attach‑band cell
@@ -2174,7 +2174,7 @@ is not a candidate (2.2). Only the male is grasped; the attachment grasp rows (`
 Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright), tolerance 0.08 rad. The aligned
 orientation is defined by the target's **reviewed frame** (`generation.front_axis` / `up_axis` per model, written by
 `ground_isg` from the icl; §5.5 "Frame"): upright = the reviewed up axis along world +z with the front axis along the
-wall normal. An alias without the frame record for its model is rejected (`missing_frame`), never sampled with a
+wall normal. A variant without the frame record for its model is rejected (`missing_frame`), never sampled with a
 default. (World horizontal — the level goal of an elongated wall item — was retired on 2026-09-23.)
 
 ### 6.10 Alignment — axial
@@ -2185,9 +2185,9 @@ COM (TRO constraint, parent = support) installed after settling, its anchor on t
 `generation.hinge_sink_m` = 1 mm below the support top so the object cannot rock — the target stays at its settled pose
 (owner 2026‑10‑12, alignment-axial#05: lowered 1 mm into the support and hinged at its COM, the tablespoon popped back
 up tilted 0.015–0.024 rad and failed the drift check) — drift ≤ 1 mm / 0.005 rad over the 60-step check; the record's
-`anchor_position` is that anchor (§3.14). The hinge is frictionless unless the alias's own
+`anchor_position` is that anchor (§3.14). The hinge is frictionless unless the variant's own
 `generation` sets the world-vertical resistance keys (`hinge_stop_decel_rad_s2` / `hinge_viscous_tau_s` /
-`hinge_brake_omega_rad_s`, §7; `generation_defaults` sets none for the axial, a key the alias leaves out takes the
+`hinge_brake_omega_rad_s`, §7; `generation_defaults` sets none for the axial, a key the variant leaves out takes the
 world-vertical default; owner 2026‑10‑12: the alignment-axial#05 tablespoon turned 0.022 rad on its frictionless hinge
 while settling): then friction / damping come from the same helper with the inertia about the vertical axis,
 I_z = m (long² + short²) / 12 over the target's footprint, and the constraint record carries them, so the oracle and the
@@ -2260,7 +2260,7 @@ alternate over the 8 partner tries) and the target's place / goal yaw is the edg
 in‑hand turn ≤ 45°). The two turns are chosen independently, so two boxes can meet with perpendicular wide faces
 (touching#02 c8_k0: the target's widest face along the edge, the partner's facing the robot). `generation.widest_faces`
 (owner 2026‑10‑13, touching#02: "aligned means their widest faces point the same way"; default unset = off; set on the 12
-touching#02 aliases) keeps the target's and the partner's widest upright faces parallel at init and at the goal. A widest
+touching#02 variants) keeps the target's and the partner's widest upright faces parallel at init and at the goal. A widest
 face's normal is the short axis of the footprint's minimum‑area rectangle at the rest orientation, so the rule does not
 depend on the models' local frames. The target's init yaws are its edge‑aligned yaws, screened and drawn without jitter
 (§4.6 step 1): all four for `parallel` (the two normals along the edge tangent or both along the stance's depth axis,
@@ -2292,7 +2292,7 @@ other side or meeting on other faces than `faces`. Recorded: `template_facts.pai
 `rel_yaw_deg`, `long_axes_deg`, each long axis against the depth axis, `facing_deg`, `offset_deg` (the partner → target offset of
 the rectangles' centres against the partner's long axis: 90 = side by side), `stagger_m`, `side` (robot frame) / `pair_side`
 (seen along the partner's front), `gap_m` (footprint clearance) and `faces`; touching also `summary.touching.push_max_height_m`.
-The four aliases (DECISIONS_LOG 2026‑10‑13 22:40; fronts from the models' cross‑sections, confirmed on renders): nextto#01
+The four variants (DECISIONS_LOG 2026‑10‑13 22:40; fronts from the models' cross‑sections, confirmed on renders): nextto#01
 marker/xakoic `+x` (cap) and colored_pencil/acumgp `-x` (tip), #03 tablespoon/yxxfdj `-x` (bowl) and chopstick/bcwuwv `-x`
 (tip), #04 gym_shoe/kmcbym and mcfcwq `+x` (toes) — `facing: away`, the pair pointing away from the robot side by side, the
 partner on `partner_side` (#04: the left shoe on the left, a wearable pair; `support_margin` 0.005 m: bench_pfjnnj_0's top raster is
@@ -2302,7 +2302,7 @@ were rejected at the template); touching#02 box_of_cereal/iucshm `+x` and dkhgxn
 the place and opens (0.10 − 0.043) / 2 m further) and no push cap: with `push_max_height_m` 0.035 (the 4.3 cm thick box tips
 above b / μ ≈ 4.3 cm, μ ≈ 0.5) no leaning or low blade passed the exact IK from any push-stance lateral on bar_udatjt_0
 (pair1013_c8_k3 / k4 / k5: every attempt `contact_unreachable`); the mid-height push may tip the box onto the taller partner,
-at most ≈ atan(0.05 / 0.218) = 13° before it rests against it. Aliases without the key are sampled as before.
+at most ≈ atan(0.05 / 0.218) = 13° before it rests against it. Variants without the key are sampled as before.
 
 **Raised release** (owner decision 2026‑10‑14 ~01:51, COMPLAINTS.md nextto#03: "try the higher release: lift the spoon about 2 cm so
 the fingers open above the chopstick. The spoon then drops that far and may turn - but not too high - just so that the fingers don't
@@ -2386,7 +2386,7 @@ between them; partner displacement ≤ 5 mm at the goal; a fixed partner gets no
 instance is written and the oracle's demo gate on the last frame, `ispatialgym.eval.goal_occlusion`) does not judge the
 target of an inside goal — an opaque container hides it by design (inside#02's candy was 100 % hidden in every check);
 its record stays in the report with `judged: false`. The partner (the container) is judged instead, with the same
-threshold (≥ 50 % hidden: `goal_occluded`). Every inside alias.
+threshold (≥ 50 % hidden: `goal_occluded`). Every inside variant.
 
 **Goal predicates `under` / `ontop` (D-007, option A, 2026-09-16).** OmniGibson's `Under` / `OnTop` shoot one vertical ray
 from the supporting object's own surface point into the resting object; on a physically correct placement the verdict
@@ -2414,7 +2414,7 @@ coffee tables do not; `under_clearance`), and the target's footprint fits betwee
 ```json
 {
   "schema": "isg-oracle-v1", "instance_id": "...", "tro_sha256": "...",
-  "task_family": "inter_object_relation_satisfaction", "alias": "...", "path_bucket_m": null,
+  "task_family": "inter_object_relation_satisfaction", "variant": "...", "path_bucket_m": null,
   "stances": {
     "init":         {"base_pose2d": [x, y, yaw], "translate": 0.5, "tilt": 0.0, "arms": "untucked", "stand_off": 0.45, "edge": "e2"},
     "manipulation": {"base_pose2d": [...], "translate": 0.75, "tilt": -0.42, "stand_off": 0.35, "focus": [x, y, z], "arms": ["right"]},
@@ -2440,7 +2440,7 @@ Only the blocks a task uses are present. `run_isg --mode oracle` requires the si
 neighbouring support, 3.2) - the oracle leaves it out of the collision world for the grasp poses like the support.
 
 The sidecar carries **facts, not an action list** (decision 2026-09-15): the sequence is the oracle's program for the
-alias (`oracle_primitives_design.md` §3.7, one function per row of its §6.2), expanded from these blocks by `run_isg`
+variant (`oracle_primitives_design.md` §3.7, one function per row of its §6.2), expanded from these blocks by `run_isg`
 and by the sampler's program check (3.5). One schema therefore serves every subtask, and a new subtask adds a program,
 not a schema version. Each block is consumed by a named action of the oracle doc §3.6 (`paths` → `Navigate`,
 `transitions` → `Transition`, `grasps` → `Grasp` / `Lift` / `Place`, `contacts.push` → `Push`, `contacts.brace` →
@@ -2462,8 +2462,8 @@ exponential creep). The loader applies them as a `UsdPhysics.DriveAPI` angular d
 velocity 0, `damping` per deg/s = damping · π/180, `maxForce` = friction): PhysX's implicit force-limited damped
 spring gives torque = clamp(−damping · ω, ±friction) — recorded verbatim in `drive`; `physxJoint:jointFriction` is not
 usable (articulation joints only; the hinge is a plain joint). `resistance_facts` = the mass, extents and inertia the
-values came from. The axial table hinge (6.10) records neither key — frictionless as before — unless its alias sets
-the resistance keys in its own `generation` (owner 2026‑10‑12, the tablespoon aliases): then both, by the same formulas
+values came from. The axial table hinge (6.10) records neither key — frictionless as before — unless its variant sets
+the resistance keys in its own `generation` (owner 2026‑10‑12, the tablespoon variants): then both, by the same formulas
 with I_z = m (long² + short²) / 12 of the target's footprint.
 
 ## 8. Error tolerances
@@ -2485,14 +2485,14 @@ size-normalised errors.
 
 The tolerances are written into the TRO per target and pinned by the evaluation profile `isg-v1` together with the
 camera configuration and `n_render_iterations = 1` (`task_definition_and_evaluation.md`, observation timing);
-`generation.tolerances` in the customs list overrides per alias, never per instance. Continuous
+`generation.tolerances` in the customs list overrides per variant, never per instance. Continuous
 `orientation_equivalences` are enumerated at 5° (3.13), finer than every orientation tolerance above.
 
 ## 9. `ground_isg`, `sample_isg`, `multiply_isg`
 
 **`ground_isg`** (iddl + icl → BDDL + customs list). For each iddl file and each category combination admitted by the
 icl (`roles/constraints_compatible.csv`; `--test-only` / `--representative-only` restrict the candidates to the `test = 1` /
-`representative = 1` rows of `roles/candidates.csv`): write the BDDL (alias, synsets from the KB, groups),
+`representative = 1` rows of `roles/candidates.csv`): write the BDDL (variant, synsets from the KB, groups),
 the customs entry (per-scene whitelists = full icl pools minus the `:require` rejects — `missing_grasps:<pipeline>` /
 `missing_contacts` / `missing_handle` in the blacklist —, bindings of the scene roles, `generation` seeded from the
 existing entry or `generation_defaults.py`, section 2.3), then test the
@@ -2500,7 +2500,7 @@ combination with **one representative model per category** (`roles/candidates.cs
 run the full initialization once (template + instance 0). Success → the template and instance 0 are kept, the
 constraints learned are appended; failure → the representative model is moved to that scene's blacklist with the
 rejection reason, and the combination is retried with the next representative (icl order) once; a combination with
-no successful representative anywhere is written with an empty whitelist and flagged. The alias is never a simple
+no successful representative anywhere is written with an empty whitelist and flagged. The variant is never a simple
 cartesian product of category lists: only correlated pairs from `roles/constraints_compatible.csv` are grounded.
 
 **`sample_isg`** (BDDL + customs → N templates). N = min(#valid model combinations, `templates_max`), minus one when
@@ -2519,12 +2519,12 @@ of the rules (draws, exact IK, transitions, paths) with the constraints as prior
 path buckets; every success appends constraints; rejections are counted per reason (`summary.rejections`).
 
 **Eval seeds and the eval separation** (owner 2026‑10‑11). An eval instance is sampled with `sample_isg --seed-split eval
---seed-index k` (k = 0, 1, … per alias; the split seeds are stable, disjoint across the splits and unique per alias). Within
+--seed-index k` (k = 0, 1, … per variant; the split seeds are stable, disjoint across the splits and unique per variant). Within
 one task and one (scene, room), a pair of eval instances offends when their robot start bases (x, y) are less than **0.5 m**
 apart, or — camera relocalization — their goal bases are; start and goal are checked separately
-(`ispatialgym.sampling.instance_separation`, `MIN_SEPARATION_M`, the checker's `--min`). The checker names the later alias
-of each pair (alias-list order, else sorted) to re-sample with its next seed index. *Owner decision 2026‑10‑12 (~08:16):*
-the threshold went from 1.0 m to 0.5 m; the ten camera-relocalization aliases sharing house_single_floor / living_room_0
+(`ispatialgym.sampling.instance_separation`, `MIN_SEPARATION_M`, the checker's `--min`). The checker names the later variant
+of each pair (variant-list order, else sorted) to re-sample with its next seed index. *Owner decision 2026‑10‑12 (~08:16):*
+the threshold went from 1.0 m to 0.5 m; the ten camera-relocalization variants sharing house_single_floor / living_room_0
 still had five pairs 0.61–0.92 m apart under 1.0 m with the best of seeds 0–2.
 
 ## 10. `[pilot]` numbers

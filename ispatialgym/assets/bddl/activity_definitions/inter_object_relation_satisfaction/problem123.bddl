@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-123)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor)
+    (:variant inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor)
 
     ; hand-grounded (owner 2026-10-12 ~16:05 items 3 / 4, nextto_large#02): problem89 (inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor) copied with the target
     ; serving_cart.n.01 (serving_cart/heqtlk, spawned on the floor of house_single_floor/dining_room_0) and the relation nextto

@@ -82,7 +82,7 @@ def problem_for(base: ProblemSpec, target_cat: str, target_model: str, grasp_key
     if not same:
         pools[d_cat] = {"same_category": [d_model], "other_categories": []}
     raw["distractors"] = {"pools": pools, "lookalike_groups": []}
-    return ProblemSpec(name=base.name, alias=base.alias, roles=roles, scenes=base.scenes, generation=gen, raw=raw)
+    return ProblemSpec(name=base.name, variant=base.variant, roles=roles, scenes=base.scenes, generation=gen, raw=raw)
 
 
 def rooms_of(spec_file):

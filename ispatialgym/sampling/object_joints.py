@@ -1,4 +1,4 @@
-"""An articulated scene object posed by the alias before the stances (owner 2026-10-12 ~16:05, inside_large_scale#02: the fridge's left
+"""An articulated scene object posed by the variant before the stances (owner 2026-10-12 ~16:05, inside_large_scale#02: the fridge's left
 door open at init, ``generation.partner_joint_init``; the band CLI's ``--support-joints``): the joint request parsed and clamped, the
 joints set, the links that moved, and what the moved links change for the geometry - the AABB without them (stance stand-offs), the
 raster cells under them (an interior surface's sides) and their floor footprints (the path planner's map). Duck-typed on OmniGibson's

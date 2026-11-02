@@ -23,7 +23,7 @@ from ispatialgym.sampling.v2.ik import IKChecker, IKResult
 from ispatialgym.sampling.v2.stances import Stance
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "sidecars")
-ALIAS = "configuration_matching-block_design-block_4-breakfast_table_board"
+VARIANT = "configuration_matching-block_design-block_4-breakfast_table_board"
 POSTURE = [0.8, 0.0, 0.9, 0.0, 0.0, 0.0, 1.0]
 
 
@@ -37,7 +37,7 @@ def _sampler(gen):
     BD = _bd()
     s = object.__new__(BD.BlockDesign)
     s.spec = SimpleNamespace(generation=dict(gen))
-    s.gp = SimpleNamespace(alias=ALIAS)
+    s.gp = SimpleNamespace(variant=VARIANT)
     return s
 
 
@@ -227,9 +227,9 @@ def test_program_puts_the_repose_on_the_first_grasp_after_the_base_move():
     block's re-grasp carries none."""
     d = _raw()
     last = _two_stances(d)
-    plain = expand(ALIAS, Sidecar.from_dict(copy.deepcopy(d)))
+    plain = expand(VARIANT, Sidecar.from_dict(copy.deepcopy(d)))
     last["repose"] = copy.deepcopy(REPOSE)
-    acts = expand(ALIAS, Sidecar.from_dict(d))
+    acts = expand(VARIANT, Sidecar.from_dict(d))
     assert [a.summary() for a in acts] == [a.summary() for a in plain]
     assert all(a.repose is None for a in plain if a.name == "grasp")
     grasps = [(i, a) for i, a in enumerate(acts) if a.name == "grasp"]
@@ -250,7 +250,7 @@ def test_program_puts_the_repose_on_the_first_grasp_after_the_base_move():
         last2 = _two_stances(d2)
         mutate(sorted(d2["blocks"], key=lambda x: x["order"])[0], last2)
         with pytest.raises(SidecarError) as e:
-            expand(ALIAS, Sidecar.from_dict(d2))
+            expand(VARIANT, Sidecar.from_dict(d2))
         assert what in str(e.value), (what, str(e.value))
     # a flip-in-place block after the base move: the re-pose is the first grasp's, the re-grasp's record has none
     d3 = _raw()
@@ -259,7 +259,7 @@ def test_program_puts_the_repose_on_the_first_grasp_after_the_base_move():
     last3["table_flip"] = {"in_hand_flip": True, "place": {"position": [7.2, 3.0, 0.86], "orientation": [0.0, 0.0, 0.0, 1.0]},
                            "regrasp": {"face_pair": "x", "tilt_pick_deg": 30.0, "yaw_deg": 0.0, "carry_height": 0.12,
                                        "pick": {"position": [7.2, 3.0, 0.85], "orientation": [0.0, 1.0, 0.0, 0.0]}}}
-    g3 = [a for a in expand(ALIAS, Sidecar.from_dict(d3)) if a.name == "grasp" and a.object == last3["instance"]]
+    g3 = [a for a in expand(VARIANT, Sidecar.from_dict(d3)) if a.name == "grasp" and a.object == last3["instance"]]
     assert len(g3) == 2 and g3[0].repose is not None and g3[1].repose is None and "repose" not in g3[1].block.extra
 
 
@@ -378,7 +378,7 @@ def test_oracle_grasp_reposes_before_its_transit(tmp_path):
         sc, env = iors_world()
         env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
         ex, motions, backend, _ = make_executor(env, sc, path)
-        acts = expand(sc.alias, sc)
+        acts = expand(sc.variant, sc)
         gi = next(i for i, a in enumerate(acts) if a.name == "grasp")
         if repose:
             acts[gi] = dataclasses.replace(acts[gi], repose={"arm": "right", "target": "pre_grasp", "q": q7, "from_stance": "init",

@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-toothbrush",
+  "variant": "mental_rotation-toothbrush",
   "source_job": "mental_rotation-toothbrush__representative__target-vkrjps"
  }
 ]

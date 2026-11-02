@@ -1,6 +1,6 @@
 (define (problem alignment-9)
     (:domain ispatialgym)
-    (:alias alignment-axial-paperback_book_h070-desk)
+    (:variant alignment-axial-paperback_book_h070-desk)
 
     ; ground_isg 2.0.0: alignment-axial-paperback_book_h070-desk (alignment/axial.iddl; alignment-axial#02~T3/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-axial-paperback_book-desk: scale = 0.7, scale_source = default_step, scale_axes = height, height_axis = {'paperback_book/jhaltj': 'x'}

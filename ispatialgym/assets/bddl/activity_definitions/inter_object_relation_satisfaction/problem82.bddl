@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-82)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-tablespoon-chopstick-pedestal_table)
+    (:variant inter_object_relation_satisfaction-nextto-tablespoon-chopstick-pedestal_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-tablespoon-chopstick-pedestal_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#03~T5/representative)
     ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the

@@ -41,25 +41,25 @@ log = logging.getLogger("ispatialgym.sampling")
 TABLE_CATEGORIES = ("breakfast_table", "desk", "coffee_table", "conference_table", "pedestal_table", "countertop", "bar", "nightstand", "console_table", "side_table")
 
 #: a path component is at most 255 bytes on ext4 (and most filesystems); the longest name derived from an instance id is
-#: ``<iid>-tro_state.json`` (2026-09-25: the 3-distractor milk alias' id ran to 241 characters and the TRO write failed
+#: ``<iid>-tro_state.json`` (2026-09-25: the 3-distractor milk variant' id ran to 241 characters and the TRO write failed
 #: with ENAMETOOLONG after an attempt had passed every check, 0925-044627)
 INSTANCE_FILE_NAME_MAX = 255
 INSTANCE_ID_MAX = INSTANCE_FILE_NAME_MAX - len("-tro_state.json")
 
 
-def make_instance_id(alias: str, template_id: str, index: int) -> str:
-    """``<alias>__<template_id>__<index:04d>``; when that exceeds :data:`INSTANCE_ID_MAX` bytes the template component is
-    cut and suffixed with ``~<sha1[:8] of the full template id>`` (deterministic, still unique per template). The alias
+def make_instance_id(variant: str, template_id: str, index: int) -> str:
+    """``<variant>__<template_id>__<index:04d>``; when that exceeds :data:`INSTANCE_ID_MAX` bytes the template component is
+    cut and suffixed with ``~<sha1[:8] of the full template id>`` (deterministic, still unique per template). The variant
     stays the first ``__`` component (``first_demo`` / the schedulers read it from the file name) and the consumers derive
     the id from the file name and the template dir from the path, never from the id's structure."""
-    iid = f"{alias}__{template_id}__{index:04d}"
+    iid = f"{variant}__{template_id}__{index:04d}"
     if len(iid.encode("utf-8")) <= INSTANCE_ID_MAX:
         return iid
     import hashlib
 
     digest = hashlib.sha1(template_id.encode("utf-8")).hexdigest()[:8]
-    keep = max(INSTANCE_ID_MAX - len(f"{alias}____{index:04d}".encode("utf-8")) - len(digest) - 1, 0)
-    return f"{alias}__{template_id[:keep]}~{digest}__{index:04d}"
+    keep = max(INSTANCE_ID_MAX - len(f"{variant}____{index:04d}".encode("utf-8")) - len(digest) - 1, 0)
+    return f"{variant}__{template_id[:keep]}~{digest}__{index:04d}"
 
 
 @dataclass
@@ -255,7 +255,7 @@ class TaskSampler:
         self.objects[b.name] = obj
         return b
 
-    def alias_role(self, role: str, bound: Bound):
+    def variant_role(self, role: str, bound: Bound):
         self.bindings.roles[role] = [bound]
 
     def bind_floor(self, role: str = "floor", room: Optional[str] = None):
@@ -403,7 +403,7 @@ class TaskSampler:
                 contacts = f" [contacts unavailable: {ce!r}]"
             raise Reject("unstable_init" if vel_err else "trembling", f"{err}" + (f"; residual velocity: {vel_err}" if vel_err else "") + contacts)
         if vel_err:
-            log.info("%s: residual velocity after the settle ignored, the objects are visually still: %s", getattr(getattr(self, "gp", None), "alias", self.__class__.__name__), vel_err)
+            log.info("%s: residual velocity after the settle ignored, the objects are visually still: %s", getattr(getattr(self, "gp", None), "variant", self.__class__.__name__), vel_err)
         for name in draft.object_poses:
             p, q = self.objects[name].get_position_orientation()
             draft.object_poses[name] = (p.clone(), q.clone())
@@ -529,7 +529,7 @@ class TaskSampler:
             problem_name=self.spec.name,
             activity=self.activity,
             definition_id=self.definition_id,
-            task_variant=self.problem.alias,
+            task_variant=self.problem.variant,
             instance_id=instance_id,
             generation_seed=seed,
             bddl_sha256=self.template_meta["bddl_sha256"],
@@ -580,7 +580,7 @@ class TaskSampler:
             "sampled_with_rooms": list(self.world.loaded_rooms or []),
             "scene_variant": self._scene_variant_meta(),
             "problem": self.spec.name,
-            "alias": self.problem.alias,
+            "variant": self.problem.variant,
             "choices": {r: c.__dict__ for r, c in self.choices.items()},
             "inst_to_name": inst_to_name,
             "scene_load_s": self.world.load_time,

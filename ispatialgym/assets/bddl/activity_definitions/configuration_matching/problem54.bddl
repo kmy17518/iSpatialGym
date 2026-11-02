@@ -1,6 +1,6 @@
 (define (problem configuration_matching-54)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-countertop)
+    (:variant configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-countertop)
 
     ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-hinged_jar_vzwhbg-countertop (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#02~T2/representative/fallback1:next_model)
     ; fallback 1 (next_model) of configuration_matching-articulation_open_small_scale-hinged_jar-countertop: model = vzwhbg, slot = variation_geometry, primary_model = gqtsam

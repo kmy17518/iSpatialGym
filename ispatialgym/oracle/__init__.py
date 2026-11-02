@@ -11,7 +11,7 @@ Layering (``ispatialgym/docs/oracle_primitives_design.md`` §3, v2):
   non-convergence.
 * Layer 2 actions  ``actions`` (the vocabulary, ``targets()`` / ``annotate()``) + ``execute`` (the
   ``EXECUTORS[ActionClass] = (execute, postcondition)`` table).
-* Layer 3 programs ``programs.expand(alias, sidecar)`` from the ``sidecar`` facts.
+* Layer 3 programs ``programs.expand(variant, sidecar)`` from the ``sidecar`` facts.
 * Executor         ``executor.Executor`` (checkpoint → execute under ``qa.Monitors`` → postcondition → one retry →
   annotate; epilogue), ``recorder.Recorder`` (hdf5 / LeRobot / mp4 / annotations), ``run_isg`` (the driver).
 * v1 (kept runnable): ``skills.Skills``, ``tasks``, ``run_isg_v1``.

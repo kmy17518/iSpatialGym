@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-nextto_large_scale-0000",
   "tro_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
+  "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
   "path_bucket_m": null,
   "stances": {
     "init": {

@@ -45,7 +45,7 @@ pose. Object scaling (owner 2026-09-26) = per grasp the reachable **depth window
 slid along the optical axis over the ``depth_search_grid_m`` grid of ``depth_search_range_m``, a depth passing when the
 object is in frame and the screening IK reaches the hand pose, the continuous run through the reference depth shrunk by
 ``depth_margin_m``; each instance draws a start depth and a goal depth uniformly in the window with
-``|d1 − d0| ≥ min_depth_change_m`` (toward or away from the camera; an eval alias fixes the direction and a start-depth
+``|d1 − d0| ≥ min_depth_change_m`` (toward or away from the camera; an eval variant fixes the direction and a start-depth
 band, ``generation.requested_direction`` / ``start_depth_band``, owner 2026-10-11), solves the start configuration by IK
 from the default posture and confirms the straight move (``conventions.line_waypoints``) with the exact IK at its base pose.
 
@@ -630,7 +630,7 @@ class HeldObjectV2(SamplerV2):
             return d[key]
         if default is not None:
             return default
-        raise Reject("spec", f"{self.gp.alias}: generation.{key} missing and no default in generation_defaults")
+        raise Reject("spec", f"{self.gp.variant}: generation.{key} missing and no default in generation_defaults")
 
     def hold_constants(self) -> HoldConstants:
         return HoldConstants.from_generation(self.g("hold"))
@@ -736,7 +736,7 @@ class HeldObjectV2(SamplerV2):
         if source == "solved":
             cache[key] = {k: v for k, v in sol.items() if k not in ("source",)}
             _write_json(HOLD_CACHE_PATH, cache)
-        log.info("%s: fixed %s-arm hold (%s) depth %.2f trunk (%.2f, %.2f) roll %.0f deg", self.gp.alias, arm, source, hc.depth_m, hc.translate, hc.tilt, hc.roll_deg)
+        log.info("%s: fixed %s-arm hold (%s) depth %.2f trunk (%.2f, %.2f) roll %.0f deg", self.gp.variant, arm, source, hc.depth_m, hc.translate, hc.tilt, hc.roll_deg)
         return HoldSolution(arm, q, q_rel, eef_in_base, pad_in_base, cam_in_base, sol)
 
     def adopt_hold(self, h: HoldSolution) -> None:
@@ -749,7 +749,7 @@ class HeldObjectV2(SamplerV2):
         self.template_meta["init_arms"] = hold_init_arms(h.arm)
         self.prior = load_visibility_prior(VISIBILITY_PRIOR_PATH, self.hold, h.arm)
         if not self.prior:
-            log.info("%s: no B7 visibility prior for this hold (%s arm, roll %.0f deg); every library row is realised and measured", self.gp.alias, h.arm,
+            log.info("%s: no B7 visibility prior for this hold (%s arm, roll %.0f deg); every library row is realised and measured", self.gp.variant, h.arm,
                      self.hold.roll_deg)
 
     def choose_hold(self) -> None:
@@ -772,7 +772,7 @@ class HeldObjectV2(SamplerV2):
             except Exception as e:  # noqa: BLE001 - the other arm is an offer: its planner failing never costs the default arm's template
                 if arm == default:
                     raise
-                log.warning("%s: the %s arm's hold could not be solved (%r); not offered", self.gp.alias, arm, e)
+                log.warning("%s: the %s arm's hold could not be solved (%r); not offered", self.gp.variant, arm, e)
                 failed[arm] = Reject("hold_pose", f"the {arm} arm's hold raised {e!r}"[:300])
                 return None, None, str(failed[arm])
             return solved[arm], solved[arm].q, ""
@@ -795,7 +795,7 @@ class HeldObjectV2(SamplerV2):
             first = e
         fallback = {"from_arm": self.arm, "why": str(first)[:300], "goal_options": self.template_facts.get("goal_options")}
         TT._count(self, "segment_fallbacks")
-        log.info("%s: segment fallback: the %s arm's hold leaves no goal option (%s); the goal search runs with the %s arm's hold", self.gp.alias, self.arm,
+        log.info("%s: segment fallback: the %s arm's hold leaves no goal option (%s); the goal search runs with the %s arm's hold", self.gp.variant, self.arm,
                  str(first)[:160], others[0])
         self.adopt_hold(solved[others[0]])
         self.hold_arm = self.template_facts["hold_arm"] = hold_arm_record(self.arm, default, offered, decision, fallback)
@@ -1068,7 +1068,7 @@ class HeldObjectV2(SamplerV2):
             "gravity_vs_library_deg": math.degrees(C.quat_angle(rel_grav[1], lib_rel[1])),
             "finger_q_contact": q_contact.tolist(),
         }
-        log.info("%s: grasp realised: %s", self.gp.alias, {k: (round(v, 1) if isinstance(v, float) else v) for k, v in self.grasp_debug.items()})
+        log.info("%s: grasp realised: %s", self.gp.variant, {k: (round(v, 1) if isinstance(v, float) else v) for k, v in self.grasp_debug.items()})
         self.robot.set_joint_positions(q_contact, indices=gidx, drive=False)  # pads on the object in the saved state
         self.robot.keep_still()
         self.world.full_step(render=True)  # sync transforms / caches after the non-rendering control steps
@@ -1359,7 +1359,7 @@ class ObjectScalingV2(HeldObjectV2):
         self.template_facts["depth_windows"] = windows
         if not self.options:
             raise Reject("goal_infeasible", f"no library grasp has a depth window admitting a {min_change:.2f} m move ({stats}; {windows})")
-        log.info("%s: depth windows per grasp %s (%s)", self.gp.alias, {k: v["window"] for k, v in self.options.items()}, stats)
+        log.info("%s: depth windows per grasp %s (%s)", self.gp.variant, {k: v["window"] for k, v in self.options.items()}, stats)
 
     def start_config(self, g: GL.Grasp, d0: float) -> Optional[Tuple[th.Tensor, C.Pose, C.Pose]]:
         """The start of an instance: ``g``'s object with its root at depth ``d0`` (the reference hold slid along the optical
@@ -1591,7 +1591,7 @@ class MentalRotationV2(HeldObjectV2):
                                                   "goal_angle": "continuous", "goal_draws_per_start": int(self.g("goal_draws_per_start"))}
         if not self.options:
             raise Reject("goal_infeasible", f"no library grasp has a start in view that the screening IK reaches ({stats})")
-        log.info("%s: %d grasps with start options (%s)", self.gp.alias, len(self.options), stats)
+        log.info("%s: %d grasps with start options (%s)", self.gp.variant, len(self.options), stats)
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()

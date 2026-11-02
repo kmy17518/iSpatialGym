@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-106)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table)
+    (:variant inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-breakfast_table (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#02~T2/representative)
     ; owner 2026-10-12 ~10:25 item 4 touching#02 variant B (inter_object_relation_satisfaction-touching#02~B2): hand-made from this grounding - target box_of_cereal/iucshm x0.8 (box_of_cereal__iucshm__s080), registry mode test

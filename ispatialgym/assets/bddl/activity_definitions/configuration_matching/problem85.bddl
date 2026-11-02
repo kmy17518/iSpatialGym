@@ -1,6 +1,6 @@
 (define (problem configuration_matching-85)
     (:domain ispatialgym)
-    (:alias configuration_matching-attachment-lid-stockpot-breakfast_table)
+    (:variant configuration_matching-attachment-lid-stockpot-breakfast_table)
 
     ; ground_isg 2.0.0: configuration_matching-attachment-lid-stockpot-breakfast_table (configuration_matching/attachment.iddl; configuration_matching-attachment#04~T1/representative)
     ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced

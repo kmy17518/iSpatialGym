@@ -4,14 +4,14 @@
     python scripts/isg/pilot_ledger.py --manifest runlogs/pilot_20260915/jobs_sample.json --live runlogs/runpod/pilot/live \
         [--killed runlogs/pilot_20260915/killed_at_stop.json] [--requested 2] --out runlogs/pilot_20260915
 
-Writes ``progress.json`` (per alias: pod, rc, wall, n_written, instance ids / seeds, rejection histogram, exception line,
-state ∈ {complete, partial, zero, crashed, killed, never_started}, demo outcomes) and ``audit.md`` (per subtask: aliases,
+Writes ``progress.json`` (per variant: pod, rc, wall, n_written, instance ids / seeds, rejection histogram, exception line,
+state ∈ {complete, partial, zero, crashed, killed, never_started}, demo outcomes) and ``audit.md`` (per subtask: variants,
 jobs done, n_written histogram, crashes grouped by exception, dominant attempt-level and candidate-level rejections,
 median / max wall, attempts per written instance, demo verdicts). ``scene_reset`` is a counter of scene resets, not a
 rejection, and is reported apart.
 
 Sources per pod dir ``<live>/<pod name>/``: ``done.txt`` (``<jid> rc=<rc> wall=<s> n_written=<n>``), ``<jid>/summary.json``
-(v2 ``isg-sampling-summary-v2``: ``problems.<alias>.<template>.{n_written,time_s,rejections,rejection_examples,seeds,
+(v2 ``isg-sampling-summary-v2``: ``problems.<variant>.<template>.{n_written,time_s,rejections,rejection_examples,seeds,
 written,error}``), ``<jid>/run.log`` (``... instance i attempt j rejected in <stage> after <s>s: [<reason>] <message>``,
 ``Traceback`` blocks, ``RUN_ISG_RESULT {...}`` of the demo jobs).
 """
@@ -53,7 +53,7 @@ def parse_run_log(path):
     for i, line in enumerate(lines):
         m = REJ_RE.search(line)
         if m:
-            rej.append({"alias": m.group(1), "instance": int(m.group(2)), "attempt": int(m.group(3)), "stage": m.group(4), "s": float(m.group(5)),
+            rej.append({"variant": m.group(1), "instance": int(m.group(2)), "attempt": int(m.group(3)), "stage": m.group(4), "s": float(m.group(5)),
                         "reason": m.group(6), "msg": m.group(7)[:300]})
             attempts.add((m.group(1), int(m.group(2)), int(m.group(3))))
         if line.startswith("Traceback"):
@@ -69,7 +69,7 @@ def parse_run_log(path):
     return rej, exc, results, len(attempts)
 
 
-def _alias_entry(jid, alias, subtask, pod, summ, arec, runs, rej, exc, n_attempts, killed_jids, requested):
+def _variant_entry(jid, variant, subtask, pod, summ, arec, runs, rej, exc, n_attempts, killed_jids, requested):
     n_written, time_s, rejections, examples, seeds, written, error = 0, None, {}, {}, [], [], None
     for prob in (summ.get("problems") or {}).values():
         for t in prob.values():
@@ -109,19 +109,19 @@ def _alias_entry(jid, alias, subtask, pod, summ, arec, runs, rej, exc, n_attempt
             "attempts_logged": n_attempts, "rejected_attempts": rej, "exceptions": exc if not arec else ([error] if error else []), "error": error, "state": state}
 
 
-def _merge(ledger, alias, entry):
-    rec = ledger.get(alias)
+def _merge(ledger, variant, entry):
+    rec = ledger.get(variant)
     if rec is None or (entry["n_written"], entry["state"] == "complete") > (rec["n_written"], rec["state"] == "complete"):
         if rec is not None:
             entry["other_runs"] = rec.get("other_runs", []) + [{"pod": rec["pod"], "job": rec["job"], "state": rec["state"], "n_written": rec["n_written"]}]
-        ledger[alias] = entry
+        ledger[variant] = entry
     else:
         rec.setdefault("other_runs", []).append({"pod": entry["pod"], "job": entry["job"], "state": entry["state"], "n_written": entry["n_written"]})
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--manifest", required=True, help="one or more manifests, comma-separated (single-alias jobs or C5 chunks)")
+    ap.add_argument("--manifest", required=True, help="one or more manifests, comma-separated (single-variant jobs or C5 chunks)")
     ap.add_argument("--customs", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "ispatialgym", "assets", "task_specs", "isg_customs.json"))
     ap.add_argument("--live", required=True)
     ap.add_argument("--killed", default=None)
@@ -131,15 +131,15 @@ def main():
     jobs = {}
     for mpath in args.manifest.split(","):
         for j in json.load(open(mpath)):
-            if j.get("aliases"):  # C5 chunk: one job, several aliases
-                for a in j["aliases"]:
-                    jobs.setdefault(j["id"], {"id": j["id"], "alias": None, "subtask": None, "aliases": j["aliases"], "subtasks": j.get("subtasks")})
+            if j.get("variants"):  # C5 chunk: one job, several variants
+                for a in j["variants"]:
+                    jobs.setdefault(j["id"], {"id": j["id"], "variant": None, "subtask": None, "variants": j["variants"], "subtasks": j.get("subtasks")})
             else:
                 jobs[j["id"]] = j
     customs = json.load(open(args.customs)) if args.customs else {}
 
-    def subtask_of(alias):
-        e = customs.get(alias) or {}
+    def subtask_of(variant):
+        e = customs.get(variant) or {}
         if e.get("subtask"):
             return e["subtask"]
         iddl = e.get("iddl", "")
@@ -176,14 +176,14 @@ def main():
                     summ = json.load(open(sp))
                 except Exception:
                     summ = {}
-            alias_list = j.get("aliases") or [j["alias"]]
-            for alias in alias_list:
-                sub_summ = {"problems": {k: v for k, v in (summ.get("problems") or {}).items() if k == alias}}
-                arec = (summ.get("aliases") or {}).get(alias) or {}
-                sub_rej = [r for r in rej if alias in r.get("msg", "") or True] if len(alias_list) == 1 else [r for r in rej if r.get("alias") == alias]
-                entry = _alias_entry(jid, alias, subtask_of(alias) if j.get("aliases") else j["subtask"], pod, sub_summ, arec, done.get(jid, []),
-                                     sub_rej, exc, n_attempts if len(alias_list) == 1 else None, killed_jids, args.requested)
-                _merge(ledger, alias, entry)
+            variant_list = j.get("variants") or [j["variant"]]
+            for variant in variant_list:
+                sub_summ = {"problems": {k: v for k, v in (summ.get("problems") or {}).items() if k == variant}}
+                arec = (summ.get("variants") or {}).get(variant) or {}
+                sub_rej = [r for r in rej if variant in r.get("msg", "") or True] if len(variant_list) == 1 else [r for r in rej if r.get("variant") == variant]
+                entry = _variant_entry(jid, variant, subtask_of(variant) if j.get("variants") else j["subtask"], pod, sub_summ, arec, done.get(jid, []),
+                                     sub_rej, exc, n_attempts if len(variant_list) == 1 else None, killed_jids, args.requested)
+                _merge(ledger, variant, entry)
             continue
             n_written, time_s, rejections, examples, seeds, written, error = 0, None, {}, {}, [], [], None
             for prob in (summ.get("problems") or {}).values():
@@ -214,41 +214,41 @@ def main():
                 state = "crashed"
             else:
                 state = "zero"
-            rec = ledger.get(j["alias"])
+            rec = ledger.get(j["variant"])
             entry = {"job": jid, "subtask": j["subtask"], "pod": pod, "runs": runs, "rc": last["rc"] if last else None, "wall": last["wall"] if last else None,
                      "n_written": n_written, "time_s": time_s, "instances": written, "seeds": seeds, "rejections": rejections, "rejection_examples": examples,
                      "attempts_logged": n_attempts, "rejected_attempts": rej, "exceptions": exc, "error": error, "state": state}
-            # an alias may have run on several pods (re-dispatch after a crash): keep the best outcome, remember the others
+            # a variant may have run on several pods (re-dispatch after a crash): keep the best outcome, remember the others
             if rec is None or (entry["n_written"], entry["state"] == "complete") > (rec["n_written"], rec["state"] == "complete"):
                 if rec is not None:
                     entry["other_runs"] = rec.get("other_runs", []) + [{"pod": rec["pod"], "state": rec["state"], "n_written": rec["n_written"], "exceptions": rec["exceptions"]}]
-                ledger[j["alias"]] = entry
+                ledger[j["variant"]] = entry
             else:
                 rec.setdefault("other_runs", []).append({"pod": pod, "state": state, "n_written": n_written, "exceptions": exc})
     for jid, j in jobs.items():
-        for alias in (j.get("aliases") or [j["alias"]]):
-            if alias in ledger:
+        for variant in (j.get("variants") or [j["variant"]]):
+            if variant in ledger:
                 continue
-            ledger[alias] = {"job": jid, "subtask": subtask_of(alias) if j.get("aliases") else j["subtask"], "pod": None, "runs": [], "rc": None, "wall": None,
+            ledger[variant] = {"job": jid, "subtask": subtask_of(variant) if j.get("variants") else j["subtask"], "pod": None, "runs": [], "rc": None, "wall": None,
                              "n_written": 0, "time_s": None, "instances": [], "seeds": [], "rejections": {}, "rejection_examples": {}, "attempts_logged": 0,
                              "rejected_attempts": [], "exceptions": [], "error": None, "state": "killed" if jid in killed_jids else "never_started"}
         continue
-        if j["alias"] not in ledger:
-            ledger[j["alias"]] = {"job": jid, "subtask": j["subtask"], "pod": None, "runs": [], "rc": None, "wall": None, "n_written": 0, "time_s": None,
+        if j["variant"] not in ledger:
+            ledger[j["variant"]] = {"job": jid, "subtask": j["subtask"], "pod": None, "runs": [], "rc": None, "wall": None, "n_written": 0, "time_s": None,
                                   "instances": [], "seeds": [], "rejections": {}, "rejection_examples": {}, "attempts_logged": 0, "rejected_attempts": [],
                                   "exceptions": [], "error": None, "state": "killed" if jid in killed_jids else "never_started"}
-    for alias, rec in ledger.items():
+    for variant, rec in ledger.items():
         rec["demos"] = demos.get(rec["job"], [])
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "progress.json"), "w") as f:
-        json.dump({"requested_per_alias": args.requested, "aliases": ledger}, f, indent=1)
+        json.dump({"requested_per_variant": args.requested, "variants": ledger}, f, indent=1)
 
     # ---- audit ----
     by = collections.defaultdict(list)
-    for alias, rec in ledger.items():
+    for variant, rec in ledger.items():
         by[rec["subtask"]].append(rec)
-    md = ["# E1 pilot — yield audit", "", f"{len(ledger)} aliases; states: " + ", ".join(f"{k} {v}" for k, v in sorted(collections.Counter(r['state'] for r in ledger.values()).items())), "",
-          "| subtask | aliases | ran | n_written 0/1/2 | crashed | killed / never | median wall s | max wall s | attempts per instance | dominant attempt rejections (excl. scene_reset) | demos ok / run |",
+    md = ["# E1 pilot — yield audit", "", f"{len(ledger)} variants; states: " + ", ".join(f"{k} {v}" for k, v in sorted(collections.Counter(r['state'] for r in ledger.values()).items())), "",
+          "| subtask | variants | ran | n_written 0/1/2 | crashed | killed / never | median wall s | max wall s | attempts per instance | dominant attempt rejections (excl. scene_reset) | demos ok / run |",
           "|---|---|---|---|---|---|---|---|---|---|---|"]
     detail = []
     for st in sorted(by):
@@ -272,7 +272,7 @@ def main():
         md.append(f"| {st} | {len(recs)} | {len(ran)} | {hist.get(0,0)}/{hist.get(1,0)}/{hist.get(2,0)} | {len(crashed)} | {kn} | "
                   f"{statistics.median(walls):.0f} | {max(walls):.0f} | {api} | " if walls else f"| {st} | {len(recs)} | {len(ran)} | {hist.get(0,0)}/{hist.get(1,0)}/{hist.get(2,0)} | {len(crashed)} | {kn} | - | - | {api} | ")
         md[-1] += ", ".join(f"{k} {v}" for k, v in rej.most_common(4)) + f" | {dem_ok} / {dem_run} |"
-        # detail: exceptions, candidate-level messages, per-alias lines
+        # detail: exceptions, candidate-level messages, per-variant lines
         exc = collections.Counter(e for r in recs for e in r["exceptions"])
         errs = collections.Counter((r["error"] or "")[:110] for r in recs if r["error"] and not r["exceptions"])
         cand = collections.Counter()

@@ -1,12 +1,12 @@
 (define (problem disembedding-32)
     (:domain ispatialgym)
-    (:alias disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table)
+    (:variant disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table)
 
     ; ground_isg 2.0.0: disembedding-tablefork-tablefork_1_table_knife_1_tablespoon_1-breakfast_table (disembedding/disembedding.iddl; disembedding#10~T5/representative)
     ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list
-    ; (generation.groups.distractors); both are part of the alias (e.g. bottle_of_beer_3_bottle_of_sake_1). Trays are
+    ; (generation.groups.distractors); both are part of the variant (e.g. bottle_of_beer_3_bottle_of_sake_1). Trays are
     ; fixed models for now (tray uekqey source, tray hvlfig destination; roles/candidates.csv).
 
     (:objects

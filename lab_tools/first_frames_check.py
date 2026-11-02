@@ -39,7 +39,7 @@ def main(argv=None) -> int:
     # so run first_frames.py once with a brace-free glob covering the bundle and --only the requested ids
     glob_pat = os.path.join(WT, "datasets", "isg-reloc-train-instances", "prod_0927", TASK, "i1*", "inst", TASK, "house_single_floor", "instances", "*-tro_state.json")
     t0 = time.time()
-    cmd = [CONDA_PY, os.path.join(WT, "lab_tools", "first_frames.py"), "--alias", TASK, "--inst-root", args.scratch, "--tro-glob", glob_pat, "--out", args.scratch, "--only", *args.instances]
+    cmd = [CONDA_PY, os.path.join(WT, "lab_tools", "first_frames.py"), "--variant", TASK, "--inst-root", args.scratch, "--tro-glob", glob_pat, "--out", args.scratch, "--only", *args.instances]
     env = dict(os.environ, OMNIGIBSON_HEADLESS="1", OMNI_KIT_ACCEPT_EULA="YES", HF_HUB_OFFLINE="1")
     rc = subprocess.run(cmd, cwd=WT, stdout=open(os.path.join(args.scratch, "render.log"), "w"), stderr=subprocess.STDOUT, env=env).returncode
     rows = []

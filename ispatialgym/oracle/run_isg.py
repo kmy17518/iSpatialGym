@@ -21,7 +21,7 @@ What it does
    ``blocked_footprints`` of the instance) on the planner map. ``pose_targets`` / ``groups`` /
    ``orientation_equivalences`` / ``evaluation_profile`` are the task's (``configure_targets``).
 2. **Sidecar** (``--sidecar``, default ``<iid>.oracle.json`` next to the TRO): loaded, validated, ``tro_sha256``
-   verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(alias, sidecar)`` → the action list.
+   verified (``--allow-sha-mismatch`` for hand-built sidecars), ``expand(variant, sidecar)`` → the action list.
 3. **Executor** (:class:`~ispatialgym.oracle.executor.Executor`): per action checkpoint → execute under the QA
    monitors → postcondition → one retry → annotate; epilogue: binary success → ``max(50, 20 %)`` no-op → settled →
    goal image (``--goal-image``: ≥ 3 renders, ``goal_observation.camera_pose_world``, profile ``isg-v1``) → TRO goal
@@ -31,7 +31,7 @@ What it does
    ``lerobot/`` (``full``), ``head_rgb.mp4`` with ``--video``, ``init_rgb.png`` / ``final_rgb.png`` / ``goal_rgb.png``,
    ``annotations.json`` (the three §6.3 levels, QA verdicts) and ``meta.json``.
 5. Prints one line ``RUN_ISG_RESULT {...}`` and exits with ``0`` success, ``2`` oracle / QA failure (``reason`` one
-   of ``qa.CATEGORIES``), ``3`` ``no_oracle`` (no sidecar / no program for the alias; the instance is still loaded
+   of ``qa.CATEGORIES``), ``3`` ``no_oracle`` (no sidecar / no program for the variant; the instance is still loaded
    and its init view rendered), ``4`` ``error`` (traceback in ``meta.json``).
 
 ``--mode replay`` feeds the actions of a LeRobot episode (``--replay <dataset root> [--episode N]``) or of a
@@ -868,7 +868,7 @@ def episode_annotations(sidecar: Sidecar) -> EpisodeAnnotations:
         family_description=FAMILY_DESCRIPTIONS.get(family, ""),
         template_description=template,
         instance_description=instance,
-        alias=sidecar.alias,
+        variant=sidecar.variant,
         instance_id=sidecar.instance_id,
     )
 
@@ -1113,11 +1113,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         os.makedirs(out_dir, exist_ok=True)
         meta.update({
             "instance_id": iid, "template_dir": loader.template_dir, "template_id": loader.tmeta.get("template_id"), "problem": loader.tmeta["problem"],
-            "activity": loader.activity, "activity_definition_id": loader.did, "alias": loader.tmeta.get("alias") or loader.tro.meta.task_variant,
+            "activity": loader.activity, "activity_definition_id": loader.did, "variant": loader.tmeta.get("variant") or loader.tro.meta.task_variant,
             "scene": loader.tmeta.get("scene"), "load_room_instances": loader.tmeta.get("load_room_instances"), "tro_path": tro_path,
             "robot_name": loader.robot_name, "out_dir": out_dir,
         })
-        result.update({"instance": iid, "activity": loader.activity, "alias": meta["alias"], "out": out_dir})
+        result.update({"instance": iid, "activity": loader.activity, "variant": meta["variant"], "out": out_dir})
 
         # ---------------------------------------------------------------- sidecar + program (before the sim: cheap failures first)
         actions = None
@@ -1137,11 +1137,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                         raise
                     meta["tro_sha256_verified"] = False
                     log.warning("%s (--allow-sha-mismatch)", e)
-                alias = sidecar.alias
+                variant = sidecar.variant
                 try:
-                    actions = expand(alias, sidecar)
+                    actions = expand(variant, sidecar)
                 except SidecarError as e:
-                    program_error = f"no program for {alias!r}: {e}"
+                    program_error = f"no program for {variant!r}: {e}"
                 if actions is not None and os.environ.get("ISG_PROGRAM_HOOK"):
                     # experiments (owner 2026-09-19 night: the door pull-back / push-open study): ``path.py:callable`` or
                     # ``module:callable`` rewriting the expanded program; recorded in meta, never used by the pilot runs
@@ -1295,7 +1295,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
         rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", video=args.video, video_size=args.video_size,
                                  all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
                                  external_camera=EXTERNAL_CAMERA_NAME if args.dev else None,
-                                 behavior_shard=args.behavior_shard, behavior_task=meta.get("alias") or loader.activity)
+                                 behavior_shard=args.behavior_shard, behavior_task=meta.get("variant") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if loader.scene_crop and hasattr(recorder, "scene_crop"):
@@ -1346,7 +1346,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
 
             try:
                 _goal = list(getattr(getattr(task, "problem", None), "goal", None) or [])
-                executor.protected_goal = _PROT.goal_protected(_goal, loader.physical, _PROT.alias_override(meta.get("alias")))
+                executor.protected_goal = _PROT.goal_protected(_goal, loader.physical, _PROT.variant_override(meta.get("variant")))
             except Exception as e:  # noqa: BLE001
                 log.warning("protected objects unavailable (%r): transits unchecked", e)
                 executor.protected_goal = []

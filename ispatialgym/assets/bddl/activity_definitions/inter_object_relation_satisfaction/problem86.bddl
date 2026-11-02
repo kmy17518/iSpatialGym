@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-86)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bottom_cabinet)
+    (:variant inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bottom_cabinet)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bottom_cabinet (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#04~T4/representative)
     ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the

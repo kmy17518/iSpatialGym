@@ -4,8 +4,8 @@
     python scripts/isg/pilot_demos.py --collected runlogs/runpod/pilot --out runlogs/pilot_20260915/demos \
         [--subtasks mental_rotation object_scaling ...] [--parallel 4] [--only-missing]
 
-Every v2 template directory found under ``<collected>/<pod>/v2__<alias>/<alias>/<template>/`` is staged (TRO + sidecar +
-template files + ``activity_definitions``, no renders) under ``runlogs/smoke_inputs/pilot_instances/<alias>/<template>/`` —
+Every v2 template directory found under ``<collected>/<pod>/v2__<variant>/<variant>/<template>/`` is staged (TRO + sidecar +
+template files + ``activity_definitions``, no renders) under ``runlogs/smoke_inputs/pilot_instances/<variant>/<template>/`` —
 a path ``remote_run.py`` syncs — and every instance gets one ``run_isg --mode oracle --video`` on a free pool pod through
 ``remote_run.py`` (``--parallel`` workers); results are pulled to ``<out>/<iid>/`` (meta.json, annotations.json,
 demo.hdf5, head_rgb.mp4, lerobot/). ``demos.jsonl`` in ``<out>`` records one line per run (status, success, reason, wall).
@@ -29,8 +29,8 @@ STAGE = os.path.join(REPO, "runlogs", "smoke_inputs", "pilot_instances")
 REMOTE_RUN = os.path.join(REPO, "scripts", "runpod", "remote_run.py")
 
 
-def subtask_of(alias: str, customs: dict) -> str:
-    e = customs.get(alias) or {}
+def subtask_of(variant: str, customs: dict) -> str:
+    e = customs.get(variant) or {}
     st = e.get("subtask")
     if st:
         return st
@@ -41,24 +41,24 @@ def subtask_of(alias: str, customs: dict) -> str:
 
 
 def stage_templates(collected: str, customs: dict, subtasks):
-    """Copy every v2 template dir (without renders / validation) into the staging tree; return [(alias, template_dir, tro)]."""
+    """Copy every v2 template dir (without renders / validation) into the staging tree; return [(variant, template_dir, tro)]."""
     items = []
     for tdir in sorted(glob.glob(os.path.join(collected, "*", "v2__*", "*", "*", "instances"))):
         tdir = os.path.dirname(tdir)
-        alias = os.path.basename(os.path.dirname(tdir))
-        st = subtask_of(alias, customs)
+        variant = os.path.basename(os.path.dirname(tdir))
+        st = subtask_of(variant, customs)
         if subtasks and st not in subtasks:
             continue
-        dst = os.path.join(STAGE, alias, os.path.basename(tdir))
+        dst = os.path.join(STAGE, variant, os.path.basename(tdir))
         if not os.path.exists(os.path.join(dst, "template.json")):
             shutil.copytree(tdir, dst, ignore=shutil.ignore_patterns("renders", "validation", "*.png"), dirs_exist_ok=True)
         for tro in sorted(glob.glob(os.path.join(dst, "instances", "*-tro_state.json"))):
-            items.append((alias, st, dst, tro))
+            items.append((variant, st, dst, tro))
     return items
 
 
 def run_one(item, out_root: str, timeout: int):
-    alias, st, tdir, tro = item
+    variant, st, tdir, tro = item
     iid = os.path.basename(tro).replace("-tro_state.json", "")
     rel_tro = os.path.relpath(tro, REPO)
     out_dir = os.path.join(out_root, iid)
@@ -75,7 +75,7 @@ def run_one(item, out_root: str, timeout: int):
             meta = json.load(open(m))
         except Exception:
             pass
-    rec = {"iid": iid, "alias": alias, "subtask": st, "rc": r.returncode, "wall_s": round(time.time() - t0),
+    rec = {"iid": iid, "variant": variant, "subtask": st, "rc": r.returncode, "wall_s": round(time.time() - t0),
            "status": (meta or {}).get("status"), "success": (meta or {}).get("success"), "reason": (meta or {}).get("reason"),
            "n_steps": (meta or {}).get("n_steps"), "out": out_dir}
     return rec

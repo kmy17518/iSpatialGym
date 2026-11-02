@@ -3,7 +3,7 @@
   "instance_id": "camera_relocalization-standard__house_single_floor__living_room_0__0000",
   "tro_sha256": "d1102d24e684e04181b4983c7add9ced6342f84b46db6e93fa50fb0f47489177",
   "task_family": "camera_relocalization",
-  "alias": "camera_relocalization-standard",
+  "variant": "camera_relocalization-standard",
   "path_bucket_m": 3.0,
   "stances": {
     "init": {

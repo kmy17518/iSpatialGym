@@ -2,7 +2,7 @@
 
 An iSpatialGym problem is a stock BDDL problem file in the ``ispatialgym`` domain with three extra sections:
 
-* ``(:alias <variant>)`` -- optional, directly after ``:domain``. Recorded as ``task_variant``.
+* ``(:variant <variant>)`` -- optional, directly after ``:domain``. Recorded as ``task_variant``.
 * ``(:groups MEMBER MEMBER ... - GROUP_NAME ...)`` -- typed-list shaped like ``:objects``. Group names have the
   instance-name shape (``blocks_group.n.01_1``) but are not synsets: nothing is loaded for them and they must not
   be declared in ``:objects``.
@@ -33,9 +33,9 @@ activity name (:data:`LEGACY_ACTIVITIES`, e.g. ``world_alignment`` -> ``alignmen
 is named -- in the problem name, as the directory of a legacy root, in ``load_problem`` / ``problem_path`` and in
 the TRO ``activity`` field -- and compares equal to its canonical name (:func:`canonical_activity`).
 
-``activity_definitions/A/problems.json`` is the optional alias <-> definition id registry written by the v2 grounding
-(``ground_isg``): :func:`load_problem_registry`, :func:`alias_of`, :func:`id_of_alias`,
-:func:`validate_problem_registry`. Without a registry the aliases are read from the problem files themselves.
+``activity_definitions/A/problems.json`` is the optional variant <-> definition id registry written by the v2 grounding
+(``ground_isg``): :func:`load_problem_registry`, :func:`variant_of`, :func:`id_of_variant`,
+:func:`validate_problem_registry`. Without a registry the variants are read from the problem files themselves.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ AGENT_INSTANCE = "agent.n.01_1"
 #: the v1 instances under ``runlogs/runpod/samp`` were sampled as ``world_alignment``.
 LEGACY_ACTIVITIES: Dict[str, str] = {"world_alignment": "alignment"}
 
-#: Optional alias <-> definition id registry of an activity directory (``ground_isg`` allocates ids per alias).
+#: Optional variant <-> definition id registry of an activity directory (``ground_isg`` allocates ids per variant).
 PROBLEM_REGISTRY_FILE = "problems.json"
 
 #: Group symbols by iddl group role (``docs/task_bddl_formats.md`` "Object names") and the v1 spellings that the
@@ -101,8 +101,8 @@ QUANTIFIER_TOKENS = frozenset({"forall", "exists", "forn", "forpairs", "fornpair
 INSTANCE_RE = re.compile(r"^[a-z0-9_]+(?:-[a-z0-9_]+)*\.n\.\d{2}_\d+$")
 #: ``<family>-<subtask>-<category slots>`` (v2, e.g. ``inter_object_relation_satisfaction-ontop_small_scale-apple-
 #: plate-breakfast_table``) or a bare v1 variant (``table_surface``): segments of lowercase letters, digits and ``_``
-#: joined by single ``-``; the alias starts with a letter and has no empty segment.
-ALIAS_RE = re.compile(r"^[a-z][a-z0-9_]*(?:-[a-z0-9_]+)*$")
+#: joined by single ``-``; the variant starts with a letter and has no empty segment.
+VARIANT_RE = re.compile(r"^[a-z][a-z0-9_]*(?:-[a-z0-9_]+)*$")
 PROBLEM_FILE_RE = re.compile(r"^problem(\d+)\.bddl$")
 
 
@@ -242,7 +242,7 @@ class ISGProblem:
     definition_id: int
     problem_name: str
     domain: str
-    alias: Optional[str]
+    variant: Optional[str]
     objects: Dict[str, List[str]]  # synset -> declared instances (declaration order)
     groups: Dict[str, List[str]]  # group symbol -> member instances
     raw_init: list
@@ -270,7 +270,7 @@ class ISGProblem:
 
     @property
     def task_variant(self) -> Optional[str]:
-        return self.alias
+        return self.variant
 
     @cached_property
     def instances(self) -> List[str]:
@@ -334,8 +334,8 @@ class ISGProblem:
     def expanded_bddl(self) -> str:
         """Stock-compatible BDDL text of the expanded problem (groups appear only in aggregate atoms)."""
         lines = [f"(define (problem {self.problem_name})", f"    (:domain {self.domain})"]
-        if self.alias:
-            lines.append(f"    (:alias {self.alias})")
+        if self.variant:
+            lines.append(f"    (:variant {self.variant})")
         lines.append("")
         lines.append("    (:objects")
         for syn, insts in self.objects.items():
@@ -561,58 +561,58 @@ def parse_problem_file(path: str, activity: Optional[str] = None, definition_id:
 
 
 # ----------------------------------------------------------------------------------------------------------------
-# Alias <-> definition id registry (problems.json)
+# Variant <-> definition id registry (problems.json)
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def _read_alias(path: str) -> Optional[str]:
-    """The ``(:alias ...)`` of a problem file without parsing / validating the rest of it."""
+def _read_variant(path: str) -> Optional[str]:
+    """The ``(:variant ...)`` of a problem file without parsing / validating the rest of it."""
     tokens = scan_tokens(filename=path)
     for section in tokens[1:] if isinstance(tokens, list) else []:
-        if isinstance(section, list) and section and section[0] == ":alias":
+        if isinstance(section, list) and section and section[0] == ":variant":
             if len(section) != 2 or not isinstance(section[1], str):
-                raise ISGProblemError(f"{path}: (:alias ...) must hold exactly one symbol, got {section[1:]!r}")
+                raise ISGProblemError(f"{path}: (:variant ...) must hold exactly one symbol, got {section[1:]!r}")
             return section[1]
     return None
 
 
-def _alias_repr(alias: Optional[str]) -> str:
-    return f"(:alias {alias})" if alias is not None else "no (:alias ...)"
+def _variant_repr(variant: Optional[str]) -> str:
+    return f"(:variant {variant})" if variant is not None else "no (:variant ...)"
 
 
-def problem_aliases(activity: str, root: Optional[str] = None) -> Dict[int, Optional[str]]:
-    """``{definition id: alias}`` read from the ``problemN.bddl`` files of ``activity`` (``None`` = no alias)."""
-    return {pid: _read_alias(problem_path(activity, pid, root)) for pid in list_problem_ids(activity, root)}
+def problem_variants(activity: str, root: Optional[str] = None) -> Dict[int, Optional[str]]:
+    """``{definition id: variant}`` read from the ``problemN.bddl`` files of ``activity`` (``None`` = no variant)."""
+    return {pid: _read_variant(problem_path(activity, pid, root)) for pid in list_problem_ids(activity, root)}
 
 
 def _registry_entries(data, what: str):
-    """Normalize the accepted ``problems.json`` shapes to ``(alias, id)`` pairs."""
+    """Normalize the accepted ``problems.json`` shapes to ``(variant, id)`` pairs."""
     if isinstance(data, dict) and "problems" in data:
         data = data["problems"]
     if isinstance(data, list):
         for i, rec in enumerate(data):
-            if not isinstance(rec, dict) or "alias" not in rec:
-                raise ISGProblemError(f"{what}: entry {i} must be an object with 'alias' and 'id', got {rec!r}")
+            if not isinstance(rec, dict) or "variant" not in rec:
+                raise ISGProblemError(f"{what}: entry {i} must be an object with 'variant' and 'id', got {rec!r}")
             pid = rec.get("id", rec.get("definition_id"))
             if pid is None:
-                raise ISGProblemError(f"{what}: entry {i} ({rec.get('alias')!r}) has no 'id' / 'definition_id'")
-            yield rec["alias"], pid
+                raise ISGProblemError(f"{what}: entry {i} ({rec.get('variant')!r}) has no 'id' / 'definition_id'")
+            yield rec["variant"], pid
     elif isinstance(data, dict):
-        if data and all(isinstance(k, str) and k.isdigit() for k in data):  # inverse shape {"<id>": "<alias>"}
-            for k, alias in data.items():
-                yield alias, int(k)
+        if data and all(isinstance(k, str) and k.isdigit() for k in data):  # inverse shape {"<id>": "<variant>"}
+            for k, variant in data.items():
+                yield variant, int(k)
         else:
             yield from data.items()
     else:
-        raise ISGProblemError(f"{what}: must be a JSON object {{alias: id}} or a list of {{alias, id}} records")
+        raise ISGProblemError(f"{what}: must be a JSON object {{variant: id}} or a list of {{variant, id}} records")
 
 
 def load_problem_registry(activity_dir: str, missing_ok: bool = False) -> Dict[str, int]:
-    """``{alias: definition id}`` from ``<activity_dir>/problems.json`` (``activity_dir`` may also be the file).
+    """``{variant: definition id}`` from ``<activity_dir>/problems.json`` (``activity_dir`` may also be the file).
 
-    Canonical shape: a JSON object ``{"<alias>": <id>, ...}``. Also accepted: the inverse ``{"<id>": "<alias>"}``,
-    a list of ``{"alias": ..., "id" | "definition_id": ...}`` records, and any of these under a ``"problems"`` key
-    (an ``"activity"`` sibling, when present, must name this activity). Aliases must match :data:`ALIAS_RE` and be
+    Canonical shape: a JSON object ``{"<variant>": <id>, ...}``. Also accepted: the inverse ``{"<id>": "<variant>"}``,
+    a list of ``{"variant": ..., "id" | "definition_id": ...}`` records, and any of these under a ``"problems"`` key
+    (an ``"activity"`` sibling, when present, must name this activity). Variants must match :data:`VARIANT_RE` and be
     unique; ids must be distinct non-negative integers. A missing file raises ``FileNotFoundError`` unless
     ``missing_ok`` (then ``{}``).
     """
@@ -633,95 +633,95 @@ def load_problem_registry(activity_dir: str, missing_ok: bool = False) -> Dict[s
             raise ISGProblemError(f"{what}: 'activity' is {data['activity']!r} but the directory is {directory!r}")
     registry: Dict[str, int] = {}
     ids: Dict[int, str] = {}
-    for alias, pid in _registry_entries(data, what):
-        if not isinstance(alias, str) or not ALIAS_RE.match(alias):
-            raise ISGProblemError(f"{what}: invalid alias {alias!r}")
+    for variant, pid in _registry_entries(data, what):
+        if not isinstance(variant, str) or not VARIANT_RE.match(variant):
+            raise ISGProblemError(f"{what}: invalid variant {variant!r}")
         if isinstance(pid, bool) or not isinstance(pid, int) or pid < 0:
             if isinstance(pid, str) and pid.isdigit():
                 pid = int(pid)
             else:
-                raise ISGProblemError(f"{what}: id of {alias!r} must be a non-negative integer, got {pid!r}")
-        if alias in registry:
-            raise ISGProblemError(f"{what}: alias {alias!r} is registered more than once")
+                raise ISGProblemError(f"{what}: id of {variant!r} must be a non-negative integer, got {pid!r}")
+        if variant in registry:
+            raise ISGProblemError(f"{what}: variant {variant!r} is registered more than once")
         if pid in ids:
-            raise ISGProblemError(f"{what}: id {pid} is registered for both {ids[pid]!r} and {alias!r}")
-        registry[alias] = pid
-        ids[pid] = alias
+            raise ISGProblemError(f"{what}: id {pid} is registered for both {ids[pid]!r} and {variant!r}")
+        registry[variant] = pid
+        ids[pid] = variant
     return registry
 
 
-def alias_of(activity: str, definition_id: int, root: Optional[str] = None) -> Optional[str]:
-    """Alias of problem ``definition_id`` of ``activity``.
+def variant_of(activity: str, definition_id: int, root: Optional[str] = None) -> Optional[str]:
+    """Variant of problem ``definition_id`` of ``activity``.
 
-    From ``problems.json`` when it registers the id (checked against the file's ``(:alias ...)`` when the file
-    exists), else from the problem file itself; ``None`` when the problem declares no alias.
+    From ``problems.json`` when it registers the id (checked against the file's ``(:variant ...)`` when the file
+    exists), else from the problem file itself; ``None`` when the problem declares no variant.
     """
     definition_id = int(definition_id)
     directory = activity_dir(activity, root)
     registry = load_problem_registry(directory, missing_ok=True)
-    registered = next((alias for alias, pid in registry.items() if pid == definition_id), None)
+    registered = next((variant for variant, pid in registry.items() if pid == definition_id), None)
     path = problem_path(activity, definition_id, root)
     if not os.path.isfile(path):
         if registered is not None:
             raise ISGProblemError(f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {registered!r} -> {definition_id} but {path} does not exist")
         raise FileNotFoundError(f"Activity {activity!r} has no problem {definition_id}: neither a registry entry nor {path}")
-    declared = _read_alias(path)
+    declared = _read_variant(path)
     if registered is not None and declared != registered:
         raise ISGProblemError(
             f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {registered!r} -> {definition_id} but {path} declares "
-            f"{_alias_repr(declared)}"
+            f"{_variant_repr(declared)}"
         )
     return declared
 
 
-def id_of_alias(activity: str, alias: str, root: Optional[str] = None) -> int:
-    """Definition id of the problem of ``activity`` whose alias is ``alias``.
+def id_of_variant(activity: str, variant: str, root: Optional[str] = None) -> int:
+    """Definition id of the problem of ``activity`` whose variant is ``variant``.
 
-    From ``problems.json`` when it registers the alias (checked against the file when it exists), else by scanning
-    the ``(:alias ...)`` of the problem files. Raises :class:`ISGProblemError` naming the known aliases otherwise.
+    From ``problems.json`` when it registers the variant (checked against the file when it exists), else by scanning
+    the ``(:variant ...)`` of the problem files. Raises :class:`ISGProblemError` naming the known variants otherwise.
     """
     directory = activity_dir(activity, root)
     registry = load_problem_registry(directory, missing_ok=True)
-    if alias in registry:
-        pid = registry[alias]
+    if variant in registry:
+        pid = registry[variant]
         path = problem_path(activity, pid, root)
-        if os.path.isfile(path) and _read_alias(path) != alias:
+        if os.path.isfile(path) and _read_variant(path) != variant:
             raise ISGProblemError(
-                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but {path} declares "
-                f"{_alias_repr(_read_alias(path))}"
+                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {variant!r} -> {pid} but {path} declares "
+                f"{_variant_repr(_read_variant(path))}"
             )
         return pid
-    declared = problem_aliases(activity, root)
-    matches = [pid for pid, a in declared.items() if a == alias]
+    declared = problem_variants(activity, root)
+    matches = [pid for pid, a in declared.items() if a == variant]
     if len(matches) > 1:
-        raise ISGProblemError(f"Activity {activity!r}: problems {matches} all declare (:alias {alias})")
+        raise ISGProblemError(f"Activity {activity!r}: problems {matches} all declare (:variant {variant})")
     if matches:
         return matches[0]
     known = sorted(set(registry) | {a for a in declared.values() if a})
-    raise ISGProblemError(f"Activity {activity!r} has no problem with alias {alias!r}; known aliases: {known}")
+    raise ISGProblemError(f"Activity {activity!r} has no problem with variant {variant!r}; known variants: {known}")
 
 
 def validate_problem_registry(activity: str, root: Optional[str] = None) -> Dict[str, int]:
     """Check ``problems.json`` of ``activity`` against its problem files and return the registry.
 
-    Every registered id must have a ``problemN.bddl`` whose ``(:alias ...)`` is the registered alias, every problem
-    file that declares an alias must be registered under it, and the files must be contiguous. A problem without an
-    alias (the standard camera relocalization) need not be registered.
+    Every registered id must have a ``problemN.bddl`` whose ``(:variant ...)`` is the registered variant, every problem
+    file that declares a variant must be registered under it, and the files must be contiguous. A problem without an
+    variant (the standard camera relocalization) need not be registered.
     """
     registry = load_problem_registry(activity_dir(activity, root))
-    declared = problem_aliases(activity, root)
-    for alias, pid in registry.items():
+    declared = problem_variants(activity, root)
+    for variant, pid in registry.items():
         if pid not in declared:
-            raise ISGProblemError(f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but problem{pid}.bddl does not exist")
-        if declared[pid] != alias:
+            raise ISGProblemError(f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {variant!r} -> {pid} but problem{pid}.bddl does not exist")
+        if declared[pid] != variant:
             raise ISGProblemError(
-                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but problem{pid}.bddl declares "
-                f"{_alias_repr(declared[pid])}"
+                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {variant!r} -> {pid} but problem{pid}.bddl declares "
+                f"{_variant_repr(declared[pid])}"
             )
-    for pid, alias in declared.items():
-        if alias is not None and registry.get(alias) != pid:
+    for pid, variant in declared.items():
+        if variant is not None and registry.get(variant) != pid:
             raise ISGProblemError(
-                f"problem{pid}.bddl of {activity!r} declares (:alias {alias}) but {PROBLEM_REGISTRY_FILE} does not register it"
+                f"problem{pid}.bddl of {activity!r} declares (:variant {variant}) but {PROBLEM_REGISTRY_FILE} does not register it"
             )
     return registry
 
@@ -736,7 +736,7 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
     sections = tokens[1:]
     problem_name = None
     domain = None
-    alias = None
+    variant = None
     objects: Dict[str, List[str]] = {}
     groups: Dict[str, List[str]] = {}
     init = None
@@ -756,12 +756,12 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
             problem_name = group[-1]
         elif tag == ":domain":
             domain = group[-1]
-        elif tag == ":alias":
+        elif tag == ":variant":
             if len(group) != 2 or not isinstance(group[1], str):
-                raise ISGProblemError(f"(:alias ...) must hold exactly one symbol, got {group[1:]!r}")
-            alias = group[1]
-            if not ALIAS_RE.match(alias):
-                raise ISGProblemError(f"Invalid alias {alias!r}")
+                raise ISGProblemError(f"(:variant ...) must hold exactly one symbol, got {group[1:]!r}")
+            variant = group[1]
+            if not VARIANT_RE.match(variant):
+                raise ISGProblemError(f"Invalid variant {variant!r}")
         elif tag == ":objects":
             objects = _parse_typed_list(group[1:], ":objects")
         elif tag == ":groups":
@@ -789,8 +789,8 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
         raise ISGProblemError("Missing (problem <name>) section")
     if init is None or goal is None:
         raise ISGProblemError("Both (:init ...) and (:goal ...) sections are required")
-    if ":alias" in order and order.index(":alias") != order.index(":domain") + 1:
-        raise ISGProblemError("(:alias ...) must directly follow (:domain ...)")
+    if ":variant" in order and order.index(":variant") != order.index(":domain") + 1:
+        raise ISGProblemError("(:variant ...) must directly follow (:domain ...)")
     if ":measure" in order and order.index(":measure") < order.index(":goal"):
         raise ISGProblemError("(:measure ...) must come after (:goal ...)")
     # ``<activity>-<definition id>``; a retired activity name (``world_alignment-0`` for ``alignment-0``) is accepted.
@@ -812,7 +812,7 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
         definition_id=int(definition_id),
         problem_name=problem_name,
         domain=domain,
-        alias=alias,
+        variant=variant,
         objects=objects,
         groups=groups,
         raw_init=copy.deepcopy(init),

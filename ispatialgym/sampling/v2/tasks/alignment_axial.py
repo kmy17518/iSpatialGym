@@ -18,7 +18,7 @@ with the push arm locked; owner decision 2026-09-16 08:10: axial is push-only ot
 the stop, ``summary.brace = "present" | "none"``); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support;
 the target stays at its settled pose, the anchor lies on the COM's vertical axis ``hinge_sink_m`` = 1 mm below the support top) is installed
 and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps); it is frictionless
-unless the alias's generation sets the world-vertical resistance keys (``hinge_resistance``).
+unless the variant's generation sets the world-vertical resistance keys (``hinge_resistance``).
 Goal: position unchanged, orientation = long axis parallel to the front edge, front toward the robot (tolerance
 0.10 rad, equivalences from the customs entry). Sidecar: ``init`` / ``manipulation`` stances (arms right + left),
 the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) and ``contacts.brace`` (``stop_edge``).
@@ -63,8 +63,8 @@ THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down
 BRACE_CELL_TOL = 1.0
 END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
 BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
-#: the world-vertical hinge resistance keys (``alignment_wall.hinge_resistance``): an axial alias whose own ``generation`` sets any
-#: of them gets the resisted hinge (``AlignmentAxial.hinge_resistance``), every other axial alias keeps the frictionless one
+#: the world-vertical hinge resistance keys (``alignment_wall.hinge_resistance``): an axial variant whose own ``generation`` sets any
+#: of them gets the resisted hinge (``AlignmentAxial.hinge_resistance``), every other axial variant keeps the frictionless one
 HINGE_RESISTANCE_KEYS = ("hinge_stop_decel_rad_s2", "hinge_viscous_tau_s", "hinge_brake_omega_rad_s")
 
 
@@ -105,7 +105,7 @@ class AlignmentAxial(SamplerV2):
         req = self.choice.bindings.get("support")
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.variant}: scenes.{self.scene}.bindings.support must list scene object names")
         SR.check_support(SUBTASK, self.scene, names[0])
         self.bind_scene_object("support", self.world.obj(names[0]))
 
@@ -193,7 +193,7 @@ class AlignmentAxial(SamplerV2):
                                 st_try.lateral = cand.lateral
                             init = st_try
                             break
-                        log.info("%s: edge %s lateral %.2f t %.2f: reference edge %d/%d points visible from init (%d in frame)", self.gp.alias, edge.name, cand.lateral,
+                        log.info("%s: edge %s lateral %.2f t %.2f: reference edge %d/%d points visible from init (%d in frame)", self.gp.variant, edge.name, cand.lateral,
                                  st_try.translate, n_vis, int(ev.get("points", 9)), n_in)
                     if init is not None:
                         break
@@ -208,7 +208,7 @@ class AlignmentAxial(SamplerV2):
                 break
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
@@ -284,7 +284,7 @@ class AlignmentAxial(SamplerV2):
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
                 errors.append(f"candidate {int(k)}: {e}")
-                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+                log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
@@ -665,7 +665,7 @@ class AlignmentAxial(SamplerV2):
             brace_only = getattr(self, "push_only", False) and "brace" in msg and TT.program_check_stub()
             if not brace_only:
                 raise
-            log.warning("%s: program check asks for contacts.brace on a push-only axial (%s); recorded as stub-push-only (ISG_PROGRAM_CHECK=stub)", self.gp.alias, msg[:200])
+            log.warning("%s: program check asks for contacts.brace on a push-only axial (%s); recorded as stub-push-only (ISG_PROGRAM_CHECK=stub)", self.gp.variant, msg[:200])
             report = {"mode": "stub-push-only", "problems": [], "note": "brace-less axial not yet accepted by the oracle program; structural check skipped", "error": msg[:300]}
             self.last_program_check = report
             draft.summary["program_check"] = report
@@ -683,8 +683,8 @@ class AlignmentAxial(SamplerV2):
 
     def hinge_resistance(self) -> Optional[Dict[str, Any]]:
         """§6.10 hinge friction / damping (owner 2026-10-12, alignment-axial#05: the tablespoon turned 0.022 rad on its
-        frictionless hinge while settling). None - the frictionless hinge - unless the alias's own ``generation`` sets one of
-        :data:`HINGE_RESISTANCE_KEYS` (``generation_defaults`` has none for the axial; a key the alias leaves out takes the world
+        frictionless hinge while settling). None - the frictionless hinge - unless the variant's own ``generation`` sets one of
+        :data:`HINGE_RESISTANCE_KEYS` (``generation_defaults`` has none for the axial; a key the variant leaves out takes the world
         vertical's default). Then the wall's helper :func:`ispatialgym.sampling.constraints.hinge_resistance` with the inertia
         about the vertical hinge axis: the spawned target's mass over its footprint (the template's long × short extents)."""
         keys = {k: self.gen(k) for k in HINGE_RESISTANCE_KEYS}
@@ -724,7 +724,7 @@ class AlignmentAxial(SamplerV2):
         p1, q1 = target.get_position_orientation()
         moved, turned = float(th.linalg.norm(p1 - p0)), C.quat_angle(q1, q0)
         if res is not None:
-            log.info("%s: hinge friction %.4g N·m, damping %.4g N·m·s/rad (I_z %.4g kg·m², %.4g kg): drifted %.1f mm / %.4f rad over %d steps", self.gp.alias,
+            log.info("%s: hinge friction %.4g N·m, damping %.4g N·m·s/rad (I_z %.4g kg·m², %.4g kg): drifted %.1f mm / %.4f rad over %d steps", self.gp.variant,
                      res["friction"], res["damping"], res["inertia_kgm2"], res["mass_kg"], moved * 1000, turned, int(drift.get("steps", 60)))
         if moved > float(drift.get("position_m", 0.001)) or turned > float(drift.get("orientation_rad", 0.005)):
             raise Reject("hinge_drift", f"target drifted {moved * 1000:.1f} mm / {turned:.4f} rad with the hinge")

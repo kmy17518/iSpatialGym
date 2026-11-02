@@ -3,7 +3,7 @@
   "instance_id": "inter_object_relation_satisfaction-touching-can_of_soda-mug-breakfast_table__house_single_floor__target-can_of_soda-bfrzvk__partner-mug-ycbmug__0000",
   "tro_sha256": "785b0fa2fd31fa0072bc7f0cd0a131ef512bb287d6e07bb991ee3656e962f302",
   "task_family": "inter_object_relation_satisfaction",
-  "alias": "inter_object_relation_satisfaction-touching-can_of_soda-mug-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-touching-can_of_soda-mug-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {

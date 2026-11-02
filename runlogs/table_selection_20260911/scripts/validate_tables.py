@@ -141,7 +141,7 @@ def spec_for_table(pspec: ProblemSpec, scene: str, table_row, partner_row=None) 
         if old.fixed.get("table_front_edge"):
             fixed["table_front_edge"] = old.fixed["table_front_edge"]
     scene_spec = SceneSpec(scene, rooms, fixed, options)
-    new = ProblemSpec(name=pspec.name, alias=pspec.alias, roles=pspec.roles, scenes={scene: scene_spec},
+    new = ProblemSpec(name=pspec.name, variant=pspec.variant, roles=pspec.roles, scenes={scene: scene_spec},
                       generation=copy.deepcopy(pspec.generation), raw=copy.deepcopy(pspec.raw))
     return new
 

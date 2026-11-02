@@ -136,13 +136,13 @@ class EpisodeAnnotations:
     family_description: str = ""
     template_description: str = ""
     instance_description: str = ""
-    alias: str = ""
+    variant: str = ""
     instance_id: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "family": self.family, "family_description": self.family_description, "template_description": self.template_description,
-            "instance_description": self.instance_description, "alias": self.alias, "instance_id": self.instance_id,
+            "instance_description": self.instance_description, "variant": self.variant, "instance_id": self.instance_id,
         }
 
 
@@ -216,7 +216,7 @@ class RecorderConfig:
     #: ``<root>/<repo_id>`` of the LeRobot v3 shard the episode is appended to in BEHAVIOR's replay_obs format
     #: (:mod:`ispatialgym.oracle.behavior_lerobot`; the robot must carry replay_obs's sensors); None: not written
     behavior_shard: Optional[str] = None
-    #: task name of the shard's episodes (the alias)
+    #: task name of the shard's episodes (the variant)
     behavior_task: Optional[str] = None
     #: the shard's segments handed to BEHAVIOR's LeRobot writer from a background thread (same frames, same order), so the
     #: demo does not wait on the video encoders' queues. Default: ISPATIALGYM_ASYNC_SHARD=1 (off when unset)

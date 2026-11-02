@@ -67,8 +67,8 @@ SPLIT_LATERAL_SHIFTS = (0.0, 0.10, -0.10, 0.20, -0.20, 0.30, -0.30)  # split con
 
 
 def phase2_gen(s, key: str, default=None):
-    """``generation.<key>`` of the alias's customs entry for sampler ``s``, else of its subtask's generation_defaults, else
-    ``default`` - so a subtask's Phase-2 cone is set in one place and an alias can still override it."""
+    """``generation.<key>`` of the variant's customs entry for sampler ``s``, else of its subtask's generation_defaults, else
+    ``default`` - so a subtask's Phase-2 cone is set in one place and a variant can still override it."""
     v = s.gen(key, None)
     if v is not None:
         return v
@@ -205,7 +205,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     s.surface_z = z_req
     fact.update({"surface": "interior", "z_world": round(float(itop.z), 4), "z_above_floor": round(float(itop.z) - floor_z, 4),
                  "open_edges": list(getattr(itop, "open_edges", []) or []), "n_board_cells": int(itop.mask.sum()), "n_free_cells": int(itop.free.sum())})
-    log.info("%s: interior surface of %s at %.2f m above the floor (%s): %d free cells, open sides %s", s.gp.alias, support.name, z_req, fact.get("why"),
+    log.info("%s: interior surface of %s at %.2f m above the floor (%s): %d free cells, open sides %s", s.gp.variant, support.name, z_req, fact.get("why"),
              fact["n_free_cells"], fact["open_edges"] or "none")
     tf = getattr(s, "template_facts", None)
     if isinstance(tf, dict):
@@ -809,7 +809,7 @@ def box_corners(centre_xy, half: float, z0: float, z1: float) -> th.Tensor:
 # grasp library access (pipeline suffixes tolerated: the facade writes ``t`` / ``i`` / ``a`` / ``f``)
 # ----------------------------------------------------------------------------------------------------------------
 
-PIPELINE_ALIASES = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert", "i": "insert", "fl": "insert", "floating": "floating", "f": "floating",
+PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert", "i": "insert", "fl": "insert", "floating": "floating", "f": "floating",
                     "": "floating", "attachment": "attachment", "a": "attachment", "handle_half": "floating", "h": "floating"}
 
 
@@ -819,7 +819,7 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
     from ispatialgym.sampling import grasp_library as GL
 
     choice = s.choice.models[role]
-    pipeline = PIPELINE_ALIASES.get(s.gp.roles[role].grasp_pipeline() or default_pipeline, s.gp.roles[role].grasp_pipeline() or default_pipeline)
+    pipeline = PIPELINE_VARIANTS.get(s.gp.roles[role].grasp_pipeline() or default_pipeline, s.gp.roles[role].grasp_pipeline() or default_pipeline)
     kinds = list(kinds) if kinds else [pipeline]
     try:
         key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, kinds)
@@ -2280,7 +2280,7 @@ def split_cone_opts(s) -> Optional[Dict[str, Any]]:
     """Owner 2026-10-11 (cone A/B variant C), opt-in per subtask with ``generation.phase2_split_cone``: the keyword arguments of
     :func:`phase2_split_cone` - the start position's classes at the init view (``init_view_class_deg``), the work stance's shifts
     along the edge (``phase2_lateral_shifts_m``) and its classes (``phase2_tight_class_deg`` / ``phase2_loose_class_deg``) - or None
-    (off: Phase 2 as before). Every key through :func:`phase2_gen` (the alias's customs, else its subtask's generation_defaults).
+    (off: Phase 2 as before). Every key through :func:`phase2_gen` (the variant's customs, else its subtask's generation_defaults).
     ``phase2_split_fallback_classes_deg`` adds ``fallback_classes_deg``: the plain Phase 2's classes for a template whose split
     cone finds no (stance, position) pair."""
     if not phase2_gen(s, "phase2_split_cone", False):
@@ -3169,7 +3169,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
             if not getattr(s, "_band_feasible_reuse_logged", False):
                 s._band_feasible_reuse_logged = True
                 log.info("%s: BAND_FEASIBLE_REUSE: feasible set of the focus cell read from the band (%d pairs) instead of the batched IK screen",
-                         getattr(getattr(s, "gp", None), "alias", "?"), len(F_reused))
+                         getattr(getattr(s, "gp", None), "variant", "?"), len(F_reused))
             continue
         F_of[a] = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
         if fixed is None and band_yaws:
@@ -3234,7 +3234,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                 screened[a] = True
             F = pool_of(F_of)
             _count(s, "tilt_snap.adopted")
-            log.info("%s: TILT_SNAP: stance tilt %.3f -> grid tilt %.3f (camera rules pass, %d pairs)", getattr(getattr(s, "gp", None), "alias", "?"),
+            log.info("%s: TILT_SNAP: stance tilt %.3f -> grid tilt %.3f (camera rules pass, %d pairs)", getattr(getattr(s, "gp", None), "variant", "?"),
                      snap_facts["from"][1], snap_facts["grid"][1], len(F))
         else:
             _count(s, "tilt_snap." + snap_facts.get("outcome", "none"))
@@ -3372,7 +3372,7 @@ def _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp
                 if k:
                     culprits.append(f"{o.name}({k})")
         log.info("DIAG_EMPTY_F %s: focus %s base %s trunk %.2f/%+.2f arm %s: %d pairs with no scene object, %d scene objects (%d within 1.5 m); "
-                 "pairs with one object out: %s", getattr(getattr(s, "gp", None), "alias", "?"), [round(float(v), 3) for v in _t(fx).tolist()],
+                 "pairs with one object out: %s", getattr(getattr(s, "gp", None), "variant", "?"), [round(float(v), 3) for v in _t(fx).tolist()],
                  [round(float(v), 3) for v in base], float(st.translate), float(st.tilt), a, n_all, len(scene), len(near), culprits or "none")
     except Exception as e:  # noqa: BLE001 - a diagnostic never fails an attempt
         log.info("DIAG_EMPTY_F failed: %r", e)

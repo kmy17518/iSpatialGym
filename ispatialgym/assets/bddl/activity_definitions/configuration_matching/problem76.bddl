@@ -1,6 +1,6 @@
 (define (problem configuration_matching-76)
     (:domain ispatialgym)
-    (:alias configuration_matching-block_design-block_4-conference_table)
+    (:variant configuration_matching-block_design-block_4-conference_table)
 
     ; ground_isg 2.0.0: configuration_matching-block_design-block_4-conference_table (configuration_matching/block_design.iddl; configuration_matching-block_design#01~T2/representative)
     ; Configuration matching - block design. Four identical custom Kohs blocks (toy_dice/isgblk, ispatialgym-assets)

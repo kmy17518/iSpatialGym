@@ -2,19 +2,19 @@
 
 Every pick of ``roles/representatives.csv`` lists up to five support rows in order (``triplet`` = their index, the note
 ``init=<ontop|inside>; top_z=<m above the floor>``). ``ground_isg`` grounds one combination per row, labelled ``<pick>~T<triplet>``:
-the rows of one support category share an alias and union their scene blocks (``bindings.support`` lists several names,
+the rows of one support category share a variant and union their scene blocks (``bindings.support`` lists several names,
 ``bindings.support_surfaces`` one ``{name, init, top_z, row}`` entry per row, ``row`` = the label), an ``init=inside`` row gets its own
-alias (support token ``<category>_inside``). Each row is one **candidate**, sampled on its own: ``sample_isg --scene S --support NAME
+variant (support token ``<category>_inside``). Each row is one **candidate**, sampled on its own: ``sample_isg --scene S --support NAME
 --support-row ROW`` (``GroundedProblem.override_support``). The owner's order per pick: (cand1, k=0) ... (cand5, k=0), then
 (cand1, k=1) ... (cand5, k=1) with the eval seed ``--seed-split eval --seed-index k``, stopping at the first candidate whose instance
 passes demo + replay (:func:`submission_order`).
 
-:func:`pick_candidates` maps every combination of a pick to its alias and scene block: the customs ``support_surfaces`` entry whose
+:func:`pick_candidates` maps every combination of a pick to its variant and scene block: the customs ``support_surfaces`` entry whose
 ``row`` is the combination label (exact), else - walls, floor supports, rows without ``top_z``, picks without a support role - the
-alias ``ground_isg`` gives the combination (its own combination code on the same icl, nothing written). It then checks the customs
+variant ``ground_isg`` gives the combination (its own combination code on the same icl, nothing written). It then checks the customs
 block the way the sampler will use it (``override_support``, a non-empty whitelist per sampleable role). ``status`` is ``ok`` or why
 the candidate cannot run: ``no_iddl``, ``not_grounded: <the grounder's skip reason>`` (``not_grounded: excluded_support: <support>@<scene>:
-<why>`` for a support the alignment support rules exclude, ``support_rules``), ``no_alias``, ``superseded_by:<alias>``,
+<why>`` for a support the alignment support rules exclude, ``support_rules``), ``no_variant``, ``superseded_by:<variant>``,
 ``no_scene_block``, ``not_bound: <reason>``, ``empty_whitelist:<roles>``, ``duplicate_of:c<n>`` (the same block as an earlier
 candidate of the pick: one job covers both).
 
@@ -63,19 +63,19 @@ LAUNCH_55_SUBTASKS = (
 SLOT = "representative"
 DEFAULT_SEEDS = (0, 1)
 
-TABLE_COLUMNS = ("pick", "cand", "label", "alias", "scene", "support", "row", "init", "top_z", "triplet", "room", "kind", "status", "args")
-ORDER_COLUMNS = ("pick", "step", "cand", "k", "label", "alias", "scene", "support", "row", "init", "top_z", "triplet", "status", "run", "args")
+TABLE_COLUMNS = ("pick", "cand", "label", "variant", "scene", "support", "row", "init", "top_z", "triplet", "room", "kind", "status", "args")
+ORDER_COLUMNS = ("pick", "step", "cand", "k", "label", "variant", "scene", "support", "row", "init", "top_z", "triplet", "status", "run", "args")
 
 
 @dataclass
 class Candidate:
-    """One combination of a pick: the support row ``cand`` (1-based, sheet order) and the alias / scene block it runs in."""
+    """One combination of a pick: the support row ``cand`` (1-based, sheet order) and the variant / scene block it runs in."""
 
     pick: str
     cand: int
     label: str  # the grounder's combination label: <pick>~T<triplet>, the pick itself when it has one combination
     subtask: str
-    alias: Optional[str] = None
+    variant: Optional[str] = None
     scene: Optional[str] = None
     support: Optional[str] = None  # sample_isg --support: scene object / wall name, "floor"; None for a pick without a support role
     row: Optional[str] = None  # sample_isg --support-row: the support_surfaces row label, a wall's region id
@@ -84,7 +84,7 @@ class Candidate:
     triplet: Optional[str] = None
     room: Optional[str] = None  # the support's room(s) per the selection (a wall region's room, a floor support's room)
     kind: str = "none"  # surface | wall | floor | object | none (no support role)
-    fallbacks: List[str] = field(default_factory=list)  # the alias's fallback aliases (customs ``fallbacks``), rank order
+    fallbacks: List[str] = field(default_factory=list)  # the variant's fallback variants (customs ``fallbacks``), rank order
     status: str = "ok"
 
     @property
@@ -100,7 +100,7 @@ class Candidate:
 
     def sample_args(self, k: Optional[int] = None, split: str = "eval") -> List[str]:
         """``sample_isg`` arguments of the candidate (with the split seed ``k`` when given)."""
-        out = ["--alias", self.alias or "?"]
+        out = ["--variant", self.variant or "?"]
         if self.scene:
             out += ["--scene", self.scene]
         if self.support:
@@ -153,15 +153,15 @@ def pick_variants(icl, pick: str, slot: str = SLOT) -> List[Tuple[str, Dict[str,
 
 
 def _surface_index(customs: Dict[str, Any]) -> Dict[Tuple[str, str], List[str]]:
-    """``(scene, row label) -> [aliases]`` over the live primary aliases' ``bindings.support_surfaces`` entries."""
+    """``(scene, row label) -> [variants]`` over the live primary variants' ``bindings.support_surfaces`` entries."""
     out: Dict[Tuple[str, str], List[str]] = {}
-    for alias, e in customs.items():
-        if alias.startswith("_") or not isinstance(e, dict) or e.get("fallback_of") or e.get("superseded_by"):
+    for variant, e in customs.items():
+        if variant.startswith("_") or not isinstance(e, dict) or e.get("fallback_of") or e.get("superseded_by"):
             continue
         for sc, blk in (e.get("scenes") or {}).items():
             for s in (blk.get("bindings") or {}).get("support_surfaces") or []:
                 if isinstance(s, dict) and s.get("row"):
-                    out.setdefault((sc, s["row"]), []).append(alias)
+                    out.setdefault((sc, s["row"]), []).append(variant)
     return out
 
 
@@ -171,22 +171,22 @@ def _note_rooms(row: Dict[str, str]) -> Optional[str]:
 
 
 def _check(c: Candidate, customs: Dict[str, Any]) -> None:
-    """``c.status`` from the customs entry: the alias exists and is live, the scene block exists and binds the candidate as
+    """``c.status`` from the customs entry: the variant exists and is live, the scene block exists and binds the candidate as
     ``sample_isg --support`` will narrow it, every sampleable role keeps a model."""
-    entry = customs.get(c.alias) if c.alias else None
+    entry = customs.get(c.variant) if c.variant else None
     if not isinstance(entry, dict):
-        c.status = "no_alias"
+        c.status = "no_variant"
         return
     if entry.get("superseded_by"):
         c.status = f"superseded_by:{entry['superseded_by']}"
         return
     c.fallbacks = [a for a in entry.get("fallbacks") or [] if isinstance(customs.get(a), dict) and not customs[a].get("superseded_by")]
     if c.scene is None:
-        return  # a pick without a scene object (held objects, camera relocalization) samples every block of its alias
+        return  # a pick without a scene object (held objects, camera relocalization) samples every block of its variant
     if c.scene not in (entry.get("scenes") or {}):
         c.status = "no_scene_block"
         return
-    gp = GroundedProblem(c.alias, copy.deepcopy(entry), subtask=c.subtask)
+    gp = GroundedProblem(c.variant, copy.deepcopy(entry), subtask=c.subtask)
     if c.support:
         try:
             rec = gp.override_support(c.scene, c.support, row=c.row)
@@ -203,7 +203,7 @@ def _check(c: Candidate, customs: Dict[str, Any]) -> None:
 def pick_candidates(customs: Dict[str, Any], icl=None, iddls: Optional[Dict[str, Any]] = None, subtasks: Optional[Sequence[str]] = None,
                     picks: Optional[Sequence[str]] = None) -> Dict[str, List[Candidate]]:
     """``{pick: [Candidate]}`` (sheet order) of the picks of ``subtasks`` / ``picks`` (default: every pick of the sheet), from the
-    customs data (``{alias: entry}``), the icl (``ground_isg.ICL``; its ``roles/representatives.csv`` is the sheet) and the iddls."""
+    customs data (``{variant: entry}``), the icl (``ground_isg.ICL``; its ``roles/representatives.csv`` is the sheet) and the iddls."""
     from ispatialgym.sampling import ground_isg as GI
     from ispatialgym.sampling import iddl as I
     from ispatialgym.sampling.customs import Customs
@@ -244,7 +244,7 @@ def pick_candidates(customs: Dict[str, Any], icl=None, iddls: Optional[Dict[str,
                 c.status = f"not_grounded: {skipped.get(label, 'no combination')}"
                 continue
             iddl = iddls[st]
-            c.alias = iddl.fill_alias(comb.alias_values(icl, iddl))
+            c.variant = iddl.fill_variant(comb.variant_values(icl, iddl))
             rp = comb.roles.get("support")
             if rp is not None and srow is not None:
                 c.room = c.room or (rp.pick_row or {}).get("room") or None
@@ -258,14 +258,14 @@ def pick_candidates(customs: Dict[str, Any], icl=None, iddls: Optional[Dict[str,
                     c.kind, c.support, c.row = "surface", name, label
                     c.init, c.top_z = rp.surface.get("init"), rp.surface.get("top_z")
                     hits = surfaces.get((c.scene, label)) or []
-                    if len(hits) == 1 or (hits and c.alias not in hits):
-                        c.alias = hits[0]
+                    if len(hits) == 1 or (hits and c.variant not in hits):
+                        c.variant = hits[0]
                 else:
                     c.kind, c.support = "object", name
             _check(c, customs)
         seen: Dict[Tuple[Any, ...], int] = {}
         for c in cands:
-            key = (c.alias, c.scene, c.support, c.row)
+            key = (c.variant, c.scene, c.support, c.row)
             if c.ok and key in seen:
                 c.status = f"duplicate_of:c{seen[key]}"
             elif c.ok:
@@ -306,9 +306,9 @@ def table_rows(cands: Dict[str, List[Candidate]], only_ok: bool = False) -> List
         for c in pick_cands:
             if only_ok and not c.ok:
                 continue
-            out.append({"pick": c.pick, "cand": str(c.cand), "label": c.label, "alias": _fmt(c.alias), "scene": _fmt(c.scene),
+            out.append({"pick": c.pick, "cand": str(c.cand), "label": c.label, "variant": _fmt(c.variant), "scene": _fmt(c.scene),
                         "support": _fmt(c.support), "row": _fmt(c.row), "init": _fmt(c.init), "top_z": _fmt(c.top_z), "triplet": _fmt(c.triplet),
-                        "room": _fmt(c.room), "kind": c.kind, "status": c.status, "args": shlex.join(c.sample_args()) if c.alias else "-"})
+                        "room": _fmt(c.room), "kind": c.kind, "status": c.status, "args": shlex.join(c.sample_args()) if c.variant else "-"})
     return out
 
 
@@ -318,10 +318,10 @@ def order_rows(cands: Dict[str, List[Candidate]], seeds: Sequence[int] = DEFAULT
     for c, k, step in submission_order(cands, seeds):
         if only_ok and not c.ok:
             continue
-        out.append({"pick": c.pick, "step": str(step), "cand": str(c.cand), "k": str(k), "label": c.label, "alias": _fmt(c.alias),
+        out.append({"pick": c.pick, "step": str(step), "cand": str(c.cand), "k": str(k), "label": c.label, "variant": _fmt(c.variant),
                     "scene": _fmt(c.scene), "support": _fmt(c.support), "row": _fmt(c.row), "init": _fmt(c.init), "top_z": _fmt(c.top_z),
                     "triplet": _fmt(c.triplet), "status": c.status, "run": c.run_dir(k),
-                    "args": shlex.join(c.sample_args(k, split)) if c.alias else "-"})
+                    "args": shlex.join(c.sample_args(k, split)) if c.variant else "-"})
     return out
 
 
@@ -361,9 +361,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("\t".join(r[c] for c in cols))
     if args.json:
         data = {"customs": os.path.abspath(args.customs), "icl": icl.root,
-                "picks": {p: [{**asdict(c), "tag": c.tag, "args": c.sample_args() if c.alias else None} for c in cs] for p, cs in cands.items()},
+                "picks": {p: [{**asdict(c), "tag": c.tag, "args": c.sample_args() if c.variant else None} for c in cs] for p, cs in cands.items()},
                 "order": [{"pick": c.pick, "step": step, "cand": c.cand, "k": k, "status": c.status, "run": c.run_dir(k),
-                           "args": c.sample_args(k, args.split) if c.alias else None} for c, k, step in submission_order(cands, seeds)]}
+                           "args": c.sample_args(k, args.split) if c.variant else None} for c, k, step in submission_order(cands, seeds)]}
         with open(args.json, "w") as f:
             json.dump(data, f, indent=1)
     all_c = [c for cs in cands.values() for c in cs]

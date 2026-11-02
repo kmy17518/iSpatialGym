@@ -20,7 +20,7 @@ write-back, ``template_meta.json`` with the stances / cached geometry / spec has
 
 Optional hooks: ``after_goal_check(draft)`` (checks that need the settled goal pose, e.g. the place IK), ``record_
 constraints(draft)`` (typed records appended to the customs entry), ``support_objects()`` (ignored for the final grasp
-pose), ``v1_role_aliases()`` (facade BDDL rendering until D1).
+pose), ``v1_role_variants()`` (facade BDDL rendering until D1).
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ PAD_HALF_HEIGHT = 0.012
 
 
 def requested_height_extra(sampler_or_gp) -> float:
-    """``generation.contact_height_extra_m`` of the alias (0.0 when absent)."""
+    """``generation.contact_height_extra_m`` of the variant (0.0 when absent)."""
     gen = getattr(sampler_or_gp, "gen", None)
     try:
         return max(0.0, float(gen("contact_height_extra_m", 0.0) or 0.0)) if gen is not None else 0.0
@@ -214,10 +214,10 @@ class ContextV2:
     choice: TemplateChoice
     world: SimWorld
     kit: RobotKit
-    out_dir: str  # <out_root>/<alias>/<template_id>
+    out_dir: str  # <out_root>/<variant>/<template_id>
     base_seed: int = 0
     customs_sha256: Optional[str] = None
-    variant: Optional[str] = None  # task sub-variant (open / close, ...)
+    sub_variant: Optional[str] = None  # task sub-variant (open / close, block pattern id, ...)
 
     @property
     def scene(self) -> str:
@@ -228,7 +228,7 @@ class ContextV2:
         return self.choice.template_id
 
     @property
-    def alias_dir(self) -> str:
+    def variant_dir(self) -> str:
         return os.path.dirname(os.path.abspath(self.out_dir))
 
 
@@ -263,7 +263,7 @@ class SamplerV2(TaskSampler):
         super().__init__(v1ctx)
         self.activity = self.gp.activity
         self.definition_id = self.gp.definition_id
-        self.sidecar = SidecarDraft(self.gp.alias, self.gp.family)
+        self.sidecar = SidecarDraft(self.gp.variant, self.gp.family)
         arm = self.gp.gen("arm", "right")
         default_arms = ["right"] if arm in (None, "auto", "right") else (["left"] if arm == "left" else ["right", "left"])
         margin = self.gp.gen("joint_limit_margin_rad", None)  # None = IKChecker.JOINT_LIMIT_MARGIN (0.05)
@@ -284,10 +284,10 @@ class SamplerV2(TaskSampler):
         self.instance_seeds: List[int] = []
         self.template_facts: Dict[str, Any] = {}  # cached geometry of sample_template (written to template_meta)
         self.height_extra_last: Optional[Dict[str, Any]] = None  # the A/B knob's last verdict (``lift_contact_height`` / ``annotate_height_extra``)
-        self.template_meta.update({"alias": self.gp.alias, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
+        self.template_meta.update({"variant": self.gp.variant, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
                                    "spec_hash": self.gp.spec_hash(), "choice": self.choice.to_json(), "rooms": list(self.gp.rooms(self.scene)),
                                    "customs": self.gp.customs_path, "joint_limit_margin_rad": float(self.ikc.JOINT_LIMIT_MARGIN)})
-        self.variant = ctx.variant
+        self.sub_variant = ctx.sub_variant
         self.last_program_check: Optional[Dict[str, Any]] = None
         self._park_xy: Optional[th.Tensor] = None
         # train-fast (2026-10-31): PARK_ONCE's (key, xy, floor_z) of the last computed park; the one-line "first time taken" log keys
@@ -321,12 +321,12 @@ class SamplerV2(TaskSampler):
     def spa_template_start(self, errors: List[str], draws: int = 8) -> None:
         """start_per_attempt: the template's own start draw found no start with the template seed's draw; up to ``draws`` more draws
         from derived streams (every attempt draws its own start anyway: the template's start only shows that one exists, and one
-        unlucky draw would otherwise reject the template for every train job of the alias). Leaves the start unset when every draw
+        unlucky draw would otherwise reject the template for every train job of the variant). Leaves the start unset when every draw
         fails (the caller's rejection follows)."""
         for k in range(1, int(draws) + 1):
             try:
                 self.spa_redraw_start(np.random.default_rng([int(self.ctx.base_seed), k]))
-                log.info("%s: start_per_attempt: template start found on setup draw %d: %s", self.gp.alias, k, getattr(self, "_spa_facts", None))
+                log.info("%s: start_per_attempt: template start found on setup draw %d: %s", self.gp.variant, k, getattr(self, "_spa_facts", None))
                 return
             except Reject as e:
                 errors.append(f"start_per_attempt setup draw {k}: [{e.reason}] {str(e)[:200]}")
@@ -364,7 +364,7 @@ class SamplerV2(TaskSampler):
         (``neighbors.evaluate_on_tops``; identical without neighbours)."""
         return NB.evaluate_on_tops(self, predicate_cls, [self.scope[n] for n in names], PRED.evaluate_predicate)
 
-    def v1_role_aliases(self) -> Dict[str, str]:  # hook (facade only)
+    def v1_role_variants(self) -> Dict[str, str]:  # hook (facade only)
         """Extra v1 role names bound to v2 roles when the BDDL is rendered through ``bddl_writer`` (e.g. IORS small-scale:
         ``{"partner_support": "support"}``)."""
         return {}
@@ -397,7 +397,7 @@ class SamplerV2(TaskSampler):
                 self._spa_draw_s = time.time() - t_spa
             self._spa_drawn = False
             self._split_cone_cands = self._split_cone_pools = None
-            log.info("%s: start_per_attempt: start drawn in %.1fs: %s", self.gp.alias, getattr(self, "_spa_draw_s", 0.0), getattr(self, "_spa_facts", None))
+            log.info("%s: start_per_attempt: start drawn in %.1fs: %s", self.gp.variant, getattr(self, "_spa_draw_s", 0.0), getattr(self, "_spa_facts", None))
         TT.split_cone_draw(self, rng)
         draft = self.sample_instance(rng)
         if start_per_attempt():
@@ -419,7 +419,7 @@ class SamplerV2(TaskSampler):
         rooms = self.gp.rooms(self.scene)
         room = room or (rooms[0] if rooms else None)
         if room is None:
-            raise Reject("spec", f"{self.gp.alias}: no room / floor binding in scene {self.scene}")
+            raise Reject("spec", f"{self.gp.variant}: no room / floor binding in scene {self.scene}")
         return self.bind_scene_object(role, self.world.floor_of_room(room))
 
     # ------------------------------------------------------------------ spawning
@@ -436,7 +436,7 @@ class SamplerV2(TaskSampler):
     # ------------------------------------------------------------------ BDDL
 
     def build_bddl(self) -> ISGProblem:
-        """The grounded BDDL of the alias with the bindings mapped onto its instances; when the alias has none yet (v1
+        """The grounded BDDL of the variant with the bindings mapped onto its instances; when the variant has none yet (v1
         facade), render it with the v1 ``bddl_writer`` from the v1 role names."""
         if self.gp.bddl is not None:
             want = {i for i in self.gp.bddl.instances if i != AGENT_INSTANCE}
@@ -448,10 +448,10 @@ class SamplerV2(TaskSampler):
             return problem
         v1 = Bindings()
         v1._counters = dict(self.bindings._counters)
-        aliases = {**self.v1_role_aliases()}
+        variants = {**self.v1_role_variants()}
         for role, lst in self.bindings.roles.items():
             v1.roles[V1_ROLE_MAP.get(role, role)] = list(lst)
-        for v1_role, v2_role in aliases.items():
+        for v1_role, v2_role in variants.items():
             if v2_role in self.bindings.roles:
                 v1.roles[v1_role] = list(self.bindings.roles[v2_role])
         return build_problem(self.activity, self.definition_id, v1)
@@ -461,9 +461,9 @@ class SamplerV2(TaskSampler):
     def setup(self):
         t0 = time.time()
         k0 = self.kit.stats_snapshot()
-        n_reset = self.world.reset_scene_objects(context=f"{self.gp.alias}: before the template setup")
+        n_reset = self.world.reset_scene_objects(context=f"{self.gp.variant}: before the template setup")
         if n_reset:
-            log.info("%s: %d scene objects reset before the template setup", self.gp.alias, n_reset)
+            log.info("%s: %d scene objects reset before the template setup", self.gp.variant, n_reset)
         self.park_robot()
         self.template_meta["init_arms"] = "untucked"
         self.bind_scene_roles()
@@ -527,8 +527,8 @@ class SamplerV2(TaskSampler):
         rec = self.template_meta["scene_crop"]
         if (live.get("mode"), live.get("center_object"), live.get("radius_m")) != (rec.get("mode"), rec.get("center_object"), rec.get("radius_m")):
             log.warning("%s: template %s was saved from a SCENE_CROP %s world; this world is %s (template_meta.scene_crop keeps the template's)",
-                        self.gp.alias, self.ctx.template_id, rec.get("mode"), live.get("mode"))
-        log.info("%s: continuing template %s (%d instances so far, sha %s)", self.gp.alias, self.ctx.template_id, self.template_meta["n_written"], self.template_sha[:12])
+                        self.gp.variant, self.ctx.template_id, rec.get("mode"), live.get("mode"))
+        log.info("%s: continuing template %s (%d instances so far, sha %s)", self.gp.variant, self.ctx.template_id, self.template_meta["n_written"], self.template_sha[:12])
         return True
 
     # ------------------------------------------------------------------ parking (§3.3)
@@ -565,12 +565,12 @@ class SamplerV2(TaskSampler):
             _, xy, floor_z = cached
             self.counters["park_cell_reused"] = self.counters.get("park_cell_reused", 0) + 1
             self._log_once("park_once", "%s: PARK_ONCE: park cell (%.2f, %.2f) / floor z %.4f reused while the keep-away set is unchanged (no park_pose)",
-                           self.gp.alias, float(xy[0]), float(xy[1]), floor_z)
+                           self.gp.variant, float(xy[0]), float(xy[1]), floor_z)
         else:
             try:
                 xy = NAV.park_pose(self.kit, rooms, keep_away=keep)
             except NAV.NavigationError as e:
-                log.warning("%s: %s; parking at the room centre", self.gp.alias, e)
+                log.warning("%s: %s; parking at the room centre", self.gp.variant, e)
                 xy = self.world.robot_park_xy
             # the task room's measured floor (``SimWorld.measure_floor_z``: raycast, cached per room); the kit's copy follows
             floor_z = self.world.measure_floor_z(xy)
@@ -610,7 +610,7 @@ class SamplerV2(TaskSampler):
                 objs.append(o)
         self.counters["park_sync_partial"] = self.counters.get("park_sync_partial", 0) + 1
         self._log_once("park_once_sync", "%s: PARK_ONCE: robot root unmoved since the last full cuRobo sync; refreshing %d task / reset objects only",
-                       self.gp.alias, len(objs))
+                       self.gp.variant, len(objs))
         self.kit.sync_world(only_objects=objs)
 
     def settle_still_entities(self, draft: Draft) -> List[Any]:
@@ -725,7 +725,7 @@ class SamplerV2(TaskSampler):
             out[g.object] = {"leg": "carry waypoint", "raise_m": raise_m, "lateral_m": lat, "straight_leg_failure": why}
             self.sidecar.waypoint_policy = (self.sidecar.waypoint_policy + "; " if self.sidecar.waypoint_policy else "") + \
                 f"carry: straight lift-end -> pre-place leg infeasible, one carry waypoint recorded (raise {raise_m:.2f} m, lateral {lat:+.2f} m), both sub-legs screened at {self.CARRY_LEG_WAYPOINTS} waypoints"
-            log.info("%s: carry waypoint recorded for %s (raise %.2f m, lateral %+.2f m): straight leg %s", self.gp.alias, g.object, raise_m, lat, why)
+            log.info("%s: carry waypoint recorded for %s (raise %.2f m, lateral %+.2f m): straight leg %s", self.gp.variant, g.object, raise_m, lat, why)
         if out:
             draft.summary["carry"] = out
 
@@ -954,7 +954,7 @@ class SamplerV2(TaskSampler):
         g = self.sidecar.grasp_of(carried)
         obj = self.objects.get(carried)
         if g is None or g.eef_in_object is None:
-            log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.alias, carried)
+            log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.variant, carried)
             return obj, arm or (g.arm if g else "right"), None
         return obj, arm or g.arm, g.eef_in_object
 
@@ -1022,7 +1022,7 @@ class SamplerV2(TaskSampler):
                                             max_length_m=max_len)
                     return path, dep, self.record_transition(frm, to, trunk_from=travel)
                 except Reject as e:
-                    log.info("%s: travel %s -> %s at trunk %.2f/%+.2f after the drive-back: %s", self.gp.alias, frm.name, to.name, travel[0], travel[1], e)
+                    log.info("%s: travel %s -> %s at trunk %.2f/%+.2f after the drive-back: %s", self.gp.variant, frm.name, to.name, travel[0], travel[1], e)
                     self.drop_travel_records(frm.name, to.name)
         path, tr = P0.connect(self, frm, to, path_max_m=max_len)
         return path, None, tr
@@ -1117,11 +1117,11 @@ class SamplerV2(TaskSampler):
     def program_check(self, draft: Draft) -> Dict[str, Any]:
         from ispatialgym.sampling.v2 import tabletop as TT
 
-        report = PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask)
+        report = PC.run(self.gp.variant, self.sidecar, self, subtask=self.subtask)
         # the wrist turn of a library pinch ranked on its whole held chain (owner 2026-09-27; ranking only, never a rejection)
-        report = TT.held_turns(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
+        report = TT.held_turns(self, draft, report, lambda: PC.run(self.gp.variant, self.sidecar, self, subtask=self.subtask))
         # the arm of the segment ranked on its whole held chain (owner 2026-09-27, first-demo v2.2; ranking only, never a rejection)
-        report = TT.held_arms(self, draft, report, lambda: PC.run(self.gp.alias, self.sidecar, self, subtask=self.subtask))
+        report = TT.held_arms(self, draft, report, lambda: PC.run(self.gp.variant, self.sidecar, self, subtask=self.subtask))
         self.last_program_check = report
         draft.summary["program_check"] = report
         return report
@@ -1134,21 +1134,21 @@ class SamplerV2(TaskSampler):
     # ------------------------------------------------------------------ writing
 
     def save_template(self):
-        """v1 template writer; the grounded BDDL goes to ``<alias>/activity_definitions/<activity>/problem<N>.bddl`` (§1).
+        """v1 template writer; the grounded BDDL goes to ``<variant>/activity_definitions/<activity>/problem<N>.bddl`` (§1).
         The v1 copy inside the template directory stays until D5 moves ``validate_instances.py`` to the §1 layout
         (its loader reads ``<template>/activity_definitions``)."""
         super().save_template()
         # train-fast SCENE_CROP (2026-11-01): what template-partial_rooms.json holds (the collector loads it with scene_crop.loaded_rooms)
         self.template_meta["scene_crop"] = self._world_scene_crop()
-        bddl_dir = os.path.join(self.ctx2.alias_dir, "activity_definitions", self.activity)
+        bddl_dir = os.path.join(self.ctx2.variant_dir, "activity_definitions", self.activity)
         os.makedirs(bddl_dir, exist_ok=True)
         with open(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), "w") as f:
             f.write(self.problem.text)
         self.template_meta["activity_definition"] = os.path.relpath(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), self.ctx.out_dir)
-        # v1 tools split ``problem`` as <activity>-<def_id>; the alias lives under ``alias``
+        # v1 tools split ``problem`` as <activity>-<def_id>; the variant lives under ``variant``
         self.template_meta["problem"] = f"{self.activity}-{self.definition_id}"
-        self.template_meta["alias"] = self.gp.alias
-        self.template_meta["bddl_alias"] = self.problem.alias
+        self.template_meta["variant"] = self.gp.variant
+        self.template_meta["bddl_variant"] = self.problem.variant
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         iid = self.instance_id(index)
@@ -1242,21 +1242,21 @@ class SamplerV2(TaskSampler):
             return
         check_record = getattr(self.instance_filter, "check_record", None)
         if check_record is None:
-            self._log_once("early_filter_off", "%s: EARLY_REPEAT_FILTER: the instance filter has no check_record; post-write check only", self.gp.alias)
+            self._log_once("early_filter_off", "%s: EARLY_REPEAT_FILTER: the instance filter has no check_record; post-write check only", self.gp.variant)
             return
         try:
             rec = self.instance_record(draft)
             incomplete = SEP.record_complete(rec)
         except Exception as e:  # noqa: BLE001 - never lose an attempt to the early check: the post-write check decides
             self._log_once(f"early_filter_error:{self.activity}", "%s: EARLY_REPEAT_FILTER: draft record not built (%r); post-write check only for %s",
-                           self.gp.alias, e, self.activity, level=logging.WARNING)
+                           self.gp.variant, e, self.activity, level=logging.WARNING)
             return
         if incomplete:
             self._log_once(f"early_filter_incomplete:{self.activity}", "%s: EARLY_REPEAT_FILTER: draft record of %s is %s; post-write check only",
-                           self.gp.alias, self.activity, incomplete)
+                           self.gp.variant, self.activity, incomplete)
             return
         self._log_once("early_filter_on", "%s: EARLY_REPEAT_FILTER: repeat rule checked on the draft after sample (poses %s -> %s) against %d eval instances",
-                       self.gp.alias, [p.name for p in rec.start], [p.name for p in rec.goal], len(getattr(self.instance_filter, "pool", None) or []))
+                       self.gp.variant, [p.name for p in rec.start], [p.name for p in rec.goal], len(getattr(self.instance_filter, "pool", None) or []))
         why = check_record(rec)
         if why:
             self.counters["repeats_eval_early"] = self.counters.get("repeats_eval_early", 0) + 1
@@ -1334,7 +1334,7 @@ class SamplerV2(TaskSampler):
             rep = GO.report(objects, method="predicted: settled goal poses, robot at the program check's end, head-camera depth", robot=source,
                             seconds=round(time.time() - t0, 2))
         except Exception as e:  # noqa: BLE001 - a failed prediction keeps the instance; the oracle's gate still judges its last frame
-            log.warning("%s: goal occlusion not predicted: %r", self.gp.alias, e)
+            log.warning("%s: goal occlusion not predicted: %r", self.gp.variant, e)
             rep = {"error": repr(e), "occluded": False, "robot": source}
         finally:
             self.world.restore(state)
@@ -1433,8 +1433,8 @@ class SamplerV2(TaskSampler):
     def log_attempt_stages(self, index: int, attempt: int, clock: "_StageClock") -> None:
         """STAGE_TIMING: two INFO lines per attempt - the stage seconds and the attempt's kit counters (every ``*_calls`` / ``*_s`` /
         ``*_problems`` / ``*_configs`` key of ``RobotKit.stats_snapshot``, whatever the kit counts)."""
-        log.info("%s: instance %d attempt %d stages: %s", self.gp.alias, index, attempt, clock.stages_text())
-        log.info("%s: instance %d attempt %d kit: %s", self.gp.alias, index, attempt, format_kit_delta(clock.total_kit()))
+        log.info("%s: instance %d attempt %d stages: %s", self.gp.variant, index, attempt, clock.stages_text())
+        log.info("%s: instance %d attempt %d kit: %s", self.gp.variant, index, attempt, format_kit_delta(clock.total_kit()))
 
     def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None, indices: Optional[Sequence[int]] = None) -> List[str]:
         """Per attempt: sample (task module) -> apply -> settle + BEHAVIOR validation -> goal feasibility (robot parked per
@@ -1451,12 +1451,12 @@ class SamplerV2(TaskSampler):
         for i_index, index in enumerate(indices):
             ok = False
             for attempt in range(max_attempts):
-                # the alias's time budget (sample_isg --time-budget-s) ends the run between attempts only: an attempt in progress
+                # the variant's time budget (sample_isg --time-budget-s) ends the run between attempts only: an attempt in progress
                 # always finishes, and a template whose setup finished gets its first attempt
                 if deadline is not None and time.time() >= deadline and (attempt > 0 or i_index > 0):
                     out_of_time = True
                     self.counters["time_budget_stops"] = self.counters.get("time_budget_stops", 0) + 1
-                    log.warning("%s: time budget used up; no attempt %d of instance %d", self.gp.alias, attempt, index)
+                    log.warning("%s: time budget used up; no attempt %d of instance %d", self.gp.variant, attempt, index)
                     break
                 seed = int(self.ctx.base_seed * 1000003 + index * 1009 + attempt)
                 rng = np.random.default_rng(seed)
@@ -1467,7 +1467,7 @@ class SamplerV2(TaskSampler):
                 phase = "reset"
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
-                                                             context=f"{self.gp.alias}: instance {index} attempt {attempt}")
+                                                             context=f"{self.gp.variant}: instance {index} attempt {attempt}")
                     if n_reset:
                         # a counter (scene objects put back before the attempt), not a rejection
                         self.counters["scene_reset"] = self.counters.get("scene_reset", 0) + n_reset
@@ -1477,7 +1477,7 @@ class SamplerV2(TaskSampler):
                         n_parked = self.park_spawned_objects()
                         if n_parked:
                             self.counters["spawned_parked_at_reset"] = self.counters.get("spawned_parked_at_reset", 0) + n_parked
-                            self._log_once("park_spawned", "%s: PARK_SPAWNED: %d spawned objects parked before the attempt (one physics step)", self.gp.alias, n_parked)
+                            self._log_once("park_spawned", "%s: PARK_SPAWNED: %d spawned objects parked before the attempt (one physics step)", self.gp.variant, n_parked)
                     self.park_robot()
                     self.ikc.solutions.clear()
                     self.ikc.attempt = attempt  # ``IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT``: attempt 0 solves without the random re-solves
@@ -1532,7 +1532,7 @@ class SamplerV2(TaskSampler):
                     # run_isg loads an instance through the template meta; demos replay instances while the rest of the
                     # template is still being sampled
                     self.write_template_meta()
-                    log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.alias, index, attempt, time.time() - t0)
+                    log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.variant, index, attempt, time.time() - t0)
                     self.log_attempt_stages(index, attempt, clock)
                     ok = True
                     break
@@ -1541,18 +1541,18 @@ class SamplerV2(TaskSampler):
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
                     log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
-                    log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
+                    log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if isinstance(e, TemplateExhausted) and not start_per_attempt():
                         exhausted = True
                         self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1
-                        log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.alias, index, attempt)
+                        log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.variant, index, attempt)
                         break
             if out_of_time or exhausted:
                 break
             if not ok:
-                log.error("%s: instance %d failed after %d attempts; rejections=%s", self.gp.alias, index, max_attempts, self.rejection_log.counts)
+                log.error("%s: instance %d failed after %d attempts; rejections=%s", self.gp.variant, index, max_attempts, self.rejection_log.counts)
         self.template_meta["n_written"] = self.template_meta.get("n_written", 0) + len(written)
         if self.template_paths is not None:
             self.write_template_meta()

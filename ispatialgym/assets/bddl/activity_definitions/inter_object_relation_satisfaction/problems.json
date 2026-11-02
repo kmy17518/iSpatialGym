@@ -2,32 +2,32 @@
  "activity": "inter_object_relation_satisfaction",
  "problems": [
   {
-   "alias": "ontop",
+   "variant": "ontop",
    "id": 0,
    "legacy": true
   },
   {
-   "alias": "under",
+   "variant": "under",
    "id": 1,
    "legacy": true
   },
   {
-   "alias": "inside",
+   "variant": "inside",
    "id": 2,
    "legacy": true
   },
   {
-   "alias": "nextto",
+   "variant": "nextto",
    "id": 3,
    "legacy": true
   },
   {
-   "alias": "touching",
+   "variant": "touching",
    "id": 4,
    "legacy": true
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
    "id": 5,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -38,7 +38,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-bar",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-bar",
    "id": 6,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -49,7 +49,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-commercial_kitchen_table",
    "id": 7,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -60,7 +60,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-countertop",
    "id": 8,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -71,7 +71,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
    "id": 9,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -82,7 +82,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-commercial_kitchen_table",
    "id": 10,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -93,7 +93,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
    "id": 11,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -104,7 +104,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-burner",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-burner",
    "id": 12,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -115,7 +115,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-stove",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-stove",
    "id": 13,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -126,7 +126,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-flat_top_grill",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-flat_top_grill",
    "id": 14,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -137,7 +137,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
    "id": 15,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -148,7 +148,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
    "id": 16,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -159,7 +159,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
    "id": 17,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -170,7 +170,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
    "id": 18,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -181,7 +181,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
    "id": 19,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -192,7 +192,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-countertop",
    "id": 20,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -203,7 +203,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-countertop",
    "id": 21,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -217,7 +217,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-shelf",
    "id": 22,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -228,7 +228,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-shelf",
    "id": 23,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -242,7 +242,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
    "id": 24,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -253,7 +253,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-wall_mounted_sink",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-wall_mounted_sink",
    "id": 25,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -264,7 +264,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-wall_mounted_sink",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-wall_mounted_sink",
    "id": 26,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -278,7 +278,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
    "id": 27,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -289,7 +289,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
    "id": 28,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -303,7 +303,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
    "id": 29,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -314,7 +314,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
    "id": 30,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -328,7 +328,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap-soap_dish-bottom_cabinet",
    "id": 31,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -339,7 +339,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
    "id": 32,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -350,7 +350,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-bar_soap_utgixp-soap_dish-bottom_cabinet",
    "id": 33,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -364,7 +364,7 @@
    "fallback_kind": "next_model"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-countertop",
    "id": 34,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -375,7 +375,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-countertop",
+   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-countertop",
    "id": 35,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -386,7 +386,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-bar",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-bar",
    "id": 36,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -397,7 +397,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-carving_knife-cutting_board-commercial_kitchen_table",
    "id": 37,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -408,7 +408,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-coffee_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-coffee_table",
    "id": 38,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -419,7 +419,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-pedestal_table",
    "id": 39,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -430,7 +430,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-bar",
    "id": 40,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -441,7 +441,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-pedestal_table",
    "id": 41,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -452,7 +452,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-coffee_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-coffee_table",
    "id": 42,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -463,7 +463,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-booth",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-booth",
    "id": 43,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -474,7 +474,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-breakfast_table",
    "id": 44,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -485,7 +485,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-plate-place_mat-pedestal_table",
    "id": 45,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -496,7 +496,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-countertop",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-countertop",
    "id": 46,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -507,7 +507,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-commercial_kitchen_table",
    "id": 47,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -518,7 +518,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-conference_table",
+   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-conference_table",
    "id": 48,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -529,7 +529,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-bar",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-bar",
    "id": 49,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -540,7 +540,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-metal_bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-under_small_scale-spatula-paper_sheet-metal_bottom_cabinet",
    "id": 50,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -551,7 +551,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-bar",
+   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-bar",
    "id": 51,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -562,7 +562,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-commercial_kitchen_table",
    "id": 52,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -573,7 +573,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-bar",
+   "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-bar",
    "id": 53,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -584,7 +584,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-coffee_table",
+   "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-coffee_table",
    "id": 54,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -595,7 +595,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
    "id": 55,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -609,7 +609,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-floor",
    "id": 56,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -623,7 +623,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-floor",
    "id": 57,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -637,7 +637,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-countertop",
    "id": 58,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -648,7 +648,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet",
    "id": 59,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -659,7 +659,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-coffee_table",
+   "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-coffee_table",
    "id": 60,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -670,7 +670,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-pedestal_table",
    "id": 61,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -681,7 +681,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop",
+   "variant": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop",
    "id": 62,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -692,7 +692,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-commercial_kitchen_table",
    "id": 63,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -703,7 +703,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-burner",
+   "variant": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-burner",
    "id": 64,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -714,7 +714,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-stove",
+   "variant": "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-stove",
    "id": 65,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -725,7 +725,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk",
+   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk",
    "id": 66,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -736,7 +736,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-cubicle",
+   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-cubicle",
    "id": 67,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -747,7 +747,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-countertop",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-countertop",
    "id": 68,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -758,7 +758,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-breakfast_table",
    "id": 69,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -769,7 +769,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-bar",
+   "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-bar",
    "id": 70,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -780,7 +780,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-countertop",
+   "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-countertop",
    "id": 71,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -791,7 +791,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-pedestal_table",
    "id": 72,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -802,7 +802,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-booth",
+   "variant": "inter_object_relation_satisfaction-nextto-salt_shaker-pepper_shaker-booth",
    "id": 73,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -813,7 +813,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
    "id": 74,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -827,7 +827,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor",
    "id": 75,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -841,7 +841,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-desk",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-marker-desk-desk",
    "id": 76,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -852,7 +852,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-sofa",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-sofa",
    "id": 77,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -866,7 +866,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-floor",
    "id": 78,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -880,7 +880,7 @@
    "fallback_kind": "init_surface"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-apple-desk-desk",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-apple-desk-desk",
    "id": 79,
    "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
@@ -891,7 +891,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table",
    "id": 80,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -902,7 +902,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-bar",
+   "variant": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-bar",
    "id": 81,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -913,7 +913,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-pedestal_table",
+   "variant": "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-pedestal_table",
    "id": 82,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -924,7 +924,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-hall_tree_inside",
+   "variant": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-hall_tree_inside",
    "id": 83,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -935,7 +935,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-hall_tree",
+   "variant": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-hall_tree",
    "id": 84,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -946,7 +946,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench",
+   "variant": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench",
    "id": 85,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -957,7 +957,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bottom_cabinet",
    "id": 86,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -968,7 +968,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-shelf",
+   "variant": "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-shelf",
    "id": 87,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -979,7 +979,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
    "id": 88,
    "grounded": "2026-09-19",
    "by": "hand (owner probe 2026-09-19 20:14)",
@@ -990,7 +990,7 @@
    "mode": "probe"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor",
    "id": 89,
    "grounded": "2026-09-19",
    "by": "hand (owner probe 2026-09-19 20:14)",
@@ -1001,7 +1001,7 @@
    "mode": "probe"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-bottom_cabinet",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-bottom_cabinet",
    "id": 90,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1012,7 +1012,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-nightstand",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-nightstand",
    "id": 91,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1023,7 +1023,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-countertop",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-countertop",
    "id": 92,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1034,7 +1034,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-breakfast_table",
    "id": 93,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1045,7 +1045,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-bar",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-bar",
    "id": 94,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1056,7 +1056,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-commercial_kitchen_table",
    "id": 95,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1067,7 +1067,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-bookcase",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal-box_of_cereal-bookcase",
    "id": 96,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1078,7 +1078,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-hardback-hardback-shelf",
+   "variant": "inter_object_relation_satisfaction-touching-hardback-hardback-shelf",
    "id": 97,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1089,7 +1089,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-hardback-hardback-bookcase",
+   "variant": "inter_object_relation_satisfaction-touching-hardback-hardback-bookcase",
    "id": 98,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1100,7 +1100,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-hardback-hardback-bookcase_inside",
+   "variant": "inter_object_relation_satisfaction-touching-hardback-hardback-bookcase_inside",
    "id": 99,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1111,7 +1111,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-countertop",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-countertop",
    "id": 100,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1122,7 +1122,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-washer",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-washer",
    "id": 101,
    "grounded": "2026-10-11",
    "by": "ground_isg 2.0.0",
@@ -1133,7 +1133,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-commercial_kitchen_table",
    "id": 102,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -1144,7 +1144,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table",
    "id": 103,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -1155,7 +1155,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-desk",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-desk",
    "id": 104,
    "grounded": "2026-10-12",
    "by": "ground_isg 2.0.0",
@@ -1166,7 +1166,7 @@
    "mode": "representative"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-countertop",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-countertop",
    "id": 105,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
@@ -1177,7 +1177,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-breakfast_table",
    "id": 106,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
@@ -1188,7 +1188,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar",
    "id": 107,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
@@ -1199,7 +1199,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-commercial_kitchen_table",
    "id": 108,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
@@ -1210,7 +1210,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bookcase",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bookcase",
    "id": 109,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant B)",
@@ -1221,7 +1221,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-desk",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-desk",
    "id": 110,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant C)",
@@ -1232,7 +1232,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-conference_table",
+   "variant": "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-conference_table",
    "id": 111,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target x0.8 with box_of_cereal__iucshm__s080; owner 2026-10-12 ~10:25 item 4 touching#02 variant C)",
@@ -1243,7 +1243,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop",
    "id": 112,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c1)",
@@ -1254,7 +1254,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-floor",
    "id": 113,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c2)",
@@ -1265,7 +1265,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor",
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-mouse-desk-floor",
    "id": 114,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row, inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#02 c1)",
@@ -1276,7 +1276,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor",
    "id": 115,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c1)",
@@ -1287,7 +1287,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_place",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_place",
    "id": 116,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#03 c2)",
@@ -1298,7 +1298,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor",
    "id": 117,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c1)",
@@ -1309,7 +1309,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor",
    "id": 118,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on the sheet rows with the floor init as the pick's only support row and desk_mdhelw_0 as its representative partner, inter_object_relation_satisfaction-under_large_scale-marker-desk-floor's generation; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-under_large_scale#02 c2)",
@@ -1320,7 +1320,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table",
+   "variant": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table",
    "id": 119,
    "grounded": "2026-10-12",
    "by": "hand-grounded (bddl_from_iddl.render of touching_large_scale.iddl; owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c1)",
@@ -1331,7 +1331,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor",
+   "variant": "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-floor",
    "id": 120,
    "grounded": "2026-10-12",
    "by": "hand-grounded (bddl_from_iddl.render of touching_large_scale.iddl; owner 2026-10-12 ~16:05 inter_object_relation_satisfaction-touching_large_scale#03 c2)",
@@ -1342,7 +1342,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-countertop",
    "id": 121,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#03; owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03 c1)",
@@ -1353,7 +1353,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-bar",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink-bar",
    "id": 122,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#03; owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03 c2)",
@@ -1364,7 +1364,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-breakfast_table-floor",
    "id": 123,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-89 with the target serving_cart/heqtlk and the relation nextto, owner ~16:05 nextto_large#02)",
@@ -1375,7 +1375,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-countertop",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-countertop",
    "id": 124,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
@@ -1386,7 +1386,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-commercial_kitchen_table",
    "id": 125,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
@@ -1397,7 +1397,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-breakfast_table",
    "id": 126,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
@@ -1408,7 +1408,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-desk",
+   "variant": "inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-desk",
    "id": 127,
    "grounded": "2026-10-12",
    "by": "hand-grounded (ground_isg 2.0.0 on a scratch sheet, target spray_bottle/wegawe with spray_bottle__wegawe__t; owner 2026-10-12 ~16:05 touching#04)",
@@ -1419,7 +1419,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table",
    "id": 128,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c1)",
@@ -1430,7 +1430,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-bar",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-bar",
    "id": 129,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c2/c3)",
@@ -1441,7 +1441,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-floor",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-floor",
    "id": 130,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl on the sheet rows of inter_object_relation_satisfaction-inside_large_scale#02; owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02 c4)",
@@ -1452,7 +1452,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-floor_iorsl",
    "id": 131,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-75 with the iors_large keys, owner ~19:20 under_large#01)",
@@ -1463,7 +1463,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk_iorsl",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk_iorsl",
    "id": 132,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-27 with the iors_large keys, owner ~19:20 under_large#01)",
@@ -1474,7 +1474,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed_iorsl",
    "id": 133,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-74 with the iors_large keys, owner ~19:20 under_large#01)",
@@ -1485,7 +1485,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-bar",
    "id": 134,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V3 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3 V3a/V3b)",
@@ -1496,7 +1496,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-drop_in_sink_lkklqs_0-breakfast_table",
    "id": 135,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V3 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3 V3c)",
@@ -1507,7 +1507,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink-commercial_kitchen_table",
    "id": 136,
    "grounded": "2026-10-12",
    "by": "hand-grounded (rendered from inside_large_scale.iddl, alias 121's generation with the V4 inside keys; owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V4 V4a/V4b)",
@@ -1518,7 +1518,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-plate-commercial_kitchen_sink_xecfyh_0-commercial_kitchen_table",
    "id": 137,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-136 with the V4 ALT keys drop_height_m 0.22 + inside_stance_postures, owner ~21:10 inside_large#03 V4b)",
@@ -1529,7 +1529,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_flat",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_flat",
    "id": 138,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-115, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
@@ -1540,7 +1540,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_flat",
    "id": 139,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-117, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
@@ -1551,7 +1551,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_flat",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_flat",
    "id": 140,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-118, push-under variant 'flat', owner ~20:55 under_large#02 / #03)",
@@ -1562,7 +1562,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_place",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_place",
    "id": 141,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-117, variant 'place', owner ~21:25 under_large#02 / #03)",
@@ -1573,7 +1573,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_place",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_place",
    "id": 142,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-118, variant 'place', owner ~21:25 under_large#02 / #03)",
@@ -1584,7 +1584,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf070",
    "id": 143,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-128 with inside_surface_z_m 0.70, owner ~21:15 inside_large#02 lower shelf)",
@@ -1595,7 +1595,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-trash_can-desk-floor_pitched",
    "id": 144,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-115, variant 'pitched', owner ~20:55 under_large#02 / #03)",
@@ -1606,7 +1606,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_pitched",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk-floor_pitched",
    "id": 145,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-117, variant 'pitched', owner ~20:55 under_large#02 / #03)",
@@ -1617,7 +1617,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched",
    "id": 146,
    "grounded": "2026-10-12",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-118, variant 'pitched', owner ~20:55 under_large#02 / #03)",
@@ -1628,7 +1628,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf097",
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-jar_of_spaghetti_sauce-fridge-breakfast_table_shelf097",
    "id": 147,
    "grounded": "2026-10-13",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-128 with inside_surface_z_m 0.97 + inside_goal_region, owner ~03:15 inside_large#02 0.969 m shelf)",
@@ -1639,7 +1639,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-pedestal_table-floor",
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-pedestal_table-floor",
    "id": 148,
    "grounded": "2026-10-13",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner pedestal_table.n.01 (pedestal_table_nlfgwe_2), owner ~20:34 nextto_large#02)",
@@ -1650,7 +1650,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor",
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor",
    "id": 149,
    "grounded": "2026-10-13",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner coffee_table.n.01 (coffee_table_rlsebe_0), owner ~20:34 nextto_large#02)",
@@ -1661,7 +1661,7 @@
    "mode": "test"
   },
   {
-   "alias": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-countertop-floor",
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-serving_cart-countertop-floor",
    "id": 150,
    "grounded": "2026-10-13",
    "by": "hand-grounded (copy of inter_object_relation_satisfaction-123 with the partner countertop.n.01 (countertop_kelker_0), owner ~20:34 nextto_large#02)",

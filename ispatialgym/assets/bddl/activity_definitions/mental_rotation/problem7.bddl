@@ -1,6 +1,6 @@
 (define (problem mental_rotation-7)
     (:domain ispatialgym)
-    (:alias mental_rotation-soup_ladle)
+    (:variant mental_rotation-soup_ladle)
 
     ; ground_isg 2.0.0: mental_rotation-soup_ladle (mental_rotation/mental_rotation.iddl; mental_rotation#08/representative)
     ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame

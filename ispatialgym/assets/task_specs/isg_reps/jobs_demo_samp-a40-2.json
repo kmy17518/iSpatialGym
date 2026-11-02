@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-tongs",
+  "variant": "mental_rotation-tongs",
   "source_job": "mental_rotation-tongs__representative__target-rcpjld"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-can_of_soda",
+  "variant": "object_scaling-can_of_soda",
   "source_job": "object_scaling-can_of_soda__representative__target-opivig"
  }
 ]

@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: disembedding-chili-distractors-breakfast_table (disembedding#14, slot representative)",
  "disembedding-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "target": {
     "models": {
@@ -1261,7 +1261,7 @@
   },
   "_isg": {
    "subtask": "disembedding",
-   "alias": "disembedding-chili-distractors-breakfast_table",
+   "variant": "disembedding-chili-distractors-breakfast_table",
    "pick": "disembedding#14",
    "slot": "representative",
    "iddl": "disembedding/disembedding.iddl",

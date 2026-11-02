@@ -1,7 +1,7 @@
 {
  "_comment": "world horizontal smoke test",
  "world_alignment-2": {
-  "alias": "world_horizontal",
+  "variant": "world_horizontal",
   "roles": {
    "target": {
     "models": {

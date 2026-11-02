@@ -1,6 +1,6 @@
 (define (problem configuration_matching-80)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_small_scale-carton_cdmmwy-breakfast_table)
+    (:variant configuration_matching-articulation_open_small_scale-carton_cdmmwy-breakfast_table)
 
     ; hand-grounded 2026-09-19 (TEST, owner request): two-flap carton cdmmwy (0.23 x 0.31 x 0.19 m) on the breakfast table; copy of problem52 with the carton synset
     ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on

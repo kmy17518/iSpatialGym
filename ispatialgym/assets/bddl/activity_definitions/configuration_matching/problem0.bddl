@@ -1,7 +1,7 @@
 (define (problem configuration_matching-0)
     (:domain ispatialgym)
 
-    (:alias block_design)
+    (:variant block_design)
 
     ; toy_dice.n.01 (patterned cubes, 20 models) stands in for the interchangeable design blocks.
     (:objects

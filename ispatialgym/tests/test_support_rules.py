@@ -165,9 +165,9 @@ def test_override_support_refuses_an_excluded_support():
 @needs_assets
 def test_apply_support_rules_narrows_the_block(tmp_path):
     customs = tmp_path / "customs.json"
-    alias = f"{WALL}-x-y"
-    customs.write_text(json.dumps({alias: _wall_clock_entry()}))
-    gp = GroundedProblem(alias, json.loads(customs.read_text())[alias], customs_path=str(customs), subtask=WALL)
+    variant = f"{WALL}-x-y"
+    customs.write_text(json.dumps({variant: _wall_clock_entry()}))
+    gp = GroundedProblem(variant, json.loads(customs.read_text())[variant], customs_path=str(customs), subtask=WALL)
     dropped = gp.apply_support_rules(OFFICE)
     assert list(dropped) == ["walls_dmcumz_0"] and dropped["walls_dmcumz_0"].startswith("transparent_wall: ")
     b = gp.bindings(OFFICE)
@@ -177,8 +177,8 @@ def test_apply_support_rules_narrows_the_block(tmp_path):
     # the source customs file keeps the entry's own block, the copy gets the narrowed one
     gp.save_customs()
     gp.save_customs(str(tmp_path / "copy.json"))
-    assert json.loads(customs.read_text())[alias]["scenes"] == _wall_clock_entry()["scenes"]
-    assert json.loads((tmp_path / "copy.json").read_text())[alias]["scenes"][OFFICE]["bindings"]["support"] == ["walls_wcngqp_0"]
+    assert json.loads(customs.read_text())[variant]["scenes"] == _wall_clock_entry()["scenes"]
+    assert json.loads((tmp_path / "copy.json").read_text())[variant]["scenes"][OFFICE]["bindings"]["support"] == ["walls_wcngqp_0"]
     # the floor of the dropped wall's room moves to the remaining regions' room
     moved = _gp(_wall_clock_entry(floor_room="meeting_room_0"), WALL)
     moved.apply_support_rules(OFFICE)

@@ -37,7 +37,7 @@ def _world():
 
 def _sampler(relation="touching", gen=None, partner=PARTNER, **extra):
     s = IS.IORSSmall.__new__(IS.IORSSmall)
-    s.relation, s.gp, s.spec = relation, SimpleNamespace(alias="a"), SimpleNamespace(generation=dict(gen or {}))
+    s.relation, s.gp, s.spec = relation, SimpleNamespace(variant="a"), SimpleNamespace(generation=dict(gen or {}))
     s.hull = {"target": _box(*TARGET), "partner": _box(*partner)}
     s.rest = {"target": C.IDENTITY_QUAT.clone(), "partner": C.IDENTITY_QUAT.clone()}
     s.pair, s.shelf_start, s.world = {"g_NT": 0.0554}, None, _world()
@@ -226,7 +226,7 @@ def test_phase3_target_keeps_f_over_other_yaws_out_of_the_band(monkeypatch):
 # ---------------------------------------------------------------------------------------------------------------- the customs
 
 
-def test_touching02_aliases_carry_the_key_and_every_use_is_valid():
+def test_touching02_variants_carry_the_key_and_every_use_is_valid():
     with open(CUSTOMS) as f:
         customs = json.load(f)
     t02 = [k for k in customs if k.startswith("inter_object_relation_satisfaction-touching-box_of_cereal")]

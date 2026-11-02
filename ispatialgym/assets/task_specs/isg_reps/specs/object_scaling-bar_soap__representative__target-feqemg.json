@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: object_scaling-bar_soap (object_scaling#26, slot representative)",
  "object_scaling-0": {
-  "alias": null,
+  "variant": null,
   "roles": {
    "floor": {
     "fixed": true
@@ -42,7 +42,7 @@
   },
   "_isg": {
    "subtask": "object_scaling",
-   "alias": "object_scaling-bar_soap",
+   "variant": "object_scaling-bar_soap",
    "pick": "object_scaling#26",
    "slot": "representative",
    "iddl": "object_scaling/object_scaling.iddl",

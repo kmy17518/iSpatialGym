@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "camera_relocalization-obstructed",
   "slot": "representative",
-  "alias": "camera_relocalization-obstructed-vacuum_1",
+  "variant": "camera_relocalization-obstructed-vacuum_1",
   "source_job": "camera_relocalization-obstructed-vacuum_1__representative__obstacles-wikhik"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bottle_of_pop",
+  "variant": "object_scaling-bottle_of_pop",
   "source_job": "object_scaling-bottle_of_pop__representative__target-jnoksl"
  },
  {
@@ -23,7 +23,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-bell_pepper",
+  "variant": "object_scaling-bell_pepper",
   "source_job": "object_scaling-bell_pepper__representative__target-ukkycp"
  }
 ]

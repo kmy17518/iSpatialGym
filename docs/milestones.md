@@ -35,7 +35,7 @@ Tagged states of this repository and what passed on them.
   (`pads_clear` / `cap`); `release_grasp_immediately` bypasses it; a pending release travels with the state (the dict and an optional
   serialized block behind its own sentinel, so a stock state is unchanged). The oracle's `_release` still waits for the registry to
   clear; the release check sees +1 at every release; no gripper command is partial.
-- **r15padclear** (demo + goal-judged replay of the 19 aliases that release a grasp, on a copy of r14's instance - block design and
+- **r15padclear** (demo + goal-judged replay of the 19 variants that release a grasp, on a copy of r14's instance - block design and
   carton lever with their sampled goals, the other 17 with r14's achieved poses as goals; the 9 without a release keep r14): 19 / 19
   demos and replays pass, block design and carton lever included. Every weld outlived the +1 command by 1-2 control steps (4-8
   physics steps, 33-67 ms), each ended by a pad leaving the object; the cap never acted. After the let-go: the dice dropped ~25 mm
@@ -74,8 +74,8 @@ Tagged states of this repository and what passed on them.
   stock path; for a registered pair the `_attach` override joins in place). `AttachedTo._update`
   does nothing for registered members (it joined on contact at 5 cm / 15 deg in SO(3) and snapped a lid 4 cm out of the hand);
   `_attach` / `_detach` of a registered pair go through the same joint and filter. Every join is logged (`meta["attach_joins"]`:
-  trigger, contact, offsets, snap size). No other alias uses `attached`: 20 configuration_matching problems have it in the goal,
-  their 19 customs aliases all use `attachment.iddl`; of the 28 v3.0 aliases only cap, cork and lid.
+  trigger, contact, offsets, snap size). No other variant uses `attached`: 20 configuration_matching problems have it in the goal,
+  their 19 customs variants all use `attachment.iddl`; of the 28 v3.0 variants only cap, cork and lid.
 - **Collision**: the load-time filters are gone (sampler v1/v2, `run_isg._restore_attachment_filters`); the pair's filtered pairs
   are added at the join and removed at a detach (state loads queue the edit for the next check). Editing them while the simulation
   plays invalidates PhysX's tensor views (`update_handles()` then segfaulted); the stock route (dump state, stop, edit, play, load
@@ -137,7 +137,7 @@ Tagged states of this repository and what passed on them.
   the sandal was reverted by `9b422a29`), `9b422a29` (drops come down before the release), `855546a1` (a free-standing body's handle
   follow turns rigidly about the start hinge; the opened fingers bound a drop's descent), `f704954b` (a descent whose plan jumps is tried
   shorter), `56cb2e8e` (customs: the sandal drops from 0.15 m, the (0.95, -1.2) trunk first), `c9522ff8` (the same as the default of
-  every under_large_scale alias, and for the sibling breakfast-table sandal). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
+  every under_large_scale variant, and for the sibling breakfast-table sandal). Behavior-1K unchanged (`ddbd8ff24`): the assisted grasp's release-by-command rule - what demo collection and evaluation share -
   is untouched; every change is in how the oracle commands the robot.
 - **The owner's audit** (r4 demos, `ab47a362`) - cause, fix, before -> after on the same instance (largest |torso command - measured|,
   deg; torso speed while its command and the base are still, deg/s; head-camera motion within 10 still steps, mm; finger force on the
@@ -169,16 +169,16 @@ Tagged states of this repository and what passed on them.
     recorded drop pose (`lower_drop`: until its bottom is 2 cm above the surface under it, at most 20 cm, collision-checked with only the
     held object left out, the opened fingers 1.5 cm clear; a leg whose plan jumps is tried shorter). On the instances drawn with
     `drop_height_m` 0.25 the wrist flips 5-9 cm down, so it comes 6.8 cm: released 16.7 cm up, landed 10 mm aside, success with the
-    yaw 0.7 rad off (tolerance 0.8) - marginal. With the alias drawn at `drop_height_m` 0.15 and the deeper drop trunk (0.95, -1.2) first
+    yaw 0.7 rad off (tolerance 0.8) - marginal. With the variant drawn at `drop_height_m` 0.15 and the deeper drop trunk (0.95, -1.2) first
     (a customs copy) it comes the full 11.7 cm: released 1.7 cm above its rest, landed 1.2 mm aside, push yaw 0.075 rad off - success
     (sampler: instance 0 at attempt 0 in 1420 s). The goal-judged replay passed too
     (3172 steps). Seed 3 at 0.15 likewise (11.7 cm down, landed 1.0 mm aside, yaw 0.073 rad off; replay passed); at
     `drop_height_m` 0.10 seeds 0 / 3 come 6.8 / 6.9 cm down to the same 1.6-1.7 cm release (1.2 / 1.1 mm, 0.024 / 0.105 rad; replays
     passed) (`runs/r11sandal_drop*`). The shipped customs entry has `drop_height_m` 0.15 with the (0.95, -1.2) trunk first
     (`56cb2e8e`; drawn from it unchanged, seed 0 reproduces the customs copy's demo exactly: `runs/r12sandal_shipped_s0`). `c9522ff8`
-    (owner 2026-10-10) makes both the default of every under_large_scale alias (`PUSH_UNDER_DROP_HEIGHT_M` 0.15, was 0.10;
+    (owner 2026-10-10) makes both the default of every under_large_scale variant (`PUSH_UNDER_DROP_HEIGHT_M` 0.15, was 0.10;
     `PUSH_UNDER_DROP_TRUNKS`, (0.95, -1.2) before (0.5, -0.6)) and gives the sibling `...sandal-breakfast_table-floor` (was 0.25) the
-    same entry. Of the 28 only the breakfast-table sandal is an under alias, and it already had both. The ten aliases without an
+    same entry. Of the 28 only the breakfast-table sandal is an under variant, and it already had both. The ten variants without an
     override (apple / marker under the desk, pencil under the sofa, sandal under the bed) have no push-under tuning; first draws on the
     new default (`runs/r13default_*`, seed 0): apple and marker on the desk or the floor and the pencil on the sofa or the floor are
     rejected before any drop (no free edge / no workspace on the desk or sofa top, no stance C or A for a floor init, the pencil's
@@ -191,11 +191,11 @@ Tagged states of this repository and what passed on them.
   grasp fails its finishing swing (3.02-3.07 rad, both attempts) on Turing GPUs - Titan RTX on viscam2 and svl - with the original code
   `ab47a362` as with the new, and passes on Ampere / Ada (A5000, A6000, 3090, L40S): the GPU, not the code or the rewritten instance.
 - **Validation** (viscam, overflow to svl's Titan RTX nodes; sample -> demo -> goal-judged replay): A/B demos on the r4/r5/r6 instances
-  (`ab5`-`ab11`); r5 (`06abb98a`, all 28) 27/28 and r6 (`bdb9ec76`, the 8 articulation aliases) 8/8 for the earlier fixes; tests
+  (`ab5`-`ab11`); r5 (`06abb98a`, all 28) 27/28 and r6 (`bdb9ec76`, the 8 articulation variants) 8/8 for the earlier fixes; tests
   (`f704954b`, `c9522ff8`; GPU node): 1476 passed, the 4 pre-existing failures. On svl: r5 lid / blender open / world vertical's replay as on viscam.
   Two r5 replays on viscam12 hit a cffi version clash in numba's cache load (Kit's bundled cffi) before any action; re-run, both passed.
 
-## `v3.0-reconciled` — production (`v2.0-vectorized`), the multienv speedups (`v2.0-multienv`) and `first-demo-v3.0` on one branch; the goal-occlusion screen before generation; the 28 v3.0 aliases sampled, demonstrated and replayed through the evaluator on one commit (2026-10-08)
+## `v3.0-reconciled` — production (`v2.0-vectorized`), the multienv speedups (`v2.0-multienv`) and `first-demo-v3.0` on one branch; the goal-occlusion screen before generation; the 28 v3.0 variants sampled, demonstrated and replayed through the evaluator on one commit (2026-10-08)
 
 - **Branch / commits** (untagged, local): iSpatialGym `v3.0-reconciled` from `v2.0-multienv` (`33072fca`): `aac50a6e` merges `v2.0-vectorized`
   (release by the gripper command `998cd55b`, Brace.follow `7140a215`, Push.follow `f6385a89`, the attach release `7c48588d` /
@@ -231,7 +231,7 @@ Tagged states of this repository and what passed on them.
     are removed and the attempt is rejected (`goal_occluded`). 2-3.5 s per instance; fail-open; `ISPATIALGYM_GOAL_OCCLUSION=off` disables.
   - *Oracle* (`demo_gating` `goal_occlusion`, default in oracle mode): the same screen on the demo's settled last frame (verdict
     `goal_occluded`, `meta.goal_occlusion`), so a miss of the prediction never becomes a demo. *Offline:* `scripts/isg/goal_occlusion_check.py`.
-  - *Validation* against production's post-hoc screen (`prod_0927`, 61 instances of 5 aliases): TP 11 / FN 1 / FP 0 / TN 47, 2 not
+  - *Validation* against production's post-hoc screen (`prod_0927`, 61 instances of 5 variants): TP 11 / FN 1 / FP 0 / TN 47, 2 not
     predicted (no end witness; target outside the predicted frame); median |predicted - measured| 0.011. The miss (milk 1409, 0.478 vs
     0.575) and the largest gaps (brussels sprouts, up to 0.34) are where the demo's end departs from the plan's. On the 28 below the
     prediction is within 0.01 for most (kielbasa 0.221 / 0.219, teacup 0.263 / 0.266) and off where the demo ends elsewhere than the
@@ -258,7 +258,7 @@ Tagged states of this repository and what passed on them.
   instance on the same code gave 2754 / 3305. Round r3 (`4af874f2`, replays on `0fdc2259` / `fc3e410d`) went 26/28 before the carton fix
   (carton lever red; its sandal sampler spent three 2400 s attempts).
 
-  | alias | v3.0 | r4 demo | r4 replay | occlusion predicted / measured | r3 demo / replay |
+  | variant | v3.0 | r4 demo | r4 replay | occlusion predicted / measured | r3 demo / replay |
   |---|---|---|---|---|---|
   | block design | 3562 | 3676 | 4412 | 0.087 / 0.108 | 3707 / 4449 |
   | door close | 3028 | 2477 | 2973 | 0.0 / 0.0 | 2556 / 3068 |
@@ -301,11 +301,11 @@ Tagged states of this repository and what passed on them.
   `7ba60e3b` the reel builder (`scripts/isg/build_demo_reel.py`), the latest-success manifest (`fe9a6e69`), these docs and TODO.md.
 - **How the 28 demos were made** (owner rules 2026-09-27 23:05, as v2.2): each fix declares its situation predicate and its code paths and is
   otherwise a strict no-op that adds a fired / not-fired note. Every predicate was evaluated in shadow over the 28 v2.2 release instances
-  (`runlogs/first-demo-v3.0/reports/scoping.md`): 9 aliases exposed - world vertical (F1); door open (F2, F5); carton lever (F3, a sampling
+  (`runlogs/first-demo-v3.0/reports/scoping.md`): 9 variants exposed - world vertical (F1); door open (F2, F5); carton lever (F3, a sampling
   change: re-sampled); cork, cap, lid (F4); marker, dishwasher open, dishwasher close (F5). Phase A proved each fix on its v2.2 instance
   (job markers `runlogs/jobs/v30_f*_20260930/`); the canaries `v30_canary_20260930` on `e4bc51ab` went 42/43 (the red is pre-existing,
-  below); the freeze `v30_sweep_20260930-1` on `e4bc51ab` re-ran the 9 exposed aliases ×2: 18/18 green (both copies step for step on
-  seven aliases; the cap 899 / 812 and the lid 938 / 909 drew differently on the two machines). The other 19 aliases keep their v2.2
+  below); the freeze `v30_sweep_20260930-1` on `e4bc51ab` re-ran the 9 exposed variants ×2: 18/18 green (both copies step for step on
+  seven variants; the cap 899 / 812 and the lid 938 / 909 drew differently on the two machines). The other 19 variants keep their v2.2
   release run (made on `e6c62b73` / kielbasa `bc78d77f`); `made_on`, the scoping evidence and the arm are in every manifest entry
   (`runlogs/first-demo-v3.0/manifest.json`).
 - **The fixes** (each: the situation, the code path; Phase A = the fix on its v2.2 instance, a demo-only replay - F3 a fresh sample - with
@@ -325,11 +325,11 @@ Tagged states of this repository and what passed on them.
   13.2 cm planned dip) and dishwasher close (forward, 15.4 cm). Dishwasher open is exposed (its plan dips 24.5 cm) but no leg qualifies -
   the four variants stall 13-15 mm short - so it runs v2.2's plan (1557 steps, as v2.2). Strict no-op evidence for the others: blender
   close (F1's literal predicate matched it) replayed on `e4bc51ab` = v2.2 step for step (885); the canary replays of the non-exposed
-  fragile aliases repeat v2.2 (carton close 1265, milk 904, shampoo 1510; block design 3580 / 3567 vs 3562, run-to-run as before; the
+  fragile variants repeat v2.2 (carton close 1265, milk 904, shampoo 1510; block design 3580 / 3567 vs 3562, run-to-run as before; the
   sandal 2756 / 2756 vs 2754: every action up to the push-under step for step, then the push 290 vs 289 and the settle 460 vs 459 - no
   v3.0 path wraps the push, F1 'no arm to re-pose', F5 evaluated 6.1 cm <= 7 cm).
 - **No-op replays** (evidence only, after the freeze, local RTX 4090; `runlogs/first-demo-v3.0/reports/noop_replays.md`): the 14
-  aliases neither exposed nor canaried, replayed from their v2.2 instances on `e4bc51ab` (`v30_noop_replay_20260930`): 14/14 green,
+  variants neither exposed nor canaried, replayed from their v2.2 instances on `e4bc51ab` (`v30_noop_replay_20260930`): 14/14 green,
   13/14 step for step as v2.2 (every action and the settle), no v3.0 note fired. Axial's push came out 341 steps vs 343 (515 vs 518 in
   all, settle 86 vs 87). A/B `v30_noop_ab_20260930` on `bc78d77f`, local RTX 4090: the axial replays as 515 / [48, 341, 40] / 86 and
   the sandal as 2756 / push 290 / 460 - equal per action to their `e4bc51ab` replays. Both differences from the v2.2 runs (fresh sample
@@ -352,8 +352,8 @@ Tagged states of this repository and what passed on them.
     15.2 -> 0 cm (257 -> 233); dishwasher open 24.1 cm, unchanged (no leg qualifies).
   - *Demo length:* 33441 demo steps in total (v2.2 34617). Shorter: door open 2876 -> 2201, carton lever 1604 -> 1316, world vertical
     1149 -> 1050, marker 740 -> 681, cork 950 -> 893, dishwasher close 567 -> 546, lid 950 -> 938; cap 864 -> 899 (another draw,
-    attempt 2 -> 1); dishwasher open 1557 and the 19 kept aliases unchanged.
-  - *Attempts:* attempt 0 for 18/28 aliases (v2.2 18/28); cap 2 -> 1, the others unchanged.
+    attempt 2 -> 1); dishwasher open 1557 and the 19 kept variants unchanged.
+  - *Attempts:* attempt 0 for 18/28 variants (v2.2 18/28); cap 2 -> 1, the others unchanged.
   - *Smoothness* (largest per-step arm-joint change / arm joint path, rad): the set's largest stays 0.048 (door close, kept). Re-runs:
     door open 0.036 -> 0.038 / 53.8 -> 38.4, world vertical 0.020 / 24.1 -> 17.7, carton lever 0.030 -> 0.037 / 38.0 -> 34.1, cork
     0.038 -> 0.030 / 16.1 -> 15.8; up on dishwasher close 0.036 -> 0.041 / 12.1 -> 14.3 and marker 0.027 -> 0.029 / 15.5 -> 16.2 (the
@@ -362,9 +362,9 @@ Tagged states of this repository and what passed on them.
     2232, dishwasher open 1411 -> 557; up on marker 784 -> 1074, lid 883 -> 1538, dishwasher close 645 -> 675 (pod-to-pod demo walls
     vary with the GPU).
   - *Success:* 28/28 (v2.2 28/28).
-- **Canaries** (`v30_canary_20260930`, `e4bc51ab`): the 9 exposed aliases + the fragile sandal, shampoo, milk, block design and carton
+- **Canaries** (`v30_canary_20260930`, `e4bc51ab`): the 9 exposed variants + the fragile sandal, shampoo, milk, block design and carton
   close - replays of their v2.2 release instances on type-A pods (L40S / RTX 6000 Ada / L40) 14/14 and type-B (RTX 5090 / RTX 4090)
-  14/14, fresh samples 13/14, plus the blender close no-op replay. Determinism: the fresh samples of the exposed aliases draw their v2.2
+  14/14, fresh samples 13/14, plus the blender close no-op replay. Determinism: the fresh samples of the exposed variants draw their v2.2
   instance (seed 0, sampling unchanged for them; the carton lever is re-sampled by F3) and the demos repeat across pod types (door open
   2201 on three pods, cork 893, world vertical 1050 / 1049). Red: the sandal's fresh sample (0930-183356, local RTX 4090) - plan_failed at
   its grasp (the protection's via-above and its finishing swing refused, -0.0228 / -0.0149 m, 3.05 / 3.03 rad), v2.1's / v2.2's known
@@ -409,9 +409,9 @@ Tagged states of this repository and what passed on them.
 - **Tag / commit:** `first-demo-v2.2` → `bc78d77f` on `rush-20260917-2100` (`first-demo-v2.1` `5d6a7ff5` + `2b6e0904` the left arm +
   `e6c62b73` / `db1b7555` / `1d8aa61d` engineering track + `bc78d77f` an oracle fix).
 - **How the 28 demos were made** (owner rules 2026-09-27 23:05): a full resampling sweep `v22_sweep_20260928-1` on `e6c62b73` - phase 1 =
-  the 11 in-scope aliases ×2 + touching + cap, phase 2 = the other 15 once, one queue longest first - went 37/39: both kielbasa copies
-  failed on one instance (seed 0 is deterministic on one commit). The fix `bc78d77f` is scoped (below); its exposed alias was re-run on
-  `bc78d77f` (`v22_sweep_20260928-2`, kielbasa ×2: 2/2 green, 0928-080032 / 080036, 942 steps each, the pre-grasp witness reached through the ready posture). 27 aliases keep their green run of `-1`; `made_on`, the scoping evidence
+  the 11 in-scope variants ×2 + touching + cap, phase 2 = the other 15 once, one queue longest first - went 37/39: both kielbasa copies
+  failed on one instance (seed 0 is deterministic on one commit). The fix `bc78d77f` is scoped (below); its exposed variant was re-run on
+  `bc78d77f` (`v22_sweep_20260928-2`, kielbasa ×2: 2/2 green, 0928-080032 / 080036, 942 steps each, the pre-grasp witness reached through the ready posture). 27 variants keep their green run of `-1`; `made_on`, the scoping evidence
   and the arm are in every manifest entry (`runlogs/first-demo-v2.2/manifest.json`).
 - **The rule** (owner 2026-09-27; `sampling/v2/orient.py`, `tabletop.py`, the task modules): per arm-bound segment (grasp → carry →
   place → release, the push-under blade, a held object's hold) the other arm is offered when it has no role besides the segment and the
@@ -429,7 +429,7 @@ Tagged states of this repository and what passed on them.
   band (`reports/mirrored_bands.md`).
 - **Results vs v2.1** (`runlogs/first-demo-v2.2/reports/measurements.md`, per copy):
   - *Arm:* the left arm on milk (2/2), shampoo (2/2), apple (2/2), bar soap (1/2); the right on sprouts, marker, teacup, kielbasa, sandal,
-    banana, canned food; touching - offer evaluated, not fired - and cap / the 15 phase-2 aliases (not in path) unchanged. Every left
+    banana, canned food; touching - offer evaluated, not fired - and cap / the 15 phase-2 variants (not in path) unchanged. Every left
     choice is "only arm feasible at the draw": phase 2 ranked the stance by the best arm's reach and only the left arm reached from it; no
     draw had both arms feasible at the same pose. Program and annotations name the acting hand in every run.
   - *Right joint-2 limit lines (sampling log):* apple 19 → 0, milk 9 → 0, shampoo 0 → 0, marker 6 → 3, cap 21 → 13; up on bar soap 2 → 8,
@@ -442,7 +442,7 @@ Tagged states of this repository and what passed on them.
   - *Wall time:* median 994.5 s (v2.1) → 1104 s; IORS large sandal 3001 s → 3318 / 5032 s (its sampling 1497 s → up to 4599 s: the left
     arm's coupling runs where the right arm's failed, and attempt 0 spends its 2400 s budget).
   - *Mirrored-band candidates that failed the exact IK:* 170/236 = 72 % in the sweep (canaries 79/116, 30/54).
-- **Canaries** (`v22_canary_20260928`, on `e6c62b73`): the fragile aliases + the 11 exposed ones - replays of the v2.1 release instances on
+- **Canaries** (`v22_canary_20260928`, on `e6c62b73`): the fragile variants + the 11 exposed ones - replays of the v2.1 release instances on
   L40S (13/13) and RTX 5090 (12/13), fresh samples 13/15; the task-specific test (fresh apple and sandal, where the owner expected the
   left arm, + controls touching and cap vs v2.1): apple left, sandal right (only arm feasible), touching identical to v2.1 (strict no-op),
   cap unchanged. Reds, all right-arm instances the v2.1 oracle fails identically: the sandal 5090 replay (v2.1's own red canary, A/B
@@ -457,7 +457,7 @@ Tagged states of this repository and what passed on them.
     gain `witness_via_posture: "not fired"`). No sampling path.
   - *Exposure* (log scan of every v2.1 / v2.2 sweep and canary run): 4 runs, all failed before - the kielbasa instance ×3 and cap
     0927-221834 (v2.1); never on a green run (none of the 28 v2.1 release entries, none of the 37 green `-1` runs).
-  - *Canaries* (`v22_canary_20260928-2`, on `bc78d77f`): replays of the `-1` instances of the fragile aliases + the kielbasa instance on two
+  - *Canaries* (`v22_canary_20260928-2`, on `bc78d77f`): replays of the `-1` instances of the fragile variants + the kielbasa instance on two
     pod sets 12/12, fresh samples 5/6; kielbasa succeeds through the ready posture in all three runs (942 steps). Red: block design's fresh
     sample (not_reached at the final layout check) - the same instance as its green `-1` run, the fix never fired in it: the known
     block-design fragility.
@@ -465,7 +465,7 @@ Tagged states of this repository and what passed on them.
   start state (robot base / joints / velocities / controller goals / assisted grasps, task objects' poses and joints, hinges, constraints,
   attachments, render settings; `run_isg` writes it to `meta.start_state`); `first_demo.py run --warm` runs the sampler and the demo in one
   Isaac process (stage 1: `og.clear()` between them), keeps a pristine TRO copy and loads it in a fresh process on the same pod. 8/8
-  representative aliases equal (`v22_warm_20260928`; 7 bit-identical, banana equal on every value - its sha differed only by an object's
+  representative variants equal (`v22_warm_20260928`; 7 bit-identical, banana equal on every value - its sha differed only by an object's
   repr address, fixed `1d8aa61d`). Stage 1 saves one process boot, not the scene load (warm load 86.8 s vs fresh 93.1 s median); stage 2
   (the demo adopting the sampler's world) is next. Warm runs live under `first_demo_warm/`; release evidence stays on fresh processes
   (`reports/warm_vs_fresh.md`).
@@ -486,9 +486,9 @@ Tagged states of this repository and what passed on them.
 
 - **Tag / commit:** `first-demo-v2.1` → `5d6a7ff5` on `rush-20260917-2100` (`first-demo-v2.0` + the orientation-chooser session's
   commits `6313cfe0` … `576c8ef1` + this session's `06f45e24` … `5d6a7ff5`).
-- **How the 28 demos were made** (owner decisions 2026-09-27 23:05, rule 5): 25 aliases keep their green run of the sweep
-  `v21_sweep_20260927-6` on `6ef3110f`; the last fix (`8e26243f` + `5d6a7ff5`, milk) is scoped, its exposed aliases (milk,
-  kielbasa) and the alias -6 lost to a pod's TTL (object scaling) were re-run on the frozen `5d6a7ff5` (`v21_sweep_20260927-8`).
+- **How the 28 demos were made** (owner decisions 2026-09-27 23:05, rule 5): 25 variants keep their green run of the sweep
+  `v21_sweep_20260927-6` on `6ef3110f`; the last fix (`8e26243f` + `5d6a7ff5`, milk) is scoped, its exposed variants (milk,
+  kielbasa) and the variant -6 lost to a pod's TTL (object scaling) were re-run on the frozen `5d6a7ff5` (`v21_sweep_20260927-8`).
   `made_on` and the scoping evidence are in every manifest entry (`runlogs/first-demo-v2.1/manifest.json`).
 - **Phase A.** Each owner finding on v2.0 was fixed so that it switches on only in its situation, detected at run time, and was
   proven with a demo (head + overhead video) against its reference before the sweep (job markers `runlogs/jobs/v21_*_20260927/`):
@@ -533,7 +533,7 @@ Tagged states of this repository and what passed on them.
     milk (slope 0.875) and kielbasa (0.638), not on bar soap (0.0). On the v2.0 collection it fires on milk, kielbasa and apple
     (0.543); bar soap no; marker, touching, teacup, cap, cork, lid never reach it (teacup and marker replays reproduce v2.0's
     step counts exactly).
-  - *Canaries* (job `v21_canary_20260927`, on `5d6a7ff5`): the fragile aliases sandal, shampoo, milk, block design, carton close and the
+  - *Canaries* (job `v21_canary_20260927`, on `5d6a7ff5`): the fragile variants sandal, shampoo, milk, block design, carton close and the
     exposed kielbasa, each replayed from its -6 instance on an L40S and an RTX 5090 pod plus a fresh sample - 17 of 18 green. The
     sandal's RTX 5090 replay failed at its grasp; the same replay on the base commit on the same pod fails identically (job
     `v21_sandal_ab_20260927`: the same clearances and swings), and the fix is not evaluated on the sandal's drop-bound grasp - so
@@ -542,7 +542,7 @@ Tagged states of this repository and what passed on them.
     spaces launches ≥ 2 s.
   - *Re-run on the frozen `5d6a7ff5`:* `v21_sweep_20260927-8`: milk ×1 (0928-013557, the predicate fires: the recorded grasp), kielbasa ×2 (0928-013601,
     0928-013605, fires), object scaling ×1 (0928-013609; its -6 run was lost to a pod's TTL, the predicate never runs for it) -
-    4/4 green. The other 25 aliases keep their -6 run: the fix changes no sampling path and its predicate does not fire on their
+    4/4 green. The other 25 variants keep their -6 run: the fix changes no sampling path and its predicate does not fire on their
     instances (bar soap: slope 0.0; the rest never reach it). Shampoo's -6 phase 1 has one finished copy (the second was running
     when -6 was stopped); its canaries are green.
 - **Owner rules checked after phase 1:** the tie-breaker's against-the-generator choices (cap's `~r180` turns for reach) were
@@ -552,7 +552,7 @@ Tagged states of this repository and what passed on them.
   - **Demo length:** 34130 demo steps in total (v2.0 33598). Shorter: block design 3936 → 3646 (A2), apple 960 → 761, carton
     close 1464 → 1265, cap 927 → 858, footstool 999 → 624; longer on new instances: door close 2350 → 3028, door open 2246 →
     2876, dishwasher open 1234 → 1557, shampoo 1545 → 1715.
-  - **Attempts:** attempt 0 for 21/28 aliases (v2.0 21/28). Earlier: cap 3 → 1, cork 1 → 0, sprouts 1 → 0, footstool 2 → 1;
+  - **Attempts:** attempt 0 for 21/28 variants (v2.0 21/28). Earlier: cap 3 → 1, cork 1 → 0, sprouts 1 → 0, footstool 2 → 1;
     later: axial 0 → 1, shampoo 0 → 3.
   - **Orientation decisions** in the collected runs: 16 only feasible, 10 for reach, 3 default; 3 of 29 in the wrist-flipped
     branch; 2 against the generator's order, both the only feasible turn.
@@ -567,7 +567,7 @@ Tagged states of this repository and what passed on them.
   - **Wall time:** the `--dev` overhead camera costs +6.7 % demo time on one machine; pod-to-pod demo walls vary with the GPU.
   - Full table: `runlogs/first-demo-v2.1/reports/measurements.md`.
 
-| alias | demo (made on) | other copies | sampling attempt (v2.0) | steps (v2.0) |
+| variant | demo (made on) | other copies | sampling attempt (v2.0) | steps (v2.0) |
 |---|---|---|---|---|
 | `alignment-axial-board_game-breakfast_table` | 0927-212340 (`6ef3110f`) | 0927-212705 | 1 (0) | 518 (563) |
 | `alignment-world_vertical-painting_s070-walls` | 0927-205225 (`6ef3110f`) | 0927-205922 | 0 (0) | 1149 (1148) |
@@ -657,18 +657,18 @@ Tagged states of this repository and what passed on them.
   - **B3:** the other sessions' commits since v1.2 (object-scaling depth draw and drive targets, mental-rotation drive
     targets, held-start program check, `validate_instances` stance arms) get their first sweep here.
 - **Sweep** `v2_sweep_20260927-1` on `29a94212` (worktree `ispatialgym-v2sweep`, 250 kg chassis, v1.0 budgets):
-  - phase 1: 28/28 (the 13 most exposed aliases × 2–3 copies);
+  - phase 1: 28/28 (the 13 most exposed variants × 2–3 copies);
   - phase 2: 15/15;
   - 43/43 green in total.
 - **Measured against the v1.2 demos:**
-  - **Attempts:** attempt 0 for 21/28 aliases (v1.2: 18/28). Earlier: world_vertical 7 → 0, cork 6 → 1, apple 2 → 0,
+  - **Attempts:** attempt 0 for 21/28 variants (v1.2: 18/28). Earlier: world_vertical 7 → 0, cork 6 → 1, apple 2 → 0,
     axial / blender close / sandal 1 → 0. Later: footstool 1 → 2, cap 2 → 3, lid 0 → 1, milk 0 → 1.
-  - **Twins:** evaluated on 13 aliases, recorded on 6. Four rescue a library row that was infeasible at a joint limit:
+  - **Twins:** evaluated on 13 variants, recorded on 6. Four rescue a library row that was infeasible at a joint limit:
     shampoo (joint 5 within 5 mrad; twin margin 0.48 rad), apple (joint 2, 3 mrad; 0.07), cork (joint 5, 32 mrad; 0.058),
     kielbasa (joint 7, 33 mrad; 0.055). Two win on margin: bar soap (0.007 → 0.19 rad), sprouts (0.063 → 0.18). Inside the
     searches the twin also rescued draws that were not the recorded one (shampoo 16, sandal 8, milk 2). Pushes, braces,
     blades, handles and cube grasps are not affected: they already tried both wrist turns.
-  - **Witness margins:** the smallest IK-witness joint-limit margin rose on 13 aliases (bar soap 0.029 → 0.186 rad, sprouts
+  - **Witness margins:** the smallest IK-witness joint-limit margin rose on 13 variants (bar soap 0.029 → 0.186 rad, sprouts
     0.025 → 0.180, sandal 0.008 → 0.102, cork 0.015 → 0.073, world_vertical 0.056 → 0.190) and fell on 7 (apple 0.109 →
     0.002, teacup 0.107 → 0.044, cap 0.153 → 0.065, lid 0.052 → 0.023, kielbasa 0.085 → 0.056).
   - **Random re-solves** in the recorded attempt: cork 92, lid 26, cap 26, sprouts 10 (all attempts ≥ 1).
@@ -677,7 +677,7 @@ Tagged states of this repository and what passed on them.
     2.42 → 3.37 rad (sprouts).
   - **Demo length:** 33598 demo steps in total (v1.2: 34693).
 
-| alias | demo on this commit (collected) | other copies (phase 1) | sampling attempt (v1.2) | steps (v1.2) |
+| variant | demo on this commit (collected) | other copies (phase 1) | sampling attempt (v1.2) | steps (v1.2) |
 |---|---|---|---|---|
 | `alignment-axial-board_game-breakfast_table` | 0927-030114 | 0927-030116, 0927-030118 | 0 (1) | 563 (563) |
 | `alignment-world_vertical-painting_s070-walls` | 0927-030124 | 0927-030126 | 0 (7) | 1148 (1280) |
@@ -724,7 +724,7 @@ Tagged states of this repository and what passed on them.
     60 steps); the retry attaches. Its transit into the witness branch takes the protection's via-above.
   - **Flipped-witness check:** it depends on the raw IK branch, which differs between processes. `validate_instances`
     rejects the axial Y instances that sampling accepts.
-  - **Twin wrist travel:** a twin picked on margin lengthens the swing to the pre-grasp (above), and 7 aliases drew instances
+  - **Twin wrist travel:** a twin picked on margin lengthens the swing to the pre-grasp (above), and 7 variants drew instances
     with a smaller witness margin than v1.2. There was no run with twins off, so the twins' share of the attempt and time
     changes is not isolated from B1.
   - **Oracle fallbacks:** both are still in the code. Neither fired in any v2 run; removing them needs another sweep.
@@ -741,13 +741,13 @@ Tagged states of this repository and what passed on them.
 - **Evidence on this commit** (job `held_keep_hold_20260926`, demo-only replays of the v1.1 instances; the sampler is
   unchanged since `6c9873a4`):
 
-  | alias | demo on this code | instance (v1.1 run) | steps: move + still |
+  | variant | demo on this code | instance (v1.1 run) | steps: move + still |
   |---|---|---|---|
   | `object_scaling-canned_food` | 0926-154820 | 0926-151156 | 47 + 50 (was 56 + 150) |
   | `mental_rotation-banana` | 0926-155334 | 0926-152026 | 58 + 50 (unchanged; the banana barely sagged) |
 
   After the move the SPAM hand now moves at most 0.2 mm / 0.06° (was 5 mm / 4°); both demos succeed and settle.
-- **The other 26 aliases** end with a free arm (23 retreat, 2 set_torso, 1 push_close), which the change does not touch;
+- **The other 26 variants** end with a free arm (23 retreat, 2 set_torso, 1 push_close), which the change does not touch;
   their `first-demo-v1.0` runs stand.
 - **Unit tests** on this commit: 1233 passed; the same 4 known failures.
 - **Collected demos:** `runlogs/first-demo-v1.2/` (the two replays copied, the 26 others linked into `runlogs/first-demo-v1.0/`).
@@ -757,19 +757,19 @@ Tagged states of this repository and what passed on them.
 - **Tag / commit:** `first-demo-v1.1` → `6c9873a4` on `rush-20260917-2100` (`first-demo-v1.0` + the milestone docs commits +
   `6c9873a4`).
 - **Change** (owner decision 2026-09-26 15:00): object scaling's fixed hold rolls the closing axis 90° (fingers horizontal,
-  closing toward the robot) on all 30 object_scaling aliases, so an object pinched across its side faces the camera with that
+  closing toward the robot) on all 30 object_scaling variants, so an object pinched across its side faces the camera with that
   side; mental rotation keeps 15°. The object_scaling demo of the set is `object_scaling-canned_food` (the SPAM tin, its logo
   face toward the camera) instead of `object_scaling-beaker` (a plain white cup). The B7 visibility survey, rendered at 15°,
   applies only at that hold; at 90° every grasp row is measured by the renders.
 - **Evidence on this commit** (job `object_scaling_p90_rep_20260926`, `first_demo.py run`, 250 kg chassis, both sampled at
   attempt 0):
 
-  | alias | sampling + demo run on this code | replaces |
+  | variant | sampling + demo run on this code | replaces |
   |---|---|---|
   | `object_scaling-canned_food` | 0926-151156 | `object_scaling-beaker` (v1.0 run 0926-075332) |
   | `mental_rotation-banana` | 0926-152026 | its v1.0 run 0926-072342 (re-run because `held_object.py` changed) |
 
-- **The other 26 aliases** keep their `first-demo-v1.0` runs (table below): between `b7234b1b` and `6c9873a4` only the 30
+- **The other 26 variants** keep their `first-demo-v1.0` runs (table below): between `b7234b1b` and `6c9873a4` only the 30
   object_scaling customs entries (`generation.hold.roll_deg`), the object_scaling defaults, `held_object.py` (held-object tasks
   only), its tests and the spec changed.
 - **How the hold and the object were chosen:** `runlogs/hold_roll_20260926/` (roll +90 / −90 vs 15 on can_of_soda and beaker:
@@ -782,22 +782,22 @@ Tagged states of this repository and what passed on them.
   roll (0.60–0.85 m fail for every grasp), so object scaling only brings the object 10–15 cm closer; the front finger crosses
   the held object (≥ 40 % stays visible, checked at init and goal).
 
-## `first-demo-v1.0` — all 28 first-demo aliases pass sampling + demo (2026-09-26)
+## `first-demo-v1.0` — all 28 first-demo variants pass sampling + demo (2026-09-26)
 
 - **Tag / commit:** `first-demo-v1.0` → `b7234b1b` on `rush-20260917-2100`.
 - **Evidence:** the code of this commit (`ispatialgym/`, `scripts/`) is identical, tree for tree, to branch `face-travel-w16`
-  (`5bdbe1de`). On that code every alias below was sampled and then demoed successfully in one full run
-  (`python scripts/isg/first_demo.py run --alias <alias>`, 250 kg chassis): job `pilot_face_travel_20260926-3`, 28/28,
+  (`5bdbe1de`). On that code every variant below was sampled and then demoed successfully in one full run
+  (`python scripts/isg/first_demo.py run --variant <variant>`, 250 kg chassis): job `pilot_face_travel_20260926-3`, 28/28,
   2026-09-26 06:51–08:18 PDT.
 - The same code without the face_travel base-path style (`pilot-wave-16`, `7aefab00`) passed 31/31 as well (job
-  `pilot_wave_20260925-16`: the 28 aliases, extra phase-1 copies of axial and world_vertical, and the cork replay of instance
+  `pilot_wave_20260925-16`: the 28 variants, extra phase-1 copies of axial and world_vertical, and the cork replay of instance
   0921-030246).
 - **Unit tests** on this commit: 1229 passed; 4 known failures deselected (`test_stance_sidecar_keeps_extras_and_recorded_configuration`,
   `test_transition_standoff_enumeration`, `test_push_under_record_and_geometry_constants`,
   `test_push_under_attempt_budget_rejects_time_budget_with_the_stage`).
-- **Sampling budgets:** 8 attempts per alias, except cap 16, cork 20 and shampoo 16 (timeout 14400 s).
+- **Sampling budgets:** 8 attempts per variant, except cap 16, cork 20 and shampoo 16 (timeout 14400 s).
 
-| alias | sampling + demo run on this code (`pilot_face_travel_20260926-3`) | drive legs (recorded style) | run on `pilot-wave-16` |
+| variant | sampling + demo run on this code (`pilot_face_travel_20260926-3`) | drive legs (recorded style) | run on `pilot-wave-16` |
 |---|---|---|---|
 | `alignment-axial-board_game-breakfast_table` | 0926-073330 | no drive leg | 0926-063516 |
 | `alignment-world_vertical-painting_s070-walls` | 0926-065156 | init → manipulation: recorded | 0926-063509 |
@@ -828,7 +828,7 @@ Tagged states of this repository and what passed on them.
 | `mental_rotation-banana` | 0926-072342 | no drive leg | 0926-065122 |
 | `object_scaling-beaker` | 0926-075332 | no drive leg | 0926-072149 |
 
-**Collected demos:** copies of the 28 run directories above, one video link per alias and a `manifest.json` are in
+**Collected demos:** copies of the 28 run directories above, one video link per variant and a `manifest.json` are in
 `runlogs/first-demo-v1.0/`.
 
 **Artefacts** (local to the pilot machine; `runlogs/` is not tracked): each run lives in

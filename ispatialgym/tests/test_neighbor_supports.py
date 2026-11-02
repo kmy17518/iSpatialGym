@@ -70,9 +70,9 @@ def test_support_surface_entry_carries_the_neighbors_and_is_unchanged_without():
 
 
 def test_the_candidate_record_names_the_neighbors_only_when_the_entry_has_them():
-    from ispatialgym.sampling.v2.problem import GroundedProblem, subtask_of_alias
+    from ispatialgym.sampling.v2.problem import GroundedProblem, subtask_of_variant
 
-    alias = "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop"
+    variant = "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop"
     surfaces = [{"name": "countertop_kelzer_0", "init": "ontop", "top_z": 0.89, "row": "p#04~T2"},
                 {"name": "countertop_kelker_0", "init": "ontop", "top_z": 0.89, "row": "p#04~T1", "neighbors": ["countertop_kelzer_0"]}]
     entry = {"iddl": "inter_object_relation_satisfaction/inside.iddl", "definition_id": 62,
@@ -82,7 +82,7 @@ def test_the_candidate_record_names_the_neighbors_only_when_the_entry_has_them()
                                                                                    "support_surfaces": surfaces, "floor": {"room": "kitchen_0"}},
                                                "whitelist": {}, "blacklist": {}}},
              "generation": {}, "constraints": []}
-    gp = GroundedProblem(alias, copy.deepcopy(entry), subtask=subtask_of_alias(alias))
+    gp = GroundedProblem(variant, copy.deepcopy(entry), subtask=subtask_of_variant(variant))
     rec = gp.override_support("house_single_floor", "countertop_kelker_0", rooms=["kitchen_0"])
     assert rec["neighbors"] == ["countertop_kelzer_0"] and gp.bindings("house_single_floor")["support_surfaces"] == [surfaces[1]]
     assert "neighbors" not in gp.override_support("house_single_floor", "countertop_kelzer_0", rooms=["kitchen_0"])
@@ -186,7 +186,7 @@ def _surface_sampler(surfaces, tops, floor_z=0.0):
             raise KeyError(f"no object {name!r}")
         return NS(name=name)
 
-    s = NS(choice=NS(bindings={"support_surfaces": surfaces}), gp=NS(alias="a"), template_facts={}, gen=lambda k, d=None: d)
+    s = NS(choice=NS(bindings={"support_surfaces": surfaces}), gp=NS(variant="a"), template_facts={}, gen=lambda k, d=None: d)
     s.support_top = lambda support, ignore=(): tops[support.name]
     s.world = NS(floor_z=floor_z, spawned={}, obj=obj)
     return s

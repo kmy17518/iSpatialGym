@@ -5,7 +5,7 @@
   "weight": 1.0,
   "subtask": "object_scaling",
   "slot": "representative",
-  "alias": "object_scaling-lemon",
+  "variant": "object_scaling-lemon",
   "source_job": "object_scaling-lemon__representative__target-bmvxas"
  },
  {
@@ -14,7 +14,7 @@
   "weight": 1.0,
   "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "mental_rotation-cookie_cutter",
+  "variant": "mental_rotation-cookie_cutter",
   "source_job": "mental_rotation-cookie_cutter__representative__target-jpscvj"
  }
 ]

@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-under_large_scale-marker-desk-floor (inter_object_relation_satisfaction-under_large_scale#02, slot representative)",
  "inter_object_relation_satisfaction-1": {
-  "alias": "under",
+  "variant": "under",
   "roles": {
    "target": {
     "models": {
@@ -56,7 +56,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-under_large_scale",
-   "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
    "pick": "inter_object_relation_satisfaction-under_large_scale#02",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",

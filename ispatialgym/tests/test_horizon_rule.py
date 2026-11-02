@@ -1,5 +1,5 @@
 """The lab evaluator's step budget (``lab_tools.horizon``): ``--horizon auto`` = the demo's length for a ground-truth replay,
-twice the longest training demo of the alias for a policy; ``--max-steps auto`` = ceil(1.6 x horizon) + 100."""
+twice the longest training demo of the variant for a policy; ``--max-steps auto`` = ceil(1.6 x horizon) + 100."""
 
 from __future__ import annotations
 

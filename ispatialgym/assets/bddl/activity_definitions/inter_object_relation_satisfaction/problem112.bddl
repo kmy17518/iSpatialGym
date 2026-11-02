@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-112)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop)
+    (:variant inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_large_scale-soap_dispenser-countertop-countertop (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#01~T1/representative)
     ; owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c1: hand-made from this grounding - soap_dispenser/zwudcz onto countertop_fjkase_0 from countertop_ikwqer_0 / countertop_sjxber_0 (the sampler draws one); registry mode test

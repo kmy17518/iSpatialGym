@@ -137,7 +137,7 @@ def main(argv=None) -> int:
     p.add_argument("--demo", required=True, help="demo dir(s) holding demo.hdf5, comma-separated")
     p.add_argument("--root", required=True, help="LeRobot root dir")
     p.add_argument("--repo-id", required=True)
-    p.add_argument("--task", required=True, help="task name written into the dataset (the alias)")
+    p.add_argument("--task", required=True, help="task name written into the dataset (the variant)")
     p.add_argument("--resume", action="store_true", help="append to an existing dataset")
     p.add_argument("--flush-every-n-steps", type=int, default=1000)
     p.add_argument("--unmodified", action="store_true",

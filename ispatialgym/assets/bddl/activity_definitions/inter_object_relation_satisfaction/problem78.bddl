@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-78)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-pencil-sofa-floor)
+    (:variant inter_object_relation_satisfaction-under_large_scale-pencil-sofa-floor)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-pencil-sofa-floor (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#03/representative/fallback2:init_surface)
     ; fallback 2 (init_surface) of inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk: init_surface = floor

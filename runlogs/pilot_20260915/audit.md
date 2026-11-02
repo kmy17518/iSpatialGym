@@ -1,7 +1,7 @@
 # E1 pilot — yield audit (2026-09-16 02:10 PDT, after the C0 stop)
 
 Source: 21 pilot pods, `done.txt` + `summary.json` + `run.log` of every job dir (`runlogs/runpod/pilot/live/`, full artefacts in
-`runlogs/runpod/pilot/<pod>/`), `progress.json` (ledger per alias), `killed_at_stop.json`. 197 aliases × (1 template × 2 instances,
+`runlogs/runpod/pilot/<pod>/`), `progress.json` (ledger per variant), `killed_at_stop.json`. 197 variants × (1 template × 2 instances,
 `--max-attempts 10`): **complete 76, partial 1, zero 25, crashed 59, killed 7, never started 29 → 151 instances**.
 
 ## Red flags (owner)
@@ -16,13 +16,13 @@ Source: 21 pilot pods, `done.txt` + `summary.json` + `run.log` of every job dir 
    the detour corner (corridor ≥ 0.75 m leaves ~12 cm per side), or a per-template artefact applied to the second instance
    (`blocked_footprints` / obstacle pose restore). Needs the hdf5 base trajectory vs the sidecar path. Sampler-or-oracle bug.
 3. **Disembedding 0/26 — the source tray is placed ≈ 24 cm below the table top** (`no raycast hits on the tray`, 12) or its inner
-   floor raster is nearly empty (`inner floor too small`, 10). Module bug (agent 8db7c96f on it). **Blocks the reschedule of 30 aliases.**
+   floor raster is nearly empty (`inner floor too small`, 10). Module bug (agent 8db7c96f on it). **Blocks the reschedule of 30 variants.**
 4. **Axial 2/5 complete at 14 attempts per instance, 3 zero** — every rejection is `target_placement`: the left stop‑edge brace reaches
    across the centre line (`contact_unreachable`) or no long‑axis end lands in the band (`grasp_unreachable`) → decisions A1 (left band,
    joint placement, pitched push class). Block design 0/1 for the same reason (`target_placement` 20).
-5. **Wall alignment 0/20**: `push_unreachable` 167, `no_manipulation_stance` 25, 7 aliases `no wall spot passes Phase 2 at δ = ±30°`
+5. **Wall alignment 0/20**: `push_unreachable` 167, `no_manipulation_stance` 25, 7 variants `no wall spot passes Phase 2 at δ = ±30°`
    (plus 5 crashes on the missing reach volume, fixed) → A6 (idle‑arm posture), A8 (δ 15–25°), B (scale_hint fallback).
-6. **Articulation 0/17**: large `no_stance` 250 / `handle_unreachable` 24 (+2 aliases crashed on the cuRobo mesh cache, fixed 4096) → A4;
+6. **Articulation 0/17**: large `no_stance` 250 / `handle_unreachable` 24 (+2 variants crashed on the cuRobo mesh cache, fixed 4096) → A4;
    small: `carton-floor` grounding contract (`bindings.support must list scene objects` ×2, bug), toolbox `no_workspace` (no brace‑band
    cell on the top at s = 0.45 ×3, band/height check needed), `missing_handle` 8.4 mm ×2 and blender `no_stable_state` ×2 (yield → fallback).
 7. **IORS large 0/8**: `no_init_surface` (desk/sofa/bar/countertop: no free edge at s = 0.45; floor candidates fail) → A5 + A3.
@@ -31,7 +31,7 @@ Source: 21 pilot pods, `done.txt` + `summary.json` + `run.log` of every job dir 
 
 ## -1 / crash classification
 
-| cause | aliases | class | status |
+| cause | variants | class | status |
 |---|---|---|---|
 | `reach_volume.npz` not on the pods (git‑ignored) | 5 wall | bug | fixed `e26746f`, re‑run |
 | cuRobo `Cannot add mesh, cache is full (2048)` | 4 large articulation | bug | fixed (4096), re‑run |
@@ -42,20 +42,20 @@ Source: 21 pilot pods, `done.txt` + `summary.json` + `run.log` of every job dir 
 | wall `no wall spot … δ = ±30°` | 7 | spec (A8 / A6 / scale_hint) | decisions |
 | IORS large `no_init_surface` | 8 | spec (A5 / A3) | decisions |
 | attachment `edge_too_short` 1.65 > 1.16, no attach‑reach survivor | 2 | spec (A1 / A3) | decisions |
-| `missing_handle` 8.4 mm, blender `no_stable_state`, `does_not_fit_inside`, `target_not_pushable` | 6 | yield → fallback alias (B) | decisions |
+| `missing_handle` 8.4 mm, blender `no_stable_state`, `does_not_fit_inside`, `target_not_pushable` | 6 | yield → fallback variant (B) | decisions |
 
-Bugs that block the reschedule: the disembedding tray (30 aliases), the QA fov rule (every manipulation demo), the obstructed
+Bugs that block the reschedule: the disembedding tray (30 variants), the QA fov rule (every manipulation demo), the obstructed
 navigation collision (half the camera demos). The other crashes are fixed or need only the decisions.
 
 ## Working well
-mental_rotation 25/25 (1.1 attempts per instance, median 435 s per alias incl. scene load), object_scaling 19/19 (1.1), obstructed
+mental_rotation 25/25 (1.1 attempts per instance, median 435 s per variant incl. scene load), object_scaling 19/19 (1.1), obstructed
 16/17 (3.2), standard 1/1, IORS ontop‑small 5/5 (2.7), nextto 4/5 + 1 partial (2.8), under‑small 2/2 (1.5), inside 2/5 (14.5).
 Demos: mental_rotation 1/1, obstructed 7/12 (see flag 2), nextto 0/6 (flag 1).
 
 
-197 aliases; states: complete 76, crashed 59, killed 7, never_started 29, partial 1, zero 25
+197 variants; states: complete 76, crashed 59, killed 7, never_started 29, partial 1, zero 25
 
-| subtask | aliases | ran | n_written 0/1/2 | crashed | killed / never | median wall s | max wall s | attempts per instance | dominant attempt rejections (excl. scene_reset) | demos ok / run |
+| subtask | variants | ran | n_written 0/1/2 | crashed | killed / never | median wall s | max wall s | attempts per instance | dominant attempt rejections (excl. scene_reset) | demos ok / run |
 |---|---|---|---|---|---|---|---|---|---|---|
 | alignment-axial | 10 | 5 | 3/0/2 | 0 | 5 | 3131 | 3725 | 14.2 | target_placement 53 | 0 / 0 |
 | alignment-world_horizontal | 10 | 10 | 10/0/0 | 7 | 0 | 207 | 2350 | - | push_unreachable 48, no_manipulation_stance 12, no_stance 4 | 0 / 0 |

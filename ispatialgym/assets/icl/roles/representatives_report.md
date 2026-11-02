@@ -291,9 +291,9 @@ Every §4 tabletop pick (11 subtasks, 80 picks) carries the same 3 support tripl
 | T3 | heldout | `restaurant_diner/bar_xxftww_0` | bar | bar_0, dining_room_0 | 1.08 | +u 4.00 (1.70/4.00/4.10) | iors_small_scale | ok [overhang=0.08 (stand-off from the AABB 0.53 m); run035_short=1.70] |
 
 - alternative held-out `Rs_int/bottom_cabinet_jhymlr_0` checked, not needed: best usable edge 1.62 m -> longest admissible row articulation_small_scale, flags short_rows_only
-- category `countertop` appears in T1 variation_geometry (`countertop_ikwqer_0`) and T2 representative (`countertop_kelker_0`): category-based alias names need the triplet / instance to stay distinct
-- category `desk` appears in T1 heldout (`desk_pfsjbc_0`) and T3 variation_geometry (`desk_mdhelw_1`): category-based alias names need the triplet / instance to stay distinct
-- category `bar` appears in T2 variation_geometry (`bar_udatjt_0`) and T3 heldout (`bar_xxftww_0`): category-based alias names need the triplet / instance to stay distinct
+- category `countertop` appears in T1 variation_geometry (`countertop_ikwqer_0`) and T2 representative (`countertop_kelker_0`): category-based variant names need the triplet / instance to stay distinct
+- category `desk` appears in T1 heldout (`desk_pfsjbc_0`) and T3 variation_geometry (`desk_mdhelw_1`): category-based variant names need the triplet / instance to stay distinct
+- category `bar` appears in T2 variation_geometry (`bar_udatjt_0`) and T3 heldout (`bar_xxftww_0`): category-based variant names need the triplet / instance to stay distinct
 - T1 VB-ISC height change: 0.81 -> 0.93 m (11 cm)
 - T2 VB-ISC height change: 0.89 -> 1.05 m (16 cm)
 - T3 VB-ISC height change: 0.67 -> 0.79 m (11 cm)
@@ -351,7 +351,7 @@ The crowded kitchen picks (`bottom_cabinet_fancyy_0`: 1.50 m handle next to `ove
 | drawers | variation_geometry | `Rs_int/bottom_cabinet_bamfsz_1` | j_link_4 | drawer | base | 3.00 (0.40) | j_link_4#A: bar 16 mm @ 0.68 m, handle (chosen) | yes | rejected: robot-eroded free run 0.40 m < 2.0 m (no view stance) |
 | drawers | heldout | `Rs_int/bottom_cabinet_jhymlr_0` | j_link_2 | drawer | base | 2.30 (1.00) | none admissible | B4 heuristic | rejected: free run in front 2.30 m < 3.0 m; robot-eroded free run 1.00 m < 2.0 m (no view stance); no admissible handle row: bar 5mm@0.74m/handle, edge_drawer_top 43mm@0.71m/edge_blocked |
 
-- The two `bottom_cabinet` picks (cabinet doors / drawers) share the category-based alias token; the follow class differs per joint kind (A4), so the grounder / sampler must keep the class per bound object (or split the alias by joint kind).
+- The two `bottom_cabinet` picks (cabinet doors / drawers) share the category-based variant token; the follow class differs per joint kind (A4), so the grounder / sampler must keep the class per bound object (or split the variant by joint kind).
 - `bottom_cabinet_rvunhj_*`: the protruding handles are 7-8 mm wide after the 1.6x instance scale (below the 15 mm pinch filter); the admissible pinch is the exposed door-leaf edge (`j_link_2#F`, 39 mm, verdict `edge`); the other three doors of each unit have no exposed edge (`edge_blocked`) and `rvunhj_0` j_link_0 / j_link_1 have 0.0 m eroded free run.
 - Drawers: no drawer unit in the inventory reaches 3.0 m robot-eroded free run; `bottom_cabinet_bamfsz_0` (3.00 / 2.30 m, canonical annotation, 19-20 mm rail pulls) is the best; `j_link_4` is its top drawer (0.82 m; j_link_1-3 at 0.38 / 0.60 / 0.71 m are alternatives).
 

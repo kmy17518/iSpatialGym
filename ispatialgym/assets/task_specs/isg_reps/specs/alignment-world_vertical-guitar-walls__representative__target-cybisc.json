@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: alignment-world_vertical-guitar-walls (alignment-world_vertical#10, slot representative)",
  "world_alignment-1": {
-  "alias": "world_vertical",
+  "variant": "world_vertical",
   "roles": {
    "floor": {
     "fixed": true
@@ -115,7 +115,7 @@
   },
   "_isg": {
    "subtask": "alignment-world_vertical",
-   "alias": "alignment-world_vertical-guitar-walls",
+   "variant": "alignment-world_vertical-guitar-walls",
    "pick": "alignment-world_vertical#10",
    "slot": "representative",
    "iddl": "alignment/world_vertical.iddl",

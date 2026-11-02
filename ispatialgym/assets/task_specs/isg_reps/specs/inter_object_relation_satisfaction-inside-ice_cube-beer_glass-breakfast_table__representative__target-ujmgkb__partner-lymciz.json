@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table (inter_object_relation_satisfaction-inside#04, slot representative)",
  "inter_object_relation_satisfaction-2": {
-  "alias": "inside",
+  "variant": "inside",
   "roles": {
    "target": {
     "models": {
@@ -51,7 +51,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-inside",
-   "alias": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
+   "variant": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
    "pick": "inter_object_relation_satisfaction-inside#04",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/inside.iddl",

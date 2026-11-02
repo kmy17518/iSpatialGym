@@ -52,7 +52,7 @@ def parse_args(argv=None):
     ap.add_argument("--episodes", type=int, nargs="*", default=None)
     ap.add_argument("--task", default=TASK)
     ap.add_argument("--horizon", type=H.spec, default="auto",
-                    help="auto (default): replay = each slot's own demo length, policy = twice the longest training demo of the alias "
+                    help="auto (default): replay = each slot's own demo length, policy = twice the longest training demo of the variant "
                          "(datasets/isg-init), shared by the batch; a number: the fixed protocol")
     ap.add_argument("--num-envs", type=int, default=4)
     ap.add_argument("--tiled", dest="tiled", action="store_true", default=False, help="one tiled render product for all clones (off: the tiles share one exposure, gate 3d)")

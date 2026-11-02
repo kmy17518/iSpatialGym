@@ -3,7 +3,7 @@
 builds them (OmniGibson/scripts/learning): lerobot's ``aggregate_datasets`` packs the episodes of every shard into shared
 data / video files, then BEHAVIOR's ``verify_aggregate`` checks the result.
 
-    python scripts/isg/aggregate_isg_lerobot.py --sweep-root <prod root>/<sweep> --output-root <out> --task <alias> [--task ...] [--multitask]
+    python scripts/isg/aggregate_isg_lerobot.py --sweep-root <prod root>/<sweep> --output-root <out> --task <variant> [--task ...] [--multitask]
 
 Per task the inputs are the collection shards (``<slice>/lerobot/shard_*``: successful demos without a mid-episode retry,
 written while recording) and the replay shards (``<task dir>/replay/lerobot/*``: replay_obs_isg.py of retried demos and of

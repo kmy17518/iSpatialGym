@@ -1,7 +1,7 @@
 # IORS-4 (touching) target / partner selection (2026-09-11)
 
 Goal: choose the object categories and models of the `target` and `partner` roles of
-`inter_object_relation_satisfaction-4` (alias `touching`: the target is pushed - or grasped and set down - until it is in
+`inter_object_relation_satisfaction-4` (variant `touching`: the target is pushed - or grasped and set down - until it is in
 rigid contact with the partner, both released; see `ispatialgym/docs/task_bddl_formats.md` section 7 and the sampler
 `ispatialgym/sampling/tasks/iors.py`, which puts the partner on the robot's left with a 10-25 cm gap, translates the target
 sideways until the hulls touch and rejects goals where the partner moves > 5 mm), with the same target / partner rules as

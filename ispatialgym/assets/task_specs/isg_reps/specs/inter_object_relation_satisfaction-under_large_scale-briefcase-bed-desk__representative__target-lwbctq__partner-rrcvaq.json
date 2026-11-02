@@ -1,7 +1,7 @@
 {
  "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-under_large_scale-briefcase-bed-desk (inter_object_relation_satisfaction-under_large_scale#04, slot representative)",
  "inter_object_relation_satisfaction-1": {
-  "alias": "under",
+  "variant": "under",
   "roles": {
    "target": {
     "models": {
@@ -62,7 +62,7 @@
   },
   "_isg": {
    "subtask": "inter_object_relation_satisfaction-under_large_scale",
-   "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-bed-desk",
+   "variant": "inter_object_relation_satisfaction-under_large_scale-briefcase-bed-desk",
    "pick": "inter_object_relation_satisfaction-under_large_scale#04",
    "slot": "representative",
    "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",

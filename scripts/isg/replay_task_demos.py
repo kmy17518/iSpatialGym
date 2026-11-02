@@ -4,7 +4,7 @@ was dropped) and demos recorded before the BEHAVIOR output. Each demo.hdf5 is pl
 settings (replay_obs_isg.py) into a replay shard of the task, ``<task dir>/replay/lerobot/<shard>``; ``<shard>.episodes.json``
 lists the demos in episode order.
 
-    python scripts/isg/replay_task_demos.py --task-dir <prod root>/<sweep>/<alias> --shard <name> [--audit <glob>] [--limit N] [--dry-run]
+    python scripts/isg/replay_task_demos.py --task-dir <prod root>/<sweep>/<variant> --shard <name> [--audit <glob>] [--limit N] [--dry-run]
 
 A demo qualifies when its latest results row is a success recorded with change detection on, in a fresh world, a world with
 the scene restore, or a no-restore world the scene audit found clean (``--audit`` reports), with a readable demo.hdf5 and no

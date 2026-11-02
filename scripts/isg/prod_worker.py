@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""One production job: a ``sample_isg`` slice of one alias (instances ``[start, start + count)`` of its first template) with
+"""One production job: a ``sample_isg`` slice of one variant (instances ``[start, start + count)`` of its first template) with
 ``run_isg`` demos running next to it on the job's GPU.
 
-    python scripts/isg/prod_worker.py --alias A --start S --count N --out DIR [--seed 0] [--max-attempts 8] [--demo-workers 2]
+    python scripts/isg/prod_worker.py --variant A --start S --count N --out DIR [--seed 0] [--max-attempts 8] [--demo-workers 2]
 
 The sampler writes an instance's TRO, oracle sidecar and summary, the summary last. As soon as an instance's summary
 exists it is replayed by first_demo's ``run_isg --mode oracle --video --video-size 540`` command in a process of its
@@ -93,7 +93,7 @@ def ready_instances(inst_root):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--alias", required=True)
+    ap.add_argument("--variant", required=True)
     ap.add_argument("--start", type=int, required=True, help="first instance index of the slice")
     ap.add_argument("--count", type=int, required=True, help="instances in the slice")
     ap.add_argument("--out", required=True, help="job directory")
@@ -145,7 +145,7 @@ def main(argv=None):
             if p.poll() is None:
                 continue
             rec = result_record(lp) or {"status": "error", "reason": "no RUN_ISG_RESULT line"}
-            row = {"instance": iid, "alias": args.alias, "rc": p.returncode, "status": rec.get("status"), "success": bool(rec.get("success")),
+            row = {"instance": iid, "variant": args.variant, "rc": p.returncode, "status": rec.get("status"), "success": bool(rec.get("success")),
                    "reason": rec.get("reason"), "n_steps": rec.get("n_steps"), "wall_s": round(time.time() - t0, 1), "tro": tro,
                    "out": rec.get("out"), "reused_world": False, "provisional": False, "provenance": rec.get("provenance"),
                    "hdf5_ok": rec.get("hdf5_ok"), "behavior_lerobot": rec.get("behavior_lerobot"),
@@ -171,7 +171,7 @@ def main(argv=None):
             break
         time.sleep(args.poll_s)
 
-    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
+    summary = {"provenance": job_provenance(), "variant": args.variant, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
                "n_instances": len(ready_instances(inst_glob)), "n_demos": len(done), "wall_s": round(time.time() - t_job, 1),
                "stopped": stopping["flag"]}
     with open(os.path.join(out, "worker_summary.json"), "w") as f:
@@ -244,7 +244,7 @@ def resume_sampler(out, start, count):
 
 
 def sampler_command(args, first, n, root):
-    return [sys.executable, "-m", "ispatialgym.sampling.sample_isg", "--alias", args.alias, "--templates", "1",
+    return [sys.executable, "-m", "ispatialgym.sampling.sample_isg", "--variant", args.variant, "--templates", "1",
             "--instances-per-template", str(n), "--start-index", str(first), "--seed", str(args.seed),
             "--max-attempts", str(args.max_attempts), "--no-write-back", "--out", root, "--log-level", "INFO"]
 
@@ -375,7 +375,7 @@ def run_queue_mode(args):
         time.sleep(args.poll_s)
 
     n_demos = sum(1 for line in open(results_path) if line.strip()) if os.path.exists(results_path) else 0
-    summary = {"provenance": job_provenance(), "alias": args.alias, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
+    summary = {"provenance": job_provenance(), "variant": args.variant, "start": args.start, "count": args.count, "seed": args.seed, "sampler_rc": sampler_rc,
                "demo_mode": args.demo_mode, "sampler_restarts": sampler_restarts, "n_instances": len(ready_instances(inst_glob)), "n_demos": n_demos,
                "runner_processes": n_started, "claims_released_at_start": len(released), "rerecorded": rerun,
                "wall_s": round(time.time() - t_job, 1), "stopped": stopping["flag"]}

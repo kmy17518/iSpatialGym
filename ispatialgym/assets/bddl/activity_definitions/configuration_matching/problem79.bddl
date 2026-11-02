@@ -1,6 +1,6 @@
 (define (problem configuration_matching-79)
     (:domain ispatialgym)
-    (:alias configuration_matching-articulation_open_small_scale-carton_msfzpz_s035-breakfast_table)
+    (:variant configuration_matching-articulation_open_small_scale-carton_msfzpz_s035-breakfast_table)
 
     ; hand-grounded 2026-09-19 (TEST, owner request): carton msfzpz scaled 0.35 on the breakfast table - the floor-support init of the
     ; >0.6 m carton is not implemented (articulation_small floor_support_todo); copy of problem52 with the carton synset

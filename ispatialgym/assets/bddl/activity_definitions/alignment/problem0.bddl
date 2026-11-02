@@ -1,7 +1,7 @@
 (define (problem alignment-0)
     (:domain ispatialgym)
 
-    (:alias table_surface)
+    (:variant table_surface)
 
     (:objects
         fishing_rod.n.01_1 - fishing_rod.n.01

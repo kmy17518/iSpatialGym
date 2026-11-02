@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-52)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-commercial_kitchen_table)
+    (:variant inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-commercial_kitchen_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-commercial_kitchen_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#01~T4/representative)
     ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is

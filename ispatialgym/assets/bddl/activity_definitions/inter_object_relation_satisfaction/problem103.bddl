@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-103)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table)
+    (:variant inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-breakfast_table (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#04~T4/representative)
     ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it

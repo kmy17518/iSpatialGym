@@ -1,6 +1,6 @@
 (define (problem inter_object_relation_satisfaction-74)
     (:domain ispatialgym)
-    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed)
+    (:variant inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed)
 
     ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed (inter_object_relation_satisfaction/under_large_scale.iddl; inter_object_relation_satisfaction-under_large_scale#01/representative/fallback1:init_surface)
     ; fallback 1 (init_surface) of inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk: init_surface = partner

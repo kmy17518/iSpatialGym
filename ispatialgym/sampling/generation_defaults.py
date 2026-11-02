@@ -1,7 +1,7 @@
 """Per-subtask ``generation`` seeds of the task customs list (``docs/instance_sampling_spec.md`` §2.3).
 
-``ground_isg`` creates a customs entry per grounded alias; its ``generation`` block is copied from the existing entry
-when the alias was grounded before, otherwise from :data:`DEFAULTS` here. **Every number is the one written in the
+``ground_isg`` creates a customs entry per grounded variant; its ``generation`` block is copied from the existing entry
+when the variant was grounded before, otherwise from :data:`DEFAULTS` here. **Every number is the one written in the
 spec** — the section is cited next to each value — so that no sampler holds a default of its own (§2.3 "There are no
 defaults hidden in the samplers"). Numbers the spec marks ``[pilot]`` (§10) are flagged ``# [pilot]``: the pilot
 (TODO E1/E2) verifies or replaces them, here.
@@ -18,7 +18,7 @@ Shape (§2.3 example)::
 the relative ``joint_fraction``, the depth floor ``depth_min_m`` / relative ``depth_fraction``) because the TRO writer
 pins one number per metric; the ``settled_override_*`` keys carry the "goal := settled pose" threshold of §8.
 
-Shared rules that are not per-alias parameters (the tabletop stance scan of §4, the Prompt-0 lattice of §5.2, the IK
+Shared rules that are not per-variant parameters (the tabletop stance scan of §4, the Prompt-0 lattice of §5.2, the IK
 seed counts of §3.6, the camera model of §3.4) belong to the sampler core / conventions module and are deliberately
 not repeated here.
 """
@@ -153,7 +153,7 @@ _CAMERA_RELOCALIZATION_COMMON: Dict[str, Any] = {
 #: Owner 2026-10-11 (cone decision for the 44 tabletop picks: variant C passed its small test): Phase 2 with the split cone in every
 #: tabletop subtask - the start position within 20 / 30 deg of the init camera (wide start image), the work stance shifted along the
 #: edge by these offsets and the position within tight 8 / loose 20 deg of its camera (tabletop.split_cone_opts / phase2_angle_classes
-#: read the keys; an alias's own keys win).
+#: read the keys; a variant's own keys win).
 _TABLETOP_SPLIT_CONE: Dict[str, Any] = {
     "phase2_split_cone": True,
     "init_view_class_deg": [20.0, 30.0],
@@ -205,7 +205,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "depth_search_grid_m": 0.01,
         "depth_margin_m": 0.02,
         "min_depth_change_m": 0.05,  # §6.3 |d1 − d0| ≥ 0.05 m, toward or away from the camera
-        # eval instances (owner 2026-10-11, set per alias in the customs, dropped for train by multiply_isg): the move "toward" /
+        # eval instances (owner 2026-10-11, set per variant in the customs, dropped for train by multiply_isg): the move "toward" /
         # "away" from the camera (None: either), and the start-depth band = fractions [lo, hi] of the start depths that admit
         # that move (0 = the nearest; None: all of them)
         "requested_direction": None,
@@ -267,7 +267,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "distractor_spacing_extra_m": 0.01,
         # random (cell, yaw) draws per distractor in place_distractors (same rules; 2026-09-25: 80 -> 400. A lying 22 cm
         # bottle fits the 34 cm wide floor only within a few degrees of the tray's axes once the target's pinch strip and
-        # the 1 cm margins are out: 340 of 377 manipulation candidates of the 3-distractor milk alias (0925-034257) ended
+        # the 1 cm margins are out: 340 of 377 manipulation candidates of the 3-distractor milk variant (0925-034257) ended
         # in "no free position", 176 of them for the first distractor)
         "distractor_place_tries": 400,
         "max_occlusion_ratio": 0.30,  # §4.6 / §6.4 distractors may occlude the target up to 30 %
@@ -279,7 +279,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "destination_floor_visible_fraction": 0.30,  # §6.4 destination floor ≥ 30 % unoccluded in the confirmation render
         "lateral_margin_m": 0.437,  # §4.4 [pilot] the two fixed trays' half lengths along the edge + gap
         # owner 2026-10-12 (A2a): the side of the destination tray, chosen before the margins - only that side keeps the §4.4
-        # destination margin, the other one needs room for the source tray alone. Eval instances: "left" / "right" per alias in
+        # destination margin, the other one needs room for the source tray alone. Eval instances: "left" / "right" per variant in
         # the customs (dropped for train by multiply_isg); None: drawn per template from its seed
         "destination_side": None,
         "carry_height_extra_m": 0.03,  # §4.7 lift ≥ tallest distractor + tray rim + 3 cm above the source floor
@@ -298,7 +298,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         # 2026-09-25: mass of both trays (0 = the dataset's category mass, 0.39 kg for the uekqey base link). Under 1 kg
         # bottles that is a 10:1 inverted mass ratio in the table-tray-bottle stack and PhysX resolves it with contact
         # chatter: the bottles hopped 1-7 mm seconds after their release in 8 of 8 settled attempts of the 3-distractor milk
-        # alias (0925-034257); headless A/B on identical layouts: 0.39 kg 3 of 12 layouts moving, 2 kg 0 of 6 at <= 0.01 mm
+        # variant (0925-034257); headless A/B on identical layouts: 0.39 kg 3 of 12 layouts moving, 2 kg 0 of 6 at <= 0.01 mm
         # per frame (bottles at 0.3 kg - the mass-ratio probe - 0 of 6 too). Recorded per instance as a TRO ``constraints``
         # record {"type": "mass"} the demo loader re-applies (constraints.apply_mass)
         "tray_mass_kg": 2.0,
@@ -315,7 +315,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {"targets": {"size": 4, "draw": "same_model"}},  # §2.3 targets {size: 4, draw: same_model}
         "path_buckets": None,
         "grid": [2, 2],  # §6.5 touching 2 × 2 grid anchored at the top-left block
-        "patterns": {"test_rbbr": ["red", "blue", "blue", "red"]},  # §6.5 generation.patterns (or --variant)
+        "patterns": {"test_rbbr": ["red", "blue", "blue", "red"]},  # §6.5 generation.patterns (or --sub-variant)
         "block_gap_m": 0.001,  # §4.5 / §6.5 pitch = edge + 1 mm
         "scatter_min_gap_m": 0.03,  # §4.6 ≥ 3 cm gaps between footprints
         "region_spacing_extra_m": 0.03,  # §4.5 cells at spacing edge·√2 + 0.03
@@ -588,12 +588,12 @@ def defaults_for(subtask: str) -> Dict[str, Any]:
 def seed_generation(subtask: str, existing_entry: Optional[Dict[str, Any]] = None, reseed: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """The ``generation`` block of a customs entry (§2.3 "Seeding").
 
-    Copied from ``existing_entry["generation"]`` when the alias was grounded before (the tuned numbers survive a
+    Copied from ``existing_entry["generation"]`` when the variant was grounded before (the tuned numbers survive a
     re-grounding), otherwise :func:`defaults_for`. Keys the defaults have and the existing block lacks are added
     (a spec number introduced after the entry was created), existing values are never overwritten -- except the
     keys named in ``reseed`` (``ground_isg --reseed-generation KEY,...``: a spec number the owner changed, e.g.
     ``deviation_range_deg`` after A8), which take the default again; ``reseed = ["*"]`` re-seeds the whole block
-    (the group sizes are re-derived from the alias anyway).
+    (the group sizes are re-derived from the variant anyway).
     """
     seed = defaults_for(subtask)
     if existing_entry and isinstance(existing_entry.get("generation"), dict):
