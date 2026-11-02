@@ -694,6 +694,10 @@ class VecInstanceLoader:
             return {}, {}
         t0 = time.time()
         loaded: List[int] = []
+        # phase 1 (vec_next 2026-10-31): every clone's TRO restored WITHOUT the physics step Scene.reset ends with (that step advances
+        # the whole world: restoring the clones one after another gave the clone restored first N-1 extra unheld steps), then ONE
+        # world step - per clone exactly the N=1 sequence (restore, one step, then the per-slot restores of phase 2).
+        staged: Dict[int, Tuple[Any, str, Dict[str, Any], Dict[str, Any]]] = {}
         for i in wanted:
             scene = env.scenes[i]
             path = os.path.abspath(tro_paths[i])
@@ -709,8 +713,31 @@ class VecInstanceLoader:
                     scene.load_state(copy.deepcopy(self.scene_state0[i]), serialized=False)
                     scene.trav_map.floor_map[0] = _copy_map(self.floor_map_template[i])
                 rep["trav_cells_blocked"] = block_trav_map_from_meta(scene, tro.meta.scene or {})
-                task.load_tro_instance(env, tro=tro, env_idx=i, settle_steps=0)
+                self._restore_probe(f"before_load_{i}", list(range(self.num_envs)))
+                task.load_tro_instance(env, tro=tro, env_idx=i, settle_steps=0, defer_reset_step=True)
+                self._restore_probe(f"after_load_{i}", list(range(self.num_envs)))
                 self.tros[i], self.tro_paths[i] = tro, path
+            except LoadError as e:
+                log.error("slot %d (%s): load failed: %s: %s", i, os.path.basename(path), e.reason, e.message)
+                self.failed[i] = {"reason": e.reason, "message": e.message}
+                rep.update({"load_error": e.message, "load_error_reason": e.reason})
+                self.slot_reports[i] = rep
+                continue
+            except Exception as e:  # noqa: BLE001  (a TRO the task rejects, a missing object: this slot's episode only)
+                log.error("slot %d (%s): load failed: %r", i, os.path.basename(path), e)
+                self.failed[i] = {"reason": "error", "message": repr(e)}
+                rep.update({"load_error": repr(e), "load_error_reason": "error"})
+                self.slot_reports[i] = rep
+                continue
+            staged[i] = (tro, path, rep, extras)
+        if staged:
+            task.finish_deferred_reset(sorted(staged))
+            self._restore_probe("after_reset_step", sorted(staged))
+        # phase 2: the per-slot restores (sleep threshold, hinges, attachments, grasps) and the robot's hold
+        for i in sorted(staged):
+            tro, path, rep, extras = staged[i]
+            scene = env.scenes[i]
+            try:
                 physical = {k: v for k, v in task.physical_scope_of(i).items() if v is not None and not isinstance(v, GroupEntity)}
                 rep["rigid_sleep_threshold"] = self._apply_rigid_sleep_threshold(physical.values())
                 sl = SlotLoader(SceneView(env, i), self.robots[i], tro, physical, scene_translation(scene))
@@ -726,7 +753,7 @@ class VecInstanceLoader:
                 rep.update({"load_error": e.message, "load_error_reason": e.reason})
                 self.slot_reports[i] = rep
                 continue
-            except Exception as e:  # noqa: BLE001  (a TRO the task rejects, a missing object: this slot's episode only)
+            except Exception as e:  # noqa: BLE001
                 log.error("slot %d (%s): load failed: %r", i, os.path.basename(path), e)
                 self.failed[i] = {"reason": "error", "message": repr(e)}
                 rep.update({"load_error": repr(e), "load_error_reason": "error"})
@@ -744,23 +771,28 @@ class VecInstanceLoader:
             sl.hold = hold
             self.slot_reports[i] = rep
             loaded.append(i)
+            self._restore_probe(f"after_slot_{i}", list(range(self.num_envs)))
         self._fresh = False
         if not loaded:
             self.batches += 1
             return {}, {}
         # one settle for the batch: physics substeps with every loaded env's task entities held, two full steps for the caches
+        self._restore_probe("before_settle", loaded)
         for _ in range(self.settle_physics_steps):
             og.sim.step_physics()
             self._hold_entities(loaded)
+        self._restore_probe("after_settle_physics", loaded)
         for _ in range(2):
             og.sim.step()
             self._hold_entities(loaded)
+        self._restore_probe("after_settle_steps", loaded)
         for i in loaded:
             env.scenes[i].update_initial_file()
             n = settle_steps[i] if settle_steps is not None and settle_steps[i] is not None else task.settle_steps
             task.configure_evaluation(settle_eval, int(n), env_indices=[i])  # before the reset activates its pose_settled windows
         idx = th.tensor(loaded, dtype=th.long)
         obs_list, info = env.reset(env_indices=idx)  # the loaded scenes back to their snapshots, pose_settled tracking on, a render
+        self._restore_probe("after_reset", loaded)
         info_list = info.get("obs_info") or [None] * len(loaded)
         if self.warm_renders > 0:
             # the renderer's adaptation to every clone's new view (see __init__); physics untouched, the observation re-read
@@ -789,10 +821,40 @@ class VecInstanceLoader:
             if t_i is not None:
                 rp = rp - t_i
             self.slot_reports[i]["robot_base_init_scene"] = {"position": [float(v) for v in rp], "orientation": [float(v) for v in rq]}
+        self._restore_probe("after_restore_after_reset", loaded)
+        if os.environ.get("ISG_RESTORE_PROBE_EXIT") == "1":
+            os._exit(0)
         self.batches += 1
         self.report["last_restore_s"] = round(time.time() - t0, 1)
         self.report["warm_renders"] = self.warm_renders
         return obs, infos
+
+    def _restore_probe(self, phase: str, slots: Sequence[int]) -> None:
+        """Diagnostic (ISG_RESTORE_PROBE=<jsonl path>, off by default): every listed slot's robot base / joints and task objects
+        (scene-relative, float64 lists) and the sim clock, appended as one JSON line per phase of the batch restore."""
+        path = os.environ.get("ISG_RESTORE_PROBE")
+        if not path:
+            return
+        rec = {"phase": phase, "t": float(og.sim.current_time), "slots": {}}
+        for i in slots:
+            try:
+                tr = scene_translation(self.env.scenes[i])
+                tr = th.zeros(3, dtype=th.float64) if tr is None else th.as_tensor(tr, dtype=th.float64)
+                d = {}
+                robot = self.robots[i]
+                p, q = robot.get_position_orientation()
+                d["robot_base"] = (th.as_tensor(p, dtype=th.float64) - tr).tolist() + th.as_tensor(q, dtype=th.float64).tolist()
+                d["joints"] = th.as_tensor(robot.get_joint_positions(), dtype=th.float64).tolist()
+                for name, obj in (self.task.physical_scope_of(i) or {}).items():
+                    if obj is None or isinstance(obj, GroupEntity) or not hasattr(obj, "get_position_orientation"):
+                        continue
+                    p, q = obj.get_position_orientation()
+                    d[name] = (th.as_tensor(p, dtype=th.float64) - tr).tolist() + th.as_tensor(q, dtype=th.float64).tolist()
+                rec["slots"][str(i)] = d
+            except Exception as e:  # noqa: BLE001
+                rec["slots"][str(i)] = {"error": repr(e)}
+        with open(path, "a") as f:
+            f.write(json.dumps(rec) + "\n")
 
     def _hold_entities(self, loaded: Sequence[int]) -> None:
         for i in loaded:

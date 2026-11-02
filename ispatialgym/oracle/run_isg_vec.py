@@ -377,6 +377,19 @@ class SlotRecorder:
                         print(f"SLEEP_ASSIST {self.name} step {step}: {inst} wake() failed: {ex!r}", flush=True)
                     continue
             debug = _ASSIST_DEBUG and step % 30 == 0
+            # the rest window must be free of robot contact (vec_next 2026-10-31): an object held still by a motionless gripper
+            # otherwise passes the window and is slept on the very step the fingers let go (tablespoon slot 1, step 549), freezing
+            # the release mid-way. Every contact with the robot restarts the window.
+            if not asleep and Touching is not None and hasattr(obj, "states") and Touching in obj.states:
+                try:
+                    if bool(obj.states[Touching].get_value(self.robot)):
+                        hist.clear()
+                        if debug:
+                            print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: touching the robot (window restarted)", flush=True)
+                        continue
+                except Exception as ex:  # noqa: BLE001
+                    if debug:
+                        print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
             if asleep or near or len(hist) < W:
                 if debug:
                     print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: asleep={asleep} near={near} hist={len(hist)}", flush=True)

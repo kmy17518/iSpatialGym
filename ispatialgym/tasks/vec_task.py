@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 import torch as th
@@ -173,11 +174,16 @@ class VecISpatialGymTask(ISpatialGymTask):
         # base class's env-0 pairs are this env's pairs); the predicate wrapper looks them up by the entity's scene index
         PRED.set_attachment_context(self._attachment_pairs(meta), scene_idx=getattr(scene, "idx", None) if scene is not None else None)
 
-    def load_tro_instance(self, env, tro=None, settle_steps=25, apply_object_states=True, env_idx: int = 0):
+    def load_tro_instance(self, env, tro=None, settle_steps=25, apply_object_states=True, env_idx: int = 0, defer_reset_step: bool = False):
         """The TRO into clone ``env_idx``: object states with their root poses moved into the clone's frame, the robot pose set
         scene-relative, the robot joints, the targets; then exactly the single-env sequence - ``settle_steps`` physics steps with
         the scope's entities kept still, the scene's initial file updated, the scene reset, the tracking of that env reset. The
-        vectorized loader calls it with ``settle_steps=0`` (as ``run_isg.InstanceLoader.restore`` does) and settles the batch."""
+        vectorized loader calls it with ``settle_steps=0`` (as ``run_isg.InstanceLoader.restore`` does) and settles the batch.
+
+        ``defer_reset_step`` (vec_next 2026-10-31): the scene is restored from its new initial file WITHOUT the physics step that
+        ``Scene.reset`` ends with - that step advances every scene of the world, so restoring N clones one after another gave the clone
+        restored first N-1 extra unheld physics steps (the per-slot step-0 offsets from N=1). The caller restores every clone this way
+        and then calls :meth:`finish_deferred_reset` once: per clone the N=1 sequence (restore, one physics step, tracking reset)."""
         if tro is None:
             tro = self._tro if self._tro is not None else self._tro_path
         if tro is None:
@@ -225,8 +231,32 @@ class VecISpatialGymTask(ISpatialGymTask):
                 if entity is not None and not isinstance(entity, GroupEntity):
                     entity.keep_still()
         scene.update_initial_file()
+        if defer_reset_step:
+            self._restore_scene_no_step(scene)
+            return
         scene.reset()
         self._reset_tracking([env_idx])
+
+    @staticmethod
+    def _restore_scene_no_step(scene) -> None:
+        """``Scene.reset(hard=True)`` without its closing ``og.sim.step_physics()`` (the step that advances the whole world)."""
+        assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
+        assert scene._initial_file is not None
+        scene.restore(scene_file=scene._initial_file)
+
+    def finish_deferred_reset(self, env_indices) -> None:
+        """The one physics step and the tracking reset after :meth:`load_tro_instance` (``defer_reset_step=True``) of every listed env."""
+        og.sim.step_physics()
+        self._reset_tracking([int(i) for i in env_indices])
+
+    def _reset_scene(self, env, env_indices):
+        """``BaseTask._reset_scene`` (each scene's ``reset()``, each ending with a physics step of the WHOLE world) as one batch: every
+        listed scene restored, then one physics step - per scene the N=1 sequence. ``ISG_BATCHED_SCENE_RESET=0`` restores the stock loop."""
+        if os.environ.get("ISG_BATCHED_SCENE_RESET", "1") == "0":
+            return BehaviorTask._reset_scene(self, env, env_indices)
+        for idx in env_indices:
+            self._restore_scene_no_step(env.scenes[int(idx)])
+        og.sim.step_physics()
 
     def _verify_object_bindings_env(self, tro, scope):
         for inst, binding in tro.meta.object_bindings.items():
