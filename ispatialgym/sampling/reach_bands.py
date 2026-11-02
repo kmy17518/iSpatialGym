@@ -177,6 +177,47 @@ def cache_root() -> str:
     return os.environ.get("ISPATIALGYM_REACH_BANDS", CACHE_DEFAULT)
 
 
+def _band_refine_on() -> bool:
+    from ispatialgym.fastflags import fast_on
+
+    return fast_on("BAND_REFINE")
+
+
+def _job_local_bands() -> bool:
+    from ispatialgym.fastflags import fast_on
+
+    return fast_on("BAND_JOB_LOCAL")
+
+
+def job_local_copy(npz: str) -> str:
+    """train-fast 2026-11-01 (BAND_JOB_LOCAL, default on): a band found outside ``ISPATIALGYM_REACH_BANDS`` (the committed runlog, a
+    store) is copied there (``.npz`` + ``.json``, timestamps kept) and the copy is loaded, so every write-back of this process
+    (feasible sets, the band evidence) lands in the job's own directory; unchanged without the variable or with the switch off."""
+    env = os.environ.get("ISPATIALGYM_REACH_BANDS")
+    if not env or not _job_local_bands():
+        return npz
+    env = os.path.abspath(os.path.expanduser(env))
+    if os.path.dirname(os.path.abspath(npz)) == env:
+        return npz
+    import shutil
+
+    dst = os.path.join(env, os.path.basename(npz))
+    try:
+        os.makedirs(env, exist_ok=True)
+        if not os.path.exists(dst):
+            js = npz[:-4] + ".json"
+            if os.path.exists(js):
+                shutil.copy2(js, dst[:-4] + ".json.tmp%d" % os.getpid())
+                os.replace(dst[:-4] + ".json.tmp%d" % os.getpid(), dst[:-4] + ".json")
+            shutil.copy2(npz, dst + ".tmp%d.npz" % os.getpid())
+            os.replace(dst + ".tmp%d.npz" % os.getpid(), dst)
+            log.info("BAND_JOB_LOCAL: %s copied into the job's band directory", os.path.basename(npz))
+        return dst
+    except OSError as e:  # noqa: BLE001 - an unwritable job directory: load the original (the base behaviour)
+        log.warning("BAND_JOB_LOCAL: could not copy %s into %s (%r); loading the original", npz, env, e)
+        return npz
+
+
 def default_dirs() -> List[str]:
     """Directories :meth:`ReachBands.load` searches, in order: ``ISPATIALGYM_REACH_BANDS``, the committed runlog, ``~/.cache``."""
     env = os.environ.get("ISPATIALGYM_REACH_BANDS")
@@ -529,6 +570,14 @@ class ReachBands:
                 if under_edge is not None and bool(meta.get("under_edge")) != bool(under_edge):
                     continue
                 hits.append((npz, meta))
+        env = os.environ.get("ISPATIALGYM_REACH_BANDS")
+        if env and _job_local_bands():
+            # train-fast 2026-11-01 (BAND_JOB_LOCAL): the same band file in the job's directory and elsewhere -> the job's copy only (the
+            # newest-first order below otherwise let a committed band another job had written back win over the job's copy, and every
+            # job then wrote into that one shared file)
+            env = os.path.abspath(os.path.expanduser(env))
+            mine = {os.path.basename(npz) for npz, _ in hits if os.path.dirname(os.path.abspath(npz)) == env}
+            hits = [h for h in hits if os.path.dirname(os.path.abspath(h[0])) == env or os.path.basename(h[0]) not in mine]
         # finest lattice first, then most trunks, then the newest (contact bands with height=None: the class nearest 0.10 m)
         hits.sort(key=lambda h: (abs(float(h[1].get("height_class", 0.1)) - 0.1) if (contact_set and hcls is None) else 0.0, float(h[1].get("lattice", 1.0)),
                                  -len(h[1].get("trunks", [])), -os.path.getmtime(h[0])))
@@ -558,7 +607,7 @@ class ReachBands:
                                     f"surface_z={surface_z}{f' support_joints={support_joints}' if support_joints else ''} in {list(dirs) if dirs is not None else default_dirs()}")
         if len(paths) > 1:
             log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target or contact_set, paths[0])
-        return ReachBands.from_files(paths[0])
+        return ReachBands.from_files(job_local_copy(paths[0]))
 
     # -- queries --------------------------------------------------------------------------------------------------
     def stand_off_of(self, stand_off: Optional[float]) -> Optional[float]:
@@ -594,6 +643,14 @@ class ReachBands:
     def band(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> np.ndarray:
         """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides);
         ``stand_off``: the cells of the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
+        if stand_off is None and not self.cells_so and self.path and _band_refine_on():
+            # train-fast 2026-11-01 (BAND_REFINE, owner design): the cells of the stance's ACTUAL trunk (0.01 rad key), started from the
+            # band's grid trunks and refined by verified reachability (v2/band_refine.py); the grid arrays themselves are untouched
+            from ispatialgym.sampling.v2 import band_refine as BR
+
+            out = BR.refined_cells(self, translate, tilt)
+            if out is not None:
+                return out
         cells = self._maps(stand_off)[0]
         k = self.nearest_trunk(translate, tilt, stand_off)
         return cells[k] if k is not None else np.zeros((0, 2))

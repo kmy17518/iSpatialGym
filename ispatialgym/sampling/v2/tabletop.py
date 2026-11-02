@@ -1220,6 +1220,80 @@ def workspace(s, bands: RB.ReachBands, stance: Stance, top, erosion: float = 0.0
     return out
 
 
+def stored_feasible_set(bands: RB.ReachBands, stance: Stance, grasps: Sequence[Any], yaws: Sequence[float] = YAWS) -> Optional[List[Tuple[float, Any]]]:
+    """train-fast 2026-10-31 (``ISPATIALGYM_FAST_BAND_FEASIBLE_REUSE``): the feasible set F a sampler stored in the band for this stance's
+    (trunk, focus cell) (:func:`store_feasible_set` appends ``meta["feasible_sets"]`` entries ``{trunk, cell, feasible: [[yaw, grasp name]]}``
+    with the sampler's world yaws and library grasp names; ``removed`` marks an empty F) mapped back onto ``grasps`` / ``yaws``, or None
+    when nothing was stored for that cell (or the stored names match no grasp): the caller then screens with the batched IK as before
+    (two padded 64 x 12 cuRobo calls per arm and candidate, 17-40 s on a shared TITAN RTX). The band's own generation-time ``pairs``
+    (yaw offsets relative to the base yaw) are not read here - their yaw convention differs."""
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(stance.focus[:2]) if stance.focus is not None else None
+    if bands is None or stance.focus is None or not isinstance(getattr(bands, "meta", None), dict) or bands.meta.get("stand_offs"):
+        return None
+    entries = bands.meta.get("feasible_sets") or []
+    if not entries:
+        return None
+    k = bands.nearest_trunk(float(stance.translate), float(stance.tilt))
+    if k is None:
+        return None
+    cell_base = bands.to_base(np.asarray(stance.focus[:2].tolist()), stance.base_pose2d)[0]
+    i = bands.cell_index(k[0], k[1], cell_base)
+    if i is None:
+        return None
+    for fs in reversed(entries):  # the most recent store of this (trunk, cell) wins
+        tr = fs.get("trunk") or []
+        if len(tr) != 2 or abs(float(tr[0]) - float(k[0])) > 1e-6 or abs(float(tr[1]) - float(k[1])) > 1e-6:
+            continue
+        if bands.cell_index(k[0], k[1], np.asarray(fs.get("cell") or [1e9, 1e9], dtype=float)) != i:
+            continue
+        if fs.get("removed"):
+            return []
+        by_name: Dict[str, Any] = {}
+        for g in grasps:
+            by_name.setdefault(C.split_twin(getattr(g, "name", str(g)))[0], g)
+        out: List[Tuple[float, Any]] = []
+        for yaw, gname in fs.get("feasible") or []:
+            g = by_name.get(str(gname))
+            if g is None:
+                continue
+            yaw0 = min(yaws, key=lambda y: abs(C.wrap_angle(float(yaw) - float(y))))
+            out.append((float(yaw0), g))
+        return out if out else None
+    return None
+
+
+def evidence_cell(s, bands: RB.ReachBands, stance: Stance) -> Optional[Tuple[Any, str, str]]:
+    """train-fast 2026-11-01 (BAND_EVIDENCE): ``(evidence, world key, cell key)`` of ``stance``'s (trunk, focus cell) in ``bands`` (the band
+    of the top under the focus for neighbouring supports), None when the band has no such cell or keeps per-stand-off maps."""
+    from ispatialgym.sampling.v2 import band_evidence as EV
+
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(stance.focus[:2]) if stance.focus is not None else None
+    if bands is None or stance.focus is None or not isinstance(getattr(bands, "meta", None), dict) or bands.meta.get("stand_offs"):
+        return None
+    from ispatialgym.sampling.v2 import band_refine as BR
+
+    if BR.refine_on():
+        # BAND_REFINE: the stance's own trunk (0.01) and the focus cell (a refined cell: possibly an addition, not on the grid trunk);
+        # verified reachability does not depend on the world -> one world key
+        cb = bands.to_base(np.asarray(stance.focus[:2].tolist()), stance.base_pose2d)[0]
+        return BR.store_of(bands), BR.WORLD, BR.cell_key((float(stance.translate), float(stance.tilt)), cb)
+    k = bands.nearest_trunk(float(stance.translate), float(stance.tilt))
+    if k is None:
+        return None
+    cell_base = bands.to_base(np.asarray(stance.focus[:2].tolist()), stance.base_pose2d)[0]
+    i = bands.cell_index(k[0], k[1], cell_base)
+    if i is None:
+        return None
+    crop = s._world_scene_crop() if hasattr(s, "_world_scene_crop") else None
+    wk = EV.world_key(getattr(s.world, "scene_model", "?"), list(getattr(s.world, "loaded_rooms", None) or []), crop)
+    # the stance's own trunk, not the band's nearest grid trunk: Phase 2 tilts lie anywhere in a +-0.15 rad band around a grid tilt
+    # (prompt0.tilt_band), and a cell reachable at the grid tilt may not be at the stance's (inside_02: x 0.96 m at 0.25 / -1.2 yes,
+    # at 0.25 / -1.07 no) - one record per grid trunk would let empty screens at one tilt kill the cell for the other
+    return EV.evidence_of(bands), wk, EV.cell_key((round(float(stance.translate), 3), round(float(stance.tilt), 3)), bands.cells[k][i])
+
+
 def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[float, Any]], yaws: Sequence[float] = YAWS) -> None:
     """§4.6 step 1 / §3.10: store the feasible set F of the focus cell under (trunk, cell) in the band (``pairs`` +
     ``meta.feasible_sets``); an empty F removes the cell from the band. In-memory (and written back to the band's
@@ -1267,9 +1341,15 @@ def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[f
             arrays = {RB.trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in bands.cells.items()}
             for (tr, ti), pp in bands.pairs.items():
                 arrays[RB.trunk_key(tr, ti) + "__pairs"] = np.asarray(pp, dtype=np.int32).reshape(-1, 3)
-            np.savez_compressed(bands.path, **arrays)
-            with open(bands.path[:-4] + ".json", "w") as f:
+            # train-fast 2026-10-31: atomic (per-process temp file + rename) - several train jobs of one template write the same band file,
+            # and a torn .npz / .json would break the next job's band load (the write-back itself is the base code's)
+            tmp_npz = f"{bands.path[:-4]}.tmp{os.getpid()}.npz"
+            np.savez_compressed(tmp_npz, **arrays)
+            tmp_json = f"{bands.path[:-4]}.json.tmp{os.getpid()}"
+            with open(tmp_json, "w") as f:
                 json.dump(bands.meta, f, indent=1, default=str)
+            os.replace(tmp_npz, bands.path)
+            os.replace(tmp_json, bands.path[:-4] + ".json")
         except OSError as e:  # noqa: BLE001 - a read-only cache is not a sampling error
             log.debug("band write-back skipped (%r)", e)
 
@@ -2155,6 +2235,11 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                   else default_in_frame(s, st, cam, focus, info, float(target_half_extent), height, margin))
             if not ok:
                 continue
+            # TILT_SNAP (2026-11-01): Phase 3 re-applies these work-camera rules to a stance moved to its grid tilt (the plain path's
+            # classes, also after a split-cone fallback)
+            s._phase2_camera_rule = {"max_angle": math.radians(angle_classes_deg[1]), "boxed": lambda st_, cam_, f_, i_: bool(
+                in_frame_fn(s, st_, cam_, f_, i_) if in_frame_fn is not None
+                else default_in_frame(s, st_, cam_, f_, i_, float(target_half_extent), height, margin))}
             c = st.with_trunk(st.translate, st.tilt, "manipulation")
             c.focus = focus
             c.extras.update({"axis_angle": ang, "angle_class": 0 if ang <= math.radians(angle_classes_deg[0]) else 1, "focus_info": info})
@@ -2264,6 +2349,9 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
     def boxed(stance, cam, focus, info) -> bool:
         return bool(in_frame_fn(s, stance, cam, focus, info) if in_frame_fn is not None
                     else default_in_frame(s, stance, cam, focus, info, float(target_half_extent), height, margin))
+
+    # TILT_SNAP (2026-11-01): Phase 3 re-applies these work-camera rules to a stance moved to its grid tilt
+    s._phase2_camera_rule = {"max_angle": float(w1), "boxed": boxed}
 
     seen: Dict[Tuple[float, float], Tuple[float, bool]] = {}  # position (mm) -> (init-view angle, admitted at the init view)
     out: List[Stance] = []
@@ -2995,22 +3083,168 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
         return object_pose_on(s, hull, rest_quat, cell, yaw, z if support_z is not None else NB.z_at(top, cell))
 
     F_of: Dict[str, List[Tuple[float, Any]]] = {}
+    # train-fast 2026-11-01 (BAND_EVIDENCE, default on; replaces BAND_FEASIBLE_REUSE and, while on, the band write-back that deleted a
+    # cell on one empty screen): F = every pair a screen of this (world, trunk, cell) ever passed minus the pairs the exact IK demoted;
+    # a cell without a record, or one attempt in RESCREEN_P, is screened afresh (the set grows), and a reused F that runs dry is
+    # re-screened once below
+    from ispatialgym.sampling.v2 import band_evidence as EV
+
+    from ispatialgym.sampling.v2 import band_refine as BR
+
+    # BAND_REFINE (owner design 2026-11-01): the evidence path with world-independent keys at the stance's own trunk and only verified
+    # reachability failures counted (band_refine.py); off: BAND_EVIDENCE as before
+    refine = bool(fixed is None and band_yaws and BR.refine_on())
+    ev_on = fixed is None and band_yaws and (refine or fast_on("BAND_EVIDENCE"))
+    task_objs = list((getattr(getattr(s, "world", None), "spawned", None) or {}).values()) if refine else []
+    ev_of: Dict[str, Optional[Tuple[Any, str, str]]] = {}
+    by_gname: Dict[str, Any] = {}
+    for g in grasps:
+        by_gname.setdefault(C.split_twin(getattr(g, "name", str(g)))[0], g)
+
+    def gname(g) -> str:
+        return C.split_twin(getattr(g, "name", str(g)))[0]
+
+    def ev_F(a: str) -> Optional[List[Tuple[float, Any]]]:
+        e = ev_of.get(a)
+        rec = e[0].record(e[1], e[2]) if e is not None else None
+        if rec is None:
+            return None
+        if (BR.dead(rec) if refine else EV.cell_dead(rec)):
+            return []
+        out = []
+        for yaw, gn in EV.feasible_pairs(rec, k=BR.k() if refine else None):
+            if gn in by_gname:
+                out.append((min(yaws, key=lambda y: abs(C.wrap_angle(float(yaw) - float(y)))), by_gname[gn]))
+        return out
+
+    def screen(a: str) -> List[Tuple[float, Any]]:
+        e = ev_of.get(a)
+        # a cell with evidence is screened afresh (the evidence is its memory); without one, the screen cache as before
+        args = ([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of)
+        if e is None:
+            found = s.ikc.feasible_sets(*args).get(0, [])
+        else:
+            try:
+                found = s.ikc.feasible_sets(*args, cache=False).get(0, [])
+            except TypeError:  # a stand-in checker without the cache switch (tests)
+                found = s.ikc.feasible_sets(*args).get(0, [])
+        if e is not None and refine:
+            if not e[0].seen((float(st_of[a].translate), float(st_of[a].tilt))):
+                _count(s, "refine.new_key")
+            verdict = record_refined_screen(s, e, found, args, task_objs, gname)
+            if verdict != "found":
+                _count(s, "refine.verify_other" if verdict == "other" else "refine.verify_reach_fail")
+            if verdict == "reach" and BR.dead(e[0].record(e[1], e[2])):
+                _count(s, "refine.blacklisted")
+        elif e is not None:
+            e[0].add_screen(e[1], e[2], [(float(y), gname(g)) for y, g in found])
+        _count(s, "band_evidence.screen")
+        return found
+
+    screened: Dict[str, bool] = {}
     for a in offered:
+        if ev_on:
+            ev_of[a] = evidence_cell(s, band_of.get(a), st_of[a])
+            known = ev_F(a)
+            if known is not None and (not known or float(rng.random()) >= EV.rescreen_p()):
+                F_of[a] = known
+                screened[a] = False
+                _count(s, "band_evidence.reused" if known else "band_evidence.dead_cell")
+            else:
+                found = screen(a)
+                screened[a] = True
+                F_of[a] = ev_F(a) if ev_of.get(a) is not None else found  # the union with what earlier screens found
+            if (band_of.get(a) is not None) and band_of[a].meta.get("mirrored_from"):
+                _count(s, "arm_band_mirrored.foci")
+                if not F_of[a]:
+                    _count(s, "arm_band_mirrored.empty_F")
+            continue
+        # train-fast 2026-10-31 (BAND_FEASIBLE_REUSE, superseded 2026-11-01 by BAND_EVIDENCE; off by default): F this sampler (or an earlier
+        # job of the template, through the published band) stored for the same (trunk, focus cell) is reused instead of the two padded
+        # batched-IK screens; the exact IK below confirms every drawn pair, but a reused F that runs dry is not re-screened
+        F_reused = stored_feasible_set(band_of.get(a), st_of[a], grasps, yaws) if (fixed is None and band_yaws and fast_on("BAND_FEASIBLE_REUSE", default=False)) else None
+        if F_reused is not None:
+            F_of[a] = F_reused
+            _count(s, "band_feasible_reused")
+            if not getattr(s, "_band_feasible_reuse_logged", False):
+                s._band_feasible_reuse_logged = True
+                log.info("%s: BAND_FEASIBLE_REUSE: feasible set of the focus cell read from the band (%d pairs) instead of the batched IK screen",
+                         getattr(getattr(s, "gp", None), "alias", "?"), len(F_reused))
+            continue
         F_of[a] = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
         if fixed is None and band_yaws:
-            store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
+            if not F_of[a] and fast_on("BAND_VERIFY_STORE"):
+                # train-fast 2026-11-01 (owner): an empty screen removes the cell from the band only when it is a reachability failure
+                spawned = list((getattr(getattr(s, "world", None), "spawned", None) or {}).values())
+                if _screen_quiet(s, ([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of), spawned):
+                    _count(s, "refine.verify_other")
+                else:
+                    store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
+            else:
+                store_feasible_set(band_of.get(a), st_of[a], F_of[a], yaws)
         if (band_of.get(a) is not None) and band_of[a].meta.get("mirrored_from"):
             _count(s, "arm_band_mirrored.foci")
             if not F_of[a]:
                 _count(s, "arm_band_mirrored.empty_F")
-    pool: Dict[Tuple[float, str], Tuple[float, Any, List[str]]] = {}
-    for a in offered:
-        for yaw0, g in F_of[a]:
-            k = (round(float(yaw0), 4), str(getattr(g, "name", id(g))))
-            if k not in pool:
-                pool[k] = (float(yaw0), g, [])
-            pool[k][2].append(a)
-    F = list(pool.values())
+    if refine and float(rng.random()) < BR.add_p():
+        _refine_add(s, band_of.get(offered[0]), st_of[offered[0]], offered[0], fx, top, yaws, grasps, pose_at, ignore_for_grasp, eef_of, task_objs, rng)
+
+    def pool_of(F_by_arm, skip=()) -> List[Tuple[float, Any, List[str]]]:
+        pool: Dict[Tuple[float, str], Tuple[float, Any, List[str]]] = {}
+        for a in offered:
+            for yaw0, g in F_by_arm[a]:
+                k = (round(float(yaw0), 4), str(getattr(g, "name", id(g))))
+                if k in skip:
+                    continue
+                if k not in pool:
+                    pool[k] = (float(yaw0), g, [])
+                pool[k][2].append(a)
+        return list(pool.values())
+
+    def ev_unreachable(a: str) -> bool:
+        e = ev_of.get(a)
+        rec = e[0].record(e[1], e[2]) if e is not None else None
+        return bool(rec and rec.get("unreachable"))
+
+    F = pool_of(F_of)
+    if not F and ev_on and not all(screened.get(a, True) or ev_unreachable(a) for a in offered):
+        # a dead cell by the evidence: one fresh screen before rejecting (the counts may be another world's or an old unlucky streak);
+        # a cell TILT_SNAP found out of reach at this trunk is not re-screened
+        for a in offered:
+            if not screened.get(a, True) and not ev_unreachable(a):
+                screen(a)
+                screened[a] = True
+                F_of[a] = ev_F(a) or []
+        F = pool_of(F_of)
+    if not F and fixed is None and fast_on("TILT_SNAP") and not all(ev_unreachable(a) for a in offered):
+        # TILT_SNAP (owner 2026-11-01, inside_02): Phase 2 stances take continuous tilts between the band's grid tilts, and a far cell the
+        # band holds at the grid tilt may be out of reach at the stance's (x 0.96 m at 0.25 / -1.2, not at 0.25 / -1.07). An empty F at the
+        # stance's tilt: the stance moves to the grid tilt its band cells came from when it stays collision-free and Phase 2's work-camera
+        # rules (axis angle, target in frame) still pass there, and F is screened there; otherwise the cell is kept only when both grid
+        # tilts around the stance's tilt hold it - else it is out of reach at this trunk (evidence: unreachable, never re-screened).
+        F_snap, snap_facts = _tilt_snap(s, manip, st_of, offered, band_of, fx, yaws, grasps, pose_at, ignore_for_grasp, eef_of)
+        if F_snap:
+            for a in offered:
+                ev_of[a] = evidence_cell(s, band_of.get(a), st_of[a]) if ev_on else None
+                F_of[a] = F_snap.get(a, [])
+                e = ev_of.get(a)
+                if e is not None:
+                    e[0].add_screen(e[1], e[2], [(float(y), gname(g)) for y, g in F_of[a]])
+                    F_of[a] = ev_F(a) or F_of[a]
+                screened[a] = True
+            F = pool_of(F_of)
+            _count(s, "tilt_snap.adopted")
+            log.info("%s: TILT_SNAP: stance tilt %.3f -> grid tilt %.3f (camera rules pass, %d pairs)", getattr(getattr(s, "gp", None), "alias", "?"),
+                     snap_facts["from"][1], snap_facts["grid"][1], len(F))
+        else:
+            _count(s, "tilt_snap." + snap_facts.get("outcome", "none"))
+            if snap_facts.get("outcome") == "out_of_bracket" and ev_on and not refine:
+                for a in offered:
+                    e = ev_of.get(a)
+                    if e is not None:
+                        e[0].mark_unreachable(e[1], e[2])
+    if not F and fast_on("DIAG_EMPTY_F", default=False):
+        _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp, eef_of)
     if not F:
         _reject("grasp_unreachable", f"empty feasible set F at the focus {[round(float(v), 3) for v in fx.tolist()]} (trunk {manip.translate:.2f}/{manip.tilt:+.2f}, "
                                      f"{len(yaws)} yaws x {len(grasps)} grasps{', arms ' + str(offered) if len(offered) > 1 else ''})")
@@ -3018,10 +3252,145 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     fails = {"support": 0, "ik": 0}
     last_reason = ""
     exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+    tried: set = set()
+    n_pairs = len(F)
+    while F:
+        out = _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
+                           band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None)
+        if isinstance(out, tuple):
+            return out
+        last_reason = out or last_reason
+        if not (ev_on and not all(screened.get(a, True) for a in offered)):
+            break
+        # BAND_EVIDENCE: the reused F ran dry - one fresh screen of the arms whose F came from the evidence, then the pairs not tried yet
+        for a in offered:
+            if not screened.get(a, True):
+                screen(a)
+                screened[a] = True
+                F_of[a] = ev_F(a) or []
+        _count(s, "band_evidence.rescreen_dry")
+        F = pool_of(F_of, skip=tried)
+        n_pairs += len(F)
+    _reject("grasp_unreachable", f"F ({n_pairs} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
+
+
+def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str], band_of, fx, yaws, grasps, pose_at, ignore_for_grasp,
+               eef_of) -> Tuple[Optional[Dict[str, List[Tuple[float, Any]]]], Dict[str, Any]]:
+    """TILT_SNAP (owner 2026-11-01) for :func:`phase3_target`'s empty F: ``(F per arm at the grid tilt, facts)`` when the stance moved to
+    its band's grid tilt (``st_of`` and ``manip`` take that trunk), else ``(None, facts)`` with ``facts["outcome"]`` one of ``no_band``,
+    ``on_grid`` (already at a grid tilt), ``collides``, ``camera`` (Phase 2's work-camera rules fail there), ``no_rule`` (no Phase 2 rule
+    recorded), ``empty_at_grid``, then the bracket test: ``in_bracket`` (both grid tilts around the stance's tilt hold the cell: kept,
+    an ordinary miss) or ``out_of_bracket`` (out of reach at this trunk)."""
+    a0 = offered[0]
+    st = st_of[a0]
+    bands = band_of.get(a0)
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(st.focus[:2]) if st.focus is not None else None
+    facts: Dict[str, Any] = {"from": [float(st.translate), float(st.tilt)]}
+    if bands is None or st.focus is None or not isinstance(getattr(bands, "meta", None), dict) or bands.meta.get("stand_offs"):
+        facts["outcome"] = "no_band"
+        return None, facts
+    k = bands.nearest_trunk(float(st.translate), float(st.tilt))
+    if k is None:
+        facts["outcome"] = "no_band"
+        return None, facts
+    facts["grid"] = [float(k[0]), float(k[1])]
+    outcome = None
+    if abs(float(k[1]) - float(st.tilt)) <= 1e-3 and abs(float(k[0]) - float(st.translate)) <= 1e-3:
+        outcome = "on_grid"
+    rule = getattr(s, "_phase2_camera_rule", None)
+    if outcome is None and rule is None:
+        outcome = "no_rule"
+    if outcome is None:
+        snapped = {a: st_of[a].with_trunk(float(k[0]), float(k[1]), st_of[a].name) for a in offered}
+        free = s.ikc.stances_collision_free(list(snapped.values())).tolist()
+        if not all(free):
+            outcome = "collides"
+        else:
+            cam = stance_cameras(s, [snapped[a0]])[0]
+            focus = _t(manip.focus).float()
+            info = manip.extras.get("focus_info")
+            if float(s.world.camera_model.angle_off_axis(cam, focus)) > float(rule["max_angle"]) or not rule["boxed"](snapped[a0], cam, focus, info):
+                outcome = "camera"
+            else:
+                found = {}
+                for a in offered:
+                    args = ([fx], list(yaws), grasps, pose_at, snapped[a], a, list(ignore_for_grasp), eef_of)
+                    try:
+                        found[a] = s.ikc.feasible_sets(*args, cache=False).get(0, [])
+                    except TypeError:  # a stand-in checker without the cache switch (tests)
+                        found[a] = s.ikc.feasible_sets(*args).get(0, [])
+                if any(found.values()):
+                    for a in offered:
+                        st_of[a] = snapped[a]
+                    manip.translate, manip.tilt = float(k[0]), float(k[1])
+                    manip.q = None
+                    manip.extras["tilt_snap"] = {"from": facts["from"], "to": facts["grid"]}
+                    facts["outcome"] = "adopted"
+                    return found, facts
+                outcome = "empty_at_grid"
+    facts["first"] = outcome
+    # the bracket: the band's grid tilts at this translate just below and above the stance's tilt must both hold the cell
+    tilts = sorted({float(t) for (tr, t) in bands.cells if abs(float(tr) - float(st.translate)) < 1e-6 and len(bands.cells[(tr, t)])})
+    lo = max((t for t in tilts if t <= float(st.tilt) + 1e-6), default=None)
+    hi = min((t for t in tilts if t >= float(st.tilt) - 1e-6), default=None)
+    cell_base = bands.to_base(np.asarray(st.focus[:2].tolist()), st.base_pose2d)[0]
+    both = lo is not None and hi is not None and all(bands.cell_index(float(st.translate), t, cell_base) is not None for t in {lo, hi})
+    facts.update({"bracket": [lo, hi], "outcome": "in_bracket" if both else "out_of_bracket"})
+    return None, facts
+
+
+def _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp, eef_of, limit: int = 4) -> None:
+    """train-fast 2026-11-01 diagnostic (``ISPATIALGYM_FAST_DIAG_EMPTY_F=1``, off by default; the inside_02 crop divergence): for the first
+    ``limit`` empty feasible sets of the process, the screen again with every scene object out of the collision world (pairs found = the
+    collision world caused it), then with each scene object within 1.5 m of the focus out alone (the culprits); one INFO line each."""
+    n = s.__dict__.get("_diag_empty_f_n", 0)
+    if n >= limit:
+        return
+    s._diag_empty_f_n = n + 1
+    try:
+        a = offered[0]
+        st = st_of[a]
+        base = list(st.base_pose2d)
+
+        def screen(ignore_extra) -> int:
+            with s.ikc.ignoring(list(ignore_extra)):
+                return len(s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st, a, list(ignore_for_grasp), eef_of, cache=False).get(0, []))
+
+        scene = [o for o in s.world.scene.objects if o is not s.robot and not getattr(o, "visual_only", False)]
+        n_all = screen(scene)
+        near = []
+        for o in scene:
+            lo, hi = o.aabb
+            c = (lo[:2] + hi[:2]) / 2
+            if float(th.linalg.norm(c - _t(fx)[:2].float())) < 1.5:
+                near.append(o)
+        culprits = []
+        if n_all:
+            for o in near:
+                k = screen([o])
+                if k:
+                    culprits.append(f"{o.name}({k})")
+        log.info("DIAG_EMPTY_F %s: focus %s base %s trunk %.2f/%+.2f arm %s: %d pairs with no scene object, %d scene objects (%d within 1.5 m); "
+                 "pairs with one object out: %s", getattr(getattr(s, "gp", None), "alias", "?"), [round(float(v), 3) for v in _t(fx).tolist()],
+                 [round(float(v), 3) for v in base], float(st.translate), float(st.tilt), a, n_all, len(scene), len(near), culprits or "none")
+    except Exception as e:  # noqa: BLE001 - a diagnostic never fails an attempt
+        log.info("DIAG_EMPTY_F failed: %r", e)
+
+
+def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins, band_of,
+                 name, offered, arm, manip, fails, ev_of, gname, tried, verify=None):
+    """:func:`phase3_target`'s draw over F (without replacement): ``(pose, GraspRecord)`` on the first exact-IK confirmation, else the last
+    IK failure reason. With ``ev_of`` (BAND_EVIDENCE) each tried pair's outcome is counted in its arm's evidence (a pair whose positions
+    all left the support counts nothing); ``tried`` collects the pairs drawn."""
+    last_reason = ""
     for i in rng.permutation(len(F)):
         yaw0, g, arms_i = F[int(i)]
         a0 = arms_i[0]
+        tried.add((round(float(yaw0), 4), str(getattr(g, "name", id(g)))))
         yaw = float(yaw0) + float(rng.uniform(-jitter, jitter))
+        n_ik = 0
+        last_fail = None
         for _ in range(int(n_positions)):
             r, a = float(rng.uniform(0.0, focus_radius)), float(rng.uniform(0.0, 2 * math.pi))
             xy = th.tensor([float(fx[0]) + r * math.cos(a), float(fx[1]) + r * math.sin(a)])
@@ -3044,10 +3413,15 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                         _count(s, "arm_band_mirrored.ik_tried")
                         if not o.get("ok"):
                             _count(s, "arm_band_mirrored.ik_failed")
+            n_ik += 1
             if not res.ok:
                 fails["ik"] += 1
                 last_reason = res.reason
+                last_fail = (pre, eef)
                 continue
+            if ev_of is not None and ev_of.get(a0) is not None:
+                e = ev_of[a0]
+                e[0].add_exact(e[1], e[2], float(yaw0), gname(g), True)
             finger_q = list(getattr(g_rec, "finger_q", []) or []) or None
             rec = GraspRecord(name, arm_c, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_in_object)
             if pick is not None:
@@ -3059,7 +3433,93 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                 adopt_arm(manip, st_of[arm_c])
             rec.stance = manip.name
             return pose, rec
-    _reject("grasp_unreachable", f"F ({len(F)} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
+        if n_ik and ev_of is not None and ev_of.get(a0) is not None:
+            e = ev_of[a0]
+            if verify is None:
+                e[0].add_exact(e[1], e[2], float(yaw0), gname(g), False)
+            elif last_fail is not None:
+                if not verified_exact_failure(s, last_fail[0], last_fail[1], st_of[a0], a0, exact_kw, verify):
+                    _count(s, "refine.verify_other")
+                else:
+                    _count(s, "refine.verify_reach_fail")
+                    e[0].add_exact(e[1], e[2], float(yaw0), gname(g), False)
+                    from ispatialgym.sampling.v2 import band_refine as BR
+
+                    rec = e[0].record(e[1], e[2]) or {}
+                    if _pair_demoted(rec, float(yaw0), gname(g), BR.k()):
+                        _count(s, "refine.blacklisted")
+    return last_reason
+
+
+def verified_exact_failure(s, pre: Pose, eef: Pose, stance: Stance, arm: str, exact_kw: Dict[str, Any], objs) -> bool:
+    """BAND_REFINE: whether a pair's exact-IK failure is a reachability failure - the exact IK at the same [pre, eef] still fails with the
+    task-spawned objects ``objs`` out of the collision world (the static scene stays). The exact IK's own rules count when they persist
+    that way - ``exact IK failed``, ``ik_joint_limit`` (joint-limit margin), ``ik_reach`` (witness residual), ``approach_untrackable``:
+    properties of the arm at that stance and pose; a pass means the failure was a collision with a task object."""
+    with s.ikc.ignoring(list(objs)):
+        again = s.ikc.exact([pre, eef], stance, arm, **exact_kw)
+    return not again.ok
+
+
+def _pair_demoted(rec: Dict[str, Any], yaw: float, grasp: str, k: int) -> bool:
+    from ispatialgym.sampling.v2 import band_evidence as EV
+
+    v = (rec.get("pairs") or {}).get(EV.pair_key(yaw, grasp))
+    return bool(v) and EV.demoted(v, k)
+
+
+def record_refined_screen(s, e: Tuple[Any, str, str], found, args, objs, gname) -> str:
+    """BAND_REFINE: record a feasible-set screen of a (trunk, cell) key in its refinement store ``e`` = (store, world key, cell key) and
+    return the verdict - ``found`` (pairs: recorded as positives), ``other`` (empty in this world but not with the task-spawned objects
+    ``objs`` out: a collision with task objects - only the reachable pairs are recorded, nothing counts against the cell) or ``reach``
+    (empty with them out too: a verified reachability failure, recorded as an empty screen)."""
+    if found:
+        e[0].add_screen(e[1], e[2], [(float(y), gname(g)) for y, g in found])
+        return "found"
+    reach = _screen_quiet(s, args, objs)
+    if reach:
+        e[0].add_screen(e[1], e[2], [(float(y), gname(g)) for y, g in reach])
+        return "other"
+    e[0].add_screen(e[1], e[2], [])
+    return "reach"
+
+
+def _screen_quiet(s, args, objs) -> List[Tuple[float, Any]]:
+    """The feasible-set screen of ``args`` with ``objs`` (the task-spawned objects) out of the collision world: the static scene stays
+    (BAND_REFINE / BAND_VERIFY_STORE reachability verification)."""
+    with s.ikc.ignoring(list(objs)):
+        try:
+            return s.ikc.feasible_sets(*args, cache=False).get(0, [])
+        except TypeError:  # a stand-in checker without the cache switch (tests)
+            return s.ikc.feasible_sets(*args).get(0, [])
+
+
+def _refine_add(s, bands, st: Stance, a: str, fx, top, yaws, grasps, pose_at, ignore_for_grasp, eef_of, objs, rng) -> None:
+    """BAND_REFINE additions: one lattice neighbour of the focus cell missing from the stance trunk's refined cells, on the top, screened
+    with the task-spawned objects out; a pair found adds the cell to the key."""
+    from ispatialgym.sampling.v2 import band_refine as BR
+
+    if isinstance(bands, NB.NeighborBands):
+        bands = bands.member_for(_t(fx)[:2]) if fx is not None else None
+    if bands is None or not getattr(bands, "path", None) or bands.meta.get("stand_offs") or st.focus is None:
+        return
+    cells = bands.band(float(st.translate), float(st.tilt))
+    cb = bands.to_base(np.asarray(st.focus[:2].tolist()), st.base_pose2d)[0]
+    lattice = float(bands.meta.get("lattice", 0.08) or 0.08)
+    cand = []
+    for nb in BR.neighbours(cells, cb, lattice):
+        w = bands.to_world(np.asarray([nb], dtype=float), st.base_pose2d)[0]
+        if top is None or top.contains(th.tensor([float(w[0]), float(w[1])]), 0.0):
+            cand.append((nb, w))
+    if not cand:
+        return
+    nb, w = cand[int(rng.integers(len(cand)))]
+    found = _screen_quiet(s, ([th.tensor([float(w[0]), float(w[1])])], list(yaws), grasps, pose_at, st, a, list(ignore_for_grasp), eef_of), objs)
+    _count(s, "refine.add_screened")
+    if found:
+        BR.store_of(bands).add_cell(BR.cell_key((float(st.translate), float(st.tilt)), nb),
+                                    [(float(y), C.split_twin(getattr(g, "name", str(g)))[0]) for y, g in found])
+        _count(s, "refine.added")
 
 
 def fallback_arms(rec: GraspRecord) -> List[str]:
