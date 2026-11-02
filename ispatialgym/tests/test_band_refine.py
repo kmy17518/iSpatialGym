@@ -28,14 +28,14 @@ def _cells(a):
     return sorted((round(float(x), 3), round(float(y), 3)) for x, y in np.asarray(a).reshape(-1, 2))
 
 
-def test_a_new_key_starts_from_the_bracket_or_the_nearest_trunk(tmp_path, monkeypatch):
+def test_a_new_key_starts_from_the_nearest_trunk_or_the_bracket(tmp_path, monkeypatch):
     b = _band(tmp_path)
-    assert _cells(b.band(0.25, -1.07)) == _cells([NEAR, MID])  # bracket: the cells -0.9 and -1.2 both hold (FAR is -1.2's only)
-    assert _cells(b.band(0.25, -1.2)) == _cells([NEAR, MID, FAR])  # on a grid tilt: that trunk's cells
-    assert _cells(b.band(0.25, -1.35)) == _cells([NEAR, MID, FAR])  # beyond the grid: the nearest trunk's
-    monkeypatch.setenv("ISPATIALGYM_FAST_BAND_REFINE_INIT", "nearest")
+    assert _cells(b.band(0.25, -1.07)) == _cells([NEAR, MID, FAR])  # nearest (the default): a copy of the nearest grid trunk (-1.2)
+    monkeypatch.setenv("ISPATIALGYM_FAST_BAND_REFINE_INIT", "bracket")
     b2 = _band(tmp_path, "b2")
-    assert _cells(b2.band(0.25, -1.07)) == _cells([NEAR, MID, FAR])  # a copy of the nearest grid trunk (-1.2)
+    assert _cells(b2.band(0.25, -1.07)) == _cells([NEAR, MID])  # bracket: the cells -0.9 and -1.2 both hold (FAR is -1.2's only)
+    assert _cells(b2.band(0.25, -1.2)) == _cells([NEAR, MID, FAR])  # on a grid tilt: that trunk's cells
+    assert _cells(b2.band(0.25, -1.35)) == _cells([NEAR, MID, FAR])  # beyond the grid: the nearest trunk's
     monkeypatch.setenv("ISPATIALGYM_FAST_BAND_REFINE", "0")
     assert _cells(_band(tmp_path, "b3").band(0.25, -1.07)) == _cells([NEAR, MID, FAR])  # off: the grid trunk as before
 

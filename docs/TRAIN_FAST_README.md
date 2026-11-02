@@ -22,7 +22,10 @@ curated training data.
 | shared sampling cache | `$F/cache/sampling` (start-draw cells, exact-IK witnesses; `ISGF_SAMPLING_CACHE` overrides) |
 | read-only inputs | `$E=/vision/u/minyeong/projects/isg_home/eval85` (counted eval templates, `snapshot.sh`), train85's `bands_train` and templates |
 
-`$F/scripts` is not in git. Section 6 lists the scripts each experiment needs.
+A snapshot of `$F/scripts` as of 11-01 20:10 PST is in [scripts/trainfast/](../scripts/trainfast/), without `__pycache__`. The scripts
+hard-code the cluster paths (`$F`, `$W`, train85, eval85) and run from `$F/scripts`; the cluster copy is the live one. The `*.bak_*`
+files are `job_fast.sh` / `submit_fast.py` before their 10-31 21:50 and 11-01 09:27 edits, which is what earlier tags ran. Section 6
+lists the scripts each experiment needs.
 
 ## 2. Code changes (commits on 43ad206a)
 
@@ -39,18 +42,24 @@ curated training data.
 | `433b1c14` | RECORD_CHANGED_ONLY and the per-step cost split (`Executor.step_costs`) |
 | `6124ed00` | unit tests of the switches (stubs, no simulator) |
 | `0bc722ac` | FAST_FLOW.md, SPEED_REPORT.md |
+| `2616ca71` | this README |
+| later | the owner's 11-01 defaults (TILT_SNAP off, BAND_REFINE_INIT nearest) and the `scripts/trainfast/` snapshot: `git log --oneline 2616ca71..train-fast` |
 
 Every switch is `ISPATIALGYM_FAST_<NAME>`, read by `fastflags.fast_on` / `fast_value`. `=0` turns one off and `ISPATIALGYM_FAST=0`
 turns all of them off (the base code's behaviour, an A side on the same code). They are **on by default** except:
 BAND_FEASIBLE_REUSE, DIAG_EMPTY_F, the three IK branch switches LIMIT_RETRY_RETURN_ALL / REMEMBERED_WITH_SEED / SINGLE_RETRY_EXACT
-(off since 11-01: they caused robot stutters, experiment E6), and BAND_SHARE (job-script level, off). SCENE_CROP takes a mode
-(`full` / `rooms` / `region`; the default depends on the family, see FAST_FLOW.md).
+(off since 11-01: they caused robot stutters, experiment E6), TILT_SNAP (off since 11-01 20:10, E11), and BAND_SHARE (job-script
+level, off). SCENE_CROP takes a mode (`full` / `rooms` / `region`; the default depends on the family, see FAST_FLOW.md).
+BAND_REFINE_INIT defaults to `nearest` since 11-01 20:10 (was `bracket`, E14).
 
-**Defaults still to decide** (they are on in the code; see the experiments):
-- TILT_SNAP hurt inside_02 (E11).
-- BAND_REFINE_INIT: the `bracket` start (the code default) looked worse than `nearest` / off on ontop. BAND_REFINE itself was not
-  distinguishable from off (E14).
-- CR_OBSTACLE_RETRY was not shown to help or hurt (E12).
+**Owner decisions of 11-01 evening:**
+- TILT_SNAP off (it lowered inside_02's yield, E11).
+- BAND_REFINE_INIT `nearest` (the `bracket` start halved ontop's yield, E14). BAND_REFINE itself stays on: with `nearest` it was
+  not worse than off on either alias.
+- RECORD_CHANGED_ONLY stays as it is (on). Collections use the cropped scene path; its effect on full-scene physics (E13) matters
+  only if full-scene demos are needed.
+
+**Still to decide:** CR_OBSTACLE_RETRY was not shown to help or hurt (E12).
 
 ## 3. Setting up a replication
 
@@ -130,7 +139,8 @@ The cluster worktree was edited during the campaign, so a tag ran on the code of
 | 11-01 11:00 | IK_CACHE_SHARE_CROP, DIAG_EMPTY_F |
 | 11-01 12:00 | BAND_EVIDENCE keyed by the stance's own trunk |
 | 11-01 15:40 | TILT_SNAP |
-| 11-01 17:00 | BAND_REFINE, BAND_VERIFY_STORE, RECORD_CHANGED_ONLY |
+| 11-01 16:20 | BAND_REFINE, BAND_VERIFY_STORE, RECORD_CHANGED_ONLY (DECISIONS logs them at 17:00; the first `refine_on` jobs started 16:20, `full3` at 16:33) |
+| 11-01 20:10 | defaults: TILT_SNAP off, BAND_REFINE_INIT `nearest`. Tags submitted from 15:40 ran TILT_SNAP on, and tags from 16:20 the `bracket` start: to repeat them add `ISPATIALGYM_FAST_TILT_SNAP=1` / `ISPATIALGYM_FAST_BAND_REFINE_INIT=bracket` |
 
 ## 6. Experiments
 
@@ -260,7 +270,8 @@ Production (train85) made 4.6 successful demos per GPU-hour.
   - Written / attempts: 8/680 (1.18 %, Wilson 95 % 0.60-2.30) vs 15/493 (3.04 %, 1.85-4.96); Fisher two-sided p = 0.031.
   - `tilt_snap.adopted` 163 times. Rejections shifted to `gripper_not_in_frame` at pre-place (385 vs 258).
   - inside_02 is limited by the pre-place frame check, not the tilt.
-  - To repeat the baseline arm, add `ISPATIALGYM_FAST_TILT_SNAP=0`.
+  - TILT_SNAP is off by default since 11-01 20:10, so the baseline arm is now the default; the `tiltsnap` arm needs
+    `ISPATIALGYM_FAST_TILT_SNAP=1`.
 
 ### E12. Camera relocalization switches (11-01)
 
@@ -321,42 +332,47 @@ Production (train85) made 4.6 successful demos per GPU-hour.
 
 ### E14. Band refinement A/B (11-01)
 
-- Arms on ontop_small_01 and touching_01, 4 jobs of n=24 per arm and alias:
-  - `refine_on`: defaults (BAND_REFINE, INIT bracket).
-  - `refine_nearest`: `BAND_REFINE_INIT=nearest`.
-  - `refine_off`: `BAND_REFINE=0`, i.e. BAND_EVIDENCE as before.
+- Arms on ontop_small_01 and touching_01, 4 jobs of n=24 per arm and alias, submitted 16:20-17:01 (TILT_SNAP was on in all of them):
+  - `refine_on`: the defaults then (BAND_REFINE, INIT bracket). On today's code add `BAND_REFINE_INIT=bracket TILT_SNAP=1`.
+  - `refine_nearest`: `BAND_REFINE_INIT=nearest`, the default since 20:10. On today's code add `TILT_SNAP=1`.
+  - `refine_off`: `BAND_REFINE=0`, i.e. BAND_EVIDENCE as before. On today's code add `TILT_SNAP=1`.
 - Script: `refine_ab.py`. It reports written / attempts with Wilson intervals, Fisher p against off, the `refine.*` counters, the
   rejection mix, and the focus-ahead distance of written instances.
-- Results at 18:12, about 60 minutes after the last 18 jobs loaded. Job 18248578 (touching, nearest) was killed for running out of
-  memory at 32 GB after 2 attempts, so that cell has 3 jobs. Yield = written / attempts.
+- Final results: every job ran to completion (the last at 19:04), except job 18248578 (touching, nearest), which was killed for
+  running out of memory at 32 GB after 2 attempts (1 written); it is in the pooled numbers but not the job-level test. Yield =
+  written / attempts. The 18:12 interim reading gave the same verdict.
 
   | alias | arm | yield (95 % Wilson) | Fisher p vs off | written per sampler-h | per-job yield % | job-level p vs off |
   |---|---|---|---|---|---|---|
-  | ontop_small_01 | refine_on (bracket) | 37/658 = 5.6 % (4.1-7.7) | 0.0018 | 7.5 | 13.3, 3.7, 6.7, 3.5 | 0.20 |
-  | | refine_nearest | 47/392 = 12.0 % (9.1-15.6) | 0.59 | 10.9 | 5.0, 12.4, 17.4, 14.3 | 0.89 |
-  | | refine_off | 53/494 = 10.7 % (8.3-13.8) | - | 11.0 | 12.9, 15.1, 6.6, 14.9 | - |
-  | touching_01 | refine_on (bracket) | 51/773 = 6.6 % (5.1-8.6) | 1.0 | 10.6 | 6.5, 7.7, 10.9, 2.7 | 1.0 |
-  | | refine_nearest | 46/478 = 9.6 % (7.3-12.6) | 0.065 | 13.9 | 10.2, 12.6, 6.4 | 0.23 |
-  | | refine_off | 50/748 = 6.7 % (5.1-8.7) | - | 10.2 | 5.0, 7.7, 5.0, 8.6 | - |
+  | ontop_small_01 | refine_on (bracket) | 51/972 = 5.2 % (4.0-6.8) | 1.6e-5 | 7.8 | 8.4, 3.2, 7.8, 3.2 | 0.11 |
+  | | refine_nearest | 81/717 = 11.3 % (9.2-13.8) | 0.93 | 12.6 | 6.0, 13.5, 14.9, 13.4 | 0.89 |
+  | | refine_off | 78/707 = 11.0 % (8.9-13.6) | - | 12.1 | 10.3, 19.1, 6.6, 12.4 | - |
+  | touching_01 | refine_on (bracket) | 76/959 = 7.9 % (6.4-9.8) | 0.55 | 12.3 | 8.8, 7.7, 14.0, 4.4 | 0.49 |
+  | | refine_nearest | 64/644 = 9.9 % (7.9-12.5) | 0.045 | 14.5 | 10.1, 13.9, 7.1 (+ the OOM job, 1/2) | 0.23 |
+  | | refine_off | 76/1064 = 7.1 % (5.7-8.8) | - | 11.4 | 7.3, 6.6, 6.2, 8.6 | - |
 
-  Job-level p = exact two-sided Mann-Whitney on the per-job yields. The Fisher test treats attempts as independent; attempts within a
-  job share a template and the bands it learns, and the jobs of one arm spread widely (refine_off on ontop: 6.6-15.1 %).
+  Job-level p = exact two-sided Mann-Whitney on the per-job yields; with 4 against 4 jobs the smallest possible p is 0.029. The Fisher
+  test treats attempts as independent; attempts within a job share a template and the bands it learns, and the jobs of one arm
+  spread widely (refine_off on ontop: 6.6-19.1 %).
 - Counters (ontop / touching):
-  - refine_on: `refine.new_key` 60 / 40, `verify_reach_fail` 137 / 147, `blacklisted` 52 / 30, `added` 11 / 29 of 16 / 54 screened,
-    `verify_other` 1 / 1.
-  - refine_nearest: `new_key` 58 / 30, `verify_reach_fail` 96 / 110, `blacklisted` 33 / 11, `added` 4 / 6 of 20 / 28 screened,
-    `verify_other` 1 / 2.
-  - Task objects alone almost never caused an empty screen (`verify_other` 1-2 per arm).
-- Focus distance ahead of the base, written instances (median, range):
-  - ontop: bracket 0.80 m (0.72-0.96), nearest 0.88 (0.72-0.96), off 0.88 (0.72-0.96).
-  - touching: 0.72 m for all three; ranges 0.64-0.88 for bracket and nearest (additions), 0.64-0.80 for off.
-- Verdict: the differences are within noise, with one suggestive exception.
-  - On ontop the bracket start yields half of off per attempt (p 0.002 per attempt, but only 0.20 per job with 4 jobs).
-  - It has a plausible mechanism: the bracket start drops the far cells where ontop succeeds (median focus 0.80 vs 0.88), and its
-    rejections shift to `path_collision` (41 % vs 25 % under off).
-  - nearest is indistinguishable from off on both aliases. BAND_REFINE itself (nearest) vs off shows no measurable difference in this
-    test.
-  - Recommendation: BAND_REFINE_INIT `nearest` if BAND_REFINE stays on. The code default is still `bracket` (owner decision).
+  - refine_on: `refine.new_key` 71 / 40, `verify_reach_fail` 223 / 210, `blacklisted` 69 / 33, `added` 15 / 32 of 23 / 69 screened,
+    `verify_other` 2 / 2.
+  - refine_nearest: `new_key` 72 / 33, `verify_reach_fail` 203 / 170, `blacklisted` 59 / 22, `added` 9 / 9 of 34 / 40 screened,
+    `verify_other` 1 / 5.
+  - Task objects alone almost never caused an empty screen (`verify_other` 1-5 per arm).
+  - `tilt_snap.adopted` 67 / 69 / 87 on ontop and 33 / 22 / 32 on touching (on / nearest / off).
+- Rejections on ontop: `path_collision` 40 % under bracket, 22 % under nearest, 27 % under off; `path_too_long` 14 / 41 / 29 %.
+- Focus distance ahead of the base, written instances (median, range): ontop 0.80 m (0.72-0.96) for bracket and nearest, 0.88 m
+  (0.72-0.96) for off; touching 0.72 m (0.64-0.88) for all three. At 18:12 nearest's ontop median was 0.88, so the shorter focus is
+  not specific to the bracket start.
+- Verdict:
+  - On ontop the bracket start yields half of off: 5.2 % vs 11.0 %, p = 1.6e-5 per attempt. Per job it is p = 0.11 with 4 jobs, and
+    every bracket job is below three of the four off jobs. Its rejections shift to `path_collision`.
+  - nearest is indistinguishable from off on ontop (11.3 % vs 11.0 %). On touching it is higher (9.9 % vs 7.1 %, p = 0.045 per
+    attempt, 0.23 per job with 3 jobs): suggestive, within noise at the job level.
+  - bracket on touching: no difference from off.
+  - Taken up: BAND_REFINE_INIT `nearest` is the default since 11-01 20:10. The owner's combination (nearest with TILT_SNAP off) was
+    not run as an arm.
 
 ### Production-configuration fills (stopped)
 
@@ -365,11 +381,12 @@ Production (train85) made 4.6 successful demos per GPU-hour.
 
 ## 7. Open items
 
-- The BAND_REFINE / BAND_REFINE_INIT defaults (E14 recommends `nearest`). A job-level answer needs more jobs, not longer ones.
+- BAND_REFINE with `nearest` vs off: a job-level answer needs more jobs, not longer ones (E14). The new defaults together
+  (nearest, TILT_SNAP off) were not run as an arm.
 - Memory: one of 18 jobs at 32 GB was killed for running out of memory (sampler + 2 collectors).
-- TILT_SNAP default (E11). inside_02's pre-place gripper-in-frame limit.
-- RECORD_CHANGED_ONLY changes the physics of some instances (E13). Either rewrite it to compare the dumped state, or decide whether
-  that is acceptable.
+- inside_02's pre-place gripper-in-frame limit (E11).
+- RECORD_CHANGED_ONLY changes the physics of some full-scene instances (E13). Left as is: collections use the cropped path. If
+  full-scene demos are needed, rewrite it to decide "changed" from the dumped state.
 - block_design_01 board placement; inside_large_scale_03 `no_init_surface`.
 - disembedding_04 / 07-10 have no train85 template copy, so they were never submitted.
 - Low-yield aliases on both crop and full: nextto_01, touching_02, inside_01, axial_04.
