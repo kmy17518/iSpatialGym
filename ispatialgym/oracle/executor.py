@@ -937,12 +937,48 @@ class Executor:
         always dump the full state."""
         self._recording_filter = bool(enabled)
         registry = getattr(getattr(self.env, "scene", None), "object_registry", None)
+        if enabled and fast_on("RECORD_CHANGED_ONLY"):
+            self._active_filter = self._changed_filter()  # the instance attribute shadows the static method
         if registry is not None and hasattr(registry, "set_dump_filter"):
             registry.set_dump_filter(self._active_filter if enabled else (lambda obj: True))
 
     @staticmethod
     def _active_filter(obj) -> bool:
         return bool(getattr(obj, "is_active", True) and getattr(obj, "initialized", True))
+
+    #: RECORD_CHANGED_ONLY: an awake object enters a recorded state only when its root pose or joints moved more than this since the
+    #: state it was last recorded with (m / quaternion components / joint units)
+    RECORD_CHANGE_TOL = 1e-5
+
+    def _changed_filter(self):
+        """train-fast 2026-11-01 (RECORD_CHANGED_ONLY): BEHAVIOR's per-step filter (awake, initialized objects) plus: only objects whose root
+        pose or joint positions changed by more than :data:`RECORD_CHANGE_TOL` since their last recorded state. In the full house scene
+        ~50 static objects stay awake (resting-contact chatter: bushes, sofas, pot plants) and were written every step; a replay then
+        re-posed them every step - half the replay speed, and the renderer's temporal history disturbed on static edges (nextto_02
+        100322: 3.2 grey levels from the cropped path vs 1.9 run-to-run). An object left out keeps its last loaded state on replay, as a
+        sleeping object always did; the comparison is against the last RECORDED state, so a slow drift is still recorded once it adds up."""
+        last: Dict[str, th.Tensor] = {}
+        tol = float(fast_value("RECORD_CHANGE_TOL", self.RECORD_CHANGE_TOL))
+        base = Executor._active_filter
+
+        def flt(obj) -> bool:
+            if not base(obj):
+                return False
+            try:
+                p, q = obj.get_position_orientation()
+                parts = [th.as_tensor(p, dtype=th.float32).reshape(-1), th.as_tensor(q, dtype=th.float32).reshape(-1)]
+                if int(getattr(obj, "n_joints", 0) or 0) > 0:
+                    parts.append(th.as_tensor(obj.get_joint_positions(), dtype=th.float32).reshape(-1))
+                fp = th.cat(parts)
+            except Exception:  # noqa: BLE001 - anything without a pose: recorded as before
+                return True
+            prev = last.get(obj.name)
+            if prev is not None and prev.shape == fp.shape and float((fp - prev).abs().max()) <= tol:
+                return False
+            last[obj.name] = fp.clone()
+            return True
+
+        return flt
 
     @property
     def state_owner(self):
@@ -996,8 +1032,15 @@ class Executor:
                                                              "gripper_command": round(cmd, 4)})
 
     def step(self, action: th.Tensor, phase: int = PHASE_ORACLE, action_index: int = -1, attempt: int = 0, monitor: bool = True) -> Optional[Verdict]:
+        # 2026-11-01 train-fast (always on): per-step cost split - env step (physics + obs + task), monitors, state dump, recorder, QA
+        sc = self.__dict__.setdefault("step_costs", {"steps": 0, "env_step_s": 0.0, "monitors_s": 0.0, "dump_s": 0.0, "record_s": 0.0, "qa_s": 0.0,
+                                                     "dump_floats": 0})
+        _t0 = time.perf_counter()
         ag_before = self._ag_held()
         obs, reward, terminated, truncated, info = SE.step(self.env, action, n_render_iterations=self.cfg.n_render_iterations)
+        _t1 = time.perf_counter()
+        sc["steps"] += 1
+        sc["env_step_s"] += _t1 - _t0
         self.n += 1
         ag_after = self._ag_held()
         self._check_releases(ag_before, ag_after, action)
@@ -1027,8 +1070,14 @@ class Executor:
                 self.arm_stutter = None
         if self.root_watch is not None:
             self.root_watch.observe(self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None, self.n)
+        _t2 = time.perf_counter()
+        sc["monitors_s"] += _t2 - _t1
         if self.recorder is not None:
             state = self._dump_state(full=False) if (self.cfg.record_state and self.recorder.cfg.hdf5) else None
+            _t3 = time.perf_counter()
+            sc["dump_s"] += _t3 - _t2
+            if state is not None:
+                sc["dump_floats"] += int(state.numel())
             sim_time = None
             try:
                 sim_time = float(self.sim.current_time)
@@ -1040,9 +1089,12 @@ class Executor:
                 rew = 0.0
             self.recorder.record(self.n, action, obs, info, state=state, phase=phase, action_index=action_index, attempt=attempt,
                                  reward=rew, terminated=bool(terminated), truncated=bool(truncated), sim_time=sim_time)
+            sc["record_s"] += time.perf_counter() - _t3
         verdict = None
+        _t4 = time.perf_counter()
         if monitor and self.monitors is not None:
             verdict = self.monitors.check_timeout_only(self.n) if self._qa_off else self.monitors.check(self.n)
+        sc["qa_s"] += time.perf_counter() - _t4
         if verdict is None and self.n >= self.cfg.max_steps:
             verdict = Verdict("timeout", f"episode exceeded max_steps {self.cfg.max_steps}", step=self.n)
             self.stats.record(verdict)
