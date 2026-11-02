@@ -22,10 +22,10 @@ curated training data.
 | shared sampling cache | `$F/cache/sampling` (start-draw cells, exact-IK witnesses; `ISGF_SAMPLING_CACHE` overrides) |
 | read-only inputs | `$E=/vision/u/minyeong/projects/isg_home/eval85` (counted eval templates, `snapshot.sh`), train85's `bands_train` and templates |
 
-A snapshot of `$F/scripts` as of 11-01 20:10 PST is in [scripts/trainfast/](../scripts/trainfast/), without `__pycache__`. The scripts
-hard-code the cluster paths (`$F`, `$W`, train85, eval85) and run from `$F/scripts`; the cluster copy is the live one. The `*.bak_*`
-files are `job_fast.sh` / `submit_fast.py` before their 10-31 21:50 and 11-01 09:27 edits, which is what earlier tags ran. Section 6
-lists the scripts each experiment needs.
+A snapshot of `$F/scripts` (11-01 20:10 PST, refreshed at 22:30 with the E15 scripts) is in
+[scripts/trainfast/](../scripts/trainfast/), without `__pycache__`. The scripts hard-code the cluster paths (`$F`, `$W`, train85,
+eval85) and run from `$F/scripts`; the cluster copy is the live one. The `*.bak_*` files are `job_fast.sh` / `submit_fast.py` before
+their 10-31 21:50 and 11-01 09:27 edits, which is what earlier tags ran. Section 6 lists the scripts each experiment needs.
 
 ## 2. Code changes (commits on 43ad206a)
 
@@ -146,7 +146,8 @@ The cluster worktree was edited during the campaign, so a tag ran on the code of
 
 Aliases are written short: `ontop_small_01` = `inter_object_relation_satisfaction-ontop_small_scale_01`, and so on. n = instances per
 job, k = collectors per job. "Steady" successes per GPU-hour exclude the world load at the job start; "whole" includes it.
-Production (train85) made 4.6 successful demos per GPU-hour.
+Production (train85) made 7,183 successful demos in 2,404 GPU-hours of job wall, 2.99 per GPU-hour. The 10-31 notes quoted 4.6,
+which the job walls do not reproduce. Speed-ups are against train85 on the same alias keys (`speed_compare.py`; see SPEED_REPORT.md).
 
 ### E1. Speed of the fast flow (10-31)
 
@@ -155,8 +156,11 @@ Production (train85) made 4.6 successful demos per GPU-hour.
 - 14 aliases: ontop_small_01, inside_02, nextto_02, under_small_01, touching_01, axial_01, world_vertical_02, attachment_02,
   artic_open_small_01, disembedding_03, cr-obstructed-toy_car_1, mr-mug, os-bell_pepper, block_design_01.
 - Results:
-  - Round-1 fleet: 90 successes in 93 demos, 7.5 whole / 21.7 steady successes per GPU-hour.
-  - pilot: 782 written, 714 successes (91 %), 53.0 GPU-h, i.e. 13.5 whole / 15.9 steady per GPU-hour, 2.9x production.
+  - Final whole / steady successes per GPU-hour on the 14 keys (train85 on them: 3.2): base 2.1 / 7.4, flags 6.8 / 16.7, fast
+    8.8 / 21.9 (x2.8), fast2 10.7 / 22.7 (x3.4). Cancelled jobs count to their slurm end (the 10-31 interim 7.5 for round 1 was
+    taken while jobs ran).
+  - pilot: 782 written, 714 successes (91 %), 53.0 GPU-h, i.e. 13.5 whole / 15.9 steady per GPU-hour, x3.4 against train85 on the
+    same 10 keys (4.0 per GPU-hour there).
   - Demo success by tag: base 84 %, flags 95, fast 97, fast2 91, pilot 91.
   - axial_01, attachment_02, block_design_01 and inside_02 wrote nothing in any tag (yield problems, see E8, E10, E11).
 - Caveat: house tabletop numbers from round 2 until 11-01 09:40 ran with the band contamination (E9) and count only as speed
@@ -171,6 +175,8 @@ Production (train85) made 4.6 successful demos per GPU-hour.
   - An isolated nextto demo: base 473 s load / 235 s episode / 56 s plan; fast 431 / 179 / 33.
   - An uncontended sampler takes 62 s per attempt (ontop), against 108-137 s co-located with two collectors.
   - 24 vs 9 CPUs was inconclusive at n=12. The CPU request was later set to 12 from the jobs' measured use (sacct).
+  - Per key against fast2 (SPEED_REPORT.md): one collector 7.8 / 10.6 vs 9.3 / 12.7 successes per GPU-hour; the split layout 2.5 / 2.0
+    vs 12.2 / 6.0 (its collector GPU idles); 24 CPUs 8.0 / 10.1 / 13.3 vs 9.3 / 12.2 / 12.7. Sampler + 2 collectors stays.
 
 ### E3. COLLECTOR_PREBUILD (10-31 22:40)
 
@@ -374,6 +380,23 @@ Production (train85) made 4.6 successful demos per GPU-hour.
   - Taken up: BAND_REFINE_INIT `nearest` is the default since 11-01 20:10. The owner's combination (nearest with TILT_SNAP off) was
     not run as an arm.
 
+### E15. Collector costs, job balance and the final accounting (11-01 evening)
+
+- No new jobs; scripts over the existing outputs (all in `$F/scripts`):
+  - `step_costs.py [tags]`: the collectors' always-on timers (`meta.json` `fast.step_costs` / `fast.world_sync`), per family.
+  - `job_balance.py [tags]`: collector busy share = demo time ÷ collector wall, and the drain after the sampler ends.
+  - `gpu_use.py [tags]`: utilisation and peak memory from each job's `gpu.log`.
+  - `speed_compare.py <tags>`: each tag against train85 on the same keys.
+  - `projection.py <label> <tags> ...`: speed-up at train85's alias mix.
+  - `fleet_summary.py` now charges a job cancelled before `ISGF_END` its sacct Elapsed instead of "until now".
+- Results (2,021 demos of pilot2-4 / crop2 / crop4; 78 jobs):
+  - Collector episode time: env step 59 %, QA 13 %, planning and the rest 15 %, world syncs 7 %, state dump 3 %, recorder 3 %.
+  - Collectors are busy 29 % of their wall in the median job; only large IORS and disembedding keep them busy.
+  - GPU utilisation is 8-39 % (median per tag); peak memory 17-20 GB per job.
+  - At train85's mix: TITAN x2.9-4.3 (9.7-10.9 successes per GPU-hour), L40S x7.4 (21.7).
+- Decision: no narrower per-step dump / sync set (it cannot move throughput while the sampler bounds the job). Details and the
+  projection: SPEED_REPORT.md.
+
 ### Production-configuration fills (stopped)
 
 - Tags `pilot2` (27 aliases on viscam L40S, 93 % demo success by 12:34), `pilot3`, `pilot4` (`refill.py`, stop file `refill.stop`).
@@ -394,6 +417,8 @@ Production (train85) made 4.6 successful demos per GPU-hour.
   - the split-cone collapse (E8);
   - bands written back into the eval85 / train85 snapshots;
   - static-object recording in full-scene demos (E13).
+- Packing beyond sampler + 2 collectors: 3+ collectors per GPU (large IORS, disembedding) and 2 samplers per GPU (L40S), with a
+  TITAN control on the same keys (SPEED_REPORT.md recommendation 1).
 - Follow-ups the owner asked for on 10-31, not started: GPU PhysX for a single-scene collector; a vectorized oracle collector
   (FAST_FLOW.md).
 

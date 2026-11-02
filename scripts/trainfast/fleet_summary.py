@@ -3,7 +3,8 @@
 
     fleet_summary.py [--tag base --tag fast ...] [--md]
 
-GPU-hours = job wall (ISGF_END) or, for a running job, now - start (ISGF_SAMPLE line). A job's statistics come from job_stats.json
+GPU-hours = job wall (ISGF_END); for a job cancelled or killed before it, slurm's Elapsed (sacct); for a running job, now - start
+(ISGF_SAMPLE line). A job's statistics come from job_stats.json
 (fast_check.py); for a running job they are recomputed from its logs on the fly.
 """
 import argparse
@@ -34,6 +35,10 @@ def job_wall(job):
                 end = int(m.group(1))
     if end is not None:
         return end, "done"
+    # 2026-11-01: a job cancelled or killed before its ISGF_END line ran for slurm's Elapsed, not until now
+    ended = _slurm_ended(job)
+    if ended is not None:
+        return ended, "ended"
     if start:
         try:
             from datetime import datetime
@@ -42,6 +47,24 @@ def job_wall(job):
         except ValueError:
             pass
     return None, "unknown"
+
+
+_SACCT = {}
+
+
+def _slurm_ended(job):
+    """Elapsed seconds of the job's slurm job (``<job>/jobid``) when it is no longer pending or running, else None."""
+    try:
+        jid = open(os.path.join(job, "jobid")).read().split()[0]
+    except (OSError, IndexError):
+        return None
+    if jid not in _SACCT:
+        out = subprocess.run(["sacct", "-j", jid, "-X", "-n", "-P", "-o", "State,ElapsedRaw"], capture_output=True, text=True).stdout.split("\n")
+        _SACCT[jid] = out[0].split("|") if out and out[0] else None
+    rec = _SACCT[jid]
+    if not rec or rec[0].split()[0] in ("RUNNING", "PENDING", "REQUEUED", "SUSPENDED"):
+        return None
+    return int(rec[1])
 
 
 def stats_of(job):
@@ -101,7 +124,7 @@ def main():
         for _, _, s in sel:
             for k, v in s["rejections"].items():
                 rej[k] = rej.get(k, 0) + v
-        return {"jobs": len(sel), "done": sum(1 for _, _, s in sel if s["_state"] == "done"), "attempts": att, "written": wr,
+        return {"jobs": len(sel), "done": sum(1 for _, _, s in sel if s["_state"] in ("done", "ended")), "attempts": att, "written": wr,
                 "s_per_attempt": att_s / att if att else None, "attempts_per_written": att / wr if wr else None,
                 "demos": demos, "successes": succ, "s_per_demo": sum(dw) / len(dw) if dw else None,
                 "gpu_h": wall / 3600, "succ_per_gpu_h": succ / (wall / 3600) if wall else None,
