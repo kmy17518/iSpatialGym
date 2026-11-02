@@ -441,7 +441,7 @@ def test_submission_order_and_cli(grounded, capsys, tmp_path):
     assert rows[2]["args"].endswith("--support-row 'disembedding#05~T3' --seed-split eval --seed-index 0") and rows[2]["run"] == "disembedding_05/c3_k0"
     data = json.loads((tmp_path / "c.json").read_text())
     assert len(data["order"]) == 10 and data["picks"]["disembedding#05"][2]["tag"] == grounded.cands["disembedding#05"][2].tag
-    assert SC.main(["--subtask", "inter_object_relation_satisfaction-nextto", "--subtask", "disembedding", "--only-ok"] + common) == 0
+    assert SC.main(["--subtask", "inter_object_relation_satisfaction-nextto_small_scale", "--subtask", "disembedding", "--only-ok"] + common) == 0
     table = capsys.readouterr().out.splitlines()
     assert table[0].split("\t") == list(SC.TABLE_COLUMNS) and len(table) == 16 and all(line.split("\t")[12] == "ok" for line in table[1:])
     assert sum(line.split("\t")[0] == "inter_object_relation_satisfaction-nextto#04" for line in table[1:]) == 5

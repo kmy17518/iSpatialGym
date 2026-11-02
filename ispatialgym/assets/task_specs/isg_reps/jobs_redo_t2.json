@@ -60,16 +60,16 @@
   "variant": "disembedding-tablefork-distractors-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table"
  },
  {
   "id": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk__representative__target-lykqoh__partner-ukfaaz",

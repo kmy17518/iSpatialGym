@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table (inter_object_relation_satisfaction-inside#01, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-breakfast_table (inter_object_relation_satisfaction-inside#02, slot representative)",
  "inter_object_relation_satisfaction-2": {
   "variant": "inside",
   "roles": {
    "target": {
     "models": {
-     "brussels_sprouts": [
-      "mbkrxe"
+     "hard_candy": [
+      "vwegtt"
      ]
     },
     "grasps": {
-     "key": "brussels_sprouts__mbkrxe__i"
+     "key": "hard_candy__vwegtt"
     }
    },
    "partner": {
     "models": {
-     "bowl": [
-      "belcml"
+     "hingeless_jar": [
+      "lvuvbf"
      ]
     }
    },
@@ -50,11 +50,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-inside",
-   "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-inside#01",
+   "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+   "variant": "inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-inside#02",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

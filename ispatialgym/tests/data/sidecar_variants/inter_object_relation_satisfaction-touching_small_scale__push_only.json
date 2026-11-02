@@ -1,9 +1,9 @@
 {
   "schema": "isg-oracle-v1",
-  "instance_id": "inter_object_relation_satisfaction-touching-can_of_soda-mug-breakfast_table__house_single_floor__target-can_of_soda-bfrzvk__partner-mug-ycbmug__0000",
+  "instance_id": "inter_object_relation_satisfaction-touching_small_scale-can_of_soda-mug-breakfast_table__house_single_floor__target-can_of_soda-bfrzvk__partner-mug-ycbmug__0000",
   "tro_sha256": "785b0fa2fd31fa0072bc7f0cd0a131ef512bb287d6e07bb991ee3656e962f302",
   "task_family": "inter_object_relation_satisfaction",
-  "variant": "inter_object_relation_satisfaction-touching-can_of_soda-mug-breakfast_table",
+  "variant": "inter_object_relation_satisfaction-touching_small_scale-can_of_soda-mug-breakfast_table",
   "path_bucket_m": null,
   "stances": {
     "init": {
@@ -181,42 +181,13 @@
         0.0
       ],
       "distance_m": 0.018
-    },
+    }
+  },
+  "summary": {
     "brace": {
-      "arm": "left",
-      "object": "mug.n.04_1",
-      "kind": "far_side",
-      "pre": {
-        "position": [
-          6.869,
-          3.11,
-          0.863
-        ],
-        "orientation": [
-          -0.0,
-          0.707107,
-          0.0,
-          0.707107
-        ]
-      },
-      "contact": {
-        "position": [
-          6.969,
-          3.11,
-          0.863
-        ],
-        "orientation": [
-          -0.0,
-          0.707107,
-          0.0,
-          0.707107
-        ]
-      },
-      "direction": [
-        1.0,
-        0.0,
-        0.0
-      ]
+      "present": false,
+      "gate": "brace_off_band",
+      "candidates": 0
     }
   }
 }

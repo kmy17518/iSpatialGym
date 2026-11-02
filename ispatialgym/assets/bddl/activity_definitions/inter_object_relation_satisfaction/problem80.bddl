@@ -1,9 +1,9 @@
 (define (problem inter_object_relation_satisfaction-80)
     (:domain ispatialgym)
-    (:variant inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table)
+    (:variant inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#03~T4/representative)
-    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table (inter_object_relation_satisfaction/nextto_small_scale.iddl; inter_object_relation_satisfaction-nextto#03~T4/representative)
+    ; IORS - nextto (small-scale). Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
     ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
 
     (:objects

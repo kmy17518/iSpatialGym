@@ -37,8 +37,8 @@ POD_PREFIX = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/con
               "OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands ")
 
 PIPELINE = {"disembedding": "tabletop", "inter_object_relation_satisfaction-ontop_small_scale": "tabletop", "inter_object_relation_satisfaction-under_small_scale": "tabletop",
-            "inter_object_relation_satisfaction-nextto": "tabletop", "inter_object_relation_satisfaction-touching": "tabletop",
-            "inter_object_relation_satisfaction-inside": "insert", "configuration_matching-attachment": "attachment",
+            "inter_object_relation_satisfaction-nextto_small_scale": "tabletop", "inter_object_relation_satisfaction-touching_small_scale": "tabletop",
+            "inter_object_relation_satisfaction-inside_small_scale": "insert", "configuration_matching-attachment": "attachment",
             "inter_object_relation_satisfaction-ontop_large_scale": "tabletop", "inter_object_relation_satisfaction-under_large_scale": "tabletop"}
 GENERIC = {"alignment-axial", "configuration_matching-block_design"}
 BRACE = {"configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale"}

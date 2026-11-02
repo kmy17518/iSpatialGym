@@ -72,10 +72,10 @@ def test_support_surface_entry_carries_the_neighbors_and_is_unchanged_without():
 def test_the_candidate_record_names_the_neighbors_only_when_the_entry_has_them():
     from ispatialgym.sampling.v2.problem import GroundedProblem, subtask_of_variant
 
-    variant = "inter_object_relation_satisfaction-inside-garlic_clove-saucepot-countertop"
+    variant = "inter_object_relation_satisfaction-inside_small_scale-garlic_clove-saucepot-countertop"
     surfaces = [{"name": "countertop_kelzer_0", "init": "ontop", "top_z": 0.89, "row": "p#04~T2"},
                 {"name": "countertop_kelker_0", "init": "ontop", "top_z": 0.89, "row": "p#04~T1", "neighbors": ["countertop_kelzer_0"]}]
-    entry = {"iddl": "inter_object_relation_satisfaction/inside.iddl", "definition_id": 62,
+    entry = {"iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl", "definition_id": 62,
              "roles": {"target": {"category": "garlic_clove", "sampleable": True}, "partner": {"category": "saucepot", "sampleable": True},
                        "support": {"category": "countertop", "sampleable": False}, "floor": {"sampleable": False}},
              "scenes": {"house_single_floor": {"rooms": ["kitchen_0"], "bindings": {"support": ["countertop_kelzer_0", "countertop_kelker_0"],

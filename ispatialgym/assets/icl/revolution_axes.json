@@ -98,7 +98,7 @@
   "uses": [
    "disembedding/distractors",
    "inter_object_relation_satisfaction-under_small_scale/target",
-   "inter_object_relation_satisfaction-inside/partner"
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
   ]
  },
  "beer_glass/mxsliu": {
@@ -119,7 +119,7 @@
   "uses": [
    "disembedding/distractors",
    "inter_object_relation_satisfaction-under_small_scale/target",
-   "inter_object_relation_satisfaction-inside/partner"
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
   ]
  },
  "beeswax_candle/nhdnje": {
@@ -862,7 +862,7 @@
    "object_scaling/target",
    "disembedding/target",
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-touching/target"
+   "inter_object_relation_satisfaction-touching_small_scale/target"
   ]
  },
  "bottle_of_medicine/fmfwng": {
@@ -883,7 +883,7 @@
    "object_scaling/target",
    "disembedding/target",
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-touching/target"
+   "inter_object_relation_satisfaction-touching_small_scale/target"
   ]
  },
  "bottle_of_medicine/kqkwoq": {
@@ -904,7 +904,7 @@
    "object_scaling/target",
    "disembedding/target",
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-touching/target"
+   "inter_object_relation_satisfaction-touching_small_scale/target"
   ]
  },
  "bottle_of_medicine/syfpak": {
@@ -925,7 +925,7 @@
    "object_scaling/target",
    "disembedding/target",
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-touching/target"
+   "inter_object_relation_satisfaction-touching_small_scale/target"
   ]
  },
  "bottle_of_olive_oil/cqycjk": {
@@ -2815,7 +2815,7 @@
   "uses": [
    "object_scaling/target",
    "inter_object_relation_satisfaction-ontop_large_scale/target",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "carrot/aucrah": {
@@ -2834,7 +2834,7 @@
   ],
   "uses": [
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "carrot/qhmmmx": {
@@ -2853,7 +2853,7 @@
   ],
   "uses": [
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "chopstick/bcwuwv": {
@@ -2908,7 +2908,7 @@
    0.00825
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "cinnamon_stick/smfuqz": {
@@ -2927,7 +2927,7 @@
    0.01111
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "cola_bottle/oyqdtz": {
@@ -2964,7 +2964,7 @@
    0.0048
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/bkdqwb": {
@@ -2983,7 +2983,7 @@
    0.00481
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/bnsqcn": {
@@ -3002,7 +3002,7 @@
    0.00481
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/deuvcx": {
@@ -3021,7 +3021,7 @@
    0.00479
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/egvqng": {
@@ -3040,7 +3040,7 @@
    0.00481
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/jdqvdl": {
@@ -3059,7 +3059,7 @@
    0.00479
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/jnccuz": {
@@ -3078,7 +3078,7 @@
    0.00478
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/kadvlg": {
@@ -3097,7 +3097,7 @@
    0.00478
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/kgmapz": {
@@ -3116,7 +3116,7 @@
    0.00479
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/kjwoqm": {
@@ -3135,7 +3135,7 @@
    0.00487
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/nssris": {
@@ -3154,7 +3154,7 @@
    0.00479
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "colored_pencil/qrxemk": {
@@ -3173,7 +3173,7 @@
    0.00478
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "conditioner_dispenser/njqnuo": {
@@ -3403,7 +3403,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "jar_of_spaghetti_sauce/xpasvb": {
@@ -3422,7 +3422,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "jar_of_spaghetti_sauce/yqnmoy": {
@@ -3441,7 +3441,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "jar_of_spaghetti_sauce/zahyds": {
@@ -3460,7 +3460,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "lemonade_bottle/yprkek": {
@@ -3536,7 +3536,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/mcpkkq": {
@@ -3556,7 +3556,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/mznenj": {
@@ -3575,7 +3575,7 @@
    0.01397
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/oyjbhy": {
@@ -3594,7 +3594,7 @@
    0.01407
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/qemval": {
@@ -3613,7 +3613,7 @@
   ],
   "uses": [
    "object_scaling/target",
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/rsxbso": {
@@ -3649,7 +3649,7 @@
    0.01413
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/vrjwkg": {
@@ -3667,7 +3667,7 @@
    0.01407
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/xakoic": {
@@ -3686,7 +3686,7 @@
    0.01407
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "marker/zmimhb": {
@@ -3974,7 +3974,7 @@
    0.00394
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/gbzzcg": {
@@ -3994,7 +3994,7 @@
    0.00392
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/heqkmr": {
@@ -4014,7 +4014,7 @@
    0.00394
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/hmawzy": {
@@ -4033,7 +4033,7 @@
    0.004
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/jntybl": {
@@ -4053,7 +4053,7 @@
    0.00392
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/lruiot": {
@@ -4073,7 +4073,7 @@
    0.00393
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/lykqoh": {
@@ -4093,7 +4093,7 @@
    0.00391
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/mvmxfo": {
@@ -4113,7 +4113,7 @@
    0.00392
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/rzscao": {
@@ -4133,7 +4133,7 @@
    0.00391
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/vedvit": {
@@ -4153,7 +4153,7 @@
    0.00396
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/vpzhth": {
@@ -4173,7 +4173,7 @@
    0.00392
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pencil/vvofwr": {
@@ -4193,7 +4193,7 @@
    0.00399
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target"
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
   ]
  },
  "pepper_shaker/tgcwtr": {
@@ -4212,8 +4212,8 @@
    0.15963
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/target",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "pepper_shaker/ykujyn": {
@@ -4233,8 +4233,8 @@
    0.15963
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/target",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "public_trash_can/gvnfgj": {
@@ -4289,8 +4289,8 @@
    0.15505
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/target",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "salt_shaker/iomwtn": {
@@ -4308,8 +4308,8 @@
    0.13983
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/target",
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/target",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "salt_shaker/qowouj": {
@@ -4328,7 +4328,7 @@
    0.07283
   ],
   "uses": [
-   "inter_object_relation_satisfaction-nextto/partner"
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
   ]
  },
  "shampoo_dispenser/eblcnw": {
@@ -4596,7 +4596,7 @@
   ],
   "uses": [
    "disembedding/distractors",
-   "inter_object_relation_satisfaction-inside/partner"
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
   ]
  },
  "vase/atgnsc": {
@@ -4632,7 +4632,7 @@
    0.16297
   ],
   "uses": [
-   "inter_object_relation_satisfaction-inside/partner"
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
   ]
  },
  "vase/stqkvx": {
@@ -4651,7 +4651,7 @@
    0.20809
   ],
   "uses": [
-   "inter_object_relation_satisfaction-inside/partner"
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
   ]
  },
  "wall_nail/wlnail": {

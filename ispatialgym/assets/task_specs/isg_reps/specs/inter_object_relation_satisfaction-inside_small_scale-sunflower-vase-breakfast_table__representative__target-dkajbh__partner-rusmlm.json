@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table (inter_object_relation_satisfaction-touching#03, slot representative)",
- "inter_object_relation_satisfaction-4": {
-  "variant": "touching",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-breakfast_table (inter_object_relation_satisfaction-inside#05, slot representative)",
+ "inter_object_relation_satisfaction-2": {
+  "variant": "inside",
   "roles": {
    "target": {
     "models": {
-     "carton_of_milk": [
-      "xmugpm"
+     "sunflower": [
+      "dkajbh"
      ]
     },
     "grasps": {
-     "key": "carton_of_milk__xmugpm"
+     "key": "sunflower__dkajbh"
     }
    },
    "partner": {
     "models": {
-     "box_of_cookies": [
-      "lwhbid"
+     "vase": [
+      "rusmlm"
      ]
     }
    },
@@ -50,16 +50,16 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-touching",
-   "variant": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-touching#03",
+   "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+   "variant": "inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-inside#05",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",
      "role": "target",
-     "pipeline": "tabletop"
+     "pipeline": "insert"
     }
    ],
    "scene": "house_single_floor",

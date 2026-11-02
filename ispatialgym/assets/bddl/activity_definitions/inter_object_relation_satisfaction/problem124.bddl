@@ -1,10 +1,10 @@
 (define (problem inter_object_relation_satisfaction-124)
     (:domain ispatialgym)
-    (:variant inter_object_relation_satisfaction-touching-spray_bottle_wegawe-bottle_of_detergent-countertop)
+    (:variant inter_object_relation_satisfaction-touching_small_scale-spray_bottle_wegawe-bottle_of_detergent-countertop)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching-spray_bottle-bottle_of_detergent-countertop (inter_object_relation_satisfaction/touching.iddl; inter_object_relation_satisfaction-touching#04~T2/representative)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-countertop (inter_object_relation_satisfaction/touching_small_scale.iddl; inter_object_relation_satisfaction-touching#04~T2/representative)
     ; owner 2026-10-12 ~16:05 touching#04 with spray_bottle/wegawe (~W1, ~W2): hand-made from this grounding - target spray_bottle/wegawe (spray_bottle__wegawe__t), registry mode test
-    ; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
+    ; IORS - touching (small-scale). Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
     ; while the other gripper braces the partner's far side (push and brace computed geometrically, no artefact); the
     ; partner must not move (> 5 mm) at the goal.
 

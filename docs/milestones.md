@@ -587,12 +587,12 @@ Tagged states of this repository and what passed on them.
 | `configuration_matching-block_design-block_4-breakfast_table_board` | 0927-202313 (`6ef3110f`) | 0927-202315 | 0 (0) | 3646 (3936) |
 | `disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table` | 0927-213135 (`6ef3110f`) | 0927-213222, 0927-213504 | 0 (0) | 876 (929) |
 | `disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table` | 0928-013557 (`5d6a7ff5`) | – | 1 (1) | 890 (881) |
-| `inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table` | 0927-210516 (`6ef3110f`) | 0927-210632 | 0 (1) | 892 (969) |
-| `inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table` | 0927-211238 (`6ef3110f`) | – | 0 (0) | 806 (806) |
+| `inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table` | 0927-210516 (`6ef3110f`) | 0927-210632 | 0 (1) | 892 (969) |
+| `inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table` | 0927-211238 (`6ef3110f`) | – | 0 (0) | 806 (806) |
 | `inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor` | 0927-211643 (`6ef3110f`) | – | 3 (0) | 1715 (1545) |
 | `inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table` | 0927-212056 (`6ef3110f`) | 0927-212310 | 0 (0) | 761 (960) |
 | `inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table` | 0928-013601 (`5d6a7ff5`) | 0928-013605 | 0 (0) | 863 (945) |
-| `inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0927-205001 (`6ef3110f`) | 0927-205038 | 0 (0) | 1638 (1638) |
+| `inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0927-205001 (`6ef3110f`) | 0927-205038 | 0 (0) | 1638 (1638) |
 | `inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table` | 0927-202317 (`6ef3110f`) | 0927-202319 | 0 (0) | 2754 (2768) |
 | `inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table` | 0927-210941 (`6ef3110f`) | – | 0 (0) | 891 (891) |
 | `mental_rotation-banana` | 0927-210824 (`6ef3110f`) | – | 0 (0) | 108 (108) |
@@ -697,12 +697,12 @@ Tagged states of this repository and what passed on them.
 | `configuration_matching-block_design-block_4-breakfast_table_board` | 0927-040243 | – | 0 (0) | 3936 (3772) |
 | `disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table` | 0927-034001 | 0927-034021 | 0 (0) | 929 (863) |
 | `disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table` | 0927-040245 | – | 1 (0) | 881 (906) |
-| `inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table` | 0927-034023 | 0927-034137 | 1 (1) | 969 (886) |
-| `inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table` | 0927-040247 | – | 0 (0) | 806 (999) |
+| `inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table` | 0927-034023 | 0927-034137 | 1 (1) | 969 (886) |
+| `inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table` | 0927-040247 | – | 0 (0) | 806 (999) |
 | `inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor` | 0927-030109 | 0927-030112 | 0 (0) | 1545 (1972) |
 | `inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table` | 0927-041454 | – | 0 (2) | 960 (944) |
 | `inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table` | 0927-034205 | 0927-034228 | 0 (0) | 945 (1136) |
-| `inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0927-041624 | – | 0 (0) | 1638 (1653) |
+| `inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0927-041624 | – | 0 (0) | 1638 (1653) |
 | `inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table` | 0927-030120 | 0927-030122 | 0 (1) | 2768 (2493) |
 | `inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table` | 0927-041703 | – | 0 (0) | 891 (918) |
 | `mental_rotation-banana` | 0927-041741 | – | 0 (0) | 108 (108) |
@@ -817,12 +817,12 @@ Tagged states of this repository and what passed on them.
 | `configuration_matching-block_design-block_4-breakfast_table_board` | 0926-065148 | init → manipulation: recorded; manipulation_2 → manipulation_3: recorded | 0926-065102 |
 | `disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table` | 0926-065154 | manipulation → placement (carried): recorded | 0926-065108 |
 | `disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table` | 0926-065152 | manipulation → placement (carried): recorded | 0926-065106 |
-| `inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table` | 0926-075013 | no drive leg | 0926-071855 |
-| `inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table` | 0926-074719 | no drive leg | 0926-071633 |
+| `inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table` | 0926-075013 | no drive leg | 0926-071855 |
+| `inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table` | 0926-074719 | no drive leg | 0926-071633 |
 | `inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor` | 0926-065142 | init → manipulation: face_travel; manipulation → placement (carried): recorded | 0926-065056 |
 | `inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table` | 0926-073844 | no drive leg | 0926-070834 |
 | `inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table` | 0926-074242 | no drive leg | 0926-070913 |
-| `inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0926-074810 | manipulation → push (carried): recorded | 0926-071724 |
+| `inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table` | 0926-074810 | manipulation → push (carried): recorded | 0926-071724 |
 | `inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table` | 0926-065144 | init → manipulation: recorded; manipulation → placement (carried): recorded | 0926-065058 |
 | `inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table` | 0926-065200 | no drive leg | 0926-065112 |
 | `mental_rotation-banana` | 0926-072342 | no drive leg | 0926-065122 |

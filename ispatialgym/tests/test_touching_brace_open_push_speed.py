@@ -24,7 +24,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance
 
 CUSTOMS = os.path.join(os.path.dirname(__file__), "..", "assets", "task_specs", "isg_customs.json")
-BAR = "inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"
+BAR = "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar"
 
 #: box_of_cereal/dkhgxn's collision boundary points (its own frame, scale 1; the sampler's local_hull), 0.1 mm
 DKHGXN = th.tensor([

@@ -1,27 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table (inter_object_relation_satisfaction-nextto#01, slot representative)",
- "inter_object_relation_satisfaction-3": {
-  "variant": "nextto",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching_small_scale-carton_of_milk-box_of_cookies-breakfast_table (inter_object_relation_satisfaction-touching#03, slot representative)",
+ "inter_object_relation_satisfaction-4": {
+  "variant": "touching",
   "roles": {
    "target": {
     "models": {
-     "pencil": [
-      "hmawzy"
+     "carton_of_milk": [
+      "xmugpm"
      ]
     },
     "grasps": {
-     "key": "pencil__hmawzy__s"
-    },
-    "scale": [
-     1.0,
-     3.231,
-     4.998
-    ]
+     "key": "carton_of_milk__xmugpm"
+    }
    },
    "partner": {
     "models": {
-     "ruler": [
-      "rutqab"
+     "box_of_cookies": [
+      "lwhbid"
      ]
     }
    },
@@ -49,18 +44,17 @@
   },
   "generation": {
    "instances_per_template": 2,
-   "nextto_gap": 0.02,
    "tolerances": {
     "position": 0.03,
     "orientation": 0.2
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-nextto",
-   "variant": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-nextto#01",
+   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-carton_of_milk-box_of_cookies-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-touching#03",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

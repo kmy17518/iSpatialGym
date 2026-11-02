@@ -81,11 +81,11 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "inter_object_relation_satisfaction-nextto_large_scale": _TABLE + ("stances.placement", "contacts.push", "paths"),  # the base push (no grasp), ending at placement
     "inter_object_relation_satisfaction-ontop_small_scale": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-under_small_scale": _TABLE + ("grasps",),
-    "inter_object_relation_satisfaction-inside": _TABLE + ("grasps",),
-    "inter_object_relation_satisfaction-nextto": _TABLE + ("grasps",),
+    "inter_object_relation_satisfaction-inside_small_scale": _TABLE + ("grasps",),
+    "inter_object_relation_satisfaction-nextto_small_scale": _TABLE + ("grasps",),
     # touching is brace-optional like axial (owner decision 2026-09-16 17:10; core ``6de8803``): ``contacts.brace`` is
     # recorded only when the joint two-arm placement exists, the push chain is required, the push closure is the stop
-    "inter_object_relation_satisfaction-touching": _TABLE + ("grasps", "contacts.push"),
+    "inter_object_relation_satisfaction-touching_small_scale": _TABLE + ("grasps", "contacts.push"),
 }
 SUBTASKS: Tuple[str, ...] = tuple(REQUIRED_BLOCKS)
 
@@ -980,8 +980,8 @@ def variant_templates(root: str = IDDL_ROOT) -> Dict[str, Tuple[str, str]]:
 
 
 def subtask_of_variant(variant: str, root: str = IDDL_ROOT) -> str:
-    """Resolve a grounded variant (``inter_object_relation_satisfaction-inside-apple-bowl-breakfast_table``) or a variant
-    template itself to the iddl subtask id (``inter_object_relation_satisfaction-inside``). Slots ``{role}`` match one
+    """Resolve a grounded variant (``inter_object_relation_satisfaction-inside_small_scale-apple-bowl-breakfast_table``) or a variant
+    template itself to the iddl subtask id (``inter_object_relation_satisfaction-inside_small_scale``). Slots ``{role}`` match one
     ``-``-separated token of ``[a-z0-9_]+`` (category names, group tokens such as ``block_4``)."""
     if not isinstance(variant, str) or not variant:
         raise SidecarError(f"variant must be a non-empty string, got {variant!r}")

@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table (inter_object_relation_satisfaction-touching#02, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching_small_scale-bottle_of_medicine-first_aid_kit-breakfast_table (inter_object_relation_satisfaction-touching#04, slot representative)",
  "inter_object_relation_satisfaction-4": {
   "variant": "touching",
   "roles": {
    "target": {
     "models": {
-     "teacup": [
-      "cpozxi"
+     "bottle_of_medicine": [
+      "kasbsy"
      ]
     },
     "grasps": {
-     "key": "teacup__cpozxi__t"
+     "key": "bottle_of_medicine__kasbsy__t"
     }
    },
    "partner": {
     "models": {
-     "teapot": [
-      "foaehs"
+     "first_aid_kit": [
+      "flctdz"
      ]
     }
    },
@@ -50,11 +50,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-touching",
-   "variant": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-touching#02",
+   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-bottle_of_medicine-first_aid_kit-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-touching#04",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

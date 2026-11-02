@@ -105,9 +105,9 @@ SUBTASKS: Dict[str, dict] = {
     "alignment-axial": {"family": "alignment", "roles": {"target": {"kind": "sampleable", "frame": "axial"}, "support": {"kind": "scene"}}},
     f"{IORS}-ontop_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
     f"{IORS}-under_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
-    f"{IORS}-inside": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "insert"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
-    f"{IORS}-nextto": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
-    f"{IORS}-touching": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
+    f"{IORS}-inside_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "insert"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
+    f"{IORS}-nextto_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
+    f"{IORS}-touching_small_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "sampleable"}, "support": {"kind": "scene"}}},
     f"{IORS}-ontop_large_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "scene_partner"}, "support": {"kind": "scene"}}},
     f"{IORS}-under_large_scale": {"family": IORS, "roles": {"target": {"kind": "sampleable", "pipeline": "tabletop"}, "partner": {"kind": "scene_partner"}, "support": {"kind": "scene"}}},
 }
@@ -116,7 +116,7 @@ ONTOP_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table", "countertop")
 UNDER_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table")
 #: tabletop-grasp categories the large-scale IORS target pools may be filled from (owner: fill missing candidates;
 #: the physical requirement is only "small graspable object that rests on a table / mattress"); validated later
-LARGE_TARGET_FILL_FROM = {f"{IORS}-ontop_small_scale", f"{IORS}-nextto", f"{IORS}-touching", "disembedding"}
+LARGE_TARGET_FILL_FROM = {f"{IORS}-ontop_small_scale", f"{IORS}-nextto_small_scale", f"{IORS}-touching_small_scale", "disembedding"}
 UNDER_LARGE_MAX_HEIGHT = 0.20  # m: must fit under a 0.30 m clearance with the gripper below the wrist (spec 6.12)
 
 REP_COLUMNS = ["family", "subtask", "pick", "role", "slot", "category", "model", "scene", "name", "joint", "kind", "grasp_key",
@@ -146,7 +146,7 @@ BAND_SPAN_M = 0.70
 #: five short rows: a support whose best usable edge is below the long rows is flagged ``short_rows_only``.
 MARGIN_ROWS: List[dict] = [
     {"id": "iors_small_scale", "need": 2.35, "how": "pilot",
-     "subtasks": [f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside", f"{IORS}-nextto", f"{IORS}-touching"],
+     "subtasks": [f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside_small_scale", f"{IORS}-nextto_small_scale", f"{IORS}-touching_small_scale"],
      "note": "abs(lambda_min) + max(0, lambda_max) + 2 w_t + 2 D_p + 4 w_p + 0.04 with a 35 cm platter partner (D_p 0.38, w_p 0.175)"},
     {"id": "disembedding", "need": 2.30, "how": "pilot", "subtasks": ["disembedding"],
      "note": "2 (b + 0.437 + 0.02), b = 0.66-0.70 at tilt 0 with the 99 deg hfov (two fixed trays along the edge)"},

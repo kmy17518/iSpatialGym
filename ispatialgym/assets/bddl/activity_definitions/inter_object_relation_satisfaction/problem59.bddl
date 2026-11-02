@@ -1,9 +1,9 @@
 (define (problem inter_object_relation_satisfaction-59)
     (:domain ispatialgym)
-    (:variant inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet)
+    (:variant inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-bottom_cabinet)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside-sunflower-vase-bottom_cabinet (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#03~T5/representative)
-    ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-bottom_cabinet (inter_object_relation_satisfaction/inside_small_scale.iddl; inter_object_relation_satisfaction-inside#03~T5/representative)
+    ; IORS - inside (small-scale). Target lowered into the partner (fillable container) on the support; the target's goal orientation is
     ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
     ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
     ; by the upper stem) is required.

@@ -41,7 +41,7 @@ def _run(env, gen):
 
 
 def test_braces_held_span_each_brace_to_its_arms_next_retreat():
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-touching_small_scale.json"))
     actions = expand(sc.variant, sc)
     names = [a.name for a in actions]
     b, p = names.index("brace"), names.index("push")

@@ -1152,124 +1152,124 @@
   "variant": "disembedding-bar_soap-distractors-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__representative__target-mbkrxe__partner-belcml",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__representative__target-mbkrxe__partner-belcml.json",
+  "id": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table__representative__target-mbkrxe__partner-belcml",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table__representative__target-mbkrxe__partner-belcml.json",
   "problem": "inter_object_relation_satisfaction-2",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-inside",
+  "subtask": "inter_object_relation_satisfaction-inside_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table__representative__target-vwegtt__partner-lvuvbf",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table__representative__target-vwegtt__partner-lvuvbf.json",
+  "id": "inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-breakfast_table__representative__target-vwegtt__partner-lvuvbf",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-breakfast_table__representative__target-vwegtt__partner-lvuvbf.json",
   "problem": "inter_object_relation_satisfaction-2",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-inside",
+  "subtask": "inter_object_relation_satisfaction-inside_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table__representative__target-vfuilh__partner-tfzijn",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table__representative__target-vfuilh__partner-tfzijn.json",
+  "id": "inter_object_relation_satisfaction-inside_small_scale-quartz-saucepot-breakfast_table__representative__target-vfuilh__partner-tfzijn",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside_small_scale-quartz-saucepot-breakfast_table__representative__target-vfuilh__partner-tfzijn.json",
   "problem": "inter_object_relation_satisfaction-2",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-inside",
+  "subtask": "inter_object_relation_satisfaction-inside_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-inside_small_scale-quartz-saucepot-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table__representative__target-ujmgkb__partner-lymciz",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table__representative__target-ujmgkb__partner-lymciz.json",
+  "id": "inter_object_relation_satisfaction-inside_small_scale-ice_cube-beer_glass-breakfast_table__representative__target-ujmgkb__partner-lymciz",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside_small_scale-ice_cube-beer_glass-breakfast_table__representative__target-ujmgkb__partner-lymciz.json",
   "problem": "inter_object_relation_satisfaction-2",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-inside",
+  "subtask": "inter_object_relation_satisfaction-inside_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-inside_small_scale-ice_cube-beer_glass-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table__representative__target-dkajbh__partner-rusmlm",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table__representative__target-dkajbh__partner-rusmlm.json",
+  "id": "inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-breakfast_table__representative__target-dkajbh__partner-rusmlm",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-breakfast_table__representative__target-dkajbh__partner-rusmlm.json",
   "problem": "inter_object_relation_satisfaction-2",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-inside",
+  "subtask": "inter_object_relation_satisfaction-inside_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-inside_small_scale-sunflower-vase-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table__representative__target-hmawzy__partner-rutqab",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table__representative__target-hmawzy__partner-rutqab.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-breakfast_table__representative__target-hmawzy__partner-rutqab",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-breakfast_table__representative__target-hmawzy__partner-rutqab.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__representative__target-xakoic__partner-acumgp",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__representative__target-xakoic__partner-acumgp.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table__representative__target-xakoic__partner-acumgp",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table__representative__target-xakoic__partner-acumgp.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table__representative__target-qxpzdm__partner-fwjuab",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table__representative__target-qxpzdm__partner-fwjuab.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-cinnamon_stick-star_anise-breakfast_table__representative__target-qxpzdm__partner-fwjuab",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-cinnamon_stick-star_anise-breakfast_table__representative__target-qxpzdm__partner-fwjuab.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-cinnamon_stick-star_anise-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table__representative__target-exmsmm__partner-acgdtc",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table__representative__target-exmsmm__partner-acgdtc.json",
+  "id": "inter_object_relation_satisfaction-nextto_small_scale-jar_of_spaghetti_sauce-canned_food-breakfast_table__representative__target-exmsmm__partner-acgdtc",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-nextto_small_scale-jar_of_spaghetti_sauce-canned_food-breakfast_table__representative__target-exmsmm__partner-acgdtc.json",
   "problem": "inter_object_relation_satisfaction-3",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-nextto",
+  "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-nextto_small_scale-jar_of_spaghetti_sauce-canned_food-breakfast_table"
  },
  {
   "id": "inter_object_relation_satisfaction-ontop_large_scale-pen-bed-desk__representative__target-gzrbrx__partner-rrcvaq",
@@ -1392,52 +1392,52 @@
   "variant": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__representative__target-humkqw__partner-ntbrtz",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__representative__target-humkqw__partner-ntbrtz.json",
+  "id": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table__representative__target-humkqw__partner-ntbrtz",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table__representative__target-humkqw__partner-ntbrtz.json",
   "problem": "inter_object_relation_satisfaction-4",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-touching",
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table__representative__target-cpozxi__partner-foaehs",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table__representative__target-cpozxi__partner-foaehs.json",
+  "id": "inter_object_relation_satisfaction-touching_small_scale-teacup-teapot-breakfast_table__representative__target-cpozxi__partner-foaehs",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching_small_scale-teacup-teapot-breakfast_table__representative__target-cpozxi__partner-foaehs.json",
   "problem": "inter_object_relation_satisfaction-4",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-touching",
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-touching_small_scale-teacup-teapot-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table__representative__target-xmugpm__partner-lwhbid",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table__representative__target-xmugpm__partner-lwhbid.json",
+  "id": "inter_object_relation_satisfaction-touching_small_scale-carton_of_milk-box_of_cookies-breakfast_table__representative__target-xmugpm__partner-lwhbid",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching_small_scale-carton_of_milk-box_of_cookies-breakfast_table__representative__target-xmugpm__partner-lwhbid.json",
   "problem": "inter_object_relation_satisfaction-4",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-touching",
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-touching_small_scale-carton_of_milk-box_of_cookies-breakfast_table"
  },
  {
-  "id": "inter_object_relation_satisfaction-touching-bottle_of_medicine-first_aid_kit-breakfast_table__representative__target-kasbsy__partner-flctdz",
-  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching-bottle_of_medicine-first_aid_kit-breakfast_table__representative__target-kasbsy__partner-flctdz.json",
+  "id": "inter_object_relation_satisfaction-touching_small_scale-bottle_of_medicine-first_aid_kit-breakfast_table__representative__target-kasbsy__partner-flctdz",
+  "spec": "ispatialgym/assets/task_specs/isg_reps/specs/inter_object_relation_satisfaction-touching_small_scale-bottle_of_medicine-first_aid_kit-breakfast_table__representative__target-kasbsy__partner-flctdz.json",
   "problem": "inter_object_relation_satisfaction-4",
   "scene": "house_single_floor",
   "n_instances": 2,
   "max_templates": 1,
   "weight": 3.0,
-  "subtask": "inter_object_relation_satisfaction-touching",
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "slot": "representative",
-  "variant": "inter_object_relation_satisfaction-touching-bottle_of_medicine-first_aid_kit-breakfast_table"
+  "variant": "inter_object_relation_satisfaction-touching_small_scale-bottle_of_medicine-first_aid_kit-breakfast_table"
  },
  {
   "id": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk__representative__target-chgcrm__partner-rrcvaq",

@@ -1,5 +1,5 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table (inter_object_relation_satisfaction-nextto#04, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto_small_scale-cinnamon_stick-star_anise-breakfast_table (inter_object_relation_satisfaction-nextto#04, slot representative)",
  "inter_object_relation_satisfaction-3": {
   "variant": "nextto",
   "roles": {
@@ -56,11 +56,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-nextto",
-   "variant": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table",
+   "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+   "variant": "inter_object_relation_satisfaction-nextto_small_scale-cinnamon_stick-star_anise-breakfast_table",
    "pick": "inter_object_relation_satisfaction-nextto#04",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

@@ -69,7 +69,7 @@ PRIORITY = {
     "configuration_matching-articulation_open_large_scale": 10, "configuration_matching-articulation_close_large_scale": 11,
     "inter_object_relation_satisfaction-ontop_large_scale": 12,
     "inter_object_relation_satisfaction-ontop_small_scale": 20, "disembedding": 21, "inter_object_relation_satisfaction-under_small_scale": 22,
-    "inter_object_relation_satisfaction-touching": 30, "alignment-world_vertical": 31,
+    "inter_object_relation_satisfaction-touching_small_scale": 30, "alignment-world_vertical": 31,
 }
 # default loop variant per subtask (the first-demo variant) and the sample_isg scene restriction where one is needed
 DEFAULT_VARIANT = {
@@ -86,9 +86,9 @@ DEFAULT_VARIANT = {
     "alignment-axial": "alignment-axial-board_game-breakfast_table",
     "inter_object_relation_satisfaction-ontop_small_scale": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
     "inter_object_relation_satisfaction-under_small_scale": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
-    "inter_object_relation_satisfaction-inside": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
-    "inter_object_relation_satisfaction-nextto": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
-    "inter_object_relation_satisfaction-touching": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+    "inter_object_relation_satisfaction-inside_small_scale": "inter_object_relation_satisfaction-inside_small_scale-brussels_sprouts-bowl-breakfast_table",
+    "inter_object_relation_satisfaction-nextto_small_scale": "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table",
+    "inter_object_relation_satisfaction-touching_small_scale": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
     "inter_object_relation_satisfaction-ontop_large_scale": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
     "inter_object_relation_satisfaction-under_large_scale": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
 }

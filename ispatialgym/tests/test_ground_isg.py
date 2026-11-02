@@ -58,7 +58,7 @@ SUBTASKS = [
     "alignment-axial",
     "inter_object_relation_satisfaction-under_small_scale",
     "inter_object_relation_satisfaction-under_large_scale",
-    "inter_object_relation_satisfaction-nextto",
+    "inter_object_relation_satisfaction-nextto_small_scale",
 ]
 
 
@@ -341,10 +341,10 @@ def test_groups(grounded):
 
 
 def test_generation_is_seeded_from_defaults_then_from_the_existing_entry(grounded):
-    gp = _entries(grounded, "inter_object_relation_satisfaction-nextto")[0]
-    for k, v in G.DEFAULTS["inter_object_relation_satisfaction-nextto"].items():
+    gp = _entries(grounded, "inter_object_relation_satisfaction-nextto_small_scale")[0]
+    for k, v in G.DEFAULTS["inter_object_relation_satisfaction-nextto_small_scale"].items():
         assert gp.entry.generation[k] == v
-    tuned = G.seed_generation("inter_object_relation_satisfaction-nextto", {"generation": {"templates_max": 3, "tolerances": {"position": 0.01}}})
+    tuned = G.seed_generation("inter_object_relation_satisfaction-nextto_small_scale", {"generation": {"templates_max": 3, "tolerances": {"position": 0.01}}})
     assert tuned["templates_max"] == 3 and tuned["tolerances"] == {"position": 0.01} and tuned["instances_per_template"] == 5
     assert set(G.DEFAULTS) == set(IDDLS)
     for st, gen in G.DEFAULTS.items():
@@ -374,7 +374,7 @@ def test_registry_absorbs_legacy_templates_and_flags_duplicate_variants(tmp_path
 
 
 def test_bddl_variant_falls_back_to_the_parser_spelling(monkeypatch):
-    variant = "inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table"
+    variant = "inter_object_relation_satisfaction-nextto_small_scale-spatula-soup_ladle-breakfast_table"
     assert B.bddl_variant(variant) == variant  # the parser accepts the v2 variant
     monkeypatch.setattr(B, "VARIANT_RE", re.compile(r"^[a-z][a-z0-9_]*$"))  # the pre-A4 parser: no '-'
     spelled = B.bddl_variant(variant)
@@ -383,7 +383,7 @@ def test_bddl_variant_falls_back_to_the_parser_spelling(monkeypatch):
 
 
 def test_render_rejects_missing_or_extra_roles():
-    iddl = IDDLS["inter_object_relation_satisfaction-nextto"]
+    iddl = IDDLS["inter_object_relation_satisfaction-nextto_small_scale"]
     from ispatialgym.sampling.knowledge import synset_of_category as syn
 
     g = {"target": B.RoleGrounding("target", "sampleable", "pencil", syn("pencil")), "support": B.RoleGrounding("support", "scene", "desk", syn("desk"))}
@@ -394,7 +394,7 @@ def test_render_rejects_missing_or_extra_roles():
     with pytest.raises(B.GroundingError, match="does not have"):
         B.render(iddl, g, 0, "x", "inter_object_relation_satisfaction")
     del g["bogus"]
-    r = B.render(iddl, g, 0, "inter_object_relation_satisfaction-nextto-pencil-ruler-desk", "inter_object_relation_satisfaction")
+    r = B.render(iddl, g, 0, "inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-desk", "inter_object_relation_satisfaction")
     t, p = f"{syn('pencil')}_1", f"{syn('ruler')}_1"
     assert r.instances == {"target": t, "partner": p, "support": f"{syn('desk')}_1", "floor": "floor.n.01_1", "agent": "agent.n.01_1"}
     assert ["nextto", "?" + t, "?" + p] in r.problem.goal
@@ -726,18 +726,18 @@ def test_several_representative_supports_per_pick(tmp_path):
     for cat, scene, name in extra:
         icl.picks[pick]["support"]["representative"].append(dict(base, category=cat, scene=scene, name=name, model=name.rsplit("_", 2)[1]))
     g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False))
-    g.run(["inter_object_relation_satisfaction-nextto"])
+    g.run(["inter_object_relation_satisfaction-nextto_small_scale"])
     variants = {gp.variant for gp in g.grounded if gp.combination.pick.startswith(pick)}
     tokens = {a.split("-")[-1] for a in variants}
     assert tokens == {"breakfast_table", "countertop", "bar", "commercial_kitchen_table", "conference_table", "desk"}
-    bar = g.customs.entries["inter_object_relation_satisfaction-nextto-pencil-ruler-bar"]
+    bar = g.customs.entries["inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-bar"]
     assert set(bar.scenes) == {"house_single_floor", "restaurant_diner"}
     assert bar.scenes["house_single_floor"].bindings["support"] == ["bar_udatjt_0"] and bar.scenes["restaurant_diner"].bindings["support"] == ["bar_xxftww_0"]
     assert bar.scenes["house_single_floor"].rooms == ["kitchen_0"] and set(bar.scenes["restaurant_diner"].rooms) == {"bar_0", "dining_room_0"}
     for sc in bar.scenes.values():
         assert sc.whitelist["target"] == {"pencil": ["hmawzy"]} and sc.bindings["floor"] == {"room": sc.rooms[0]}
     # the desk variant also carries the other picks' representative desk? no: only the supports of the selection
-    desk = g.customs.entries["inter_object_relation_satisfaction-nextto-pencil-ruler-desk"]
+    desk = g.customs.entries["inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-desk"]
     assert desk.scenes["office_cubicles_right"].bindings["support"] == ["desk_mdhelw_1"]
     ids = P.list_problem_ids("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
     assert len(ids) == len({gp.variant for gp in g.grounded})
@@ -774,7 +774,7 @@ def test_inside_support_rows_get_their_own_variant_bddl_and_surface(tmp_path):
     rows.append(dict(base, note="init=inside; top_z=0.40 (shelf)", triplet="2"))
     for _ in range(2):  # the second run re-grounds the same rows into the same customs
         g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False))
-        g.run(["inter_object_relation_satisfaction-nextto"])
+        g.run(["inter_object_relation_satisfaction-nextto_small_scale"])
         g.customs.save()
     by_variant = {gp.variant: gp for gp in g.grounded if gp.combination.pick.startswith(pick)}
     cat = base["category"]

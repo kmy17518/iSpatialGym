@@ -36,7 +36,7 @@ from ispatialgym.sampling.reach_bands import PLACED_MODE_FOCUS, PlacedSpec, heig
 import make_jobs as MJ  # noqa: E402
 
 BANDS = os.path.join(REPO, "runlogs", "reach_bands_20260915", "bands")
-BRACE_SUBTASKS = ("alignment-axial", "configuration_matching-block_design", "configuration_matching-attachment", "inter_object_relation_satisfaction-touching")
+BRACE_SUBTASKS = ("alignment-axial", "configuration_matching-block_design", "configuration_matching-attachment", "inter_object_relation_satisfaction-touching_small_scale")
 TIMEOUT = "timeout 5400 "
 
 

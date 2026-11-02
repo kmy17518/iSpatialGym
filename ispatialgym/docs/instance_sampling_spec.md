@@ -146,8 +146,8 @@ One entry per variant. Scene-independent model pools are the icl's job; the cust
 
 ```json
 {
-  "inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table": {
-    "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+  "inter_object_relation_satisfaction-nextto_small_scale-spatula-soup_ladle-breakfast_table": {
+    "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
     "definition_id": 3,
     "roles": {
       "target":  {"category": "spatula",    "sampleable": true,  "require": {"grasps": "tabletop"}, "representative": "hkvsep"},

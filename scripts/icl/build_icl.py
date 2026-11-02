@@ -101,8 +101,8 @@ SCENES = ["house_single_floor", "house_double_floor_upper", "house_double_floor_
 IORS = "inter_object_relation_satisfaction"
 CM = "configuration_matching"
 TABLETOP_SUBTASKS = ["disembedding", f"{CM}-block_design", f"{CM}-articulation_open_small_scale", f"{CM}-articulation_close_small_scale",
-                     f"{CM}-attachment", "alignment-axial", f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside",
-                     f"{IORS}-nextto", f"{IORS}-touching", f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale"]
+                     f"{CM}-attachment", "alignment-axial", f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside_small_scale",
+                     f"{IORS}-nextto_small_scale", f"{IORS}-touching_small_scale", f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale"]
 WALL_SUBTASKS = ["alignment-world_vertical"]
 ONTOP_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table", "countertop")
 UNDER_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table")
@@ -179,9 +179,9 @@ PINS: Dict[str, Dict[str, List[str]]] = {
     f"{IORS}-ontop_small_scale": {"target": ["pack_of_kielbasa/dgodnn"], "partner": ["platter/csanbr"], "support": [_SUP]},
     f"{IORS}-under_large_scale": {"target": ["toy_figure/cobfpg"], "partner": ["house_single_floor:bed_rrcvaq_0"],
                                   "support": ["house_single_floor:desk_xhjsub_0"]},
-    f"{IORS}-inside": {"target": ["lemon/ovbcff"], "partner": ["bowl/belcml"], "support": [_SUP]},
-    f"{IORS}-nextto": {"target": ["spatula/hkvsep"], "partner": ["soup_ladle/cfzneb"], "support": [_SUP]},
-    f"{IORS}-touching": {"target": ["can_of_baking_mix/blrqqz", "can_of_baking_mix/orwvfx"], "partner": ["board_game/eoywpy", "board_game/gcfkqa"],
+    f"{IORS}-inside_small_scale": {"target": ["lemon/ovbcff"], "partner": ["bowl/belcml"], "support": [_SUP]},
+    f"{IORS}-nextto_small_scale": {"target": ["spatula/hkvsep"], "partner": ["soup_ladle/cfzneb"], "support": [_SUP]},
+    f"{IORS}-touching_small_scale": {"target": ["can_of_baking_mix/blrqqz", "can_of_baking_mix/orwvfx"], "partner": ["board_game/eoywpy", "board_game/gcfkqa"],
                          "support": [_SUP]},
 }
 for _st in TABLETOP_SUBTASKS:  # the test support is the representative support of every tabletop subtask
@@ -595,8 +595,8 @@ class Builder:
         for cat, row in self.blocks[("inter_object_relation_satisfaction-1 (under)", "partner")]:
             if row.get("model") and cat not in ("bed", "couch", "sofa", "desk"):
                 self.add_object(f"{IORS}-under_small_scale", "partner", cat, row)
-        for old, new in (("inter_object_relation_satisfaction-2 (inside)", f"{IORS}-inside"), ("inter_object_relation_satisfaction-3 (nextto)", f"{IORS}-nextto"),
-                         ("inter_object_relation_satisfaction-4 (touching)", f"{IORS}-touching")):
+        for old, new in (("inter_object_relation_satisfaction-2 (inside)", f"{IORS}-inside_small_scale"), ("inter_object_relation_satisfaction-3 (nextto)", f"{IORS}-nextto_small_scale"),
+                         ("inter_object_relation_satisfaction-4 (touching)", f"{IORS}-touching_small_scale")):
             for cat, row in self.blocks[(old, "target")]:
                 r = self.add_object(new, "target", cat, row)
                 if not r["grasp_key"]:

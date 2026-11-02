@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table (inter_object_relation_satisfaction-touching#01, slot representative)",
- "inter_object_relation_satisfaction-4": {
-  "variant": "touching",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table (inter_object_relation_satisfaction-nextto#02, slot representative)",
+ "inter_object_relation_satisfaction-3": {
+  "variant": "nextto",
   "roles": {
    "target": {
     "models": {
-     "box_of_sanitary_napkins": [
-      "humkqw"
+     "marker": [
+      "xakoic"
      ]
     },
     "grasps": {
-     "key": "box_of_sanitary_napkins__humkqw"
+     "key": "marker__xakoic"
     }
    },
    "partner": {
     "models": {
-     "box_of_tissues": [
-      "ntbrtz"
+     "colored_pencil": [
+      "acumgp"
      ]
     }
    },
@@ -44,17 +44,18 @@
   },
   "generation": {
    "instances_per_template": 2,
+   "nextto_gap": 0.02,
    "tolerances": {
     "position": 0.03,
     "orientation": 0.2
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-touching",
-   "variant": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-touching#01",
+   "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+   "variant": "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-nextto#02",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

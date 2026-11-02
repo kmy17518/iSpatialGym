@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table (inter_object_relation_satisfaction-inside#05, slot representative)",
- "inter_object_relation_satisfaction-2": {
-  "variant": "inside",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-touching_small_scale-teacup-teapot-breakfast_table (inter_object_relation_satisfaction-touching#02, slot representative)",
+ "inter_object_relation_satisfaction-4": {
+  "variant": "touching",
   "roles": {
    "target": {
     "models": {
-     "sunflower": [
-      "dkajbh"
+     "teacup": [
+      "cpozxi"
      ]
     },
     "grasps": {
-     "key": "sunflower__dkajbh"
+     "key": "teacup__cpozxi__t"
     }
    },
    "partner": {
     "models": {
-     "vase": [
-      "rusmlm"
+     "teapot": [
+      "foaehs"
      ]
     }
    },
@@ -50,16 +50,16 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-inside",
-   "variant": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-inside#05",
+   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-teacup-teapot-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-touching#02",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",
      "role": "target",
-     "pipeline": "insert"
+     "pipeline": "tabletop"
     }
    ],
    "scene": "house_single_floor",

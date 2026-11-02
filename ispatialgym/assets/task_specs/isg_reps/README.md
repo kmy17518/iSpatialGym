@@ -15,11 +15,11 @@
 | configuration_matching-attachment | 6 |
 | configuration_matching-block_design | 1 |
 | disembedding | 30 |
-| inter_object_relation_satisfaction-inside | 5 |
-| inter_object_relation_satisfaction-nextto | 5 |
+| inter_object_relation_satisfaction-inside_small_scale | 5 |
+| inter_object_relation_satisfaction-nextto_small_scale | 5 |
 | inter_object_relation_satisfaction-ontop_large_scale | 5 |
 | inter_object_relation_satisfaction-ontop_small_scale | 5 |
-| inter_object_relation_satisfaction-touching | 4 |
+| inter_object_relation_satisfaction-touching_small_scale | 4 |
 | inter_object_relation_satisfaction-under_large_scale | 5 |
 | inter_object_relation_satisfaction-under_small_scale | 4 |
 | mental_rotation | 30 |

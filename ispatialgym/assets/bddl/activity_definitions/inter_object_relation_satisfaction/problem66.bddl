@@ -1,9 +1,9 @@
 (define (problem inter_object_relation_satisfaction-66)
     (:domain ispatialgym)
-    (:variant inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk)
+    (:variant inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-desk)
 
-    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto-marker-colored_pencil-desk (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#01~T4/representative)
-    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-desk (inter_object_relation_satisfaction/nextto_small_scale.iddl; inter_object_relation_satisfaction-nextto#01~T4/representative)
+    ; IORS - nextto (small-scale). Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
     ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
 
     (:objects

@@ -229,9 +229,9 @@ def test_phase3_target_keeps_f_over_other_yaws_out_of_the_band(monkeypatch):
 def test_touching02_variants_carry_the_key_and_every_use_is_valid():
     with open(CUSTOMS) as f:
         customs = json.load(f)
-    t02 = [k for k in customs if k.startswith("inter_object_relation_satisfaction-touching-box_of_cereal")]
+    t02 = [k for k in customs if k.startswith("inter_object_relation_satisfaction-touching_small_scale-box_of_cereal")]
     assert len(t02) == 12 and all(customs[k]["generation"].get("widest_faces") == "parallel" for k in t02)
     for k, e in customs.items():
         mode = (e.get("generation") or {}).get("widest_faces") if isinstance(e, dict) else None
         if mode is not None:
-            assert mode in IS.WIDEST_FACES and e["iddl"] == "inter_object_relation_satisfaction/touching.iddl", k
+            assert mode in IS.WIDEST_FACES and e["iddl"] == "inter_object_relation_satisfaction/touching_small_scale.iddl", k

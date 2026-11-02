@@ -51,7 +51,7 @@ SUBTASKS = ["camera_relocalization-standard", "camera_relocalization-obstructed"
             "configuration_matching-articulation_close_small_scale", "configuration_matching-articulation_open_large_scale",
             "configuration_matching-articulation_close_large_scale", "alignment-world_vertical", "alignment-axial",
             "inter_object_relation_satisfaction-ontop_small_scale", "inter_object_relation_satisfaction-under_small_scale",
-            "inter_object_relation_satisfaction-inside", "inter_object_relation_satisfaction-nextto", "inter_object_relation_satisfaction-touching",
+            "inter_object_relation_satisfaction-inside_small_scale", "inter_object_relation_satisfaction-nextto_small_scale", "inter_object_relation_satisfaction-touching_small_scale",
             "inter_object_relation_satisfaction-ontop_large_scale", "inter_object_relation_satisfaction-under_large_scale"]
 
 

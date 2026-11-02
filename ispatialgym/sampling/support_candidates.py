@@ -56,9 +56,9 @@ LAUNCH_55_SUBTASKS = (
     "configuration_matching-articulation_close_large_scale",
     "inter_object_relation_satisfaction-ontop_small_scale",
     "inter_object_relation_satisfaction-under_small_scale",
-    "inter_object_relation_satisfaction-inside",
-    "inter_object_relation_satisfaction-nextto",
-    "inter_object_relation_satisfaction-touching",
+    "inter_object_relation_satisfaction-inside_small_scale",
+    "inter_object_relation_satisfaction-nextto_small_scale",
+    "inter_object_relation_satisfaction-touching_small_scale",
 )
 SLOT = "representative"
 DEFAULT_SEEDS = (0, 1)

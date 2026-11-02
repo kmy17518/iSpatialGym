@@ -127,8 +127,8 @@ MINUTES = {"alignment-axial": 35.0, "alignment-world_vertical": 25.0, "camera_re
            "configuration_matching-articulation_open_small_scale": 20.0, "configuration_matching-articulation_close_small_scale": 20.0,
            "configuration_matching-articulation_open_large_scale": 40.0, "configuration_matching-articulation_close_large_scale": 40.0,
            "inter_object_relation_satisfaction-ontop_small_scale": 15.0, "inter_object_relation_satisfaction-under_small_scale": 15.0,
-           "inter_object_relation_satisfaction-inside": 20.0, "inter_object_relation_satisfaction-nextto": 15.0,
-           "inter_object_relation_satisfaction-touching": 25.0, "inter_object_relation_satisfaction-ontop_large_scale": 30.0,
+           "inter_object_relation_satisfaction-inside_small_scale": 20.0, "inter_object_relation_satisfaction-nextto_small_scale": 15.0,
+           "inter_object_relation_satisfaction-touching_small_scale": 25.0, "inter_object_relation_satisfaction-ontop_large_scale": 30.0,
            "inter_object_relation_satisfaction-under_large_scale": 30.0}
 CHUNK_CMD = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
              "OMNIGIBSON_HEADLESS=1 timeout {timeout} python -m ispatialgym.sampling.sample_isg {variants} --templates {templates} "

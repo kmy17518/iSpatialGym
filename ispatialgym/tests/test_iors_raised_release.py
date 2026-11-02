@@ -131,7 +131,7 @@ def test_record_drop_and_reject_when_the_open_jaw_reaches_the_settled_partner(mo
 
 
 def test_program_place_avoids_the_partner_only_for_a_raised_release():
-    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-nextto.json"))
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-nextto_small_scale.json"))
     place = next(a for a in expand(sc.variant, sc) if isinstance(a, Place))
     assert place.kind == "support" and place.avoid == ()
     sc.grasps[0].extra["raised_release"] = {"raise_m": 0.013, "drop_m": 0.013}
@@ -142,6 +142,6 @@ def test_program_place_avoids_the_partner_only_for_a_raised_release():
 def test_nextto03_variant_alone_carries_the_key():
     customs = json.load(open(CUSTOMS))
     keyed = sorted(a for a, e in customs.items() if isinstance(e, dict) and (e.get("generation") or {}).get("raised_release") is not None)
-    assert keyed == ["inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table"]
+    assert keyed == ["inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table"]
     gen = customs[keyed[0]]["generation"]
     assert set(gen["raised_release"]) <= set(IS.RAISED_RELEASE_DEFAULTS) and gen["pair_goal_align"]["facing"] == "away" and gen["init_align_support"] is True

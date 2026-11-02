@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table (inter_object_relation_satisfaction-inside#03, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside_small_scale-ice_cube-beer_glass-breakfast_table (inter_object_relation_satisfaction-inside#04, slot representative)",
  "inter_object_relation_satisfaction-2": {
   "variant": "inside",
   "roles": {
    "target": {
     "models": {
-     "quartz": [
-      "vfuilh"
+     "ice_cube": [
+      "ujmgkb"
      ]
     },
     "grasps": {
-     "key": "quartz__vfuilh"
+     "key": "ice_cube__ujmgkb__i"
     }
    },
    "partner": {
     "models": {
-     "saucepot": [
-      "tfzijn"
+     "beer_glass": [
+      "lymciz"
      ]
     }
    },
@@ -50,11 +50,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-inside",
-   "variant": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-inside#03",
+   "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+   "variant": "inter_object_relation_satisfaction-inside_small_scale-ice_cube-beer_glass-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-inside#04",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

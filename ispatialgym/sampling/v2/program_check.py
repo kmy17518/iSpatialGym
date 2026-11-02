@@ -458,9 +458,9 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "alignment-axial": ("stances.init", "stances.manipulation", "transitions", "contacts.push"),  # brace optional (owner 2026-09-16 08:10; F6 9b03aa4)
     "inter_object_relation_satisfaction-ontop_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
     "inter_object_relation_satisfaction-under_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
-    "inter_object_relation_satisfaction-inside": ("stances.init", "stances.manipulation", "transitions", "grasps"),
-    "inter_object_relation_satisfaction-nextto": ("stances.init", "stances.manipulation", "transitions", "grasps"),
-    "inter_object_relation_satisfaction-touching": ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push"),  # brace optional (owner 2026-09-16 17:10; same rule as axial)
+    "inter_object_relation_satisfaction-inside_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
+    "inter_object_relation_satisfaction-nextto_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
+    "inter_object_relation_satisfaction-touching_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.push"),  # brace optional (owner 2026-09-16 17:10; same rule as axial)
     "inter_object_relation_satisfaction-ontop_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
     "inter_object_relation_satisfaction-under_large_scale": ("stances.init", "stances.manipulation", "stances.placement", "transitions", "grasps", "paths"),
     # registered 2026-10-12 ahead of their modes (each mode may adjust its list): inside as ontop; touching as ontop + the push record

@@ -350,10 +350,10 @@ def test_touching_push_candidates_above_the_cap_are_not_tried(monkeypatch):
 def test_the_four_variants_carry_the_key_and_every_use_is_valid():
     with open(CUSTOMS) as f:
         customs = json.load(f)
-    want = {"inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar": "touching02",
-            "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table": "nextto01",
-            "inter_object_relation_satisfaction-nextto-tablespoon-chopstick-breakfast_table": "nextto03",
-            "inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench": "nextto04"}
+    want = {"inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar": "touching02",
+            "inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table": "nextto01",
+            "inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table": "nextto03",
+            "inter_object_relation_satisfaction-nextto_small_scale-gym_shoe-gym_shoe-bench": "nextto04"}
     have = {k for k, e in customs.items() if isinstance(e, dict) and (e.get("generation") or {}).get("pair_goal_align") is not None}
     assert have == set(want)
     for variant, name in want.items():
@@ -364,8 +364,8 @@ def test_the_four_variants_carry_the_key_and_every_use_is_valid():
             assert f"{roles[role]['category']}/{roles[role]['representative']}" in g["pair_goal_align"]["front"]
         assert g["pair_goal_align"]["facing"] in IS.PAIR_FACINGS
         assert all(v in IS.PAIR_FRONT_AXES for v in g["pair_goal_align"]["front"].values())
-    assert customs["inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["widest_faces"] == "parallel"
-    assert customs["inter_object_relation_satisfaction-touching-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["touching_place_gap_m"] == 0.05
+    assert customs["inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["widest_faces"] == "parallel"
+    assert customs["inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar"]["generation"]["touching_place_gap_m"] == 0.05
     for variant in list(want)[1:]:
         assert customs[variant]["generation"]["init_align_support"] is True
-    assert customs["inter_object_relation_satisfaction-nextto-gym_shoe-gym_shoe-bench"]["generation"]["support_margin"] == 0.005
+    assert customs["inter_object_relation_satisfaction-nextto_small_scale-gym_shoe-gym_shoe-bench"]["generation"]["support_margin"] == 0.005

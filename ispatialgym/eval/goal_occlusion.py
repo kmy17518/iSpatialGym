@@ -39,7 +39,7 @@ FIXTURE_CATEGORIES = ("dishwasher", "door")
 EXEMPT_SUBTASK_PREFIXES = ("camera_relocalization",)
 #: subtasks whose goal puts the target inside its partner: the target is not judged, the partner (the container) is (inside#02's candy
 #: was 100 % hidden in its jar in every check)
-CONTAINED_TARGET_SUBTASK_PREFIXES = ("inter_object_relation_satisfaction-inside",)
+CONTAINED_TARGET_SUBTASK_PREFIXES = ("inter_object_relation_satisfaction-inside_small_scale",)
 
 
 def enabled(environ=os.environ) -> bool:

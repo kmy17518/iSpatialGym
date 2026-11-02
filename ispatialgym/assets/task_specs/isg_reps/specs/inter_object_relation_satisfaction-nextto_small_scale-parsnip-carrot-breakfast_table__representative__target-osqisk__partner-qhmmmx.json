@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table (inter_object_relation_satisfaction-nextto#05, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table (inter_object_relation_satisfaction-nextto#03, slot representative)",
  "inter_object_relation_satisfaction-3": {
   "variant": "nextto",
   "roles": {
    "target": {
     "models": {
-     "jar_of_spaghetti_sauce": [
-      "exmsmm"
+     "parsnip": [
+      "osqisk"
      ]
     },
     "grasps": {
-     "key": "jar_of_spaghetti_sauce__exmsmm__t"
+     "key": "parsnip__osqisk"
     }
    },
    "partner": {
     "models": {
-     "canned_food": [
-      "acgdtc"
+     "carrot": [
+      "qhmmmx"
      ]
     }
    },
@@ -51,11 +51,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-nextto",
-   "variant": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-nextto#05",
+   "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+   "variant": "inter_object_relation_satisfaction-nextto_small_scale-parsnip-carrot-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-nextto#03",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

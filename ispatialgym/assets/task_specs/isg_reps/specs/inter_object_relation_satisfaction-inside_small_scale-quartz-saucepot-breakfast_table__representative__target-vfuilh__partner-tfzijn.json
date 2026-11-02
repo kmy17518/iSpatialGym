@@ -1,22 +1,22 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table (inter_object_relation_satisfaction-inside#02, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-inside_small_scale-quartz-saucepot-breakfast_table (inter_object_relation_satisfaction-inside#03, slot representative)",
  "inter_object_relation_satisfaction-2": {
   "variant": "inside",
   "roles": {
    "target": {
     "models": {
-     "hard_candy": [
-      "vwegtt"
+     "quartz": [
+      "vfuilh"
      ]
     },
     "grasps": {
-     "key": "hard_candy__vwegtt"
+     "key": "quartz__vfuilh"
     }
    },
    "partner": {
     "models": {
-     "hingeless_jar": [
-      "lvuvbf"
+     "saucepot": [
+      "tfzijn"
      ]
     }
    },
@@ -50,11 +50,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-inside",
-   "variant": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-inside#02",
+   "subtask": "inter_object_relation_satisfaction-inside_small_scale",
+   "variant": "inter_object_relation_satisfaction-inside_small_scale-quartz-saucepot-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-inside#03",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "iddl": "inter_object_relation_satisfaction/inside_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

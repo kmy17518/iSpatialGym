@@ -134,11 +134,11 @@ GRASP_KEY_SUFFIX_PREFERENCE = {"inter_object_relation_satisfaction-touching#03":
 TARGET_FIT_SUBTASKS = {
     "inter_object_relation_satisfaction-ontop_small_scale": "on_partner",
     "inter_object_relation_satisfaction-under_small_scale": "on_partner",
-    "inter_object_relation_satisfaction-inside": "inside",
+    "inter_object_relation_satisfaction-inside_small_scale": "inside",
 }
 #: Owner 2026-10-11: a nextto pair of mirror objects ends with the right one on the robot's right of the left one; the models' hands
 #: go to ``generation.handedness`` and the sampler places the partner on the side that leaves the target on its own side.
-HANDEDNESS_SUBTASKS = ("inter_object_relation_satisfaction-nextto",)
+HANDEDNESS_SUBTASKS = ("inter_object_relation_satisfaction-nextto_small_scale",)
 #: Hand of the mirror-pair models (no sheet column says it): the side of the sole's arch (the medial side) in the canonical frame, toe
 #: along +x and up +z - arch on +y (the shoe's own left) = a right shoe. Measured on the visual meshes (sole outline within 1 cm of the
 #: bottom, per tenth of the length) 2026-10-11: the nextto#04 targets are right shoes, their partners the left shoes of the pairs.
@@ -2475,7 +2475,7 @@ class Grounder:
             return None
         if subtask == "configuration_matching-block_design":
             return None
-        if subtask == "inter_object_relation_satisfaction-inside" and role == "target":
+        if subtask == "inter_object_relation_satisfaction-inside_small_scale" and role == "target":
             return None
         if subtask in WALL_SUBTASKS:
             if (row.get("symmetric_180") or "") == "1" and row.get("frame_front"):

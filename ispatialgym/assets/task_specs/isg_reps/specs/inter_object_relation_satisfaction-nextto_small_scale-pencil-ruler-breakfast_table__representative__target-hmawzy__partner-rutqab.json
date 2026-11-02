@@ -1,22 +1,27 @@
 {
- "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table (inter_object_relation_satisfaction-nextto#02, slot representative)",
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-breakfast_table (inter_object_relation_satisfaction-nextto#01, slot representative)",
  "inter_object_relation_satisfaction-3": {
   "variant": "nextto",
   "roles": {
    "target": {
     "models": {
-     "marker": [
-      "xakoic"
+     "pencil": [
+      "hmawzy"
      ]
     },
     "grasps": {
-     "key": "marker__xakoic"
-    }
+     "key": "pencil__hmawzy__s"
+    },
+    "scale": [
+     1.0,
+     3.231,
+     4.998
+    ]
    },
    "partner": {
     "models": {
-     "colored_pencil": [
-      "acumgp"
+     "ruler": [
+      "rutqab"
      ]
     }
    },
@@ -51,11 +56,11 @@
    }
   },
   "_isg": {
-   "subtask": "inter_object_relation_satisfaction-nextto",
-   "variant": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
-   "pick": "inter_object_relation_satisfaction-nextto#02",
+   "subtask": "inter_object_relation_satisfaction-nextto_small_scale",
+   "variant": "inter_object_relation_satisfaction-nextto_small_scale-pencil-ruler-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-nextto#01",
    "slot": "representative",
-   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "iddl": "inter_object_relation_satisfaction/nextto_small_scale.iddl",
    "require": [
     {
      "kind": "grasps",

@@ -76,9 +76,9 @@ SCENE_CROP_DEFAULTS: Dict[str, str] = {
     # tabletop
     "inter_object_relation_satisfaction-ontop_small_scale": "region",
     "inter_object_relation_satisfaction-under_small_scale": "region",
-    "inter_object_relation_satisfaction-inside": "region",
-    "inter_object_relation_satisfaction-nextto": "region",
-    "inter_object_relation_satisfaction-touching": "region",
+    "inter_object_relation_satisfaction-inside_small_scale": "region",
+    "inter_object_relation_satisfaction-nextto_small_scale": "region",
+    "inter_object_relation_satisfaction-touching_small_scale": "region",
     "configuration_matching-articulation_open_small_scale": "region",
     "configuration_matching-articulation_close_small_scale": "region",
     "configuration_matching-articulation_small_scale-open": "region",

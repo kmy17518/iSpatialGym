@@ -173,8 +173,8 @@ def test_inside_goal_judges_the_container_not_the_target():
     candy = _Obj("target_hard_candy_0", [1.1, 0.0, 0.0], [0.05, 0.05, 0.05])
     depth = _depth(np.inf)
     depth[:] = 0.85  # the jar's front wall stands in front of the candy (its own surface is within the tolerance)
-    inside = "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-bar"
-    assert GO.contained_target(inside) and GO.contained_target("inter_object_relation_satisfaction-inside")
+    inside = "inter_object_relation_satisfaction-inside_small_scale-hard_candy-hingeless_jar-bar"
+    assert GO.contained_target(inside) and GO.contained_target("inter_object_relation_satisfaction-inside_small_scale")
     assert not GO.contained_target("inter_object_relation_satisfaction-ontop_small_scale") and not GO.contained_target(None)
     objs = GO.screen_scene(depth, CAM, INTR, [jar, candy], subtask=inside)
     assert objs["target_hard_candy_0"]["occluded"] == 1.0 and objs["target_hard_candy_0"]["judged"] is False
