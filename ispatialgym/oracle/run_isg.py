@@ -70,6 +70,11 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 os.environ.setdefault("OMNIGIBSON_CHANGE_DETECTION_NUMPY", "1")
+# the exact opt-ins run_isg_vec defaults on (the fast flow's job env sets them too): the potential reuses the termination's goal
+# evaluation, the batched symmetry search, one relation_error per member pair within an evaluation
+os.environ.setdefault("ISPATIALGYM_SHARED_GOAL_EVAL", "1")
+os.environ.setdefault("ISPATIALGYM_FAST_GEOMETRY", "1")
+os.environ.setdefault("ISPATIALGYM_FAST_ASSIGN", "1")
 
 import torch as th  # noqa: E402
 
