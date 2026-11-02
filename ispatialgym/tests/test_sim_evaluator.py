@@ -456,6 +456,11 @@ def test_alignment_task_symbolic_and_geometric_success(task_env):
     first_err = next(e for (s_, e) in errs if s_ == teleport_step)
     assert result["error_metric"]["orientation_error"] <= first_err + 1e-12
     assert result["error_metric"]["orientation_error"] == pytest.approx(min(e for (s_, e) in errs if teleport_step <= s_ <= teleport_step + W - 1), abs=0)
+    # closest approach: over every executed step / the goal steps; never worse than the evaluated success step
+    ca, cg = result["closest_approach"], result["closest_goal_approach"]
+    assert ca is not None and cg is not None and cg["goal"] is True
+    assert ca["score"] <= cg["score"] <= result["error_metric"]["orientation_error"] / 0.05 + 1e-12
+    assert cg["error_metric"]["orientation_error"] == pytest.approx(min(e for (s_, e) in errs if s_ >= teleport_step), abs=0)
     assert all(not g for (s, g, _, _) in trace if s < teleport_step)
     assert all(g and succ for (s, g, _, succ) in trace if s >= teleport_step)
     assert result["success"] and result["terminated"] and not result["truncated"]

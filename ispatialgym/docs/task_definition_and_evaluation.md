@@ -646,6 +646,13 @@ episode result (`run_isg` writes the same keys into `meta.json` and its
   with its `error_metric` when `settle_eval` is on, else null. Verification
   (`scripts/vec_eval/compare_slots.py`, `verify_rules.py`, the rooms gate)
   compares the first steps.
+- `closest_approach` / `closest_goal_approach` (owner 2026-11-01): how close the
+  rollout got, beside the judged errors and deciding nothing - the step with
+  the lowest selection score over every step the episode ran, and over the
+  steps where the goal held (ties to the earlier step), each with its `step`,
+  `score`, `goal`, `measure_within` and `error_metric`; null when no step could
+  be scored. A stopping run ends at its success selection, so they cover the
+  steps executed; a run without stop-on-success covers its whole budget.
 - `errors`: the per-target error reports the run mode is judged by - at its
   evaluated geometric step, else its evaluated symbolic step, else at the last
   step (`errors_final_step`):

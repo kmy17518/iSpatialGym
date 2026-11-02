@@ -30,7 +30,14 @@ as ``*_first_step``); the step the episode is judged at is the *chosen* step (``
 * on mode (a settled success): the first step, as before - the settled window already certifies the state.
 
 The errors, error metric and settled flag a mode is judged by are those of its chosen geometric step, else its chosen symbolic
-step, else the current step. The run mode's geometric selection is *final* (:attr:`SuccessTracker.final`, the episode's
+step, else the current step.
+
+**Closest approach** (owner 2026-11-01), reported beside the judged errors and never deciding anything: over every step the
+episode ran (whatever the mode), the step with the lowest :func:`selection_score` (``closest_approach``), and the lowest among the
+steps where ``G`` held (``closest_goal_approach``), ties to the earlier step; None when no step could be scored. A stopping run
+ends at its selection, so the records cover the steps executed (a run without stop-on-success covers its whole budget).
+
+The run mode's geometric selection is *final* (:attr:`SuccessTracker.final`, the episode's
 termination and a stopping run's end) at the first settled geometric success in the on mode, and at ``first + W - 1`` in the off
 mode (``W`` = 1 gives the earlier first-success behaviour).
 
@@ -190,6 +197,8 @@ class SuccessTracker:
         self.settled_at: Dict[str, Dict[str, Optional[bool]]] = {m: {k: None for k in KINDS} for m in self.modes}
         #: the errors at the first step (kept for comparison; the evaluation uses ``errors_at``)
         self.errors_first: Dict[str, Dict[str, Optional[Dict[str, Any]]]] = {m: {k: None for k in KINDS} for m in self.modes}
+        #: the closest approach over every step ("any") and over the steps where G held ("goal"): (t, score, G, M, errors) or None
+        self.closest: Dict[str, Optional[Tuple[int, float, bool, bool, Optional[Dict[str, Any]]]]] = {"any": None, "goal": None}
         self.last: Optional[Tuple[int, bool, bool, bool]] = None
 
     @property
@@ -220,6 +229,12 @@ class SuccessTracker:
         self.gm_run = self.gm_run + 1 if (goal and within) else 0
         n = self.settle_steps
         score = selection_score(errors, self.atoms) if self.atoms else None
+        # closest approach: every step, and the steps where G held (ties keep the earlier step)
+        if score is not None:
+            for key, eligible in (("any", True), ("goal", goal)):
+                cur = self.closest[key]
+                if eligible and (cur is None or score < cur[1]):
+                    self.closest[key] = (t, score, goal, within, errors)
         # off mode: the first step, then the better candidates of [first, first + W - 1]
         for kind, hit in (("symbolic", goal), ("geometric", goal and within)):
             first = self.first["off"][kind]
@@ -290,6 +305,16 @@ class SuccessTracker:
         kind = self._evaluation_kind(mode)
         return self.errors_at[mode][kind] if kind is not None else current
 
+    def closest_report(self, key: str, atoms: Sequence[Tuple[str, str]], where: str = "") -> Optional[Dict[str, Any]]:
+        """``closest_approach`` (``key`` "any") / ``closest_goal_approach`` ("goal"): its step, score, ``G`` / ``M`` at that step and
+        the error metric there; None when no step could be scored."""
+        rec = self.closest[key]
+        if rec is None:
+            return None
+        t, score, goal, within, errs = rec
+        return {"step": t, "score": score, "goal": goal, "measure_within": within,
+                "error_metric": error_metric(errs, atoms, where) if atoms else None}
+
     def mode_report(self, mode: str, current: Dict[str, Any], atoms: Sequence[Tuple[str, str]], where: str = "") -> Dict[str, Any]:
         errs = self.evaluation_errors(current, mode)
         kind = self._evaluation_kind(mode)
@@ -311,7 +336,8 @@ class SuccessTracker:
         if self.other_mode is not None:
             other = self.mode_report(self.other_mode, current, atoms, where)
             other.pop("errors")
-        out.update({"settle_steps": self.settle_steps, "goal_first_step": self.goal_first_step, "other_mode": other})
+        out.update({"settle_steps": self.settle_steps, "goal_first_step": self.goal_first_step, "other_mode": other,
+                    "closest_approach": self.closest_report("any", atoms, where), "closest_goal_approach": self.closest_report("goal", atoms, where)})
         return out
 
     def state(self) -> Dict[str, Any]:
@@ -320,7 +346,7 @@ class SuccessTracker:
                 "gm_run": self.gm_run, "first": copy.deepcopy(self.first), "best": copy.deepcopy(self.best),
                 "best_score": copy.deepcopy(self.best_score), "errors_at": {m: dict(v) for m, v in self.errors_at.items()},
                 "settled_at": copy.deepcopy(self.settled_at), "errors_first": {m: dict(v) for m, v in self.errors_first.items()},
-                "last": self.last}
+                "closest": dict(self.closest), "last": self.last}
 
     def load(self, state: Dict[str, Any]) -> None:
         self.settle_eval, self.settle_steps = bool(state["settle_eval"]), int(state["settle_steps"])
@@ -332,6 +358,7 @@ class SuccessTracker:
         self.errors_at = {m: dict(v) for m, v in state["errors_at"].items()}
         self.settled_at = copy.deepcopy(state["settled_at"])
         self.errors_first = {m: dict(v) for m, v in state["errors_first"].items()}
+        self.closest = dict(state.get("closest") or {"any": None, "goal": None})
         self.last = state["last"]
 
 

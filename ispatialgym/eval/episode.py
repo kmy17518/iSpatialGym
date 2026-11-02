@@ -30,6 +30,8 @@ def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, t
         ``errors`` / ``error_metric`` / ``measured`` -- at the run mode's evaluated geometric step, else its evaluated symbolic
         step, else the terminal step (``evaluation_step`` / ``evaluation_kind`` / ``evaluation_settled``: which, and its S);
         ``errors_final_step`` -- at the terminal step.
+        ``closest_approach`` / ``closest_goal_approach`` -- the lowest-error step the episode ran (any step / a step where the goal
+        held): ``step``, ``score``, ``goal``, ``measure_within``, ``error_metric``; None when no step could be scored.
     """
     isg = isg_info(last_info)
     evaluation = isg.get("evaluation") or {}
@@ -50,6 +52,8 @@ def summarize_episode(last_info: Dict[str, Any], steps: int, terminated: bool, t
         "evaluation_kind": evaluation.get("kind"),
         "evaluation_settled": evaluation.get("settled"),
         "success_final": isg.get("success_final"),
+        "closest_approach": isg.get("closest_approach"),
+        "closest_goal_approach": isg.get("closest_goal_approach"),
         "other_mode": isg["other_mode"],
         "errors": evaluation.get("errors"),
         "error_metric": evaluation.get("error_metric"),

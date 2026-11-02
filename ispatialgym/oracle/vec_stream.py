@@ -345,6 +345,8 @@ class VecStreamExecutor:
             "evaluation_kind": evaluation.get("kind"),
             "evaluation_settled": evaluation.get("settled"),
             "success_final": isg.get("success_final"),
+            "closest_approach": isg.get("closest_approach"),
+            "closest_goal_approach": isg.get("closest_goal_approach"),
             "errors": evaluation.get("errors") or isg.get("errors") or {},
             "errors_final_step": isg.get("errors") or {},
             "error_metric": evaluation.get("error_metric"),

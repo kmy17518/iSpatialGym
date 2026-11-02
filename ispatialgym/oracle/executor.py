@@ -2064,6 +2064,8 @@ class Executor:
             "evaluation_kind": evaluation.get("kind"),
             "evaluation_settled": evaluation.get("settled"),
             "success_final": isg.get("success_final"),
+            "closest_approach": isg.get("closest_approach"),
+            "closest_goal_approach": isg.get("closest_goal_approach"),
             # the errors the run mode is judged by (at its evaluated geometric step, else at its evaluated symbolic step, else at the
             # last step) and the last step's
             "errors": evaluation.get("errors") or isg.get("errors") or {},

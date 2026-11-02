@@ -1588,7 +1588,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             "settle_steps": budget["settle_steps"],
             **{k: episode.get(k) for k in ("symbolic_success", "symbolic_success_step", "symbolic_first_step", "geometric_success", "geometric_success_step",
                                             "geometric_first_step", "evaluation_step", "evaluation_kind", "evaluation_settled", "success_final", "error_metric",
-                                            "errors", "errors_final_step", "measured", "other_mode")},
+                                            "closest_approach", "closest_goal_approach", "errors", "errors_final_step", "measured", "other_mode")},
             "tolerance_profile": tolerance_profile,
             "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"], "binary_branch": episode.get("binary_branch"),
             "collisions": (episode.get("monitors") or {}).get("collisions", {}).get("n_events"),

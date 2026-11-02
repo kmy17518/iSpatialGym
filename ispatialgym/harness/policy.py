@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 EPISODE_KEYS = ("success", "reason", "success_metric", "settle_eval", "settle_steps", "symbolic_success", "symbolic_success_step",
                 "symbolic_first_step", "geometric_success", "geometric_success_step", "geometric_first_step", "evaluation_step",
-                "evaluation_settled", "error_metric", "other_mode", "n_steps", "n_action_steps")
+                "evaluation_settled", "error_metric", "closest_approach", "closest_goal_approach", "other_mode", "n_steps", "n_action_steps")
 
 
 #: run_isg's budget for an instance without a demo (``ispatialgym.eval.instances.DEFAULT_MAX_STEPS``)

@@ -236,3 +236,33 @@ def test_state_and_load_carry_the_selection():
     assert tr.best["off"]["geometric"] == 1 and tr.best_score["off"]["geometric"] == pytest.approx(0.1)
     tr.update(2, 1, 0, 0, perr(0.0, 0.0, within=False))  # the retried step fails M: the selection stays
     assert tr.best["off"]["geometric"] == 1
+
+
+def test_closest_approach_over_every_step_and_over_the_goal_steps():
+    # step 1: the lowest error but G fails (a transient pass); step 3: the lowest while G holds; step 4 ties step 3 -> 3
+    steps = [(0, 0, 0, perr(0.02, 0.0)), (0, 0, 0, perr(0.001, 0.0)), (1, 0, 0, perr(0.03, 0.0, within=False)), (1, 1, 0, perr(0.004, 0.0)),
+             (1, 1, 0, perr(0.004, 0.0)), (1, 1, 0, perr(0.01, 0.0))]
+    tr = feed(MET.SuccessTracker(settle_eval=False, settle_steps=2, atoms=ATOM), steps)
+    rep = tr.report(perr(9, 9), ATOM)
+    any_, goal = rep["closest_approach"], rep["closest_goal_approach"]
+    assert (any_["step"], any_["goal"], any_["measure_within"]) == (1, False, False)
+    assert any_["error_metric"]["position_error"] == pytest.approx(0.001) and any_["score"] == pytest.approx(0.05)
+    assert (goal["step"], goal["goal"], goal["measure_within"]) == (3, True, True)
+    assert goal["error_metric"]["position_error"] == pytest.approx(0.004)
+    # they decide nothing: the evaluated geometric step is the window's (first 3, window 3..4 -> 3)
+    assert rep["geometric_success_step"] == 3 and rep["geometric_first_step"] == 3
+    # tracked in a settle-eval run too, over every step
+    on = feed(MET.SuccessTracker(settle_eval=True, settle_steps=2, atoms=ATOM), steps)
+    assert on.report(perr(9, 9), ATOM)["closest_approach"]["step"] == 1
+
+
+def test_closest_approach_is_none_without_a_score_and_survives_a_rollback():
+    tr = run(MET.SuccessTracker(settle_eval=False, settle_steps=2), [(1, 1, 0)] * 3)  # no atoms: nothing to score
+    rep = tr.report({"t": "cutoff"}, [])
+    assert rep["closest_approach"] is None and rep["closest_goal_approach"] is None
+    tr = feed(MET.SuccessTracker(settle_eval=False, settle_steps=3, atoms=ATOM), [(1, 1, 0, perr(0.01, 0.0))])
+    cp = tr.state()
+    tr.update(1, 1, 1, 0, perr(0.001, 0.0))
+    assert tr.closest["goal"][0] == 1
+    tr.load(cp)
+    assert tr.closest["goal"][0] == 0 and tr.closest["any"][0] == 0

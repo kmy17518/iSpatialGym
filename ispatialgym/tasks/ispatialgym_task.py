@@ -883,6 +883,8 @@ class ISpatialGymTask(BehaviorTask):
             "geometric_first_step": ev["geometric_first_step"],
             "goal_first_step": ev["goal_first_step"],
             "other_mode": ev["other_mode"],
+            "closest_approach": ev["closest_approach"],
+            "closest_goal_approach": ev["closest_goal_approach"],
             "evaluation": {"errors": ev["errors"], "error_metric": ev["error_metric"], "measured": self.measured_conditions_report(ev["errors"]),
                            "step": ev["evaluation_step"], "kind": ev["evaluation_kind"], "settled": ev["evaluation_settled"]},
             "conditions": self.goal_conditions_report(status),
