@@ -30,8 +30,8 @@ def _run(tmp_path, per_scene: bool, async_frames: bool, video: bool = False, cap
 
         env.sim.dump_state = forbidden
         env.sim.load_state = forbidden
-    rcfg = RecorderConfig(hdf5=True, lerobot=False, video=video, async_frames=async_frames, **(rcfg_kw or {}))
-    ecfg = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, per_scene_state=per_scene, **(ecfg_kw or {}))
+    rcfg = RecorderConfig(hdf5=True, lerobot=False, views=("head",) if video else (), async_frames=async_frames, **(rcfg_kw or {}))
+    ecfg = ExecutorConfig(settle_steps=50, per_scene_state=per_scene, **(ecfg_kw or {}))
     state0 = env.scene.dump_state(serialized=True) if per_scene else env.sim.dump_state(serialized=True)
     ex, motions, backend, rec = make_executor(env, sc, None, exec_cfg=ecfg)
     rec = Recorder(str(tmp_path), env, env.robot, "robot_r1:zed_link:Camera:0", dict(env.objects), fps=30, cfg=rcfg, instance_id=sc.instance_id)
@@ -40,7 +40,7 @@ def _run(tmp_path, per_scene: bool, async_frames: bool, video: bool = False, cap
     rec.start(env.get_obs()[0], {}, state0=state0)
     ex.recorder = rec
     result = ex.run_program(expand(sc.variant, sc))
-    paths = rec.close({"instance_id": sc.instance_id, "success": bool(result["success"])}, qa=result["qa"]["stats"], success=bool(result["success"]))
+    paths = rec.close({"instance_id": sc.instance_id, "success": bool(result["success"])}, qa=result["monitors"]["stats"], success=bool(result["success"]))
     return result, rec, paths
 
 
@@ -59,13 +59,13 @@ def test_per_scene_state_records_the_same_episode(tmp_path):
 def test_async_frames_hand_the_sinks_the_same_frames(tmp_path):
     def capture_into(store):
         def hook(rec):
-            orig_video = rec._write_video_frame
+            orig_video = rec._write_view_frame
 
-            def video(frame, external=False):
+            def video(view, frame):
                 store["video"].append(np.array(frame, copy=True))
-                return orig_video(frame, external=external)
+                return orig_video(view, frame)
 
-            rec._write_video_frame = video
+            rec._write_view_frame = video
 
             class FakeDataset:
                 root = str(tmp_path / f"lerobot_{id(store)}")
@@ -280,7 +280,7 @@ def test_behavior_proprio_rollback_to_a_mark_resumes_from_the_kept_step(tmp_path
     h5py = pytest.importorskip("h5py")
     sc, env = iors_world()
     rec = Recorder(str(tmp_path), env, env.robot, "robot_r1:zed_link:Camera:0", dict(env.objects), fps=30,
-                   cfg=RecorderConfig(hdf5=True, lerobot=False, video=False, behavior_proprio=True), instance_id=sc.instance_id)
+                   cfg=RecorderConfig(hdf5=True, lerobot=False, behavior_proprio=True), instance_id=sc.instance_id)
     _stub_behavior_proprio(rec)
     rec.start(env.get_obs()[0], {}, state0=env.sim.dump_state(serialized=True))
     step = [0]
@@ -335,8 +335,8 @@ def test_behavior_proprio_is_the_writers_r1pro_layout_whatever_the_robot_class()
 
 def test_physics_only_recorder_refuses_frame_sinks_and_keeps_no_frame(tmp_path):
     sc, env = iors_world()
-    for kw in ({"video": True}, {"lerobot": True}, {"behavior_shard": True}):
-        cfg = RecorderConfig(**{"hdf5": True, "lerobot": False, "video": False, "physics_only": True, **kw})
+    for kw in ({"views": ("head",)}, {"lerobot": True}, {"behavior_shard": True}):
+        cfg = RecorderConfig(**{"hdf5": True, "lerobot": False, "physics_only": True, **kw})
         with pytest.raises(ValueError, match="records demo.hdf5 only"):
             Recorder(str(tmp_path), env, env.robot, "robot_r1:zed_link:Camera:0", dict(env.objects), fps=30, cfg=cfg, instance_id=sc.instance_id)
 

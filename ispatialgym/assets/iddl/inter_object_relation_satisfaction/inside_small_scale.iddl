@@ -1,7 +1,7 @@
-; IORS - inside (small-scale). Target lowered into the partner (fillable container) on the support; the target's goal orientation is
-; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
-; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held
-; by the upper stem) is required.
+; IORS - inside (small-scale). Target lowered into the partner (fillable container) on the support; the target's goal
+; orientation is whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses
+; measured. The insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container;
+; flowers held by the upper stem) is required.
 (define (iddl inter_object_relation_satisfaction-inside_small_scale)
     (:family inter_object_relation_satisfaction)
     (:variant inter_object_relation_satisfaction-inside_small_scale-{target}-{partner}-{support})

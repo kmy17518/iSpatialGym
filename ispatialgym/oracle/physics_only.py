@@ -101,7 +101,7 @@ def behavior_proprio(robot) -> np.ndarray:
 
 def check_recording(video: bool, lerobot: bool, behavior_shard: Optional[str]) -> None:
     """Physics-only collection records demo.hdf5 alone: every frame sink would store stale images."""
-    sinks = [n for n, on in (("--video", video), ("LeRobot (--record full)", lerobot), ("--behavior-shard", behavior_shard)) if on]
+    sinks = [n for n, on in (("--record-view", video), ("LeRobot (--record full)", lerobot), ("--behavior-shard", behavior_shard)) if on]
     if sinks:
         raise ValueError(f"{ENV_FLAG}=1 records demo.hdf5 only (use --record hdf5 without {', '.join(sinks)}); "
                          "observations come from ispatialgym.multienv.replay")

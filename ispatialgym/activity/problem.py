@@ -6,10 +6,10 @@ An iSpatialGym problem is a stock BDDL problem file in the ``ispatialgym`` domai
 * ``(:groups MEMBER MEMBER ... - GROUP_NAME ...)`` -- typed-list shaped like ``:objects``. Group names have the
   instance-name shape (``blocks_group.n.01_1``) but are not synsets: nothing is loaded for them and they must not
   be declared in ``:objects``.
-* ``(:measure (pose_reached ?x) (layout_reached ?g) ...)`` -- optional, after ``:goal``. Non-gating targets: the
-  listed ``pose_reached`` / ``layout_reached`` atoms are configured from the TRO and their position / orientation
-  errors are reported exactly like goal atoms, but they never decide success. An atom may not appear both in the
-  goal and in ``:measure``.
+* ``(:measure (pose_reached ?x) (layout_reached ?g) ...)`` -- after ``:goal``. The measured targets: the listed
+  ``pose_reached`` / ``layout_reached`` atoms are configured from the TRO, their errors are reported, and geometric
+  success requires every one of them within its tolerance; symbolic success is the goal alone. An atom may also
+  appear in the goal, where it gates symbolic success as well (``is_gating``: in ``:goal``).
 
 Groups are expanded on the parsed nested lists before compilation:
 
@@ -68,6 +68,16 @@ AGENT_INSTANCE = "agent.n.01_1"
 #: (problem names, directories of legacy roots, the TRO ``activity`` field) and is equivalent to its canonical name;
 #: the v1 instances under ``runlogs/runpod/samp`` were sampled as ``world_alignment``.
 LEGACY_ACTIVITIES: Dict[str, str] = {"world_alignment": "alignment"}
+#: Section names of problem files written before the rename (the sampler's outputs keep their own BDDL copies).
+LEGACY_SECTIONS: Dict[str, str] = {":alias": ":variant"}  # legacy spelling
+#: Subtask (iddl) ids renamed on 2026-10-14: the small-scale IORS tasks carry their scale, as ontop / under do. A variant, a
+#: variant template or an instance id written before (the eval85 runs, their BDDL copies, sidecars, template metadata and
+#: TROs) reads as its current name (:func:`canonical_variant`).
+LEGACY_SUBTASK_IDS: Dict[str, str] = {
+    "inter_object_relation_satisfaction-inside": "inter_object_relation_satisfaction-inside_small_scale",  # legacy spelling
+    "inter_object_relation_satisfaction-nextto": "inter_object_relation_satisfaction-nextto_small_scale",  # legacy spelling
+    "inter_object_relation_satisfaction-touching": "inter_object_relation_satisfaction-touching_small_scale",  # legacy spelling
+}
 
 #: Optional variant <-> definition id registry of an activity directory (``ground_isg`` allocates ids per variant).
 PROBLEM_REGISTRY_FILE = "problems.json"
@@ -133,6 +143,18 @@ def activity_names(activity: str) -> List[str]:
     """Every accepted spelling of ``activity``: the canonical name first, then its retired names."""
     canonical = canonical_activity(activity)
     return [canonical] + [old for old, new in LEGACY_ACTIVITIES.items() if new == canonical]
+
+
+def canonical_variant(variant):
+    """``variant`` (a subtask id, a variant, a variant template or an instance id starting with one) under its current
+    subtask id (:data:`LEGACY_SUBTASK_IDS`): ``inter_object_relation_satisfaction-touching-a-b-c`` (legacy spelling) ->
+    ``inter_object_relation_satisfaction-touching_small_scale-a-b-c``; anything else (other types included) unchanged."""
+    if not isinstance(variant, str):
+        return variant
+    for old, new in LEGACY_SUBTASK_IDS.items():
+        if variant == old or variant.startswith(old + "-"):
+            return new + variant[len(old):]
+    return variant
 
 
 def same_activity(a: str, b: str) -> bool:
@@ -250,8 +272,16 @@ class ISGProblem:
     raw_measure: list = field(default_factory=list)  # (:measure ...) literals as written
     init: list = field(default_factory=list)  # expanded init literals
     goal: list = field(default_factory=list)  # expanded top-level goal conjuncts
-    measure: list = field(default_factory=list)  # non-gating pose_reached / layout_reached literals
+    measure: list = field(default_factory=list)  # measured pose_reached / layout_reached literals (may also be in the goal)
     path: Optional[str] = None
+
+    def content_key(self) -> tuple:
+        """The objects, groups, expanded init and the union of the goal and measure atoms: what two copies of a problem must share
+        whichever section an atom sits in (the 2026-10-14 scoring change copied / moved pose_reached / layout_reached into
+        ``:measure``)."""
+        flat = lambda exprs: sorted(" ".join(to_bddl(e).split()) for e in exprs)  # noqa: E731
+        return ({k: list(v) for k, v in sorted(self.objects.items())}, {k: list(v) for k, v in sorted(self.groups.items())}, flat(self.init),
+                sorted(set(flat(self.goal)) | set(flat(self.measure))))
 
     # ------------------------------------------------------------------ derived
 
@@ -431,7 +461,7 @@ class ISGCompiledTask:
         self.layout_reached_args: List[str] = _unique(
             a for head in self.goal_conditions for a in collect_predicate_args(head, "layout_reached")
         )
-        # ... and the non-gating ones from (:measure ...). Both kinds are configured from the TRO and reported.
+        # ... and the measured ones of (:measure ...) (an atom may be in both). Both kinds are configured from the TRO and reported.
         self.measure_pose_reached_args: List[str] = list(problem.measure_pose_reached_args)
         self.measure_layout_reached_args: List[str] = list(problem.measure_layout_reached_args)
 
@@ -445,8 +475,14 @@ class ISGCompiledTask:
         return _unique(self.layout_reached_args + self.measure_layout_reached_args)
 
     def is_gating(self, predicate: str, arg: str) -> bool:
+        """The atom ``(predicate arg)`` is in ``:goal``."""
         gated = self.pose_reached_args if predicate == "pose_reached" else self.layout_reached_args
         return arg in gated
+
+    def in_measure(self, predicate: str, arg: str) -> bool:
+        """The atom ``(predicate arg)`` is in ``:measure``."""
+        measured = self.measure_pose_reached_args if predicate == "pose_reached" else self.measure_layout_reached_args
+        return arg in measured
 
     # BehaviorTask-facing API ---------------------------------------------------------------------------------
 
@@ -569,10 +605,10 @@ def _read_variant(path: str) -> Optional[str]:
     """The ``(:variant ...)`` of a problem file without parsing / validating the rest of it."""
     tokens = scan_tokens(filename=path)
     for section in tokens[1:] if isinstance(tokens, list) else []:
-        if isinstance(section, list) and section and section[0] == ":variant":
+        if isinstance(section, list) and section and section[0] in (":variant", *LEGACY_SECTIONS):
             if len(section) != 2 or not isinstance(section[1], str):
                 raise ISGProblemError(f"{path}: (:variant ...) must hold exactly one symbol, got {section[1:]!r}")
-            return section[1]
+            return canonical_variant(section[1])
     return None
 
 
@@ -591,18 +627,20 @@ def _registry_entries(data, what: str):
         data = data["problems"]
     if isinstance(data, list):
         for i, rec in enumerate(data):
+            rec = {("variant" if k == "alias" else k): v for k, v in rec.items()} if isinstance(rec, dict) else rec  # legacy spelling
             if not isinstance(rec, dict) or "variant" not in rec:
                 raise ISGProblemError(f"{what}: entry {i} must be an object with 'variant' and 'id', got {rec!r}")
             pid = rec.get("id", rec.get("definition_id"))
             if pid is None:
                 raise ISGProblemError(f"{what}: entry {i} ({rec.get('variant')!r}) has no 'id' / 'definition_id'")
-            yield rec["variant"], pid
+            yield canonical_variant(rec["variant"]), pid
     elif isinstance(data, dict):
         if data and all(isinstance(k, str) and k.isdigit() for k in data):  # inverse shape {"<id>": "<variant>"}
             for k, variant in data.items():
-                yield variant, int(k)
+                yield canonical_variant(variant), int(k)
         else:
-            yield from data.items()
+            for variant, pid in data.items():
+                yield canonical_variant(variant), pid
     else:
         raise ISGProblemError(f"{what}: must be a JSON object {{variant: id}} or a list of {{variant, id}} records")
 
@@ -680,6 +718,7 @@ def id_of_variant(activity: str, variant: str, root: Optional[str] = None) -> in
     From ``problems.json`` when it registers the variant (checked against the file when it exists), else by scanning
     the ``(:variant ...)`` of the problem files. Raises :class:`ISGProblemError` naming the known variants otherwise.
     """
+    variant = canonical_variant(variant)
     directory = activity_dir(activity, root)
     registry = load_problem_registry(directory, missing_ok=True)
     if variant in registry:
@@ -747,7 +786,7 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
     for group in sections:
         if not isinstance(group, list) or not group:
             raise ISGProblemError(f"Malformed section {group!r}")
-        tag = group[0]
+        tag = LEGACY_SECTIONS.get(group[0], group[0])
         if tag in seen:
             raise ISGProblemError(f"Duplicate section {tag}")
         seen.add(tag)
@@ -759,7 +798,7 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
         elif tag == ":variant":
             if len(group) != 2 or not isinstance(group[1], str):
                 raise ISGProblemError(f"(:variant ...) must hold exactly one symbol, got {group[1:]!r}")
-            variant = group[1]
+            variant = canonical_variant(group[1])
             if not VARIANT_RE.match(variant):
                 raise ISGProblemError(f"Invalid variant {variant!r}")
         elif tag == ":objects":
@@ -868,9 +907,8 @@ def _validate_declarations(problem: ISGProblem) -> None:
 
 def _validate_measure(problem: ISGProblem, measure: list) -> list:
     """Validate the ``(:measure ...)`` literals: unary ``pose_reached`` / ``layout_reached`` atoms on declared
-    instances or groups, no duplicates, and disjoint from the goal's atoms of the same predicate."""
+    instances or groups, no duplicates (an atom may also be in the goal)."""
     symbols = set(problem.scope_symbols)
-    gated = {pred: set(problem.literal_args(pred, where="goal")) for pred in MEASURE_PREDICATES}
     out = []
     seen = set()
     for lit in measure:
@@ -884,8 +922,6 @@ def _validate_measure(problem: ISGProblem, measure: list) -> list:
         arg = _strip(lit[1])
         if arg not in symbols:
             raise ISGProblemError(f":measure: {arg!r} is not a declared instance or group in {lit}")
-        if arg in gated[pred]:
-            raise ISGProblemError(f":measure: ({pred} {arg}) is already a gating goal atom")
         if (pred, arg) in seen:
             raise ISGProblemError(f":measure lists ({pred} {arg}) more than once")
         seen.add((pred, arg))

@@ -1,5 +1,6 @@
-; IORS - nextto (small-scale). Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
-; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+; IORS - nextto (small-scale). Target and partner on the support with an init gap above the NextTo bound; the target is
+; moved to the nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same
+; orientation.
 (define (iddl inter_object_relation_satisfaction-nextto_small_scale)
     (:family inter_object_relation_satisfaction)
     (:variant inter_object_relation_satisfaction-nextto_small_scale-{target}-{partner}-{support})

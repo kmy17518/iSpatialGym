@@ -1,21 +1,19 @@
 """Gate 3a of the vectorized evaluator: ``VecStreamExecutor`` on N fake environments (no simulator).
 
 Every environment runs its own scripted stream against the single-env fake world of ``test_v2_oracle`` (toy kinematics,
-30 Hz); the per-env goal tracker mimics ``ISpatialGymTask``'s two-level info (``first_success_step`` / ``binary_success_ever``
-/ gating pose errors / conditions). Checked:
+30 Hz); the per-env goal (the robot base within 5 cm of a point, a ``pose_reached`` target) is scored by the fake task's tracker
+(``ispatialgym.eval.metrics``, settle-eval off as a policy run's). Checked:
 
-* per-env success tracking and ``first_success_step``;
-* the epilogue windows and verdicts per env (success after max(50, 20 %), the never-held 10-step window -> ``tolerance`` with
-  ``never_reached``, goal held then lost -> second window -> ``tolerance`` at the last step, a timeout verdict without a window);
+* per-env geometric / symbolic success and their steps; a stream has no epilogue: it ends at the source's ``None`` (horizon,
+  stop on success) or at ``max_steps`` and the metrics judge it (``not_reached`` when the goal never held);
 * environments finishing at different steps, one never reaching the goal; a finished env's robot receives its no-op (last
   action, base stopped) and does not move while the others continue;
-* parity: every slot's result equals the single-env ``Executor.run_stream`` run of the same scenario alone (same n_steps,
-  n_action_steps, reason, settle windows, first_success_step, final robot pose), so the batch is N independent episodes.
+* parity: every slot's result equals the single-env ``Executor.run_stream`` run of the same scenario alone (same n_steps, reason,
+  success steps, errors, final robot pose), so the batch is N independent episodes.
 """
 
 from __future__ import annotations
 
-import copy
 import math
 import types
 from typing import Any, Dict, List, Optional
@@ -23,8 +21,9 @@ from typing import Any, Dict, List, Optional
 import pytest
 import torch as th
 
+from ispatialgym.eval import metrics as MET
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig
+from ispatialgym.oracle.executor import Executor, ExecutorConfig
 from ispatialgym.oracle.vec_stream import Slot, VecStreamExecutor
 from ispatialgym.tests.test_v2_oracle import CAM_KEY, FakeEnv, FakeRobot
 
@@ -35,27 +34,21 @@ AGENT = "agent.n.01_1"
 
 
 class GoalTracker:
-    """``ISpatialGymTask``'s per-env evaluation on the fake: the goal is the robot base within 5 cm of ``goal_xy``."""
+    """The fake world's per-step facts: the goal is the robot base within 5 cm of ``goal_xy`` (a ``pose_reached`` atom in :goal
+    and :measure)."""
 
     def __init__(self, goal_xy, tol: float = 0.05):
         self.goal = th.tensor(goal_xy, dtype=th.float32)
         self.tol = tol
-        self.first = -1
-        self.errors_at_first = None
 
     def __call__(self, env: FakeEnv) -> Dict[str, Any]:
         pos, _ = env.robot.get_position_orientation()
         err = float(th.linalg.norm(pos[:2] - self.goal))
         within = err <= self.tol
-        errors = {"pose_errors": {AGENT: {"position_error": err, "orientation_error": 0.0, "within_tolerance": within, "gating": True}},
-                  "layout_errors": {}, "max_position_error": err, "max_orientation_error": 0.0, "max_layout_position_error": None, "max_layout_orientation_error": None}
-        if within and self.first < 0:
-            self.first = env._current_step
-            self.errors_at_first = copy.deepcopy(errors)
-        return {"binary_success": within, "binary_success_ever": self.first >= 0, "first_success_step": self.first, "official_success": self.first >= 0,
-                "settled": False, "settled_success": False, "first_settled_success_step": -1, "settle_latency_steps": -1,
-                "errors": errors, "errors_at_first_success": self.errors_at_first, "final_errors": self.errors_at_first or errors,
-                "conditions": [{"index": 0, "bddl": f"(pose_reached ?{AGENT})", "kind": "binary", "satisfied": within}], "measured": [], "group_assignments": {}}
+        errors = {"pose_errors": {AGENT: {"position_error": err, "orientation_error": 0.0, "within_tolerance": within, "in_goal": True, "in_measure": True}},
+                  "layout_errors": {}}
+        return {"binary_success": within, "settled": False, "errors": errors, "group_assignments": {},
+                "conditions": [{"index": 0, "bddl": f"(pose_reached ?{AGENT})", "kind": "binary", "satisfied": within}]}
 
 
 class FakeVecEnv:
@@ -117,10 +110,10 @@ class Drive:
 
 SCENARIOS = {
     # name: (goal distance along +x, normalized vx, horizon, stop_on_success, max_steps)
-    "reach_then_stop": (0.5, 0.5, 120, True, 20000),  # success: goal held through the 50-step window
-    "never_reached": (5.0, 0.5, 120, True, 20000),  # never-held rule: 10-step window, tolerance verdict
-    "reach_and_pass": (0.5, 0.5, 80, False, 20000),  # goal held around step 40 then lost: second window, tolerance at the end
-    "timeout": (5.0, 0.5, 120, True, 30),  # QA timeout at step 30: no window
+    "reach_then_stop": (0.5, 0.5, 120, True, 20000),  # geometric success, the stream stops there
+    "never_reached": (5.0, 0.5, 120, True, 20000),  # the horizon ends the stream: not_reached
+    "reach_and_pass": (0.5, 0.5, 80, False, 20000),  # the goal held around step 40, then the robot drove on: still a success (off mode)
+    "capped": (5.0, 0.5, 120, True, 30),  # max_steps ends the stream at 30, no timeout verdict: not_reached
 }
 
 
@@ -128,6 +121,7 @@ def make_world(name: str):
     dist, vx, horizon, stop, max_steps = SCENARIOS[name]
     robot = FakeRobot()
     env = FakeEnv(robot, {}, evaluate=GoalTracker((dist, 0.0)))
+    env.task.tracker = MET.SuccessTracker(settle_eval=False, settle_steps=45)
     source = Drive(robot, vx, horizon, stop_on_success=stop)
     cfg = ExecutorConfig(max_steps=max_steps)
     return env, source, cfg
@@ -138,8 +132,7 @@ class _State:
 
 
 def run_single(name: str) -> Dict[str, Any]:
-    """The single-env executor on the same scenario, with the lab's never-held rule applied as the production patch does
-    (10-step window, no second window, when the goal never held during the stream)."""
+    """The single-env executor on the same scenario."""
     env, source, cfg = make_world(name)
     ex = Executor(env, env.task, None, recorder=None, motions=None, monitors=None, cfg=cfg, sim=env.sim, state=_State(), tracked_objects={}, cam_key=CAM_KEY)
     obs, info = env._obs(), env._info()
@@ -154,20 +147,6 @@ def run_single(name: str) -> Dict[str, Any]:
             yield a
             o, i = ex.last_obs, ex.last_info
 
-    # the production epilogue patch (lab_tools/evaluator_patches.py): decided on binary_success_ever at the end of the stream
-    orig = ex.epilogue
-
-    def patched(verdict, n_action_steps):
-        if not ex.isg.get("binary_success_ever", ex.isg.get("binary_success", False)):
-            saved = (cfg.settle_second_window_factor, cfg.settle_fraction, cfg.settle_min_steps)
-            cfg.settle_second_window_factor, cfg.settle_fraction, cfg.settle_min_steps = 0.0, 0.0, 10
-            try:
-                return orig(verdict, n_action_steps)
-            finally:
-                cfg.settle_second_window_factor, cfg.settle_fraction, cfg.settle_min_steps = saved
-        return orig(verdict, n_action_steps)
-
-    ex.epilogue = patched
     result = ex.run_stream(stream())
     result["_pose"] = env.robot.get_position_orientation()
     result["_steps"] = env.steps
@@ -177,7 +156,7 @@ def run_single(name: str) -> Dict[str, Any]:
 def run_vec(names: List[str]):
     worlds = [make_world(n) for n in names]
     venv = FakeVecEnv([w[0] for w in worlds])
-    slots = [Slot(idx=i, robot=w[0].robot, source=w[1], cfg=w[2], task=w[0].task, tracked={}, held=lambda: [], never_held_window=10) for i, w in enumerate(worlds)]
+    slots = [Slot(idx=i, robot=w[0].robot, source=w[1], cfg=w[2], task=w[0].task, tracked={}, held=lambda: []) for i, w in enumerate(worlds)]
     vex = VecStreamExecutor(venv, slots, sim=None)
     results = vex.run([w[0]._obs() for w in worlds], [w[0]._info() for w in worlds])
     return venv, slots, results
@@ -187,40 +166,34 @@ def run_vec(names: List[str]):
 
 
 def test_four_environments_finish_independently_with_their_own_verdicts():
-    names = ["reach_then_stop", "never_reached", "reach_and_pass", "timeout"]
+    names = ["reach_then_stop", "never_reached", "reach_and_pass", "capped"]
     venv, slots, results = run_vec(names)
     by = dict(zip(names, results))
 
     r = by["reach_then_stop"]
-    assert r["success"] is True and r["reason"] is None
-    assert r["first_success_step"] >= 0 and r["binary_success_ever"] and r["binary_success_final"]
-    assert r["settle_windows"] == [50] and r["n_steps"] == r["n_action_steps"] + 50
-    assert r["n_action_steps"] == r["first_success_step"]  # the stream ends at the first official success (the fake counts steps after stepping)
+    assert r["success"] is True and r["reason"] is None and r["geometric_success"] and r["symbolic_success"]
+    assert r["epilogue_steps"] == 0 and r["n_steps"] == r["n_action_steps"]
+    assert r["n_action_steps"] == r["geometric_success_step"]  # the stream ends at the geometric success (the fake counts steps after stepping)
 
     r = by["never_reached"]
-    assert r["success"] is False and r["reason"] == "tolerance" and r["verdict"]["details"]["never_reached"] is True
-    assert r["first_success_step"] == -1 and r["settle_windows"] == [10] and r["n_action_steps"] == 120 and r["n_steps"] == 130
+    assert r["success"] is False and r["reason"] == "not_reached" and r["geometric_success_step"] is None and r["n_steps"] == 120
 
     r = by["reach_and_pass"]
-    # the goal held, then the robot drove on: the second window runs, and the gating target out of tolerance at the end
-    # is the executor's ``tolerance`` verdict (not the never-reached one)
-    assert r["success"] is False and r["reason"] == "tolerance" and not r["verdict"]["details"].get("never_reached")
-    assert r["binary_success_ever"] and not r["binary_success_final"]
-    assert r["settle_windows"] == [50, 100] and r["n_action_steps"] == 80 and r["n_steps"] == 230
-    assert "first_window" in r["motion_delta"]
+    # the goal held, then the robot drove on: off mode, the first step decides
+    assert r["success"] is True and r["geometric_success_step"] < 80 and r["n_steps"] == 80
+    assert r["errors"]["pose_errors"][AGENT]["within_tolerance"] and not r["errors_final_step"]["pose_errors"][AGENT]["within_tolerance"]
 
-    r = by["timeout"]
-    assert r["success"] is False and r["reason"] == "timeout" and r["n_steps"] == 30 and r["n_action_steps"] == 30
-    assert r["n_settle_steps"] == 0 and r["settle_windows"] == [10]  # the never-held window is recorded, not run (timeout verdict)
+    r = by["capped"]
+    assert r["success"] is False and r["reason"] == "not_reached" and r["n_steps"] == 30 and r["n_action_steps"] == 30
 
     # the batch ran until the longest episode; every env was stepped every batch step
-    assert len(venv.action_log) == max(r["n_steps"] for r in results) == 230
+    assert len(venv.action_log) == max(r["n_steps"] for r in results) == 120
     for e in venv.envs:
-        assert e.steps == 230
+        assert e.steps == 120
 
 
 def test_finished_environment_receives_its_noop_and_stays_put():
-    names = ["timeout", "reach_then_stop", "reach_and_pass"]
+    names = ["capped", "reach_then_stop", "reach_and_pass"]
     venv, slots, results = run_vec(names)
     for i, (name, r) in enumerate(zip(names, results)):
         done_at = r["n_steps"]
@@ -236,7 +209,7 @@ def test_finished_environment_receives_its_noop_and_stays_put():
     env_t = venv.envs[0]
     pose_mid = None
 
-    env2, src2, cfg2 = make_world("timeout")
+    env2, src2, cfg2 = make_world("capped")
     # replay the batch actions for env 0 on a fresh fake up to its verdict, then compare with the final pose
     for a in venv.action_log[:30]:
         env2.step(a[0])
@@ -246,14 +219,14 @@ def test_finished_environment_receives_its_noop_and_stays_put():
 
 
 @pytest.mark.parametrize("names", [
-    ["reach_then_stop", "never_reached", "reach_and_pass", "timeout"],
+    ["reach_then_stop", "never_reached", "reach_and_pass", "capped"],
     ["never_reached", "never_reached", "never_reached"],  # the same episode in every slot
     ["reach_and_pass"],
 ])
 def test_each_slot_matches_the_single_env_executor(names):
     venv, slots, results = run_vec(names)
-    keys = ("success", "reason", "n_steps", "n_action_steps", "n_settle_steps", "settle_window", "settle_windows", "first_success_step",
-            "binary_success_ever", "binary_success_final", "settled_success")
+    keys = ("success", "reason", "n_steps", "n_action_steps", "n_settle_steps", "epilogue_steps", "symbolic_success", "symbolic_success_step",
+            "geometric_success", "geometric_success_step", "goal_first_step", "error_metric", "other_mode")
     for name, r, s in zip(names, results, slots):
         single = run_single(name)
         for k in keys:
@@ -306,6 +279,20 @@ def test_clone_frames_translate_targets_objects_and_robot_but_not_the_base_scene
     assert th.equal(out.pose_targets["cup.n.01_1"].position, rel.position)
     assert offset_targets_meta(meta, base) is meta  # bit-identical path for the base scene
     assert th.equal(world.position, th.tensor([15.4, 1.94, 1.15]))  # the TRO meta itself is untouched
+    # a group target: the absolute slot positions move with the clone, the layout relations (member-relative) do not
+    from ispatialgym.eval.targets import GroupTarget, LayoutRelation, Slot
+
+    group = GroupTarget("assembly", ["lid.n.01_1", "pot.n.01_1"], "fixed", "slot_position", {"lid.n.01_1": "s0", "pot.n.01_1": "s1"}, [],
+                        {"s0": Slot("s0", th.tensor([1.0, 2.0, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0])),
+                         "s1": Slot("s1", th.tensor([1.0, 2.0, 0.8]), th.tensor([0.0, 0.0, 0.0, 1.0]))},
+                        (0.05, 0.1), [LayoutRelation("s1", "s0", th.tensor([0.0, 0.0, 0.1]), th.tensor([0.0, 0.0, 0.0, 1.0]))], (0.01, 0.1))
+    meta = types.SimpleNamespace(pose_targets={}, groups={"assembly": group})
+    out = offset_targets_meta(meta, clone)
+    assert th.allclose(out.groups["assembly"].target_slots["s0"].position, th.tensor([41.0, 2.0, 0.9]))
+    assert th.allclose(out.groups["assembly"].target_slots["s1"].position, th.tensor([41.0, 2.0, 0.8]))
+    assert th.equal(out.groups["assembly"].layout_relations[0].position, th.tensor([0.0, 0.0, 0.1]))
+    assert th.equal(group.target_slots["s0"].position, th.tensor([1.0, 2.0, 0.9]))  # the TRO meta itself is untouched
+    assert out.groups["assembly"].members == group.members and out.groups["assembly"].pose_tolerances == (0.05, 0.1)
     # an object state: root position translated, orientation / joints untouched
     st = {"root_link": {"pos": th.tensor([1.0, 2.0, 0.5]), "ori": th.tensor([0.0, 0.0, 0.0, 1.0])}, "joint_pos": th.tensor([0.3])}
     out = offset_object_state(st, clone)
@@ -344,3 +331,60 @@ def test_attachment_context_is_per_scene():
     assert PRED.attachment_context(Ent("bolt", 1), Ent("nut", 1))["equivalences"] == []  # falls back to the single-env entry
     PRED.set_attachment_context([])
     PRED.set_attachment_context([], scene_idx=0)
+
+
+# ------------------------------------------------------------------------------- the evaluated success step and the stop rule (2026-11-01)
+
+
+class GoalTrackerTol(GoalTracker):
+    """``GoalTracker`` with the report's tolerances (what ``ISpatialGymTask.collect_errors`` adds), so the selection can score steps."""
+
+    def __init__(self, goal_xy, tol: float = 0.05):
+        super().__init__(goal_xy, tol)
+        self.log: Dict[int, Any] = {}  # step -> (position error, within)
+
+    def __call__(self, env: FakeEnv) -> Dict[str, Any]:
+        d = super().__call__(env)
+        rep = d["errors"]["pose_errors"][AGENT]
+        rep["tolerances"] = {"position": self.tol, "orientation": None}
+        self.log[int(env._current_step)] = (rep["position_error"], rep["within_tolerance"])
+        return d
+
+
+@pytest.mark.parametrize("vec", [False, True])
+def test_stop_on_success_waits_for_the_final_selection_and_judges_the_lowest_error_step(vec):
+    # the source never stops by itself; the robot drives through the goal (error falls, then rises): the executor's stop rule must
+    # end the episode W - 1 steps after the first success, judged at the closest approach inside that window
+    W = 10
+    robot = FakeRobot()
+    goal = GoalTrackerTol((0.5, 0.0), tol=0.05)
+    env = FakeEnv(robot, {}, evaluate=goal)
+    env.task.tracker = MET.SuccessTracker(settle_eval=False, settle_steps=W, atoms=[("pose_reached", AGENT)])
+    source = Drive(robot, 0.5, 400, stop_on_success=False)
+    cfg = ExecutorConfig(max_steps=20000, stop_on_success=True)
+    if vec:
+        slot = Slot(idx=0, robot=robot, source=source, cfg=cfg, task=env.task, tracked={}, held=lambda: [])
+        r = VecStreamExecutor(FakeVecEnv([env]), [slot], sim=None).run([env._obs()], [env._info()])[0]
+    else:
+        ex = Executor(env, env.task, None, recorder=None, motions=None, monitors=None, cfg=cfg, sim=env.sim, state=_State(), tracked_objects={}, cam_key=CAM_KEY)
+        obs, info = env._obs(), env._info()
+        ex.last_obs, ex.last_info = obs, info
+
+        def stream():
+            o, i = obs, info
+            while True:
+                a = source(o, i)
+                if a is None:
+                    return
+                yield a
+                o, i = ex.last_obs, ex.last_info
+
+        r = ex.run_stream(stream())
+    first = r["geometric_first_step"]
+    assert r["success"] and first is not None and r["success_final"]
+    assert r["n_action_steps"] == first + W - 1  # not at the first success: at the end of its selection window
+    best = r["geometric_success_step"]
+    assert first <= best <= first + W - 1
+    assert r["evaluation_step"] == best and r["evaluation_kind"] == "geometric"
+    # the judged error is the window's minimum among the steps within tolerance
+    assert r["error_metric"]["position_error"] == min(goal.log[t][0] for t in range(first, first + W) if t in goal.log and goal.log[t][1])

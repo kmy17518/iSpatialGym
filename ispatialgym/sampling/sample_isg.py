@@ -362,7 +362,7 @@ class WorldPool:
 
 
 def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, out_root: str, n_instances: int, seed: int, max_attempts: int,
-                 sub_variant: Optional[str] = None, customs_sha256: Optional[str] = None, start_index: Optional[int] = None,
+                 customs_sha256: Optional[str] = None, start_index: Optional[int] = None,
                  deadline: Optional[float] = None, indices: Optional[List[int]] = None, instance_filter=None,
                  meta_extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Build the sampler of the variant's subtask for ``choice``, run ``setup()`` + ``run_instances``; returns the
@@ -376,7 +376,7 @@ def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, o
     out_dir = os.path.join(out_root, problem.variant, choice.template_id)
     os.makedirs(out_dir, exist_ok=True)
     t0 = time.time()
-    ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256, sub_variant=sub_variant)
+    ctx = ContextV2(problem, choice, world, kit, out_dir, base_seed=seed, customs_sha256=customs_sha256)
     sampler = get_sampler(problem.subtask)(ctx)
     sampler.deadline = deadline
     sampler.instance_filter = instance_filter
@@ -482,7 +482,6 @@ def main(argv=None, shutdown: bool = True):
                         help="per variant: once this much time has passed (times the subtask's generation.time_budget_factor) no new "
                              "attempt, template or scene is started; an attempt in progress always finishes, so a run is cut off only "
                              "while it keeps failing")
-    parser.add_argument("--sub-variant", default=None, help="task sub-variant (open / close, block pattern id, ...)")
     parser.add_argument("--no-write-back", action="store_true", help="do not append blacklists / constraints to the source customs file")
     parser.add_argument("--v1-spec", default=None, help="facade: v1 task spec json (until ground_isg lands)")
     parser.add_argument("--v1-problem", default=None, help="facade: <activity>-<def_id> key in --v1-spec")
@@ -610,7 +609,7 @@ def run_variant(args, variant: str, pool: WorldPool, report: Dict[str, Any], cus
                 continue
             if os.path.exists(out_dir) and args.overwrite:
                 shutil.rmtree(out_dir)
-            entry = run_template(gp, choice, world, kit, args.out, n_inst, seed * 7919 + ti, args.max_attempts, args.sub_variant, customs_sha,
+            entry = run_template(gp, choice, world, kit, args.out, n_inst, seed * 7919 + ti, args.max_attempts, customs_sha,
                                  start_index=args.start_index, deadline=deadline, meta_extra=meta_extra)
             if (entry.get("counters") or {}).get("time_budget_stops"):
                 report["variants"].setdefault(variant, {})["time_budget_exhausted"] = True

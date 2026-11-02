@@ -223,6 +223,13 @@ def test_sidecar_round_trips(subtask, tmp_path):
     assert all(v["pixels"] == 123 for v in sc2.to_dict()["language"]["objects"].values())
 
 
+@pytest.mark.parametrize("subtask", FIXTURE_SUBTASKS)
+def test_sidecar_written_before_the_rename_loads(subtask):
+    old = {("alias" if k == "variant" else k): v for k, v in raw(subtask).items()}  # legacy spelling
+    sc = Sidecar.from_dict(old)
+    assert sc == load(subtask) and sc.to_dict()["variant"] == raw(subtask)["variant"]
+
+
 def test_subtask_of_variant():
     for subtask in SUBTASKS:
         if subtask in FIXTURE_SUBTASKS:
@@ -533,12 +540,13 @@ def test_disembedding_grasp_may_touch_the_tray_objects():
 
 def test_iors_place_kinds_and_relations():
     kinds = {}
-    for rel in ("ontop_small_scale", "under_small_scale", "inside", "nextto", "touching", "ontop_large_scale", "under_large_scale"):
+    for rel in ("ontop_small_scale", "under_small_scale", "inside_small_scale", "nextto_small_scale", "touching_small_scale", "ontop_large_scale",
+                "under_large_scale"):
         sc = load(f"inter_object_relation_satisfaction-{rel}")
         place = [a for a in expand(sc.variant, sc) if a.name == "place"][0]
         kinds[rel] = (place.kind, place.relation)
-    assert kinds["inside"] == ("drop", "into")
-    assert kinds["nextto"] == ("support", "next to") and kinds["touching"] == ("support", "next to")
+    assert kinds["inside_small_scale"] == ("drop", "into")
+    assert kinds["nextto_small_scale"] == ("support", "next to") and kinds["touching_small_scale"] == ("support", "next to")
     assert kinds["under_large_scale"] == ("support", "under")
     assert kinds["ontop_small_scale"] == kinds["under_small_scale"] == kinds["ontop_large_scale"] == ("support", "on")
     att = load("configuration_matching-attachment")

@@ -1,5 +1,5 @@
 """Group evaluation with the per-evaluation relation_error memo (ISPATIALGYM_FAST_ASSIGN) against without it, bit for
-bit (no simulator; members are stand-ins with fixed poses)."""
+bit, and a pinned member's assignment (no simulator; members are stand-ins with fixed poses)."""
 
 import math
 import struct
@@ -56,6 +56,48 @@ def _key(ev):
         return x
     return f({"assignment": ev.assignment, "members": ev.member_errors, "relations": ev.relation_errors,
               "pose": ev.pose_reached, "layout": ev.layout_reached})
+
+
+def _board_target(pinned: bool):
+    """Four blocks in a row and a board behind them (``slot_board``), every pair related; the board pinned or exchangeable."""
+    members = [f"toy_dice.n.01_{i}" for i in range(1, 5)] + ["tray.n.01_1"]
+    slots = {f"slot_{i}": [0.1 * i, 0.0, 0.0] for i in range(4)}
+    slots["slot_board"] = [0.15, 0.1, 0.0]
+    ids = list(slots)
+    relations = [{"from": a, "to": b, "position": [slots[b][k] - slots[a][k] for k in range(3)], "orientation": [0, 0, 0, 1]}
+                 for i, a in enumerate(ids) for b in ids[i + 1:]]
+    assignment = {"mode": "exchangeable", "cost": "layout", **({"pinned": {"tray.n.01_1": "slot_board"}} if pinned else {})}
+    return GroupTarget.from_dict("targets_group.n.01_1", {
+        "members": members, "assignment": assignment, "orientation_equivalences": [],
+        "target_slots": {s: {"position": p, "orientation": [0, 0, 0, 1]} for s, p in slots.items()},
+        "layout_relations": relations, "layout_tolerances": {"position": 0.01, "orientation": 0.05},
+        "pose_tolerances": {"position": 0.03, "orientation": 0.1}})
+
+
+def test_pinned_member_keeps_its_slot(monkeypatch):
+    unit = th.tensor([0.0, 0.0, 0.0, 1.0])
+    at = {"toy_dice.n.01_1": [0.2, 0.0, 0.0], "toy_dice.n.01_2": [0.0, 0.0, 0.0], "toy_dice.n.01_3": [0.3, 0.0, 0.0],
+          "toy_dice.n.01_4": [0.1, 0.0, 0.0], "tray.n.01_1": [0.15, 0.1, 0.0]}
+    # the board and the block of slot_1 trade places: only an exchangeable board takes the swapped arrangement for the layout
+    swapped = {**at, "toy_dice.n.01_4": [0.15, 0.1, 0.0], "tray.n.01_1": [0.1, 0.0, 0.0]}
+    results = {}
+    for name, poses in (("placed", at), ("swapped", swapped)):
+        objs = {m: _Member(th.tensor(p), unit) for m, p in poses.items()}
+        for pinned in (True, False):
+            for mode in ("", "1"):
+                monkeypatch.setattr(GE, "FAST_ASSIGN", mode)
+                ent = GE.GroupEntity("targets_group.n.01_1", list(objs), resolve_member=lambda n: objs[n])
+                ent.set_target(_board_target(pinned))
+                results[name, pinned, mode] = ent.evaluate()
+    for key in results:
+        assert _key(results[key]) == _key(results[key[:2] + ("",)])
+    placed = results["placed", True, ""]
+    assert placed.layout_reached and placed.pose_reached
+    assert placed.assignment == {"toy_dice.n.01_1": "slot_2", "toy_dice.n.01_2": "slot_0", "toy_dice.n.01_3": "slot_3",
+                                 "toy_dice.n.01_4": "slot_1", "tray.n.01_1": "slot_board"}
+    assert list(placed.assignment) == sorted(placed.assignment)
+    assert results["swapped", True, ""].assignment["tray.n.01_1"] == "slot_board" and not results["swapped", True, ""].layout_reached
+    assert results["swapped", False, ""].assignment["tray.n.01_1"] == "slot_1" and results["swapped", False, ""].layout_reached
 
 
 @pytest.mark.parametrize("eqs", [[], YAW4])

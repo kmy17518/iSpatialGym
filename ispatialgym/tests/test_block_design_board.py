@@ -30,7 +30,7 @@ def _top_and_edge():
 def _sampler(top, board=True, gen=None):
     s = object.__new__(BD.BlockDesign)
     s.spec = SimpleNamespace(generation={**GEN, **(gen or {})})
-    s.subtask, s.defaults, s.sub_variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
+    s.subtask, s.defaults, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), "targets"
     s.gp = SimpleNamespace(variant="configuration_matching-block_design-block_4-breakfast_table_board", roles={"targets": None, **({"board": None} if board else {})})
     s.kit = SimpleNamespace(trav_free=lambda xy: True)
     s.top = top

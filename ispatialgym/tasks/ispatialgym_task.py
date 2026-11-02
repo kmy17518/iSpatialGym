@@ -1,14 +1,20 @@
-"""``ISpatialGymTask``: BEHAVIOR-compatible task that evaluates iSpatialGym problems at two levels.
+"""``ISpatialGymTask``: BEHAVIOR-compatible task that scores iSpatialGym problems (owner 2026-10-14, ``ispatialgym.eval.metrics``).
 
-Level 1 -- **binary success** ``G(t)``: every goal atom except ``pose_settled`` holds (``pose_reached`` /
-``layout_reached`` are configured from the TRO and may compare a full pose, only the depth along the head-camera
-axis, only the orientation, joint positions, or relative poses between group members).
+Per step ``t``: ``G(t)`` - every goal atom except ``pose_settled`` holds (``pose_reached`` / ``layout_reached`` are configured
+from the TRO and may compare a full pose, only the depth along the head-camera axis, only the orientation, joint positions, or
+relative poses between group members); ``M(t)`` - every ``(:measure ...)`` atom is within its tolerance; ``S(t)`` - every
+``pose_settled`` atom holds (its window of ``settle_steps`` steps ending at ``t`` is full and within the drift thresholds).
 
-Level 2 -- once ``G`` has held for the first time (``first_success_step``), the ``pose_settled`` atoms are tracked:
-``settle_latency_steps = first_settled_success_step - first_success_step`` where the settled-success step is the
-first ``t >= first_success_step`` with ``G(t) and S(t)``. Position / orientation errors of every configured pose,
-group and articulation target are reported per step; the representative values (``final_errors``) are the errors
-at the first binary success, or at the current (terminal) step if ``G`` was never reached.
+**Symbolic** success is the BDDL ``:goal``; **geometric** success (the primary metric) is symbolic success plus every
+``:measure`` atom within tolerance at the same step(s). ``settle_eval`` off: symbolic = the first ``t`` with ``G(t)``,
+geometric = the first with ``G(t)`` and ``M(t)``; on: the first ``t`` with ``S(t)`` where ``G`` (``G`` and ``M``) held at every
+step of the window. The *evaluated* success step of an unsettled success (settle-eval off) is the lowest-error candidate within
+the settle window after its first step; a settled success is judged at its first step as before (``ispatialgym.eval.metrics``,
+owner 2026-11-01); the first step is kept as ``*_first_step``. The run's mode gives
+``info["success"]`` and ``official_success`` (its geometric success reached), ``success_final`` (its selection can no longer change)
+and the termination (``success_final``);
+a settle-eval-on run also reports the off mode in ``other_mode`` (None with settle-eval off). The tolerances are the
+``isg-v2`` profile's (``ispatialgym.eval.tolerance_profile``, :meth:`ISpatialGymTask.apply_tolerance_profile` at load).
 
 Everything is surfaced in ``info["ispatialgym"]`` of ``env.step``; see :meth:`ISpatialGymTask._populate_isg_info`.
 """
@@ -44,6 +50,8 @@ from ispatialgym.activity.problem import (
     load_problem,
     to_bddl,
 )
+from ispatialgym.eval import metrics as MET
+from ispatialgym.eval import tolerance_profile as TP
 from ispatialgym.eval.group_entity import GroupEntity
 from ispatialgym.eval.tro import (
     TROFile,
@@ -62,8 +70,8 @@ log = logging.getLogger(__name__)
 #: evaluator decides ``pose_settled`` by the window's configuration drift alone (``sampling.predicates``,
 #: ``DRIFT_SETTLED_ENTITIES``) and this window carries the rest criterion:
 #:
-#: * ``n_steps`` 45 control steps (1.5 s) - the longest window that fits the executor's shortest settle phase
-#:   (``settle_min_steps`` 50; two of the 28 latest first-demo successes have 76 settle steps);
+#: * ``n_steps`` 45 control steps (1.5 s) - the default ``settle_steps`` of oracle and policy runs (2026-10-14: the window is
+#:   ``run_isg --settle-steps`` in every mode, ``ISpatialGymTask.settle_steps`` overrides this value);
 #: * ``pos_tolerance`` 2 mm, ``ori_tolerance`` 5 mrad, ``joint_tolerance`` 5 mrad (metres for prismatic joints) - the tightest
 #:   round values every settled entity of those 28 demos clears at its last step with margin: their end-of-episode drift
 #:   over 1.5 s is at most 0.074 mm, 0.98 mrad (the float32 quaternion resolution) and 0.036 rad/1000 on the robot's
@@ -139,13 +147,11 @@ class ISpatialGymTask(BehaviorTask):
             states it stores are applied by :meth:`load_tro_instance` (requires a playing simulator).
         object_bindings (None or dict): ``{bddl_instance: scene_object_name}`` for every physical instance. If
             None, the TRO ``object_bindings`` are used, else the scene task metadata ``inst_to_name``.
-        require_pose_settled (bool): if True, official success (``task.success``) additionally requires every
-            ``pose_settled`` goal atom to hold together with the binary goals; otherwise official success is the
-            binary success (reached at any step of the episode).
-        terminate_on_binary_success (bool): end the episode at the first binary success instead of waiting for
-            the settled success (settle latency is then not measurable).
-        pose_settled_config (None or dict): kwargs forwarded to ``PoseSettled.activate`` for every settled entity
-            (None = :data:`DEFAULT_POSE_SETTLED_CONFIG`, the drift window of the ``isg-v1`` settle criterion; ``{}`` =
+        settle_eval (bool): the run's settle-eval mode (module docstring): its geometric success is ``task.success`` and
+            ends the episode; with settle-eval on the off mode is reported too (``other_mode``).
+        settle_steps (int): the ``pose_settled`` window (``PoseSettled`` ``n_steps``) and the settle-eval window, in steps.
+        pose_settled_config (None or dict): kwargs forwarded to ``PoseSettled.activate`` for every settled entity, with
+            ``n_steps`` = ``settle_steps`` (None = :data:`DEFAULT_POSE_SETTLED_CONFIG`'s drift thresholds; ``{}`` =
             OmniGibson's stock state).
         highlight_task_relevant_objects, termination_config, reward_config, include_obs: see ``BehaviorTask``.
     """
@@ -158,8 +164,8 @@ class ISpatialGymTask(BehaviorTask):
         activity_definitions_root=None,
         tro_path=None,
         object_bindings=None,
-        require_pose_settled=False,
-        terminate_on_binary_success=False,
+        settle_eval=False,
+        settle_steps=DEFAULT_POSE_SETTLED_CONFIG["n_steps"],
         pose_settled_config=None,
         highlight_task_relevant_objects=False,
         termination_config=None,
@@ -203,14 +209,19 @@ class ISpatialGymTask(BehaviorTask):
         self.problem: Optional[ISGProblem] = None
         self.task_variant = None
         self.groups: Dict[str, list] = {}
-        self.require_pose_settled = bool(require_pose_settled)
-        self.terminate_on_binary_success = bool(terminate_on_binary_success)
-        self.pose_settled_config = dict(DEFAULT_POSE_SETTLED_CONFIG if pose_settled_config is None else pose_settled_config)
+        self.settle_eval = bool(settle_eval)
+        self.settle_steps = int(settle_steps)
+        self._settle_steps_envs: list = [self.settle_steps]
+        self.pose_settled_config = {**(DEFAULT_POSE_SETTLED_CONFIG if pose_settled_config is None else pose_settled_config), "n_steps": self.settle_steps}
         self._config_object_bindings = dict(object_bindings) if object_bindings else None
         self._tro: Optional[TROFile] = None
         self._tro_path = tro_path
         self._targets_configured = False
+        self._target_metas: Dict[int, Any] = {}
+        self._measure_atoms: list = []
         self._pose_settled_head_idxs = []
+        #: the ``isg-v2`` record of :meth:`apply_tolerance_profile` (meta.json ``tolerance_profile``), per env
+        self.tolerance_profiles: Dict[int, Dict[str, Any]] = {}
         self._reset_tracking()
 
         BaseTask.__init__(self, termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
@@ -279,6 +290,8 @@ class ISpatialGymTask(BehaviorTask):
         self._pose_settled_insts = list(self.compiled_task.pose_settled_insts)
         self._pose_settled_head_idxs = list(self.compiled_task.pose_settled_head_idxs)
         self._other_goal_head_idxs = list(self.compiled_task.binary_goal_head_idxs)
+        self._measure_atoms = MET.measure_atoms(self.problem)
+        MET.error_metric_case(self._measure_atoms, self.problem_label)  # an episode is judged by it: fail at load, not at the end
 
         n_goals = len(self.compiled_task.conditions.parsed_goal_conditions)
         self.instruction_order = th.arange(n_goals)
@@ -335,6 +348,7 @@ class ISpatialGymTask(BehaviorTask):
         """Push TRO pose / group / articulation targets into the bound scope entities (strict)."""
         apply_targets_to_scope(meta, self.object_scope)
         self._targets_configured = True
+        self._target_metas[0] = meta
         for entity in self.group_entities.values():
             entity.invalidate()
         PRED.set_attachment_context(self._attachment_pairs(meta))
@@ -476,6 +490,20 @@ class ISpatialGymTask(BehaviorTask):
         return {k: v for k, v in (self.object_scope or {}).items() if isinstance(v, GroupEntity)}
 
     @property
+    def n_envs(self) -> int:
+        return 1
+
+    def scope_of(self, env_idx: int = 0) -> Dict[str, Any]:
+        return self.object_scope
+
+    def group_entities_of(self, env_idx: int = 0) -> Dict[str, GroupEntity]:
+        return {k: v for k, v in (self.scope_of(env_idx) or {}).items() if isinstance(v, GroupEntity)}
+
+    @property
+    def problem_label(self) -> str:
+        return f"{self.activity_name}-{self.activity_definition_id} ({self.task_variant})"
+
+    @property
     def physical_object_scope(self) -> Dict[str, Any]:
         return {k: v for k, v in (self.object_scope or {}).items() if not isinstance(v, GroupEntity)}
 
@@ -556,6 +584,7 @@ class ISpatialGymTask(BehaviorTask):
         return terminations
 
     def step(self, env, action):
+        self._step_env = env  # the goal evaluation reads each env's episode step (the tracking advances once per step)
         if not SHARED_GOAL_EVAL:
             return super().step(env, action)
         self._shared_armed, self._shared_goal = True, None
@@ -606,33 +635,97 @@ class ISpatialGymTask(BehaviorTask):
         return value
 
     def _check_goal_impl(self, env_idx=0):
-        """Evaluate all goal heads once; decide termination.
+        """Evaluate all goal heads and the error reports of env ``env_idx`` once; advance its tracking (once per episode step)
+        and decide termination.
 
-        Returns ``(done, goal_status)`` like ``CompiledTask.check_goal``. ``done`` is the first settled success
-        (``G and S``) when the goal has ``pose_settled`` atoms and ``terminate_on_binary_success`` is False,
-        otherwise the first binary success.
+        Returns ``(done, goal_status)`` like ``CompiledTask.check_goal``; ``done`` is the run mode's geometric success.
         """
-        _, status = self.compiled_task.check_goal(self.evaluate_predicate)
+        _, status = self.compiled_task.check_goal(lambda name, *ents: self._evaluate_predicate(env_idx, name, *ents))
         satisfied = set(status["satisfied"])
-        binary = set(self._other_goal_head_idxs).issubset(satisfied)
+        goal = set(self._other_goal_head_idxs).issubset(satisfied)
         settled = set(self._pose_settled_head_idxs).issubset(satisfied)
-        self._last_goal_eval = (binary, settled, status)
-        if not self._pose_settled_head_idxs or self.terminate_on_binary_success:
-            return binary, status
-        return (binary and settled), status
+        errors = self.collect_errors(env_idx)
+        within = MET.measure_within(errors, self._measure_atoms)
+        tracker = self._trackers[env_idx]
+        env = getattr(self, "_step_env", None)
+        if env is not None:
+            t = int(env.episode_steps[env_idx])
+            if tracker.last is None or tracker.last[0] != t:
+                if tracker.last is None and list(tracker.atoms) != list(self._measure_atoms):
+                    tracker.atoms = list(self._measure_atoms)  # trackers made before the activity was loaded
+                tracker.update(t, goal, within, settled, errors)
+        self._last_goal_evals[env_idx] = (goal, within, settled, status)
+        self._last_errors[env_idx] = errors
+        # the termination: the run mode's geometric selection is final (first settled success with settle-eval on; the end of the
+        # selection window after the first success with it off). info["success"] (success_of) is reached-or-not, as before.
+        return tracker.final, status
 
-    def _reset_tracking(self):
-        self._last_goal_eval = None
-        self._first_success_step = -1
-        self._first_settled_success_step = -1
-        self._errors_at_first_success = None
-        self._settled_history = {}
-        self._pose_settled_other_success = [{}]
-        self._t_other_success = [-1]
+    def settle_steps_of(self, env_idx: int = 0) -> int:
+        """Env ``env_idx``'s ``pose_settled`` / settle-eval window (:meth:`configure_evaluation`)."""
+        return int(self._settle_steps_envs[env_idx])
+
+    def pose_settled_config_of(self, env_idx: int = 0) -> Dict[str, Any]:
+        return {**self.pose_settled_config, "n_steps": self.settle_steps_of(env_idx)}
+
+    def _reset_tracking(self, env_indices=None):
+        n = self.n_envs
+        if len(self._settle_steps_envs) != n:
+            self._settle_steps_envs = [self.settle_steps] * n
+        if env_indices is None or len(getattr(self, "_trackers", ())) != n:
+            self._trackers = [None] * n
+            self._last_goal_evals = [None] * n
+            self._last_errors = [None] * n
+            self._pose_settled_other_success = [{} for _ in range(n)]
+            self._t_other_success = [-1] * n
+            env_indices = range(n)
+        for i in env_indices:
+            i = int(i)
+            self._trackers[i] = MET.SuccessTracker(self.settle_eval, self.settle_steps_of(i), atoms=self._measure_atoms)
+            self._last_goal_evals[i] = None
+            self._last_errors[i] = None
 
     def _reset_variables(self, env, env_indices):
         super()._reset_variables(env, env_indices)
-        self._reset_tracking()
+        self._reset_tracking(env_indices)
+
+    @property
+    def metrics_state(self) -> Dict[str, Any]:
+        """The tracking a checkpoint rollback restores (a copy; the executor's ``TASK_TRACKING_ATTRS``)."""
+        return {"trackers": [t.state() for t in self._trackers], "last_goal_evals": list(self._last_goal_evals), "last_errors": list(self._last_errors)}
+
+    @metrics_state.setter
+    def metrics_state(self, state: Dict[str, Any]) -> None:
+        for tracker, s in zip(self._trackers, state["trackers"]):
+            tracker.load(s)
+        self._last_goal_evals = list(state["last_goal_evals"])
+        self._last_errors = list(state["last_errors"])
+
+    def configure_evaluation(self, settle_eval: bool, settle_steps: int, env_indices=None) -> None:
+        """The run's settle-eval mode and the window of envs ``env_indices`` (default all; ``run_isg`` / the vectorized loader,
+        per instance, before its reset): their ``PoseSettled`` windows get ``n_steps = settle_steps`` and their tracking restarts."""
+        if int(settle_steps) < 1:
+            raise ValueError(f"settle_steps must be >= 1, got {settle_steps}")
+        self.settle_eval = bool(settle_eval)
+        if env_indices is None:
+            self.settle_steps = int(settle_steps)
+            self.pose_settled_config = {**self.pose_settled_config, "n_steps": self.settle_steps}
+            self._settle_steps_envs = [self.settle_steps] * self.n_envs
+            env_indices = range(self.n_envs)
+        else:
+            env_indices = [int(i) for i in env_indices]
+            if len(self._settle_steps_envs) != self.n_envs:
+                self._settle_steps_envs = [self.settle_steps] * self.n_envs
+            for i in env_indices:
+                self._settle_steps_envs[i] = int(settle_steps)
+        self._reset_tracking(env_indices)
+        if self.object_scopes is not None:
+            self._reset_pose_settled_tracking(env_indices)
+
+    def apply_tolerance_profile(self, mode: str, scale: Optional[float] = None, customs_path: Optional[str] = None) -> Dict[str, Any]:
+        """The ``isg-v2`` tolerances of the loaded TRO from the current state (after the loader's settle, before the first step),
+        written into the TRO in memory with the targets re-configured; returns the record (kept in :attr:`tolerance_profiles`)."""
+        self.tolerance_profiles[0] = TP.apply_to_task(self, mode, scale=scale, customs_path=customs_path)
+        return self.tolerance_profiles[0]
 
     def reset(self, env, env_indices=None):
         super().reset(env, env_indices=env_indices)
@@ -645,44 +738,36 @@ class ISpatialGymTask(BehaviorTask):
         for inst in self._pose_settled_insts:
             entity = self.object_scope.get(inst)
             if entity is not None and not isinstance(entity, GroupEntity) and PoseSettled in entity.states:
-                entity.states[PoseSettled].activate(**self.pose_settled_config)
+                entity.states[PoseSettled].activate(**self.pose_settled_config_of(0))
+
+    def success_of(self, env_idx: int = 0) -> bool:
+        """The run mode's geometric success reached in env ``env_idx``."""
+        return self._trackers[env_idx].done
 
     @property
     def official_success(self) -> bool:
-        """Binary success reached at some step (or settled success when ``require_pose_settled``)."""
-        if self.require_pose_settled:
-            return self._first_settled_success_step >= 0
-        return self._first_success_step >= 0
+        return self.success_of(0)
 
     def _step_termination(self, env, action, infos=None):
         dones, infos = BaseTask._step_termination(self, env=env, action=action, infos=infos)
-        info = infos[0]
-        info["goal_status"] = self._termination_conditions["predicate"].goal_status[0]
-        self._update_success_tracking(env)
-        info["success"] = self.official_success
-        info["termination_conditions"]["predicate"]["success"] = self.official_success
-        self._populate_isg_info(env, info)
-        if self._pose_settled_insts:
-            self._populate_pose_settled_info(info, 0)
+        goal_status = self._termination_conditions["predicate"].goal_status
+        for env_idx in range(self.n_envs):
+            info = infos[env_idx]
+            info["goal_status"] = goal_status[env_idx]
+            success = self.success_of(env_idx)
+            info["success"] = success
+            info["termination_conditions"]["predicate"]["success"] = success
+            self._populate_isg_info(env, info, env_idx)
+            if self._pose_settled_insts:
+                self._populate_pose_settled_info(info, env_idx)
         return dones, infos
-
-    def _update_success_tracking(self, env):
-        if self._last_goal_eval is None:
-            return
-        binary, settled, _ = self._last_goal_eval
-        t = int(env.episode_steps[0])
-        if binary and self._first_success_step < 0:
-            self._first_success_step = t
-            self._errors_at_first_success = self.collect_errors()
-        if binary and settled and self._first_success_step >= 0 and self._first_settled_success_step < 0:
-            self._first_settled_success_step = t
 
     # ------------------------------------------------------------------------------------------------------------
     # Errors
     # ------------------------------------------------------------------------------------------------------------
 
-    def _is_configured(self, inst, state_cls):
-        entity = (self.object_scope or {}).get(inst)
+    def _is_configured(self, inst, state_cls, env_idx: int = 0):
+        entity = (self.scope_of(env_idx) or {}).get(inst)
         if entity is None:
             return False
         if isinstance(entity, GroupEntity):
@@ -705,37 +790,26 @@ class ISpatialGymTask(BehaviorTask):
             return []
         return [inst for inst in self.compiled_task.all_layout_reached_args if self._is_configured(inst, LayoutReached)]
 
-    def collect_errors(self) -> Dict[str, Any]:
-        """Current errors of every configured target plus the max position / orientation errors.
-
-        ``max_position_error`` / ``max_orientation_error`` range over the pose targets (``pose_reached``-type:
-        world/camera-frame pose, depth or orientation); ``max_layout_position_error`` /
-        ``max_layout_orientation_error`` range over the layout targets (group relations, prismatic / revolute joints).
-        """
-        pose_errors, layout_errors = {}, {}
-        for inst in self.measured_pose_instances:
-            report = self.object_scope[inst].states[PoseReached].get_error_report()
-            if report is not None:
-                report["gating"] = self.compiled_task.is_gating("pose_reached", inst)
-                pose_errors[inst] = report
-        for inst in self.measured_layout_instances:
-            report = self.object_scope[inst].states[LayoutReached].get_error_report()
-            if report is not None:
-                report["gating"] = self.compiled_task.is_gating("layout_reached", inst)
-                layout_errors[inst] = report
-
-        def _max(reports, key):
-            vals = [r[key] for r in reports.values() if r.get(key) is not None]
-            return max(vals) if vals else None
-
-        return {
-            "pose_errors": pose_errors,
-            "layout_errors": layout_errors,
-            "max_position_error": _max(pose_errors, "position_error"),
-            "max_orientation_error": _max(pose_errors, "orientation_error"),
-            "max_layout_position_error": _max(layout_errors, "position_error"),
-            "max_layout_orientation_error": _max(layout_errors, "orientation_error"),
-        }
+    def collect_errors(self, env_idx: int = 0) -> Dict[str, Any]:
+        """Current error reports of every configured pose / group / articulation target of env ``env_idx`` (the ``pose_reached``
+        / ``layout_reached`` arguments of ``:goal`` and ``:measure``): ``{"pose_errors": {inst: report}, "layout_errors": {...}}``,
+        each report with its ``tolerances`` (``tolerance_profile.target_tolerances``), ``in_goal`` and ``in_measure``."""
+        out: Dict[str, Any] = {"pose_errors": {}, "layout_errors": {}}
+        if self.compiled_task is None:
+            return out
+        scope, meta = self.scope_of(env_idx), self._target_metas.get(env_idx)
+        for predicate, state_cls, args, key in (("pose_reached", PoseReached, self.compiled_task.all_pose_reached_args, "pose_errors"),
+                                                ("layout_reached", LayoutReached, self.compiled_task.all_layout_reached_args, "layout_errors")):
+            for inst in args:
+                if not self._is_configured(inst, state_cls, env_idx):
+                    continue
+                report = scope[inst].states[state_cls].get_error_report()
+                if report is None:
+                    continue
+                report.update({"tolerances": TP.target_tolerances(meta, inst, predicate), "in_goal": bool(self.compiled_task.is_gating(predicate, inst)),
+                               "in_measure": bool(self.compiled_task.in_measure(predicate, inst))})
+                out[key][inst] = report
+        return out
 
     # ------------------------------------------------------------------------------------------------------------
     # Info
@@ -755,58 +829,72 @@ class ISpatialGymTask(BehaviorTask):
         ]
 
     def measured_conditions_report(self, errors):
-        """The non-gating ``(:measure ...)`` atoms with their current within-tolerance status (informational)."""
+        """The ``(:measure ...)`` atoms with their within-tolerance status in ``errors`` (``in_goal``: the atom is in ``:goal`` too)."""
         out = []
         for lit in self.problem.measure:
             pred, arg = lit[0], lit[1].lstrip("?")
-            reports = errors["pose_errors"] if pred == "pose_reached" else errors["layout_errors"]
+            reports = (errors.get("pose_errors") if pred == "pose_reached" else errors.get("layout_errors")) or {}
             report = reports.get(arg)
             out.append(
                 {
                     "bddl": _compact(lit),
                     "kind": "measure",
+                    "in_goal": bool(self.compiled_task.is_gating(pred, arg)),
                     "configured": report is not None,
                     "within_tolerance": None if report is None else report.get("within_tolerance"),
                 }
             )
         return out
 
-    def _populate_isg_info(self, env, info):
-        binary, settled, status = self._last_goal_eval if self._last_goal_eval else (False, False, info["goal_status"])
-        current_errors = self.collect_errors()
-        first, first_settled = self._first_success_step, self._first_settled_success_step
-        latency = (first_settled - first) if (first >= 0 and first_settled >= 0) else -1
-        dt = og.sim.get_sim_step_dt()
-        final_errors = self._errors_at_first_success if self._errors_at_first_success is not None else current_errors
+    def _populate_isg_info(self, env, info, env_idx: int = 0):
+        """``info["ispatialgym"]`` of env ``env_idx``: this step's facts (``goal`` = G, ``measure_within`` = M, ``settled`` = S, its
+        ``errors`` / ``error_metric`` / ``measured``), the run mode's symbolic and geometric success (``*_success_step``: the evaluated
+        step, ``*_first_step``: the first; 0-based episode steps, None while not reached), ``success_final`` (the run mode's geometric
+        selection can no longer change), ``evaluation`` (the errors the run mode is judged by: at its evaluated geometric step, else its
+        evaluated symbolic step, else this step's, with that ``step``, ``kind`` and its ``settled`` flag), ``other_mode`` (the off mode's
+        success with settle-eval on, else None) and the goal conditions."""
+        goal, within, settled, status = self._last_goal_evals[env_idx] or (False, False, False, info["goal_status"])
+        errors = self._last_errors[env_idx]
+        if errors is None:
+            errors = self.collect_errors(env_idx)
+        where = self.problem_label
+        ev = self._trackers[env_idx].report(errors, self._measure_atoms, where)
+        groups = self.group_entities_of(env_idx)
         info["ispatialgym"] = {
             "activity": self.activity_name,
             "activity_definition_id": self.activity_definition_id,
             "task_variant": self.task_variant,
-            "official_success": self.official_success,
-            "require_pose_settled": self.require_pose_settled,
-            "pose_settled_config": dict(self.pose_settled_config),
-            "binary_success": bool(binary),
-            "binary_success_ever": first >= 0,
-            "first_success_step": first,
+            "env_idx": env_idx,
+            "step": int(env.episode_steps[env_idx]),
+            "settle_eval": ev["settle_eval"],
+            "settle_steps": ev["settle_steps"],
+            "pose_settled_config": self.pose_settled_config_of(env_idx),
+            "goal": bool(goal),
+            "measure_within": bool(within),
             "settled": bool(settled),
-            "settled_success": bool(binary and settled),
-            "first_settled_success_step": first_settled,
-            "settle_latency_steps": latency,
-            "settle_latency_seconds": (latency * dt) if latency >= 0 else None,
-            "step": int(env.episode_steps[0]),
+            "error_metric": MET.error_metric(errors, self._measure_atoms, where),
+            "official_success": ev["geometric_success"],
+            "success_final": ev["success_final"],
+            "symbolic_success": ev["symbolic_success"],
+            "symbolic_success_step": ev["symbolic_success_step"],
+            "symbolic_first_step": ev["symbolic_first_step"],
+            "geometric_success": ev["geometric_success"],
+            "geometric_success_step": ev["geometric_success_step"],
+            "geometric_first_step": ev["geometric_first_step"],
+            "goal_first_step": ev["goal_first_step"],
+            "other_mode": ev["other_mode"],
+            "closest_approach": ev["closest_approach"],
+            "closest_goal_approach": ev["closest_goal_approach"],
+            "evaluation": {"errors": ev["errors"], "error_metric": ev["error_metric"], "measured": self.measured_conditions_report(ev["errors"]),
+                           "step": ev["evaluation_step"], "kind": ev["evaluation_kind"], "settled": ev["evaluation_settled"]},
             "conditions": self.goal_conditions_report(status),
-            "measured": self.measured_conditions_report(current_errors),
-            "errors": current_errors,
-            "errors_at_first_success": self._errors_at_first_success,
-            "final_errors": final_errors,
-            "max_position_error": final_errors["max_position_error"],
-            "max_orientation_error": final_errors["max_orientation_error"],
-            "max_layout_position_error": final_errors["max_layout_position_error"],
-            "max_layout_orientation_error": final_errors["max_layout_orientation_error"],
+            "measured": self.measured_conditions_report(errors),
+            "errors": errors,
             "group_assignments": {
                 name: (entity.evaluate().assignment if entity.evaluate() is not None else None)
-                for name, entity in self.group_entities.items()
+                for name, entity in groups.items()
             },
+            "tolerance_profile": (self.tolerance_profiles.get(env_idx) or {}).get("name"),
         }
 
     # ------------------------------------------------------------------------------------------------------------

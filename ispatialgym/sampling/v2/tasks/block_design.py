@@ -315,8 +315,7 @@ class BlockDesign(SamplerV2):
         patterns = self.g("patterns") or {}
         if not patterns:
             return 0
-        pats = [list(patterns[self.sub_variant])] if self.sub_variant and self.sub_variant in patterns else [list(p) for p in patterns.values()]
-        return max(len(p) - len(set(p)) for p in pats)
+        return max(len(p) - len(set(p)) for p in patterns.values())
 
     def _flips_expected(self) -> bool:
         return self._n_flips() > 0 and (bool(self.gen("block_no_flip", False)) or float(self.gen("goal_face_up_prob", 0.5)) > 0.0)
@@ -618,8 +617,6 @@ class BlockDesign(SamplerV2):
         patterns = self.g("patterns") or {}
         if not patterns:
             raise Reject("spec", "generation.patterns is empty")
-        if self.sub_variant and self.sub_variant in patterns:
-            return self.sub_variant, list(patterns[self.sub_variant])
         pid = list(patterns)[int(rng.integers(len(patterns)))]
         return pid, list(patterns[pid])
 

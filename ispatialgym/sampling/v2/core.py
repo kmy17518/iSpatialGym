@@ -217,7 +217,6 @@ class ContextV2:
     out_dir: str  # <out_root>/<variant>/<template_id>
     base_seed: int = 0
     customs_sha256: Optional[str] = None
-    sub_variant: Optional[str] = None  # task sub-variant (open / close, block pattern id, ...)
 
     @property
     def scene(self) -> str:
@@ -287,7 +286,6 @@ class SamplerV2(TaskSampler):
         self.template_meta.update({"variant": self.gp.variant, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
                                    "spec_hash": self.gp.spec_hash(), "choice": self.choice.to_json(), "rooms": list(self.gp.rooms(self.scene)),
                                    "customs": self.gp.customs_path, "joint_limit_margin_rad": float(self.ikc.JOINT_LIMIT_MARGIN)})
-        self.sub_variant = ctx.sub_variant
         self.last_program_check: Optional[Dict[str, Any]] = None
         self._park_xy: Optional[th.Tensor] = None
         # train-fast (2026-10-31): PARK_ONCE's (key, xy, floor_z) of the last computed park; the one-line "first time taken" log keys

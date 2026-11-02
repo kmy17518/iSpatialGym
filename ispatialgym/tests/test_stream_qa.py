@@ -1,5 +1,6 @@
-"""Stream QA as a switch (``stream_qa`` off | stop | log) in the single-env executor and in ``VecStreamExecutor``, and
-``Monitors.check_timeout_only`` (``off``: the lab evaluator's former ``Monitors.check`` patch)."""
+"""QA of a replay / policy stream in the single-env executor and in ``VecStreamExecutor``: the oracle's retry rules never end a
+stream (``Monitors.check_timeout_only``: the collision statistics are kept, only the step budget applies), the ``--qa`` metrics
+are logged the same way by both, and the ``run_isg`` switches (``--qa`` / ``--no-qa``, ``--record-view``)."""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ HITS = (10, 11, 12)
 
 
 class FakeMonitors:
-    """QA monitors whose collision monitor fires at the steps ``HITS``; ``check_timeout_only`` is the real one."""
+    """Retry rules whose collision rule fires at the steps ``HITS``; ``check_timeout_only`` is the real one."""
 
     check_timeout_only = Monitors.check_timeout_only
 
@@ -38,6 +39,9 @@ class FakeMonitors:
     def report(self):
         return {"stats": self.stats.to_dict()}
 
+    def _contact_pairs(self, step=None):
+        return set()
+
     def _check_collision(self):
         self.collision_checks += 1
         if self.episode_steps in HITS:
@@ -54,9 +58,9 @@ class FakeMonitors:
         return self._check_collision() or self._check_timeout()
 
 
-def run_single(mode):
+def run_single(qa=True):
     env, source, cfg = make_world("reach_then_stop")
-    cfg.stream_qa = mode
+    cfg.qa = qa
     mon = FakeMonitors()
     ex = Executor(env, env.task, None, recorder=None, motions=None, monitors=mon, cfg=cfg, sim=env.sim, state=_State(), tracked_objects={}, cam_key=CAM_KEY)
     ex.last_obs, ex.last_info = env._obs(), env._info()
@@ -71,30 +75,31 @@ def run_single(mode):
     return ex.run_stream(stream()), mon
 
 
-def run_vec(mode):
+def run_vec(qa=True):
     env, source, cfg = make_world("reach_then_stop")
     mon = FakeMonitors()
-    slot = Slot(idx=0, robot=env.robot, source=source, cfg=cfg, task=env.task, monitors=mon, tracked={}, held=lambda: [], never_held_window=None)
-    (r,) = VecStreamExecutor(FakeVecEnv([env]), [slot], sim=None, stream_qa=mode).run([env._obs()], [env._info()])
+    slot = Slot(idx=0, robot=env.robot, source=source, cfg=cfg, task=env.task, monitors=mon, tracked={}, held=lambda: [])
+    (r,) = VecStreamExecutor(FakeVecEnv([env]), [slot], sim=None, qa=qa).run([env._obs()], [env._info()])
     return r, mon
 
 
-@pytest.mark.parametrize("mode", ["stop", "log", "off"])
-def test_stream_qa_modes_single_env_and_vectorized(mode):
-    single, smon = run_single(mode)
-    vec, vmon = run_vec(mode)
-    for k in ("success", "reason", "n_steps", "n_action_steps", "settle_windows", "first_success_step", "stream_qa"):
-        assert vec[k] == single[k], (mode, k, vec[k], single[k])
-    if mode == "stop":
-        assert single["success"] is False and single["reason"] == "collision" and single["n_action_steps"] == HITS[0]
-        assert single["stream_qa"] is None
-    elif mode == "log":
-        assert single["success"] is True and single["n_action_steps"] > HITS[-1]
-        (entry,) = single["stream_qa"]
-        assert entry["key"] == ["collision", "gripper", "cup_0"] and (entry["first_step"], entry["last_step"], entry["n"]) == (10, 12, 3)
-    else:
-        assert single["success"] is True and single["stream_qa"] is None and single["n_action_steps"] > HITS[-1]
-        assert smon.collision_checks >= single["n_action_steps"] and vmon.collision_checks >= vec["n_action_steps"]  # statistics kept
+@pytest.mark.parametrize("qa", [True, False])
+def test_a_stream_is_judged_by_its_goal_single_env_and_vectorized(qa):
+    single, smon = run_single(qa)
+    vec, vmon = run_vec(qa)
+    for k in ("success", "reason", "n_steps", "n_action_steps", "epilogue_steps", "geometric_success_step", "symbolic_success_step"):
+        assert vec[k] == single[k], (k, vec[k], single[k])
+    assert single["success"] is True and single["reason"] is None and single["n_action_steps"] > HITS[-1]
+    assert smon.collision_checks >= single["n_action_steps"] and vmon.collision_checks >= vec["n_action_steps"]  # statistics kept
+    if not qa:
+        assert single["qa"] == vec["qa"] == {"enabled": False}
+        return
+    s, v = single["qa"], vec["qa"]
+    assert s["mode"] == v["mode"] == "stream" and s["stopped_by"] is None and v["stopped_by"] is None
+    assert s["steps_observed"] == v["steps_observed"] == single["n_steps"]
+    for name in s["metrics"]:
+        if name != "goal_occlusion":  # the vectorized evaluator does not render the goal frame
+            assert v["metrics"][name] == s["metrics"][name], name
 
 
 def test_check_timeout_only_discards_the_collision_verdict_and_keeps_the_timeout():
@@ -113,11 +118,19 @@ def test_check_timeout_only_discards_the_collision_verdict_and_keeps_the_timeout
     assert Monitors.check_timeout_only(stub, 8).category == "timeout"
 
 
-def test_run_isg_accepts_the_three_modes():
+def test_run_isg_qa_and_record_view_switches(monkeypatch):
+    from ispatialgym.oracle import r1pro_model as M
     from ispatialgym.oracle import run_isg as R
 
-    for mode in ("stop", "log", "off"):
-        assert R.parse_args(["--instance", "x", "--mode", "policy", "--stream-qa", mode]).stream_qa == mode
-    assert R.parse_args(["--instance", "x"]).stream_qa == "stop"  # v3.0's default
-    with pytest.raises(ValueError):
-        VecStreamExecutor(FakeVecEnv([]), [], stream_qa="bogus")
+    a = R.parse_args(["--instance", "x"])
+    assert a.qa is True and a.record_view == ()
+    a = R.parse_args(["--instance", "x", "--mode", "replay", "--no-qa", "--record-view", "tiled, head,head,right_wrist"])
+    assert a.qa is False and a.record_view == ("tiled", "head", "right_wrist")
+    for argv in (["--record-view", "head,top"], ["--stream-qa", "log"], ["--demo-gating", "none"], ["--dev"]):
+        with pytest.raises(SystemExit):
+            R.parse_args(["--instance", "x"] + argv)
+    monkeypatch.setattr(M, "head_camera_only", lambda: True)
+    assert R.parse_args(["--instance", "x", "--record-view", "head,external"]).record_view == ("head", "external")
+    for view in ("tiled", "left_wrist"):
+        with pytest.raises(SystemExit):
+            R.parse_args(["--instance", "x", "--record-view", view])

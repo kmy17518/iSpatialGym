@@ -62,7 +62,11 @@ def validate_tro_against_problem(meta: ISGTroMeta, compiled: ISGCompiledTask, re
     binding.
     """
     problem = compiled.problem
-    if not same_activity(meta.activity, problem.activity) or meta.activity_definition_id != problem.definition_id:
+    # the eval release renumbered the problems per activity (numbered from 0): a TRO sampled before the renumbering names the
+    # sampler's id, so a TRO whose variant is the problem's is the same problem whatever its id (the variant is the problem's
+    # identity: one grounded setup of a subtask)
+    same_variant = bool(meta.task_variant) and meta.task_variant == problem.variant
+    if not same_activity(meta.activity, problem.activity) or (meta.activity_definition_id != problem.definition_id and not same_variant):
         raise TROValidationError(
             f"TRO is for {meta.name!r} but the problem is {problem.name!r}"
         )

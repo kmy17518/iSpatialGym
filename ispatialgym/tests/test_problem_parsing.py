@@ -27,82 +27,33 @@ from ispatialgym.activity import (
     same_activity,
     validate_problem_registry,
 )
+from ispatialgym import ASSETS_ROOT
 from ispatialgym.activity.problem import parse_problem_file, parse_problem_string
 
-# Expected structure per problem: (variant, binary-success predicates, pose_settled args, gating pose_reached args,
-# gating layout_reached args, non-gating (:measure) pose_reached args). Binary predicates are the multiset of
-# predicate tokens of the expanded binary goal.
+#: the problems EXPECTED describes (the v1 templates and the first grounded picks); the shipped tree holds the eval
+#: release's problems only
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bddl")
+
+# Expected structure per problem: (variant, binary-success predicates, pose_settled args, :goal pose_reached args,
+# :goal layout_reached args, :measure pose_reached args, :measure layout_reached args) - an atom may be in both sections
+# (2026-10-14). Binary predicates are the multiset of predicate tokens of the expanded binary goal.
 EXPECTED = {
-    # problem0 of these three = pick #01 of the representative sheet (grounded 2026-10-11; the hand-written mug problems before)
-    ("camera_relocalization", 0): ("camera_relocalization-standard", ["pose_reached"], ["agent.n.01_1"], ["agent.n.01_1"], [], []),
-    ("object_scaling", 0): ("object_scaling-canned_food", ["grasped", "pose_reached"], ["canned_food.n.01_1", "agent.n.01_1"], ["canned_food.n.01_1"], [], []),
-    ("mental_rotation", 0): ("mental_rotation-classroom_mock_up", ["grasped", "pose_reached"], ["mock-up.n.01_1", "agent.n.01_1"], ["mock-up.n.01_1"], [], []),
-    ("disembedding", 0): (
-        None,
-        ["ontop", "not ontop", "not ontop", "not ontop", "not grasped"],
-        ["mug.n.04_1", "agent.n.01_1"],
-        [],
-        [],
-        ["mug.n.04_1"],
-    ),
-    ("configuration_matching", 0): (
-        "block_design",
-        ["ontop"] * 4 + ["layout_reached"] + ["not grasped"] * 4,
-        ["toy_dice.n.01_1", "toy_dice.n.01_2", "toy_dice.n.01_3", "toy_dice.n.01_4", "agent.n.01_1"],
-        [],
-        ["blocks_group.n.01_1"],
-        ["blocks_group.n.01_1"],
-    ),
-    ("configuration_matching", 1): (
-        "articulation",
-        ["open", "layout_reached", "not grasped"],
-        ["cabinet.n.01_1", "agent.n.01_1"],
-        [],
-        ["cabinet.n.01_1"],
-        [],
-    ),
-    ("configuration_matching", 2): (
-        "articulation",
-        ["not open", "layout_reached", "not grasped"],
-        ["cabinet.n.01_1", "agent.n.01_1"],
-        [],
-        ["cabinet.n.01_1"],
-        [],
-    ),
-    ("configuration_matching", 3): (
-        "attachment",
-        ["attached", "ontop", "layout_reached", "not grasped", "not grasped"],
-        ["digital_camera.n.01_1", "camera_tripod.n.01_1", "agent.n.01_1"],
-        [],
-        ["attachment_group.n.01_1"],
-        ["attachment_group.n.01_1"],
-    ),
-    ("alignment", 0): (
-        "table_surface",
-        ["ontop", "pose_reached", "not grasped"],
-        ["fishing_rod.n.01_1", "agent.n.01_1"],
-        ["fishing_rod.n.01_1"],
-        [],
-        [],
-    ),
-    ("alignment", 1): (
-        "world_vertical",
-        ["pose_reached", "not grasped"],
-        ["painting.n.01_1", "agent.n.01_1"],
-        ["painting.n.01_1"],
-        [],
-        [],
-    ),
+    ('camera_relocalization', 0): ('camera_relocalization-standard', ['pose_reached'], ['agent.n.01_1'], ['agent.n.01_1'], [], ['agent.n.01_1'], []),
+    ('object_scaling', 0): ('object_scaling-canned_food', ['grasped', 'pose_reached'], ['canned_food.n.01_1', 'agent.n.01_1'], ['canned_food.n.01_1'], [], ['canned_food.n.01_1'], []),
+    ('mental_rotation', 0): ('mental_rotation-classroom_mock_up', ['grasped', 'pose_reached'], ['mock-up.n.01_1', 'agent.n.01_1'], ['mock-up.n.01_1'], [], ['mock-up.n.01_1'], []),
+    ('disembedding', 0): (None, ['ontop', 'not ontop', 'not ontop', 'not ontop', 'not grasped'], ['mug.n.04_1', 'agent.n.01_1'], [], [], ['mug.n.04_1'], []),
+    ('configuration_matching', 0): ('block_design', ['ontop', 'ontop', 'ontop', 'ontop', 'layout_reached', 'not grasped', 'not grasped', 'not grasped', 'not grasped'], ['toy_dice.n.01_1', 'toy_dice.n.01_2', 'toy_dice.n.01_3', 'toy_dice.n.01_4', 'agent.n.01_1'], [], ['blocks_group.n.01_1'], ['blocks_group.n.01_1'], ['blocks_group.n.01_1']),
+    ('configuration_matching', 1): ('articulation', ['open', 'not grasped'], ['cabinet.n.01_1', 'agent.n.01_1'], [], [], [], ['cabinet.n.01_1']),
+    ('configuration_matching', 2): ('articulation', ['not open', 'not grasped'], ['cabinet.n.01_1', 'agent.n.01_1'], [], [], [], ['cabinet.n.01_1']),
+    ('configuration_matching', 3): ('attachment', ['attached', 'ontop', 'layout_reached', 'not grasped', 'not grasped'], ['digital_camera.n.01_1', 'camera_tripod.n.01_1', 'agent.n.01_1'], [], ['attachment_group.n.01_1'], ['attachment_group.n.01_1'], ['attachment_group.n.01_1']),
+    ('alignment', 0): ('table_surface', ['ontop', 'pose_reached', 'not grasped'], ['fishing_rod.n.01_1', 'agent.n.01_1'], ['fishing_rod.n.01_1'], [], ['fishing_rod.n.01_1'], []),
+    ('alignment', 1): ('world_vertical', ['pose_reached', 'not grasped'], ['painting.n.01_1', 'agent.n.01_1'], ['painting.n.01_1'], [], ['painting.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 0): ('ontop', ['ontop', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 1): ('under', ['under', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 2): ('inside', ['inside', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 3): ('nextto', ['nextto', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
+    ('inter_object_relation_satisfaction', 4): ('touching', ['touching', 'not grasped', 'not grasped'], ['apple.n.01_1', 'bowl.n.01_1', 'agent.n.01_1'], [], [], ['apple.n.01_1', 'bowl.n.01_1'], []),
 }
-for i, rel in enumerate(["ontop", "under", "inside", "nextto", "touching"]):
-    EXPECTED[("inter_object_relation_satisfaction", i)] = (
-        rel,
-        [rel, "not grasped", "not grasped"],
-        ["apple.n.01_1", "bowl.n.01_1", "agent.n.01_1"],
-        [],
-        [],
-        ["apple.n.01_1", "bowl.n.01_1"],
-    )
 
 
 def _binary_tokens(problem):
@@ -120,10 +71,12 @@ def _shipped_problems():
 
 
 def test_all_shipped_problems_are_listed():
-    """Every structural template has an entry in EXPECTED; the retired directory name is gone. Problems that the
-    v2 grounding (``ground_isg``) adds next to the templates are covered by ``test_every_shipped_problem_compiles``."""
-    found = set(_shipped_problems())
-    assert set(EXPECTED) <= found
+    """The shipped problems are those of the eval release's subtasks (``isg_customs.json``: iddl family + definition id);
+    the retired directory name is gone."""
+    with open(os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")) as f:
+        customs = json.load(f)
+    expected = {(e["iddl"].split("/")[0], int(e["definition_id"])) for k, e in customs.items() if not k.startswith("_")}
+    assert set(_shipped_problems()) == expected
     assert "world_alignment" not in list_activities()
     assert "alignment" in list_activities()
 
@@ -143,8 +96,8 @@ def test_every_shipped_problem_compiles(activity, definition_id):
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
 def test_shipped_problem_structure(activity, definition_id):
-    variant, binary, settled, pose_reached, layout_reached, measured = EXPECTED[(activity, definition_id)]
-    problem = load_problem(activity, definition_id)
+    variant, binary, settled, pose_reached, layout_reached, measure_pose, measure_layout = EXPECTED[(activity, definition_id)]
+    problem = load_problem(activity, definition_id, root=FIXTURES)
     compiled = problem.compile()
     assert problem.name == f"{activity}-{definition_id}"
     assert problem.variant == variant
@@ -152,30 +105,20 @@ def test_shipped_problem_structure(activity, definition_id):
     assert compiled.pose_settled_insts == settled
     assert compiled.pose_reached_args == pose_reached
     assert compiled.layout_reached_args == layout_reached
-    assert compiled.measure_pose_reached_args == measured
-    assert compiled.measure_layout_reached_args == []
-    assert compiled.all_pose_reached_args == pose_reached + measured
-    for arg in pose_reached:
-        assert compiled.is_gating("pose_reached", arg)
-    for arg in measured:
-        assert not compiled.is_gating("pose_reached", arg)
-    # measured atoms never appear in the compiled goal
-    assert not any(a in measured for head in compiled.goal_conditions for a in collect_predicate_args(head, "pose_reached"))
-    # Binary heads + pose_settled heads partition the goal
-    assert sorted(compiled.binary_goal_head_idxs + compiled.pose_settled_head_idxs) == list(range(len(problem.goal)))
-    assert len(compiled.pose_settled_head_idxs) == len(settled)
-    # Exactly one ground option for these conjunctive goals
-    assert len(compiled.ground_goal_state_options) == 1
-    # No group symbol survives in a pointwise atom
-    for conj in problem.goal:
-        lit = conj[1] if conj[0] == "not" else conj
-        if lit[0] not in ("pose_reached", "layout_reached"):
-            assert not any(problem.is_group(a) for a in lit[1:]), conj
+    assert compiled.measure_pose_reached_args == measure_pose
+    assert compiled.measure_layout_reached_args == measure_layout
+    assert compiled.all_pose_reached_args == list(dict.fromkeys(pose_reached + measure_pose))
+    for pred, goal_args, measure_args in (("pose_reached", pose_reached, measure_pose), ("layout_reached", layout_reached, measure_layout)):
+        for arg in set(goal_args) | set(measure_args):
+            assert compiled.is_gating(pred, arg) == (arg in goal_args) and compiled.in_measure(pred, arg) == (arg in measure_args)
+    # an atom only in :measure never appears in the compiled goal
+    only_measured = [a for a in measure_pose if a not in pose_reached]
+    assert not any(a in only_measured for head in compiled.goal_conditions for a in collect_predicate_args(head, "pose_reached"))
 
 
 @pytest.mark.parametrize("activity,definition_id", sorted(EXPECTED))
 def test_expanded_bddl_round_trips(activity, definition_id):
-    problem = load_problem(activity, definition_id)
+    problem = load_problem(activity, definition_id, root=FIXTURES)
     again = parse_problem_string(problem.expanded_bddl(), activity, definition_id)
     assert again.goal == problem.goal
     assert again.init == problem.init
@@ -188,7 +131,7 @@ def test_expanded_bddl_is_stock_compatible():
     """The expanded text compiles with the stock bddl pipeline (unknown sections are ignored by parse_problem)."""
     from bddl.activity import Conditions, get_goal_conditions, get_object_scope
 
-    problem = load_problem("configuration_matching", 0)
+    problem = load_problem("configuration_matching", 0, root=FIXTURES)
     conds = Conditions("configuration_matching", 0, "ispatialgym", predefined_problem=problem.expanded_bddl())
     scope = get_object_scope(conds) | set(problem.groups)
     goals = get_goal_conditions(conds, scope)
@@ -196,7 +139,7 @@ def test_expanded_bddl_is_stock_compatible():
 
 
 def test_compiled_goal_evaluates_with_callback():
-    problem = load_problem("disembedding", 0)
+    problem = load_problem("disembedding", 0, root=FIXTURES)
     compiled = problem.compile()
     seen = []
 
@@ -281,11 +224,24 @@ def test_measure_section():
     assert "(:measure" in p.expanded_bddl()
 
 
+def test_an_atom_may_be_in_goal_and_measure():
+    """2026-10-14: a ``pose_reached`` / ``layout_reached`` atom may sit in :goal (gating) and in :measure (judged by geometric
+    success) at once; it is evaluated once per target."""
+    p = _parse(f"{HEADER} {OBJECTS} {GROUPS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_2) (layout_reached ?g.n.01_1)))")
+    compiled = p.compile()
+    assert compiled.pose_reached_args == ["mug.n.04_2"] and compiled.measure_pose_reached_args == ["mug.n.04_2"]
+    assert compiled.all_pose_reached_args == ["mug.n.04_2"]
+    assert compiled.is_gating("pose_reached", "mug.n.04_2") and compiled.in_measure("pose_reached", "mug.n.04_2")
+    assert not compiled.is_gating("layout_reached", "g.n.01_1") and compiled.in_measure("layout_reached", "g.n.01_1")
+    seen = []
+    compiled.check_goal(lambda cls, *ents: seen.append((cls.__name__, ents)) or True)
+    assert ("PoseReached", ("mug.n.04_2",)) in seen and ("LayoutReached", ("g.n.01_1",)) not in seen
+
+
 @pytest.mark.parametrize(
     "body,match",
     [
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (ontop ?mug.n.04_1 ?tray.n.01_1)))", "only accepts"),
-        (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_2)))", "already a gating"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_1) (pose_reached ?mug.n.04_1)))", "more than once"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?bowl.n.01_1)))", "not a declared"),
         (f"{HEADER} {OBJECTS} {INIT} {GOAL} (:measure (pose_reached ?mug.n.04_1 ?tray.n.01_1)))", "exactly one"),
@@ -353,13 +309,12 @@ def test_legacy_activity_name_loads_renamed_templates():
     assert problem_path("world_alignment", 0) == problem_path("alignment", 0)
     assert problem_path("alignment", 0).endswith(os.path.join("alignment", "problem0.bddl"))
     assert activity_dir("world_alignment").endswith(os.sep + "alignment")
-    ids = list_problem_ids("alignment")
-    assert list_problem_ids("world_alignment") == ids
-    assert ids[:2] == [0, 1] and ids == list(range(len(ids)))  # the v1 templates stay 0-1; ground_isg appends contiguous ids
-    problem = load_problem("world_alignment", 0)
+    ids = list_problem_ids("alignment", FIXTURES)
+    assert list_problem_ids("world_alignment", FIXTURES) == ids == [0, 1]  # the v1 templates
+    problem = load_problem("world_alignment", 0, root=FIXTURES)
     assert problem.activity == "alignment" and problem.name == "alignment-0" and problem.canonical_name == "alignment-0"
     assert problem.variant == "table_surface"
-    assert problem.path == problem_path("alignment", 0)
+    assert problem.path == problem_path("alignment", 0, FIXTURES)
 
 
 def test_problem_name_accepts_canonical_and_retired_activity():
@@ -387,7 +342,7 @@ def test_legacy_root_directory_is_found_under_either_name():
     problem keeps the directory's activity."""
     with tempfile.TemporaryDirectory() as root:
         os.makedirs(os.path.join(root, "world_alignment"))
-        with open(problem_path("alignment", 0), "r") as f:
+        with open(problem_path("alignment", 0, FIXTURES), "r") as f:
             text = f.read().replace("(define (problem alignment-0)", "(define (problem world_alignment-0)")
         with open(os.path.join(root, "world_alignment", "problem0.bddl"), "w") as f:
             f.write(text)
@@ -410,7 +365,7 @@ def test_tro_activity_check_accepts_retired_name():
     from ispatialgym.eval.targets import SCHEMA_VERSION, ISGTroMeta, TROValidationError
     from ispatialgym.eval.tro import validate_tro_against_problem
 
-    compiled = load_problem("alignment", 0).compile()
+    compiled = load_problem("alignment", 0, root=FIXTURES).compile()
 
     def meta(activity, variant="table_surface"):
         return ISGTroMeta.from_dict(
@@ -499,7 +454,7 @@ def _write_activity(root, activity, variants, registry=None):
 def test_problem_registry_lookup_and_fallback():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
-        second = act + "-nextto-spatula-soup_ladle-breakfast_table"
+        second = act + "-nextto_small_scale-spatula-soup_ladle-breakfast_table"
         directory = _write_activity(root, act, [V2_VARIANT, second, None], registry={V2_VARIANT: 0, second: 1})
         assert problem_registry_path(act, root) == os.path.join(directory, "problems.json")
         assert load_problem_registry(directory) == {V2_VARIANT: 0, second: 1}
@@ -512,7 +467,7 @@ def test_problem_registry_lookup_and_fallback():
         problem = load_problem(act, id_of_variant(act, V2_VARIANT, root), root=root)
         assert problem.task_variant == V2_VARIANT
         with pytest.raises(ISGProblemError, match="known variants"):
-            id_of_variant(act, act + "-inside-apple-bowl-breakfast_table", root)
+            id_of_variant(act, act + "-inside_small_scale-apple-bowl-breakfast_table", root)
         with pytest.raises(FileNotFoundError, match="no problem 5"):
             variant_of(act, 5, root)
 
@@ -569,7 +524,7 @@ def test_malformed_problem_registries_are_rejected(registry, match):
 def test_problem_registry_must_agree_with_the_files():
     with tempfile.TemporaryDirectory() as root:
         act = "inter_object_relation_satisfaction"
-        other = act + "-nextto-spatula-soup_ladle-breakfast_table"
+        other = act + "-nextto_small_scale-spatula-soup_ladle-breakfast_table"
         # stale registry: variant registered under an id whose file declares another variant
         _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 1, other: 0})
         with pytest.raises(ISGProblemError, match=r"registers .* -> 0 but .*problem0.bddl declares \(:variant"):
@@ -579,7 +534,7 @@ def test_problem_registry_must_agree_with_the_files():
         with pytest.raises(ISGProblemError, match="declares"):
             validate_problem_registry(act, root)
         # registered id without a file
-        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0, other: 1, act + "-touching-a-b-c": 2})
+        _write_activity(root, act, [V2_VARIANT, other], registry={V2_VARIANT: 0, other: 1, act + "-touching_small_scale-a-b-c": 2})
         with pytest.raises(ISGProblemError, match="problem2.bddl does not exist"):
             validate_problem_registry(act, root)
         with pytest.raises(ISGProblemError, match="does not exist"):
@@ -633,6 +588,20 @@ def test_variant_grammar_is_lowercase():
     # the regex is lowercase-only; BDDL's tokenizer lowercases the file anyway, so ``A-b`` parses as ``a-b``
     assert not VARIANT_RE.match("A-b") and not VARIANT_RE.match("a-B")
     assert _parse(f"{HEADER} (:variant Alignment-Axial-Fishing_Rod-Table) {OBJECTS} {INIT} {GOAL})").variant == "alignment-axial-fishing_rod-table"
+
+
+def test_problem_files_written_before_the_rename():
+    p = _parse(f"{HEADER} (:alias {V2_VARIANT}) {OBJECTS} {INIT} {GOAL})")  # legacy spelling
+    assert p.variant == V2_VARIANT and f"(:variant {V2_VARIANT})" in p.expanded_bddl()
+    with pytest.raises(ISGProblemError, match="Duplicate section"):
+        _parse(f"{HEADER} (:alias a) (:variant a) {OBJECTS} {INIT} {GOAL})")  # legacy spelling
+    with tempfile.TemporaryDirectory() as root:
+        act = "inter_object_relation_satisfaction"
+        directory = _write_activity(root, act, [V2_VARIANT], registry=[{"alias": V2_VARIANT, "id": 0}])  # legacy spelling
+        with open(os.path.join(directory, "problem0.bddl"), "w") as f:
+            f.write(_iors_problem(act, 0, V2_VARIANT).replace("(:variant ", "(:alias "))  # legacy spelling
+        assert load_problem_registry(directory) == {V2_VARIANT: 0}
+        assert problem_variants(act, root) == {0: V2_VARIANT} and validate_problem_registry(act, root) == {V2_VARIANT: 0}
 
 
 # ----------------------------------------------------------------------------------------------------------------

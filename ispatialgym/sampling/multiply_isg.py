@@ -88,8 +88,10 @@ def parse_path_buckets(text: Optional[str]) -> Optional[List[Dict[str, Any]]]:
 
 
 def load_template(template_dir: str) -> Dict[str, Any]:
+    from ispatialgym.oracle.sidecar import from_legacy_keys
+
     with open(os.path.join(template_dir, "template_meta.json")) as f:
-        return json.load(f)
+        return from_legacy_keys(json.load(f))
 
 
 def problem_for_template(meta: Dict[str, Any], customs: Optional[str], bddl_root: Optional[str]) -> GroundedProblem:
@@ -249,7 +251,7 @@ def main(argv=None):
     try:
         world, kit = pool.get(gp, choice.scene)
         existing = next_index(target_dir)
-        entry = run_template(gp, choice, world, kit, out_root, args.instances, seed * 7919 + existing, args.max_attempts, meta.get("sub_variant"),
+        entry = run_template(gp, choice, world, kit, out_root, args.instances, seed * 7919 + existing, args.max_attempts,
                              None, start_index=existing, meta_extra={"split": seed_rec} if args.split else None)
         entry["start_index"] = existing
         entry["split"] = seed_rec
@@ -352,7 +354,7 @@ def main_train(args) -> int:
                 filt = SEP.repeat_filter(eval_recs, task=gp.activity, pos_m=args.repeat_pos_m, ang_deg=args.repeat_ang_deg) if eval_recs else None
                 split = {**job["seed_rec"], "scene": scene, "room": room or None, "scene_source": "split" if job["scene_draw"] else "template",
                          "source_template": job["dir"]}
-                entry = run_template(gp, choice, world, kit, out_root, len(idxs), job["seed"] * 7919, args.max_attempts, job["meta"].get("sub_variant"), None,
+                entry = run_template(gp, choice, world, kit, out_root, len(idxs), job["seed"] * 7919, args.max_attempts, None,
                                      indices=idxs, instance_filter=filt, meta_extra={"split": split})
                 entry["indices"] = idxs
                 entry["split"] = split

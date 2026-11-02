@@ -320,7 +320,7 @@ def test_block_design_candidates_record_their_shift_from_the_init(monkeypatch):
         corners = th.tensor([[x, y, z] for x in (-0.0127, 0.0127) for y in (-0.0127, 0.0127) for z in (0.0, 0.0254)])
         s.spec = SimpleNamespace(generation={"patterns": {"test_rbbr": ["red", "blue", "blue", "red"]}, "block_no_flip": True, "flip_directions": ["right"],
                                              "manip_lateral_shifts_m": [0.35, 0.45, 0.25], **gen})
-        s.subtask, s.defaults, s.sub_variant, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), None, "targets"
+        s.subtask, s.defaults, s.role = BD.SUBTASK, BD.GD.defaults_for(BD.SUBTASK), "targets"
         s.gp = SimpleNamespace(variant="configuration_matching-block_design-block_4-breakfast_table_board", roles={"targets": None})
         s.ctx = SimpleNamespace(base_seed=0)
         s.kit = SimpleNamespace(trav_free=lambda xy: True)

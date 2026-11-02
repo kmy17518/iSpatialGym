@@ -2861,21 +2861,23 @@ def attach_correction_regime(ctx: Dict[str, Any], cfg: ExecuteConfig) -> AttachC
     source = "sidecar"
     if not isinstance(d, dict) or not d:
         d, source = None, "defaults"
-        variant = getattr(sidecar, "variant", None) if sidecar is not None else None
-        if variant:
+        key = getattr(sidecar, "variant", None) if sidecar is not None else None
+        if key:
             try:
                 import json
 
-                from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
+                from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH, entry_key
 
                 # a plain read (not the schema-validating Customs.load: an unrelated entry mid-edit must not cost the regime)
                 with open(DEFAULT_CUSTOMS_PATH) as f:
-                    entry = json.load(f).get(variant) or {}
+                    data = json.load(f)
+                ekey = entry_key(data, key)  # the variant's entry (this repository's list) or its subtask's (the release's)
+                entry = (data.get(ekey) or {}) if ekey else {}
                 g = entry.get("generation") or {}
                 if isinstance(g.get("attach_correction"), dict) and g["attach_correction"]:
-                    d, source = g["attach_correction"], f"customs[{variant}]"
+                    d, source = g["attach_correction"], f"customs[{ekey}]"
             except Exception as e:  # noqa: BLE001 - the customs are optional here
-                log.warning("attach correction: customs lookup for %s failed (%s); defaults", variant, e)
+                log.warning("attach correction: customs lookup for %s failed (%s); defaults", key, e)
     if d:
         for k in ("soft_pos_tol_m", "stop_when_improvement_below_m", "target_pos_m", "target_rot_rad"):
             if k in d:

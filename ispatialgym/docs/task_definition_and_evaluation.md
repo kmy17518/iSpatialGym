@@ -268,10 +268,32 @@ The common v1 semantics are:
   coincide for a static table.
 - BEHAVIOR's other restricted-axis modes (`z`, `xy`, `yaw`) remain available on
   `PoseReached` but are not part of the iSpatialGym TRO schema.
-- A `pose_reached` (or `layout_reached`) atom in the goal gates success; the
-  same atom in the problem's `(:measure ...)` section is configured and its
-  errors are reported identically, but it never gates. Every TRO target must
-  correspond to one of the two, so the BDDL alone states what is evaluated.
+- A `pose_reached` (or `layout_reached`) atom in `:goal` is part of the
+  symbolic goal; an atom in the problem's `(:measure ...)` section is judged by
+  geometric success: within its tolerance at the step(s) the goal is judged
+  (see `pose_settled` below). Since 2026-10-14 an atom may sit in both
+  sections. Every TRO target must correspond to at least one atom, so the BDDL
+  alone states what is evaluated.
+- Tolerances (2026-10-14): one per target, used for the predicates, geometric
+  success, the oracle's push loops and the goal override: the `isg-v2` profile
+  (`ispatialgym.eval.tolerance_profile`), computed at load (after the loader's
+  settle, before the first step) from the target's error at that step and
+  written over the loaded TRO's tolerances in memory (the TRO fields stay, the
+  dataset is never written). Scale groups: micro (Object Scaling, Mental
+  Rotation and Alignment pose targets: max(0.01 m, 10 % of the change) /
+  max(0.05 rad, 10 % of the change); articulation joints per joint: prismatic
+  max(0.01 m, 10 % |dq|), revolute max(0.05 rad, 10 % |dq|); block-design /
+  attachment relations 0.01 m / 0.05 rad), small (articulation small-scale
+  root, block-design / attachment slots, Disembedding, IORS small-scale: 0.03 m
+  / 0.10 rad), large (Camera Relocalization, IORS large-scale: 0.05 m /
+  0.15 rad). An `evaluation.tolerances` block in the subtask's
+  `isg_customs.json` entry overrides (`pose` / `layout`: absolute `position` /
+  `orientation`; `joints`: `revolute` / `prismatic` floors and `fraction`);
+  `run_isg --tolerance-scale` (default 3 for `--mode policy`, else 1)
+  multiplies every tolerance, overrides included. Object Scaling compares the
+  full position in the head-camera frame (its TRO depth metric becomes `full`
+  at load). The record (profile, mode, scale, and per target its scale group,
+  change, tolerances and override flags) is `meta.json`'s `tolerance_profile`.
 
 The TRO `link` field controls which pose is evaluated:
 
@@ -336,10 +358,11 @@ configuration and `pose_reached` is the absolute world placement:
 TRO relation stores one slot's pose in another slot's frame, and the evaluator
 checks the same relative pose between the blocks assigned to those slots.
 Relations are invariant to where the arrangement sits, so a correct design
-displaced on the table still satisfies `layout_reached`. Binary success is
-`ontop`, `layout_reached` and release; the absolute placement
-(`(:measure (pose_reached ?blocks_group.n.01_1))` against `target_slots`) is
-reported as the block-design pose error but does not gate success.
+displaced on the table still satisfies `layout_reached`. Symbolic success is
+`ontop`, `layout_reached` and release; geometric success adds the
+`(:measure ...)` atoms within tolerance: the relations again (`layout_reached`
+of the group, also in `:goal`) and the absolute placement (`pose_reached` of
+the group against `target_slots`).
 
 One shared, one-to-one block-to-slot assignment is computed per evaluation step,
 consumed by both predicates, and logged. Its cost is the total relation error
@@ -349,15 +372,27 @@ groups without relations. `orientation_equivalences` handles block symmetry on
 both ends of every relation. `pose_settled(blocks_group)` expands per block and
 does not depend on the assignment.
 
+In the board variant (`problem11`, the release's block design: the blocks go
+into the pockets of a puzzle board, `tray.n.01_1`), the board is a member of
+the group too, pinned to a slot of its own (`assignment.pinned`), so it is never
+matched to a block's slot. Its relations to the blocks make `layout_reached`
+judge each block's pocket and face relative to the board: a design rotated or
+shifted on the board fails symbolically, and `pose_reached` also needs the
+board within the group's tolerance of where it stands in the goal image. The
+blocks' `ontop` goal is per block (on the group it would put the board on
+itself).
+
 ### Articulation variant
 
 `layout_reached(articulated_object)` is the object's internal configuration:
 every non-fixed joint has a target position and tolerance in the TRO, and all
 must hold. Because joint positions exactly parametrize the moving links' poses
 relative to the base link, this covers any number of independently moving links
-with a fixed part-to-target mapping. Binary success is the `open` guard,
-`layout_reached` and release. A movable articulated object may add a root pose
-target (`pose_reached` with `link: null`); fixed-base assets do not need one.
+with a fixed part-to-target mapping. Symbolic success is the `open` guard and
+release (BEHAVIOR's `open`); `layout_reached` - every joint within its
+tolerance - is in `(:measure ...)` and decides geometric success, together with
+the root pose target of a movable articulated object (`pose_reached` with
+`link: null`, the small-scale variant); fixed-base assets do not need one.
 
 `open` is kept as a semantic guard in both directions (`open` goal for opening,
 `(not (open ...))` goal for closing). BEHAVIOR's `Open` only checks that a
@@ -368,8 +403,9 @@ configuration alone.
 
 The goal combines the directional `attached(child, parent)` relation with a
 fixed-assignment group containing both objects: `layout_reached` checks the
-child's pose in the parent frame (gating), while the group's `target_slots`
-record both world poses for error reporting only.
+child's pose in the parent frame (in `:goal` and `:measure`), and the group's
+`pose_reached` (both world poses, `target_slots`) is in `:measure`; geometric
+success needs both within tolerance.
 `attached` verifies a real BEHAVIOR attachment joint; the TRO names the exact
 male/female attachment-link pair because BEHAVIOR serializes only the parent
 object.
@@ -443,7 +479,7 @@ Required settlement entities are:
 | Object Scaling | manipulated object, agent |
 | Mental Rotation | manipulated object, agent |
 | Disembedding | selected object, agent |
-| Configuration Matching — block design | every block in the group, agent |
+| Configuration Matching — block design | every member of the group (the blocks, and the board in the board variant), agent |
 | Configuration Matching — articulation | articulated object, agent |
 | Configuration Matching — attachment | both attached objects, agent |
 | World Alignment — table surface | manipulated object, agent |
@@ -453,46 +489,77 @@ Required settlement entities are:
 Each `pose_settled` atom should be an explicit top-level BDDL goal. A group form
 is expanded to one atom per physical member during compilation.
 
-Define:
+Scoring (2026-10-14, `ispatialgym.eval.metrics`). Per step `t`:
 
-- `G(t)`: all non-`pose_settled` goals are true at step `t` (binary success).
-- `S(t)`: all required `pose_settled` goals are true at step `t`.
-- Binary success: `G(t)` reached at any step of the episode.
-- Settled success: `G(t) AND S(t)`.
+- `G(t)`: every goal atom except `pose_settled` holds.
+- `M(t)`: every `(:measure ...)` atom is within its tolerance (`pose_reached` by
+  its pose report's `within_tolerance`, `layout_reached` by its layout
+  report's).
+- `S(t)`: every `pose_settled` atom holds: its window of `settle_steps` steps
+  ending at `t` is full and within the drift thresholds (2 mm / 5 mrad /
+  5 mrad; the window's configuration drift alone, without OmniGibson's
+  per-step velocity gate: `sampling.predicates.settled_by_drift`). Vacuously
+  true without such atoms.
 
-`ISpatialGymTask` takes two flags:
+**Symbolic** success is the BDDL `:goal`; **geometric** success, the primary
+metric, is symbolic success plus every `:measure` atom within tolerance at the
+same step(s). The settle-eval switch defines both:
 
-```yaml
-task:
-  require_pose_settled: false        # official success = settled success when true
-  terminate_on_binary_success: false # end the episode at the first G(t) instead of the first G AND S
-```
+| settle-eval | symbolic success | geometric success |
+| --- | --- | --- |
+| off | the first `t` with `G(t)` | the first `t` with `G(t)` and `M(t)` |
+| on | the first `t` with `S(t)` where `G` held at every step of the window | the first `t` with `S(t)` where `G` and `M` held at every step of the window |
 
-- Binary success and settled success are always both reported, whatever the
-  flags. `require_pose_settled` only decides which one `task.success` (the
-  BEHAVIOR-compatible official success) means.
-- By default the episode continues after the first `G(t)` until the first
-  `G(t) AND S(t)` so that the settle latency can be measured; a timeout after
-  `G` was reached leaves `success = true` (binary mode) with latency `-1`.
+These are the *first* steps. **The evaluated step** (owner 2026-11-01) is the
+step an episode is judged at. A settled success (settle-eval on) is judged at
+its first step, as before: the settled window already certifies the state. An
+unsettled success (settle-eval off, and the off mode reported alongside a
+settle-eval run) is judged at the candidate with the lowest selection score,
+ties to the earlier step: the steps `t` in `[first, first + W - 1]` (`W` =
+`settle_steps`) where the kind's condition (`G`; `G` and `M`) holds. The selection score
+(`eval.metrics.selection_score`) is the largest error-to-tolerance ratio over
+the `:measure` atoms' reports: position error / position tolerance and
+orientation error / orientation tolerance of a pose or group target, every
+joint's error / its own tolerance of an articulation (a missing component is
+skipped; a zero tolerance gives 0 for a zero error, else infinity). Without a
+computable score (no `:measure` atom) the evaluated step is the first step.
+The errors, the error metric and the settled flag of a mode are those of its
+evaluated geometric step, else its evaluated symbolic step, else the current
+step.
 
-```text
-t_goal = first t where G(t)
-t_settled = first t >= t_goal where G(t) AND S(t)
-latency_steps = t_settled - t_goal
-latency_seconds = latency_steps * sim_step_dt
-```
+`ISpatialGymTask(settle_eval=..., settle_steps=...)` (or `configure_evaluation`
+per instance, before its reset) tracks the run's mode every step: it gives
+`info["success"]` and `official_success` (its geometric success reached),
+`success_final` (its geometric selection can no longer change: at the first
+settled geometric success with settle-eval on, at `first + W - 1` with it off)
+and the termination (`success_final`), a value the episode ended before
+reaching being null. A settle-eval-on run also tracks the off mode and reports
+it as `other_mode`; a settle-eval-off run tracks no other mode (`other_mode`
+null: a policy run ends `W - 1` steps after its first success, before an
+on-mode window could fill). `settle_steps` is
+also the `PoseSettled` window (`n_steps`) of every settled entity. A checkpoint
+rollback restores the tracking (`ISpatialGymTask.metrics_state`).
 
-The timer remains anchored at the first `G(t)` if a non-settlement goal
-temporarily becomes false before final settled success. The final success step
-must still satisfy all goals simultaneously.
+`run_isg`: `--settle-eval auto` is on for oracle and replay runs, off for
+policy runs. `--settle-steps` is the window in every mode: an oracle program's
+epilogue is exactly that long and reserved in the step budget (default 45); a
+replay streams its demo's action rows and only the first that many settle rows
+(default all of them; more than the demo has is an error); a policy run has no
+epilogue (default 45). `--success-metric geometric|symbolic` (default
+geometric) decides `success`, the status and the exit code; a policy run ends
+when its geometric selection is final (settle-eval off: `W - 1` steps after the
+first geometric success, or at its step budget if that comes first; settle-eval
+on: at the first settled geometric success) either way, a replay runs its whole
+demo, and without geometric success an episode runs to `--max-steps` (an
+oracle program: plus its epilogue). Consequences accepted with the change:
+articulation open / close tasks' symbolic success is BEHAVIOR's `open`, and an
+episode without geometric success runs to its step budget.
 
-The BDDL conditions determine which entities must settle. The flag controls
-whether those conditions gate official success; evaluation code must not infer
-an entity list from task names.
+The BDDL conditions determine which entities must settle; evaluation code must
+not infer an entity list from task names.
 
 BEHAVIOR's per-entity `pose_settled` instrumentation (`info["done"]["pose_settled"]`)
-is kept; the task-level `t_settled`, latency and termination live in
-`ISpatialGymTask`.
+is kept.
 
 ## Observation timing: BEHAVIOR convention (decided 2026-09-06)
 
@@ -551,10 +618,10 @@ Decision:
    `pose_settled`, ...) is judged on physics-synced state at the current step.
    Camera Relocalization therefore uses the sensor prim pose, which is the pose
    of the frame dispatched at that step (visible to the policy two steps
-   later), never the render-side transform. The reported `first_success_step`
+   later), never the render-side transform. A success step of settle-eval off
    thus precedes the first policy observation of the matching image by the
-   render latency; settled success (>= 10 stationary steps) makes the two
-   coincide.
+   render latency; settle-eval on (a window of `settle_steps` stationary steps)
+   makes the two coincide.
 
 Changing the convention later (e.g. `n_render_iterations=3` for current
 frames) is a profile change that must be applied to demos, goal images and
@@ -565,23 +632,52 @@ metrics.
 
 `ISpatialGymTask` writes `info["done"]["ispatialgym"]` every step and
 `ispatialgym.eval.episode.summarize_episode` turns the final one into the
-episode result:
+episode result (`run_isg` writes the same keys into `meta.json` and its
+`RUN_ISG_RESULT` line):
 
-- `success` (official), `binary_success`, `first_success_step`.
-- `settled_success`, `first_settled_success_step`, `settle_latency_steps`,
-  `settle_latency_seconds`.
-- `position_error` / `orientation_error`: the maximum over the pose targets
-  (scalar targets and group members), taken at the first binary success or, if
-  it never happened, at the terminal step. `layout_position_error` /
-  `layout_orientation_error`: the same over the layout targets (group relations;
-  prismatic / revolute joints of articulated objects).
-- `errors`: the per-target detail behind those maxima (`pose_errors`,
-  `layout_errors`, each with the metric labels, `within_tolerance` and whether
-  the atom is `gating`); `errors_at_termination` for the last step.
+- `success`: the run mode's geometric success (`--success-metric symbolic`: its
+  symbolic success); `symbolic_success` / `symbolic_success_step`,
+  `geometric_success` / `geometric_success_step` (`*_success_step`: the
+  evaluated step; 0-based episode steps, null when not reached) with
+  `symbolic_first_step` / `geometric_first_step` (the first steps);
+  `evaluation_step` / `evaluation_kind` / `evaluation_settled` (the step the
+  errors below are from, which kind's, and its `S`); `success_final`;
+  `settle_eval`, `settle_steps`; `other_mode`: the same values of the off mode
+  with its `error_metric` when `settle_eval` is on, else null. Verification
+  (`scripts/vec_eval/compare_slots.py`, `verify_rules.py`, the rooms gate)
+  compares the first steps.
+- `closest_approach` / `closest_goal_approach` (owner 2026-11-01): how close the
+  rollout got, beside the judged errors and deciding nothing - the step with
+  the lowest selection score over every step the episode ran, and over the
+  steps where the goal held (ties to the earlier step), each with its `step`,
+  `score`, `goal`, `measure_within` and `error_metric`; null when no step could
+  be scored. A stopping run ends at its success selection, so they cover the
+  steps executed; a run without stop-on-success covers its whole budget.
+- `errors`: the per-target error reports the run mode is judged by - at its
+  evaluated geometric step, else its evaluated symbolic step, else at the last
+  step (`errors_final_step`):
+  `pose_errors` / `layout_errors`, each with its metric labels,
+  `within_tolerance`, `tolerances` and whether the atom is `in_goal` /
+  `in_measure`.
+- `error_metric` = `{position_error, orientation_error, case}`, from the
+  `:measure` atoms' reports: `poses` (two or more `pose_reached`: IORS
+  small-scale) the maximum over them; `layout` (`layout_reached` and
+  `pose_reached` on one entity: articulation small-scale, block design,
+  attachment) the layout report's errors; `pose` (one `pose_reached`) its
+  report's; `layout_only` (one `layout_reached`, no pose: articulation
+  large-scale) its report's. Any other combination is an error at load,
+  naming the problem. A missing component (an orientation-free target, a
+  revolute-only articulation) is null.
+- `measured`: the `:measure` atoms with their within-tolerance status at the
+  evaluation step (geometric success, else the last step).
 - `group_assignments`: the shared member-to-slot assignment per group.
 - `conditions`: every goal atom with its BDDL text, kind (`binary` /
-  `pose_settled`) and truth value, for diagnosing failures; `measured`: the
-  non-gating `:measure` atoms with their within-tolerance status.
+  `pose_settled`) and truth value, for diagnosing failures.
+- `tolerance_profile` (`run_isg`): the `isg-v2` record (profile, mode, scale,
+  and per target its scale group, change, tolerances and override flags).
+- Per step, in the recording: `eval/symbolic` (`G`), `eval/settled` (`S`),
+  `eval/geometric_within` (`M`), `eval/position_error` /
+  `eval/orientation_error` (the step's error metric).
 
 Meters and radians remain separate. No normalized or mixed-unit aggregate error
 is included in v1.
@@ -596,14 +692,16 @@ These are cross-task decisions only; each task still needs a dedicated review.
   depth along the head-camera axis for Object Scaling, world-frame orientation
   for Mental Rotation. Their initial grasp must be restorable from the instance.
 - Disembedding samples controlled candidate-object occlusion of the target and
-  requires the selected object `ontop` the destination tray and released; the
-  exact target pose is measured (`pose_targets` on the object, not on the
-  agent) but does not gate success.
+  requires the selected object `ontop` the destination tray and released (the
+  symbolic goal); the exact target pose (`pose_targets` on the object, not on
+  the agent) is in `:measure`: geometric success.
 - Configuration Matching contains block-design, articulation, and
-  attachment variants. Every variant gates success on `layout_reached` for the
-  relative or internal configuration together with `open`/`(not (open ...))` or
-  `attached` as the semantic guard; absolute placement (`target_slots`) is
-  measured only.
+  attachment variants. Block design and attachment put `layout_reached` (the
+  relative configuration) in the symbolic goal with `ontop` / `attached`;
+  articulation's symbolic goal is `open` / `(not (open ...))`. Geometric
+  success adds the `:measure` atoms: articulation's joints (and, small-scale,
+  its root pose), block design's and attachment's relations and absolute
+  placement (`target_slots`).
 - Alignment (activity `alignment`, previously World Alignment / Rod and Frame)
   has two variants. Axial (previously table surface): the object starts and
   stays `ontop` the table while reaching its target orientation. World vertical: an object (e.g. a painting) hangs on a wall
@@ -613,14 +711,16 @@ These are cross-task decisions only; each task still needs a dedicated review.
   and would not pivot at the center of mass. (A third variant, world horizontal
   — an elongated wall item pushed back to level on the same hinge — was retired
   on 2026-09-23.)
-- Inter-object Relation Satisfaction, previously called Relation Satisfaction,
-  gates success on the intended spatial-relation predicate and release; the
-  exact pictured poses are measured only. `open` remains excluded from this
-  task because articulation now belongs to Configuration Matching. It has
-  seven subtasks (ontop / under × small-scale / large-scale, inside, nextto,
-  touching); the small-scale `under` puts the manipulated target on the
-  partner, so its goal is `(under ?partner ?target)`; `inside` does not
-  evaluate the target's orientation.
+- Inter-object Relation Satisfaction, previously called Relation Satisfaction:
+  the symbolic goal is the intended spatial-relation predicate and release;
+  geometric success adds the pictured poses (`:measure`) within tolerance.
+  `open` remains excluded from this task because articulation now belongs to
+  Configuration Matching. It has ten tasks: ontop, under, inside, nextto and
+  touching, each small-scale and large-scale (`touching_small_scale`,
+  `nextto_small_scale` and `inside_small_scale` were `touching`, `nextto` and
+  `inside` before 2026-10-14); the small-scale `under` puts the manipulated
+  target on the partner, so its goal is `(under ?partner ?target)`; `inside`
+  does not evaluate the target's orientation.
 - Configuration Matching's articulation variant is split into large-scale
   (scene objects, opened primarily by base / trunk motion) and small-scale
   (spawned objects on a support, handle arm + brace arm), each in an open and a
@@ -640,9 +740,11 @@ file-level map):
   configuration.
 - `layout_reached` for groups (relative poses) and articulated objects (joint
   targets), and group-aware `pose_reached` with a shared assignment.
-- Flag-controlled settled/binary success, task-level latency, per-target error
-  reporting (`ISpatialGymTask`), and a TRO loader that overlays object states
-  and the robot root pose / joint positions, settles, and snapshots.
+- Symbolic / geometric success under both settle-eval modes
+  (`ispatialgym.eval.metrics`, `ISpatialGymTask`), the `isg-v2` tolerance
+  profile (`ispatialgym.eval.tolerance_profile`), per-target error reporting
+  with tolerances and the error metric, and a TRO loader that overlays object
+  states and the robot root pose / joint positions, settles, and snapshots.
 
 Remaining gaps (instance restoration and generation):
 

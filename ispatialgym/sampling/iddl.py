@@ -9,7 +9,7 @@ An iddl file is a BDDL problem skeleton written over bare **roles** instead of s
         (:require (grasps <role> <pipeline>) (contacts <role>) (handle <role>))   ; optional
         (:init <literals>)                       ; no ? prefix
         (:goal (and <literals>))                 ; ? prefix; pose_settled atoms are direct children of the and
-        (:measure <literals>)                    ; optional: pose_reached / layout_reached, reported but not gating
+        (:measure <literals>)                    ; pose_reached / layout_reached: the measured targets (also allowed in :goal)
     )
 
 The parser knows nothing about categories, models or role kinds — those are the icl's (``roles/candidates.csv``);
@@ -444,10 +444,6 @@ def parse(text: str, path: Optional[str] = None) -> IDDL:
         if lit in measure:
             raise IDDLError(f"{where}: :measure lists {lit} twice")
         measure.append(lit)
-    gated = {(p, _strip(a[0])) for g in goal for p, a in _atoms(g) if p in MEASURE_PREDICATES}
-    for lit in measure:
-        if (lit[0], _strip(lit[1])) in gated:
-            raise IDDLError(f"{where}: {lit} is both a gating goal atom and a :measure atom")
 
     iddl = IDDL(
         subtask=subtask,

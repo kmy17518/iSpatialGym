@@ -1,0 +1,26 @@
+# Standard track: the evaluation conditions results are reported under (run_isg's defaults), plus head and external
+# videos of every episode.
+#   python -m ispatialgym.run_isg --config configs/eval.yaml --task <name> --policy <module:attribute>
+# Command-line options override these values; null means the default described next to it.
+
+mode: policy
+
+# Episode budget: null = the instance's max_steps (twice its reference demonstration's length, at least 300),
+# and 1 s of wall clock per step for the policy's steps.
+max_steps: null
+wallclock: null
+
+# Success is the first step at which the goal holds and every measured target is within tolerance.
+settle_eval: "off"
+settle_steps: 45
+success_metric: geometric
+tolerance_scale: 3.0
+
+# Evaluation camera profile isg-v1 (the goal images were rendered with it).
+image_size: 1080
+head_aperture: 40.0
+
+# Outputs: <out>/<instance id>/{meta.json, config.yaml, init_rgb.png, final_rgb.png, <view>_rgb.mp4}
+out: runs
+record_view: [head, external]
+video_size: null

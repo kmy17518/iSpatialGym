@@ -303,7 +303,7 @@ class Grounder:
                 fixed["wall"] = sorted({r["wall"] for r in regions})
             variant_fill["target"], variant_fill["support"] = target["category"], "walls"
         elif subtask.startswith(IORS):
-            pipeline = "insert" if subtask.endswith("inside") else "tabletop"
+            pipeline = "insert" if subtask == f"{IORS}-inside_small_scale" else "tabletop"
             spawned("target", target, pipeline)
             variant_fill["target"] = target["category"]
             if partner is not None and partner.get("kind") == "scene":

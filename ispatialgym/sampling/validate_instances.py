@@ -120,8 +120,11 @@ def pose_deviation(p0, q0, p1, q1) -> Tuple[float, float]:
 
 
 def _read_json(path: str) -> Dict[str, Any]:
+    from ispatialgym.oracle.sidecar import from_legacy_keys
+
     with open(path) as f:
-        return json.load(f)
+        data = json.load(f)
+    return from_legacy_keys(data) if isinstance(data, dict) else data
 
 
 def _write_json(path: str, data: Any) -> None:
@@ -693,11 +696,14 @@ class _GenerationView:
 
 
 def customs_generation(variant: Optional[str]) -> Dict[str, Any]:
-    """The ``generation`` of ``variant`` in the tree's customs list (empty when the variant or the file is missing)."""
-    from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
+    """The ``generation`` of ``variant``'s entry in the tree's customs list (its own, or its subtask's in a list keyed by subtask:
+    ``customs.entry_key``; empty when the entry or the file is missing)."""
+    from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH, entry_key
 
     try:
-        return dict((_read_json(DEFAULT_CUSTOMS_PATH).get(variant or "") or {}).get("generation") or {})
+        data = _read_json(DEFAULT_CUSTOMS_PATH)
+        key = entry_key(data, variant)
+        return dict(((data.get(key) or {}) if key else {}).get("generation") or {})
     except (OSError, json.JSONDecodeError):
         return {}
 

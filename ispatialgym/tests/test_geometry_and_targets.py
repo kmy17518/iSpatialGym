@@ -1,6 +1,7 @@
 """Pose math, member-to-slot assignment and TRO target validation (no simulator)."""
 
 import math
+import os
 
 import pytest
 import torch as th
@@ -32,6 +33,8 @@ from ispatialgym.eval.tro import TROFile, validate_tro_against_problem
 Z90 = axis_angle_quat([0, 0, 1], math.pi / 2)
 X180 = axis_angle_quat([1, 0, 0], math.pi)
 CUBE_SYMMETRIES = [axis_angle_quat([0, 0, 1], k * math.pi / 2) for k in range(1, 4)]  # a yaw-symmetric block
+#: the v1 template problems these tests compile (the shipped tree holds the eval release's problems only)
+BDDL_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bddl")
 
 
 def _pose(pos, quat=IDENTITY_QUAT):
@@ -193,6 +196,23 @@ def test_group_target_validation():
         GroupTarget.from_dict("g", one_slot)
 
 
+def test_group_target_pinned_members():
+    d = _group_dict()
+    d["assignment"]["pinned"] = {"toy_dice.n.01_2": "slot_1"}
+    assert GroupTarget.from_dict("g", d).pinned == {"toy_dice.n.01_2": "slot_1"}
+    assert GroupTarget.from_dict("g", _group_dict()).pinned == {}
+    fixed = _group_dict(mode="fixed")
+    fixed["assignment"]["pinned"] = {"toy_dice.n.01_2": "slot_1"}
+    with pytest.raises(TROValidationError, match="for exchangeable groups"):
+        GroupTarget.from_dict("g", fixed)
+    for pinned, match in (({"mug.n.04_1": "slot_1"}, "non-members"), ({"toy_dice.n.01_2": "slot_9"}, "distinct target_slots"),
+                          ({"toy_dice.n.01_1": "slot_1", "toy_dice.n.01_2": "slot_1"}, "distinct target_slots")):
+        bad = _group_dict()
+        bad["assignment"]["pinned"] = pinned
+        with pytest.raises(TROValidationError, match=match):
+            GroupTarget.from_dict("g", bad)
+
+
 def _meta_dict(activity="world_alignment", definition_id=0, variant="table_surface", **overrides):
     d = {
         "schema_version": SCHEMA_VERSION,
@@ -219,7 +239,7 @@ def _meta_dict(activity="world_alignment", definition_id=0, variant="table_surfa
 
 
 def test_tro_meta_and_problem_validation():
-    compiled = load_problem("world_alignment", 0).compile()
+    compiled = load_problem("world_alignment", 0, root=BDDL_FIXTURES).compile()
     meta = ISGTroMeta.from_dict(_meta_dict())
     validate_tro_against_problem(meta, compiled)
     assert meta.measured_instances() == ["fishing_rod.n.01_1"]
@@ -246,7 +266,7 @@ def test_tro_file_splits_behavior_state_from_metadata():
 
 
 def test_layout_targets_are_required_by_layout_reached_goals():
-    compiled = load_problem("configuration_matching", 1).compile()
+    compiled = load_problem("configuration_matching", 1, root=BDDL_FIXTURES).compile()
     base = _meta_dict(
         activity="configuration_matching",
         definition_id=1,
@@ -263,7 +283,7 @@ def test_layout_targets_are_required_by_layout_reached_goals():
     with pytest.raises(TROValidationError, match=r"no \(pose_reached cabinet.n.01_1\) atom"):
         validate_tro_against_problem(ISGTroMeta.from_dict(base), compiled)
 
-    compiled = load_problem("configuration_matching", 0).compile()
+    compiled = load_problem("configuration_matching", 0, root=BDDL_FIXTURES).compile()
     block = _meta_dict(
         activity="configuration_matching",
         definition_id=0,
@@ -298,7 +318,7 @@ def _dice_group(with_pose_tolerances=True):
 def test_measure_atoms_require_and_license_targets():
     """(:measure ...) atoms need a TRO target just like goal atoms, and TRO targets need a goal or :measure atom."""
     # Disembedding: (pose_reached ?mug.n.04_1) lives in :measure -> a pose target is required ...
-    compiled = load_problem("disembedding", 0).compile()
+    compiled = load_problem("disembedding", 0, root=BDDL_FIXTURES).compile()
     meta = _meta_dict(activity="disembedding", definition_id=0, variant=None, object_bindings={}, pose_targets={})
     with pytest.raises(TROValidationError, match=r"\(pose_reached mug.n.04_1\) in :measure has no pose_targets"):
         validate_tro_against_problem(ISGTroMeta.from_dict(meta), compiled, require_bindings=False)
@@ -310,7 +330,7 @@ def test_measure_atoms_require_and_license_targets():
         validate_tro_against_problem(ISGTroMeta.from_dict(meta), compiled, require_bindings=False)
 
     # Block design: layout_reached gates, pose_reached is measured -> the group needs relations AND slots/tolerances
-    compiled = load_problem("configuration_matching", 0).compile()
+    compiled = load_problem("configuration_matching", 0, root=BDDL_FIXTURES).compile()
     block = _meta_dict(activity="configuration_matching", definition_id=0, variant="block_design", object_bindings={}, pose_targets={})
     block["groups"] = {"blocks_group.n.01_1": _dice_group(with_pose_tolerances=False)}
     with pytest.raises(TROValidationError, match=r"\(pose_reached blocks_group.n.01_1\) in :measure needs groups"):
@@ -318,7 +338,7 @@ def test_measure_atoms_require_and_license_targets():
     block["groups"] = {"blocks_group.n.01_1": _dice_group()}
     validate_tro_against_problem(ISGTroMeta.from_dict(block), compiled, require_bindings=False)
     # a group target for a group that no atom mentions is rejected
-    compiled_wa = load_problem("world_alignment", 0).compile()
+    compiled_wa = load_problem("world_alignment", 0, root=BDDL_FIXTURES).compile()
     stray = _meta_dict(groups={"blocks_group.n.01_1": _dice_group()})
     with pytest.raises(TROValidationError, match="not a declared BDDL group"):
         validate_tro_against_problem(ISGTroMeta.from_dict(stray), compiled_wa)

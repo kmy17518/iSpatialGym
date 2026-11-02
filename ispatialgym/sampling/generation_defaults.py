@@ -315,7 +315,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {"targets": {"size": 4, "draw": "same_model"}},  # §2.3 targets {size: 4, draw: same_model}
         "path_buckets": None,
         "grid": [2, 2],  # §6.5 touching 2 × 2 grid anchored at the top-left block
-        "patterns": {"test_rbbr": ["red", "blue", "blue", "red"]},  # §6.5 generation.patterns (or --sub-variant)
+        "patterns": {"test_rbbr": ["red", "blue", "blue", "red"]},  # §6.5 generation.patterns (one drawn per instance)
         "block_gap_m": 0.001,  # §4.5 / §6.5 pitch = edge + 1 mm
         "scatter_min_gap_m": 0.03,  # §4.6 ≥ 3 cm gaps between footprints
         "region_spacing_extra_m": 0.03,  # §4.5 cells at spacing edge·√2 + 0.03

@@ -318,14 +318,19 @@ class GroundedProblem:
     @classmethod
     def load(cls, variant: str, customs_path: Optional[str] = None, bddl_root: Optional[str] = None, icl_root: Optional[str] = None,
              iddl_root: Optional[str] = None) -> "GroundedProblem":
-        """Load ``customs_path[variant]`` (default ``assets/task_specs/task_custom_lists.json``), the grounded BDDL
-        ``<bddl_root>/<activity>/problem<definition_id>.bddl`` and, when ``sampling.iddl`` exists (D1), the parsed iddl."""
+        """Load ``variant``'s customs entry (``customs_path[customs.entry_key(..., variant)]``: the variant's own entry, or its
+        subtask's in a list keyed by subtask such as the eval release's; default ``assets/task_specs/isg_customs.json``), the
+        grounded BDDL ``<bddl_root>/<activity>/problem<definition_id>.bddl`` and, when ``sampling.iddl`` exists (D1), the parsed
+        iddl."""
+        from ispatialgym.sampling.customs import entry_key
+
         customs_path = customs_path or DEFAULT_CUSTOMS
         with open(customs_path) as f:
             data = json.load(f)
-        if variant not in data:
-            raise GroundingError(f"variant {variant!r} not in {customs_path}; have {sorted(k for k in data if not k.startswith('_'))[:20]}...")
-        entry = data[variant]
+        key = entry_key(data, variant)
+        if key is None:
+            raise GroundingError(f"variant {variant!r} (nor its subtask) not in {customs_path}; have {sorted(k for k in data if not k.startswith('_'))[:20]}...")
+        entry = data[key]
         gp = cls(variant, entry, customs_path=customs_path, bddl_root=bddl_root, lookalikes=LookalikeIndex.load(icl_root))
         gp.iddl_path = os.path.join(iddl_root or DEFAULT_IDDL_ROOT, entry["iddl"]) if entry.get("iddl") else None
         gp.iddl = _load_iddl(gp.iddl_path)
@@ -697,11 +702,13 @@ class GroundedProblem:
         entry = self.entry
         if self.scene_overrides and (self.customs_path is None or os.path.abspath(path) == os.path.abspath(self.customs_path)):
             entry = {**self.entry, "scenes": self.own_scenes()}
+        from ispatialgym.sampling.customs import entry_key
+
         data = {}
         if os.path.exists(path):
             with open(path) as f:
                 data = json.load(f)
-        data[self.variant] = entry
+        data[entry_key(data, self.variant) or self.variant] = entry
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f, indent=1)

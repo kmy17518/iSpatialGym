@@ -426,8 +426,8 @@ def test_instance_filter_rejects_and_removes_a_repeat_and_explicit_indices(tmp_p
 
 def test_room_override_template_id_and_write_back(tmp_path):
     customs = tmp_path / "customs.json"
-    customs.write_text(json.dumps({"object_scaling-apple": _held_entry(), "_meta": {"x": 1}}))
-    gp = GroundedProblem("object_scaling-apple", json.loads(customs.read_text())["object_scaling-apple"], customs_path=str(customs))
+    customs.write_text(json.dumps({"object_scaling_apple": _held_entry(), "_meta": {"x": 1}}))
+    gp = GroundedProblem("object_scaling-apple", json.loads(customs.read_text())["object_scaling_apple"], customs_path=str(customs))
     assert gp.floor_only() and gp.room_tag("house_single_floor") is None
     # a scene the entry does not list: the block is synthesized from the entry's first block
     assert gp.override_scene_room("Rs_int", "living_room_0", note="test") is True
@@ -449,9 +449,9 @@ def test_room_override_template_id_and_write_back(tmp_path):
     gp.save_customs(str(tmp_path / "copy.json"))
     gp.save_customs()
     src = json.loads(customs.read_text())
-    assert src["_meta"] == {"x": 1} and list(src["object_scaling-apple"]["scenes"]) == ["house_single_floor"]
-    assert src["object_scaling-apple"]["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"]
-    cp = json.loads((tmp_path / "copy.json").read_text())["object_scaling-apple"]["scenes"]
+    assert src["_meta"] == {"x": 1} and list(src["object_scaling_apple"]["scenes"]) == ["house_single_floor"]
+    assert src["object_scaling_apple"]["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"]
+    cp = json.loads((tmp_path / "copy.json").read_text())["object_scaling_apple"]["scenes"]
     assert cp["house_single_floor"]["rooms"] == ["kitchen_0"] and cp["house_single_floor"]["_synthesized"] and cp["Rs_int"]["rooms"] == ["living_room_0"]
     assert gp.override_scene_room("house_single_floor", "living_room_0") is False
     assert gp.entry["scenes"]["house_single_floor"] == _held_entry()["scenes"]["house_single_floor"] and gp.room_tag("house_single_floor") is None

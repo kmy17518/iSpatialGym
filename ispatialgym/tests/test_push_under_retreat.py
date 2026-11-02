@@ -291,7 +291,7 @@ def test_vertical_angle_is_the_tilt_modulo_yaw():
 def _gate_executor(actions, q_now, category="briefcase", model="lwbctq", goal=None):
     ex = Executor.__new__(Executor)
     ex.program_actions = actions
-    ex.cfg = ExecutorConfig(demo_gating=("placed_orientation",))
+    ex.cfg = ExecutorConfig()
     tgt = SimpleNamespace(frame="world", orientation=_yaw(0.0025) if goal is None else goal, orientation_tolerance=0.2, orientation_metric="full",
                           orientation_equivalences=[])
     obj = SimpleNamespace(name=f"target_{category}_{model}_0", category=category, model=model)

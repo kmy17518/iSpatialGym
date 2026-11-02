@@ -27,11 +27,12 @@ import numpy as np
 import pytest
 import torch as th
 
+from ispatialgym.eval import metrics as MET
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
 from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, PushClose, BaseFollow, Place, Reorient, Brace as QA_Brace
-from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, RootWatch, SimState, apply_goal_override
+from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE, Recorder, RecorderConfig, sensor_name
@@ -339,14 +340,22 @@ class FakeScene:
 
 
 class FakeTask:
+    """The task's scoring (``ispatialgym.eval.metrics``) over the fake world's per-step facts; ``metrics_state`` is what a
+    rollback restores (``executor.TASK_TRACKING_ATTRS``)."""
+
     def __init__(self, objects: Dict[str, Any], robot):
         self.object_scope = dict(objects)
         self.object_scope[AGENT_INSTANCE] = robot
         self.compiled_task = None
-        self._first_success_step = -1
-        self._first_settled_success_step = -1
-        self._errors_at_first_success = None
-        self._last_goal_eval = None
+        self.tracker = MET.SuccessTracker(settle_eval=True, settle_steps=45)
+
+    @property
+    def metrics_state(self):
+        return self.tracker.state()
+
+    @metrics_state.setter
+    def metrics_state(self, state):
+        self.tracker.load(state)
 
     def update_bddl_scope_metadata(self, env):
         pass
@@ -454,12 +463,39 @@ class FakeEnv:
         return {self.robot.name: {CAM_KEY: {"rgb": self._frame.clone()}, "proprio": self.robot.q.clone()}}
 
     def _info(self):
-        isg = self.evaluate(self)
-        isg.setdefault("binary_success_ever", isg.get("binary_success", False))
-        isg.setdefault("settled_success", isg.get("binary_success", False) and isg.get("settled", False))
-        isg.setdefault("errors", {})
+        """The task's ``info["ispatialgym"]`` of this step from ``evaluate``'s facts: ``goal`` (G; or ``binary_success``),
+        ``settled`` (S), ``measure_within`` (M; default every reported target within tolerance) and ``errors`` (each target a
+        ``(:measure ...)`` atom), scored by the fake task's tracker once per episode step."""
+        d = self.evaluate(self)
+        errors = d.get("errors") or {}
+        goal = bool(d.get("goal", d.get("binary_success", False)))
+        reps = [r for k in ("pose_errors", "layout_errors") for r in (errors.get(k) or {}).values() if isinstance(r, dict)]
+        within = bool(d.get("measure_within", all(r.get("within_tolerance", True) for r in reps)))
+        settled = bool(d.get("settled", False))
+        tr = self.task.tracker
+        if self._current_step > 0 and (tr.last is None or tr.last[0] != self._current_step):
+            tr.update(self._current_step, goal, within, settled, errors)
+        atoms = [("pose_reached", k) for k in (errors.get("pose_errors") or {})] + [("layout_reached", k) for k in (errors.get("layout_errors") or {})]
+        try:
+            rep = tr.report(errors, atoms)
+        except MET.ErrorMetricError:
+            rep = tr.report(errors, [])
+
+        def measured(errs):
+            return [{"bddl": f"({p} ?{a})", "kind": "measure", "within_tolerance": ((errs.get("pose_errors" if p == "pose_reached" else "layout_errors") or {})
+                                                                                   .get(a) or {}).get("within_tolerance")} for p, a in atoms]
+
+        isg = {**d, "goal": goal, "measure_within": within, "settled": settled, "settle_eval": rep["settle_eval"], "settle_steps": rep["settle_steps"],
+               "official_success": rep["geometric_success"], "success_final": rep["success_final"],
+               "symbolic_success": rep["symbolic_success"], "symbolic_success_step": rep["symbolic_success_step"],
+               "symbolic_first_step": rep["symbolic_first_step"], "geometric_first_step": rep["geometric_first_step"],
+               "closest_approach": rep["closest_approach"], "closest_goal_approach": rep["closest_goal_approach"],
+               "geometric_success": rep["geometric_success"], "geometric_success_step": rep["geometric_success_step"], "goal_first_step": rep["goal_first_step"],
+               "other_mode": rep["other_mode"], "evaluation": {"errors": rep["errors"], "error_metric": rep["error_metric"], "measured": measured(rep["errors"]),
+                                                     "step": rep["evaluation_step"], "kind": rep["evaluation_kind"], "settled": rep["evaluation_settled"]},
+               "error_metric": rep["error_metric"]}
+        isg.setdefault("errors", errors)
         isg.setdefault("conditions", [])
-        isg.setdefault("first_settled_success_step", 0 if isg["settled_success"] else -1)
         return {"done": {"ispatialgym": isg}}
 
     def get_obs(self):
@@ -552,19 +588,37 @@ def iors_world(ag_roundtrip=True, evaluate=None, render_lag: int = 1):
     return sc, env
 
 
-def make_executor(env, sc, tmp_path=None, recorder_cfg=None, exec_cfg=None, qa_cfg=None, contacts=None, camera=None):
+def make_executor(env, sc, tmp_path=None, recorder_cfg=None, exec_cfg=None, qa_cfg=None, contacts=None, camera=None, qa=False):
+    """The executor over the fake world; ``qa``: run the ``--qa`` metrics (``ExecutorConfig.qa``, off here: the fake world's
+    scripted motions are no demos, the metrics have tests of their own)."""
     backend = FakeBackend(env.robot)
     motions = Motions(env, backend, MotionsConfig(settle_steps=5, gripper_steps=20, cartesian_step=0.05, cartesian_rot_step=0.3))
-    qa_cfg = qa_cfg or QA.QAConfig(pause_steps=100000, fov_min_steps=100000)
+    qa_cfg = qa_cfg or QA.QAConfig(stall_steps=100000, fov_min_steps=100000)
     monitors = QA.Monitors(env, env.robot, cfg=qa_cfg, camera=camera)
     monitors._contact_api = contacts if contacts is not None else FakeContacts(lambda step, query: [])
     recorder = None
     if tmp_path is not None:
-        recorder = Recorder(str(tmp_path), env, env.robot, CAM_KEY, dict(env.objects), fps=30, cfg=recorder_cfg or RecorderConfig(hdf5=True, lerobot=False, video=False), instance_id=sc.instance_id)
+        recorder = Recorder(str(tmp_path), env, env.robot, CAM_KEY, dict(env.objects), fps=30, cfg=recorder_cfg or RecorderConfig(hdf5=True, lerobot=False), instance_id=sc.instance_id)
         recorder.start(env.get_obs()[0], {}, state0=env.sim.dump_state(serialized=True))
-    cfg = exec_cfg or ExecutorConfig(settle_min_steps=50, settle_fraction=0.2)
+    cfg = exec_cfg or ExecutorConfig(settle_steps=50)
+    cfg.qa = qa
+    env.task.tracker = MET.SuccessTracker(settle_eval=env.task.tracker.settle_eval, settle_steps=cfg.settle_steps)
     ex = Executor(env, env.task, sc, recorder=recorder, motions=motions, monitors=monitors, cfg=cfg, sim=env.sim, tracked_objects=dict(env.objects), cam_key=CAM_KEY)
     return ex, motions, backend, recorder
+
+
+#: ``--qa`` limits the fake world's programs pass: its base drives without moving the base joints (a pause on every program)
+#: and its scripted arms move faster on average than BEHAVIOR's teleoperators (jerky motion)
+QUIET_QA = QA.QAThresholds(pause_steps=10**6, vel_avg=1e9, vel_prop_over_09max=1.0, acc_avg=1e9, jerk_avg=1e9)
+
+
+def quiet_qa(monkeypatch, thresholds: QA.QAThresholds = QUIET_QA) -> None:
+    """The executor's ``--qa`` metrics with ``thresholds`` (default :data:`QUIET_QA`), for a test of one metric."""
+    import functools
+
+    from ispatialgym.oracle import executor as EXE
+
+    monkeypatch.setattr(EXE, "QA", functools.partial(QA.QA, thresholds=thresholds))
 
 
 def success_eval(goal_obj: str, goal_pos: Sequence[float], tol: float = 0.05):
@@ -1279,7 +1333,7 @@ def axial_world(gain=1.0, stop=None, tol=0.10):
 
     def evaluate(env_):
         err = C.quat_angle(goal_q, board.quat)
-        return {"binary_success": err < tol, "settled": True, "errors": {"pose_errors": {obj: {"orientation_error": err, "within_tolerance": err < tol, "gating": True}}}}
+        return {"binary_success": err < tol, "settled": True, "errors": {"pose_errors": {obj: {"orientation_error": err, "within_tolerance": err < tol, "in_goal": True}}}}
 
     env.evaluate = evaluate
     a_init = math.atan2(float(push.contact.init.position[1] - geom.pivot[1]), float(push.contact.init.position[0] - geom.pivot[0]))
@@ -1364,12 +1418,13 @@ def test_brace_retry_ladder_short_and_overshoot(tmp_path):
     result = ex.run_program(actions)
     assert result["success"], result["verdict"]
     assert result["brace_retry"] == []
-    # (c) hopeless: the stop blocks at 60 % whatever the brace does and is touched every time -> every brace rung, then tolerance
+    # (c) hopeless: the stop blocks at 60 % whatever the brace does and is touched every time -> every brace rung, then the goal
+    # (its pose_reached atom) never holds: not_reached
     sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.6)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path / "c")
     ex.monitors._contact_api = touch_while_blocked(ex, env, board, pushes=99)
     result = ex.run_program(actions)
-    assert result["reason"] == "tolerance"
+    assert result["reason"] == "not_reached"
     br = result["brace_retry"][0]
     assert [r["next_offset_m"] for r in br["retries"]] == [0.005, 0.010, 0.015, 0.020] and br["final_offset_m"] == 0.020 and br["final"]["reason"] == "short"
     # (d) short without a brace contact, out of tolerance (the board just slips back): the brace stays, the pad aims past the goal
@@ -1495,10 +1550,11 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
     the last render by further frames and the fixed 3 renders still recorded the failed attempt's last arm pose as the
     hold step's frame (the one-frame flash of the hand in ~half of the retried demos of 09-18 .. 09-22): the restore
     must render until the head camera shows the checkpoint scene again."""
-    monkeypatch.setattr(Recorder, "_open_video", lambda self: setattr(self, "_writer", _CollectingWriter()))
+    writer = _CollectingWriter()
+    monkeypatch.setattr(Recorder, "_open_views", lambda self, robs: self._writers.__setitem__("head", writer))
     sc, env = iors_world(render_lag=render_lag)
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, recorder_cfg=RecorderConfig(hdf5=True, lerobot=False, video=True, frame_buffer="raw"))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, recorder_cfg=RecorderConfig(hdf5=True, lerobot=False, views=("head",), frame_buffer="raw"))
     backend.fail_ik_paths = 1  # the grasp approach fails once: attempt 0 has N > 0 recorded steps (gripper + arm_to)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
@@ -1509,7 +1565,7 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
     rows = rec.rows
     steps = np.asarray(rows["step"])
     assert len(steps) == result["n_steps"] and np.all(np.diff(steps) == 1)  # committed steps only, contiguous
-    frames = rec._writer.frames
+    frames = writer.frames
     assert len(frames) == result["n_steps"]
     # every committed frame shows a state of the committed sequence: its own row's or (the renderer's lag) an earlier
     # committed row's — never the failed attempt's (the restore hold step used to show its last pose)
@@ -1526,7 +1582,7 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
         assert ok, f"frame at committed row {i} (step {steps[i]}) shows a state outside the committed episode"
     # and the boundary frame in particular is the restored state, not the failed attempt's last one
     b = grasp["step_start"]  # row index of the restore hold step (steps are 1-based)
-    paths = rec.close({"instance_id": sc.instance_id, "success": True}, qa=result["qa"]["stats"], success=True)
+    paths = rec.close({"instance_id": sc.instance_id, "success": True}, qa=result["monitors"]["stats"], success=True)
     with h5py.File(paths["hdf5"]) as f:
         g = f["data/demo_0"]
         assert len(g["isg/step"]) == result["n_steps"]
@@ -1605,138 +1661,62 @@ def test_restore_render_loop_caps_and_falls_back():
     assert env.sim.renders - renders0 == 3 and rr == unchecked
 
 
-def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
-    """Owner decision 2026-09-16 10:15 item 2: with ``demo_gating=("placed_orientation",)`` (run_isg oracle default) a
-    placed object whose final orientation error exceeds its recorded target tolerance fails the demo with
-    ``placed_orientation`` (errors in ``demo_gating``); the TRO target stays non-gating for the evaluation, and
-    without the gate the same run is a success."""
+def test_placed_orientation_is_reported_for_an_oracle_demo_and_fails_nothing(tmp_path):
+    """Owner decision 2026-09-16 10:15 item 2, as a fact since 2026-10-14 (the gate is dealt with elsewhere): every placed
+    object's final orientation error against its recorded target tolerance is in ``result.placed_orientation``; an error above
+    the tolerance no longer fails the demo, and the TRO target stays non-gating for the evaluation."""
     goal_q = th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)])  # the apple's recorded orientation target (0.5 rad yaw)
 
     def world(err_rad):
         sc, env = iors_world()
         goal = _place_goal(sc)
-        apple = env.objects["apple.n.01_1"]
         env.task._tro = SimpleNamespace(meta=SimpleNamespace(pose_targets={"apple.n.01_1": SimpleNamespace(frame="world", orientation=goal_q, orientation_tolerance=0.2,
                                                                                                                  orientation_metric="full", position=None, position_tolerance=None,
                                                                                                                  orientation_equivalences=[])}))
 
         def evaluate(env_):
             d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-            # the evaluator reports the (non-gating) IORS pose target: orientation error as measured, never gating
-            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            # the evaluator reports the IORS pose target (in :measure, not in :goal): orientation error as measured; its own
+            # (profile) tolerance is not under test here - the measured targets count as within
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "in_goal": False, "within_tolerance": err_rad <= 0.2})
+            d["measure_within"] = True
             return d
 
         env.evaluate = evaluate
         return sc, env
 
-    # (a) the cup fell at release: 0.46 rad -> placed_orientation, the position-only success notwithstanding
+    # (a) the cup fell at release: 0.46 rad is outside the tolerance, reported; the demo still succeeds
     sc, env = world(0.46)
-    ex, *_ = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "placed_orientation" and result["binary_success_final"] and result["verdict"]["details"]["targets"] == ["apple.n.01_1"]
-    dg = result["demo_gating"]
-    assert dg["enabled"] == ["placed_orientation"] and dg["placed_orientation"]["apple.n.01_1"] == {"orientation_error": 0.46, "tolerance": 0.2, "within": False, "metric": "full", "target_gating": False}
-    assert "plate.n.04_1" not in dg["placed_orientation"]  # only the placed objects, not the partner
-    # (b) within tolerance -> success, the report kept
-    sc, env = world(0.12)
-    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is True
-    # (c) the gate off (replay / policy modes): the 0.46 rad run passes, the evaluation is unchanged
-    sc, env = world(0.46)
-    ex, *_ = make_executor(env, sc, tmp_path / "c")
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"] == {"enabled": []}
-    # (d) no orientation target on the placed object: nothing to gate
-    sc, env = iors_world()
-    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is None
-    # (e) placed_tilt (the oracle default): a roll about the object's own up axis passes, a tipped object fails
-    tilt_cfg = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_tilt",))
-    sc, env = world(0.46)
-    apple = env.objects["apple.n.01_1"]
-    yaw = 0.5 + 0.46  # the apple rolled 0.46 rad about its own (vertical) axis relative to the goal yaw 0.5
-
-    def roll(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
-            apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
-
-    env.after_step = roll
-    ex, *_ = make_executor(env, sc, tmp_path / "e", exec_cfg=tilt_cfg)
+    ex, *_ = make_executor(env, sc, tmp_path)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    rep = result["demo_gating"]
-    assert rep["placed_tilt"]["apple.n.01_1"]["within"] is True and rep["placed_tilt"]["apple.n.01_1"]["tilt_deg"] < 1.0
-    assert rep["placed_orientation"]["apple.n.01_1"]["within"] is False  # the strict reading is reported alongside
-    sc, env = world(0.46)
-    apple = env.objects["apple.n.01_1"]
-
-    def tip(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
-            apple.quat = th.tensor([math.sin(0.25), 0.0, 0.0, math.cos(0.25)])  # 0.5 rad = 28.6 deg about x: the up axis tips
-
-    env.after_step = tip
-    ex, *_ = make_executor(env, sc, tmp_path / "f", exec_cfg=tilt_cfg)
+    po = result["placed_orientation"]
+    assert po["apple.n.01_1"] == {"orientation_error": 0.46, "tolerance": 0.2, "within": False, "metric": "full", "target_in_goal": False}
+    assert "plate.n.04_1" not in po  # only the placed objects, not the partner
+    # (b) within tolerance
+    sc, env = world(0.12)
+    ex, *_ = make_executor(env, sc, tmp_path / "b")
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "placed_tilt" and abs(result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] - 28.6) < 0.5
-    # an equivalence that flips the object (180 deg about x) makes an upside-down placement acceptable for the tilt
-    sc, env = world(0.46)
-    env.task._tro.meta.pose_targets["apple.n.01_1"].orientation_equivalences = [th.tensor([1.0, 0.0, 0.0, 0.0])]
-    apple = env.objects["apple.n.01_1"]
-
-    def flip(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
-            apple.quat = th.tensor([1.0, 0.0, 0.0, 0.0])
-
-    env.after_step = flip
-    ex, *_ = make_executor(env, sc, tmp_path / "g", exec_cfg=tilt_cfg)
+    assert result["success"] and result["placed_orientation"]["apple.n.01_1"]["within"] is True
+    # (c) no orientation target on the placed object: nothing to compare
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, *_ = make_executor(env, sc, tmp_path / "c")
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] < 1.0
-    # (f) an elongated object (a marker lying flat, native bbox 15 x 1.7 x 1.4 cm) is judged on its long axis: a 92
-    # deg roll about that axis at release (the pilot nextto re-run) is not a tip; standing up on its end is
-    sc, env = world(0.46)
-    marker = env.objects["apple.n.01_1"]
-    marker.aabb_extent = th.tensor([0.1536, 0.0171, 0.0141])
-
-    def roll_about_x(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(marker.pos - th.tensor(_place_goal(sc)))) < 0.08:
-            marker.quat = C.qmul(th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)]), th.tensor([math.sin(0.8), 0.0, 0.0, math.cos(0.8)]))  # goal yaw, then 1.6 rad about the marker's own x
-
-    env.after_step = roll_about_x
-    ex, *_ = make_executor(env, sc, tmp_path / "h", exec_cfg=tilt_cfg)
-    result = ex.run_program(expand(sc.variant, sc))
-    rep = result["demo_gating"]["placed_tilt"]["apple.n.01_1"]
-    assert result["success"] and rep["axis"] == "x" and rep["rule"] == "long" and rep["tilt_deg"] < 1.0, (result["verdict"], rep)
-    assert result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is False
-    sc, env = world(0.46)
-    marker = env.objects["apple.n.01_1"]
-    marker.aabb_extent = th.tensor([0.1536, 0.0171, 0.0141])
-
-    def stand_up(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(marker.pos - th.tensor(_place_goal(sc)))) < 0.08:
-            marker.quat = C.qmul(th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)]), th.tensor([0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)]))  # the long axis pitched up 90 deg
-
-    env.after_step = stand_up
-    ex, *_ = make_executor(env, sc, tmp_path / "i", exec_cfg=tilt_cfg)
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "placed_tilt" and abs(result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] - 90.0) < 0.5
+    assert result["success"] and result["placed_orientation"]["apple.n.01_1"]["within"] is None
 
 
-def test_placed_orientation_gate_compares_cylinders_modulo_their_long_axis(tmp_path, monkeypatch):
+def test_placed_orientation_compares_cylinders_modulo_their_long_axis(tmp_path, monkeypatch):
     """Owner decision 2026-09-16 17:10 item 4, fallback (the closure investigation ended without its criterion): in the
-    full ``placed_orientation`` gate an object whose model has a continuous symmetry about its long axis in the ICL
-    symmetry survey (``assets/icl/revolution_axes.json``: marker, pencil, bottles) is compared modulo rotation about that
-    axis; a marker rolled 92 deg about its own axis during finger closure (0916-152503: 0.386 rad full error) passes,
-    the same marker standing on its end fails, every untagged object keeps the full error, and the equivalence can be
-    switched off."""
+    ``placed_orientation`` report an object whose model has a continuous symmetry about its long axis in the ICL symmetry
+    survey (``assets/icl/revolution_axes.json``: marker, pencil, bottles) is compared modulo rotation about that axis; a
+    marker rolled 92 deg about its own axis during finger closure (0916-152503: 0.386 rad full error) is within, the same
+    marker standing on its end is not, every untagged object keeps the full error, and the equivalence can be switched off."""
     from ispatialgym.oracle import executor as EXE
 
     goal_q = th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)])  # the recorded goal: yaw 0.5 rad, the long axis (x) level
     table = {"marker/xakoic": {"axis": "x", "tags": ["xinf"], "sources": ["symmetry_near", "geom_near"]}}
     monkeypatch.setattr(EXE, "revolution_axes", lambda path=EXE.REVOLUTION_AXES_PATH: table)
-    gate = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",))
 
     def world(err_rad, category="marker", model="xakoic", quat_after=None):
         sc, env = iors_world()
@@ -1750,7 +1730,8 @@ def test_placed_orientation_gate_compares_cylinders_modulo_their_long_axis(tmp_p
 
         def evaluate(env_):
             d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "in_goal": False, "within_tolerance": err_rad <= 0.2})
+            d["measure_within"] = True  # the profile's measured tolerance is not under test here
             return d
 
         env.evaluate = evaluate
@@ -1763,48 +1744,37 @@ def test_placed_orientation_gate_compares_cylinders_modulo_their_long_axis(tmp_p
             env.after_step = after
         return sc, env
 
+    def report(sc, env, path, cfg=None):
+        ex, *_ = make_executor(env, sc, path, exec_cfg=cfg)
+        result = ex.run_program(expand(sc.variant, sc))
+        assert result["success"], result["verdict"]
+        return result["placed_orientation"]["apple.n.01_1"]
+
     rolled = C.qmul(goal_q, th.tensor([math.sin(0.8), 0.0, 0.0, math.cos(0.8)]))  # the goal yaw, then 1.6 rad (92 deg) about the marker's own x
     standing = C.qmul(goal_q, th.tensor([0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)]))  # the long axis pitched up 90 deg
-    # (a) the rolled marker: the evaluator's full error 1.6 rad fails the strict reading, the gate compares modulo the roll -> success
-    sc, env = world(1.6, quat_after=rolled)
-    ex, *_ = make_executor(env, sc, tmp_path / "a", exec_cfg=gate)
-    result = ex.run_program(expand(sc.variant, sc))
-    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
-    assert result["success"], (result["verdict"], rep)
+    # (a) the rolled marker: the evaluator's full error 1.6 rad, compared modulo the roll -> within
+    rep = report(*world(1.6, quat_after=rolled), tmp_path / "a")
     assert rep["within"] is True and rep["orientation_error"] < 0.02 and rep["full_error"] == 1.6 and rep["tolerance"] == 0.2
     assert rep["revolution_axis"] == "x" and rep["model"] == "marker/xakoic" and "rotation about the x axis" in rep["equivalence"]
-    assert result["demo_gating"]["enabled"] == ["placed_orientation"] and "placed_tilt" in result["demo_gating"]  # the tilt reading is still reported alongside
-    # (b) the same marker standing on its end: the axis error is 90 deg -> placed_orientation
-    sc, env = world(1.6, quat_after=standing)
-    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=gate)
-    result = ex.run_program(expand(sc.variant, sc))
-    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
-    assert result["reason"] == "placed_orientation" and abs(rep["orientation_error"] - math.pi / 2) < 0.01 and rep["full_error"] == 1.6
+    # (b) the same marker standing on its end: the axis error is 90 deg
+    rep = report(*world(1.6, quat_after=standing), tmp_path / "b")
+    assert rep["within"] is False and abs(rep["orientation_error"] - math.pi / 2) < 0.01 and rep["full_error"] == 1.6
     # (c) a target equivalence (a half turn about the marker's y) makes the upside-down marker pass the axis reading too
     sc, env = world(1.6, quat_after=C.qmul(goal_q, th.tensor([0.0, 1.0, 0.0, 0.0])))
     env.task._tro.meta.pose_targets["apple.n.01_1"].orientation_equivalences = [th.tensor([0.0, 1.0, 0.0, 0.0])]
-    ex, *_ = make_executor(env, sc, tmp_path / "c", exec_cfg=gate)
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["orientation_error"] < 0.02
-    # (d) an untagged model keeps the full error: the same roll fails
-    sc, env = world(1.6, category="apple", model="omzprq", quat_after=rolled)
-    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=gate)
-    result = ex.run_program(expand(sc.variant, sc))
-    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
-    assert result["reason"] == "placed_orientation" and rep["orientation_error"] == 1.6 and "full_error" not in rep and "equivalence" not in rep
-    # (e) the equivalence switched off: the marker's roll fails with the full error
-    sc, env = world(1.6, quat_after=rolled)
-    ex, *_ = make_executor(env, sc, tmp_path / "e", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",), demo_revolution_axes=False))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "placed_orientation" and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["orientation_error"] == 1.6
+    assert report(sc, env, tmp_path / "c")["orientation_error"] < 0.02
+    # (d) an untagged model keeps the full error
+    rep = report(*world(1.6, category="apple", model="omzprq", quat_after=rolled), tmp_path / "d")
+    assert rep["within"] is False and rep["orientation_error"] == 1.6 and "full_error" not in rep and "equivalence" not in rep
+    # (e) the equivalence switched off: the marker's roll keeps the full error
+    rep = report(*world(1.6, quat_after=rolled), tmp_path / "e", ExecutorConfig(settle_steps=50, demo_revolution_axes=False))
+    assert rep["orientation_error"] == 1.6
     # (f) the category / model fall back to the scene object's name (<category>_<model>_<i>) when the attributes are missing
     sc, env = world(1.6, quat_after=rolled)
     obj = env.objects["apple.n.01_1"]
     del obj.category
     obj.name = "marker_xakoic_0"
-    ex, *_ = make_executor(env, sc, tmp_path / "f", exec_cfg=gate)
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["revolution_axis"] == "x"
+    assert report(sc, env, tmp_path / "f")["revolution_axis"] == "x"
 
 
 def test_revolution_axes_asset_tags_the_pilot_cylinders():
@@ -1823,13 +1793,14 @@ def test_revolution_axes_asset_tags_the_pilot_cylinders():
         assert v["axis"] in ("x", "y", "z") and f"{v['axis']}inf" in v["tags"] and v["ratio"] >= 1.5, (k, v)
 
 
-def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
-    """Owner rule 2026-09-16: in the epilogue motion window an object's rotation counts only when the goal has an
-    orientation target for it; a spinning near-spherical object with a stable position passes; a second, 2x
-    longer window is the second chance before a not_settled verdict."""
+def test_epilogue_is_exactly_settle_steps_and_the_metrics_decide(tmp_path):
+    """2026-10-14: a program's epilogue is exactly ``settle_steps`` no-op steps (reserved in the step budget, no second window, no
+    motion rule) and the task's metrics decide: success = the run mode's geometric success; the goal held but never through a
+    settled window -> ``not_settled``; the goal held, the measured targets never within tolerance -> ``symbolic_only``. Motion over
+    the window is a fact (``motion_delta``)."""
     sc, env = iors_world()
     goal = _place_goal(sc)
-    env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)  # position-only target: orientation_error absent
+    env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)
     apple = env.objects["apple.n.01_1"]
 
     def spin(step_action):
@@ -1838,44 +1809,32 @@ def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp
             apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
 
     env.after_step = spin
-    ex, *_ = make_executor(env, sc, tmp_path)
+    ex, *_ = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["motion_delta"]["apple.n.01_1_rad"] > 0.1 and result["motion_delta"]["apple.n.01_1_m"] < 1e-6
-    assert result["settle_windows"] == [result["settle_window"]]
-    # with an orientation target on the apple the same spin is a not_settled verdict, after the second window
+    assert result["epilogue_steps"] == 40 and result["n_settle_steps"] == 40 and result["settle_steps"] == 40
+    assert result["geometric_success"] and result["geometric_success_step"] <= result["n_steps"] and result["symbolic_success"]
+    assert result["motion_delta"]["apple.n.01_1_rad"] > 0.1  # a fact, no verdict
+    assert result["other_mode"]["settle_eval"] is False and result["other_mode"]["geometric_success"]
+    # never settled: the goal holds, S never does
     sc, env = iors_world()
-
-    def eval_oriented(env_):
-        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
-        d["errors"]["pose_errors"]["apple.n.01_1"]["orientation_error"] = 0.0
-        return d
-
-    env.evaluate = eval_oriented
-    apple = env.objects["apple.n.01_1"]
-    env.after_step = spin
-    ex, *_ = make_executor(env, sc, tmp_path / "b")
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "settled": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and len(result["settle_windows"]) == 2 and result["settle_windows"][1] == 2 * result["settle_windows"][0]
-    assert "first_window" in result["motion_delta"]
-    # a transient (the object stops during the second window) is a success
+    assert result["reason"] == "not_settled" and not result["symbolic_success"] and result["goal_first_step"] is not None
+    assert result["other_mode"]["symbolic_success"] and result["other_mode"]["geometric_success"]  # settle-eval off would pass
+    # symbolic only: the goal holds and settles, the measured target is outside its tolerance
     sc, env = iors_world()
-    env.evaluate = eval_oriented
-    apple = env.objects["apple.n.01_1"]
-    stop_at = {"step": None}
-
-    def spin_then_stop(step_action):
-        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(goal))) < 0.08:
-            if stop_at["step"] is None:
-                stop_at["step"] = env._current_step + 120  # ~55 steps into the first no-op window
-            if env._current_step < stop_at["step"]:
-                yaw = 0.05 * env._current_step
-                apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
-
-    env.after_step = spin_then_stop
-    ex, *_ = make_executor(env, sc, tmp_path / "c")
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "measure_within": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "c", exec_cfg=ExecutorConfig(settle_steps=40))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and len(result["settle_windows"]) == 2
+    assert result["reason"] == "symbolic_only" and result["symbolic_success"] and not result["geometric_success"]
+    # ... which the symbolic success metric accepts
+    sc, env = iors_world()
+    env.evaluate = lambda env_: {**success_eval("apple.n.01_1", goal, tol=0.08)(env_), "measure_within": False}
+    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=ExecutorConfig(settle_steps=40, success_metric="symbolic"))
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"] and result["success_metric"] == "symbolic" and not result["geometric_success"]
 
 
 # ==========================================================================================
@@ -1918,9 +1877,9 @@ def test_base_follow_hybrid_drives_base_and_ramps_arm_together():
     seen = []
     orig_emit = m._emit
 
-    def spy():
+    def spy(*args, **kwargs):
         seen.append((m.base_pose2d(), m.state.arm_target["right"].clone()))
-        return orig_emit()
+        return orig_emit(*args, **kwargs)
 
     m._emit = spy
     n = drive(env, m.base_follow_hybrid(path, "right"))
@@ -2482,16 +2441,15 @@ def test_program_runs_end_to_end_with_retry_from_checkpoint(tmp_path):
     grasp = result["actions"][1]
     assert grasp["name"] == "grasp" and len(grasp["attempts"]) == 2
     assert grasp["attempts"][0]["category"] == "failed_grasp" and grasp["attempts"][1] is None
-    assert result["qa"]["stats"]["by_category"] == {"failed_grasp": 1}
-    assert result["qa"]["stats"]["by_action"] == {"grasp": {"failed_grasp": 1}}
+    assert result["monitors"]["stats"]["by_category"] == {"failed_grasp": 1}
+    assert result["monitors"]["stats"]["by_action"] == {"grasp": {"failed_grasp": 1}}
     # the checkpoint restored the simulator and the executor state; OmniGibson's own AG round-trip was fine here
     assert len(result["checkpoint_reports"]) == 1 and result["checkpoint_reports"][0]["ag_roundtrip_ok"] is True
     # planner attachment follows the grasp / release
     assert backend._attached == {}
     assert env.robot._ag_obj_in_hand["right"] is None
-    # epilogue: the no-op window is max(50, 20 % of the action steps)
-    assert result["settle_window"] == max(50, math.ceil(0.2 * result["n_action_steps"]))
-    assert result["n_settle_steps"] == result["settle_window"]
+    # epilogue: exactly settle_steps no-op steps (50 in make_executor's configuration)
+    assert result["epilogue_steps"] == 50 and result["n_settle_steps"] == 50
     # the recorder: the failed attempt was rolled back, the demo holds only committed steps
     assert rec.n == result["n_steps"] and rec.n_pending == 0
     assert len(rec.rollbacks) == 1 and rec.rollbacks[0]["action_index"] == 1 and rec.rollbacks[0]["verdict"]["category"] == "failed_grasp"
@@ -2531,37 +2489,43 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
     assert "plan_pose" in backend2.calls
 
 
-def test_execute_functions_toggle_the_fov_monitor_around_the_checked_segment(tmp_path):
-    """FOV rule (b): the grasp opens the acting arm's span once the pre-grasp is reached; nothing touches it through the
-    lift and the carry; the place closes it after the release (the executor wires ``ctx["hooks"]["fov"]`` to
-    ``Monitors.set_fov_enabled``). The carry leg is a straight Cartesian leg (``targets["carry"]``), not a trajopt."""
+def test_execute_functions_toggle_the_gripper_in_view_span_around_the_checked_segment(tmp_path, monkeypatch):
+    """FOV rule (b): the grasp opens the acting arm's span once the pre-grasp is reached; nothing touches it through the lift
+    and the carry; the place closes it after the release (the executor wires ``ctx["hooks"]["fov"]`` to the retry rule's
+    ``Monitors.set_fov_enabled`` and the QA log's ``QA.set_fov_enabled``). The carry leg is a straight Cartesian leg
+    (``targets["carry"]``), not a trajopt."""
+    quiet_qa(monkeypatch)
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa=True)
+    actions = expand(sc.variant, sc)
+    ex._init_qa(oracle=True, actions=actions)
     calls = []
     spans = []
-    orig = ex.monitors.set_fov_enabled
+    current = {"index": None}
+    orig = ex.qa.set_fov_enabled
 
     def spy(enabled=True):
-        calls.append((ex.monitors.action_index, bool(enabled)))
+        calls.append((current["index"], bool(enabled)))
         orig(enabled)
 
-    ex.monitors.set_fov_enabled = spy
-    actions = expand(sc.variant, sc)
+    ex.qa.set_fov_enabled = spy
     plans_before_place = None
     for i, a in enumerate(actions[:4]):
         if i == 3:
             plans_before_place = sum(1 for c in backend.calls if c in ("plan_pose", "plan_joint"))
+        current["index"] = i
         assert ex.run_action(i, a) is None, a.name
-        spans.append(dict(ex.monitors.fov_span))
+        spans.append(dict(ex.qa.fov_span))
+        assert ex.monitors.fov_spans() == spans[-1]  # the retry rule's spans follow the same hook
     by_action = {}
     for idx, en in calls:
         by_action.setdefault(idx, []).append(en)
-    assert by_action[1] == [False, True]  # grasp: transit to the pre-grasp unmonitored, the span opens at the pre-grasp
+    assert by_action[1] == [False, True]  # grasp: transit to the pre-grasp unwatched, the span opens at the pre-grasp
     assert 2 not in by_action  # lift: the span stays open, no hook
     assert by_action[3] == [False]  # place: no hook before the carry / descent, the span closes after the release
     assert spans[1]["right"] and spans[2]["right"] and not spans[3]["right"]  # open after the grasp and the lift, closed after the place
-    assert not ex.monitors.fov_enabled  # no span open after the release
+    assert not any(ex.qa.fov_span.values())  # no span open after the release
     place_notes = ex.action_records[3].notes
     assert place_notes["carry_leg"]["kind"] == "straight" and place_notes["carry_leg"]["waypoints"] >= 3
     if place_notes["carry_leg"]["finish"] is None:  # the carry is differential IK: no trajopt in the place at all
@@ -2665,7 +2629,7 @@ def test_second_failure_fails_the_episode_with_the_action_category(tmp_path):
     assert result["verdict"]["action"] == "grasp" and result["verdict"]["attempt"] == 1
     assert [a["name"] for a in result["actions"]] == ["transition", "grasp"]
     assert len(result["actions"][1]["attempts"]) == 2
-    assert result["qa"]["stats"]["by_action"]["grasp"]["failed_grasp"] == 2
+    assert result["monitors"]["stats"]["by_action"]["grasp"]["failed_grasp"] == 2
     # the epilogue still ran its no-op window; the failed attempt stays in the record for diagnosis
     assert result["n_settle_steps"] >= 50
     assert len(rec.rollbacks) == 1 and rec.actions[1].verdict["category"] == "failed_grasp"
@@ -2680,7 +2644,7 @@ def test_plan_failed_is_retried_and_counted_separately(tmp_path):
     backend.fail_plans = 2
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["qa"]["stats"]["by_category"] == {"plan_failed": 1}
+    assert result["monitors"]["stats"]["by_category"] == {"plan_failed": 1}
     assert result["actions"][1]["attempts"][0]["details"]["stage"] == "trajopt"
     assert result["actions"][1]["notes"]["pre_grasp_transit"] == "supports present"
 
@@ -2704,8 +2668,8 @@ def test_qa_monitor_verdict_propagates_and_is_retried(tmp_path):
     assert result["success"], result["verdict"]
     assert result["actions"][0]["attempts"][0]["category"] == "collision"
     assert result["actions"][0]["attempts"][0]["details"]["object"] == "table_0"
-    assert result["qa"]["stats"]["by_action"] == {"transition": {"collision": 1}}
-    assert result["qa"]["collisions"]["by_object"] == {"table_0": 3}
+    assert result["monitors"]["stats"]["by_action"] == {"transition": {"collision": 1}}
+    assert result["monitors"]["collisions"]["by_object"] == {"table_0": 3}
     assert hits["n"] == 3
 
 
@@ -2732,7 +2696,7 @@ def test_intended_contacts_and_finger_links_are_exempt(tmp_path):
     ex.monitors._contact_api = FakeContacts(script)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["qa"]["stats"]["by_category"] == {} and seen["manip"] > 0
+    assert result["monitors"]["stats"]["by_category"] == {} and seen["manip"] > 0
 
 
 def test_grasp_may_touch_objects_must_stay_on_the_source_tray():
@@ -2832,7 +2796,7 @@ def test_drop_place_forbids_any_contact_with_the_container(tmp_path):
     # (a) the opening fingers touch the bowl during the drop -> collision (the finger exemption does not apply)
     sprout, bowl = env.objects["brussels_sprouts.n.01_1"], env.objects["bowl.n.01_1"]
     env.evaluate = success_eval("brussels_sprouts.n.01_1", [float(v) for v in place.place.position], tol=0.15)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa_cfg=QA.QAConfig(pause_steps=100000, fov_min_steps=100000, collision_min_steps=2))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa_cfg=QA.QAConfig(stall_steps=100000, fov_min_steps=100000, collision_min_steps=2))
 
     def fingers_on_bowl(step, query):
         if ex.monitors.action is not None and ex.monitors.action.name == "place":
@@ -2847,7 +2811,7 @@ def test_drop_place_forbids_any_contact_with_the_container(tmp_path):
     sc, env = inside_world()
     sprout, bowl = env.objects["brussels_sprouts.n.01_1"], env.objects["bowl.n.01_1"]
     env.evaluate = success_eval("brussels_sprouts.n.01_1", [float(v) for v in place.place.position], tol=0.15)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "b", qa_cfg=QA.QAConfig(pause_steps=100000, fov_min_steps=100000, collision_min_steps=2))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "b", qa_cfg=QA.QAConfig(stall_steps=100000, fov_min_steps=100000, collision_min_steps=2))
 
     def held_on_bowl(step, query):
         if ex.monitors.action is not None and ex.monitors.action.name == "place" and env.robot._ag_obj_in_hand["right"] is sprout:
@@ -2882,13 +2846,13 @@ def test_targets_failed_and_error_categories(tmp_path):
     assert result["actions"][1]["attempts"][0]["category"] == "targets_failed"
 
 
-def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
+def test_epilogue_verdicts_and_goal_image(tmp_path):
     # 1) the goal never holds -> not_reached, no goal image
     sc, env = iors_world()
     ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
     assert result["reason"] == "not_reached" and result["goal_observation"] is None and env.sim.renders == 0
-    # 2) the goal holds but a measured error is above tolerance -> tolerance
+    # 2) the goal holds but a measured target is outside its tolerance -> symbolic_only (symbolic, no geometric success)
     sc, env = iors_world()
     goal = _place_goal(sc)
 
@@ -2900,10 +2864,9 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
     env.evaluate = eval_tol
     ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "tolerance" and result["verdict"]["details"]["targets"] == ["plate.n.04_1"]
-    # 3) the goal holds, nothing moves over the window, but the evaluator's pose_settled never fires: a success by
-    #    default (the §6.4 "motion after the window" is measured by the executor), not_settled when the evaluator's
-    #    verdict is required
+    assert result["reason"] == "symbolic_only" and result["verdict"]["details"]["outside"] == ["(pose_reached ?plate.n.04_1)"]
+    assert result["error_metric"] == {"position_error": 0.5, "orientation_error": None, "case": "poses"} and result["goal_observation"] is None
+    # 3) the goal holds, the evaluator's pose_settled never does -> not_settled (settle-eval on)
     sc, env = iors_world()
 
     def eval_unsettled(env_):
@@ -2912,15 +2875,10 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
         return d
 
     env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=False))
+    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["success"] and result["settled_success"] is False
-    sc, env = iors_world()
-    env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True, require_task_settled=True))
-    result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and result["verdict"]["details"]["task_settled_success"] is False
-    # 3b) the goal held once but not at the last step -> not_settled
+    assert result["reason"] == "not_settled" and "never through a settled window of 45 steps" in result["verdict"]["message"]
+    # 3b) the goal held a few steps, then not any more -> not_settled
     sc, env = iors_world()
     hits = {"n": 0}
 
@@ -2930,13 +2888,12 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
             hits["n"] += 1
             if hits["n"] > 3:
                 d["binary_success"] = False
-                d["binary_success_ever"] = True
         return d
 
     env.evaluate = eval_transient
     ex, *_ = make_executor(env, sc)
     result = ex.run_program(expand(sc.variant, sc))
-    assert result["reason"] == "not_settled" and "no longer holds" in result["verdict"]["message"]
+    assert result["reason"] == "not_settled" and result["goal_first_step"] is not None
     # 4) success: the goal image is captured after >= 3 renders with the physics-synced camera pose
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)
@@ -2951,68 +2908,55 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
 
 
 def test_replay_stream_holds_the_last_streamed_configuration(tmp_path):
-    """Replay / policy mode: the epilogue's no-op window must repeat the last streamed action (base stopped), not the
-    Layer-1 hold targets captured at construction (which would drive the robot back to its initial pose)."""
+    """Replay mode: the demo's action rows and its settle rows are streamed (no epilogue: the settle rows, recorded as settle
+    steps, are the window the metrics read), and nothing re-applies the Layer-1 hold targets captured at construction (which
+    would drive the robot back to its initial pose)."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
-    # record the oracle program's actions, then replay them through a fresh executor on a fresh world
+    # record the oracle program's actions and its settle window, then replay them through a fresh executor on a fresh world
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"]
-    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_steps"]]]
+    n_action = result["n_action_steps"]
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
     ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "replay")
+    ex2.stream_phases = [PHASE_ORACLE] * n_action + [PHASE_SETTLE] * (len(actions) - n_action)
     q_init = env2.robot.q.clone()
     result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
     assert result2["success"], result2["verdict"]
-    assert result2["n_action_steps"] == len(actions) and result2["n_settle_steps"] == max(50, math.ceil(0.2 * len(actions)))
+    assert result2["n_steps"] == len(actions) and result2["n_settle_steps"] == 50 and result2["epilogue_steps"] == 0
     # the arm stayed where the stream left it (the initial hold targets were not re-applied)
     last = th.as_tensor(actions[-1])
     idx = env2.robot.controller_action_idx
     assert th.allclose(env2.robot.q[env2.robot.arm_control_idx["right"]], last[idx["arm_right"]], atol=1e-5)
     assert not th.allclose(env2.robot.q[env2.robot.arm_control_idx["right"]], q_init[env2.robot.arm_control_idx["right"]], atol=1e-3)
     assert th.equal(env2.last_action[idx["base"]], th.zeros(3))
-    assert result2["qa"]["stats"]["by_category"] == {}
+    assert result2["monitors"]["stats"]["by_category"] == {}
 
 
-def test_replay_stream_qa_log_records_monitor_verdicts_and_judges_the_goal(tmp_path):
-    """--stream-qa log: a QA monitor verdict during a replay stream is recorded (consecutive repeats merged) and the stream
-    goes on, so the goal decides; the default (stop) still ends the episode at the verdict."""
-    from ispatialgym.oracle.qa import Verdict
-
+def test_replay_stream_logs_its_qa_metrics_and_the_goal_decides(tmp_path):
+    """A replay / policy stream only logs its ``--qa`` metrics (owner 2026-10-14): a robot link on an object during the replay
+    is in ``result.qa`` with its steps (consecutive steps one run), the stream goes on and the goal decides."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"]
     actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
-
-    def with_contact(ex_):
-        real = ex_.monitors.check
-
-        def check(n):
-            v = real(n)
-            if v is None and 5 <= n <= 8:
-                return Verdict("collision", f"left_gripper_finger_link1 in contact with target_apple_0 for {n - 4} steps", step=n,
-                               details={"link": "left_gripper_finger_link1", "object": "target_apple_0"})
-            return v
-
-        ex_.monitors.check = check
-
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
-    ex2, *_ = make_executor(env2, sc2, tmp_path / "stop")
-    with_contact(ex2)
+    P = env2.robot.prim_path
+    contacts = FakeContacts(lambda step, query: [(f"{P}/base_link", "/World/plate_pkkgzc_0/base_link")] if 5 <= step <= 8 else [])
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "log", contacts=contacts, qa=True)
     r2 = ex2.run_stream(th.as_tensor(a) for a in actions)
-    assert not r2["success"] and r2["reason"] == "collision" and r2["stream_qa"] is None
-    sc3, env3 = iors_world()
-    env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
-    ex3, *_ = make_executor(env3, sc3, tmp_path / "log", exec_cfg=ExecutorConfig(stream_qa="log"))
-    with_contact(ex3)
-    r3 = ex3.run_stream(th.as_tensor(a) for a in actions)
-    assert r3["success"], r3["verdict"]
-    assert [(e["key"], e["first_step"], e["last_step"], e["n"]) for e in r3["stream_qa"]] == [(["collision", "left_gripper_finger_link1", "target_apple_0"], 5, 8, 4)]
+    assert r2["success"], r2["verdict"]
+    qa = r2["qa"]
+    assert qa["mode"] == "stream" and qa["stopped_by"] is None and "robot_touching_objects" in qa["hard_triggered"]
+    assert qa["metrics"]["robot_touching_objects"]["runs"] == [{"link": "base_link", "object": "plate_pkkgzc_0", "action": None,
+                                                                "first_step": 5, "last_step": 8, "n": 4}]
+    assert qa["metrics"]["gripper_in_view"] == {"measured": False, "why": "oracle only", "mode": "soft", "triggered": False}
 
 
 def test_checkpoint_restore_fixes_a_broken_ag_roundtrip(tmp_path):
@@ -3069,10 +3013,10 @@ def test_camera_model_projection_and_fov_margin():
     assert cam.in_frame(pose, th.tensor([0.8 * edge, 0.0, -1.0]), margin=0.05)
 
 
-def test_fov_pause_and_ghost_hand_monitors():
+def test_fov_stalled_and_held_object_drift_rules():
     robot = FakeRobot()
     env = FakeEnv(robot, {})
-    mon = QA.Monitors(env, robot, cfg=QA.QAConfig(fov_min_steps=3, pause_steps=4), camera=QA.CameraModel.from_hfov())
+    mon = QA.Monitors(env, robot, cfg=QA.QAConfig(fov_min_steps=3, stall_steps=4), camera=QA.CameraModel.from_hfov())
     mon._contact_api = FakeContacts(lambda s, q: [])
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-ontop_small_scale.json"))
     actions = expand(sc.variant, sc)
@@ -3144,23 +3088,25 @@ def test_fov_pause_and_ghost_hand_monitors():
     mon.restore_fov_spans(spans)
     assert mon.fov_span["right"] and not mon.fov_span["left"]
     mon.set_fov_span("right", False)
-    # in frame: the eef in front of the robot -> the pause monitor fires after 4 stationary steps
+    # in frame: the eef in front of the robot -> the stalled rule fires after 4 stationary steps; a settle step (a hold /
+    # settle wait of the motion layer) restarts the count
     robot.q[robot.arm_control_idx["right"]] = in_q
     robot.dq = th.zeros(28)
     mon.begin_action(grasp, 1, 1, intended=set(), held=[], manipulation=True)
-    verdicts = [mon.check(i) for i in range(1, 5)]
-    assert verdicts[:3] == [None, None, None] and verdicts[3].category == "paused"
-    # ghost hand: the held object drifts off the hand
+    assert [mon.check(i) for i in range(1, 4)] == [None] * 3 and mon.check(4, settle=True) is None
+    verdicts = [mon.check(i) for i in range(5, 9)]
+    assert verdicts[:3] == [None, None, None] and verdicts[3].category == "stalled" and verdicts[3].details["steps"] == 4
+    # held object drift: the held object drifts off the hand
     apple = FakeObject("apple_0", robot.eef_pose("right")[0].tolist())
     robot._ag_obj_in_hand["right"] = apple
     mon.begin_epilogue(held=[apple])
     assert mon.check(10) is None
     apple.pos = apple.pos + th.tensor([0.2, 0.0, 0.0])
     v = mon.check(11)
-    assert v is not None and v.category == "ghost_hand" and v.details["object"] == "apple_0"
+    assert v is not None and v.category == "held_object_drift" and v.details["object"] == "apple_0"
     stats = mon.stats.to_dict()
-    assert stats["by_category"] == {"gripper_out_of_fov": 3, "paused": 1, "ghost_hand": 1}  # (b), (b') and the lift of (d)
-    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 2, "paused": 1} and stats["by_action"]["lift"] == {"gripper_out_of_fov": 1}
+    assert stats["by_category"] == {"gripper_out_of_fov": 3, "stalled": 1, "held_object_drift": 1}  # (b), (b') and the lift of (d)
+    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 2, "stalled": 1} and stats["by_action"]["lift"] == {"gripper_out_of_fov": 1}
 
 
 def test_category_of_and_verdict_validation():
@@ -3187,7 +3133,7 @@ def test_recorder_hdf5_schema_and_state_pairing(tmp_path):
     rec.episode.instance_description = "put the apple on the plate"
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"]
-    paths = rec.close({"instance_id": sc.instance_id, "success": True}, qa=result["qa"]["stats"], success=True)
+    paths = rec.close({"instance_id": sc.instance_id, "success": True}, qa=result["monitors"]["stats"], success=True)
     assert paths["hdf5"] and os.path.exists(paths["hdf5"]) and paths["annotations"]
     T = result["n_steps"]
     with h5py.File(paths["hdf5"], "r") as f:
@@ -3207,7 +3153,7 @@ def test_recorder_hdf5_schema_and_state_pairing(tmp_path):
         s1 = th.from_numpy(demo["state"][1][: int(demo["state_size"][1])])
         assert th.allclose(s1[:28], q_after0, atol=1e-6)
         isg = demo["isg"]
-        for key in ("step", "phase", "action_index", "attempt", "joint_positions", "joint_velocities", "base_pose", "eef_pose_left", "eef_pose_right", "head_camera_pose", "proprio", "eval/binary_success", "eval/max_position_error"):
+        for key in ("step", "phase", "action_index", "attempt", "joint_positions", "joint_velocities", "base_pose", "eef_pose_left", "eef_pose_right", "head_camera_pose", "proprio", "eval/symbolic", "eval/settled", "eval/geometric_within", "eval/position_error", "eval/orientation_error"):
             assert key in isg, key
         assert isg["object_pose/apple.n.01_1"].shape == (T, 7)
         phases = np.asarray(isg["phase"])
@@ -3238,7 +3184,7 @@ def test_recorder_hdf5_schema_and_state_pairing(tmp_path):
 
 def test_recorder_lerobot_feature_mapping_and_video_only_mode(tmp_path):
     sc, env = iors_world()
-    rec = Recorder(str(tmp_path), env, env.robot, CAM_KEY, dict(env.objects), cfg=RecorderConfig(hdf5=False, lerobot=False, video=False))
+    rec = Recorder(str(tmp_path), env, env.robot, CAM_KEY, dict(env.objects), cfg=RecorderConfig(hdf5=False, lerobot=False))
     obs = env.get_obs()[0]
     rec.start(obs)
     robs = obs[env.robot.name]
@@ -3286,7 +3232,9 @@ def test_apply_goal_override_writes_only_applied_targets():
     assert m["articulation_targets"]["c"]["joints"]["j"]["position"] == 1.25
 
 
-def test_goal_override_thresholds_measured_only_vs_gating():
+def test_goal_override_uses_each_targets_own_tolerance():
+    """One tolerance per target (the ``isg-v2`` profile's, which the loaded TRO carries): the goal override applies a settled
+    value within it, whether the target's atom is in :goal or only in :measure."""
     from ispatialgym.eval.targets import PoseTarget
 
     sc, env = iors_world()
@@ -3299,21 +3247,16 @@ def test_goal_override_thresholds_measured_only_vs_gating():
         def is_gating(self, pred, inst):
             return False
 
-    # measured only: threshold max(0.01, 0.25 * 0.08 m extent) = 0.02 m -> a 5 mm settled offset is applied
-    rec = ex._override_pose_target("apple.n.01_1", tgt, Compiled())
-    assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.02) and rec["position_error"] == pytest.approx(0.005, abs=1e-6)
-    apple.pos = apple.pos + th.tensor([0.05, 0.0, 0.0])
-    assert ex._override_pose_target("apple.n.01_1", tgt, Compiled())["applied"] is False
-
     class Gating(Compiled):
         def is_gating(self, pred, inst):
             return True
 
-    # gating: the target's own tolerance (3 cm) applies -> 5.5 cm still rejected, 2.5 cm accepted
-    assert ex._override_pose_target("apple.n.01_1", tgt, Gating())["applied"] is False
-    apple.pos = apple.pos - th.tensor([0.03, 0.0, 0.0])
-    rec = ex._override_pose_target("apple.n.01_1", tgt, Gating())
-    assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.03)
+    for compiled in (Compiled(), Gating()):
+        apple.pos = tgt.position.float() - th.tensor([0.005, 0.0, 0.0])
+        rec = ex._override_pose_target("apple.n.01_1", tgt, compiled)
+        assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.03) and rec["position_error"] == pytest.approx(0.005, abs=1e-6)
+        apple.pos = apple.pos + th.tensor([0.05, 0.0, 0.0])  # 5.5 cm off: rejected
+        assert ex._override_pose_target("apple.n.01_1", tgt, compiled)["applied"] is False
     depth = PoseTarget.from_dict("apple.n.01_1", {"position": [0, 0, -0.5], "position_metric": "depth", "frame": f"{AGENT_INSTANCE}::{CAM_KEY}", "position_tolerance": 0.02})
     assert ex._override_pose_target("apple.n.01_1", depth, Gating())["applied"] is False
 
@@ -3703,7 +3646,7 @@ def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     motions.relax_arms = relax_spy
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
-    assert result["n_settle_steps"] == result["settle_window"]  # the relax steps are the window's first steps
+    assert result["n_settle_steps"] == result["epilogue_steps"]  # the relax steps are the window's first steps
     assert set(result["epilogue_relax"]) == {"left", "right"} == set(relaxed_from)
     # the relaxed targets equal the measured joints (the fake joints follow their targets exactly: nothing to relax, 0 rad)
     for arm in M.ARMS:
@@ -3713,9 +3656,9 @@ def test_epilogue_relaxes_the_arm_targets_inside_the_first_window(tmp_path):
     # with the relax off the window is pure no-op and nothing is reported
     sc2, env2 = iors_world()
     env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
-    ex2, _, _, _ = make_executor(env2, sc2, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, epilogue_relax_arms=False))
+    ex2, _, _, _ = make_executor(env2, sc2, tmp_path, exec_cfg=ExecutorConfig(settle_steps=50, epilogue_relax_arms=False))
     result2 = ex2.run_program(expand(sc2.variant, sc2))
-    assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["settle_window"]
+    assert result2["success"] and result2["epilogue_relax"] == {} and result2["n_settle_steps"] == result2["epilogue_steps"] == 50
 
 
 def test_a_push_on_a_braked_link_streams_at_the_cartesian_speed():
@@ -4032,7 +3975,7 @@ def test_collision_monitor_allows_the_brace_fingers_on_the_braced_object():
     partner = FakeObject("partner_box_of_tissues_0", [0.6, 0.1, 0.9], category="box_of_tissues")
     target = FakeObject("target_box_of_napkins_0", [0.6, -0.1, 0.9], category="box")
     env = FakeEnv(robot, {"partner": partner, "target": target})
-    mon = QA.Monitors(env, robot, cfg=QA.QAConfig(collision_min_steps=2, fov_min_steps=100000, pause_steps=100000))
+    mon = QA.Monitors(env, robot, cfg=QA.QAConfig(collision_min_steps=2, fov_min_steps=100000, stall_steps=100000))
     left_pad = f"{robot.prim_path}/{M.FINGER_LINKS['left'][0]}"
     right_pad = f"{robot.prim_path}/{M.FINGER_LINKS['right'][0]}"
     torso = f"{robot.prim_path}/torso_link4"
@@ -4041,25 +3984,25 @@ def test_collision_monitor_allows_the_brace_fingers_on_the_braced_object():
     allowed = [(list(M.FINGER_LINKS["left"]) + [M.GRIPPER_LINK["left"]], partner.name)]
     # the brace (left) pad presses the partner throughout the (right-arm) push: allowed
     mon._contact_api = FakeContacts(lambda s, q: [(left_pad, f"{partner.prim_path}/base_link")])
-    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, allowed=allowed)
     assert [mon.check(i) for i in range(1, 6)] == [None] * 5
     assert mon.stats.events.get("contact", 0) == 0 and mon.collision_events == []
     mon.end_action()
     # the same contact without the allowance is the old verdict
     mon._contact_api = FakeContacts(lambda s, q: [(left_pad, f"{partner.prim_path}/base_link")])
-    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False)
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True)
     verdicts = [mon.check(i) for i in range(1, 4)]
     assert verdicts[0] is None and verdicts[1] is not None and verdicts[1].category == "collision" and "left_gripper_finger_link1" in verdicts[1].message
     mon.end_action()
     # an allowed pair covers ONLY those links against THAT object: the torso on the partner, or the left pad on a third object, still fail
     mon._contact_api = FakeContacts(lambda s, q: [(torso, f"{partner.prim_path}/base_link")])
-    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, allowed=allowed)
     verdicts = [mon.check(i) for i in range(1, 4)]
     assert verdicts[1] is not None and verdicts[1].details["link"] == "torso_link4"
     mon.end_action()
     # the acting arm's own fingers stay exempt as before
     mon._contact_api = FakeContacts(lambda s, q: [(right_pad, f"{partner.prim_path}/base_link")])
-    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, fov=False, allowed=allowed)
+    mon.begin_action(push, 7, 0, intended={target.name}, held=[], manipulation=True, allowed=allowed)
     assert [mon.check(i) for i in range(1, 4)] == [None] * 3
     mon.end_action()
 
@@ -4330,7 +4273,7 @@ def test_apply_recorded_targets_sets_the_groups_the_record_covers():
 
 
 # ==========================================================================================
-# root_moved gate / stage-2 hand-over (owner 2026-09-27, blender 0926-073955)
+# object_tilt (former root_moved gate) / stage-2 hand-over (owner 2026-09-27, blender 0926-073955)
 # ==========================================================================================
 
 
@@ -4353,21 +4296,30 @@ def _tipping_plate_world(tip_deg: float):
     return sc, env, plate
 
 
-def test_root_moved_gates_a_tipped_articulated_body_only_when_enabled(tmp_path):
-    """Owner 2026-09-27: the root of a free-standing articulated object whose joint the program works is reported in
-    ``articulated_root`` (peak displacement / tilt / rotation with the action, end values) and, with ``demo_gating`` ``root_moved``,
-    a tilt above 2 x 0.02 rad at any step (or an end shift above 5 mm / 0.02 rad) fails the demo; a 1 deg rock passes."""
-    for gate, tip, ok in ((("root_moved",), 3.0, False), ((), 3.0, True), (("root_moved",), 1.0, True)):
+def test_object_tilt_fails_an_oracle_demo_at_the_step_without_a_retry(tmp_path, monkeypatch):
+    """``--qa`` object_tilt (owner 2026-09-27 ``root_moved``; its 10 mm / 0.04 rad band since 2026-10-14): the root of a
+    free-standing articulated object whose joint the program works is read every step; a 3 deg tip fails the oracle demo at
+    that step, the action not retried; a 1 deg rock passes; ``--no-qa`` watches nothing."""
+    quiet_qa(monkeypatch)
+    for qa, tip, ok in ((True, 3.0, False), (False, 3.0, True), (True, 1.0, True)):
         sc, env, plate = _tipping_plate_world(tip)
-        ex, *_ = make_executor(env, sc, tmp_path / f"{len(gate)}_{tip}", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=gate))
-        ex.operated_roots = lambda plate=plate: ({"plate.n.04_1": plate}, {})
+        ex, *_ = make_executor(env, sc, tmp_path / f"{qa}_{tip}", qa=qa)
+        ex.operated_roots = lambda actions=None, plate=plate: ({"plate.n.04_1": plate}, {})
         result = ex.run_program(expand(sc.variant, sc))
-        rep = result["articulated_root"]["objects"]["plate.n.04_1"]
+        assert result["success"] is ok, (qa, tip, result["verdict"])
+        if not qa:
+            assert result["qa"] == {"enabled": False}
+            continue
+        tilt = result["qa"]["metrics"]["object_tilt"]
+        rep = tilt["objects"]["plate.n.04_1"]
         assert abs(math.degrees(rep["peak"]["tilt_rad"]["value"]) - tip) < 0.05 and rep["peak"]["tilt_rad"]["action"] in ("place", "grasp", "lift")
-        assert rep["end"]["rotation_rad"] < 1e-5 and rep["end"]["displacement_m"] < 1e-6
-        assert result["success"] is ok, (gate, tip, result["verdict"])
-        if not ok:
-            assert result["reason"] == "root_moved" and result["verdict"]["details"]["targets"] == ["plate.n.04_1"]
+        if ok:
+            assert rep["end"]["rotation_rad"] < 1e-5 and rep["end"]["displacement_m"] < 1e-6 and not tilt["triggered"]
+            continue
+        (ev,) = tilt["events"]
+        v = result["verdict"]
+        assert result["reason"] == "object_tilt" and result["qa"]["stopped_by"] == "object_tilt" and v["details"]["object"] == "plate.n.04_1"
+        assert v["step"] == ev["step"] and len(result["actions"][v["action_index"]]["attempts"]) == 1
 
 
 def test_operated_roots_watch_the_worked_free_articulated_object_only():
@@ -4391,16 +4343,16 @@ def test_operated_roots_watch_the_worked_free_articulated_object_only():
 
 def test_root_watch_checkpoint_forgets_a_rolled_back_attempt():
     obj = FakeObject("lidded_0", [0.0, 0.0, 0.5])
-    w = RootWatch({"x": obj})
+    w = QA.RootWatch({"x": obj})
     w.observe("grasp", 0)
     snap = w.snapshot()
     obj.pos = th.tensor([0.02, 0.0, 0.5])  # the failed attempt shoves the body 2 cm; the retry starts from the checkpoint
     w.observe("base_follow", 1)
-    assert list(w.exceeded(0.005, 0.02, 2.0)) == ["x"]
+    assert list(w.over_band(0.005, 0.02)) == ["x"]
     w.load(snap)
     obj.pos = th.tensor([0.0, 0.0, 0.5])
     w.observe("base_follow", 1)
-    assert w.exceeded(0.005, 0.02, 2.0) == {}
+    assert w.over_band(0.005, 0.02) == {}
 
 
 def test_base_follow_stage2_handover_does_not_ride_past_follow_to():
@@ -4751,3 +4703,94 @@ def test_ag_release_rule_is_the_tasks_not_the_oracles():
     for path in glob.glob(os.path.join(pkg, "oracle", "*.py")):
         src = open(path).read()
         assert "ag_release_on_pad_clear =" not in src and "ag_release_max_delay_s =" not in src, path
+
+
+def test_settle_eval_off_takes_the_first_step_the_goal_holds(tmp_path):
+    """Settle-eval off (run_isg --settle-eval off, the default of --mode policy): symbolic success is the first step the goal
+    holds, geometric success the first step it holds with every measured target within tolerance - no pose_settled window;
+    no other mode is reported (``other_mode`` None)."""
+    sc, env = iors_world()
+    goal = _place_goal(sc)
+
+    def eval_unsettled(env_):
+        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+        d["settled"] = False
+        return d
+
+    env.evaluate = eval_unsettled
+    env.task.tracker = MET.SuccessTracker(settle_eval=False)
+    ex, *_ = make_executor(env, sc, tmp_path / "a")
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"], result["verdict"]
+    assert result["settle_eval"] is False and result["other_mode"] is None
+    # a goal that held a few steps and then not any more still counts: its first step decides
+    sc, env = iors_world()
+    hits = {"n": 0}
+
+    def eval_transient(env_):
+        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+        if d["binary_success"]:
+            hits["n"] += 1
+            if hits["n"] > 3:
+                d["binary_success"] = False
+        return d
+
+    env.evaluate = eval_transient
+    env.task.tracker = MET.SuccessTracker(settle_eval=False)
+    ex, *_ = make_executor(env, sc, tmp_path / "c")
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"] and result["geometric_success_step"] == result["symbolic_success_step"] == result["goal_first_step"]
+    assert result["errors"] is not result["errors_final_step"]  # judged at the geometric success, not at the last step
+
+
+def test_wall_clock_ends_a_stream_and_times_out_a_program(tmp_path):
+    """``ExecutorConfig.max_wall_s``: a stream (replay / policy) stops taking actions and the task's metrics judge the episode,
+    as at the end of its steps; a program gets a ``timeout`` verdict."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.variant, sc))
+    assert result["success"] and result["wall_clock_exceeded"] is False
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "stream", exec_cfg=ExecutorConfig(max_wall_s=1e-9))
+    result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
+    assert result2["wall_clock_exceeded"] and result2["n_steps"] == 0 and result2["epilogue_steps"] == 0
+    assert not result2["success"] and result2["reason"] == "not_reached"  # judged by the metrics: the apple was never moved
+    sc3, env3 = iors_world()
+    env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
+    ex3, *_ = make_executor(env3, sc3, tmp_path / "program", exec_cfg=ExecutorConfig(max_wall_s=1e-9))
+    result3 = ex3.run_program(expand(sc3.variant, sc3))
+    assert result3["reason"] == "timeout" and "wall clock" in result3["verdict"]["message"] and result3["wall_clock_exceeded"]
+
+
+def test_program_epilogue_is_reserved_in_the_step_budget(tmp_path):
+    """A program's actions get ``max_steps - settle_steps`` steps (``Executor.action_budget``): its epilogue always fits; a program
+    that needs more times out before it (no epilogue then). A stream ends at ``max_steps`` without a timeout verdict and the
+    metrics judge it."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.variant, sc))
+    n_action = result["n_action_steps"]
+    # exactly enough: the program and its 50-step epilogue
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "fit", exec_cfg=ExecutorConfig(max_steps=n_action + 50, settle_steps=50))
+    result2 = ex2.run_program(expand(sc2.variant, sc2))
+    assert result2["success"], result2["verdict"]
+    assert result2["n_steps"] == n_action + 50 and result2["epilogue_steps"] == 50 and ex2.action_budget == n_action
+    # one step short: the actions time out at the action budget, the epilogue is not cut into
+    sc3, env3 = iors_world()
+    env3.evaluate = success_eval("apple.n.01_1", _place_goal(sc3), tol=0.08)
+    ex3, *_ = make_executor(env3, sc3, tmp_path / "short", exec_cfg=ExecutorConfig(max_steps=n_action + 49, settle_steps=50))
+    result3 = ex3.run_program(expand(sc3.variant, sc3))
+    assert result3["reason"] == "timeout" and result3["epilogue_steps"] == 0 and result3["n_steps"] <= n_action
+    # a stream: cut at max_steps, judged by the metrics
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_steps"]]]
+    sc4, env4 = iors_world()
+    env4.evaluate = success_eval("apple.n.01_1", _place_goal(sc4), tol=0.08)
+    ex4, *_ = make_executor(env4, sc4, tmp_path / "stream", exec_cfg=ExecutorConfig(max_steps=20))
+    result4 = ex4.run_stream(th.as_tensor(a) for a in actions)
+    assert result4["n_steps"] == 20 and result4["reason"] == "not_reached"

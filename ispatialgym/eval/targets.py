@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch as th
 
+from ispatialgym.activity.problem import canonical_variant
 from ispatialgym.eval.geometry import as_tensor, quat_angle, quat_normalize, relative_pose
 
 SCHEMA_VERSION = "isg-tro-v1"
@@ -226,6 +227,7 @@ class GroupTarget:
     pose_tolerances: Optional[Tuple[float, float]]
     layout_relations: List[LayoutRelation]
     layout_tolerances: Optional[Tuple[float, float]]
+    pinned: Dict[str, str] = field(default_factory=dict)  # exchangeable mode: members held to one slot, the others matched
 
     @classmethod
     def from_dict(cls, name: str, d: Dict[str, Any]) -> "GroupTarget":
@@ -267,6 +269,14 @@ class GroupTarget:
                 raise TROValidationError(f"{what}.assignment.member_to_slot must map every member exactly once")
             if slots and (set(member_to_slot.values()) != set(slots) or len(set(member_to_slot.values())) != len(slots)):
                 raise TROValidationError(f"{what}.assignment.member_to_slot must be a bijection onto target_slots")
+        pinned = dict(assignment.get("pinned") or {})
+        if pinned:
+            if mode != "exchangeable":
+                raise TROValidationError(f"{what}.assignment.pinned is for exchangeable groups (a fixed group maps every member)")
+            if not set(pinned) <= set(members):
+                raise TROValidationError(f"{what}.assignment.pinned names non-members {sorted(set(pinned) - set(members))}")
+            if not set(pinned.values()) <= set(slots) or len(set(pinned.values())) != len(pinned):
+                raise TROValidationError(f"{what}.assignment.pinned must map its members to distinct target_slots")
 
         relations_raw = d.get("layout_relations") or []
         relations = []
@@ -312,6 +322,7 @@ class GroupTarget:
             pose_tolerances=tol_pair("pose_tolerances"),
             layout_relations=relations,
             layout_tolerances=tol_pair("layout_tolerances"),
+            pinned=pinned,
         )
 
     @property
@@ -418,8 +429,8 @@ class ISGTroMeta:
             schema_version=d["schema_version"],
             activity=d["activity"],
             activity_definition_id=definition_id,
-            task_variant=d.get("task_variant"),
-            instance_id=d.get("instance_id"),
+            task_variant=canonical_variant(d.get("task_variant")),
+            instance_id=canonical_variant(d.get("instance_id")),
             scene=dict(d.get("scene") or {}),
             object_bindings=dict(d.get("object_bindings") or {}),
             pose_targets=pose_targets,

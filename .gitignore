@@ -37,6 +37,8 @@ ispatialgym/behavior-vision-suite.github.io/
 
 # Generated task instances (ispatialgym.sampling default output, repo-root datasets/ only) and sampler probes
 /datasets/
+# run_isg runs of eval dataset instances (default --out ./runs)
+/runs/
 sampling_report_*.json
 validation_report_*.json
 

@@ -37,6 +37,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from ispatialgym.oracle.sidecar import from_legacy_keys
+
 CAMERA = "camera_relocalization"
 HELD_TASKS = ("object_scaling", "mental_rotation")
 RULE_TASKS = (CAMERA,) + HELD_TASKS
@@ -195,6 +197,7 @@ class InstanceRecord:
 
     @staticmethod
     def from_json(d: Dict[str, Any]) -> "InstanceRecord":
+        d = from_legacy_keys(d)
         return InstanceRecord(d.get("path", ""), d["task"], d["variant"], d.get("instance_id", ""), d["scene"], d.get("room", ""),
                               list(d["start_base"]), None if d.get("goal_base") is None else list(d["goal_base"]),
                               [Pose(**p) for p in d.get("start") or []], [Pose(**p) for p in d.get("goal") or []], dict(d.get("split") or {}),
@@ -361,9 +364,10 @@ def record_from_dicts(tro: Dict[str, Any], sidecar: Optional[Dict[str, Any]] = N
 def _read_json(path: str) -> Optional[Dict[str, Any]]:
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
     except (OSError, ValueError):
         return None
+    return from_legacy_keys(data) if isinstance(data, dict) else data
 
 
 def read_instance(tro_path: str) -> InstanceRecord:

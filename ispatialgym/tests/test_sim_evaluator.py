@@ -27,7 +27,7 @@ gm.ENABLE_TRANSITION_RULES = False
 import omnigibson.utils.transform_utils as T  # noqa: E402
 from bddl import predicates as bddl_predicates  # noqa: E402
 from ispatialgym import single_env as SE  # noqa: E402
-from omnigibson.object_states import LayoutReached, Open, PoseReached, PoseSettled  # noqa: E402
+from omnigibson.object_states import LayoutReached, Open, PoseReached  # noqa: E402
 from omnigibson.objects import DatasetObject  # noqa: E402
 from omnigibson.robots import Robot  # noqa: E402
 from omnigibson.utils.bddl_utils import evaluate_bddl_predicate  # noqa: E402
@@ -38,6 +38,9 @@ from ispatialgym.eval.episode import isg_info, run_episode  # noqa: E402
 from ispatialgym.eval.geometry import relative_pose  # noqa: E402
 from ispatialgym.eval.group_entity import GroupEntity  # noqa: E402
 from ispatialgym.eval.targets import GroupTarget  # noqa: E402
+
+#: the test problems (alignment-0: a fishing rod on a breakfast table, variant ``table_surface``)
+FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bddl")
 
 HEAD_CAMERA = "robot_r1:zed_link:Camera:0"
 IDENTITY = th.tensor([0.0, 0.0, 0.0, 1.0])
@@ -320,6 +323,7 @@ def _alignment_cfg(task_extra=None):
             "type": "ISpatialGymTask",
             "activity_name": "alignment",
             "activity_definition_id": 0,
+            "activity_definitions_root": FIXTURES,
             "object_bindings": {"fishing_rod.n.01_1": "rod", "table.n.02_1": "table", "floor.n.01_1": "floor_slab"},
             "termination_config": {"max_steps": 80},
         },
@@ -340,20 +344,18 @@ def task_env(state_env):
 
 @pytest.fixture(scope="module")
 def measure_task_env(task_env):
-    """The same scene with a TEST-ONLY copy of alignment-0, written to a temporary activity root, whose
-    ``pose_reached`` atom is moved from the goal to ``(:measure ...)``. It exercises the non-gating path (success is
-    relational only, the rod's orientation error is reported without gating). The shipped alignment problems are
-    untouched: there ``pose_reached`` stays in the goal and gates success."""
+    """The same scene with a TEST-ONLY copy of alignment-0, written to a temporary activity root, whose ``pose_reached``
+    atom is only in ``(:measure ...)`` (taken out of the goal). It exercises the measure-only path: the symbolic goal is
+    relational (ontop + released), the rod's orientation decides geometric success. The shipped problems keep
+    ``pose_reached`` in both sections."""
     og.clear()
-    from ispatialgym.activity import ACTIVITY_DEFINITIONS_ROOT
-
     tmp = tempfile.mkdtemp(prefix="isg_measure_")
     os.makedirs(os.path.join(tmp, "alignment"))
-    with open(os.path.join(ACTIVITY_DEFINITIONS_ROOT, "alignment", "problem0.bddl")) as f:
+    with open(os.path.join(FIXTURES, "alignment", "problem0.bddl")) as f:
         text = f.read()
-    assert "            (pose_reached ?fishing_rod.n.01_1)\n" in text
-    text = text.replace("            (pose_reached ?fishing_rod.n.01_1)\n", "")
-    text = text.rstrip()[:-1] + "\n    (:measure\n        (pose_reached ?fishing_rod.n.01_1)\n    )\n)\n"
+    goal_atom = "            (pose_reached ?fishing_rod.n.01_1)\n"
+    assert goal_atom in text and "(:measure" in text
+    text = text.replace(goal_atom, "", 1)  # the first occurrence is the goal's; the :measure block keeps its own
     with open(os.path.join(tmp, "alignment", "problem0.bddl"), "w") as f:
         f.write(text)
     env = og.Environment(configs=_alignment_cfg({"activity_definitions_root": tmp}))
@@ -396,7 +398,7 @@ def _write_tro(env, q_goal, path):
         json.dump(tro, f, cls=TorchEncoder)
 
 
-def test_alignment_task_two_level_evaluation(task_env):
+def test_alignment_task_symbolic_and_geometric_success(task_env):
     env = task_env
     task = env.task
     rod = env.scene.object_registry("name", "rod")
@@ -431,49 +433,64 @@ def test_alignment_task_two_level_evaluation(task_env):
             rod.keep_still()
         return th.zeros(env.scene.robots[0].action_dim)
 
+    errs = []
+
     def on_step(i, info):
         isg = isg_info(info)
-        trace.append((isg["step"], isg["binary_success"], isg["settled"], info["done"]["success"]))
+        trace.append((isg["step"], isg["goal"], isg["settled"], info["done"]["success"]))
+        errs.append((isg["step"], isg["error_metric"]["orientation_error"]))
 
     result = run_episode(env, policy, on_step=on_step)
 
-    # Level 1: binary success at the teleport step, official success follows it immediately
-    assert result["binary_success"] and result["first_success_step"] == teleport_step
-    assert all(not b for (s, b, _, _) in trace if s < teleport_step)
-    assert all(b and succ for (s, b, _, succ) in trace if s >= teleport_step)
+    # settle-eval off (the task's default): symbolic and geometric success first at the teleport step (the pose_reached atom is in
+    # :goal and :measure); the evaluated step is the lowest-error candidate of the settle window after it (eval.metrics,
+    # 2026-11-01) and the episode ends at that window's last step
+    W = result["settle_steps"]
+    assert result["symbolic_success"] and result["symbolic_first_step"] == teleport_step
+    assert result["geometric_success"] and result["geometric_first_step"] == teleport_step
+    for kind in ("symbolic", "geometric"):
+        assert teleport_step <= result[f"{kind}_success_step"] <= teleport_step + W - 1
+    assert result["evaluation_step"] == result["geometric_success_step"] and result["evaluation_kind"] == "geometric"
+    assert result["success_final"] and result["steps"] == teleport_step + W
+    # the evaluated step's error is no larger than the first success step's
+    first_err = next(e for (s_, e) in errs if s_ == teleport_step)
+    assert result["error_metric"]["orientation_error"] <= first_err + 1e-12
+    assert result["error_metric"]["orientation_error"] == pytest.approx(min(e for (s_, e) in errs if teleport_step <= s_ <= teleport_step + W - 1), abs=0)
+    # closest approach: over every executed step / the goal steps; never worse than the evaluated success step
+    ca, cg = result["closest_approach"], result["closest_goal_approach"]
+    assert ca is not None and cg is not None and cg["goal"] is True
+    assert ca["score"] <= cg["score"] <= result["error_metric"]["orientation_error"] / 0.05 + 1e-12
+    assert cg["error_metric"]["orientation_error"] == pytest.approx(min(e for (s_, e) in errs if s_ >= teleport_step), abs=0)
+    assert all(not g for (s, g, _, _) in trace if s < teleport_step)
+    assert all(g and succ for (s, g, _, succ) in trace if s >= teleport_step)
     assert result["success"] and result["terminated"] and not result["truncated"]
-    # Level 2: settled some steps later; latency measured from the first binary success
-    assert result["settled_success"] and result["first_settled_success_step"] > teleport_step
-    assert result["settle_latency_steps"] == result["first_settled_success_step"] - teleport_step
-    # the teleport perturbs the rod, so a full PoseSettled window must elapse before it counts as settled
-    assert result["settle_latency_steps"] >= rod.states[PoseSettled].n_steps - 1
-    assert result["settle_latency_seconds"] == pytest.approx(result["settle_latency_steps"] * og.sim.get_sim_step_dt())
-    # Errors: snapshot at the first binary success, orientation-only target
-    assert result["position_error"] is None
-    assert result["orientation_error"] is not None and result["orientation_error"] <= 0.05
-    assert result["errors"]["pose_errors"]["fishing_rod.n.01_1"]["orientation_metric"] == "full"
-    assert result["layout_position_error"] is None and result["layout_orientation_error"] is None
+    assert result["other_mode"] is None  # settle-eval off reports no other mode
+    # errors at the geometric success: an orientation-only target, in :goal and :measure, with its tolerance
+    assert result["error_metric"]["case"] == "pose" and result["error_metric"]["position_error"] is None
+    assert result["error_metric"]["orientation_error"] <= 0.05
+    rod_err = result["errors"]["pose_errors"]["fishing_rod.n.01_1"]
+    assert rod_err["orientation_metric"] == "full" and rod_err["in_goal"] and rod_err["in_measure"]
+    assert rod_err["tolerances"] == {"position": None, "orientation": 0.05}
     kinds = {c["bddl"]: c["kind"] for c in result["conditions"]}
     assert kinds["(pose_reached ?fishing_rod.n.01_1)"] == "binary"
     assert kinds["(pose_settled ?agent.n.01_1)"] == "pose_settled"
-    assert all(c["satisfied"] for c in result["conditions"])
 
     # A reset returns to the snapshotted initial state: goal not reached, tracking cleared
     env.reset()
     _, _, _, _, info = SE.step(env, th.zeros(env.scene.robots[0].action_dim))
     isg = isg_info(info)
-    assert not isg["binary_success"] and isg["first_success_step"] == -1 and isg["settle_latency_steps"] == -1
-    assert isg["errors"]["max_orientation_error"] == pytest.approx(0.6, abs=0.05)
-    assert isg["final_errors"] is isg["errors"] or isg["final_errors"] == isg["errors"]
+    assert not isg["goal"] and isg["symbolic_success_step"] is None and isg["geometric_success_step"] is None
+    assert isg["error_metric"]["orientation_error"] == pytest.approx(0.6, abs=0.05)
+    assert isg["evaluation"]["errors"] is isg["errors"]  # no geometric success yet: judged at the current step
 
 
-def test_alignment_task_non_gating_measure_atom(measure_task_env):
-    """(:measure (pose_reached ?rod)): the target is configured and reported but never gates success, and the
-    representative error is the one at the first binary success even if the pose improves afterwards."""
+def test_alignment_task_measure_only_atom(measure_task_env):
+    """(:measure (pose_reached ?rod)) only: the symbolic goal (ontop + released) holds from step 0, geometric success waits for
+    the rod's orientation (the teleport step); the errors are judged at the geometric success."""
     env = measure_task_env
     task = env.task
     rod = env.scene.object_registry("name", "rod")
-    assert task.compiled_task.pose_reached_args == []  # nothing gates through pose_reached ...
+    assert task.compiled_task.pose_reached_args == []  # pose_reached is not in the goal ...
     assert task.compiled_task.measure_pose_reached_args == ["fishing_rod.n.01_1"]  # ... but the rod is measured
 
     for _ in range(60):
@@ -498,19 +515,16 @@ def test_alignment_task_non_gating_measure_atom(measure_task_env):
 
     result = run_episode(env, policy)
 
-    # binary success is immediate (ontop + released), independent of the 0.6 rad orientation error
-    assert result["binary_success"] and result["first_success_step"] == 0 and result["success"]
+    # first steps: symbolic at 0, geometric at the teleport step; the evaluated steps lie in the settle windows after them
+    W = result["settle_steps"]
+    assert result["symbolic_success"] and result["symbolic_first_step"] == 0 and 0 <= result["symbolic_success_step"] <= W - 1
+    assert result["geometric_success"] and result["geometric_first_step"] == teleport_step and result["success"]
+    assert teleport_step <= result["geometric_success_step"] <= teleport_step + W - 1 and result["steps"] == teleport_step + W
     kinds = {c["bddl"]: c["kind"] for c in result["conditions"]}
     assert "(pose_reached ?fishing_rod.n.01_1)" not in kinds
     assert result["measured"] == [
-        {"bddl": "(pose_reached ?fishing_rod.n.01_1)", "kind": "measure", "configured": True, "within_tolerance": True}
+        {"bddl": "(pose_reached ?fishing_rod.n.01_1)", "kind": "measure", "in_goal": False, "configured": True, "within_tolerance": True}
     ]
-    # representative error = error at the first binary success (0.6 rad), although the rod was rotated to the goal
-    # at step 5 and the terminal error is small
     rod_err = result["errors"]["pose_errors"]["fishing_rod.n.01_1"]
-    assert rod_err["gating"] is False and rod_err["orientation_metric"] == "full"
-    assert result["orientation_error"] == pytest.approx(0.6, abs=0.03) and result["position_error"] is None
-    assert result["errors_at_termination"]["max_orientation_error"] < 0.05
-    # settle latency is measured from step 0
-    assert result["settled_success"] and result["settle_latency_steps"] == result["first_settled_success_step"]
-    assert result["settle_latency_steps"] >= teleport_step
+    assert rod_err["in_goal"] is False and rod_err["in_measure"] and rod_err["orientation_metric"] == "full"
+    assert result["error_metric"]["orientation_error"] < 0.05 and result["error_metric"]["position_error"] is None

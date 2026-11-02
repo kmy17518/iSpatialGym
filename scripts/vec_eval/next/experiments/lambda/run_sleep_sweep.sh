@@ -1,0 +1,17 @@
+#!/bin/bash
+# Sleep-threshold sweep, targeted at free non-articulated objects (rigid_sleep_threshold), on the failing stacked kielbasa configuration (N=2, clone at z=30).
+set -u
+NEXT=/home/minyeongk/Desktop/projects/ispatialgym-eval-vec-next
+APPDATA=/home/minyeongk/Desktop/projects/Behavior-1K-vec-speed-6a6194600/OmniGibson/appdata
+VOUT=$HOME/vec_eval85/next/sleep_sweep; mkdir -p $VOUT
+INST=$HOME/vec_eval85/instances/eval/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table.json
+log() { echo "[$(date -Is)] $*"; }
+run() { local name=$1; shift; rm -rf $VOUT/$name
+  ( export ISG_EVAL_ROOT=$NEXT OMNIGIBSON_APPDATA_PATH=$APPDATA ISG_ROOMS_OVERRIDE=$NEXT/scripts/vec_eval/rooms/rooms_override.json; source $NEXT/scripts/vec_eval/env_lambda.sh >/dev/null 2>&1
+    python -u -m ispatialgym.oracle.run_isg_vec --mode replay --instances $INST --same-instance-all-slots --num-envs 2 --scene-offsets "0,0,30" --wallclock 0 \
+      --record-view tiled --grid-video --tile-px 240 --external-size 240 --tag next:sleep:$name "$@" --out $VOUT/$name ) > $VOUT/$name.log 2>&1
+  log "$name $* rc=$? $(grep -c RUN_ISG_RESULT $VOUT/$name.log) results; $(grep -o 'world built in [0-9.]*s' $VOUT/$name.log | head -1); $(grep -o '"rigid_sleep_threshold": {[^}]*' $VOUT/$name.log | head -1 | cut -c1-120)"; }
+run S_2e4 --physics-override rigid_sleep_threshold=0.0002
+run S_5e4 --physics-override rigid_sleep_threshold=0.0005
+run S_1e3 --physics-override rigid_sleep_threshold=0.001
+log "SLEEP SWEEP DONE"

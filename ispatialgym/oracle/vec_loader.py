@@ -48,14 +48,28 @@ from ispatialgym.tasks import VecISpatialGymTask  # noqa: F401  (registers the t
 log = logging.getLogger(__name__)
 
 
-def world_payload(template_dir: str) -> Dict[str, Any]:
-    """What makes two templates the same world for the batch: the scene model, the room filter, the problem, the set of scene
-    objects with their categories / models, and their resting poses / joint positions. The robot's own entry (pose, virtual base
-    joints, AABB) is excluded: the TRO restore overwrites it; AABBs, sleep flags and residual velocities are settle noise."""
-    with open(os.path.join(template_dir, "template.json")) as f:
+def template_paths(template_dir: str, tmeta: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
+    """``(template.json, template_meta.json)`` of a template: the sampler's layout (both next to ``instances/``) or the eval
+    dataset's (``tmeta["_paths"]`` of :func:`run_isg.resolve_instance`: ``<scene>_task_<subtask>_0_0_template.json`` and its
+    ``-meta.json``)."""
+    paths = (tmeta or {}).get("_paths") or {}
+    if paths.get("scene_file"):
+        t = paths["scene_file"]
+        return t, t[: -len(".json")] + "-meta.json"
+    return os.path.join(template_dir, "template.json"), os.path.join(template_dir, "template_meta.json")
+
+
+def world_payload(template_dir: str, tmeta: Optional[Dict[str, Any]] = None, ignore_objects: Sequence[str] = ()) -> Dict[str, Any]:
+    """What makes two templates the same world for the batch: the scene model, the room filter, the problem's activity, the set of
+    scene objects with their categories / models, and their resting poses / joint positions. The robot's own entry (pose, virtual base
+    joints, AABB) is excluded: the TRO restore overwrites it; AABBs, sleep flags and residual velocities are settle noise.
+    ``ignore_objects``: scene object names whose state is left out (the task objects a TRO re-places)."""
+    t_path, m_path = template_paths(template_dir, tmeta)
+    with open(t_path) as f:
         t = json.load(f)
-    with open(os.path.join(template_dir, "template_meta.json")) as f:
+    with open(m_path) as f:
         meta = json.load(f)
+    skip = set(ignore_objects)
     init = (t.get("objects_info") or {}).get("init_info") or {}
     objs = {k: {"class": v.get("class_name"), "args": {a: v.get("args", {}).get(a) for a in ("category", "model", "name", "scale", "fixed_base")}}
             for k, v in init.items() if not str(k).startswith("robot")}
@@ -68,8 +82,10 @@ def world_payload(template_dir: str) -> Dict[str, Any]:
             return [strip(v) for v in x]
         return x
 
-    state = {k: strip(v) for k, v in reg.items() if not str(k).startswith("robot")}
-    return {"scene": meta.get("scene"), "rooms": meta.get("load_room_instances"), "problem": meta.get("problem"), "objects": objs, "state": state}
+    state = {k: strip(v) for k, v in reg.items() if not str(k).startswith("robot") and k not in skip}
+    problem = meta.get("problem") or ""
+    return {"scene": meta.get("scene"), "rooms": meta.get("load_room_instances"), "problem": problem.rsplit("-", 1)[0] if "-" in problem else problem,
+            "objects": objs, "state": state}
 
 
 def _leaves(x, prefix=""):
@@ -112,11 +128,38 @@ def worlds_compatible(a: Dict[str, Any], b: Dict[str, Any], tol: float = 5e-3) -
     return (not bad), bad
 
 
-def world_signature(template_dir: str) -> str:
+def tro_task_objects(tro_path: str) -> List[str]:
+    """The scene object names a TRO's ``object_bindings`` name (the objects its restore re-places)."""
+    try:
+        with open(tro_path) as f:
+            raw = json.load(f)
+        meta = raw.get("ispatialgym") or raw.get("metadata") or {}
+        out = []
+        for v in (meta.get("object_bindings") or {}).values():
+            name = v.get("scene_object_name") if isinstance(v, dict) else v
+            if name:
+                out.append(str(name))
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def world_signature(template_dir: str, tmeta: Optional[Dict[str, Any]] = None) -> str:
     """A label of the world (scene, rooms, problem, object set: the parts compared exactly); the state is compared with a tolerance
     by :func:`worlds_compatible`, so two templates with equal signatures may still be rejected."""
-    p = world_payload(template_dir)
+    p = world_payload(template_dir, tmeta)
     return hashlib.sha256(json.dumps({k: p[k] for k in ("scene", "rooms", "problem", "objects")}, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
+#: the carb render settings the tiled-exposure experiment reads (auto-exposure histogram, tone mapping, AA, DLSS, render mode, path tracing)
+RENDER_SETTING_KEYS = ["/rtx/rendermode", "/rtx/post/histogram/enabled", "/rtx/post/histogram/minEV", "/rtx/post/histogram/maxEV", "/rtx/post/histogram/tau",
+                       "/rtx/post/histogram/whiteScale", "/rtx/post/histogram/useExposureClamping", "/rtx/post/tonemap/op", "/rtx/post/tonemap/filmIso",
+                       "/rtx/post/tonemap/cameraShutter", "/rtx/post/tonemap/fNumber", "/rtx/post/tonemap/whitepoint", "/rtx/post/tonemap/cm2Factor",
+                       "/rtx/post/tonemap/enableSrgbToGamma", "/rtx/post/aa/op", "/rtx/post/dlss/execMode", "/rtx/post/dlss/enabled", "/rtx/post/dlss/auto",
+                       "/rtx/pathtracing/totalSpp", "/rtx/pathtracing/spp", "/rtx/pathtracing/optixDenoiser/enabled", "/rtx/pathtracing/adaptiveSampling/enabled",
+                       "/rtx/directLighting/sampledLighting/enabled", "/rtx/indirectDiffuse/enabled", "/rtx/reflections/enabled", "/rtx/ambientOcclusion/enabled",
+                       "/rtx/post/scaling/enabled", "/rtx/post/scaling/staticRatio", "/rtx/fractionalCutoutOpacity", "/rtx/post/lensFlares/enabled",
+                       "/rtx/post/motionblur/enabled", "/rtx/post/dof/enabled", "/rtx/post/colorcorr/enabled", "/rtx/post/colorgrad/enabled"]
 
 
 class SceneView:
@@ -177,7 +220,9 @@ class SlotLoader(InstanceLoader):
         return super()._create_hinge(rec)
 
     def cleanup(self) -> None:
-        """Before the clone goes back to the template's state: its hinge prims removed, its robot's grasps released."""
+        """Before the clone goes back to the template's state: its hinge prims removed, its robot's grasps released, the
+        attachment pairs it filtered restored and its per-pair records forgotten (``predicates.reset_pair_records``)."""
+        from ispatialgym.sampling import predicates as PRED
         from ispatialgym.sampling.constraints import remove_hinge
 
         for h in list(self.hinges):
@@ -186,6 +231,7 @@ class SlotLoader(InstanceLoader):
         for arm, held in list(getattr(self.robot, "_ag_obj_in_hand", {}).items()):
             if held is not None:
                 self.robot.release_grasp_immediately(arm)
+        self.report["pair_records_reset"] = PRED.reset_pair_records(self.env.scene)
 
 
 class VecInstanceLoader:
@@ -194,7 +240,9 @@ class VecInstanceLoader:
     def __init__(self, num_envs: int, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM,
                  behavior_output: bool = True, tiled_rendering: bool = False, settle_physics_steps: int = 25, warm_renders: int = 100, enhanced_determinism: Optional[bool] = None,
                  fixed_handle_ag: bool = True, physics_overrides: Optional[Dict[str, Any]] = None, dummy_bodies: int = 0, dummy_bodies_x: float = 63.0,
-                 render_overrides: Optional[Dict[str, Any]] = None, scene_margin: Optional[float] = None):
+                 render_overrides: Optional[Dict[str, Any]] = None, scene_margin: Optional[float] = None, drop_depth: bool = True,
+                 external_camera_hw: Optional[Tuple[int, int]] = None, layout: str = "grid", load_rooms: Optional[Sequence[str]] = None,
+                 log_render_settings: bool = False, seg_instance: bool = False):
         """``tiled_rendering``: one tiled render product for all clones' cameras (off by default: the tiles share one exposure, so
         a clone's frames stay 15-20 % off its own per-camera render). ``warm_renders``: renders after the batch's reset before
         the first observation is taken - the real-time renderer adapts to a camera's new view over ~20-60 frames (a robot moved
@@ -222,6 +270,30 @@ class VecInstanceLoader:
         self.scene_margin = None if scene_margin is None else float(scene_margin)
         self.dummy_bodies = int(dummy_bodies)
         self.dummy_bodies_x = float(dummy_bodies_x)
+        # the robot's depth annotators are dropped from the BEHAVIOR observation layout (nothing of a policy run reads them; they
+        # cost a render readback per camera per step); ``external_camera_hw``: BEHAVIOR's JoyLo replay camera over the robot's
+        # shoulder on every clone (run_isg --record-view external / tiled) at this (height, width)
+        self.drop_depth = bool(drop_depth)
+        self.external_camera_hw = None if external_camera_hw is None else (int(external_camera_hw[0]), int(external_camera_hw[1]))
+        # clone placement (the vec-eval Behavior-1K overlay, scenes/scene_base.py): the scene measured by its live objects (the
+        # sampler parks removed objects 100 m underground and far away, which stretched house_single_floor to ~190 m and put
+        # clone 6 of a line past x = 1500 m, where float32 world coordinates resolve 0.1 mm) and, with "grid", the clones on a
+        # ceil(sqrt(N))-column grid instead of one line along +x; "line" keeps OmniGibson's line (still with the live box)
+        self.layout = str(layout)
+        # room loading (campaign rooms, 2026-10-28): None = the template's ``load_room_instances`` (the task rooms + every
+        # room sharing a wall / doorway, ``sampling.sim_utils.adjacent_rooms``), or what ``run_isg.rooms_for_template`` put into
+        # the config from ISG_ROOMS_OVERRIDE (by template variant); a list = exactly these room instances (an override: the
+        # rooms the demos can actually see; the driver resolves --rooms-override / --load-rooms into it). OmniGibson always
+        # loads walls / ceilings / roofs / fences / doors whatever the list (``InteractiveTraversableScene._should_load_object``);
+        # floors, windows, lights and furniture follow the list. Recorded in ``report["load_rooms"]`` and every slot's meta.
+        self.load_rooms = None if load_rooms is None else [str(r) for r in load_rooms]
+        # ``seg_instance`` on every robot camera (the room-visibility probe of run_isg_vec --seg-visibility): per-pixel
+        # object ids; run with the sampler's crash guard (``/rtx/raytracing/showLights`` = 0, SimWorld.LIGHT_SHAPES_SETTING)
+        self.seg_instance = bool(seg_instance)
+        # read the exposure / tone-mapping / AA / render-mode carb settings after the launch into report["render_settings"]
+        # (the tiled-exposure experiment, 2026-10-27); forces an explicit og.launch before the world like render_overrides
+        self.log_render_settings = bool(log_render_settings)
+        self._render_disabled: set = set()  # clones whose render products are paused (lever S1-finished)
         self.robot_name_arg = robot_name
         self.image_size = int(image_size)
         self.head_aperture = float(head_aperture)
@@ -244,6 +316,8 @@ class VecInstanceLoader:
         self.failed: Dict[int, Dict[str, Any]] = {}
         self.scene_loads = 0
         self.batches = 0
+        self.task_objects: List[str] = []
+        self._compatible: set = set()
 
     # ------------------------------------------------------------------ world
 
@@ -256,26 +330,91 @@ class VecInstanceLoader:
         iid, template_dir, tmeta, activity, did = resolve_instance(os.path.abspath(first_tro_path))
         tro = load_tro(os.path.abspath(first_tro_path))
         self.template_dir = template_dir
-        self.payload = world_payload(template_dir)
-        self.signature = world_signature(template_dir)
+        self.template_file = os.path.abspath(template_paths(template_dir, tmeta)[0])
+        self.task_objects = tro_task_objects(os.path.abspath(first_tro_path))
+        self.payload = world_payload(template_dir, tmeta, ignore_objects=self.task_objects)
+        self.signature = world_signature(template_dir, tmeta)
         self.tmeta, self.activity, self.did = tmeta, activity, did
         self.robot_name = self.robot_name_arg or robot_name_from_tro(tro)
         self.cfg = build_env_config(template_dir, tmeta, tro, os.path.abspath(first_tro_path), activity, did, self.robot_name, self.image_size, behavior_output=self.behavior_output)
         self.cfg["task"]["type"] = "VecISpatialGymTask"
         self.cfg["env"]["num_envs"] = self.num_envs
-        t0 = time.time()
-        if self.scene_margin is not None:
-            import omnigibson.simulator as _S
+        template_rooms = tmeta.get("load_room_instances")
+        if self.load_rooms is not None:
+            self.cfg["scene"]["load_room_instances"] = list(self.load_rooms)
+            self.report["load_rooms"] = {"mode": "override", "rooms": list(self.load_rooms), "template_rooms": template_rooms,
+                                         "dropped": [r for r in (template_rooms or []) if r not in self.load_rooms],
+                                         "added": [r for r in self.load_rooms if r not in (template_rooms or [])]}
+        else:
+            # build_env_config applied ISG_ROOMS_OVERRIDE (by template variant) when set: report what the world will load
+            cfg_rooms = self.cfg["scene"].get("load_room_instances")
+            if cfg_rooms != template_rooms:
+                self.report["load_rooms"] = {"mode": "env-override", "rooms": cfg_rooms, "template_rooms": template_rooms,
+                                             "dropped": [r for r in (template_rooms or []) if r not in (cfg_rooms or [])], "source": os.environ.get("ISG_ROOMS_OVERRIDE")}
+            else:
+                self.report["load_rooms"] = {"mode": "template", "rooms": template_rooms}
+        if self.drop_depth:
+            for r in self.cfg["robots"]:
+                r["obs_modalities"] = [m for m in r.get("obs_modalities", []) if m != "depth_linear"]
+        if self.seg_instance:
+            for r in self.cfg["robots"]:
+                if "seg_instance" not in r.get("obs_modalities", []):
+                    r["obs_modalities"] = list(r.get("obs_modalities", [])) + ["seg_instance"]
+        if self.external_camera_hw is not None:
+            from ispatialgym.oracle.run_isg import EXTERNAL_CAMERA_NAME
 
+            self.cfg["env"]["external_sensors"] = [{
+                "sensor_type": "VisionSensor", "name": EXTERNAL_CAMERA_NAME,
+                "relative_prim_path": f"/controllable__r1pro__{self.robot_name}/base_link/{EXTERNAL_CAMERA_NAME}",
+                "modalities": ["rgb"],
+                "sensor_kwargs": {"image_height": self.external_camera_hw[0], "image_width": self.external_camera_hw[1], "horizontal_aperture": 40.0},
+                "position": th.tensor([-0.4, 0.0, 2.0], dtype=th.float32),
+                "orientation": th.tensor([0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32),
+                "pose_frame": "parent",
+            }]
+        t0 = time.time()
+        # vec_next (2026-10-30, the small-object trembling): macro-level physics overrides applied before the world is built -
+        # sleep_threshold (every entity's physxRigidBody / physxArticulation sleepThreshold, stock 5e-5), solver_position_iterations /
+        # solver_velocity_iterations (every object's solver iteration counts, stock 32 / 1)
+        if self.physics_overrides:
+            import omnigibson.prims.entity_prim as _ep
+            import omnigibson.objects.usd_object as _uo
+            if "sleep_threshold" in self.physics_overrides:
+                with _ep.m.unlocked():
+                    _ep.m.DEFAULT_SLEEP_THRESHOLD = float(self.physics_overrides["sleep_threshold"])
+                self.report["sleep_threshold"] = float(_ep.m.DEFAULT_SLEEP_THRESHOLD)
+            if "solver_position_iterations" in self.physics_overrides:
+                with _uo.m.unlocked():
+                    _uo.m.DEFAULT_SOLVER_POSITION_ITERATIONS = int(self.physics_overrides["solver_position_iterations"])
+                self.report["solver_position_iterations"] = int(_uo.m.DEFAULT_SOLVER_POSITION_ITERATIONS)
+            if "solver_velocity_iterations" in self.physics_overrides:
+                with _uo.m.unlocked():
+                    _uo.m.DEFAULT_SOLVER_VELOCITY_ITERATIONS = int(self.physics_overrides["solver_velocity_iterations"])
+                self.report["solver_velocity_iterations"] = int(_uo.m.DEFAULT_SOLVER_VELOCITY_ITERATIONS)
+        import math as _math
+
+        os.environ.setdefault("ISG_SCENE_LIVE_AABB", "1")
+        # "grid-centered" (2026-10-27): the same grid centred on scene 0 (ISG_SCENE_GRID_CENTER=1 in the overlay) - the clones
+        # take the cells around the origin nearest first, so the farthest clone origin is (px, py) instead of (2 px, 2 py)
+        cols = int(_math.ceil(_math.sqrt(self.num_envs))) if (self.layout in ("grid", "grid-centered") and self.num_envs > 1) else 0
+        os.environ["ISG_SCENE_GRID_COLS"] = str(cols)
+        os.environ["ISG_SCENE_GRID_CENTER"] = "1" if self.layout == "grid-centered" else "0"
+        self.report["clone_layout"] = {"layout": self.layout, "grid_cols": cols, "grid_center": self.layout == "grid-centered",
+                                       "live_aabb": os.environ.get("ISG_SCENE_LIVE_AABB") == "1"}
+        import omnigibson.simulator as _S
+
+        if self.scene_margin is not None:
             with _S.m.unlocked():
                 _S.m.SCENE_MARGIN = self.scene_margin
-            self.report["scene_margin"] = float(_S.m.SCENE_MARGIN)
-        if self.render_overrides and og.sim is None:
+        self.report["scene_margin"] = float(_S.m.SCENE_MARGIN)
+        if (self.render_overrides or self.log_render_settings) and og.sim is None:
             import omnigibson.lazy as lazy
 
             env_cfg = self.cfg["env"]
             og.launch(physics_dt=1.0 / env_cfg["physics_frequency"], rendering_dt=1.0 / env_cfg.get("rendering_frequency", 30), sim_step_dt=1.0 / env_cfg["action_frequency"])
             settings = lazy.carb.settings.get_settings()
+            if self.log_render_settings:
+                self.report["render_settings_before_overrides"] = {k: settings.get(k) for k in RENDER_SETTING_KEYS}
             applied = {}
             for key, value in self.render_overrides.items():
                 if isinstance(value, bool):
@@ -287,7 +426,10 @@ class VecInstanceLoader:
                 else:
                     settings.set_string(key, str(value))
                 applied[key] = settings.get(key)
-            self.report["render_overrides"] = applied
+            if self.render_overrides:
+                self.report["render_overrides"] = applied
+            if self.log_render_settings:
+                self.report["render_settings"] = {k: settings.get(k) for k in RENDER_SETTING_KEYS}
         self.env = og.Environment(configs=self.cfg)
         self.scene_loads += 1
         from ispatialgym.sampling.scene_variants import patch_trav_map_from_meta
@@ -347,6 +489,47 @@ class VecInstanceLoader:
         return self.env
 
     @staticmethod
+    def _is_free_rigid(obj) -> bool:
+        """A free (not fixed, not kinematic), non-articulated (no movable joint) object that is not the robot: the objects the rigid-body
+        overrides apply to. Fixed-joint-only assets (the meta-link articulations of the teapot or a lid) count as rigid."""
+        if getattr(obj, "fixed_base", False) or getattr(obj, "kinematic_only", False) or getattr(obj, "category", "") == "agent":
+            return False
+        return not (int(getattr(obj, "n_dof", 0) or 0) > 0 or len(getattr(obj, "joints", {}) or {}) > 0)
+
+    def _apply_rigid_sleep_threshold(self, objs) -> Optional[Dict[str, Any]]:
+        """vec_next (2026-10-30): the rigid-body physics overrides for a slot's TASK objects, which the TRO restore adds after the world build
+        (the build-time pass in ``_apply_physics_overrides`` only reaches the scene's own objects): every free, non-articulated object of
+        ``objs`` gets ``rigid_sleep_threshold`` (physxRigidBody / physxArticulation sleepThreshold) and ``rigid_solver_position_iterations`` /
+        ``rigid_solver_velocity_iterations`` (the solver iteration counts; the teapot-on-bar chatter that never sleeps at OmniGibson's 32 / 1
+        sleeps within 0.5 s at 64 / 8, probe R7 2026-10-30). Returns the report entry (None when no override is on)."""
+        ov = self.physics_overrides or {}
+        thr = ov.get("rigid_sleep_threshold")
+        pos_it, vel_it = ov.get("rigid_solver_position_iterations"), ov.get("rigid_solver_velocity_iterations")
+        if thr is None and pos_it is None and vel_it is None:
+            return None
+        names, skipped = [], []
+        for obj in objs:
+            if not self._is_free_rigid(obj):
+                skipped.append(obj.name)
+                continue
+            try:
+                if thr is not None:
+                    obj.sleep_threshold = float(thr)
+                if pos_it is not None:
+                    obj.solver_position_iteration_count = int(pos_it)
+                if vel_it is not None:
+                    obj.solver_velocity_iteration_count = int(vel_it)
+                names.append(obj.name)
+            except Exception as ex:  # noqa: BLE001
+                skipped.append(f"{obj.name}!{type(ex).__name__}")
+        out: Dict[str, Any] = {"set": names, "skipped": skipped}
+        if thr is not None:
+            out["threshold"] = float(thr)
+        if pos_it is not None or vel_it is not None:
+            out["solver_iterations"] = {"position": None if pos_it is None else int(pos_it), "velocity": None if vel_it is None else int(vel_it)}
+        return out
+
+    @staticmethod
     def _apply_physics_overrides(ov: Dict[str, Any]) -> Dict[str, Any]:
         """Physics-engine settings for the item-2 experiments (simulator stopped)."""
         import omnigibson.lazy as lazy
@@ -363,6 +546,69 @@ class VecInstanceLoader:
             if "gpu_dynamics" in ov:
                 ctx.enable_gpu_dynamics(bool(ov["gpu_dynamics"]))
                 out["gpu_dynamics"] = bool(ov["gpu_dynamics"])
+        if "rigid_sleep_threshold" in ov:
+            # vec_next (2026-10-30, the small-object trembling): physxRigidBody:sleepThreshold of every FREE, NON-ARTICULATED object (no joints,
+            # not fixed_base, not kinematic, not the robot) - the resting light objects whose stack never sleeps at OmniGibson's 5e-5 and whose
+            # TGS residual then drives a limit cycle in some clone configurations. Articulations (doors, drawers, robots) keep the stock value.
+            thr = float(ov["rigid_sleep_threshold"])
+            n_set, names = 0, []
+            for scene in og.sim.scenes:
+                for obj in scene.objects:
+                    if getattr(obj, "fixed_base", False) or getattr(obj, "kinematic_only", False) or getattr(obj, "category", "") == "agent":
+                        continue
+                    if int(getattr(obj, "n_dof", 0) or 0) > 0 or len(getattr(obj, "joints", {}) or {}) > 0:
+                        continue
+                    try:
+                        obj.sleep_threshold = thr
+                        n_set += 1
+                        if scene.idx == 0:
+                            names.append(obj.name)
+                    except Exception:  # noqa: BLE001
+                        pass
+            out["rigid_sleep_threshold"] = {"threshold": thr, "objects": n_set, "scene0_names": names[:40]}
+        if "rigid_solver_position_iterations" in ov or "rigid_solver_velocity_iterations" in ov:
+            # vec_next (2026-10-30, the teapot-on-bar chatter): solver iteration counts of every free non-articulated scene object (the task
+            # objects get theirs at the restore, _apply_rigid_sleep_threshold); articulations and the robot keep OmniGibson's 32 / 1
+            pos_it, vel_it = ov.get("rigid_solver_position_iterations"), ov.get("rigid_solver_velocity_iterations")
+            n_set = 0
+            for scene in og.sim.scenes:
+                for obj in scene.objects:
+                    if not VecInstanceLoader._is_free_rigid(obj):
+                        continue
+                    try:
+                        if pos_it is not None:
+                            obj.solver_position_iteration_count = int(pos_it)
+                        if vel_it is not None:
+                            obj.solver_velocity_iteration_count = int(vel_it)
+                        n_set += 1
+                    except Exception:  # noqa: BLE001
+                        pass
+            out["rigid_solver_iterations"] = {"position": pos_it, "velocity": vel_it, "objects": n_set}
+        if "stabilization" in ov:
+            # physxScene:enableStabilization on the physics scene prim + physxRigidBody:stabilizationThreshold on every free object
+            thr = float(ov["stabilization"])
+            scene_prim = None
+            for prim in og.sim.stage.Traverse():
+                if prim.GetTypeName() == "PhysicsScene":
+                    scene_prim = prim
+                    break
+            with og.sim.editing_usd():
+                if scene_prim is not None:
+                    attr = scene_prim.GetAttribute("physxScene:enableStabilization")
+                    if not attr or not attr.IsValid():
+                        attr = scene_prim.CreateAttribute("physxScene:enableStabilization", lazy.pxr.Sdf.ValueTypeNames.Bool)
+                    attr.Set(thr > 0)
+            n_set = 0
+            for scene in og.sim.scenes:
+                for obj in scene.objects:
+                    if getattr(obj, "fixed_base", False) or getattr(obj, "kinematic_only", False) or getattr(obj, "category", "") == "agent":
+                        continue
+                    try:
+                        obj.stabilization_threshold = thr
+                        n_set += 1
+                    except Exception:  # noqa: BLE001
+                        pass
+            out["stabilization"] = {"enabled": thr > 0, "threshold": thr, "objects": n_set}
         if "num_threads" in ov:
             settings = lazy.carb.settings.get_settings()
             settings.set_int("/persistent/physics/numThreads", int(ov["num_threads"]))
@@ -415,28 +661,43 @@ class VecInstanceLoader:
     # ------------------------------------------------------------------ loader contract (per batch)
 
     def check_template(self, tro_path: str) -> str:
-        _, template_dir, _, _, _ = resolve_instance(os.path.abspath(tro_path))
-        if os.path.abspath(template_dir) == os.path.abspath(self.template_dir):
+        """The instance's template must be this world's: the same template dir, or one whose scene / rooms / activity / object set
+        and resting state (the TRO's own task objects excepted) match (:func:`worlds_compatible`)."""
+        _, template_dir, tmeta, _, _ = resolve_instance(os.path.abspath(tro_path))
+        key = os.path.abspath(template_paths(template_dir, tmeta)[0])
+        if key == self.template_file:
             return template_dir
-        ok, bad = worlds_compatible(self.payload, world_payload(template_dir))
+        if key in self._compatible:
+            return template_dir
+        ok, bad = worlds_compatible(self.payload, world_payload(template_dir, tmeta, ignore_objects=set(self.task_objects) | set(tro_task_objects(os.path.abspath(tro_path)))))
         if not ok:
             raise RuntimeError(f"{tro_path}: template {template_dir} is another world than {self.template_dir}: {bad[:3]}")
+        self._compatible.add(key)
         return template_dir
 
-    def restore_batch(self, tro_paths: Sequence[Optional[str]]) -> Tuple[Dict[int, Any], Dict[int, Any]]:
+    def restore_batch(self, tro_paths: Sequence[Optional[str]], settle_eval: bool = True, settle_steps: Optional[Sequence[Optional[int]]] = None,
+                      mode: str = "replay", tolerance_scale: Optional[float] = None) -> Tuple[Dict[int, Any], Dict[int, Any]]:
         """Load ``tro_paths[i]`` into clone ``i`` (None = idle slot, left as it is); returns ``({env_idx: obs}, {env_idx: info})``
         of the loaded envs after the reset. A slot whose §3.14 restore fails (``LoadError``) is recorded in ``self.failed[i]``
-        (``{"reason", "message"}``), left holding, and excluded from the returned dicts."""
+        (``{"reason", "message"}``), left holding, and excluded from the returned dicts. Every loaded env gets the run's
+        ``settle_eval`` and its window ``settle_steps[i]`` (default the task's) before the reset and its ``isg-v2`` tolerances
+        (``mode`` / ``tolerance_scale``, ``slot_reports[i]["tolerance_profile"]``) after it, as ``run_isg`` does."""
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta
 
         assert len(tro_paths) == self.num_envs, (len(tro_paths), self.num_envs)
         env, task = self.env, self.task
         wanted = [i for i, p in enumerate(tro_paths) if p]
         self.failed = {}
+        for i in sorted(self._render_disabled):  # lever S1-finished: every paused clone renders again before the warm renders
+            self.set_render_enabled(i, True)
         if not wanted:
             return {}, {}
         t0 = time.time()
         loaded: List[int] = []
+        # phase 1 (vec_next 2026-10-31): every clone's TRO restored WITHOUT the physics step Scene.reset ends with (that step advances
+        # the whole world: restoring the clones one after another gave the clone restored first N-1 extra unheld steps), then ONE
+        # world step - per clone exactly the N=1 sequence (restore, one step, then the per-slot restores of phase 2).
+        staged: Dict[int, Tuple[Any, str, Dict[str, Any], Dict[str, Any]]] = {}
         for i in wanted:
             scene = env.scenes[i]
             path = os.path.abspath(tro_paths[i])
@@ -444,19 +705,43 @@ class VecInstanceLoader:
             tro = load_tro(path)
             rep: Dict[str, Any] = {"tro_path": path, "template_dir": template_dir}
             extras = tro.meta.extras or {}
-            if not self._fresh:
-                # the previous episode's hinge prims / grasps of this clone away, then the whole clone back to the template's state
-                if self.slots[i] is not None:
-                    self.slots[i].cleanup()
-                scene.load_state(copy.deepcopy(self.scene_state0[i]), serialized=False)
-                scene.trav_map.floor_map[0] = _copy_map(self.floor_map_template[i])
-            rep["trav_cells_blocked"] = block_trav_map_from_meta(scene, tro.meta.scene or {})
-            task.load_tro_instance(env, tro=tro, env_idx=i, settle_steps=0)
-            self.tros[i], self.tro_paths[i] = tro, path
-            physical = {k: v for k, v in task.physical_scope_of(i).items() if v is not None and not isinstance(v, GroupEntity)}
-            sl = SlotLoader(SceneView(env, i), self.robots[i], tro, physical, scene_translation(scene))
-            self.slots[i] = sl
             try:
+                if not self._fresh:
+                    # the previous episode's hinge prims / grasps of this clone away, then the whole clone back to the template's state
+                    if self.slots[i] is not None:
+                        self.slots[i].cleanup()
+                    scene.load_state(copy.deepcopy(self.scene_state0[i]), serialized=False)
+                    scene.trav_map.floor_map[0] = _copy_map(self.floor_map_template[i])
+                rep["trav_cells_blocked"] = block_trav_map_from_meta(scene, tro.meta.scene or {})
+                self._restore_probe(f"before_load_{i}", list(range(self.num_envs)))
+                task.load_tro_instance(env, tro=tro, env_idx=i, settle_steps=0, defer_reset_step=True)
+                self._restore_probe(f"after_load_{i}", list(range(self.num_envs)))
+                self.tros[i], self.tro_paths[i] = tro, path
+            except LoadError as e:
+                log.error("slot %d (%s): load failed: %s: %s", i, os.path.basename(path), e.reason, e.message)
+                self.failed[i] = {"reason": e.reason, "message": e.message}
+                rep.update({"load_error": e.message, "load_error_reason": e.reason})
+                self.slot_reports[i] = rep
+                continue
+            except Exception as e:  # noqa: BLE001  (a TRO the task rejects, a missing object: this slot's episode only)
+                log.error("slot %d (%s): load failed: %r", i, os.path.basename(path), e)
+                self.failed[i] = {"reason": "error", "message": repr(e)}
+                rep.update({"load_error": repr(e), "load_error_reason": "error"})
+                self.slot_reports[i] = rep
+                continue
+            staged[i] = (tro, path, rep, extras)
+        if staged:
+            task.finish_deferred_reset(sorted(staged))
+            self._restore_probe("after_reset_step", sorted(staged))
+        # phase 2: the per-slot restores (sleep threshold, hinges, attachments, grasps) and the robot's hold
+        for i in sorted(staged):
+            tro, path, rep, extras = staged[i]
+            scene = env.scenes[i]
+            try:
+                physical = {k: v for k, v in task.physical_scope_of(i).items() if v is not None and not isinstance(v, GroupEntity)}
+                rep["rigid_sleep_threshold"] = self._apply_rigid_sleep_threshold(physical.values())
+                sl = SlotLoader(SceneView(env, i), self.robots[i], tro, physical, scene_translation(scene))
+                self.slots[i] = sl
                 rep["constraints"] = sl._restore_constraints(extras.get("constraints") or [])
                 rep["attachments"] = sl._attachment_report(extras.get("attachment_targets") or [])
                 sl._articulation_q = sl._held_articulations(physical)
@@ -466,6 +751,12 @@ class VecInstanceLoader:
                 log.error("slot %d (%s): load failed: %s: %s", i, os.path.basename(path), e.reason, e.message)
                 self.failed[i] = {"reason": e.reason, "message": e.message}
                 rep.update({"load_error": e.message, "load_error_reason": e.reason})
+                self.slot_reports[i] = rep
+                continue
+            except Exception as e:  # noqa: BLE001
+                log.error("slot %d (%s): load failed: %r", i, os.path.basename(path), e)
+                self.failed[i] = {"reason": "error", "message": repr(e)}
+                rep.update({"load_error": repr(e), "load_error_reason": "error"})
                 self.slot_reports[i] = rep
                 continue
             robot = self.robots[i]
@@ -480,22 +771,28 @@ class VecInstanceLoader:
             sl.hold = hold
             self.slot_reports[i] = rep
             loaded.append(i)
+            self._restore_probe(f"after_slot_{i}", list(range(self.num_envs)))
         self._fresh = False
         if not loaded:
             self.batches += 1
             return {}, {}
         # one settle for the batch: physics substeps with every loaded env's task entities held, two full steps for the caches
+        self._restore_probe("before_settle", loaded)
         for _ in range(self.settle_physics_steps):
             og.sim.step_physics()
             self._hold_entities(loaded)
+        self._restore_probe("after_settle_physics", loaded)
         for _ in range(2):
             og.sim.step()
             self._hold_entities(loaded)
+        self._restore_probe("after_settle_steps", loaded)
         for i in loaded:
             env.scenes[i].update_initial_file()
-        task._reset_tracking(loaded)
+            n = settle_steps[i] if settle_steps is not None and settle_steps[i] is not None else task.settle_steps
+            task.configure_evaluation(settle_eval, int(n), env_indices=[i])  # before the reset activates its pose_settled windows
         idx = th.tensor(loaded, dtype=th.long)
         obs_list, info = env.reset(env_indices=idx)  # the loaded scenes back to their snapshots, pose_settled tracking on, a render
+        self._restore_probe("after_reset", loaded)
         info_list = info.get("obs_info") or [None] * len(loaded)
         if self.warm_renders > 0:
             # the renderer's adaptation to every clone's new view (see __init__); physics untouched, the observation re-read
@@ -517,21 +814,141 @@ class VecInstanceLoader:
                 continue
             if self.slot_reports[i]["controller_targets_restored"]:
                 self.robots[i].apply_action(sl.hold.action())
+            self.slot_reports[i]["tolerance_profile"] = task.apply_tolerance_profile(mode, scale=tolerance_scale, env_idx=i, scene=env.scenes[i],
+                                                                                     meta=self.tros[i].meta)
             rp, rq = self.robots[i].get_position_orientation()
             t_i = scene_translation(env.scenes[i])
             if t_i is not None:
                 rp = rp - t_i
             self.slot_reports[i]["robot_base_init_scene"] = {"position": [float(v) for v in rp], "orientation": [float(v) for v in rq]}
+        self._restore_probe("after_restore_after_reset", loaded)
+        if os.environ.get("ISG_RESTORE_PROBE_EXIT") == "1":
+            os._exit(0)
         self.batches += 1
         self.report["last_restore_s"] = round(time.time() - t0, 1)
         self.report["warm_renders"] = self.warm_renders
         return obs, infos
+
+    def _restore_probe(self, phase: str, slots: Sequence[int]) -> None:
+        """Diagnostic (ISG_RESTORE_PROBE=<jsonl path>, off by default): every listed slot's robot base / joints and task objects
+        (scene-relative, float64 lists) and the sim clock, appended as one JSON line per phase of the batch restore."""
+        path = os.environ.get("ISG_RESTORE_PROBE")
+        if not path:
+            return
+        rec = {"phase": phase, "t": float(og.sim.current_time), "slots": {}}
+        for i in slots:
+            try:
+                tr = scene_translation(self.env.scenes[i])
+                tr = th.zeros(3, dtype=th.float64) if tr is None else th.as_tensor(tr, dtype=th.float64)
+                d = {}
+                robot = self.robots[i]
+                p, q = robot.get_position_orientation()
+                d["robot_base"] = (th.as_tensor(p, dtype=th.float64) - tr).tolist() + th.as_tensor(q, dtype=th.float64).tolist()
+                d["joints"] = th.as_tensor(robot.get_joint_positions(), dtype=th.float64).tolist()
+                for name, obj in (self.task.physical_scope_of(i) or {}).items():
+                    if obj is None or isinstance(obj, GroupEntity) or not hasattr(obj, "get_position_orientation"):
+                        continue
+                    p, q = obj.get_position_orientation()
+                    d[name] = (th.as_tensor(p, dtype=th.float64) - tr).tolist() + th.as_tensor(q, dtype=th.float64).tolist()
+                rec["slots"][str(i)] = d
+            except Exception as e:  # noqa: BLE001
+                rec["slots"][str(i)] = {"error": repr(e)}
+        with open(path, "a") as f:
+            f.write(json.dumps(rec) + "\n")
 
     def _hold_entities(self, loaded: Sequence[int]) -> None:
         for i in loaded:
             self.slots[i]._hold_entities()
 
     # ------------------------------------------------------------------ helpers
+
+    def render_products(self, i: int) -> List[Any]:
+        """The per-camera render products of clone ``i`` (its robot's VisionSensors and its external camera); none with tiled
+        rendering (one shared product per camera name)."""
+        if self.env is None or getattr(self.env, "_tiled_sensor", None) is not None:
+            return []
+        out = []
+        for sensor in getattr(self.robots[i], "sensors", {}).values():
+            rp = getattr(sensor, "render_product", None)
+            if rp is not None:
+                out.append(rp)
+        for sensors in (getattr(self.env, "_ext_sensor_map", None) or {}).values():
+            try:
+                rp = getattr(sensors[i], "render_product", None)
+            except Exception:  # noqa: BLE001
+                rp = None
+            if rp is not None:
+                out.append(rp)
+        return out
+
+    #: how a clone's cameras are paused (lever S1-finished): "hydra-sync" = HydraTexture.set_updates_enabled inside og.sim.editing_usd()
+    #: (the 10-27 implementation: ends with a full USD->Fabric synchronisation), "hydra-nosync" = the same call with OmniGibson's USD-edit
+    #: guard muted and no Fabric sync (2026-10-28: is the other slots' brightness transient the sync or the switch?), "detach" = the
+    #: sensors' annotators detached from their render products instead (the products keep rendering; no AOV readback)
+    render_switch_method: str = "hydra-sync"
+
+    def _sensors(self, i: int) -> List[Any]:
+        out = list(getattr(self.robots[i], "sensors", {}).values())
+        for sensors in (getattr(self.env, "_ext_sensor_map", None) or {}).values():
+            try:
+                out.append(sensors[i])
+            except Exception:  # noqa: BLE001
+                pass
+        return out
+
+    def set_render_enabled(self, i: int, enabled: bool) -> int:
+        """Pause / resume the rendering of clone ``i``'s cameras (``HydraTexture.set_updates_enabled``, lever S1-finished, 2026-10-27):
+        a finished slot's cameras need not be rendered until the next batch restores it. Returns the number of products switched.
+        ``render_switch_method`` selects the mechanism (module attribute above)."""
+        n = 0
+        method = self.render_switch_method
+        if method == "detach":
+            for sensor in self._sensors(i):
+                rp = getattr(sensor, "render_product", None)
+                anns = getattr(sensor, "_annotators", None) or {}
+                if rp is None:
+                    continue
+                for ann in anns.values():
+                    try:
+                        if enabled:
+                            ann.attach([rp])
+                        else:
+                            ann.detach([rp])
+                        n += 1
+                    except Exception:  # noqa: BLE001
+                        pass
+        else:
+            rps = self.render_products(i)
+            if rps:
+                if method == "hydra-nosync":
+                    # the guard (a Tf.Notice listener) is muted for the call; no SynchronizeToFabric afterwards
+                    guard = getattr(og.sim, "_usd_guard_enabled", None)
+                    try:
+                        if guard is not None:
+                            og.sim._usd_guard_enabled = False
+                        for rp in rps:
+                            ht = getattr(rp, "hydra_texture", None)
+                            if ht is not None and hasattr(ht, "set_updates_enabled"):
+                                ht.set_updates_enabled(bool(enabled))
+                                n += 1
+                    finally:
+                        if guard is not None:
+                            og.sim._usd_guard_enabled = guard
+                            og.sim._deferred_usd_guard_error = None
+                else:
+                    # the switch edits the render product's /Render prim: inside OmniGibson's USD-edit guard (og.sim.editing_usd), else the
+                    # next og.sim.step raises "USD edit detected outside of og.sim.editing_usd() context" (seen 2026-10-27)
+                    with og.sim.editing_usd():
+                        for rp in rps:
+                            ht = getattr(rp, "hydra_texture", None)
+                            if ht is not None and hasattr(ht, "set_updates_enabled"):
+                                ht.set_updates_enabled(bool(enabled))
+                                n += 1
+        if enabled:
+            self._render_disabled.discard(i)
+        elif n:
+            self._render_disabled.add(i)
+        return n
 
     def tracked(self, i: int) -> Dict[str, Any]:
         sl = self.slots[i]
