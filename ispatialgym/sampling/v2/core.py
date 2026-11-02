@@ -65,6 +65,13 @@ from ispatialgym.sampling.v2.stances import PathRecord, SidecarDraft, Stance, Tr
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
+def start_per_attempt() -> bool:
+    """train85 (owner 2026-10-14 ~20:45): ``ISPATIALGYM_START_PER_ATTEMPT=1``, set only by the train jobs, makes every attempt draw
+    its own start (:meth:`SamplerV2.spa_redraw_start`) instead of the start ``sample_template`` drew once per template from the
+    template seed; each instance's start is in its own TRO / sidecar. Unset: nothing changes."""
+    return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1"
+
+
 class TemplateExhausted(Reject):
     """A rejection after which no attempt of the template can succeed (IORS small once every start-region candidate failed its
     init -> manipulation travel deterministically): ``run_instances`` counts it like any rejection and ends the template's attempts
@@ -293,6 +300,23 @@ class SamplerV2(TaskSampler):
     def sample_instance(self, rng: np.random.Generator) -> Draft:  # hook
         raise NotImplementedError
 
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:  # hook (start_per_attempt)
+        """This attempt's own start drawn from the attempt's ``rng`` (:func:`start_per_attempt`): the task modules whose
+        ``sample_template`` fixes the start for the template override it; the others draw the start per attempt already."""
+
+    def spa_template_start(self, errors: List[str], draws: int = 8) -> None:
+        """start_per_attempt: the template's own start draw found no start with the template seed's draw; up to ``draws`` more draws
+        from derived streams (every attempt draws its own start anyway: the template's start only shows that one exists, and one
+        unlucky draw would otherwise reject the template for every train job of the alias). Leaves the start unset when every draw
+        fails (the caller's rejection follows)."""
+        for k in range(1, int(draws) + 1):
+            try:
+                self.spa_redraw_start(np.random.default_rng([int(self.ctx.base_seed), k]))
+                log.info("%s: start_per_attempt: template start found on setup draw %d: %s", self.gp.alias, k, getattr(self, "_spa_facts", None))
+                return
+            except Reject as e:
+                errors.append(f"start_per_attempt setup draw {k}: [{e.reason}] {str(e)[:200]}")
+
     def goal(self, draft: Draft):  # hook
         """Goal poses / joint targets -> ``draft.goal_poses`` / ``draft.goal_joints`` and ``draft.pose_targets`` /
         ``draft.articulation_targets``; the sidecar ``goal`` block."""
@@ -346,8 +370,18 @@ class SamplerV2(TaskSampler):
         from ispatialgym.sampling.v2 import tabletop as TT
 
         self.sidecar.reset_instance()
+        if start_per_attempt():
+            if not getattr(self, "_spa_drawn", False):
+                t_spa = time.time()
+                self.spa_redraw_start(rng)
+                self._spa_draw_s = time.time() - t_spa
+            self._spa_drawn = False
+            self._split_cone_cands = self._split_cone_pools = None
+            log.info("%s: start_per_attempt: start drawn in %.1fs: %s", self.gp.alias, getattr(self, "_spa_draw_s", 0.0), getattr(self, "_spa_facts", None))
         TT.split_cone_draw(self, rng)
         draft = self.sample_instance(rng)
+        if start_per_attempt():
+            draft.summary["start_per_attempt"] = {**(getattr(self, "_spa_facts", None) or {}), "draw_s": round(float(getattr(self, "_spa_draw_s", 0.0)), 2)}
         if draft.robot_q is None and "init" in self.sidecar.stances:
             st = self.sidecar.stance("init")
             draft.robot_q = st.q if st.q is not None else self.ikc.q_locked(st)
@@ -1058,7 +1092,9 @@ class SamplerV2(TaskSampler):
                         "checks": self.check_flags()})
         with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
             json.dump(_jsonable(summary), f, indent=2)
-        if "stances" not in self.template_meta:
+        if start_per_attempt():
+            self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
+        elif "stances" not in self.template_meta:
             self.template_meta["stances"] = {k: v.to_meta() for k, v in self.sidecar.stances.items()}
         return path
 
@@ -1319,7 +1355,7 @@ class SamplerV2(TaskSampler):
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
                     self.on_reject(e)
-                    if isinstance(e, TemplateExhausted):
+                    if isinstance(e, TemplateExhausted) and not start_per_attempt():
                         exhausted = True
                         self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1
                         log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.alias, index, attempt)

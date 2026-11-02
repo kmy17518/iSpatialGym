@@ -43,6 +43,7 @@ from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
+from ispatialgym.sampling.v2.core import start_per_attempt  # noqa: E402  (train85)
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
@@ -764,6 +765,8 @@ class IORSSmall(SamplerV2):
                                                                           + " / ".join(TT.side_name(sd) for sd in self.template_sides())))
         if "start_region" in self.template_facts:
             self.template_facts["start_region"]["failed_lateral_draws"] = failed
+        if not self.manip_candidates and start_per_attempt():
+            self.spa_template_start(failed)
         if not self.manip_candidates:
             if not phase2_any:
                 raise Reject("no_manipulation_stance", "Phase 2 left no survivor: " + "; ".join(failed))
@@ -1455,6 +1458,15 @@ class IORSSmall(SamplerV2):
         return sides[int(rng.integers(len(sides)))] if len(sides) > 1 else sides[0]
 
     def sample(self, rng: np.random.Generator) -> Draft:
+        from ispatialgym.sampling.v2.core import start_per_attempt
+
+        if start_per_attempt():  # this attempt's start first: the partner sides come from its start region
+            import time
+
+            t_spa = time.time()
+            self.spa_redraw_start(rng)
+            self._spa_draw_s = time.time() - t_spa
+            self._spa_drawn = True
         # A1 step 3: the partner's side is fixed before the target is placed - before the split cone draws the start position too
         self.region_side = None if self.shelf_start is not None else self.draw_partner_side(rng)
         return super().sample(rng)
@@ -1508,6 +1520,88 @@ class IORSSmall(SamplerV2):
                 "g_NT": self.pair.get("g_NT"), "nextto_gap_extra": self.partner_gap_extra, "g_min": self.gap_min, "m_end": self.table_end_margin}
 
     # ------------------------------------------------------------------ instance (§4.6 Phase 3 + §6.11)
+
+    def _spa_edge_trunk(self, edge, init, H_max: float):
+        """start_per_attempt: the edge's init trunk (Phase 1b) after its free-floor test, once per process, or the Reject the edge raised."""
+        cache = self.__dict__.setdefault("_spa_edges", {})
+        if edge.name not in cache:
+            lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
+            n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(init.stand_off, lat)))
+            if n_free < max(1, len(lats) // 3):
+                cache[edge.name] = Reject("no_free_edge", f"{edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
+            else:
+                try:
+                    cache[edge.name] = TT.phase1b_init_trunk(self, init, H_max, top=self.top)
+                except Reject as e:
+                    if e.reason not in ("no_workspace", "edge_too_short", "stance_collision"):
+                        raise
+                    cache[edge.name] = e
+        return cache[edge.name]
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """start_per_attempt (train85): this attempt's own edge, init stance and Phase-2 pool cut to the A1 start region (lateral redrawn until it has a cell) from the attempt's ``rng``, drawn as
+        ``sample_template`` draws the template's (every edge with a free-floor run, random order; Phase 1c's lateral); the shelf layout's
+        book poses follow the edge. The segment arms and their bands are the template's."""
+        H_max = max(TT.height_of(self.hull["target"], self.rest["target"]), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        nb_top = self.neighbor_start_top()
+        margins = self.lateral_margins()
+        errors: List[str] = []
+        init_stance = init_trunk = None
+        for edge, init in TT.edge_frames(self, self.top, rng):
+            trunk = self._spa_edge_trunk(edge, init, H_max)
+            if isinstance(trunk, Reject):
+                errors.append(f"{edge.name}: {trunk}")
+                continue
+            try:
+                init_stance = TT.phase1c_lateral(self, trunk, margins, rng, top=self.top)
+            except Reject as e:
+                if e.reason in ("no_workspace", "edge_too_short", "stance_collision"):
+                    errors.append(f"{edge.name}: {e}")
+                    continue
+                raise
+            init_trunk, self.edge = trunk, edge
+            break
+        if init_stance is None:
+            raise Reject("no_free_edge", "start_per_attempt: " + ("; ".join(errors) or f"{self.support.name}: no edge with a free, collision-free stance"))
+        init_stance.name = "init"
+        self.init_stance = init_stance
+        self.shelf_pose = self.shelf_partner_pose = None
+        phase2_band: Dict[str, Any] = {}
+        if self.shelf_start is not None:
+            side = self.shelf_start["lean_side"]
+            self.shelf_pose, _ = TT.shelf_lean_pose(self, self.hull["target"], self.rest["target"], self.top, self.edge, self.support, side)
+            self.shelf_partner_pose, _ = TT.shelf_lean_pose(self, self.hull["partner"], self.rest["partner"], self.top, self.edge, self.support, -side)
+            t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
+            p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
+            free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
+            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+                raise Reject("shelf_width", f"start_per_attempt: {free:.2f} m between the two leaning books on edge {self.edge.name}")
+            phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
+        failed: List[str] = []
+        phase2_any = False
+        for i in range(max(1, int(self.gen("start_region_lateral_draws", START_REGION_LATERAL_DRAWS)))):
+            if i:
+                try:
+                    self.init_stance = TT.phase1c_lateral(self, init_trunk, margins, rng, top=self.top)
+                except Reject as e:
+                    failed.append(f"redraw: [{e.reason}] {e}")
+                    break
+                self.init_stance.name = "init"
+            cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
+                                                  target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  **phase2_band)
+            phase2_any = phase2_any or bool(cands)
+            self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
+            if self.manip_candidates:
+                break
+            failed.append(f"lateral {self.init_stance.lateral:+.2f}: " + ("Phase 2 left no survivor" if not cands else "no start cell for the partner on the "
+                                                                          + " / ".join(TT.side_name(sd) for sd in self.template_sides())))
+        if not self.manip_candidates:
+            raise Reject("no_manipulation_stance" if not phase2_any else "no_start_region", "start_per_attempt: " + "; ".join(failed))
+        self._spa_facts = {"edge": self.edge.name, "lateral_m": round(float(self.init_stance.lateral), 4),
+                           "trunk": [round(float(self.init_stance.translate), 3), round(float(self.init_stance.tilt), 3)],
+                           "base_pose2d": [round(float(v), 4) for v in self.init_stance.base_pose2d], "n_manipulation_candidates": len(self.manip_candidates)}
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()

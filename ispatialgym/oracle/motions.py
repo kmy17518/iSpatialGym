@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Set, Tuple, Union
@@ -56,6 +57,18 @@ from ispatialgym.robot import base_path as BP
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
+
+
+# train85 (owner 2026-10-14 ~22:00): the oracle's waits end once nothing moves any more, so a demo carries no long standstill
+# (thresholds of reconcile83's generation.oracle_still_exit). ISPATIALGYM_ORACLE_STILL_EXIT=1 turns it on; unset, nothing changes.
+STILL_EXIT_MOVE = 1e-4  # rad or m per control step: did not move
+STILL_EXIT_STEPS = 5  # consecutive still steps that end a settle / a gripper wait
+STILL_EXIT_OBJECT_SPEED = 0.005  # m/s: the object released last must be slower than this too (settle)
+STILL_EXIT_CONVERGE_WINDOW = 10  # steps: _wait_converged stops when its error dropped less than STILL_EXIT_MOVE over this many
+
+
+def oracle_still_exit() -> bool:
+    return os.environ.get("ISPATIALGYM_ORACLE_STILL_EXIT") == "1"
 
 Pose = Tuple[th.Tensor, th.Tensor]
 
@@ -558,23 +571,72 @@ class Motions:
         for _ in range(int(steps)):
             yield self._emit()
 
+    def _still_watch(self) -> Callable[[], bool]:
+        """The still exit of ``settle``: a check to call after every emitted step, True once every robot joint moved less than
+        STILL_EXIT_MOVE per step and the object released last (``release_events``; none: no object check) moved slower than
+        STILL_EXIT_OBJECT_SPEED, STILL_EXIT_STEPS steps in a row."""
+        name = next((e.get("object") for e in reversed(self.release_events) if e.get("event") == "instant_open" and e.get("object")), None)
+        scene = getattr(self.env, "scene", None)
+        obj = scene.object_registry("name", name, None) if (name is not None and scene is not None) else None
+        prev = [self.robot.get_joint_positions().float().clone()]
+        run = [0]
+
+        def still() -> bool:
+            q = self.robot.get_joint_positions().float()
+            ok = float((q - prev[0]).abs().max()) < STILL_EXIT_MOVE
+            prev[0] = q.clone()
+            if ok and obj is not None:
+                try:
+                    ok = float(th.linalg.norm(obj.get_linear_velocity().float())) < STILL_EXIT_OBJECT_SPEED
+                except Exception:  # noqa: BLE001  (as SimState.object_velocity: no reading = at rest)
+                    pass
+            run[0] = run[0] + 1 if ok else 0
+            return run[0] >= STILL_EXIT_STEPS
+
+        return still
+
+    def _trim_still_waypoints(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool) -> th.Tensor:
+        """The still exit of ``execute_joint_trajectory``, on the joints the trajectory drives: streaming starts at the last
+        waypoint still within STILL_EXIT_MOVE of the first, and the trailing waypoints within it of the last are dropped but
+        the last."""
+        idx = [self.robot.arm_control_idx[a] for a in arms if a in self.robot.arm_control_idx] + ([self.robot.trunk_control_idx] if trunk else [])
+        T = len(q_traj)
+        if T < 2 or not idx:
+            return q_traj
+        sub = q_traj[:, th.cat([th.as_tensor(i).long().flatten() for i in idx])].float()
+        moving = th.nonzero((sub - sub[0]).abs().max(dim=1).values > STILL_EXIT_MOVE).flatten()
+        start = int(moving[0]) - 1 if len(moving) else T - 1
+        away = th.nonzero((sub - sub[-1]).abs().max(dim=1).values > STILL_EXIT_MOVE).flatten()
+        end = int(away[-1]) + 1 if len(away) else 0  # the first of the trailing waypoints within STILL_EXIT_MOVE of the last
+        keep = list(range(start, max(start, end))) + [T - 1]
+        return q_traj if len(keep) == T else q_traj[keep]
+
     def settle(self, max_steps: Optional[int] = None, vel_tol: Optional[float] = None) -> Iterator[th.Tensor]:
         """Hold until every joint velocity is below ``vel_tol`` (or ``max_steps`` elapsed; never raises)."""
         self.state.stop_base()
         max_steps = self.cfg.settle_max_steps if max_steps is None else int(max_steps)
         vel_tol = self.cfg.settle_vel_tol if vel_tol is None else float(vel_tol)
+        still = self._still_watch() if oracle_still_exit() else None
         for _ in range(max_steps):
             yield self._emit()
             if float(self.robot.get_joint_velocities().abs().max()) < vel_tol:
+                return
+            if still is not None and still():
                 return
 
     def _wait_converged(self, arms: Sequence[str], trunk: bool, tol: float, max_steps: int, loose: Optional[float] = None) -> Iterator[th.Tensor]:
         def err() -> float:
             return max([self.state.arm_error(a) for a in arms] + ([self.state.trunk_error()] if trunk else [0.0]))
 
+        still_exit = oracle_still_exit()
+        errs: List[float] = []
         for _ in range(max_steps):
             if err() < tol:
                 return
+            if still_exit:
+                errs.append(err())
+                if len(errs) > STILL_EXIT_CONVERGE_WINDOW and errs[-1 - STILL_EXIT_CONVERGE_WINDOW] - errs[-1] < STILL_EXIT_MOVE:
+                    break
             yield self._emit()
         e = err()
         if e > (self.cfg.joint_tol_loose if loose is None else loose):
@@ -676,12 +738,21 @@ class Motions:
                 self.release_events.append({"arm": arm, "event": "instant_open", "from_m": round(q_now, 4), "object": getattr(held_before, "name", None)})
             self.state.set_gripper(arm, False)  # exactly the open command (the assisted grasp's release condition)
         steps = self.cfg.gripper_steps if steps is None else int(steps)
+        still_exit = oracle_still_exit() and not (close and rate)
+        q_fingers = self.robot.get_joint_positions()[idx].float().clone() if still_exit else None
+        n_still = 0
         for i in range(steps):
             yield self._emit()
+            if still_exit:
+                q_now_f = self.robot.get_joint_positions()[idx].float()
+                n_still = n_still + 1 if float((q_now_f - q_fingers).abs().max()) < STILL_EXIT_MOVE else 0
+                q_fingers = q_now_f.clone()
             if i > 10:
                 if close and self.held_object(arm) is not None:
                     break
                 if float(self.robot.get_joint_velocities()[idx].abs().max()) < 1e-3:
+                    break
+                if still_exit and n_still >= STILL_EXIT_STEPS:
                     break
         yield from self.hold(5)
 
@@ -736,6 +807,8 @@ class Motions:
         q_traj = C.as_tensor(q_traj)
         if len(q_traj) > self.cfg.trajectory_max_steps:
             raise SkillError("timeout", f"trajectory of {len(q_traj)} steps exceeds the budget {self.cfg.trajectory_max_steps}")
+        if oracle_still_exit():
+            q_traj = self._trim_still_waypoints(q_traj, arms, trunk)
         self.state.stop_base()
         for q in q_traj:
             self.state.set_from_q(q, arms=arms, trunk=trunk)
