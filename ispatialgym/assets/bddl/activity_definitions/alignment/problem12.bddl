@@ -30,4 +30,8 @@
             (pose_settled ?agent.n.01_1)
         )
     )
+
+    (:measure
+        (pose_reached ?keyboard.n.01_1)
+    )
 )

@@ -22,10 +22,13 @@
     (:goal
         (and
             (open ?cabinet.n.01_1)
-            (layout_reached ?cabinet.n.01_1)
             (not (grasped ?agent.n.01_1 ?cabinet.n.01_1))
             (pose_settled ?cabinet.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
+    )
+
+    (:measure
+        (layout_reached ?cabinet.n.01_1)
     )
 )

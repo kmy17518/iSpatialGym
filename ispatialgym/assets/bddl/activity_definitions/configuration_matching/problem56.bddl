@@ -25,7 +25,6 @@
     (:goal
         (and
             (open ?hinged_jar.n.01_1)
-            (layout_reached ?hinged_jar.n.01_1)
             (ontop ?hinged_jar.n.01_1 ?conference_table.n.01_1)
             (not (grasped ?agent.n.01_1 ?hinged_jar.n.01_1))
             (pose_settled ?hinged_jar.n.01_1)
@@ -35,5 +34,6 @@
 
     (:measure
         (pose_reached ?hinged_jar.n.01_1)
+        (layout_reached ?hinged_jar.n.01_1)
     )
 )

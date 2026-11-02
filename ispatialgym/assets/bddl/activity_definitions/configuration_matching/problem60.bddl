@@ -24,7 +24,6 @@
     (:goal
         (and
             (open ?toolbox.n.01_1)
-            (layout_reached ?toolbox.n.01_1)
             (ontop ?toolbox.n.01_1 ?countertop.n.01_1)
             (not (grasped ?agent.n.01_1 ?toolbox.n.01_1))
             (pose_settled ?toolbox.n.01_1)
@@ -34,5 +33,6 @@
 
     (:measure
         (pose_reached ?toolbox.n.01_1)
+        (layout_reached ?toolbox.n.01_1)
     )
 )

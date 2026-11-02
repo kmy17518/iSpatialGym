@@ -28,4 +28,8 @@
             (pose_settled ?agent.n.01_1)
         )
     )
+
+    (:measure
+        (pose_reached ?license_plate.n.01_1)
+    )
 )

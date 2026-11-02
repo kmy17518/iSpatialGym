@@ -40,5 +40,6 @@
 
     (:measure
         (pose_reached ?targets_group.n.01_1)
+        (layout_reached ?targets_group.n.01_1)
     )
 )

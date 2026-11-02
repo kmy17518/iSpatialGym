@@ -25,7 +25,6 @@
     (:goal
         (and
             (open ?blender.n.01_1)
-            (layout_reached ?blender.n.01_1)
             (ontop ?blender.n.01_1 ?breakfast_table.n.01_1)
             (not (grasped ?agent.n.01_1 ?blender.n.01_1))
             (pose_settled ?blender.n.01_1)
@@ -35,5 +34,6 @@
 
     (:measure
         (pose_reached ?blender.n.01_1)
+        (layout_reached ?blender.n.01_1)
     )
 )

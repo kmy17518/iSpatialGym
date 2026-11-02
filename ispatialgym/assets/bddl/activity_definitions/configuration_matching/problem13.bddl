@@ -39,5 +39,6 @@
 
     (:measure
         (pose_reached ?assembly_group.n.01_1)
+        (layout_reached ?assembly_group.n.01_1)
     )
 )

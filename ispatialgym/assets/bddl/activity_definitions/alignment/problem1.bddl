@@ -25,4 +25,8 @@
             (pose_settled ?agent.n.01_1)
         )
     )
+
+    (:measure
+        (pose_reached ?painting.n.01_1)
+    )
 )

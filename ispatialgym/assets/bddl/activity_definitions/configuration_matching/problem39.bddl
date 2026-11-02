@@ -24,7 +24,6 @@
     (:goal
         (and
             (open ?carton.n.02_1)
-            (layout_reached ?carton.n.02_1)
             (ontop ?carton.n.02_1 ?conference_table.n.01_1)
             (not (grasped ?agent.n.01_1 ?carton.n.02_1))
             (pose_settled ?carton.n.02_1)
@@ -34,5 +33,6 @@
 
     (:measure
         (pose_reached ?carton.n.02_1)
+        (layout_reached ?carton.n.02_1)
     )
 )

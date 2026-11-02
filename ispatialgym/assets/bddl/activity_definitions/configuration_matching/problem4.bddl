@@ -21,10 +21,13 @@
     (:goal
         (and
             (not (open ?door.n.01_1))
-            (layout_reached ?door.n.01_1)
             (not (grasped ?agent.n.01_1 ?door.n.01_1))
             (pose_settled ?door.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
+    )
+
+    (:measure
+        (layout_reached ?door.n.01_1)
     )
 )
