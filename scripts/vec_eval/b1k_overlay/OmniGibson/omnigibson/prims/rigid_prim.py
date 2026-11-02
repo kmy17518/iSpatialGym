@@ -425,7 +425,24 @@ class RigidPrim(XFormPrim):
         """
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
         meshes = self._visual_meshes.values() if self.is_meta_link else self._collision_meshes.values()
-        return sum(get_mesh_volume_and_com(mesh.prim, world_frame=True)[0] for mesh in meshes)
+        # iSpatialGym vec-eval overlay (campaign vec_next, 2026-10-31): a clone is a pure translation of scene 0, so each mesh's
+        # world-frame volume equals scene 0's; the clones replay scene 0's values (computed on the stock path) instead of rebuilding
+        # the trimesh mesh from translated vertices - 37-39 % of a clone's object loop (py-spy, apple N=4) and bit-identical link
+        # masses across the clones (a recomputation from translated coordinates can round differently). ISG_VEC_MESH_CACHE=0 = stock.
+        use_cache = os.environ.get("ISG_VEC_MESH_CACHE", "1") == "1"
+        scene = self.scene if use_cache else None
+        total = 0.0
+        for mesh in meshes:
+            key = ("world_volume", mesh.relative_prim_path) if scene is not None else None
+            hit = _ISG_MESH_CACHE.get(key) if (key is not None and scene.idx > 0) else None
+            if hit is None:
+                vol = get_mesh_volume_and_com(mesh.prim, world_frame=True)[0]
+                if key is not None and scene.idx == 0:
+                    _ISG_MESH_CACHE[key] = vol
+            else:
+                vol = hit
+            total = total + vol
+        return total
 
     @property
     def ccd_enabled(self):
@@ -532,6 +549,21 @@ class RigidPrim(XFormPrim):
         transform back to world frame using just the link's pose-matrix (rotation + translation,
         no scale) — matching what RigidBodyViewAPI.POSE_MATRICES provides.
         """
+        # iSpatialGym vec-eval overlay (campaign vec_next, 2026-10-31): the link-local, scale-baked points are the same for scene 0's link
+        # and every clone's copy (a clone is a pure translation), so the clones replay scene 0's tensors instead of transforming every
+        # collision vertex to world and back (60 % of the build's first update_handles, py-spy apple N=4); the clones' AABB / adjacency
+        # geometry is then exactly slot 0's (a round trip through a ~60 m clone offset rounds differently). ISG_VEC_MESH_CACHE=0 = stock.
+        scene = self.scene if os.environ.get("ISG_VEC_MESH_CACHE", "1") == "1" else None
+        key = ("collision_mesh_cpu_data", self.relative_prim_path) if scene is not None else None
+        if key is not None and scene.idx > 0 and key in _ISG_MESH_CACHE:
+            hit = _ISG_MESH_CACHE[key]
+            return None if hit is None else (hit[0].clone(), hit[1].clone())
+        data = self._isg_collision_mesh_cpu_data_stock()
+        if key is not None and scene.idx == 0:
+            _ISG_MESH_CACHE[key] = None if data is None else (data[0].clone(), data[1].clone())
+        return data
+
+    def _isg_collision_mesh_cpu_data_stock(self):
         world_to_scaled_link = T.pose_inv(T.pose2mat(self.get_position_orientation()))
         pts_concat, idx_concat, point_offset = [], [], 0
         for geom in self._collision_meshes.values():

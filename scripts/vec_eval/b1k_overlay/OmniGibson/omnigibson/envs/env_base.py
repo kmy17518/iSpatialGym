@@ -498,7 +498,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 self._tiled_sensor = None
 
         # Play and complete loading
-        og.sim.play()
+        with _isg_bt("env.final_play"):
+            og.sim.play()
+        # vec_next overlay (2026-10-31): the build's plays are over - ISG_PHYSX_REPLICATE never replicates a later play (the clones
+        # stop being copies of scene 0 once their instances are restored)
+        og.sim._isg_replicate_build = False
         # Run any additional task post-loading behavior
         with _isg_bt("env.task_post_play_load"):
             self.task.post_play_load(env=self)

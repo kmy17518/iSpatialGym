@@ -482,12 +482,24 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._visual_states = states_set & get_visual_states()
 
         # If we require visual updates, possibly create additional APIs
+        # iSpatialGym vec-eval overlay (campaign vec_next, 2026-10-31): a CLONE's steam / fire emitters (visual-only flow effects of the
+        # heat states) are created on first use - set_emitter_enabled(..., True) - instead of for every object of every clone at the first
+        # play (27 % of the build's _non_physics_step, py-spy apple N=4). Scene 0 keeps the stock eager path (the N=1 build unchanged).
+        # ISG_VEC_LAZY_EMITTERS=0 = stock everywhere.
+        self._isg_lazy_emitters = set()
+        lazy_emit = (os.environ.get("ISG_VEC_LAZY_EMITTERS", "1") == "1" and self.scene is not None and self.scene.idx > 0)
         if len(self._visual_states) > 0:
             if len(states_set & get_steam_states()) > 0:
-                self._create_emitter_apis(EmitterType.STEAM)
+                if lazy_emit:
+                    self._isg_lazy_emitters.add(EmitterType.STEAM)
+                else:
+                    self._create_emitter_apis(EmitterType.STEAM)
 
             if len(states_set & get_fire_states()) > 0:
-                self._create_emitter_apis(EmitterType.FIRE)
+                if lazy_emit:
+                    self._isg_lazy_emitters.add(EmitterType.FIRE)
+                else:
+                    self._create_emitter_apis(EmitterType.FIRE)
 
     def add_state(self, state):
         """
@@ -837,7 +849,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             value (bool): Value to set
         """
         if emitter_type not in self._emitters:
-            return
+            if not (value and emitter_type in getattr(self, "_isg_lazy_emitters", ())):
+                return
+            self._isg_lazy_emitters.discard(emitter_type)
+            self._create_emitter_apis(emitter_type)  # the deferred creation (clones, ISG_VEC_LAZY_EMITTERS)
+            if emitter_type not in self._emitters:
+                return
         # If we're running fabric and the value is active, we need to manually update the pose in the USD
         # to ensure the rendering is updated properly at the correct pose
         # TODO(#2082): Verify if this is still needed.
