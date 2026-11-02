@@ -63,6 +63,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch as th
 
+from ispatialgym.fastflags import fast_on, fast_value
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import knowledge as K
@@ -97,6 +98,10 @@ N_FREE_POINTS = 60
 N_GOAL_TRIES = 20
 N_YAW_TRIES = 3
 OBSTACLE_MAX_CELLS = 8
+#: CR_GEODESIC_FIELD: slack (m) around the bucket when goal cells are drawn from the geodesic field (the A* bucket check stays)
+FIELD_TOL_M = 0.15
+#: CR_OBSTACLE_RETRY: goal candidates of one attempt whose obstacle placement may fail before the attempt is rejected
+OBSTACLE_GOAL_TRIES = 3
 #: obstacle displacement tolerances at the goal settle (§6.2 "displacement is checked at the goal settle")
 OBSTACLE_MAX_TILT_RAD = 0.05
 #: footprint growth of ``blocked_footprints`` (the 2 cm the chair variant's ``freed_footprints`` use, §3.1)
@@ -190,14 +195,84 @@ def path_yaws(points: Sequence[Sequence[float]], final_yaw: float) -> List[float
     return yaws
 
 
-def path_cells(rng, n_points: int, max_cells: int) -> List[int]:
-    """Indices of the middle 30..70 % of a path (every interior index on short paths), shuffled, at most ``max_cells``."""
+def path_cell_range(n_points: int) -> List[int]:
+    """The indices of the middle 30..70 % of a path (every interior index on short paths), in order."""
     if n_points < 3:
         return []
     lo, hi = int(math.floor(0.3 * (n_points - 1))), int(math.ceil(0.7 * (n_points - 1)))
-    idx = list(range(max(lo, 1), min(hi, n_points - 2) + 1)) or list(range(1, n_points - 1))
+    return list(range(max(lo, 1), min(hi, n_points - 2) + 1)) or list(range(1, n_points - 1))
+
+
+def path_cells(rng, n_points: int, max_cells: int, allowed: Optional[Sequence[int]] = None) -> List[int]:
+    """Indices of the middle 30..70 % of a path (every interior index on short paths), shuffled, at most ``max_cells``.
+    ``allowed`` (CR_OBSTACLE_PREFILTER): draw only among these indices of that range."""
+    idx = path_cell_range(n_points)
+    if allowed is not None:
+        keep = set(int(i) for i in allowed)
+        idx = [i for i in idx if i in keep]
+    if not idx:
+        return []
     perm = rng.permutation(len(idx))
     return [idx[int(i)] for i in perm[:max_cells]]
+
+
+#: the four forward neighbour offsets of an 8-connected grid and their step lengths (in cells)
+_FIELD_STEPS = ((0, 1, 1.0), (1, 0, 1.0), (1, 1, math.sqrt(2.0)), (1, -1, math.sqrt(2.0)))
+
+
+def geodesic_field(free: np.ndarray, src: Tuple[int, int]) -> np.ndarray:
+    """Shortest 8-connected grid distance (in cells: 1 per side step, sqrt 2 per diagonal step) from ``src`` to every
+    cell of the boolean map ``free``, ``inf`` where unreachable. The metric of BEHAVIOR's ``astar`` (the source cell is
+    admitted whatever its value, every other cell must be free), so ``field[goal] * resolution`` is the geodesic
+    ``get_shortest_path`` returns for that goal cell (CR_GEODESIC_FIELD)."""
+    free = np.asarray(free, dtype=bool).copy()
+    rows, cols = free.shape
+    si, sj = int(src[0]), int(src[1])
+    if not (0 <= si < rows and 0 <= sj < cols):
+        return np.full((rows, cols), np.inf)
+    free[si, sj] = True
+    try:
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import dijkstra
+    except ImportError:  # pragma: no cover - scipy ships with OmniGibson
+        return _geodesic_field_heap(free, (si, sj))
+    ids = np.full((rows + 2, cols + 2), -1, dtype=np.int64)
+    ii, jj = np.nonzero(free)
+    ids[ii + 1, jj + 1] = np.arange(len(ii))
+    a = ids[1:-1, 1:-1]
+    src_l, dst_l, w_l = [], [], []
+    for di, dj, w in _FIELD_STEPS:
+        b = ids[1 + di:rows + 1 + di, 1 + dj:cols + 1 + dj]
+        ok = (a >= 0) & (b >= 0)
+        src_l.append(a[ok])
+        dst_l.append(b[ok])
+        w_l.append(np.full(int(ok.sum()), w))
+    s, t, w = np.concatenate(src_l), np.concatenate(dst_l), np.concatenate(w_l)
+    n = len(ii)
+    g = coo_matrix((np.concatenate([w, w]), (np.concatenate([s, t]), np.concatenate([t, s]))), shape=(n, n)).tocsr()
+    out = np.full((rows, cols), np.inf)
+    out[ii, jj] = dijkstra(g, directed=True, indices=int(ids[si + 1, sj + 1]))
+    return out
+
+
+def _geodesic_field_heap(free: np.ndarray, src: Tuple[int, int]) -> np.ndarray:
+    """:func:`geodesic_field` without scipy (a heap Dijkstra; ``free[src]`` already set)."""
+    import heapq
+    rows, cols = free.shape
+    out = np.full((rows, cols), np.inf)
+    out[src] = 0.0
+    heap = [(0.0, src)]
+    steps = [(s * di, s * dj, w) for di, dj, w in _FIELD_STEPS for s in (1, -1)]
+    while heap:
+        dcur, (i, j) = heapq.heappop(heap)
+        if dcur > out[i, j]:
+            continue
+        for di, dj, w in steps:
+            a, b = i + di, j + dj
+            if 0 <= a < rows and 0 <= b < cols and free[a, b] and dcur + w < out[a, b]:
+                out[a, b] = dcur + w
+                heapq.heappush(heap, (dcur + w, (a, b)))
+    return out
 
 
 def bucket_min_detour(bucket_hi: float, min_detour_m: float, by_bucket: Optional[Dict[str, float]] = None) -> float:
@@ -493,11 +568,25 @@ class CameraRelocalizationV2(SamplerV2):
         base0, q0 = init
         cam0 = self.kit.camera_pose(q0)
         axis0 = self.world.camera_model.optical_axis(cam0)
+        # CR_GEODESIC_FIELD: one Dijkstra from the init cell; the goal points are drawn among the room's cells whose geodesic
+        # lies in the bucket (instead of the init's points, most of which fail the A* bucket check below)
+        goal_pts = pts
+        fast_facts: Dict[str, Any] = {}
+        if fast_on("CR_GEODESIC_FIELD"):
+            import time as _time
+            t_f = _time.perf_counter()
+            field = self.field_from(base0)
+            goal_pts = self.field_goal_points(rng, field, lo, hi, N_FREE_POINTS)
+            fast_facts["field"] = {"s": round(_time.perf_counter() - t_f, 3), "goal_points": len(goal_pts)}
+            if not goal_pts:
+                raise Reject("goal_sampling", f"no free cell of the task room at a geodesic in ({lo}, {hi}] m from the init (geodesic field)")
+        prefilter = self.obstructed and fast_on("CR_OBSTACLE_PREFILTER")
+        retry = self.obstructed and fast_on("CR_OBSTACLE_RETRY")
         # goal candidates: analytic filters (bucket upper bound on the Euclidean distance, heading), collision later;
         # candidates whose Euclidean distance lies inside the bucket are tried first (a path is never shorter than it)
         cands = []
         n_self_collide = 0
-        for xy in pts:
+        for xy in goal_pts:
             e = math.hypot(float(xy[0]) - base0[0], float(xy[1]) - base0[1])
             if e < MIN_EUCLIDEAN_M or e > hi:
                 continue
@@ -525,6 +614,7 @@ class CameraRelocalizationV2(SamplerV2):
         order = list(rng.permutation(len(cands)))
         order.sort(key=lambda i: 0 if cands[int(i)][0] > lo else 1)  # Euclidean distance already inside the bucket first (stable: random within)
         chosen = None
+        obstacle_err: Optional[Reject] = None
         n_rendered = 0
         fails: Dict[str, int] = {}
         for i in order[:N_GOAL_TRIES]:
@@ -538,6 +628,9 @@ class CameraRelocalizationV2(SamplerV2):
                 continue
             if bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
                 fails["bucket"] = fails.get("bucket", 0) + 1
+                continue
+            if prefilter and self.obstacle_names and not self.obstacle_cell_indices(path, self.obstacle_names[0], base0, base1):
+                fails["obstacle_prefilter"] = fails.get("obstacle_prefilter", 0) + 1  # no middle cell clears both bases: place_obstacles cannot succeed
                 continue
             rec = self.build_path_record(path, base0, base1, (tr0, ti0))
             if rec is None:
@@ -557,9 +650,31 @@ class CameraRelocalizationV2(SamplerV2):
                 fails["shared"] = fails.get("shared", 0) + 1
                 continue
             chosen = (e, heading, base1, tr1, ti1, q1, cam1, arms, geo, goal_vis, init_vis, shared, path, rec)
-            break
+            if not retry:
+                break
+            # CR_OBSTACLE_RETRY: an obstacle that fits no cell of this goal's path costs this goal, not the attempt
+            try:
+                self.finish_goal(d, rng, chosen, bi, lo, hi, base0, q0, cam0, tr0, ti0, fails, fast_facts)
+                return d
+            except Reject as err:
+                if err.reason not in ("obstacle", "obstacle_lookalike"):
+                    raise
+                obstacle_err = err
+                fails[err.reason] = fails.get(err.reason, 0) + 1
+                self.unplace_goal(base0, q0)
+                chosen = None
+                if fails.get("obstacle", 0) + fails.get("obstacle_lookalike", 0) >= int(fast_value("CR_OBSTACLE_GOAL_TRIES", OBSTACLE_GOAL_TRIES, int)):
+                    raise Reject(err.reason, f"{fails.get('obstacle', 0) + fails.get('obstacle_lookalike', 0)} goal(s) failed the obstacle placement; last: {err}")
         if chosen is None:
+            if retry and obstacle_err is not None:
+                raise Reject(obstacle_err.reason, f"no further goal candidate after {fails}; last: {obstacle_err}")
             raise Reject("goal_sampling", f"no goal candidate passed collision / path / bucket / visibility ({n_rendered} rendered; {fails})")
+        self.finish_goal(d, rng, chosen, bi, lo, hi, base0, q0, cam0, tr0, ti0, fails, fast_facts)
+        return d
+
+    def finish_goal(self, d: Draft, rng, chosen, bi: int, lo: float, hi: float, base0, q0, cam0, tr0: float, ti0: float, fails: Dict[str, int],
+                    fast_facts: Dict[str, Any]):
+        """The chosen goal into the draft and the sidecar (stances, goal block, path, bucket), then the obstacles (§6.2)."""
         e, heading, base1, tr1, ti1, q1, cam1, arms, geo, goal_vis, init_vis, shared, path, rec = chosen
         self.kit.apply(q0, base0)
         d.robot_q = q0
@@ -570,6 +685,8 @@ class CameraRelocalizationV2(SamplerV2):
         d.summary.update({"euclidean_m": e, "geodesic_m": float(geo), "path_length_m": rec.length_m, "heading_deg": math.degrees(heading), "goal_base_pose2d": list(base1),
                           "goal_trunk": [tr1, ti1], "goal_arms": arms, "goal_visible_objects": goal_vis, "init_visible_objects": init_vis, "shared_fraction": shared,
                           "path_bucket_m": hi, "bucket": {"lo_m": lo, "hi_m": hi}, "candidate_failures": fails})
+        if fast_facts:
+            d.summary["cr_fast"] = fast_facts
         # sidecar: the two stances, the goal block, the path, the bucket
         st_init = Stance("init", base0, tr0, ti0, arms=self.stance_arms())
         st_init.q = q0
@@ -583,7 +700,6 @@ class CameraRelocalizationV2(SamplerV2):
         self.sidecar.path_bucket_m = hi
         if self.obstructed:
             self.place_obstacles(d, rng, base0, q0, cam0, base1, q1, cam1, path, float(geo), rec, lo, hi)
-        return d
 
     def goal(self, draft: Draft):
         cam1 = draft.extras["goal_cam"]
@@ -637,6 +753,70 @@ class CameraRelocalizationV2(SamplerV2):
             return None
         return PathRecord(frm, to, "global", waypoints, path_length(waypoints), posture=self.init_arms, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M,
                           n_checked=len(poses), style=BP.FACE_TRAVEL)
+
+    # ------------------------------------------------------------------ train-fast: goal cells and obstacle cells drawn up front
+
+    def field_from(self, base0) -> np.ndarray:
+        """CR_GEODESIC_FIELD: the eroded-map geodesic (m) from the init cell to every cell (:func:`geodesic_field`; the
+        cells ``get_shortest_path`` maps the two positions to)."""
+        trav = self.world.scene.trav_map
+        m = self.kit.eroded_trav_map(0)
+        src = trav.world_to_map(th.tensor(base0[:2], dtype=th.float32))
+        return geodesic_field((m != 0).cpu().numpy(), (int(src[0]), int(src[1]))) * float(trav.map_resolution)
+
+    def field_at(self, field: np.ndarray, xy) -> float:
+        ij = self.world.scene.trav_map.world_to_map(G.t(xy)[:2])
+        i, j = int(ij[0]), int(ij[1])
+        if not (0 <= i < field.shape[0] and 0 <= j < field.shape[1]):
+            return math.inf
+        return float(field[i, j])
+
+    def field_goal_points(self, rng, field: np.ndarray, lo: float, hi: float, n: int) -> List[th.Tensor]:
+        """Up to ``n`` free eroded cells of the task room whose geodesic from the init lies in the bucket (± the field
+        slack), uniformly: the cells ``random_free_points`` draws, conditioned on the bucket before any check."""
+        tol = float(fast_value("CR_FIELD_TOL_M", FIELD_TOL_M, float))
+        trav = self.world.scene.trav_map
+        m = self.kit.eroded_trav_map(0).cpu().numpy() == 255
+        cells = np.argwhere(m & (field > lo - tol) & (field <= hi + tol))
+        out: List[th.Tensor] = []
+        tries = 0
+        while len(cells) and len(out) < n and tries < 50 * n:
+            tries += 1
+            xy = trav.map_to_world(th.tensor(cells[int(rng.integers(len(cells)))]))
+            if not self.in_room(xy):
+                continue
+            g = self.field_at(field, xy)  # the cell A* maps this position to
+            if lo - tol < g <= hi + tol:
+                out.append(xy)
+        return out
+
+    def obstacle_keep_out(self, name: str) -> float:
+        """The base clearance ``try_obstacle_cell`` demands around ``name`` (its "near_robot" rule)."""
+        margin = float(self.obstacle_params().get("footprint_margin_m", FOOTPRINT_MARGIN_M))
+        return self.obst_geom[name]["radius_m"] + margin + self.kit.BASE_ROOM_RADIUS + 0.10
+
+    def obstacle_cell_indices(self, path, name: str, base0, base1) -> List[int]:
+        """CR_OBSTACLE_PREFILTER: the indices of the middle of ``path`` (:func:`path_cell_range`) that pass the two free
+        checks of ``try_obstacle_cell`` for ``name`` (in the task room, ``obstacle_keep_out`` from both bases); every other
+        cell fails there before any settle or plan."""
+        keep_out = self.obstacle_keep_out(name)
+        out = []
+        for idx in path_cell_range(len(path)):
+            xy = G.t(path[idx])[:2]
+            if not self.in_room(xy):
+                continue
+            if any(float(th.linalg.norm(xy - th.tensor(b[:2]))) < keep_out for b in (base0, base1)):
+                continue
+            out.append(idx)
+        return out
+
+    def unplace_goal(self, base0, q0):
+        """CR_OBSTACLE_RETRY: undo a goal whose obstacle placement failed (obstacles parked, the init -> goal path dropped;
+        the stances, goal block and bucket are overwritten by the next goal)."""
+        for name in self.obstacle_names:
+            self.park_obstacle(name)
+        self.sidecar.paths[:] = [p for p in self.sidecar.paths if not (p.frm == "init" and p.to == "goal")]
+        self.kit.apply(q0, base0)
 
     def map_tol(self) -> float:
         """Divergence tolerance: half a map cell (v1)."""
@@ -997,7 +1177,8 @@ class CameraRelocalizationV2(SamplerV2):
         n_tried = 0
         for name in names:
             placed = None
-            for idx in path_cells(rng, len(cur_path), OBSTACLE_MAX_CELLS):
+            allowed = self.obstacle_cell_indices(cur_path, name, base0, base1) if fast_on("CR_OBSTACLE_PREFILTER") else None
+            for idx in path_cells(rng, len(cur_path), OBSTACLE_MAX_CELLS, allowed=allowed):
                 n_tried += 1
                 xy = cur_path[idx]
                 yaw = float(rng.uniform(-math.pi, math.pi))
