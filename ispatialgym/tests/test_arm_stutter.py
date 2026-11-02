@@ -14,7 +14,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.executor import ExecutorConfig
 from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.qa import ArmStutter, StutterConfig, find_stutters, stutter_report_hdf5
-from ispatialgym.tests.test_v2_oracle import FakeRobot, _place_goal, iors_world, make_executor, success_eval
+from ispatialgym.tests.test_v2_oracle import FakeRobot, _place_goal, iors_world, make_executor, quiet_qa, success_eval
 
 DT = 1.0 / 30.0
 
@@ -137,12 +137,14 @@ def test_stutter_report_of_a_recorded_demo(tmp_path):
     assert not stutter_report_hdf5(str(tmp_path / "smooth.hdf5"))["flagged"]
 
 
-@pytest.mark.parametrize("gated", [True, False])
-def test_arm_stutter_gate_discards_a_demo_whose_arm_stutters(tmp_path, gated, monkeypatch):
+@pytest.mark.parametrize("qa", [True, False])
+def test_arm_stutter_fails_an_oracle_demo_whose_arm_stutters(tmp_path, qa, monkeypatch):
+    """The former demo gate ``arm_stutter`` (category ``robot_stutter``) is the ``--qa`` hard metric ``arm_stutter`` since the
+    vec-eval-next merge: with ``--qa`` an oracle demo whose arm stutters fails; ``result.arm_stutter`` is recorded either way."""
+    quiet_qa(monkeypatch)
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2,
-                                                                                        demo_gating=("arm_stutter",) if gated else ()))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_steps=50), qa=qa)
     real = ArmStutter.observe
     lurch_q = trace(lurch(2, 4))
     seen = {"n": 0, "q0": None}
@@ -162,17 +164,22 @@ def test_arm_stutter_gate_discards_a_demo_whose_arm_stutters(tmp_path, gated, mo
     monkeypatch.setattr(ArmStutter, "observe", observe)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["arm_stutter"]["flagged"] and result["arm_stutter"]["worst"]["action"] == "place"
-    if gated:
-        assert not result["success"] and result["reason"] == "robot_stutter"
-        assert result["qa"]["stats"]["by_category"].get("robot_stutter") == 1
+    if qa:
+        assert not result["success"] and result["reason"] == "arm_stutter" and result["qa"]["stopped_by"] == "arm_stutter"
+        metric = result["qa"]["metrics"]["arm_stutter"]
+        assert metric["mode"] == "hard" and metric["triggered"] and metric["worst"]["action"] == "place"
+        assert "arm_stutter" in result["qa"]["hard_triggered"]
     else:
         assert result["success"], result["verdict"]
+        assert result["qa"] == {"enabled": False}
 
 
-def test_an_unremarkable_program_is_not_a_stutter(tmp_path):
+def test_an_unremarkable_program_is_not_a_stutter(tmp_path, monkeypatch):
+    quiet_qa(monkeypatch)
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
-    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("arm_stutter",)))
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_steps=50), qa=True)
     result = ex.run_program(expand(sc.variant, sc))
     assert result["success"], result["verdict"]
     assert result["arm_stutter"]["flagged"] is False and result["arm_stutter"]["stutters"] == []
+    assert result["qa"]["metrics"]["arm_stutter"]["triggered"] is False

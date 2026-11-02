@@ -63,7 +63,7 @@ GRASP = SimpleNamespace(name="grasp", arms=("right",))
 
 def test_the_metric_table_mirrors_behavior_plus_the_demo_gates_and_the_oracle_rules():
     assert set(QA.HARD_METRICS) == {"robot_touching_objects", "robot_touching_itself", "pause", "jerky_motion", "ghost_hand", "object_tilt",
-                                    "goal_occlusion", "robot_wobble", "bad_release"}
+                                    "goal_occlusion", "robot_wobble", "bad_release", "arm_stutter"}  # arm_stutter: train-fast's former gate
     assert set(QA.SOFT_METRICS) == {"held_object_drift", "stalled", "gripper_in_view", "failed_grasp", "head_camera_upright", "arm_hand_contacts"}
     assert {k for k, v in QA.QA_METRICS.items() if v.get("oracle_only")} == {"gripper_in_view", "failed_grasp"}
     assert {k for k, v in QA.QA_METRICS.items() if v.get("retried")} == set(QA.RULE_METRICS.values()) == {"held_object_drift", "stalled", "gripper_in_view", "failed_grasp"}
@@ -306,6 +306,24 @@ def test_bad_release_and_goal_occlusion_are_hard():
         raise RuntimeError("no depth")
 
     assert qa.finish(goal_occlusion=broken, step=0) is None and "no depth" in qa.report()["metrics"]["goal_occlusion"]["report"]["error"]
+
+
+def test_arm_stutter_is_hard_and_judged_at_the_finish():
+    stutter = {"flagged": True, "stutters": [{"arm": "right", "first_step": 11, "last_step": 14, "n_jolts": 3, "max_jolt_rad_s": 1.75, "action": "reorient"}],
+               "thresholds": {"jolt_rad_s": 0.6, "move_rad_s": 0.3, "window_steps": 6, "min_jolts": 3}}
+    stutter["worst"] = stutter["stutters"][0]
+    robot, qa, _ = world()
+    qa.note_arm_stutter(stutter)
+    v = qa.finish(step=20)
+    assert v.category == "arm_stutter" and "right arm" in v.message and v.details["qa"] == "hard" and qa.report()["stopped_by"] == "arm_stutter"
+    m = qa.report()["metrics"]["arm_stutter"]
+    assert m["triggered"] and m["mode"] == "hard" and m["worst"]["action"] == "reorient"
+    robot, qa, _ = world(oracle=False)  # a stream logs it, no verdict
+    qa.note_arm_stutter(stutter)
+    assert qa.finish(step=20) is None and "arm_stutter" in qa.report()["hard_triggered"]
+    robot, qa, _ = world()
+    qa.note_arm_stutter({})  # not measured
+    assert qa.finish(step=1) is None and qa.report()["metrics"]["arm_stutter"] == {"measured": False, "mode": "hard", "triggered": False}
 
 
 def test_restore_forgets_the_rolled_back_steps_and_a_step_that_is_not_live_never_stops():

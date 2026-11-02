@@ -20,6 +20,7 @@ times of the shared loop (every environment advances together).
 
 from __future__ import annotations
 
+import logging
 import time
 import os
 import sys
@@ -30,8 +31,10 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 import torch as th
 
 from ispatialgym.oracle.executor import Executor, ExecutorConfig, MotionSnapshot, _StreamAction, _hold_actions, _jsonable
-from ispatialgym.oracle.qa import QA, QAStats, Verdict
+from ispatialgym.oracle.qa import QA, ArmStutter, QAStats, Verdict
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE
+
+log = logging.getLogger(__name__)
 
 ActionSource = Callable[[Any, Any], Optional[Any]]  # (obs, info) -> action | None
 
@@ -90,6 +93,8 @@ class Slot:
     _ag_last: Optional[Dict[str, Optional[str]]] = None
     #: the environment's ``--qa`` metrics (``VecStreamExecutor(qa=True)``)
     qa: Any = None
+    #: the commanded arm jolts of the stream (``qa.ArmStutter``, ``result.arm_stutter``; judged by the QA metric ``arm_stutter``)
+    arm_stutter: Any = None
     wall_clock_exceeded: bool = False
 
     @property
@@ -143,6 +148,11 @@ class VecStreamExecutor:
             if s.monitors is not None:
                 s.stats = s.monitors.stats
             s.rules = _Rules(s.cfg, s.task)
+            if s.arm_stutter is None:
+                try:
+                    s.arm_stutter = ArmStutter(s.robot)
+                except Exception as e:  # noqa: BLE001  (a robot without arm controllers: no fact, no metric), as Executor._init_qa
+                    log.warning("env %d: arm stutter monitor unavailable (%r)", s.idx, e)
             if self.qa and s.qa is None:
                 s.qa = QA(s.robot, oracle=False, scene=getattr(s.robot, "scene", None),
                           task_objects=[getattr(o, "name", n) for n, o in s.tracked.items() if o is not s.robot],
@@ -256,6 +266,12 @@ class VecStreamExecutor:
                     s.qa.observe(s.n, actions[s.idx], acting=phase == PHASE_ORACLE, held=[n for n in ag_after.values() if n],
                                  release_violations=s.release_check["violations"][n_violations:])
                     T["qa_s"] += time.time() - t1
+                if s.arm_stutter is not None:
+                    try:  # the stream is one motion, its settle rows none (Executor.step: action index 0, attempt 0)
+                        s.arm_stutter.observe(s.n, actions[s.idx], 0 if phase == PHASE_ORACLE else -1, None)
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("env %d: arm stutter monitor failed (%r); disabled", s.idx, e)
+                        s.arm_stutter = None
                 verdict = None
                 if s.monitors is not None:
                     t1 = time.time()
@@ -323,7 +339,9 @@ class VecStreamExecutor:
             verdict = s.rules.metric_verdict(isg)
             if verdict is not None:
                 s.stats.record(verdict)
+        stutter_report = s.arm_stutter.report() if s.arm_stutter is not None else {}
         if s.qa is not None:
+            s.qa.note_arm_stutter(stutter_report)
             s.qa.finish(step=s.n)
         s.timings["settle_s"] = time.time() - t0
         s.verdict = verdict
@@ -375,6 +393,7 @@ class VecStreamExecutor:
             "actions": [],
             "monitors": s.monitors.report() if s.monitors is not None else {"stats": s.stats.to_dict()},
             "qa": s.qa.report() if s.qa is not None else {"enabled": False},
+            "arm_stutter": stutter_report,
             "checkpoint_reports": [],
             "brace_retry": _jsonable([]),
             "goal_observation": None,
