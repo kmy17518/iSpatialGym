@@ -217,6 +217,8 @@ def test_phase3_target_keeps_f_over_other_yaws_out_of_the_band(monkeypatch):
     calls, stored, rec = _phase3(monkeypatch, yaws)
     assert calls["yaws"] == yaws and stored == []
     assert any(rec.yaw == pytest.approx(y, abs=1e-9) for y in yaws)  # no jitter
+    monkeypatch.setenv("ISPATIALGYM_FAST_BAND_EVIDENCE", "0")  # the band store is the base path (BAND_EVIDENCE keeps counts instead)
+    monkeypatch.setenv("ISPATIALGYM_FAST_BAND_REFINE", "0")  # (and so does BAND_REFINE)
     calls, stored, rec = _phase3(monkeypatch)  # the band's 8 yaws: F is stored as before
     assert calls["yaws"] == list(TT.YAWS) and len(stored) == 1
 
