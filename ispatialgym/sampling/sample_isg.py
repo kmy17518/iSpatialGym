@@ -65,6 +65,7 @@ os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 import numpy as np  # noqa: E402
 
 from ispatialgym import REPO_ROOT  # noqa: E402
+from ispatialgym.fastflags import fast_on  # noqa: E402  (train-fast 2026-10-31 switches)
 from ispatialgym.sampling import split_seeds as SS  # noqa: E402
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling.v2.problem import (  # noqa: E402
@@ -214,15 +215,73 @@ def kit_mesh_cache(world) -> Optional[int]:
     return max(RB.MESH_CACHE_MIN, 64 * math.ceil((n + RB.MESH_CACHE_HEADROOM) / 64))
 
 
+#: train-fast 2026-10-31 (SAMPLER_CAMERAS): the subtask ids (prefixes) whose sampler reads pixels - camera relocalization's goal-view
+#: object count (``visible_pixels``), disembedding's and the held tasks' (object scaling, mental rotation) visible fractions
+#: (``object_pixels``), alignment-world_vertical's ``min_object_pixels`` screen (``alignment_wall``). Every other family (iors_*,
+#: alignment-axial, attachment, block design, articulation_*) uses frustum math / raycasts on ``camera_model`` and never a render.
+PIXEL_SUBTASK_PREFIXES = ("camera_relocalization", "disembedding", "object_scaling", "mental_rotation", "alignment-world_vertical")
+
+
+def needs_pixels(subtask: Optional[str]) -> bool:
+    """Whether the sampler of ``subtask`` reads pixels (``PIXEL_SUBTASK_PREFIXES``); an unknown / missing subtask: yes (the safe side)."""
+    if not subtask:
+        return True
+    return any(str(subtask).startswith(p) for p in PIXEL_SUBTASK_PREFIXES)
+
+
+def scene_crop_request(problem: GroundedProblem, scene: str) -> Tuple[str, Dict[str, Any], float]:
+    """train-fast SCENE_CROP (2026-11-01): ``(requested mode, the scene block's bindings, radius m)`` of ``problem`` in ``scene``
+    (``scene_crop.requested_mode``: ``ISPATIALGYM_FAST_SCENE_CROP``, default per family, ``full`` with ``ISPATIALGYM_FAST=0``)."""
+    from ispatialgym.sampling import scene_crop as SCROP
+
+    mode = SCROP.requested_mode(getattr(problem, "subtask", None))
+    try:
+        bindings = problem.bindings(scene)
+    except Exception:  # noqa: BLE001 - a stand-in without a scene block
+        bindings = {}
+    return mode, bindings, (SCROP.crop_radius() if mode == "region" else SCROP.DEFAULT_RADIUS_M)
+
+
+def scene_crop_plan(scene: str, rooms: List[str], scene_json: dict, scene_path: str, mode: str, bindings: Dict[str, Any], radius: float,
+                    out_dir: str):
+    """The ``scene_crop.CropPlan`` of a world about to load ``scene_json`` (the variant / stable json at ``scene_path``) for the task
+    ``rooms``; a cropped plan's scene file is written under ``out_dir`` (``<scene>__crop_<hash>.json``). Today's room list (rooms +
+    adjacent with ``ISG_LOAD_ADJACENT``, as ``SimWorld``) gives the ``dropped`` list."""
+    from ispatialgym.sampling import scene_crop as SCROP
+    from ispatialgym.sampling.sim_utils import adjacent_rooms
+
+    load_adjacent = os.environ.get("ISG_LOAD_ADJACENT", "1") == "1"
+    today = None
+    if rooms:
+        today = list(rooms) + ([r for r in adjacent_rooms(scene, rooms) if r not in rooms] if load_adjacent else [])
+    plan = SCROP.compute_crop(scene_json, mode, rooms, today, bindings=bindings, radius=radius)
+    if plan.cropped:
+        SCROP.write_cropped_scene(scene_json, plan, out_dir, scene, scene_path)
+    return plan
+
+
 class WorldPool:
     """One live OmniGibson world at a time, re-created when the world key (scene, task rooms, removed chairs) changes;
-    aliases with the same key reuse it (``last_action`` = ``"loaded"`` / ``"reused"`` after :meth:`get`)."""
+    aliases with the same key reuse it (``last_action`` = ``"loaded"`` / ``"reused"`` after :meth:`get`).
+
+    train-fast 2026-10-31 (SAMPLER_CAMERAS, ``ISPATIALGYM_FAST_SAMPLER_CAMERAS=0`` = every world with cameras as today): a world for a
+    family that reads no pixels (:func:`needs_pixels`) is built without the head camera (``SimWorld(cameras=False, usd_camera_model=True)``:
+    no 1080^2 rgb / seg_instance buffers or annotators, ``camera_model`` from the USD focal length, ``camera_pose()`` from the zed_link
+    pose). A camera world is reused by any alias; a camera-free one only by aliases that need no pixels (else it is re-created).
+
+    train-fast 2026-11-01 (SCENE_CROP, ``ispatialgym.sampling.scene_crop``; ``ISPATIALGYM_FAST_SCENE_CROP=full`` or
+    ``ISPATIALGYM_FAST=0`` = today's loading): the world loads a cropped copy of the variant / stable json (:func:`scene_crop_plan`:
+    ``rooms`` = the task rooms and what can meet the collision world, ``region`` = that within the radius of the support) while
+    ``SimWorld.stable_scene`` stays the uncropped variant. The crop is part of the pool key (``crop_key``: mode, radius, support): a
+    live world is reused only when its crop holds the requested one (``scene_crop.covers``: full > rooms > the same region), so two
+    templates with different supports never share a cropped world."""
 
     def __init__(self, out_root: str):
         self.out_root = out_root
         self.world = None
         self.kit = None
         self.key = None
+        self.crop_key = None  # train-fast SCENE_CROP: the live world's CropPlan.key()
         self.last_action = None
         self.n_loads = 0
         self.load_time_s = 0.0
@@ -238,13 +297,23 @@ class WorldPool:
         key = world_key(problem, scene, stable)
         removed = list(key[2])
         rooms = list(key[1])
-        if self.key == key and self.world is not None:
+        cameras = not (fast_on("SAMPLER_CAMERAS") and not needs_pixels(getattr(problem, "subtask", None)))
+        from ispatialgym.sampling import scene_crop as SCROP
+
+        crop_mode, crop_bindings, crop_radius = scene_crop_request(problem, scene)
+        wanted_crop = SCROP.request_key(crop_mode, crop_bindings, crop_radius)
+        if self.key == key and self.world is not None and (getattr(self.world, "cameras", True) or not cameras) and SCROP.covers(self.crop_key, wanted_crop):
             self.last_action = "reused"
-            log.info("world reused for %s: %s", problem.alias, world_key_str(key))
+            log.info("world reused for %s: %s%s (SCENE_CROP of the live world: %s)", problem.alias, world_key_str(key),
+                     "" if getattr(self.world, "cameras", True) else " (camera-free)", (self.crop_key or ("full",))[0])
             return self.world, self.kit
         if self.world is not None:
+            if self.key == key and not SCROP.covers(self.crop_key, wanted_crop):
+                log.info("world re-created for %s: SCENE_CROP %s requested, the live world is cropped %s", problem.alias, wanted_crop, self.crop_key)
+            elif self.key == key:
+                log.info("world re-created for %s: %s needs the head camera and the live world has none", problem.alias, problem.subtask)
             og.clear()
-            self.world, self.kit = None, None
+            self.world, self.kit, self.crop_key = None, None, None
         t0 = time.time()
         variant = None
         if removed:
@@ -254,7 +323,20 @@ class WorldPool:
             variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed),
                        "moved_objects": vjson["metadata"]["ispatialgym"].get("moved_objects")}
             log.info("scene variant for %s: %d objects moved out of the scene (%s)", scene, len(removed), removed)
-        self.world = SimWorld(scene, rooms, scene_variant=variant)
+        plan = scene_crop_plan(scene, rooms, vjson if removed else stable, variant["path"] if variant else stable_scene_path(scene), crop_mode, crop_bindings,
+                               crop_radius, os.path.join(self.out_root, "scene_variants"))
+        crop = None
+        if plan.cropped:
+            crop = {"path": plan.path, "loaded_rooms": list(plan.loaded_rooms or []), "meta": plan.meta(), "log": plan.describe(),
+                    "zone_xy": plan.region_xy if plan.mode == "region" else None}
+        else:
+            log.info("%s", plan.describe())
+        self.world = SimWorld(scene, rooms, scene_variant=variant, cameras=cameras, usd_camera_model=not cameras, scene_crop=crop)
+        self.crop_key = plan.key()
+        if not cameras:
+            log.info("SAMPLER_CAMERAS: world for %s (%s) built without the head camera: no rgb / seg_instance buffers; camera_model from the USD "
+                     "focal length (fx %.1f px), camera_pose() from zed_link; instance summaries carry visibility=pending", problem.alias,
+                     problem.subtask, float(self.world.camera_model.fx))
         cache = kit_mesh_cache(self.world)
         self.kit = RobotKit(self.world, prebuild=("right_arm",), mesh_cache_size=cache)  # the left-arm planner is built on first use (brace tasks)
         if cache is not None:

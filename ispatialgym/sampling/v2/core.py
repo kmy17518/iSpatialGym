@@ -267,7 +267,12 @@ class SamplerV2(TaskSampler):
         default_arms = ["right"] if arm in (None, "auto", "right") else (["left"] if arm == "left" else ["right", "left"])
         margin = self.gp.gen("joint_limit_margin_rad", None)  # None = IKChecker.JOINT_LIMIT_MARGIN (0.05)
         reach = self.gp.gen("witness_residual_at_draw_m", None)  # (a) reach quality at the draw: last witness within this of its pose
-        self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z},
+        ik_scope = {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z}
+        crop = self._world_scene_crop()
+        if crop.get("mode", "full") != "full":
+            # train-fast SCENE_CROP (2026-11-01): a cropped world is another collision world - its own cache namespace (full keeps today's)
+            ik_scope["scene_crop"] = f"{crop['mode']}:{crop.get('center_object')}:{crop.get('radius_m')}"
+        self.ikc = IKChecker(self.kit, ik_scope,
                              default_working_arms=default_arms, joint_limit_margin=None if margin is None else float(margin),
                              witness_residual_at_draw=None if reach is None else float(reach))
         self.rejection_log = RejectionLog(keep=3)
@@ -505,6 +510,14 @@ class SamplerV2(TaskSampler):
         for k, v in (old.get("counters") or {}).items():
             self.counters[k] = self.counters.get(k, 0) + int(v)
         self.instance_seeds = list(old.get("seeds") or [])
+        # train-fast SCENE_CROP (2026-11-01): the adopted template-partial_rooms.json is the dump of the world that saved it; a meta from
+        # before the crop existed was a full load. The new instances may come from a world cropped otherwise (same task, same full scene).
+        self.template_meta.setdefault("scene_crop", {"mode": "full"})
+        live = self._world_scene_crop()
+        rec = self.template_meta["scene_crop"]
+        if (live.get("mode"), live.get("center_object"), live.get("radius_m")) != (rec.get("mode"), rec.get("center_object"), rec.get("radius_m")):
+            log.warning("%s: template %s was saved from a SCENE_CROP %s world; this world is %s (template_meta.scene_crop keeps the template's)",
+                        self.gp.alias, self.ctx.template_id, rec.get("mode"), live.get("mode"))
         log.info("%s: continuing template %s (%d instances so far, sha %s)", self.gp.alias, self.ctx.template_id, self.template_meta["n_written"], self.template_sha[:12])
         return True
 
@@ -1115,6 +1128,8 @@ class SamplerV2(TaskSampler):
         The v1 copy inside the template directory stays until D5 moves ``validate_instances.py`` to the §1 layout
         (its loader reads ``<template>/activity_definitions``)."""
         super().save_template()
+        # train-fast SCENE_CROP (2026-11-01): what template-partial_rooms.json holds (the collector loads it with scene_crop.loaded_rooms)
+        self.template_meta["scene_crop"] = self._world_scene_crop()
         bddl_dir = os.path.join(self.ctx2.alias_dir, "activity_definitions", self.activity)
         os.makedirs(bddl_dir, exist_ok=True)
         with open(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), "w") as f:
@@ -1151,6 +1166,9 @@ class SamplerV2(TaskSampler):
                         "rejections_so_far": dict(self.rejection_log.counts), "sidecar": os.path.basename(sidecar_path),
                         "stances": {k: v.to_meta() for k, v in self.sidecar.stances.items()}, "sampler_version": SAMPLER_VERSION,
                         "checks": self.check_flags()})
+        if not getattr(self.world, "cameras", True):
+            # train-fast SAMPLER_CAMERAS (2026-10-31): this world has no head camera; the pixel screens of this instance are still to run
+            summary["visibility"] = "pending"
         with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
             json.dump(_jsonable(summary), f, indent=2)
         if start_per_attempt():
@@ -1311,7 +1329,19 @@ class SamplerV2(TaskSampler):
         return {"attached_object": NAV.attached_checks_enabled(),
                 "program_check": (self.last_program_check or {}).get("mode", "expand" if os.environ.get("ISG_PROGRAM_CHECK", "").lower() != "stub" else "stub")}
 
+    def _world_scene_crop(self) -> Dict[str, Any]:
+        """``template_meta.scene_crop`` of the live world (train-fast SCENE_CROP; ``{"mode": "full"}`` for a world without one)."""
+        fn = getattr(self.world, "scene_crop_meta", None)
+        try:
+            out = fn() if callable(fn) else None
+        except Exception:  # noqa: BLE001 - a stand-in world (tests)
+            out = None
+        return out if isinstance(out, dict) else {"mode": "full"}
+
     def write_template_meta(self):
+        # train-fast SCENE_CROP: a template that never got saved still documents its world; a saved / adopted one keeps the record of
+        # the world its template-partial_rooms.json came from
+        self.template_meta.setdefault("scene_crop", self._world_scene_crop())
         self.template_meta["checks"] = self.check_flags()
         self.template_meta["rejections"] = dict(self.rejection_log.counts)
         self.template_meta["rejection_examples"] = {k: list(v) for k, v in self.rejection_log.examples.items()}

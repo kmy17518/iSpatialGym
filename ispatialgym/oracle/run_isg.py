@@ -47,6 +47,7 @@ import copy
 import gc
 import glob
 import importlib
+import hashlib
 import json
 import logging
 import math
@@ -170,12 +171,44 @@ def robot_name_from_tro(tro: TROFile, default: str = DEFAULT_ROBOT_NAME) -> str:
 
 EXTERNAL_CAMERA_NAME = "external_sensor0"  # --dev: the JoyLo replay over-the-shoulder viewpoint
 
+#: 2026-11-01 train-fast (PARTIAL_SCENE): the sampler's cropped world dump next to template.json (template meta ``scene_crop``)
+PARTIAL_SCENE_FILE = "template-partial_rooms.json"
+
+
+def scene_crop_of(tmeta: dict) -> Optional[Dict[str, Any]]:
+    """2026-11-01 train-fast (PARTIAL_SCENE): the template meta's ``scene_crop`` when the sampler loaded a cropped world (mode other
+    than ``full``) and ``ISPATIALGYM_FAST_PARTIAL_SCENE`` is on (default) - the collector then loads exactly the sampler's world
+    (``loaded_scene_file`` with ``loaded_rooms``) instead of the full template; None (absent / ``full`` / switch off): today's world."""
+    crop = (tmeta or {}).get("scene_crop")
+    if not isinstance(crop, dict) or (crop.get("mode") or "full") == "full":
+        return None
+    return crop if fast_on("PARTIAL_SCENE") else None
+
+
+def loaded_scene_path(template_dir: str, tmeta: Optional[dict] = None) -> str:
+    """The scene file the collector's world is built from: ``template.json``, or (PARTIAL_SCENE) the cropped world dump."""
+    if tmeta is None:
+        with open(os.path.join(template_dir, "template_meta.json")) as f:
+            tmeta = json.load(f)
+    crop = scene_crop_of(tmeta)
+    return os.path.join(template_dir, crop.get("loaded_scene_file") or PARTIAL_SCENE_FILE) if crop else os.path.join(template_dir, "template.json")
+
 
 def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True,
-                     behavior_output: bool = False) -> dict:
+                     behavior_output: bool = False, scene_crop: Optional[Dict[str, Any]] = None) -> dict:
     """Evaluator configuration (mirrors ``validate_instances.py``) with the robot spawned at the TRO base pose so the
     holonomic base's virtual joints stay near zero. ``behavior_output``: the robot carries BEHAVIOR replay_obs.py's sensors,
-    modalities and proprioception (``behavior_lerobot.robot_overrides``) instead of the evaluation camera profile."""
+    modalities and proprioception (``behavior_lerobot.robot_overrides``) instead of the evaluation camera profile.
+    ``scene_crop`` (2026-11-01 train-fast PARTIAL_SCENE, :func:`scene_crop_of`; None, the default: the full template as before): the
+    world is the sampler's cropped one - its dump ``loaded_scene_file`` loaded with its ``loaded_rooms``."""
+    scene_file = os.path.join(template_dir, "template.json")
+    rooms = meta.get("load_room_instances") or None
+    if scene_crop:
+        scene_file = os.path.join(template_dir, scene_crop.get("loaded_scene_file") or PARTIAL_SCENE_FILE)
+        if not os.path.exists(scene_file):
+            raise FileNotFoundError(f"template meta scene_crop (mode {scene_crop.get('mode')!r}) names {scene_file}, which does not exist "
+                                    "(ISPATIALGYM_FAST_PARTIAL_SCENE=0 loads the full template.json)")
+        rooms = scene_crop.get("loaded_rooms") or rooms
     robot_kw = {}
     poses = {k.lower(): v for k, v in (tro.robot_poses or {}).items()}
     pose = (poses.get("robot") or poses.get("r1pro") or [None])[0]
@@ -193,8 +226,8 @@ def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str,
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": meta["scene"],
-            "scene_file": os.path.join(template_dir, "template.json"),
-            "load_room_instances": meta.get("load_room_instances") or None,
+            "scene_file": scene_file,  # 2026-11-01 train-fast PARTIAL_SCENE: template.json unless the template is cropped
+            "load_room_instances": rooms,
         },
         "robots": [M.joylo_robot_config(robot_name, **sensors, **robot_kw)],
         "task": {
@@ -324,6 +357,8 @@ class InstanceLoader:
     def __init__(self, tro_path: str, robot_name: Optional[str] = None, image_size: int = DEFAULT_IMAGE_SIZE, head_aperture: float = DEFAULT_HEAD_APERTURE_MM):
         self.tro_path = os.path.abspath(tro_path)
         self.iid, self.template_dir, self.tmeta, self.activity, self.did = resolve_instance(self.tro_path)
+        # 2026-11-01 train-fast (PARTIAL_SCENE): the sampler's cropped world when the template was sampled in one (None: the full template)
+        self.scene_crop = scene_crop_of(self.tmeta)
         self.tro = load_tro(self.tro_path)
         self.robot_name = robot_name or robot_name_from_tro(self.tro)
         self.image_size = int(image_size)
@@ -347,7 +382,13 @@ class InstanceLoader:
                 with gm.unlocked():
                     setattr(gm, name, value)
         self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size,
-                                    behavior_output=getattr(self, "behavior_output", False))
+                                    behavior_output=getattr(self, "behavior_output", False), scene_crop=self.scene_crop)
+        if self.scene_crop:
+            # 2026-11-01 train-fast (PARTIAL_SCENE): the demo is recorded in the sampler's cropped world; the replayer combines it with the
+            # full template (recorder attrs isg_scene_crop / isg_full_scene_file, replay --scene full)
+            log.info("train-fast PARTIAL_SCENE: collector world = %s (crop %s, radius %s m around %s, %s dropped), rooms %s (full template: %s)",
+                     self.cfg["scene"]["scene_file"], self.scene_crop.get("mode"), self.scene_crop.get("radius_m"), self.scene_crop.get("center_object"),
+                     self.scene_crop.get("n_dropped"), self.cfg["scene"]["load_room_instances"], self.tmeta.get("load_room_instances"))
         if getattr(self, "external_camera", False):
             # --dev (owner 2026-09-17 23:39): the BEHAVIOR / JoyLo replay external viewpoint - a camera on the robot's
             # base link over its shoulder, looking down-forward (render_instances.render_template) - recorded next to
@@ -395,7 +436,7 @@ class InstanceLoader:
     def share(self, shared: Dict[str, Any]) -> None:
         """``--queue``: hand this loader's world to the next instances of the template."""
         shared.update({"env": self.env, "task": self.task, "robot": self.robot, "cam_key": self.cam_key, "cfg": self.cfg,
-                       "template_dir": self.template_dir, "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
+                       "template_dir": self.template_dir, "template_key": (template_key(self.template_dir, self.tmeta) if fast_on("COLLECTOR_PREBUILD") else None), "floor_map": self._floor_map_template, "scene_state0": self._scene_state0,
                        "build_report": {k: v for k, v in self.report.items() if k != "trav_cells_blocked"}})
 
     def attach(self, shared: Dict[str, Any]):
@@ -407,7 +448,11 @@ class InstanceLoader:
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta
 
         if os.path.abspath(shared["template_dir"]) != os.path.abspath(self.template_dir):
-            raise RuntimeError(f"--queue: {self.iid} belongs to {self.template_dir}, the world to {shared['template_dir']}")
+            # 2026-10-31 train-fast (COLLECTOR_PREBUILD): another copy of the same template (equal template_key) is the same world
+            same = fast_on("COLLECTOR_PREBUILD") and os.path.abspath(self.template_dir) in (shared.get("compatible_template_dirs") or ())
+            if not same:
+                raise RuntimeError(f"--queue: {self.iid} belongs to {self.template_dir}, the world to {shared['template_dir']}")
+            self.report["world_built_from"] = shared["template_dir"]
         self.env, self.task, self.robot, self.cam_key, self.cfg = (shared[k] for k in ("env", "task", "robot", "cam_key", "cfg"))
         prev = shared.get("loader")
         for h in list(getattr(prev, "hinges", None) or []):
@@ -903,6 +948,10 @@ def parse_args(argv=None):
     p.add_argument("--deadline", type=float, default=None, help="--queue: epoch seconds after which no instance starts")
     p.add_argument("--max-instances", type=int, default=None, help="--queue: instances per process")
     p.add_argument("--poll-s", type=float, default=10.0, help="--queue: wait between scans for new instances")
+    p.add_argument("--prebuild", default=None, metavar="TRO",
+                   help="--queue (train-fast COLLECTOR_PREBUILD): build the world from this instance of the same template (e.g. the counted eval "
+                        "instance) before the queue has any, so the scene load overlaps the sampler's; the first real instance must share its "
+                        "template_key, else <claims>/../prebuild.mismatch is written and the process exits for a restart without it")
     p.add_argument("--sidecar", default=None, help="oracle sidecar (default: <iid>.oracle.json next to the TRO)")
     p.add_argument("--mode", default="oracle", choices=["oracle", "replay", "policy"])
     p.add_argument("--replay", default=None, help="replay mode: LeRobot dataset root or demo.hdf5")
@@ -1115,6 +1164,16 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 gc.freeze()
         if shared is not None:
             shared["loader"] = loader
+        crop = (loader.tmeta.get("scene_crop") or {}) if isinstance(loader.tmeta.get("scene_crop"), dict) else {}
+        if loader.scene_crop:
+            # 2026-11-01 train-fast (PARTIAL_SCENE): which world the demo was collected in ("scene" stays the scene model name)
+            meta["scene_crop"] = {"crop": loader.scene_crop.get("mode"), "loaded_scene_file": loader.cfg["scene"]["scene_file"],
+                                  "loaded_rooms": loader.cfg["scene"]["load_room_instances"], "n_objects_loaded": len(env.scene.objects),
+                                  "radius_m": loader.scene_crop.get("radius_m"), "center_object": loader.scene_crop.get("center_object"),
+                                  "n_dropped": loader.scene_crop.get("n_dropped")}
+        elif (crop.get("mode") or "full") != "full":
+            meta["scene_crop"] = {"crop": "full", "template_crop": crop.get("mode"), "why": "ISPATIALGYM_FAST_PARTIAL_SCENE off",
+                                  "n_objects_loaded": len(env.scene.objects)}
         try:
             obs, info = loader.restore()
         except LoadError as e:
@@ -1239,6 +1298,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                                  behavior_shard=args.behavior_shard, behavior_task=meta.get("alias") or loader.activity)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
+        if loader.scene_crop and hasattr(recorder, "scene_crop"):
+            # 2026-11-01 train-fast (PARTIAL_SCENE): the hdf5 says its recorded scene file is the cropped world and where the full one is
+            recorder.scene_crop = dict(loader.scene_crop)
+            recorder.full_scene_file = os.path.abspath(os.path.join(loader.template_dir, "template.json"))
+            recorder.full_load_room_instances = loader.tmeta.get("load_room_instances")
         if image_size != int(args.image_size) and hasattr(recorder, "nominal_image_size"):
             # 2026-10-31 train-fast (PHYSICS_ONLY_TRIM): the hdf5 header's env config keeps the evaluation camera size the run would
             # have had (a playback builds its env from it), not the shrunk live cameras
@@ -1440,16 +1504,109 @@ def _claim(claims: str, iid: str) -> bool:
     return True
 
 
+def _tro_object_names(tro_path: str) -> List[str]:
+    """The scene objects an instance's TRO sets (restore rewrites their state): the ``ispatialgym.object_bindings`` scene object names of
+    its BDDL scope (task objects, support, floor) plus any top-level entry name already in scene-object form."""
+    with open(tro_path) as f:
+        raw = json.load(f)
+    names = {str(b.get("scene_object_name")) for b in ((raw.get("ispatialgym") or {}).get("object_bindings") or {}).values()
+             if isinstance(b, dict) and b.get("scene_object_name")}
+    names |= {k for k, v in raw.items() if isinstance(v, dict) and "root_link" in v}
+    return sorted(names)
+
+
+def _scene_leaves(template_dir: str, tro_path: str) -> Dict[str, Any]:
+    """The template scene as the instance's world keeps it: ``template.json`` flattened to ``{path: value}`` without the entities the
+    instance's restore rewrites (the TRO's bound objects, the robot), the robot poses of the task metadata, the file's own path, the
+    ``is_asleep`` flags, the linear / angular velocities (PhysX state: an object still swaying when one copy was saved) and the cached
+    ``non_kin/AABB`` bounding boxes (derived from the pose and the geometry; they differ between saves of an unmoved object)."""
+    names = set(_tro_object_names(tro_path))
+    # 2026-11-01 train-fast (PARTIAL_SCENE): the file the world is actually built from (the cropped dump of a cropped template)
+    with open(loaded_scene_path(template_dir)) as f:
+        doc = json.load(f)
+    for sect in ((((doc.get("state") or {}).get("registry") or {}).get("object_registry") or {}), (((doc.get("objects_info") or {}).get("init_info")) or {})):
+        for n in list(sect):
+            if n in names or n.startswith("robot"):
+                sect.pop(n, None)
+    ((doc.get("metadata") or {}).get("task") or {}).pop("robot_poses", None)
+    ((doc.get("init_info") or {}).get("args") or {}).pop("scene_file", None)
+    out: Dict[str, Any] = {}
+
+    def walk(x, p):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                walk(v, f"{p}/{k}")
+        elif isinstance(x, list):
+            for i, v in enumerate(x):
+                walk(v, f"{p}[{i}]")
+        elif not (p.endswith("/is_asleep") or "/lin_vel[" in p or "/ang_vel[" in p or "/non_kin/AABB/" in p):
+            # PhysX state and the cached bounding box (a derived value: equal poses, boxes 1.3 cm apart between an eval and a train save);
+            # poses and joints are compared
+            out[p] = x
+
+    walk(doc, "")
+    return out
+
+
+def template_key(template_dir: str, tmeta: dict, tro_path: Optional[str] = None, robot_name: Optional[str] = None) -> str:
+    """2026-10-31 train-fast (COLLECTOR_PREBUILD): the template's identity independent of where its copy lives - template id, the activity's
+    BDDL problem and the meta fields the world build reads (scene, load_room_instances, problem, scene_variant). Two copies with one key
+    are the same template; whether their saved scenes agree is :func:`template_compatible`'s question."""
+    h = hashlib.sha256()
+    activity, did = tmeta["problem"].rsplit("-", 1)
+    bddl = os.path.join(template_dir, "activity_definitions", activity, f"problem{did}.bddl")
+    if os.path.exists(bddl):
+        h.update(open(bddl, "rb").read())
+    h.update(json.dumps({k: tmeta.get(k) for k in ("template_id", "scene", "load_room_instances", "problem", "scene_variant")}, sort_keys=True,
+                        default=str).encode())
+    crop = scene_crop_of(tmeta)
+    if crop:
+        # 2026-11-01 train-fast (PARTIAL_SCENE): a cropped and an uncropped copy (or two crops) are different worlds; an uncropped
+        # template hashes exactly as before
+        h.update(json.dumps({"scene_crop": {"mode": crop.get("mode"), "radius_m": crop.get("radius_m"), "center_object": crop.get("center_object"),
+                                            "dropped": sorted(str(n) for n in (crop.get("dropped") or [])),
+                                            "loaded_rooms": crop.get("loaded_rooms")}}, sort_keys=True, default=str).encode())
+    return h.hexdigest()[:24]
+
+
+def template_compatible(dir_a: str, tro_a: str, dir_b: str, tro_b: str, tol: Optional[float] = None) -> Tuple[bool, str]:
+    """2026-10-31 train-fast (COLLECTOR_PREBUILD): may a world built from template copy ``dir_a`` (via its instance ``tro_a``) run the
+    instances of copy ``dir_b``? Yes when their scenes (:func:`_scene_leaves`) have the same entries, equal non-numeric values and numbers
+    within ``tol`` (``ISPATIALGYM_FAST_TEMPLATE_TOL_M``, 5 mm / 5e-3: two saves of one template settle untouched objects ~1e-6 apart; a
+    scene object pushed 1-2 cm or a scene variant that moved chairs away is a different world). Returns (ok, why)."""
+    tol = float(fast_value("TEMPLATE_TOL_M", 0.005)) if tol is None else float(tol)
+    A, B = _scene_leaves(dir_a, tro_a), _scene_leaves(dir_b, tro_b)
+    if set(A) != set(B):
+        extra = sorted(set(A) ^ set(B))
+        return False, f"{len(extra)} scene entries only in one copy (e.g. {extra[0][:120]})"
+    worst, where = 0.0, ""
+    for k, va in A.items():
+        vb = B[k]
+        if isinstance(va, (int, float)) and isinstance(vb, (int, float)) and not isinstance(va, bool) and not isinstance(vb, bool):
+            d = abs(float(va) - float(vb))
+            if d > worst:
+                worst, where = d, k
+        elif va != vb:
+            return False, f"{k[:120]}: {str(va)[:40]} vs {str(vb)[:40]}"
+    if worst > tol:
+        return False, f"{where[:120]} differs by {worst:.4f} (> {tol})"
+    return True, f"{len(A)} scene entries agree within {worst:.2g}"
+
+
 def instance_signature(tro_path: str) -> str:
     """What an instance must share with the previous one to reuse its world: the template, the joint resistance /
     counterbalance / mass records and the attachment filters (simulator edits the next instance only overwrites). Hinge
     prims and assisted grasps are removed / re-established per instance and do not count."""
-    _, template_dir, _, _, _ = resolve_instance(tro_path)
-    extras = load_tro(tro_path).meta.extras or {}
+    _, template_dir, tmeta, _, _ = resolve_instance(tro_path)
+    tro = load_tro(tro_path)
+    extras = tro.meta.extras or {}
+    # 2026-10-31 train-fast (COLLECTOR_PREBUILD): the template by content (template_key), so a world prebuilt from another copy of the template
+    # (the counted eval instance) serves this job's instances; off: the template's path, as before
+    tkey = template_key(template_dir, tmeta) if fast_on("COLLECTOR_PREBUILD") else os.path.abspath(template_dir)
     records = [{k: v for k, v in rec.items() if k not in ("stock", "stock_friction")}
                for rec in (extras.get("constraints") or []) if rec.get("type", "revolute") != "revolute"]
     attachments = sorted((str(r.get("child")), str(r.get("parent"))) for r in (extras.get("attachment_targets") or []))
-    return json.dumps({"template": os.path.abspath(template_dir), "records": records, "attachments": attachments}, sort_keys=True, default=str)
+    return json.dumps({"template": tkey, "records": records, "attachments": attachments}, sort_keys=True, default=str)
 
 
 def run_queue(args) -> int:
@@ -1463,6 +1620,27 @@ def run_queue(args) -> int:
     os.makedirs(claims, exist_ok=True)
     shared: Dict[str, Any] = {}
     n = 0
+    prebuilt_sig = None
+    if getattr(args, "prebuild", None) and fast_on("COLLECTOR_PREBUILD"):
+        # 2026-10-31 train-fast (COLLECTOR_PREBUILD): the scene load (430-520 s) while the sampler loads its own world and draws the first
+        # instance, instead of after it; the world is then reused as for any later instance of the queue (InstanceLoader.attach)
+        t0 = time.time()
+        image_size = int(args.image_size)
+        if PO.trim() and image_size == DEFAULT_IMAGE_SIZE:
+            image_size = int(fast_value("PHYSICS_ONLY_IMAGE_SIZE", 128))
+        pre = InstanceLoader(args.prebuild, robot_name=args.robot_name, image_size=image_size, head_aperture=args.head_aperture)
+        pre.external_camera = bool(args.dev)
+        pre.behavior_output = bool(args.behavior_shard)
+        pre.build_env()
+        pre.share(shared)
+        shared["loader"] = pre
+        if GC_FREEZE:
+            gc.collect()
+            gc.freeze()
+        prebuilt_sig = instance_signature(args.prebuild)
+        shared["signature"] = prebuilt_sig
+        shared["prebuilt_from"] = os.path.abspath(args.prebuild)
+        log.info("train-fast COLLECTOR_PREBUILD: world built from %s in %.1fs before the first queued instance", args.prebuild, time.time() - t0)
     while True:
         if (args.deadline and time.time() > args.deadline) or (args.max_instances and n >= args.max_instances):
             return EXIT_SUCCESS
@@ -1482,8 +1660,32 @@ def run_queue(args) -> int:
         sig = instance_signature(tro)
         if shared.get("signature") not in (None, sig):
             os.remove(os.path.join(claims, iid))
-            log.info("queue: %s needs a world of its own (another template or other simulator-side records)", iid)
+            if n == 0 and prebuilt_sig is not None:
+                # COLLECTOR_PREBUILD: the prebuilt world does not fit this job's template - tell the job script to restart without --prebuild
+                marker = os.path.join(os.path.dirname(os.path.abspath(claims)), "prebuild.mismatch")
+                with open(marker, "a") as f:
+                    f.write(json.dumps({"instance": iid, "prebuild": shared.get("prebuilt_from"), "instance_signature": sig, "prebuilt_signature": prebuilt_sig,
+                                        "pid": os.getpid(), "time": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
+                log.warning("train-fast COLLECTOR_PREBUILD: %s does not share the prebuilt world's signature; %s written", iid, marker)
+            log.warning("queue: %s needs a world of its own (another template or other simulator-side records than the %d instance(s) run in this "
+                        "world): its claim is released and this process exits with rc %d for a fresh one", iid, n, EXIT_QUEUE_RESTART)
             return EXIT_QUEUE_RESTART
+        if prebuilt_sig is not None and sig == prebuilt_sig:
+            tdir = os.path.dirname(os.path.dirname(os.path.abspath(tro)))
+            if tdir not in (shared.get("compatible_template_dirs") or ()):
+                pdir = os.path.dirname(os.path.dirname(shared["prebuilt_from"]))
+                ok, why = template_compatible(pdir, shared["prebuilt_from"], tdir, tro)
+                if not ok:
+                    os.remove(os.path.join(claims, iid))
+                    marker = os.path.join(os.path.dirname(os.path.abspath(claims)), "prebuild.mismatch")
+                    with open(marker, "a") as f:
+                        f.write(json.dumps({"instance": iid, "prebuild": shared.get("prebuilt_from"), "why": why, "pid": os.getpid(),
+                                            "time": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
+                    log.warning("train-fast COLLECTOR_PREBUILD: the prebuilt world does not fit %s (%s); %s written, exit %d for a fresh world",
+                                iid, why, marker, EXIT_QUEUE_RESTART)
+                    return EXIT_QUEUE_RESTART
+                shared.setdefault("compatible_template_dirs", set()).add(tdir)
+                log.info("train-fast COLLECTOR_PREBUILD: %s runs in the prebuilt world (%s)", iid, why)
         t0 = time.time()
         code, result = run_instance(args, tro, shared)
         shared["signature"] = sig

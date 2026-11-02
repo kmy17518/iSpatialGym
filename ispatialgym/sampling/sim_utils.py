@@ -124,11 +124,25 @@ class SimWorld:
     """One OmniGibson environment (scene + R1Pro) plus the helpers every task sampler needs."""
 
     def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE,
-                 load_adjacent: Optional[bool] = None, scene_variant: Optional[dict] = None, cameras: bool = True):
+                 load_adjacent: Optional[bool] = None, scene_variant: Optional[dict] = None, cameras: bool = True, usd_camera_model: bool = False,
+                 scene_crop: Optional[dict] = None):
         """``cameras=False``: the robot carries no vision sensor (``obs_modalities=["proprio"]`` - OmniGibson creates a
         ``VisionSensor`` only for requested vision modalities), so no 1080^2 rgb + seg_instance buffers, annotators or
         per-frame synthetic-data graph exist; ``cam_key`` / ``cam`` / ``camera_model`` are ``None`` and the render /
-        segmentation helpers raise. For the stages that never read pixels (reach bands: kinematics, raycasts, cuRobo)."""
+        segmentation helpers raise. For the stages that never read pixels (reach bands: kinematics, raycasts, cuRobo).
+
+        ``usd_camera_model=True`` with ``cameras=False`` (train-fast SAMPLER_CAMERAS, 2026-10-31: the sampler's camera-free world
+        for the families that use frustum math / raycasts but no pixels): ``camera_model`` is built from the head camera prim's
+        USD ``focalLength`` (the sensor the camera world reads it from wraps that prim; ``HEAD_CAMERA_FOCAL_MM_FALLBACK`` when the
+        prim is not found) with the same aperture / image size, and :meth:`camera_pose` falls back to the ``zed_link`` pose
+        composed with the USD camera offset (the kit's FK of the current configuration). ``cam`` stays ``None``: every pixel
+        helper still raises ``_require_camera``'s message.
+
+        ``scene_crop`` (train-fast SCENE_CROP, 2026-11-01; ``ispatialgym.sampling.scene_crop``; None = today's loading): ``{"path": the
+        cropped copy of the variant / stable json, "loaded_rooms": the load_room_instances it is loaded with, "meta":
+        template_meta.scene_crop, "zone_xy": ((x0, y0), (x1, y1)) or None, "log": the SCENE_CROP line}``. Only what is LOADED
+        changes: ``stable_path`` / ``stable_scene`` (the template.json merge source, the reset and scene-unchanged references, the
+        traversability patch) stay the uncropped variant, ``eval_rooms`` stays rooms + adjacent, ``loaded_rooms`` becomes the crop's."""
         # macros lock once they have been read (second SimWorld in one process after og.clear())
         for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
             if getattr(gm, name) != value:
@@ -148,6 +162,13 @@ class SimWorld:
         self.adjacent = adjacent_rooms(scene_model, self.rooms) if self.rooms else []
         self.eval_rooms = (self.rooms + [r for r in self.adjacent if r not in self.rooms]) if self.rooms else None
         self.loaded_rooms = self.eval_rooms if load_adjacent else self.rooms
+        # train-fast SCENE_CROP (2026-11-01): a cropped world loads the cropped scene file with its own room list (the task rooms);
+        # ``loaded_rooms`` (templates' ``sampled_with_rooms``, the park-cell room mask) follows what is actually loaded
+        self.scene_crop = dict(scene_crop) if scene_crop and scene_crop.get("path") else None
+        if self.scene_crop is not None:
+            self.loaded_rooms = list(self.scene_crop["loaded_rooms"])
+        #: train-fast SCENE_CROP ``region``: the xy box inside which every scene object is loaded (park cells stay inside it)
+        self.crop_zone_xy = (self.scene_crop or {}).get("zone_xy")
         self.robot_name = robot_name
         #: scene variant (``scene_variants.py``): stable scene minus e.g. the chairs around the work table. Everything
         #: downstream (template merge, scene-unchanged checks, resets) compares against the variant.
@@ -160,7 +181,7 @@ class SimWorld:
             "scene": {
                 "type": "InteractiveTraversableScene",
                 "scene_model": scene_model,
-                "scene_file": self.stable_path,
+                "scene_file": self.scene_crop["path"] if self.scene_crop is not None else self.stable_path,  # SCENE_CROP: the cropped copy
                 "seg_map_resolution": 0.1,
                 "trav_map_resolution": 0.1,
                 "load_room_instances": self.loaded_rooms,
@@ -176,6 +197,8 @@ class SimWorld:
             ],
         }
         t0 = time.time()
+        if self.scene_crop is not None and self.scene_crop.get("log"):
+            log.info("%s", self.scene_crop["log"])
         self.env = og.Environment(configs=cfg)
         self._set_measurement_render_settings()
         self.scene = self.env.scene
@@ -186,11 +209,19 @@ class SimWorld:
         log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.base_link_mass_kg["before"], self.base_link_mass_kg["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cameras = cameras
         self.cam_key = self.cam = self.camera_model = None
+        #: train-fast SAMPLER_CAMERAS: ``camera_pose`` from the zed link's pose when there is no sensor (see ``usd_camera_model``)
+        self._fk_camera = False
         if cameras:
             self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
             self.cam = self.robot.sensors[self.cam_key]
             self.cam.horizontal_aperture = HEAD_APERTURE_MM
             self.camera_model = G.CameraModel.from_sensor(float(self.cam.focal_length), HEAD_APERTURE_MM, image_size, image_size)
+        elif usd_camera_model:
+            focal, how = self.usd_head_camera_focal_length()
+            self.camera_model = G.CameraModel.from_sensor(focal, HEAD_APERTURE_MM, image_size, image_size)
+            self._fk_camera = True
+            log.info("camera-free world (SAMPLER_CAMERAS): camera model from %s (focal %.2f mm, aperture %.0f mm, %d px: hfov %.1f deg); "
+                     "camera_pose = zed_link pose o USD camera offset", how, focal, HEAD_APERTURE_MM, image_size, math.degrees(self.camera_model.hfov))
         for obj in self.scene.objects:
             obj.keep_still()
         self.n_scene_objects = len(self.scene.objects)
@@ -248,8 +279,14 @@ class SimWorld:
                 self.task_bounds = (th.stack(los).min(dim=0).values - m, th.stack(his).max(dim=0).values + m)
                 self.task_bounds[1][2] = 10.0  # everything above the floor (ceilings, wall-mounted objects)
         n_obst = sum(1 for o in self.scene.objects if self.obstacle_filter(o))
-        log.info("scene %s loaded (%d objects, %d collision-relevant, rooms=%s, adjacent=%s) in %.1fs", scene_model, self.n_scene_objects, n_obst,
-                 self.rooms, self.adjacent, self.load_time)
+        log.info("scene %s loaded (%d objects, %d collision-relevant, rooms=%s, adjacent=%s%s) in %.1fs", scene_model, self.n_scene_objects, n_obst,
+                 self.rooms, self.adjacent, f", SCENE_CROP {self.scene_crop['meta']['mode']}: loaded rooms {self.loaded_rooms}" if self.scene_crop else "",
+                 self.load_time)
+
+    def scene_crop_meta(self) -> Dict[str, Any]:
+        """``template_meta.scene_crop`` of this world (train-fast SCENE_CROP): ``{"mode": "full"}`` for today's loading."""
+        sc = getattr(self, "scene_crop", None)
+        return copy.deepcopy(sc["meta"]) if sc else {"mode": "full"}
 
     def obstacle_filter(self, obj) -> bool:
         """Whether ``obj`` is loaded into the IK collision world: spawned task objects always, scene objects when their
@@ -461,6 +498,18 @@ class SimWorld:
                 room = th.zeros(len(pts), dtype=th.long)
                 room[inside] = seg.room_ins_map[ij[inside, 0], ij[inside, 1]].long()
                 ok &= th.isin(room, ids)
+        zone = getattr(self, "crop_zone_xy", None)
+        if zone is not None and len(pts):
+            # train-fast SCENE_CROP region (2026-11-01): only inside the crop zone is every scene object loaded, so only there does a
+            # clear cell stay clear in the full scene (template.json); prefer cells whose tucked box + margin lies inside it
+            box_lo, box_hi = self.park_box()
+            zlo, zhi = th.tensor(zone[0][:2], dtype=th.float32), th.tensor(zone[1][:2], dtype=th.float32)
+            inside = ((pts + box_lo[:2] - margin) >= zlo).all(dim=1) & ((pts + box_hi[:2] + margin) <= zhi).all(dim=1)
+            if bool((ok & inside).any()):
+                ok = ok & inside
+            elif bool(ok.any()):
+                log.warning("SCENE_CROP: no clear park cell inside the crop zone %s; a cell outside it may overlap an object that is not loaded",
+                            [[round(float(v), 2) for v in zone[0][:2]], [round(float(v), 2) for v in zone[1][:2]]])
         return ok
 
     def park_blockers(self, xy, margin: float = PARK_CLEARANCE_M) -> List[Tuple[str, float]]:
@@ -733,7 +782,9 @@ class SimWorld:
 
     def _require_camera(self):
         if self.cam is None:
-            raise RuntimeError("this SimWorld was created with cameras=False (no head camera): renders / segmentation / camera poses are unavailable")
+            raise RuntimeError("this SimWorld was created with cameras=False (no head camera): renders / segmentation / pixel counts are unavailable"
+                               + (" - the sampler built it camera-free for a family listed as pixel-free (sample_isg.PIXEL_SUBTASK_PREFIXES); "
+                                  "add the family there or run with ISPATIALGYM_FAST_SAMPLER_CAMERAS=0" if getattr(self, "_fk_camera", False) else ""))
 
     #: frames rendered per measurement: at least this many (see ``seg_instance``), at most ``SEG_MAX_RENDERS``
     SEG_MIN_RENDERS = 4
@@ -1296,7 +1347,39 @@ class SimWorld:
         """The measured floor height the robot stands on (see ``measure_floor_z``)."""
         return float(self.floor_z)
 
+    #: the R1Pro head camera prim's ``focalLength`` (mm) when the prim cannot be read in a camera-free world (the value the
+    #: camera world measures from the sensor; ``tests/test_v2_oracle.FakeSensor`` carries the same)
+    HEAD_CAMERA_FOCAL_MM_FALLBACK = 17.0
+
+    def usd_head_camera_focal_length(self) -> Tuple[float, str]:
+        """``(focal length mm, where it came from)`` of the head camera: the ``Camera`` prim under the robot's ``zed_link`` read
+        through USD (the prim exists whether or not OmniGibson wrapped it in a ``VisionSensor``), else
+        ``HEAD_CAMERA_FOCAL_MM_FALLBACK``."""
+        try:
+            link = self.robot.links[M.HEAD_CAMERA_LINK]
+            for prim in link.prim.GetChildren():
+                if prim.GetPrimTypeInfo().GetTypeName() != "Camera":
+                    continue
+                attr = prim.GetAttribute("focalLength")
+                value = attr.Get() if attr and attr.IsValid() else None
+                if value is not None and float(value) > 0:
+                    return float(value), f"USD {prim.GetPrimPath()}"
+        except Exception as e:  # noqa: BLE001 - no such link / prim API: the constant
+            log.warning("head camera prim not readable (%r); focal length %.1f mm assumed", e, self.HEAD_CAMERA_FOCAL_MM_FALLBACK)
+        else:
+            log.warning("no Camera prim under %s; focal length %.1f mm assumed", M.HEAD_CAMERA_LINK, self.HEAD_CAMERA_FOCAL_MM_FALLBACK)
+        return float(self.HEAD_CAMERA_FOCAL_MM_FALLBACK), "fallback constant"
+
     def camera_pose(self) -> G.Pose:
+        """World pose of the head camera sensor frame. Camera world: the sensor prim. Camera-free sampler world
+        (``usd_camera_model``): the ``zed_link`` pose composed with the USD camera offset (``conventions.CAMERA_IN_ZED``, what the kit's
+        ``cam_in_zed`` is in such a world) - the FK of the robot's current configuration as PhysX holds it."""
+        if self.cam is None and self._fk_camera:
+            from ispatialgym.robot import conventions as C
+
+            zp, zq = self.robot.links[M.HEAD_CAMERA_LINK].get_position_orientation()
+            p, q = C.compose((zp.float(), zq.float()), C.camera_offset_in_zed(None))
+            return p.float(), q.float()
         self._require_camera()
         p, q = self.cam.get_position_orientation()
         return p.float(), q.float()

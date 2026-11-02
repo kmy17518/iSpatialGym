@@ -32,12 +32,22 @@ take new demos as they appear, and the process ends when ``--done-file`` exists 
 
 Prints ``REPLAY_DEMO {json}`` per finished demo and ``REPLAY_SUMMARY {json}`` (env-steps/s, per-tick time split, CPU,
 GPU memory) at the end; ``--results`` appends the same lines as json.
+
+``--scene`` (2026-11-01 train-fast PARTIAL_SCENE): a demo collected in the sampler's cropped world (``ISPATIALGYM_FAST_PARTIAL_SCENE``,
+hdf5 attr ``isg_scene_crop``) records the cropped world's scene file. ``full`` builds the environment from the full template
+(``isg_full_scene_file``, else ``template.json`` of the template the config's ``tro_path`` names) with the full evaluation rooms
+(``isg_full_load_room_instances``), and each slot restores the template restricted to the objects the scene loaded with every
+recorded object's entry taken from the demo (:func:`merge_partial_scene_file`); the per-step states then load by object hash into
+the full scene and the objects outside the crop keep the template's state. ``recorded``: the recorded scene file, as before.
+``auto`` (default): ``full`` when the first demo is cropped, else ``recorded``.
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
+import hashlib
 import json
 import os
 import resource
@@ -53,6 +63,136 @@ import torch as th
 
 BEHAVIOR_PROPRIO_KEY = "isg/behavior_proprio"
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# 2026-11-01 train-fast (PARTIAL_SCENE): partial demo -> full alias scene
+# ----------------------------------------------------------------------------------------------------------------------------
+
+SCENE_MODES = ("auto", "recorded", "full")
+
+
+def is_cropped(scene_crop: Optional[Dict[str, Any]]) -> bool:
+    """Was the demo collected in a cropped world (hdf5 attr ``isg_scene_crop`` with a mode other than ``full``)?"""
+    return isinstance(scene_crop, dict) and (scene_crop.get("mode") or "full") != "full"
+
+
+def scene_mode(requested: str, scene_crop: Optional[Dict[str, Any]]) -> str:
+    """``--scene``: ``auto`` is ``full`` for a cropped demo, else ``recorded`` (today's replay)."""
+    if requested not in SCENE_MODES:
+        raise ValueError(f"--scene {requested!r}: one of {SCENE_MODES}")
+    if requested == "auto":
+        return "full" if is_cropped(scene_crop) else "recorded"
+    return requested
+
+
+def _object_registry(scene_file: Dict[str, Any]) -> Dict[str, Any]:
+    state = scene_file.get("state") or {}
+    return (state.get("registry") or {}).get("object_registry", {}) if "registry" in state else state.get("object_registry", {})
+
+
+def _system_registry(scene_file: Dict[str, Any]) -> Dict[str, Any]:
+    state = scene_file.get("state") or {}
+    return (state.get("registry") or {}).get("system_registry", {}) if "registry" in state else state.get("system_registry", {})
+
+
+def _is_robot_info(name: str, info: Dict[str, Any]) -> bool:
+    """A robot entry of a scene file: OmniGibson's robot classes (a recorded ``R1Pro``) or merge_scene_files' generic ``Robot``
+    (the template's)."""
+    return str(info.get("class_module") or "").startswith("omnigibson.robots") or info.get("class_name") == "Robot"
+
+
+def merge_partial_scene_file(full: Dict[str, Any], recorded: Dict[str, Any], loaded_names=None, is_robot=None,
+                             to_scene_frame=None) -> Dict[str, Any]:
+    """The scene file a full-scene replay restores for a demo recorded in a cropped world: the full template's objects (its robot
+    entries dropped) and every object of the recorded scene file, a recorded object taking the recorded entry (init_info and
+    state), the robot, ``metadata``, ``versions`` and the scene pose from the recorded file, the systems of both (recorded wins),
+    the scene ``init_info`` from the full template (the replay scene is the full one). ``loaded_names`` (the object names of the
+    replay scene's registry): the result holds exactly those of them that either file knows - so ``Scene.restore`` sees no
+    topology change - and a recorded object the scene did not load is a ValueError. ``to_scene_frame``
+    (``Scene._scene_file_in_scene_frame``): both files are first moved to their scene frame (it returns None for a file saved at the
+    origin). The inputs are left untouched; the result is a deep copy (``restore(update_initial_file=True)`` keeps and edits it)."""
+    is_robot = is_robot or _is_robot_info
+    if to_scene_frame is not None:
+        full = to_scene_frame(full) or full
+        recorded = to_scene_frame(recorded) or recorded
+    f_info, r_info = full["objects_info"]["init_info"], recorded["objects_info"]["init_info"]
+    f_reg, r_reg = _object_registry(full), _object_registry(recorded)
+    f_state, r_state = full.get("state") or {}, recorded.get("state") or {}
+    for key, ident in (("pos", [0.0, 0.0, 0.0]), ("ori", [0.0, 0.0, 0.0, 1.0])):
+        a = [float(v) for v in (f_state.get(key) if f_state.get(key) is not None else ident)]
+        b = [float(v) for v in (r_state.get(key) if r_state.get(key) is not None else ident)]
+        if len(a) != len(b) or any(abs(x - y) > 1e-6 for x, y in zip(a, b)):
+            raise ValueError(f"the full template and the recorded scene file were saved at different scene poses ({key} {a} vs {b}); "
+                             "pass to_scene_frame=Scene._scene_file_in_scene_frame")
+    names = [n for n, v in f_info.items() if n not in r_info and not is_robot(n, v)] + list(r_info)
+    if loaded_names is not None:
+        loaded = set(loaded_names)
+        missing = sorted(n for n in r_info if n not in loaded)
+        if missing:
+            raise ValueError(f"{len(missing)} object(s) of the recorded (cropped) scene file are not in the full replay scene "
+                             f"(not in the full template / outside its load_room_instances?): {missing[:20]}")
+        names = [n for n in names if n in loaded]
+    init_info: Dict[str, Any] = {}
+    objects: Dict[str, Any] = {}
+    for n in names:
+        info, reg = (r_info, r_reg) if n in r_info else (f_info, f_reg)
+        init_info[n] = info[n]
+        if n in reg:
+            objects[n] = reg[n]
+    registry = {**(r_state.get("registry") or {}), "object_registry": objects, "system_registry": {**_system_registry(full), **_system_registry(recorded)}}
+    out = {k: v for k, v in recorded.items() if k not in ("objects_info", "state", "init_info")}
+    for k in ("metadata", "versions"):
+        if k not in out and k in full:
+            out[k] = full[k]
+    out["init_info"] = full.get("init_info", recorded.get("init_info"))
+    out["objects_info"] = {**full["objects_info"], **recorded["objects_info"], "init_info": init_info}
+    out["state"] = {**r_state, "registry": registry}
+    return copy.deepcopy(out)
+
+
+def full_scene_path(demo: "Demo") -> str:
+    """The full template scene file of a demo: ``isg_full_scene_file``, else ``<template dir>/template.json`` of the config's task
+    ``tro_path`` (``<template dir>/instances/<iid>-tro_state.json``), else of meta.json's ``template_dir`` - the first that exists."""
+    cands = []
+    if demo.full_scene_file:
+        cands.append(demo.full_scene_file)
+    if demo.tro_path:
+        cands.append(os.path.join(os.path.dirname(os.path.dirname(demo.tro_path)), "template.json"))
+    try:
+        with open(os.path.join(demo.dir, "meta.json")) as f:
+            tdir = json.load(f).get("template_dir")
+        if tdir:
+            cands.append(os.path.join(tdir, "template.json"))
+    except (OSError, ValueError):
+        pass
+    for c in cands:
+        if os.path.exists(c):
+            return c
+    raise SystemExit(f"--scene full: no full template scene file for {demo.dir} (tried {cands})")
+
+
+_FULL_SCENES: Dict[str, Dict[str, Any]] = {}
+
+
+def load_full_scene(demo: "Demo") -> Dict[str, Any]:
+    """The demo's full template scene file (read once per path; callers merge, which copies)."""
+    path = os.path.abspath(full_scene_path(demo))
+    if path not in _FULL_SCENES:
+        with open(path, "rb") as f:
+            raw = f.read()
+        if demo.full_scene_sha256 and hashlib.sha256(raw).hexdigest() != demo.full_scene_sha256:
+            print(f"WARNING --scene full: {path} is not the template.json {demo.dir} was collected against (sha256 differs)", flush=True)
+        _FULL_SCENES[path] = json.loads(raw)
+    return _FULL_SCENES[path]
+
+
+def _scene_frame_fn():
+    try:
+        from omnigibson.scenes.scene_base import Scene
+
+        return getattr(Scene, "_scene_file_in_scene_frame", None)
+    except Exception:  # noqa: BLE001
+        return None
+
 
 class Demo:
     """The recorded arrays of one demo's committed episode (``data/demo_0``)."""
@@ -63,6 +203,17 @@ class Demo:
         with h5py.File(os.path.join(demo_dir, "demo.hdf5"), "r") as f:
             g = f["data/demo_0"]
             self.scene_file = json.loads(f["data"].attrs["scene_file"])
+            # 2026-11-01 train-fast (PARTIAL_SCENE): the recorder's crop attrs (absent: collected in the full world)
+            attrs = f["data"].attrs
+            self.scene_crop = json.loads(attrs["isg_scene_crop"]) if "isg_scene_crop" in attrs else None
+            self.full_scene_file = json.loads(attrs["isg_full_scene_file"]) if "isg_full_scene_file" in attrs else None
+            self.full_scene_sha256 = json.loads(attrs["isg_full_scene_sha256"]) if "isg_full_scene_sha256" in attrs else None
+            self.full_rooms_known = "isg_full_load_room_instances" in attrs
+            self.full_rooms = json.loads(attrs["isg_full_load_room_instances"]) if self.full_rooms_known else None
+            try:
+                self.tro_path = (json.loads(attrs["config"]).get("task") or {}).get("tro_path")
+            except (KeyError, ValueError, AttributeError):
+                self.tro_path = None
             self.state = g["state"][()]
             self.state_size = g["state_size"][()]
             self.action = th.as_tensor(g["action"][()], dtype=th.float32)
@@ -150,9 +301,11 @@ class DemoSource:
             time.sleep(self.poll_s)
 
 
-def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int) -> Dict[str, Any]:
+def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int, scene: str = "recorded") -> Dict[str, Any]:
     """``create_from_hdf5``'s config edits for replay_obs's settings (include_contacts=False, include_task_obs=False,
-    replay_obs's robot sensors / modalities / proprioception), with ``n_slots`` envs and DummyTask."""
+    replay_obs's robot sensors / modalities / proprioception), with ``n_slots`` envs and DummyTask. ``scene="full"`` (2026-11-01
+    train-fast PARTIAL_SCENE): the scene file is the full template merged with the first demo's recorded objects
+    (:func:`merge_partial_scene_file`) and the rooms the full evaluation rooms."""
     from omnigibson.envs.data_wrapper import _add_recorded_non_kin_states_to_scene_file
 
     from ispatialgym.oracle import behavior_lerobot as BL
@@ -161,7 +314,15 @@ def env_config(first: Demo, demos: List[Demo], first_dir: str, n_slots: int) -> 
         config = json.loads(f["data"].attrs["config"])
     config["env"]["flatten_obs_space"] = True
     config["env"]["num_envs"] = int(n_slots)
-    scene_file = json.loads(json.dumps(first.scene_file))
+    if scene == "full":
+        # 2026-11-01 train-fast (PARTIAL_SCENE): every object of the full template (the cropped-away ones at the template state), the
+        # recorded objects as recorded; the recorded non-kin schema goes onto the recorded objects as before (a recorded object the
+        # base does not know raises in _add_recorded_non_kin_states_to_scene_file)
+        scene_file = merge_partial_scene_file(load_full_scene(first), first.scene_file, None, to_scene_frame=_scene_frame_fn())
+        if first.full_rooms_known:
+            config["scene"]["load_room_instances"] = first.full_rooms
+    else:
+        scene_file = json.loads(json.dumps(first.scene_file))
     _add_recorded_non_kin_states_to_scene_file(scene_file=scene_file, recorded_scene_files=[d.scene_file for d in demos])
     config["scene"]["scene_file"] = scene_file
     config["task"] = {"type": "DummyTask", "include_obs": False}
@@ -250,9 +411,13 @@ def _same(a, b) -> bool:
 
 
 class Slot:
-    def __init__(self, k: int, scene, writer, robot_name: str):
+    def __init__(self, k: int, scene, writer, robot_name: str, scene_mode: str = "recorded"):
         self.k = k
         self.scene = scene
+        #: 2026-11-01 train-fast (PARTIAL_SCENE): "full" restores each demo merged into the full template
+        self.scene_mode = scene_mode
+        self.n_objects_scene: Optional[int] = None
+        self.n_objects_recorded: Optional[int] = None
         self.writer = writer
         self.proprio_key = f"{robot_name}::proprio"
         self.demo: Optional[Demo] = None
@@ -265,8 +430,26 @@ class Slot:
     def start(self, demo: Demo) -> None:
         from omnigibson.envs.data_wrapper import _align_scene_object_states_with_recorded_schema
 
-        self.scene.restore(demo.scene_file, update_initial_file=True)
-        _align_scene_object_states_with_recorded_schema(scene=self.scene, recorded_scene_file=demo.scene_file)
+        scene_file = demo.scene_file
+        self.n_objects_recorded = len(demo.scene_file["objects_info"]["init_info"])
+        if self.scene_mode == "full":
+            # 2026-11-01 train-fast (PARTIAL_SCENE): the full template restricted to the objects this scene loaded, the recorded objects
+            # as recorded - restore sees no topology change; a recorded object the full scene lacks fails here
+            loaded = list(self.scene.object_registry.get_dict("name").keys())
+            try:
+                scene_file = merge_partial_scene_file(load_full_scene(demo), demo.scene_file, loaded, to_scene_frame=_scene_frame_fn())
+            except ValueError as e:
+                raise SystemExit(f"--scene full: {demo.dir}: {e}") from e
+            unknown = sorted(set(loaded) - set(scene_file["objects_info"]["init_info"]))
+            if unknown:
+                print(f"WARNING --scene full: {len(unknown)} object(s) of the replay scene are in neither the template nor {demo.name}'s "
+                      f"recorded scene file; restore removes them: {unknown[:10]}", flush=True)
+        elif is_cropped(demo.scene_crop):
+            print(f"WARNING --scene recorded: {demo.name} was collected in a cropped world ({demo.scene_crop.get('mode')}); restoring its "
+                  "recorded scene file changes this scene's objects to the crop", flush=True)
+        self.scene.restore(scene_file, update_initial_file=True)
+        _align_scene_object_states_with_recorded_schema(scene=self.scene, recorded_scene_file=scene_file)
+        self.n_objects_scene = len(self.scene.object_registry.get_dict("name"))
         self.demo, self.i, self.t0 = demo, 0, time.time()
         self.loaded = None
 
@@ -318,6 +501,10 @@ def main(argv=None) -> int:
                     help="render the slots' first states this long before the first frame: a fresh renderer's images keep changing for "
                          "~300 frames (texture streaming, exposure), which a collection process has behind it after its first demo")
     ap.add_argument("--proprio", choices=("recorded", "loaded"), default="recorded")
+    ap.add_argument("--scene", choices=SCENE_MODES, default="auto",
+                    help="2026-11-01 train-fast PARTIAL_SCENE: 'full' replays a demo collected in a cropped world (hdf5 isg_scene_crop) in the "
+                         "full template (task rooms + neighbours; objects outside the crop at the template state), 'recorded' in its "
+                         "recorded scene file (as before); 'auto': full for a cropped first demo, else recorded")
     ap.add_argument("--results", default=None, help="append REPLAY_DEMO / REPLAY_SUMMARY json lines here")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
@@ -357,15 +544,18 @@ def main(argv=None) -> int:
 
     # the environment of the first demo, as production's one-world replay: the others align their object-state schema
     # when their slot starts them
-    config = env_config(first, [first], first.dir, n_slots)
+    # 2026-11-01 train-fast (PARTIAL_SCENE): the world - recorded scene file or the full template - from the first demo
+    scene = scene_mode(args.scene, first.scene_crop)
+    config = env_config(first, [first], first.dir, n_slots, scene=scene)
     env = og.Environment(configs=config)
     load_s = time.time() - t_start
     robot_name = env.scenes[0].robots[0].name
     with individual_render_products(env):
         writers = [BL.ShardWriter(make_slot_view(env, k), args.root, f"{args.repo_prefix}_slot{k}", args.task, async_flush=args.async_flush)
                    for k in range(n_slots)]
-    slots = [Slot(k, env.scenes[k], writers[k], robot_name) for k in range(n_slots)]
+    slots = [Slot(k, env.scenes[k], writers[k], robot_name, scene_mode=scene) for k in range(n_slots)]
     slots[0].start(first)
+    n_objects_recorded_first = slots[0].n_objects_recorded  # REPLAY_SUMMARY (PARTIAL_SCENE): the first demo's recorded objects
     n_demos = 1
 
     def fill_idle(force: bool = False) -> None:
@@ -496,6 +686,7 @@ def main(argv=None) -> int:
         "objects_per_state": round(objs_in / max(1, n_steps), 1) if args.delta_load else None,
         "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
         "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
+        "scene": scene, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
         "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
     if out is not None:
         out.close()

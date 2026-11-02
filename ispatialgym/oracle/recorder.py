@@ -255,6 +255,28 @@ class _LazyRGB:
         return self._rgb
 
 
+def scene_crop_attrs(scene_crop: Optional[Dict[str, Any]], full_scene_file: Optional[str], full_load_room_instances=None) -> Dict[str, str]:
+    """2026-11-01 train-fast (PARTIAL_SCENE): the ``/data`` attrs of a demo collected in a cropped world (JSON strings) - ``isg_scene_crop``
+    (the template meta's ``scene_crop``), ``isg_full_scene_file`` (absolute path of the full ``template.json``), ``isg_full_scene_sha256``
+    (its content, when readable, so a replay elsewhere can check its copy) and ``isg_full_load_room_instances`` (the evaluation rooms).
+    The recorded ``scene_file`` stays the dump of the cropped world and the per-step states keep their format (self-describing per
+    object): the replayer (``multienv.replay --scene full``) merges them into the full template. Empty without a crop (mode ``full``)."""
+    if not isinstance(scene_crop, dict) or (scene_crop.get("mode") or "full") == "full":
+        return {}
+    out = {"isg_scene_crop": json.dumps(scene_crop, default=json_default),
+           "isg_full_scene_file": json.dumps(os.path.abspath(full_scene_file) if full_scene_file else None),
+           "isg_full_load_room_instances": json.dumps(list(full_load_room_instances) if full_load_room_instances else None)}
+    if full_scene_file and os.path.exists(full_scene_file):
+        import hashlib
+
+        h = hashlib.sha256()
+        with open(full_scene_file, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        out["isg_full_scene_sha256"] = json.dumps(h.hexdigest())
+    return out
+
+
 class Recorder:
     def __init__(self, out_dir: str, env, robot, cam_key: str, objects: Dict[str, Any], fps: int = 30, cfg: Optional[RecorderConfig] = None,
                  task_name: Optional[str] = None, instance_id: Optional[str] = None):
@@ -301,6 +323,11 @@ class Recorder:
         self.env_config = None
         # 2026-10-31 train-fast PHYSICS_ONLY_TRIM (set by run_isg): the run's cameras were shrunk; the hdf5 header's config keeps this size
         self.nominal_image_size: Optional[int] = None
+        # 2026-11-01 train-fast PARTIAL_SCENE (set by run_isg): the world was the sampler's cropped one - the template meta's scene_crop,
+        # the full template.json and its rooms go into the hdf5 header (scene_crop_attrs) for the replayer's --scene full
+        self.scene_crop: Optional[Dict[str, Any]] = None
+        self.full_scene_file: Optional[str] = None
+        self.full_load_room_instances: Optional[List[str]] = None
         self.hdf5_path = os.path.join(out_dir, "demo.hdf5") if self.cfg.hdf5 else None
         self.behavior = None  # behavior_lerobot.ShardWriter of the episode
         self.behavior_status: Optional[str] = None
@@ -928,6 +955,8 @@ class Recorder:
             data.attrs["fps"] = self.fps
             data.attrs["robot_name"] = self.robot.name
             data.attrs["head_camera_key"] = self.cam_key
+            for k, v in scene_crop_attrs(self.scene_crop, self.full_scene_file, self.full_load_room_instances).items():
+                data.attrs[k] = v  # 2026-11-01 train-fast PARTIAL_SCENE (none without a crop)
             if self.video_path and self.video_error is None and os.path.exists(self.video_path):
                 data.attrs["head_rgb_video"] = os.path.basename(self.video_path)
             demo = data.create_group("demo_0")
