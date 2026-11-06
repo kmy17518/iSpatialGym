@@ -58,6 +58,10 @@ RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after 
 #: oracle-fix 2026-11-06 (``generation.shelf_backoff_transit_m``): the program check's pre-grasp witness may lie this far (largest arm joint, rad)
 #: from the joints the backed-off transition carries the arm to - the settled target's few-mm shift; beyond it the grasp's transit is a swing
 SHELF_BACKOFF_WITNESS_GAP_RAD = 0.3
+#: oracle-fix 2026-11-06 (``generation.shelf_start_draw``, touching#03): the layouts (compartment, leans, spine depth) one attempt draws until
+#: both books' leaning starts pass the side-board rays, the board and the free span (``shelf_wall`` / ``shelf_board`` / ``shelf_width``)
+SHELF_DRAW_TRIES = 8
+SHELF_DRAW_REJECTS = ("shelf_wall", "shelf_board", "shelf_width")
 
 #: Tip-to-tip spread of the CLOSED fingers (the finger joints sit at y = ±0.0135 in the gripper link; URDF ``gripper_finger_joint``):
 #: a wide stop with tip spread ``s`` pre-shapes each finger to ``(s - CLOSED_TIP_SPREAD_M) / 2``.
@@ -275,6 +279,34 @@ def merge_shelf_pose_facts(start: Dict[str, Any], facts: Dict[str, Any]) -> None
     ``lean_side_name`` so ``lean_side`` stays the sign (+1 = the robot's left) the push, the partner's lean and the goal side
     compute with."""
     start.update({("lean_side_name" if k == "lean_side" else k): v for k, v in facts.items()})
+
+
+def shelf_free_span(t_hull_w: th.Tensor, p_hull_w: th.Tensor, edge: EdgeFrame, side: float) -> float:
+    """The free span (m) along ``edge``'s tangent between the two leaning books (world hull points) of the shelf layout, the target
+    against the board on ``side`` (+1 = the robot's left) and the partner against the other - ``sample_template``'s measure."""
+    t_lat = (t_hull_w[:, :2] - edge.mid) @ edge.tangent
+    p_lat = (p_hull_w[:, :2] - edge.mid) @ edge.tangent
+    return float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
+
+
+def shelf_draw_on(s) -> bool:
+    """``generation.shelf_start_draw`` is on for ``s``'s template (``IORSSmall.shelf_start_draw``: the shelf layout with the knob). False for an
+    object without a shelf start or the knob - the methods that ask also run on stand-ins."""
+    if getattr(s, "shelf_start", None) is None or not callable(getattr(s, "gen", None)) or s.gen("shelf_start_draw") is None:
+        return False
+    return IORSSmall.shelf_start_draw(s) is not None
+
+
+def shelf_goal_dz(start: Optional[Dict[str, Any]], hull: th.Tensor, t_pose: G.Pose, goal_quat) -> float:
+    """oracle-fix 2026-11-06 (``generation.shelf_start_draw``): the height change that keeps the target's lowest hull point at its start's when
+    the drafted goal leans another angle than the start (``start["partner_lean_deg"]``: the goal is drafted parallel to the partner) - at
+    11 vs 20 deg the book's bottom would sit 2.3 mm above or inside the board; 0 without a drawn partner lean (the mirrored lean is the
+    start's own: the goal keeps the start's height, as before)."""
+    if not start or start.get("partner_lean_deg") is None:
+        return 0.0
+    z0 = float(G.local_points_world(hull, (th.zeros(3), G.t(t_pose[1])))[:, 2].min())
+    z1 = float(G.local_points_world(hull, (th.zeros(3), G.t(goal_quat)))[:, 2].min())
+    return z0 - z1
 
 
 def partner_sides(relation: str, handed: Optional[Dict[str, str]] = None, shelf_lean: Optional[float] = None) -> List[float]:
@@ -964,6 +996,12 @@ class IORSSmall(SamplerV2):
             self.template_facts["shelf_start"] = self.shelf_start
             if free < float(self.gen("shelf_free_span_min_m", 0.15)):
                 raise Reject("shelf_width", f"{self.support.name}: {free:.2f} m between the two leaning books (< {float(self.gen('shelf_free_span_min_m', 0.15)):.2f})")
+            if self.shelf_start_draw() is not None:
+                # oracle-fix 2026-11-06 (generation.shelf_start_draw): the template's start (the key's lean and side, its compartment) is what
+                # every attempt draws its own from (:meth:`draw_shelf_side`, :meth:`draw_shelf_layout`); the template check above stays
+                self._shelf_template = {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg", "context")}
+                self._shelf_rest0 = {"target": self.rest["target"].clone(), "partner": self.rest["partner"].clone()}
+                self.template_facts["shelf_start_draw"] = self.shelf_draw_facts()
         # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm when
         # it has no role besides the segment and the target is free; its band is its own or the default arm's mirrored
         phase2_band: Dict[str, Any] = {}
@@ -971,11 +1009,7 @@ class IORSSmall(SamplerV2):
             # owner 2026-10-11 11:46 (touching#03): the arm on the target's side grasps, places and pushes (the left one for a partner on
             # the right board), the other arm has no role; Phase 2's foci come from that arm's band (its own, else the mirror)
             arm = self.shelf_push_arm()
-            self.segment_arms = [arm]
-            if self.gen("shelf_working_arm_default"):  # oracle-fix 2026-11-04 round 3: stances checked with the pushing arm working (idle-posture rejects)
-                self.ikc.default_working_arms = [arm]
-            self.arm_offer_why = f"touching shelf layout: the {arm} arm on the target's side grasps, places and pushes it; nothing braces the partner"
-            self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands)
+            self.shelf_use_arm(arm)
             phase2_band = {"bands": self.band_of_arm(arm)}
         else:
             self.segment_arms, self.arm_offer_why = TT.arm_offer(self, other_arm_roles=self.other_arm_roles())
@@ -1716,6 +1750,11 @@ class IORSSmall(SamplerV2):
     def sample(self, rng: np.random.Generator) -> Draft:
         from ispatialgym.sampling.v2.core import start_per_attempt
 
+        shelf_draw = shelf_draw_on(self)
+        if shelf_draw:
+            # oracle-fix 2026-11-06 (generation.shelf_start_draw): the board the target leans against first - it names the working arm, whose
+            # band this attempt's Phase 2 reads
+            self.draw_shelf_side(rng)
         if start_per_attempt():  # this attempt's start first: the partner sides come from its start region
             import time
 
@@ -1723,6 +1762,8 @@ class IORSSmall(SamplerV2):
             self.spa_redraw_start(rng)
             self._spa_draw_s = time.time() - t_spa
             self._spa_drawn = True
+        if shelf_draw:
+            self.draw_shelf_layout(rng)  # the compartment and the leans: the two books' poses follow the attempt's edge
         # A1 step 3: the partner's side is fixed before the target is placed - before the split cone draws the start position too
         self.region_side = None if self.shelf_start is not None else self.draw_partner_side(rng)
         return super().sample(rng)
@@ -1744,7 +1785,7 @@ class IORSSmall(SamplerV2):
         if start_per_attempt() and fast_on("SPA_CACHE"):
             # train-fast 2026-10-31: a reused lateral cell hands out fresh copies of its candidates, so the mark above does not carry; the
             # candidate's identity does (:meth:`_spa_apply_cell` filters it out of every later reuse in this process)
-            self.__dict__.setdefault("_spa_dropped", set()).add(self._spa_cand_key(cand))
+            self.__dict__.setdefault("_spa_dropped", set()).add(self._spa_drop_key(cand))
         self.manip_candidates = [c for c in self.manip_candidates if c is not cand]
         if getattr(self, "_split_cone_cands", None):
             self._split_cone_cands = [c for c in self._split_cone_cands if c is not cand]
@@ -1825,6 +1866,12 @@ class IORSSmall(SamplerV2):
         return (tuple(round(float(v), 4) for v in c.base_pose2d), round(float(c.translate), 3), round(float(c.tilt), 4),
                 None if f is None else tuple(round(float(v), 3) for v in f.flatten().tolist()[:3]))
 
+    def _spa_drop_key(self, c: Stance) -> Tuple:
+        """:meth:`_spa_cand_key`; with ``generation.shelf_start_draw`` (oracle-fix 2026-11-06) also the attempt's working arm - a travel that
+        fails with one arm working (the other idling) says nothing about the same stance with the arms swapped."""
+        key = self._spa_cand_key(c)
+        return key + (tuple(self.segment_arms),) if shelf_draw_on(self) else key
+
     @staticmethod
     def _spa_top_signature(top) -> Dict[str, Any]:
         """What identifies a top raster in a cell's cache key: name, height, grid (resolution, shape, origin) and a hash of its free cells."""
@@ -1852,10 +1899,11 @@ class IORSSmall(SamplerV2):
         """The cache key of one lateral cell: everything the cell's computation reads - the collision world (``ikc.cache_scope``: scene, rooms,
         floor), the template, the support and its top raster (and the neighbour top of ``start_region_on_neighbors``), the edge, the Phase-1b
         trunk, H_max, both hulls (half extent, height, rest quat), the margins row, the generation knobs Phase 2 / the start region read, the
-        sides, the segment arms and their bands, the shelf layout, and the cell itself."""
+        sides, the segment arms and their bands, the shelf layout, and the cell itself. With ``generation.shelf_start_draw`` (oracle-fix
+        2026-11-06) the cell holds no book poses (``"shelf_poses": "per_attempt"``: :meth:`draw_shelf_layout` places them after the cell)."""
         ex = init_trunk.extras
         arms = list(self.segment_arms)
-        return {**self.ikc.cache_scope, "template_id": self.choice.template_id, "support": self.support.name, "relation": self.relation,
+        payload = {**self.ikc.cache_scope, "template_id": self.choice.template_id, "support": self.support.name, "relation": self.relation,
                 "top": self._spa_top_signature(self.top), "nb_top": None if nb_top is None else self._spa_top_signature(nb_top), "edge": edge.to_json(),
                 "init_trunk": {"translate": float(init_trunk.translate), "tilt": float(init_trunk.tilt), "stand_off": init_trunk.stand_off,
                                **{k: ex.get(k) for k in ("lam_min", "lam_max", "d_ws", "d_near", "d_far", "t_range", "b", "delta_min", "delta_max")}},
@@ -1873,6 +1921,9 @@ class IORSSmall(SamplerV2):
                 "segment_arms": arms, "bands": {a: self._spa_band_signature(self.band_of_arm(a)) for a in arms},
                 "shelf_start": None if self.shelf_start is None else {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg")},
                 "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
+        if shelf_draw_on(self):
+            payload["shelf_poses"] = "per_attempt"
+        return payload
 
     def _spa_cell_compute(self, edge: EdgeFrame, init_trunk: Stance, lateral: float, margins: Dict[str, Any], H_max: float, nb_top) -> Dict[str, Any]:
         """The start of one lateral cell, computed as :meth:`spa_redraw_start` computes a draw without the memo - Phase 1c at the cell's lateral
@@ -1896,7 +1947,7 @@ class IORSSmall(SamplerV2):
         self.edge, self.init_stance = edge, init_stance
         self.shelf_pose = self.shelf_partner_pose = None
         phase2_band: Dict[str, Any] = {}
-        if self.shelf_start is not None:
+        if self.shelf_start is not None and not shelf_draw_on(self):  # oracle-fix 2026-11-06: shelf_start_draw places the books per attempt
             side = self.shelf_start["lean_side"]
             self.shelf_pose, _ = TT.shelf_lean_pose(self, self.hull["target"], self.rest["target"], self.top, edge, self.support, side)
             self.shelf_partner_pose, _ = TT.shelf_lean_pose(self, self.hull["partner"], self.rest["partner"], self.top, edge, self.support, -side)
@@ -1905,6 +1956,7 @@ class IORSSmall(SamplerV2):
             free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
             if free < float(self.gen("shelf_free_span_min_m", 0.15)):
                 return rejected("shelf_width", f"{free:.2f} m between the two leaning books on edge {edge.name}")
+        if self.shelf_start is not None:
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
         cands = TT.phase2_manipulation_stance(self, init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
@@ -1943,6 +1995,8 @@ class IORSSmall(SamplerV2):
         keeps every cell as its JSON text, so each use parses a fresh copy: nothing an attempt mutates reaches the next one."""
         memo = self.__dict__.setdefault("_spa_cells", {})
         mkey = (edge.name, int(i))
+        if shelf_draw_on(self):  # oracle-fix 2026-11-06 (shelf_start_draw): a cell per working arm (its band's candidates, the other arm idling)
+            mkey = mkey + (tuple(self.segment_arms),)
         if mkey in memo:
             return json.loads(memo[mkey]), "memo"
         lateral = self._spa_cell_centre(lo, hi, cell_m, i)
@@ -1973,7 +2027,7 @@ class IORSSmall(SamplerV2):
         cands = [Stance.from_cache(d, edge=edge) for d in cell["cands"]]
         dropped = self.__dict__.get("_spa_dropped") or set()
         if dropped:
-            cands = [c for c in cands if self._spa_cand_key(c) not in dropped]
+            cands = [c for c in cands if self._spa_drop_key(c) not in dropped]
         sides = [float(sd) for sd in (cell.get("region_sides") or [])]
         if self.shelf_start is None:
             sides = [sd for sd in sides if any(TT.in_start_region(c, sd) for c in cands)]
@@ -2079,7 +2133,7 @@ class IORSSmall(SamplerV2):
         self.init_stance = init_stance
         self.shelf_pose = self.shelf_partner_pose = None
         phase2_band: Dict[str, Any] = {}
-        if self.shelf_start is not None:
+        if self.shelf_start is not None and not shelf_draw_on(self):  # oracle-fix 2026-11-06: shelf_start_draw places the books per attempt
             side = self.shelf_start["lean_side"]
             self.shelf_pose, _ = TT.shelf_lean_pose(self, self.hull["target"], self.rest["target"], self.top, self.edge, self.support, side)
             self.shelf_partner_pose, _ = TT.shelf_lean_pose(self, self.hull["partner"], self.rest["partner"], self.top, self.edge, self.support, -side)
@@ -2088,6 +2142,7 @@ class IORSSmall(SamplerV2):
             free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
             if free < float(self.gen("shelf_free_span_min_m", 0.15)):
                 raise Reject("shelf_width", f"start_per_attempt: {free:.2f} m between the two leaning books on edge {self.edge.name}")
+        if self.shelf_start is not None:
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
         failed: List[str] = []
         phase2_any = False
@@ -2257,6 +2312,8 @@ class IORSSmall(SamplerV2):
                 d.summary.update({"relation": self.relation, "manipulation_candidate": int(k), "grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw},
                                   "manipulation_stance": manip.to_meta(), "pair": self.pair, "arm": TT.segment_arm_summary(grasp, arms_here),
                                   "partner_draw": self.partner_draw})
+                if getattr(self, "_shelf_draw", None) is not None:  # oracle-fix 2026-11-06 (shelf_start_draw): the attempt's compartment, boards, leans
+                    d.summary["shelf_start"] = dict(self._shelf_draw, arm=grasp.arm)
                 grasp.extras["arm_offer"] = TT.arm_offer_record(self.segment_arms, arms_here, grasp, self.arm_offer_why)
                 d.pose_targets[pname] = self._pose_target("partner", p_pose)
                 d.pose_targets[tname] = self._pose_target("target", t_pose)
@@ -2898,9 +2955,14 @@ class IORSSmall(SamplerV2):
             raise Reject("pair_goal_align", f"settled goal: {why}")
 
     def target_goal_quat(self, t_pose: G.Pose, manip: Stance, p_pose: Optional[G.Pose] = None) -> th.Tensor:
-        """The target's goal orientation; with :meth:`pair_goal_align` and the partner's pose, :meth:`pair_goal_quat`."""
+        """The target's goal orientation; with :meth:`pair_goal_align` and the partner's pose, :meth:`pair_goal_quat`. The shelf layout: the
+        start mirrored to lean the partner's way, parallel to it - with ``generation.shelf_start_draw`` (oracle-fix 2026-11-06) the partner's
+        own drawn lean (``partner_lean_deg``; the turn is the sum of the two leans, the tip release settles from there)."""
         if self.shelf_start is not None:  # touching#03: the book ends resting against the partner, leaning like it
-            return TT.mirrored_lean_quat(t_pose[1], self.edge, self.shelf_start["lean_side"], self.shelf_start["lean_deg"])
+            lean = self.shelf_start["lean_deg"]
+            if self.shelf_start.get("partner_lean_deg") is not None:
+                lean = 0.5 * (float(lean) + float(self.shelf_start["partner_lean_deg"]))
+            return TT.mirrored_lean_quat(t_pose[1], self.edge, self.shelf_start["lean_side"], lean)
         if self.relation == "inside" and self.up_axis() is not None:
             return self.standing_goal_quat(t_pose[1], manip)
         if p_pose is not None and self.pair_goal_align() is not None:
@@ -2920,19 +2982,184 @@ class IORSSmall(SamplerV2):
             depth_t = self.pair_level_depth("target", t_quat, min_area_rect(self.world.footprint(self.hull["partner"], p_pose))[3], manip)
         _, lat = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_lat.min()), float(t_lat.max())), self.place_gap())
         xy = manip.world(depth_t, lat)
-        return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
+        dz = shelf_goal_dz(getattr(self, "shelf_start", None), self.hull["target"], t_pose, t_quat)  # oracle-fix 2026-11-06 (shelf_start_draw)
+        return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2]) + dz]), t_quat
 
     # ------------------------------------------------------------------ touching shelf layout (touching#03, owner 2026-10-11 11:46)
+
+    # -- the start drawn per attempt (oracle-fix 2026-11-06, owner feedback on the touching#03 demo: "touching 3 - it does need more varied
+    #    start - why don't we try also initializing in different compartments' walls, and at different lean angles?") --
+
+    def shelf_start_draw(self) -> Optional[Dict[str, Any]]:
+        """Opt-in ``generation.shelf_start_draw`` (oracle-fix 2026-11-06, touching#03: the books started at one pose in every attempt, so with the
+        counted eval index every completed attempt was ``repeats_eval`` - start and goal 0.00 m / 0 deg from the eval instance): the shelf
+        layout's start drawn per attempt instead of fixed by the template. ``{"layouts": {support: [[bay_m, side], ...]}, "lean_deg": [lo, hi],
+        "spine_behind_edge_m": [lo, hi], "tries": n}``: ``layouts`` - the compartment (its centre, m along the edge tangent from the edge
+        midpoint, + = the robot's left: ``shelf_bay_lateral_m``'s lateral) and the side board the target leans against (``"left"`` /
+        ``"right"``, robot frame; the partner leans against the compartment's other board and the arm on the target's side works), one drawn
+        uniformly per attempt - a support without a list keeps the template's layout (``shelf_bay_lateral_m`` or 0, the key's side);
+        ``lean_deg`` - the target's and the partner's lean, each drawn uniformly (omitted: the key's lean for both); ``spine_behind_edge_m``
+        - the spine depth behind the board's front edge, one draw for both books (omitted: ``shelf_spine_behind_edge_m``); ``tries`` - the
+        layouts an attempt draws until both starts pass (:data:`SHELF_DRAW_TRIES`). Normalised: ``{"layouts": [(bay_m, side sign)],
+        "lean_deg", "spine_behind_edge_m", "tries"}`` for this template's support. None when off (every attempt starts at the template's
+        start, as before) or outside the shelf layout; ``Reject("spec")`` for a malformed block."""
+        if getattr(self, "shelf_start", None) is None:
+            return None
+        raw = self.gen("shelf_start_draw")
+        if raw is None:
+            return None
+        cached = self.__dict__.get("_shelf_draw_spec")
+        if cached is not None and cached[0] is raw:
+            return cached[1]
+        bad = f"{self.gp.variant}: generation.shelf_start_draw"
+        if not isinstance(raw, dict):
+            raise Reject("spec", f"{bad} must be a dict, got {raw!r}")
+
+        def pair(key: str, lo_min: float, hi_max: float) -> Optional[Tuple[float, float]]:
+            v = raw.get(key)
+            if v is None:
+                return None
+            if not (isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, (int, float)) for x in v) and lo_min <= float(v[0]) <= float(v[1]) <= hi_max):
+                raise Reject("spec", f"{bad}.{key} must be [lo, hi] with {lo_min} <= lo <= hi <= {hi_max}, got {v!r}")
+            return float(v[0]), float(v[1])
+
+        name = getattr(self.support, "name", "")
+        bays = self.gen("shelf_bay_lateral_m")
+        bay0 = float(bays.get(name, 0.0)) if isinstance(bays, dict) else 0.0
+        side0 = float(self.__dict__.get("_shelf_template", self.shelf_start)["lean_side"])
+        per_support = raw.get("layouts") or {}
+        if not isinstance(per_support, dict):
+            raise Reject("spec", f"{bad}.layouts must map a support name to its layouts, got {per_support!r}")
+        rows = per_support.get(name)
+        layouts: List[Tuple[float, float]] = []
+        for row in rows if rows is not None else [[bay0, TT.side_name(side0)]]:
+            if not (isinstance(row, (list, tuple)) and len(row) == 2 and isinstance(row[0], (int, float)) and row[1] in ("left", "right")):
+                raise Reject("spec", f"{bad}.layouts.{name}: every layout is [bay_m, 'left' | 'right'], got {row!r}")
+            layouts.append((float(row[0]), 1.0 if row[1] == "left" else -1.0))
+        if not layouts:
+            raise Reject("spec", f"{bad}.layouts.{name} is empty")
+        tries = raw.get("tries", SHELF_DRAW_TRIES)
+        if not isinstance(tries, int) or tries < 1:
+            raise Reject("spec", f"{bad}.tries must be a positive int, got {tries!r}")
+        spec = {"layouts": layouts, "lean_deg": pair("lean_deg", 0.0, 45.0), "spine_behind_edge_m": pair("spine_behind_edge_m", 0.0, 0.5), "tries": tries}
+        self._shelf_draw_spec = (raw, spec)
+        return spec
+
+    def shelf_draw_facts(self) -> Dict[str, Any]:
+        """``template_facts["shelf_start_draw"]``: the layouts an attempt draws from (bay, the target's board), the ranges, the tries and the
+        template's own layout; the mirror (the other board, the other arm) needs start_per_attempt (each attempt's Phase 2 with that arm)."""
+        spec = self.shelf_start_draw()
+        bays = self.gen("shelf_bay_lateral_m")
+        return {"layouts": [[bay, TT.side_name(sd)] for bay, sd in spec["layouts"]], "lean_deg": spec["lean_deg"], "spine_behind_edge_m": spec["spine_behind_edge_m"],
+                "tries": spec["tries"], "template_layout": [float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0,
+                                                            TT.side_name(self._shelf_template["lean_side"])],
+                "mirror": bool(start_per_attempt()) and any(sd != self._shelf_template["lean_side"] for _, sd in spec["layouts"])}
+
+    def shelf_use_arm(self, arm: str) -> None:
+        """The shelf layout's working arm (owner 2026-10-11 11:46): the arm on the target's side grasps, places and pushes, the other arm has no
+        role; Phase 2's foci come from that arm's band (its own, else the mirror). oracle-fix 2026-11-06: :meth:`draw_shelf_side` sets it per attempt."""
+        self.segment_arms = [arm]
+        if self.gen("shelf_working_arm_default"):  # oracle-fix 2026-11-04 round 3: stances checked with the pushing arm working (idle-posture rejects)
+            self.ikc.default_working_arms = [arm]
+        self.arm_offer_why = f"touching shelf layout: the {arm} arm on the target's side grasps, places and pushes it; nothing braces the partner"
+        self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands)
+
+    def shelf_rests(self, side: float, lean_target: float, lean_partner: float) -> Tuple[th.Tensor, th.Tensor]:
+        """The two books' rest orientations for a drawn layout: the target's library rest turned to lean ``lean_target`` deg toward ``side``
+        (``tabletop.releaned_quat``), the partner leaning ``lean_partner`` deg toward the other board (``tabletop.upright_lean_quat``)."""
+        base = self._shelf_template
+        t_rest = TT.releaned_quat(self._shelf_rest0["target"], float(base["lean_side"]), float(base["lean_deg"]), side, lean_target)
+        return t_rest, TT.upright_lean_quat(self.hull["partner"], -float(side), float(lean_partner))
+
+    def draw_shelf_side(self, rng: np.random.Generator) -> None:
+        """:meth:`shelf_start_draw`, before the attempt's start: one of the support's layouts uniformly - its board names the working arm
+        (:meth:`shelf_use_arm`) and the books' nominal rests (the key's lean, mirrored to that board) feed the start's Phase 2 and its cache
+        key; :meth:`draw_shelf_layout` then places the books. Restricted to the key's board without start_per_attempt (the template's Phase-2
+        candidates belong to its arm) and, for eval, to the board opposite ``generation.partner_side``."""
+        spec = self.shelf_start_draw()
+        base = self._shelf_template
+        layouts, why = list(spec["layouts"]), None
+        assigned = self.gen("partner_side")
+        fixed = (-1.0 if assigned == "left" else 1.0) if assigned in ("left", "right") else None
+        if fixed is not None:
+            why = f"generation.partner_side {assigned}: the target on the {TT.side_name(fixed)} board"
+        elif not start_per_attempt():
+            fixed, why = float(base["lean_side"]), "no start_per_attempt: the template's arm and candidates"
+        if fixed is not None:
+            bays = self.gen("shelf_bay_lateral_m")
+            bay0 = float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0
+            layouts = [lay for lay in layouts if lay[1] == fixed] or [(bay0, fixed)]
+        k = int(rng.integers(len(layouts)))
+        bay, side = layouts[k]
+        self.shelf_start = {"key": base["key"], "lean_side": side, "lean_deg": base["lean_deg"], "context": base.get("context")}
+        self.rest["target"], self.rest["partner"] = self.shelf_rests(side, float(base["lean_deg"]), float(base["lean_deg"]))
+        self.shelf_use_arm(self.shelf_push_arm())
+        self.shelf_pose = self.shelf_partner_pose = None
+        self._shelf_draw = {"layout": [bay, TT.side_name(side)], "n_layouts": len(layouts), "restricted": why}
+        self._shelf_side_layouts = [lay for lay in layouts if lay[1] == side]
+
+    def draw_shelf_layout(self, rng: np.random.Generator) -> None:
+        """:meth:`shelf_start_draw`, after the attempt's start (its edge): the books' leaning starts of the drawn layout - the target against
+        the drawn board of the compartment, the partner against the other (``tabletop.shelf_lean_pose`` with the bay as the rays' start and
+        the drawn spine depth), each at its drawn lean - and the free span between them (``shelf_free_span_min_m``). A layout that fails
+        (``shelf_wall`` / ``shelf_board`` / ``shelf_width``) is drawn again among the layouts of the same board (the arm is the attempt's),
+        up to ``tries``; then that rejection. Sets the rests, the two poses and ``shelf_start`` (the drawn facts, ``partner_lean_deg``: the
+        goal is drafted parallel to the partner); the facts go to ``summary.shelf_start``."""
+        spec = self.shelf_start_draw()
+        base = self._shelf_template
+        side = float(self.shelf_start["lean_side"])
+        same = self._shelf_side_layouts
+        bay = float(self._shelf_draw["layout"][0])
+        span_min = float(self.gen("shelf_free_span_min_m", 0.15))
+        tried: List[str] = []
+        last: Optional[Reject] = None
+        for k in range(int(spec["tries"])):
+            if k:
+                bay = float(same[int(rng.integers(len(same)))][0])
+            lean_t, lean_p = (float(rng.uniform(*spec["lean_deg"])), float(rng.uniform(*spec["lean_deg"]))) if spec["lean_deg"] else (float(base["lean_deg"]),) * 2
+            spine = float(rng.uniform(*spec["spine_behind_edge_m"])) if spec["spine_behind_edge_m"] else None
+            rest_t, rest_p = self.shelf_rests(side, lean_t, lean_p)
+            label = f"bay {bay:+.2f} {TT.side_name(side)} board, leans {lean_t:.1f} / {lean_p:.1f} deg" + ("" if spine is None else f", spine {spine:.3f} m")
+            try:
+                t_pose, tf = TT.shelf_lean_pose(self, self.hull["target"], rest_t, self.top, self.edge, self.support, side, spine_behind=spine, lateral0=bay)
+                p_pose, pf = TT.shelf_lean_pose(self, self.hull["partner"], rest_p, self.top, self.edge, self.support, -side, spine_behind=spine, lateral0=bay)
+                free = shelf_free_span(self.world.hull_at(self.hull["target"], t_pose), self.world.hull_at(self.hull["partner"], p_pose), self.edge, side)
+                if free < span_min:
+                    raise Reject("shelf_width", f"{self.support.name}: {free:.3f} m between the two leaning books (< {span_min:.2f})")
+            except Reject as e:
+                if e.reason not in SHELF_DRAW_REJECTS:
+                    raise
+                TT._count(self, f"shelf_start_draw.{e.reason}")
+                tried.append(f"{label}: [{e.reason}] {str(e)[:160]}")
+                last = e
+                continue
+            start = {"key": base["key"], "lean_side": side, "lean_deg": round(lean_t, 2), "context": base.get("context"), "partner_lean_deg": round(lean_p, 2),
+                     "bay_m": round(bay, 4), "spine_behind_edge_m": round(float(self.gen("shelf_spine_behind_edge_m", TT.SHELF_SPINE_BEHIND_EDGE_M) if spine is None else spine), 4)}
+            merge_shelf_pose_facts(start, tf)
+            start.update({"partner": pf, "free_span_m": round(free, 4)})
+            self.shelf_start = start
+            self.rest["target"], self.rest["partner"] = rest_t, rest_p
+            self.shelf_pose, self.shelf_partner_pose = t_pose, p_pose
+            self._shelf_draw.update({"bay_m": round(bay, 4), "target_board": TT.side_name(side), "target_lean_deg": round(lean_t, 2), "partner_lean_deg": round(lean_p, 2),
+                                     "spine_behind_edge_m": start["spine_behind_edge_m"], "target_position": tf.get("position"), "partner_position": pf.get("position"),
+                                     "wall_lateral_m": [tf.get("wall_lateral_m"), pf.get("wall_lateral_m")], "free_span_m": round(free, 4), "tries": k + 1,
+                                     "rejected": tried})
+            log.info("%s: shelf start draw: %s (the %s arm), free span %.3f m, try %d of %d", self.gp.variant, label, self.segment_arms[0], free, k + 1, int(spec["tries"]))
+            return
+        raise Reject(last.reason if last is not None else "shelf_wall", f"shelf_start_draw: no drawn layout of the {TT.side_name(side)} board passes in "
+                                                                       f"{int(spec['tries'])} tries ({'; '.join(tried[-3:])})")
 
     def _fixed_start_memo_key(self, manip: Stance, arm: str, fingers: Optional[float], per_grasp: bool) -> Tuple[Any, ...]:
         """The key of the fixed start's grasp verdict at ``manip`` (``generation.fixed_start_memo``): the base pose, trunk and locked
         configuration (both arms' postures), the working arm, the pre-shaped opening and whether the transit is judged per grasp; the start
-        pose and the grasp library are the template's."""
+        pose and the grasp library are the template's (with ``generation.shelf_start_draw`` the attempt's start pose joins the key)."""
         q = self.ikc.q_locked(manip)
         key = (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
                tuple(round(float(v), 3) for v in G.t(q).flatten().tolist()), arm, None if fingers is None else round(float(fingers), 4), bool(per_grasp))
         if self.shelf_backoff_m() > 0.0 or self.gen("shelf_transit_max_reach_rad") is not None:  # oracle-fix 2026-11-06: another verdict
             key = key + ("backoff", round(self.shelf_backoff_m(), 4), self.gen("shelf_transit_max_reach_rad"))
+        if shelf_draw_on(self) and self.shelf_pose is not None:  # oracle-fix 2026-11-06 (shelf_start_draw): the start is the attempt's
+            key = key + ("start", tuple(round(float(v), 3) for v in [*G.t(self.shelf_pose[0]).tolist(), *G.t(self.shelf_pose[1]).tolist()]))
         return key
 
     def _fixed_start_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
@@ -3509,7 +3736,7 @@ class IORSSmall(SamplerV2):
             if raised is None:
                 lat, t_quat = self.avoid_release_sweep(st, depth_t, lat, t_quat, lat_init, p_lat, p_hull_w, gap)
         xy = st.world(depth_t, lat)
-        pos = th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])])
+        pos = th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2]) + shelf_goal_dz(getattr(self, "shelf_start", None), self.hull["target"], t_pose, t_quat)])
         if raised is not None:
             pos = pos + th.tensor([0.0, 0.0, self.release_raise(pos, t_quat, p_hull_w, raised)])
         return pos, t_quat

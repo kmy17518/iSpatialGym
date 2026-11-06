@@ -321,9 +321,19 @@ def upright_lean_quat(hull: th.Tensor, lean_side: float, lean_deg: float) -> th.
     return C.mat_to_quat(Rx @ R0).float()
 
 
+def releaned_quat(rest_quat, lean_side0: float, lean_deg0: float, lean_side: float, lean_deg: float) -> th.Tensor:
+    """oracle-fix 2026-11-06 (touching#03, ``generation.shelf_start_draw``): an upright book's rest orientation ``rest_quat`` that leans
+    ``lean_deg0`` toward ``lean_side0`` (:func:`upright_shelf_facts`) turned about rest-frame +x (spine -> into the shelf) until it leans
+    ``lean_deg`` toward ``lean_side`` (+1 = rest-frame +y, the robot's left; :func:`upright_lean_quat`'s sign) - the spine keeps facing
+    the robot and the grasp library rows stay where they are on the book (object frame); the exact IK judges them at the new pose."""
+    half = 0.5 * math.radians(-float(lean_side) * float(lean_deg) + float(lean_side0) * float(lean_deg0))
+    return C.qmul(th.tensor([math.sin(half), 0.0, 0.0, math.cos(half)]), _t(rest_quat).float()).float()
+
+
 def mirrored_lean_quat(quat, edge: EdgeFrame, lean_side: float, lean_deg: float) -> th.Tensor:
     """``quat`` (an upright book leaning ``lean_deg`` toward ``lean_side`` of ``edge``) turned about the edge's inward axis so it
-    leans the same angle to the other side (the touching#03 goal: the target rests against the partner, parallel to it)."""
+    leans the same angle to the other side (the touching#03 goal: the target rests against the partner, parallel to it). A book
+    leaning ``a`` deg ends leaning ``b`` deg the other way with ``lean_deg`` = (a + b) / 2 (the turn is 2 ``lean_deg``)."""
     axis = th.tensor([float(edge.inward[0]), float(edge.inward[1]), 0.0])
     axis = axis / th.linalg.norm(axis)
     half = 0.5 * 2.0 * float(lean_side) * math.radians(float(lean_deg))
