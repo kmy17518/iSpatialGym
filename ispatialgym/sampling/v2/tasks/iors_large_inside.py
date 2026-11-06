@@ -12,8 +12,8 @@ as a basin's flat floor rests with its rim over the flaring walls).
 
 Stance C faces the opening: base square to a side of the interior raster (``inside_stance_side``: the world direction the opening faces, e.g.
 ``"+y"``; default every side, pooled nearest first), stand-offs ``inside_stand_offs_m`` (default :data:`STAND_OFFS`) + the partner's AABB overhang,
-laterals along the side, trunks from the goal-side band (without one: the :data:`NO_BAND_TRUNKS` trunks per base pose
-with the most reach margin to the goal cell); the goal cell = the band-admitted goal cell nearest the base; the target at the goal in frame
+laterals along the side, trunks from the goal-side band (without one: the :data:`NO_BAND_TRUNKS` trunks per base pose, among ``inside_trunks``
+when set, with the most reach margin to the goal cell); the goal cell = the band-admitted goal cell nearest the base; the target at the goal in frame
 (5 %). The collision check tries the arm postures ``inside_stance_postures`` in order (:func:`free_in_postures`; default ``untucked``: the
 working arm untucked, the idle arm's A6 retry; ``ready`` / ``tucked``: both arms, as the goal-side band's ``trunk_config`` checks) and a
 candidate keeps the first that is free.
@@ -563,6 +563,11 @@ class InsideMode:
         self.place["band"] = rb
         self.place.setdefault("bands", {})[arm] = rb
         trunks = rb.trunks() if rb is not None else [(float(t), float(k)) for t in RB.TRANSLATES for k in RB.TILTS]
+        if rb is None and self.gp.gen("inside_trunks"):
+            # oracle-fix 2026-11-06 (owner feedback on the touching_large#02 demo, the umbrella on the hall tree's bench board): opt-in
+            # generation.inside_trunks - the C trunks without a goal-side band instead of the whole grid (whose reach-margin cut keeps the deepest
+            # leans: offline, a top-down release 0.55-0.65 m ahead at 0.65 m is out of their IK reach or of the head camera's frame)
+            trunks = [(float(t), float(k)) for t, k in self.gp.gen("inside_trunks")]
         half_run = edge.length / 2 - (half + 0.10)
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
         goal_cells = self.place["cells"]
@@ -625,9 +630,13 @@ class InsideMode:
         for st, cam in zip(cands, P0.camera_poses(self, cands)):
             gc = st.extras["goal_cell"]
             focus = th.tensor([gc[0], gc[1], z_mid])
-            if not P0.in_frame(self, cam, self.hull_corners_world(self.hull, self.goal_pose_at(gc, self.rest))):
+            # oracle-fix 2026-11-06: a mode may name the orientation the target is released at there (the touching surface place's yaw along the
+            # board - the 0.82 m umbrella at the rest yaw reached 0.43 m toward the base, under the head camera's frame); the rest orientation else
+            quat_f = getattr(self, "frame_quat_at", lambda _gc: self.rest)(gc)
+            corners = self.hull_corners_world(self.hull, self.goal_pose_at(gc, quat_f))
+            if not P0.in_frame(self, cam, corners):
                 if os.environ.get("ISPATIALGYM_STANCE_BLAME"):
-                    uv, depth = self.world.camera_model.project(cam, self.hull_corners_world(self.hull, self.goal_pose_at(gc, self.rest)))
+                    uv, depth = self.world.camera_model.project(cam, corners)
                     log.info("%s: STANCE_BLAME inside stance C %s side %s: collision-free %s trunk (%.2f, %+.2f) so %.2f: the target at the goal cell %s "
                              "out of frame (uv x %.0f..%.0f y %.0f..%.0f of %d px, depth min %.2f m, axis %.1f deg)%s", self.gp.variant, partner.name, edge.name,
                              [round(float(v), 2) for v in st.base_pose2d], st.translate, st.tilt, st.stand_off, [round(v, 2) for v in gc],

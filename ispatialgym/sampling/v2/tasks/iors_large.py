@@ -5196,6 +5196,10 @@ class IORSLarge(SamplerV2):
         if gp is not None and str(gp.gen("touching_place") or "").lower() == M.LEAN_PLACE_KIND:
             # oracle-fix 2026-11-04 round 3 (touching_large#02, the umbrella): placed leaning on the partner, its lower end on the floor
             return M.LeanTouchingMode
+        if gp is not None and str(gp.gen("touching_place") or "").lower() == M.SURFACE_PLACE_KIND:
+            # oracle-fix 2026-11-06 (owner feedback on the touching_large#02 demo: "the largest compartment (the top one) has a surface that the
+            # umbrella can lay flat on"): set down on an interior board of the partner - the inside mode's raster, stance C and release
+            return M.SurfaceTouchingMode
         return M.TouchingMode
 
     def _sample_nextto(self) -> type:
