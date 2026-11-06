@@ -40738,7 +40738,58 @@
    "shelf_backoff_transit_m": 0.2,
    "_shelf_backoff_transit_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"instead of swinging arm backwards to reach grasp, I prefer robot moving backwards then reaching through forward movement\"): the init -> manipulation transition drives back to the manipulation stand-off + 0.20 m (s_T 0.75 at kmuacd_0), the left arm makes its straight joint ramp to the pre-grasp there (~2.3 s, the hand ~0.23 m in front of the opening), then the trunk and the 0.20 m drive-in with the arm frozen; the grasp's own transit becomes ~0 rad. t03tip5_kmuacd_s5 0000: the grasp's arm_to swung the shoulder-flipped pre-grasp [-3.23, 2.63, 2.16, ...] from untucked in 11.5 s (joint1 -3.23 rad, the hand up to z 1.90 and 0.47 m behind the base, 3.18 m of hand path for 0.52 m); the near branch's ramp at the stance passes over the bookcase top (55 / 70 ramp configurations within 4 cm of it, 243 transit rejections in that run), backed off 0.10 m 13 / 70, 0.15-0.25 m 0 / 70 (numpy URDF kinematics, at the init and the manipulation trunk)",
    "shelf_transit_max_reach_rad": 1.6,
-   "_shelf_transit_max_reach_rad_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"instead of swinging arm backwards to reach grasp, I prefer robot moving backwards then reaching through forward movement\"): a pre-grasp witness farther than 1.6 rad (largest left-arm joint change) from the posture its transit starts in (untucked) is re-solved seeded at that posture, then at ready, else the grasp is refused - the flipped twin [-3.233, 2.629, 2.158, -1.108, 0.836, -0.962, 0.399] is 3.23 rad away (joint-limit margin 0.085 rad), the near branch [0.129, 0.199, -0.188, -1.107, 0.548, -0.665, -0.119] 1.37 rad (margin 0.373 rad; its approach / lift / pre-place / place chain tracks with margins 0.14-0.33 rad)"
+   "_shelf_transit_max_reach_rad_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"instead of swinging arm backwards to reach grasp, I prefer robot moving backwards then reaching through forward movement\"): a pre-grasp witness farther than 1.6 rad (largest left-arm joint change) from the posture its transit starts in (untucked) is re-solved seeded at that posture, then at ready, else the grasp is refused - the flipped twin [-3.233, 2.629, 2.158, -1.108, 0.836, -0.962, 0.399] is 3.23 rad away (joint-limit margin 0.085 rad), the near branch [0.129, 0.199, -0.188, -1.107, 0.548, -0.665, -0.119] 1.37 rad (margin 0.373 rad; its approach / lift / pre-place / place chain tracks with margins 0.14-0.33 rad)",
+   "shelf_start_draw": {
+    "layouts": {
+     "bookcase_kmuacd_0": [
+      [
+       0.0,
+       "right"
+      ],
+      [
+       -0.37,
+       "left"
+      ],
+      [
+       -0.37,
+       "right"
+      ]
+     ],
+     "bookcase_otwukr_1": [
+      [
+       0.19,
+       "left"
+      ],
+      [
+       0.19,
+       "right"
+      ],
+      [
+       -0.19,
+       "left"
+      ],
+      [
+       -0.19,
+       "right"
+      ]
+     ],
+     "bookcase_opryhp_0": [
+      [
+       0.0,
+       "left"
+      ],
+      [
+       0.0,
+       "right"
+      ]
+     ]
+    },
+    "lean_deg": [
+     11.0,
+     20.0
+    ]
+   },
+   "_shelf_start_draw_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside demo: \"touching 3 - it does need more varied start - why don't we try also initializing in different compartments' walls, and at different lean angles?\"): each attempt draws the compartment, the board the target leans against (the partner on the other board, the arm on the target's side works) and both leans (11-20 deg, independent) instead of the template's one start. fix1 (counted eval index, kmuacd_0 T1): 265 completed attempts in g300013-18, all repeats_eval (start_base 0.12 m / 0 deg, both books 0.00 m / 0 deg); only start cell 9 (base lateral -0.065) of the 10 collision-free cells (-0.515..-0.065) completes - cells 0-4 not_in_frame (the target at +0.12 out of the init image), 5-8 grasp_unreachable. kmuacd_0 at 0.84 m: three 0.34 m cubes (centre boards +0.166 / -0.176, right cube about -0.20..-0.54, centre -0.37); layouts: centre cube mirrored (right arm), right cube with the left arm (in the image from cells 0-4), right cube mirrored; the left cube (+0.37) is out (no base pose left of -0.015: door_pxhbim_1 / the wall), the eval's own layout (centre, left board) is out (any lean in range moves its books <= 0.9 cm / 5 deg from the key's 15, inside 0.03 m / 0.2 rad: every instance repeats). otwukr_1: bays +-0.19 (the divider at 0), opryhp_0: its bay, both boards. Leans: below atan(thickness / height) = 8.0 deg (acbrnv 3.1 / 22.3 cm) / 8.8 deg (agbqsy 3.3 / 21.3 cm) a book's centre of mass stays over its own bottom edge and nothing holds it to the board; at 11 deg the lever toward the board is 5.9 / 4.1 mm (13.8 / 11.7 mm at 15). At 20 / 20 the free span of the 0.342 m cube is 0.128 m (22 / 22: 0.115 < shelf_free_span_min_m 0.12), the tip release's goal tilt ~18 deg (geometry 15.2 + the 2.7 measured excess at 15) under goal_tip_max_deg 20; the drafted goal leans parallel to the partner's drawn lean"
   },
   "constraints": []
  },
