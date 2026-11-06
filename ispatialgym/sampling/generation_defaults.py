@@ -165,6 +165,28 @@ _TABLETOP_SPLIT_CONE: Dict[str, Any] = {
     "phase2_split_fallback_classes_deg": [20.0, 30.0],
 }
 
+#: oracle-fix 2026-11-06 (owner feedback on the inside_large#02 demo, the jar of sauce carried into the fridge: "does this use the same
+#: navigation module as camera relocalization? the path doesn't seem smooth. ... make iors large tasks use the smooth navigation module
+#: that camera relocalization uses"): every drive of the IORS large-scale subtasks - empty-handed (``base_path_style``) and carried
+#: (``carried_base_path_style``) - is checked and recorded as the ``robot.base_path`` face_travel schedule camera relocalization drives,
+#: the polyline (``recorded``) where the schedule collides. The jar's carried leg as recorded: 17.2 s, 3.71 m, 409 deg of rotation for a
+#: net -1 deg, the body 59 deg off the travel direction on average; as face_travel on the same polyline (offline replay of
+#: ``Motions._base_reference``) 9.0 s / 102 deg.
+#: ``face_travel_max_extra_rotation_deg`` 10: a schedule that turns the body more than 10 deg beyond the polyline as recorded is not used
+#: - a straight leg whose ends do not face the way turns to the travel heading and back (a 10 cm back-up: 2 x 180 deg, 11.5 s for 0.8 s).
+#: Over the 104 IORS-large path records of $OFH/runs (offline references) face_travel everywhere drives 544 s / 11899 deg, recorded
+#: 431 s / 7496 deg, the rule 403 s / 6894 deg (28 of the 104 as face_travel: 6 of the 7 multi-corner carries, the jar's among them).
+#: No ``face_travel_fallback_cfgs``: the carried-leg probe over $OFH/runs has inside_large at 362 clear / 713 collide (663 of the 713 in
+#: the last 1 % of the swept schedule, the approach to the place stance), but a schedule with simplify / fillet 3 cm keeps the grid
+#: path's short end hooks as corners and spot turns - on 6 of the 7 multi-corner carries it turns the body more than the recorded
+#: polyline (the jar: 19.4 s / 426 deg against recorded 17.6 s / 402 deg).
+#: ``SamplerV2.gen_seeded`` reads these for an entry (or a counted template's customs copy) that lacks the keys; an entry's own value wins.
+IORS_LARGE_PATHS: Dict[str, Any] = {
+    "base_path_style": "face_travel",
+    "carried_base_path_style": "face_travel",
+    "face_travel_max_extra_rotation_deg": 10.0,
+}
+
 DEFAULTS: Dict[str, Dict[str, Any]] = {
     # ---- camera relocalization (§6.1 / §6.2) -------------------------------------------------------------------
     "camera_relocalization-standard": {**COMMON, **_CAMERA_RELOCALIZATION_COMMON},
@@ -486,6 +508,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-ontop_large_scale": {
         **COMMON,
+        **IORS_LARGE_PATHS,  # oracle-fix 2026-11-06: the face_travel drives of camera relocalization
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -501,6 +524,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-under_large_scale": {
         **COMMON,
+        **IORS_LARGE_PATHS,  # oracle-fix 2026-11-06: the face_travel drives of camera relocalization
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -523,6 +547,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     # own keys come with its patch
     "inter_object_relation_satisfaction-inside_large_scale": {
         **COMMON,
+        **IORS_LARGE_PATHS,  # oracle-fix 2026-11-06: the face_travel drives of camera relocalization
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -538,6 +563,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-touching_large_scale": {
         **COMMON,
+        **IORS_LARGE_PATHS,  # oracle-fix 2026-11-06: the face_travel drives of camera relocalization
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -553,6 +579,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
     },
     "inter_object_relation_satisfaction-nextto_large_scale": {
         **COMMON,
+        **IORS_LARGE_PATHS,  # oracle-fix 2026-11-06: the face_travel drives of camera relocalization
         "tolerances": dict(TOLERANCES_MEASURED),  # §8
         "groups": {},
         "path_buckets": None,
@@ -628,6 +655,7 @@ __all__ = [
     "COMMON",
     "DEFAULTS",
     "GROUP_ROLES",
+    "IORS_LARGE_PATHS",
     "IORS_SMALL_COMMON",
     "TOLERANCES_ARTICULATION",
     "TOLERANCES_MEASURED",
