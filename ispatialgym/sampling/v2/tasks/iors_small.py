@@ -607,6 +607,14 @@ class IORSSmall(SamplerV2):
         return float(self.gen("partner_gap_extra_m", 0.03))
 
     @property
+    def nextto_gap_extra(self) -> float:
+        """oracle-fix 2026-11-06 (owner: "salt shaker / pepper shaker too close together at init - just a little nudge makes the condition
+        true"): the nextto init gap's margin over g_NT, ``generation.nextto_gap_extra_m`` (the key the defaults always documented for
+        g in [g_NT + 0.03, D_p]; the bound read partner_gap_extra_m, also 0.03 everywhere). Set to 0.12 the target moves >= 0.13 m to its
+        goal - beyond the policy position tolerance 0.09 - so a nudge of the partner cannot satisfy the goal at init."""
+        return float(self.gen("nextto_gap_extra_m", self.partner_gap_extra))
+
+    @property
     def goal_drop(self) -> float:
         return float(self.gen("goal_drop_m", 0.01))
 
@@ -1558,8 +1566,10 @@ class IORSSmall(SamplerV2):
         w_t = TT.half_extent(self.hull["target"], self.rest["target"])
         w_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
         W_p = 2 * w_p
-        return {"kind": "iors", "w_t": w_t, "w_p": w_p, "W_p": W_p, "D_p_max": W_p + self.partner_gap_extra, "safety": 0.02, "relation": self.relation,
-                "g_NT": self.pair.get("g_NT"), "nextto_gap_extra": self.partner_gap_extra, "g_min": self.gap_min, "m_end": self.table_end_margin}
+        # a nextto pair's D_p ceiling moves with its gap margin (the interval [g_NT + margin, W_p + margin] keeps its width)
+        extra = max(self.partner_gap_extra, self.nextto_gap_extra) if self.relation == "nextto" else self.partner_gap_extra
+        return {"kind": "iors", "w_t": w_t, "w_p": w_p, "W_p": W_p, "D_p_max": W_p + extra, "safety": 0.02, "relation": self.relation,
+                "g_NT": self.pair.get("g_NT"), "nextto_gap_extra": self.nextto_gap_extra, "g_min": self.gap_min, "m_end": self.table_end_margin}
 
     # ------------------------------------------------------------------ instance (§4.6 Phase 3 + §6.11)
 
@@ -2125,9 +2135,9 @@ class IORSSmall(SamplerV2):
         D_p = float(info.get("D_p", self.lateral_margins()["D_p_max"]))
         g_lo = self.gap_min
         if self.relation == "nextto":
-            g_lo = float(self.pair["g_NT"]) + self.partner_gap_extra
+            g_lo = float(self.pair["g_NT"]) + self.nextto_gap_extra
             if D_p < g_lo:
-                raise Reject("pair_gap", f"D_p {D_p:.2f} < g_NT + {self.partner_gap_extra:.2f} = {g_lo:.2f}")
+                raise Reject("pair_gap", f"D_p {D_p:.2f} < g_NT + {self.nextto_gap_extra:.2f} = {g_lo:.2f}")
         return g_lo, max(g_lo, D_p)
 
     def place_gap(self) -> float:

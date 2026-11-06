@@ -80,3 +80,29 @@ def test_the_kielbasa_on_the_rim_is_not_ontop_and_a_resting_one_is(monkeypatch, 
     _install_rays(monkeypatch, pts)  # resting on it: every probe hits 5 mm above the surface
     r = rays(platter, kielbasa)
     assert r["ok"] is True and r["n_hits_on_upper"] == 9 and r["centre_hit"] is True
+
+
+def test_nextto_init_gap_margin_reads_nextto_gap_extra_m():
+    """oracle-fix 2026-11-06 (salt / pepper too close at init): the nextto gap's lower bound is g_NT + generation.nextto_gap_extra_m (0.12
+    on the nextto_small aliases), not partner_gap_extra_m; other relations keep footprint_gap_min_m."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+    from ispatialgym.sampling.v2.core import Reject
+
+    gen = {"partner_gap_extra_m": 0.03, "nextto_gap_extra_m": 0.12, "footprint_gap_min_m": 0.03}
+    s = IS.IORSSmall.__new__(IS.IORSSmall)
+    s.gen = lambda k, d=None: gen.get(k, d)
+    s.relation, s.pair = "nextto", {"g_NT": 0.031}
+    s.lateral_margins = lambda: {"D_p_max": 1.0}  # gap_range evaluates it as the dict default
+    s.init_stance = SimpleNamespace(extras={"margins": {"D_p": 0.219}})
+    lo, hi = s.gap_range()
+    assert lo == pytest.approx(0.151) and hi == pytest.approx(0.219)
+    s.init_stance = SimpleNamespace(extras={"margins": {"D_p": 0.10}})
+    with pytest.raises(Reject):
+        s.gap_range()
+    del gen["nextto_gap_extra_m"]  # an entry without the key: the old bound
+    s.init_stance = SimpleNamespace(extras={"margins": {"D_p": 0.10}})
+    assert s.gap_range() == (pytest.approx(0.061), pytest.approx(0.10))
+    s.relation = "ontop"
+    assert s.gap_range()[0] == pytest.approx(0.03)

@@ -31456,7 +31456,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "handedness": {
     "gym_shoe/kmcbym": "right",
@@ -31472,7 +31472,8 @@
     "relative_yaw_deg": 0.0,
     "facing": "away"
    },
-   "support_margin": 0.005
+   "support_margin": 0.005,
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -31575,13 +31576,14 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
    },
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -31684,13 +31686,14 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
    },
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -31793,13 +31796,14 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
    },
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -31902,13 +31906,14 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "handedness": {
     "gym_shoe/kmcbym": "right",
     "gym_shoe/mcfcwq": "left"
    },
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -32017,7 +32022,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "partner_side": "left",
    "init_align_support": true,
@@ -32033,7 +32038,8 @@
     "partner_clearance_m": 0.005,
     "max_raise_m": 0.03
    },
-   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table."
+   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table.",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": [],
   "evaluation": {
@@ -32150,14 +32156,15 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "partner_side": "left",
    "raised_release": {
     "partner_clearance_m": 0.005,
     "max_raise_m": 0.03
    },
-   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table."
+   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table.",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": [],
   "evaluation": {
@@ -32274,14 +32281,15 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "partner_side": "left",
    "raised_release": {
     "partner_clearance_m": 0.005,
     "max_raise_m": 0.03
    },
-   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table."
+   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table.",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": [],
   "evaluation": {
@@ -32443,14 +32451,15 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "partner_side": "left",
    "raised_release": {
     "partner_clearance_m": 0.005,
     "max_raise_m": 0.03
    },
-   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table."
+   "_raised_release_note": "oracle-fix 2026-11-03 (nextto#01, train85 0/3 not_reached): the marker's top-down pinch opens toward the colored pencil lying beside it (pair_goal_align: parallel); the full opening swept 43-47 mm into the pencil at every train release, the oracle's release clearance then moved the marker 30 mm off its goal (= the position tolerance) or shoved the pencil 43 mm. The raised release of nextto#03 (tablespoon / chopstick, same geometry): the jaw opens above the pencil and the marker drops onto the table.",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": [],
   "evaluation": {
@@ -32568,9 +32577,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -32679,9 +32689,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -32790,9 +32801,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -32901,9 +32913,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -33012,9 +33025,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "left"
+   "partner_side": "left",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -33123,9 +33137,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "right"
+   "partner_side": "right",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -33278,7 +33293,7 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
    "partner_side": "right",
    "init_align_support": true,
@@ -33293,7 +33308,8 @@
    "raised_release": {
     "partner_clearance_m": 0.005,
     "max_raise_m": 0.03
-   }
+   },
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },
@@ -33408,9 +33424,10 @@
    "partner_gap_extra_m": 0.03,
    "partner_moved_max_m": 0.005,
    "goal_drop_m": 0.01,
-   "nextto_gap_extra_m": 0.03,
+   "nextto_gap_extra_m": 0.12,
    "nextto_divisor": 6.0,
-   "partner_side": "right"
+   "partner_side": "right",
+   "_nextto_gap_extra_note": "oracle-fix 2026-11-06 (owner feedback, vec_eval85 rollout: 'nextto salt shaker pepper shaker - too close together at init (just little nudge makes condition eval true)'): at 0.03 the init AABB gap stood only 3.1-6.6 cm past OmniGibson's NextTo threshold g_NT and the target moved 3.5-7.7 cm to its goal, under the policy position tolerance 0.09 m (0.03 x 3): the position measure held at step 0 in all 594 salt / pepper episodes and 65 of the 84 off-mode successes moved the salt < 1 cm (the robot pushed the pepper 2.6 cm). 0.12: the target moves >= 0.13 m, a partner-only push needs >= 0.12 m (> its own 0.09 m tolerance). iors_small.nextto_gap_extra (the D_p ceiling moves with it)."
   },
   "constraints": []
  },

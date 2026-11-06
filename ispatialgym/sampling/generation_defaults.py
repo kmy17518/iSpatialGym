@@ -468,7 +468,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {},
         "path_buckets": None,
         **IORS_SMALL_COMMON,
-        "nextto_gap_extra_m": 0.03,  # §4.4 / §4.6 g ∈ [g_NT + 0.03, D_p], g_NT = mean(dims_a + dims_b)/6 (OmniGibson NextTo)
+        # §4.4 / §4.6 g ∈ [g_NT + m, W_p + m], g_NT = mean(dims_a + dims_b)/6 (OmniGibson NextTo); m 0.03 -> 0.12 (oracle-fix 2026-11-06,
+        # owner: a nudge made the goal true at init - the target moves >= 0.13 m, beyond the policy tolerance 0.09)
+        "nextto_gap_extra_m": 0.12,
         "nextto_divisor": 6.0,  # §4.4 g_NT = mean(dims_target + dims_partner) / 6
     },
     "inter_object_relation_satisfaction-touching_small_scale": {

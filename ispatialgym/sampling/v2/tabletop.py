@@ -461,7 +461,7 @@ def lateral_margins(margins: Dict[str, Any], lam_min: float, lam_max: float, b: 
             info["g_NT_lo"] = g_lo
             g_min = g_lo
             if D_p < g_lo:
-                info["reject"] = ("pair_gap", f"D_p {D_p:.3f} < g_NT + 0.03 = {g_lo:.3f}")
+                info["reject"] = ("pair_gap", f"D_p {D_p:.3f} < g_NT + {float(margins.get('nextto_gap_extra', 0.03)):.2f} = {g_lo:.3f}")
         m_end = float(margins.get("m_end", TABLE_END_MARGIN))
         info.update({"g_min": g_min, "m_end": m_end, "L_min": 2 * w_t + g_min + 2 * w_p + 2 * m_end})
         m_R = m_L = 0.0
