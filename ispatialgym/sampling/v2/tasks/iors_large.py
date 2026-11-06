@@ -3153,6 +3153,42 @@ class IORSLarge(SamplerV2):
         # before the path turns (probe_pillow: the path turned 0.41 m from bed_kddswt_1's side, a wheel sphere 8.7 mm from it, in the 0.9 m corridor)
         back = self.gp.gen("carry_departure_min_back_m")
         dep_kw = {} if back is None else {"min_standoff": float(manip.stand_off or 0.0) + float(back)}
+        # oracle-fix 2026-11-06 (opt-in generation.carry_arrive_straight_m, hardback inside_large#01): the carried path first ends that far behind C
+        # along C's axis and drives straight in (NAV.plan_path arrive_straight_m), so the turn to C's heading happens away from the partner;
+        # the plain path after it (local_hb 2026-11-06: every carry turned into C 0.6 m from bookcase_jaysra_0 with the book ~0.8 m ahead, and
+        # the straightened base's wheels touched bed_rrcvaq_1 0.37 m away on the same turn)
+        arrive = float(self.gp.gen("carry_arrive_straight_m") or 0.0)
+        variants = ([{"arrive_straight_m": arrive}] if arrive > 0.0 else []) + [{}]
+        chosen: Dict[str, Any] = {}
+
+        def carried_path(redo=None, **kw):
+            """The carried path B -> C: per variant (straight arrival first) the local path, then the eroded global one on a path_collision (the
+            local shortest path hugs the partner's corner with the object out front, 0920-100543); a straight arrival that finds no path at all
+            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition)."""
+            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)]
+            i = 0
+            while True:
+                k, v, force = tries[i]
+                plain = k == len(variants) - 1
+                try:
+                    p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
+                    chosen.clear()
+                    chosen.update(v)
+                    return p
+                except Reject as e:
+                    if plain and e.reason != "path_collision":
+                        raise
+                    if not plain:
+                        log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
+                                 str(e)[:600])
+                    # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
+                    i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
+                    if i >= len(tries):
+                        raise
+                    self._drop_leg_records(place.name)
+                    if redo is not None:
+                        redo()
+
         for tt in self.travel_trunks(init, manip):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
                 continue  # B already straight: the plain leg below is the same thing
@@ -3160,17 +3196,8 @@ class IORSLarge(SamplerV2):
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
                 start = NAV.departure_pose(manip, dep.stand_off)
                 drive_q = self.carry_drive_arms(place, tname, arm)
-                try:
-                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, arm_q=drive_q)
-                except Reject as e:
-                    if e.reason != "path_collision":
-                        raise
-                    # the local (un-eroded) shortest path hugs the partner's corner with the object out front (0920-100543: stride 4/35
-                    # at the table end); the eroded global map keeps the body's distance
-                    self._drop_leg_records(place.name)
-                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
-                    path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True,
-                                            arm_q=drive_q)
+                path = carried_path(redo=lambda tt=tt: self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw),
+                                    trunk=tt, start_pose2d=start, arm_q=drive_q)
                 # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -3178,26 +3205,23 @@ class IORSLarge(SamplerV2):
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.variant, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
-                                "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors}
+                                "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors,
+                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
                 return path
             except Reject as e:
                 self._drop_leg_records(place.name)
                 errors.append(f"travel trunk {tuple(round(v, 2) for v in tt)}: {e.reason}: {e}")
+                # oracle-fix 2026-11-06 (hardback): the carry leg's error text is cut at 700 characters by its caller; each travel trunk's whole reason
+                log.info("%s: B -> C carry: travel trunk %s failed: %s: %s", self.gp.variant, tuple(round(v, 2) for v in tt), e.reason, str(e)[:1500])
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
         try:
-            try:
-                path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len)
-            except Reject as e:
-                if e.reason != "path_collision":
-                    raise
-                self._drop_leg_records(place.name)
-                path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=True)
+            path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.variant, "; ".join(errors),
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
-                            "lift_arm_q": q_lift_arm is not None, "tried": errors}
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
             return path
         except Reject as e:
             self._drop_leg_records(place.name)

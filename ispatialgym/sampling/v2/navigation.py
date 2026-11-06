@@ -485,7 +485,7 @@ def path_collision_free(kit: "RobotKit", poses: Sequence[Tuple[float, float, flo
 
 def path_blame(kit: "RobotKit", pose: Tuple[float, float, float], trunk: Tuple[float, float], posture: str, q_arms: Optional[Dict[str, th.Tensor]],
                margin: float) -> str:
-    """Opt-in (``ISPATIALGYM_STANCE_BLAME``, oracle-fix 2026-11-04 owner item 4): at a colliding swept pose (the carried object still
+    """Opt-in (``ISPATIALGYM_STANCE_BLAME``, or ``ISPATIALGYM_PATH_BLAME`` for this blame alone; oracle-fix 2026-11-04 owner item 4): at a colliding swept pose (the carried object still
     attached), the robot / attached links in the world (by class) and the world meshes in contact (``world_collision_offenders``)."""
     try:
         q = kit.q_at_base_pose(_nav_q(kit, trunk, posture, q_arms), *pose)
@@ -762,7 +762,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
               margin: float = 0.01, edge_slide: bool = False, edge_slide_back_m: float = 0.0, style: str = "recorded",
-              probe_face_travel: bool = False, global_blocked: Sequence[Any] = (), face_travel_cfgs: Sequence[Dict[str, float]] = (),
+              probe_face_travel: bool = False, global_blocked: Sequence[Any] = (), face_travel_cfgs: Sequence[Dict[str, float]] = (), arrive_straight_m: float = 0.0,
               face_travel_max_extra_rotation_deg: Optional[float] = None) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
@@ -805,6 +805,14 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
                                    back_m=edge_slide_back_m)
         except NavigationError as e:
             log.info("%s -> %s: edge slide not available (%s); falling back to the grid path", stance_from.name, stance_to.name, e)
+    # oracle-fix 2026-11-06 (``arrive_straight_m``; hardback carry, generation.carry_arrive_straight_m): the grid path ends that far behind
+    # ``stance_to`` along its own axis, at its heading, and the last leg drives straight in - the turn to the stance's heading happens there,
+    # not at the stance (the hardback's carried book, ~0.8 m ahead of the base, swept into the bookcase on the turn at stance C)
+    tail: List[Tuple[float, float, float]] = []
+    if arrive_straight_m and float(arrive_straight_m) > 0.0:
+        fwd = th.tensor([math.cos(float(stance_to.yaw)), math.sin(float(stance_to.yaw))], dtype=b_xy.dtype)
+        b_xy = b_xy - fwd * float(arrive_straight_m)
+        tail = [(float(b_xy[0]), float(b_xy[1]), float(stance_to.yaw))]
     free_local = local_map(kit, rooms, blocked=blocked)
     a, b = _to_map(kit, a_xy), _to_map(kit, b_xy)
     a_free, b_free = nearest_free_cell(free_local, a, 3), nearest_free_cell(free_local, b, 3)
@@ -815,7 +823,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         if cells is not None:
             cells = simplify_path(cells, free_local)
             pts = [_to_world(kit, c) for c in cells[1:-1]]
-            waypoints = [tuple(stance_from.base_pose2d)] + [(float(p[0]), float(p[1]), float("nan")) for p in pts] + [tuple(stance_to.base_pose2d)]
+            waypoints = [tuple(stance_from.base_pose2d)] + [(float(p[0]), float(p[1]), float("nan")) for p in pts] + tail + [tuple(stance_to.base_pose2d)]
     if waypoints is None:
         mode = "global"
         free_g = eroded_map(kit)
@@ -837,7 +845,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
             raise NavigationError("no_path", f"{stance_from.name} -> {stance_to.name}: disconnected on the eroded map")
         cells = simplify_path(cells, free_g)
         pts = [_to_world(kit, c) for c in cells]
-        waypoints = [tuple(stance_from.base_pose2d)] + [(float(p[0]), float(p[1]), float("nan")) for p in pts] + [tuple(stance_to.base_pose2d)]
+        waypoints = [tuple(stance_from.base_pose2d)] + [(float(p[0]), float(p[1]), float("nan")) for p in pts] + tail + [tuple(stance_to.base_pose2d)]
     # yaws of the intermediate waypoints: heading of the following segment
     filled: List[Tuple[float, float, float]] = []
     for i, w in enumerate(waypoints):
@@ -889,7 +897,9 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         poses = stride_poses(filled, stride, max_yaw_step=step)
         swept = stride_poses(filled, stride, yaw_envelope=True, max_yaw_step=step)  # the strides + the tracker's yaw lag on the turns (owner 2026-09-25)
         ok, bad = path_collision_free(kit, swept, trunk, posture, margin=float(margin), q_arms=arm_q)
-        blame = path_blame(kit, swept[bad], trunk, posture, arm_q, float(margin)) if not ok and os.environ.get("ISPATIALGYM_STANCE_BLAME") else ""
+        # oracle-fix 2026-11-06: ISPATIALGYM_PATH_BLAME turns on this blame alone (STANCE_BLAME also turns on the stance / roll blames: 16x slower)
+        blame = path_blame(kit, swept[bad], trunk, posture, arm_q, float(margin)) if not ok and (os.environ.get("ISPATIALGYM_STANCE_BLAME")
+                                                                                              or os.environ.get("ISPATIALGYM_PATH_BLAME")) else ""
     log.debug("%s path %s -> %s: heading step <= %.2f deg between checked poses (farthest robot / carried point %s from the base centre): %d strides, %d swept poses",
               mode, stance_from.name, stance_to.name, math.degrees(step), "unknown" if radius is None else f"{radius:.2f} m", len(poses), len(swept))
     if not ok:
