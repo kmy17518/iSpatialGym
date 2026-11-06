@@ -632,8 +632,15 @@ class Transition(Action):
     def annotate(self, sidecar):
         purpose = "placing" if self.transition.to == "placement" else "manipulation"
         with_obj = f" with {sidecar.language.phrase(self.carried)}" if self.carried else ""
-        fine = f"back off{with_obj}, set the trunk for {purpose} and move in to {_dest(self.transition.to)}"
         t0, k0 = self.stance_from.trunk
+        if getattr(self.transition, "departure", False) and self.transition.trunk_to is not None:
+            # oracle-fix 2026-11-06 (owner, blender close ep 3136): a departure drives back and sets the TRAVEL trunk, with no drive-in
+            # (its label described the arrival's trunk and drive-in in all 1212 departure episodes of isg-1020)
+            tt, kt = (float(v) for v in self.transition.trunk_to)
+            fine = f"back off{with_obj} and straighten the trunk before driving to {_dest(self.transition.to)}"
+            numbers = f"drive back{with_obj} to {self.transition.stand_off:.2f} m stand-off, set trunk translate {tt:.2f} / tilt {kt:.2f} (from {t0:.2f} / {k0:.2f})"
+            return fine, numbers
+        fine = f"back off{with_obj}, set the trunk for {purpose} and move in to {_dest(self.transition.to)}"
         t1, k1 = self.stance_to.trunk
         s = self.stance_to.stand_off
         arrive = f", drive in to {s:.2f} m stand-off" if s is not None else ", drive in"

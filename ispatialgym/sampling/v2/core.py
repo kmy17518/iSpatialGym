@@ -1074,6 +1074,12 @@ class SamplerV2(TaskSampler):
                     r, l, _ = stance_arm_vectors(self.kit, to)  # the departure sweep puts the arms in the arriving stance's posture
                     path = self.record_path(frm, to, trunk=travel, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(frm, dep.stand_off),
                                             max_length_m=max_len)
+                    # oracle-fix 2026-11-06 (owner, blender close ep 3136: "why does it go to pre close twice?"): the path is swept with the
+                    # arms the departure puts in the arriving stance's posture, so the record carries them - the oracle's navigate keeps an
+                    # empty arm at a record's arms_q; without them it re-posed the arm to untucked and the arrival moved it out again
+                    # (~360 of 887 steps in 78 / 101 isg-1020 blender-close demos)
+                    if not path.carried and path.arms_q is None:
+                        path.arms_q = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
                     return path, dep, self.record_transition(frm, to, trunk_from=travel)
                 except Reject as e:
                     log.info("%s: travel %s -> %s at trunk %.2f/%+.2f after the drive-back: %s", self.gp.variant, frm.name, to.name, travel[0], travel[1], e)

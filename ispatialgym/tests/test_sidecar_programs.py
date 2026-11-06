@@ -1567,3 +1567,18 @@ def test_validation_rejects(subtask, mutate, match):
     assert any(match in p for p in problems), problems
     with pytest.raises(SidecarError):
         Sidecar.from_dict((lambda d: (mutate(d), d)[1])(raw(subtask))).validate()
+
+
+def test_departure_transition_label_names_the_travel_trunk_and_no_drive_in():
+    """oracle-fix 2026-11-06 (owner, blender close ep 3136): a departure drives back and sets the travel trunk (``trunk_to``), no drive-in;
+    an arrival keeps its label."""
+    from types import SimpleNamespace as NS
+
+    frm = NS(trunk=(0.40, 0.0), stand_off=0.45)
+    to = NS(trunk=(0.0, -0.31), stand_off=0.35)
+    dep = NS(transition=NS(to="manipulation", stand_off=0.55, departure=True, trunk_to=(0.0, 0.0)), carried=None, stance_from=frm, stance_to=to)
+    fine, numbers = A.Transition.annotate(dep, None)
+    assert "straighten the trunk" in fine and "drive in" not in numbers and "translate 0.00 / tilt 0.00 (from 0.40 / 0.00)" in numbers
+    arr = NS(transition=NS(to="manipulation", stand_off=0.55, departure=False, trunk_to=None), carried=None, stance_from=frm, stance_to=to)
+    fine, numbers = A.Transition.annotate(arr, None)
+    assert "drive in to 0.35 m" in numbers and "tilt -0.31" in numbers
