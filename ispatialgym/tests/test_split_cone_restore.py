@@ -57,6 +57,33 @@ def test_switch_off_is_the_collapse(monkeypatch):
     assert len(set(drawn[1:])) == 1 and drawn[1] == drawn[0]  # the patch's behaviour: stuck at the first attempt's position
 
 
+class _PreDrawStub(_Stub):
+    """iors_small's order: ``sample`` draws the attempt's start first (a new candidate list, ``_spa_drawn``), then ``SamplerV2.sample``."""
+
+    def __init__(self):
+        super().__init__()
+        self.n = 0
+
+    def sample(self, rng):
+        self.n += 1
+        self.manip_candidates = [_cand(100 * self.n + p, k) for p in range(3) for k in range(2)]  # this attempt's start's positions
+        self._spa_drawn = True
+        return CORE.SamplerV2.sample(self, rng)
+
+
+def test_a_start_drawn_by_the_task_keeps_its_own_candidates(monkeypatch):
+    """oracle-fix 2026-11-06 (ontop_small_04 / inside_04): the restore put the previous start's list back over the list the task had just
+    drawn - every attempt after the first used the first start's stances."""
+    monkeypatch.setenv("ISPATIALGYM_START_PER_ATTEMPT", "1")
+    monkeypatch.setenv("ISPATIALGYM_FAST_SPLIT_CONE_RESTORE", "1")
+    s = _PreDrawStub()
+    for i in range(12):
+        s.sample(np.random.default_rng(i))
+    drawn = [next(iter(p)) for p in s.seen]
+    assert [pos // 100 for pos in drawn] == list(range(1, 13))  # attempt n draws among attempt n's start positions
+    assert not s._spa_drawn and len(s._split_cone_cands) == 6
+
+
 def test_without_start_per_attempt_nothing_changes(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_START_PER_ATTEMPT", raising=False)
     s = _Stub()

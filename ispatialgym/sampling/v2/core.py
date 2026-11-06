@@ -384,7 +384,12 @@ class SamplerV2(TaskSampler):
         self.sidecar.reset_instance()
         if start_per_attempt():
             full = getattr(self, "_split_cone_cands", None)
-            if full is not None and fast_on("SPLIT_CONE_RESTORE"):
+            # oracle-fix 2026-11-06 (zero-yield survey, ontop_small_04 / inside_04): a task that drew this attempt's start before calling here
+            # (``_spa_drawn``: iors_small.sample, whose spa_redraw_start rebuilds manip_candidates for the new start) keeps that list - the
+            # restore below put the PREVIOUS start's candidates back over it, so every attempt after a process's first drove from its own
+            # init to the first start's manipulation stances (path_too_long 3.1-4.3 m, path_collision, partner frame 0/82, an empty
+            # candidate list: 92 % target_placement on ontop_small_04, 2 written in 615 attempts)
+            if full is not None and fast_on("SPLIT_CONE_RESTORE") and not getattr(self, "_spa_drawn", False):
                 # train-fast 2026-11-01 (SPLIT_CONE_RESTORE): split_cone_draw narrowed manip_candidates to the last attempt's position; the
                 # reset below rebuilds the pools from manip_candidates, so without this every attempt after the first kept that one
                 # position (only iors_small's spa_redraw_start rebuilds the list): the template's full list goes back first

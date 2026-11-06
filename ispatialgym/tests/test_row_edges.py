@@ -77,3 +77,24 @@ def test_edge_frames_keep_the_edges_the_support_row_names():
     s, top = _sampler([{"name": "bar_udatjt_0", "top_z": 1.05, "edges": ["+u", "-v"]}])
     top.open_edges = ["-v", "+v"]
     assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]
+
+
+def test_generation_init_edges_keeps_the_named_edges_after_the_support_row():
+    """oracle-fix 2026-11-06 (block_design#01: the fast flow's fixed template seed stood every job at the -v end, 0 of 311 attempts
+    written): ``generation.init_edges`` narrows Phase 1a's edges in every order; unset / empty keeps today's list."""
+    import numpy as np
+
+    every = ["+u", "+v", "-u", "-v"]
+    s, top = _sampler()
+    s.gen = lambda key, default=None: {"init_edges": ["+v"]}.get(key, default)
+    assert TT.gen_edges(s) == ["+v"]
+    for seed in range(6):
+        assert [e.name for e, _ in TT.edge_frames(s, top, rng=np.random.default_rng(seed))] == ["+v"]
+    s.gen = lambda key, default=None: default
+    assert TT.gen_edges(s) == [] and sorted(e.name for e, _ in TT.edge_frames(s, top)) == every
+    s.gen = lambda key, default=None: {"init_edges": []}.get(key, default)
+    assert sorted(e.name for e, _ in TT.edge_frames(s, top)) == every
+    # the support row's edges first, the knob within them
+    s, top = _sampler([{"name": "bar_udatjt_0", "top_z": 1.05, "edges": ["+u", "-v"]}])
+    s.gen = lambda key, default=None: {"init_edges": ["-v", "+v"]}.get(key, default)
+    assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]

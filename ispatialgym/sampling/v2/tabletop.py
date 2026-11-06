@@ -1990,9 +1990,19 @@ def row_edges(s, top) -> List[str]:
     return [str(e) for e in (spec or {}).get("edges") or []]
 
 
+def gen_edges(s) -> List[str]:
+    """Opt-in ``generation.init_edges`` (oracle-fix 2026-11-06, block_design#01): the edges Phase 1a may stand at, applied after the
+    support row's (:func:`row_edges`). The support row lives in the template's bindings (``multiply_isg`` rebuilds the choice from
+    ``template_meta.json``, so a customs edit of the row never reaches the fast flow), the generation block in the customs the flow
+    loads; [] = every edge."""
+    edges = s.gen("init_edges", None) if hasattr(s, "gen") else None
+    return [str(e) for e in edges or []]
+
+
 def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[EdgeFrame, Stance]]:
     """Every edge of the top (random order with ``rng``) with its stance at ``stand_off`` + overhang (>= 5 cm), trunk
-    (0.5, 0) — before the floor / collision checks of Phase 1a. A support row naming ``edges`` (:func:`row_edges`) keeps only those."""
+    (0.5, 0) — before the floor / collision checks of Phase 1a. A support row naming ``edges`` (:func:`row_edges`) keeps only those,
+    and ``generation.init_edges`` (:func:`gen_edges`) those of them it names."""
     support = s.world.obj(top.name)
     lo, hi = support.aabb
     aabb_xy = th.tensor([[float(lo[0] if sx == 0 else hi[0]), float(lo[1] if sy == 0 else hi[1])] for sx in (0, 1) for sy in (0, 1)])
@@ -2004,7 +2014,11 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     if keep:
         log.info("phase 1a: the support row keeps edge(s) %s of %s", keep, [e[0] for e in edges])
         edges = [e for e in edges if e[0] in keep]
-    order = [int(i) for i in rng.permutation(len(edges))] if rng is not None else list(range(len(edges)))
+    keep_gen = gen_edges(s)
+    if keep_gen:
+        log.info("phase 1a: generation.init_edges keeps edge(s) %s of %s", keep_gen, [e[0] for e in edges])
+        edges = [e for e in edges if e[0] in keep_gen]
+    order =[int(i) for i in rng.permutation(len(edges))] if rng is not None else list(range(len(edges)))
     out = []
     for i in order:
         name, mid, normal, length = edges[i]
