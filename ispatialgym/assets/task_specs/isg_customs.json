@@ -100,7 +100,11 @@
     0.5
    ],
    "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
-   "base_path_style": "face_travel"
+   "base_path_style": "face_travel",
+   "push_arc_stall_ends_arc": true,
+   "_push_arc_stall_ends_arc_note": "oracle-fix 2026-11-06 (owner request: 'start investigating aliases that have low yield & take long time to sample/collect demo, and fix them' - alignment-axial_01): the dominant failed demo is push plan_failed 'arm_arc_closed_loop(right): 10 consecutive differential-IK misses' (axial_01 6 / 15 failed demos in trainfast rule2 + survey1 300003; axial_05 8 / 15 in pilot3). hdf5 of 300003 / 100002 / 100007 / 100010: the hand orbits 0.07-0.16 rad ahead of the free object, right_arm_joint4 (elbow) straightens -1.1 -> -0.25..-0.37 rad, the arm Jacobian's smallest singular value falls to 0.028-0.038 (0.12-0.13 elsewhere) and every step misses (offline float32 replay of the loop from the measured joints reproduces it; 60 iterations or no damping boost do not help). On: those misses end the arc (stop ik_stall) instead of failing the push - survey1 300003 stalled with the board game 0.047 rad from its goal (tolerance 0.10).",
+   "push_arc_replay_lag_rad": 0.08,
+   "_push_arc_replay_lag_rad_note": "oracle-fix 2026-11-06 (alignment-axial_01, same measurements): the sampler's arc replay (program_check.replay_arc_push) moves the object exactly with the pad, the oracle's object lags the hand 0.07-0.16 rad near the arc end (successes ~0.02) - the replay now has to track the arc 0.08 rad past the goal band (an arc the arm cannot reach that far is approach_untrackable and redrawn), so the oracle's object ends within the 0.10 rad tolerance when the hand stalls at its reach end."
   },
   "constraints": [
    {
@@ -563,7 +567,11 @@
     0.5
    ],
    "_base_path_style_note": "2026-09-26 owner overnight plan item 6: the uncarried drives of this family are checked and recorded as the robot.base_path face_travel schedule (recorded fallback when a stride of the schedule collides; carried legs stay recorded)",
-   "base_path_style": "face_travel"
+   "base_path_style": "face_travel",
+   "push_arc_stall_ends_arc": true,
+   "_push_arc_stall_ends_arc_note": "oracle-fix 2026-11-06 (owner request: 'start investigating aliases that have low yield & take long time to sample/collect demo, and fix them' - alignment-axial_01): the dominant failed demo is push plan_failed 'arm_arc_closed_loop(right): 10 consecutive differential-IK misses' (axial_01 6 / 15 failed demos in trainfast rule2 + survey1 300003; axial_05 8 / 15 in pilot3). hdf5 of 300003 / 100002 / 100007 / 100010: the hand orbits 0.07-0.16 rad ahead of the free object, right_arm_joint4 (elbow) straightens -1.1 -> -0.25..-0.37 rad, the arm Jacobian's smallest singular value falls to 0.028-0.038 (0.12-0.13 elsewhere) and every step misses (offline float32 replay of the loop from the measured joints reproduces it; 60 iterations or no damping boost do not help). On: those misses end the arc (stop ik_stall) instead of failing the push - survey1 300003 stalled with the board game 0.047 rad from its goal (tolerance 0.10).",
+   "push_arc_replay_lag_rad": 0.08,
+   "_push_arc_replay_lag_rad_note": "oracle-fix 2026-11-06 (alignment-axial_01, same measurements): the sampler's arc replay (program_check.replay_arc_push) moves the object exactly with the pad, the oracle's object lags the hand 0.07-0.16 rad near the arc end (successes ~0.02) - the replay now has to track the arc 0.08 rad past the goal band (an arc the arm cannot reach that far is approach_untrackable and redrawn), so the oracle's object ends within the 0.10 rad tolerance when the hand stalls at its reach end."
   },
   "constraints": [
    {
@@ -3773,7 +3781,11 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "push_arc_stall_ends_arc": true,
+   "_push_arc_stall_ends_arc_note": "oracle-fix 2026-11-06 (owner request: 'start investigating aliases that have low yield & take long time to sample/collect demo, and fix them' - alignment-axial_05): the dominant failed demo is push plan_failed 'arm_arc_closed_loop(right): 10 consecutive differential-IK misses' (axial_01 6 / 15 failed demos in trainfast rule2 + survey1 300003; axial_05 8 / 15 in pilot3). hdf5 of 300003 / 100002 / 100007 / 100010: the hand orbits 0.07-0.16 rad ahead of the free object, right_arm_joint4 (elbow) straightens -1.1 -> -0.25..-0.37 rad, the arm Jacobian's smallest singular value falls to 0.028-0.038 (0.12-0.13 elsewhere) and every step misses (offline float32 replay of the loop from the measured joints reproduces it; 60 iterations or no damping boost do not help). On: those misses end the arc (stop ik_stall) instead of failing the push - survey1 300003 stalled with the board game 0.047 rad from its goal (tolerance 0.10).",
+   "push_arc_replay_lag_rad": 0.08,
+   "_push_arc_replay_lag_rad_note": "oracle-fix 2026-11-06 (alignment-axial_05, same measurements): the sampler's arc replay (program_check.replay_arc_push) moves the object exactly with the pad, the oracle's object lags the hand 0.07-0.16 rad near the arc end (successes ~0.02) - the replay now has to track the arc 0.08 rad past the goal band (an arc the arm cannot reach that far is approach_untrackable and redrawn), so the oracle's object ends within the 0.10 rad tolerance when the hand stalls at its reach end."
   },
   "constraints": [
    {
@@ -4120,7 +4132,11 @@
     0.7,
     0.6,
     0.5
-   ]
+   ],
+   "push_arc_stall_ends_arc": true,
+   "_push_arc_stall_ends_arc_note": "oracle-fix 2026-11-06 (owner request: 'start investigating aliases that have low yield & take long time to sample/collect demo, and fix them' - alignment-axial_05): the dominant failed demo is push plan_failed 'arm_arc_closed_loop(right): 10 consecutive differential-IK misses' (axial_01 6 / 15 failed demos in trainfast rule2 + survey1 300003; axial_05 8 / 15 in pilot3). hdf5 of 300003 / 100002 / 100007 / 100010: the hand orbits 0.07-0.16 rad ahead of the free object, right_arm_joint4 (elbow) straightens -1.1 -> -0.25..-0.37 rad, the arm Jacobian's smallest singular value falls to 0.028-0.038 (0.12-0.13 elsewhere) and every step misses (offline float32 replay of the loop from the measured joints reproduces it; 60 iterations or no damping boost do not help). On: those misses end the arc (stop ik_stall) instead of failing the push - survey1 300003 stalled with the board game 0.047 rad from its goal (tolerance 0.10).",
+   "push_arc_replay_lag_rad": 0.08,
+   "_push_arc_replay_lag_rad_note": "oracle-fix 2026-11-06 (alignment-axial_05, same measurements): the sampler's arc replay (program_check.replay_arc_push) moves the object exactly with the pad, the oracle's object lags the hand 0.07-0.16 rad near the arc end (successes ~0.02) - the replay now has to track the arc 0.08 rad past the goal band (an arc the arm cannot reach that far is approach_untrackable and redrawn), so the oracle's object ends within the 0.10 rad tolerance when the hand stalls at its reach end."
   },
   "constraints": [
    {
