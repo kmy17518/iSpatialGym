@@ -111,7 +111,10 @@ collector() {
     local r1=$(cat $JOBDIR/results.jsonl 2>/dev/null | wc -l)
     echo "COLLECT_EXIT c$i q=$q rc=$rc wall_s=$(( $(date +%s) - t1 )) results=$(( r1 - r0 ))" | tee -a $JOBDIR/job.txt
     if [ "$r1" -eq "$r0" ] && [ "$rc" -ne 0 ] && [ "$rc" -ne 75 ]; then barren=$(( barren + 1 )); else barren=0; fi
-    [ "$rc" -eq 0 ] && [ -e $JOBDIR/sampling.done ] && break
+    # 2026-11-06: no break on rc alone - a process that released its claim for a fresh world (run_isg EXIT_QUEUE_RESTART 75) reaches the
+    # shell as 0 (og.shutdown exits 0), so an instance landing as sampling.done appeared was never collected (fix1_t03nr N 1 jobs: the
+    # prebuild-mismatch instance left unclaimed); the loop ends at its top check (done and nothing ready left unclaimed)
+    [ "$rc" -eq 0 ] && [ -e $JOBDIR/sampling.done ] && [ "$(python $S/queue_watch.py $JOBDIR left)" -eq 0 ] && break
   done
   echo $rc > $JOBDIR/collect_c$i.rc
 }
