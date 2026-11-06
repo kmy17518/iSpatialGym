@@ -223,8 +223,9 @@ _SPA_CACHE_ANNOUNCED = False
 #: the target's bottom = the support top) of each push class at which the hand clears the support - the vertical blade's fingertips 5 mm
 #: (the old blade's height), a leaning blade's fingertips ``blade_lean_tip_above_m`` (its leading edge dips below the tips), the horizontal
 #: hand of the fingertip / pad pushes closing horizontally 5 cm (the gripper body, r 4 cm on the eef axis, 1 cm clear), the vertically
-#: closing ones 6.2 cm (the lower knuckle 4.2 cm below the pads, r 1.5 cm, 5 mm clear)
-PUSH_SWEEP_MIN_HEIGHT_M = {"blade": 0.005, "tip_h": 0.05, "tip_v": 0.062}
+#: closing ones 6.2 cm (the lower knuckle 4.2 cm below the pads, r 1.5 cm, 5 mm clear); the pad pushes ``push_h`` / ``push_v`` (one turn
+#: each: the wrist camera hangs 7.4 / 7.5 cm below the contact with its r 1.8 cm) 8 cm - below it the pre-pose's camera stands in the table
+PUSH_SWEEP_MIN_HEIGHT_M = {"blade": 0.005, "tip_h": 0.05, "tip_v": 0.062, "pad": 0.08}
 #: the push contact's window around the centre line (m, across it and in height): the outermost material within it is the face the
 #: fingertips stop ``stop_clearance_m`` before (no part of them starts inside the target)
 PUSH_SWEEP_WINDOW_M = 0.01
@@ -4767,8 +4768,8 @@ class IORSSmall(SamplerV2):
         groups: List[Tuple[float, int, Any]] = []
         groups += [(h, 0, (lambda h=h: tips(h))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"])]
         groups += [(h, 1, (lambda h=h: tip_v(h))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_v"])]
-        groups += [(h, 2, (lambda h=h: pad(h, False))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"])]
-        groups += [(h, 3, (lambda h=h: pad(h, True))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_v"])]
+        groups += [(h, 2, (lambda h=h: pad(h, False))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["pad"])]
+        groups += [(h, 3, (lambda h=h: pad(h, True))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["pad"])]
         for i, lean in enumerate(leans):
             groups += [(h, 4 + i, (lambda h=h, lean=lean: leaning(h, lean))) for h in heights(lean_tip)]
         if 0.0 in pitches:

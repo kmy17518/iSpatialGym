@@ -90,9 +90,10 @@ def test_candidates_rise_from_the_lowest_height_on_the_footprint_centre_line():
     assert min(c[2]["contact_height_m"] for c in cands if c[0] == "push_tip_v-") == pytest.approx(0.062)
     assert {c[0].rstrip("-") for c in cands} == {"push_tip_h", "push_tip_v", "push_h", "push_v", "push_blade_lean20", "push_blade_lean12", "push_blade_lean8",
                                                   "push_blade_0"}  # every class
-    # ties keep today's class order: at 5 cm the fingertip push before the pad push
-    at5 = [c[0] for c in cands if abs(c[2]["contact_height_m"] - 0.05) < 1e-6]
-    assert at5.index("push_tip_h-") < at5.index("push_h")
+    # ties keep today's class order: at 8 cm the fingertip push before the pad push, whose wrist camera hangs below it until then
+    at8 = [c[0] for c in cands if abs(c[2]["contact_height_m"] - 0.08) < 1e-6]
+    assert at8.index("push_tip_h-") < at8.index("push_h")
+    assert min(c[2]["contact_height_m"] for c in cands if c[0] in ("push_h", "push_v")) == pytest.approx(0.08)
     for kind, (o, q), ex in cands:
         cp = ex["contact_point"]
         # the line through the footprint centre (the body's base, x 0.70), not the hull points' mean pulled toward the head
