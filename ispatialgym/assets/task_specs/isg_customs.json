@@ -41007,17 +41007,10 @@
    "push_height_sweep": true,
    "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried",
    "push_raised_max_aspect": 1.5,
-   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it)."
+   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it).",
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
-  "constraints": [],
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "constraints": []
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-commercial_kitchen_table": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41155,17 +41148,10 @@
    "push_height_sweep": true,
    "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried",
    "push_raised_max_aspect": 1.5,
-   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it)."
+   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it).",
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
-  "constraints": [],
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "constraints": []
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-countertop": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41321,17 +41307,10 @@
    "push_height_sweep": true,
    "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried",
    "push_raised_max_aspect": 1.5,
-   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it)."
+   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it).",
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
-  "constraints": [],
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "constraints": []
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-desk": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41469,17 +41448,10 @@
    "push_height_sweep": true,
    "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried",
    "push_raised_max_aspect": 1.5,
-   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it)."
+   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it).",
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
-  "constraints": [],
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "constraints": []
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-washer": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41618,17 +41590,10 @@
    "push_height_sweep": true,
    "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried",
    "push_raised_max_aspect": 1.5,
-   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it)."
+   "_push_raised_max_aspect_note": "oracle-fix 2026-11-06 (owner: push the most reachable centre-bottom part so it doesn't wobble): the raised blade (palm above the bottle's top) stays off for the 0.27 m bottle (height / footprint ~3): its demo rocked 3.6 -> 20.3 deg pushed at 83 % of its height; the default allows it as the sweep's last resort (touching_02's cereal box needs it).",
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
-  "constraints": [],
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "constraints": []
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle_wegawe-bottle_of_detergent-breakfast_table": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41760,18 +41725,11 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
   "constraints": [],
-  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W4 = the rows ~T4 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-breakfast_table (breakfast_table_rhjoby_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone",
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W4 = the rows ~T4 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-breakfast_table (breakfast_table_rhjoby_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle_wegawe-bottle_of_detergent-commercial_kitchen_table": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -41903,18 +41861,11 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
   "constraints": [],
-  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W3 = the rows ~T3 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-commercial_kitchen_table (commercial_kitchen_table_vxvtec_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone",
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W3 = the rows ~T3 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-commercial_kitchen_table (commercial_kitchen_table_vxvtec_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle_wegawe-bottle_of_detergent-countertop": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -42056,18 +42007,11 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
   "constraints": [],
-  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W1, ~W2 = the rows ~T1, ~T2 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-countertop (countertop_fjkase_0, countertop_ikwqer_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone",
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W1, ~W2 = the rows ~T1, ~T2 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-countertop (countertop_fjkase_0, countertop_ikwqer_0); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
  },
  "inter_object_relation_satisfaction-touching_small_scale-spray_bottle_wegawe-bottle_of_detergent-desk": {
   "iddl": "inter_object_relation_satisfaction/touching_small_scale.iddl",
@@ -42199,18 +42143,11 @@
     "max_long_side_m": 0.3,
     "max_height_m": 0.3
    },
-   "partner_max_aspect": 3.2
+   "partner_max_aspect": 3.2,
+   "_tolerance_reverted_note": "oracle-fix 2026-11-06 (owner: \"spray bottle tolerance - go back to default\"): the round-3 per-alias pose orientation tolerance 0.45 rad (evaluation.tolerances) removed - the default profile applies again. With the low centre-line push (push_height_sweep) the fix1 demo pushed at 5.0 cm (was 22.8 cm), tilted <= 5.8 deg (was 20.3) and ended 0.021 rad off (round 3 measured 0.343 / 0.346 rad, all tilt)"
   },
   "constraints": [],
-  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W5 = the rows ~T5 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-desk (desk_mdhelw_1); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone",
-  "evaluation": {
-   "tolerances": {
-    "pose": {
-     "orientation": 0.45
-    }
-   },
-   "_tolerance_note": "oracle-fix 2026-11-04 round 3 (touching#04 never had a demo; the owner asked for one per eval alias, creative fixes allowed): the trigger bottle ends LEANING on the detergent bottle - tch04 0000 / 0001 orientation error 0.343 / 0.346 rad, all of it tilt (final quaternion x -0.12, y -0.125: 20 deg), position 23 mm: the push stops 6.8 mm short of the sampled goal (base nudged 3 x 12.8 mm, the trigger head already touches the partner) and the extended push tips the bottle; the small-scale profile gives 0.10 rad. 0.45 rad = the measured 0.346 + margin (eval85 m3_k0 / w5_k1: 0.231 / 0.522). Per ALIAS (the partner gets it too: its errors 0.000)"
-  }
+  "_note": "owner 2026-10-12 ~16:05: touching#04 with the target spray_bottle/wegawe (spray_bottle__wegawe__t) - rows ~W5 = the rows ~T5 of inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-desk (desk_mdhelw_1); hand-made: ground_isg's grounding of a scratch sheet with wegawe as the target, renamed, with that alias's generation (without push_max_pinch_m: wegawe is 7.85 cm across at its rest, under the 8.9 cm default) and withdrawn models; registry mode test, so a re-ground of touching#04 leaves it alone"
  },
  "inter_object_relation_satisfaction-touching_large_scale-storage_box-bookcase-coffee_table": {
   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
