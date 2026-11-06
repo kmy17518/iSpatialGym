@@ -32,4 +32,12 @@ timeout -s INT -k 300 $(( ${BUDGET_S:-1800} + 900 )) python -m ispatialgym.sampl
   --no-write-back --out $JOBDIR/inst --log-level INFO > $JOBDIR/sample.log 2>&1
 RC=$?
 [ $RC -eq 0 ] && KIT_RC=0
+# PERSIST_BANDS=<dir> (job_val.sh's): the bands this job computed on a miss go into a STATIC store (registry band_stores / BAND_STORES
+# of later fast-flow jobs read it, never write it: no sharing between jobs)
+if [ -n "${PERSIST_BANDS:-}" ]; then
+  mkdir -p $PERSIST_BANDS
+  for f in $(grep -lE '"computed_by": "(iors_large compute-on-miss|sampling.v2.tabletop.compute_bands)"' $ISPATIALGYM_REACH_BANDS/*.json 2>/dev/null); do
+    cp -n --preserve=timestamps $f ${f%.json}.npz $PERSIST_BANDS/ 2>/dev/null && echo "PERSIST_BAND $(basename $f)" | tee -a $JOBDIR/job.txt
+  done
+fi
 echo "SAMPLE_EXIT $RC wall_s=$(( $(date +%s) - t0 )) written=$(grep -c ' written (attempt ' $JOBDIR/sample.log 2>/dev/null; true) tro=$(find $JOBDIR/inst -name '*-tro_state.json' | wc -l)" | tee -a $JOBDIR/job.txt
