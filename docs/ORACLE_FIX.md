@@ -841,9 +841,9 @@ them". Full write-up for the owner: `~/Desktop/projects/ispatialgym/tmp/outputs/
 | SPLIT_CONE_RESTORE keeps a start iors_small drew itself (BUG since 11-01: every attempt after the first drove to the first start's stances) | c261ef5c / 3c198874 | on | every IORS-small split-cone alias |
 | `generation.init_edges` (block_design#01: +v only) | d4603537 | opt-in | block_design_01 |
 | `generation.c_skip_dead_b` (skip a C whose every drawable pick already failed at B) + under_large#01 ground trunks / c_tries 72 | 01ad8d8c / f5bd955b | opt-in | under_large_01, ontop_large_01, inside_large_02 |
-| `generation.push_gripper_open` (open-gripper low push classes first) | dfae6b70 / c6bdef13 | opt-in | 12 cereal-box aliases |
+| `generation.push_gripper_open` (open-gripper low push classes first) | dfae6b70 / c6bdef13 | opt-in | OFF since 60083d53 (validation: 9 / 16 demos, 8.1 attempts per instance vs closed 16 / 16, 5.9; tilt 0.4 vs 16.1 deg) |
 | `generation.shelf_start_draw` (books' compartment / board / lean per attempt) | 97613441 | opt-in | touching#03 |
-| `generation.push_arc_stall_ends_arc` + `push_arc_replay_lag_rad` (arc push at the reach end) | 9656c537 | opt-in | axial_01, axial_05 |
+| `generation.push_arc_stall_ends_arc` + `push_arc_replay_lag_rad` (arc push at the reach end) | 9656c537 | opt-in | axial_01 (8 / 12); reverted on axial_05 in 60083d53 (0 / 12, all not_reached) |
 | `witness_residual_pre_m` 0.005 | 7c34c732 | customs | nextto_large_02 |
 | disembedding templates copied to `$OFH/templates` + registry rows | 19e0d1ca | - | disembedding_04 / 07 / 08 / 09 / 10 |
 | `generation.place_inhand_reaim`, `target_orientation_equivalences` | f960f9cb | opt-in | disembedding_07, disembedding_10 |
@@ -854,3 +854,8 @@ them". Full write-up for the owner: `~/Desktop/projects/ispatialgym/tmp/outputs/
 
 Validation runs: `$OFH/out/{survey1,fix2,fix2_t02open,fix2_t03init,fix2_t03base}/<key>/g*`; status script `$OFH/jobs/r2_status.sh`
 (per tag / key stats via `jobs/survey.py` + push class / tilt / shelf draws / hardback checks).
+Validated (09:12 PST snapshot): touching#03 4 / 4 (baseline 0 written in 718 attempts); inside_large_03 4 / 4 (was 0 attempts); the
+split-cone fix's controls ontop_small_01 1.75 / touching_01 2.1 / touching_02 5.9 attempts per instance (were 8-37); jar 230 s per
+attempt (875), under_large_01 793 s (1569-2128), ontop_large_01 642 s (1033). Open: ontop_small_01 4 / 12 (the kielbasa tips 21-27 deg
+at the place touchdown; trainfast 78 / 80), ontop_small_04 goal_tipped, inside_04, under_large_02 / 03, disembedding_07 / 10,
+articulation close / open_large_03, the hardback (0 in 4143 attempts).
