@@ -153,7 +153,7 @@ GRASP_COLUMNS = REQUIRE_CORE + ["quat_xyzw", "finger_q1", "finger_q2", "pad_clea
 HANDLE_COLUMNS = REQUIRE_CORE + ["joint", "joint_type", "joint_kind", "status", "chosen", "exposed", "length_m", "depth_m", "pull_dir",
                                  "axis_dir", "hinge_point", "lower", "upper", "closed_q", "instance_scale", "position_world", "height_world_m",
                                  "front_free_m", "front_free_eroded_m", "review_graspable", "review_pinch"]
-CONTACT_COLUMNS = REQUIRE_CORE + ["contact_role", "direction", "shape_class", "scale"]
+CONTACT_COLUMNS = REQUIRE_CORE + ["contact_role", "direction", "shape_class", "scale", "face", "height_m", "height_range_m", "inset_m", "spacing_m", "spots"]  # oracle-fix 2026-11-03: base-push spots
 #: grasp-library `constraint` -> iddl grasp pipeline
 GRASP_PIPELINE = {"floating": "floating", "handle_half": "floating", "tabletop": "tabletop", "tabletop_insert": "insert",
                   "flower_stem_top": "insert", "attachment_free": "attachment"}
@@ -1124,7 +1124,8 @@ class Builder:
         """require/contacts.csv from ``runlogs/contacts_<date>/<category>__<model>.json`` (B6). Expected file content:
         ``{"key", "category", "model", "scale", "contacts": [{"name", "role": "push|brace|stop_edge", "position", "approach",
         "closing", "direction", "shape_class", "verdict", "flags", "note"}]}`` (object base_link frame, metres). Header-only
-        while no such directory exists."""
+        while no such directory exists. Base-push spots (oracle-fix 2026-11-03, ``iors_large_nextto.push_spot_annotation``) add
+        ``face`` (+x / -x / +y / -y), ``height_m``, ``height_range_m``, ``inset_m``, ``spacing_m`` and the two-hand ``spots``."""
         out: List[dict] = []
         dirs = sorted(glob.glob(CONTACTS_GLOB))
         if not dirs:
@@ -1139,7 +1140,11 @@ class Builder:
                             "axis_close": json.dumps(c.get("closing")), "width_m": "", "verdict": c.get("verdict", "ok"),
                             "flags": ";".join(c.get("flags", [])), "note": (c.get("note", "") or "")[:200], "path": self._rel(path),
                             "source": os.path.basename(root), "contact_role": c.get("role", ""), "direction": json.dumps(c.get("direction")),
-                            "shape_class": c.get("shape_class", ""), "scale": json.dumps(d.get("scale")) if d.get("scale") else ""})
+                            "shape_class": c.get("shape_class", ""), "scale": json.dumps(d.get("scale")) if d.get("scale") else "",
+                            # oracle-fix 2026-11-03 (owner decision 3a): the base-push spots of a floor-standing target
+                            "face": c.get("face", ""), "height_m": c.get("height_m", ""),
+                            "height_range_m": json.dumps(c.get("height_range_m")) if c.get("height_range_m") else "", "inset_m": c.get("inset_m", ""),
+                            "spacing_m": c.get("spacing_m", ""), "spots": json.dumps(c.get("spots")) if c.get("spots") else ""})
         return out
 
     # -- rotational symmetry (survey runlog)

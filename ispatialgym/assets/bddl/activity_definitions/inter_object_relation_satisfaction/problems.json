@@ -1670,6 +1670,116 @@
    "pick": "inter_object_relation_satisfaction-nextto_large_scale#02~countertop",
    "slot": "variation_geometry",
    "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk",
+   "id": 151,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-147 for the hardback / bookcase, oracle-fix inside_large#01 from desk_bhkhxo_0)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#01~T2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-bed",
+   "id": 152,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-147 for the hardback / bookcase, oracle-fix inside_large#01 from bed_rrcvaq_1)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#01~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-pillow-bed-floor",
+   "id": 153,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-18 for the pillow / hotel bed, floor init (problem 114's), oracle-fix ontop_large#03)",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#03~floor",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor",
+   "id": 154,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-120 for the umbrella / hallstand, oracle-fix touching_large#02)",
+   "subtask": "inter_object_relation_satisfaction-touching_large_scale",
+   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-touching_large_scale#02~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-swivel_chair-desk-floor",
+   "id": 155,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-149 for swivel_chair / desk, oracle-fix inter_object_relation_satisfaction-nextto_large_scale#01)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#01~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-nextto_large_scale-coffee_table-sofa-floor",
+   "id": 156,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-149 for coffee_table / sofa, oracle-fix inter_object_relation_satisfaction-nextto_large_scale#03)",
+   "subtask": "inter_object_relation_satisfaction-nextto_large_scale",
+   "iddl": "inter_object_relation_satisfaction/nextto_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto_large_scale#03~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-touching_large_scale-ottoman-sofa-floor",
+   "id": 157,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-120 for the ottoman / sofa, base push; oracle-fix touching_large#01)",
+   "subtask": "inter_object_relation_satisfaction-touching_large_scale",
+   "iddl": "inter_object_relation_satisfaction/touching_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-touching_large_scale#01~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-ontop_large_scale-pillow-bed-bed",
+   "id": 158,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-153 with the init on the other bed, as 112's two countertops; oracle-fix ontop_large#03)",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#03~T2",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-bed_side_any",
+   "id": 159,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-147 for the hardback / bookcase, oracle-fix inside_large#01 from bed_rrcvaq_1); variant: no fixed inside_stance_side (the sampler's own open edges +u / -u; the first bed run: no stance C at bookcase_jaysra_0 with +y)",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#01~T1",
+   "slot": "representative",
+   "mode": "test"
+  },
+  {
+   "variant": "inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-bed_shelf052",
+   "id": 160,
+   "grounded": "2026-11-03",
+   "by": "hand-grounded (copy of inter_object_relation_satisfaction-147 for the hardback / bookcase, oracle-fix inside_large#01 from bed_rrcvaq_1); variant: the 0.52 m board (sheet: raised 18 mm) and no fixed stance side",
+   "subtask": "inter_object_relation_satisfaction-inside_large_scale",
+   "iddl": "inter_object_relation_satisfaction/inside_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-inside_large_scale#01~T1",
+   "slot": "representative",
+   "mode": "test"
   }
  ]
 }

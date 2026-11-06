@@ -1,0 +1,38 @@
+(define (problem inter_object_relation_satisfaction-154)
+    (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor)
+
+    ; oracle-fix 2026-11-03: touching_large#02 hand-made (problem120 with umbrella / hallstand): umbrella/ziqzqo from the floor of corridor_0 to touching hall_tree_daxzaw_0
+    ; (house_double_floor_lower; registry mode test); dropped in front of the stand's face and pushed along the floor, as the storage box.
+    ; The v2 grasp (ISPATIALGYM_GRASP_LIBRARY_V2 at the oracle-fix copy): the legacy umbrella__ziqzqo__t grasps are all flagged.
+    ; IORS - touching (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+    ; explicit support choice made by ground_isg, never a runtime fallback) and ends touching a large scene partner (a copy of
+    ; ontop_large_scale with the goal predicate touching; registered 2026-10-12, the sampler mode comes next). Three recorded
+    ; stances: init A, manipulation B, placement C.
+
+    (:objects
+        umbrella.n.01_1 - umbrella.n.01
+        hallstand.n.01_1 - hallstand.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop umbrella.n.01_1 floor.n.01_1)
+        (not (touching umbrella.n.01_1 hallstand.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (touching ?umbrella.n.01_1 ?hallstand.n.01_1)
+            (not (grasped ?agent.n.01_1 ?umbrella.n.01_1))
+            (pose_settled ?umbrella.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?umbrella.n.01_1)
+    )
+)

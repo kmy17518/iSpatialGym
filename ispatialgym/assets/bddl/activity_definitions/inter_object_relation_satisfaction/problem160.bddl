@@ -1,0 +1,38 @@
+(define (problem inter_object_relation_satisfaction-160)
+    (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-bed_shelf052)
+
+    ; oracle-fix 2026-11-03: inside_large#01 hand-made (rendered as problem147 from inside_large_scale.iddl; the subtask has no candidates rows) -
+    ; hardback/bqvvvx into bookcase_jaysra_0's 0.94 m board from bed_rrcvaq_1 (sheet T1); the overhang pick, grasp hardback__bqvvvx__bo; registry mode test
+    ; IORS - inside (large-scale). The target starts on a support (a table near the partner, or the floor beside it - an
+    ; explicit support choice made by ground_isg, never a runtime fallback) and ends inside a large scene partner (a copy of
+    ; ontop_large_scale with the goal predicate inside; registered 2026-10-12, the sampler mode comes next). Three recorded
+    ; stances: init A, manipulation B, placement C.
+
+    (:objects
+        hardback.n.01_1 - hardback.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        bed.n.01_1 - bed.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop hardback.n.01_1 bed.n.01_1)
+        (not (inside hardback.n.01_1 bookcase.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (inside ?hardback.n.01_1 ?bookcase.n.01_1)
+            (not (grasped ?agent.n.01_1 ?hardback.n.01_1))
+            (pose_settled ?hardback.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?hardback.n.01_1)
+    )
+)

@@ -1,0 +1,33 @@
+(define (problem inter_object_relation_satisfaction-155)
+    (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-nextto_large_scale-swivel_chair-desk-floor)
+
+    ; oracle-fix 2026-11-03: inter_object_relation_satisfaction-nextto_large_scale#01 hand-made (problem149 with swivel_chair.n.01 / desk.n.01): swivel_chair/iiihwn spawned on the floor of
+    ; house_double_floor_upper/bedroom_2 (its scene instance swivel_chair_iiihwn_0 removed) and pushed next to desk_uqcmzf_0 by the base (no grasp); registry mode test
+
+    (:objects
+        swivel_chair.n.01_1 - swivel_chair.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop swivel_chair.n.01_1 floor.n.01_1)
+        (not (nextto swivel_chair.n.01_1 desk.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (nextto ?swivel_chair.n.01_1 ?desk.n.01_1)
+            (not (grasped ?agent.n.01_1 ?swivel_chair.n.01_1))
+            (pose_settled ?swivel_chair.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?swivel_chair.n.01_1)
+    )
+)

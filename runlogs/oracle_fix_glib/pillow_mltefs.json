@@ -1,0 +1,19 @@
+[
+ {
+  "category": "pillow",
+  "model": "mltefs",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop_level_pinch",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "pillow__mltefs__lp",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "pillow__mltefs__s1__tabletop_level_pinch"
+ }
+]

@@ -1,0 +1,537 @@
+{
+ "key": "ottoman__miftfy",
+ "category": "ottoman",
+ "model": "miftfy",
+ "scale": null,
+ "contacts": [
+  {
+   "name": "push_+x_h0.270",
+   "role": "base_push",
+   "face": "+x",
+   "height_m": 0.27,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.2014,
+    0.0002,
+    0.0771
+   ],
+   "inset_m": 0.001,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     0.1993,
+     0.1702,
+     0.0771
+    ],
+    [
+     0.1998,
+     -0.1698,
+     0.0771
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_+x_h0.220",
+   "role": "base_push",
+   "face": "+x",
+   "height_m": 0.22,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.2019,
+    0.0002,
+    0.0271
+   ],
+   "inset_m": 0.0006,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     0.1996,
+     0.1702,
+     0.0271
+    ],
+    [
+     0.2001,
+     -0.1698,
+     0.0271
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_+x_h0.170",
+   "role": "base_push",
+   "face": "+x",
+   "height_m": 0.17,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.2023,
+    0.0002,
+    -0.0229
+   ],
+   "inset_m": 0.0001,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     0.1996,
+     0.1702,
+     -0.0229
+    ],
+    [
+     0.2004,
+     -0.1698,
+     -0.0229
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-x_h0.270",
+   "role": "base_push",
+   "face": "-x",
+   "height_m": 0.27,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    -0.2011,
+    0.0002,
+    0.0771
+   ],
+   "inset_m": 0.0,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     -0.1988,
+     -0.1698,
+     0.0771
+    ],
+    [
+     -0.1988,
+     0.1702,
+     0.0771
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-x_h0.220",
+   "role": "base_push",
+   "face": "-x",
+   "height_m": 0.22,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    -0.2011,
+    0.0002,
+    0.0271
+   ],
+   "inset_m": 0.0,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     -0.2002,
+     -0.1698,
+     0.0271
+    ],
+    [
+     -0.1996,
+     0.1702,
+     0.0271
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-x_h0.170",
+   "role": "base_push",
+   "face": "-x",
+   "height_m": 0.17,
+   "height_range_m": [
+    0.15,
+    0.3
+   ],
+   "approach": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "direction": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    -0.2008,
+    0.0002,
+    -0.0229
+   ],
+   "inset_m": 0.0003,
+   "spacing_m": 0.34,
+   "spots": [
+    [
+     -0.2011,
+     -0.1698,
+     -0.0229
+    ],
+    [
+     -0.2,
+     0.1702,
+     -0.0229
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_+y_h0.270",
+   "role": "base_push",
+   "face": "+y",
+   "height_m": 0.27,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    0.2039,
+    0.0771
+   ],
+   "inset_m": 0.001,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     -0.1493,
+     0.2,
+     0.0771
+    ],
+    [
+     0.1507,
+     0.2048,
+     0.0771
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_+y_h0.220",
+   "role": "base_push",
+   "face": "+y",
+   "height_m": 0.22,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    0.2049,
+    0.0271
+   ],
+   "inset_m": 0.0,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     -0.1493,
+     0.2015,
+     0.0271
+    ],
+    [
+     0.1507,
+     0.2041,
+     0.0271
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_+y_h0.170",
+   "role": "base_push",
+   "face": "+y",
+   "height_m": 0.17,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    -1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    0.2045,
+    -0.0229
+   ],
+   "inset_m": 0.0003,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     -0.1493,
+     0.202,
+     -0.0229
+    ],
+    [
+     0.1507,
+     0.2033,
+     -0.0229
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-y_h0.270",
+   "role": "base_push",
+   "face": "-y",
+   "height_m": 0.27,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    -0.2041,
+    0.0771
+   ],
+   "inset_m": 0.0003,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     0.1507,
+     -0.2041,
+     0.0771
+    ],
+    [
+     -0.1493,
+     -0.2017,
+     0.0771
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-y_h0.220",
+   "role": "base_push",
+   "face": "-y",
+   "height_m": 0.22,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    -0.2017,
+    0.0271
+   ],
+   "inset_m": 0.0027,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     0.1507,
+     -0.2027,
+     0.0271
+    ],
+    [
+     -0.1493,
+     -0.2017,
+     0.0271
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  },
+  {
+   "name": "push_-y_h0.170",
+   "role": "base_push",
+   "face": "-y",
+   "height_m": 0.17,
+   "height_range_m": [
+    0.15,
+    0.31
+   ],
+   "approach": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "direction": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "shape_class": "face",
+   "verdict": "ok",
+   "flags": [],
+   "position": [
+    0.0007,
+    -0.2018,
+    -0.0229
+   ],
+   "inset_m": 0.0026,
+   "spacing_m": 0.3,
+   "spots": [
+    [
+     0.1507,
+     -0.2017,
+     -0.0229
+    ],
+    [
+     -0.1493,
+     -0.2017,
+     -0.0229
+    ]
+   ],
+   "note": "derived from the collision pieces by scripts/oracle_fix/push_spot_annotate.py (flat 0.02 m, inset <= 0.15 m, probes +-0.03 / +-0.01 m, heights 0.15-0.75 m step 0.01); review before production"
+  }
+ ],
+ "box_local": [
+  [
+   -0.2010650634765625,
+   -0.2043914794921875,
+   -0.19286775588989258
+  ],
+  [
+   0.2024688720703125,
+   0.20486831665039062,
+   0.13053512573242188
+  ]
+ ],
+ "source": "oracle-fix 2026-11-03 push_spot_annotate.py"
+}

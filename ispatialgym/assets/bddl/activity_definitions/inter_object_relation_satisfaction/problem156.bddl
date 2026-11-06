@@ -1,0 +1,34 @@
+(define (problem inter_object_relation_satisfaction-156)
+    (:domain ispatialgym)
+    (:variant inter_object_relation_satisfaction-nextto_large_scale-coffee_table-sofa-floor)
+
+    ; oracle-fix 2026-11-03: inter_object_relation_satisfaction-nextto_large_scale#03 hand-made (problem149 with coffee_table.n.01 / sofa.n.01): coffee_table/osroux spawned on the floor of
+    ; house_double_floor_upper/living_room_0 (its scene instance coffee_table_osroux_0 removed) and pushed next to sofa_ukfaaz_0 by the base (no grasp); registry mode test
+    ; 2026-11-03 22:20: partner re-bound in isg_customs.json to house_single_floor sofa_hiphpn_0 (ukfaaz: an L sectional in a room corner, no free floor for the push)
+
+    (:objects
+        coffee_table.n.01_1 - coffee_table.n.01
+        sofa.n.01_1 - sofa.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop coffee_table.n.01_1 floor.n.01_1)
+        (not (nextto coffee_table.n.01_1 sofa.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (nextto ?coffee_table.n.01_1 ?sofa.n.01_1)
+            (not (grasped ?agent.n.01_1 ?coffee_table.n.01_1))
+            (pose_settled ?coffee_table.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?coffee_table.n.01_1)
+    )
+)
