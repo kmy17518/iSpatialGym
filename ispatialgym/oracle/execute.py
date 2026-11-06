@@ -2667,7 +2667,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     elif action.kind == "support":
         recorded = targets
         targets = raise_place_for_inhand_pose(action, state, ctx.get("sidecar"), targets, ctx, cfg)
-        if cfg.place_inhand_reaim:
+        if place_inhand_reaim_wanted(ctx, cfg):
             reaimed = reaim_place_for_inhand_pose(action, motions, state, ctx.get("sidecar"), recorded, ctx, cfg, ignore=on)
             if reaimed is not None:
                 targets = reaimed
@@ -3261,6 +3261,14 @@ def place_touch_stop_wanted(action, ctx: Dict[str, Any], cfg: ExecuteConfig) -> 
     if getattr(action, "kind", None) != "support" or not getattr(action, "on", None) or getattr(action, "relation", "on") != "on":
         return False
     return bool(cfg.place_touch_stop or variant_generation(ctx).get("place_touch_stop"))
+
+
+def place_inhand_reaim_wanted(ctx: Dict[str, Any], cfg: ExecuteConfig) -> bool:
+    """Whether a support place is re-aimed to the measured in-hand pose (``reaim_place_for_inhand_pose``): the switch
+    (``ISPATIALGYM_PLACE_INHAND_REAIM=1``) or, oracle-fix 2026-11-06, ``generation.place_inhand_reaim`` true for the variant (survey1
+    disembedding_10: the table fork turned 7.2 / 10.0 / 14.6 deg about z under the closing fingers, the place set it down with that turn,
+    3 of 4 demos symbolic_only at 0.13 / 0.17 / 0.26 rad over the 0.1 rad tolerance with 1-3 mm position error)."""
+    return bool(cfg.place_inhand_reaim or variant_generation(ctx).get("place_inhand_reaim"))
 
 
 def place_touch_stop_check(state, obj: str, partner: str, partner_p0, cfg: ExecuteConfig, rec: Dict[str, Any]) -> Callable[[], bool]:

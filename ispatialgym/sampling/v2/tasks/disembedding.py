@@ -438,6 +438,17 @@ class Disembedding(SamplerV2):
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
 
+    def target_equivalences(self) -> Optional[List[List[float]]]:
+        """The target's pose-target ``orientation_equivalences`` (§3.13: the rotation group of the customs ``roles.target.
+        orientation_equivalences`` tags); None (today's identity-only goal) unless ``generation.target_orientation_equivalences``.
+
+        oracle-fix 2026-11-06 (survey1 disembedding_07, cellulose tape ["x2", "zinf"]: 2 of 4 demos symbolic_only at 0.26 / 0.32 rad, the
+        roll turned 15.5 deg about its own axis by the opening fingers at the release - a turn the tags say leaves the roll unchanged)."""
+        if not self.gen("target_orientation_equivalences", False):
+            return None
+        mc = self.choice.models["target"]
+        return self.gp.orientation_equivalences("target", mc.category, mc.model) or None
+
     # ------------------------------------------------------------------ roles
 
     def v1_role_variants(self) -> Dict[str, str]:
@@ -1058,7 +1069,7 @@ class Disembedding(SamplerV2):
         d.robot_q = self.stance_q(init)
         d.base_pose2d = tuple(init.base_pose2d)
         d.goal_poses[tname] = goal
-        d.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
+        d.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20), equivalences=self.target_equivalences())
         d.extras["initial_occlusion"] = occ
         # the trays' mass (sample_template): the loader re-applies it (run_isg._restore_constraints), the settle / stillness gate ran with it
         masses = [{"type": "mass", "object": n, "mass_kg": round(float(self.tray_mass[self.objects[n].name]["after_kg"]), 4), "stock_kg": round(float(self.tray_mass[self.objects[n].name]["before_kg"]), 4),
@@ -1299,7 +1310,7 @@ class Disembedding(SamplerV2):
         dst_w = self.dst_floor.at(draft.object_poses[dname])
         goal = self._goal_pose(draft.object_poses[tname], dst_w)
         draft.goal_poses[tname] = goal
-        draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
+        draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20), equivalences=self.target_equivalences())
         g = self.sidecar.grasp_of(tname)
         if g is not None:
             g.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
