@@ -1486,7 +1486,14 @@ class Motions:
             if bool(hit_0[1:].any()):
                 why = "collision"
                 k = int(th.nonzero(hit_0[1:]).reshape(-1)[0]) + 1
-                raise _StraightFallback(f"waypoint {k}/{n} penetrates an obstacle")
+                # oracle-fix 2026-11-04 round 4: what the waypoint penetrates - the world meshes whose removal alone clears it (none: self-collision)
+                offs_txt = ""
+                try:
+                    offs = self.backend.world_collision_offenders(ramp[k], emb_name=emb, limit=4)
+                    offs_txt = f" ({'world: ' + ', '.join(str(o).split('/')[-4] + ':' + str(o).split('/')[-1] if len(str(o).split('/')) >= 4 else str(o) for o in offs) if offs else 'the world alone is clear: self-collision'})"
+                except Exception as e_off:  # noqa: BLE001 - a diagnostic
+                    offs_txt = f" (offenders failed: {e_off!r})"
+                raise _StraightFallback(f"waypoint {k}/{n} penetrates an obstacle{offs_txt}")
             if bool(hit_m.any()):
                 budget = float(fast_value("STRAIGHT_ARM_CONTACT_RAD", 0.1))
                 lead = 0

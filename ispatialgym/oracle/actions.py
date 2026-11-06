@@ -88,6 +88,14 @@ RETREAT_LITTLE = 0.05  # "move contacting grippers away a little" after a place 
 # Waypoint counts follow the F5 rule (poses at k/n, the goal last): ``n`` poses = ``n − 1`` intermediate + the goal.
 N_WAYPOINTS = 3  # poses of a short straight segment (approach, lift, descent, retreat, straight push): 2 + the goal
 CARRY_WAYPOINT_SPACING = 0.05  # the carry leg lift end -> pre-place is a longer straight leg: a pose every 5 cm
+#: oracle-fix 2026-11-05: the carry waypoints tried when a straight carry leg does not track - ``(where, raise m, lateral m, orientation
+#: fraction toward the pre-place's)``: ``start`` = at the hand (rotate first), ``mid`` = the leg's midpoint, ``end`` = at the pre-place
+#: (translate first); lateral is horizontal, across the leg. The sampler's search at C (``IORSLarge._carry_track_at_c``) and the oracle's
+#: online search (``execute._carry_online``) read the same table
+CARRY_VIAS = (("start", 0.0, 0.0, 1.0), ("start", 0.05, 0.0, 1.0), ("start", 0.10, 0.0, 1.0),
+              ("mid", 0.05, 0.0, 1.0), ("mid", 0.10, 0.0, 1.0), ("mid", 0.05, 0.05, 1.0), ("mid", 0.05, -0.05, 1.0),
+              ("mid", 0.0, 0.0, 0.5), ("mid", 0.05, 0.0, 0.5), ("mid", 0.10, 0.0, 0.5),
+              ("end", 0.05, 0.0, 0.0), ("end", 0.10, 0.0, 0.0))
 N_INHAND = 4  # in-hand motions of the held-object tasks / attachment: 3 intermediate + the goal (spec §3.9, §6.3)
 N_YAW_ALIGN = 2  # block yaw-align stage (``flip_waypoints`` ``n_yaw``; the sampler's ``orbit_waypoints(..., n=2)``)
 N_FLIP = 3  # block 90° flip stage (``flip_waypoints`` ``n_flip``)
@@ -112,6 +120,39 @@ def _conventions():
     from ispatialgym.robot import conventions as C  # noqa: N812
 
     return C
+
+
+def carry_via_candidates(h0, pre) -> List[Tuple[str, Any]]:
+    """The candidate carry waypoints of :data:`CARRY_VIAS` between the hand pose ``h0`` and the pre-place ``pre`` (``(pos, quat)``),
+    labelled ``"<where> raise <m> lateral <m> turn <frac>"``."""
+    import torch as th
+
+    C = _conventions()
+    p0, q0 = th.as_tensor(h0[0]).float().reshape(-1)[:3], th.as_tensor(h0[1]).float().reshape(-1)
+    p1, q1 = th.as_tensor(pre[0]).float().reshape(-1)[:3], th.as_tensor(pre[1]).float().reshape(-1)
+    d = p1 - p0
+    across = th.tensor([-float(d[1]), float(d[0]), 0.0])
+    across = across / max(float(th.linalg.norm(across)), 1e-6)
+    out: List[Tuple[str, Any]] = []
+    for where, raise_m, lat, frac in CARRY_VIAS:
+        base = {"start": p0, "mid": 0.5 * (p0 + p1), "end": p1}[where]
+        pos = base + th.tensor([0.0, 0.0, float(raise_m)]) + across * float(lat)
+        out.append((f"{where} raise {raise_m:.2f} lateral {lat:+.2f} turn {frac:.1f}", (pos, C.slerp(q0, q1, float(frac)).float())))
+    return out
+
+
+def carry_leg_poses(chain: Sequence[Any]) -> List[Tuple[Any, Any]]:
+    """The carry leg's poses through ``chain`` (``(pos, quat)`` each) as :meth:`Place._carry_leg` builds them: a pose every
+    :data:`CARRY_WAYPOINT_SPACING`, at least :data:`N_WAYPOINTS` per segment."""
+    import torch as th
+
+    C = _conventions()
+    out: List[Tuple[Any, Any]] = []
+    for a, b in zip(chain[:-1], chain[1:]):
+        length = float(th.linalg.norm(th.as_tensor(b[0]).float() - th.as_tensor(a[0]).float()))
+        n = max(N_WAYPOINTS, int(math.ceil(length / CARRY_WAYPOINT_SPACING)))
+        out += [tuple(w) for w in C.line_waypoints(a, b, n)]
+    return out
 
 
 def _to_list(x: Any) -> List[float]:
@@ -745,6 +786,9 @@ class Lift(Action):
     object: str
     carry_height: float
     after: Action
+    #: oracle-fix 2026-11-04 round 4 (``grasps[i].lift_away``, touching#03's shelf tip release): a world offset (m) added to the lift's end - the book
+    #: leaning on a side board is lifted away from it; None = straight up
+    away: Optional[Sequence[float]] = None
     TARGET_KEYS = ("lift",)
 
     def __post_init__(self):
@@ -768,7 +812,8 @@ class Lift(Action):
             start = self.after.end_pose(sidecar, state)
         if start is None:
             raise SidecarError(f"lift: the preceding action {self.after.name} leaves no eef pose")
-        return start, start.translated([0.0, 0.0, self.carry_height])
+        dx, dy, dz = (float(v) for v in (self.away or (0.0, 0.0, 0.0)))
+        return start, start.translated([dx, dy, self.carry_height + dz])
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -780,6 +825,8 @@ class Lift(Action):
 
     def annotate(self, sidecar):
         obj = sidecar.language.phrase(self.object)
+        if self.away:
+            return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} up and {_cm(math.hypot(float(self.away[0]), float(self.away[1])))} away from the board"
         return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} straight up"
 
 
@@ -1454,6 +1501,10 @@ class Retreat(Action):
     #: it must be shorter than ``max(distance, 2 x contact_retreat_escape_m)`` - the 10 cm escape opposite a wall push ran the
     #: arm 14 mm past its reach (0920-192950 action 33)
     escape_far: Optional[float] = None
+    #: oracle-fix 2026-11-05 (the hardback's overhang pick, diagnostic hbD1: the 5 cm escape off the desk left the hand at the book's far
+    #: end once the base backed off to the grasp stance, and no transit to the pre-grasp planned with the desk present): the contact
+    #: escape's leg off the supports (``escape_direction``) is this long instead of ``contact_retreat_escape_m`` when set
+    escape_up_m: Optional[float] = None
     #: owner 2026-09-20 21:20 (the lever's fist leaving the flaps): first straight UP by ``lift_first_m`` (off the flap the palm
     #: presses), then ``distance`` along ``slide_dir`` (world unit vector; the leg along -a when None) - so the palm does not drag
     #: the box against the other hand's grasp

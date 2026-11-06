@@ -546,6 +546,7 @@ class InstanceLoader:
     def restore(self, settle_physics_steps: int = 25):
         """TRO → simulator, then the §3.14 restores, a settle with the task entities held, the snapshot, one reset."""
         env, task, robot = self.env, self.task, self.robot
+        self.report["floor_collision_filter"] = self._apply_floor_filters()
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
         # the rigid-body overrides of the task objects the TRO placed (the build's pass reaches the scene's own objects only), before
@@ -770,6 +771,42 @@ class InstanceLoader:
         applied = apply_mass(ent, float(rec["mass_kg"]), rec.get("link"))
         return {"type": "mass", "object": rec["object"], **applied}
 
+    def _apply_floor_filters(self) -> List[str]:
+        """Oracle-fix 2026-11-04 round 3 (articulation #03, bottom_cabinet_rvunhj_0): the collision between each articulation-target object of
+        the TRO and the TRO's floor instance(s) filtered, before the TRO load - when the TRO records a ``floor_collision_filter`` constraint or
+        the variant's customs set ``generation.floor_collision_filter``. A probe found the cabinet's lower door slab 5.6 mm into
+        floors_ovpbsn_0 at every angle (its only contact; the floor's friction pinned the door against 150 N m; free with the pair filtered).
+        Returns the filtered pairs."""
+        recs = [r for r in ((self.tro.meta.extras or {}).get("constraints") or []) if isinstance(r, dict) and r.get("type") == "floor_collision_filter"]
+        on = bool(recs)
+        if not on:
+            from types import SimpleNamespace
+
+            from ispatialgym.oracle.execute import variant_generation
+
+            variant = (self.tmeta or {}).get("variant") if isinstance(getattr(self, "tmeta", None), dict) else None
+            variant = variant or getattr(self.tro.meta, "variant", None) or os.path.basename(os.path.dirname(str(self.template_dir or "")))
+            on = bool(variant_generation({"sidecar": SimpleNamespace(variant=variant)}).get("floor_collision_filter"))
+        if not on:
+            return []
+        from ispatialgym.sampling import predicates as PRED
+
+        b = self.tro.meta.object_bindings or {}
+        names = {k: (v.get("scene_object_name") if isinstance(v, dict) else v) for k, v in b.items()}
+        targets = [names.get(i) for i in (self.tro.meta.articulation_targets or {})]
+        floors = [n for i, n in names.items() if i.split(".")[0] == "floor" and n]
+        out = []
+        for t in targets:
+            for f in floors:
+                o, fl = self.env.scene.object_registry("name", t), self.env.scene.object_registry("name", f)
+                if o is None or fl is None:
+                    log.warning("floor collision filter: %s / %s not in the scene", t, f)
+                    continue
+                PRED.set_pair_collision_filter(o, fl, True)
+                out.append(f"{t} x {f}")
+                log.info("floor collision filter: %s x %s filtered", t, f)
+        return out
+
     def _restore_constraints(self, records: List[dict]) -> List[dict]:
         out = []
         self.hinges = []
@@ -789,6 +826,9 @@ class InstanceLoader:
                 out.append(self._apply_mass(rec))
                 self._mass_records.append(rec)
                 log.info("mass applied: %s = %s", rec["object"], out[-1])
+                continue
+            if kind == "floor_collision_filter":  # applied before the TRO load (_apply_floor_filters)
+                out.append({"type": kind, "object": rec.get("object"), "applied": "before the load"})
                 continue
             if kind == "counterbalance":
                 out.append(self._apply_counterbalance(rec))

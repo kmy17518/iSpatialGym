@@ -1225,7 +1225,23 @@ class Sidecar:
         family = family_of_subtask(subtask)
         if self.task_family != family:
             out.append(f"task_family: {self.task_family!r} but the variant belongs to {family!r}")
-        for name in REQUIRED_BLOCKS[subtask]:
+        required = REQUIRED_BLOCKS[subtask]
+        if subtask == "inter_object_relation_satisfaction-touching_large_scale" and not self.grasps:
+            push = self.contacts.push if self.contacts is not None else None
+            if push is not None and push.kind == "push_touching":
+                # oracle-fix 2026-11-03 (touching_large#01, an ottoman already on the floor): the floor start has nothing to pick - no
+                # grasp, no carried path, no placement stance; ``programs._iors_large_touching_program`` runs the push chain alone
+                required = tuple(n for n in required if n not in ("stances.placement", "grasps", "paths"))
+            elif push is not None and push.kind == "base_push":
+                # ... or the base push against the partner's face (the nextto_large blocks: placement = the push end, paths, no grasp)
+                required = tuple(n for n in required if n != "grasps")
+        elif subtask == "inter_object_relation_satisfaction-touching_large_scale" and str(self.grasps[0].extra.get("place_kind") or "") == "lean":
+            # oracle-fix 2026-11-04 round 3 (touching_large#02): the lean release - no push
+            required = tuple(n for n in required if n != "contacts.push")
+        elif subtask == "inter_object_relation_satisfaction-touching_small_scale" and self.grasps and str(self.grasps[0].extra.get("place_kind") or "") == "shelf_tip":
+            # oracle-fix 2026-11-04 round 4 (touching#03): the shelf layout's tip release - the book tips onto the partner, no push
+            required = tuple(n for n in required if n != "contacts.push")
+        for name in required:
             if not self.has_block(name):
                 out.append(f"{subtask}: required block '{name}' is missing")
         if self.path_bucket_m is not None and self.path_bucket_m <= 0:

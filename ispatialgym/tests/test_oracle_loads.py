@@ -244,3 +244,256 @@ def test_goal_occlusion_fails_an_oracle_demo_with_its_own_verdict(tmp_path, monk
     result = ex.run_program(expand(sc.variant, sc))
     assert not result["success"] and result["reason"] == "goal_occlusion" and result["geometric_success"]
     assert result["qa"]["metrics"]["goal_occlusion"]["report"]["worst"] == "target_apple_0" and result["qa"]["stopped_by"] == "goal_occlusion"
+
+
+def test_is_nextto_place_reads_the_sidecar_subtask_not_the_relation_word():
+    """oracle-fix 2026-11-03: the release-clearance cap applies to NEXT-TO subtasks (no push closes the gap after the release) and not to
+    touching, whose place shares the relation word "next to"; an unknown sidecar keeps the touching behaviour."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle.execute import ExecuteConfig, _is_nextto_place
+
+    nextto = SimpleNamespace(variant="inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-breakfast_table")
+    nextto_large = SimpleNamespace(variant="inter_object_relation_satisfaction-nextto_large_scale-serving_cart-coffee_table-floor")
+    touching = SimpleNamespace(variant="inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-desk")
+    assert _is_nextto_place({"sidecar": nextto}) and _is_nextto_place({"sidecar": nextto_large})
+    assert not _is_nextto_place({"sidecar": touching}) and not _is_nextto_place({}) and not _is_nextto_place({"sidecar": SimpleNamespace(variant=None)})
+    cfg = ExecuteConfig()
+    assert 0 < cfg.place_partner_clear_nextto_max_m < cfg.place_partner_clear_max_m  # the cap stays under the nextto tolerance of 0.03
+
+
+def test_reaim_place_sets_the_object_not_the_hand_on_the_recorded_place():
+    """oracle-fix 2026-11-03 (bar soap placed_orientation): with the object turned in the hand since the grasp, the re-aimed place puts the
+    OBJECT where the recorded place with the recorded grasp would; never below the recorded hand; nothing when the re-aimed pose is out of
+    reach, when the in-hand pose is within the thresholds, or for a non-support place."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle.actions import Place
+    from ispatialgym.oracle.execute import ExecuteConfig, reaim_place_for_inhand_pose
+    from ispatialgym.oracle.sidecar import Pose
+    from ispatialgym.robot import conventions as C
+
+    def yaw_q(a):
+        return th.tensor([0.0, 0.0, math.sin(a / 2), math.cos(a / 2)])
+
+    down = th.tensor([1.0, 0.0, 0.0, 0.0])  # a top-down hand
+    eio_rec = (th.tensor([0.0, 0.0, 0.03]), down)
+    eio_live = C.compose((th.zeros(3), yaw_q(0.3)), (th.tensor([0.004, 0.0, 0.03]), down))  # the soap turned 0.3 rad + slid 4 mm in the hand
+    obj_pose = (th.tensor([0.5, 0.2, 0.9]), yaw_q(0.1))
+    eef_pose = C.compose(obj_pose, eio_live)
+    soap = SimpleNamespace(name="soap")
+    state = SimpleNamespace(object=lambda n: soap, held_object=lambda arm: soap, eef_pose=lambda arm: eef_pose, object_pose=lambda n: obj_pose)
+    grasp = SimpleNamespace(object="bar_soap.n.01_1", arm="left", extra={"eef_in_object": {"position": eio_rec[0].tolist(), "orientation": eio_rec[1].tolist()}})
+    sidecar = SimpleNamespace(grasps=[grasp])
+    reach = {"ok": True}
+    motions = SimpleNamespace(backend=SimpleNamespace(solve_ik=lambda *a, **k: (th.zeros(28) if reach["ok"] else None), update_world=lambda **k: None),
+                              robot=SimpleNamespace(get_joint_positions=lambda: th.zeros(28)))
+
+    def P(x, y, z):
+        return Pose(position=[x, y, z], orientation=down.tolist())
+
+    targets = {"pre_place": P(0.6, 0.0, 1.0), "place": P(0.6, 0.0, 0.92), "descent": [P(0.6, 0.0, 0.96)], "retreat": [P(0.6, 0.0, 1.0)], "carry": [P(0.4, 0.0, 1.1)]}
+    action = Place(kind="support", arm="left", object="bar_soap.n.01_1", place=None, pre_place=None, on="soap_dish.n.01_1")
+    cfg = ExecuteConfig()
+    ctx = {}
+    out = reaim_place_for_inhand_pose(action, motions, state, sidecar, targets, ctx, cfg)
+    assert out is not None and ctx["place_inhand_reaim"]["applied"] and ctx["place_inhand_reaim"]["inhand_rot_rad"] == pytest.approx(0.3, abs=1e-3)
+    for k in ("place", "pre_place"):
+        want = C.compose(as_world_pose(targets[k]), C.invert(eio_rec))  # where the recorded hand + recorded grasp set the object
+        got = C.compose(as_world_pose(out[k]), C.invert(eio_live))  # where the re-aimed hand + live grasp set it
+        lift = ctx["place_inhand_reaim"]["lift_m"]
+        assert th.allclose(got[0] - th.tensor([0.0, 0.0, lift]), want[0], atol=1e-5) and C.quat_angle(got[1], want[1]) < 1e-4
+    assert as_world_pose(out["place"])[0][2] >= 0.92 - 1e-6  # never below the recorded hand
+    assert out["carry"] == targets["carry"] and len(out["descent"]) == 1 and len(out["retreat"]) == 1
+    reach["ok"] = False
+    assert reaim_place_for_inhand_pose(action, motions, state, sidecar, targets, {}, cfg) is None
+    reach["ok"] = True
+    still = SimpleNamespace(object=lambda n: soap, held_object=lambda arm: soap, eef_pose=lambda arm: C.compose(obj_pose, eio_rec), object_pose=lambda n: obj_pose)
+    ctx2 = {}
+    assert reaim_place_for_inhand_pose(action, motions, still, sidecar, targets, ctx2, cfg) is None and "thresholds" in ctx2["place_inhand_reaim"]["reason"]
+    drop = Place(kind="drop", arm="left", object="bar_soap.n.01_1", place=None, pre_place=None, on="soap_dish.n.01_1")
+    assert reaim_place_for_inhand_pose(drop, motions, state, sidecar, targets, {}, cfg) is None
+    assert ExecuteConfig().place_inhand_reaim is False  # opt-in (ISPATIALGYM_PLACE_INHAND_REAIM=1)
+
+
+def test_push_recontact_rounds_move_the_contact_with_the_object(monkeypatch):
+    """oracle-fix 2026-11-03 (A.2): a free object's arc push still beyond its goal tolerance is made again from where the object lies - the
+    recorded contact moved rigidly with the object, an arc of the residual about the moved centre - until within the tolerance; a skill
+    error ends the rounds; nothing happens within the tolerance."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import execute as EX
+    from ispatialgym.oracle.motions import SkillError
+    from ispatialgym.oracle.sidecar import Pose
+    from ispatialgym.robot import conventions as C
+
+    def yq(a):
+        return th.tensor([0.0, 0.0, math.sin(a / 2), math.cos(a / 2)])
+
+    goal_yaw = 0.69
+    obj = {"pose": (th.tensor([0.0, 0.0, 0.7]), yq(0.0))}
+    pose0 = (th.tensor([0.0, 0.0, 0.7]), yq(0.0))
+    init = Pose(position=[0.15, 0.0, 0.71], orientation=[1.0, 0.0, 0.0, 0.0])
+    wps = [init] + [Pose(position=[float(v) for v in p.tolist()], orientation=[float(v) for v in q.tolist()])
+                    for p, q in (EX._rotate_pose_about(init, th.tensor([0.0, 0.0, 0.71]), f * goal_yaw) for f in (0.5, 1.0))]
+    targets = {"pre": Pose(position=[0.15, 0.0, 0.79], orientation=[1.0, 0.0, 0.0, 0.0]), "waypoints": wps, "direction": [0.0, 1.0, 0.0]}
+    geom = EX.push_geometry(wps, targets["direction"])
+    calls = []
+
+    def residual(g, state, o, p0, art):
+        return C.wrap_angle(goal_yaw - C.yaw_of(obj["pose"][1])), "goal_orientation"
+
+    def arc_loop(motions, state, arm, o, arc, g, pose_now, cfg, ctx, label):
+        calls.append({"arc": arc, "geom": g, "pose_now": pose_now})
+        p, q = obj["pose"]
+        obj["pose"] = (p + th.tensor([0.0, 0.02, 0.0]), C.qmul(yq(0.8 * float(g.angle)), q))  # the object follows 80 % of the round's arc
+        yield th.zeros(1)
+
+    def gen(*a, **k):
+        yield th.zeros(1)
+
+    monkeypatch.setattr(EX, "push_residual", residual)
+    monkeypatch.setattr(EX, "_push_arc_closed_loop", arc_loop)
+    monkeypatch.setattr(EX, "reach_push_pre", gen)
+    monkeypatch.setattr(EX, "_hold_until_still", gen)
+    state = SimpleNamespace(object_pose=lambda o: obj["pose"], eef_pose=lambda arm: (th.tensor([0.1, 0.1, 0.71]), th.tensor([1.0, 0.0, 0.0, 0.0])),
+                            pose_target=lambda o: SimpleNamespace(orientation_tolerance=0.05))
+    base = {"pose": [0.0, -0.6, 1.5708], "moves": []}
+
+    def track_path(goals, tracker_cfg=None):
+        base["moves"].append(list(goals[0]))
+        base["pose"] = list(goals[0])
+        yield th.zeros(1)
+
+    from ispatialgym.oracle.motions import MotionsConfig
+
+    motions = SimpleNamespace(arm_along=gen, protecting=None, base_pose2d=lambda: tuple(base["pose"]), track_path=track_path, cfg=MotionsConfig(),
+                              follow_phase="arm")
+    monkeypatch.setattr(EX, "realign_base_clear", lambda m, a, b, margin: None)
+    action = SimpleNamespace(name="push", arm="right", contact=SimpleNamespace(object="book", arm="right"))
+    cfg = EX.ExecuteConfig()
+    ctx = {}
+    obj["pose"] = (th.tensor([0.03, 0.04, 0.7]), yq(0.32))  # the first push turned it 0.32 rad and slid it (door_lags)
+    end = (th.tensor([0.1, 0.1, 0.71]), th.tensor([1.0, 0.0, 0.0, 0.0]))
+    g = EX._push_recontact_rounds(action, motions, state, targets, geom, pose0, [], [], cfg, ctx, end)
+    try:
+        while True:
+            next(g)
+    except StopIteration:
+        pass
+    rec = ctx["push_recontact"]
+    assert len(calls) == 2 and len(rec["rounds"]) == 2 and rec["stop"] == "within the goal tolerance"
+    c0 = calls[0]
+    T = C.compose(c0["pose_now"], C.invert(pose0))
+    want_init = C.compose(T, as_world_pose(init))  # the recorded contact moved rigidly with the object
+    assert th.allclose(as_world_pose(c0["arc"][0])[0], want_init[0], atol=1e-5)
+    assert float(c0["geom"].angle) == pytest.approx(goal_yaw - 0.32, abs=2e-3)  # an arc of the residual
+    assert th.allclose(c0["geom"].pivot[:2], th.tensor([0.03, 0.04]), atol=1e-3)  # about the object's centre now
+    assert rec["rounds"][1]["residual_after_rad"] < rec["rounds"][0]["residual_before_rad"]
+    # the base followed the object's planar shift (its pivot moved 5 cm in round 1): the stance carried, the yaw kept
+    assert rec["rounds"][0]["base_move"]["blocked"] is None and base["moves"][0] == pytest.approx([0.03, -0.56, 1.5708], abs=1e-3)
+    # within the tolerance: nothing
+    obj["pose"] = (th.tensor([0.0, 0.0, 0.7]), yq(goal_yaw - 0.01))
+    calls.clear()
+    ctx2 = {}
+    g = EX._push_recontact_rounds(action, motions, state, targets, geom, pose0, [], [], cfg, ctx2, end)
+    try:
+        while True:
+            next(g)
+    except StopIteration:
+        pass
+    assert calls == [] and ctx2["push_recontact"]["stop"] == "within the goal tolerance"
+    # a round that never touched the object: the next one moves the contact 2.5 cm toward the pivot
+    follow = {"frac": 0.0}
+
+    def arc_loop_miss(motions, state, arm, o, arc, g, pose_now, cfg, ctx, label):
+        calls.append({"arc": arc, "geom": g, "pose_now": pose_now})
+        p, q = obj["pose"]
+        obj["pose"] = (p, C.qmul(yq(follow["frac"] * float(g.angle)), q))
+        follow["frac"] = 0.8
+        yield th.zeros(1)
+
+    monkeypatch.setattr(EX, "_push_arc_closed_loop", arc_loop_miss)
+    obj["pose"] = (th.tensor([0.0, 0.0, 0.7]), yq(0.0))  # the first push never touched it
+    calls.clear()
+    ctx4 = {}
+    g = EX._push_recontact_rounds(action, motions, state, targets, geom, pose0, [], [], cfg, ctx4, end)
+    try:
+        while True:
+            next(g)
+    except StopIteration:
+        pass
+    r4 = ctx4["push_recontact"]["rounds"]
+    assert r4[0]["untouched_before"] and r4[0]["inward_m"] == pytest.approx(0.025) and r4[1]["inward_m"] == pytest.approx(0.05)
+    r0 = float(th.linalg.norm(as_world_pose(calls[0]["arc"][0])[0][:2] - calls[0]["geom"].pivot[:2]))
+    assert r0 == pytest.approx(0.15 - 0.025, abs=1e-3)  # the contact 2.5 cm further in than the recorded 0.15 m
+    # a skill error ends the rounds
+    obj["pose"] = (th.tensor([0.0, 0.0, 0.7]), yq(0.3))
+
+    def boom(*a, **k):
+        raise SkillError("plan_failed", "no plan to the moved pre-contact")
+        yield
+
+    monkeypatch.setattr(EX, "reach_push_pre", boom)
+    ctx3 = {}
+    g = EX._push_recontact_rounds(action, motions, state, targets, geom, pose0, [], [], cfg, ctx3, end)
+    try:
+        while True:
+            next(g)
+    except StopIteration:
+        pass
+    assert ctx3["push_recontact"]["stop"] == "skill error" and "plan_failed" in ctx3["push_recontact"]["rounds"][0]["error"]
+
+
+def test_place_touch_stop_rule():
+    """oracle-fix 2026-11-03 (bar soap on its dish): a support place onto a partner stops its descent at the first touch, or once the partner
+    moved 1.5 mm; only with the switch / the variant's generation key, only for relation 'on'."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import execute as EX
+
+    cfg = EX.ExecuteConfig()
+    place = SimpleNamespace(kind="support", on="soap_dish.n.01_1", relation="on")
+    assert not EX.place_touch_stop_wanted(place, {}, cfg)
+    assert EX.place_touch_stop_wanted(place, {}, EX.ExecuteConfig(place_touch_stop=True))
+    EX._VARIANT_GENERATION_CACHE["v_touch"] = {"place_touch_stop": True}
+    assert EX.place_touch_stop_wanted(place, {"sidecar": SimpleNamespace(variant="v_touch")}, cfg)
+    assert not EX.place_touch_stop_wanted(SimpleNamespace(kind="support", on="x", relation="next to"), {}, EX.ExecuteConfig(place_touch_stop=True))
+    assert not EX.place_touch_stop_wanted(SimpleNamespace(kind="drop", on="x", relation="on"), {}, EX.ExecuteConfig(place_touch_stop=True))
+    w = {"touch": False, "p": th.tensor([0.0, 0.0, 0.66])}
+    state = SimpleNamespace(object_pose=lambda n: (w["p"], th.tensor([0.0, 0.0, 0.0, 1.0])), touching_pair=lambda a, b: w["touch"])
+    rec = {}
+    stop = EX.place_touch_stop_check(state, "soap", "dish", th.tensor([0.0, 0.0, 0.66]), cfg, rec)
+    assert stop() is False
+    w["touch"] = True
+    assert stop() is True and "touches" in rec["why"]
+    w["touch"], w["p"] = False, th.tensor([0.002, 0.0, 0.66])
+    assert stop() is True and "moved 2.0 mm" in rec["why"]
+
+
+def test_wobble_min_steps_gate():
+    """oracle-fix 2026-11-03 (the dishwasher's single-step 1.003-1.093 deg spikes): with wobble_min_steps 1 (default) the first step over the
+    limit fires robot_wobble, with 3 only a run of 3 consecutive steps does; every step over is recorded."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import qa as QA
+
+    def run(min_steps, devs):
+        q = object.__new__(QA.QA)
+        q.t = QA.QAThresholds(wobble_min_steps=min_steps)
+        q.wobble = QA._Spans(10)
+        q.action_name = "base_follow"
+        seq = iter(devs)
+        q.torso = SimpleNamespace(observe=lambda step, a, name: next(seq))
+        hard = []
+        for k in range(len(devs)):
+            q._wobble(k, None, hard)
+        return hard, q.wobble.steps
+
+    assert QA.QAThresholds().wobble_min_steps == 1
+    hard, n = run(1, [0.5, 1.003, 0.9, 0.8])
+    assert [h[0] for h in hard] == ["robot_wobble"] and n == 1
+    hard, n = run(3, [0.5, 1.003, 0.9, 0.8])
+    assert hard == [] and n == 1
+    hard, n = run(3, [1.1, 1.2, 1.3, 1.2, 0.5])
+    assert [h[0] for h in hard] == ["robot_wobble"] and hard[0][2]["steps"] == 3 and n == 4

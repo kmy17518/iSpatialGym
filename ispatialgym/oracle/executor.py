@@ -378,6 +378,8 @@ NOTE_KEYS = NOTE_KEYS + ("grasp_support_lift", "place_inhand_raise")
 #: owner audit 2026-10-09: a grasp approach stopped on the support, a free-hanging drop released at once, a next-to / touching place moved
 #: off the partner for the release and the push extended by it
 NOTE_KEYS = NOTE_KEYS + ("approach_support_stop", "partner_release_clearance", "push_place_shift_extended_m", "drop_lowered")
+#: oracle-fix 2026-11-03: the touch-stopped descent, the in-hand place re-aim and the push re-contact rounds
+NOTE_KEYS = NOTE_KEYS + ("place_touch_stop", "place_inhand_reaim", "push_recontact")
 #: first-demo v2.1 A2 (block design 0927-040243): a travel leg kept an arm in its IK branch; the next contact ran on the kept branch
 NOTE_KEYS = NOTE_KEYS + ("branch_kept", "witnesses_rebranched")
 #: first-demo v2.1 (sandal on pods): the arm moved into the pre-grasp witness's posture before an approach that tracks only from there

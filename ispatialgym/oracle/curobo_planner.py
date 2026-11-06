@@ -1435,15 +1435,20 @@ class R1ProCuRobo:
                     break
         return out
 
-    def world_collision_offenders(self, q_full: th.Tensor, emb_name: str = "whole_body", limit: int = 6) -> List[str]:
+    def world_collision_offenders(self, q_full: th.Tensor, emb_name: str = "whole_body", limit: int = 6, margin: Optional[float] = None) -> List[str]:
         """The enabled world meshes (and the ground slab) whose removal clears the penetration at ``q_full``: each enabled
-        obstacle is disabled in turn and the world check re-run (2026-09-19 diagnostic; the world is restored)."""
+        obstacle is disabled in turn and the world check re-run (2026-09-19 diagnostic; the world is restored). ``margin``: the check's
+        clearance (default the checker's own). Oracle-fix 2026-11-04 round 4: a pose already clear at that margin has no offender (the
+        search used to return the first ``limit`` names in sorted order - armchair_ybcnmu_0 for a wheel 8.7 mm from a bed at a 1 cm path margin)."""
+        kw = {} if margin is None else {"margin": float(margin)}
+        if not bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False, **kw)[0]):
+            return []
         out: List[str] = []
         names = [n for n in sorted(self._world_mesh_names) if n not in self._disabled_obstacles]
         for name in names:
             self._mesh_enable(name, False)
             try:
-                hit = bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False)[0])
+                hit = bool(self.check_collision(q_full, emb_name=emb_name, self_collision=False, **kw)[0])
             finally:
                 self._mesh_enable(name, True)
             if not hit:

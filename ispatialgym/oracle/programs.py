@@ -158,7 +158,8 @@ def _brace_contact(sc: Sidecar):
 
 def _pick(g: GraspRecord) -> Tuple[Grasp, Lift]:
     grasp = Grasp(kind="library", arm=g.arm, object=g.object, grasp=g, touches=g.may_touch[0])
-    return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp)
+    # oracle-fix 2026-11-04 round 4: ``grasps[i].lift_away`` (the shelf tip release lifts the book away from the side board it leans on)
+    return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp, away=g.extra.get("lift_away"))
 
 
 #: ``contacts.push_pick``: the push before an overhang pick (owner 2026-10-13 ~03:15 item 4; sampler ``iors_large._overhang_pick``)
@@ -200,7 +201,9 @@ def _pick_actions(sc: Sidecar, g: GraspRecord, stance: str = "manipulation") -> 
     support = push.extra.get("support")
     p = Push(contact=push, base_yaw=sc.stance(stance).base_pose2d[2], touches=(support,) if isinstance(support, str) and support else ())
     to_grasp = _travel(sc, stance, _grasp_stance(g)) if _grasp_stance(g) != stance else []
-    return [p, Retreat(arm=push.arm, object=push.object, after=p)] + to_grasp + [grasp, lift]
+    up = push.extra.get("retreat_up_m")  # oracle-fix 2026-11-05: the escape off the support before the travel to the grasp stance
+    up = float(up) if isinstance(up, (int, float)) and up > 0 else None
+    return [p, Retreat(arm=push.arm, object=push.object, after=p, escape_up_m=up)] + to_grasp + [grasp, lift]
 
 
 def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on", avoid: Tuple[str, ...] = ()) -> List[Action]:
@@ -1202,6 +1205,16 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
     Shelf layout (``contacts.push.layout`` = :data:`TOUCHING_SHELF_LAYOUT`, touching#03): the same push-only chain with the
     grasping hand as the push arm (the left hand pushing rightward toward a partner on the right board); a brace is refused."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
+    if str(g.extra.get("place_kind") or "") == "shelf_tip":
+        # oracle-fix 2026-11-04 round 4 (touching#03, sampler ``generation.shelf_tip_release``): the book is placed at the lean the goal check
+        # settled from and tips onto the partner - the nextto chain (pick, carry, place, retreat), no push and no brace
+        if sc.contacts is not None and (sc.contacts.push is not None or sc.contacts.brace is not None):
+            raise SidecarError("touching (shelf tip release): no push / brace contact is recorded")
+        if "push" in sc.stances:  # the second base pose the place is made from (the book carried there in hand)
+            grasp, lift = _pick(g)
+            return (_travel(sc, "init", "manipulation") + [grasp, lift] + _travel(sc, "manipulation", "push", carried=g.object)
+                    + _place_and_retreat(g, "support", _IORS_RELATION_WORDS["touching"]))
+        return program_iors_small(sc, "nextto")
     push = _push_contact(sc)
     brace = sc.contacts.brace if sc.contacts is not None else None
     if push.extra.get("layout") == TOUCHING_SHELF_LAYOUT:
@@ -1237,13 +1250,42 @@ def _iors_large_touching_program(sc: Sidecar) -> List[Action]:
     object → place(drop on the floor in front of the face) → retreat → [the deep push stance: trunk-only transition] → push along the
     floor → retreat. ``contacts.push`` (``kind: "push_touching"``) names the ``partner``: the push may touch it (``touches``, no
     ``avoid``) and follows it (``Push.follow``: the pad stops when the target reaches its goal, the touching pose - ``execute_push``'s
-    stop rule - moved with the partner if the partner moved); ``touching`` is read in the epilogue."""
+    stop rule - moved with the partner if the partner moved); ``touching`` is read in the epilogue.
+
+    Floor start (oracle-fix 2026-11-03, touching_large#01: an ottoman that already stands on the floor of the sofa's room, nothing to
+    pick): a sidecar with NO grasp record and a ``push_touching`` contact is the push chain alone - init A → the push stance (``push``
+    when recorded, else ``manipulation``; recorded path / transition) → push along the floor → retreat. The sampler must record the
+    target's floor start and the push stance for it; until it does, such a sidecar does not exist (today a missing grasp raised)."""
+    push = sc.contacts.push if sc.contacts is not None else None
+    if not sc.grasps and push is not None and push.kind == BASE_PUSH_KIND:
+        # oracle-fix 2026-11-03 (touching_large#01, the ottoman; sampler ``generation.touching_push: "base"``): the floor-standing target driven
+        # against the partner's face by the base - the nextto chain (``program_iors_large_nextto``), its drive stopped once Touching holds
+        # (``execute.base_push_relation``: the record's ``relation: touching``)
+        if push.extra.get("relation") != "touching":
+            raise SidecarError("contacts.push.relation: a touching base push records relation 'touching'")
+        return program_iors_large_nextto(sc)
+    if not sc.grasps:
+        if push is None or push.kind != "push_touching":
+            raise SidecarError("contacts.push: a record with kind 'push_touching' is required (IORS touching, large-scale, floor start: no grasp recorded)")
+        partner = push.extra.get("partner")
+        if not isinstance(partner, str) or not partner:
+            raise SidecarError("contacts.push.partner: the instance the target is pushed against is required (IORS touching, large-scale)")
+        push_stance = "push" if "push" in sc.stances else "manipulation"
+        base_yaw = sc.stance(push_stance).base_pose2d[2]
+        p = Push(contact=push, base_yaw=base_yaw, touches=(partner,), follow=partner)
+        return _travel(sc, "init", push_stance) + [p, Retreat(arm=push.arm, object=push.object, after=p)]
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     if sc.path(_grasp_stance(g), "placement") is None:
         raise SidecarError(f"paths: IORS large-scale needs the recorded path from {_grasp_stance(g)!r} to 'placement'")
+    if str(g.extra.get("place_kind") or "") == "lean":
+        # oracle-fix 2026-11-04 round 3 (touching_large#02, the umbrella; sampler ``generation.touching_place: "lean"``): released at the
+        # recorded lean pose - its lower end just above the floor, leaning on the partner - and left there: no drop on the floor, no push
+        pick = _pick_actions(sc, g)
+        carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=pick[-1], waypoints=g.waypoints)] if g.waypoints else []
+        head = _travel(sc, "init", "manipulation") + pick + carry + _travel(sc, _grasp_stance(g), "placement", carried=g.object)
+        return head + _place_and_retreat(g, "drop", _IORS_RELATION_WORDS["touching"])
     if str(g.extra.get("place_kind") or "support") != "drop":
-        raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop')")
-    push = sc.contacts.push if sc.contacts is not None else None
+        raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop') or leans it on the partner ('lean')")
     if push is None or push.kind != "push_touching":
         raise SidecarError("contacts.push: a record with kind 'push_touching' is required (IORS touching, large-scale)")
     if push.object != g.object:

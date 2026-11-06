@@ -115,6 +115,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -1202,6 +1203,11 @@ class QAThresholds:
     object_tilt_pos_m: float = 0.010
     object_tilt_rad: float = 0.04
     wobble_deg: float = 1.0
+    #: oracle-fix 2026-11-03 (articulation_open_large#02, the dishwasher: 4 of 6 replays failed robot_wobble on ONE step of 1.003-1.093 deg
+    #: in the base follow, the passing one peaked at 0.914): the hard verdict fires once the torso stayed over ``wobble_deg`` for this
+    #: many consecutive steps (1 = the first step over, the owner's rule as written; ``ISPATIALGYM_QA_WOBBLE_MIN_STEPS``). Every step over
+    #: is recorded in the report either way
+    wobble_min_steps: int = field(default_factory=lambda: int(os.environ.get("ISPATIALGYM_QA_WOBBLE_MIN_STEPS", "1")))
     max_runs: int = 200
 
 
@@ -1644,9 +1650,13 @@ class QA:
             log.warning("QA robot_wobble disabled (%r)", e)
             self.torso = None
             return
-        if dev > self.t.wobble_deg and self.wobble.add(step, ("torso",), deg=round(dev, 3), action=self.action_name):
-            hard.append(("robot_wobble", f"a load bent the torso {dev:.2f} deg off its command (> {self.t.wobble_deg:.2f} deg): the robot visibly wobbles",
-                         {"deg": round(dev, 3)}))
+        if dev > self.t.wobble_deg:
+            self.wobble.add(step, ("torso",), deg=round(dev, 3), action=self.action_name)
+            run = self.wobble._open.get(("torso",))
+            n = int(run["n"]) if run is not None and run.get("last_step") == step else 1
+            if n == max(1, int(self.t.wobble_min_steps)):
+                hard.append(("robot_wobble", f"a load bent the torso {dev:.2f} deg off its command (> {self.t.wobble_deg:.2f} deg"
+                             + (f" for {n} steps" if n > 1 else "") + "): the robot visibly wobbles", {"deg": round(dev, 3), "steps": n}))
 
     # ------------------------------------------------------------------ checkpoints
 
