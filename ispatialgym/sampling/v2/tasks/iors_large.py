@@ -597,6 +597,28 @@ def pair_key(yaw: float, grasp: Any, yaw_step: float = math.pi / 8) -> Tuple[int
     return int(round(float(yaw) / yaw_step)), getattr(grasp, "name", grasp)
 
 
+def dead_at_b(F_live: Sequence[Tuple[float, Any]], b_ik_cache: Dict[Any, Any], yaw_step: float, end_aligned=lambda yaw0: None,
+              buckets: Optional[set] = None) -> bool:
+    """oracle-fix 2026-11-06 (speed, ``generation.c_skip_dead_b``): True when every pair of ``F_live`` a draw at this C can take (the yaw
+    buckets ``buckets`` only, when given: the push-under yaw lock's) ends in the draw loop's first ``continue`` - its B key (the draw
+    loop's ``bk``: yaw bucket, or the aligned init yaw of ``end_aligned``, and the grasp name) holds None in ``b_ik_cache`` (the pick's
+    exact IK failed at B for every arm that held it) or ``end_aligned`` gives False (no aligned goal yaw). Such a C cannot be written:
+    its push chain, F_goal and release-tilt screens are skipped. False for no candidate pair (the C loop's own rules name that)."""
+    n = 0
+    for yaw0, g in F_live:
+        b = int(round(float(yaw0) / yaw_step))
+        if buckets is not None and b not in buckets:
+            continue
+        n += 1
+        y_end = end_aligned(float(yaw0))
+        if y_end is False:
+            continue
+        bk = (b if y_end is None else round(float(y_end), 4), getattr(g, "name", str(g)))
+        if bk not in b_ik_cache or b_ik_cache[bk] is not None:
+            return False
+    return n > 0
+
+
 def union_feasible(F_by_arm: Dict[str, Sequence[Tuple[float, Any]]], yaw_step: float = math.pi / 8) -> List[Tuple[float, Any]]:
     """The usable pairs of a B over its arms (owner 2026-09-27, first-demo v2.2): the first arm's F in order, then the pairs only
     the next arms hold."""
@@ -1477,6 +1499,31 @@ class IORSLarge(SamplerV2):
             log.info("%s: push-under yaw lock %s: kept %d of %d yaws at C (d %.2f λ %+.2f, carry yaw offset %+.2f): %s, offsets %s m", self.gp.variant, lock, len(kept),
                      len(yaws), place.stand_off or 0.0, place.lateral, d_yaw, [round(y, 2) for y in kept], [round(float(offs.get(y, -1.0)), 3) for y in kept])
         return kept
+
+    def _c_dead_at_b(self, F_live: Sequence[Tuple[float, Any]], b_ik_cache: Dict[Any, Any], place: Stance, manip: Stance, yaw_step: float) -> bool:
+        """oracle-fix 2026-11-06 (speed, opt-in ``generation.c_skip_dead_b``): C ``place`` cannot be written from B ``manip`` - every pair of
+        ``F_live`` a draw there can take already failed its exact IK at B (:func:`dead_at_b`; the B side does not depend on C, ``b_ik_cache``
+        is the C loop's). The push-under yaw lock's kept yaws at this C (:meth:`push_yaws_locked`'s rule, carry yaw offset as the C loop's)
+        narrow the pairs. under_large_scale_01 (sandal under the bed, trainfast crop4 / full4): 41 of 42 C tries of a B exhausted by
+        'B: [pre-grasp, grasp] exact IK (cached)' alone after their push chains (3.7-4.7 s each) and F_goal screens; the chains after B
+        was dead were 365 of 508 in a 3005 s attempt."""
+        d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(place.yaw - manip.yaw)
+        end = lambda y0: self.end_aligned_init_yaw(y0, d_yaw)  # noqa: E731
+        if dead_at_b(F_live, b_ik_cache, yaw_step, end):
+            return True
+        if not self.push_under or self.push_yaw_lock() is None:
+            return False
+        d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
+        yaws = sorted({float(y) for y, _ in F_live})
+        kept = []
+        for y in yaws:
+            q = G.qmul(G.quat_from_yaw(y + d_yaw), self.rest)
+            o = self.push_contact_offset(q, d_push)
+            if self.push_yaw_kept(q, d_push, -1.0 if o is None else o):
+                kept.append(y)
+        if not kept or len(kept) == len(yaws):  # none kept: the C loop's lock rule skips the C itself; all kept: judged above
+            return False
+        return dead_at_b(F_live, b_ik_cache, yaw_step, end, {int(round(y / yaw_step)) for y in kept})
 
     def push_contact_forms(self) -> List[str]:
         """``generation.push_under_contact`` (owner 2026-10-13 ~04:30 item 2; :data:`PUSH_CONTACT_FORMS`, one name or a list in preference
@@ -4398,6 +4445,8 @@ class IORSLarge(SamplerV2):
         errors = []
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
+        skip_dead_b = bool(self.gp.gen("c_skip_dead_b", False))  # oracle-fix 2026-11-06 (speed): see _c_dead_at_b
+        n_dead_b = 0
         for i_c, kc in enumerate(order[:n_try]):
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
             F_live = [yg for yg in F_init if pair_key(yg[0], yg[1], yaw_step) not in deferred] if deferred else F_init
@@ -4409,6 +4458,18 @@ class IORSLarge(SamplerV2):
             place.extras = dict(c_pool[int(kc)].extras)
             gc = place.extras["goal_cell"]
             push = self.push_under
+            if skip_dead_b and self._c_dead_at_b(F_live, b_ik_cache, place, manip, yaw_step):
+                # oracle-fix 2026-11-06 (speed, generation.c_skip_dead_b): every draw this C can take would end at 'B: [pre-grasp, grasp] exact IK
+                # (cached)' - skipped before its push chain / F_goal / release-tilt screens (only the random draws a skipped C consumed differ)
+                n_dead_b += 1
+                TT._count(self, "c_skip_dead_b")
+                if n_dead_b == 1:
+                    log.info("%s: C candidate %d of %d (d %.2f λ %+.2f) and the next like it skipped (generation.c_skip_dead_b): every pair of the %s arm's "
+                             "F_init (%d) its draws can take failed its exact IK at B (%.2f, %.2f)", self.gp.variant, i_c + 1, min(n_try, len(order)),
+                             place.stand_off or 0.0, place.lateral or 0.0, arm, len(F_live), manip.translate, manip.tilt)
+                errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): skipped - every F_init pair its draws can take failed its "
+                              f"exact IK at B (generation.c_skip_dead_b; {n_dead_b} C skipped)")
+                continue
             base_key = tuple(round(float(v), 3) for v in place.base_pose2d)
             if base_key in carry_failed_bases:
                 errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f}): skipped - the carry leg failed at this base pose")
