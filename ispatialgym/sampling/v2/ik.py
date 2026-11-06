@@ -1096,6 +1096,46 @@ class IKChecker:
         eef = self.kit.fk([M.EEF_LINK[arm]], G.t(q))[M.EEF_LINK[arm]]
         return float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0])))
 
+    #: dense straight-line steps of :meth:`reach_collisions_off` from the start eef to the pose
+    REACH_OFF_STEPS = 24
+
+    def reach_collisions_off(self, pose: Pose, q_starts: Sequence[th.Tensor], arm: str) -> Dict[str, Any]:
+        """Diagnostic (oracle-fix 2026-11-04 round 3): how close ``arm``'s eef gets to ``pose`` with collisions off, by damped least
+        squares tracked along the straight line from each start's eef (``REACH_OFF_STEPS`` waypoints; a single far waypoint made the
+        DLS return no configuration at all, and the caller measured the START: the 674-846 mm 'short' of the bookcase F_goal blame).
+        The best start's ``{"q", "reached", "short_mm", "rot_rad", "limit_mrad", "limit_joint", "at_limits", "status"}``; ``reached``
+        = within the witness tolerance (:meth:`reaches`)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        be = self.kit.backend
+        self.kit._ensure_synced()
+        best: Optional[Dict[str, Any]] = None
+        for q0 in q_starts:
+            q0 = G.t(q0).clone()
+            eef = self.kit.fk([M.EEF_LINK[arm]], q0)[M.EEF_LINK[arm]]
+            wps = C.line_waypoints((G.t(eef[0]), G.t(eef[1])), (G.t(pose[0]), G.t(pose[1])), self.REACH_OFF_STEPS)
+            res = be.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(p[0]), G.t(p[1]))} for p in wps], q_start=q0, pos_tol=1e-3, rot_tol=5e-3,
+                                   max_iters=60, check_collisions=False, sync_world=False, max_joint_step=10.0)
+            q = res.q_traj[-1].clone() if getattr(res, "q_traj", None) is not None else q0
+            if not res.success:
+                # the converged prefix stops a waypoint short: finish on the pose itself from there (a miss returns no q: keep the prefix)
+                fin = be.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=q, pos_tol=1e-3, rot_tol=5e-3,
+                                       max_iters=200, check_collisions=False, sync_world=False, max_joint_step=10.0)
+                if getattr(fin, "q_traj", None) is not None:
+                    q = fin.q_traj[-1].clone()
+            e = self.kit.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+            m_lim, jn = self.joint_limit_margin(q, arm)
+            diag = getattr(res, "diagnostics", None) or {}
+            out = {"q": q, "reached": self.reaches(q, pose, arm), "short_mm": round(float(th.linalg.norm(G.t(e[0]) - G.t(pose[0]))) * 1000, 1),
+                   "rot_rad": round(float(G.quat_angle(e[1], G.t(pose[1]))), 3), "limit_mrad": round(m_lim * 1000, 0), "limit_joint": jn,
+                   "at_limits": list(diag.get("at_lower", [])) + list(diag.get("at_upper", [])), "status": str(getattr(res, "status", ""))[:120]}
+            if best is None or (out["reached"], -out["short_mm"]) > (best["reached"], -best["short_mm"]):
+                best = out
+            if out["reached"]:
+                break
+        return best or {"q": None, "reached": False, "short_mm": float("nan"), "rot_rad": float("nan"), "limit_mrad": float("nan"), "limit_joint": "",
+                        "at_limits": [], "status": "no start"}
+
     def canonical_q(self, q: th.Tensor, stance: Stance) -> th.Tensor:
         """``q`` with the virtual base joints re-expressed relative to a robot root at the **world origin** (identity pose,
         z = 0) so that FK with an identity root puts ``base_link`` at the stance's recorded ``base_pose2d`` on the measured floor
@@ -1299,7 +1339,7 @@ class IKChecker:
 
     def continue_chain(self, q_start: th.Tensor, waypoints: Sequence[Pose], arm: str, ignore: Sequence[Any] = (), ignore_end: Sequence[Any] = (),
                        soft_stall_m: Optional[float] = None, limit_margin: float = 0.0, ignore_start: Sequence[Any] = (), ground_along: bool = True,
-                       ground_meshes_along: bool = True) -> IKResult:
+                       ground_meshes_along: bool = True, finish_max_remaining_m: Optional[float] = None) -> IKResult:
         """A chain that starts where the arm already **is** (owner 2026-09-24): ``q_start`` is the configuration the previous
         motion ended in (the place configuration for the retreat off it, the grasp configuration for the lift, the previous
         action's end for a ``Retreat``), and the chain is tracked from it by differential IK exactly as the oracle's
@@ -1324,7 +1364,7 @@ class IKChecker:
         q_end, why = self.track_chain(q_start, wps, arm, ignore=ignore, ignore_end=ignore_end, soft_stall_m=soft_stall_m,
                                       finish_max_excursion=self.FINISH_MAX_EXCURSION, soft_pos_tol=self.ORACLE_SOFT_POS_TOL, soft_rot_tol=self.ORACLE_SOFT_ROT_TOL,
                                       max_iters=self.ORACLE_DIFF_IK_MAX_ITERS, limit_margin=float(limit_margin), ignore_start=list(ignore_start), ground_at_start=False,
-                                      ground_along=ground_along, ground_meshes_along=ground_meshes_along)
+                                      ground_along=ground_along, ground_meshes_along=ground_meshes_along, finish_max_remaining_m=finish_max_remaining_m)
         if q_end is None:
             return IKResult(False, None, why, n)
         return IKResult(True, q_end, "tracked continuation" + (" (stall finished)" if "finished" in why else ""), n)
@@ -1334,7 +1374,7 @@ class IKChecker:
                     finish_max_excursion: Optional[float] = None, soft_pos_tol: Optional[float] = None, soft_rot_tol: Optional[float] = None,
                     max_iters: int = 60, limit_margin: float = 0.0, ignore_start: Sequence[Any] = (), ground_at_start: bool = True,
                     ground_along: bool = True, ground_meshes_along: bool = True, refine_jumps: bool = False,
-                    min_limit_margin: Optional[float] = None) -> Tuple[Optional[th.Tensor], str]:
+                    min_limit_margin: Optional[float] = None, finish_max_remaining_m: Optional[float] = None) -> Tuple[Optional[th.Tensor], str]:
         """Differential-IK tracking of a whole eef chain (a reorient: yaw-align orbit, in-hand flip) from ``q_from`` (which
         reaches ``waypoints[0]``) exactly as the oracle's ``arm_along`` tracks it - every segment densified by position
         (``TRACK_STEP_M``) AND rotation (``TRACK_STEP_RAD``), no joint step above ``APPROACH_MAX_STEP`` - the configurations
@@ -1406,6 +1446,12 @@ class IKChecker:
             if soft_stall_m is not None and diag.get("stage") == "diff_ik" and stall is not None and float(stall) <= float(soft_stall_m) and res.q_traj is not None and len(res.q_traj) > 0:
                 # the oracle's finish: plan to the end pose from where the tracking stalled (here: its exact IK seeded there)
                 q_last = res.q_traj[-1].clone()
+                rem = (self.last_track_stall or {}).get("remaining_m")
+                if finish_max_remaining_m is not None and rem is not None and float(rem) > float(finish_max_remaining_m):
+                    # oracle-fix 2026-11-05 (generation.carry_finish_max_remaining_m; hardback hbD7: the carry at C stalled at 8/53 with 0.38 m left -
+                    # accepted here by the IK finish, the oracle's planned finish next to the bookcase failed): a long remainder is no finish
+                    return None, (f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}; the stall leaves {float(rem):.2f} m "
+                                  f"(> {float(finish_max_remaining_m):.2f} m the oracle's planned finish is trusted with)")
                 with self.ignoring(list(ignore) + list(ignore_end)):
                     q_fin = self.kit.ik(wps[-1], q_last, arm=arm)
                 if q_fin is None:
@@ -1731,7 +1777,8 @@ class IKChecker:
     # -- bands: feasible sets ------------------------------------------------------------------------------------
     def feasible_sets(self, cells: Sequence[Any], yaws: Sequence[float], grasps: Sequence[Any], pose_at: Callable[..., Pose], stance: Stance,
                       arm: str = "right", ignore_for_grasp: Sequence[Any] = (), eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
-                      scale_key: Any = None, cache: bool = True, pose_per_grasp: bool = False) -> Dict[int, List[Tuple[float, Any]]]:
+                      scale_key: Any = None, cache: bool = True, pose_per_grasp: bool = False, pre_of: Optional[Callable[[Pose], Pose]] = None,
+                      pre_tag: Optional[str] = None) -> Dict[int, List[Tuple[float, Any]]]:
         """§4.6 step 1 over many cells in one batch per trunk: for every cell index the feasible set F of ``(yaw, grasp)``
         pairs whose [pre-grasp, grasp] pass the screening IK from ``stance`` (grasp pose with ``ignore_for_grasp``
         removed). ``pose_at(cell, yaw) -> object pose`` (``pose_per_grasp``: ``pose_at(cell, yaw, grasp)``, an object pose that
@@ -1750,7 +1797,7 @@ class IKChecker:
                                                  "grasps": [(getattr(g, "key", None), getattr(g, "name", None), list(G.t(eef_of(g)[0]).tolist()), list(G.t(eef_of(g)[1]).tolist())) for g in grasps],
                                                  "poses0": poses0,
                                                  "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS,
-                                                 **({"pose_per_grasp": True} if pose_per_grasp else {})})
+                                                 **({"pose_per_grasp": True} if pose_per_grasp else {}), **({"pre": pre_tag or "custom"} if pre_of is not None else {})})
             hit = cache_get(key)
             if hit is not None:
                 return {int(i): [(float(yaw), by_name[gn]) for yaw, gn in lst if gn in by_name] for i, lst in hit.items()}
@@ -1760,7 +1807,7 @@ class IKChecker:
                 obj_pose = None if pose_per_grasp else pose_at(cell, yaw)
                 for g in grasps:
                     eef = grasp_pose(pose_at(cell, yaw, g) if pose_per_grasp else obj_pose, eef_of(g))
-                    pairs.append([pre_pose(eef), eef])
+                    pairs.append([(pre_of or pre_pose)(eef), eef])  # pre_of: the release's own pre-place (oracle-fix 2026-11-04 round 3)
                     index.append((i, yaw, g))
         feas = self.screen_pairs(pairs, stance, arm, ignore_for_last=ignore_for_grasp)
         out: Dict[int, List[Tuple[float, Any]]] = {}

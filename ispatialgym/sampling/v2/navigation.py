@@ -24,6 +24,7 @@ from __future__ import annotations
 import heapq
 import logging
 import math
+import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
@@ -461,6 +462,71 @@ def path_collision_free(kit: "RobotKit", poses: Sequence[Tuple[float, float, flo
     return False, int(th.nonzero(~free)[0])
 
 
+def path_blame(kit: "RobotKit", pose: Tuple[float, float, float], trunk: Tuple[float, float], posture: str, q_arms: Optional[Dict[str, th.Tensor]],
+               margin: float) -> str:
+    """Opt-in (``ISPATIALGYM_STANCE_BLAME``, oracle-fix 2026-11-04 owner item 4): at a colliding swept pose (the carried object still
+    attached), the robot / attached links in the world (by class) and the world meshes in contact (``world_collision_offenders``)."""
+    try:
+        q = kit.q_at_base_pose(_nav_q(kit, trunk, posture, q_arms), *pose)
+        costs = kit.backend._collision_costs(kit.backend.kin_entry("whole_body"))
+        links = sorted(set(costs.get("link_of_sphere", [])))
+        hits = [l for l in links if not bool(kit.links_clear(q, [l], float(margin))[0])]
+        offs = []
+        try:
+            # oracle-fix 2026-11-04 round 4: at the path's margin (a margin-only contact named whatever mesh sorts first), object + mesh names
+            offs = [(lambda p: f"{p[-4]}:{p[-1]}" if len(p) >= 4 else str(o))(str(o).split("/"))
+                    for o in kit.backend.world_collision_offenders(q, emb_name="whole_body", limit=4, margin=float(margin))]
+        except Exception as e:  # noqa: BLE001
+            offs = [f"offenders failed ({e!r})"]
+        # the decisive splits: with self-collision off (a carried object or an arm against the robot's own links), with the ground slab
+        # off would need a world re-sync (not done: it would undo the caller's ignore set); the mesh offender search names whatever mesh it disables first when neither
+        # helps (2026-11-04: it named an armchair, then ceiling downlights, for the same pose)
+        q1 = q.unsqueeze(0)
+        world_hit = bool(kit.backend.check_collision(q1, emb_name="whole_body", sync_world=False, self_collision=False, margin=float(margin))[0])
+        self_only = not world_hit
+        bodies = _world_bodies_freeing(kit, q1, pose, float(margin)) if world_hit else ""
+        return (f"; blame: {'SELF-COLLISION only (world clear with self-collision off)' if self_only else 'world contact'}"
+                f"; links near the world {hits}; world meshes {offs}{bodies}")
+    except Exception as e:  # noqa: BLE001
+        return f"; blame failed ({e!r})"
+
+
+def _world_bodies_freeing(kit: "RobotKit", q1: th.Tensor, pose: Tuple[float, float, float], margin: float) -> str:
+    """Oracle-fix 2026-11-04 round 3 (item 3b): the world bodies whose removal ALONE frees a colliding swept pose - each scene object whose
+    AABB lies within 1.5 m of the base (nearest first, 14 at most) taken out by ``ik._Ignoring`` (its collision meshes off, as
+    ``IKChecker._collision_blame`` does for spawned objects), the world re-checked without self-collision; the cuRobo ground slab and the
+    floor objects too. The base pose and the nearest AABB distances are logged to check the pose's frame against the scene
+    (``world_collision_offenders`` names whatever mesh it disables first)."""
+    try:
+        from ispatialgym.sampling.v2.ik import _Ignoring
+
+        x, y = float(pose[0]), float(pose[1])
+        rows = []
+        for o in list(getattr(getattr(getattr(kit, "world", None), "scene", None), "objects", None) or []):
+            try:
+                lo, hi = o.aabb
+            except Exception:  # noqa: BLE001
+                continue
+            d = math.hypot(max(float(lo[0]) - x, 0.0, x - float(hi[0])), max(float(lo[1]) - y, 0.0, y - float(hi[1])))
+            if d < 1.5 and "ceiling" not in o.name:
+                rows.append((d, o))
+        rows.sort(key=lambda r: r[0])
+
+        def free_without(objs, ground: bool = True) -> bool:
+            with _Ignoring(kit, list(objs), ground=ground):
+                return not bool(kit.backend.check_collision(q1, emb_name="whole_body", sync_world=False, self_collision=False, margin=margin)[0])
+
+        freeing = [f"{o.name} ({d:.2f} m)" for d, o in rows[:14] if free_without([o])]
+        slab = free_without([], ground=False)
+        floors = [o for _, o in rows if "floor" in o.name]
+        fl = free_without(floors) if floors else None
+        near = ", ".join(f"{o.name} {d:.2f}" for d, o in rows[:8])
+        return (f"; base pose ({x:.2f}, {y:.2f}) nearest AABBs: {near}; freed by removing alone: {freeing or 'none'}; ground slab off: "
+                f"{'free' if slab else 'still collides'}; floor objects off: {fl}")
+    except Exception as e:  # noqa: BLE001
+        return f"; body search failed ({e!r})"
+
+
 def _nav_q(kit: "RobotKit", trunk: Tuple[float, float], posture: str = "untucked", q_arms: Optional[Dict[str, th.Tensor]] = None,
            fingers: Optional[float] = None) -> th.Tensor:
     kw = {} if fingers is None else {"fingers": fingers}
@@ -675,7 +741,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
               margin: float = 0.01, edge_slide: bool = False, edge_slide_back_m: float = 0.0, style: str = "recorded",
-              probe_face_travel: bool = False) -> PathRecord:
+              probe_face_travel: bool = False, global_blocked: Sequence[Any] = ()) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
@@ -723,6 +789,16 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     if waypoints is None:
         mode = "global"
         free_g = eroded_map(kit)
+        if global_blocked:
+            # oracle-fix 2026-11-04 round 4 (core.path_keep_off_footprints): footprints the global path keeps off too (the eroded map alone let the
+            # pillow's carried path turn 0.41 m from a bed side - a wheel sphere 8.7 mm from it)
+            from ispatialgym.sampling.scene_variants import polygon_cells
+
+            free_g = free_g.clone()
+            for poly in global_blocked:
+                cells = polygon_cells(kit.world.scene.trav_map, poly, 0)
+                if len(cells):
+                    free_g[cells[:, 0], cells[:, 1]] = False
         ga, gb = nearest_free_cell(free_g, a, 20), nearest_free_cell(free_g, b, 20)
         if ga is None or gb is None:
             raise NavigationError("no_path", f"no eroded-free cell near {stance_from.name} / {stance_to.name}")
@@ -763,12 +839,13 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         poses = stride_poses(filled, stride, max_yaw_step=step)
         swept = stride_poses(filled, stride, yaw_envelope=True, max_yaw_step=step)  # the strides + the tracker's yaw lag on the turns (owner 2026-09-25)
         ok, bad = path_collision_free(kit, swept, trunk, posture, margin=float(margin), q_arms=arm_q)
+        blame = path_blame(kit, swept[bad], trunk, posture, arm_q, float(margin)) if not ok and os.environ.get("ISPATIALGYM_STANCE_BLAME") else ""
     log.debug("%s path %s -> %s: heading step <= %.2f deg between checked poses (farthest robot / carried point %s from the base centre): %d strides, %d swept poses",
               mode, stance_from.name, stance_to.name, math.degrees(step), "unknown" if radius is None else f"{radius:.2f} m", len(poses), len(swept))
     if not ok:
         raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at swept pose {bad}/{len(swept)} ({tuple(round(v, 3) for v in swept[bad])}, "
                                                 f"{len(poses)} strides + the yaw-lag envelope) at trunk {trunk}"
-                                                + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else ""))
+                                                + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else "") + blame)
     if probe_face_travel and carried_obj is not None:
         try:
             ft_swept = yaw_lag_envelope(face_travel_poses(filled, stride, max_yaw_step=step), max_yaw_step=step)

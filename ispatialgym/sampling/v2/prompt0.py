@@ -41,6 +41,7 @@ import contextlib
 import copy
 import logging
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -357,6 +358,55 @@ def body_free(s, stances: Sequence[Stance], arms_excluded: bool = False, margin:
         else:
             out.append(s.ikc.stances_collision_free(part, margin=margin))
     return th.cat(out)
+
+
+def link_class(link: str) -> str:
+    """``arm`` / ``torso`` / ``base`` / ``head`` of a robot link name (the stance blame's body class)."""
+    n = str(link)
+    if "arm" in n or "gripper" in n or "realsense" in n or "hand" in n:
+        return "arm"
+    if "torso" in n:
+        return "torso"
+    if "zed" in n or "head" in n:
+        return "head"
+    return "base"
+
+
+def blame_stances(s, stances: Sequence[Stance], label: str, postures: Sequence[str] = ("untucked",), limit: Optional[int] = None,
+                  margin: float = COLLISION_MARGIN) -> List[Dict[str, Any]]:
+    """Opt-in diagnostic (``ISPATIALGYM_STANCE_BLAME=<n>``, oracle-fix 2026-11-04): for up to ``n`` of ``stances`` (spread over the list) and
+    each posture, the robot links in the world (by class: arm / torso / base / head) and the body they hit (``IKChecker._collision_blame``:
+    a spawned object, a scene object, the ground slab or self-collision), logged one line per candidate under ``label``. Returns the rows."""
+    n = int(limit if limit is not None else (os.environ.get("ISPATIALGYM_STANCE_BLAME") or 0) or 0)
+    if n <= 0 or not stances:
+        return []
+    idx = sorted({int(round(i * (len(stances) - 1) / max(1, n - 1))) for i in range(min(n, len(stances)))})
+    rows: List[Dict[str, Any]] = []
+    try:
+        costs = s.kit.backend._collision_costs(s.kit.backend.kin_entry("whole_body"))
+        links = sorted(set(costs.get("link_of_sphere", [])))
+    except Exception:  # noqa: BLE001
+        links = []
+    for i in idx:
+        st = stances[i]
+        for posture in postures:
+            try:
+                q = s.ikc.q_locked(st) if posture == "untucked" else s.ikc.q_locked(st, arms=posture)
+                hits = [l for l in links if not bool(s.kit.links_clear(q, [l], float(margin))[0])] if links else []
+                by_class: Dict[str, List[str]] = {}
+                for l in hits:
+                    by_class.setdefault(link_class(l), []).append(l)
+                body = s.ikc._collision_blame(q, (), margin=float(margin))
+            except Exception as e:  # noqa: BLE001
+                by_class, body = {}, f"blame failed ({e!r})"
+            row = {"i": i, "posture": posture, "base_pose2d": [round(float(v), 2) for v in st.base_pose2d], "trunk": [st.translate, st.tilt],
+                   "stand_off": st.stand_off, "lateral": getattr(st, "lateral", None), "links": by_class, "body": body,
+                   **{k: st.extras[k] for k in ("reach_margin_m", "goal_cell") if k in (st.extras or {})}}
+            rows.append(row)
+            log.info("%s: STANCE_BLAME %s cand %d/%d %s: base %s trunk (%.2f, %+.2f) so %.2f lat %s: links %s; %s%s", s.gp.variant, label, i, len(stances), posture,
+                     row["base_pose2d"], st.translate, st.tilt, st.stand_off, row["lateral"], {k: len(v) for k, v in by_class.items()} or "-",
+                     body[:200], f"; reach margin {row['reach_margin_m']}" if "reach_margin_m" in row else "")
+    return rows
 
 
 def debug_collisions(s, stances: Sequence[Stance], arms_excluded: bool, margin: float = COLLISION_MARGIN) -> None:

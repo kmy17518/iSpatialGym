@@ -539,6 +539,21 @@ class SamplerV2(TaskSampler):
         """Floor footprints (world xy polygons) every recorded path plans around on the local map (default none)."""
         return []
 
+    def path_keep_off_footprints(self) -> List[Any]:
+        """Opt-in ``generation.path_keep_off`` (oracle-fix 2026-11-04 round 4, pillow 158): ``[{"name": <object>, "margin_m": m}, ...]`` - every
+        recorded path keeps its base centre ``margin_m`` off the object's AABB footprint, on the local AND the eroded global map (probe_pillow:
+        the global path turned 0.41 m from bed_kddswt_1's side, its wheel sphere - 0.404 m from the base centre - 8.7 mm from the bed)."""
+        out = []
+        for rec in (self.gp.gen("path_keep_off") or []):
+            obj = self.world.scene.object_registry("name", str(rec.get("name"))) if hasattr(self.world.scene, "object_registry") else None
+            if obj is None:
+                continue
+            lo, hi = obj.aabb
+            from ispatialgym.sampling.scene_variants import aabb_footprint
+
+            out.append(aabb_footprint(lo, hi, float(rec.get("margin_m", 0.4))))
+        return out
+
     def _log_once(self, key: str, msg: str, *args, level: int = logging.INFO) -> None:
         """One log line per sampler the first time a train-fast path is taken (``key``)."""
         seen = getattr(self, "_fast_logged", None)  # a sampler built without __init__ (the pure-python run_instances tests) gets the set here
@@ -679,7 +694,7 @@ class SamplerV2(TaskSampler):
                 continue
             stance = self.sidecar.stances.get(g.stance) or self.sidecar.stance("manipulation")
             obj = self.objects.get(g.object)
-            lift_end = (G.t(g.grasp[0]) + th.tensor([0.0, 0.0, float(g.carry_height)]), G.t(g.grasp[1]))
+            lift_end = PC.lift_end_pose(g)
             pre_place = (G.t(g.pre_place[0]), G.t(g.pre_place[1]))
             supports = self.support_objects()
             cam = self.camera_pose_at(stance)
@@ -753,6 +768,11 @@ class SamplerV2(TaskSampler):
             self.counters["goal_tipped"] = self.counters.get("goal_tipped", 0) + 1
             raise Reject("goal_tipped", f"up axis after the goal settle off by {bad} deg (> {max_deg:.0f})")
 
+    def stance_check_ignores(self, stance) -> List[Any]:
+        """Objects out of the world in :meth:`check_stances_with_objects` for ``stance`` (hook; none by default - oracle-fix 2026-11-04 round 3: the
+        large IORS base push / push-under skip the target there, which stands at its INIT pose while the robot is elsewhere in the program)."""
+        return []
+
     def check_stances_with_objects(self, draft: Draft):
         """§4.6 step 5: whole-body collision check of every recorded stance (init, manipulation, placement, ...) with the
         objects placed (the Phase-2 scan ran without them); ``Reject("stance_collision_with_objects")``. Runs after the
@@ -769,9 +789,17 @@ class SamplerV2(TaskSampler):
             arm_q = {f"{arm}_arm": self.carry_arm_q[st.carried]} if (obj is not None and st.carried in self.carry_arm_q) else {}
             with self.object_joints_of(st):  # a stance the task recorded with an articulated object's joint held elsewhere (push-close re-stance)
                 with NAV.attached(self.kit, arm if obj is not None else None, obj, eef_in_object=eef_in_object):
-                    with self.ikc.ignoring([obj] if obj is not None else []):
+                    extra = [o for o in self.stance_check_ignores(st) if o is not obj]  # after the sync above (a re-sync would undo an outer ignore)
+                    with self.ikc.ignoring(([obj] if obj is not None else []) + extra):
                         if not self.ikc.stance_collision_free(st, **arm_q):
                             bad.append(st.name)
+                            if os.environ.get("ISPATIALGYM_STANCE_BLAME"):  # oracle-fix 2026-11-04 round 3: which body the stance hits
+                                try:
+                                    log.info("%s: STANCE_BLAME settle stance %s (base %s trunk (%.2f, %.2f), posture %s): %s", self.gp.variant, st.name,
+                                             [round(float(v), 2) for v in st.base_pose2d], st.translate, st.tilt, getattr(st, "idle_posture", None),
+                                             self.ikc._collision_blame(self.ikc.q_locked(st, **arm_q), [obj] if obj is not None else [], 0.01)[:300])
+                                except Exception as e:  # noqa: BLE001 - a diagnostic never fails the draw
+                                    log.info("%s: STANCE_BLAME settle stance blame failed (%r)", self.gp.variant, e)
         if bad:
             raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")
         # §3.8 with the objects placed: the recorded transitions are swept again — trunk sweep and drive-in with the
@@ -785,7 +813,8 @@ class SamplerV2(TaskSampler):
             obj, arm, eef_in_object = self.carried_attachment(carried_name)
             q_carry = self.carry_arm_q.get(carried_name) if (obj is not None and carried_name) else None
             override = {arm: q_carry} if q_carry is not None else None
-            with self.object_joints_of(to), self.ikc.ignoring([obj] if obj is not None else []):
+            extra_t = [o for o in self.stance_check_ignores(to) if o is not obj]  # oracle-fix 2026-11-04 round 3: as the stances above
+            with self.object_joints_of(to), self.ikc.ignoring(([obj] if obj is not None else []) + extra_t):
                 if tr.departure:
                     # a departure transition is re-swept at its recorded stand-off only (the recorded path starts at that pose)
                     new = NAV.departure_transition(self.kit, frm, to, tr.trunk_to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
@@ -1064,7 +1093,8 @@ class SamplerV2(TaskSampler):
         slide alone (``NAV.plan_axis_leg``: the heading kept, forward / backward and lateral moves only), no grid planner;
         ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local map; ``Reject(no_path | path_collision |
         path_too_long | place_leg_collision | place_leg_heading)``."""
-        blocked = list(blocked) + list(self.path_blocked())
+        keep_off = self.path_keep_off_footprints()
+        blocked = list(blocked) + list(self.path_blocked()) + list(keep_off)
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
@@ -1083,7 +1113,9 @@ class SamplerV2(TaskSampler):
             # a CARRIED drive may ask for more clearance than the 1 cm of the whole-body stride checks (generation.carry_path_margin_m;
             # 0921-040940: the idle arm brushed a wardrobe on a 0.54 m carry the 1 cm check had passed) - a local path that fails it
             # falls back to the eroded global map in the callers' path_collision retry
-            margin = float(self.gp.gen("carry_path_margin_m", 0.01)) if (carried and obj is not None) else 0.01
+            # oracle-fix 2026-11-04 round 3: ``generation.path_margin_m`` the same for the empty-handed legs (default 1 cm; the briefcase / cabinet #03
+            # demos failed `collision` on navigate legs: an arm link on a wall, a finger on the neighbouring cabinet)
+            margin = float(self.gp.gen("carry_path_margin_m", 0.01)) if (carried and obj is not None) else float(self.gp.gen("path_margin_m", 0.01))
             # owner 2026-09-26: ``generation.base_path_style`` (default "recorded") - a family that opts in has its UNCARRIED drives checked
             # and recorded as the face_travel schedule (recorded fallback when the schedule collides); carried legs stay recorded, the
             # schedule only probed at 1 cm for the morning report
@@ -1095,7 +1127,8 @@ class SamplerV2(TaskSampler):
                 style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
                 p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
                                   blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q,
-                                  margin=margin, edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried)
+                                  margin=margin, edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried,
+                                  **({"global_blocked": keep_off} if keep_off else {}))
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

@@ -1647,6 +1647,108 @@ def test_flipped_push_chain_check_rejects_only_a_witness_in_another_branch():
     assert IKResult(False, None, why, 3).code == "approach_untrackable"
 
 
+def test_rewitness_flipped_push_moves_the_witness_to_the_stance_branch_when_the_arc_replays(monkeypatch):
+    """oracle-fix 2026-11-03 (axial#02 never sampled, axial_04 44 of ~300 attempts): a flipped pre-contact witness is replayed from the raw IK
+    of the stance posture's branch; when the arc follows, the ``pre`` witness becomes that configuration (polished), else the instance is
+    rejected with both reasons; a witness on the stance branch is not judged (None)."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    idx = th.arange(7)
+    q_wit = th.zeros(28)
+    calls = []
+
+    def make(q_raw, residual=0.001):
+        kit = SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": idx}), ik=lambda pose, q_seed, arm="right": q_raw)
+        ikc = SimpleNamespace(q_locked=lambda stance, fingers=None: th.zeros(28), WITNESS_RESIDUAL_MAX=0.002,
+                              polish_witness=lambda q, pose, arm, ignore=(): (th.as_tensor(q).clone() + 0.01, residual),
+                              joint_limit_margin=lambda q, arm: (0.5, "right_arm_joint4"), canonical_q=lambda q, stance: th.as_tensor(q))
+        gp = SimpleNamespace(gen=lambda key, default=None: default)
+        return SimpleNamespace(kit=kit, ikc=ikc, gp=gp)
+
+    lines = []
+
+    def replay_ok(q, line=False):
+        calls.append(q.clone())
+        lines.append(line)
+        return True, "arc followed", {"swept": 0.3}
+
+    def replay_bad(q, line=False):
+        calls.append(q.clone())
+        lines.append(line)
+        return False, "approach_untrackable: push replay - the closed-loop arc stops at joint_limit", {}
+
+    chain = [((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))] * 4
+    near = th.zeros(28)
+    near[3] = 0.73
+    assert PC._rewitness_flipped_push(make(near), chain, None, "right", q_wit, None, replay_ok, {"pre": {}}, {"pre": q_wit}, "pre", []) is None
+    assert calls == []
+    far = th.zeros(28)
+    far[6] = 3.1  # the other branch (a wrist flip)
+    witnesses, single_q = {"pre": {"q": [0.0] * 28}}, {"pre": q_wit}
+    ok, note = PC._rewitness_flipped_push(make(far), chain, None, "right", q_wit, None, replay_ok, witnesses, single_q, "pre", [])
+    assert ok and "re-witnessed on the stance posture's branch" in note and "3.10 rad" in note
+    assert len(calls) == 1 and float(calls[0][6]) == pytest.approx(3.1)  # the arc replayed from the stance branch, not from the flipped witness
+    assert lines == [True]  # oracle-fix 2026-11-05: a straight push is tracked from that branch too (ISG_PUSH_REWITNESS_LINE on by default)
+    assert float(single_q["pre"][6]) == pytest.approx(3.11) and witnesses["pre"]["q"][6] == pytest.approx(3.11, abs=1e-4)
+    assert witnesses["pre"]["branch"].startswith("re-witnessed") and witnesses["pre"]["fk_residual_m"] == 0.001
+    ok, why = PC._rewitness_flipped_push(make(far), chain, None, "right", q_wit, None, replay_bad, {"pre": {}}, {"pre": q_wit}, "pre", [])
+    assert not ok and why.startswith("approach_untrackable") and "another branch" in why and "fails too" in why and "joint_limit" in why
+    ok, why = PC._rewitness_flipped_push(make(far, residual=0.01), chain, None, "right", q_wit, None, replay_ok, {"pre": {}}, {"pre": q_wit}, "pre", [])
+    assert not ok and "polishes to 10.0 mm" in why
+    # oracle-fix 2026-11-05 (generation.push_flipped_keep_recorded): a straight push that fails from the stance branch and tracks from the
+    # recorded witness keeps the recorded witness (nothing re-witnessed); off, or when it fails from there too, the instance is rejected
+    line_bad = lambda q, line=False: (False, "approach_untrackable: straight push replay (28 dense poses): waypoint 21/28", {"line": {"dense": 28}})
+    tracked = []
+    monkeypatch.setattr(PC, "track_line_push", lambda s, arm, q_from, w: (tracked.append(q_from) or True, "straight push tracked (28 dense poses)", {}))
+    ok, why = PC._rewitness_flipped_push(make(far), chain, None, "right", q_wit, None, line_bad, {"pre": {}}, {"pre": q_wit}, "pre", [])
+    assert not ok and tracked == []
+    keep = make(far)
+    keep.gp = SimpleNamespace(gen=lambda key, default=None: True if key == "push_flipped_keep_recorded" else default)
+    witnesses, single_q = {"pre": {"q": [0.0] * 28}}, {"pre": q_wit}
+    ok, note = PC._rewitness_flipped_push(keep, chain, None, "right", q_wit, None, line_bad, witnesses, single_q, "pre", [])
+    assert ok and note.startswith("recorded witness kept") and tracked == [q_wit] and single_q["pre"] is q_wit and witnesses["pre"] == {"q": [0.0] * 28}
+    monkeypatch.setattr(PC, "track_line_push", lambda s, arm, q_from, w: (False, "approach_untrackable: straight push replay: waypoint 5/28", {}))
+    ok, why = PC._rewitness_flipped_push(keep, chain, None, "right", q_wit, None, line_bad, {"pre": {}}, {"pre": q_wit}, "pre", [])
+    assert not ok and "from the recorded witness too" in why
+
+
+def test_track_line_push_runs_the_straight_push_as_arm_along():
+    """oracle-fix 2026-11-05 (hardback hb21_desk_s55: the re-witnessed straight push was not replayed and the oracle's arm_along stalled at
+    waypoint 21/28): the straight push is densified from the FK pose of the given configuration through the waypoints as
+    ``Motions._densify`` does and tracked at the arm_along solver settings from that configuration; a failed track is approach_untrackable."""
+    import math
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    mcfg = MO.MotionsConfig()
+    frame = M.EEF_LINK["left"]
+    got = {}
+
+    def solve_ik_path(group, targets, q_start=None, **kw):
+        got.update(group=group, n=len(targets), q_start=q_start.clone(), kw=kw)
+        ok = got.get("ok", True)
+        return SimpleNamespace(success=ok, q_traj=th.zeros(len(targets), 28) if ok else None, status="ok" if ok else "differential IK did not converge at waypoint 21/28")
+
+    kit = SimpleNamespace(_ensure_synced=lambda: None, fk=lambda frames, q: {frame: (th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0]))},
+                          backend=SimpleNamespace(solve_ik_path=solve_ik_path))
+    sampler = SimpleNamespace(kit=kit)
+    q0 = th.arange(28).float()
+    wps = [((0.1, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)), ((0.2, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))]
+    ok, why, rep = PC.track_line_push(sampler, "left", q0, wps)
+    ends = [th.zeros(3)] + [th.tensor(w[0]).float() for w in wps]
+    n_dense = sum(max(1, math.ceil(float(th.linalg.norm(b - a)) / mcfg.cartesian_step)) for a, b in zip(ends, ends[1:]))
+    assert ok and rep["dense"] == got["n"] == n_dense >= 20 and got["group"] == "left_arm" and th.equal(got["q_start"], q0)
+    assert got["kw"]["max_iters"] == mcfg.diff_ik_max_iters and got["kw"]["soft_pos_tol"] == mcfg.diff_ik_soft_pos_tol and got["kw"]["check_collisions"] is False
+    got["ok"] = False
+    ok, why, rep = PC.track_line_push(sampler, "left", q0, wps)
+    assert not ok and why.startswith("approach_untrackable") and "21/28" in why
+
+
 def _budget_sampler(outcomes):
     """A ``SamplerV2`` whose attempts follow ``outcomes`` (True = an instance is written, False = rejected), the rest stubbed."""
     from types import SimpleNamespace

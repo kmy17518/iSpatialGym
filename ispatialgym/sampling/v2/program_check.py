@@ -20,6 +20,7 @@ from the collision world for the final pose).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import time
@@ -67,6 +68,108 @@ def _flipped_push_chain_check(sampler, chain, stance, arm: str, q_first, ignore_
     return False, (f"approach_untrackable: push pre-contact witness {gap:.2f} rad from the raw IK from the stance posture (another branch): "
                    f"trajopt reaches such a witness only through the pushed object and the closed-loop arc fails from either branch")
 
+def _flipped_push_witness(sampler, chain, stance, arm: str, q_first, fingers) -> Optional[Tuple[float, th.Tensor]]:
+    """``(gap, q_raw)`` when the recorded pre-contact witness ``q_first`` lies more than :data:`FLIPPED_PUSH_WITNESS_RAD` (any arm joint)
+    from ``q_raw``, the raw IK of the pre-contact seeded at the stance posture (the branch the oracle's planner reaches from the stance
+    without going through the pushed object); ``None`` when it is on that branch or the raw IK is unavailable."""
+    idx = sampler.kit.robot.arm_control_idx[arm]
+    q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+    try:
+        q_raw = sampler.kit.ik(chain[0], q_seed, arm=arm)
+    except Exception:  # noqa: BLE001 - no judgement without the raw solution
+        return None
+    if q_raw is None:
+        return None
+    q_raw = th.as_tensor(q_raw).reshape(-1).float()
+    gap = float(th.max(th.abs(q_raw[idx] - th.as_tensor(q_first).reshape(-1)[idx].float())))
+    return None if gap <= FLIPPED_PUSH_WITNESS_RAD else (gap, q_raw)
+
+
+def _rewitness_flipped_push(sampler, chain, stance, arm: str, q_first, fingers, replay, witnesses: Dict[str, Any], single_q: Dict[str, Any],
+                            key: str, ignore_all) -> Optional[Tuple[bool, str]]:
+    """oracle-fix 2026-11-03 (axial#02 never sampled for eval; alignment-axial_04 lost 44 of ~300 train attempts and axial_05 its share to
+    :func:`_flipped_push_chain_check`): a free-object push whose recorded pre-contact witness sits in another IK branch than the stance
+    posture's is no longer rejected outright. The 2026-09-26 rule assumed the oracle lands on the stance branch; since 2026-10-12 the
+    oracle plans straight to the recorded witness (``execute.reach_pre_pose``), and the 2026-09-27 arc replay (:func:`replay_arc_push`)
+    simulates the closed-loop arc the rule was guarding against. Trajopt still reaches a flipped witness only through the pushed object
+    (owner 2026-09-26, 5 of 5), so the witness is moved to the stance posture's branch instead: the arc is replayed from the raw IK of
+    the pre-contact seeded at the stance posture (``replay(q_raw)``, the same replay as from the recorded witness) and, when it follows,
+    the ``pre`` witness (``witnesses[key]``, ``single_q[key]``: what the oracle plans to and what ``push_pre_standoff`` reads) becomes
+    that configuration, polished onto the recorded pose under the pre-pose residual limit. When the arc does not replay from that branch
+    either, the instance is rejected as before (both reasons kept). ``None`` when the witness is not flipped.
+    oracle-fix 2026-11-05 (hb21_desk_s55: a straight push moved to the stance branch with nothing replayed, the oracle's push stalled there):
+    a straight push is tracked from that branch too (``replay(q_raw, line=True)``, :func:`track_line_push`); ``ISG_PUSH_REWITNESS_LINE=off``
+    restores the unchecked move."""
+    flipped = _flipped_push_witness(sampler, chain, stance, arm, q_first, fingers)
+    if flipped is None:
+        return None
+    gap, q_raw = flipped
+    why_old = (f"push pre-contact witness {gap:.2f} rad from the raw IK from the stance posture (another branch): trajopt reaches such a "
+               f"witness only through the pushed object")
+    ok_r, why_r, rep_r = replay(q_raw, line=os.environ.get("ISG_PUSH_REWITNESS_LINE", "on").lower() not in ("off", "0", "false"))
+    if rep_r:
+        log.info("program check: push replay from the stance posture's branch (the recorded witness is %.2f rad away): %s %s", gap, why_r[:200], rep_r)
+    if not ok_r and "line" in rep_r and bool(sampler.gp.gen("push_flipped_keep_recorded") or False):
+        # oracle-fix 2026-11-05 (opt-in generation.push_flipped_keep_recorded; hb21_desk_s55 / hb22_desk_s13: the stance branch of the hardback's
+        # overhang push sits at left/right_arm_joint2's limit (margin 0.003 rad) and its straight push stalls, while the recorded branch tracks):
+        # a straight push that tracks from the recorded witness keeps it - the oracle plans to the recorded witness (execute.reach_pre_pose)
+        ok_k, why_k, _ = track_line_push(sampler, arm, q_first, chain[1:])
+        if ok_k:
+            log.info("program check: the push pre-contact witness lies %.2f rad from the stance posture's branch, whose straight push fails (%s); the "
+                     "recorded witness is kept: %s", gap, why_r[:160], why_k)
+            return True, f"recorded witness kept ({gap:.2f} rad from the stance posture's branch, whose straight push fails: {why_r[:100]}); {why_k}"
+        why_r = f"{why_r}; from the recorded witness too: {why_k}"
+    if not ok_r:
+        log.info("program check: the push pre-contact witness lies %.2f rad from the stance posture's branch and the arc does not replay from that branch - rejected", gap)
+        return False, f"approach_untrackable: {why_old}; the arc replay from the stance posture's branch fails too: {why_r}"
+    q_pre, res_pre = sampler.ikc.polish_witness(q_raw, chain[0], arm, ignore=list(ignore_all))
+    limit = float(sampler.gp.gen("witness_residual_pre_m", sampler.gp.gen("witness_residual_max_m", sampler.ikc.WITNESS_RESIDUAL_MAX)))
+    if res_pre > limit:
+        return False, (f"approach_untrackable: {why_old}; the stance-branch pre-contact polishes to {res_pre * 1000:.1f} mm > {limit * 1000:.0f} mm "
+                       f"from the recorded pose")
+    m_pre, j_pre = sampler.ikc.joint_limit_margin(q_pre, arm)
+    note = f"re-witnessed on the stance posture's branch (the recorded witness was {gap:.2f} rad away, another branch); arc replay from it: {why_r}"
+    if key in witnesses:
+        witnesses[key].update({"q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pre, stance).tolist()], "fk_residual_m": round(res_pre, 5),
+                               "joint_limit_margin_rad": round(m_pre, 4), "joint_limit_nearest": j_pre, "branch": note[:200]})
+    single_q[key] = q_pre.clone()
+    log.info("program check: the %s witness of the push re-witnessed on the stance posture's branch (%.2f rad from the recorded one); the arc replays from it", key, gap)
+    return True, note
+
+
+def track_line_push(sampler, arm: str, q_from, waypoints) -> Tuple[bool, str, Dict[str, Any]]:
+    """oracle-fix 2026-11-05 (hardback hb21_desk_s55, the first instance through the program check: the straight overhang push's pre-contact
+    witness was re-witnessed on the stance posture's branch 3.13 rad from the recorded one and nothing was replayed - 'not an arc' - and
+    the oracle's ``arm_along`` from that branch stalled at waypoint 21/28, pos_err 11.5 mm, plan_failed): a straight push tracked from
+    ``q_from`` as ``Motions.along_reaches`` / ``arm_along`` runs it - ``Motions._densify`` from the FK pose through ``waypoints`` at the
+    arm_along solver settings, collisions not judged (the push's contact legs run without a veto). ``(ok, why, report)``."""
+    import math
+
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+
+    mcfg, kit = MO.MotionsConfig(), sampler.kit
+    frame = M.EEF_LINK[arm]
+    kit._ensure_synced()
+    q = th.as_tensor(q_from).reshape(-1).float().clone()
+    p0, o0 = kit.fk([frame], q)[frame]
+    prev = (th.as_tensor(p0).float(), th.as_tensor(o0).float())
+    dense = []
+    for wp in waypoints:
+        p1, o1 = th.as_tensor(wp[0]).float(), th.as_tensor(wp[1]).float()
+        n_d = max(1, int(math.ceil(max(float(th.linalg.norm(p1 - prev[0])) / mcfg.cartesian_step, float(C.quat_angle(prev[1], o1)) / mcfg.cartesian_rot_step))))
+        dense.extend(tuple(w) for w in C.line_waypoints(prev, (p1, o1), n_d))
+        prev = (p1, o1)
+    res = kit.backend.solve_ik_path(f"{arm}_arm", [{frame: w} for w in dense], q_start=q, pos_tol=mcfg.diff_ik_pos_tol, rot_tol=mcfg.diff_ik_rot_tol,
+                                    max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol,
+                                    soft_rot_tol=mcfg.diff_ik_soft_rot_tol)
+    rep = {"dense": len(dense)}
+    if not res.success or res.q_traj is None:
+        return False, f"approach_untrackable: straight push replay ({len(dense)} dense poses): {res.status}", rep
+    return True, f"straight push tracked ({len(dense)} dense poses)", rep
+
+
 def _push_stop_frac_arc() -> float:
     """The oracle's ``ExecuteConfig.push_stop_frac_arc``: an arc push stops at this fraction of the orientation tolerance."""
     from ispatialgym.oracle import execute as E
@@ -75,7 +178,7 @@ def _push_stop_frac_arc() -> float:
 
 
 def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, direction, obj, supports: Sequence[Any], ignore: Sequence[Any],
-                    band_rad: float, retreat_distance: float, speed_m_s: Optional[float] = None) -> Tuple[bool, str, Dict[str, Any]]:
+                    band_rad: float, retreat_distance: float, speed_m_s: Optional[float] = None, line: bool = False) -> Tuple[bool, str, Dict[str, Any]]:
     """A free-object arc push replayed kinematically as the oracle executes it (owner 2026-09-27, first-demo v2 A8; the object
     follows the pad): from the pre-contact witness ``q_pre`` the straight leg to the first contact pose (``execute_push`` ->
     ``_push_arc_closed_loop``: ``Motions.arm_along`` at the arm_along solver settings), then the TRUE arc of ``push_geometry``
@@ -103,7 +206,11 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     rep: Dict[str, Any] = {}
     geom = E.push_geometry(list(waypoints), direction)
     if geom.kind != "arc":
-        return True, "not an arc", rep
+        if not line:
+            return True, "not an arc", rep
+        # ``line`` (a re-witnessed straight push, :func:`_rewitness_flipped_push`): the straight push from ``q_pre``, as arm_along runs it
+        ok_l, why_l, rep["line"] = track_line_push(sampler, arm, q_pre, waypoints)
+        return ok_l, why_l, rep
 
     def fk(q):
         p, qq = kit.fk([frame], q)[frame]
@@ -188,6 +295,48 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     if stop != "joint_at_target":
         return False, f"approach_untrackable: push replay - the closed-loop arc stops at {stop} (swept {swept:+.3f} of {q_to:+.3f} rad)", rep
     # 3. the contact retreat's escape leg from the arc's end (execute_retreat)
+    status, why, rep_r, _ = replay_contact_escape(sampler, arm, q, obj, supports, ignore, retreat_distance)
+    if rep_r is not None:
+        rep["retreat"] = rep_r
+    if status == "none":
+        return True, "arc replayed (no escape direction)", rep
+    if status == "replayed":
+        return True, "arc + retreat replayed", rep
+    if status == "finished":
+        return True, "arc + retreat replayed (stall finished)", rep
+    if status == "partial":
+        return True, "arc replayed, retreat partial", rep
+    return False, why, rep
+
+
+def replay_contact_escape(sampler, arm: str, q: th.Tensor, obj, supports: Sequence[Any], ignore: Sequence[Any], retreat_distance: float,
+                          start: str = "the arc's end", escape_up_m: Optional[float] = None) -> Tuple[str, str, Optional[Dict[str, Any]], th.Tensor]:
+    """The contact retreat's escape leg as ``execute_retreat`` runs it after a push / brace, from the configuration ``q`` the push left
+    the arm in: radial off ``obj``'s centre in the support plane, then off its ``supports`` (``escape_direction``), the end probed for
+    reach and shortened like ``_retreat_reach``; tracked with the retreat's joint-limit margin; a stall away from a joint limit finished
+    by IK, a partial retreat accepted as the oracle accepts it. Collisions are not judged (a colliding leg is finished around by the
+    oracle's planned finish, only the kinematics can strand it). Returns ``(status, why, report, q_end)``: ``status`` "none" (no escape
+    direction - the oracle runs the recorded leg), "replayed", "finished", "partial" or "failed" (``why`` says where the leg stalls,
+    leaving ``start``); ``q_end`` is where the leg leaves the arm. Step 3 of :func:`replay_arc_push`, shared with the retreat after the
+    overhang push (oracle-fix 2026-11-05)."""
+    import math
+
+    from ispatialgym.oracle import execute as E
+    from ispatialgym.oracle import motions as MO
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+
+    ecfg, mcfg = E.ExecuteConfig(), MO.MotionsConfig()
+    backend, kit = sampler.kit.backend, sampler.kit
+    frame = M.EEF_LINK[arm]
+    idx = kit.robot.arm_control_idx[arm]
+
+    def fk(q_):
+        p, qq = kit.fk([frame], q_)[frame]
+        return th.as_tensor(p).float(), th.as_tensor(qq).float()
+
+    kit._ensure_synced()
+    q = th.as_tensor(q).reshape(-1).float().clone()
     here = fk(q)
     n = E.escape_direction(None, here, supports)
     radial_d = None
@@ -200,11 +349,12 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     except Exception:  # noqa: BLE001
         radial_d = None
     if radial_d is None and n is None:
-        return True, "arc replayed (no escape direction)", rep
+        return "none", "", None, q
     d1 = radial_d if radial_d is not None else n
     out = ecfg.contact_retreat_escape_m
     far = max(float(retreat_distance), 2 * out)
-    normal_out = n * out if (n is not None and radial_d is not None) else th.zeros(3)
+    up = float(escape_up_m) if escape_up_m else out  # Retreat.escape_up_m, as execute_retreat reads it
+    normal_out = n * up if (n is not None and radial_d is not None) else th.zeros(3)
     far_used, tried = far, []
     with sampler.ikc.ignoring(list(ignore)):
         for f in tuple(ecfg.retreat_reach_factors) or (1.0,):
@@ -219,7 +369,7 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
         else:
             far_used = tried[-1][0]
     leg = [(here[0] + d1 * out, here[1]), (here[0] + d1 * far_used + normal_out, here[1])]
-    rep["retreat"] = {"distance_m": far_used, "probe": tried}
+    rep = {"distance_m": far_used, "probe": tried}
     dense_r: List[Any] = []
     prev = here
     for w in leg:
@@ -232,27 +382,30 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
                                   max_iters=mcfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=mcfg.diff_ik_soft_pos_tol_free,
                                   soft_rot_tol=mcfg.diff_ik_soft_rot_tol, limit_margin=ecfg.retreat_limit_margin_rad)
     if r_leg.success:
-        return True, "arc + retreat replayed", rep
+        q_end = r_leg.q_traj[-1].reshape(-1).float() if r_leg.q_traj is not None and len(r_leg.q_traj) > 0 else q
+        return "replayed", "", rep, q_end
     diag = dict(getattr(r_leg, "diagnostics", None) or {})
     k, stall = diag.get("fail_index"), diag.get("pos_err")
     at_limit = bool(diag.get("at_lower") or diag.get("at_upper"))
     q_stall = r_leg.q_traj[-1].reshape(-1).float() if r_leg.q_traj is not None and len(r_leg.q_traj) > 0 else q
     remaining = float(stall or 0.0) + sum(float(th.linalg.norm(th.as_tensor(dense_r[i][0]) - th.as_tensor(dense_r[i - 1][0]))) for i in range(max(int(k or 1), 1), len(dense_r)))
-    rep["retreat"].update({"stall_m": None if stall is None else round(float(stall), 4), "at_limit": at_limit, "fail_index": k, "n_dense": len(dense_r)})
+    rep.update({"stall_m": None if stall is None else round(float(stall), 4), "at_limit": at_limit, "fail_index": k, "n_dense": len(dense_r)})
     if diag.get("stage") == "diff_ik" and stall is not None and not at_limit and float(stall) <= ecfg.free_leg_finish_max_stall and remaining <= ecfg.free_leg_finish_max_remaining:
         # ApproachFinish without a witness: cuRobo's IK of the end pose from the stall, within the finish's joint excursion
         with sampler.ikc.ignoring(list(ignore)):
             q_fin = kit.ik(leg[-1], q_stall, arm=arm)
         if q_fin is not None and float(th.max(th.abs(th.as_tensor(q_fin).reshape(-1).float()[idx] - q_stall[idx]))) <= MO.ApproachFinish(None).max_excursion:
-            rep["retreat"]["finished"] = True
-            return True, "arc + retreat replayed (stall finished)", rep
+            rep["finished"] = True
+            q_end = q_stall.clone()
+            q_end[idx] = th.as_tensor(q_fin).reshape(-1).float()[idx]
+            return "finished", "", rep, q_end
     moved = float(th.linalg.norm(fk(q_stall)[0] - here[0]))
     end_gap = float(th.linalg.norm(fk(q_stall)[0] - leg[-1][0]))
     if end_gap <= ecfg.retreat_partial_accept_m or moved >= out - 0.005:
-        rep["retreat"]["partial"] = {"short_m": round(end_gap, 4), "moved_m": round(moved, 4)}
-        return True, "arc replayed, retreat partial", rep
-    return False, (f"approach_untrackable: push replay - the contact retreat's escape leg from the arc's end stalls after {moved * 1000:.0f} mm "
-                   f"({end_gap * 1000:.0f} mm short; {r_leg.status[:160]})"), rep
+        rep["partial"] = {"short_m": round(end_gap, 4), "moved_m": round(moved, 4)}
+        return "partial", "", rep, q_stall
+    return "failed", (f"approach_untrackable: push replay - the contact retreat's escape leg from {start} stalls after {moved * 1000:.0f} mm "
+                      f"({end_gap * 1000:.0f} mm short; {r_leg.status[:160]})"), rep, q_stall
 
 
 def push_keeps_recorded_pre(contact, pre_pose, first_contact_pose) -> bool:
@@ -488,6 +641,26 @@ def _expand():
         return None
 
 
+def lift_away(g) -> Optional[th.Tensor]:
+    """The grasp record's ``lift_away`` (world xyz, m; oracle-fix 2026-11-04 round 4, touching#03's shelf tip release): the oracle's ``Lift`` adds it to
+    the straight-up segment (the book leaning on a side board is lifted away from it). None when the record has none."""
+    ex = getattr(g, "extras", None)
+    if ex is None:
+        ex = getattr(g, "extra", None)
+    v = (ex or {}).get("lift_away") if isinstance(ex, dict) else None
+    return None if v is None else th.as_tensor([float(x) for x in v], dtype=th.float32)
+
+
+def lift_end_pose(g, carry_height: Optional[float] = None):
+    """The lift's end pose of a grasp record: ``carry_height`` (default the record's) straight above the grasp pose, plus :func:`lift_away`."""
+    h = float(g.carry_height or 0.0) if carry_height is None else float(carry_height)
+    end = th.as_tensor(g.grasp[0], dtype=th.float32) + th.tensor([0.0, 0.0, h])
+    away = lift_away(g)
+    if away is not None:
+        end = end + away
+    return end, th.as_tensor(g.grasp[1], dtype=th.float32)
+
+
 def subtask_blocks(subtask: str) -> Tuple[str, ...]:
     if subtask in PROGRAM_BLOCKS:  # ``...-inside_large_scale`` also starts with ``...-inside``
         return PROGRAM_BLOCKS[subtask]
@@ -516,7 +689,22 @@ def check_blocks(subtask: str, sidecar: Dict[str, Any]) -> List[str]:
     base pose and trunk, transitions / paths reference existing stances and paths satisfy ``PathRecord.schema_ok``,
     every grasp has its four eef poses. Returns the list of problems (empty = ok)."""
     problems: List[str] = []
-    for blk in subtask_blocks(subtask):
+    blocks = subtask_blocks(subtask)
+    if subtask.startswith("inter_object_relation_satisfaction-touching_large_scale") and not sidecar.get("grasps"):
+        # oracle-fix 2026-11-03: the sidecar's own relaxation (``oracle.sidecar``): a floor start has nothing to pick - the push chain
+        # alone (push_touching: no grasp / placement / path) or the base push against the partner's face (base_push: no grasp)
+        kind = ((sidecar.get("contacts") or {}).get("push") or {}).get("kind")
+        if kind == "push_touching":
+            blocks = tuple(b for b in blocks if b not in ("stances.placement", "grasps", "paths"))
+        elif kind == "base_push":
+            blocks = tuple(b for b in blocks if b != "grasps")
+    elif subtask.startswith("inter_object_relation_satisfaction-touching_large_scale") and str((sidecar.get("grasps") or [{}])[0].get("place_kind") or "") == "lean":
+        # oracle-fix 2026-11-04 round 4 (touching_large#02): the sidecar's lean relaxation - the lean release has no push
+        blocks = tuple(b for b in blocks if b != "contacts.push")
+    elif subtask.startswith("inter_object_relation_satisfaction-touching_small_scale") and str((sidecar.get("grasps") or [{}])[0].get("place_kind") or "") == "shelf_tip":
+        # oracle-fix 2026-11-04 round 4 (touching#03): the sidecar's shelf tip relaxation - the book tips onto the partner, no push
+        blocks = tuple(b for b in blocks if b != "contacts.push")
+    for blk in blocks:
         if not _has_block(sidecar, blk):
             problems.append(f"missing block {blk}")
     stances = sidecar.get("stances") or {}
@@ -989,70 +1177,91 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
             # gate below stays and simply passes for them)
             _fast_note("EARLY_FRAME_GATE", "the fingertip frame gate runs over the static targets of every action before any IK")
             _STATS["early_gate_poses"] = _early_frame_gate(sidecar, sc, sampler, actions)
+        # oracle-fix 2026-11-05 (ISG_PC_DIAG_ALL=1, diagnostic, off by default): a rejected action is logged and the check goes on with the
+        # next one (the tracker advanced past it as if it had passed), the first rejection raised at the end - one long attempt (the
+        # hardback's 3500 s) then names every action the program check would reject, not only the first
+        diag_all = os.environ.get("ISG_PC_DIAG_ALL", "").lower() in ("1", "on", "true")
+        diag_fails: List[Tuple[int, str, Any]] = []
         for i, action in enumerate(actions):
-            name = getattr(action, "name", type(action).__name__)
-            if name in ("navigate", "transition") and i not in travel_handled:
-                # owner 2026-09-24: an EMPTY-HANDED travel after an arm action is driven with the arm where the last motion left it
-                # (or lifted a little) when that sweeps free - recorded as ``arms_q`` on its legs (``choose_departure_arms``)
-                grp = _travel_group(actions, i)
-                travel_handled.update(grp)
-                carries = tracker.carried is not None or any(getattr(getattr(actions[j], "path", None), "carried", None) or getattr(actions[j], "carried", None) for j in grp)
-                if not carries and tracker.arm_end_q and os.environ.get("ISG_DEPARTURE_ARMS", "on").lower() not in ("off", "0", "false"):
-                    try:
-                        dep = choose_departure_arms(sidecar, sampler, actions, grp, tracker)
-                    except Reject:
-                        raise
-                    except Exception as e:  # noqa: BLE001 - a failed selection keeps the canonical postures (the records as swept)
-                        log.warning("program check: departure arms not chosen for the travel at %s (%r): the stance postures stay", grp, e)
-                        dep = None
-                    if dep is not None:
-                        report.setdefault("departure_arms", []).append(dep)
             try:
-                targets = action.targets(sc, state)
-            except Exception as e:
-                raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
-            stance_name, carried = tracker.before(action)
-            locked = tracker.locked_arms(action)
-            # block design (owner 2026-09-19): the acting arm's IK is seeded from where the previous action left it - the lift
-            # tracked from the grasp witness, the reorient from the lift's end, the carry / place from the reorient's end - as
-            # the oracle's arm_along runs them (pod runs 0919-140558 / 151544: the reorient checked from a fresh exact IK passed
-            # while the oracle, tracking from the grasp's branch, jumped 0.23 rad / stalled 14 mm)
-            q_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0]) if getattr(sidecar, "blocks", None) else None
-            if q_prev is None and name == "place" and carried and carried in (getattr(sampler, "carry_arm_q", None) or {}):
-                # a place after a CARRY (IORS large-scale, owner 2026-09-20): the object arrives in the hand at the carry configuration the
-                # sampler recorded (``carry_arm_q``), so the pre-place / place witnesses are solved in that branch - the oracle reaches the
-                # pre-place from there with a bounded joint swing (0920-135625: a witness 2.09 rad away made the drop 'plan_failed')
-                st_seed = tracker.stance_obj if tracker.stance_obj is not None else sidecar.stances.get(stance_name)
-                if st_seed is not None:
-                    arm_c = (getattr(action, "arms", None) or ["right"])[0]
-                    q_prev = sampler.ikc.q_locked(st_seed).clone()
-                    # the tracked end of the straight carry leg when the task recorded it (``carry_end_q``), else the carry configuration
-                    src = (getattr(sampler, "carry_end_q", None) or {}).get(carried, sampler.carry_arm_q[carried])
-                    q_prev[sampler.kit.robot.arm_control_idx[arm_c]] = th.as_tensor(src, dtype=th.float32)
-            if name == "push" and (getattr(getattr(action, "contact", None), "extra", None) or {}).get("q_hint") is not None:
-                # a press recorded with the branch that leaves room for the other hand's pinch (two-flap v2, 2026-09-19): the IK seed
-                q_prev = th.as_tensor(action.contact.extra["q_hint"], dtype=th.float32)
-            # owner 2026-09-24: where the previous arm action left THIS arm (every family) - the leg that starts there is tracked from it
-            q_end_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0])
-            n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj, q_seed_prev=q_prev,
-                                                q_end_prev=q_end_prev, held_since_init=tracker.carried is not None and tracker.carried_arm is None)
-            end_q = witnesses.pop("__arm_end_q__", None)
-            partial_leg = witnesses.pop("__partial__", None)
-            repose_note = witnesses.pop("__repose__", None)
-            tracker.after(action, witnesses, sampler)
-            tracker.note_arm_end(action, end_q)
-            _carry_joint_state(action)
-            entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
-                     "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
-            if locked:
-                entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
-            if partial_leg is not None:
-                entry["partial_leg"] = partial_leg
-            if repose_note is not None:
-                entry["repose"] = repose_note
-            report["actions"].append(entry)
-            _STATS["n_actions_checked"] += 1
-            _STATS["n_poses"] += int(n)
+                name = getattr(action, "name", type(action).__name__)
+                if name in ("navigate", "transition") and i not in travel_handled:
+                    # owner 2026-09-24: an EMPTY-HANDED travel after an arm action is driven with the arm where the last motion left it
+                    # (or lifted a little) when that sweeps free - recorded as ``arms_q`` on its legs (``choose_departure_arms``)
+                    grp = _travel_group(actions, i)
+                    travel_handled.update(grp)
+                    carries = tracker.carried is not None or any(getattr(getattr(actions[j], "path", None), "carried", None) or getattr(actions[j], "carried", None) for j in grp)
+                    if not carries and tracker.arm_end_q and os.environ.get("ISG_DEPARTURE_ARMS", "on").lower() not in ("off", "0", "false"):
+                        try:
+                            dep = choose_departure_arms(sidecar, sampler, actions, grp, tracker)
+                        except Reject:
+                            raise
+                        except Exception as e:  # noqa: BLE001 - a failed selection keeps the canonical postures (the records as swept)
+                            log.warning("program check: departure arms not chosen for the travel at %s (%r): the stance postures stay", grp, e)
+                            dep = None
+                        if dep is not None:
+                            report.setdefault("departure_arms", []).append(dep)
+                try:
+                    targets = action.targets(sc, state)
+                except Exception as e:
+                    raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
+                stance_name, carried = tracker.before(action)
+                locked = tracker.locked_arms(action)
+                # block design (owner 2026-09-19): the acting arm's IK is seeded from where the previous action left it - the lift
+                # tracked from the grasp witness, the reorient from the lift's end, the carry / place from the reorient's end - as
+                # the oracle's arm_along runs them (pod runs 0919-140558 / 151544: the reorient checked from a fresh exact IK passed
+                # while the oracle, tracking from the grasp's branch, jumped 0.23 rad / stalled 14 mm)
+                q_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0]) if getattr(sidecar, "blocks", None) else None
+                if q_prev is None and name == "place" and carried and carried in (getattr(sampler, "carry_arm_q", None) or {}):
+                    # a place after a CARRY (IORS large-scale, owner 2026-09-20): the object arrives in the hand at the carry configuration the
+                    # sampler recorded (``carry_arm_q``), so the pre-place / place witnesses are solved in that branch - the oracle reaches the
+                    # pre-place from there with a bounded joint swing (0920-135625: a witness 2.09 rad away made the drop 'plan_failed')
+                    st_seed = tracker.stance_obj if tracker.stance_obj is not None else sidecar.stances.get(stance_name)
+                    if st_seed is not None:
+                        arm_c = (getattr(action, "arms", None) or ["right"])[0]
+                        q_prev = sampler.ikc.q_locked(st_seed).clone()
+                        # the tracked end of the straight carry leg when the task recorded it (``carry_end_q``), else the carry configuration
+                        src = (getattr(sampler, "carry_end_q", None) or {}).get(carried, sampler.carry_arm_q[carried])
+                        q_prev[sampler.kit.robot.arm_control_idx[arm_c]] = th.as_tensor(src, dtype=th.float32)
+                if name == "push" and (getattr(getattr(action, "contact", None), "extra", None) or {}).get("q_hint") is not None:
+                    # a press recorded with the branch that leaves room for the other hand's pinch (two-flap v2, 2026-09-19): the IK seed
+                    q_prev = th.as_tensor(action.contact.extra["q_hint"], dtype=th.float32)
+                # owner 2026-09-24: where the previous arm action left THIS arm (every family) - the leg that starts there is tracked from it
+                q_end_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0])
+                n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj, q_seed_prev=q_prev,
+                                                    q_end_prev=q_end_prev, held_since_init=tracker.carried is not None and tracker.carried_arm is None)
+                end_q = witnesses.pop("__arm_end_q__", None)
+                partial_leg = witnesses.pop("__partial__", None)
+                repose_note = witnesses.pop("__repose__", None)
+                tracker.after(action, witnesses, sampler)
+                tracker.note_arm_end(action, end_q)
+                _carry_joint_state(action)
+                entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
+                         "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
+                if locked:
+                    entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
+                if partial_leg is not None:
+                    entry["partial_leg"] = partial_leg
+                if repose_note is not None:
+                    entry["repose"] = repose_note
+                report["actions"].append(entry)
+                _STATS["n_actions_checked"] += 1
+                _STATS["n_poses"] += int(n)
+            except Reject as e_diag:
+                if not diag_all:
+                    raise
+                name_d = getattr(action, "name", type(action).__name__)
+                diag_fails.append((i, name_d, e_diag))
+                log.warning("program check DIAG (ISG_PC_DIAG_ALL): action %d %s rejected: %s - going on with the next action", i, name_d, str(e_diag)[:400])
+                try:
+                    tracker.after(action, {}, sampler)
+                    tracker.note_arm_end(action, None)
+                except Exception as e_adv:  # noqa: BLE001 - a diagnostic run keeps going
+                    log.warning("program check DIAG: the tracker could not advance past action %d (%r)", i, e_adv)
+        if diag_fails:
+            log.warning("program check DIAG: %d of %d actions rejected: %s", len(diag_fails), len(actions),
+                        "; ".join(f"{i_} {n_}: {str(e_)[:200]}" for i_, n_, e_ in diag_fails))
+            raise diag_fails[0][2]
         _STATS["rejected"] = False
     finally:
         tracker.restore_moved(sampler)  # block records advanced through the program go back to their init poses (the TRO is written from the live world)
@@ -2060,6 +2269,11 @@ def _where_of(action, name: str, stance_name: str, arm: str, carried: Optional[s
 _EARLY_GATE_ACTIONS = ("grasp", "place", "push", "brace", "base_push")
 
 
+def _pick_overhang_push(action) -> bool:
+    """``action`` is the overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``)."""
+    return getattr(action, "name", "") == "push" and str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang"
+
+
 def _world_advances(sidecar, action) -> bool:
     """Whether the check's world changes AFTER ``action`` (``_Tracker.after`` / ``run._carry_joint_state``), so later actions' targets
     are not the static ones: a place while block records exist (``advance_block``), a push while a packing tail exists (``advance_push``),
@@ -2253,6 +2467,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_seed[sampler.kit.robot.arm_control_idx[arm]] = th.tensor(pq, dtype=th.float32)
     end_q_raw: Optional[th.Tensor] = None
     end_key = _END_KEY.get(name)
+    if end_key is None and _pick_overhang_push(action):
+        end_key = "waypoints"  # oracle-fix 2026-11-05: the retreat after the overhang push leaves from where the push leaves the arm
     if name == "retreat" and after_name == "base_follow" and isinstance(targets, dict) and targets.get("retreat"):
         # the retreat after a hybrid / sequential follow: the search recorded the retreat configuration it found at the final
         # pose (``base_follow_path.retreat_arm_q``); verify THAT witness (FK residual, collision, margin) instead of re-solving
@@ -2278,6 +2494,47 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 log.info("program check: retreat after the follow verified from the search's witness (residual %.1f mm, margin %.3f rad at %s)", residual * 1000, margin, jn)
                 return 1, witnesses
             log.info("program check: the search's retreat witness fails (residual %.1f mm, free %s, margin %.3f at %s): re-solving the retreat", residual * 1000, free, margin, jn)
+    if name == "retreat" and _pick_overhang_push(getattr(action, "after", None)):
+        # oracle-fix 2026-11-05 (hardback inside_large#01, hb14_desk_s3 attempt 0 after 3480 s of sampling: 'retreat: ik_joint_limit:
+        # left_arm_joint7 within 3 mrad of its limit at the pose (every solution found ...) (... after push)'): the oracle never runs the
+        # recorded leg after the overhang push (10 cm along -a: toward the torso for the open hand that drew the object to the edge) -
+        # execute_retreat's contact escape leaves radially off the object (over its far rim, back where the push came from) and up off
+        # the support, from where the push left the arm. That leg is replayed here (replay_contact_escape, the arc pushes' escape) from
+        # the push's tracked end configuration; only in this situation
+        c_ = action.after.contact
+        goal_ = c_.goal
+        goal_t = (th.as_tensor(goal_.position if hasattr(goal_, "position") else goal_[0], dtype=th.float32),
+                  th.as_tensor(goal_.orientation if hasattr(goal_, "orientation") else goal_[1], dtype=th.float32))
+        obj_ = sampler.objects.get(c_.object)
+        sup_ = list(sampler.support_objects()) if hasattr(sampler, "support_objects") else []
+        ign_ = ([obj_] if obj_ is not None else []) + sup_
+        where_ = _where_of(action, name, stance_name, arm, carried, locked)
+        q_from = None
+        if q_end_prev is not None:
+            q_from = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+            idx_ = sampler.kit.robot.arm_control_idx[arm]
+            q_from[idx_] = th.as_tensor(q_end_prev, dtype=th.float32)[idx_]
+            if not sampler.ikc.reaches(q_from, goal_t, arm):
+                q_from = None
+        src_ = "the push's tracked end configuration"
+        if q_from is None:
+            src_ = "a fresh IK of the push's end pose"
+            _count("n_ik_single")
+            r_ = sampler.ikc.exact([goal_t], stance, arm, ignore_for_last=ign_, cache=False, fingers=fingers)
+            if not r_.ok or r_.q is None:
+                raise Reject(r_.code or "program_check_failed", f"retreat: the overhang push's end pose: {r_.reason} ({where_})", action=name)
+            q_from = r_.q
+        from ispatialgym.oracle.actions import RETREAT_DIST
+
+        status_, why_, rep_, q_end_ = replay_contact_escape(sampler, arm, q_from, obj_, sup_, ign_, float(getattr(action, "distance", None) or RETREAT_DIST),
+                                                            start="the overhang push's end", escape_up_m=getattr(action, "escape_up_m", None))
+        if status_ == "failed":
+            raise Reject("approach_untrackable", f"retreat: {why_} ({where_})", action=name)
+        if status_ != "none":
+            log.info("program check: the retreat after the overhang push of %s replayed as the oracle's contact escape from %s: %s %s",
+                     c_.object, src_, status_, rep_)
+            witnesses["__arm_end_q__"] = q_end_
+            return 1, witnesses
     where = _where_of(action, name, stance_name, arm, carried, locked)
     pose_targets = list(iter_pose_targets(targets))
     if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
@@ -2410,7 +2667,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     # centimetres (shampoo dispenser 0925-171050); the floor mesh is already in the ignore set
                     floor_lift = name == "lift" and any("floor" in str(getattr(o, "name", "")).lower() for o in ign_all)
                     _count("n_chains")
-                    res = sampler.ikc.continue_chain(q_start, chain, arm, ignore=ign_all, ignore_end=ign_end,
+                    # oracle-fix 2026-11-05 (opt-in generation.carry_finish_max_remaining_m): the place's carry stall is finished only this close to its end
+                    fin_rem = sampler.gp.gen("carry_finish_max_remaining_m") if (name == "place" and key == "carry" and hasattr(sampler, "gp")) else None
+                    res = sampler.ikc.continue_chain(q_start, chain, arm, ignore=ign_all, ignore_end=ign_end, finish_max_remaining_m=None if fin_rem is None else float(fin_rem),
                                                      soft_stall_m=None if name == "reorient" else sampler.ikc.FREE_LEG_STALL_M,
                                                      limit_margin=RETREAT_LIMIT_MARGIN_RAD if (name == "retreat" or (name == "place" and getattr(action, "kind", None) == "attach" and key in ("carry", "descent"))) else 0.0,
                                                      ignore_start=ign_start, ground_along=not floor_lift, ground_meshes_along=not floor_lift)
@@ -2455,6 +2714,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             if pre_poses:
                                 q_ref, chain_ref = single_q["pre"], list(pre_poses) + list(chain)
                         chk = None
+                        replay = None  # the arc replay from a given pre-contact configuration (set when the replay runs)
                         if (q_ref is not None and len(chain_ref) >= 4 and not _is_pack_push(sidecar, action)
                                 and os.environ.get("ISG_PUSH_REPLAY", "on").lower() not in ("off", "0", "false")):
                             # owner 2026-09-27 (A8): a free-object arc push is replayed as the oracle runs it - the straight leg, the true
@@ -2466,16 +2726,26 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             obj_ = sampler.objects.get(getattr(getattr(action, "contact", None), "object", None))
                             from ispatialgym.oracle.execute import push_speed_of
 
-                            ok_r, why_r, rep_r = replay_arc_push(sampler, arm, q_ref, chain_ref[0], chain_ref[1:], targets.get("direction") if isinstance(targets, dict) else None,
-                                                                 obj_, list(sampler.support_objects()), list(ignore_all) + list(ignore_last), band, RETREAT_DIST,
-                                                                 speed_m_s=push_speed_of(getattr(action, "contact", None)))
+                            def replay(q_from, _chain=chain_ref, _dir=targets.get("direction") if isinstance(targets, dict) else None, _obj=obj_, _band=band,
+                                       _ign=list(ignore_all) + list(ignore_last), _speed=push_speed_of(getattr(action, "contact", None)), line=False):
+                                return replay_arc_push(sampler, arm, q_from, _chain[0], _chain[1:], _dir, _obj, list(sampler.support_objects()), _ign, _band,
+                                                       RETREAT_DIST, speed_m_s=_speed, line=line)
+
+                            ok_r, why_r, rep_r = replay(q_ref)
                             if rep_r:
                                 log.info("program check: push replay of %s: %s %s", getattr(getattr(action, "contact", None), "object", None), why_r[:200], rep_r)
                             chain_notes[key] = why_r[:160]
                             if not ok_r:
                                 chk = (False, why_r)
-                        if chk is None and q_ref is not None and os.environ.get("ISG_FLIPPED_PUSH_CHECK", "on").lower() not in ("off", "0", "false"):
-                            chk = _flipped_push_chain_check(sampler, chain_ref, stance, arm, q_ref, ignore_last, ignore_all, fingers, approached)
+                        flipped_mode = os.environ.get("ISG_FLIPPED_PUSH_CHECK", "on").lower()
+                        if chk is None and q_ref is not None and flipped_mode not in ("off", "0", "false"):
+                            if flipped_mode == "strict" or replay is None:
+                                chk = _flipped_push_chain_check(sampler, chain_ref, stance, arm, q_ref, ignore_last, ignore_all, fingers, approached)
+                            else:
+                                # oracle-fix 2026-11-03: a flipped witness is re-witnessed on the stance posture's branch when the arc replays
+                                # from there (ISG_FLIPPED_PUSH_CHECK=strict restores the 2026-09-26 outright rejection)
+                                chk = _rewitness_flipped_push(sampler, chain_ref, stance, arm, q_ref, fingers, replay, witnesses, single_q,
+                                                              k_first if q_first is not None else "pre", ignore_all)
                         if chk is not None:
                             chain_notes[key] = chk[1][:160]
                             if not chk[0]:
@@ -2629,7 +2899,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 frm_name = getattr(getattr(action, "path", None), "frm", None) or getattr(getattr(action, "transition", None), "frm", None)
                 frm_st = sidecar.stances.get(frm_name) if frm_name else None
                 if frm_st is not None and getattr(g, "grasp", None) is not None:
-                    lift_end = (th.as_tensor(g.grasp[0], dtype=th.float32) + th.tensor([0.0, 0.0, float(g.carry_height or 0.0)]), th.as_tensor(g.grasp[1], dtype=th.float32))
+                    lift_end = lift_end_pose(g)
                     wps = getattr(g, "waypoints", None)
                     if wps:
                         # an in-hand move after the lift (``Reorient`` to the CARRY pose, owner 2026-09-20 05:20): the object rides at
@@ -2645,7 +2915,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     if r_lift.ok and r_lift.q is not None:
                         q_arms[attach_arm] = r_lift.q[sampler.kit.robot.arm_control_idx[attach_arm]].clone()
                 drive_ctx = _attach_ctx(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object, nested=True)
-            with drive_ctx:
+            # oracle-fix 2026-11-04 round 3: the sampler's stance_check_ignores of the leg's arriving stance (the target at its INIT pose is not where
+            # the robot meets it after the pick: the briefcase's push-under crouch "base pose ... collides" 5-8 x per run)
+            to_name = getattr(getattr(action, "path", None), "to", None) or getattr(getattr(action, "transition", None), "to", None)
+            to_st = sidecar.stances.get(to_name) if to_name else None
+            ign_extra = list(sampler.stance_check_ignores(to_st)) if (to_st is not None and callable(getattr(sampler, "stance_check_ignores", None))) else []
+            with drive_ctx, (sampler.ikc.ignoring(ign_extra) if ign_extra else contextlib.nullcontext()):
                 # the stance's recorded finger opening too (a push-close re-stance records the closed fist at its pre-contact: checked
                 # open, the spread pads reached the flap - 0920-191145 'base pose ... collides at trunk')
                 ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms=q_arms, fingers=fingers_st)
