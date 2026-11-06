@@ -38127,7 +38127,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": []
  },
@@ -38272,7 +38274,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": []
  },
@@ -38417,7 +38421,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": []
  },
@@ -38562,7 +38568,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": []
  },
@@ -38707,7 +38715,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": []
  },
@@ -38872,7 +38882,9 @@
    "touching_place_gap_m": 0.05,
    "brace_open_when_wide": true,
    "push_speed_m_s": 0.02,
-   "_brace_push_note": "owner 2026-10-14 ~02:04 (touching#02 pair1013_c8_k8 replay): 'left brace should be open gripper like touching 1 because it's wide ... right gripper should push more gently (slowly)'. brace_open_when_wide: dkhgxn's far face is 0.151 m wide at the brace height (>= 0.05 + 2 x 0.01), so the left hand braces it with the open fingertips 9 cm apart straddling the push line (c8_k8 had the closed tips: the wide stop's vertex rule saw 2 of the hull's 56 points on that face). push_speed_m_s: c8_k8's straight push ran at the arm's 0.10 m/s (9.4-10 cm/s measured), the 4.3 cm thick target tipped about its leading bottom edge to 15.6 deg (the partner 12.1 deg in the rock-back round); 0.02 m/s makes the tip quasi-static (the box's tipping time ~0.12 s vs ~1.2 s to lean it on the partner)"
+   "_brace_push_note": "owner 2026-10-14 ~02:04 (touching#02 pair1013_c8_k8 replay): 'left brace should be open gripper like touching 1 because it's wide ... right gripper should push more gently (slowly)'. brace_open_when_wide: dkhgxn's far face is 0.151 m wide at the brace height (>= 0.05 + 2 x 0.01), so the left hand braces it with the open fingertips 9 cm apart straddling the push line (c8_k8 had the closed tips: the wide stop's vertex rule saw 2 of the hull's 56 points on that face). push_speed_m_s: c8_k8's straight push ran at the arm's 0.10 m/s (9.4-10 cm/s measured), the 4.3 cm thick target tipped about its leading bottom edge to 15.6 deg (the partner 12.1 deg in the rock-back round); 0.02 m/s makes the tip quasi-static (the box's tipping time ~0.12 s vs ~1.2 s to lean it on the partner)",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bar_udatjt_0 (row inter_object_relation_satisfaction-touching#02~B3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T3 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39025,7 +39037,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on bookcase_jpdtvg_0 (row inter_object_relation_satisfaction-touching#02~B5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T5 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39178,7 +39192,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on breakfast_table_rhjoby_0 (row inter_object_relation_satisfaction-touching#02~B2, = C2); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T2 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39331,7 +39347,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on commercial_kitchen_table_vxvtec_0 (row inter_object_relation_satisfaction-touching#02~B4, = C4); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T4 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39483,7 +39501,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on conference_table_fpkmyw_0 (row inter_object_relation_satisfaction-touching#02~C5); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T7 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39636,7 +39656,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 B: touching#02 variant B - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on countertop_kelzer_0 (row inter_object_relation_satisfaction-touching#02~B1, = C1); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T1 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
@@ -39788,7 +39810,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "widest_faces": "parallel"
+   "widest_faces": "parallel",
+   "push_height_sweep": false,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06: the push height sweep (default on for touching small scale since the owner's spray-bottle feedback) is OFF here: fix1 on the trunk wrote 1 instance in 245 attempts (trainfast: 30 in 1130 = 1 / 37.7) - of the attempts reaching the goal check 1 / 45 passed (trainfast 30 / 175): 19 contact_unreachable (the place's clear pose failing at the laterals with a low push; at the others the hull hand check rejects the low pushes: wrist camera / knuckle / gripper body inside 5 mm of the box), 10 lift_unreachable, 8 brace_open_required. The cereal box keeps today's push until a sweep that fits it."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~10:25 item 4 C: touching#02 variant C - the target box_of_cereal/iucshm at spawn scale 0.8 (21.8 cm) with box_of_cereal__iucshm__s080 on desk_mdhelw_1 (row inter_object_relation_satisfaction-touching#02~C3); hand-made: ground_isg's grounding of inter_object_relation_satisfaction-touching#02~T6 on a scratch sheet, renamed, with A's generation; registry mode test, so a re-ground of touching#02 leaves it alone"
