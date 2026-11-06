@@ -18143,7 +18143,11 @@
    "_phase2_split_cone_note": "owner 2026-10-12 ~03:30 (4b): split cone (variant C) off - the board alias runs the reconcile cone, Phase 2 with tight 20 / loose 30 deg (set here: the subtask's defaults are C's 8 / 20)",
    "phase2_tight_class_deg": 20.0,
    "phase2_loose_class_deg": 30.0,
-   "repose_after_base_move": true
+   "repose_after_base_move": true,
+   "init_edges": [
+    "+v"
+   ],
+   "_init_edges_note": "oracle-fix 2026-11-06 (owner feedback on the configuration_matching-block_design_01 yield: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): Phase 1a stands only at the +v end (x 5.39, facing +x), the edge of the counted eval instance (s3_55tasks a2_k4) and of both instances block_design#01 ever wrote (a1_seed0, a2_k4, attempt 0 each). The fast flow seeds the template with split_seed(train, variant, 0) whatever the job's start index, so every job drew the edges in the same order and stood at the -v end (x 9.19): 8 jobs / 7 tags, 311 attempts, 0 written, every attempt board_placement (off the top at depth 0.44-0.48; the pitched place probe fails at (0.52, -0.06) / (0.60, +0.05); the one probe pass ends at the layout). The -v end never wrote in any code version either (eval85 c1_k0, bd01_board_c / bd01_board_rc k5: 0 in 235 attempts). The support row's edges would not reach the fast flow (multiply_isg takes the bindings from template_meta.json), hence a generation knob (tabletop.gen_edges)"
   },
   "constraints": []
  },
