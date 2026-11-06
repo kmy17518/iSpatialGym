@@ -102,6 +102,18 @@ def test_ranges_midpoints_ties_and_coverage():
         assert x["range"][0] <= x["height"] <= x["range"][1] and x["range"][1] - x["range"][0] <= 0.02 + 1e-12
 
 
+def test_exact_lookup_prefers_the_finest_anchor_over_a_coarse_one():
+    # of-v2maps 2026-11-06: $GBH/anchors.json holds an interior board authored at 0.81 (1e-2 m) and the breakfast table's measured top
+    # 0.8126 (1e-4 m); 0.8126 is "exact" for both keys and the height-sorted scan returned 0.81 - every map lookup there missed
+    A = HA.AnchorSet.from_surfaces([_surf("a", "board", 0.81, prec=1e-2, surface="interior"), _surf("a", "t1", 0.8126), _surf("a", "t2", 0.7853)])
+    a, k = A.lookup(0.8126)
+    assert k == "exact" and a["key"] == "0.8126"
+    a, k = A.lookup(0.81)  # the coarse anchor still resolves its own height
+    assert k == "exact" and a["key"] == "0.81"
+    a, k = A.lookup(0.7853)
+    assert k == "exact" and a["key"] == "0.7853"
+
+
 def test_inventory_rows_dedup_floor_datum_and_interior_planes():
     surfaces, rep = HA.build_surfaces([os.path.join(os.path.dirname(HA.INVENTORY), "..", "ispatialgym", "assets", "icl", "roles", "candidates.csv")])
     tops = [s for s in surfaces if s.surface == "top"]
@@ -249,3 +261,82 @@ def test_grasp_set_keeps_the_tested_representative():
     names = [g["name"] for g in gs]
     assert "top_0" in names and "top_0~r180" in names and sum(1 for g in gs if not g["twin"]) == 5  # 0 + 4 samples
     assert [g for g in gs if g["name"] == "top_0"][0]["physics"] == "tested"
+
+
+# ------------------------------------------------------------------------------------------------ the other arm of a map view (of-v2maps)
+
+
+class _ViewBand:
+    """A ReachBands stand-in: ``meta`` (mode / arm) and ``mirrored``."""
+
+    def __init__(self, arm, mode="map_view", path=None):
+        self.meta, self.path = {"mode": mode, "arm": arm, "map_path": path}, path
+
+    @property
+    def arm(self):
+        return self.meta["arm"]
+
+    def mirrored(self):
+        if self.meta["mode"] == "map_view":
+            raise ValueError("map views are not mirrored")
+        return _ViewBand("left" if self.arm == "right" else "right", mode="tabletop", path=None)
+
+
+def _arm_band_sampler():
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    spec = TT.BandSpec(object="cat/model", grasp_key="cat__model", arm="right")
+    return SimpleNamespace(band_spec=spec, top=SimpleNamespace(name="table_0", z=0.8126), world=SimpleNamespace(scene_model="scene", floor_z=0.0),
+                           template_facts={})
+
+
+def test_map_view_other_arm_takes_its_own_map(monkeypatch):
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    asked = []
+    monkeypatch.setattr(TT, "map_bands", lambda s, spec, top, arm=None: asked.append(arm) or _ViewBand(arm, path=f"map_{arm}"))
+    monkeypatch.setattr(TT, "band_facts", lambda b: {"arm": b.arm, "mode": b.meta["mode"]})
+    s = _arm_band_sampler()
+    own = TT.arm_band(s, "left", bands=_ViewBand("right", path="map_right"))
+    assert asked == ["left"] and own.arm == "left" and own.meta["map_path"] == "map_left"
+    assert s.template_facts["arm_bands"]["left"] == {"arm": "left", "mode": "map_view"}
+    assert TT.arm_band(s, "left", bands=own) is own and asked == ["left"]  # an arm's own view is returned as is, no second lookup
+
+
+def test_map_view_other_arm_without_a_map_keeps_the_legacy_path(monkeypatch):
+    from ispatialgym.sampling import reach_bands as RB
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    monkeypatch.setattr(TT, "map_bands", lambda s, spec, top, arm=None: None)
+    monkeypatch.setattr(TT, "band_facts", lambda b: {"arm": b.arm})
+    loads = []
+
+    def load(scene, support, obj, gkey, *, arm="right", **kw):
+        loads.append(arm)
+        if arm == "left":
+            raise FileNotFoundError("no left band")
+        return _ViewBand("right", mode="tabletop", path="legacy_right")
+
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(load))
+    own = TT.arm_band(_arm_band_sampler(), "left", bands=_ViewBand("right", path="map_right"))
+    assert loads == ["left", "right"] and own.arm == "left" and own.meta["mode"] == "tabletop"  # the right legacy band, mirrored
+
+    loads.clear()
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(lambda *a, arm="right", **kw: loads.append(arm) or _ViewBand(arm, mode="tabletop", path=f"legacy_{arm}")))
+    own = TT.arm_band(_arm_band_sampler(), "left", bands=_ViewBand("right", path="map_right"))
+    assert loads == ["left"] and own.path == "legacy_left"  # the left arm's own legacy band when cached
+
+
+def test_skip_existing_counts_only_the_runs_arm_and_kind(tmp_path):
+    from ispatialgym.sampling import reach_maps as RM
+
+    p = tmp_path / "map__cat__model__h0.8126__abc.json"
+    p.write_text(json.dumps({"arm": "right", "kind": "tabletop"}))
+    assert RM._map_meta_matches(str(p), "right", "tabletop")
+    assert not RM._map_meta_matches(str(p), "left", "tabletop")  # a left-arm run computes its own map
+    assert not RM._map_meta_matches(str(p), "right", "brace")
+    bad = tmp_path / "map__broken.json"
+    bad.write_text("{")
+    assert not RM._map_meta_matches(str(bad), "right", "tabletop")
