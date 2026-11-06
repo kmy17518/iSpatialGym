@@ -49711,7 +49711,8 @@
    "inside_erosion_m": 0.095,
    "_erosion_note": "oracle-fix 2026-11-04 round 3: hb6 roll blame - at the front-row goal cells (y 12.59) the standing book whose pinched edge faces the base is footprint_off_board (its 0.169 m width along the depth): goal cells 0.095 m from the outline (half the width + margin)",
    "inside_goal_lateral_m": 0.3,
-   "drop_height_m": 0.02,
+   "drop_height_m": 0.01,
+   "_drop_height_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the shelf release 1 cm above the board (was 0.02, _r3f_note: a 5 mm release failed 75 / 75 attached IKs on the board pieces at the 1 cm collision margin - watch 'C place IK (attached) fail' lines naming the board; 0.02 is the fallback)",
    "inside_pre_outward": true,
    "inside_no_band_trunks": 6,
    "f_draws_max": 12,
@@ -49754,7 +49755,27 @@
    "_carry_finish_max_remaining_m_note": "oracle-fix 2026-11-05 (hbD7: the carry at C stalled at 8/53 with 0.38 m left even from the program check's lift witness; the IK finish passed the checks, the oracle's planned finish next to the bookcase failed): a carry stall is finished only this close to the pre-place",
    "_hb_main_note": "oracle-fix 2026-11-05 13:45: the main customs take customs_hb_d12_wr5_ctvmpkubodrs.json's alias (md5 889494e4; the overhang pick's push branch check + keep-recorded witness, retreat up 0.15, carry departure back 0.3, online carry vias, carry finish bound 0.05, push drift 0.023 m / 0.07 rad with the flush snap 0.70 rad) - hb30_desk_s41 0000 SUCCESS (12 / 12 actions, geometric at step 2142 settled, 2.8 mm / 0.022 rad, 0 collisions, QA clean)",
    "overhang_fail_memo_persist": true,
-   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves)."
+   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves).",
+   "release_roll_axis": "edge_normal",
+   "_release_roll_axis_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the rolled release turns about the pinched edge's outward normal (object -y, the spine) instead of the grasp point's radial direction - grasp_1 / grasp_2 pinch at x +-0.0348 m, 21.6 deg off the book's y axis, so their radial roll stood the book 21.6 deg off upright (iors_large_inside.roll_axis / rolled_quat); every row's release now has the long axis vertical before the lean",
+   "inside_spine_out": true,
+   "_inside_spine_out_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): hb30_desk_s41 0000 stood the book upright but diagonal, its spine 45 deg off the bookcase's outward normal +y - the free-yaw screen kept the first of the 16 grid yaws that passed; now each rolled row is screened only at the yaw whose spine faces out of the opening (-edge.inward, exact: the raster side is 0.15 deg off +y; inside_spine_out_tol_deg 0) and the drawn row is released there (needs inside_free_yaw)",
+   "inside_shelf_place": {
+    "spine_behind_edge_m": 0.03,
+    "wall_gap_m": 0.04,
+    "side": "near",
+    "release_lean_deg": 9.0,
+    "jaw_clear_m": 0.005
+   },
+   "_inside_shelf_place_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the touching#03 shelf pose (tabletop.shelf_lean_pose, the 2 mm wall gap made a parameter): spine 0.03 m behind the board's front edge (y 12.64 -> 12.61), the upright book's near cover 0.04 m from the side board of the goal cell's bay on the working arm's side, released leaning 9 deg toward it (past the 7.5 deg tipping angle of the 0.232 x 0.0305 m book) so the goal settle tips it onto the board: ~14.6 deg with the cover at 0.04 m (box model). The fully open jaw (C.GRIPPER_OPEN_M 0.10 + 12 mm fingers, closing axis 10 deg off the cover normal) would cross the board's face by 3-22 mm there, so jaw_clear_m 0.005 moves each row's release 0.8-2.7 cm off the board (open jaw + its 0.10 m retreat 5 mm clear): predicted settled lean 16.5-21.6 deg by row / roll (jaw_clear_m null = the 14.6 deg pose, finger contact with the board at the release likely); roll_fits keeps the footprint check",
+   "inside_goal_region": {
+    "frame": "world",
+    "x": [
+     22.4,
+     23.04
+    ]
+   },
+   "_inside_goal_region_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): goal cells in bays L / M of bookcase_jaysra_0 only (L x 22.399..22.683, M 22.746..23.041 with boards at z 0.949; bay R 23.104..23.388 sits at 0.974, 2.5 cm above the single 0.947 m raster); the shelf place snaps to a board of the cell's own bay"
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-inside_large_scale#01: hardback/bqvvvx into bookcase_jaysra_0 (0.94 m board, house_single_floor childs_room_1) from desk_bhkhxo_0 (0.77 m, sheet T2); hand-made as alias 151 (no candidates rows for the subtask: the grounder skips it), generation = alias 147's block with the bookcase keys and the overhang pick, BDDL rendered as problem 147; registry mode test, so a re-ground leaves it alone"
@@ -49893,7 +49914,8 @@
    "inside_erosion_m": 0.095,
    "_erosion_note": "oracle-fix 2026-11-04 round 3: hb6 roll blame - at the front-row goal cells (y 12.59) the standing book whose pinched edge faces the base is footprint_off_board (its 0.169 m width along the depth): goal cells 0.095 m from the outline (half the width + margin)",
    "inside_goal_lateral_m": 0.3,
-   "drop_height_m": 0.02,
+   "drop_height_m": 0.01,
+   "_drop_height_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the shelf release 1 cm above the board (was 0.02, _r3f_note: a 5 mm release failed 75 / 75 attached IKs on the board pieces at the 1 cm collision margin - watch 'C place IK (attached) fail' lines naming the board; 0.02 is the fallback)",
    "inside_pre_outward": true,
    "inside_no_band_trunks": 6,
    "f_draws_max": 12,
@@ -49936,7 +49958,19 @@
    "_carry_finish_max_remaining_m_note": "oracle-fix 2026-11-05 (hbD7: the carry at C stalled at 8/53 with 0.38 m left even from the program check's lift witness; the IK finish passed the checks, the oracle's planned finish next to the bookcase failed): a carry stall is finished only this close to the pre-place",
    "_hb_main_note": "oracle-fix 2026-11-05 13:45: the main customs take customs_hb_d12_wr5_ctvmpkubodrs.json's alias (md5 889494e4; the overhang pick's push branch check + keep-recorded witness, retreat up 0.15, carry departure back 0.3, online carry vias, carry finish bound 0.05, push drift 0.023 m / 0.07 rad with the flush snap 0.70 rad) - hb30_desk_s41 0000 SUCCESS (12 / 12 actions, geometric at step 2142 settled, 2.8 mm / 0.022 rad, 0 collisions, QA clean)",
    "overhang_fail_memo_persist": true,
-   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves)."
+   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves).",
+   "release_roll_axis": "edge_normal",
+   "_release_roll_axis_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the rolled release turns about the pinched edge's outward normal (object -y, the spine) instead of the grasp point's radial direction - grasp_1 / grasp_2 pinch at x +-0.0348 m, 21.6 deg off the book's y axis, so their radial roll stood the book 21.6 deg off upright (iors_large_inside.roll_axis / rolled_quat); every row's release now has the long axis vertical before the lean",
+   "inside_spine_out": true,
+   "_inside_spine_out_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): hb30_desk_s41 0000 stood the book upright but diagonal, its spine 45 deg off the bookcase's outward normal +y - the free-yaw screen kept the first of the 16 grid yaws that passed; now each rolled row is screened only at the yaw whose spine faces out of the opening (-edge.inward, exact: the raster side is 0.15 deg off +y; inside_spine_out_tol_deg 0) and the drawn row is released there (needs inside_free_yaw)",
+   "inside_shelf_place": {
+    "spine_behind_edge_m": 0.03,
+    "wall_gap_m": 0.04,
+    "side": "near",
+    "release_lean_deg": 9.0,
+    "jaw_clear_m": 0.005
+   },
+   "_inside_shelf_place_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the touching#03 shelf pose (tabletop.shelf_lean_pose, the 2 mm wall gap made a parameter): spine 0.03 m behind the board's front edge (y 12.64 -> 12.61), the upright book's near cover 0.04 m from the side board of the goal cell's bay on the working arm's side, released leaning 9 deg toward it (past the 7.5 deg tipping angle of the 0.232 x 0.0305 m book) so the goal settle tips it onto the board: ~14.6 deg with the cover at 0.04 m (box model). The fully open jaw (C.GRIPPER_OPEN_M 0.10 + 12 mm fingers, closing axis 10 deg off the cover normal) would cross the board's face by 3-22 mm there, so jaw_clear_m 0.005 moves each row's release 0.8-2.7 cm off the board (open jaw + its 0.10 m retreat 5 mm clear): predicted settled lean 16.5-21.6 deg by row / roll (jaw_clear_m null = the 14.6 deg pose, finger contact with the board at the release likely); roll_fits keeps the footprint check"
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-inside_large_scale#01: hardback/bqvvvx into bookcase_jaysra_0 (0.94 m board, house_single_floor childs_room_1) from bed_rrcvaq_1 (0.49 m, sheet T1); hand-made as alias 152 (no candidates rows for the subtask: the grounder skips it), generation = alias 147's block with the bookcase keys and the overhang pick, BDDL rendered as problem 147; registry mode test, so a re-ground leaves it alone"
@@ -50951,7 +50985,8 @@
    "inside_erosion_m": 0.095,
    "_erosion_note": "oracle-fix 2026-11-04 round 3: hb6 roll blame - at the front-row goal cells (y 12.59) the standing book whose pinched edge faces the base is footprint_off_board (its 0.169 m width along the depth): goal cells 0.095 m from the outline (half the width + margin)",
    "inside_goal_lateral_m": 0.3,
-   "drop_height_m": 0.02,
+   "drop_height_m": 0.01,
+   "_drop_height_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the shelf release 1 cm above the board (was 0.02, _r3f_note: a 5 mm release failed 75 / 75 attached IKs on the board pieces at the 1 cm collision margin - watch 'C place IK (attached) fail' lines naming the board; 0.02 is the fallback)",
    "inside_pre_outward": true,
    "inside_no_band_trunks": 6,
    "f_draws_max": 12,
@@ -50994,7 +51029,19 @@
    "_carry_finish_max_remaining_m_note": "oracle-fix 2026-11-05 (hbD7: the carry at C stalled at 8/53 with 0.38 m left even from the program check's lift witness; the IK finish passed the checks, the oracle's planned finish next to the bookcase failed): a carry stall is finished only this close to the pre-place",
    "_hb_main_note": "oracle-fix 2026-11-05 13:45: the main customs take customs_hb_d12_wr5_ctvmpkubodrs.json's alias (md5 889494e4; the overhang pick's push branch check + keep-recorded witness, retreat up 0.15, carry departure back 0.3, online carry vias, carry finish bound 0.05, push drift 0.023 m / 0.07 rad with the flush snap 0.70 rad) - hb30_desk_s41 0000 SUCCESS (12 / 12 actions, geometric at step 2142 settled, 2.8 mm / 0.022 rad, 0 collisions, QA clean)",
    "overhang_fail_memo_persist": true,
-   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves)."
+   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves).",
+   "release_roll_axis": "edge_normal",
+   "_release_roll_axis_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the rolled release turns about the pinched edge's outward normal (object -y, the spine) instead of the grasp point's radial direction - grasp_1 / grasp_2 pinch at x +-0.0348 m, 21.6 deg off the book's y axis, so their radial roll stood the book 21.6 deg off upright (iors_large_inside.roll_axis / rolled_quat); every row's release now has the long axis vertical before the lean",
+   "inside_spine_out": true,
+   "_inside_spine_out_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): hb30_desk_s41 0000 stood the book upright but diagonal, its spine 45 deg off the bookcase's outward normal +y - the free-yaw screen kept the first of the 16 grid yaws that passed; now each rolled row is screened only at the yaw whose spine faces out of the opening (-edge.inward, exact: the raster side is 0.15 deg off +y; inside_spine_out_tol_deg 0) and the drawn row is released there (needs inside_free_yaw)",
+   "inside_shelf_place": {
+    "spine_behind_edge_m": 0.03,
+    "wall_gap_m": 0.04,
+    "side": "near",
+    "release_lean_deg": 9.0,
+    "jaw_clear_m": 0.005
+   },
+   "_inside_shelf_place_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the touching#03 shelf pose (tabletop.shelf_lean_pose, the 2 mm wall gap made a parameter): spine 0.03 m behind the board's front edge (y 12.64 -> 12.61), the upright book's near cover 0.04 m from the side board of the goal cell's bay on the working arm's side, released leaning 9 deg toward it (past the 7.5 deg tipping angle of the 0.232 x 0.0305 m book) so the goal settle tips it onto the board: ~14.6 deg with the cover at 0.04 m (box model). The fully open jaw (C.GRIPPER_OPEN_M 0.10 + 12 mm fingers, closing axis 10 deg off the cover normal) would cross the board's face by 3-22 mm there, so jaw_clear_m 0.005 moves each row's release 0.8-2.7 cm off the board (open jaw + its 0.10 m retreat 5 mm clear): predicted settled lean 16.5-21.6 deg by row / roll (jaw_clear_m null = the 14.6 deg pose, finger contact with the board at the release likely); roll_fits keeps the footprint check"
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-inside_large_scale#01: hardback/bqvvvx into bookcase_jaysra_0 (0.94 m board, house_single_floor childs_room_1) from bed_rrcvaq_1 (0.49 m, sheet T1); hand-made as alias 159 (no candidates rows for the subtask: the grounder skips it), generation = alias 147's block with the bookcase keys and the overhang pick, BDDL rendered as problem 147; registry mode test, so a re-ground leaves it alone; variant of 152: no fixed inside_stance_side (the sampler's own open edges +u / -u; the first bed run: no stance C at bookcase_jaysra_0 with +y)"
@@ -51133,7 +51180,8 @@
    "inside_erosion_m": 0.095,
    "_erosion_note": "oracle-fix 2026-11-04 round 3: hb6 roll blame - at the front-row goal cells (y 12.59) the standing book whose pinched edge faces the base is footprint_off_board (its 0.169 m width along the depth): goal cells 0.095 m from the outline (half the width + margin)",
    "inside_goal_lateral_m": 0.3,
-   "drop_height_m": 0.02,
+   "drop_height_m": 0.01,
+   "_drop_height_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the shelf release 1 cm above the board (was 0.02, _r3f_note: a 5 mm release failed 75 / 75 attached IKs on the board pieces at the 1 cm collision margin - watch 'C place IK (attached) fail' lines naming the board; 0.02 is the fallback)",
    "inside_pre_outward": true,
    "inside_no_band_trunks": 6,
    "f_draws_max": 12,
@@ -51176,7 +51224,19 @@
    "_carry_finish_max_remaining_m_note": "oracle-fix 2026-11-05 (hbD7: the carry at C stalled at 8/53 with 0.38 m left even from the program check's lift witness; the IK finish passed the checks, the oracle's planned finish next to the bookcase failed): a carry stall is finished only this close to the pre-place",
    "_hb_main_note": "oracle-fix 2026-11-05 13:45: the main customs take customs_hb_d12_wr5_ctvmpkubodrs.json's alias (md5 889494e4; the overhang pick's push branch check + keep-recorded witness, retreat up 0.15, carry departure back 0.3, online carry vias, carry finish bound 0.05, push drift 0.023 m / 0.07 rad with the flush snap 0.70 rad) - hb30_desk_s41 0000 SUCCESS (12 / 12 actions, geometric at step 2142 settled, 2.8 mm / 0.022 rad, 0 collisions, QA clean)",
    "overhang_fail_memo_persist": true,
-   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves)."
+   "_speed_fold_note": "oracle-fix 2026-11-06 one trunk (owner: the speed round's generation keys become per-alias customs, validated through the fast flow): from customs_spd2 / spd3.json. Folded: b_fingertip_frame_check (briefcase: B's pre-grasp / grasp by the fingertip gate before the draw - 51 % of its rejected time was that late gate), overhang_fail_memo_persist (hardback: 5.0x hb30's attempts on the same seeds with a warm cache, spd2f). Not folded: fixed_start_memo (touching#03: measured harmful), shelf_transit_per_grasp and fixed_start_prescreen (no instance gained; the batched screen costs more than the exact IK it saves).",
+   "release_roll_axis": "edge_normal",
+   "_release_roll_axis_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the rolled release turns about the pinched edge's outward normal (object -y, the spine) instead of the grasp point's radial direction - grasp_1 / grasp_2 pinch at x +-0.0348 m, 21.6 deg off the book's y axis, so their radial roll stood the book 21.6 deg off upright (iors_large_inside.roll_axis / rolled_quat); every row's release now has the long axis vertical before the lean",
+   "inside_spine_out": true,
+   "_inside_spine_out_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): hb30_desk_s41 0000 stood the book upright but diagonal, its spine 45 deg off the bookcase's outward normal +y - the free-yaw screen kept the first of the 16 grid yaws that passed; now each rolled row is screened only at the yaw whose spine faces out of the opening (-edge.inward, exact: the raster side is 0.15 deg off +y; inside_spine_out_tol_deg 0) and the drawn row is released there (needs inside_free_yaw)",
+   "inside_shelf_place": {
+    "spine_behind_edge_m": 0.03,
+    "wall_gap_m": 0.04,
+    "side": "near",
+    "release_lean_deg": 9.0,
+    "jaw_clear_m": 0.005
+   },
+   "_inside_shelf_place_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): the touching#03 shelf pose (tabletop.shelf_lean_pose, the 2 mm wall gap made a parameter): spine 0.03 m behind the board's front edge (y 12.64 -> 12.61), the upright book's near cover 0.04 m from the side board of the goal cell's bay on the working arm's side, released leaning 9 deg toward it (past the 7.5 deg tipping angle of the 0.232 x 0.0305 m book) so the goal settle tips it onto the board: ~14.6 deg with the cover at 0.04 m (box model). The fully open jaw (C.GRIPPER_OPEN_M 0.10 + 12 mm fingers, closing axis 10 deg off the cover normal) would cross the board's face by 3-22 mm there, so jaw_clear_m 0.005 moves each row's release 0.8-2.7 cm off the board (open jaw + its 0.10 m retreat 5 mm clear): predicted settled lean 16.5-21.6 deg by row / roll (jaw_clear_m null = the 14.6 deg pose, finger contact with the board at the release likely); roll_fits keeps the footprint check"
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-inside_large_scale#01: hardback/bqvvvx into bookcase_jaysra_0 (0.94 m board, house_single_floor childs_room_1) from bed_rrcvaq_1 (0.49 m, sheet T1); hand-made as alias 160 (no candidates rows for the subtask: the grounder skips it), generation = alias 147's block with the bookcase keys and the overhang pick, BDDL rendered as problem 147; registry mode test, so a re-ground leaves it alone; variant of 152: the 0.52 m board (sheet: raised 18 mm) and no fixed stance side"

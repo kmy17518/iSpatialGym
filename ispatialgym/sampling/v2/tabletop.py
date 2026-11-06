@@ -263,12 +263,15 @@ def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, 
     return float(lateral0) + float(side) * float(h["distance"]), fact
 
 
-def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support, lean_side: float) -> Tuple[Pose, Dict[str, Any]]:
+def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support, lean_side: float, *, wall_gap: Optional[float] = None,
+                    spine_behind: Optional[float] = None, lateral0: Optional[float] = None) -> Tuple[Pose, Dict[str, Any]]:
     """The upright shelf start (owner 2026-10-11 item 3): the object in its rest orientation turned to the edge's yaw (spine toward
     the robot), its spine :data:`SHELF_SPINE_BEHIND_EDGE_M` behind the board's front edge (the raster edge line + half a cell), its
     leaning edge :data:`SHELF_WALL_GAP_M` short of the side board on the ``lean_side`` (:func:`shelf_wall_lateral`), resting on
     the board; gravity does the rest. ``Reject("shelf_wall")`` without a side board there, ``Reject("shelf_board")`` when the
-    bottom edge is off the board."""
+    bottom edge is off the board. oracle-fix 2026-11-06 (inside_large#01, ``iors_large_inside``'s shelf place): ``wall_gap`` /
+    ``spine_behind`` (m) / ``lateral0`` (m along the edge tangent from ``edge.mid``: where the side-board ray starts) replace
+    :data:`SHELF_WALL_GAP_M` and the ``generation.shelf_spine_behind_edge_m`` / ``shelf_bay_lateral_m`` lookups when given."""
     pts = C.transform_points((th.zeros(3), _t(rest_quat)), hull)
     spine = -float(pts[:, 0].min())
     lat_ext = float(pts[:, 1].max()) if lean_side > 0 else -float(pts[:, 1].min())
@@ -276,16 +279,21 @@ def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support
     # oracle-fix 2026-11-04 round 3 (touching#03): ``generation.shelf_spine_behind_edge_m`` (the spine 1 cm behind the edge left the book's
     # bottom-front corners under the start camera's frame border at every kmuacd_0 cell) and ``generation.shelf_bay_lateral_m`` {support: lateral} (the compartment)
     gen = getattr(s, "gen", None)
-    spine_behind = float(gen("shelf_spine_behind_edge_m", SHELF_SPINE_BEHIND_EDGE_M)) if callable(gen) else SHELF_SPINE_BEHIND_EDGE_M
-    bays = gen("shelf_bay_lateral_m") if callable(gen) else None  # {support name: lateral of the compartment's centre, m along the edge tangent}
-    bay = float((bays or {}).get(getattr(support, "name", ""), 0.0)) if isinstance(bays, dict) else 0.0
+    if spine_behind is None:
+        spine_behind = float(gen("shelf_spine_behind_edge_m", SHELF_SPINE_BEHIND_EDGE_M)) if callable(gen) else SHELF_SPINE_BEHIND_EDGE_M
+    if lateral0 is None:
+        bays = gen("shelf_bay_lateral_m") if callable(gen) else None  # {support name: lateral of the compartment's centre, m along the edge tangent}
+        bay = float((bays or {}).get(getattr(support, "name", ""), 0.0)) if isinstance(bays, dict) else 0.0
+    else:
+        bay = float(lateral0)
+    gap = SHELF_WALL_GAP_M if wall_gap is None else float(wall_gap)
     depth = -0.5 * float(top.resolution) + spine_behind + spine
     z_ray = float(top.z) + 0.8 * height
     wall, ray = shelf_wall_lateral(s, edge, depth, z_ray, lean_side, support, bay)
     facts: Dict[str, Any] = {"edge": edge.name, "lean_side": "left" if lean_side > 0 else "right", "depth_m": round(depth, 4), "ray_z": round(z_ray, 4), "ray": ray}
     if wall is None:
         _reject("shelf_wall", f"{support.name}: no side board on the {facts['lean_side']} at {z_ray:.2f} m ({ray})")
-    lat = wall - lean_side * (lat_ext + SHELF_WALL_GAP_M)
+    lat = wall - lean_side * (lat_ext + gap)
     xy = edge.mid + edge.inward * depth + edge.tangent * lat
     pose = object_pose_on(s, hull, rest_quat, xy, edge.yaw, float(top.z))
     world = C.transform_points(pose, hull)

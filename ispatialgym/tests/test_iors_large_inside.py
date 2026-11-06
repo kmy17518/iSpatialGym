@@ -1208,3 +1208,289 @@ def test_inside_free_yaw_gives_the_drawn_row_its_screened_release_yaw():
     assert th.allclose(InsideMode.release_quat(fake, level, other, ROLL_KEY + 90.0), rolled_quat(level, row.pose[0], 90.0), atol=1e-6)
     fake._free_roll_yaw = {}
     assert th.allclose(InsideMode.release_quat(fake, level, row, ROLL_KEY + 90.0), rolled_quat(level, row.pose[0], 90.0), atol=1e-6)
+
+
+# ---------------------------------------------------------------- the shelf place of a standing book (oracle-fix 2026-11-06, owner feedback on inside_large#01)
+
+#: hardback bqvvvx (metadata bbox 0.2318 x 0.1693 x 0.0305 m, base_link offset y -1.5 mm) and its three -y pinches (hardback__bqvvvx__bo grasp_0..2:
+#: the spine edge, 1 cm into the overhang)
+_HB_HALF = th.tensor([0.23184, 0.16927, 0.03049]) / 2
+HB_HULL = th.tensor([[sx * _HB_HALF[0], sy * _HB_HALF[1], sz * _HB_HALF[2]] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]) + th.tensor([0.0, -0.0015, 0.0])
+_BO_QUAT = th.tensor([0.0, -0.76604, -0.64279, 0.0])
+BO_ROWS = [SimpleNamespace(name=n, pose=(th.tensor(p), _BO_QUAT), finger_q=[0.0318, 0.0]) for n, p in
+           (("grasp_0", [0.0, -0.0879, 0.0021]), ("grasp_1", [0.0348, -0.0879, 0.0019]), ("grasp_2", [-0.0348, -0.0879, 0.0022]))]
+X_AXIS, SPINE = th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, -1.0, 0.0])
+#: bookcase_jaysra_0's 0.94 m level (decrypted collision): bays L x 22.399..22.683, M 22.746..23.041, R 23.104..23.388, depth y 12.31..12.64 (the
+#: front edge at +y); the board faces a ray meets going +x / -x
+BAY_FACES_PLUS, BAY_FACES_MINUS = (22.683, 23.041, 23.388), (22.399, 22.746, 23.104)
+SHELF_Z = 0.947
+HB_GEN = {"release_roll_deg": [90.0, -90.0], "release_level": False, "release_roll_axis": "edge_normal", "inside_free_yaw": True, "inside_spine_out": True,
+          "inside_shelf_place": {"spine_behind_edge_m": 0.03, "wall_gap_m": 0.04, "side": "near", "release_lean_deg": 9.0}, "drop_height_m": 0.01}
+
+
+def _bookcase_interior() -> SupportInterior:
+    xs, ys = th.arange(22.41, 23.39, 0.02), th.arange(12.33, 12.64, 0.02)  # the last cell row at 12.63: the front edge 12.64
+    mask = th.ones(len(xs), len(ys), dtype=th.bool)
+    for i, x in enumerate(xs.tolist()):
+        if 22.683 < x < 22.746 or 23.041 < x < 23.104:  # the dividers
+            mask[i] = False
+    return SupportInterior("bookcase_jaysra_0", xs, ys, mask, th.zeros_like(mask), SHELF_Z, 0.0, [], 0.02, headroom=th.full((len(xs), len(ys)), 0.362))
+
+
+def _bay_raycast(starts, ends):
+    x0, x1 = float(starts[0, 0]), float(ends[0, 0])
+    face = min((v for v in BAY_FACES_PLUS if v > x0), default=None) if x1 > x0 else max((v for v in BAY_FACES_MINUS if v < x0), default=None)
+    if face is None:
+        return [{"hit": False}]
+    return [{"hit": True, "rigidBody": "/World/bookcase_jaysra_0/base_link/collisions/board", "distance": abs(face - x0)}]
+
+
+class _ShelfStub:
+    """The inside mode's release / shelf-place hooks on the bookcase level above (the +y side's raster edge: inward -y, tangent +x)."""
+
+    release_quat = IN.InsideMode.release_quat
+    goal_pose_at = IN.InsideMode.goal_pose_at
+    release_above = IN.InsideMode.release_above
+    _log_release_lift = IN.InsideMode._log_release_lift
+    release_lift_per_grasp = IN.InsideMode.release_lift_per_grasp
+    shelf_up_quat = IN.InsideMode.shelf_up_quat
+    shelf_place_at = IN.InsideMode.shelf_place_at
+    roll_fits = IN.InsideMode.roll_fits
+    screen_release_tilts = IN.InsideMode.screen_release_tilts
+    release_tilts_deg = IN.InsideMode.release_tilts_deg
+    num = IL.IORSLarge.num
+
+    def __init__(self, raycast=_bay_raycast, **gen):
+        self.gp = _GP(**{**HB_GEN, **gen})
+        self.hull, self.rest, self.grasps = HB_HULL, th.tensor([0.0, 0.0, 0.0, 1.0]), list(BO_ROWS)
+        self.world = SimpleNamespace(raycast=raycast, spawned={}, bottom_offset=lambda hl, q: -float(G.local_points_world(hl, (th.zeros(3), G.t(q)))[:, 2].min()))
+        self.partner = SimpleNamespace(name="bookcase_jaysra_0", links={"base_link": SimpleNamespace(prim_path="/World/bookcase_jaysra_0/base_link")})
+        top = _bookcase_interior()
+        (name, mid, normal, length), = [e for e in top.edges() if e[0] == "+v"]
+        self.edge = EdgeFrame.from_edge(name, mid, normal, length)
+        self.place = {"top": top, "z": SHELF_Z, "cells": top.cells()}
+        self.screened = []
+        self.ikc = SimpleNamespace(feasible_sets=self._feasible_sets)
+
+    def yaws(self):
+        return [k * 2.0 * math.pi / 16 for k in range(16)]
+
+    def _feasible_sets(self, cells, yaws, grasps, pose_at, place, arm, ignore, **kw):
+        self.screened.append((grasps[0].name, list(yaws)))
+        return {0: [(y, grasps[0]) for y in yaws]}
+
+    def placement(self, arm="right", cell=(22.89, 12.50)):
+        sp = self.shelf_place_at(self.edge, th.tensor(cell), arm)
+        return SimpleNamespace(edge=self.edge, extras={"shelf_place": sp}, stand_off=0.45, lateral=0.0, translate=0.5, tilt=0.0), sp
+
+
+def _long_axis_z(q) -> float:
+    return float(G.rotate(q, X_AXIS)[2])
+
+
+@pytest.mark.parametrize("yaw", [0.0, 0.7, math.pi, -2.2])
+def test_edge_normal_roll_stands_every_bo_row_upright(yaw):
+    """release_roll_axis "edge_normal": the roll turns about the pinched edge's outward normal (object -y for every bo row), so grasp_0..2 stand
+    the book with its long x axis vertical (+90: up, -90: down) and the spine where it was; the radial roll leaves the off-centre pinches 21.6 deg
+    off (the diagonal of the hb30_desk_s41 demo)."""
+    level = G.quat_from_yaw(yaw)
+    for g in BO_ROWS:
+        axis_obj, axis_w = IN.pinched_edge_normal(g.pose[0], level)
+        assert axis_obj.tolist() == [0.0, -1.0, 0.0] and th.allclose(axis_w, G.rotate(level, SPINE), atol=1e-6)
+        for deg in (90.0, -90.0):
+            q = IN.rolled_quat(level, g.pose[0], deg, "edge_normal")
+            assert _long_axis_z(q) == pytest.approx(math.copysign(1.0, deg), abs=1e-5)
+            assert th.allclose(G.rotate(q, SPINE), G.rotate(level, SPINE), atol=1e-5)  # the spine kept
+        radial = IN.rolled_quat(level, g.pose[0], 90.0)
+        off = math.degrees(math.acos(min(1.0, abs(_long_axis_z(radial)))))
+        assert off == pytest.approx(0.0 if g.name == "grasp_0" else 21.6, abs=0.2)
+    assert IN.roll_axis_mode(None) == "radial" and IN.roll_axis_mode("Edge_Normal") == "edge_normal"
+    with pytest.raises(ValueError):
+        IN.roll_axis_mode("spine")
+    assert IN.pinched_edge_normal(th.tensor([0.0, 0.0, 0.05]), level) is None  # on the vertical through the origin
+
+
+def test_release_quat_reads_the_roll_axis_key():
+    s = _ShelfStub()
+    s._shelf_ctx = None
+    level = G.quat_from_yaw(0.4)
+    assert _long_axis_z(s.release_quat(level, BO_ROWS[1], IN.ROLL_KEY + 90.0)) == pytest.approx(1.0, abs=1e-5)
+    s.gp.generation["release_roll_axis"] = None
+    assert _long_axis_z(s.release_quat(level, BO_ROWS[1], IN.ROLL_KEY + 90.0)) == pytest.approx(math.cos(math.radians(21.6)), abs=3e-3)
+    s.gp.generation["release_roll_axis"] = "sideways"
+    with pytest.raises(Reject) as e:
+        s.release_quat(level, BO_ROWS[1], IN.ROLL_KEY + 90.0)
+    assert e.value.reason == "spec"
+
+
+@pytest.mark.parametrize("outward", [(0.0, 1.0), (0.0026, 1.0), (-0.6, -0.8)])
+def test_spine_out_yaw_faces_the_opening(outward):
+    """inside_spine_out: the screened yaw of every row / roll turns the spine (the pinched edge's outward normal) out of the opening - exactly at
+    tolerance 0 (bookcase_jaysra_0's raster side is 0.15 deg off +y: no grid yaw would do); with a tolerance the grid yaws within it follow."""
+    o = th.tensor(outward) / th.linalg.norm(th.tensor(outward))
+    place = SimpleNamespace(edge=EdgeFrame("+v", th.zeros(2), -o, 1.0))
+    s = _ShelfStub()
+    s._shelf_ctx = None
+    for g in BO_ROWS:
+        for t in (IN.ROLL_KEY + 90.0, IN.ROLL_KEY - 90.0):
+            ys = IN.spine_out_yaws(s, g, t, place, 0.0)
+            assert len(ys) == 1
+            q = s.release_quat(G.qmul(G.quat_from_yaw(ys[0]), s.rest), g, t)
+            assert IN.spine_facing(q, SPINE, o) >= 0.97 and IN.spine_facing(q, SPINE, o) == pytest.approx(1.0, abs=1e-5)
+            assert abs(_long_axis_z(q)) == pytest.approx(1.0, abs=1e-5)
+            near = IN.spine_out_yaws(s, g, t, place, math.radians(30.0))
+            assert near[0] == ys[0] and len(near) >= 2
+            for y in near[1:]:
+                q_y = s.release_quat(G.qmul(G.quat_from_yaw(y), s.rest), g, t)
+                assert IN.spine_facing(q_y, SPINE, o) >= math.cos(math.radians(30.0)) - 1e-5
+    assert IN.spine_out_tol(None) == 0.0 and IN.spine_out_tol(10) == pytest.approx(math.radians(10.0))
+    with pytest.raises(ValueError):
+        IN.spine_out_tol(-1)
+
+
+def test_screen_spine_out_draws_the_spine_out_yaw():
+    """The release screen with inside_spine_out: each rolled row screened at its spine-out yaw only, the drawn row released there (the free-yaw
+    map); without inside_free_yaw a spec reject."""
+    s = _ShelfStub(inside_shelf_place=None)
+    place = SimpleNamespace(edge=s.edge, extras={}, stand_off=0.45, lateral=0.0, translate=0.5, tilt=0.0)
+    out, tilts_of = s.screen_release_tilts([], [22.89, 12.50], [0.0, math.pi / 2], 0.0, place, "right", [], math.pi / 8)
+    assert len(s.screened) == 6 and all(len(ys) == 1 and ys[0] == pytest.approx(math.pi, abs=1e-4) for _, ys in s.screened)  # spine -y -> world +y
+    assert len(s._free_roll_yaw) == 6 and all(v == pytest.approx(math.pi, abs=1e-4) for v in s._free_roll_yaw.values()) and len(out) == 6
+    q = s.release_quat(G.quat_from_yaw(0.3), BO_ROWS[2], IN.ROLL_KEY - 90.0)  # drawn at any carried yaw
+    assert IN.spine_facing(q, SPINE, th.tensor([0.0, 1.0])) == pytest.approx(1.0, abs=1e-5) and s._shelf_ctx is None
+    with pytest.raises(Reject) as e:
+        _ShelfStub(inside_free_yaw=False).screen_release_tilts([], [22.89, 12.50], [0.0], 0.0, place, "right", [], math.pi / 8)
+    assert e.value.reason == "spec"
+    with pytest.raises(Reject):
+        IN._shelf_spec(_ShelfStub(inside_spine_out=False), checked=True)
+
+
+def test_shelf_place_spec_key():
+    assert IN.shelf_place_spec(None) is None and IN.shelf_place_spec(False) is None
+    assert IN.shelf_place_spec(True) == IN.SHELF_PLACE_DEFAULTS
+    sp = IN.shelf_place_spec({"wall_gap_m": 0.05, "side": "Left", "jaw_clear_m": None})
+    assert sp["wall_gap_m"] == 0.05 and sp["side"] == "left" and sp["jaw_clear_m"] is None and sp["release_lean_deg"] == 9.0
+    for bad in ({"side": "far"}, {"gap": 0.04}, {"release_lean_deg": 50}, {"wall_gap_m": -0.01}, [0.04]):
+        with pytest.raises(ValueError):
+            IN.shelf_place_spec(bad)
+    assert IN.shelf_lean_side("near", "right") == -1.0 and IN.shelf_lean_side("near", "left") == 1.0 and IN.shelf_lean_side("left", "right") == 1.0
+    from ispatialgym.oracle.actions import RETREAT_DIST
+
+    assert IN.SHELF_PLACE_DEFAULTS["jaw_sweep_m"] == RETREAT_DIST  # the open jaw's sweep = the oracle place's retreat along -a
+
+
+@pytest.mark.parametrize("arm, cell, board_x", [("right", (22.89, 12.50), 22.746), ("left", (22.89, 12.50), 23.041), ("right", (22.54, 12.50), 22.399),
+                                                ("left", (22.54, 12.50), 22.683)])
+def test_shelf_place_puts_the_spine_behind_the_front_edge_and_the_cover_off_the_board(arm, cell, board_x):
+    """inside_shelf_place: the upright spine-out book in the goal cell's bay, its spine 0.03 m behind the board's front edge (y 12.64), its near
+    cover wall_gap_m (0.04) from the side board on the working arm's side; the release leans 9 deg toward that board, 1 cm above the board, moved
+    off it per row until the fully open jaw (and its retreat) keeps 5 mm from it; the footprint fits; without the jaw rule the release stays at
+    the upright pose (the near cover 4 cm off at mid-height, the top corner 2.2 cm)."""
+    s = _ShelfStub()
+    place, sp = s.placement(arm, cell)
+    side = -1.0 if arm == "right" else 1.0
+    assert sp["lean_side"] == side and sp["side"] == ("right" if arm == "right" else "left") and sp["side_rule"] == "near"
+    up = (th.tensor([sp["xy"][0], sp["xy"][1], 1.06]), th.tensor(sp["up_quat"]))
+    pts = G.local_points_world(HB_HULL, up)
+    assert float(pts[:, 1].max()) == pytest.approx(12.64 - 0.03, abs=1e-4)  # the spine
+    assert side * board_x - float((side * pts[:, 0]).max()) == pytest.approx(0.04, abs=1e-4)  # the near cover
+    assert abs(_long_axis_z(up[1])) == pytest.approx(1.0, abs=1e-5) and IN.spine_facing(up[1], SPINE, th.tensor([0.0, 1.0])) == pytest.approx(1.0, abs=1e-5)
+    assert float(s.edge.mid[0]) + side * sp["board_u_m"] == pytest.approx(board_x, abs=1e-4)
+    s._shelf_ctx = IN.shelf_context(s, place)
+    moved = []
+    for g in BO_ROWS:
+        for t in (IN.ROLL_KEY + 90.0, IN.ROLL_KEY - 90.0):
+            yaw = IN.spine_out_yaws(s, g, t, place, 0.0)[0]
+            q = s.release_quat(G.qmul(G.quat_from_yaw(yaw), s.rest), g, t)
+            assert abs(_long_axis_z(q)) == pytest.approx(math.cos(math.radians(9.0)), abs=1e-5)
+            assert side * float(G.rotate(q, X_AXIS)[0]) * math.copysign(1.0, _long_axis_z(q)) > 0.15  # the top leans toward the board
+            pose = s.goal_pose_at(sp["xy"], q, g.pose)
+            w = G.local_points_world(HB_HULL, pose)
+            assert float(w[:, 2].min()) == pytest.approx(SHELF_Z + 0.01, abs=1e-5)  # drop_height_m
+            assert float(w[:, 1].max()) == pytest.approx(12.61, abs=1e-4) and float(pose[0][1]) == pytest.approx(sp["xy"][1], abs=1e-6)
+            reach = IN.open_jaw_reach(IL.IK.grasp_pose(pose, g.pose), s.edge.mid, s.edge.inward, side, 0.02, 0.10, 0.005)
+            assert reach + 0.005 == pytest.approx(sp["board_u_m"], abs=2e-4)  # the open jaw binds: 5 mm from the board
+            assert side * board_x - float((side * w[:, 0]).max()) > 0.02
+            assert s.roll_fits(pose[0][:2], q) is None
+            moved.append(IN.shelf_release_xy(s, sp["xy"], q, g.pose)[2])
+    assert 0.005 < min(moved) and max(moved) < 0.03  # 0.8 .. 2.7 cm for the bbox hull
+    s._shelf_ctx["jaw_clear"] = None
+    s._shelf_ctx["memo"].clear()
+    q = s.release_quat(G.qmul(G.quat_from_yaw(math.pi), s.rest), BO_ROWS[0], IN.ROLL_KEY + 90.0)
+    pose = s.goal_pose_at(sp["xy"], q, BO_ROWS[0].pose)
+    assert float(pose[0][0]) == pytest.approx(sp["xy"][0], abs=1e-6)
+    w = G.local_points_world(HB_HULL, pose)
+    assert side * board_x - float((side * w[:, 0]).max()) == pytest.approx(0.022, abs=1e-3)  # the leaned top corner
+    assert float(s.goal_pose_at(sp["xy"], s.rest)[0][0]) == pytest.approx(sp["xy"][0], abs=1e-6)  # a flat orientation: not the context's
+
+
+def test_shelf_place_without_a_side_board_drops_the_cell(caplog):
+    s = _ShelfStub(raycast=lambda a, b: [{"hit": True, "rigidBody": "/World/walls/wall_3", "distance": 0.2}])
+    with caplog.at_level("INFO", logger="ispatialgym.sampling.v2"):
+        assert s.shelf_place_at(s.edge, th.tensor([22.89, 12.50]), "right") is None
+    assert "shelf_wall" in caplog.text and s.place["shelf_places"]
+    assert s.shelf_place_at(s.edge, th.tensor([22.89, 12.50]), "right") is None  # memoised
+
+
+def test_shelf_screen_and_release_eef_in_object():
+    """The screen at a shelf C: the rolled rows at the spine-out yaw, leaned, each release at its own xy (the drawn row's at the goal check via the
+    recorded grasp's T_obj->eef)."""
+    s = _ShelfStub()
+    place, sp = s.placement("right")
+    out, _ = s.screen_release_tilts([], sp["xy"], [0.0], 0.0, place, "right", [], math.pi / 8)
+    assert len(out) == 3 and s._shelf_ctx is not None and len(s._shelf_ctx["quats"]) == 2 and len(s._shelf_ctx["memo"]) == 6  # 1 init yaw x 3 rows
+    rec = SimpleNamespace(eef_in_object=BO_ROWS[2].pose)
+    s.sidecar, s.tname = SimpleNamespace(grasp_of=lambda name: rec), "hardback.n.01_1"
+    assert IN.InsideMode.release_eef_in_object(s) is rec.eef_in_object
+    q = s.release_quat(G.quat_from_yaw(1.0), BO_ROWS[2], IN.ROLL_KEY + 90.0)
+    a = s.goal_pose_at(sp["xy"], q, IN.InsideMode.release_eef_in_object(s))
+    b = s.goal_pose_at(sp["xy"], th.tensor([float(v) for v in q]), BO_ROWS[2].pose)  # the summary's goal_quat floats
+    assert th.allclose(a[0], b[0]) and float(a[0][0]) > sp["xy"][0] + 0.005
+
+
+def test_shelf_lean_pose_wall_gap_spine_and_ray_start_parameters():
+    """tabletop.shelf_lean_pose's oracle-fix 2026-11-06 keywords: the wall gap, the spine depth and where the side-board ray starts; the
+    defaults stay SHELF_WALL_GAP_M / the generation keys (iors_small's touching#03 start)."""
+    import types
+
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    s = _ShelfStub()
+    q_up = s.shelf_up_quat(s.edge)
+    rest_up = G.qmul(G.quat_from_yaw(-s.edge.yaw), q_up)
+    rays = []
+    s.world.raycast = lambda a, b: rays.append(a.clone()) or _bay_raycast(a, b)
+    lat0 = 22.54 - float(s.edge.mid[0])
+    pose, facts = TT.shelf_lean_pose(s, HB_HULL, rest_up, s.place["top"], s.edge, s.partner, 1.0, wall_gap=0.05, spine_behind=0.025, lateral0=lat0)
+    pts = G.local_points_world(HB_HULL, pose)
+    assert float(rays[-1][0, 0]) == pytest.approx(22.54, abs=1e-5) and float(pts[:, 0].max()) == pytest.approx(22.683 - 0.05, abs=1e-4)
+    assert float(pts[:, 1].max()) == pytest.approx(12.64 - 0.025, abs=1e-4) and facts["wall_lateral_m"] == pytest.approx(22.683 - float(s.edge.mid[0]), abs=1e-4)
+    s.gen = types.MethodType(lambda self_, k, d=None: d, s)  # no generation keys: the defaults
+    pose0, _ = TT.shelf_lean_pose(s, HB_HULL, rest_up, s.place["top"], s.edge, s.partner, 1.0)
+    pts0 = G.local_points_world(HB_HULL, pose0)
+    assert float(pts0[:, 0].max()) == pytest.approx(23.041 - TT.SHELF_WALL_GAP_M, abs=1e-4)  # the ray from the edge midpoint (bay M)
+    assert float(pts0[:, 1].max()) == pytest.approx(12.64 - TT.SHELF_SPINE_BEHIND_EDGE_M, abs=1e-4)
+
+
+def test_goal_region_keeps_bays_l_and_m_of_the_desk_alias():
+    """generation.inside_goal_region of the desk alias: bays L and M of bookcase_jaysra_0 (bay R's board sits 2.5 cm above the 0.947 m raster)."""
+    import json
+
+    from ispatialgym import REPO_ROOT
+
+    customs = json.load(open(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")))
+    gen = customs["inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk"]["generation"]
+    region = IN.goal_region(gen["inside_goal_region"])
+    assert region == {"frame": "world", "x": [22.40, 23.04], "y": None}
+    top = _bookcase_interior()
+    cells = top.cells()
+    kept = cells[IN.in_goal_region(cells, region)]
+    assert float(kept[:, 0].max()) < 23.041 and float(kept[:, 0].min()) >= 22.40 and bool(((kept[:, 0] > 22.746) & (kept[:, 0] < 23.041)).any())
+    assert not bool((kept[:, 0] > 23.104).any()) and len(kept) < len(cells)
+    for alias in ("desk", "bed", "bed_side_any", "bed_shelf052"):
+        g = customs[f"inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-{alias}"]["generation"]
+        assert g["release_roll_axis"] == "edge_normal" and g["inside_spine_out"] is True and g["inside_free_yaw"] is True and g["drop_height_m"] == 0.01
+        spec = IN.shelf_place_spec(g["inside_shelf_place"])
+        assert (spec["spine_behind_edge_m"], spec["wall_gap_m"], spec["side"], spec["release_lean_deg"]) == (0.03, 0.04, "near", 9.0)
+        assert all(f"_{k}_note" in g for k in ("release_roll_axis", "inside_spine_out", "inside_shelf_place", "drop_height_m"))
+        assert ("inside_goal_region" in g) == (alias == "desk")
