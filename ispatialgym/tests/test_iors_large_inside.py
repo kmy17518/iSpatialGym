@@ -1471,3 +1471,26 @@ def test_shelf_lean_pose_wall_gap_spine_and_ray_start_parameters():
     assert float(pts0[:, 0].max()) == pytest.approx(23.041 - TT.SHELF_WALL_GAP_M, abs=1e-4)  # the ray from the edge midpoint (bay M)
     assert float(pts0[:, 1].max()) == pytest.approx(12.64 - TT.SHELF_SPINE_BEHIND_EDGE_M, abs=1e-4)
 
+
+def test_goal_region_keeps_bays_l_and_m_of_the_desk_alias():
+    """generation.inside_goal_region of the desk alias: bays L and M of bookcase_jaysra_0 (bay R's board sits 2.5 cm above the 0.947 m raster)."""
+    import json
+
+    from ispatialgym import REPO_ROOT
+
+    customs = json.load(open(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")))
+    gen = customs["inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk"]["generation"]
+    region = IN.goal_region(gen["inside_goal_region"])
+    assert region == {"frame": "world", "x": [22.40, 23.04], "y": None}
+    top = _bookcase_interior()
+    cells = top.cells()
+    kept = cells[IN.in_goal_region(cells, region)]
+    assert float(kept[:, 0].max()) < 23.041 and float(kept[:, 0].min()) >= 22.40 and bool(((kept[:, 0] > 22.746) & (kept[:, 0] < 23.041)).any())
+    assert not bool((kept[:, 0] > 23.104).any()) and len(kept) < len(cells)
+    for alias in ("desk", "bed", "bed_side_any", "bed_shelf052"):
+        g = customs[f"inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-{alias}"]["generation"]
+        assert g["release_roll_axis"] == "edge_normal" and g["inside_spine_out"] is True and g["inside_free_yaw"] is True and g["drop_height_m"] == 0.01
+        spec = IN.shelf_place_spec(g["inside_shelf_place"])
+        assert (spec["spine_behind_edge_m"], spec["wall_gap_m"], spec["side"], spec["release_lean_deg"]) == (0.03, 0.04, "near", 9.0)
+        assert all(f"_{k}_note" in g for k in ("release_roll_axis", "inside_spine_out", "inside_shelf_place", "drop_height_m"))
+        assert ("inside_goal_region" in g) == (alias == "desk")
