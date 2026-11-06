@@ -9566,7 +9566,7 @@
    },
    "direction": "close",
    "prompt0": {
-    "beta_max_deg": 20.0,
+    "beta_max_deg": 40.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
     "d_scan_max_m": 1.1,
@@ -9612,7 +9612,8 @@
    "_r3e_note": "oracle-fix 2026-11-04 round 3 (cabinet diagnosis): in all 53 cabinet demos j_link_2 moved <= 0.0006 rad - the door is friction-locked (stock PhysX 0.2 x (|F| + |T|) loaded by the leaf weight and the pull, r 0.365 m lever), the hand stalls, arm lag 1.8-40 deg, the torso bends linearly to > 1 deg (the robot_wobble), the re-grasp then closes 36-72 mm off the bar (failed_grasp). The dishwasher passes with the counterbalance record: counterbalance true (gravity off on the leaf, damping 5) + joint_friction [0.05]",
    "_neighbour_note": "oracle-fix 2026-11-04 round 3: the AG joint holds link_2 (logged) yet the door never moves: j_link_2's 8 mm bar stands 70 mm from the neighbouring door's bar (j_link_0#B; the double door's centre) - the closed gripper jams against the closed neighbour. other_joints_init j_link_0 1.4 rad (held open in the template and the instance; Open restricted to j_link_2 via the joint_friction record's openable_joints)",
    "floor_collision_filter": false,
-   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success"
+   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success",
+   "_prompt0_beta_max_deg_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 articulation close / open_large#03: repeats_eval 46 of 60 / most rejections, 0 written in 3579 s): the measured goal (the cabinet's link poses) is the template's own - every train attempt matches the eval's at 0.00 m / 0 deg - so the start base alone separates them, and Phase 1 draws it on a bearing U(-20, 20) deg at the nearest seeing distance: two draws within 15 deg / 0.25 m of each other ~60 % of the time per eval instance (rejected gaps 0.00-0.25 m / 0-14 deg); bearings U(-40, 40) deg halve that (~34 %), an infeasible bearing is redrawn by Phase 1"
   },
   "constraints": []
  },
@@ -12328,7 +12329,7 @@
    },
    "direction": "open",
    "prompt0": {
-    "beta_max_deg": 20.0,
+    "beta_max_deg": 40.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
     "d_scan_max_m": 1.1
@@ -12362,7 +12363,8 @@
    "_r3e_note": "oracle-fix 2026-11-04 round 3 (cabinet diagnosis): in all 53 cabinet demos j_link_2 moved <= 0.0006 rad - the door is friction-locked (stock PhysX 0.2 x (|F| + |T|) loaded by the leaf weight and the pull, r 0.365 m lever), the hand stalls, arm lag 1.8-40 deg, the torso bends linearly to > 1 deg (the robot_wobble), the re-grasp then closes 36-72 mm off the bar (failed_grasp). The dishwasher passes with the counterbalance record: counterbalance true (gravity off on the leaf, damping 5) + joint_friction [0.05]",
    "_neighbour_note": "oracle-fix 2026-11-04 round 3: the AG joint holds link_2 (logged) yet the door never moves: j_link_2's 8 mm bar stands 70 mm from the neighbouring door's bar (j_link_0#B; the double door's centre) - the closed gripper jams against the closed neighbour. other_joints_init j_link_0 1.4 rad (held open in the template and the instance; Open restricted to j_link_2 via the joint_friction record's openable_joints)",
    "floor_collision_filter": false,
-   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success"
+   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success",
+   "_prompt0_beta_max_deg_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 articulation close / open_large#03: repeats_eval 46 of 60 / most rejections, 0 written in 3579 s): the measured goal (the cabinet's link poses) is the template's own - every train attempt matches the eval's at 0.00 m / 0 deg - so the start base alone separates them, and Phase 1 draws it on a bearing U(-20, 20) deg at the nearest seeing distance: two draws within 15 deg / 0.25 m of each other ~60 % of the time per eval instance (rejected gaps 0.00-0.25 m / 0-14 deg); bearings U(-40, 40) deg halve that (~34 %), an infeasible bearing is redrawn by Phase 1"
   },
   "constraints": []
  },
