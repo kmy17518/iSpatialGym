@@ -1351,13 +1351,8 @@ class Motions:
             except Exception as e:  # noqa: BLE001
                 rec["why"] = f"no goal pose ({e!r})"[:160]
                 return False
-        gp, gq = (x.float() for x in as_world_pose(goal_pose))
-        here = self.eef_pose(arm)
-        z_top = max(float(here[0][2]), float(gp[2])) + float(self.cfg.transit_dip_lift_m)
-        legs = [("straight", [(gp, gq)]),
-                ("up-over-down", [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(gp[0]), float(gp[1]), z_top]), gq), (gp, gq)])]
         tried = []
-        for name, wps in legs:
+        for name, wps in self._cartesian_legs(arm, goal_pose):
             try:
                 segments, why = self._cartesian_transit(arm, wps, q_end)
             except Exception as e:  # noqa: BLE001 - a backend without the checks: the plan runs as before
@@ -1374,6 +1369,46 @@ class Motions:
         rec.update({"tried": tried, "why": f"the plan dips {dip[0] * 100:.1f} cm but no Cartesian leg qualifies: planned as before"})
         log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end; no Cartesian leg qualifies (%s): the plan runs", arm, dip[0] * 100, "; ".join(tried))
         return False
+
+    def _cartesian_legs(self, arm: str, goal_pose: Any) -> List[Tuple[str, List[Pose]]]:
+        """The Cartesian legs from the hand to ``goal_pose`` (:meth:`_dip_gate`, :meth:`cartesian_transit`), in the order tried: straight,
+        else up ``transit_dip_lift_m`` above the higher end, across at that height, down."""
+        gp, gq = (x.float() for x in as_world_pose(goal_pose))
+        here = self.eef_pose(arm)
+        z_top = max(float(here[0][2]), float(gp[2])) + float(self.cfg.transit_dip_lift_m)
+        return [("straight", [(gp, gq)]),
+                ("up-over-down", [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(gp[0]), float(gp[1]), z_top]), gq), (gp, gq)])]
+
+    def cartesian_transit(self, arm: str, pose: Any, q_end: Any, approach: Sequence[Any] = (), ignore_objects=()) -> Generator[th.Tensor, None, Dict[str, Any]]:
+        """oracle-fix 2026-11-06 (owner, inside_large#02: "when grasping the jar the hand seems to brush on the table's surface"): the hand
+        to ``pose`` along :meth:`_cartesian_legs` (straight, else up-over-down), tracked with the world's collisions checked - the world
+        synced with only ``ignore_objects`` left out (the supports stay) - ending in ``q_end``'s IK branch (the sampler's witness) with
+        ``approach`` tracking from its end, as the dipping-transit gate's legs (:meth:`_cartesian_transit`). The grasp transit's step
+        before its supports-ignored fallback: with the table left out the straight joint ramp of 0.26 m dropped the open hand to the table
+        top (eef z 0.715 m over a 0.706 m surface, both ends 0.76-0.85 m) and slid it 44 cm along it. Streams the leg and returns
+        ``{"leg", "why", "tried"}``; SkillError(plan_failed) when no leg qualifies - nothing moved."""
+        if q_end is None:
+            raise SkillError("plan_failed", "no witness configuration for a Cartesian transit (its IK branch)", stage="cartesian_transit")
+        self.backend.update_world(ignore_objects=list(ignore_objects or ()))
+        prev = self._dip
+        self._dip = {"arm": arm, "approach": list(approach or ()), "record": {}}
+        tried: List[str] = []
+        try:
+            for name, wps in self._cartesian_legs(arm, pose):
+                try:
+                    segments, why = self._cartesian_transit(arm, wps, q_end)
+                except Exception as e:  # noqa: BLE001 - a backend without the checks: no leg
+                    segments, why = None, f"no check ({e!r})"[:160]
+                tried.append(f"{name}: {why}")
+                if segments is None:
+                    continue
+                for q_traj, steps in segments:
+                    yield from self.execute_joint_trajectory(self._retime(q_traj, steps), arms=[arm])
+                log.info("arm_to(%s): Cartesian %s leg to the pose with the world present (%s)", arm, name, "; ".join(tried))
+                return {"leg": name, "why": why, "tried": tried}
+        finally:
+            self._dip = prev
+        raise SkillError("plan_failed", f"no Cartesian leg qualifies ({'; '.join(tried)})"[:300], stage="cartesian_transit")
 
     def _protect_gate(self, arms: Sequence[str], emb: str, res: Any, goal_pose: Any, q_goal: Optional[th.Tensor],
                       replan: Callable[[], Any]) -> Generator[th.Tensor, None, Tuple[bool, Any]]:

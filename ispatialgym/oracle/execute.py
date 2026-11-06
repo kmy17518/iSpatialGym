@@ -408,6 +408,10 @@ class ExecuteConfig:
     #: support near it - inside their footprints, over their tops (a table / desk contact, not a wall) - planned directly as above
     #: (m; None = off, only ``pre_pose_standoff_skip_m``; the owner's value 0.06)
     pre_pose_standoff_skip_above_m: Optional[float] = None
+    #: oracle-fix 2026-11-06 (owner, inside_large#02 jar: the hand brushed the table on its way to the grasp): when no plan reaches the
+    #: pre-grasp with the supports present, a Cartesian leg (straight, else up-over-down) tracked with them present comes before the
+    #: supports-ignored plan (``Motions.cartesian_transit``); False = straight to the supports-ignored plan, as before
+    pre_grasp_cartesian_fallback: bool = True
     #: (owner 2026-09-18 12:42) a straight push's pre-pose sits this far above / before its first contact pose (m; None = the record's 10 cm)
     push_pre_dist_m: Optional[float] = 0.04
     #: (touching#04 2026-10-12) the transit to a free object's push pre-contact is planned with the pushed object in the collision world -
@@ -908,6 +912,10 @@ def reach_via_standoff(motions: Motions, arm: str, pre, distance: float, q_hint,
             log.warning("grasp(%s): the standoff plan with %s failed (%s)", arm, tag, e.message)
             rec.setdefault("failures", []).append(f"{tag}: {e.message[:100]}")
     else:
+        # oracle-fix 2026-11-06: a Cartesian leg with the supports present first (``cartesian_before_ignoring``)
+        if (yield from cartesian_before_ignoring(motions, arm, pre, q_hint, (), ctx, "; ".join(rec.get("failures") or ["no plan to the standoff"]))):
+            rec["fallback"] = "cartesian"
+            return
         log.warning("grasp(%s): no plan to the standoff; direct plan to the pre-grasp with the supports ignored", arm)
         rec["fallback"] = "direct"
         ctx["pre_grasp_transit"] = "supports ignored (direct fallback)"
@@ -1746,9 +1754,36 @@ def _grasp_transit(action: Grasp, motions: Motions, state, targets, ctx, arm: st
         except SkillError as e:
             if e.details.get("stage") == "protected":
                 raise
+            if (yield from cartesian_before_ignoring(motions, arm, targets["pre_grasp"], _witness(ctx, "pre_grasp"), targets.get("approach") or (), ctx, e.message)):
+                return
             log.warning("grasp(%s): no transit to the pre-grasp with the supports present (%s); planning with them ignored", arm, e.message)
             ctx["pre_grasp_transit"] = f"supports ignored (fallback: {e.message[:80]})"
             yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
+
+
+def cartesian_before_ignoring(motions: Motions, arm: str, pre, q_hint, approach: Sequence[Any], ctx: Dict[str, Any], failure: str,
+                              ignore: Sequence[Any] = ()) -> Generator[th.Tensor, None, bool]:
+    """oracle-fix 2026-11-06 (``ExecuteConfig.pre_grasp_cartesian_fallback``; owner, inside_large#02: "when grasping the jar the hand seems to
+    brush on the table's surface"): before a grasp transit leaves its supports out of the collision world, the hand goes to the pre-grasp
+    ``pre`` along a Cartesian leg tracked with them present (``Motions.cartesian_transit``: straight, else up-over-down, in the witness's
+    IK branch, the approach tracking from its end). The jar (0000 of fix1 inside_large_02): every plan with the table present failed
+    (the straight joint ramp penetrated it at 66 / 173, via ready at 37 / 98, trajopt), the supports-ignored straight ramp then dropped
+    the open hand onto the table top and slid it 44 cm along it (fingers 48 steps, gripper body 52; trainfast: the fallback on 129 of 3455
+    grasps). ``ignore``: what the failed plans had left out already (kept out). True = the leg ran (``ctx["pre_grasp_transit"]``)."""
+    if not _cfg(ctx).pre_grasp_cartesian_fallback or not hasattr(motions, "cartesian_transit"):
+        return False
+    try:
+        rec = yield from motions.cartesian_transit(arm, pre, q_hint, approach=approach, ignore_objects=ignore)
+    except SkillError as e2:
+        if e2.details.get("stage") == "protected":
+            raise
+        log.info("grasp(%s): no Cartesian leg to the pre-grasp with the supports present either (%s)", arm, e2.message[:200])
+        ctx["pre_grasp_cartesian"] = {"ran": False, "why": e2.message[:240]}
+        return False
+    log.warning("grasp(%s): no plan to the pre-grasp with the supports present (%s); a Cartesian %s leg with them present instead", arm, failure[:160], rec["leg"])
+    ctx["pre_grasp_cartesian"] = {"ran": True, **rec}
+    ctx["pre_grasp_transit"] = f"cartesian {rec['leg']} leg, supports present (fallback: {failure[:80]})"
+    return True
 
 
 def _protected_for(ctx, state, target: Optional[str] = None) -> List[Tuple[str, Any]]:

@@ -345,7 +345,7 @@ TASK_TRACKING_ATTRS = ("metrics_state",)
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
              "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "follow", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit",
-             "navigate_arms_reposed", "navigate_arms_source", "retreat_partial_m", "retreat_start_contacts", "retreat_start_offenders", "brace_allowed",
+             "pre_grasp_cartesian", "navigate_arms_reposed", "navigate_arms_source", "retreat_partial_m", "retreat_start_contacts", "retreat_start_offenders", "brace_allowed",
              "push_strokes", "push_contact_form")
 
 
