@@ -234,9 +234,11 @@ PUSH_SWEEP_MIN_HEIGHT_M = {"blade": 0.005, "tip_h": 0.05, "tip_v": 0.062, "pad":
 PUSH_SWEEP_WINDOW_M = 0.01
 #: the footprint the push line goes through: the target's hull cut this far above its bottom (the part it stands on)
 PUSH_SWEEP_BASE_CUT_M = 0.005
-#: the raised blade (palm above the top) is the sweep's last resort only for a target this tall over its smallest footprint side or less
-#: (``generation.push_raised_max_aspect``): a taller one rocks when pushed near its top (the spray bottle: 3.6 -> 20.3 deg)
-PUSH_RAISED_MAX_ASPECT = 1.5
+#: the raised blade (palm above the top) is the sweep's last resort for a target this tall over its smallest footprint side or less
+#: (``generation.push_raised_max_aspect``; default: every target - the sweep tries every lower contact first): the spray bottle aliases set
+#: 1.5 (it rocked 3.6 -> 20.3 deg pushed near its top); with 1.5 for every alias touching_02's cereal box lost its only feasible class
+#: (fix1 2026-11-06: 1 instance in 146 attempts vs trainfast's 33 per instance, 9 goal-check contact_unreachable)
+PUSH_RAISED_MAX_ASPECT = math.inf
 
 
 def _spa_json_default(o):

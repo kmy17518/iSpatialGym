@@ -80,8 +80,15 @@ def test_candidates_rise_from_the_lowest_height_on_the_footprint_centre_line():
     cands, hull_w = _candidates(s)
     hs = [c[2]["contact_height_m"] for c in cands]
     assert hs == sorted(hs) and hs[0] <= 0.5 * H
-    assert max(hs) <= 0.5 * H + 1e-6  # nothing above half the height: the raised blade is not offered to the tall bottle
-    assert not any(k.startswith("push_blade_0_high") for k, _, _ in cands)
+    # the raised blade is the sweep's last resort by default (touching_02's cereal box needs it); everything before it at most half the height
+    assert [c[0] for c in cands[-2:]] == ["push_blade_0_high-", "push_blade_0_high"] and max(hs[:-2]) <= 0.5 * H + 1e-6
+    # the spray-bottle aliases set push_raised_max_aspect 1.5: not offered to the tall bottle (it rocked pushed near its top)
+    s_spray = _sampler(gen={"push_raised_max_aspect": 1.5})
+    cands_spray, _ = _candidates(s_spray)
+    assert not any(k.startswith("push_blade_0_high") for k, _, _ in cands_spray)
+    assert max(c[2]["contact_height_m"] for c in cands_spray) <= 0.5 * H + 1e-6
+    cands = cands_spray
+    hs = [c[2]["contact_height_m"] for c in cands]
     # the lowest: the vertical blade's tips 5 mm above the table, its two wrist turns together, then the leaning blades at 2.5 cm and
     # the horizontal fingertip push at 5 cm
     assert [c[0] for c in cands[:2]] == ["push_blade_0-", "push_blade_0"] and hs[0] == pytest.approx(0.005)
