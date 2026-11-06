@@ -947,7 +947,8 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, min_standoff: Optional[float] = None,
                check_drive_in: bool = True, path_end_standoff: Optional[float] = None,
                arm_q_override: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None,
-               extra_max: float = TRANSITION_EXTRA_MAX, blame: Optional[Any] = None) -> Optional[Transition]:
+               extra_max: float = TRANSITION_EXTRA_MAX, blame: Optional[Any] = None, arms_to_q: Optional[Dict[str, th.Tensor]] = None,
+               fingers: Optional[float] = None) -> Optional[Transition]:
     """§3.8: the smallest ``s_T ∈ transition_standoffs(s)`` (``s`` = the arriving stance's stand-off, driven back along
     -inward) at which (a) the swept trunk motion (``n_samples`` trunks between the two stances' values, both endpoints
     included) and (b) the **drive-in** ``s_T → s`` (``check_drive_in``, strides of ``STRIDE_M`` at the arriving trunk)
@@ -967,7 +968,13 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     so the sweep / drive-in / drive-back are checked with that arm there instead of the stances' recorded postures
     (IORS large-scale 0919-211642: the sweep into the placement crouch was checked with the untucked arm while the
     oracle held the sandal at the lift pose, and the sandal brushed the table top). ``trunk_from``: the trunk the robot
-    arrives with when it differs from ``stance_from``'s (a departure transition straightened it to a travel trunk)."""
+    arrives with when it differs from ``stance_from``'s (a departure transition straightened it to a travel trunk).
+
+    ``arms_to_q`` (arm -> 7 joint values; oracle-fix 2026-11-06, the shelf back-off ``generation.shelf_backoff_transit_m``): arms the
+    oracle moves to these joints AFTER the drive-back, before the trunk motion (the record's ``arms_q``, ``execute.move_idle_arms``) -
+    the sweep and the drive-in are checked with them, the drive-back from the path's end with the departing arms as they are; a
+    holding arm's ``arm_q_override`` wins. ``fingers``: the arriving arms' finger opening for the sweep and the drive-in (the opening
+    the oracle pre-shapes to before the arms move, ``transitions[].preshape_m``); None = the arriving stance's, as before."""
     tf, tt = (stance_from.translate, stance_from.tilt) if trunk_from is None else (float(trunk_from[0]), float(trunk_from[1])), (stance_to.translate, stance_to.tilt)
     s = float(stance_to.stand_off if stance_to.stand_off is not None else 0.0)
     same_trunk = abs(tf[0] - tt[0]) < 1e-6 and abs(tf[1] - tt[1]) < 1e-6
@@ -981,10 +988,13 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
 
     # the arms of the arriving stance (its recorded configuration / working arms untucked / idle arm in its A6 posture):
     # the oracle moves the idle arm there before the trunk motion (``idle_posture`` / ``arms_q`` in the sidecar)
-    right_arm, left_arm, fingers = stance_arm_vectors(kit, stance_to, posture)
+    right_arm, left_arm, f_to = stance_arm_vectors(kit, stance_to, posture)
+    fingers = f_to if fingers is None else float(fingers)
     arms_to = {"right": right_arm, "left": left_arm}
     r_from, l_from, f_from = stance_arm_vectors(kit, stance_from)
     arms_from = {"right": r_from, "left": l_from}
+    for a, q in (arms_to_q or {}).items():  # oracle-fix 2026-11-06: moved there after the drive-back; the departing arms keep theirs
+        arms_to[a] = q
     for a, q in (arm_q_override or {}).items():
         arms_to[a], arms_from[a] = q, q
     right_arm, left_arm = arms_to["right"], arms_to["left"]
@@ -1031,6 +1041,23 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     log.info("transition %s -> %s: no s_T (trunk %s -> %s%s): %s", stance_from.name, stance_to.name, tuple(round(v, 2) for v in tf), tuple(round(v, 2) for v in tt),
              f", carrying {getattr(carried_obj, 'name', carried_obj)}" if carried_obj is not None else "", "; ".join(why[:3] + (["..."] if len(why) > 4 else []) + why[-1:] if len(why) > 3 else why))
     return None
+
+
+def recorded_arms_to(extras: Optional[Dict[str, Any]]) -> Tuple[Optional[Dict[str, th.Tensor]], Optional[float]]:
+    """oracle-fix 2026-11-06 (the shelf back-off): ``(arms_to_q, fingers)`` for :func:`transition` from a transition record's extras - the
+    arm joints the oracle moves the arms to after the drive-back (``arms_q``: arm -> 7) and the pre-shaped finger opening (``preshape_m``:
+    arm -> m, the widest); ``(None, None)`` without them (every record before 2026-11-06)."""
+    ex = extras or {}
+    out: Dict[str, th.Tensor] = {}
+    for a, v in (ex.get("arms_q") or {}).items():
+        try:
+            q = th.as_tensor([float(x) for x in v], dtype=th.float32)
+        except (TypeError, ValueError):
+            continue
+        if q.numel() == 7:
+            out[str(a)] = q
+    shape = [float(v) for v in (ex.get("preshape_m") or {}).values() if v is not None]
+    return (out or None), (max(shape) if shape else None)
 
 
 def departure_pose(stance_from: Stance, s_T: float) -> Tuple[float, float, float]:

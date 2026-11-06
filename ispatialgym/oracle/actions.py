@@ -502,6 +502,20 @@ def _arms_q_of(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, List[float
     return out or None
 
 
+def _preshape_of(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+    """``preshape_m`` of a transition record (arm -> finger opening in m, oracle-fix 2026-11-06), None when absent or malformed."""
+    ps = (extra or {}).get("preshape_m")
+    if not isinstance(ps, dict):
+        return None
+    out: Dict[str, float] = {}
+    for a, v in ps.items():
+        try:
+            out[str(a)] = float(v)
+        except (TypeError, ValueError):
+            return None
+    return out or None
+
+
 @dataclass(kw_only=True)
 class Navigate(Action):
     """Follow a recorded base path (``paths[i]``; motion ``track_path``).
@@ -587,12 +601,13 @@ class Transition(Action):
     """Stance transition (``transitions[i]`` + the two stances, spec §3.8): drive back to the transition stand-off
     s_T, move the trunk, drive in (motions ``track_path`` → ``trunk_to`` → ``track_path``).
 
-    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw], "arms_q": {arm: [7]} | None}``
-    — the fields ``drive_back`` / ``trunk`` / ``drive_in`` of the ``TransitionPoses`` dataclass
+    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw], "arms_q": {arm: [7]} | None,
+    "preshape": {arm: m} | None}`` — the fields ``drive_back`` / ``trunk`` / ``drive_in`` of the ``TransitionPoses`` dataclass
     ``conventions.transition_poses(stance_from, stance_to, s_T)`` returns (stances passed as their sidecar dicts);
     ``arms_q`` (sidecar ``transitions[].arms_q``, owner 2026-09-24): the arm joints the sampler swept the transition with when
     it left an arm where the previous motion ended it - the executor's ``move_idle_arms`` then targets these instead of
-    the arriving stance's posture.
+    the arriving stance's posture. ``preshape`` (sidecar ``transitions[].preshape_m``, oracle-fix 2026-11-06, the shelf back-off: the
+    record carries the arm to its pre-grasp): the finger opening per arm the executor pre-shapes to before the arms move.
     """
 
     name: str = "transition"
@@ -600,7 +615,7 @@ class Transition(Action):
     stance_from: Stance
     stance_to: Stance
     carried: Optional[str] = None
-    TARGET_KEYS = ("drive_back", "trunk", "drive_in", "arms_q")
+    TARGET_KEYS = ("drive_back", "trunk", "drive_in", "arms_q", "preshape")
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -612,7 +627,7 @@ class Transition(Action):
             tp = C.transition_poses(self.stance_from.to_dict(), self.stance_to.to_dict(), self.transition.stand_off)
         translate, tilt = (float(v) for v in tp.trunk)
         return {"drive_back": _as_pose2d(tp.drive_back), "trunk": (translate, tilt), "drive_in": _as_pose2d(tp.drive_in),
-                "arms_q": _arms_q_of(getattr(self.transition, "extra", None))}
+                "arms_q": _arms_q_of(getattr(self.transition, "extra", None)), "preshape": _preshape_of(getattr(self.transition, "extra", None))}
 
     def annotate(self, sidecar):
         purpose = "placing" if self.transition.to == "placement" else "manipulation"

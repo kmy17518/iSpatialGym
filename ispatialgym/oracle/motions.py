@@ -518,6 +518,9 @@ class Motions:
         #: pre-shaped opening emits a command < 0 while the fingers are meant to be open) and the release events for the record
         self.gripper_intent_closed: Dict[str, bool] = {}
         self.release_events: List[Dict[str, Any]] = []
+        #: oracle-fix 2026-11-06 (the shelf back-off): arm -> the opening a transition pre-shaped the fingers to before carrying the hand to its
+        #: pre-grasp (``execute.move_idle_arms`` ``preshape``); the grasp keeps it while the command still holds it (``execute.transit_preshape_held``)
+        self.transit_preshape: Dict[str, float] = {}
         #: object -> the world move a next-to / touching place made away from its partner so the opening fingers clear it
         #: (``execute.clear_release_of_partner``); the push that follows extends its line by it
         self.place_shifts: Dict[str, th.Tensor] = {}
