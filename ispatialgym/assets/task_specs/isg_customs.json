@@ -49929,7 +49929,16 @@
      23.04
     ]
    },
-   "_inside_goal_region_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): goal cells in bays L / M of bookcase_jaysra_0 only (L x 22.399..22.683, M 22.746..23.041 with boards at z 0.949; bay R 23.104..23.388 sits at 0.974, 2.5 cm above the single 0.947 m raster); the shelf place snaps to a board of the cell's own bay"
+   "_inside_goal_region_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk demo: 'I want the book to be placed inside the compartment like the init poses of hardback touching hardback'): goal cells in bays L / M of bookcase_jaysra_0 only (L x 22.399..22.683, M 22.746..23.041 with boards at z 0.949; bay R 23.104..23.388 sits at 0.974, 2.5 cm above the single 0.947 m raster); the shelf place snaps to a board of the cell's own bay",
+   "carry_arrive_straight_m": 0.35,
+   "_carry_arrive_straight_note": "oracle-fix 2026-11-06 (owner: fix the hardback; 0 instances in 4746 attempts of the spine-out jobs): every carry B -> C (cluster 369 / 369, local 7 / 7) collided at the turn into stance C - the book ~0.8 m ahead swept into bookcase_jaysra_0, or the straightened base's wheels touched bed_rrcvaq_1 0.37 m away; the carried path now ends 0.35 m behind C along C's axis and drives straight in",
+   "inside_stand_offs_m": [
+    0.55,
+    0.65,
+    0.75,
+    0.85
+   ],
+   "_inside_stand_offs_note": "oracle-fix 2026-11-06: with the straight arrival the carried book (the trunk -0.61 pick's lift configuration, hand 0.51 m ahead) still touched the bookcase at the 0.65 m stance or 9 cm before it (attached_object_left_eef_link; local as1 / as2: 8 of 8 straight-arrival path tries in 2 carry legs); 0.75 / 0.85 added (default 0.35-0.65): at 0.85 the spine-out release screens F_goal 15 for both rolls (0.55-0.65: 10 / 0) and local as3 wrote an instance at its 4th attempt"
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-inside_large_scale#01: hardback/bqvvvx into bookcase_jaysra_0 (0.94 m board, house_single_floor childs_room_1) from desk_bhkhxo_0 (0.77 m, sheet T2); hand-made as alias 151 (no candidates rows for the subtask: the grounder skips it), generation = alias 147's block with the bookcase keys and the overhang pick, BDDL rendered as problem 147; registry mode test, so a re-ground leaves it alone"
