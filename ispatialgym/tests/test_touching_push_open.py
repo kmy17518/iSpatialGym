@@ -407,3 +407,20 @@ def test_the_program_check_solves_the_push_chain_with_the_record_opening(monkeyp
     PC.check_action_targets(sc0, sampler, push0, push0.targets(sc0, None), "manipulation", None)
     ik0 = [f for k, f in seen if k in ("exact", "waypoints")]
     assert ik0 and all(f == 0.0 for f in ik0)
+
+
+# ---------------------------------------------------------------------------------------------------------------- customs
+
+
+def test_customs_turn_the_key_on_for_the_12_cereal_box_touching_aliases_only():
+    with open(CUSTOMS) as f:
+        customs = json.load(f)
+    on = sorted(a for a, v in customs.items() if isinstance(v, dict) and (v.get("generation") or {}).get("push_gripper_open"))
+    cereal = sorted(a for a in customs if "box_of_cereal" in a and "touching_small_scale" in a)
+    assert len(cereal) == 12 and on == cereal
+    for a in cereal:
+        g = customs[a]["generation"]
+        assert g["push_height_sweep"] is False  # today's lateral rule: the first lateral with push + brace
+        note = g["_push_gripper_open_note"]
+        assert note.startswith(f"oracle-fix 2026-11-06 (owner feedback on the {a} demo:") and "push_open_v-" in note
+    assert BO.BAR in cereal
