@@ -36,6 +36,10 @@ hands, a straight floor push of the closed gripper from stance C, exact IK on th
   of F is drawn only when its goal yaw lies within half a screening step of the partner's axes, at the init yaw that puts the goal yaw
   on them (:func:`end_aligned_yaw`, no jitter). ``generation.init_align_partner`` (default false) aligns the init yaw instead
   (:func:`partner_aligned_yaws`).
+
+``generation.touching_place`` picks another place: ``"lean"`` (:class:`LeanTouchingMode`, the target leaning on the partner, its lower
+end on the floor) or ``"surface"`` (:class:`SurfaceTouchingMode`, the target set down on an interior board of the partner - the inside
+mode's raster, stance C and release, touching the partner through the board).
 """
 
 from __future__ import annotations
@@ -54,6 +58,7 @@ from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 from ispatialgym.sampling.v2.tasks import iors_large as IL
+from ispatialgym.sampling.v2.tasks import iors_large_inside as IN
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -1127,3 +1132,230 @@ class LeanTouchingMode(TouchingMode):
             g.extras.update({"place_kind": LEAN_PLACE_KIND, "then": LEAN_PLACE_KIND, "goal_cell": [float(v) for v in gc], "partner": self.pname})
         d.summary["lean_touching"] = dict(facts, edge=lane["edge"], lane=lane["lat"], partner=self.pname, goal_cell=[float(v) for v in gc])
         log.info("%s: lean place against %s's face %s (lane %+.2f): %s", self.gp.variant, self.pname, lane["edge"], lane["lat"], facts)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the surface place (oracle-fix 2026-11-06, owner feedback on the touching_large#02 demo: the umbrella on the hall tree's bench board)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: ``generation.touching_place`` / ``grasps[0].place_kind`` of the surface place (``programs._iors_large_touching_program``)
+SURFACE_PLACE_KIND = "surface"
+#: the footprint rule: every hull point, moved this much along the raster axes, over a usable board cell (``generation.surface_footprint_margin_m``)
+SURFACE_FOOTPRINT_MARGIN_M = 0.005
+#: ``generation.touching_wall``: the footprint within this of the board's end on the wall's side (``generation.touching_wall_hug_m``)
+SURFACE_WALL_HUG_M = 0.04
+#: the settled target's lowest point at most this far from the board (``generation.surface_rest_max_m``): it still lies on it
+SURFACE_REST_MAX_M = 0.03
+
+
+def footprint_xy(hull_local: th.Tensor, xy, quat) -> th.Tensor:
+    """The target's hull points (world xy) with its root at ``xy`` and orientation ``quat``."""
+    return G.local_points_world(hull_local, (th.tensor([float(xy[0]), float(xy[1]), 0.0]), G.t(quat).float()))[:, :2]
+
+
+def surface_fit_why(pts_xy: th.Tensor, xs: th.Tensor, ys: th.Tensor, free: th.Tensor, margin: float, wall: Optional[th.Tensor] = None,
+                    hug: float = SURFACE_WALL_HUG_M) -> Optional[str]:
+    """The surface place's footprint rule: None when every footprint point (and each moved ``margin`` along the raster axes) lies over a free
+    board cell (``iors_large_inside.footprint_fits``) and, with ``wall`` (a unit world xy), the footprint moved ``hug`` along it leaves the board
+    (the board ends within ``hug`` on that side: the target lies against the wall standing there); else why."""
+    if not IN.footprint_fits(pts_xy, xs, ys, free, margin):
+        return "footprint_off_board"
+    if wall is not None and IN.footprint_fits(G.t(pts_xy).float()[:, :2] + G.t(wall).float()[:2] * float(hug), xs, ys, free, 0.0):
+        return "wall_beyond_hug"
+    return None
+
+
+class SurfaceTouchingMode(IN.InsideMode):
+    """``generation.touching_place: "surface"`` (oracle-fix 2026-11-06, owner feedback on the touching_large#02 demo: "the largest compartment (the
+    top one) has a surface that the umbrella can lay flat on ... fix why that compartment wasn't sampled"): the target is carried to stance C and
+    set down lying at its rest orientation on an interior board of the partner (hall_tree_upkvgr_0's alcove above the bench, 0.58 m) - it touches
+    the partner through the board (OmniGibson's Touching: a contact between any links; the board is the hall tree's base_link). The floor push /
+    lean never proposed it: their goal lies on free floor in front of the partner's AABB edges, the board 0.28-0.71 m behind the edge line.
+
+    The inside mode's machinery (:class:`~ispatialgym.sampling.v2.tasks.iors_large_inside.InsideMode`): the board raster of
+    ``SimWorld.support_interior`` at ``inside_surface_z_m`` +- ``inside_surface_tol_m``, goal cells ``inside_erosion_m`` from its outline (the
+    default, the half extent + 2 cm, leaves none on a board as deep as the target is long), stance C square to the raster side
+    ``inside_stance_side`` (``inside_stand_offs_m`` + the AABB overhang; ``inside_trunks`` without a goal-side band), the release ``drop_height_m``
+    + the open gripper's clearance above the board with the partner in the collision world. Changed for the relation:
+
+    * **Footprint** (:meth:`release_fit`): a goal cell is kept when the target's footprint at one of the release yaws lies over usable board
+      cells, ``surface_footprint_margin_m`` to spare (a 0.82 m umbrella fits a 0.43 x 1.30 m board along it only); ``generation.touching_wall``
+      (opt-in, ``"+y"`` / ...) keeps the cells whose footprint ends within ``touching_wall_hug_m`` of the board's end on that side (a wall
+      stands there; Touching holds on the board either way).
+    * **Release yaw** (``generation.goal_align_partner``, default true: TouchingMode's rule): on the partner's axes, the init yaw drawn so the
+      carried yaw lands there (:func:`end_aligned_yaw`); F_goal is screened at the aligned yaw of each screened one whose footprint fits at
+      the goal cell (:meth:`release_feasible`).
+    * **Goal check**: no drop-test protrusion (the BDDL goal is touching, which the goal check evaluates); the settled target still lies on
+      the board (``surface_rest_max_m``).
+    * **Records**: ``grasps[0].place_kind`` "surface" - the oracle program is the lean's: pick, carry, drop-release on the board, retreat, no
+      push (``programs._iors_large_touching_program``, ``program_check.check_blocks``) -, ``summary.surface_touching``."""
+
+    @property
+    def push_under(self) -> bool:
+        return False
+
+    # ------------------------------------------------------------------ the release yaw (TouchingMode's goal alignment)
+
+    def goal_align_partner(self) -> bool:
+        """``generation.goal_align_partner`` (default true): the release yaw on the partner's axes (an interior board's sides)."""
+        return bool(self.gp.gen("goal_align_partner", True))
+
+    def partner_axes_yaw(self) -> float:
+        """The release yaw that turns the target at its rest orientation parallel to the partner's axes (mod 90 deg)."""
+        return G.yaw_of(self.partner.get_position_orientation()[1]) - G.yaw_of(self.rest)
+
+    def align_snap(self) -> float:
+        """Half a screening step (rad): how far the drawn init yaw turns to put the carried yaw on the partner's axes."""
+        return math.pi / max(1, len(self.yaws()))
+
+    def init_yaw_jitter(self) -> float:
+        return 0.0 if self.goal_align_partner() else super().init_yaw_jitter()
+
+    def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
+        if not self.goal_align_partner():
+            return super().end_aligned_init_yaw(yaw0, d_yaw)
+        y = end_aligned_yaw(yaw0, d_yaw, self.partner_axes_yaw(), self.align_snap())
+        return False if y is None else y
+
+    def release_yaw(self, yaw: float) -> Optional[float]:
+        """The yaw the target is released at for a screened release yaw: with ``goal_align_partner`` the partner-aligned one within
+        :meth:`align_snap` (None: none), else the yaw itself."""
+        if not self.goal_align_partner():
+            return float(yaw)
+        return end_aligned_yaw(yaw, 0.0, self.partner_axes_yaw(), self.align_snap())
+
+    def release_yaws(self) -> List[float]:
+        """The release yaws the goal cells are screened at: the partner's four axes with ``goal_align_partner``, else the screening grid."""
+        if self.goal_align_partner():
+            a = self.partner_axes_yaw()
+            return [a + k * 0.5 * math.pi for k in range(4)]
+        return list(self.yaws())
+
+    # ------------------------------------------------------------------ the board and the footprint rule
+
+    def surface_wall(self) -> Optional[th.Tensor]:
+        """``generation.touching_wall`` (opt-in; ``"+x"`` / ``"-x"`` / ``"+y"`` / ``"-y"`` or [dx, dy]): the side of the board a wall stands at."""
+        try:
+            return IN.side_vector(self.gp.gen("touching_wall"))
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.variant}: generation.touching_wall: {e}")
+
+    def release_fit(self, xy, yaw: float) -> Optional[str]:
+        """The footprint rule (:func:`surface_fit_why`) of the target released at the root ``xy`` and the yaw ``yaw`` (rest turned by it)."""
+        itop = self.place["top"]
+        pts = footprint_xy(self.hull, xy, G.qmul(G.quat_from_yaw(float(yaw)), self.rest))
+        return surface_fit_why(pts, itop.xs, itop.ys, self.place["surface_free"], float(self.num("surface_footprint_margin_m", SURFACE_FOOTPRINT_MARGIN_M)),
+                               self.place.get("surface_wall"), float(self.num("touching_wall_hug_m", SURFACE_WALL_HUG_M)))
+
+    def prepare_partner(self):
+        """InsideMode's interior raster and goal cells, then the footprint rule: the goal cells where the target fits on the usable board
+        cells at one of :meth:`release_yaws` (+ ``touching_wall``); ``Reject("surface_no_fit")`` without one. One INFO line with the counts
+        (``template_facts.surface_touching``); InsideMode's rim / protrusion facts are not used."""
+        super().prepare_partner()
+        itop, cells = self.place["top"], self.place["cells"]
+        self.place["surface_free"] = itop.usable(float(self.place["height"]), IN.HEADROOM_MARGIN_M)
+        self.place["surface_wall"] = self.surface_wall()
+        yaws = self.release_yaws()
+        kept, per_yaw, misfit = [], [0] * len(yaws), {}
+        for c in cells:
+            ok = False
+            for k, y in enumerate(yaws):
+                why = self.release_fit(c, y)
+                if why is None:
+                    per_yaw[k] += 1
+                    ok = True
+                else:
+                    misfit[why] = misfit.get(why, 0) + 1
+            if ok:
+                kept.append(c)
+        out = th.stack(kept) if kept else th.zeros(0, 2)
+        wall = self.place["surface_wall"]
+        facts = {"n_goal_cells_eroded": int(len(cells)), "n_goal_cells": int(len(out)), "goal_cells": IN.cell_span(out), "goal_align_partner": self.goal_align_partner(),
+                 "fit_per_yaw": {f"{math.degrees(y):.1f}": n for y, n in zip(yaws, per_yaw)}, "misfits": misfit,
+                 "footprint_margin_m": float(self.num("surface_footprint_margin_m", SURFACE_FOOTPRINT_MARGIN_M)),
+                 "wall": None if wall is None else {"side": [round(float(v), 3) for v in wall], "hug_m": float(self.num("touching_wall_hug_m", SURFACE_WALL_HUG_M))}}
+        self.place["cells"] = out
+        self.template_facts["surface_touching"] = facts
+        self.template_facts["partner"]["n_goal_cells"] = int(len(out))
+        log.info("%s: surface touching on %s at %.3f m: %d of %d goal cells fit the target's footprint at a release yaw (%s; per yaw %s, misfits %s%s)",
+                 self.gp.variant, self.partner.name, float(self.place["z"]), len(out), len(cells), facts["goal_cells"], facts["fit_per_yaw"], misfit,
+                 "" if wall is None else f", within {facts['wall']['hug_m']:.2f} m of the board's {facts['wall']['side']} end")
+        if not len(out):
+            raise Reject("surface_no_fit", f"{self.partner.name}: the target's footprint fits none of the {len(cells)} goal cells at {float(self.place['z']):.3f} m "
+                                           f"at the release yaws {[round(math.degrees(y), 1) for y in yaws]} deg ({misfit})")
+
+    def frame_quat_at(self, goal_cell) -> th.Tensor:
+        """The target's orientation in stance C's frame test (InsideMode's hook): the first release yaw whose footprint fits at the goal cell -
+        along the board, not at the rest yaw (the umbrella across the board reached 0.43 m toward the base, under the head camera's frame)."""
+        for y in self.release_yaws():
+            if self.release_fit(goal_cell, y) is None:
+                return G.qmul(G.quat_from_yaw(float(y)), self.rest)
+        return self.rest
+
+    # ------------------------------------------------------------------ F_goal at the aligned, fitting release yaws
+
+    def release_feasible(self, release_xy, yaws, release_pose, place: Stance, arm: str, ignore_place) -> List[Tuple[float, Any]]:
+        """IORSLarge's F_goal screen at the yaws the target is released at (:meth:`release_yaw` of each screened one - the draw puts the carried
+        yaw there, :meth:`end_aligned_init_yaw`) whose footprint fits at the goal cell (:meth:`release_fit`); a screened yaw without one is not
+        screened. The pairs come back at the screened yaws (the keys of the intersection with F_init). One INFO line per C."""
+        at: Dict[float, Tuple[float, float]] = {}
+        skipped: Dict[str, int] = {}
+        for y in yaws:
+            ya = self.release_yaw(y)
+            why = "not_alignable" if ya is None else self.release_fit(release_xy, ya)
+            if why is not None:
+                skipped[why] = skipped.get(why, 0) + 1
+                TT._count(self, f"surface.release_yaw_{why}")
+                continue
+            at.setdefault(round(float(ya), 4), (float(ya), float(y)))
+        out = super().release_feasible(release_xy, [ya for ya, _ in at.values()], release_pose, place, arm, ignore_place) if at else []
+        log.info("%s: surface F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %d of %d screened yaws released at %s deg (skipped %s): F_goal %d",
+                 self.gp.variant, place.stand_off or 0.0, place.lateral, place.translate, place.tilt, [round(float(v), 3) for v in release_xy[:2]], len(at), len(yaws),
+                 [round(math.degrees(ya), 1) for ya, _ in at.values()], skipped, len(out))
+        return [(at[round(float(ya), 4)][1], g) for ya, g in out if round(float(ya), 4) in at]
+
+    # ------------------------------------------------------------------ goal check and records
+
+    def refine_targets_from_goal(self, draft: Draft):
+        """IORSLarge's (the settled pose becomes the target; the partner unchanged) without InsideMode's protrusion rule (the BDDL goal is touching,
+        which the goal check reads next); the settled target must still lie on the board: its lowest point within ``surface_rest_max_m`` of the
+        surface (``Reject("goal_off_surface")``: rolled off onto the floor, where it may still touch the partner). ``summary.surface_rest``."""
+        IL.IORSLarge.refine_targets_from_goal(self, draft)
+        p, q = self.target.get_position_orientation()
+        pts = self.world.hull_at(self.hull, (p.float(), q.float()))
+        z_s = float(self.place["z"])
+        above = float(pts[:, 2].min()) - z_s
+        max_m = float(self.num("surface_rest_max_m", SURFACE_REST_MAX_M))
+        draft.summary["surface_rest"] = {"bottom_above_surface_m": round(above, 4), "max_m": max_m, "surface_z": round(z_s, 4),
+                                         "settled_xy": [round(float(v), 4) for v in p[:2].tolist()]}
+        if abs(above) > max_m:
+            raise Reject("goal_off_surface", f"the settled target's lowest point lies {above:+.3f} m from {self.partner.name}'s board at {z_s:.3f} m "
+                                             f"(> {max_m:.2f}): it left the board")
+
+    def after_goal_check(self, draft: Draft):
+        """InsideMode's release re-check (pre-place / release from C, the target attached, the partner present; the open gripper's clearance over the
+        board; the release in the placement image) and its release facts, the record's place kind "surface" (InsideMode writes the drop's)."""
+        super().after_goal_check(draft)
+        grasp = self.sidecar.grasp_of(self.tname)
+        grasp.extras["place_kind"] = SURFACE_PLACE_KIND
+        if isinstance(draft.summary.get("release"), dict):
+            draft.summary["release"]["place_kind"] = SURFACE_PLACE_KIND
+
+    def sample_instance(self, rng: np.random.Generator) -> Draft:
+        d = super().sample_instance(rng)
+        self.surface_records(d)
+        return d
+
+    def surface_records(self, d: Draft) -> None:
+        """``grasps[0].place_kind`` "surface" (+ ``then``, ``goal_cell``, ``partner``) and ``summary.surface_touching`` (the goal cell, the release
+        yaw, the board's height, the footprint rule at the drawn release)."""
+        gc = [float(v) for v in d.summary["goal_cell"]]
+        yaw = G.yaw_of(G.qmul(self.goal_quat_of(d), G.qinv(self.rest)))
+        g = self.sidecar.grasp_of(self.tname)
+        if g is not None:
+            g.extras.update({"place_kind": SURFACE_PLACE_KIND, "then": SURFACE_PLACE_KIND, "goal_cell": gc, "partner": self.pname})
+        z_s = float(self.place["z"])
+        facts = {"partner": self.pname, "goal_cell": gc, "surface_z": round(z_s, 4), "surface_z_above_floor": round(z_s - self.floor_z, 4),
+                 "release_yaw_deg": round(math.degrees(yaw), 2), "footprint": self.release_fit(gc, yaw) or "fits"}
+        d.summary["surface_touching"] = facts
+        log.info("%s: surface place on %s's board: %s", self.gp.variant, self.pname, facts)

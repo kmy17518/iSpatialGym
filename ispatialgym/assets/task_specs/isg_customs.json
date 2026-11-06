@@ -50046,7 +50046,39 @@
    "_iors_large_touching_note": "owner 2026-10-12 ~16:05 touching_large#03: touching_goal_gap_m 0.002 (the goal 2 mm short of the bookcase's face, the goal check nudges it to contact; the code default, written out); partner_view_min_points 1 (iors_large relaxation 2a: stance A sees at least one of the bookcase's three nearest bottom-edge points)",
    "carry_collision_margin_m": 0.01,
    "_umbrella_note": "oracle-fix 2026-11-03 touching_large#02 (never grounded): umbrella/ziqzqo (0.81 m, closed) starts on the floor of corridor_0 and ends on the floor touching hall_tree_daxzaw_0 (the hallstand) - the storage box's mode (drop in front of the face, push along the floor). The legacy grasps umbrella__ziqzqo__t are all flagged one_finger; run with ISPATIALGYM_GRASP_LIBRARY_V2 at the oracle-fix copy of the v2 entry (1 physics-valid top grasp, roles_all_20261102), whose library.json carries legacy_key umbrella__ziqzqo__t. Leaning it on the stand (a 'lean' place) is not implemented; the BDDL goal is touching, which the floor push satisfies. Generation = alias 120's",
-   "touching_place": "lean",
+   "touching_place": "surface",
+   "_touching_place_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the umbrella is set down LYING on hall_tree_upkvgr_0's alcove board above the bench (iors_large_touching.SurfaceTouchingMode: the inside mode's board raster, stance C and release above the board, touching through the board - the hall tree is one link). Never proposed before: the lean / floor modes put the lower end on free floor in front of the partner's AABB edges, the board lies 0.28-0.71 m behind the +x AABB line (the canopy above 2.09 m). The lying-on-the-floor configuration stays selectable as touching_place \"lean\" (the lean_* keys below are kept)",
+   "inside_surface_z_m": 0.58,
+   "_inside_surface_z_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the alcove board: collision hull c13 top 0.581 m (visual 0.554), x [-1.222, -0.788] (0.43 m deep), y [2.954, 4.258] (1.30 m wide), headroom 1.44 m to the canopy; support_interior emulated on the decrypted hulls: 1342 board cells (1300 c13 + 42 on the c12 side panel's top)",
+   "inside_surface_tol_m": 0.03,
+   "_inside_surface_tol_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): +-3 cm keeps the board alone (the shoe slots at 0.02 / 0.27 m and the panel tops at 0.675 m stay out)",
+   "inside_stance_side": "+x",
+   "_inside_stance_side_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the alcove opens to +x (the corridor); its back (c10 / c0) at x -1.22 / -1.31, the wardrobe side at +y, the c12 panel at -y",
+   "inside_erosion_m": 0.08,
+   "_inside_erosion_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the default erosion (the umbrella's half extent 0.409 + 2 cm = 0.43 m) leaves 0 goal cells on a 0.43 m deep board; 0.08 m leaves 695 (emulated), of which the footprint rule keeps those where the 0.82 m shaft lies along the board: 284 at 90 deg / 292 at 270 deg, 0 across it",
+   "inside_stand_offs_m": [
+    0.1,
+    0.2,
+    0.3
+   ],
+   "_inside_stand_offs_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the base 0.10-0.30 m outside the AABB's +x line (EdgeFrame adds the canopy's 0.31 m overhang over the raster side at x -0.82): the nearest goal cell (x -0.90) 0.50-0.70 m ahead of the base, the reach of a top-down release at z ~0.65",
+   "inside_trunks": [
+    [
+     0.5,
+     -0.3
+    ],
+    [
+     0.5,
+     0.0
+    ],
+    [
+     0.75,
+     -0.3
+    ]
+   ],
+   "_inside_trunks_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): stance C trunks without a goal-side band (the default grid's reach-margin cut keeps the deepest leans): offline IK of the top-down mid-shaft release at z 0.646, 0.17 m right of the base centre - (0.5, -0.3) joint margin 0.13 / 0.06 rad at 0.55 / 0.65 m ahead, (0.5, 0.0) 0.17 at 0.55, (0.75, -0.3) 0.05 / 0.07 at 0.65 / 0.75, all with the lying umbrella in the head camera's frame; (0.95, -0.6) reaches (0.08) but the umbrella is out of frame up to 0.85 m ahead",
+   "inside_goal_lateral_m": 0.17,
+   "_inside_goal_lateral_m_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor demo: \"the largest compartment (the top one) has a surface that the umbrella can lay flat on ... Try sampling there and fix why that compartment wasn't sampled\"): the goal cell nearest a point 0.17 m to the working arm's side of the base (in front of the right shoulder), the offline IK's release point",
    "_lean_note": "oracle-fix 2026-11-04 round 3 (owner item 4): the umbrella is placed LEANING on hall_tree_daxzaw_0 - its lower end on the floor, its axis lean_angles_deg (default 18 / 24 / 12) from the vertical toward the stand, touching it (iors_large_touching.LeanTouchingMode: the lean pose from horizontal ray profiles of the partner per lane, the spin = the screened yaw, the release IK with the partner and the floor out of the last pose; program: pick, carry, drop-release at the lean pose, no push). The floor push (umbrella2: no push chain at the blade-window yaws) is not used.",
    "lean_angles_deg": [
     90.0,

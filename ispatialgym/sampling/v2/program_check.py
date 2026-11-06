@@ -698,8 +698,9 @@ def check_blocks(subtask: str, sidecar: Dict[str, Any]) -> List[str]:
             blocks = tuple(b for b in blocks if b not in ("stances.placement", "grasps", "paths"))
         elif kind == "base_push":
             blocks = tuple(b for b in blocks if b != "grasps")
-    elif subtask.startswith("inter_object_relation_satisfaction-touching_large_scale") and str((sidecar.get("grasps") or [{}])[0].get("place_kind") or "") == "lean":
-        # oracle-fix 2026-11-04 round 4 (touching_large#02): the sidecar's lean relaxation - the lean release has no push
+    elif subtask.startswith("inter_object_relation_satisfaction-touching_large_scale") and str((sidecar.get("grasps") or [{}])[0].get("place_kind") or "") in ("lean", "surface"):
+        # oracle-fix 2026-11-04 round 4 (touching_large#02): the sidecar's lean relaxation - the lean release has no push; oracle-fix 2026-11-06:
+        # nor the release on the partner's board (``generation.touching_place: "surface"``)
         blocks = tuple(b for b in blocks if b != "contacts.push")
     elif subtask.startswith("inter_object_relation_satisfaction-touching_small_scale") and str((sidecar.get("grasps") or [{}])[0].get("place_kind") or "") == "shelf_tip":
         # oracle-fix 2026-11-04 round 4 (touching#03): the sidecar's shelf tip relaxation - the book tips onto the partner, no push
