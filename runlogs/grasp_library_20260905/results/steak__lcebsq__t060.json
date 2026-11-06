@@ -1,0 +1,214 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "steak",
+ "model": "lcebsq",
+ "key": "steak__lcebsq__t060",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.1292010726928711,
+  0.2506627426147461,
+  0.06308231353759766
+ ],
+ "ready": true,
+ "base_key": "steak__lcebsq__t",
+ "scale": [
+  0.6,
+  0.6,
+  0.6
+ ],
+ "scale_rule": "uniform_owner_lying",
+ "bbox_scaled": [
+  0.0775,
+  0.1504,
+  0.0378
+ ],
+ "orig_n_valid": 5,
+ "provenance": {
+  "decision": "owner 2026-11-06 on the ontop_small#02 steak demo (rs_ontop_small02 0000): \"want to scale down steak so it can be grasped lying down & fits inside the floor of the frying pan (right now it's standing up)\" - steak__lcebsq__t has the one rest x_down (lying widths 12.9 / 25.1 cm exceed the a1 generator's 8.89 cm aperture, so it stands on its 6.3 cm edge); at x0.6 it lies 7.75 x 15.0 x 3.8 cm (bbox; collision hull 7.95 x 15.2 x 4.0): the top pinch across 7.8-8.0 cm fits the aperture and the footprint fits frying_pan/jpzusm's floor disc (radius 0.096 m, iors_small.ContainerFloor on the grasp-bands export)",
+  "b1k_commit": "6a6194600",
+  "scripts": "runlogs/grasp_library_20260905/scripts with the job's paths (scripts/oracle_fix/job_glib_scaled_key.sh; = isg_home/eval85/scratch_spatula076/scripts)",
+  "pipeline": "a1 / tabletop = the pipeline and constraint of the base key steak__lcebsq__t: ontop_small_scale.iddl requires (grasps target tabletop); the canonical rest (lying) is required - the job fails when gen_candidates falls back to a side rest; the key sorts after steak__lcebsq__t"
+ },
+ "candidates_meta": {
+  "object": {
+   "category": "steak",
+   "model": "lcebsq"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5988,
+   "n_tilt": 879,
+   "n_width_antipodal": 601,
+   "n_table": 598,
+   "n_collision": 300,
+   "n_sweep": 245,
+   "n_lever": 245,
+   "n_selected": 12,
+   "com": [
+    -0.0008,
+    0.0004,
+    0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0208
+   ],
+   "score": 9.9609,
+   "meta": {
+    "com_perp": 0.00156,
+    "width": 0.06435,
+    "antipodal": 0.87545,
+    "coverage": 1.0,
+    "clearance": 0.01145,
+    "tilt_deg": 29.99999
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g0_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g0_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g0_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g0_wrist.png"
+   },
+   "t_s": 8.7
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0143
+   ],
+   "score": 9.8977,
+   "meta": {
+    "com_perp": 0.00785,
+    "width": 0.06109,
+    "antipodal": 0.99007,
+    "coverage": 0.75,
+    "clearance": 0.01675,
+    "tilt_deg": 2.61173
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g1_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g1_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g1_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g1_wrist.png"
+   },
+   "t_s": 4.68
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0147
+   ],
+   "score": 9.666,
+   "meta": {
+    "com_perp": 0.01089,
+    "width": 0.06121,
+    "antipodal": 0.99026,
+    "coverage": 1.0,
+    "clearance": 0.01392,
+    "tilt_deg": 0.47063
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g2_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g2_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g2_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g2_wrist.png"
+   },
+   "t_s": 4.65
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0153
+   ],
+   "score": 9.4714,
+   "meta": {
+    "com_perp": 0.00792,
+    "width": 0.06232,
+    "antipodal": 0.9876,
+    "coverage": 1.0,
+    "clearance": 0.01218,
+    "tilt_deg": 30.84481
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g3_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g3_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g3_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g3_wrist.png"
+   },
+   "t_s": 4.66
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0193
+   ],
+   "score": 9.0224,
+   "meta": {
+    "com_perp": 0.01446,
+    "width": 0.06809,
+    "antipodal": 0.87177,
+    "coverage": 1.0,
+    "clearance": 0.01013,
+    "tilt_deg": 6.33812
+   },
+   "frames": {
+    "v1": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g4_v1.png",
+    "v2": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g4_v2.png",
+    "v3": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g4_v3.png",
+    "wrist": "/vision/u/minyeong/projects/isg_home/oracle_fix/glib_scaled/steak__lcebsq__t060/glib/frames/steak__lcebsq__t060/g4_wrist.png"
+   },
+   "t_s": 4.64
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 35.8
+}

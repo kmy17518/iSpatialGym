@@ -1,0 +1,17 @@
+{
+ "batch": "wave8_steakt060 (2026-11-06, oracle-fix integrator on strips/steak__lcebsq__t060.png with review_prompt.md; owner feedback on the ontop_small#02 demo: the steak scaled x0.6 to be grasped lying)",
+ "models": [
+  {
+   "key": "steak__lcebsq__t060",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down width pinch of the lying steak; tilts 30 deg under gravity"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down width pinch at the middle, level"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down width pinch at the middle, level"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down width pinch near one end; tilts 31 deg under gravity"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down width pinch off-centre, near level"}
+   ],
+   "object_note": "uniform x0.6 (scale [0.6, 0.6, 0.6]), lying (rest canonical); both pads on the steak in V1 / V2, no visible gap or penetration; fingertips at the steak's lower edge, not below it"
+  }
+ ]
+}
