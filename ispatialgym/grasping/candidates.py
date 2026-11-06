@@ -58,7 +58,8 @@ class CandidateConfig:
     seed: int = 0
     aperture_m: float = GRIPPER_MAX_OPENING - 0.008
     min_width_m: float = 0.003
-    cone_deg: float = 30.0
+    # oracle-fix 2026-11-04 (owner item 5): ISG_GLIB_CONE_DEG overrides (the pillow's tapered edge needs 45 deg; unset = 30)
+    cone_deg: float = field(default_factory=lambda: float(os.environ.get("ISG_GLIB_CONE_DEG") or 30.0))
     top_max_tilt_deg: float = 40.0
     side_tilt_deg: Tuple[float, float] = (70.0, 100.0)
     obj_margin_m: float = 0.001

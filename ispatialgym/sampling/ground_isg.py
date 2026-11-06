@@ -601,7 +601,10 @@ class ICL:
         return [h for h in rows if self.handle_row_admissible(h, instance=False)]
 
     def contacts_available(self) -> bool:
-        return bool(self.contacts)
+        """Whether the B6 library has push rows (``(contacts <role>)`` is enforced only then; header-only = pending). oracle-fix
+        2026-11-03: rows of other roles (``base_push``, the push spots of floor-standing targets) do not switch it on - they cover none
+        of the small push targets the requirement is for."""
+        return any(c.get("kind") == "push" or c.get("contact_role") == "push" for c in self.contacts)
 
     def admissible_contacts(self, category: str, model: str) -> List[Dict[str, str]]:
         return [c for c in self.contacts_by_model.get((category, model), []) if c.get("kind") == "push" or c.get("contact_role") == "push"]

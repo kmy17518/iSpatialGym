@@ -141,6 +141,18 @@ def tables_in_rooms(stable: dict, rooms: Iterable[str], names_or_categories: Ite
     return sorted(out)
 
 
+#: env var naming a directory of campaign-owned ``<scene>_stable.json`` copies (e.g. furniture raised off the floor); a scene
+#: with a file there is read from it instead of the shared dataset, which stays untouched
+STABLE_SCENE_DIR_ENV = "ISPATIALGYM_STABLE_SCENE_DIR"
+
+
+def stable_scene_override(scene: str) -> Optional[str]:
+    """``$ISPATIALGYM_STABLE_SCENE_DIR/<scene>_stable.json`` when the env var is set and the file exists, else None."""
+    d = os.environ.get(STABLE_SCENE_DIR_ENV)
+    path = os.path.join(d, f"{scene}_stable.json") if d else None
+    return path if path and os.path.isfile(path) else None
+
+
 #: ``write_variant`` modes: ``move`` parks the listed objects outside the scene (templates keep every scene object, owner
 #: 2026-10-11), ``remove`` deletes them from the file (the reach-band worlds, which drop objects for speed)
 VARIANT_MODES = ("move", "remove")

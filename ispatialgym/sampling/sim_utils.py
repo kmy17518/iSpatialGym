@@ -55,7 +55,9 @@ class Reject(Exception):
 
 
 def stable_scene_path(scene_model: str) -> str:
-    return os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene_model, "json", f"{scene_model}_stable.json")
+    from ispatialgym.sampling.scene_variants import stable_scene_override
+
+    return stable_scene_override(scene_model) or os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene_model, "json", f"{scene_model}_stable.json")
 
 
 def adjacent_rooms(scene_model: str, rooms: Sequence[str], reach_m: float = 0.6) -> List[str]:

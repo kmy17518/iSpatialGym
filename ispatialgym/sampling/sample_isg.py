@@ -174,7 +174,9 @@ def stable_scene_json(scene: str) -> dict:
     """The stable scene json of ``scene`` (package import only, no simulator launch)."""
     from omnigibson.utils.asset_utils import get_dataset_path
 
-    path = os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")
+    from ispatialgym.sampling.scene_variants import stable_scene_override
+
+    path = stable_scene_override(scene) or os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")
     with open(path) as f:
         return json.load(f)
 
