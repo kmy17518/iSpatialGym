@@ -972,11 +972,13 @@ def map_sampling_root() -> Optional[str]:
     return os.environ.get("ISPATIALGYM_REACH_MAPS") or None
 
 
-def map_bands(s, spec: BandSpec, top) -> Optional[RB.ReachBands]:
+def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
     """The scene-independent reach map of the sampler's object at the support's actual height above the floor, as a multi-distance band
     view (``map_sampling.as_bands``); None when the object has no v2 library entry or no compatible map covers the height (the anchors of
     ``ISPATIALGYM_REACH_MAP_ANCHORS``: exact or within 1 cm, else uncovered). Turns the grasp pose's support policy on
-    (``ISPATIALGYM_SUPPORT_POLICY``): exact sampling keeps the support for the palm / wrist camera / arm and the 2 mm finger rule."""
+    (``ISPATIALGYM_SUPPORT_POLICY``): exact sampling keeps the support for the palm / wrist camera / arm and the 2 mm finger rule.
+    ``arm`` (default ``spec.arm``): the arm whose map is looked up (:func:`arm_band`'s other segment arm)."""
+    arm = arm or spec.arm
     from ispatialgym.sampling import grasp_library as GL
     from ispatialgym.sampling import map_sampling as MS
     from ispatialgym.sampling import reach_maps as RMAP
@@ -994,12 +996,12 @@ def map_bands(s, spec: BandSpec, top) -> Optional[RB.ReachBands]:
             an = json.load(f)
         anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
     root = os.path.join(map_sampling_root(), os.path.basename(os.path.dirname(lib.path)))
-    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=spec.arm, anchors=anchors)
+    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors)
     if rm is None:
-        log.info("reach map miss for %s (%s) at h %.4f (%s)", spec.object, spec.grasp_key, h, root)
+        log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
         return None
     os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "1")
-    log.info("reach map hit for %s at h %.4f: %s", spec.object, h, rm.path)
+    log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
 
@@ -1217,6 +1219,13 @@ def arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Op
     if key in cache:
         return cache[key]
     m = base.meta
+    if m.get("mode") == "map_view":
+        own = map_view_arm_band(s, arm, spec=spec, top=top, edge=edge)
+        cache[key] = own
+        tf = getattr(s, "template_facts", None)
+        if isinstance(tf, dict):
+            tf.setdefault("arm_bands", {})[arm] = band_facts(own)
+        return own
     srf = m.get("surface") or {}
     surface = {"surface_z": float(srf["z_requested_above_floor"])} if srf.get("mode") == "interior" and srf.get("z_requested_above_floor") is not None else {}
     try:
@@ -1231,6 +1240,35 @@ def arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Op
     tf = getattr(s, "template_facts", None)
     if isinstance(tf, dict):
         tf.setdefault("arm_bands", {})[arm] = band_facts(own)
+    return own
+
+
+def map_view_arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None, edge: Optional[EdgeFrame] = None) -> RB.ReachBands:
+    """of-v2maps 2026-11-06: ``arm``'s band when the default arm's is a reach-map view (``mode: map_view``, :func:`map_bands`). A map view
+    is never mirrored (``ReachBands.mirrored`` raises: the map is computed per arm in the synthetic world), so this is ``arm``'s own map;
+    without one, the legacy band path for that arm (a miss keeps the legacy path, per arm): ``arm``'s cached band, else the default
+    arm's legacy band (cached, or computed in-process as :func:`ensure_bands` would) mirrored. One INFO line names the choice."""
+    sp = spec or getattr(s, "band_spec", None) or BandSpec.from_sampler(s)
+    t = _top(s, top)
+    own = map_bands(s, sp, t, arm=arm)
+    if own is not None:
+        log.info("%s-arm reach band: the %s-arm reach map (%s)", arm, arm, own.meta.get("map_path"))
+        return own
+    scene, support = s.world.scene_model, t.name
+    gkey = "generic" if sp.generic_pinch else sp.grasp_key
+    try:
+        own = RB.ReachBands.load(scene, support, sp.object, gkey, placed=sp.placed, scale=sp.scale, arm=arm)
+        log.info("%s-arm reach band: no %s-arm reach map, the legacy band %s", arm, arm, own.path)
+        return own
+    except FileNotFoundError:
+        pass
+    try:
+        legacy = RB.ReachBands.load(scene, support, sp.object, gkey, placed=sp.placed, scale=sp.scale, arm=sp.arm)
+    except FileNotFoundError:
+        log.info("reach band cache miss for %s / %s (%s): computing in-process (the %s arm has no reach map)", support, sp.object, gkey, arm)
+        legacy = compute_bands(s, sp, t, edge)
+    own = legacy if legacy.arm == arm else legacy.mirrored()
+    log.info("%s-arm reach band: no %s-arm reach map, the legacy %s band%s (%s)", arm, arm, legacy.arm, "" if own is legacy else " mirrored", legacy.path)
     return own
 
 
