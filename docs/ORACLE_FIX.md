@@ -768,3 +768,60 @@ round (section 9 and its code) stays uncommitted on top. The job-pipeline speed 
 - 20:44 videos: the 17 picks closed in this campaign replayed (run_isg --mode replay, tiled view: left wrist | head | right wrist over
   the external camera) - 17 / 17 replays succeeded at their demos' step counts; one concatenated, labelled video (677 s) at
   `~/Desktop/projects/ispatialgym/tmp/outputs/oracle_fix_17_closed_picks_tiled.mp4`; jobs `$OFH/jobs/job_video.sh`, runs `vid17_*`.
+
+## 10. One trunk (owner decisions 2026-11-05) and the demo-feedback round (2026-11-06)
+
+Record: DECISIONS entries 2026-11-05 23:30 - 2026-11-06. Nothing pushed.
+
+### 10.1 The trunk
+
+- `oracle-fix` is the one trunk for alias validation, train-demo collection and evaluation. grasp-bands' uncommitted work = 4 commits on branch
+  grasp-bands (8cf6203e..6f7519b4), oracle-fix's single 8516d022 split into 7 logical commits on top (backup branch
+  `oracle-fix-single-8516d022`, identical tree), the speed round committed, train-fast-vecnext ac7b4bc2 merged (08514913, no conflicts;
+  run_isg.py / tabletop.py keep both sides, TILT_SNAP default off). No commits on train-fast / train-fast-vecnext from here on.
+- Tests: run with the trunk's PYTHONPATH (`R:R/Behavior-1K/OmniGibson:R/Behavior-1K/bddl3`; the conda env otherwise imports the main
+  repo's Behavior-1K): 6 failed = the new_base_fails set (2464 passed).
+- Runs use FROZEN snapshots only: `scripts/trainfast/snapshot_trunk.sh` (lambda) -> `$OFH/code/trunk_<commit>` (git archive, read-only,
+  Behavior-1K = links into the frozen `$OFH/code/b1k_6a6194600_p<patch md5>` + its own datasets dir).
+
+### 10.2 The pipeline (validation = collection = the fast flow)
+
+- Submit on sc: `python3 <snap>/scripts/trainfast/submit_fast.py submit <key> <n> --flow fast --code <snap> --kcollect 2 [--gres l40s]`
+  with, for validation, `--root $OFH --job-prefix isgof_ --base-index 300000 --tag <tag>`; `--extra-env NAME=VALUE` (job.env's
+  ISPATIALGYM_* / ISG_* now win over env_fast.sh / fast_env.sh); `--customs template` to read a counted template's own copy (default: the
+  snapshot's isg_customs.json for every alias - pre-rename variants resolve through customs.entry_key).
+- Aliases outside train85's counted table: `scripts/trainfast/registry.tsv` (template copy, eval index, limits, band stores, extra env),
+  made by `register_alias.py <key> <run dir> --root $OFH ...` from a template run: `submit_fast.py template <alias> <key> --code <snap>
+  --seed-index K [--scene/--support/--support-row]` (= job_template.sh, the KIND=eval template step; PERSIST_BANDS supported).
+- `submit_fast.py recollect <job dir>` (job_recollect.sh: collector-only, pinned; = KIND=demo), `job_video.sh <job> <snap> <out> [n]`
+  (open-loop tiled review videos), `fleet_summary.py --root $OFH --tag <tag>` (successes per GPU-hour).
+- fast_env.sh: `ISGF_GOAL_OCCLUSION` (on for mental_rotation / disembedding keys only), `ISG_VEC_ASSET_CACHE_DIR=$OFH/asset_cache`.
+- Goal occlusion at the replay stage: `multienv/replay.py --goal-occlusion auto|on|off` (job_replay_multi.sh: auto) - the oracle's screen at
+  the demo's settled last frame, the task's tracked objects only; an occluded demo is dropped (REPLAY_OCCLUSION lines). Validated on
+  isg-1020 demos the train85 sampler measured: |predicted - replay| median 0.002-0.003, verdict agreement 45 / 45.
+- Smoke (one job per family, N 2): 16 / 18 demos; scripts/oracle_fix/job_val.sh is retired for validation.
+
+### 10.3 Demo feedback (owner 2026-11-06) - fixes and validation (fast flow, tag fix1)
+
+| item | cause | fix | validation |
+|---|---|---|---|
+| steak standing | only key steak__lcebsq__t (x_down rest; lying widths > the 8.9 cm opening); goal centred on the pan's bbox incl. the handle | scale 0.6 + key steak__lcebsq__t060 (lying, 5 / 5 valid), `ontop_centre: container` (the pan's measured floor) | 1 / 1: lying flat (up axis 1.00, was 0.00), 7 mm from the floor centre (was 9.1 cm, against the handle wall) |
+| coffee table push | closer stances die out of frame; d 0.50 | tried d 0.55-0.65: the extended arms ride 1.9 cm high over the 2 cm glass edge (0 / 6 contact) -> REVERTED to the d 0.50 set | 4 / 4 before (coffee_hsf2) |
+| spray bottle wobble | the push at 83 % of its height (raised blade fallback) | `push_height_sweep` (default on, touching small): lowest reachable contact on the centre line | spray 1 / 1: contact 5 cm (18 % of H, was 83 %), tilt <= 5.8 deg (was 20.3), final 0.021 rad; touching_01 4 / 4; touching_02 yield under watch (1 instance in 207 attempts vs 1 / 38 in trainfast) - the raised blade restored as the last resort (spray aliases keep it off) |
+| umbrella compartment | floor-only lean modes (outer AABB edges) | `touching_place: surface` (SurfaceTouchingMode on the inside mode) | 3 / 3 on the alcove board |
+| jar path | carried legs always 'recorded' (409 deg rotation) | face_travel for IORS-large legs within polyline + 10 deg | 1 / 1, the carried leg face_travel |
+| touching#03 arm swing | flipped IK branch (joint1 -3.23) | shelf back-off 0.20 m + near-branch reach limit; tip release prefers the manipulation stance / tries each lateral's carried drive | 3 / 3 (review runs with an empty eval index: with the repeat rule every completed attempt repeated the eval instance - the alias's start diversity is narrow) |
+| hardback in the bay | roll about the grasp radial, first-found yaw | edge-normal roll, spine out, shelf place (settled lean 16.5-21.6 deg predicted) | running |
+| blender pre-close twice | departure path lacked arms_q (navigate re-posed) | departure path records its swept arms; departure label | 4 / 4 |
+| dishwasher grasp at the edge | bar offset drawn per instance; canonical row unscaled | handle_row record:bar, centre offset (open) / centre +-0.069 (close) | open 8 / 8 + 7 / 7, close 4 / 4 |
+| dishwasher spring-back | policy release kick + damping-5 coast (oracle demos hold) | counterbalance_damping 15 | A/B 7 / 7 at 15 vs 8 / 8 at 5 |
+| kielbasa ontop | support_rays 1 / 9 probe | centre of the smaller footprint + >= 3 hits within 2 cm | isg-1020 rays verdicts 600 / 600 unchanged |
+| soup ladle / bottle of pop | chrome + black / black cola materials | hgvzdm / pvabxf representatives | 4 / 4 each |
+| salt / pepper too close | init gap 3-7 cm past g_NT, target moves < 0.09 tolerance | nextto_gap_extra_m 0.12 (17 nextto_small aliases) | 8 / 10 demos, moves 0.136-0.158 m; ~2x attempts per instance |
+
+Also found and fixed on the way: submit_fast.py took a counted row's customs PATH as the mode (a7080903); the collector loop broke on rc 0 although
+a queue restart (rc 75) reaches the shell as 0, so an instance landing with sampling.done was never collected (72bff7f6; `recollect` reran the two
+lost ones: 2 / 2); touching#03's tip release took the first lateral whose place passed and its carried drive swept the book into the cube wall
+(a5f1e229); job_template.sh PERSIST_BANDS. Review videos (open loop, tiled): `$OFH/out/fix1_video/<key>`; concatenated on lambda
+`~/Desktop/projects/ispatialgym/tmp/outputs/oracle_fix_feedback_fixes_tiled*.mp4`. Open: the hardback (8 validation jobs, ~1 h per attempt), the
+spray bottle's orientation tolerance (0.45 since round 3, not needed at 0.021 rad: the owner's call), touching_02's yield.
