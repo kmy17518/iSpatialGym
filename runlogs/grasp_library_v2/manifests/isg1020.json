@@ -1,0 +1,279 @@
+[
+ {
+  "category": "brussels_sprouts",
+  "model": "mbkrxe",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop_insert",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "brussels_sprouts__mbkrxe__i",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "brussels_sprouts__mbkrxe__s1__tabletop_insert"
+ },
+ {
+  "category": "sunflower",
+  "model": "dkajbh",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "flower_stem_top",
+  "rest_hint_wxyz": [
+   0.906273,
+   -0.419598,
+   -0.046325,
+   -0.021448
+  ],
+  "rest_pose": "r50_hull_face",
+  "legacy_key": "sunflower__dkajbh__r50",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "sunflower__dkajbh__s1__flower_stem_top__r97010c"
+ },
+ {
+  "category": "gym_shoe",
+  "model": "kmcbym",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "gym_shoe__kmcbym__t",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "gym_shoe__kmcbym__s1"
+ },
+ {
+  "category": "salt_shaker",
+  "model": "fonexa",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "salt_shaker__fonexa__t",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "salt_shaker__fonexa__s1"
+ },
+ {
+  "category": "tablespoon",
+  "model": "yxxfdj",
+  "scale": [
+   1.0,
+   1.0,
+   1.75
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "tablespoon__yxxfdj__st",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "tablespoon__yxxfdj__s1x1x1.75"
+ },
+ {
+  "category": "bar_soap",
+  "model": "utgixp",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "bar_soap__utgixp",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "bar_soap__utgixp__s1"
+ },
+ {
+  "category": "pack_of_kielbasa",
+  "model": "dgodnn",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "pack_of_kielbasa__dgodnn__t",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "pack_of_kielbasa__dgodnn__s1"
+ },
+ {
+  "category": "box_of_cereal",
+  "model": "iucshm",
+  "scale": [
+   0.8,
+   0.8,
+   0.8
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "box_of_cereal__iucshm__s080",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "box_of_cereal__iucshm__s0.8"
+ },
+ {
+  "category": "box_of_sanitary_napkins",
+  "model": "humkqw",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "box_of_sanitary_napkins__humkqw",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "box_of_sanitary_napkins__humkqw__s1"
+ },
+ {
+  "category": "beer_glass",
+  "model": "mxsliu",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "beer_glass__mxsliu__t2f",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "beer_glass__mxsliu__s1"
+ },
+ {
+  "category": "plate",
+  "model": "qtfzeq",
+  "scale": [
+   1.0,
+   1.0,
+   3.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "plate__qtfzeq__st",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "plate__qtfzeq__s1x1x3"
+ },
+ {
+  "category": "spatula",
+  "model": "hkvsep",
+  "scale": [
+   0.76,
+   0.76,
+   0.76
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "spatula__hkvsep__t076",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "spatula__hkvsep__s0.76"
+ },
+ {
+  "category": "teacup",
+  "model": "wopjex",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "tabletop",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "teacup__wopjex__t",
+  "kind": "tabletop",
+  "source": "legacy_key",
+  "id": "teacup__wopjex__s1"
+ },
+ {
+  "category": "cap",
+  "model": "xxqyrt",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "attachment_free",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "cap__xxqyrt",
+  "kind": "attachment",
+  "source": "legacy_key",
+  "id": "cap__xxqyrt__s1__attachment_free"
+ },
+ {
+  "category": "lid",
+  "model": "pbmsji",
+  "scale": [
+   0.65,
+   0.65,
+   0.65
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "attachment_free",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "lid__pbmsji__s065",
+  "kind": "attachment",
+  "source": "legacy_key",
+  "id": "lid__pbmsji__s0.65__attachment_free"
+ },
+ {
+  "category": "lid",
+  "model": "tnwisp",
+  "scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "dataset": "behavior-1k-assets",
+  "constraint": "attachment_free",
+  "rest_hint_wxyz": null,
+  "rest_pose": "canonical",
+  "legacy_key": "lid__tnwisp",
+  "kind": "attachment",
+  "source": "legacy_key",
+  "id": "lid__tnwisp__s1__attachment_free"
+ }
+]
