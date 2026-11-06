@@ -1235,8 +1235,9 @@ class Sidecar:
             elif push is not None and push.kind == "base_push":
                 # ... or the base push against the partner's face (the nextto_large blocks: placement = the push end, paths, no grasp)
                 required = tuple(n for n in required if n != "grasps")
-        elif subtask == "inter_object_relation_satisfaction-touching_large_scale" and str(self.grasps[0].extra.get("place_kind") or "") == "lean":
-            # oracle-fix 2026-11-04 round 3 (touching_large#02): the lean release - no push
+        elif subtask == "inter_object_relation_satisfaction-touching_large_scale" and str(self.grasps[0].extra.get("place_kind") or "") in ("lean", "surface"):
+            # oracle-fix 2026-11-04 round 3 (touching_large#02): the lean release - no push; oracle-fix 2026-11-06: nor the release on the
+            # partner's board (``generation.touching_place: "surface"``)
             required = tuple(n for n in required if n != "contacts.push")
         elif subtask == "inter_object_relation_satisfaction-touching_small_scale" and self.grasps and str(self.grasps[0].extra.get("place_kind") or "") == "shelf_tip":
             # oracle-fix 2026-11-04 round 4 (touching#03): the shelf layout's tip release - the book tips onto the partner, no push

@@ -1277,15 +1277,18 @@ def _iors_large_touching_program(sc: Sidecar) -> List[Action]:
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     if sc.path(_grasp_stance(g), "placement") is None:
         raise SidecarError(f"paths: IORS large-scale needs the recorded path from {_grasp_stance(g)!r} to 'placement'")
-    if str(g.extra.get("place_kind") or "") == "lean":
+    if str(g.extra.get("place_kind") or "") in ("lean", "surface"):
         # oracle-fix 2026-11-04 round 3 (touching_large#02, the umbrella; sampler ``generation.touching_place: "lean"``): released at the
-        # recorded lean pose - its lower end just above the floor, leaning on the partner - and left there: no drop on the floor, no push
+        # recorded lean pose - its lower end just above the floor, leaning on the partner - and left there: no drop on the floor, no push.
+        # oracle-fix 2026-11-06 (``touching_place: "surface"``, owner feedback on the touching_large#02 demo): the same release lying on an
+        # interior board of the partner (the inside mode's drop above the board, the partner an obstacle), touching it through the board
         pick = _pick_actions(sc, g)
         carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=pick[-1], waypoints=g.waypoints)] if g.waypoints else []
         head = _travel(sc, "init", "manipulation") + pick + carry + _travel(sc, _grasp_stance(g), "placement", carried=g.object)
         return head + _place_and_retreat(g, "drop", _IORS_RELATION_WORDS["touching"])
     if str(g.extra.get("place_kind") or "support") != "drop":
-        raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop') or leans it on the partner ('lean')")
+        raise SidecarError("grasps[0].place_kind: IORS touching (large-scale) drops the target on the floor before the push ('drop'), leans it on the partner ('lean') "
+                           "or sets it on the partner's board ('surface')")
     if push is None or push.kind != "push_touching":
         raise SidecarError("contacts.push: a record with kind 'push_touching' is required (IORS touching, large-scale)")
     if push.object != g.object:
