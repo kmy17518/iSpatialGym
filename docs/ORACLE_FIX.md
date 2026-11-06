@@ -824,4 +824,33 @@ a queue restart (rc 75) reaches the shell as 0, so an instance landing with samp
 lost ones: 2 / 2); touching#03's tip release took the first lateral whose place passed and its carried drive swept the book into the cube wall
 (a5f1e229); job_template.sh PERSIST_BANDS. Review videos (open loop, tiled): `$OFH/out/fix1_video/<key>`; concatenated on lambda
 `~/Desktop/projects/ispatialgym/tmp/outputs/oracle_fix_feedback_fixes_tiled*.mp4`. Open: the hardback (12 validation jobs without the blame
-diagnostics), the spray bottle's orientation tolerance (0.45 since round 3, not needed at 0.021 rad: the owner's call).
+diagnostics). The spray bottle's 0.45 rad tolerance was removed in round 2 (c15adeb1, section 11).
+
+## 11. Round 2 (owner 2026-11-06 afternoon): requests, the low-yield survey, fixes (fast flow, tags survey1 / fix2*)
+
+Owner: "spray bottle tolerance - go back to default; cereal box - does it push with the gripper open? if not try open at a lower
+height; touching 3 - vary the start (other compartments' walls, lean angles); then investigate the low-yield / slow aliases and fix
+them". Full write-up for the owner: `~/Desktop/projects/ispatialgym/tmp/outputs/oracle_fix_round2_report.md`; every number is in
+`$OFH/DECISIONS.md` (2026-11-06 entries after 15:00 UTC).
+
+| change | commit | default | aliases |
+|---|---|---|---|
+| spray tolerance back to the default profile | c15adeb1 | - | 9 spray-bottle touching aliases |
+| Cartesian leg with the supports present before a grasp transit ignores them (jar brushing the table) | 2c20bdda | on (`ExecuteConfig.pre_grasp_cartesian_fallback`) | all |
+| job_video.sh replays in the full template (`VIDEO_SCENE=full`) | 0d3e197c | on | review videos |
+| SPLIT_CONE_RESTORE keeps a start iors_small drew itself (BUG since 11-01: every attempt after the first drove to the first start's stances) | c261ef5c / 3c198874 | on | every IORS-small split-cone alias |
+| `generation.init_edges` (block_design#01: +v only) | d4603537 | opt-in | block_design_01 |
+| `generation.c_skip_dead_b` (skip a C whose every drawable pick already failed at B) + under_large#01 ground trunks / c_tries 72 | 01ad8d8c / f5bd955b | opt-in | under_large_01, ontop_large_01, inside_large_02 |
+| `generation.push_gripper_open` (open-gripper low push classes first) | dfae6b70 / c6bdef13 | opt-in | 12 cereal-box aliases |
+| `generation.shelf_start_draw` (books' compartment / board / lean per attempt) | 97613441 | opt-in | touching#03 |
+| `generation.push_arc_stall_ends_arc` + `push_arc_replay_lag_rad` (arc push at the reach end) | 9656c537 | opt-in | axial_01, axial_05 |
+| `witness_residual_pre_m` 0.005 | 7c34c732 | customs | nextto_large_02 |
+| disembedding templates copied to `$OFH/templates` + registry rows | 19e0d1ca | - | disembedding_04 / 07 / 08 / 09 / 10 |
+| `generation.place_inhand_reaim`, `target_orientation_equivalences` | f960f9cb | opt-in | disembedding_07, disembedding_10 |
+| IORS-large trunk-first A -> B leg records its arms (`paths[].arms_q`) | bfb2f946 | on | under_large_02 (+ any alias taking that fallback) |
+| `generation.init_setup_draws` (template setup retries) | b632d4b4 | opt-in | inside_large_03 |
+| `prompt0.beta_max_deg` 40 (unmeasured) | 2db87c19 | customs | articulation close / open_large_03 |
+| getattr guards (test fakes) | 91ab9413 | - | - |
+
+Validation runs: `$OFH/out/{survey1,fix2,fix2_t02open,fix2_t03init,fix2_t03base}/<key>/g*`; status script `$OFH/jobs/r2_status.sh`
+(per tag / key stats via `jobs/survey.py` + push class / tilt / shelf draws / hardback checks).
