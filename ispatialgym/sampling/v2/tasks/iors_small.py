@@ -4391,6 +4391,7 @@ class IORSSmall(SamplerV2):
         # height found so far
         sweep = self.push_height_sweep_on()
         best: Optional[Tuple[Tuple[float, int], Optional[Stance], bool]] = None  # ((height, unbraced), stance or None for the manipulation stance, manip_ok)
+        tip_ok: List[Optional[Stance]] = []  # the tip release's laterals whose place passes (None = the manipulation stance itself)
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
             probe = cand if cand is not None else manip
@@ -4400,8 +4401,9 @@ class IORSSmall(SamplerV2):
                 place_why = self.place_infeasible_why(probe, t_place_pose, grasp)
                 tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: tip release{'; place: ' + place_why if place_why else ''}")
                 if place_why is None:
-                    st, manip_ok = cand, cand is None
-                    break
+                    tip_ok.append(cand)
+                    if cand is None:
+                        break  # the manipulation stance places: no second base pose, no carried drive
                 continue
             self._push_chain_fails = []
             self._push_chain_height = None
@@ -4431,6 +4433,22 @@ class IORSSmall(SamplerV2):
                     break
                 if fallback is None:
                     fallback = (cand, cand is None)
+        if tip_ok:
+            # oracle-fix 2026-11-06 (touching#03 with the shelf back-off: 11 / 11 goal checks rejected 'local path manipulation -> push
+            # collides', the book lifted inside the cube swept into its side board by the lateral drive): the manipulation stance when it
+            # places, else each passing lateral in order until its stance and carried drive pass (``_record_push_stance``)
+            if any(c is None for c in tip_ok):
+                return None
+            whys = []
+            for cand in tip_ok:
+                try:
+                    log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
+                    draft.summary.setdefault("touching", {})["push_stance_search"] = tried
+                    return self._record_push_stance(draft, manip, grasp, cand, t_place_pose, p_pose)
+                except Reject as e:
+                    whys.append(f"{float(cand.extras.get('lateral_shift_m', 0.0)):+.2f}: {e}")
+                    tried.append(f"tip release drive {whys[-1][:160]}")
+            raise Reject("path_collision", f"touching tip release: no passing lateral's stance + carried drive is clear ({'; '.join(whys)})")
         if best is not None:
             st, manip_ok = best[1], best[2]
             draft.summary.setdefault("touching", {})["push_stance_lowest_contact_m"] = None if math.isinf(best[0][0]) else best[0][0]
@@ -4444,6 +4462,12 @@ class IORSSmall(SamplerV2):
                 raise Reject("place_unreachable", f"touching tip release: the place fails from every lateral ({'; '.join(tried)})")
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
         log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
+        return self._record_push_stance(draft, manip, grasp, st, t_place_pose, p_pose)
+
+    def _record_push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Stance:
+        """The chosen push stance ``st`` checked whole-body with the objects at the place and recorded, with the carried drive manipulation
+        -> ``st`` (:meth:`push_stance`). ``Reject(stance_collision | lift_unreachable | no_path | path_collision)``."""
+        tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         try:
             TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         finally:
