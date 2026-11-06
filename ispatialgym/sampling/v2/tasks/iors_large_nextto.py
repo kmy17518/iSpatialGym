@@ -52,6 +52,7 @@ spread), ``hand_spacing_m`` and ``face_centre_in_object`` (the midpoint of the t
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -117,6 +118,28 @@ DEFAULTS: Dict[str, Any] = {
     "push_hands": 1,
     "push_hand_spacings_m": [0.30, 0.26, 0.34, 0.22],
     "push_hands_depth_tol_m": 0.03,
+    # oracle-fix 2026-11-03 (touching_large#01, the ottoman): the same base push against a large partner's face until TOUCHING
+    # (``generation.touching_push: "base"`` on a touching_large alias, :class:`TouchingBasePushMode`): the goal's AABB gap from the partner
+    # (2 mm short of contact, the storage box's touching_goal_gap_m; the goal check nudges it on to contact), the drive's push-on after
+    # Touching first holds, and the goal check's nudge (1 mm steps, at most 25)
+    "touching_goal_gap_m": 0.002,
+    # ... and the floor test of a touching footprint skips its points within this of the partner's AABB: the goal 2 mm off the partner
+    # lies in the partner's own cells of the traversability map (0.1 m cells; the first ottoman run: every goal 'not_floor'); the
+    # footprint still may not overlap the partner's AABB
+    "touching_floor_skip_m": 0.15,
+    "touching_push_on_m": 0.0,
+    # ... and (opt-in, a sectional / chaise sofa whose AABB face lies far from its material, oracle-fix 2026-11-03 22:55: sofa_hiphpn_0's
+    # seat front 0.5 m inside the AABB's chaise tip) the touching goal advanced along the push from the AABB face to touching_goal_gap_m
+    # short of the partner's material (its collision pieces cut at ``touching_section_heights`` fractions of the target's height), at
+    # most touching_advance_max_m; the partner test of every footprint (goal, start, sweep) then uses those sections, not the AABB
+    "touching_partner_surface": False,
+    # oracle-fix 2026-11-04 (owner item 1b): how many push spots / two-hand pairs per face the stance searches try (the first ones of
+    # _face_candidates / _face_pairs: the probe's best heights); a model with a push-spot annotation tries every annotated one
+    "push_face_spots_max": 2,
+    "touching_section_heights": [0.1, 0.35, 0.6, 0.85],
+    "touching_advance_max_m": 1.0,
+    "nudge_m": 0.001,
+    "max_nudges": 25,
 }
 
 
@@ -124,6 +147,19 @@ def knob(s, key: str) -> Any:
     """``generation.<key>`` of the variant, else :data:`DEFAULTS`."""
     v = s.gp.gen(key) if s is not None else None
     return DEFAULTS[key] if v is None else v
+
+
+def push_relation(s) -> str:
+    """The relation the base push establishes: ``touching`` for :class:`TouchingBasePushMode` (a touching_large alias), else ``nextto``."""
+    return "touching" if getattr(s, "relation", None) == "touching" else "nextto"
+
+
+def goal_gap(s, bound: float) -> float:
+    """The goal's AABB gap from the partner: nextto - ``goal_gap_frac`` of the NextTo bound clamped to [``goal_gap_min_m``,
+    ``goal_gap_max_m``]; touching - ``touching_goal_gap_m`` (the goal check nudges the target on to contact)."""
+    if push_relation(s) == "touching":
+        return max(float(knob(s, "touching_goal_gap_m")), 0.0)
+    return min(max(float(knob(s, "goal_gap_frac")) * bound, float(knob(s, "goal_gap_min_m"))), float(knob(s, "goal_gap_max_m")))
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -412,6 +448,116 @@ def translated_pose(pose: G.Pose, delta) -> G.Pose:
 # ----------------------------------------------------------------------------------------------------------------
 
 
+#: oracle-fix 2026-11-03 (owner decision 3a): per-model push-spot annotations, the B6 contacts slot of the icl
+#: (``runlogs/contacts_<date>/<category>__<model>.json``, ``scripts/icl/build_icl.py build_contacts`` -> ``require/contacts.csv``), like the
+#: articulation handles of ``require/handles.csv``. A contact of role ``push`` names its ``face`` (+x / -x / +y / -y of the root frame),
+#: ``position`` (the one-hand spot on the face, root frame, m), ``height_m`` (above the target's lowest point) and, for two hands,
+#: ``spacing_m`` and ``spots`` (the two spots, root frame). A model with an annotation pushes ONLY at its annotated spots; without one the
+#: automatic face probe runs (the serving cart).
+#: the B6 rows a base push reads: ``base_push`` (a floor-standing target's push spots; distinct from the small-object ``push``
+#: rows whose presence makes the grounder enforce ``(contacts target)``) and ``push``
+BASE_PUSH_ROLES = ("base_push", "push")
+CONTACTS_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))), "runlogs")
+
+
+def push_spot_annotation(s) -> Optional[Dict[str, Any]]:
+    """The newest ``runlogs/contacts_*/<category>__<model>.json`` of the target model with at least one ``push`` contact (cached on
+    ``s.place``), else None."""
+    if "push_annotation" in s.place:
+        return s.place["push_annotation"]
+    out = None
+    try:
+        import glob
+
+        mc = s.choice.models["target"]
+        key = f"{mc.category}__{mc.model}"
+        for d in sorted(glob.glob(os.path.join(CONTACTS_ROOT, "contacts_*")), reverse=True):
+            path = os.path.join(d, key + ".json")
+            if os.path.exists(path):
+                with open(path) as f:
+                    ann = json.load(f)
+                if any(c.get("role") in BASE_PUSH_ROLES and c.get("verdict", "ok") == "ok" for c in ann.get("contacts", [])):
+                    out = {**ann, "path": path}
+                break
+    except Exception as e:  # noqa: BLE001 - no annotation: the automatic probe
+        log.warning("%s: push-spot annotation lookup failed (%r)", s.gp.variant, e)
+    s.place["push_annotation"] = out
+    return out
+
+
+def annotated_spot(face: str, lo, hi, position, height: Optional[float] = None) -> Dict[str, float]:
+    """An annotated spot (root-frame ``position`` on ``face``) as a face-probe record: ``coord`` along the outward normal, ``t0`` along
+    the tangent, ``z``, ``inset`` from the AABB plane, ``spread`` 0 (reviewed flat), ``height`` above the lowest point."""
+    nx, ny = FACES[face]
+    p = [float(v) for v in position]
+    coord = p[0] * nx + p[1] * ny
+    t0 = -p[0] * ny + p[1] * nx
+    h = float(height) if height is not None else p[2] - float(lo[2])
+    return {"coord": coord, "spread": 0.0, "t0": t0, "z": p[2], "height": h, "inset": face_outer(face, lo, hi) - coord, "relaxed": False, "annotated": True}
+
+
+def annotated_faces(s, face: str) -> Optional[Tuple[List[Dict[str, float]], List[Dict[str, Any]]]]:
+    """``(one-hand candidates, two-hand pairs)`` of ``face`` from the model's push-spot annotation, or None without an annotation (the
+    automatic probe then runs). A face the annotation does not name gives ``([], [])``."""
+    ann = push_spot_annotation(s)
+    if ann is None:
+        return None
+    lo, hi = s.place["local_lo"], s.place["local_hi"]
+    ones, pairs = [], []
+    for c in ann.get("contacts", []):
+        if c.get("role") not in BASE_PUSH_ROLES or c.get("face") != face or c.get("verdict", "ok") != "ok":
+            continue
+        h = c.get("height_m")
+        if c.get("position") is not None:
+            ones.append({**annotated_spot(face, lo, hi, c["position"], h), "name": c.get("name")})
+        spots = c.get("spots") or []
+        if len(spots) == 2 and c.get("spacing_m"):
+            sp = [{**annotated_spot(face, lo, hi, q, h), "name": c.get("name")} for q in spots]
+            sp.sort(key=lambda r: -r["t0"])  # the spot at +spacing / 2 along the tangent first (spot_pairs' order)
+            pairs.append({"height": sp[0]["height"], "spacing": float(c["spacing_m"]), "spots": sp, "relaxed": False, "annotated": True})
+    return ones, pairs
+
+
+def face_spots_cap(s, spots: Sequence[Any]) -> List[Any]:
+    """The spots / pairs of one face the stance search tries: all of an annotated model's, else the first ``push_face_spots_max``."""
+    if push_spot_annotation(s) is not None:
+        return list(spots)
+    n = knob(s, "push_face_spots_max")
+    return list(spots) if not n else list(spots)[: int(n)]
+
+
+def note_reach_margin(s, stand_off: float, translate: float, tilt: float, margin: float, height: float) -> None:
+    """oracle-fix 2026-11-03 (owner decision 3b, tuning ``push_stand_offs_m`` / ``push_trunks``): the shoulder reach margin of every
+    one-hand push stance tried, min / max / count per (stand-off, trunk), in ``template_facts["nextto_reach_margins"]`` (logged with the
+    draw's ``no_push``)."""
+    facts = getattr(s, "template_facts", None)
+    if facts is None:  # a bare sampler (unit tests)
+        return
+    rec = facts.setdefault("nextto_reach_margins", {})
+    key = f"so{stand_off:.2f} t({translate:.2f},{tilt:+.2f})"
+    r = rec.setdefault(key, {"min": margin, "max": margin, "n": 0, "heights": [height, height]})
+    r["min"], r["max"], r["n"] = round(min(r["min"], margin), 3), round(max(r["max"], margin), 3), r["n"] + 1
+    r["heights"] = [round(min(r["heights"][0], height), 3), round(max(r["heights"][1], height), 3)]
+
+
+def dump_push_geometry(s) -> None:
+    """``ISPATIALGYM_PUSH_FACE_DUMP=<dir>`` (oracle-fix 2026-11-03, for the push-spot annotations): the target's collision pieces (root
+    frame) and its local box to ``<dir>/<category>__<model>.npz`` (``pieces`` concatenated, ``offsets``, ``lo``, ``hi``)."""
+    out_dir = os.environ.get("ISPATIALGYM_PUSH_FACE_DUMP")
+    if not out_dir:
+        return
+    try:
+        mc = s.choice.models["target"]
+        os.makedirs(out_dir, exist_ok=True)
+        pieces = [th.as_tensor(p).float().reshape(-1, 3).numpy() for p in s.place["pieces"]]
+        offsets = np.cumsum([0] + [len(p) for p in pieces])
+        np.savez(os.path.join(out_dir, f"{mc.category}__{mc.model}.npz"), pieces=np.concatenate(pieces) if pieces else np.zeros((0, 3)), offsets=offsets,
+                 lo=s.place["local_lo"].numpy(), hi=s.place["local_hi"].numpy())
+        log.info("%s: push geometry of %s/%s dumped to %s (%d pieces)", s.gp.variant, mc.category, mc.model, out_dir, len(pieces))
+    except Exception as e:  # noqa: BLE001
+        log.warning("%s: push geometry dump failed (%r)", s.gp.variant, e)
+
+
 def prepare(s) -> None:
     """The target's geometry (root-frame hull, local box, collision pieces), the partner's sides and the obstacle boxes of the floor
     the target slides on; no grasp library, no init surface: the target stands on the floor (the support role, when the variant has
@@ -433,6 +579,10 @@ def prepare(s) -> None:
     s.place = {"height": height, "half": 0.5 * max(float(hi[0] - lo[0]), float(hi[1] - lo[1])), "z": s.floor_z, "cells": th.zeros(0, 2), "edges": sides,
                "local_lo": lo, "local_hi": hi, "pieces": s.world.local_collision_pieces(tgt), "partner_aabb": (plo, phi)}
     s.place["boxes"] = obstacle_boxes(s, height)
+    dump_push_geometry(s)
+    ann = push_spot_annotation(s)
+    if ann is not None:
+        s.template_facts.setdefault("push_spot_annotation", {"path": ann.get("path"), "spots": [c.get("name") for c in ann.get("contacts", [])]})
     if "support" in s.gp.scene_roles() and not s.bindings.has("support"):
         s.variant_role("support", s.bindings.one("floor"))
     s.template_facts["nextto"] = {"target_box_local": [lo.tolist(), hi.tolist()], "target_height_m": round(height, 4), "partner": partner.name,
@@ -487,9 +637,17 @@ def nextto_now(s) -> Optional[bool]:
         return None
 
 
-def floor_ok(s, corners: th.Tensor, step: float = 0.08) -> Optional[str]:
+def near_box(p, lo2, hi2, margin: float) -> bool:
+    """Whether the xy point ``p`` lies within ``margin`` of the axis-aligned rectangle ``lo2``-``hi2`` (inside counts)."""
+    dx = max(float(lo2[0]) - float(p[0]), 0.0, float(p[0]) - float(hi2[0]))
+    dy = max(float(lo2[1]) - float(p[1]), 0.0, float(p[1]) - float(hi2[1]))
+    return math.hypot(dx, dy) <= margin
+
+
+def floor_ok(s, corners: th.Tensor, step: float = 0.08, skip_near: Optional[Tuple[Any, Any, float]] = None) -> Optional[str]:
     """Why the footprint polygon is not on free floor (None when it is): every corner, edge point and interior grid point on the
-    (un-eroded) floor map and in the task rooms."""
+    (un-eroded) floor map and in the task rooms. ``skip_near`` = ``(lo xy, hi xy, margin)``: points within ``margin`` of that box are not
+    tested on the map (a touching goal against the partner, :func:`footprint_free`)."""
     a, b, c_ = corners[0], corners[1], corners[3]
     u, v = b - a, c_ - a
     nu = max(1, int(math.ceil(float(th.linalg.norm(u)) / step)))
@@ -497,11 +655,28 @@ def floor_ok(s, corners: th.Tensor, step: float = 0.08) -> Optional[str]:
     for i in range(nu + 1):
         for j in range(nv + 1):
             p = a + u * (i / nu) + v * (j / nv)
+            if skip_near is not None and near_box(p, *skip_near):
+                continue
             if not s.kit.trav_free(p):
+                _floor_debug(s, "not_floor", p)
                 return "not_floor"
             if not P0.in_task_rooms(s, p):
+                _floor_debug(s, "outside_rooms", p)
                 return "outside_rooms"
     return None
+
+
+_FLOOR_DEBUG_N = [0]
+
+
+def _floor_debug(s, why: str, p) -> None:
+    """``ISPATIALGYM_NEXTTO_FLOOR_DEBUG=<n>`` (oracle-fix 2026-11-03, the coffee table's goal_not_floor): log the first n failing floor
+    points of the process with the draw's current side / face (``s.place["_floor_ctx"]``)."""
+    n = int(os.environ.get("ISPATIALGYM_NEXTTO_FLOOR_DEBUG") or 0)
+    if _FLOOR_DEBUG_N[0] >= n:
+        return
+    _FLOOR_DEBUG_N[0] += 1
+    log.info("%s: floor test %s at %s (%s)", s.gp.variant, why, [round(float(v), 3) for v in p[:2].tolist()], s.place.get("_floor_ctx"))
 
 
 def floor_names_at(s, pts: th.Tensor) -> List[Optional[str]]:
@@ -528,15 +703,64 @@ def footprint_free(s, xy, yaw: float, clearance: float) -> Optional[str]:
     from every obstacle box, no overlap with the partner's AABB."""
     lo, hi = s.place["local_lo"], s.place["local_hi"]
     corners = footprint(lo, hi, xy, yaw)
-    why = floor_ok(s, footprint(lo, hi, xy, yaw, grow=clearance))
+    plo, phi = s.place["partner_aabb"]
+    skip = (plo[:2], phi[:2], float(knob(s, "touching_floor_skip_m"))) if push_relation(s) == "touching" else None
+    why = floor_ok(s, footprint(lo, hi, xy, yaw, grow=clearance), skip_near=skip)
     if why is not None:
         return why
     hit = footprint_blocked(corners, s.place["boxes"], clearance)
     if hit is not None:
         return f"obstacle:{hit}"
-    plo, phi = s.place["partner_aabb"]
+    polys = partner_sections(s)
+    if polys is not None:  # a touching goal against the partner's material: its sections, not its AABB
+        return "partner" if hits_sections(corners, polys) else None
     if G.polygons_overlap(corners, box_corners(plo[:2], phi[:2]), 0.0):
         return "partner"
+    return None
+
+
+def partner_sections(s) -> Optional[List[th.Tensor]]:
+    """World-xy convex sections of the partner's collision pieces at ``touching_section_heights`` x the target's height above the floor
+    (cached on ``s.place``), or None when ``touching_partner_surface`` is off / not a touching push."""
+    if push_relation(s) != "touching" or not knob(s, "touching_partner_surface"):
+        return None
+    if "partner_sections" not in s.place:
+        p = s.partner
+        root = p.get_position_orientation()
+        world = [G.local_points_world(th.as_tensor(P).float().reshape(-1, 3), (G.t(root[0]), G.t(root[1]))) for P in s.world.local_collision_pieces(p)]
+        polys: List[th.Tensor] = []
+        for f in knob(s, "touching_section_heights"):
+            polys += horizontal_section(world, float(s.floor_z) + float(f) * float(s.place["height"]))
+        s.place["partner_sections"] = polys
+        s.template_facts.setdefault("touching_partner_sections", {"pieces": len(world), "polygons": len(polys)})
+    return s.place["partner_sections"]
+
+
+def hits_sections(corners: th.Tensor, polys: Sequence[th.Tensor], margin: float = 0.0) -> bool:
+    return any(G.polygons_overlap(corners, P, margin) for P in polys)
+
+
+def advance_to_surface(lo, hi, xy, yaw: float, d2: th.Tensor, polys: Sequence[th.Tensor], gap: float, max_m: float,
+                       step: float = 0.01) -> Optional[float]:
+    """How far the footprint at root ``xy`` / ``yaw`` moves along ``d2`` before it comes within ``gap`` of the material ``polys`` (bisected
+    to 0.5 mm after a ``step`` scan); 0 when it already does; None when nothing is met within ``max_m``."""
+    d2 = th.as_tensor(d2).float()
+
+    def hit(t: float) -> bool:
+        return hits_sections(footprint(lo, hi, th.as_tensor(xy).float() + d2 * float(t), yaw), polys, gap)
+
+    if hit(0.0):
+        return 0.0
+    a = 0.0
+    t = step
+    while t <= max_m + 1e-9:
+        if hit(t):
+            b = t
+            while b - a > 5e-4:
+                m = 0.5 * (a + b)
+                a, b = (a, m) if hit(m) else (m, b)
+            return a
+        a, t = t, t + step
     return None
 
 
@@ -599,8 +823,16 @@ def _draw(s, rng: np.random.Generator) -> Draft:
                 continue
             yaw = face_yaw(face, d2)
             bound = nextto_bound(*world_aabb(lo, hi, (0.0, 0.0), yaw, s.floor_z), plo, phi)
-            gap = min(max(float(knob(s, "goal_gap_frac")) * bound, float(knob(s, "goal_gap_min_m"))), float(knob(s, "goal_gap_max_m")))
+            gap = goal_gap(s, bound)
             goal_xy = goal_root_xy(side, lo, hi, yaw, gap, cand["lateral"])
+            polys = partner_sections(s)
+            if polys is not None:
+                adv = advance_to_surface(lo, hi, goal_xy, yaw, d2, polys, gap, float(knob(s, "touching_advance_max_m")))
+                if adv is None:
+                    count(stats, "goal_no_partner_surface")
+                    continue
+                goal_xy = th.as_tensor(goal_xy).float() + th.as_tensor(d2).float() * adv
+            s.place["_floor_ctx"] = f"goal side {side.name} face {face} yaw {yaw:.2f} at {[round(float(v), 2) for v in goal_xy[:2].tolist()]}, partner {[round(float(v), 2) for v in (*plo[:2].tolist(), *phi[:2].tolist())]}"
             why = footprint_free(s, goal_xy, yaw, clearance)
             if why is not None:
                 count(stats, f"goal_{why.split(':')[0]}")
@@ -649,12 +881,17 @@ def _draw(s, rng: np.random.Generator) -> Draft:
             d.summary["nextto"]["draw_stats"] = dict(stats)
             return d
     s.template_facts.setdefault("nextto_draw_stats", []).append(dict(stats))
+    if (getattr(s, "template_facts", None) or {}).get("nextto_reach_margins"):
+        log.info("%s: push stance reach margins (want %s): %s", s.gp.variant, list(knob(s, "push_reach_margin_m")), s.template_facts["nextto_reach_margins"])
     raise Reject("no_push", f"{tries} goal candidates, none admits the push ({dict(sorted(stats.items(), key=lambda kv: -kv[1]))}): " + "; ".join(errors[-3:]))
 
 
 def _goal_nextto(s, goal_xy, yaw: float, d2: th.Tensor) -> Optional[bool]:
     """NextTo at the goal and at the lateral / yaw probes: True when the goal and at least 3 of the 4 probes read true, False when one
-    of them does not, None when NextTo cannot be read (the goal check decides)."""
+    of them does not, None when NextTo cannot be read (the goal check decides). Touching (:class:`TouchingBasePushMode`): None - the goal
+    stands ``touching_goal_gap_m`` short of the partner and the goal check nudges it on to contact."""
+    if push_relation(s) == "touching":
+        return None
     lat = float(knob(s, "nextto_probe_lateral_m"))
     dyaw = math.radians(float(knob(s, "nextto_probe_yaw_deg")))
     left = th.tensor([-float(d2[1]), float(d2[0])])
@@ -681,7 +918,11 @@ def _face_candidates(s, face: str) -> List[Dict[str, float]]:
 
 def _face_candidates_uncached(s, face: str) -> List[Dict[str, float]]:
     """At ``face_flat_tol_m`` / ``face_max_inset_m``; when no height passes, once more at twice the flatness tolerance and the inset +
-    0.10 m (recorded ``relaxed``: the guarded approach finds the actual contact)."""
+    0.10 m (recorded ``relaxed``: the guarded approach finds the actual contact). A model with a push-spot annotation
+    (:func:`push_spot_annotation`) uses its annotated spots of ``face`` instead (oracle-fix 2026-11-03)."""
+    ann = annotated_faces(s, face)
+    if ann is not None:
+        return ann[0]
     lo, hi = s.place["local_lo"], s.place["local_hi"]
     probe_lat, probe_z = (float(v) for v in knob(s, "face_probe_m"))
     half_d = 0.5 * depth_along(face, lo, hi)
@@ -709,6 +950,9 @@ def _face_pairs(s, face: str) -> List[Dict[str, Any]]:
     """The two-hand push spots of ``face`` (:func:`spot_pairs`; once per face and template): at ``face_flat_tol_m`` / ``face_max_inset_m``,
     else at the one hand's relaxed tolerances (each spot then ``relaxed``)."""
     cache = s.place.setdefault("pair_cache", {})
+    ann = annotated_faces(s, face) if face not in cache else None
+    if ann is not None:
+        cache[face] = ann[1]  # the annotated two-hand spots of the face (oracle-fix 2026-11-03)
     if face not in cache:
         lo, hi = s.place["local_lo"], s.place["local_hi"]
         probe_lat, probe_z = (float(v) for v in knob(s, "face_probe_m"))
@@ -743,7 +987,7 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
     root = G.t(init_pose[0])
     margin_lo, margin_hi = (float(v) for v in knob(s, "push_reach_margin_m"))
     cands: List[Tuple[Stance, Dict[str, Any]]] = []
-    for f in faces[:2]:
+    for f in face_spots_cap(s, faces):
         p_loc = contact_local(face, f["coord"], f["t0"], f["z"])
         point = G.local_points_world(p_loc.reshape(1, 3), (root, rquat))[0]
         for arm in arms:
@@ -756,6 +1000,7 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
                     for t, k in knob(s, "push_trunks"):
                         st = Stance("manipulation", pose2d, float(t), float(k), float(so), None, None, arm_lateral(float(lat), arm), point.clone(), [arm])
                         m = s.reach_margin(st, point, arm)
+                        note_reach_margin(s, float(so), float(t), float(k), float(m), float(f["height"]))
                         if not margin_lo <= m <= margin_hi:
                             count(stats, "stance_reach")
                             continue
@@ -783,7 +1028,7 @@ def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tenso
     rquat, root = G.t(init_pose[1]), G.t(init_pose[0])
     margin_lo, margin_hi = (float(v) for v in knob(s, "push_reach_margin_m"))
     cands: List[Tuple[Stance, Dict[str, Any]]] = []
-    for pr in _face_pairs(s, face)[:2]:
+    for pr in face_spots_cap(s, _face_pairs(s, face)):
         pts = [G.local_points_world(contact_local(face, sp["coord"], sp["t0"], sp["z"]).reshape(1, 3), (root, rquat))[0] for sp in pr["spots"]]
         side_of = spots_by_arm(pts, d2)
         points = {a: pts[side_of[a]] for a in (arm1, arm2)}
@@ -838,7 +1083,11 @@ def _complete(s, rng, cands: List[Tuple[Stance, Dict[str, Any]]], chain_of, side
         end.base_pose2d = end2d
         end.focus = None
         end.extras = {"push_from": "manipulation", "push_distance_m": round(dist, 4)}
-        if not bool(s.ikc.stances_collision_free([end])[0]):
+        # oracle-fix 2026-11-04 round 3 (chair 155 in the lobby: 52 x "push end collides with the target at init" - the base ends where the
+        # chair stood): opt-in generation.push_end_ignore_target checks the end stance with the target out of the world, as the sweep
+        with (s.ikc.ignoring([s.target]) if s.gp.gen("push_end_ignore_target") else _NoCtx()):
+            end_free = bool(s.ikc.stances_collision_free([end])[0])
+        if not end_free:
             why.append(f"push end {tuple(round(v, 2) for v in end2d)} collides with the target at init")
             count(stats, "push_end_collision")
             continue
@@ -886,6 +1135,11 @@ def _push_chain_pair(s, st: Stance, hands: Sequence[Tuple[str, th.Tensor]], d2: 
             r = PC.second_hand_chain(s, st, arm1, c1["q_pre"], c1["q"], arm2, pre, approach, s.target)
             if not r["ok"]:
                 why.append(f"{tag}: {r['why']}")
+                if r["why"].startswith("pre-contact"):
+                    q2 = s.ikc.q_locked(st, fingers=0.0).clone()
+                    i1 = s.kit.robot.arm_control_idx[arm1]
+                    q2[i1] = c1["q_pre"][i1]
+                    blame_push_pre(s, st, arm2, pre, tag, r["why"], q2, check_frame)
                 continue
             second = {"arm": arm2, "pre": pre, "contact": contact, "q_pre": r["q_pre"], "q": r["q"], "pitch_deg": c1["pitch_deg"], "wrist": wrist}
             return {**c1, "q_both": r["q"].clone(), "second": second}
@@ -908,12 +1162,49 @@ def _hand_chains(s, st: Stance, arm: str, point: th.Tensor, d2: th.Tensor, pre_m
             r_pre = s.ikc.exact([pre], st, arm, cache=False, fingers=C.FINGER_CLOSED)
             if not r_pre.ok or r_pre.q is None:
                 why.append(f"{tag}: pre-contact {r_pre.reason}")
+                blame_push_pre(s, st, arm, pre, tag, r_pre.reason, s.ikc.q_locked(st, fingers=C.FINGER_CLOSED), check_frame)
                 continue
             r = s.ikc.waypoints_ok([pre] + approach, st, arm, ignore_for_last=[tgt], cache=False, fingers=C.FINGER_CLOSED, q_first=r_pre.q)
             if not r.ok or r.q is None:
                 why.append(f"{tag}: approach {r.reason}")
                 continue
             yield {"pre": pre, "contact": contact, "q": r.q.clone(), "q_pre": r_pre.q.clone(), "pitch_deg": float(pitch), "wrist": wrist}
+
+
+class _NoCtx:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def blame_push_pre(s, st: Stance, arm: str, pre, tag: str, reason: str, q_start: th.Tensor, frame_checked: bool) -> None:
+    """Opt-in (``ISPATIALGYM_STANCE_BLAME=<n>``, oracle-fix 2026-11-04 round 3 item 1): why the closed hand's pre-contact exact IK failed at
+    this stance / pitch / wrist turn - reached with collisions off or not (mm short, rad off, the joint nearest its limit), else the robot
+    links x bodies in contact at a configuration reaching it (``IORSLarge._place_ik_contacts``), and whether the pre fingertip was
+    checked in the head frame before the IK (``frame_checked``: the check runs first, so a blamed pose is in frame). At most 12 x n lines
+    per attempt."""
+    n = os.environ.get("ISPATIALGYM_STANCE_BLAME")
+    if not n:
+        return
+    key = getattr(s, "_attempt_t0", None)
+    seen = getattr(s, "_push_pre_blame", None)
+    if seen is None or seen[0] != key:
+        seen = s._push_pre_blame = [key, 0]
+    try:
+        cap = 12 * max(1, int(n))
+    except ValueError:
+        cap = 12
+    if seen[1] >= cap:
+        return
+    seen[1] += 1
+    try:
+        why = s._place_ik_contacts(pre, q_start, arm, [])
+    except Exception as e:  # noqa: BLE001 - a diagnostic never fails the draw
+        why = f"blame failed ({e!r})"
+    log.info("%s: STANCE_BLAME push pre-contact %s hand, %s [%s]: frame %s; %s", s.gp.variant, arm, tag, str(reason)[:80],
+             "in (checked)" if frame_checked else "not checked", why[:420])
 
 
 def _sweep_ok(s, st: Stance, end2d: Tuple[float, float, float], arms: Sequence[str], q: th.Tensor, why: List[str]) -> bool:
@@ -982,7 +1273,7 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
               "face": face, "face_inset_m": round(float(f["inset"]), 4), "face_spread_m": round(float(f["spread"]), 4), "face_relaxed": bool(f.get("relaxed")), "pitch_deg": chain["pitch_deg"],
               "wrist_sign": chain["wrist"], "partner": pname, "end_stance": END_STANCE, "goal_gap_m": round(gap, 4), "nextto_bound_m": round(bound, 4),
               "drift_tol_m": float(knob(s, "drift_tol_m")), "yaw_tol_rad": float(knob(s, "yaw_tol_rad")), "nextto_push_on_m": float(knob(s, "nextto_push_on_m")),
-              "push_speed_m_s": float(knob(s, "push_speed_m_s")),
+              "push_speed_m_s": float(knob(s, "push_speed_m_s")), "relation": push_relation(s),
               "reach_margin_m": round(float(info["reach_margin"]), 4), "ignore_last": [tname], "ignore_every": []}
     second = chain.get("second")
     if second is not None:
@@ -1010,7 +1301,9 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
     d.robot_q = s.stance_q(init)
     d.base_pose2d = tuple(init.base_pose2d)
     pp, _ = s.partner.get_position_orientation()
-    d.summary.update({"relation": "nextto", "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(st), "legs": {"A_B": leg},
+    if push_relation(s) == "touching":
+        extras["touching_push_on_m"] = float(knob(s, "touching_push_on_m"))
+    d.summary.update({"relation": push_relation(s), "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(st), "legs": {"A_B": leg},
                       "partner_position": [float(v) for v in pp], "arm": {"arm": arm}})
     d.summary["nextto"] = {"side": side.name, "push_angle_deg": round(math.degrees(C.wrap_angle(math.atan2(float(d2[1]), float(d2[0])) - side.yaw)), 2), "face": face,
                            "target_yaw": round(yaw, 4), "push_distance_m": round(dist, 4), "goal_gap_m": round(gap, 4), "nextto_bound_m": round(bound, 4),
@@ -1096,3 +1389,63 @@ class NextToMode:
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         return []
+
+
+class TouchingBasePushMode(NextToMode):
+    """oracle-fix 2026-11-03 (touching_large#01: an ottoman pushed against a sofa; ``generation.touching_push: "base"`` on a touching_large
+    alias, ``IORSLarge._sample_touching``): :class:`NextToMode`'s base push with the goal ``touching_goal_gap_m`` short of the partner's face
+    (no NextTo probes, :func:`goal_gap`, :func:`_goal_nextto`), the record's ``relation: touching`` (the oracle stops the drive once
+    Touching holds and the object went ``touching_push_on_m`` further) and, in the goal check, the settled goal nudged ``nudge_m`` at a time
+    along the push until ``touching(target, partner)`` holds (the storage box's rule, ``iors_large_touching.nudge_until_touching``)."""
+
+    def refine_targets_from_goal(self, draft: Draft):
+        nudge_until_touching(self, draft)
+        super().refine_targets_from_goal(draft)
+
+
+def nudge_until_touching(s, draft: Draft) -> None:
+    """The settled goal nudged ``nudge_m`` (1 mm) at a time along the base push's direction until ``touching(target, partner)`` holds, at
+    most ``max_nudges`` times (the task's predicate through ``sampling.predicates.evaluate_predicate``); ``summary.touching_nudge``;
+    ``Reject("goal_infeasible")`` without contact."""
+    from bddl import predicates as BP
+
+    from ispatialgym.sampling import predicates as PRED
+
+    t, p = s.target, s.partner
+    push = s.sidecar.contacts.get("push")
+    if push is None:
+        raise Reject("goal_infeasible", "touching base push: no push record to nudge along")
+    d = th.as_tensor(push.direction).reshape(-1)[:2].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    step, n = float(knob(s, "nudge_m")), int(knob(s, "max_nudges"))
+
+    def gap_now() -> str:  # oracle-fix 2026-11-03: the AABB gap / overlap per axis and the centre offset (the reject's diagnostic)
+        try:
+            tlo, thi = (th.as_tensor(v).float() for v in t.aabb)
+            plo, phi = (th.as_tensor(v).float() for v in p.aabb)
+            gx = max(float(plo[0] - thi[0]), float(tlo[0] - phi[0]))
+            gy = max(float(plo[1] - thi[1]), float(tlo[1] - phi[1]))
+            c = 0.5 * (tlo + thi) - 0.5 * (plo + phi)
+            return f"AABB gap x {gx:+.3f} y {gy:+.3f} m, centre offset {[round(float(v), 3) for v in c[:2].tolist()]}"
+        except Exception as e:  # noqa: BLE001
+            return f"gap unreadable ({e!r})"
+
+    start = gap_now()
+    for k in range(n + 1):
+        s.world.wake([t, p])
+        # the task's (touching ?t ?p) through the shared wrapper (OmniGibson's contact report, then the 3 mm gap to the partner's merged
+        # convex hull): a kinematic-only partner (fixed base, no joints: sofa_hiphpn_0) is in no PhysX contact report, so the raw state
+        # never reads True. The hull is lenient for a sectional (its chaise pocket is inside it) - touching_partner_surface puts the goal
+        # at the material first
+        if PRED.evaluate_predicate(BP.Touching, t, p):
+            draft.summary["touching_nudge"] = {"steps": k, "m": round(k * step, 4)}
+            return
+        if k == n:
+            break
+        pos, quat = t.get_position_orientation()
+        t.set_position_orientation(pos + th.tensor([float(d[0]) * step, float(d[1]) * step, 0.0]), quat)
+        t.keep_still()
+        s.world.step_physics(3, still=[s.robot, p])
+    raise Reject("goal_infeasible", f"touching base push: no contact with {p.name} after {n} nudges of {1000 * step:.0f} mm along the push "
+                                    f"(direction {[round(float(v), 3) for v in d.tolist()]}; before: {start}; after: {gap_now()})")
+

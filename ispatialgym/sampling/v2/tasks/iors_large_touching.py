@@ -697,3 +697,433 @@ class TouchingMode:
                 r["relation"] = "touching"
                 r["face"] = _jsonable((draft.summary.get("push_touching") or {}).get("edge"))
         return out
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the lean place (oracle-fix 2026-11-04 round 3, touching_large#02: the umbrella leaning on the hallstand, no push)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: ``generation.touching_place`` / ``grasps[0].place_kind`` of the lean release (``programs._iors_large_touching_program``)
+LEAN_PLACE_KIND = "lean"
+#: lean angles from the vertical (deg), tried in order per lane (``generation.lean_angles_deg``)
+LEAN_ANGLES_DEG = (18.0, 24.0, 12.0)
+#: the released object's lowest point above the floor and its gap to the nearest partner surface (``generation.lean_drop_m`` /
+#: ``lean_gap_m``): it drops onto its lower end and tips the gap onto the partner
+LEAN_DROP_M = 0.004
+LEAN_GAP_M = 0.003
+#: the partner profile along a lane: horizontal rays every this step from FACE_PROBE_MIN_Z_M to the leaning object's top
+LEAN_PROFILE_STEP_M = 0.02
+#: the contact at least this fraction of the leaning object's height up (a lower contact rolls the object off sideways)
+LEAN_CONTACT_MIN_FRACTION = 0.35
+#: the profile rays start this far outside the AABB edge (the lower end stands up to L sin(theta) outside)
+LEAN_PROBE_OUTSIDE_M = 0.80
+#: stance C (frontal): base stand-offs from the AABB edge line, the lane's offset to the arm side, trunks (``generation.lean_stand_offs_m``,
+#: ``lean_lane_offsets_m``, ``lean_trunks``)
+LEAN_STAND_OFFS_M = (0.50, 0.60, 0.70, 0.80, 0.90)
+LEAN_LANE_OFFSETS_M = (0.15, 0.0, 0.30)
+LEAN_TRUNKS = ((0.75, -0.6), (0.95, -0.6), (0.5, -0.6), (0.75, -0.3), (0.95, -0.9), (0.5, -0.9), (0.95, -0.3))
+#: the lean lane step along the face (wider than the push lanes: one lean per 15 cm)
+LEAN_LANE_STEP_M = 0.15
+
+
+def quat_between(a, b) -> th.Tensor:
+    """The shortest rotation (xyzw) taking the direction ``a`` onto ``b``."""
+    a = th.as_tensor(a, dtype=th.float32).reshape(3)
+    b = th.as_tensor(b, dtype=th.float32).reshape(3)
+    a, b = a / a.norm().clamp_min(1e-9), b / b.norm().clamp_min(1e-9)
+    c = float(a @ b)
+    if c < -1.0 + 1e-6:
+        ax = th.linalg.cross(a, th.tensor([1.0, 0.0, 0.0]))
+        if float(ax.norm()) < 1e-6:
+            ax = th.linalg.cross(a, th.tensor([0.0, 1.0, 0.0]))
+        return G.quat_about_axis(ax / ax.norm(), math.pi)
+    v = th.linalg.cross(a, b)
+    q = th.tensor([float(v[0]), float(v[1]), float(v[2]), 1.0 + c])
+    return q / q.norm()
+
+
+def lean_axis(d2, theta: float, azimuth: float = 0.0) -> th.Tensor:
+    """The leaning object's axis (lower end -> top) tilted ``theta`` (rad) from the vertical toward the partner (``d2`` = into it); ``azimuth``
+    (rad) turns the tilt direction about the vertical (oracle-fix 2026-11-04 round 4: 90 deg at theta 90 = lying along the face)."""
+    d = unit_xy(d2)
+    c, s_ = math.cos(azimuth), math.sin(azimuth)
+    dx, dy = c * float(d[0]) - s_ * float(d[1]), s_ * float(d[0]) + c * float(d[1])
+    return th.tensor([math.sin(theta) * dx, math.sin(theta) * dy, math.cos(theta)])
+
+
+def lean_quat(rest, axis_local, d2, theta: float, spin: float, azimuth: float = 0.0) -> th.Tensor:
+    """The lean orientation: ``rest`` turned so the object's ``axis_local`` (lower end -> top, object frame) lies along
+    :func:`lean_axis`, then spun ``spin`` (rad) about that axis (the screened yaw's free degree)."""
+    a0 = G.rotate(G.t(rest), G.t(axis_local))
+    ahat = lean_axis(d2, theta, azimuth)
+    return G.qmul(G.quat_about_axis(ahat, float(spin)), G.qmul(quat_between(a0, ahat), G.t(rest)))
+
+
+def lean_offset(v: th.Tensor, heights: th.Tensor, d2, prof_z: Sequence[float], prof_s: Sequence[Optional[float]], prof_partner: Sequence[bool],
+                gap: float, step: float) -> Optional[Tuple[float, float, bool]]:
+    """How far outside the AABB edge line the leaning object's root must stand: the object's points ``v`` (relative to its root, world
+    axes) at ``heights`` above the floor clear every profile surface - per ray height ``prof_z`` the nearest hit ``prof_s`` behind the
+    edge line (None: nothing at that height), ``prof_partner`` whether it is the partner - by ``gap``: ``x = max_p (v_p . d2 - s(z_p)) +
+    gap``. ``(x, contact height, contact on the partner)`` of the binding point; None when no point meets a surface (it would pass)."""
+    d = unit_xy(d2)
+    z = th.as_tensor([float(t) for t in prof_z], dtype=th.float32)
+    if len(z) == 0:
+        return None
+    along = th.as_tensor(v, dtype=th.float32)[:, :2] @ d
+    best = None
+    for p in range(len(along)):
+        k = int(th.argmin((z - float(heights[p])).abs()))
+        if abs(float(z[k]) - float(heights[p])) > 0.5 * step + 1e-6 or prof_s[k] is None:
+            continue
+        c = float(along[p]) - float(prof_s[k]) + float(gap)
+        if best is None or c > best[0]:
+            best = (c, float(heights[p]), bool(prof_partner[k]))
+    return best
+
+
+def axis_and_top(hull_local: th.Tensor, top_end: str = "auto") -> Tuple[th.Tensor, float, float]:
+    """The long axis of an elongated object (its local AABB's longest axis) pointing to its top end, its length and the half width across
+    it. ``top_end`` "+" / "-": the top on that side of the axis; "auto": the end whose last 12 % holds the wider cross-section (an umbrella's
+    crook handle, not its ferrule)."""
+    pts = th.as_tensor(hull_local, dtype=th.float32)
+    lo, hi = pts.min(dim=0).values, pts.max(dim=0).values
+    i = int(th.argmax(hi - lo))
+    length = float(hi[i] - lo[i])
+    others = [j for j in range(3) if j != i]
+    c = 0.5 * (lo + hi)
+    rad = th.linalg.norm(pts[:, others] - c[others], dim=1)
+    half_w = float(rad.max())
+    if top_end in ("+", "-"):
+        sign = 1.0 if top_end == "+" else -1.0
+    else:
+        def spread(mask) -> float:  # the end slab's cross-section: its extent across the axis
+            if not bool(mask.any()):
+                return 0.0
+            q = pts[mask][:, others]
+            return float((q.max(dim=0).values - q.min(dim=0).values).max())
+
+        r_hi = spread(pts[:, i] >= float(hi[i]) - 0.12 * length)
+        r_lo = spread(pts[:, i] <= float(lo[i]) + 0.12 * length)
+        sign = 1.0 if r_hi >= r_lo else -1.0
+    ax = th.zeros(3)
+    ax[i] = sign
+    return ax, length, half_w
+
+
+class LeanTouchingMode(TouchingMode):
+    """``generation.touching_place: "lean"`` (oracle-fix 2026-11-04 round 3, touching_large#02): the target is carried to stance C and
+    released LEANING on the partner - its lower end on the floor, its axis ``lean_angles_deg`` from the vertical toward the partner's face,
+    touching it, as a book leans on a compartment's side board - with no drop and no push. Per lane of a partner face (the AABB edges, lanes
+    every ``LEAN_LANE_STEP_M``) horizontal rays every ``LEAN_PROFILE_STEP_M`` up to the object's top find the nearest surface behind the
+    edge line at each height (:func:`lean_offset`); the root stands where the object's points clear every surface by ``lean_gap_m`` and the
+    binding point is the partner's, at least ``LEAN_CONTACT_MIN_FRACTION`` of the height up; the lower end on free floor. The goal pose
+    (:meth:`goal_pose_at`) is the lean orientation (:func:`lean_quat`, the screened yaw = the spin about the axis) at that root,
+    ``lean_drop_m`` above the floor; the release IK screens it with the partner and the floor out of the last pose. The goal check settles
+    it and nudges it toward the partner until Touching holds (TouchingMode's). Records: ``grasps[0].place_kind`` "lean", ``summary.
+    lean_touching``."""
+
+    @property
+    def push_under(self) -> bool:
+        return False
+
+    def goal_align_partner(self) -> bool:
+        return False  # the screened yaw is the spin about the leaning axis, free
+
+    def init_yaw_jitter(self) -> float:
+        return IL.IORSLarge.init_yaw_jitter(self)
+
+    def place_ignores(self) -> List[Any]:
+        return [self.obj("floor"), self.partner]
+
+    def lean_geometry(self) -> Dict[str, Any]:
+        """The target's axis (lower end -> top, object frame), length and half width (:func:`axis_and_top`); memoised per template."""
+        geo = self.place.get("lean_geo")
+        if geo is None:
+            ax, length, half_w = axis_and_top(self.hull, str(self.gp.gen("lean_top_end") or "auto"))
+            geo = self.place["lean_geo"] = {"axis_local": ax, "length": length, "half_w": half_w}
+            log.info("%s: lean geometry: axis %s (top end), length %.3f m, half width %.3f m", self.gp.variant, ax.tolist(), length, half_w)
+        return geo
+
+    def lean_azimuths(self) -> List[float]:
+        """``generation.lean_azimuths_deg`` (rad; default [0]): the tilt directions turned from the face normal (oracle-fix 2026-11-04 round 4:
+        [90] with lean_angles_deg [90] lays the object along the face - lying into the face put the umbrella's mid-shaft grasp under C's base)."""
+        return [math.radians(float(a)) for a in (self.gp.gen("lean_azimuths_deg") or [0.0])]
+
+    def lean_half_lateral(self) -> float:
+        """The object's half extent along the face over the azimuths: its half width, or with an azimuth off the normal half its length."""
+        geo = self.lean_geometry()
+        return max([geo["half_w"]] + [0.5 * geo["length"] * abs(math.sin(a)) + geo["half_w"] for a in self.lean_azimuths()])
+
+    def lean_profile(self, edge: EdgeFrame, lat: float) -> Dict[str, Any]:
+        """The surfaces behind lane ``lat`` of ``edge`` per height: the nearest hit offset behind the edge line over the rays across the
+        object's extent along the face (three across its width; every 4 cm over :meth:`lean_half_lateral` with an azimuth), None: no hit,
+        and whether it is the partner's; memoised per (edge, lane)."""
+        key = (edge.name, round(float(lat), 4))
+        memo = self.place.setdefault("lean_profiles", {})
+        if key in memo:
+            return memo[key]
+        from ispatialgym.sampling.sim_utils import raytest_batch
+
+        geo = self.lean_geometry()
+        d2 = unit_xy(edge.inward)
+        tangent = th.tensor([-float(d2[1]), float(d2[0])])
+        lo, hi = self.partner.aabb
+        depth = float(th.abs(d2 @ (hi[:2].float() - lo[:2].float())))
+        e0 = edge.mid.float() + tangent * float(lat)
+        step = LEAN_PROFILE_STEP_M
+        zs = [FACE_PROBE_MIN_Z_M + k * step for k in range(int(math.ceil((geo["length"] + 0.05) / step)))]
+        half_lat = self.lean_half_lateral()
+        lats = (-geo["half_w"], 0.0, geo["half_w"]) if half_lat <= geo["half_w"] + 1e-6 else \
+            tuple(float(v) for v in th.linspace(-half_lat, half_lat, max(3, int(math.ceil(2 * half_lat / 0.04)) + 1)).tolist())
+        starts, ends = [], []
+        for z in zs:
+            for fl in lats:
+                p = e0 + tangent * float(fl)
+                a, b = p - d2 * LEAN_PROBE_OUTSIDE_M, p + d2 * (depth + 0.02)
+                starts.append([float(a[0]), float(a[1]), self.floor_z + z])
+                ends.append([float(b[0]), float(b[1]), self.floor_z + z])
+        ignore = [l.prim_path for o in (self.robot, self.target) for l in getattr(o, "links", {}).values()]
+        raw = raytest_batch(starts, ends, only_closest=True, ignore_bodies=ignore or None)
+        prims = {l.prim_path for l in self.partner.links.values()}
+        s_of, on_of, by = [], [], []
+        for k in range(len(zs)):
+            best = None
+            for h in raw[k * len(lats):(k + 1) * len(lats)]:
+                if not h.get("hit"):
+                    continue
+                body = str(h.get("rigidBody"))
+                s = float((th.as_tensor([float(h["position"][0]), float(h["position"][1])]) - e0) @ d2)
+                on = body in prims or any(body.startswith(pp + "/") for pp in prims)
+                if best is None or s < best[0]:
+                    best = (s, on, None if on else (self._object_of_prim(body) or body))
+            s_of.append(None if best is None else best[0])
+            on_of.append(bool(best[1]) if best is not None else False)
+            by.append(None if best is None else best[2])
+        memo[key] = {"e0": e0, "d2": d2, "z": zs, "s": s_of, "partner": on_of, "by": by}
+        return memo[key]
+
+    def lean_pose(self, prof: Dict[str, Any], theta: float, spin: float, azimuth: float = 0.0) -> Tuple[Optional[G.Pose], Dict[str, Any]]:
+        """The lean pose at a lane (:meth:`lean_profile`) for the angle ``theta`` and the ``spin`` (rad): ``(pose or None, facts)``; None
+        with ``facts["why"]`` when the object would meet no surface, meet another object first, touch too low, or its lower end is not
+        free floor."""
+        geo = self.lean_geometry()
+        quat = lean_quat(self.rest, geo["axis_local"], prof["d2"], theta, spin, azimuth)
+        v = G.local_points_world(self.hull, (th.zeros(3), G.t(quat)))
+        z_root = -float(v[:, 2].min()) + float(self.num("lean_drop_m", LEAN_DROP_M))
+        heights = v[:, 2] + z_root
+        got = lean_offset(v, heights, prof["d2"], prof["z"], prof["s"], prof["partner"], float(self.num("lean_gap_m", LEAN_GAP_M)), LEAN_PROFILE_STEP_M)
+        facts: Dict[str, Any] = {"theta_deg": round(math.degrees(theta), 1), "spin_rad": round(float(spin), 3), "azimuth_deg": round(math.degrees(azimuth), 1)}
+        if got is None:
+            facts["why"] = "no_surface"
+            return None, facts
+        x, h_c, on = got
+        top = float(heights.max())
+        facts.update({"root_out_m": round(x, 4), "contact_height_m": round(h_c, 3), "top_m": round(top, 3)})
+        if not on:
+            facts["why"] = "other_object_first"
+            return None, facts
+        if h_c < float(self.num("lean_contact_min_fraction", LEAN_CONTACT_MIN_FRACTION)) * top:
+            facts["why"] = "contact_low"
+            return None, facts
+        root = prof["e0"] - prof["d2"] * x
+        lowest = v[int(th.argmin(v[:, 2]))]
+        tip = root + lowest[:2]
+        if not self._free_floor_cell(tip):
+            facts["why"] = "lower_end_not_free"
+            return None, facts
+        facts["lower_end"] = [round(float(tip[0]), 3), round(float(tip[1]), 3)]
+        return (th.tensor([float(root[0]), float(root[1]), self.floor_z + z_root]), quat), facts
+
+    def prepare_partner(self):
+        super().prepare_partner()
+        self.place["lean_lanes"] = {}
+
+    def _placement_candidates_at(self, edge: EdgeFrame, init_xy, arm: Optional[str] = None) -> List[Stance]:
+        """Stance C of the lean: per lane of ``edge`` the first lean angle whose nominal pose (spin 0) holds (:meth:`lean_pose`); frontal
+        stances square to the face at ``lean_stand_offs_m`` with the lane ``lean_lane_offsets_m`` to the arm's side, the ``lean_trunks``,
+        whole-body collision-free (the floor mesh out), the lower end, the contact and the top in frame. Extras: ``goal_cell`` = the lane's
+        point on the edge line (:meth:`goal_pose_at` finds the lean from it), ``push_dir`` (the goal check's nudge), ``lean``."""
+        arm = arm or self.seg_arm
+        geo = self.lean_geometry()
+        d2 = unit_xy(edge.inward)
+        half_run = edge.length / 2 - self.lean_half_lateral() - LANE_END_MARGIN_M
+        if any(abs(a) > 1e-6 for a in self.lean_azimuths()):
+            half_run = max(0.0, half_run)  # an object lying along a face shorter than itself: the centre lane (its ends past the face's)
+        lanes = centred_lanes(half_run, LEAN_LANE_STEP_M)
+        angles = [math.radians(float(a)) for a in (self.gp.gen("lean_angles_deg") or LEAN_ANGLES_DEG)]
+        stand_offs = [float(v) for v in (self.gp.gen("lean_stand_offs_m") or LEAN_STAND_OFFS_M)]
+        offsets = [float(v) for v in (self.gp.gen("lean_lane_offsets_m") or LEAN_LANE_OFFSETS_M)]
+        trunks = [tuple(float(x) for x in t) for t in (self.gp.gen("lean_trunks") or LEAN_TRUNKS)]
+        stats: Dict[str, Any] = {"edge": edge.name, "lanes": len(lanes), "lean_ok": 0, "why": {}, "base_ok": 0, "candidates": 0}
+        cands: List[Stance] = []
+        for i_lane, lat in enumerate(lanes):
+            prof = self.lean_profile(edge, lat)
+            if i_lane == 0:  # the centre lane's surfaces per height (m behind the edge line, the body met first)
+                log.info("%s: lean profile %s face %s lane %+.2f: %s", self.gp.variant, self.partner.name, edge.name, lat,
+                         " ".join(f"{z:.2f}:{'-' if sv is None else f'{sv:.2f}'}{'' if on or sv is None else '(' + str(b)[:24] + ')'}"
+                                  for z, sv, on, b in list(zip(prof["z"], prof["s"], prof["partner"], prof["by"]))[::2]))
+            pose, facts, az_ok = None, {}, 0.0
+            for th_ in angles:
+                for az in self.lean_azimuths():
+                    pose, facts = self.lean_pose(prof, th_, 0.0, az)
+                    if pose is not None:
+                        az_ok = az
+                        break
+                    stats["why"][facts["why"]] = stats["why"].get(facts["why"], 0) + 1
+                if pose is not None:
+                    break
+            if pose is None:
+                continue
+            stats["lean_ok"] += 1
+            e0 = prof["e0"]
+            key = (round(float(e0[0]), 3), round(float(e0[1]), 3))
+            self.place["lean_lanes"][key] = {"edge": edge.name, "lat": float(lat), "theta": math.radians(facts["theta_deg"]), "az": az_ok, "prof": prof}
+            pts = G.local_points_world(self.hull, pose)
+            focus = pts.mean(dim=0)
+            look = th.stack([pts[int(th.argmin(pts[:, 2]))], pts[int(th.argmax(pts[:, 2]))], focus])
+            common = {"goal_cell": [float(e0[0]), float(e0[1])], "push_dir": [float(d2[0]), float(d2[1])], "edge": edge.name,
+                      "lean": dict(facts, lane=float(lat)), "lean_look": look.tolist()}
+            for off in offsets:
+                for so in stand_offs:
+                    lat_b = IL.frontal_lane_lateral(float(lat), off, arm)
+                    xy = edge.base_xy(so, lat_b)
+                    if not P0.base_ok(self, xy):
+                        continue
+                    stats["base_ok"] += 1
+                    for tr, ti in trunks:
+                        st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), tr, ti, so, edge, None, lat_b, None, [arm])
+                        st.focus = focus.clone()
+                        st.extras.update(common, stance_kind="frontal", lane_offset_m=IL.arm_sign(arm) * off)
+                        cands.append(st)
+                        stats["candidates"] += 1
+        self.template_facts.setdefault("lean_stats", {})[edge.name] = stats
+        if not cands:
+            log.info("%s: lean stance C at %s face %s: no candidate (%s)", self.gp.variant, self.partner.name, edge.name, stats)
+            return []
+        with self.ikc.ignoring([self.obj("floor")]):
+            free = P0.body_free(self, cands)
+        cands = [st for st, ok in zip(cands, free.tolist()) if ok]
+        stats["collision_free"] = len(cands)
+        cams = P0.camera_poses(self, cands) if cands else []
+        out_ = []
+        for st, cam in zip(cands, cams):
+            if not P0.in_frame(self, cam, th.as_tensor(st.extras["lean_look"], dtype=th.float32)):
+                stats["out_of_frame"] = stats.get("out_of_frame", 0) + 1
+                continue
+            st.extras["angle_class"] = 1
+            out_.append(st)
+        stats["visible"] = len(out_)
+        log.info("%s: lean stance C at %s face %s: %d survivors (%s)", self.gp.variant, self.partner.name, edge.name, len(out_), stats)
+        return out_
+
+    def goal_pose_at(self, goal_cell, quat, eef_in_object=None) -> G.Pose:
+        """The lean pose of the lane whose edge-line point is ``goal_cell`` at the spin of ``quat`` (= yaw * rest: the yaw is the spin);
+        a lane the candidates did not record falls back to IORSLarge's floor pose."""
+        key = (round(float(goal_cell[0]), 3), round(float(goal_cell[1]), 3))
+        lane = (self.place.get("lean_lanes") or {}).get(key)
+        if lane is None:
+            return super().goal_pose_at(goal_cell, quat, eef_in_object)
+        spin = G.yaw_of(G.qmul(G.t(quat), G.qinv(self.rest)))
+        az = float(lane.get("az", 0.0))
+        pose, facts = self.lean_pose(lane["prof"], lane["theta"], spin, az)
+        if pose is None:
+            # this spin's lean fails a rule: the nominal lane's root with this orientation (the IK screen / the goal check decide)
+            geo = self.lean_geometry()
+            q = lean_quat(self.rest, geo["axis_local"], lane["prof"]["d2"], lane["theta"], spin, az)
+            pose0, _ = self.lean_pose(lane["prof"], lane["theta"], 0.0, az)
+            if pose0 is None:
+                return super().goal_pose_at(goal_cell, quat, eef_in_object)
+            v = G.local_points_world(self.hull, (th.zeros(3), G.t(q)))
+            z = self.floor_z - float(v[:, 2].min()) + float(self.num("lean_drop_m", LEAN_DROP_M))
+            return th.tensor([float(pose0[0][0]), float(pose0[0][1]), z]), q
+        return pose
+
+    def free_spin(self) -> bool:
+        """``generation.lean_free_spin`` (oracle-fix 2026-11-04 round 4, default false): the spin about the leaning axis is not tied to the
+        carried init yaw (the hand re-orients the object for the lean anyway): F_goal is screened over the whole spin grid and a row
+        feasible at any spin pairs with every init yaw; :meth:`release_quat` gives the drawn row its first feasible spin."""
+        return bool(self.gp.gen("lean_free_spin", False))
+
+    def release_feasible(self, release_xy, yaws, release_pose, place: Stance, arm: str, ignore_place) -> List[Tuple[float, Any]]:
+        if not self.free_spin():
+            return super().release_feasible(release_xy, yaws, release_pose, place, arm, ignore_place)
+        out = super().release_feasible(release_xy, self.yaws(), release_pose, place, arm, ignore_place)
+        spins: Dict[str, List[float]] = {}
+        for spin, g in out:
+            spins.setdefault(g.name, []).append(float(spin))
+        self.place["lean_spins"] = spins  # the C being screened; the draws at this C follow immediately
+        return [(y, g) for y in yaws for g in self.grasps if g.name in spins]
+
+    def release_quat(self, level_quat, grasp, tilt_deg: float):
+        spins = (self.place.get("lean_spins") or {}).get(getattr(grasp, "name", None)) if self.free_spin() else None
+        if not spins:
+            return level_quat
+        return G.qmul(G.quat_from_yaw(spins[0]), self.rest)
+
+    def after_goal_check(self, draft: Draft):
+        """IORSLarge's place re-check at the settled goal; when that fails (oracle-fix 2026-11-04 round 4: umb_upk2_s2 'exact IK failed at pose
+        1 of 2' after the umbrella rolled a little about its axis in the settle), the release pose the settle started from (``draft.goal_poses``,
+        the lean ``lean_drop_m`` above the floor) is re-checked and kept as the place - the oracle releases where the goal check released; the
+        evaluation target stays the settled pose. ``summary.lean_place`` says which."""
+        name = self.tname
+        try:
+            super().after_goal_check(draft)
+            draft.summary["lean_place"] = "settled"
+            return
+        except Reject as e:
+            if e.reason != "place_unreachable" or name not in draft.goal_poses:
+                raise
+            first = e
+        tgt = draft.pose_targets[name]
+        settled = (tgt["position"], tgt["orientation"])
+        rel_pos, rel_quat = draft.goal_poses[name]
+        tgt["position"], tgt["orientation"] = [float(v) for v in rel_pos], [float(v) for v in rel_quat]
+        try:
+            super().after_goal_check(draft)
+        except Reject as e2:
+            if e2.reason == "place_unreachable":
+                raise Reject("place_unreachable", f"{first} (at the release pose too: {e2})")
+            raise
+        finally:
+            tgt["position"], tgt["orientation"] = settled
+        draft.summary["lean_place"] = "release"
+        log.info("%s: lean place re-checked at the release pose (the settled one failed: %s)", self.gp.variant, first)
+
+    def sample_instance(self, rng: np.random.Generator) -> Draft:
+        d = IL.IORSLarge.sample_instance(self, rng)
+        self.lean_records(d)
+        return d
+
+    def check_goal_upright(self, draft: Draft):
+        """SamplerV2's tip guard measured on the leaning object's LONG axis (oracle-fix 2026-11-04 round 3): the stock rule compares the object's
+        local up axis, which swings around when the umbrella rolls a little about its own axis while the lean holds (goal_tipped > 40 deg on a
+        flat face); here the angle between the long axis at the release and after the settle, ``generation.goal_tip_max_deg`` (default 15)."""
+        name = self.tname
+        if name not in draft.goal_poses:
+            return super().check_goal_upright(draft)
+        ax = G.t(self.lean_geometry()["axis_local"]).float()
+        _, q_now = self.target.get_position_orientation()
+        a_goal = G.rotate(G.t(draft.goal_poses[name][1]).float(), ax)
+        a_now = G.rotate(q_now.float(), ax)
+        deg = math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(a_goal, a_now))))))
+        draft.summary["goal_tilt_deg"] = {name: round(deg, 2), "measured_on": "long axis"}
+        max_deg = float(self.gen("goal_tip_max_deg", 15.0)) if hasattr(self, "gen") else 15.0
+        if deg > max_deg:
+            self.counters["goal_tipped"] = self.counters.get("goal_tipped", 0) + 1
+            raise Reject("goal_tipped", f"long axis after the goal settle off by {deg:.1f} deg (> {max_deg:.0f})")
+
+    def lean_records(self, d: Draft) -> None:
+        """``grasps[0].place_kind`` "lean" (+ ``then``, ``goal_cell``) and ``summary.lean_touching`` (lane, angle, spin, root, contact)."""
+        place = self.sidecar.stance("placement")
+        gc = place.extras.get("goal_cell")
+        key = (round(float(gc[0]), 3), round(float(gc[1]), 3))
+        lane = (self.place.get("lean_lanes") or {}).get(key)
+        if lane is None:
+            raise Reject("spec", f"{self.gp.variant}: the lean coupling recorded no lean lane at {gc}")
+        spin = G.yaw_of(G.qmul(self.goal_quat_of(d), G.qinv(self.rest)))
+        _, facts = self.lean_pose(lane["prof"], lane["theta"], spin, float(lane.get("az", 0.0)))
+        g = self.sidecar.grasp_of(self.tname)
+        if g is not None:
+            g.extras.update({"place_kind": LEAN_PLACE_KIND, "then": LEAN_PLACE_KIND, "goal_cell": [float(v) for v in gc], "partner": self.pname})
+        d.summary["lean_touching"] = dict(facts, edge=lane["edge"], lane=lane["lat"], partner=self.pname, goal_cell=[float(v) for v in gc])
+        log.info("%s: lean place against %s's face %s (lane %+.2f): %s", self.gp.variant, self.pname, lane["edge"], lane["lat"], facts)

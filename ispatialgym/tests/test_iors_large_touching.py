@@ -400,3 +400,133 @@ def test_every_draw_of_a_c_is_alignable():
     b = _bare("ontop")
     b.gp = _GP()
     assert b.alignable_draws(F, order, d_yaw) == order
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# the floor start (oracle-fix 2026-11-03, touching_large#01: an ottoman already on the floor, nothing to pick)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_touching_large_floor_start_is_the_push_chain_alone():
+    """A sidecar without a grasp record and with a ``push_touching`` contact: init -> the push stance -> push -> retreat; the push follows
+    and may touch the partner. Without the contact the program says what is missing."""
+    with open(FIXTURE) as f:
+        d = json.load(f)
+    d2 = copy.deepcopy(d)
+    d2.pop("grasps", None)
+    d2.pop("paths", None)
+    d2["transitions"] = [{"from": "init", "to": "push", "stand_off": 0.65, "order": ["drive-back", "trunk", "drive-in"]}]
+    sc = Sidecar.from_dict(d2)
+    assert sc.problems() == []  # the floor start needs no grasp, carried path or placement stance (sidecar.problems)
+    actions = expand(sc.variant, sc)
+    assert [a.name for a in actions] == ["transition", "push", "retreat"]
+    to_push, push, ret = actions
+    assert to_push.stance_from.translate != to_push.stance_to.translate and to_push.transition.to == "push"
+    assert push.kind == "push_touching" and push.touches == ("bookcase.n.01_1",) and push.follow == "bookcase.n.01_1" and push.avoid == ()
+    assert push.arms == ("right",) and push.objects == ("storage_box.n.01_1",) and ret.after is push
+    d3 = copy.deepcopy(d2)
+    d3["contacts"]["push"]["kind"] = "push_under"
+    with pytest.raises(SidecarError, match="push_touching"):
+        expand(sc.variant, Sidecar.from_dict(d3))
+    d4 = copy.deepcopy(d2)
+    d4["contacts"]["push"].pop("partner")
+    with pytest.raises(SidecarError, match="partner"):
+        expand(sc.variant, Sidecar.from_dict(d4))
+
+
+# ---------------------------------------------------------------- the lean place (oracle-fix 2026-11-04 round 3, touching_large#02)
+
+
+def test_lean_quat_puts_the_axis_on_the_lean_direction():
+    """The object's local axis (lower end -> top) ends ``theta`` from the vertical, leaning toward the partner (into ``d2``), whatever
+    the rest orientation and the spin; the spin turns the object about that axis."""
+    rest = G.quat_about_axis(th.tensor([0.0, 1.0, 0.0]), math.pi / 2)  # lying: the local z axis along world -x... any rest
+    ax = th.tensor([0.0, 0.0, 1.0])
+    for d2 in ((1.0, 0.0), (0.0, -1.0), (0.6, 0.8)):
+        for spin in (0.0, 1.3, -2.0):
+            q = TM.lean_quat(rest, ax, d2, math.radians(20.0), spin)
+            a = G.rotate(q, ax)
+            want = TM.lean_axis(d2, math.radians(20.0))
+            assert float(th.linalg.norm(a - want)) < 1e-4
+            assert abs(math.degrees(math.acos(float(a[2]))) - 20.0) < 1e-3 and float(a[:2] @ TM.unit_xy(d2)) > 0
+    q0, q1 = TM.lean_quat(rest, ax, (1.0, 0.0), 0.3, 0.0), TM.lean_quat(rest, ax, (1.0, 0.0), 0.3, 0.7)
+    assert abs(G.quat_angle(q0, q1) - 0.7) < 1e-4
+
+
+def test_lean_offset_clears_the_surfaces_and_names_the_contact():
+    """A rod 0.8 m long leaning 20 deg toward a wall 0.1 m behind the edge line over the heights 0.2-0.9 m (a seat front 0.05 m behind it
+    below 0.45 m): the root stands where the highest-reaching point clears the wall by the gap; a low other object binds -> not the partner."""
+    th_ = math.radians(20.0)
+    a = TM.lean_axis((1.0, 0.0), th_)
+    v = th.stack([a * s for s in th.linspace(-0.4, 0.4, 41)])  # root at the rod's middle
+    heights = v[:, 2] + 0.4 * math.cos(th_)
+    zs = [0.02 + 0.02 * k for k in range(50)]
+    s = [0.10 if 0.2 <= z <= 0.9 else None for z in zs]
+    got = TM.lean_offset(v, heights, (1.0, 0.0), zs, s, [True] * len(zs), 0.003, 0.02)
+    x, h, on = got
+    assert on and abs(h - float(heights.max())) < 0.021  # the top touches
+    assert abs(x - (0.4 * math.sin(th_) - 0.10 + 0.003)) < 0.002
+    s2 = [0.05 if 0.2 <= z <= 0.45 else (0.10 if z <= 0.9 else None) for z in zs]
+    x2, h2, _ = TM.lean_offset(v, heights, (1.0, 0.0), zs, s2, [True] * len(zs), 0.003, 0.02)
+    assert x2 >= x - 1e-6  # a nearer surface lower down can only push the root out
+    other = [z < 0.3 for z in zs]
+    assert TM.lean_offset(v, heights, (1.0, 0.0), zs, [0.3 if z < 0.3 else None for z in zs], [not o for o in other], 0.003, 0.02)[2] is False
+    assert TM.lean_offset(v, heights, (1.0, 0.0), zs, [None] * len(zs), [False] * len(zs), 0.003, 0.02) is None
+
+
+def test_axis_and_top_picks_the_wide_end():
+    """An umbrella-like point set along local y: a 1 cm shaft with a 6 cm crook at +y -> the axis +y, its length and half width."""
+    shaft = th.tensor([[0.005 * math.cos(t), y, 0.005 * math.sin(t)] for y in (-0.40, -0.2, 0.0, 0.2, 0.40) for t in (0.0, 1.6, 3.2, 4.8)])
+    crook = th.tensor([[0.06, 0.38, 0.0], [0.05, 0.36, 0.02]])
+    assert TM.axis_and_top(th.cat([shaft, -crook]))[0].tolist() == [0.0, -1.0, 0.0]  # the crook at -y
+    ax, length, half_w = TM.axis_and_top(th.cat([shaft, crook]))
+    assert ax.tolist() == [0.0, 1.0, 0.0] and abs(length - 0.80) < 1e-5 and half_w > 0.03
+    assert TM.axis_and_top(th.cat([shaft, crook]), "-")[0].tolist() == [0.0, -1.0, 0.0]
+
+
+def test_touching_lean_hook_and_program(monkeypatch):
+    """``generation.touching_place: "lean"`` adopts LeanTouchingMode (no push-under; the partner and the floor out of the release's last
+    pose); a sidecar whose grasp records ``place_kind`` "lean" and no push contact validates and expands to the pick, the carry and a
+    drop-release at the recorded lean pose - no push."""
+    s = _bare()
+    s.gp = _GP(touching_place="lean")
+    assert IL.IORSLarge._sample_touching(s) is TM.LeanTouchingMode
+    s._adopt_mode(TM.LeanTouchingMode)
+    s.obj = lambda role: f"{role}_obj"
+    monkeypatch.setattr(type(s), "partner", "partner_obj")  # the adopted class is this sampler's own
+    assert s.push_under is False and s.goal_align_partner() is False and s.place_ignores() == ["floor_obj", "partner_obj"]
+    with open(FIXTURE) as f:
+        d = json.load(f)
+    d2 = copy.deepcopy(d)
+    d2["contacts"].pop("push")
+    if not d2["contacts"]:
+        d2.pop("contacts")
+    d2["grasps"][0]["place_kind"] = "lean"
+    d2["stances"].pop("push", None)
+    d2["transitions"] = [t for t in d2.get("transitions", []) if "push" not in (t.get("from"), t.get("to"))]
+    sc = Sidecar.from_dict(d2)
+    assert sc.problems() == []
+    actions = expand(sc.variant, sc)
+    assert [a.name for a in actions] == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
+    assert actions[4].kind == "drop" and actions[5].after is actions[4]
+    d3 = copy.deepcopy(d2)
+    d3["grasps"][0]["place_kind"] = "support"
+    with pytest.raises(SidecarError, match="lean"):
+        expand(sc.variant, Sidecar.from_dict(d3))
+
+
+def test_lean_azimuth_turns_the_tilt_about_the_vertical():
+    """oracle-fix 2026-11-04 round 4 (generation.lean_azimuths_deg): azimuth 0 tilts into the face; 90 deg at a 90 deg lean lays the axis along
+    the face (horizontal, perpendicular to the face normal) - the umbrella lying beside the hall tree instead of pointing at the robot."""
+    from ispatialgym.sampling.v2.tasks.iors_large_touching import lean_axis, lean_quat
+
+    into = lean_axis([0.0, 1.0], math.radians(20.0))
+    assert into.tolist() == pytest.approx([0.0, math.sin(math.radians(20.0)), math.cos(math.radians(20.0))], abs=1e-6)
+    along = lean_axis([0.0, 1.0], math.pi / 2, math.pi / 2)
+    assert along.tolist() == pytest.approx([-1.0, 0.0, 0.0], abs=1e-6)
+    q = lean_quat(th.tensor([0.0, 0.0, 0.0, 1.0]), th.tensor([1.0, 0.0, 0.0]), [0.0, 1.0], math.pi / 2, 0.0, math.pi / 2)
+    from ispatialgym.sampling import geometry as G
+
+    assert G.rotate(q, th.tensor([1.0, 0.0, 0.0])).tolist() == pytest.approx([-1.0, 0.0, 0.0], abs=1e-5)
+    # spin 0 about a horizontal axis keeps a top-down approach top-down (the rest axis already horizontal)
+    assert G.rotate(q, th.tensor([0.0, 0.0, -1.0])).tolist() == pytest.approx([0.0, 0.0, -1.0], abs=1e-5)

@@ -1009,6 +1009,13 @@ class IORSLarge(SamplerV2):
         tgt = self.target
         self.hull = self.world.local_hull(tgt)
         self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
+        keep = self.gp.gen("grasp_rows")
+        if keep:  # oracle-fix 2026-11-04 round 3 (hardback): opt-in generation.grasp_rows - only these library rows (the spine edge's pinches)
+            kept = [g for g in self.grasps if getattr(g, "name", None) in set(keep)]
+            if not kept:
+                raise Reject("spec", f"{self.gp.variant}: generation.grasp_rows {keep} keeps none of {[getattr(g, 'name', None) for g in self.grasps]}")
+            log.info("%s: grasp rows %s kept of %s", self.gp.variant, [g.name for g in kept], [getattr(g, "name", None) for g in self.grasps])
+            self.grasps = kept
         self.band_spec = self.make_band_spec()
         self.floor_z = float(self.obj("floor").aabb[1][2])
         self.prepare_partner()
@@ -1903,6 +1910,14 @@ class IORSLarge(SamplerV2):
             log.info("%s: reach band %s (%s) from %s", self.gp.variant, support, under or "-", rb.path)
             # a band computed before the A6 posture retry can be empty (every trunk stance collided with the untucked
             # arms: the fleet's floor-under bands of the beds) — an empty band is a miss, recomputed with the current script
+            # oracle-fix 2026-11-04 (owner item 5): a band computed for another grasp set (the legacy rows vs their v2 replacement under the
+            # same legacy key, ISPATIALGYM_GRASP_LIBRARY_V2) is stale - a miss; bands without recorded grasp names are kept as before
+            names = rb.meta.get("grasp_names")
+            grasps_ = getattr(self, "grasps", None) or []  # (a sampler without its grasp list keeps the band, as before)
+            if names and grasps_ and sorted(names) != sorted(g.name for g in grasps_) and os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") != "0":
+                log.info("%s: cached reach band %s (%s) was computed for another grasp set (%d names vs %d now): recomputing", self.gp.variant, support,
+                         under or "-", len(names), len(grasps_))
+                raise FileNotFoundError("grasp set changed")
             if int(rb.meta.get("n_reachable_total", 1) or 0) == 0 and os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") != "0":
                 log.info("%s: cached reach band %s (%s) is empty (computed with %s arms, no A6 retry): recomputing in-process", self.gp.variant, support, under or "-",
                          rb.meta.get("arms"))
@@ -2095,15 +2110,28 @@ class IORSLarge(SamplerV2):
                     errors.append(f"{edge.name}: {e.reason}")
                     continue
                 raise
-            if chosen is None:
+            free_start = bool(self.gp.gen("free_start")) and not own_top
+            if chosen is None and not free_start:
                 errors.append(f"{edge.name}: goal_region_not_visible (the partner's top patch around the goal cell / nearest bottom edge out of frame)")
                 continue
-            chosen.name = "init"
-            arm_bands = TT.arm_bands_for(self, offered, top=top, edge=chosen.edge) if len(offered) > 1 else None
-            manip = TT.phase2_manipulation_stance(self, chosen, half, target_height=height, top=top, arm_bands=arm_bands)
+            # oracle-fix 2026-11-04 (owner item 2, opt-in generation.free_start): the start pose need not stand at the support's edge -
+            # Phase 2 (stance B) is built from the edge stance as usual; when that stance does not see the goal region, stance A is
+            # searched on free floor (:meth:`free_start_stance`) with the target and the same goal-region test in frame
+            ref = chosen if chosen is not None else st
+            ref.name = "init"
+            arm_bands = TT.arm_bands_for(self, offered, top=top, edge=ref.edge) if len(offered) > 1 else None
+            manip = TT.phase2_manipulation_stance(self, ref, half, target_height=height, top=top, arm_bands=arm_bands)
             if not manip:
                 errors.append(f"{edge.name}: no_manipulation_stance")
                 continue
+            if chosen is None:
+                try:
+                    chosen = self.free_start_stance(manip[0].focus[:2].clone(), top.z, height, rng)
+                except Reject as e:
+                    errors.append(f"{edge.name}: goal_region_not_visible at the edge; free start: {e}")
+                    continue
+                self.template_facts["free_start"] = {"edge": edge.name, "base_pose2d": [round(float(v), 3) for v in chosen.base_pose2d],
+                                                     "trunk": [chosen.translate, chosen.tilt], **{k: v for k, v in chosen.extras.items() if k in ("distance", "bearing_deg", "tries")}}
             self.surface.update({"edge": edge, "init": chosen, "manip": manip, "init_xy": manip[0].focus[:2].clone(), "z": top.z, "band": getattr(self, "bands", None),
                                  "arm_bands": dict(arm_bands or {offered[0]: getattr(self, "bands", None)})})
             return
@@ -2248,6 +2276,9 @@ class IORSLarge(SamplerV2):
         trunks = rb.trunks() if rb is not None else [(t, k) for t in RB.TRANSLATES for k in list(RB.TILTS) + [RB.LOW_TOP_TILT]]
         for b in others.values():
             trunks += [k for k in b.trunks() if k not in trunks]
+        skip = {tuple(round(float(v), 3) for v in t) for t in (self.gp.gen("floor_b_trunks_exclude") or [])}
+        if skip:  # oracle-fix 2026-11-04 round 3 (mouse): the floor-level trunks wobble the torso > 1 deg at the grasp (QA robot_wobble)
+            trunks = [t for t in trunks if tuple(round(float(v), 3) for v in t) not in skip] or trunks
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + 0.03])
         cands = []
         # the floor band lies to the robot's RIGHT of the centreline (B3 under-edge probe: lateral −0.40…−0.16; the floor
@@ -2369,6 +2400,60 @@ class IORSLarge(SamplerV2):
             return st
         raise Reject("no_stance", "floor init: no stance A sees the target at c_t and the partner")
 
+    def carry_lift_extra(self) -> float:
+        """Opt-in ``generation.carry_lift_by_extent_m`` = margin (oracle-fix 2026-11-04, owner item 4): the carry lifts are raised by the
+        carried object's height + this margin, so the object's bottom clears a surface at the pick height by its own extent (a pillow
+        carried over the other bed); 0 when unset."""
+        m = self.gp.gen("carry_lift_by_extent_m")
+        if m is None:
+            return 0.0
+        _, height = self.target_dims()
+        return float(height) + float(m)
+
+    def free_start_stance(self, c_xy: th.Tensor, z_top: float, height: float, rng: np.random.Generator) -> Stance:
+        """Opt-in ``generation.free_start`` (oracle-fix 2026-11-04, owner item 2; ``{distance_range_m, tries}``, default 0.6-2.5 m, 120): a
+        start pose anywhere on free floor (eroded map, the task rooms) ``distance_range_m`` from the target's cell ``c_xy`` on its support
+        (top at ``z_top``), facing it, from which the target (its hull at rest on the top) and the partner's goal region
+        (:meth:`goal_region_visible`, the edge stance's test) are in the head-camera frame - straight torso, the most upright translate
+        that sees both (:meth:`floor_stance_a`'s rule), collision-free with a free trunk sweep."""
+        cfg = self.gp.gen("free_start")
+        cfg = dict(cfg) if isinstance(cfg, dict) else {}
+        d_lo, d_hi = (float(v) for v in cfg.get("distance_range_m", [0.6, 2.5]))
+        tries = int(cfg.get("tries", 120))
+        c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
+        focus = th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + height / 2])
+        pts = G.local_points_world(self.hull, (th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + self.world.bottom_offset(self.hull, self.rest)]), self.rest))
+        stats = {"floor": 0, "view": 0, "body": 0, "sweep": 0}
+        for k in range(tries):
+            bearing = float(rng.uniform(-math.pi, math.pi))
+            dist = float(rng.uniform(d_lo, d_hi))
+            xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
+            if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
+                stats["floor"] += 1
+                continue
+            yaw = math.atan2(float(c_xy[1] - xy[1]), float(c_xy[0] - xy[0]))
+            cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), float(t), 0.0, dist) for t in RB.TRANSLATES]
+            cams = P0.camera_poses(self, cands)
+            feas = [(st, P0.axis_angle(self, cam, focus)) for st, cam in zip(cands, cams)
+                    if P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy)]
+            if not feas:
+                stats["view"] += 1
+                continue
+            free = P0.body_free(self, [st for st, _ in feas])
+            feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
+            if not feas:
+                stats["body"] += 1
+                continue
+            if not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
+                stats["sweep"] += 1
+                continue
+            st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
+            st.extras.update({"bearing_deg": round(math.degrees(bearing), 1), "distance": round(dist, 3), "tries": k + 1, "free_start": True})
+            log.info("%s: free start: stance A at %s (%.2f m from the target cell, trunk (%.2f, 0)) after %d draws %s", self.gp.variant,
+                     [round(float(v), 2) for v in st.base_pose2d], dist, st.translate, k + 1, stats)
+            return st
+        raise Reject("no_stance", f"free start: no stance A {d_lo:.1f}-{d_hi:.1f} m from the target sees it and the goal region ({tries} draws: {stats})")
+
     # ------------------------------------------------------------------ stance C (placement)
 
     def placement_candidates(self, init_xy, arm: Optional[str] = None) -> List[Stance]:
@@ -2451,6 +2536,8 @@ class IORSLarge(SamplerV2):
             log.info("%s: stance C at %s edge %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
         free = P0.body_free(self, cands)
+        if os.environ.get("ISPATIALGYM_STANCE_BLAME"):  # oracle-fix 2026-11-04 (owner item 3)
+            P0.blame_stances(self, [st for st, f in zip(cands, free.tolist()) if not f], f"stance C {partner.name} edge {edge.name}")
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         stats["collision_free"] = len(cands)
         if not cands:
@@ -2783,15 +2870,69 @@ class IORSLarge(SamplerV2):
         here never."""
         return False
 
+    def pre_place_of(self, place_eef: G.Pose, place: Stance) -> G.Pose:
+        """The pre-place of a release at ``place_eef`` from stance C: ``PRE_DIST`` back along the gripper's approach (``IK.pre_pose``); the
+        inside mode may override it (``generation.inside_pre_outward``: straight out of the opening, oracle-fix 2026-11-04 round 3). A push-under
+        drop with ``generation.drop_pre_m``: that distance instead (the briefcase: the drop's pre-place fingertip left the crouched stance's frame)."""
+        d = self.gp.gen("drop_pre_m") if getattr(self, "push_under", False) else None
+        # oracle-fix 2026-11-04 round 3 (pillow 158): opt-in generation.place_pre_up_m - an ontop release's pre-place straight above the place (a level
+        # pinch's pre-place 10 cm back along the approach kept the carried pillow at mattress height, against the bed: every C attached IK failure)
+        up = self.gp.gen("place_pre_up_m") if (self.relation == "ontop" and not getattr(self, "push_under", False)) else None
+        if up is not None:
+            return G.t(place_eef[0]).float() + th.tensor([0.0, 0.0, float(up)]), G.t(place_eef[1]).float()
+        return IK.pre_pose(place_eef, float(d)) if d is not None else IK.pre_pose(place_eef)
+
+    def pre_place_tag(self, place: Stance) -> Optional[str]:
+        """A cache tag when :meth:`pre_place_of` differs from ``IK.pre_pose`` at ``place`` (None: the default)."""
+        d = self.gp.gen("drop_pre_m") if getattr(self, "push_under", False) else None
+        up = self.gp.gen("place_pre_up_m") if (self.relation == "ontop" and not getattr(self, "push_under", False)) else None
+        if up is not None:
+            return f"up {float(up):.3f}"
+        return None if d is None else f"drop_pre {float(d):.3f}"
+
+    def place_ignores(self) -> List[Any]:
+        """The objects out of the world at the release's last pose (the place / drop): the partner under an ontop place, else the floor;
+        the touching lean (``iors_large_touching.LeanTouchingMode``) adds the partner it leans on (oracle-fix 2026-11-04 round 3)."""
+        return [self.partner] if self.relation == "ontop" else [self.obj("floor")]
+
     def release_feasible(self, release_xy, yaws, release_pose, place: Stance, arm: str, ignore_place) -> List[Tuple[float, Any]]:
         """F_goal at the release cell for the C yaws ``yaws``: the (yaw, library row) pairs whose [pre-place, place] pass the screening IK
         with the target at ``release_pose(release_xy, yaw * rest)``; with :meth:`release_lift_per_grasp` each row at its own release
         (``release_pose(xy, quat, row.pose)``) in the same batch."""
         q_yaw = lambda yaw: G.qmul(G.quat_from_yaw(yaw), self.rest)  # noqa: E731
+        tag = getattr(self, "pre_place_tag", lambda _p: None)(place)
+        pre_kw = {"pre_of": (lambda eef: self.pre_place_of(eef, place)), "pre_tag": tag} if tag else {}
         if self.release_lift_per_grasp():
-            return self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw, g: release_pose(xy, q_yaw(yaw), g.pose), place, arm, ignore_place,
-                                          pose_per_grasp=True).get(0, [])
-        return self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, q_yaw(yaw)), place, arm, ignore_place).get(0, [])
+            out = self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw, g: release_pose(xy, q_yaw(yaw), g.pose), place, arm, ignore_place,
+                                         pose_per_grasp=True, **pre_kw).get(0, [])
+        else:
+            out = self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, q_yaw(yaw)), place, arm, ignore_place, **pre_kw).get(0, [])
+        if not out and os.environ.get("ISPATIALGYM_STANCE_BLAME"):
+            self.blame_release(release_xy, yaws, release_pose, place, arm, ignore_place, q_yaw)
+        elif out and os.environ.get("ISPATIALGYM_STANCE_BLAME_VALIDATE") and getattr(self, "_blame_validated", 0) < 2:
+            # round 3: the blame on a pair the screening IK found feasible must say "reached" (validation of the blame itself)
+            self._blame_validated = getattr(self, "_blame_validated", 0) + 1
+            self.blame_release(release_xy, [out[0][0]], release_pose, place, arm, ignore_place, q_yaw, grasps=[out[0][1]], label="VALIDATE (a feasible pair)")
+        return out
+
+    def blame_release(self, release_xy, yaws, release_pose, place: Stance, arm: str, ignore_place, q_yaw, grasps=None, label: str = "F_goal") -> None:
+        """Opt-in (``ISPATIALGYM_STANCE_BLAME``, oracle-fix 2026-11-04 owner items 2 / 3): why F_goal is empty - for a few (yaw, grasp) pairs
+        the [pre-place, place] eef poses reached with collisions off from the stance (:meth:`_place_ik_contacts`: mm short / joint limit,
+        or the links x meshes in contact). ``grasps`` / ``label``: the rows tried (default the first two) and the log tag (the
+        ``ISPATIALGYM_STANCE_BLAME_VALIDATE`` run on a feasible pair)."""
+        try:
+            per = self.release_lift_per_grasp()
+            for yaw in list(yaws)[:: max(1, len(yaws) // 4)][:4]:
+                for g in (list(grasps) if grasps is not None else list(self.grasps)[:2]):
+                    obj = release_pose(release_xy, q_yaw(yaw), g.pose) if per else release_pose(release_xy, q_yaw(yaw))
+                    eef = IK.grasp_pose(obj, g.pose)
+                    pre = IK.pre_pose(eef)
+                    q0 = self.ikc.q_locked(place)
+                    log.info("%s: STANCE_BLAME %s at %s (C base %s trunk (%.2f, %+.2f)) yaw %.2f grasp %s: pre-place: %s | place: %s", self.gp.variant, label,
+                             [round(float(v), 2) for v in release_xy[:2]], [round(float(v), 2) for v in place.base_pose2d], place.translate, place.tilt, float(yaw),
+                             getattr(g, "name", g), self._place_ik_contacts(pre, q0, arm, [])[:260], self._place_ik_contacts(eef, q0, arm, list(ignore_place))[:260])
+        except Exception as e:  # noqa: BLE001 - a diagnostic never fails the draw
+            log.info("%s: STANCE_BLAME F_goal: blame failed (%r)", self.gp.variant, e)
 
     def release_eef_in_object(self) -> Optional[G.Pose]:
         """The recorded grasp's ``T_obj→eef`` the release pose is built for when :meth:`release_lift_per_grasp`, else None (the goal and
@@ -2937,11 +3078,15 @@ class IORSLarge(SamplerV2):
         # its init pose - 0920-004500: stance C 'collided' with the target still standing on its floor cell next to C)
         place.carried = tname
         errors: List[str] = []
+        # oracle-fix 2026-11-04 round 4 (opt-in generation.carry_departure_min_back_m, pillow 158): the departure drives back at least this far from B
+        # before the path turns (probe_pillow: the path turned 0.41 m from bed_kddswt_1's side, a wheel sphere 8.7 mm from it, in the 0.9 m corridor)
+        back = self.gp.gen("carry_departure_min_back_m")
+        dep_kw = {} if back is None else {"min_standoff": float(manip.stand_off or 0.0) + float(back)}
         for tt in self.travel_trunks(init, manip):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
                 continue  # B already straight: the plain leg below is the same thing
             try:
-                dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
+                dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
                 start = NAV.departure_pose(manip, dep.stand_off)
                 drive_q = self.carry_drive_arms(place, tname, arm)
                 try:
@@ -2952,7 +3097,7 @@ class IORSLarge(SamplerV2):
                     # the local (un-eroded) shortest path hugs the partner's corner with the object out front (0920-100543: stride 4/35
                     # at the table end); the eroded global map keeps the body's distance
                     self._drop_leg_records(place.name)
-                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm)
+                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
                     path = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True,
                                             arm_q=drive_q)
                 # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
@@ -3440,6 +3585,108 @@ class IORSLarge(SamplerV2):
                 if not o.get("ok"):
                     TT._count(self, "arm_band_mirrored.ik_failed")
 
+    #: oracle-fix 2026-11-05 (opt-in ``generation.carry_via_search``): the carry waypoints tried at C when the straight carry leg does not
+    #: track - ``(where, raise m, lateral m, orientation fraction toward the pre-place's)``: ``start`` = at the carry pose (rotate first),
+    #: ``mid`` = the leg's midpoint, ``end`` = at the pre-place (translate first); lateral is horizontal, across the leg
+    CARRY_VIAS_AT_C = (("start", 0.0, 0.0, 1.0), ("start", 0.05, 0.0, 1.0), ("start", 0.10, 0.0, 1.0),
+                       ("mid", 0.05, 0.0, 1.0), ("mid", 0.10, 0.0, 1.0), ("mid", 0.05, 0.05, 1.0), ("mid", 0.05, -0.05, 1.0),
+                       ("mid", 0.0, 0.0, 0.5), ("mid", 0.05, 0.0, 0.5), ("mid", 0.10, 0.0, 0.5),
+                       ("end", 0.05, 0.0, 0.0), ("end", 0.10, 0.0, 0.0))
+
+    def _carry_vias_at_c(self, h0: G.Pose, pre_place: G.Pose) -> List[Tuple[str, G.Pose]]:
+        """The candidate carry waypoints (:data:`CARRY_VIAS_AT_C`) between the hand at C ``h0`` and the pre-place, labelled."""
+        p0, q0 = G.t(h0[0]).float(), G.t(h0[1]).float()
+        p1, q1 = G.t(pre_place[0]).float(), G.t(pre_place[1]).float()
+        d = p1 - p0
+        across = th.tensor([-float(d[1]), float(d[0]), 0.0])
+        across = across / max(float(th.linalg.norm(across)), 1e-6)
+        out: List[Tuple[str, G.Pose]] = []
+        for where, raise_m, lat, frac in self.CARRY_VIAS_AT_C:
+            base = {"start": p0, "mid": 0.5 * (p0 + p1), "end": p1}[where]
+            pos = base + th.tensor([0.0, 0.0, float(raise_m)]) + across * float(lat)
+            out.append((f"{where} raise {raise_m:.2f} lateral {lat:+.2f} turn {frac:.1f}", (pos, C.slerp(q0, q1, float(frac)).float())))
+        return out
+
+    @staticmethod
+    def _carry_leg_poses(chain: Sequence[G.Pose]) -> List[G.Pose]:
+        """The carry leg's poses through ``chain`` as ``Place._carry_leg`` builds them (a pose every ``CARRY_WAYPOINT_SPACING``)."""
+        from ispatialgym.oracle import actions as A
+
+        out: List[G.Pose] = []
+        for a, b in zip(chain[:-1], chain[1:]):
+            n = max(A.N_WAYPOINTS, int(math.ceil(float(th.linalg.norm(G.t(b[0]) - G.t(a[0]))) / A.CARRY_WAYPOINT_SPACING)))
+            out += [tuple(w) for w in C.line_waypoints(a, b, n)]
+        return out
+
+    def _carry_track_at_c(self, place: Stance, arm: str, tname: str, target, g, pre_place: G.Pose, place_eef: G.Pose,
+                          ignore_place) -> Tuple[Optional[th.Tensor], Optional[float], Optional[str], str, Optional[Dict[str, Any]]]:
+        """The oracle's carry leg at C - a straight Cartesian line from where the hand is (``carry_arm_q`` at C's trunk) to the pre-place,
+        tracked by differential IK (:meth:`_carry_track_kw`) - then the pre-place / place IK seeded at its end, which must stay within
+        ``carry_finish_max_rad`` of it. ``(q_end, swing, reason, kind, via)``: kind ``"ok"`` (reason None), ``"untrackable"`` (no q_end /
+        no drop IK from it) or ``"branch"`` (the witness swings more than the bound). With ``generation.carry_via_search`` a straight leg
+        that fails is retried through each carry waypoint of :meth:`_carry_vias_at_c` (every carry pose's fingertip in C's image by the
+        program check's gate, the whole chain tracked); ``via`` = ``{"label", "pose"}`` of the one that passed (recorded as
+        ``grasps[k].carry``, the oracle carries through it), else None and the straight leg's failure."""
+        from ispatialgym.oracle import r1pro_model as M
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        idx_r = self.kit.robot.arm_control_idx[arm]
+        q_c = self.ikc.q_locked(place).clone()
+        q_c[idx_r] = self.carry_arm_q[tname]
+        h0 = self.kit.fk([M.EEF_LINK[arm]], q_c)[M.EEF_LINK[arm]]
+        vias: List[Tuple[Optional[str], Optional[G.Pose]]] = [(None, None)]
+        if bool(self.gp.gen("carry_via_search") or False):
+            vias += self._carry_vias_at_c(h0, pre_place)
+        straight = None
+        n_frame, n_fail = 0, 0
+        with attached(self.kit, arm, target, eef_in_object=g.pose), self._floor_relaxed():
+            for label, via in vias:
+                chain = [h0] + ([via] if via is not None else []) + [pre_place]
+                if via is not None and PCK.fingertips_in_frame(self, place, "place", [("carry", self._carry_leg_poses(chain))]) is not None:
+                    n_frame += 1
+                    continue
+                q_end, why_t = self.ikc.track_chain(q_c, chain, arm, ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)),
+                                                    **self._carry_track_kw())
+                r2b = None
+                if q_end is not None:
+                    r2b = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_end)
+                if q_end is None or r2b is None or not r2b.ok or r2b.q is None:
+                    res = (None, None, (why_t if q_end is None else (r2b.reason if r2b is not None else "no IK")), "untrackable")
+                else:
+                    swing = float(th.max(th.abs(r2b.q[idx_r] - q_end[idx_r])))
+                    if swing > float(self.num("carry_finish_max_rad", 0.5)):
+                        res = (q_end, swing, f"pre-place witness {swing:.2f} rad from the tracked carry end", "branch")
+                    else:
+                        res = (q_end, swing, None, "ok")
+                if res[3] == "ok":
+                    if via is not None:
+                        log.info("%s: carry leg at C through the carry waypoint %s (the straight leg: %s; %d waypoints out of frame, %d untrackable before it)",
+                                 self.gp.variant, label, str(straight[2])[:300] if straight else "-", n_frame, n_fail)
+                    return res + (None if via is None else {"label": label, "pose": via},)
+                if via is None:
+                    straight = res
+                else:
+                    n_fail += 1
+        if len(vias) > 1:
+            return straight[:2] + (f"{straight[2]}; none of {len(vias) - 1} carry waypoints passes ({n_frame} out of frame, {n_fail} untrackable)", straight[3], None)
+        return straight + (None,)
+
+    def _carry_track_kw(self) -> Dict[str, Any]:
+        """oracle-fix 2026-11-05 (opt-in ``generation.carry_track_oracle``; hardback hb16_desk_s1 attempt 3): the carry leg at C tracked with
+        the program check's continuation acceptance (``IKChecker.continue_chain``) - the oracle's soft waypoint tolerances and iteration
+        budget, a stall finished only within ``FINISH_MAX_EXCURSION`` of where it stalled. Without the bound the carry that stalled at dense
+        pose 9/45 (11.1 mm) was finished 1.12 rad away and the program check rejected the place after 1468 s (block design's re-posed
+        carries take the same bound). ``{}`` when off: the tracking as before."""
+        kw: Dict[str, Any] = {}
+        if bool(self.gp.gen("carry_track_oracle") or False):
+            kw = {"finish_max_excursion": self.ikc.FINISH_MAX_EXCURSION, "soft_pos_tol": self.ikc.ORACLE_SOFT_POS_TOL,
+                  "soft_rot_tol": self.ikc.ORACLE_SOFT_ROT_TOL, "max_iters": self.ikc.ORACLE_DIFF_IK_MAX_ITERS}
+        rem = self.gp.gen("carry_finish_max_remaining_m")
+        if rem is not None:
+            # oracle-fix 2026-11-05 (hbD7: a carry stall 0.38 m from the pre-place passed here, the oracle's planned finish failed)
+            kw["finish_max_remaining_m"] = float(rem)
+        return kw
+
     # ------------------------------------------------------------------ the overhang pick (owner 2026-10-13 ~03:15 item 4)
 
     def pick_overhang_opts(self) -> Optional[Dict[str, Any]]:
@@ -3658,12 +3905,79 @@ class IORSLarge(SamplerV2):
                 if not (self.ikc.eef_in_frame(start, cam) and self.ikc.eef_in_frame(goal, cam)):
                     why.append(f"{chosen.proposal.label}: the push's fingertips outside B's image (5 %)")
                     continue
+                why_b = self._overhang_push_branch(st, arm, chosen, opening)
+                if why_b:
+                    why.append(f"{chosen.proposal.label}: {why_b}")
+                    continue
                 label = chosen.proposal.label
                 return {"pre": pre, "start": start, "mid": mid, "goal": goal, "direction": ch["direction"], "fingers": fingers, "opening": float(opening),
                         "pitch_deg": float(pitch), "wrist": label, "contact_along_m": round(float(contact), 4), "hand_travel_m": round(float(ch["hand_travel_m"]), 4),
                         "tip_m": float(opts["tip_m"]), "support_touch_m": None if label not in touched else round(touched[label], 4), "orient": decision,
                         "seed": push_chain_seed(self.kit, chosen, arm)}, ""
         return None, "; ".join(why)[:900]
+
+    def _overhang_push_branch(self, st: Stance, arm: str, chosen, opening: float) -> str:
+        """oracle-fix 2026-11-05 (opt-in ``generation.overhang_push_branch_check``; hardback hb21_desk_s55, the first instance through the
+        program check: its push pre-contact witness lay 3.13 rad from the stance posture's IK branch, the program check moved it there
+        (``program_check._rewitness_flipped_push``) and the oracle's straight push from that branch stalled at waypoint 21/28, plan_failed
+        after a 1365 s attempt): the chosen push chain must track as the oracle's straight push (``program_check.track_line_push``) from the
+        configuration the oracle leaves from - the stance posture's branch when the witness is flipped
+        (``program_check._flipped_push_witness``), else the witness itself. ``""`` or why."""
+        if not bool(self.gp.gen("overhang_push_branch_check") or False):
+            return ""
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        qs = list(getattr(chosen, "qs", None) or [])
+        if not qs or qs[0] is None:
+            return ""
+        chain = list(chosen.proposal.chain)
+        flipped = PCK._flipped_push_witness(self, chain, st, arm, qs[0], opening)
+        q_from = qs[0] if flipped is None else flipped[1]
+        if flipped is not None:
+            TT._count(self, "pick_overhang.push_flipped")
+        ok, why_l, _ = PCK.track_line_push(self, arm, q_from, chain[1:])
+        if ok:
+            return ""
+        if flipped is not None and bool(self.gp.gen("push_flipped_keep_recorded") or False):
+            # the program check keeps a flipped witness whose straight push tracks (program_check._rewitness_flipped_push)
+            ok_k, why_k, _ = PCK.track_line_push(self, arm, qs[0], chain[1:])
+            if ok_k:
+                TT._count(self, "pick_overhang.push_flipped_kept")
+                return ""
+            why_l = f"{why_l}; from the witness too: {why_k}"
+        TT._count(self, "pick_overhang.push_line_fails")
+        where = "the witness" if flipped is None else f"the stance posture's branch (the witness is {flipped[0]:.2f} rad away)"
+        return f"the straight push from {where} does not track: {why_l}"
+
+    def _overhang_drifted(self, post: G.Pose, st: Stance, arm: str, d=None) -> G.Pose:
+        """oracle-fix 2026-11-05 (opt-in ``generation.overhang_push_drift`` = ``{"lateral_m", "yaw_rad"}``; diagnostics hbD3 / hbD7: the
+        open-hand push of the hardback 0.16 m along -x left it -2.4 cm (left arm) / +2.65 cm (right arm) aside - away from the pushing arm
+        - and turned +0.048 / -0.096 rad; the grasp followed the book and the carry at C, checked from the predicted pose, stalled): the
+        predicted post-push pose shifted ``lateral_m`` away from the pushing arm (along B's base -left for the left arm, +left for the
+        right) and turned ``yaw_rad`` toward the same side's sign (+ for the left arm), so the grasp, the lift, the carry and the place
+        are planned for where the book ends up. ``post`` unchanged when off.
+        ``snap_max_rad`` (hb29_desk_s44 demo, 10:58: the book at yaw -1.963 pushed along -x turned to -1.574 = flush with the pad, 0.389 rad,
+        not the 0.07 assumed; the pre-grasp then lay 54 mm / 0.32 rad off the witness and closing it touched the torso): a flat pad turns a
+        box until a face lies flush with it - with the push direction ``d`` given and the yaw off the nearest flush orientation (the book's
+        axes vs ``d``, modulo 90 deg) within ``snap_max_rad``, the predicted turn is that whole offset; nearer 45 deg (the diagnostics' books,
+        no face wins) the small ``yaw_rad`` turn stands."""
+        drift = self.gp.gen("overhang_push_drift")
+        if not isinstance(drift, dict):
+            return post
+        side = 1.0 if arm == "left" else -1.0
+        yaw_b = float(st.base_pose2d[2])
+        left = th.tensor([-math.sin(yaw_b), math.cos(yaw_b), 0.0])
+        pos = G.t(post[0]).float() - left * side * float(drift.get("lateral_m", 0.0))
+        turn = side * float(drift.get("yaw_rad", 0.0))
+        snap = drift.get("snap_max_rad")
+        if snap is not None and d is not None:
+            q0 = G.t(post[1]).float()
+            psi = math.atan2(2.0 * (float(q0[3]) * float(q0[2]) + float(q0[0]) * float(q0[1])), 1.0 - 2.0 * (float(q0[1]) ** 2 + float(q0[2]) ** 2))
+            r = math.remainder(psi - math.atan2(float(d[1]), float(d[0])), math.pi / 2.0)  # the yaw off the nearest flush orientation, in [-45, 45] deg
+            if abs(r) <= float(snap):
+                turn = -r
+        quat = G.qmul(C.quat_from_yaw(turn).float(), G.t(post[1]).float())
+        return (pos, quat / th.linalg.norm(quat))
 
     def _overhang_settle(self, post: G.Pose, d, opts: Dict[str, Any]) -> Tuple[Optional[str], G.Pose, Dict[str, Any]]:
         """The physics settle of the pushed object (owner: "a physics settle of the pushed plate: not falling, little rotation"): the target
@@ -3717,7 +4031,7 @@ class IORSLarge(SamplerV2):
             chain_fail: Optional[str] = None
             for push in geo["ladder_m"]:
                 self._check_deadline(f"overhang pick ({arm} arm, push {push:.3f} m) at B ({manip.translate}, {manip.tilt:.2f})")
-                post = (G.t(t_pose[0]).float() + d3 * float(push), G.t(t_pose[1]).float())
+                post = self._overhang_drifted((G.t(t_pose[0]).float() + d3 * float(push), G.t(t_pose[1]).float()), st, arm, d3)
                 grasp_st, g_cam = st, cam
                 grasp = self._overhang_grasp(st, arm, g, post, kw, twins, cam)
                 if isinstance(grasp, str):
@@ -3767,6 +4081,22 @@ class IORSLarge(SamplerV2):
         TT._count(self, "pick_overhang.failed")
         return None, f"ladder {geo['ladder_m']} m: " + " | ".join(why)[:1200]
 
+    def _overhang_memo_key(self, manip: Stance, st_of: Dict[str, Stance], arms: Sequence[str], g, yaw0: float, focus_xy, z_init: float,
+                           twins: bool) -> Optional[Tuple[Any, ...]]:
+        """oracle-fix 2026-11-05 (opt-in ``generation.overhang_fail_memo``; hardback): the key under which a FAILED overhang pick is remembered
+        for the rest of the run - B's base pose and trunk, each offered arm's stance, the library row, the yaw bucket, the focus cell, the
+        support height. The pick depends on nothing else that changes between attempts (the scene, the options and the grasp-stance memo are
+        the run's), so the same inputs fail the same way: hb16_desk_s3 logged 199 overhang failures of 105 distinct texts (up to 11 repeats),
+        hb21_desk_s42 the same 8 pairs at its one B in 16-19 of 18 attempts. None when off."""
+        if not bool(self.gp.gen("overhang_fail_memo") or False):
+            return None
+
+        def st_key(st: Stance) -> Tuple[Any, ...]:
+            return tuple(round(float(v), 3) for v in st.base_pose2d) + (round(float(st.translate), 3), round(float(st.tilt), 3))
+
+        return (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
+                tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
+
     def _overhang_grasp_stances(self, st: Stance, arm: str, opts: Dict[str, Any]) -> List[Stance]:
         """The grasp stances of the two-stance overhang pick (stance ``"pick"``): B backed off along its axis by ``grasp_back_offs_m``,
         at B's trunk then ``grasp_trunks``, B's arms and idle posture, on free floor and whole-body collision-free (memoised per B and arm
@@ -3807,6 +4137,13 @@ class IORSLarge(SamplerV2):
             return str(res.reason)[:200]
         if not self.ikc.eef_in_frame(eef, cam):
             return "outside B's image (5 %)"
+        # oracle-fix 2026-11-05: the pre-grasp and the approach's end judged by the program check's own fingertip gate (5 % + 2 cm slack) from
+        # this stance - hb16_desk_s3 / hb17_desk_s3_diag attempt 0: the grasp from B backed off 0.10 m passed the eef box above, the program
+        # check rejected its pre-grasp at v 1058.7 (depth 0.425 m) after 3410 s; the next back-off keeps the hand deeper in the image
+        from ispatialgym.sampling.v2 import program_check as PCK
+        out = PCK.fingertips_in_frame(self, st, "grasp", [("pre_grasp", [pre]), ("approach", [eef])])
+        if out is not None:
+            return f"{out['key']} fingertip outside the image (5 %): u {out['u']}, v {out['v']}, depth {out['depth_m']} m"
         return eef, pre, res, pick
 
     def overhang_records(self, ov: Dict[str, Any], grasp: GraspRecord) -> None:
@@ -3826,6 +4163,17 @@ class IORSLarge(SamplerV2):
                                 "predicted_pose": {"position": [round(float(v), 5) for v in G.t(pred[0]).tolist()], "orientation": [round(float(v), 6) for v in G.t(pred[1]).tolist()]},
                                 "settle": f["settle"], "support_touch_m": ch.get("support_touch_m"), "ignore_every": ignore_every, "ignore_last": [],
                                 **({"orient": ch["orient"]} if ch.get("orient") else {}), **ch.get("seed", {})})
+        up = self.gp.gen("overhang_retreat_up_m")
+        if isinstance(up, (int, float)) and up > 0:
+            # oracle-fix 2026-11-05 (opt-in generation.overhang_retreat_up_m; diagnostic hbD1: after the 5 cm escape the base's back-off to the
+            # grasp stance left the hand at the book's far end and no transit to the pre-grasp planned with the desk present): the escape off
+            # the support is this long (programs._pick_actions -> Retreat.escape_up_m; the program check replays the same leg)
+            rec.extras["retreat_up_m"] = float(up)
+        if bool(self.gp.gen("carry_via_online") or False):
+            # oracle-fix 2026-11-05 (opt-in generation.carry_via_online; diagnostic hbD4: the push left the book 2.7 cm aside / 5.5 deg turned,
+            # the carry checked from this lift configuration stalled from the real one): the oracle re-searches the carry at C from where the
+            # arm is when the recorded leg does not track (execute._carry_online)
+            grasp.extras["carry_online"] = True
         self.sidecar.add_contact(rec)
         if sup is not None and self.surface.get("obj") is not None:
             self.sidecar.describe(sup, str(self.surface["obj"].category).replace("_", " "))  # the push's annotation names the support
@@ -3875,14 +4223,24 @@ class IORSLarge(SamplerV2):
         from ispatialgym.oracle import r1pro_model as M
 
         be, ikc = self.kit.backend, self.ikc
-        self.kit._ensure_synced()
-        res = be.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=G.t(q_start), pos_tol=1e-3, rot_tol=5e-3,
-                               max_iters=100, check_collisions=False, sync_world=False, max_joint_step=0.3)
-        q = res.q_traj[-1].clone() if getattr(res, "q_traj", None) is not None else G.t(q_start).clone()
-        m_lim, jn = ikc.joint_limit_margin(q, arm)
-        lim = f"{jn} {m_lim * 1000:.0f} mrad from its limit"
-        if not ikc.reaches(q, pose, arm):
-            return f"none - not reached with collisions off ({ikc.fk_residual(q, pose, arm) * 1000:.0f} mm short, {lim})"
+        # oracle-fix 2026-11-04 round 3: tracked along the line from the start (IKChecker.reach_collisions_off); the former single far
+        # waypoint returned no configuration and the residual of the START was reported (the bookcase's 674-846 mm 'short')
+        if hasattr(ikc, "reach_collisions_off"):
+            r = ikc.reach_collisions_off(pose, [G.t(q_start)], arm)
+            q = r["q"]
+            lim = f"{r['limit_joint']} {r['limit_mrad']:.0f} mrad from its limit"
+            if not r["reached"]:
+                return (f"none - not reached with collisions off ({r['short_mm']:.0f} mm short, {r['rot_rad']:.2f} rad off, {lim}"
+                        f"{', at limits ' + '/'.join(r['at_limits']) if r['at_limits'] else ''})")
+        else:  # a checker without the tracked solve (tests' stubs): one DLS solve from the start
+            self.kit._ensure_synced()
+            res = be.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=G.t(q_start), pos_tol=1e-3, rot_tol=5e-3,
+                                   max_iters=100, check_collisions=False, sync_world=False, max_joint_step=0.3)
+            q = res.q_traj[-1].clone() if getattr(res, "q_traj", None) is not None else G.t(q_start).clone()
+            m_lim, jn = ikc.joint_limit_margin(q, arm)
+            lim = f"{jn} {m_lim * 1000:.0f} mrad from its limit"
+            if not ikc.reaches(q, pose, arm):
+                return f"none - not reached with collisions off ({ikc.fk_residual(q, pose, arm) * 1000:.0f} mm short, {lim})"
         pairs: List[str] = []
         with ikc.ignoring(list(ignored)):
             if bool(self.kit.collision_free(q, margin=0.0)[0]):
@@ -4097,7 +4455,7 @@ class IORSLarge(SamplerV2):
                     errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the {self.PUSH_YAW_ORDER}{' ' + lock if lock else ''} yaws "
                                   f"({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
                     continue
-            ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
+            ignore_place = self.place_ignores()
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
             release_xy = cd if push else gc
             release_pose = (lambda xy, quat, eio=None: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat, eio=None: self.goal_pose_at(xy, quat, eio))
@@ -4215,7 +4573,15 @@ class IORSLarge(SamplerV2):
                         why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
                     if (res is None or not res.ok) and ov_opts is not None:
                         # owner 2026-10-13 ~03:15 item 4: the direct pick failed - push the object to B's support edge, grasp the overhang
-                        overhang, why_ov = self._overhang_pick(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b, ov_opts)
+                        key_ov = self._overhang_memo_key(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b)
+                        memo_ov = self.__dict__.setdefault("_overhang_fail_memo", {})
+                        if key_ov is not None and key_ov in memo_ov:
+                            TT._count(self, "pick_overhang.memo_hit")
+                            overhang, why_ov = None, f"{memo_ov[key_ov]} (remembered: the same pick failed in an earlier attempt)"
+                        else:
+                            overhang, why_ov = self._overhang_pick(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b, ov_opts)
+                            if overhang is None and key_ov is not None:
+                                memo_ov[key_ov] = why_ov
                         if overhang is not None:
                             res, t_pose, eef, pre, pick, yaw = overhang["res"], overhang["t_pose"], overhang["eef"], overhang["pre"], overhang["pick"], yaw0
                             b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), overhang["grasp_stance"], overhang["arm"], "B, overhang")
@@ -4296,7 +4662,7 @@ class IORSLarge(SamplerV2):
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
                     goal = release_pose(release_xy, goal_quat, g.pose)
                     place_eef = IK.grasp_pose(goal, g.pose)
-                    pre_place = IK.pre_pose(place_eef)
+                    pre_place = self.pre_place_of(place_eef, place)
                     # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
                     # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
                     # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
@@ -4363,6 +4729,9 @@ class IORSLarge(SamplerV2):
                 if pick_st is not manip:
                     # the two-stance overhang pick: after the push's retreat the robot backs off to the grasp stance (an empty-handed transition)
                     self.sidecar.add_stance(pick_st)
+                    # oracle-fix 2026-11-04 round 4: an earlier draw's B -> pick transition goes first (a draw failing after it - the carry leg, the
+                    # B -> C path - drops only the placement / push records: hb13_desk_s3 reached the program check with 4 'manipulation' -> 'pick')
+                    self._drop_leg_records(pick_st.name)
                     try:
                         self.record_transition(manip, pick_st)
                     except Reject as e:
@@ -4407,7 +4776,15 @@ class IORSLarge(SamplerV2):
                 # push-under crouch at C dragged the held sandal through the table top and into the floor at every s_T) - the lift
                 # is raised until the departure sweep, the carry and the arrival sweep are free; the oracle lifts by the recorded height
                 path_bc, carry_errors = None, []
-                for h in [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25))]:
+                # oracle-fix 2026-11-05 (with generation.carry_track_oracle): the carry leg at C is tracked per carry option, so a carry
+                # configuration whose branch cannot reach the pre-place (hb16_desk_s1 / hb18_desk_s1: stalled at 9-10 of 45, finish 1.12-1.21
+                # rad away) gives way to the next option instead of the whole C candidate
+                track_in_loop, carry_c, track_fails = bool(self.gp.gen("carry_track_oracle") or False), None, 0
+                heights = [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25))]
+                lift_extra = self.carry_lift_extra()
+                if lift_extra > 0:  # oracle-fix 2026-11-04 (owner item 4, opt-in generation.carry_lift_by_extent_m): each lift + the object's height + margin
+                    heights = [h + lift_extra for h in heights]
+                for h in heights:
                     q_lift = self.lift_arm_q(pick_st, eef, h, target, g.pose)
                     if q_lift is None:
                         carry_errors.append(f"lift {h:.2f} m: no IK solution from B")
@@ -4432,12 +4809,22 @@ class IORSLarge(SamplerV2):
                         try:
                             with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
                                 path_bc = self.record_carry_leg(init, pick_st, place, tname, q_arm, max_len)
-                            log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
-                            break
                         except Reject as e:
                             carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:700]}")
                             self._drop_leg_records("placement")
                             self.record_carry_arm_q(tname, arm, None)
+                            continue
+                        if track_in_loop:
+                            carry_c = self._carry_track_at_c(place, arm, tname, target, g, pre_place, place_eef, ignore_place)
+                            if carry_c[3] != "ok":
+                                carry_errors.append(f"lift {h:.2f} m, {label}: carry leg at C {carry_c[3]}: {str(carry_c[2])[:400]}")
+                                track_fails += 1
+                                path_bc, carry_c = None, None
+                                self._drop_leg_records("placement")
+                                self.record_carry_arm_q(tname, arm, None)
+                                continue
+                        log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                        break
                     if path_bc is not None:
                         break
                 if path_bc is None:
@@ -4445,7 +4832,10 @@ class IORSLarge(SamplerV2):
                     seg.failed.setdefault(bk, "C: carry leg: " + (carry_errors[0][:300] if carry_errors else "no carry option"))
                     log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.variant, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
-                    carry_failed_bases.add(base_key)
+                    if track_fails:
+                        fails["C: carry leg untrackable (per option)"] = fails.get("C: carry leg untrackable (per option)", 0) + track_fails
+                    else:  # a failed tracking depends on C's trunk: the trunk variants at this base pose stay candidates
+                        carry_failed_bases.add(base_key)
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.stances.pop("push", None)
                     self._drop_leg_records("push")
@@ -4457,17 +4847,8 @@ class IORSLarge(SamplerV2):
                 # its end configuration is the branch the witnesses must be in - the drop IK is re-solved from it and must stay within
                 # ``carry_finish_max_rad`` (0.5) of it; ``carry_end_q`` seeds the program check's place witness the same way
                 idx_r = self.kit.robot.arm_control_idx[arm]
-                q_c = self.ikc.q_locked(place).clone()
-                q_c[idx_r] = self.carry_arm_q[tname]
-                from ispatialgym.oracle import r1pro_model as M
-                h0 = self.kit.fk([M.EEF_LINK[arm]], q_c)[M.EEF_LINK[arm]]
-                with attached(self.kit, arm, target, eef_in_object=g.pose), self._floor_relaxed():
-                    q_end, why_t = self.ikc.track_chain(q_c, [h0, pre_place], arm, ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)))
-                    r2b = None
-                    if q_end is not None:
-                        r2b = self.ikc.exact([pre_place, place_eef], place, arm, ignore_for_last=ignore_place, cache=False, q_seed=q_end)
-                if q_end is None or r2b is None or not r2b.ok or r2b.q is None:
-                    reason = why_t if q_end is None else (r2b.reason if r2b is not None else "no IK")
+                q_end, fin_swing, reason, kind_c, via_c = carry_c if carry_c is not None else self._carry_track_at_c(place, arm, tname, target, g, pre_place, place_eef, ignore_place)
+                if kind_c == "untrackable":
                     errors.append(f"C: carry leg untrackable to the pre-place: {reason}")
                     seg.failed.setdefault(bk, f"C: carry leg untrackable to the pre-place: {str(reason)[:200]}")
                     log.info("%s: C (d %.2f λ %+.2f) carry leg hand -> pre-place untrackable / drop IK from its end fails: %s", self.gp.variant, place.stand_off or 0.0, place.lateral, reason)
@@ -4479,8 +4860,7 @@ class IORSLarge(SamplerV2):
                     self._drop_leg_records("push")
                     self.sidecar.grasps.clear()
                     continue
-                fin_swing = float(th.max(th.abs(r2b.q[idx_r] - q_end[idx_r])))
-                if fin_swing > float(self.num("carry_finish_max_rad", 0.5)):
+                if kind_c == "branch":
                     errors.append(f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
                     seg.failed.setdefault(bk, f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
                     log.info("%s: C (d %.2f λ %+.2f) pre-place IK from the tracked carry end swings %.2f rad (> 0.5)", self.gp.variant, place.stand_off or 0.0, place.lateral, fin_swing)
@@ -4493,6 +4873,9 @@ class IORSLarge(SamplerV2):
                     self.sidecar.grasps.clear()
                     continue
                 self.carry_end_q[tname] = q_end[idx_r].clone()
+                if via_c is not None:  # the oracle's carry leg passes through it (grasps[k].carry, Place.carry_waypoints)
+                    grasp.carry = [via_c["pose"]]
+                    grasp.extras["carry_via_at_c"] = via_c["label"]
                 log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.variant, fin_swing)
                 if push:
                     chain = {**chain, "record": {**chain.get("record", {}),
@@ -4568,8 +4951,18 @@ class IORSLarge(SamplerV2):
         return self.ikc.ignoring([self.obj("floor")]) if (self.relation == "under" or floor_class) else _NullContext()
 
     def check_stances_with_objects(self, draft: Draft):
+        # oracle-fix 2026-11-04 round 3 (chair 155): with the opt-in generation.push_end_ignore_target (a base push: the robot ends where the
+        # target stood) the stances are checked with the target out - the objects stand at their INIT poses here (11 x
+        # stance_collision_with_objects ['placement'] in chair7_lobby_s0); the push stance itself was checked with the target placed
         with self._floor_relaxed():
             super().check_stances_with_objects(draft)
+
+    def stance_check_ignores(self, stance) -> List[Any]:
+        """With ``generation.push_end_ignore_target``: the target, for every stance but init (the robot reaches them after the target left its init
+        pose: the push end where the chair stood, the push-under crouch next to the briefcase's start - brief10 blame: base_link x lwbctq)."""
+        if self.gp.gen("push_end_ignore_target") and getattr(stance, "name", "") != "init":
+            return [self.target]
+        return []
 
     def program_check(self, draft: Draft) -> Dict[str, Any]:
         with self._floor_relaxed():
@@ -4617,7 +5010,9 @@ class IORSLarge(SamplerV2):
         place = self.sidecar.stance("placement")
         goal_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = th.tensor(draft.pose_targets[tname]["orientation"])
-        ignore = [self.partner] if self.relation == "ontop" else [self.obj("floor")]
+        # the release's last-pose ignores as screened at C (oracle-fix 2026-11-04 round 4: the lean also leaves the partner it leans on out - the re-check
+        # with the floor alone met hall_tree_upkvgr_0 at the release on umb5_upk_up_s0 / umb5_upk_flat_s0 / _s1)
+        ignore = self.place_ignores()
         if self.push_under:
             # the release is the drop outside the edge (unchanged by the settle): re-check it as recorded; the push goal blade
             # follows the settled goal centre (a few mm), the chain start → mid → goal is re-solved (closed gripper)
@@ -4645,14 +5040,23 @@ class IORSLarge(SamplerV2):
                 push.extras["goal_cell"] = [float(goal_pos[0]), float(goal_pos[1])]
         else:
             place_eef = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
-            pre_place = IK.pre_pose(place_eef)
+            pre_place = self.pre_place_of(place_eef, place)
             with attached(self.kit, grasp.arm, self.target, eef_in_object=grasp.eef_in_object):
                 res = self.ikc.exact([pre_place, place_eef], place, grasp.arm, ignore_for_last=ignore, cache=False)
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / place at the settled goal fail the exact IK from stance C: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place_eef
-        cam_b = self.camera_pose_at(self.sidecar.stance(getattr(grasp, "stance", None) or "manipulation"))  # B, or the overhang pick's grasp stance
-        if not self.ikc.eef_in_frame(grasp.grasp, cam_b):
+        st_b = self.sidecar.stance(getattr(grasp, "stance", None) or "manipulation")  # B, or the overhang pick's grasp stance
+        cam_b = self.camera_pose_at(st_b)
+        if str(self.gp.gen("grasp_frame_rule") or "box") == "fingertip":
+            # oracle-fix 2026-11-04 round 3 (under_large#02, opt-in): the grasp judged by QA's own criterion - the fingertip point 5 % inside the
+            # image (program_check.fingertips_in_frame) - instead of the +-6 cm eef box (brief6_pitched_s0: 5 / 5 attempts past the push re-solve
+            # rejected here, the box bottom at v 1000-1046 of the 1026 limit, the fingertip at v 930-985)
+            from ispatialgym.sampling.v2 import program_check as PCK
+            out = PCK.fingertips_in_frame(self, st_b, "grasp_frame", [("grasp_frame", [grasp.grasp])], slack_m=0.0)
+            if out is not None:
+                raise Reject("gripper_not_in_frame", f"grasp fingertip outside the manipulation image (5 %): {out}")
+        elif not self.ikc.eef_in_frame(grasp.grasp, cam_b):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
         if self.relation == "ontop" and not self.ikc.eef_in_frame(place_eef, self.camera_pose_at(place)):
             raise Reject("gripper_not_in_frame", "place eef pose outside the placement image (5 %)")
@@ -4729,7 +5133,17 @@ class IORSLarge(SamplerV2):
         """``touching`` (``...-touching_large_scale``): the hook of the touching mode - it returns the mode's class (:meth:`_adopt_mode`),
         imported from the mode's own module inside this method. Until the mode lands every template of the subtask is rejected with
         ``relation_not_implemented``."""
+        gp = getattr(self, "gp", None)
+        if gp is not None and str(gp.gen("touching_push") or "").lower() == "base":
+            # oracle-fix 2026-11-03 (touching_large#01, the ottoman): a floor-standing target the base pushes against the partner's face
+            # (no grasp, no drop) - the nextto mode's base push with a touching goal
+            from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+            return NM.TouchingBasePushMode
         from ispatialgym.sampling.v2.tasks import iors_large_touching as M
+        if gp is not None and str(gp.gen("touching_place") or "").lower() == M.LEAN_PLACE_KIND:
+            # oracle-fix 2026-11-04 round 3 (touching_large#02, the umbrella): placed leaning on the partner, its lower end on the floor
+            return M.LeanTouchingMode
         return M.TouchingMode
 
     def _sample_nextto(self) -> type:

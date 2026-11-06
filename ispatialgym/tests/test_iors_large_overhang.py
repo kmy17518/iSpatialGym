@@ -261,6 +261,8 @@ class _Sampler:
     _overhang_geometry = IL.IORSLarge._overhang_geometry
     _overhang_touch_ok = IL.IORSLarge._overhang_touch_ok
     _overhang_push_chain = IL.IORSLarge._overhang_push_chain
+    _overhang_push_branch = IL.IORSLarge._overhang_push_branch
+    _overhang_drifted = IL.IORSLarge._overhang_drifted
     _overhang_settle = IL.IORSLarge._overhang_settle
     _overhang_pick = IL.IORSLarge._overhang_pick
     _overhang_grasp = IL.IORSLarge._overhang_grasp
@@ -365,6 +367,17 @@ def test_overhang_pick_pushes_to_the_edge_and_grasps_the_overhang(monkeypatch):
     assert rec["distance_m"] == pytest.approx(f["push_m"]) and rec["fingers"] == "open" and rec["fingers_opening_m"] == pytest.approx(C.FINGER_OPEN)
     assert rec["ignore_every"] == ["plate.n.04_1"] and rec["ignore_last"] == [] and rec["direction"][:2] == [1.0, 0.0]
     assert rec["post_push_pose"]["position"][0] == pytest.approx(1.0 + f["push_m"], abs=1e-4)
+    assert "retreat_up_m" not in rec  # oracle-fix 2026-11-05: only with generation.overhang_retreat_up_m
+    s.gp.generation["overhang_retreat_up_m"] = 0.15
+    s.overhang_records(pick, SimpleNamespace(extras={}))
+    assert s.sidecar.contacts[OH.CONTACT_SLOT].to_sidecar()["retreat_up_m"] == pytest.approx(0.15)
+    del s.gp.generation["overhang_retreat_up_m"]
+    assert "carry_online" not in grasp.extras  # oracle-fix 2026-11-05: only with generation.carry_via_online
+    s.gp.generation["carry_via_online"] = True
+    g_on = SimpleNamespace(extras={})
+    s.overhang_records(pick, g_on)
+    assert g_on.extras["carry_online"] is True
+    del s.gp.generation["carry_via_online"]
     json.dumps(rec)
     assert s.sidecar.language["objects"]["countertop.n.01_1"]["display_name"] == "countertop"  # the push's annotation names the support
     ov = grasp.extras["pick_overhang"]
@@ -484,6 +497,222 @@ def test_overhang_pick_grasps_from_b_backed_off(monkeypatch):
         OH.options({"grasp_back_offs_m": [0.9]})
 
 
+def test_overhang_grasp_stance_needs_the_pre_grasp_fingertip_in_frame(monkeypatch):
+    """oracle-fix 2026-11-05 (hb16_desk_s3: the program check rejected the pre-grasp from B backed off 0.10 m at v 1058.7): the grasp
+    stance passes the program check's fingertip gate on the pre-grasp and the approach's end, else the next back-off is tried."""
+    from ispatialgym.sampling.v2 import program_check as PCK
+
+    _first_passing_choose(monkeypatch)
+    m = _manip()
+    near = m.shifted(stand_off=float(m.stand_off) + 0.10, name="pick")
+    far = m.shifted(stand_off=float(m.stand_off) + 0.20, name="pick")
+    s = _Sampler(ikc=_IKC())
+    s.backed_off = [near, far]
+    gated = []
+
+    def frame(sampler, stance, name, items, **kw):
+        gated.append((stance, name, [k for k, _ in items]))
+        if stance is near:
+            return {"key": "pre_grasp", "index": 0, "n": 1, "u": 384.6, "v": 1058.7, "depth_m": 0.425}
+        return None
+
+    monkeypatch.setattr(PCK, "fingertips_in_frame", frame)
+    orig = IL.IORSLarge._overhang_grasp
+
+    def grasp(self, st, arm, g, obj_pose, kw, twins, cam):
+        return "exact IK failed at pose 1 of 2" if st.name == "manipulation" else orig(self, st, arm, g, obj_pose, kw, twins, cam)
+
+    s._overhang_grasp = grasp.__get__(s)
+    pick, why = s._overhang_pick(m, {"right": m}, ["right"], SimpleNamespace(name="grasp_5", pose=(G5_POS, G5_QUAT), meta={"width": G5_WIDTH}),
+                                 _aligned_yaw(), th.tensor([1.0, 0.0]), Z_TOP, False, s.pick_overhang_opts())
+    assert pick is not None, why
+    assert pick["grasp_stance"] is far
+    assert gated[0] == (near, "grasp", ["pre_grasp", "approach"]) and gated[1][0] is far
+    # every back-off out of frame: the rung fails with the gate's reason
+    monkeypatch.setattr(PCK, "fingertips_in_frame", lambda *a, **k: {"key": "pre_grasp", "index": 0, "n": 1, "u": 1.0, "v": 1070.0, "depth_m": 0.4})
+    s.__dict__.pop("_overhang_grasp_stance_memo", None)
+    pick, why = s._overhang_pick(m, {"right": m}, ["right"], SimpleNamespace(name="grasp_5", pose=(G5_POS, G5_QUAT), meta={"width": G5_WIDTH}),
+                                 _aligned_yaw(), th.tensor([1.0, 0.0]), Z_TOP, False, s.pick_overhang_opts())
+    assert pick is None and "exact IK failed" in why
+
+
+def test_carry_track_oracle_takes_the_program_checks_finish_bound():
+    """oracle-fix 2026-11-05 (hb16_desk_s1: the carry at C stalled at 9/45 and was finished 1.12 rad away): ``generation.carry_track_oracle``
+    tracks the carry leg with the program check's continuation acceptance; off, the tracking keyword arguments are as before."""
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    s = SimpleNamespace(gp=_GP(), ikc=IKChecker)
+    assert IL.IORSLarge._carry_track_kw(s) == {}
+    s.gp = _GP(carry_track_oracle=True)
+    assert IL.IORSLarge._carry_track_kw(s) == {"finish_max_excursion": 0.6, "soft_pos_tol": 0.01, "soft_rot_tol": 0.03, "max_iters": IKChecker.ORACLE_DIFF_IK_MAX_ITERS}
+    # oracle-fix 2026-11-05 (generation.carry_finish_max_remaining_m): the stall finish bound goes along
+    s.gp = _GP(carry_track_oracle=True, carry_finish_max_remaining_m=0.05)
+    assert IL.IORSLarge._carry_track_kw(s)["finish_max_remaining_m"] == pytest.approx(0.05)
+
+
+def test_track_chain_refuses_a_stall_finish_far_from_the_end():
+    """oracle-fix 2026-11-05 (hbD7: the carry at C stalled at 8/53 with 0.38 m left, the IK finish passed the check, the oracle's planned
+    finish next to the bookcase failed): with ``finish_max_remaining_m`` a stall leaving more than that to the chain's end fails the chain."""
+    from ispatialgym.sampling.v2.ik import IKChecker
+
+    rot = th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    class _Kit:
+        robot = SimpleNamespace(arm_control_idx={"right": th.arange(7)})
+        stats: Dict[str, Any] = {}
+
+        def _ensure_synced(self):
+            pass
+
+        def fk(self, frames, q):
+            return {f: (th.tensor([float(q[0]), 0.0, 1.0]), rot) for f in frames}
+
+        def ik(self, pose, q, arm="right"):
+            out = q.clone()
+            out[0] = float(pose[0][0])
+            return out
+
+        def collision_free(self, q, margin=0.0):
+            return th.ones(1, dtype=th.bool)
+
+    ikc = IKChecker.__new__(IKChecker)
+    ikc.kit = _Kit()
+    ikc.ignoring = lambda objs: contextlib.nullcontext()
+    ikc._solve_ik_path = lambda *a, **k: SimpleNamespace(success=False, q_traj=th.tensor([[0.12] + [0.0] * 6]), status="differential IK did not converge",
+                                                         diagnostics={"stage": "diff_ik", "pos_err": 0.012, "fail_index": 8})
+    chain = [(th.tensor([0.0, 0.0, 1.0]), rot), (th.tensor([0.5, 0.0, 1.0]), rot)]
+    q_end, why = ikc.track_chain(th.zeros(7), chain, "right", soft_stall_m=0.03, finish_max_remaining_m=0.05)
+    assert q_end is None and "the stall leaves 0.38 m" in why and ikc.last_track_stall["remaining_m"] == pytest.approx(0.38)
+
+
+def test_carry_track_at_c_kinds(monkeypatch):
+    """``_carry_track_at_c`` (the carry leg at C, per carry option under ``carry_track_oracle``): ok / untrackable (the tracking or the drop
+    IK from its end fails) / branch (the pre-place witness more than ``carry_finish_max_rad`` from the tracked end)."""
+    monkeypatch.setattr(IL, "attached", lambda *a, **k: contextlib.nullcontext())
+    seen = {}
+
+    class _Ikc(_IKC):
+        FINISH_MAX_EXCURSION, ORACLE_SOFT_POS_TOL, ORACLE_SOFT_ROT_TOL, ORACLE_DIFF_IK_MAX_ITERS = 0.6, 0.01, 0.03, 100
+
+        def track_chain(self, q, wps, arm, **kw):
+            seen.update(kw)
+            seen.setdefault("chains", []).append(len(wps))
+            fails = self.track_fails if len(wps) == 2 else getattr(self, "via_fails", True)
+            return (None, "approach_untrackable: stalled") if fails else (th.zeros(28), "ok")
+
+        def exact(self, poses, stance, arm, q_seed=None, **kw):
+            return IKResult(True, th.full((28,), self.swing), "", 2)
+
+    ikc = _Ikc()
+    ikc.track_fails, ikc.swing = False, 0.2
+    s = SimpleNamespace(gp=_GP(carry_track_oracle=True), ikc=ikc, carry_arm_q={"hb": th.zeros(7)}, _floor_relaxed=contextlib.nullcontext,
+                        kit=SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": th.arange(7)}), fk=lambda links, q: {links[0]: (th.zeros(3), C.IDENTITY_QUAT)}),
+                        obj=lambda role: role, num=lambda key, default=None: default)
+    s._carry_track_kw = lambda: IL.IORSLarge._carry_track_kw(s)
+    args = (None, "right", "hb", None, SimpleNamespace(pose=None), (th.zeros(3), C.IDENTITY_QUAT), (th.zeros(3), C.IDENTITY_QUAT), [])
+    q_end, swing, why, kind, via = IL.IORSLarge._carry_track_at_c(s, *args)
+    assert kind == "ok" and why is None and via is None and swing == pytest.approx(0.2) and seen["finish_max_excursion"] == 0.6
+    ikc.swing = 0.7
+    assert IL.IORSLarge._carry_track_at_c(s, *args)[3] == "branch"
+    ikc.track_fails, ikc.swing = True, 0.2
+    q_end, swing, why, kind, via = IL.IORSLarge._carry_track_at_c(s, *args)
+    assert kind == "untrackable" and q_end is None and "stalled" in why and via is None and seen["chains"][-1] == 2  # no waypoint search when off
+
+
+def test_carry_via_search_at_c(monkeypatch):
+    """oracle-fix 2026-11-05 (generation.carry_via_search; 4 / 4 hardback place checks stalled on the straight carry at C): a straight carry leg
+    that does not track is retried through the carry waypoints of ``CARRY_VIAS_AT_C`` (rotate first at the carry pose, the raised / shifted
+    midpoint, translate first), each with every carry pose's fingertip in C's image; the first that tracks is returned for ``grasps[k].carry``."""
+    from ispatialgym.sampling.v2 import program_check as PCK
+
+    monkeypatch.setattr(IL, "attached", lambda *a, **k: contextlib.nullcontext())
+    framed = []
+    monkeypatch.setattr(PCK, "fingertips_in_frame", lambda sampler, st, name, items, **kw: framed.append(len(items[0][1])) or (None if len(framed) > 1 else {"key": "carry"}))
+    seen = {}
+
+    class _Ikc(_IKC):
+        FINISH_MAX_EXCURSION, ORACLE_SOFT_POS_TOL, ORACLE_SOFT_ROT_TOL, ORACLE_DIFF_IK_MAX_ITERS = 0.6, 0.01, 0.03, 100
+
+        def track_chain(self, q, wps, arm, **kw):
+            seen.setdefault("chains", []).append([tuple(round(float(v), 3) for v in w[0]) for w in wps])
+            return (None, "approach_untrackable: stalled at 13/40") if len(wps) == 2 or self.via_fails else (th.zeros(28), "ok")
+
+        def exact(self, poses, stance, arm, q_seed=None, **kw):
+            return IKResult(True, th.full((28,), 0.1), "", 2)
+
+    ikc = _Ikc()
+    ikc.via_fails = False
+    h0 = (th.tensor([0.0, 0.0, 1.0]), C.IDENTITY_QUAT.clone())
+    pre = (th.tensor([0.6, 0.0, 1.0]), C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), math.pi / 2))
+    s = SimpleNamespace(gp=_GP(carry_track_oracle=True, carry_via_search=True), ikc=ikc, carry_arm_q={"hb": th.zeros(7)}, _floor_relaxed=contextlib.nullcontext,
+                        kit=SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": th.arange(7)}), fk=lambda links, q: {links[0]: h0}),
+                        obj=lambda role: role, num=lambda key, default=None: default, CARRY_VIAS_AT_C=IL.IORSLarge.CARRY_VIAS_AT_C)
+    for m in ("_carry_track_kw", "_carry_vias_at_c", "_carry_leg_poses"):
+        setattr(s, m, getattr(IL.IORSLarge, m).__get__(s) if m != "_carry_leg_poses" else IL.IORSLarge._carry_leg_poses)
+    args = (None, "right", "hb", None, SimpleNamespace(pose=None), pre, pre, [])
+    q_end, swing, why, kind, via = IL.IORSLarge._carry_track_at_c(s, *args)
+    # the first waypoint (rotate first at the carry pose) is out of frame; the second (raised 5 cm there) tracks
+    assert kind == "ok" and via["label"] == "start raise 0.05 lateral +0.00 turn 1.0"
+    assert seen["chains"][1] == [(0.0, 0.0, 1.0), (0.0, 0.0, 1.05), (0.6, 0.0, 1.0)] and C.quat_angle(via["pose"][1], pre[1]) < 1e-5
+    # the carry leg's poses as Place._carry_leg builds them: 3 to the waypoint at the start, a pose every 5 cm over the 0.6 m (float32) after it
+    assert framed[0] == 3 + math.ceil(float(th.linalg.norm(pre[0] - h0[0])) / 0.05)
+    ikc.via_fails = True
+    q_end, swing, why, kind, via = IL.IORSLarge._carry_track_at_c(s, *args)
+    assert kind == "untrackable" and via is None and "none of 12 carry waypoints passes" in why and "stalled at 13/40" in why
+
+
+def test_overhang_fail_memo_key():
+    """oracle-fix 2026-11-05 (generation.overhang_fail_memo): a failed overhang pick is remembered under B's pose and trunk, the arms' stances,
+    the row, the yaw bucket, the focus cell and the support height; off, there is no key (nothing is remembered)."""
+    m = _manip()
+    g = SimpleNamespace(name="grasp_0")
+    s = SimpleNamespace(gp=_GP())
+    args = (m, {"right": m}, ["right"], g, 4.32, th.tensor([1.0, 0.0]), Z_TOP, False)
+    assert IL.IORSLarge._overhang_memo_key(s, *args) is None
+    s.gp = _GP(overhang_fail_memo=True)
+    k = IL.IORSLarge._overhang_memo_key(s, *args)
+    assert k == IL.IORSLarge._overhang_memo_key(s, *args) and hash(k) is not None
+    moved = m.shifted(stand_off=float(m.stand_off) + 0.1, name="manipulation")
+    assert IL.IORSLarge._overhang_memo_key(s, moved, {"right": moved}, *args[2:]) != k
+    assert IL.IORSLarge._overhang_memo_key(s, *args[:4], 4.71, *args[5:]) != k
+    assert IL.IORSLarge._overhang_memo_key(s, *args[:3], SimpleNamespace(name="grasp_1"), *args[4:]) != k
+
+
+def test_overhang_push_branch_tracks_the_straight_push_from_where_the_oracle_leaves(monkeypatch):
+    """oracle-fix 2026-11-05 (generation.overhang_push_branch_check; hb21_desk_s55: the flipped push witness was moved to the stance branch
+    and the oracle's straight push stalled there): the chosen push chain is tracked as the oracle's straight push from the witness, or from
+    the stance posture's branch when the witness is flipped; a chain that does not track is refused, off nothing is checked."""
+    from ispatialgym.sampling.v2 import program_check as PCK
+
+    pre, start, mid, goal = [((0.1 * i, 0.0, 0.9), (0.0, 0.0, 0.0, 1.0)) for i in range(4)]
+    q_wit, q_raw = th.zeros(28), th.full((28,), 3.13)
+    chosen = SimpleNamespace(qs=[q_wit, None, None, None], proposal=SimpleNamespace(chain=[pre, start, mid, goal]))
+    calls, state = [], {"flipped": None, "ok": True}
+    monkeypatch.setattr(PCK, "_flipped_push_witness", lambda s, chain, st, arm, q_first, fingers: state["flipped"])
+
+    def track(s, arm, q_from, waypoints):
+        calls.append((q_from, list(waypoints)))
+        return state["ok"], "straight push tracked" if state["ok"] else "approach_untrackable: straight push replay (28 dense poses): waypoint 21/28", {}
+
+    monkeypatch.setattr(PCK, "track_line_push", track)
+    s = SimpleNamespace(gp=_GP(), kit=SimpleNamespace(stats={}))
+    run = lambda: IL.IORSLarge._overhang_push_branch(s, _manip(), "left", chosen, 0.08)
+    assert run() == "" and calls == []
+    s.gp = _GP(overhang_push_branch_check=True)
+    assert run() == "" and calls[-1][0] is q_wit and calls[-1][1] == [start, mid, goal]
+    state.update(flipped=(3.13, q_raw), ok=False)
+    why = run()
+    assert calls[-1][0] is q_raw and "stance posture's branch" in why and "3.13 rad" in why and "21/28" in why
+    assert s.kit.stats == {"pick_overhang.push_flipped": 1, "pick_overhang.push_line_fails": 1}
+    # generation.push_flipped_keep_recorded: the straight push tracked from the witness keeps the chain (as the program check keeps it)
+    s.gp = _GP(overhang_push_branch_check=True, push_flipped_keep_recorded=True)
+    state["track"] = lambda q: q is q_wit
+    monkeypatch.setattr(PCK, "track_line_push", lambda s_, arm, q_from, w: (calls.append((q_from, list(w))) or state["track"](q_from), "tracked or not", {}))
+    assert run() == "" and [c[0] for c in calls[-2:]] == [q_raw, q_wit] and s.kit.stats["pick_overhang.push_flipped_kept"] == 1
+    state["track"] = lambda q: False
+    assert "from the witness too" in run()
+
+
 def test_overhang_push_chain_light_sweep(monkeypatch):
     """A chain that only solves with the support out of the world is accepted under ``support_touch_m`` by the rule of
     ``approach_finger_support_touch`` - the whole body free with the support out, every non-finger link clear of the world, the fingers
@@ -565,6 +794,11 @@ def test_program_pushes_retreats_then_grasps():
     for bad, match in (({"arm": "left"}, "arm"), ({"object": "bowl.n.01_1"}, "object"), ({"kind": "push"}, "kind")):
         with pytest.raises(SidecarError, match=match):
             expand(sc.variant, Sidecar.from_dict(_sidecar_with_pick_push(**bad)))
+    assert retreat.escape_up_m is None
+    # oracle-fix 2026-11-05 (generation.overhang_retreat_up_m): the recorded escape height goes to the retreat
+    d = _sidecar_with_pick_push()
+    d["contacts"]["push_pick"]["retreat_up_m"] = 0.15
+    assert expand(sc.variant, Sidecar.from_dict(d))[2].escape_up_m == pytest.approx(0.15)
     # without the record: today's program
     d = _sidecar_with_pick_push()
     d.pop("contacts")
@@ -648,6 +882,55 @@ def test_program_check_advances_the_plate_to_the_pushed_pose():
     assert [round(float(v), 4) for v in obj.pose[0]] == [13.9, 0.30, 0.913]
 
 
+def test_program_check_retreats_after_the_overhang_push_as_the_contact_escape(monkeypatch):
+    """oracle-fix 2026-11-05 (hardback hb14_desk_s3: the recorded -a leg at a joint limit): the retreat after the overhang push is judged as
+    the oracle runs it - the contact escape from where the push left the arm (``replay_contact_escape``) - not as the recorded leg."""
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    sc = Sidecar.from_dict(_sidecar_with_pick_push())
+    actions = expand(sc.variant, sc)
+    push, retreat = actions[1], actions[2]
+    assert PC._pick_overhang_push(push) and not PC._pick_overhang_push(retreat)
+    plate, counter = object(), object()
+    idx = list(range(7))
+    calls = {"exact": 0, "escape": []}
+
+    class _IKC:
+        def q_locked(self, stance, fingers=None, **kw):
+            return th.zeros(28)
+
+        def reaches(self, q, pose, arm):
+            return float(q[0]) == 0.5  # only the push's tracked end is at its goal
+
+        def exact(self, poses, stance, arm, **kw):
+            calls["exact"] += 1
+            return IKResult(True, th.full((28,), 0.25), "", 1)
+
+    sampler = SimpleNamespace(objects={push.contact.object: plate}, support_objects=lambda: [counter], ikc=_IKC(),
+                              kit=SimpleNamespace(robot=SimpleNamespace(arm_control_idx={"right": idx, "left": idx})))
+    q_end = th.full((28,), 0.75)
+
+    def _escape(sampler_, arm, q, obj, supports, ignore, dist, start="", escape_up_m=None):
+        calls["escape"].append((arm, float(q[0]), obj, list(supports), list(ignore), dist, start))
+        calls["up"] = escape_up_m
+        return calls.get("status", "replayed"), "approach_untrackable: push replay - stalls", {"distance_m": dist}, q_end
+
+    monkeypatch.setattr(PC, "replay_contact_escape", _escape)
+    targets = retreat.targets(sc, None)
+    n, w = PC.check_action_targets(sc, sampler, retreat, targets, "manipulation", None, q_end_prev=th.full((28,), 0.5))
+    assert n == 1 and w["__arm_end_q__"] is q_end and calls["exact"] == 0
+    arm, q0, obj, sup, ign, dist, start = calls["escape"][-1]
+    assert (arm, q0, obj, sup, dist) == (push.contact.arm, 0.5, plate, [counter], 0.10) and ign == [plate, counter] and "overhang push" in start
+    assert calls["up"] is None  # no retreat_up_m recorded: the oracle's 5 cm escape
+    # no tracked end at the push's goal: a fresh IK of the push's end pose
+    PC.check_action_targets(sc, sampler, retreat, targets, "manipulation", None, q_end_prev=th.full((28,), 0.1))
+    assert calls["exact"] == 1 and calls["escape"][-1][1] == 0.25
+    calls["status"] = "failed"
+    with pytest.raises(Reject, match="push replay - stalls"):
+        PC.check_action_targets(sc, sampler, retreat, targets, "manipulation", None, q_end_prev=th.full((28,), 0.5))
+
+
 def test_executor_pick_push_measures_its_own_displacement():
     class _S:
         def pose_target(self, name):
@@ -666,3 +949,137 @@ def test_executor_pick_push_measures_its_own_displacement():
     res, src = EX.push_residual(geom, st, "plate.n.04_1", pose0)
     assert src == "line_distance" and res == pytest.approx(0.01)  # 6 cm to push, 5 cm done; never measured against the sink goal
     assert EX._push_stop_margin(st, "plate.n.04_1", geom, EX.ExecuteConfig(), {}) is None  # no stop-at-goal: the pad drives its line
+
+
+def test_carry_vias_table_is_shared_with_the_oracle():
+    """oracle-fix 2026-11-05: the sampler's carry waypoints at C and the oracle's online carry search read the same candidates."""
+    from ispatialgym.oracle import actions as A
+
+    assert tuple(IL.IORSLarge.CARRY_VIAS_AT_C) == tuple(A.CARRY_VIAS)
+    h0 = (th.tensor([0.0, 0.0, 1.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    pre = (th.tensor([0.4, 0.0, 1.0]), th.tensor([0.0, 0.0, 0.70711, 0.70711]))
+    s = SimpleNamespace(CARRY_VIAS_AT_C=IL.IORSLarge.CARRY_VIAS_AT_C)
+    mine = IL.IORSLarge._carry_vias_at_c(s, h0, pre)
+    theirs = A.carry_via_candidates(h0, pre)
+    assert [l for l, _ in mine] == [l for l, _ in theirs]
+    assert all(th.allclose(a[1][0], b[1][0]) and th.allclose(a[1][1], b[1][1]) for a, b in zip(mine, theirs))
+    legs = A.carry_leg_poses([h0, theirs[4][1], pre])
+    assert len(legs) == len(IL.IORSLarge._carry_leg_poses([h0, theirs[4][1], pre])) and th.allclose(th.as_tensor(legs[-1][0]).float(), pre[0])
+
+
+def test_oracle_carry_online_replaces_an_untrackable_carry_leg():
+    """oracle-fix 2026-11-05 (grasps[k].carry_online; diagnostic hbD4: the carry checked from the sampler's lift configuration stalled at
+    10/55 from the real one): the recorded leg is dry-run from where the arm is; when it does not track, the straight leg and the carry
+    waypoints are tried in order (fingertips in the head camera's frame, collision-checked dry run) and the first that passes replaces
+    the leg; without the flag nothing changes."""
+    from ispatialgym.oracle import execute as E
+
+    h0 = (th.tensor([0.0, 0.0, 1.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    pre = (th.tensor([0.4, 0.0, 1.0]), th.tensor([0.0, 0.0, 0.70711, 0.70711]))
+    calls = []
+
+    class _Backend:
+        def __init__(self, ok):
+            self.ok = ok
+
+        def update_world(self, ignore_objects=()):
+            calls.append(("world", len(ignore_objects)))
+
+        def q_full(self):
+            return th.zeros(28)
+
+        def solve_ik_path(self, emb, wps, check_collisions=False, **kw):
+            last = list(wps[-1].values())[0]
+            mid_z = max(float(list(w.values())[0][0][2]) for w in wps)
+            calls.append(("solve", len(wps), check_collisions, round(mid_z, 3)))
+            return SimpleNamespace(success=self.ok(len(wps), check_collisions, mid_z), status="stall at 10/55")
+
+    def motions(ok):
+        m = SimpleNamespace(backend=_Backend(ok), cfg=SimpleNamespace(diff_ik_pos_tol=0.002, diff_ik_rot_tol=0.01, diff_ik_max_iters=30, diff_ik_soft_pos_tol_free=0.01,
+                                                                    diff_ik_soft_rot_tol=0.03), eef_pose=lambda arm: h0)
+        m._densify = lambda start, wps: list(wps)
+        return m
+
+    action = SimpleNamespace(object="hardback.n.01_1", arm="right", carry_waypoints=lambda sc: [])
+    state = SimpleNamespace(eef_pose=lambda arm: h0, robot=SimpleNamespace(arm_control_idx={"right": th.arange(11, 25, 2)}))
+    targets = {"pre_place": pre}
+    recorded = [pre]
+
+    def ctx(flag):
+        g = SimpleNamespace(object="hardback.n.01_1", arm="right", extra={"carry_online": True} if flag else {})
+        mon = SimpleNamespace(camera=SimpleNamespace(in_frame=lambda cam, p, margin: True), cfg=SimpleNamespace(fov_margin=0.05), head_camera_pose=lambda: None)
+        return {"sidecar": SimpleNamespace(grasps=[g]), "monitors": mon}
+
+    # off: nothing is dry-run
+    c = ctx(False)
+    assert E._carry_online(action, motions(lambda *a: False), state, "right", targets, c, recorded, []) is None and calls == [] and "carry_online" not in c
+    # the recorded leg tracks: it stands
+    c = ctx(True)
+    assert E._carry_online(action, motions(lambda n, coll, z: True), state, "right", targets, c, recorded, []) is None and c["carry_online"] == {"recorded": "tracks"}
+    # the recorded leg (1 pose) and the straight leg stall; the first candidate raised 5 cm tracks collision-free -> it replaces the leg
+    calls.clear()
+    c = ctx(True)
+    kind, legs = E._carry_online(action, motions(lambda n, coll, z: z >= 1.049), state, "right", targets, c, recorded, ["bookcase"])
+    assert kind == "legs"
+    assert c["carry_online"]["chosen"] == "start raise 0.05 lateral +0.00 turn 1.0" and c["carry_online"]["tier"] == "in frame, collision-free"
+    tried = c["carry_online"]["tried"]
+    assert [t[0] for t in tried[:3]] == ["straight", "start raise 0.00 lateral +0.00 turn 1.0", "start raise 0.05 lateral +0.00 turn 1.0"]
+    assert [t[2] for t in tried[:3]] == [False, False, True] and tried[2][3] is True
+    assert th.allclose(th.as_tensor(legs[-1][0]).float(), pre[0]) and calls[0] == ("solve", 1, False, 1.0) and ("world", 1) in calls
+    # tracked but never collision-free: nothing replaces the leg (hbD6: the colliding straight leg jammed the arm)
+    c = ctx(True)
+    assert E._carry_online(action, motions(lambda n, coll, z: (not coll) and z >= 1.099), state, "right", targets, c, recorded, []) is None
+    assert c["carry_online"]["chosen"] is None and any(t[2] and not t[3] for t in c["carry_online"]["tried"])
+    # nothing passes: the recorded leg runs
+    c = ctx(True)
+    assert E._carry_online(action, motions(lambda *a: False), state, "right", targets, c, recorded, []) is None and c["carry_online"]["chosen"] is None
+    from ispatialgym.oracle import actions as A
+
+    assert len(c["carry_online"]["tried"]) == 1 + len(A.CARRY_VIAS)
+    # the recorded leg tracks from the program check's lift witness: the arm returns there first ("repose"), nothing else is tried
+    c = ctx(True)
+    c["sidecar"].extra = {"ik_witnesses": [{"action": 6, "name": "lift", "arm": "right", "targets": {"lift": {"q": [0.1] * 28}}}]}
+    m = motions(lambda *a: False)
+    m.backend.fk = lambda frames, q: {frames[0]: h0}
+    plain = m.backend.solve_ik_path
+    m.backend.solve_ik_path = lambda emb, wps, check_collisions=False, q_start=None, **kw: SimpleNamespace(success=q_start is not None, status="ok")
+    kind, (q7, vias) = E._carry_online(action, m, state, "right", targets, c, recorded, [])
+    assert kind == "repose" and q7.shape == (7,) and float(q7[0]) == pytest.approx(0.1) and vias == [] and c["carry_online"]["repose"]["jump_rad"] == pytest.approx(0.1)
+    # repose=False (the return failed): the candidates from the live hand
+    c2 = ctx(True)
+    c2["sidecar"].extra = c["sidecar"].extra
+    assert E._carry_online(action, m, state, "right", targets, c2, recorded, [], repose=False) is None and "repose" not in c2["carry_online"]
+
+
+def test_overhang_push_drift_shifts_the_predicted_pose_away_from_the_pushing_arm():
+    """oracle-fix 2026-11-05 (generation.overhang_push_drift; hbD3 / hbD7: the open-hand push left the hardback 2.4 / 2.65 cm aside, away from
+    the pushing arm, turned +0.048 / -0.096 rad): the predicted post-push pose is shifted away from the pushing arm along B's base left axis
+    and turned (+ for the left arm, - for the right); off, unchanged."""
+    import math as _m
+
+    st = SimpleNamespace(base_pose2d=[0.0, 0.0, 0.0])
+    post = (th.tensor([1.0, 0.0, 0.9]), C.quat_from_yaw(0.3).float())
+    s = SimpleNamespace(gp=_GP())
+    assert IL.IORSLarge._overhang_drifted(s, post, st, "left") is post
+    s.gp = _GP(overhang_push_drift={"lateral_m": 0.025, "yaw_rad": 0.07})
+
+    def yaw(q):
+        x, y, z, w = (float(v) for v in q)
+        return _m.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+
+    pl = IL.IORSLarge._overhang_drifted(s, post, st, "left")
+    pr = IL.IORSLarge._overhang_drifted(s, post, st, "right")
+    assert th.allclose(pl[0], th.tensor([1.0, -0.025, 0.9]), atol=1e-6) and yaw(pl[1]) == pytest.approx(0.37, abs=1e-5)
+    assert th.allclose(pr[0], th.tensor([1.0, 0.025, 0.9]), atol=1e-6) and yaw(pr[1]) == pytest.approx(0.23, abs=1e-5)
+    # B turned 90 deg: its left axis is -x
+    p90 = IL.IORSLarge._overhang_drifted(s, post, SimpleNamespace(base_pose2d=[0.0, 0.0, _m.pi / 2]), "left")
+    assert th.allclose(p90[0], th.tensor([1.025, 0.0, 0.9]), atol=1e-6)
+    # snap_max_rad (hb29_desk_s44: yaw -1.963 pushed along -x turned to -1.574, flush with the pad): within the bound the whole offset from the
+    # nearest flush orientation; near 45 deg the small turn stands
+    s.gp = _GP(overhang_push_drift={"lateral_m": 0.025, "yaw_rad": 0.07, "snap_max_rad": 0.70})
+    d = th.tensor([-0.9999969, 0.0024896, 0.0])
+    p44 = IL.IORSLarge._overhang_drifted(s, (post[0], C.quat_from_yaw(-1.963).float()), st, "left", d)
+    assert yaw(p44[1]) == pytest.approx(-1.963 + 0.3886, abs=2e-3)
+    p45 = IL.IORSLarge._overhang_drifted(s, (post[0], C.quat_from_yaw(-0.785).float()), st, "right", d)
+    assert yaw(p45[1]) == pytest.approx(-0.785 - 0.07, abs=1e-4)
+    assert yaw(IL.IORSLarge._overhang_drifted(s, (post[0], C.quat_from_yaw(-1.963).float()), st, "left")[1]) == pytest.approx(-1.893, abs=1e-4)  # no d: no snap

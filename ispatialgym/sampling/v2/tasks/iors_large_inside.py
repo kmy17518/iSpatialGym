@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
@@ -292,6 +293,81 @@ def tilted_quat(level_quat, eef_in_object_pos, deg: float):
     return G.qmul(G.quat_about_axis(axis, math.radians(float(deg))), G.t(level_quat).float())
 
 
+#: a release roll (oracle-fix 2026-11-04 round 3, inside_large#01) travels through the tilt bookkeeping as ``ROLL_KEY + roll deg``
+ROLL_KEY = 1000.0
+
+
+def release_rolls(value: Any) -> List[float]:
+    """``generation.release_roll_deg``: a roll (deg, -180 < roll <= 180, not 0) or a list -> the rolls screened, in order; None / [] -> []."""
+    if value is None:
+        return []
+    out: List[float] = []
+    for v in [value] if isinstance(value, (int, float)) else list(value):
+        try:
+            d = float(v)
+        except (TypeError, ValueError):
+            d = float("nan")
+        if not -180.0 < d <= 180.0 or d == 0.0:
+            raise ValueError(f"release_roll_deg {value!r}: expected rolls in degrees, -180 < roll <= 180, not 0")
+        if d not in out:
+            out.append(d)
+    return out
+
+
+def _rolls_of(s) -> List[float]:
+    """The variant's ``generation.release_roll_deg`` (:func:`release_rolls`); ``generation.release_level`` false (default true) drops the
+    level release when rolls are screened (a hardback must stand, not lie, in the compartment - oracle-fix 2026-11-04 round 3 item 2c)."""
+    try:
+        return release_rolls(s.gp.gen("release_roll_deg"))
+    except ValueError as e:
+        raise Reject("spec", f"{s.gp.variant}: {e}")
+
+
+def is_roll(key: float) -> bool:
+    return float(key) >= 0.5 * ROLL_KEY
+
+
+def roll_axis(eef_in_object_pos, level_quat) -> Optional[th.Tensor]:
+    """The world axis of a release roll: the grasp's horizontal radial direction (the grasp point's direction from the object origin at the
+    level orientation) - a roll turns the object about it, the grasped edge staying where it is (a flat book pinched at its spine stands up,
+    the spine toward the hand). None when the grasp point lies on the vertical through the origin."""
+    p = G.rotate(G.t(level_quat).float(), G.t(eef_in_object_pos).float())
+    n = math.hypot(float(p[0]), float(p[1]))
+    if n < 1e-6:
+        return None
+    return th.tensor([float(p[0]) / n, float(p[1]) / n, 0.0])
+
+
+def rolled_quat(level_quat, eef_in_object_pos, deg: float):
+    """The release orientation rolled by ``deg`` about :func:`roll_axis`; ``level_quat`` itself without a radial direction."""
+    axis = roll_axis(eef_in_object_pos, level_quat) if deg else None
+    if axis is None:
+        return level_quat
+    return G.qmul(G.quat_about_axis(axis, math.radians(float(deg))), G.t(level_quat).float())
+
+
+def footprint_fits(pts_xy: th.Tensor, xs: th.Tensor, ys: th.Tensor, free: th.Tensor, margin: float) -> bool:
+    """Whether every footprint point (N, 2), and each moved ``margin`` along the raster axes, falls on a free cell of the raster."""
+    if len(xs) < 2 or len(ys) < 2:
+        return False
+    res_x, res_y = float(xs[1] - xs[0]), float(ys[1] - ys[0])
+    offs = th.tensor([[0.0, 0.0], [margin, 0.0], [-margin, 0.0], [0.0, margin], [0.0, -margin]])
+    p = (G.t(pts_xy).float()[:, None, :2] + offs[None]).reshape(-1, 2)
+    i = th.round((p[:, 0] - float(xs[0])) / res_x).long()
+    j = th.round((p[:, 1] - float(ys[0])) / res_y).long()
+    if bool((i < 0).any() or (i >= len(xs)).any() or (j < 0).any() or (j >= len(ys)).any()):
+        return False
+    return bool(free.bool()[i, j].all())
+
+
+def thin_axis_xy(pts_xy: th.Tensor) -> th.Tensor:
+    """The horizontal direction of a footprint's smallest extent (the principal axis of least spread): an upright book's thickness."""
+    q = G.t(pts_xy).float()[:, :2]
+    q = q - q.mean(dim=0)
+    w, v = th.linalg.eigh(q.T @ q)
+    return v[:, 0] / v[:, 0].norm().clamp_min(1e-9)
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # the mode
 # ----------------------------------------------------------------------------------------------------------------
@@ -378,6 +454,12 @@ class InsideMode:
         n_part_cells = OJ.mask_out_boxes(itop, parts() if parts is not None else [], pad=0.5 * float(itop.resolution))
         if n_part_cells and not bool(itop.mask.any()):
             raise Reject("inside_surface", f"{partner.name}: every interior cell at {float(itop.z):.3f} m lies under its doors (generation.partner_joint_init)")
+        rolled = bool(_rolls_of(self))
+        if rolled:
+            # oracle-fix 2026-11-04 round 3 (inside_large#01): a rolled release stands the target up - headroom for its longest extent, the
+            # goal cells eroded by its half thickness only (each rolled pair's footprint at its yaw is checked by roll_fits)
+            ext = (lambda p: p.max(dim=0).values - p.min(dim=0).values)(G.local_points_world(self.hull, (th.zeros(3), self.rest)))
+            height, half = float(ext.max()), 0.5 * float(ext.min())
         usable = itop.usable(height, HEADROOM_MARGIN_M)
         idx = th.nonzero(usable)
         cells = th.stack([itop.xs[idx[:, 0]], itop.ys[idx[:, 1]]], dim=1) if len(idx) else th.zeros(0, 2)
@@ -509,7 +591,16 @@ class InsideMode:
                     if len(pool) == 0:
                         continue
                     stats["goal_in_band"] += 1
-                    gc = nearest_cell(pool, xy)
+                    # oracle-fix 2026-11-04 round 3 (inside_large#01): opt-in generation.inside_goal_lateral_m - the goal cell nearest a point that far to the
+                    # working arm's side of the base (in front of its shoulder; straight ahead of the base the standing book's pre-place put the forearm
+                    # across the chest: right_arm_link4/5 x torso_link4 13-27 mm, joint2 at its limit)
+                    lat_g = float(self.gp.gen("inside_goal_lateral_m", 0.0) or 0.0)
+                    aim = xy
+                    if lat_g:
+                        yaw_b = float(st.base_pose2d[2])
+                        side = -1.0 if arm == "right" else 1.0  # the right arm on the base's -y side
+                        aim = th.tensor([float(xy[0]) - math.sin(yaw_b) * side * lat_g, float(xy[1]) + math.cos(yaw_b) * side * lat_g])
+                    gc = nearest_cell(pool, aim)
                     st.extras["goal_cell"] = [float(gc[0]), float(gc[1])]
                     if rb is None:
                         st.extras["reach_margin_m"] = round(self.reach_margin(st, [float(gc[0]), float(gc[1]), z_mid], arm), 4)
@@ -518,8 +609,12 @@ class InsideMode:
         if not cands:
             log.info("%s: inside stance C at %s side %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
             return []
+        before = list(cands)
         cands, by_posture = free_in_postures(self, cands, postures)
         stats["collision_free"] = len(cands)
+        if os.environ.get("ISPATIALGYM_STANCE_BLAME"):  # oracle-fix 2026-11-04 (owner item 3): which body every rejected candidate hits
+            kept = {id(st) for st in cands}
+            P0.blame_stances(self, [st for st in before if id(st) not in kept], f"inside stance C {partner.name} side {edge.name}", postures=postures)
         if postures != list(STANCE_POSTURES):
             stats["postures"] = by_posture
         if not cands:
@@ -529,9 +624,17 @@ class InsideMode:
         classed = []
         for st, cam in zip(cands, P0.camera_poses(self, cands)):
             gc = st.extras["goal_cell"]
-            if not P0.in_frame(self, cam, self.hull_corners_world(self.hull, self.goal_pose_at(gc, self.rest))):
-                continue
             focus = th.tensor([gc[0], gc[1], z_mid])
+            if not P0.in_frame(self, cam, self.hull_corners_world(self.hull, self.goal_pose_at(gc, self.rest))):
+                if os.environ.get("ISPATIALGYM_STANCE_BLAME"):
+                    uv, depth = self.world.camera_model.project(cam, self.hull_corners_world(self.hull, self.goal_pose_at(gc, self.rest)))
+                    log.info("%s: STANCE_BLAME inside stance C %s side %s: collision-free %s trunk (%.2f, %+.2f) so %.2f: the target at the goal cell %s "
+                             "out of frame (uv x %.0f..%.0f y %.0f..%.0f of %d px, depth min %.2f m, axis %.1f deg)%s", self.gp.variant, partner.name, edge.name,
+                             [round(float(v), 2) for v in st.base_pose2d], st.translate, st.tilt, st.stand_off, [round(v, 2) for v in gc],
+                             float(uv[:, 0].min()), float(uv[:, 0].max()), float(uv[:, 1].min()), float(uv[:, 1].max()), self.world.camera_model.width,
+                             float(depth.min()), math.degrees(P0.axis_angle(self, cam, focus)),
+                             f"; reach margin {st.extras['reach_margin_m']}" if "reach_margin_m" in st.extras else "")
+                continue
             ang = P0.axis_angle(self, cam, focus)
             st.extras["axis_angle_deg"] = math.degrees(ang)
             if cone is not None and ang > math.radians(float(cone)):
@@ -621,8 +724,77 @@ class InsideMode:
 
     def release_quat(self, level_quat, grasp, tilt_deg: float):
         """IORSLarge's hook: the release orientation of ``grasp`` (a library row) at ``tilt_deg`` - :func:`tilted_quat` about the axis
-        perpendicular to the row's radial direction."""
+        perpendicular to the row's radial direction; a roll key (``ROLL_KEY + roll``, ``generation.release_roll_deg``) is
+        :func:`rolled_quat` about the radial direction itself."""
+        if is_roll(tilt_deg):
+            # oracle-fix 2026-11-04 round 4 (opt-in generation.inside_free_yaw): after a C's screen, the drawn row's release yaw is the one its rolled
+            # release passed at (the screen itself passes explicit yaws: the map is empty while it runs)
+            yg = (getattr(self, "_free_roll_yaw", None) or {}).get((getattr(grasp, "name", None), float(tilt_deg)))
+            if yg is not None:
+                level_quat = G.qmul(G.quat_from_yaw(float(yg)), self.rest)
+            return rolled_quat(level_quat, grasp.pose[0], float(tilt_deg) - ROLL_KEY)
         return tilted_quat(level_quat, grasp.pose[0], tilt_deg)
+
+
+    def pre_place_of(self, place_eef, place: Stance):
+        """IORSLarge's hook: with ``generation.inside_pre_outward`` the pre-place is the release moved ``inside_pre_m`` (default PRE_DIST)
+        straight out of the opening - along the stance side's outward normal, the orientation kept - instead of back along the gripper's
+        approach, which for a side pinch runs across a narrow compartment (inside_large#02: the jar's attached pre-place into the fridge's
+        side walls, 37-52 exact-IK fails per run; oracle-fix 2026-11-04 round 3). The oracle tracks the recorded pre-place -> place line."""
+        if not self.gp.gen("inside_pre_outward") or getattr(place, "edge", None) is None:
+            return IK.pre_pose(place_eef)
+        d = float(self.num("inside_pre_m", IK.PRE_DIST))
+        n = G.t(place.edge.inward).float()
+        out = th.tensor([-float(n[0]), -float(n[1]), 0.0]) / max(float(th.linalg.norm(n[:2])), 1e-9)
+        return G.t(place_eef[0]).float() + out * d, G.t(place_eef[1]).float()
+
+    def pre_place_tag(self, place: Stance):
+        if not self.gp.gen("inside_pre_outward") or getattr(place, "edge", None) is None:
+            return None
+        n = place.edge.inward
+        return f"outward {float(n[0]):.3f},{float(n[1]):.3f} {float(self.num('inside_pre_m', IK.PRE_DIST)):.3f}"
+
+    def blame_roll(self, release_xy, yaws, d_yaw: float, place: Stance, arm: str, ignore_place, t: float) -> None:
+        """Opt-in (``ISPATIALGYM_STANCE_BLAME``, oracle-fix 2026-11-04 round 3): why a rolled release has an empty F_goal at this C - for the
+        first two grasps, at the screened yaw whose pinched edge faces the base most, the [pre-place, place] reached with collisions off
+        (``_place_ik_contacts``) and the footprint rule."""
+        try:
+            base = th.tensor([float(place.base_pose2d[0]), float(place.base_pose2d[1])])
+            to_base = base - G.t(release_xy).float()[:2]
+            for g in list(self.grasps)[:2]:
+                def facing(yw, g=g):
+                    q = self.release_quat(G.qmul(G.quat_from_yaw(yw), self.rest), g, t)
+                    p = G.rotate(q, G.t(g.pose[0]).float())
+                    return float(p[:2] @ to_base) / max(float(th.linalg.norm(p[:2])) * float(th.linalg.norm(to_base)), 1e-9)
+                yw = max([y_ + d_yaw for y_ in yaws], key=facing)
+                quat = self.release_quat(G.qmul(G.quat_from_yaw(yw), self.rest), g, t)
+                pose = self.goal_pose_at(release_xy, quat, g.pose)
+                eef = IK.grasp_pose(pose, g.pose)
+                pre = self.pre_place_of(eef, place)
+                q0 = self.ikc.q_locked(place)
+                log.info("%s: STANCE_BLAME roll %g F_goal at %s (C base %s trunk (%.2f, %+.2f)) yaw %.2f (edge facing the base %.2f) grasp %s, footprint %s: "
+                         "pre-place: %s | place: %s", self.gp.variant, t - ROLL_KEY, [round(float(v), 2) for v in release_xy[:2]],
+                         [round(float(v), 2) for v in place.base_pose2d], place.translate, place.tilt, yw, facing(yw), getattr(g, "name", g),
+                         self.roll_fits(release_xy, quat) or "fits", self._place_ik_contacts(pre, q0, arm, [])[:240],
+                         self._place_ik_contacts(eef, q0, arm, list(ignore_place))[:240])
+        except Exception as e:  # noqa: BLE001 - a diagnostic never fails the draw
+            log.info("%s: STANCE_BLAME roll: blame failed (%r)", self.gp.variant, e)
+
+    def roll_fits(self, xy, quat) -> Optional[str]:
+        """A rolled release's footprint rule at the goal cell ``xy``: every hull point over a free board cell with ``roll_footprint_margin_m``
+        (default 0.005 m) to spare, and with ``inside_wall_hug_m`` set, a side wall within that distance along the footprint's thin axis (the
+        book stands beside a side board and leans on it if it tips). None when it fits, else why."""
+        itop = self.place["top"]
+        pts = G.local_points_world(self.hull, (th.tensor([float(xy[0]), float(xy[1]), 0.0]), G.t(quat).float()))[:, :2]
+        margin = float(self.num("roll_footprint_margin_m", 0.005))
+        if not footprint_fits(pts, itop.xs, itop.ys, itop.free, margin):
+            return "footprint_off_board"
+        hug = self.gp.gen("inside_wall_hug_m")
+        if hug is not None:
+            t = thin_axis_xy(pts)
+            if all(footprint_fits(pts + t * sgn * float(hug), itop.xs, itop.ys, itop.free, 0.0) for sgn in (1.0, -1.0)):
+                return "no_side_wall_within_hug"
+        return None
 
     def screen_release_tilts(self, F_goal, release_xy, yaws, d_yaw: float, place: Stance, arm: str, ignore_place, yaw_step: float):
         """IORSLarge's hook after the level F_goal screen of a C candidate: each ``generation.release_tilt_deg`` tilt is an alternative to
@@ -633,26 +805,61 @@ class InsideMode:
         passes in the order the draw tries them; one log line per C with F_goal per tilt. Without the key: ``(F_goal, {})``."""
         from ispatialgym.sampling.v2.tasks.iors_large import pair_key
 
-        tilts = self.release_tilts_deg()
+        tilts = self.release_tilts_deg() + [ROLL_KEY + r for r in _rolls_of(self)]
         if not tilts:
             return F_goal, {}
+        # opt-in generation.inside_free_yaw (oracle-fix 2026-11-04 round 4, hardback inside_large#01: F_init 9 x F_goal 1-3 of the rolled releases met at no
+        # carried yaw): a rolled release is screened over the whole yaw grid, a row passing at any yaw pairs with every init yaw, and release_quat gives
+        # the drawn row that yaw (the book stands in the compartment whatever yaw it was picked at; the wrist turns it)
+        free_yaw = bool(self.gp.gen("inside_free_yaw", False))
+        self._free_roll_yaw = {}
+        free_found: Dict[Tuple[Any, float], float] = {}
         tilts_of: Dict[Tuple[int, Any], List[float]] = {}
-        for y, g in F_goal:
-            tilts_of.setdefault(pair_key(y, g, yaw_step), []).append(0.0)
-        out, counts = list(F_goal), [(0.0, len(F_goal))]
+        level = bool(self.gp.gen("release_level", True))
+        if level:
+            for y, g in F_goal:
+                tilts_of.setdefault(pair_key(y, g, yaw_step), []).append(0.0)
+        out, counts = (list(F_goal) if level else []), [(0.0, len(F_goal) if level else 0)]
+        misfit: Dict[str, int] = {}
         for t in tilts:
             n = 0
             for g in self.grasps:
                 pose_at = lambda xy, yaw, g=g, t=t: self.goal_pose_at(xy, self.release_quat(G.qmul(G.quat_from_yaw(yaw), self.rest), g, t), g.pose)  # noqa: E731
-                for y, gg in self.ikc.feasible_sets([release_xy], [y_ + d_yaw for y_ in yaws], [g], pose_at, place, arm, ignore_place).get(0, []):
+                tag = getattr(self, "pre_place_tag", lambda _p: None)(place)
+                pre_kw = {"pre_of": (lambda eef: self.pre_place_of(eef, place)), "pre_tag": tag} if tag else {}
+                screen_yaws = list(self.yaws()) if (free_yaw and is_roll(t)) else [y_ + d_yaw for y_ in yaws]
+                for y, gg in self.ikc.feasible_sets([release_xy], screen_yaws, [g], pose_at, place, arm, ignore_place, **pre_kw).get(0, []):
+                    if is_roll(t):
+                        why = self.roll_fits(release_xy, self.release_quat(G.qmul(G.quat_from_yaw(y), self.rest), gg, t))
+                        if why is not None:
+                            misfit[why] = misfit.get(why, 0) + 1
+                            continue
+                    if free_yaw and is_roll(t):
+                        free_found.setdefault((getattr(gg, "name", None), float(t)), float(y))
+                        continue
                     k = pair_key(y - d_yaw, gg, yaw_step)
                     if k not in tilts_of:
                         out.append((y - d_yaw, gg))
                     tilts_of.setdefault(k, []).append(t)
                     n += 1
+            if free_yaw and is_roll(t):
+                for (name, tt), yg in free_found.items():
+                    if tt != float(t):
+                        continue
+                    gg = next((x for x in self.grasps if getattr(x, "name", None) == name), None)
+                    for y0 in yaws:  # every init yaw: the release yaw is yg
+                        k = pair_key(y0, gg, yaw_step)
+                        if k not in tilts_of:
+                            out.append((y0, gg))
+                        tilts_of.setdefault(k, []).append(t)
+                        n += 1
             counts.append((t, n))
-        log.info("%s: inside release tilt F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %s", self.gp.variant, place.stand_off or 0.0, place.lateral,
-                 place.translate, place.tilt, [round(float(v), 2) for v in release_xy], ", ".join(f"{t:g} deg: F_goal {n}" for t, n in counts))
+            if n == 0 and is_roll(t) and os.environ.get("ISPATIALGYM_STANCE_BLAME"):
+                self.blame_roll(release_xy, yaws, d_yaw, place, arm, ignore_place, t)
+        self._free_roll_yaw = dict(free_found)  # read by release_quat for this C's draws
+        log.info("%s: inside release tilt F_goal at C (d %.2f λ %+.2f trunk (%.2f, %.2f)) goal cell %s: %s%s", self.gp.variant, place.stand_off or 0.0, place.lateral,
+                 place.translate, place.tilt, [round(float(v), 2) for v in release_xy],
+                 ", ".join((f"roll {t - ROLL_KEY:g} deg" if is_roll(t) else f"{t:g} deg") + f": F_goal {n}" for t, n in counts), f" (roll footprint misfits {misfit})" if misfit else "")
         return out, tilts_of
 
     # ------------------------------------------------------------------ goal check
@@ -663,8 +870,8 @@ class InsideMode:
         flat is ``release_tilt_deg`` off."""
         tname = self.tname
         level = draft.summary.get("release_level_quat")
-        if not draft.summary.get("release_tilt_deg") or level is None or tname not in draft.goal_poses:
-            return super().check_goal_upright(draft)
+        if not draft.summary.get("release_tilt_deg") or level is None or tname not in draft.goal_poses or is_roll(float(draft.summary["release_tilt_deg"])):
+            return super().check_goal_upright(draft)  # a rolled release (the standing book) is measured against itself
         release = draft.goal_poses[tname]
         draft.goal_poses[tname] = (release[0], th.tensor([float(v) for v in level]))
         try:

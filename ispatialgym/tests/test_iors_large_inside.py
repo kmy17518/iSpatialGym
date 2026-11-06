@@ -15,6 +15,7 @@ import torch as th
 from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.sidecar import Sidecar
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.sim_utils import Reject, SupportInterior
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
@@ -1159,3 +1160,51 @@ def test_place_ik_failure_line_single_mesh_pairs_rest_and_unreached():
     s3.kit.backend.solve_ik_path = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("cuRobo down"))
     line3 = s3._place_ik_fail_line(r2, PLACE_C, SimpleNamespace(name="grasp_0"), 0.0, 0.0, pre_place, place_eef, "right", None, [], None)
     assert "contacts: not computed (RuntimeError('cuRobo down'))" in line3
+
+
+# ---------------------------------------------------------------- the rolled (standing) release (oracle-fix 2026-11-04 round 3, inside_large#01)
+
+
+def test_rolled_quat_stands_a_flat_book_with_the_pinched_edge_kept():
+    """A flat book (thickness along z) pinched at its +y edge: a 90 deg roll about the radial (+y) stands it on a short edge - its long x
+    axis vertical, the pinched edge still toward +y; -90 the other way up; the roll keys travel through the tilt bookkeeping."""
+    level = G.quat_from_yaw(0.0)
+    eio = th.tensor([0.0, 0.09, 0.0])
+    for deg in (90.0, -90.0):
+        q = IN.rolled_quat(level, eio, deg)
+        assert abs(abs(float(G.rotate(q, th.tensor([1.0, 0.0, 0.0]))[2])) - 1.0) < 1e-5  # the long axis vertical
+        assert float(G.rotate(q, eio)[1]) > 0.089  # the pinched edge stays where it was
+    assert IN.release_rolls([90, -90, 90]) == [90.0, -90.0] and IN.release_rolls(None) == []
+    with pytest.raises(ValueError):
+        IN.release_rolls([0])
+    assert IN.is_roll(IN.ROLL_KEY + 90.0) and IN.is_roll(IN.ROLL_KEY - 90.0) and not IN.is_roll(45.0)
+    assert IN.roll_axis(eio, level).tolist() == [0.0, 1.0, 0.0] and IN.roll_axis(th.zeros(3), level) is None
+
+
+def test_footprint_fits_and_the_thin_axis():
+    """A 3 x 17 cm footprint on a 0.6 x 0.3 m free raster fits in the middle, not over the edge; its thin axis is x."""
+    xs, ys = th.arange(0.0, 0.6, 0.02), th.arange(0.0, 0.3, 0.02)
+    free = th.ones(len(xs), len(ys), dtype=th.bool)
+    pts = th.tensor([[x, y] for x in (-0.015, 0.015) for y in (-0.085, 0.085)])
+    assert IN.footprint_fits(pts + th.tensor([0.3, 0.15]), xs, ys, free, 0.005)
+    assert not IN.footprint_fits(pts + th.tensor([0.3, 0.25]), xs, ys, free, 0.005)
+    assert abs(abs(float(IN.thin_axis_xy(pts)[0])) - 1.0) < 1e-5
+
+
+def test_inside_free_yaw_gives_the_drawn_row_its_screened_release_yaw():
+    """oracle-fix 2026-11-04 round 4 (generation.inside_free_yaw): after a C's screen, release_quat of a rolled release takes the yaw the row passed
+    at instead of the carried level yaw; other rows / no map keep the carried yaw."""
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.v2.tasks.iors_large_inside import ROLL_KEY, InsideMode, rolled_quat
+
+    rest = th.tensor([0.0, 0.0, 0.0, 1.0])
+    row = SimpleNamespace(name="grasp_0", pose=(th.tensor([0.0, -0.08, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0])))
+    other = SimpleNamespace(name="grasp_1", pose=row.pose)
+    level = G.qmul(G.quat_from_yaw(0.3), rest)
+    fake = SimpleNamespace(rest=rest, _free_roll_yaw={("grasp_0", ROLL_KEY + 90.0): 1.2})
+    q = InsideMode.release_quat(fake, level, row, ROLL_KEY + 90.0)
+    want = rolled_quat(G.qmul(G.quat_from_yaw(1.2), rest), row.pose[0], 90.0)
+    assert th.allclose(q, want, atol=1e-6)
+    assert th.allclose(InsideMode.release_quat(fake, level, other, ROLL_KEY + 90.0), rolled_quat(level, row.pose[0], 90.0), atol=1e-6)
+    fake._free_roll_yaw = {}
+    assert th.allclose(InsideMode.release_quat(fake, level, row, ROLL_KEY + 90.0), rolled_quat(level, row.pose[0], 90.0), atol=1e-6)

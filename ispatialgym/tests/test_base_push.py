@@ -689,3 +689,179 @@ def test_program_check_tracker_keeps_the_second_hand_on_the_cart_until_its_retre
     assert "left" in tr.arm_q
     tr.after(r_left, {}, sampler)
     assert tr.arm_q == {}
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# touching by the base push (oracle-fix 2026-11-03, touching_large#01: the ottoman against the sofa)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_touching_base_push_sampler_rules():
+    """The touching variant of the nextto mode: the goal gap is touching_goal_gap_m (not the NextTo-bound fraction), no NextTo probes, and
+    the record / summary carry relation touching; the nextto mode is unchanged."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+    def s(relation, **gen):
+        return SimpleNamespace(relation=relation, gp=SimpleNamespace(gen=lambda k, default=None: gen.get(k, default)))
+
+    nx, tc = s("nextto"), s("touching")
+    assert NM.push_relation(nx) == "nextto" and NM.push_relation(tc) == "touching"
+    assert NM.goal_gap(nx, 0.2) == pytest.approx(min(max(0.45 * 0.2, 0.06), 0.15))
+    assert NM.goal_gap(tc, 0.2) == pytest.approx(0.002) and NM.goal_gap(s("touching", touching_goal_gap_m=0.004), 0.2) == pytest.approx(0.004)
+    assert NM._goal_nextto(tc, th.zeros(2), 0.0, th.tensor([1.0, 0.0])) is None
+    assert issubclass(NM.TouchingBasePushMode, NM.NextToMode) and hasattr(NM.TouchingBasePushMode, "refine_targets_from_goal")
+
+
+def test_touching_base_push_program_and_stop_relation():
+    """A touching_large sidecar with a base push (no grasp, relation touching) expands to the nextto chain and validates; the oracle reads
+    Touching (not NextTo) for its stop and the record's push-on."""
+    import copy
+    import json
+    import os
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import execute as EX
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.oracle.sidecar import Sidecar, SidecarError
+
+    fx = os.path.join(os.path.dirname(__file__), "data", "sidecars", "inter_object_relation_satisfaction-nextto_large_scale.json")
+    with open(fx) as f:
+        d = json.load(f)
+    d2 = copy.deepcopy(d)
+    d2["variant"] = "inter_object_relation_satisfaction-touching_large_scale-ottoman-sofa-floor"
+    d2["contacts"]["push"]["relation"] = "touching"
+    sc = Sidecar.from_dict(d2)
+    assert sc.problems() == []
+    names = [a.name for a in expand(sc.variant, sc)]
+    nx = Sidecar.from_dict(d)
+    assert names == [a.name for a in expand(nx.variant, nx)] and "base_push" in names
+    d3 = copy.deepcopy(d2)
+    d3["contacts"]["push"].pop("relation")
+    with pytest.raises(SidecarError, match="relation"):
+        expand(d3["variant"], Sidecar.from_dict(d3))
+    assert EX.base_push_relation({"relation": "touching"}) == "touching" and EX.base_push_relation({}) == "nextto"
+    state = SimpleNamespace(touching=lambda a, b: True, nextto=lambda a, b: False)
+    assert EX.relation_now(state, "o", "p", "touching") is True and EX.relation_now(state, "o", "p", "nextto") is False
+    assert EX.base_push_knobs({"touching_push_on_m": 0.01})["touching_push_on_m"] == pytest.approx(0.01)
+    assert EX.base_push_knobs({})["touching_push_on_m"] == 0.0
+
+
+def test_touching_floor_skip_near_the_partner():
+    """oracle-fix 2026-11-03: the touching footprint's floor test skips the points within touching_floor_skip_m of the partner's AABB (its
+    own map cells); a nextto footprint tests every point."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+    assert NM.near_box((1.05, 0.5), (0.0, 0.0), (1.0, 1.0), 0.1) and not NM.near_box((1.2, 0.5), (0.0, 0.0), (1.0, 1.0), 0.1)
+    blocked = th.tensor([[0.0, 0.0], [1.0, 1.0]])  # the partner's cells are not free floor
+    kit = SimpleNamespace(trav_free=lambda p: not (0.0 - 0.1 <= float(p[0]) <= 1.0 + 0.1 and 0.0 - 0.1 <= float(p[1]) <= 1.0 + 0.1))
+    s = SimpleNamespace(kit=kit)
+    import ispatialgym.sampling.v2.prompt0 as P0
+
+    orig = P0.in_task_rooms
+    P0.in_task_rooms = lambda s_, p: True
+    try:
+        fp = th.tensor([[1.002, 0.2], [1.402, 0.2], [1.402, 0.6], [1.002, 0.6]])  # 2 mm off the partner's +x side
+        assert NM.floor_ok(s, fp) == "not_floor"
+        assert NM.floor_ok(s, fp, skip_near=(blocked[0], blocked[1], 0.15)) is None
+    finally:
+        P0.in_task_rooms = orig
+
+
+def test_arm_only_travel_cap_sends_long_pulls_to_sequential():
+    """oracle-fix 2026-11-03 (owner: the dishwasher follows arm only, else sequential): with hybrid_follow.arm_only_max_travel_rad an arm-only
+    follow longer than the cap does not count as feasible (the sequential search runs, and its failure does not fall back to arm-only)."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import articulation_large as AL
+
+    def make(cap):
+        s = object.__new__(AL.ArticulationLarge) if hasattr(AL, "ArticulationLarge") else SimpleNamespace()
+        s.gp = SimpleNamespace(gen=lambda k, default=None: ({"arm_only_max_travel_rad": cap} if cap is not None else {}) if k == "hybrid_follow" else default)
+        return s
+
+    fn = AL.ArticulationLarge.arm_alone_follows if hasattr(AL, "ArticulationLarge") else None
+    if fn is None:
+        pytest.skip("no ArticulationLarge class")
+    s = make(0.35)
+    ok, why = fn(s, None, 0.0, 0.55, {}, [1.0], {"1": True, "1.0": True, AL.fraction_key(1.0): True}, {})
+    assert ok is False and "arm_only_max_travel_rad" in why and s.arm_only_capped is True
+
+
+def test_push_spot_annotation_replaces_the_face_probe(tmp_path, monkeypatch):
+    """oracle-fix 2026-11-03 (owner decision 3a): a model with a push-spot annotation (runlogs/contacts_<date>/<category>__<model>.json, role
+    base_push) pushes only at its annotated spots - one hand and two hands - a face it does not name has none; without an annotation the
+    automatic probe runs."""
+    import json
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+    d = tmp_path / "contacts_20261103"
+    d.mkdir()
+    (d / "coffee_table__osroux.json").write_text(json.dumps({"key": "coffee_table__osroux", "category": "coffee_table", "model": "osroux", "contacts": [
+        {"name": "push_+x_rail", "role": "base_push", "face": "+x", "position": [0.35, 0.0, 0.31], "height_m": 0.31, "spacing_m": 0.40,
+         "spots": [[0.35, -0.2, 0.31], [0.35, 0.2, 0.31]], "verdict": "ok"}]}))
+    monkeypatch.setattr(NM, "CONTACTS_ROOT", str(tmp_path))
+    lo, hi = th.tensor([-0.4, -0.73, 0.0]), th.tensor([0.4, 0.73, 0.356])
+    s = SimpleNamespace(place={"local_lo": lo, "local_hi": hi, "pieces": []}, gp=SimpleNamespace(variant="v", gen=lambda k, default=None: default),
+                        choice=SimpleNamespace(models={"target": SimpleNamespace(category="coffee_table", model="osroux")}))
+    ones = NM._face_candidates_uncached(s, "+x")
+    assert len(ones) == 1 and ones[0]["coord"] == pytest.approx(0.35) and ones[0]["inset"] == pytest.approx(0.05) and ones[0]["annotated"]
+    assert ones[0]["height"] == pytest.approx(0.31) and ones[0]["t0"] == pytest.approx(0.0)
+    pairs = NM._face_pairs(s, "+x")
+    assert len(pairs) == 1 and pairs[0]["spacing"] == pytest.approx(0.40) and pairs[0]["spots"][0]["t0"] > pairs[0]["spots"][1]["t0"]
+    assert NM._face_candidates_uncached(s, "-y") == [] and NM._face_pairs(s, "-y") == []
+    s2 = SimpleNamespace(place={"local_lo": lo, "local_hi": hi, "pieces": []}, gp=s.gp,
+                         choice=SimpleNamespace(models={"target": SimpleNamespace(category="serving_cart", model="heqtlk")}))
+    assert NM.push_spot_annotation(s2) is None  # no annotation: the automatic probe (here: no pieces -> no candidate)
+
+
+def test_touching_goal_advances_to_a_sectional_partner_surface():
+    """oracle-fix 2026-11-03: a chaise sofa's AABB face (the chaise tip) lies 0.5 m from its seat front; the touching goal moves along the
+    push from the AABB face to touching_goal_gap_m short of the material (iors_large_nextto.advance_to_surface)."""
+    import torch as th
+
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+    seat = th.tensor([[0.0, 0.0], [3.0, 0.0], [3.0, 1.0], [0.0, 1.0]])  # seat front at y = 1.0
+    chaise = th.tensor([[2.2, 1.0], [3.0, 1.0], [3.0, 1.5], [2.2, 1.5]])  # the AABB's +y face at y = 1.5
+    lo, hi = th.tensor([-0.2, -0.2, 0.0]), th.tensor([0.2, 0.2, 0.3])
+    d2 = th.tensor([0.0, -1.0])
+    # in front of the seat part: the AABB face is 0.5 m short of the material
+    adv = NM.advance_to_surface(lo, hi, th.tensor([1.0, 1.5 + 0.2 + 0.002]), 0.0, d2, [seat, chaise], 0.002, 1.0)
+    assert adv is not None and abs(adv - 0.5) < 1e-3
+    # in front of the chaise: already at the surface
+    assert NM.advance_to_surface(lo, hi, th.tensor([2.6, 1.5 + 0.2 + 0.002]), 0.0, d2, [seat, chaise], 0.002, 1.0) == 0.0
+    # nothing within reach
+    assert NM.advance_to_surface(lo, hi, th.tensor([5.0, 1.7]), 0.0, d2, [seat, chaise], 0.002, 1.0) is None
+
+
+def test_program_check_blocks_of_a_touching_base_push_need_no_grasp():
+    """oracle-fix 2026-11-03: program_check.check_blocks mirrors the sidecar's relaxation for a touching_large floor start."""
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    sub = "inter_object_relation_satisfaction-touching_large_scale"
+    st = {"base_pose2d": [0.0, 0.0, 0.0], "translate": 0.5, "tilt": 0.0}
+    sd = {"stances": {"init": st, "manipulation": st, "placement": st}, "transitions": [{"from": "init", "to": "manipulation"}],
+          "paths": [{"from": "init", "to": "manipulation"}], "contacts": {"push": {"kind": "base_push", "arm": "right"}}}
+    assert not any("missing block" in p for p in PC.check_blocks(sub, sd))
+    sd["contacts"]["push"]["kind"] = "push"  # any other push still needs its grasp
+    assert any(p == "missing block grasps" for p in PC.check_blocks(sub, sd))
+
+
+def test_face_spots_cap_uses_every_annotated_spot():
+    """oracle-fix 2026-11-04: push_face_spots_max caps the probe's spots; an annotated model tries all of its spots."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NM
+
+    s = SimpleNamespace(place={"push_annotation": None}, gp=SimpleNamespace(gen=lambda k, default=None: None))
+    assert NM.face_spots_cap(s, [1, 2, 3, 4]) == [1, 2]
+    s.gp = SimpleNamespace(gen=lambda k, default=None: 3 if k == "push_face_spots_max" else None)
+    assert NM.face_spots_cap(s, [1, 2, 3, 4]) == [1, 2, 3]
+    s.place["push_annotation"] = {"contacts": [{"role": "base_push"}]}
+    assert NM.face_spots_cap(s, [1, 2, 3, 4]) == [1, 2, 3, 4]

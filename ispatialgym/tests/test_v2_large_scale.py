@@ -358,7 +358,8 @@ def test_icl_handle_rows_scene_instance(tmp_path):
 def test_variant_handle_row_and_pinch_width_floor():
     """Owner 2026-10-12 02:20 (open / close_large#03, office cabinet door rvunhj_0 / j_link_2): ``generation.handle_row`` takes
     the named row before the ranking and ``generation.pinch_width_min_m`` lowers the 15 mm floor; with neither the 8 mm bar
-    and the 7 mm knobs fall through to the 39 mm edge pinch, as before."""
+    and the 7 mm knobs fall through to the 39 mm edge pinch, as before. Since owner 2026-11-02 the default floor is 3 mm
+    (``PINCH_WIDTH_RANGE``): the 15 mm floor is passed explicitly below and the defaults take the bar."""
     from ispatialgym.sampling.sim_utils import Reject
 
     a, p = [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]
@@ -369,22 +370,24 @@ def test_variant_handle_row_and_pinch_width_floor():
     edge = AL.HandleRow("edge", [0.262, -0.0352, -0.1119], [1.0, 0.0, 0.0], [-0.9999, -0.0122, 0.0], 0.0386, "bottom_cabinet__rvunhj:j_link_2#F", verdict="edge")
     blocked = AL.HandleRow("edge", [0.26, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], 0.0386, "bottom_cabinet__rvunhj:j_link_2#F2", verdict="edge_blocked")
     rows = [rec_bar, rec_knob, bar, knob_b, edge, blocked]
-    row, ranked = AL.pick_handle_row(rows)  # the defaults: 15-80 mm, the ranking
+    floor15 = (0.015, 0.080)
+    row, ranked = AL.pick_handle_row(rows, width_range=floor15)  # 15-80 mm (the default before owner 2026-11-02), the ranking
     assert row is edge and ranked == AL.rank_handle_rows(rows)
+    assert AL.PINCH_WIDTH_RANGE == (0.003, 0.080) and AL.pick_handle_row(rows)[0].kind == "bar"  # the defaults: 3-80 mm
     row, _ = AL.pick_handle_row(rows, width_range=(0.006, 0.080))  # the floor alone: the ranking's first row (a bar) now fits
     assert row.kind == "bar"
     for name, want in (("j_link_2#C", bar), ("bottom_cabinet__rvunhj:j_link_2#C", bar), ("j_link_2#B", knob_b), ("record:bar", rec_bar), ("j_link_2#F", edge)):
         row, ranked = AL.pick_handle_row(rows, name, (0.006, 0.080))
         assert row is want and ranked[0] is want and sorted(map(id, ranked)) == sorted(map(id, AL.rank_handle_rows(rows)))
     with pytest.raises(Reject) as e:  # a named row below the floor is rejected, never swapped for the edge pinch
-        AL.pick_handle_row(rows, "j_link_2#C", AL.PINCH_WIDTH_RANGE, where="bottom_cabinet_rvunhj_0/j_link_2")
+        AL.pick_handle_row(rows, "j_link_2#C", floor15, where="bottom_cabinet_rvunhj_0/j_link_2")
     assert e.value.reason == "missing_handle" and "8 mm outside [15.0, 80.0] mm" in str(e.value)
     for name in ("j_link_2#Z", "j_link_2#F2", "j_link_0#C"):  # unknown / not admissible (edge_blocked) / another joint's row
         with pytest.raises(Reject) as e:
             AL.pick_handle_row(rows, name, (0.006, 0.080))
         assert e.value.reason == "spec"
     with pytest.raises(Reject) as e:
-        AL.pick_handle_row([rec_bar, rec_knob, bar, knob_b])  # nothing inside 15-80 mm and no edge
+        AL.pick_handle_row([rec_bar, rec_knob, bar, knob_b], width_range=floor15)  # nothing inside 15-80 mm and no edge
     assert e.value.reason == "missing_handle" and "8 mm outside [15.0, 80.0] mm" in str(e.value)
     with pytest.raises(Reject):
         AL.pick_handle_row(rows, None, (0.09, 0.08))
