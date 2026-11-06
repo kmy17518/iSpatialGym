@@ -6,6 +6,8 @@ validation (owner 2026-11-05: one pipeline; validation differs only in its outpu
                    [--kcollect K] [--sample-limit-s S] [--time-s T] [--tag name] [--customs template|trunk] [--extra-env NAME=VALUE ...]
                    [--root DIR] [--ledger TSV] [--base-index N] [--job-prefix isgf_] [--registry TSV] [--dry-run]
     submit_fast.py recollect <source job dir> --code <frozen snapshot> [--name N] [--iids IID ...] [--root DIR] [--job-prefix P] ...
+    submit_fast.py template <alias> <key> --code <frozen snapshot> --seed-index K [--scene S] [--support SUP] [--support-row ROW] [--n N]
+                   [--budget-s B] [--root DIR] [--job-prefix P] ...   (sample_isg at an eval seed: the template for register_alias.py)
     submit_fast.py params <key> [<n>]
     submit_fast.py keys [--registry TSV]
     submit_fast.py running
@@ -238,6 +240,37 @@ def recollect(a):
     return 0
 
 
+def template(a):
+    """job_template.sh: the template-making step that stays of job_val.sh KIND=eval (sample_isg at an eval seed, no demo); register the
+    result with register_alias.py, then submit it."""
+    job_dir = os.path.join(a.root, "out", "template", a.key, f"s{a.seed_index}" + (f"_{a.name}" if a.name else ""))
+    if os.path.exists(job_dir):
+        raise SystemExit(f"{job_dir} exists")
+    env = {"ALIAS": a.alias, "ALIAS_KEY": a.key, "ISGE_CODE": os.path.abspath(a.code), "ISGF_SCRIPTS": scripts_of(a.code), "ISGF_ROOT": os.path.abspath(a.root),
+           "SEED_SPLIT": "eval", "SEED_INDEX": a.seed_index, "N": a.n, "BUDGET_S": a.budget_s, "MAX_ATTEMPTS": a.max_attempts, "START_PER_ATTEMPT": 1,
+           "SCENE": a.scene or "", "SUPPORT": a.support or "", "SUPPORT_ROW": a.support_row or ""}
+    for kv in a.extra_env or []:
+        k, v = kv.split("=", 1)
+        env[k] = v
+    time_s = a.time_s or int(a.budget_s) + 2700
+    cmd, gres = sbatch(a, f"{a.job_prefix}tpl_{st.short_of(a.key)}", time_s, os.path.join(env["ISGF_SCRIPTS"], "job_template.sh"), job_dir)
+    if a.dry_run:
+        print("DRY", " ".join(shlex.quote(x) for x in cmd))
+        print("\n".join(f"  {k}={v}" for k, v in env.items()))
+        return 0
+    os.makedirs(job_dir)
+    os.makedirs(os.path.join(a.root, "slurm"), exist_ok=True)
+    with open(os.path.join(job_dir, "job.env"), "w") as fh:
+        for k, v in env.items():
+            fh.write(f"{k}={shlex.quote(str(v))}\n")
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        os.rename(job_dir, job_dir + ".failed_submit")
+        raise SystemExit(f"sbatch failed: {res.stderr.strip()}")
+    print(f"SUBMITTED {res.stdout.strip().split(';')[0]} template {a.alias} {job_dir} {gres} time={st.hms(time_s)} seed=eval:{a.seed_index}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -273,6 +306,18 @@ def main():
     common(r)
     r.add_argument("--name", default=None)
     r.add_argument("--iids", nargs="+", default=None)
+    tp = sub.add_parser("template")
+    tp.add_argument("alias")
+    tp.add_argument("key")
+    common(tp)
+    tp.add_argument("--seed-index", type=int, required=True)
+    tp.add_argument("--scene", default=None)
+    tp.add_argument("--support", default=None)
+    tp.add_argument("--support-row", default=None)
+    tp.add_argument("--n", type=int, default=1)
+    tp.add_argument("--budget-s", type=int, default=3600)
+    tp.add_argument("--max-attempts", type=int, default=1000)
+    tp.add_argument("--name", default=None)
     pp = sub.add_parser("params")
     pp.add_argument("key")
     pp.add_argument("n", type=int, nargs="?", default=4)
@@ -285,6 +330,8 @@ def main():
         return submit(a)
     if a.cmd == "recollect":
         return recollect(a)
+    if a.cmd == "template":
+        return template(a)
     if a.cmd == "params":
         print(st.params(aliases(a)[a.key], a.n))
         return 0
