@@ -50446,10 +50446,10 @@
     0.325
    ],
    "push_stand_offs_m": [
-    0.6,
-    0.65,
-    0.55,
-    0.7
+    0.45,
+    0.4,
+    0.5,
+    0.55
    ],
    "push_trunks": [
     [
@@ -50493,7 +50493,7 @@
     20.0,
     35.0
    ],
-   "_push_standoff_note": "oracle-fix 2026-11-06 (owner feedback on the coffee table demo: 'wouldn't IK to the push positions be easier to solve if the robot moves a bit backwards?'): every coffee_hsf2 instance stood at d 0.50 - the closer d 0.40 / 0.45 stances (tried first: the candidates sort by reach margin, capped at 0.25) died on 'pre fingertip out of frame' (projected v 1106 / 1027 px vs <= 1005), d 0.50 passed by ~50 px; at d 0.50 the right j2 / j6 sat 0.18-0.35 rad from their limits and both arms needed the planner ladder + a PROTECT via-above. Offline IK at trunk (0.95, -0.6), pitch 20: joint margin at contact / pre-contact 0.43 / 0.22 rad (d 0.50) -> 0.53 / 0.43 (0.60), 0.52 / 0.52 (0.65); reach margin 0.24 -> 0.20 / 0.18 (window [0.03, 0.45]). push_stand_offs_m [0.45, 0.40, 0.50, 0.55] -> [0.60, 0.65, 0.55, 0.70] (the closer values removed, not reordered: d 0.50 alone in the 0.25 tier would still be tried first); push_pitches_deg [20, 35] (pitch 0 had no solution with any joint margin at any trunk / stand-off)."
+   "_push_standoff_note": "oracle-fix 2026-11-06 (owner feedback on the coffee table demo: 'wouldn't IK to the push positions be easier to solve if the robot moves a bit backwards?'): every coffee_hsf2 instance stood at d 0.50 - the closer d 0.40 / 0.45 stances (tried first: the candidates sort by reach margin, capped at 0.25) died on 'pre fingertip out of frame' (projected v 1106 / 1027 px vs <= 1005), d 0.50 passed by ~50 px; at d 0.50 the right j2 / j6 sat 0.18-0.35 rad from their limits and both arms needed the planner ladder + a PROTECT via-above. Offline IK at trunk (0.95, -0.6), pitch 20: joint margin at contact / pre-contact 0.43 / 0.22 rad (d 0.50) -> 0.53 / 0.43 (0.60), 0.52 / 0.52 (0.65); reach margin 0.24 -> 0.20 / 0.18 (window [0.03, 0.45]). push_stand_offs_m [0.45, 0.40, 0.50, 0.55] -> [0.60, 0.65, 0.55, 0.70] (the closer values removed, not reordered: d 0.50 alone in the 0.25 tier would still be tried first); push_pitches_deg [20, 35] (pitch 0 had no solution with any joint margin at any trunk / stand-off). | 2026-11-06 01:10 VALIDATED AND REVERTED (fix1 isgof job 18342529, trunk_8ba250cb): the instances drew d 0.55 / 0.60 / 0.65 and the first two demos ended no_motion - both hands travelled the whole 0.2 m approach without touching the table. The coffee table's push face is only its glass top's edge (push spots: heights 0.350-0.3525, the top at 0.356 m): from 0.55-0.60 m the extended arms tracked the contact 1.9 cm high (eef z 0.377-0.378 vs the planned 0.359) and rode over the edge, from 0.50 m 0.5 cm (z 0.364, caught it, 4 / 4 coffee_hsf2). The larger stand-off buys joint margin but not the height accuracy this 2 cm edge needs -> the stand-offs back to [0.45, 0.40, 0.50, 0.55]; push_pitches_deg [20, 35] kept (pitch 0 never solved)."
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-nextto_large_scale#03: coffee_table/osroux pushed next to sofa_ukfaaz_0 (house_double_floor_upper living_room_0) by the base; hand-made as alias 156 (copy of 149), BDDL = problem149 with the new synsets; registry mode test"
