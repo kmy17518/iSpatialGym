@@ -412,15 +412,18 @@ def test_the_program_check_solves_the_push_chain_with_the_record_opening(monkeyp
 # ---------------------------------------------------------------------------------------------------------------- customs
 
 
-def test_customs_turn_the_key_on_for_the_12_cereal_box_touching_aliases_only():
+def test_customs_keep_the_key_off_on_the_12_cereal_box_touching_aliases_after_the_validation():
+    """The 12 cereal-box aliases carry the key OFF since the round-2 validation (open: 9 / 16 demos, 8.1 attempts per instance; closed:
+    16 / 16, 5.9) with both notes; no alias has it on."""
     with open(CUSTOMS) as f:
         customs = json.load(f)
     on = sorted(a for a, v in customs.items() if isinstance(v, dict) and (v.get("generation") or {}).get("push_gripper_open"))
     cereal = sorted(a for a in customs if "box_of_cereal" in a and "touching_small_scale" in a)
-    assert len(cereal) == 12 and on == cereal
+    assert len(cereal) == 12 and on == []
     for a in cereal:
         g = customs[a]["generation"]
-        assert g["push_height_sweep"] is False  # today's lateral rule: the first lateral with push + brace
+        assert g["push_gripper_open"] is False and g["push_height_sweep"] is False  # today's lateral rule: the first lateral with push + brace
         note = g["_push_gripper_open_note"]
         assert note.startswith(f"oracle-fix 2026-11-06 (owner feedback on the {a} demo:") and "push_open_v-" in note
+        assert "9 / 16 demos" in g["_push_gripper_open_off_note"]
     assert BO.BAR in cereal
