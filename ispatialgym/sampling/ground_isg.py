@@ -2247,7 +2247,12 @@ class Grounder:
         key = C.model_key(cat, m)
         subtask = iddl.subtask
         if v.grasp_key:
-            re_.grasp_keys[key] = self._preferred_grasp_key(iddl, role, cat, m, rp, v.grasp_key, row)
+            named = row
+            if row.get("_synthetic") and rp.pick_row is not None and (rp.pick_row.get("category"), rp.pick_row.get("model")) == (cat, m):
+                # oracle-fix 2026-11-06: a model without a candidates row takes the key its pick row names, as it takes that row's scale below
+                # (ontop_small#02's steak: steak__lcebsq__t060 at x0.6 - the alphabetically first key was the unscaled one)
+                named = {**row, "grasp_key": rp.pick_row.get("grasp_key") or ""}
+            re_.grasp_keys[key] = self._preferred_grasp_key(iddl, role, cat, m, rp, v.grasp_key, named)
         gk = re_.grasp_keys.get(key) or ""
         # a spawn-scaled key's grasps were tested at its scale (``__sf``, ``__s``, ``__st``, a target-fit key): the model spawns at exactly that scale
         key_scale = self.icl.key_scale.get(gk) if gk else None
@@ -2289,8 +2294,13 @@ class Grounder:
 
     def _target_base(self, iddl: I.IDDL, cat: str, m: str, rp: Optional[RolePick]) -> Tuple[Optional[str], Optional[List[float]]]:
         """The library key a target model gets at its own spawn scale and that scale (None = unit), as :meth:`_model_facts` derives
-        them, with the keys tested at a uniform shrink of it (target-fit keys) left out."""
-        row = self.icl.row(iddl.subtask, "target", cat, m) or {}
+        them, with the keys tested at a uniform shrink of it (target-fit keys) left out. oracle-fix 2026-11-06: a model without a candidates
+        row reads its pick's selection row (as :meth:`_model_facts` does) - a key and scale the sheet pins for it (ontop_small#02's steak
+        lying at x0.6, ``steak__lcebsq__t060``) are the model's own, not a target-fit shrink restored to the unscaled key."""
+        row = self.icl.row(iddl.subtask, "target", cat, m)
+        if row is None and rp is not None and rp.pick_row is not None and (rp.pick_row.get("category"), rp.pick_row.get("model")) == (cat, m):
+            row = rp.pick_row
+        row = row or {}
         row_scale = _parse_scale(row.get("scale") or "")
         keys = self._admissible_keys(iddl, "target", cat, m)
         own = {k for k in keys if not self._shrunk_key(k, row_scale)}

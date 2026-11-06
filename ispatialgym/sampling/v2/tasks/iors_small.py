@@ -610,6 +610,71 @@ class FlatTop:
                 "n_seen": int((~np.isnan(self.z)).sum())}
 
 
+class ContainerFloor:
+    """oracle-fix 2026-11-06 (``generation.ontop_centre: "container"``, owner on the ontop_small#02 steak demo): the floor of an open
+    container seen from straight above - the convex collision pieces (points, an upright frame: z up) as triangles (their convex hulls),
+    rastered (:func:`raster_from_above`) at ``res``; the floor = the horizontal cells (|n_z| >= ``normal_min``) within ``tol`` of the lowest
+    1 mm height that holds at least ``min_frac`` of the horizontal cells (a pan's rim top and handle lie above it); its centre = the centre of
+    the largest disc of floor cells (the floor cells farthest from every other cell, :func:`scipy.ndimage.distance_transform_edt`), its
+    radius that disc's. :meth:`radius_at` - the disc of floor around another centre (a fillable meta link's). ``build`` returns None when no
+    floor is seen."""
+
+    def __init__(self, x0: float, y0: float, res: float, z: float, dist: np.ndarray, centre_xy: np.ndarray, n_flat: int):
+        self.x0, self.y0, self.res, self.z, self.dist, self.centre_xy, self.n_flat = float(x0), float(y0), float(res), float(z), dist, np.asarray(centre_xy, dtype=float), int(n_flat)
+
+    @classmethod
+    def build(cls, pieces: Sequence[Any], res: float = 0.002, tol: float = 0.002, normal_min: float = 0.99, min_frac: float = 0.1) -> Optional["ContainerFloor"]:
+        from scipy import ndimage
+        from scipy.spatial import ConvexHull
+
+        tris = []
+        for P in pieces:
+            P = np.asarray(G.t(P).double().numpy() if isinstance(P, th.Tensor) else P, dtype=float).reshape(-1, 3)
+            if len(P) < 4:
+                continue
+            try:
+                tris.append(P[ConvexHull(P).simplices])
+            except Exception:  # noqa: BLE001 - a flat piece: nothing seen from above that its neighbours do not show
+                continue
+        if not tris:
+            return None
+        tri = np.concatenate(tris)
+        lo, hi = tri.reshape(-1, 3).min(axis=0), tri.reshape(-1, 3).max(axis=0)
+        x0, y0 = float(lo[0]) - 2 * res, float(lo[1]) - 2 * res
+        nx, ny = int(math.ceil((float(hi[0]) - x0) / res)) + 3, int(math.ceil((float(hi[1]) - y0) / res)) + 3
+        zbuf, nbuf = raster_from_above(tri, x0, y0, nx, ny, res)
+        horiz = ~np.isnan(zbuf) & (np.nan_to_num(nbuf) >= normal_min)
+        if not horiz.any():
+            return None
+        zn = np.nan_to_num(zbuf, nan=-1e9)
+        flat = None
+        for b in np.unique(np.round(zbuf[horiz] * 1000.0).astype(np.int64)):  # ascending: the lowest band of ``tol`` that holds enough of the floor
+            band = horiz & (zn >= (b - 0.5) / 1000.0) & (zn <= (b - 0.5) / 1000.0 + tol)
+            if band.sum() >= max(4, min_frac * horiz.sum()):
+                flat = band
+                break
+        if flat is None:
+            return None
+        z_ref = float(np.median(zbuf[flat]))
+        dist = ndimage.distance_transform_edt(flat) * res
+        top = dist >= float(dist.max()) - 0.5 * res
+        ii, jj = np.nonzero(top)
+        centre = np.array([x0 + (float(ii.mean()) + 0.5) * res, y0 + (float(jj.mean()) + 0.5) * res])
+        return cls(x0, y0, res, z_ref, dist, centre, int(flat.sum()))
+
+    def radius_at(self, xy) -> float:
+        """The radius (m) of the floor disc around ``xy`` (the upright frame): the distance from its cell to the nearest cell that is not
+        floor, less half a cell; 0 off the floor."""
+        i, j = int(math.floor((float(xy[0]) - self.x0) / self.res)), int(math.floor((float(xy[1]) - self.y0) / self.res))
+        if not (0 <= i < self.dist.shape[0] and 0 <= j < self.dist.shape[1]):
+            return 0.0
+        return max(0.0, float(self.dist[i, j]) - 0.5 * self.res)
+
+    @property
+    def radius(self) -> float:
+        return self.radius_at(self.centre_xy)
+
+
 def gap_along(behind_w: th.Tensor, ahead_w: th.Tensor, direction) -> float:
     """Gap (m) along ``direction`` (world, horizontal) from a hull to the hull ahead of it, both world points: the nearest extent of
     ``ahead_w`` minus the farthest of ``behind_w`` (negative when they overlap along it)."""
@@ -1172,7 +1237,10 @@ class IORSSmall(SamplerV2):
         """§6.11 per (target, partner): ontop / under -> the partner's top admits the target footprint with >= 1 cm
         (tier any_yaw / aligned / centred, else ``partner_too_small``); nextto -> the centre heights overlap
         (``nextto_height_mismatch``); touching -> partner stability / target pushability; inside -> opening >= footprint
-        + 1 cm at the rest orientation - standing on :meth:`up_axis` when the variant names one (the drop test runs in the goal check)."""
+        + 1 cm at the rest orientation - standing on :meth:`up_axis` when the variant names one (the drop test runs in the goal check).
+        Ontop with ``generation.ontop_centre: "container"`` (oracle-fix 2026-11-06): the target's footprint (its farthest point from its
+        centre, any yaw) + the margin within the partner's floor disc (:meth:`container_floor`), tier ``floor_disc``; the box tiers when the
+        partner shows no floor disc."""
         up = self.up_axis() if self.gen("target_up_axis") is not None else None
         t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else self.rest["target"])
         p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
@@ -1182,6 +1250,19 @@ class IORSSmall(SamplerV2):
         tx, ty = sorted([float(t_ext[0]), float(t_ext[1])])
         px, py = sorted([float(p_ext[0]), float(p_ext[1])])
         m = float(self.gen("partner_footprint_margin_m", 0.01))
+        container = self.relation == "ontop" and self.gen("ontop_centre", "bbox") not in (None, "bbox") and self.ontop_centre() == "container"
+        floor = self.container_floor() if container else None
+        if floor is not None and floor.get("radius_m") is not None:
+            # oracle-fix 2026-11-06 (ontop_small#02: the steak's x_down rest 25 x 6.3 cm passed the pan's 0.29 x 0.47 m box, handle included,
+            # and stood on its edge at the AABB centre, 9 cm from the floor's): the floor disc admits the footprint at any yaw about its centre
+            fp = G.local_points_world(self.hull["target"], (th.zeros(3), G.t(self.rest["target"])))[:, :2].float()
+            reach = float(th.linalg.norm(fp - min_area_rect(fp)[3], dim=1).max())
+            out.update(tier="floor_disc", container_floor=floor, target_reach_m=round(reach, 4))
+            self.template_facts["container_floor"] = dict(floor, target_reach_m=round(reach, 4), margin_m=m)
+            if reach + m > float(floor["radius_m"]) + 1e-9:
+                raise Reject("partner_too_small", f"target footprint reaches {reach:.3f} m from its centre: with {m:.2f} margin it leaves the partner's floor "
+                                                  f"disc (radius {float(floor['radius_m']):.3f} m, generation.ontop_centre 'container')")
+            return out
         if self.relation in ("ontop", "under"):
             tiers = list(self.gen("fit_tiers", ["any_yaw", "aligned", "centred"]))
             diag = math.hypot(tx, ty)
@@ -3038,6 +3119,78 @@ class IORSSmall(SamplerV2):
         if tgt.get("orientation_metric") is not None:
             tgt["orientation"] = [float(v) for v in goal[1]]
 
+    # -- ontop on a container's floor (oracle-fix 2026-11-06, owner on the ontop_small#02 steak demo: "want to scale down steak so it can be
+    #    grasped lying down & fits inside the floor of the frying pan (right now it's standing up)") --
+
+    def ontop_centre(self) -> str:
+        """``generation.ontop_centre`` (oracle-fix 2026-11-06): ``"bbox"`` (default, today's: the goal centred on the partner's world AABB) or
+        ``"container"`` (ontop: the target's footprint centred on the partner's floor, :meth:`container_floor`, and the pair check's fit on
+        the floor's disc - frying_pan/jpzusm's AABB holds its 18 cm handle: its centre lies at object x -0.071 m, the floor's at +0.018)."""
+        v = str(self.gen("ontop_centre", "bbox") or "bbox")
+        if v not in ("bbox", "container"):
+            raise Reject("spec", f"{self.gp.variant}: generation.ontop_centre must be 'bbox' or 'container', got {v!r}")
+        return v
+
+    def container_floor(self) -> Optional[Dict[str, Any]]:
+        """:meth:`ontop_centre` ``"container"``: the partner's floor in its root frame - :class:`ContainerFloor` of its collision pieces
+        (``SimWorld.local_collision_pieces``) turned to its rest orientation (``container_floor_res_m`` 0.002, ``container_floor_tol_m``
+        0.005: the band above the floor's lowest level, jpzusm's floor is dished 3.6 mm; ``container_floor_normal_min`` 0.99), else the centre
+        of its fillable meta link's volume (:meth:`_fillable_root`; no disc: the pair check keeps the box tiers). ``{"centre_root" (xyz),
+        "radius_m", "source": "floor" | "fillable", ...facts}``, once per template (the partner's hull of the template); None when neither."""
+        hull = self.hull.get("partner")
+        cached = getattr(self, "_container_floor", None)
+        if cached is not None and cached[0] is hull:
+            return cached[1]
+        prt = self.obj("partner")
+        rest = (th.zeros(3), G.t(self.rest["partner"]).float())
+        up = [C.transform_points(rest, G.t(P).float().reshape(-1, 3)) for P in self.world.local_collision_pieces(prt)]
+        floor = ContainerFloor.build(up, res=float(self.gen("container_floor_res_m", 0.002)), tol=float(self.gen("container_floor_tol_m", 0.005)),
+                                     normal_min=float(self.gen("container_floor_normal_min", 0.99)))
+        fill = self._fillable_root(prt)
+        fill_up = None if fill is None else C.transform_points(rest, fill.reshape(1, 3))[0]
+        out: Optional[Dict[str, Any]] = None
+        if floor is not None:
+            c_up = th.tensor([float(floor.centre_xy[0]), float(floor.centre_xy[1]), floor.z], dtype=th.float32)
+            bottom = min(float(P[:, 2].min()) for P in up if len(P))
+            out = {"source": "floor", "centre_root": C.transform_points(C.invert(rest), c_up.reshape(1, 3))[0], "radius_m": round(floor.radius, 4),
+                   "floor_above_bottom_m": round(floor.z - bottom, 4), "n_floor_cells": floor.n_flat}
+            if fill_up is not None:  # recorded: OmniGibson's own Inside samples the fillable volume's AABB
+                out["fillable_offset_m"] = round(float(th.linalg.norm(fill_up[:2] - c_up[:2])), 4)
+        elif fill is not None:
+            out = {"source": "fillable", "centre_root": fill, "radius_m": None}
+        self._container_floor = (hull, out)
+        if out is not None:
+            log.info("%s: ontop_centre container: %s centre %s (root frame), disc radius %s m", self.gp.variant, out["source"],
+                     [round(float(v), 4) for v in out["centre_root"]], out["radius_m"])
+        return out
+
+    def container_floor_at(self, p_pose: G.Pose) -> Optional[Dict[str, Any]]:
+        """:meth:`container_floor` with the partner at ``p_pose``: ``{"xy": world xy of its centre, "radius_m", "source"}``; None without one."""
+        floor = self.container_floor()
+        if floor is None:
+            return None
+        w = C.transform_points((G.t(p_pose[0]).float(), G.t(p_pose[1]).float()), G.t(floor["centre_root"]).float().reshape(1, 3))[0]
+        return {"xy": w[:2].clone(), "radius_m": floor["radius_m"], "source": floor["source"]}
+
+    def _fillable_root(self, obj) -> Optional[th.Tensor]:
+        """The centre of ``obj``'s fillable meta link's volume (its visual AABB, as OmniGibson's Inside samples it; else the link's origin)
+        in ``obj``'s root frame, from the current sim poses; None without a container meta link."""
+        for link in getattr(obj, "links", {}).values():
+            if not getattr(link, "is_meta_link", False):
+                continue
+            from omnigibson.macros import macros
+
+            if link.meta_link_type not in macros.object_states.contains.CONTAINER_META_LINK_TYPES:
+                continue
+            try:
+                lo, hi = link.visual_aabb
+                p = (G.t(lo).float() + G.t(hi).float()) / 2
+            except Exception:  # noqa: BLE001 - no visual mesh: the link's own origin
+                p = G.t(link.get_position_orientation()[0]).float()
+            root = obj.get_position_orientation()
+            return C.transform_points(C.invert((G.t(root[0]).float(), G.t(root[1]).float())), p.reshape(1, 3))[0]
+        return None
+
     def goal_pose(self, t_pose: G.Pose, p_pose: G.Pose) -> G.Pose:
         """§6.11 goal: ontop / under(small) -> centred on the partner, z = partner top + bottom offset + goal_drop; inside
         -> the **release pose**: centred on the fillable centroid, high enough above the rim that the open gripper never
@@ -3060,6 +3213,13 @@ class IORSSmall(SamplerV2):
                 # the target's footprint (its minimum-area rectangle), not its origin, centred on the partner's: the aligned long axes keep
                 # equal margins at both ends (the spatula's origin sits 1.6 cm toward its blade, the sheet leaves 1 cm per end)
                 xy = min_area_rect(p_hull_w)[3]
+                origin_off = min_area_rect(t_hull)[3]
+            container = self.relation == "ontop" and self.gen("ontop_centre", "bbox") not in (None, "bbox") and self.ontop_centre() == "container"
+            floor = self.container_floor_at(p_pose) if container else None
+            if floor is not None:
+                # oracle-fix 2026-11-06 (owner on the ontop_small#02 steak demo: "fits inside the floor of the frying pan"): the target's
+                # footprint centred on the partner's floor - the pan's AABB centre (handle included) lay 9 cm from its floor's centre
+                xy = floor["xy"]
                 origin_off = min_area_rect(t_hull)[3]
             top = float(p_hull_w[:, 2].max())
             # owner item 3 (2026-09-16 10:15): release 1 cm above the *actual* surface under the footprint centre (saucer

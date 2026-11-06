@@ -186,9 +186,9 @@ def _icl(root, grasp_rows=(), picks=None):
     with open(os.path.join(root, "roles", "representatives.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, SHEET_HEADER)
         w.writeheader()
-        for st, n, slot, (tc, tm, tk), (pc, pm) in (PICKS if picks is None else picks):
+        for st, n, slot, (tc, tm, tk, *ts), (pc, pm) in (PICKS if picks is None else picks):
             base = {"family": IORS, "subtask": st, "pick": f"{st}#{n:02d}", "slot": slot, "status": "untested"}
-            w.writerow(dict(base, role="target", category=tc, model=tm, kind="sampleable", grasp_key=tk))
+            w.writerow(dict(base, role="target", category=tc, model=tm, kind="sampleable", grasp_key=tk, **({"scale": json_list(ts[0])} if ts else {})))
             w.writerow(dict(base, role="partner", category=pc, model=pm, kind="sampleable"))
             if slot == "representative":
                 w.writerow(dict(base, role="support", **SUPPORT))
@@ -290,6 +290,18 @@ def test_grounding_never_shrinks_a_target_that_fits(tmp_path):
     soap = _entry(g, ONTOP, "bar_soap", "soap_dish")
     assert soap.scenes["house_single_floor"].whitelist["target"] == {"bar_soap": ["ofargb"]} and "target_fit" not in soap.generation
     assert soap.roles["target"].grasp_keys["bar_soap/ofargb"] == "bar_soap__ofargb" and "bar_soap/ofargb" not in soap.roles["target"].scale
+
+
+def test_grounding_keeps_a_scaled_key_the_sheet_pins_for_its_model(tmp_path):
+    """oracle-fix 2026-11-06 (ontop_small#02: the steak lying at x0.6, ``steak__lcebsq__t060``): a pick row naming a uniform-shrink key of
+    its model with that key's scale keeps both where the model fits unscaled - the sheet's choice, not a target-fit shrink the grounder
+    restores to the model's own key; the soap's own key on the same dish without the pin is left alone as before."""
+    pin = [(ONTOP, 1, "representative", ("bar_soap", "ofargb", "bar_soap__ofargb__t060", [0.6, 0.6, 0.6]), ("soap_dish", "ownvqj"))]
+    g = _ground(tmp_path, grasp_rows=[_scale_row("bar_soap__ofargb__t060", [0.6, 0.6, 0.6])], subtasks=(ONTOP,), picks=pin)
+    soap = _entry(g, ONTOP, "bar_soap", "soap_dish")
+    assert soap.scenes["house_single_floor"].whitelist["target"] == {"bar_soap": ["ofargb"]} and "target_fit" not in soap.generation
+    assert soap.roles["target"].grasp_keys["bar_soap/ofargb"] == "bar_soap__ofargb__t060"
+    assert soap.roles["target"].scale["bar_soap/ofargb"] == [0.6, 0.6, 0.6]
 
 
 def test_grounding_fits_every_partner_of_the_variant_across_slots(tmp_path):
