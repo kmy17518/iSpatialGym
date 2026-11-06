@@ -1391,7 +1391,8 @@ def keep_contact_arms(motions: Motions, state, targets, ctx: Dict[str, Any], mov
 
 def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q: Optional[Dict[str, Sequence[float]]] = None,
                    keep_sweep: Optional[Callable[[], List[th.Tensor]]] = None,
-                   keep_contacts: Optional[Callable[[Dict[str, th.Tensor]], Dict[str, th.Tensor]]] = None) -> Iterator[th.Tensor]:
+                   keep_contacts: Optional[Callable[[Dict[str, th.Tensor]], Dict[str, th.Tensor]]] = None,
+                   preshape: Optional[Dict[str, float]] = None) -> Iterator[th.Tensor]:
     """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
     decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
     the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
@@ -1404,7 +1405,9 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
     arm targets, so an arm already there does not move (the fingers still follow the stance record). ``keep_sweep`` (the leg's
     configurations with the arms as they are): an arm that holds the recorded hand pose in another IK branch may stay
     (``keep_arm_branch``, first-demo v2.1 A2). ``keep_contacts`` (a transition, first-demo v3.0 F1): an arm whose next action at
-    the arriving stance is a brace / push may stay as it is (:func:`keep_contact_arms`)."""
+    the arriving stance is a brace / push may stay as it is (:func:`keep_contact_arms`). ``preshape`` (arm -> m; a transition's
+    ``preshape_m``, oracle-fix 2026-11-06, the shelf back-off): those free arms' fingers are held at that opening before the arms move
+    (``Motions.transit_preshape`` remembers it for the grasp that follows: ``execute_grasp`` keeps it instead of opening fully)."""
     holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
@@ -1431,6 +1434,18 @@ def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any], arms_q:
         ctx["fingers_set"] = {"arms": set_fingers, "closed": want_close}
     else:
         ctx["fingers_set"] = None
+    if preshape:
+        # oracle-fix 2026-11-06 (the shelf back-off): the arm goes to its pre-grasp inside the transition - the fingers pre-shaped first, as the
+        # sampler swept the arm move, the trunk and the drive-in (``transitions[].preshape_m``)
+        shaped = {}
+        for arm, q_m in sorted(preshape.items()):
+            if arm in holding or arm not in M.ARMS:
+                continue
+            yield from motions.gripper_opening(arm, float(q_m))
+            shaped[arm] = float(q_m)
+            if isinstance(getattr(motions, "transit_preshape", None), dict):
+                motions.transit_preshape[arm] = float(q_m)
+        ctx["preshape_set"] = shaped
     if arms_q:
         targets = {arm: C.as_tensor(list(arms_q[arm])).reshape(-1).float() for arm in M.ARMS if arms_q.get(arm) is not None}
         source = "record arms_q (the arm as the previous motion left it)"
@@ -1533,7 +1548,8 @@ def execute_transition(action: Transition, motions: Motions, state, targets, ctx
     keep_sweep = (lambda: transition_sweep(motions, state, targets)) if ctx.get("next_contact") else None
     # first-demo v3.0 F1: an arm whose next action at the arriving stance is a brace / push may go there from where it is
     keep_contacts = (lambda move: keep_contact_arms(motions, state, targets, ctx, move, record=action.stance_to)) if "stance_contacts" in ctx else None
-    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep, keep_contacts=keep_contacts)
+    yield from move_idle_arms(motions, state, action.stance_to, ctx, arms_q=targets.get("arms_q"), keep_sweep=keep_sweep, keep_contacts=keep_contacts,
+                              preshape=targets.get("preshape"))
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])
@@ -2111,6 +2127,19 @@ def repose_arm(action: Grasp, motions: Motions, ctx) -> Iterator[th.Tensor]:
         return
 
 
+def transit_preshape_held(motions: Motions, arm: str) -> Optional[float]:
+    """The opening (m) a transition pre-shaped ``arm``'s fingers to (``move_idle_arms`` ``preshape``, oracle-fix 2026-11-06) while the
+    gripper still holds exactly it - open intent, the command of that opening; None otherwise (or a Motions without the record)."""
+    q_m = (getattr(motions, "transit_preshape", None) or {}).get(arm)
+    if q_m is None:
+        return None
+    try:
+        held = not motions.gripper_closed(arm) and abs(float(motions.state.gripper_cmd[arm]) - float(motions.gripper_command(arm, q_m))) < 1e-6
+    except Exception:  # noqa: BLE001 - a stub without the gripper state: the grasp opens as before
+        return None
+    return float(q_m) if held else None
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
@@ -2119,7 +2148,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     touch = list(may_touch_objects(state, action).values())
     obj_pos0 = state.object_pose(action.object)[0] if touch else None
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
-    yield from motions.gripper(arm, close=False)
+    if transit_preshape_held(motions, arm) is not None and (getattr(action.grasp, "extra", None) or {}).get("preshape_transit"):
+        # oracle-fix 2026-11-06 (the shelf back-off): the transition carried the hand to the pre-grasp with the fingers pre-shaped - a full
+        # opening there would spread them toward the shelf boards; the pre-shape below sets this grasp's own opening
+        ctx["preshape_kept_from_transition_m"] = transit_preshape_held(motions, arm)
+    else:
+        yield from motions.gripper(arm, close=False)
     # oracle-fix 2026-11-04 round 4 (``grasps[i].preshape_transit`` or env ISPATIALGYM_PRESHAPE_TRANSIT=1): the sampler checked the pre-grasp with the
     # fingers at the pre-shape (generation.approach_finger_support_touch preshape) - the transit to it is planned with them pre-shaped too (touching#03
     # 8 / 8 demos: the fully open fingers at the shelf pre-grasp witness made every cuRobo plan to it fail, supports ignored or not)
