@@ -178,7 +178,8 @@ def _push_stop_frac_arc() -> float:
 
 
 def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, direction, obj, supports: Sequence[Any], ignore: Sequence[Any],
-                    band_rad: float, retreat_distance: float, speed_m_s: Optional[float] = None, line: bool = False) -> Tuple[bool, str, Dict[str, Any]]:
+                    band_rad: float, retreat_distance: float, speed_m_s: Optional[float] = None, line: bool = False,
+                    lag_allowance_rad: float = 0.0) -> Tuple[bool, str, Dict[str, Any]]:
     """A free-object arc push replayed kinematically as the oracle executes it (owner 2026-09-27, first-demo v2 A8; the object
     follows the pad): from the pre-contact witness ``q_pre`` the straight leg to the first contact pose (``execute_push`` ->
     ``_push_arc_closed_loop``: ``Motions.arm_along`` at the arm_along solver settings), then the TRUE arc of ``push_geometry``
@@ -190,7 +191,11 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     Every setting is read from the oracle's ``ExecuteConfig`` / ``MotionsConfig``; ``speed_m_s`` (the push's recorded
     ``push_speed_m_s``, ``execute.push_speed_of``) replaces ``push_speed_arc``. Returns ``(ok, why, report)``; a replay that
     cannot follow the push (``ok`` False) is an ``approach_untrackable`` instance. Collisions are not judged (the oracle's contact
-    legs run without a veto)."""
+    legs run without a veto).
+    ``lag_allowance_rad`` (oracle-fix 2026-11-06, ``generation.push_arc_replay_lag_rad``; axial#01 / #05): the arc must track this much
+    beyond the goal band (the replay's object follows the pad exactly; the oracle's free object lags the hand by 0.07-0.16 rad near
+    the arc's end - 8 / 26 axial#05 and 6 / 31 axial#01 demos failed on 10 consecutive misses with the elbow straight there), and the
+    retreat leaves from that arc end."""
     import math
 
     from ispatialgym.oracle import execute as E
@@ -204,6 +209,7 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     idx = kit.robot.arm_control_idx[arm]
     dt = float(getattr(backend, "control_dt", 1.0 / 30.0))
     rep: Dict[str, Any] = {}
+    lag = max(0.0, float(lag_allowance_rad or 0.0))
     geom = E.push_geometry(list(waypoints), direction)
     if geom.kind != "arc":
         if not line:
@@ -243,20 +249,21 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
     p_t = th.as_tensor(waypoints[-1][0]).float()
     q_to = float(geom.angle)
     sgn_joint = 1.0 if q_to >= 0 else -1.0
+    q_goal = q_to + sgn_joint * (lag + band_rad) if lag > 0.0 else q_to  # oracle-fix 2026-11-06: the lag allowance past the goal band
     r_now = radial(fk(q)[0])
     radius = max(float(th.linalg.norm(r_now)), 0.05)
     step_ang = (float(speed_m_s) if speed_m_s else ecfg.push_speed_arc) / radius * dt
     arc_dir = signed_angle(r_now, radial(p_t))
     sgn = 1.0 if arc_dir >= 0 else -1.0
-    max_steps = int(max(abs(q_to), abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
+    max_steps = int(max(abs(q_goal), abs(arc_dir)) / max(step_ang, 1e-6) * 3) + 60
     swept, commanded, consecutive, steps, misses = 0.0, 0.0, 0, 0, 0
     stop = None
     worst = sampler.ikc.joint_limit_margin(q, arm)  # (margin, joint): the arc's closest approach to a joint limit
     while True:
-        if sgn_joint * (swept - q_to) >= -band_rad:
+        if sgn_joint * (swept - q_goal) >= -band_rad:
             stop = "joint_at_target"
             break
-        if commanded >= ecfg.push_arc_lag_factor * max(abs(q_to), 1e-3) + 2 * step_ang:
+        if commanded >= ecfg.push_arc_lag_factor * max(abs(q_goal), 1e-3) + 2 * step_ang:
             stop = "door_lags"
             break
         if steps >= max_steps:
@@ -288,10 +295,13 @@ def replay_arc_push(sampler, arm: str, q_pre: th.Tensor, pre_pose, waypoints, di
             if consecutive >= 10:
                 margin, jn = sampler.ikc.joint_limit_margin(q, arm)
                 return False, (f"approach_untrackable: push replay - the closed-loop arc misses 10 differential-IK steps in a row at swept {swept:+.3f} of {q_to:+.3f} rad "
+                               f"{f'(+{lag:.2f} lag allowance) ' if lag > 0.0 else ''}"
                                f"(nearest joint limit {margin:.3f} rad at {jn}; {getattr(r_, 'status', '')[:100]})"), rep
         steps += 1
     rep["arc"] = {"steps": steps, "swept_rad": round(swept, 4), "q_to_rad": round(q_to, 4), "stop": stop, "ik_misses": misses,
                   "min_limit_margin_rad": round(float(worst[0]), 4), "nearest_joint": worst[1]}
+    if lag > 0.0:
+        rep["arc"]["lag_allowance_rad"] = round(lag, 4)
     if stop != "joint_at_target":
         return False, f"approach_untrackable: push replay - the closed-loop arc stops at {stop} (swept {swept:+.3f} of {q_to:+.3f} rad)", rep
     # 3. the contact retreat's escape leg from the arc's end (execute_retreat)
@@ -2744,10 +2754,13 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             obj_ = sampler.objects.get(getattr(getattr(action, "contact", None), "object", None))
                             from ispatialgym.oracle.execute import push_speed_of
 
+                            # oracle-fix 2026-11-06 (axial#01 / #05, opt-in generation.push_arc_replay_lag_rad): the arc tracked that far past the band
+                            lag_rad = float((sampler.gp.gen("push_arc_replay_lag_rad") if hasattr(sampler, "gp") else 0.0) or 0.0)
+
                             def replay(q_from, _chain=chain_ref, _dir=targets.get("direction") if isinstance(targets, dict) else None, _obj=obj_, _band=band,
-                                       _ign=list(ignore_all) + list(ignore_last), _speed=push_speed_of(getattr(action, "contact", None)), line=False):
+                                       _ign=list(ignore_all) + list(ignore_last), _speed=push_speed_of(getattr(action, "contact", None)), line=False, _lag=lag_rad):
                                 return replay_arc_push(sampler, arm, q_from, _chain[0], _chain[1:], _dir, _obj, list(sampler.support_objects()), _ign, _band,
-                                                       RETREAT_DIST, speed_m_s=_speed, line=line)
+                                                       RETREAT_DIST, speed_m_s=_speed, line=line, lag_allowance_rad=_lag)
 
                             ok_r, why_r, rep_r = replay(q_ref)
                             if rep_r:

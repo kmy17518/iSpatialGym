@@ -2075,7 +2075,7 @@ class Motions:
 
     def arm_arc_closed_loop(self, arm: str, centre: th.Tensor, axis: th.Tensor, target: Pose, joint_value: Callable[[], float], q_to: float,
                             speed: Optional[float] = None, band_rad: float = 0.005, lag_factor: float = 1.3, max_ik_failures: int = 10,
-                            max_iters: int = 20) -> Generator[th.Tensor, None, Dict[str, Any]]:
+                            max_iters: int = 20, stall_ends: bool = False) -> Generator[th.Tensor, None, Dict[str, Any]]:
         """Closed-loop follow of a rigidly held handle along the circle about (``centre``, ``axis``) until the joint it
         moves reads ``q_to`` (``joint_value()``, within ``band_rad``) or the hand reaches ``target``'s angle on the arc.
 
@@ -2088,7 +2088,11 @@ class Motions:
         (dishwasher_wide 0921-050314 / 0921-235247). The commanded lead is what the demo records and a policy imitates,
         so this compliance survives the evaluator's stock drives. Stops early on ``stop_requested`` (the goal band),
         when the commanded angle exceeds ``lag_factor`` x the expected one (the door does not follow: a blocked leaf
-        is not pushed harder), or after ``max_ik_failures`` consecutive IK misses (``plan_failed`` / ``diff_ik``)."""
+        is not pushed harder), or after ``max_ik_failures`` consecutive IK misses (``plan_failed`` / ``diff_ik``).
+        ``stall_ends`` (oracle-fix 2026-11-06, ``generation.push_arc_stall_ends_arc``; axial#01 / #05: the hand orbits 0.07-0.16 rad
+        ahead of the free object, the elbow straightens - right_arm_joint4 -1.1 -> -0.25 rad, the arm Jacobian's smallest singular
+        value 0.028-0.038 - and the misses come at that reach end, the object already 0.78-1.07 rad round): the misses end the arc
+        (``stop = "ik_stall"``) instead of failing it; the object's residual decides what follows, as after ``door_lags``."""
         frame = M.EEF_LINK[arm]
         ax = C.unit(C.as_tensor(axis).float())
         cen = C.as_tensor(centre).float()
@@ -2155,6 +2159,11 @@ class Motions:
                 consecutive += 1
                 info["ik_failures"] += 1
                 if consecutive >= max_ik_failures:
+                    if stall_ends:
+                        # oracle-fix 2026-11-06 (generation.push_arc_stall_ends_arc): the arm's reach end is the end of the arc
+                        info["stop"] = "ik_stall"
+                        info["stall"] = f"{consecutive} consecutive differential-IK misses at q = {q_now:.3f} ({getattr(res, 'status', '')[:160]})"
+                        break
                     raise SkillError("plan_failed", f"arm_arc_closed_loop({arm}): {consecutive} consecutive differential-IK misses at q = {q_now:.3f} ({getattr(res, 'status', '')[:120]})",
                                      stage="diff_ik", n_waypoints=1)
             info["steps"] += 1
