@@ -88,7 +88,8 @@ def _sampler(gen=None, partner=None, **extra):
     fields.update(extra)
     s = SimpleNamespace(**fields)
     for name in ("touching_points", "touching_brace_candidates", "wide_stop_spread", "brace_tip_heights", "brace_open_rule", "_open_brace_candidates",
-                 "brace_open_when_wide", "push_speed", "push_distance", "push_margin", "place_gap", "pair_goal_align", "touching_contacts"):
+                 "brace_open_when_wide", "push_speed", "push_distance", "push_margin", "place_gap", "pair_goal_align", "touching_contacts",
+                 "push_gripper_open_on"):
         setattr(s, name, types.MethodType(getattr(IS.IORSSmall, name), s))
     return s
 

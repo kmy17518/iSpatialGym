@@ -71,7 +71,8 @@ def _sampler(lean_side=1.0, **extra):
     s = SimpleNamespace(**fields)
     for name in ("shelf_push_sign", "shelf_push_arm", "shelf_push_direction", "touching_points", "push_stance_for", "brace_gate_at", "push_chain_feasible",
                  "_touching_push_choice", "touching_push_candidates", "_leaning_blade", "_raised_blade", "push_distance", "push_margin", "place_gap",
-                 "push_hand_overlap", "hand_overlap", "pair_goal_align", "push_speed", "push_height_sweep_on", "swept_push_candidates"):
+                 "push_hand_overlap", "hand_overlap", "pair_goal_align", "push_speed", "push_height_sweep_on", "swept_push_candidates",
+                 "push_gripper_open_on", "open_push_candidates"):
         setattr(s, name, types.MethodType(getattr(IS.IORSSmall, name), s))
     return s
 
