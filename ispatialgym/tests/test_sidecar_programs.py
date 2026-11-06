@@ -628,8 +628,12 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        # follow_path / follow_segments: hybrid base-follow only; arms_q: only when the record carries it; second: a two-hand base push only
-        assert key in ("base_poses", "carried", "follow_path", "follow_segments", "arms_q", "second"), where
+        # follow_path / follow_segments: hybrid base-follow only; arms_q: only when the record carries it; second: a two-hand base push only;
+        # face_travel_cfg: navigate, only when a face_travel record carries its own schedule configuration (oracle-fix 2026-11-06)
+        assert key in ("base_poses", "carried", "follow_path", "follow_segments", "arms_q", "second", "face_travel_cfg"), where
+        return
+    if key == "face_travel_cfg":
+        assert isinstance(value, dict) and value and BP.config_with(value), where  # navigate: robot.base_path.BasePathConfig overrides
         return
     if key == "second":
         assert set(value) == {"arm", "pre", "approach", "contact"} and value["arm"] in ("left", "right"), where

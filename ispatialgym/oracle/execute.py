@@ -1156,10 +1156,16 @@ def transition_sweep(motions: Motions, state, targets) -> List[th.Tensor]:
     return out + _base_legs(motions, out[-1], state.base_pose2d(), as_pose2d(targets["drive_in"]))
 
 
-def path_sweep(motions: Motions, state, waypoints) -> List[th.Tensor]:
-    """A recorded base path's configurations with the arms and the trunk as they are."""
+def path_sweep(motions: Motions, state, waypoints, style: Optional[str] = None, face_travel_cfg: Optional[Dict[str, float]] = None) -> List[th.Tensor]:
+    """A recorded base path's configurations with the arms and the trunk as they are: along the polyline, or (oracle-fix 2026-11-06)
+    along the ``face_travel`` schedule ``track_path`` drives for ``style = "face_travel"`` (``_base_reference``: the schedule of the
+    current pose + the waypoints, the record's ``face_travel_cfg``) - the polyline is up to 0.15 m off what the base drives."""
     q = C.as_tensor(motions.backend.q_full()).reshape(-1).float().clone()
     out, prev = [q], state.base_pose2d()
+    if style == BP.FACE_TRAVEL and waypoints:
+        start = tuple(float(v) for v in prev)
+        sched = BP.BasePath.build([start] + [tuple(float(v) for v in as_pose2d(w)) for w in waypoints], BP.config_with(face_travel_cfg, motions.cfg.face_travel))
+        return out + [_q_at_base(motions, q, x, y, yaw) for x, y, yaw in sched.stride_poses(0.05, dwell_step_rad=0.1, max_yaw_step=0.1)[1:]]
     for w in waypoints:
         w = as_pose2d(w)
         out += _base_legs(motions, q, prev, w)
@@ -1483,7 +1489,8 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
                 move[arm] = qa
         if move and ctx.get("next_contact"):
             # first-demo v2.1 A2: an arm holding the recorded hand pose in another IK branch drives as it is when the path clears it
-            move = _keep_branches(motions, state, ctx, move, lambda: path_sweep(motions, state, targets["waypoints"]))
+            move = _keep_branches(motions, state, ctx, move, lambda: path_sweep(motions, state, targets["waypoints"], style=targets.get("style"),
+                                                                                face_travel_cfg=targets.get("face_travel_cfg")))
         ctx["navigate_arms_reposed"] = sorted(move)
         ctx["navigate_arms_source"] = "record arms_q"
         if move:
@@ -1508,7 +1515,9 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
             yield a
             poses.append(tuple(float(v) for v in state.base_pose2d()))
         return
-    yield from motions.track_path(targets["waypoints"], posture=posture, style=targets.get("style"))
+    # oracle-fix 2026-11-06: a record's own face_travel schedule configuration (``paths[].face_travel_cfg``), passed only when it has one
+    ft_cfg = targets.get("face_travel_cfg")
+    yield from motions.track_path(targets["waypoints"], posture=posture, style=targets.get("style"), **({"face_travel_cfg": ft_cfg} if ft_cfg else {}))
 
 
 def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:

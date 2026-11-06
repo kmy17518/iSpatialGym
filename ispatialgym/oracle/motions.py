@@ -2128,7 +2128,7 @@ class Motions:
     # ------------------------------------------------------------------ base
 
     def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None, style: Optional[str] = None,
-                        corner_stop: bool = False) -> th.Tensor:
+                        corner_stop: bool = False, face_travel_cfg: Optional[Dict[str, float]] = None) -> th.Tensor:
         """Time-parameterise the polyline current pose → waypoints.
 
         ``style = "face_travel"`` (owner 2026-09-22, camera relocalization): the shared ``robot.base_path`` schedule —
@@ -2136,7 +2136,9 @@ class Motions:
         0° / 45°, a speed dip and a zig-zag at every stair), fillets at the corners, the body facing the way with its
         turns spread over windows that keep the cruise speed, the end turns on the spot above 90° and blended below —
         with the lateral-acceleration and yaw limits through the arcs (``BP.time_parameterise``; the 0916-141035
-        record: 36.8 s and 18 % of the time at cruise → 25 s with the drive 90 % at cruise).
+        record: 36.8 s and 18 % of the time at cruise → 25 s with the drive 90 % at cruise). ``face_travel_cfg`` (oracle-fix 2026-11-06,
+        sidecar ``paths[].face_travel_cfg``): the record's own overrides of ``cfg.face_travel`` (``robot.base_path.config_with``) - the
+        schedule the sampler checked when the default one collided.
 
         Otherwise (the recorded style) the **corner-aware trapezoidal speed profile** on the polyline as recorded:
         ``v_lin`` on the straights, ``sqrt(2·a_max·path_corner_cut) / sin(θ/2)`` through a heading change θ, zero at
@@ -2151,7 +2153,7 @@ class Motions:
         if style == BP.FACE_TRAVEL:
             if corner_stop:
                 raise SkillError("execution", "track_path: corner_stop drives the recorded polyline, not the face_travel schedule")
-            path = BP.BasePath.build(pts, self.cfg.face_travel)
+            path = BP.BasePath.build(pts, BP.config_with(face_travel_cfg, self.cfg.face_travel))
             return BP.time_parameterise(path, self.dt, v_lin, v_ang, a_lin=a_max, a_yaw=float(self.cfg.base_tracker.a_max[2]), ds=float(self.cfg.path_profile_ds))
         if style not in (None, BP.RECORDED):
             raise SkillError("execution", f"track_path: unknown style {style!r}")
@@ -2270,11 +2272,13 @@ class Motions:
         return th.tensor(samples, dtype=th.float32)
 
     def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None,
-                   style: Optional[str] = None, corner_stop: bool = False, on_step: Optional[Callable[[], bool]] = None) -> Iterator[th.Tensor]:
+                   style: Optional[str] = None, corner_stop: bool = False, on_step: Optional[Callable[[], bool]] = None,
+                   face_travel_cfg: Optional[Dict[str, float]] = None) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
         feedback, velocity / acceleration limited, smoothed; translation and rotation simultaneous). ``posture`` is the
         recorded navigation posture (informational: Layer 1 changes no posture). ``style`` (``Navigate.style``): the
-        polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``);
+        polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``;
+        ``face_travel_cfg`` = the record's own overrides of ``cfg.face_travel``, oracle-fix 2026-11-06);
         ``corner_stop``: the recorded polyline with a stop and a hold at every interior waypoint (an axis-aligned leg).
         Arm and trunk hold targets stay as they are, unless ``on_step`` (called every control step after the base command,
         before it is emitted) changes them; ``on_step`` returning True stops the base there. Raises ``execution`` when the
@@ -2285,7 +2289,8 @@ class Motions:
         cfg = tracker_cfg or self.cfg.base_tracker
         v_lin = self.cfg.path_speed_fraction * min(cfg.v_max[0], cfg.v_max[1])
         v_ang = self.cfg.path_speed_fraction * cfg.v_max[2]
-        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style, corner_stop=corner_stop)
+        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style, corner_stop=corner_stop,
+                                   **({"face_travel_cfg": face_travel_cfg} if face_travel_cfg else {}))
         tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
         self.tracker = tracker
         try:
