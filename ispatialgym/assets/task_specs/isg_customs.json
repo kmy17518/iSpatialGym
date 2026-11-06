@@ -9760,7 +9760,8 @@
     },
     "handle_key": {
      "house_single_floor/dishwasher_ynrhuk_0": "dishwasher__ynrhuk"
-    }
+    },
+    "handle_row": "record:bar"
    },
    "floor": {
     "sampleable": false
@@ -9874,7 +9875,14 @@
    "joint_limit_margin_rad": 0.025,
    "_wide_note": "2026-09-19 overnight: open wider than the arm-only ~21 deg - hybrid base+arm follow with the counterbalance; S = 36/40.5/45/49.5 deg + full",
    "_close_note": "2026-09-20 01:25: q_init 16-19 deg - the reach-volume class tolerates 20 deg of pitch and the wrist little more (the arm-mode open demo is 21 deg): the close is its inverse",
-   "stable_set_include_full": false
+   "stable_set_include_full": false,
+   "bar_grasp_offsets_m": [
+    0.0,
+    0.069,
+    -0.069
+   ],
+   "counterbalance_damping": 15.0,
+   "_dishwasher_handle_note": "oracle-fix 2026-11-06 (owner feedback: 'for dishwasher is grasp position fixed? why grasp at edge?' / 'open dishwasher - is damping there? the door springs back when opened'): the handle row is fixed per template (dishwasher__ynrhuk:j_link_2#A, the 0.396 m bar), the grasp's place along it is drawn per instance from bar_offsets {0, +-0.069, +-0.138} - isg-1020 open 39 / 100 at +-0.138 (6 cm from the bar's end = 'the edge'), close 70 / 112; the centre made 31 / 33 open oracle successes vs 69 / 158 off-centre (robot_wobble 54, plan_failed 16, gripper out of view 14). The canonical csv row is left unscaled in the instance-frame record (contact 2.0 cm low, 2.2 cm deep: the eef rose 2 cm while the fingers closed) -> roles.target.handle_row record:bar (the scaled B4 bar, 24.1 mm) and bar_grasp_offsets_m [0.0, 0.069, -0.069]. Damping: the counterbalance (gravity off on the leaf, joint damping 5 1/s) IS applied and the oracle demos hold the door (error after the release +0.005 rad median); the spring-back is in POLICY rollouts: the weld release kicks the door ~0.27 rad/s closing, then a viscous coast v0 / k = 0.054 rad (k = 5.08 1/s measured = the damping) -> counterbalance_damping 15 (coast 0.018 rad, inside the 0.047-0.055 tolerance); watch robot_wobble (more drag while pulling)."
   },
   "constraints": []
  },
@@ -12357,7 +12365,8 @@
     },
     "handle_key": {
      "house_single_floor/dishwasher_ynrhuk_0": "dishwasher__ynrhuk"
-    }
+    },
+    "handle_row": "record:bar"
    },
    "floor": {
     "sampleable": false
@@ -12467,7 +12476,12 @@
    "joint_limit_margin_rad": 0.025,
    "_wide_note": "2026-09-20 00:30: 36-50 deg is kinematically out of reach for the rigid pinch grasp (wrist pitch; 0919-232626: every base pose fails IK past ~22-28 deg) - S = 27/31.5/36 deg + full; wider needs a re-grasp at ~25 deg",
    "stable_set_include_full": false,
-   "_follow_note": "oracle-fix 2026-11-03 owner decision 1 (the dishwasher follows ARM ONLY, else SEQUENTIAL, never the base): the alias already prefers arm-only (follow_mode_override hybrid + the arm-alone check, policy sequential: replay_dw02 5 of 6 sidecars follow_mode arm, 1 sequential); the robot_wobble failures happen IN the arm-only follow, the torso sagging with the pull's length (0075: past 1 deg after 0.43 rad of door travel; 0074 0.91 deg after 0.45 rad). hybrid_follow.arm_only_max_travel_rad 0.35: a longer arm-only pull goes to the sequential search (no arm-only fallback), whose pulls end after seq_max_pull_rad 0.30 (release / move / re-grasp between)"
+   "_follow_note": "oracle-fix 2026-11-03 owner decision 1 (the dishwasher follows ARM ONLY, else SEQUENTIAL, never the base): the alias already prefers arm-only (follow_mode_override hybrid + the arm-alone check, policy sequential: replay_dw02 5 of 6 sidecars follow_mode arm, 1 sequential); the robot_wobble failures happen IN the arm-only follow, the torso sagging with the pull's length (0075: past 1 deg after 0.43 rad of door travel; 0074 0.91 deg after 0.45 rad). hybrid_follow.arm_only_max_travel_rad 0.35: a longer arm-only pull goes to the sequential search (no arm-only fallback), whose pulls end after seq_max_pull_rad 0.30 (release / move / re-grasp between)",
+   "bar_grasp_offsets_m": [
+    0.0
+   ],
+   "counterbalance_damping": 15.0,
+   "_dishwasher_handle_note": "oracle-fix 2026-11-06 (owner feedback: 'for dishwasher is grasp position fixed? why grasp at edge?' / 'open dishwasher - is damping there? the door springs back when opened'): the handle row is fixed per template (dishwasher__ynrhuk:j_link_2#A, the 0.396 m bar), the grasp's place along it is drawn per instance from bar_offsets {0, +-0.069, +-0.138} - isg-1020 open 39 / 100 at +-0.138 (6 cm from the bar's end = 'the edge'), close 70 / 112; the centre made 31 / 33 open oracle successes vs 69 / 158 off-centre (robot_wobble 54, plan_failed 16, gripper out of view 14). The canonical csv row is left unscaled in the instance-frame record (contact 2.0 cm low, 2.2 cm deep: the eef rose 2 cm while the fingers closed) -> roles.target.handle_row record:bar (the scaled B4 bar, 24.1 mm) and bar_grasp_offsets_m [0.0]. Damping: the counterbalance (gravity off on the leaf, joint damping 5 1/s) IS applied and the oracle demos hold the door (error after the release +0.005 rad median); the spring-back is in POLICY rollouts: the weld release kicks the door ~0.27 rad/s closing, then a viscous coast v0 / k = 0.054 rad (k = 5.08 1/s measured = the damping) -> counterbalance_damping 15 (coast 0.018 rad, inside the 0.047-0.055 tolerance); watch robot_wobble (more drag while pulling)."
   },
   "constraints": []
  },
