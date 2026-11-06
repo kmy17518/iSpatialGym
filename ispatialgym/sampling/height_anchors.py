@@ -207,10 +207,14 @@ class AnchorSet:
     def lookup(self, h: float) -> Tuple[Optional[Dict[str, Any]], str]:
         """``(anchor, kind)``: kind ``exact`` (the query is an anchor at its precision), ``approx`` (inside an anchor's clipped range),
         ``uncovered`` (anchor None). Anchor j owns (m[j-1], m[j]] between the midpoints to its neighbours - a query exactly on a shared
-        midpoint belongs to the LOWER anchor - clipped to ``max_approx_m`` around it; every range holds its own anchor."""
-        for a in self.anchors:
-            if key(h, a["precision"]) == a["key"]:
-                return a, "exact"
+        midpoint belongs to the LOWER anchor - clipped to ``max_approx_m`` around it; every range holds its own anchor.
+
+        Several exact matches (a coarse anchor - an interior board authored at 1e-2 m - and a measured top at 1e-4 m): the FINEST
+        precision wins, then the nearest height (of-v2maps 2026-11-06: the anchor list is sorted by height, so the authored 0.81 matched
+        the breakfast table's measured 0.8126 first and every map lookup at that table missed)."""
+        exact = [a for a in self.anchors if key(h, a["precision"]) == a["key"]]
+        if exact:
+            return min(exact, key=lambda a: (float(a["precision"]), abs(float(h) - float(a["height"])))), "exact"
         hs = self.heights()
         if not hs:
             return None, "uncovered"
