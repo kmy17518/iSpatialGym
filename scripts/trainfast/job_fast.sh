@@ -29,8 +29,8 @@ export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR=$JB/numba_cache
 if [ "${START_PER_ATTEMPT:-0}" = 1 ]; then export ISPATIALGYM_START_PER_ATTEMPT=1; else unset ISPATIALGYM_START_PER_ATTEMPT; fi
 if [ "${STILL_EXIT:-0}" = 1 ]; then export ISPATIALGYM_ORACLE_STILL_EXIT=1; else unset ISPATIALGYM_ORACLE_STILL_EXIT; fi
 CUSTOMS_ARG=""
-# the snapshot's customs for a start-per-attempt alias and for CUSTOMS=trunk (submit_fast.py --customs trunk: an alias whose validated settings
-# live in the trunk's isg_customs.json); otherwise multiply_isg reads the template's own copy (the counted run's customs)
+# the snapshot's customs for a start-per-attempt alias and for CUSTOMS=trunk (submit_fast.py's default since 2026-11-06: the validated
+# settings live in the trunk's isg_customs.json); CUSTOMS=template: multiply_isg reads the template's own copy (the counted run's customs)
 { [ "${START_PER_ATTEMPT:-0}" = 1 ] || [ "${CUSTOMS:-template}" = trunk ]; } && CUSTOMS_ARG="--customs $ISGE_CODE/ispatialgym/assets/task_specs/isg_customs.json"
 # ---- the fast flow's settings (shared by sampler and collectors; see docs/FAST_FLOW.md in the worktree) ----
 source $S/fast_env.sh

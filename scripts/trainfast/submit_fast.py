@@ -141,7 +141,9 @@ def submit(a):
             raise SystemExit(f"no template copy for {a.key}: {tmpl}")
         fam = c["family"] if reg else st.family_of(c["subtask"], c["tag"])
         spa = int(c.get("start_per_attempt") or 0) if reg else (1 if a.key in st.affected_keys() else 0)
-        customs = a.customs or (c.get("customs") or "trunk" if reg else "template")
+        # one trunk (2026-11-06): the snapshot's isg_customs.json for every alias (the validated settings live there; a counted
+        # template's pre-rename variant resolves through customs.entry_key); --customs template = the counted run's copy
+        customs = a.customs or c.get("customs") or "trunk"
         env = {"ALIAS": c["alias"], "ALIAS_KEY": a.key, "PICK": c["pick"], "TAG": c["tag"], "COUNTED_RUN": c["run_dir"],
                "ISGE_CODE": os.path.abspath(a.code), "COUNTED_SNAPSHOT": c["isg_root"], "TEMPLATE": tmpl, "TEMPLATE_ID": c["template_id"],
                "COUNTED_TEMPLATE": c["template_dir"], "EVAL_INDEX": c["eval_index"] if reg else eval_index_of(a.key), "FAMILY": fam,
@@ -263,7 +265,7 @@ def main():
     s.add_argument("--sample-limit-s", type=int, default=None)
     s.add_argument("--tag", default=None)
     s.add_argument("--customs", default=None, choices=["template", "trunk"],
-                   help="the sampler's customs: the template's copy (default for counted aliases) or the snapshot's isg_customs.json (registry default)")
+                   help="the sampler's customs: the snapshot's isg_customs.json (default) or the template's own copy (the counted run's)")
     s.add_argument("--ledger", default=None, help="default: <root>/manifests/allocations.tsv")
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
     r = sub.add_parser("recollect")
