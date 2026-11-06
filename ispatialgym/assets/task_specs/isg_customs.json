@@ -37297,9 +37297,16 @@
      "grasps": "tabletop"
     },
     "representative": "lcebsq",
+    "scale": {
+     "steak/lcebsq": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
     "grasp_keys": {
      "steak/ppykkp": "steak__ppykkp__t",
-     "steak/lcebsq": "steak__lcebsq__t"
+     "steak/lcebsq": "steak__lcebsq__t060"
     }
    },
    "partner": {
@@ -37417,7 +37424,9 @@
    ],
    "table_end_margin_m": 0.1,
    "partner_on_meta_link": "heatsource",
-   "start_region_on_neighbors": true
+   "start_region_on_neighbors": true,
+   "ontop_centre": "container",
+   "_ontop_centre_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-* demo: \"want to scale down steak so it can be grasped lying down & fits inside the floor of the frying pan (right now it's standing up)\"): the steak spawns at x0.6 lying flat (7.95 x 15.2 x 4.0 cm) with steak__lcebsq__t060 (its canonical-rest grasps tested at that scale; steak__lcebsq__t's only rest is x_down - its lying widths 13.25 / 25.25 cm exceed the 8.89 cm generator aperture - so it stood on its 6.7 cm edge), and the goal centres it on frying_pan/jpzusm's floor instead of its AABB (which holds the 18 cm handle: centre at object x -0.071 m, the flat floor's at +0.018, radius 0.096 m, rim 4.9 cm above it), the pair check fitting the footprint (its farthest point from its centre, at most half its 17.1 cm diagonal, + the 1 cm margin) in that floor disc (iors_small.IORSSmall.container_floor). Needs the grasps.csv rows of steak__lcebsq__t060 (scripts/oracle_fix/job_glib_scaled_key.sh)"
   },
   "constraints": []
  },
@@ -37432,9 +37441,16 @@
      "grasps": "tabletop"
     },
     "representative": "lcebsq",
+    "scale": {
+     "steak/lcebsq": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
     "grasp_keys": {
      "steak/ppykkp": "steak__ppykkp__t",
-     "steak/lcebsq": "steak__lcebsq__t"
+     "steak/lcebsq": "steak__lcebsq__t060"
     }
    },
    "partner": {
@@ -37547,7 +37563,9 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "ontop_centre": "container",
+   "_ontop_centre_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-* demo: \"want to scale down steak so it can be grasped lying down & fits inside the floor of the frying pan (right now it's standing up)\"): the steak spawns at x0.6 lying flat (7.95 x 15.2 x 4.0 cm) with steak__lcebsq__t060 (its canonical-rest grasps tested at that scale; steak__lcebsq__t's only rest is x_down - its lying widths 13.25 / 25.25 cm exceed the 8.89 cm generator aperture - so it stood on its 6.7 cm edge), and the goal centres it on frying_pan/jpzusm's floor instead of its AABB (which holds the 18 cm handle: centre at object x -0.071 m, the flat floor's at +0.018, radius 0.096 m, rim 4.9 cm above it), the pair check fitting the footprint (its farthest point from its centre, at most half its 17.1 cm diagonal, + the 1 cm margin) in that floor disc (iors_small.IORSSmall.container_floor). Needs the grasps.csv rows of steak__lcebsq__t060 (scripts/oracle_fix/job_glib_scaled_key.sh)"
   },
   "constraints": []
  },
@@ -37832,9 +37850,16 @@
      "grasps": "tabletop"
     },
     "representative": "lcebsq",
+    "scale": {
+     "steak/lcebsq": [
+      0.6,
+      0.6,
+      0.6
+     ]
+    },
     "grasp_keys": {
      "steak/ppykkp": "steak__ppykkp__t",
-     "steak/lcebsq": "steak__lcebsq__t"
+     "steak/lcebsq": "steak__lcebsq__t060"
     }
    },
    "partner": {
@@ -37954,7 +37979,9 @@
    ],
    "table_end_margin_m": 0.1,
    "partner_on_meta_link": "heatsource",
-   "start_region_on_neighbors": true
+   "start_region_on_neighbors": true,
+   "ontop_centre": "container",
+   "_ontop_centre_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-ontop_small_scale-steak-frying_pan-* demo: \"want to scale down steak so it can be grasped lying down & fits inside the floor of the frying pan (right now it's standing up)\"): the steak spawns at x0.6 lying flat (7.95 x 15.2 x 4.0 cm) with steak__lcebsq__t060 (its canonical-rest grasps tested at that scale; steak__lcebsq__t's only rest is x_down - its lying widths 13.25 / 25.25 cm exceed the 8.89 cm generator aperture - so it stood on its 6.7 cm edge), and the goal centres it on frying_pan/jpzusm's floor instead of its AABB (which holds the 18 cm handle: centre at object x -0.071 m, the flat floor's at +0.018, radius 0.096 m, rim 4.9 cm above it), the pair check fitting the footprint (its farthest point from its centre, at most half its 17.1 cm diagonal, + the 1 cm margin) in that floor disc (iors_small.IORSSmall.container_floor). Needs the grasps.csv rows of steak__lcebsq__t060 (scripts/oracle_fix/job_glib_scaled_key.sh)"
   },
   "constraints": []
  },
