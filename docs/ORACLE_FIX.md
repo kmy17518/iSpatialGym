@@ -712,3 +712,59 @@ Update 05:46 (2026-11-05; DECISIONS entry 05:46), hardback still open:
 - 13:44: the main `isg_customs.json` takes `customs_hb_d12_wr5_ctvmpkubodrs.json`'s 4 hardback aliases (md5 508093ae -> d412befa; nothing else
   changed; the later pillow / umbrella / t03 folds kept). The 49 remaining hb30 desk jobs were cancelled; the 12 bed / side_any / shelf052 runs
   continue as a check of the folded customs on the other aliases.
+
+## 9. Speed round (2026-11-05 16:35-; owner: "from the failure logs try to speed up the data generation time for the slow aliases")
+
+Record: DECISIONS entries 16:35-; analysis scripts `isg_home/oracle_fix/diag/{gen_time,gen_batches,rej_time,warmup}.py`. The slow aliases (final
+configurations): the hardback inside_large#01 (desk: 102.8 sampling h for 1 instance; bed aliases 0 in ~50 h), touching#03 (7.5 h per instance at
+kmuacd, 0 in 10.3 h at opryhp), mouse (8.0 h / 4 instances, 1 / 4 demos), jar (2.2 h / 1), briefcase (5.5 h / 13, 2 / 12 demos), umbrella (5.5 h / 8),
+swivel chair (1 / 8 demos). Where the time goes:
+- **cold caches**: every oracle-fix job starts with an empty job-local sampling cache; the first hardback attempt takes ~2800 s, the steady ones
+  ~65 s (the first 10 attempts are 45 % of hb30's attempt time); mouse / jar / umbrella attempt 0 1400-2600 s. Production (trainfast) shares one.
+- **attach**: every attach refits the object's collision spheres (~2.2 s; 58 of 147 s of a steady hardback attempt; 2.9 of 5.5 h for the briefcase).
+- **late rejections**: touching#03 recomputes the same fixed-start grasp IK / transit verdicts per stance (97 % of its time); the briefcase fails
+  the program check's fingertip gate at the pre-grasp after the whole draw (51 % of its rejected time).
+Changes (opt-in): `ISPATIALGYM_SAMPLER_PROFILE` (cProfile dump), `generation.b_fingertip_frame_check` (iors_large: B's pre-grasp / grasp by the
+program check's fingertip gate), `generation.fixed_start_memo` + `generation.shelf_transit_per_grasp` (iors_small, with `grasp_at_pose(accept=)`),
+job_val.sh `SHARED_SAMPLING_CACHE` / `SPHERE_FIT=cache`. Customs copy `customs_spd1.json`. Profiles of four aliases running (spd0_*).
+- 17:35: the first profile was empty (the Kit launch replaces the thread's profile hook): the hook now starts after the sampler's setup and
+  dumps after every attempt (spd0b_* resubmitted). Failure memos can persist in the shared cache (opt-in `overhang_fail_memo_persist`,
+  `fixed_start_memo_persist`; keyed by scope + the alias's generation block). A/B spd1 (38 jobs): fast arm (spd1 keys + `SPHERE_FIT=cache` +
+  a shared cache per alias) vs the reference settings on the same seeds, for hardback desk (base = hb30), touching#03, briefcase, mouse, jar,
+  umbrella.
+- 17:50 (spd1 interim, same seeds): briefcase sampling 3.5x faster (5947 -> 1690 s attempt time for 12 instances; attach 513-1094 -> 12 s per
+  run) - its demo yield stays the oracle's problem (per-seed navigate wobble / wall contact); mouse 1.6x and jar 1.4x to the same instance;
+  hardback desk 1.54x attempts per hour (no instance either arm). touching#03's fixed-start memo is harmful (its successes come from stances
+  that failed before - the IK branch is random): dropped. touching#03's time is 83 % exact IK in grasp_at_pose: new opt-in
+  `fixed_start_prescreen` (one batched screen of every row / twin first). Waves spd2 / spd3 running (touching#03 base / per-grasp /
+  per-grasp + prescreen; hardback with the persisted pick memo).
+- 19:07 PAUSE. Snapshot: the hardback with the persisted pick memo + warm cache makes 5.0x the attempts of hb30 on the same seeds (227 vs 45 in
+  ~4560 s each), still no instance; touching#03 base found 1 more (s11), per-grasp transit / the prescreen none yet (the batched screen costs
+  more than the exact IK it saves); umbrella 4 / 4 runs with 2 instances and all demos ok, fast arm 1.1-1.5x; mouse / jar runs without an
+  instance spend 3000-7300 s in batched screens, and the warm cache did not hit on a new mouse seed.
+
+### Resume (speed round)
+
+State on 2026-11-05 19:07: nothing committed; all code lambda = cluster (md5 in DECISIONS 16:35-19:07). Every speed change is opt-in:
+`ISPATIALGYM_SAMPLER_PROFILE` (cProfile per attempt), `generation.b_fingertip_frame_check`, `fixed_start_memo` (harmful, do not use),
+`fixed_start_memo_persist`, `shelf_transit_per_grasp`, `fixed_start_prescreen`, `overhang_fail_memo_persist`, job_val.sh `SPHERE_FIT=cache` /
+`SHARED_SAMPLING_CACHE=<dir per alias>`. Customs copies `$OFH/customs_spd{1,2,3}.json` (jobs/mk_spd*.py); shared caches `$OFH/cache_spd1/<alias>`.
+Batches (runs/): spd0b_* profiles; spd1b/f_* (base / fast, same seeds); spd2b/f_t03 + spd3f_t03 (base / per-grasp / per-grasp + prescreen);
+spd2f_hb_desk (persisted memo; base = hb30_desk same seeds); spd4b/f_* (warm cache, new seeds). Submit scripts jobs/sub_spd*.sh (run on sc).
+1. Tabulate: on scdt, `cd $OFH/diag; python ab.py "spd4?_*" "spd?[bf]_t03_s*" "spd2f_hb_desk_s*" ...`, `python paired.py "hb30_desk_s*"
+   "spd2f_hb_desk_s*"` (base attempts in the fast run's attempt time), `python rej_time.py <glob>`, `python prof_top.py runs/<run>/sample.prof`
+   (env /vision/u/minyeong/miniconda3/envs/ispatialgym-vectorized-envs/bin/python). Check the spd4 kit lines for `feasible_sets.hit / .miss`:
+   whether the shared cache hits on new seeds (mouse / jar / umbrella cold attempts are 80-90 % batched screens).
+2. Decide per alias what goes into the main customs / job defaults (owner's call for defaults): SPHERE_FIT=cache is the clear win (attach 2.2 s
+   -> ~0 per call; briefcase 3.5x, mouse 1.6x, jar 1.4x); b_fingertip_frame_check for the briefcase; overhang_fail_memo_persist + a shared
+   cache for the hardback if spd2f keeps its 5x; touching#03 stays on base unless spd2f / spd3f show instances.
+3. Open (not speed changes, from the failure logs): the hardback's acceptance (792 picks -> 1 instance: the carried path pick -> placement
+   collides near (22.8, 13.6), no departure s_T); the briefcase's demo yield (2 / 12: crouched trunk (0.95, -0.3) sags 1.24-1.38 deg - the
+   oracle sets B's trunk before driving in s10; wall contact on the first navigate in s15); mouse / swivel chair demo failures; touching#03's
+   success is random per stance (+u cell 17).
+
+Committed 2026-11-05 20:45 (owner): lambda branch oracle-fix 8516d022 = the 100 / 100 state (this document through section 8.2); the speed
+round (section 9 and its code) stays uncommitted on top. The job-pipeline speed redo is on hold.
+- 20:44 videos: the 17 picks closed in this campaign replayed (run_isg --mode replay, tiled view: left wrist | head | right wrist over
+  the external camera) - 17 / 17 replays succeeded at their demos' step counts; one concatenated, labelled video (677 s) at
+  `~/Desktop/projects/ispatialgym/tmp/outputs/oracle_fix_17_closed_picks_tiled.mp4`; jobs `$OFH/jobs/job_video.sh`, runs `vid17_*`.

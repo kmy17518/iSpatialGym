@@ -11,6 +11,11 @@ JOBDIR=$1
 source $JOBDIR/job.env
 for kv in ${ENV_EXTRA:-}; do export "$kv"; done
 source /vision/u/minyeong/projects/ispatialgym-oracle-fix/scripts/oracle_fix/env_cluster.sh
+# oracle-fix 2026-11-05 (speed), opt-in from job.env / ENV_EXTRA: SHARED_SAMPLING_CACHE=<dir> - the sampling cache shared by the jobs of ONE alias
+# (trainfast's $F/cache/sampling; exact-IK hits are verified in the current world, feasible sets are keyed by stance / poses, not by the removed
+# objects: one dir per alias); SPHERE_FIT=cache - ISPATIALGYM_SEEDED_SPHERE_FIT (an attach's sphere fit seeded and kept per object / grasp pose)
+if [ -n "${SHARED_SAMPLING_CACHE:-}" ]; then export ISPATIALGYM_SAMPLING_CACHE=$SHARED_SAMPLING_CACHE; mkdir -p $ISPATIALGYM_SAMPLING_CACHE; fi
+[ -n "${SPHERE_FIT:-}" ] && export ISPATIALGYM_SEEDED_SPHERE_FIT=$SPHERE_FIT
 KIT_RC=1
 trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$OFH/jobs/*) rm -rf "$JB" ;; esac' EXIT
 if [ "${START_PER_ATTEMPT:-0}" = 1 ]; then export ISPATIALGYM_START_PER_ATTEMPT=1; else unset ISPATIALGYM_START_PER_ATTEMPT; fi
