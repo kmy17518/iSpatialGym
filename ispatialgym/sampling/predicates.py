@@ -96,6 +96,13 @@ RAY_LENGTH_M = 0.40
 BOTTOM_GAP_MAX_M = 0.008
 UP_AXIS_MAX_DEG = 15.0
 RING_POINTS = 8
+#: oracle-fix 2026-11-06 (owner: a pack of kielbasa lying beside a platter, its round side over the rim, passed ontop - 1 of the 9
+#: probes hit it): the rays branch holds only when the probe at the centre of the SMALLER footprint of the two objects (the resting
+#: object on a big support; the supporting object under a big sheet) hits the resting object, at least SUPPORT_MIN_HITS probes hit
+#: it, and every counted hit lies within RAY_CONTACT_MAX_M of the surface its probe starts from (:func:`rays_verdict`).
+#: ``ISPATIALGYM_SUPPORT_RAYS=any``: the rule before (the resting object's footprint, one hit anywhere along the probe).
+SUPPORT_MIN_HITS = 3
+RAY_CONTACT_MAX_M = 0.02
 TOUCHING_GAP_MAX_M = float(os.environ.get("ISG_TOUCHING_GAP_MAX_M", "0.003"))
 #: ``inside`` rays branch: the axes with the container on both sides of the inner object's centre, and the rays' length beyond the
 #: container's AABB diagonal
@@ -1137,26 +1144,63 @@ def _surface_under(lower: Any, upper: Any, x: float, y: float) -> Optional[float
     return float(h["position"][2])
 
 
+def support_rays_rule() -> str:
+    """``"centre"`` (default since 2026-11-06) or ``"any"`` (``ISPATIALGYM_SUPPORT_RAYS=any``, the rule before)."""
+    return "any" if os.environ.get("ISPATIALGYM_SUPPORT_RAYS", "").strip().lower() == "any" else "centre"
+
+
+def footprint_owner(lower: Any, upper: Any, rule: Optional[str] = None) -> Any:
+    """The object whose footprint the probes cover: the resting object under the old rule, else the one of the two with the
+    smaller AABB footprint (its centre must be covered)."""
+    if (rule or support_rays_rule()) == "any":
+        return upper
+    lo_u, hi_u = _aabb(upper)
+    lo_l, hi_l = _aabb(lower)
+    a_u = float((hi_u[0] - lo_u[0]) * (hi_u[1] - lo_u[1]))
+    a_l = float((hi_l[0] - lo_l[0]) * (hi_l[1] - lo_l[1]))
+    return upper if a_u <= a_l else lower
+
+
+def rays_verdict(probes: Sequence[Tuple[int, float, bool, Optional[float]]], rule: str) -> Dict[str, Any]:
+    """The rays branch's verdict from its probes ``(footprint point index - 0 = the centre -, surface z, hit the resting object,
+    hit z)``: the old rule any hit; the centre rule the centre's probe and at least ``SUPPORT_MIN_HITS`` probes hitting the resting
+    object within ``RAY_CONTACT_MAX_M`` of their surface."""
+    if rule == "any":
+        n_hit = sum(1 for _, _, hit, _ in probes if hit)
+        return {"ok": n_hit > 0, "n_hits_on_upper": n_hit}
+    good = [i for i, z, hit, hz in probes if hit and hz is not None and hz - z <= RAY_CONTACT_MAX_M]
+    centre = 0 in good
+    n_far = sum(1 for _, _, hit, _ in probes if hit) - len(good)
+    return {"ok": centre and len(good) >= SUPPORT_MIN_HITS, "n_hits_on_upper": len(good), "centre_hit": centre, "n_hits_far": n_far,
+            "rule": rule}
+
+
 def support_rays(lower: Any, upper: Any) -> Dict[str, Any]:
-    """Branch 2: probe rays from just below the supporting surface up into the resting object across its contact patch."""
+    """Branch 2: probe rays from just below the supporting surface up into the resting object across the contact patch
+    (:func:`rays_verdict`)."""
     from omnigibson.utils.sampling_utils import raytest_batch
 
+    rule = support_rays_rule()
     upper_paths = tuple(_link_paths(upper))
     lower_paths = _link_paths(lower)
-    starts, ends = [], []
+    starts, ends, idx = [], [], []
     n_surface = 0
-    for x, y in _footprint_points(upper):
+    for i, (x, y) in enumerate(_footprint_points(footprint_owner(lower, upper, rule))):
         z = _surface_under(lower, upper, x, y)
         if z is None:
             continue
         n_surface += 1
+        idx.append((i, z))
         starts.append([x, y, z - RAY_BELOW_SURFACE_M])
         ends.append([x, y, z - RAY_BELOW_SURFACE_M + RAY_LENGTH_M])
     if not starts:
         return {"ok": False, "n_rays": 0, "n_surface": 0, "why": "no supporting surface under the footprint"}
     hits = raytest_batch(starts, ends, only_closest=True, ignore_bodies=lower_paths or None)
-    n_hit = sum(1 for h in hits if h.get("hit") and str(h.get("rigidBody", "")).startswith(upper_paths))
-    return {"ok": n_hit > 0, "n_rays": len(starts), "n_surface": n_surface, "n_hits_on_upper": n_hit}
+    probes = []
+    for (i, z), h in zip(idx, hits):
+        on = bool(h.get("hit") and str(h.get("rigidBody", "")).startswith(upper_paths))
+        probes.append((i, z, on, float(h["position"][2]) if on and h.get("position") is not None else None))
+    return {**rays_verdict(probes, rule), "n_rays": len(starts), "n_surface": n_surface}
 
 
 def support_geometry(lower: Any, upper: Any) -> Dict[str, Any]:

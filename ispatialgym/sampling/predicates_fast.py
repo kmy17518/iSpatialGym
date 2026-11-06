@@ -42,24 +42,29 @@ def _surface_hits(P, lower_paths: List[str], upper_paths: List[str], lo_l: th.Te
 def support_rays(P, lower: Any, upper: Any) -> Dict[str, Any]:
     from omnigibson.utils.sampling_utils import raytest_batch
 
+    rule = P.support_rays_rule()
     upper_list = P._link_paths(upper)
     lower_list = P._link_paths(lower)
     lo_l, hi_l = P._aabb(lower)
-    points = P._footprint_points(upper)
-    starts, ends = [], []
+    points = P._footprint_points(P.footprint_owner(lower, upper, rule))  # oracle-fix 2026-11-06: the reference's centre rule
+    starts, ends, idx = [], [], []
     n_surface = 0
-    for (x, y), z in zip(points, _surface_hits(P, lower_list, upper_list, lo_l, hi_l, points)):
+    for i, ((x, y), z) in enumerate(zip(points, _surface_hits(P, lower_list, upper_list, lo_l, hi_l, points))):
         if z is None:
             continue
         n_surface += 1
+        idx.append((i, z))
         starts.append([x, y, z - P.RAY_BELOW_SURFACE_M])
         ends.append([x, y, z - P.RAY_BELOW_SURFACE_M + P.RAY_LENGTH_M])
     if not starts:
         return {"ok": False, "n_rays": 0, "n_surface": 0, "why": "no supporting surface under the footprint"}
     hits = raytest_batch(starts, ends, only_closest=True, ignore_bodies=lower_list or None)
     upper_paths = tuple(upper_list)
-    n_hit = sum(1 for h in hits if h.get("hit") and str(h.get("rigidBody", "")).startswith(upper_paths))
-    return {"ok": n_hit > 0, "n_rays": len(starts), "n_surface": n_surface, "n_hits_on_upper": n_hit}
+    probes = []
+    for (i, z), h in zip(idx, hits):
+        on = bool(h.get("hit") and str(h.get("rigidBody", "")).startswith(upper_paths))
+        probes.append((i, z, on, float(h["position"][2]) if on and h.get("position") is not None else None))
+    return {**P.rays_verdict(probes, rule), "n_rays": len(starts), "n_surface": n_surface}
 
 
 def support_geometry(P, lower: Any, upper: Any) -> Dict[str, Any]:
