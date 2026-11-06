@@ -5,9 +5,10 @@ Keying: a stance's ACTUAL trunk ``(translate, tilt)`` rounded to 0.01 (:func:`tr
 (``ReachBands.nearest_trunk``: a stance at 0.25 / -1.07 read 0.25 / -1.2's cells - the inside_02 failure). Phase 2's tilt scan is a
 finite set per template, so the keys stay bounded.
 
-A key without refined data starts from the band (:func:`init_cells`, ``ISPATIALGYM_FAST_BAND_REFINE_INIT``): ``bracket`` (default) the
-cells both grid tilts around the key's tilt hold (the TILT_SNAP bracket rule: no first failures paid at the far edge), the grid trunk's
-own cells on a grid tilt, the nearest grid trunk's outside the grid's tilt range; ``nearest`` a copy of the nearest grid trunk. The
+A key without refined data starts from the band (:func:`init_cells`, ``ISPATIALGYM_FAST_BAND_REFINE_INIT``): ``nearest`` (default since
+2026-11-01, owner after the refine A/B) a copy of the nearest grid trunk; ``bracket`` the cells both grid tilts around the key's tilt hold
+(the TILT_SNAP bracket rule: no first failures paid at the far edge), the grid trunk's own cells on a grid tilt, the nearest grid trunk's
+outside the grid's tilt range - on ontop_small_01 it dropped the far cells that succeed and wrote about half as many demos. The
 refined cell set of a key (:func:`refined_cells`, what ``ReachBands.band`` returns when the switch is on) = that start - the blacklisted
 cells + the added ones.
 
@@ -36,7 +37,7 @@ from ispatialgym.sampling.v2 import band_evidence as EV
 WORLD = "reach"
 K = 2
 ADD_P = 0.1
-INIT = "bracket"
+INIT = "nearest"
 
 
 def _fv(name: str, default, cast):
