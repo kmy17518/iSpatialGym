@@ -220,14 +220,35 @@ def yaw_lag_envelope(poses: Sequence[Tuple[float, float, float]], max_yaw_step: 
 
 
 def face_travel_poses(waypoints: Sequence[Sequence[float]], stride: float = STRIDE_M,
-                      max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
+                      max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD, cfg: Optional[Dict[str, float]] = None) -> List[Tuple[float, float, float]]:
     """The whole-body-checked poses of the ``face_travel`` schedule of ``waypoints`` (owner 2026-09-26: the shared
-    ``robot.base_path`` schedule the oracle drives for ``style = "face_travel"``, built with the module's default config),
-    no two consecutive ones more than ``max_yaw_step`` apart in yaw (``BasePath.stride_poses``)."""
+    ``robot.base_path`` schedule the oracle drives for ``style = "face_travel"``, built with the module's default config;
+    ``cfg`` = the record's own overrides of it, oracle-fix 2026-11-06 ``paths[].face_travel_cfg``), no two consecutive ones more
+    than ``max_yaw_step`` apart in yaw (``BasePath.stride_poses``)."""
     from ispatialgym.robot import base_path as BP
 
-    sched = BP.BasePath.build([tuple(float(v) for v in w) for w in waypoints], BP.BasePathConfig())
+    sched = BP.BasePath.build([tuple(float(v) for v in w) for w in waypoints], BP.config_with(cfg))
     return [tuple(float(v) for v in p) for p in sched.stride_poses(stride, max_yaw_step=max_yaw_step)]
+
+
+def record_sweep_poses(rec: PathRecord, yaw_envelope: bool = True, max_yaw_step: Optional[float] = YAW_STEP_MAX_RAD) -> List[Tuple[float, float, float]]:
+    """The poses a re-sweep of a recorded path checks (oracle-fix 2026-11-06, owner feedback on the inside_large#02 demo: the
+    re-sweeps swept the polyline of a record the oracle drives as the face_travel schedule, which leaves the polyline by up to
+    simplify + fillet = 0.15 m): ``rec.style == "face_travel"`` -> the schedule (with the record's ``face_travel_cfg``) and its
+    yaw-lag envelope, as :func:`plan_path` checked it; otherwise the polyline's strides (+ the yaw-lag envelope with
+    ``yaw_envelope``), as before."""
+    stride = float(getattr(rec, "stride_m", None) or STRIDE_M)
+    if getattr(rec, "style", None) == "face_travel":
+        ft = face_travel_poses(rec.waypoints, stride, max_yaw_step=max_yaw_step, cfg=getattr(rec, "face_travel_cfg", None))
+        return yaw_lag_envelope(ft, max_yaw_step=max_yaw_step)
+    return stride_poses(rec.waypoints, stride, yaw_envelope=yaw_envelope, max_yaw_step=max_yaw_step)
+
+
+def total_rotation(poses: Sequence[Sequence[float]]) -> float:
+    """How far the body turns along a drive-ordered pose sequence (rad, the sum of the shortest-way yaw changes): of a polyline's
+    waypoints = what the oracle's recorded style turns (each segment's yaw blended the shortest way), of :func:`face_travel_poses` =
+    what the schedule turns (oracle-fix 2026-11-06: within 3 deg of ``Motions._base_reference`` on 100 of 104 IORS-large records)."""
+    return float(sum(abs((float(b[2]) - float(a[2]) + math.pi) % (2 * math.pi) - math.pi) for a, b in zip(poses[:-1], poses[1:])))
 
 
 #: owner 2026-09-26: per-process tally of the log-only face_travel probe of CARRIED legs (they stay ``recorded``): how often the
@@ -741,7 +762,8 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
               margin: float = 0.01, edge_slide: bool = False, edge_slide_back_m: float = 0.0, style: str = "recorded",
-              probe_face_travel: bool = False, global_blocked: Sequence[Any] = ()) -> PathRecord:
+              probe_face_travel: bool = False, global_blocked: Sequence[Any] = (), face_travel_cfgs: Sequence[Dict[str, float]] = (),
+              face_travel_max_extra_rotation_deg: Optional[float] = None) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
@@ -756,8 +778,16 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     ``style`` (owner 2026-09-26, ``generation.base_path_style``): ``"face_travel"`` checks the shared ``robot.base_path``
     schedule of the path (:func:`face_travel_poses`) with the same posture, carried object, margin and yaw-lag envelope
     as the polyline check and records ``style = "face_travel"`` when it clears; when a stride of the schedule collides the
-    polyline check decides and the record says ``"recorded"`` (never a rejection because of the schedule). ``probe_face_travel``
-    (carried legs, which stay recorded): the schedule is checked at 1 cm, logged and tallied in
+    polyline check decides and the record says ``"recorded"`` (never a rejection because of the schedule). A carried leg
+    (oracle-fix 2026-11-06, ``generation.carried_base_path_style``) is checked alike: the object attached, the carry arms
+    ``arm_q``, the carry ``margin``. ``face_travel_cfgs`` (oracle-fix 2026-11-06, ``generation.face_travel_fallback_cfgs``):
+    ``robot.base_path.BasePathConfig`` overrides tried in order when the default schedule collides, before the polyline - the
+    first that clears is recorded as ``paths[].face_travel_cfg`` (the oracle builds its schedule with it).
+    ``face_travel_max_extra_rotation_deg`` (oracle-fix 2026-11-06, ``generation.face_travel_max_extra_rotation_deg``): a schedule
+    that turns the body more than this beyond the polyline as recorded (:func:`total_rotation`) is not checked - the polyline
+    decides (a straight 10 cm back-up as face_travel spins 180 deg twice; on 104 IORS-large records face_travel everywhere drove
+    544 s / 11899 deg against recorded 431 s / 7496 deg, the rule at 10 deg 403 s / 6894 deg). ``probe_face_travel``
+    (carried legs that stay recorded): the schedule is checked at 1 cm, logged and tallied in
     :data:`FACE_TRAVEL_CARRIED_PROBE`, never used."""
     trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
     if arm_q is None:
@@ -821,17 +851,37 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
     record_style: Optional[str] = None
     if style == "face_travel":
-        with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
-            step = yaw_step_bound(sweep_radius(kit, trunk, posture, arm_q))
-            ft = face_travel_poses(filled, stride, max_yaw_step=step)
-            ft_swept = yaw_lag_envelope(ft, max_yaw_step=step)
-            ok_ft, bad_ft = path_collision_free(kit, ft_swept, trunk, posture, margin=float(margin), q_arms=arm_q)
-        if ok_ft:
-            log.info("face_travel: %s path %s -> %s %.2f m recorded as the face_travel schedule (%d schedule poses, %d swept with the yaw-lag envelope)",
-                     mode, stance_from.name, stance_to.name, length, len(ft), len(ft_swept))
-            return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(ft), style="face_travel")
-        log.info("face_travel: %s path %s -> %s: the schedule collides at swept pose %d/%d (%s) - the polyline is checked and recorded instead",
-                 mode, stance_from.name, stance_to.name, bad_ft, len(ft_swept), tuple(round(v, 3) for v in ft_swept[bad_ft]))
+        # oracle-fix 2026-11-06: the default schedule, then each face_travel_cfgs override (one attachment for all of them)
+        cfgs: List[Optional[Dict[str, float]]] = [None] + [dict(c) for c in (face_travel_cfgs or ()) if c]
+        what = f" carrying {carried}" if carried_obj is not None else ""
+        if face_travel_max_extra_rotation_deg is not None:
+            # oracle-fix 2026-11-06: a schedule that turns the body more than the polyline as recorded does (a straight leg whose ends do
+            # not face the way: the schedule turns to the travel heading and back) is not smoother - not checked, the polyline decides
+            rot_rec, keep = total_rotation(filled), []
+            for cfg in cfgs:
+                rot_ft = total_rotation(face_travel_poses(filled, stride, max_yaw_step=None, cfg=cfg))
+                if rot_ft > rot_rec + math.radians(float(face_travel_max_extra_rotation_deg)):
+                    log.info("face_travel: %s path %s -> %s%s %.2f m: the schedule%s turns the body %.0f deg, the polyline %.0f deg (> +%.0f deg) - not checked",
+                             mode, stance_from.name, stance_to.name, what, length, "" if cfg is None else f" with {cfg}", math.degrees(rot_ft),
+                             math.degrees(rot_rec), float(face_travel_max_extra_rotation_deg))
+                else:
+                    keep.append(cfg)
+            cfgs = keep
+        if cfgs:
+            with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+                step = yaw_step_bound(sweep_radius(kit, trunk, posture, arm_q))
+                for k, cfg in enumerate(cfgs):
+                    ft = face_travel_poses(filled, stride, max_yaw_step=step, cfg=cfg)
+                    ft_swept = yaw_lag_envelope(ft, max_yaw_step=step)
+                    ok_ft, bad_ft = path_collision_free(kit, ft_swept, trunk, posture, margin=float(margin), q_arms=arm_q)
+                    if ok_ft:
+                        log.info("face_travel: %s path %s -> %s%s %.2f m recorded as the face_travel schedule%s (%d schedule poses, %d swept with the yaw-lag envelope)",
+                                 mode, stance_from.name, stance_to.name, what, length, "" if cfg is None else f" with {cfg}", len(ft), len(ft_swept))
+                        return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(ft), style="face_travel",
+                                          face_travel_cfg=cfg)
+                    log.info("face_travel: %s path %s -> %s%s: the schedule%s collides at swept pose %d/%d (%s)%s", mode, stance_from.name, stance_to.name, what,
+                             "" if cfg is None else f" with {cfg}", bad_ft, len(ft_swept), tuple(round(v, 3) for v in ft_swept[bad_ft]),
+                             " - the polyline is checked and recorded instead" if k == len(cfgs) - 1 else "")
         record_style = "recorded"
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         radius = sweep_radius(kit, trunk, posture, arm_q)

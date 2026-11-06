@@ -956,10 +956,20 @@ def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carr
         try:
             # owner 2026-09-26: ``generation.base_path_style`` - the approach of an opted-in family (large articulation, alignment) is checked and
             # recorded as the face_travel schedule when uncarried (recorded fallback when the schedule collides); a carried approach stays recorded
+            # unless ``generation.carried_base_path_style`` says face_travel (oracle-fix 2026-11-06, ``SamplerV2.base_path_style``, as record_path)
             is_carried = carried_obj is not None
+            ft_kw: Dict[str, Any] = {}
+            if callable(getattr(s, "base_path_style", None)):
+                style = s.base_path_style(is_carried)
+                if style == "face_travel" and s.gen_seeded("face_travel_fallback_cfgs"):
+                    ft_kw["face_travel_cfgs"] = list(s.gen_seeded("face_travel_fallback_cfgs"))
+                if style == "face_travel" and s.gen_seeded("face_travel_max_extra_rotation_deg") is not None:
+                    ft_kw["face_travel_max_extra_rotation_deg"] = float(s.gen_seeded("face_travel_max_extra_rotation_deg"))
+            else:
+                style = "recorded" if is_carried else str(s.gp.gen("base_path_style", "recorded") or "recorded")
             path = NAV.plan_path(s.kit, init, back_stance, carried=carried, carried_obj=carried_obj, carried_arm=arm, rooms=rooms, blocked=blocked,
-                                 max_length_m=path_max_m, trunk=tf, eef_in_object=eef_in_object,
-                                 style="recorded" if is_carried else str(s.gp.gen("base_path_style", "recorded") or "recorded"), probe_face_travel=is_carried)
+                                 max_length_m=path_max_m, trunk=tf, eef_in_object=eef_in_object, style=style,
+                                 probe_face_travel=is_carried and style != "face_travel", **ft_kw)
         except NAV.NavigationError as e:
             why.append(f"s_T {s_T:.2f}: {e.reason}")
             path_err = e

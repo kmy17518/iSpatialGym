@@ -442,12 +442,18 @@ class PathRecord:
     #: owner 2026-10-13 (disembedding): the leg into the place pose keeps the heading and moves only forward / backward or left /
     #: right (``navigation.plan_axis_leg``): ``{"back_m": the drive-back used, "tried_back_m": [...], "moves": [[axis, m], ...]}``
     axis_leg: Optional[Dict[str, Any]] = None
+    #: oracle-fix 2026-11-06 (``generation.face_travel_fallback_cfgs``): the ``robot.base_path.BasePathConfig`` overrides of the
+    #: face_travel schedule the record was checked as when the default schedule collided (e.g. simplify / fillet 3 cm); the
+    #: oracle builds its schedule with them (``robot.base_path.config_with``); None = the default schedule
+    face_travel_cfg: Optional[Dict[str, float]] = None
 
     def to_sidecar(self) -> Dict[str, Any]:
         out = {"from": self.frm, "to": self.to, "mode": self.mode, "waypoints": [[float(a) for a in w] for w in self.waypoints],
                "length_m": float(self.length_m), "posture": self.posture, "carried": self.carried}
         if self.style is not None:
             out["style"] = self.style
+        if self.style == "face_travel" and self.face_travel_cfg:
+            out["face_travel_cfg"] = {str(k): float(v) for k, v in self.face_travel_cfg.items()}
         if self.arms_q:
             out["arms_q"] = {str(a): [float(v) for v in q] for a, q in self.arms_q.items()}
         if self.axis_leg:
