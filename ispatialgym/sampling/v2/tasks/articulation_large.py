@@ -70,7 +70,7 @@ HANDLES_CSV = os.path.join(ASSETS_ROOT, "icl", "require", "handles.csv")
 #: v1 ``bddl_writer`` definition ids of the facade (``configuration_matching-1`` open, ``-2`` close)
 V1_DEFINITION_ID = {"open": 1, "close": 2}
 #: §5.3 pinch width after scaling
-PINCH_WIDTH_RANGE = (0.015, 0.080)
+PINCH_WIDTH_RANGE = (0.003, 0.080)  # handle-selection pinch width (m): 3-80 mm (owner 2026-11-02; was 15-80 mm)
 #: §5.3 waypoint fractions
 WAYPOINT_FRACTIONS = (0.25, 0.5, 0.75, 1.0)
 #: base footprint radius of the planar leaf-vs-base stand-in check (R1Pro chassis half-diagonal)

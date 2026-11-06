@@ -75,7 +75,7 @@ ARTICULATION_COMMON: Dict[str, Any] = {
     "arm_side_threshold_m": 0.10,  # §5.3
     "handle_eef_offset_m": 0.012,  # §3.6 / §5.3 eef origin = contact − 0.012·approach
     "pre_grasp_back_m": 0.10,  # §3.6 pre-grasp 0.10 m back along −approach
-    "pinch_width_range_m": [0.015, 0.080],  # §5.3 pinch width after scaling
+    "pinch_width_range_m": [0.003, 0.080],  # §5.3 handle-selection pinch width after scaling: 3-80 mm (owner 2026-11-02; was 15-80 mm)
 }
 
 #: §5.5 wall alignment (world vertical) numbers.

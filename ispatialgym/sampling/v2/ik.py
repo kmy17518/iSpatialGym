@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -273,6 +274,17 @@ ORACLE_PRESHAPE_MARGIN_M = 0.010
 FINGER_TOUCH_MAX_PENETRATION_M = 0.03
 
 
+def support_policy_on() -> bool:
+    """``ISPATIALGYM_SUPPORT_POLICY=1``: the grasp pose's support ignore is followed by the shared contact policy (:meth:`IKChecker.support_policy_ok`)."""
+    return os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") not in ("", "0", "off", "false")
+
+
+def _quat_mat(q: th.Tensor) -> th.Tensor:
+    x, y, z, w = q.tolist()
+    return th.tensor([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)], [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
 @dataclass
 class FingerTouch:
     """``generation.approach_finger_support_touch`` (owner 2026-10-13 ~03:15 item 3): along a tracked grasp approach the acting arm's
@@ -362,6 +374,40 @@ class IKChecker:
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
         self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
+
+    def support_policy_ok(self, q: th.Tensor, arm: str, supports: Sequence[Any], approached: Optional[Sequence[Any]] = None) -> Tuple[bool, str]:
+        """The shared support-contact policy (``ispatialgym.grasping.contact_policy``) on a grasp configuration whose last pose was solved with
+        ``supports`` out of the world: every link but ``arm``'s fingers clear of the world WITH the supports (the grasped / approached object
+        left out, as the approach left it), and the hand's collision hulls against each support's top plane - the fingers within the 2 mm
+        allowance, the palm, the wrist camera and the wrist not below it. Replaces the whole-support ignore of the last pose when
+        ``ISPATIALGYM_SUPPORT_POLICY=1``. ``(ok, reason)``."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.oracle import r1pro_model as M
+
+        others = self._non_finger_links(arm)
+        if not others:
+            return True, ""
+        drop = [o for o in (approached or ()) if all(o is not sp for sp in supports)]
+        with self.ignoring(drop):
+            if not bool(self.kit.links_clear(q, others, CP.DEFAULT.sphere_support_margin_m)[0]):
+                return False, "non-finger link touches the support"
+        hc = getattr(self, "_hand_checker", None)
+        if hc is None or hc.arm != arm:
+            hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+        eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+        T = th.eye(4)
+        T[:3, :3] = _quat_mat(G.t(eef[1]).float())
+        T[:3, 3] = G.t(eef[0]).float()
+        fq = float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean())
+        for sp in supports:
+            try:
+                top = float(sp.aabb[1][2])
+            except Exception:  # noqa: BLE001 - a support without an AABB (a wall): the sphere rule above only
+                continue
+            ok, reason, _ = hc.check(T, CP.Support.plane(top, name=getattr(sp, "name", "support")), (fq, fq))
+            if not bool(ok[0]):
+                return False, f"{reason[0]} on {getattr(sp, 'name', 'support')}"
+        return True, ""
 
     def set_finger_touch(self, touch: Optional[FingerTouch]) -> None:
         """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope."""
@@ -787,6 +833,10 @@ class IKChecker:
                 q = q_pol
                 qs[-1] = q
                 self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
+        if q is not None and ignore_for_last and support_policy_on():
+            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, approached)
+            if not ok_p:
+                q, why = None, f"support_policy: {why_p}"
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
             chain = [None if x is None else x.tolist() for x in qs]

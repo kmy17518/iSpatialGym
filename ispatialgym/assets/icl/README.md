@@ -41,7 +41,7 @@ which model is drawn when, spawn scales, chosen joints — those are task custom
 | `display_name`, `synset` | language‑annotation phrase; KB synset of the category |
 | `scene`, `room` | scene rows: where the object is |
 | `representative`, `test`, `rank`, `source_selection` | `representative = 1`: the model of the category `ground_isg` tests first (pick 1 / pinned; the test support, test partner, test room and the wall regions of the test room for scene rows; attachment targets: the best‑ranked male with a READY partner); `test = 1`: the test set (pick 1 + pick 2 + the v1 pins); `rank` 0 pinned, 1 pick 1, 2 pick 2, 3 alternate, 4 candidate/viable/partner, 5 pool, 6 reserve. Explicit test combinations are the cross product of the `test` rows admitted by `constraints_compatible.csv` — there is no separate combinations sheet |
-| `status` | sampleable / group rows, rooms, wall regions: `untested` (see above). Scene rows from the B4 inventory: `geometric_ok` = admitted by the geometric filters below, `geometric_reject:<reason>` = rejected but kept so nothing is silently lost (`representative` / `test` empty; every failing check is listed in `note` as `rejects=…`). Reasons — supports: `support_low` / `support_high` (top z outside 0.55–1.20 m), `support_small` (top polygon < 0.12 m² or hull short side < 0.30 m), `no_free_edge` (no edge with a ≥ 0.60 m free‑floor run at stand‑off 0.45, chairs within 1 m removed), `chair`; large‑scale supports also `no_near_partner` (no admitted partner of the subtask within 3.0 m geodesic); partners: `no_face_raster`, `under_clearance` (under: maximum under‑clearance < 0.30 m); scene articulated targets: `joint_kind_<kind>`, `ungraspable` (B4 status), `handle_low` / `handle_high` (pinch outside 0.30–1.70 m), `front_blocked` / `front_free_unknown` (eroded free floor in front of the face < 0.60 m), `pinch_narrow` / `pinch_wide` (width outside 15–80 mm after the instance scale) |
+| `status` | sampleable / group rows, rooms, wall regions: `untested` (see above). Scene rows from the B4 inventory: `geometric_ok` = admitted by the geometric filters below, `geometric_reject:<reason>` = rejected but kept so nothing is silently lost (`representative` / `test` empty; every failing check is listed in `note` as `rejects=…`). Reasons — supports: `support_low` / `support_high` (top z outside 0.55–1.20 m), `support_small` (top polygon < 0.12 m² or hull short side < 0.30 m), `no_free_edge` (no edge with a ≥ 0.60 m free‑floor run at stand‑off 0.45, chairs within 1 m removed), `chair`; large‑scale supports also `no_near_partner` (no admitted partner of the subtask within 3.0 m geodesic); partners: `no_face_raster`, `under_clearance` (under: maximum under‑clearance < 0.30 m); scene articulated targets: `joint_kind_<kind>`, `ungraspable` (B4 status), `handle_low` / `handle_high` (pinch outside 0.30–1.70 m), `front_blocked` / `front_free_unknown` (eroded free floor in front of the face < 0.60 m), `pinch_narrow` / `pinch_wide` (width outside 3–80 mm after the instance scale; 15–80 mm before 2026-11-02) |
 | `grasp_key` | preferred grasp‑library key when the role is grasped; the `(grasps <role> <pipeline>)` requirement is checked against `require/grasps.csv`, not this column; empty = no grasps yet (touching round‑1 targets are flagged in `note`) |
 | `scale` | per‑axis scale of the grasp‑tested variant (scaled categories such as `garlic_clove`, `pencil`, `french_fries`) |
 | `bbox_x/y/z` | canonical bounding box (m) from the KB inventory |
@@ -86,7 +86,7 @@ inventory (`summary.json` + `<scene>/{supports,partners,artic}/<name>.json`) wit
   partners, so the movable breakfast tables / sofas of the old table‑selection inventory have no partner row.
 - **Scene articulated targets** — one row per (scene object, joint) of the B4 artic inventory: joint kind door /
   drawer / flap, B4 handle status `handle` or `edge`, a pinch (protruding handle, else the exposed edge fallback) at
-  0.30–1.70 m world height, ≥ 0.60 m eroded free floor in front of the face, width 15–80 mm after the instance scale.
+  0.30–1.70 m world height, ≥ 0.60 m eroded free floor in front of the face, width 3–80 mm after the instance scale (15–80 mm before 2026-11-02).
 - **Rooms** and **wall regions** (the 78 validated regions of the 2026‑09‑11 survey, both wall subtasks) are unchanged
   and `untested`.
 
@@ -156,7 +156,7 @@ All three sheets start with the same core columns; sheet‑specific columns foll
 - `(handle <role>)` — ≥ 1 row with `verdict ∈ {handle, edge, manual}` (`review_graspable ≠ False`) for the model (spawned
   targets) or for the (scene, instance) (scene targets); the joint of that row is a candidate for `roles.<role>.joint`.
   Instance rows are the B4 geometric proposals until the C3 review downgrades them; `width_m` must fall in the pinch
-  range (15–80 mm) after scaling.
+  range (3–80 mm since 2026-11-02; 15–80 mm before) after scaling.
 - `(contacts <role>)` — ≥ 1 `push` row for the model (plus the brace / stop rows the task uses).
 
 ### `grasps.csv` — every validated grasp of every referenced key

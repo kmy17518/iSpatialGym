@@ -38,7 +38,7 @@ log = logging.getLogger("ispatialgym.sampling")
 #: B4 scene inventories (``ispatialgym.sampling.scene_inventory``): ``<scene>/artic/<name>.json`` per articulated scene object
 SCENE_INVENTORY_ROOT = os.path.join(REPO_ROOT, "runlogs", "scene_inventory_20260915")
 #: admissible pinch width after scaling (spec 5.3); outside it the handle is used but flagged
-PINCH_WIDTH_RANGE = (0.015, 0.080)
+PINCH_WIDTH_RANGE = (0.003, 0.080)  # handle-selection pinch width (m): 3-80 mm (owner 2026-11-02; was 15-80 mm)
 
 
 def _vec(x, default=None) -> Optional[th.Tensor]:

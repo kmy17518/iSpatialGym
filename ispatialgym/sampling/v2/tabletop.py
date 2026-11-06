@@ -892,6 +892,13 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
     scene, support = s.world.scene_model, top.name
     gkey = "generic" if spec.generic_pinch else spec.grasp_key
     surface = surface_band_kwargs(s)
+    if map_sampling_root() and not spec.generic_pinch and not spec.placed and not surface:
+        mb = map_bands(s, spec, top)
+        if mb is not None:
+            s.bands = mb
+            return s.bands
+        if os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
+            _reject("missing_map", f"no reach map for {spec.object} ({gkey}) at {support}'s height")
     try:
         bands = RB.ReachBands.load(scene, support, spec.object, gkey, placed=spec.placed, scale=spec.scale, **surface)
         log.info("reach band cache hit for %s / %s (%s%s): %s", support, spec.object, gkey, f", surface_z {surface['surface_z']:.2f}" if surface else "", bands.path)
@@ -904,6 +911,42 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
         bands = compute_bands(s, spec, top, edge)
     s.bands = NB.with_neighbor_bands(s, bands, spec, top, compute_bands)
     return s.bands
+
+
+def map_sampling_root() -> Optional[str]:
+    """``ISPATIALGYM_REACH_MAPS`` (``ispatialgym.sampling.map_sampling``): the root of the scene-independent reach maps, or None (legacy bands)."""
+    return os.environ.get("ISPATIALGYM_REACH_MAPS") or None
+
+
+def map_bands(s, spec: BandSpec, top) -> Optional[RB.ReachBands]:
+    """The scene-independent reach map of the sampler's object at the support's actual height above the floor, as a multi-distance band
+    view (``map_sampling.as_bands``); None when the object has no v2 library entry or no compatible map covers the height (the anchors of
+    ``ISPATIALGYM_REACH_MAP_ANCHORS``: exact or within 1 cm, else uncovered). Turns the grasp pose's support policy on
+    (``ISPATIALGYM_SUPPORT_POLICY``): exact sampling keeps the support for the palm / wrist camera / arm and the 2 mm finger rule."""
+    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling import reach_maps as RMAP
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    lib = GL.v2_entry(spec.grasp_key) if spec.grasp_key else None
+    if lib is None or not lib.rests:
+        return None
+    rid = sorted(lib.rests, key=lambda r: (not lib.rests[r].stable, r))[0]
+    h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
+    anchors = None
+    ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
+    if ap and os.path.exists(ap):
+        with open(ap) as f:
+            an = json.load(f)
+        anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+    root = os.path.join(map_sampling_root(), os.path.basename(os.path.dirname(lib.path)))
+    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=spec.arm, anchors=anchors)
+    if rm is None:
+        log.info("reach map miss for %s (%s) at h %.4f (%s)", spec.object, spec.grasp_key, h, root)
+        return None
+    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "1")
+    log.info("reach map hit for %s at h %.4f: %s", spec.object, h, rm.path)
+    return MS.as_bands(rm, overhang=0.0)
 
 
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,

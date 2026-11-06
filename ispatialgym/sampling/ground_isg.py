@@ -150,7 +150,7 @@ HANDEDNESS = {
 #: §2.2 grasp verdicts: ``ok``, or ``flag`` with flags ⊆ {one_finger}.
 TOLERATED_GRASP_FLAGS = {"one_finger"}
 HANDLE_ADMISSIBLE_VERDICTS = ("handle", "edge", "manual")
-PINCH_RANGE_M = (0.015, 0.080)
+PINCH_RANGE_M = (0.003, 0.080)  # handle-selection pinch width (m): 3-80 mm (owner 2026-11-02; was 15-80 mm)
 PENDING_CONTACTS_REASON = "missing_contacts_pending_B6"
 
 #: Fallback variants (owner decision 2026-09-16 B). Subtasks with an init-surface chain (§5.6: under support -> the

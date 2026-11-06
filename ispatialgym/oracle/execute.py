@@ -1598,8 +1598,14 @@ def grasp_closure(action: Grasp, width: Optional[float], cfg) -> Tuple[Optional[
     """``(rate, squeeze, thin)`` of a grasp's closure (:meth:`Motions.gripper`): a library pinch at most ``cfg.thin_pinch_width_m`` wide
     closes at ``thin_pinch_close_rate`` and holds at the touch width less ``thin_pinch_squeeze_m``; every other grasp at
     ``gripper_close_rate`` with the configured squeeze (``squeeze`` None)."""
+    return closure_for_width(width, cfg, library=action.kind == "library")
+
+
+def closure_for_width(width: Optional[float], cfg, library: bool = True) -> Tuple[Optional[float], Optional[float], bool]:
+    """:func:`grasp_closure` of a pinch ``width`` (m) - the rule itself, shared with the grasp-library validator
+    (``ispatialgym.grasping.validate_tabletop``), which closes on library candidates without an oracle ``Grasp`` action."""
     thin_w = getattr(cfg, "thin_pinch_width_m", None)
-    if action.kind == "library" and width is not None and thin_w is not None and float(width) <= float(thin_w):
+    if library and width is not None and thin_w is not None and float(width) <= float(thin_w):
         return float(cfg.thin_pinch_close_rate), float(cfg.thin_pinch_squeeze_m), True
     return cfg.gripper_close_rate, None, False
 
