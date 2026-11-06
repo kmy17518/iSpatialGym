@@ -55,6 +55,9 @@ from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecor
 
 RETREAT_DIST_M = 0.10  # oracle ``actions.RETREAT_DIST``: a place ends this far back along the approach (release + lift-off)
 RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after a place
+#: oracle-fix 2026-11-06 (``generation.shelf_backoff_transit_m``): the program check's pre-grasp witness may lie this far (largest arm joint, rad)
+#: from the joints the backed-off transition carries the arm to - the settled target's few-mm shift; beyond it the grasp's transit is a swing
+SHELF_BACKOFF_WITNESS_GAP_RAD = 0.3
 
 #: Tip-to-tip spread of the CLOSED fingers (the finger joints sit at y = ±0.0135 in the gripper link; URDF ``gripper_finger_joint``):
 #: a wide stop with tip spread ``s`` pre-shapes each finger to ``(s - CLOSED_TIP_SPREAD_M) / 2``.
@@ -1981,6 +1984,10 @@ class IORSSmall(SamplerV2):
                         why_transit = self.shelf_transit_why(manip, grasp, default, pre_open) if (self.gen("shelf_transit_check") and not per_grasp) else None
                         if why_transit is not None:
                             raise Reject("grasp_unreachable", why_transit)
+                        if self.shelf_backoff_m() > 0.0:
+                            # oracle-fix 2026-11-06 (owner feedback on the touching#03 demo, opt-in generation.shelf_backoff_transit_m): the arrival
+                            # transition recorded again backed off, the arm carried to the pre-grasp inside it (:meth:`record_shelf_backoff`)
+                            self.record_shelf_backoff(manip, grasp, default, pre_open)
                     except Reject as e:
                         if memo_key is not None:
                             self._fixed_start_memo[memo_key] = str(e)[:300]
@@ -2013,6 +2020,8 @@ class IORSSmall(SamplerV2):
                         grasp = g2
                         self.sidecar.transitions.clear()
                         self.record_stance_travel(init, manip)
+                        if self.shelf_pose is not None and self.shelf_backoff_m() > 0.0:
+                            self.record_shelf_backoff(manip, grasp, grasp.arm, pre_open)  # oracle-fix 2026-11-06: the other arm's transit backed off too
                         self.apply_height_extra_to_grasp(grasp, t_pose, manip)
                 # carry height (4A, :meth:`carry_rule`): the target (bottom at the table at init) clears the partner's top by carry_clearance_m on
                 # the way; touching only the table (set down beside the partner; "auto": raised by the push stance when its drive passes over it)
@@ -2703,8 +2712,11 @@ class IORSSmall(SamplerV2):
         configuration (both arms' postures), the working arm, the pre-shaped opening and whether the transit is judged per grasp; the start
         pose and the grasp library are the template's."""
         q = self.ikc.q_locked(manip)
-        return (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
-                tuple(round(float(v), 3) for v in G.t(q).flatten().tolist()), arm, None if fingers is None else round(float(fingers), 4), bool(per_grasp))
+        key = (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
+               tuple(round(float(v), 3) for v in G.t(q).flatten().tolist()), arm, None if fingers is None else round(float(fingers), 4), bool(per_grasp))
+        if self.shelf_backoff_m() > 0.0 or self.gen("shelf_transit_max_reach_rad") is not None:  # oracle-fix 2026-11-06: another verdict
+            key = key + ("backoff", round(self.shelf_backoff_m(), 4), self.gen("shelf_transit_max_reach_rad"))
+        return key
 
     def _fixed_start_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
         """Opt-in ``generation.fixed_start_memo_persist`` (oracle-fix 2026-11-05, speed): :meth:`_fixed_start_memo_key`'s failures in the
@@ -2727,9 +2739,12 @@ class IORSSmall(SamplerV2):
         """Opt-in ``generation.shelf_transit_check`` (oracle-fix 2026-11-04 round 4, touching#03: 8 / 8 demos failed the transit to the shelf
         pre-grasp - the straight ramp into bookcase_opryhp_1 / the support, via "ready" too, and trajopt after it): the oracle's first strategies
         re-checked here - the straight joint ramp from the stance's configuration to the pre-grasp witness, else the two ramps via the "ready"
-        arm posture (``r1pro_model.ARM_READY_Q``), each waypoint penetration-free (self + world); None when one passes, else why."""
+        arm posture (``r1pro_model.ARM_READY_Q``), each waypoint penetration-free (self + world); None when one passes, else why.
+        With ``generation.shelf_backoff_transit_m`` / ``shelf_transit_max_reach_rad`` (oracle-fix 2026-11-06): :meth:`_shelf_backoff_transit_why`."""
         from ispatialgym.oracle import r1pro_model as M
 
+        if self.shelf_backoff_m() > 0.0 or self.gen("shelf_transit_max_reach_rad") is not None:
+            return self._shelf_backoff_transit_why(manip, grasp, arm, fingers)
         kw = {"fingers": fingers} if fingers is not None else {}
         r = self.ikc.exact([grasp.pre_grasp], manip, arm, cache=False, **kw)
         if not r.ok or r.q is None:
@@ -2751,6 +2766,226 @@ class IORSSmall(SamplerV2):
         if clear(q0, q_ready) and clear(q_ready, q1):
             return None
         return f"transit check: the straight {arm}-arm ramp from the stance to the pre-grasp witness penetrates (direct and via ready)"
+
+    # ------------------------------------------------------------------ shelf back-off (oracle-fix 2026-11-06, touching#03)
+
+    def shelf_backoff_m(self) -> float:
+        """Opt-in ``generation.shelf_backoff_transit_m`` (oracle-fix 2026-11-06, owner feedback on the touching#03 demo: "instead of swinging
+        arm backwards to reach grasp, I prefer robot moving backwards then reaching through forward movement"): the shelf layout's
+        init -> manipulation transition drives back to the manipulation stand-off + this, the working arm makes its straight joint ramp to
+        the pre-grasp there, then the trunk and the drive-in with the arm frozen (:meth:`record_shelf_backoff`). 0 = off (the transit to
+        the pre-grasp is the grasp's own, from the stance)."""
+        if self.shelf_start is None:
+            return 0.0
+        return max(0.0, float(self.gen("shelf_backoff_transit_m", 0.0) or 0.0))
+
+    def _shelf_arrival(self, manip: Stance):
+        """The recorded arrival transition into ``manip`` (``record_stance_travel``'s; the back-off replaces it)."""
+        tr = next((t for t in self.sidecar.transitions if t.to == manip.name and not t.departure), None)
+        if tr is None or self.sidecar.stances.get(tr.frm) is None:
+            raise Reject("no_transition", f"shelf back-off: no recorded transition into {manip.name}")
+        return tr
+
+    def _shelf_backoff_floor(self, manip: Stance) -> float:
+        """The smallest s_T of the backed-off arrival: the manipulation stand-off + ``generation.shelf_backoff_transit_m``, or the recorded
+        arrival's s_T when that is larger (a path planned to a drive-back pose farther out: the arm is not carried forward first)."""
+        return max(float(manip.stand_off or 0.0) + self.shelf_backoff_m(), float(self._shelf_arrival(manip).stand_off))
+
+    def _shelf_transit_start(self, manip: Stance, s_T: Optional[float], fingers: Optional[float]) -> th.Tensor:
+        """The configuration the shelf transit starts from: with the back-off (``s_T``) the drive-back pose ``NAV.departure_pose(manip, s_T)``
+        with the trunk the arrival transition starts from (the oracle moves the arms after the drive-back, before the trunk) and the arms
+        the robot arrives there with - the departing stance's, or the manipulation stance's posture after a departure transition re-posed
+        them; without it the stance's configuration (the grasp's transit). ``fingers``: the pre-shaped opening (None = the stance's)."""
+        from ispatialgym.sampling.v2 import navigation as NAV
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        if s_T is None:
+            return self.ikc.q_locked(manip, fingers=fingers)
+        arr = self._shelf_arrival(manip)
+        frm = self.sidecar.stances.get(arr.frm)
+        t, k = arr.trunk_from if arr.trunk_from is not None else (frm.translate, frm.tilt)
+        r, l, f = stance_arm_vectors(self.kit, manip if self.departure_of(arr.frm, arr.to) is not None else frm)
+        x, y, yaw = NAV.departure_pose(manip, float(s_T))
+        q = self.kit.q_config(arms="untucked", translate=float(t), tilt=float(k), right_arm=r, left_arm=l, fingers=f if fingers is None else float(fingers))
+        return self.kit.q_at_base_pose(q, x, y, yaw)
+
+    def _shelf_backoff_arms(self, manip: Stance, arm: str, q_arm: th.Tensor) -> Dict[str, th.Tensor]:
+        """The arms the backed-off transition moves to after its drive-back (its record's ``arms_q``): ``arm`` at the pre-grasp joints
+        ``q_arm``, the other arm in the manipulation stance's idle posture."""
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        r, l, _ = stance_arm_vectors(self.kit, manip)
+        other = "right" if arm == "left" else "left"
+        return {arm: G.t(q_arm).float().reshape(-1).clone(), other: G.t(r if other == "right" else l).float().reshape(-1).clone()}
+
+    def _shelf_ramp_why(self, manip: Stance, arm: str, q_arm: th.Tensor, s_T: Optional[float], fingers: Optional[float]) -> Optional[str]:
+        """The straight joint ramp of the arms from :meth:`_shelf_transit_start` to :meth:`_shelf_backoff_arms` (``arm`` at ``q_arm``),
+        else the two ramps via the "ready" posture of ``arm`` (``shelf_transit_why``'s rule), each waypoint penetration-free; None
+        when one passes, else why."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        q0 = self._shelf_transit_start(manip, s_T, fingers)
+        q1 = q0.clone()
+        idx_of = self.kit.robot.arm_control_idx
+        for a, q in self._shelf_backoff_arms(manip, arm, q_arm).items():
+            q1[idx_of[a]] = q.to(q0.dtype)
+        idx = th.cat([th.as_tensor(idx_of[a]).reshape(-1).long() for a in ("left", "right")])
+
+        def clear(qa: th.Tensor, qb: th.Tensor) -> bool:
+            n = max(8, int(math.ceil(float((qb[idx] - qa[idx]).abs().max()) / 0.02)))
+            prof = 0.5 * (1.0 - th.cos(th.linspace(0.0, math.pi, n + 1, dtype=qa.dtype)))
+            ramp = qa.unsqueeze(0) + prof.unsqueeze(1) * (qb - qa).unsqueeze(0)
+            return bool(self.kit.collision_free(ramp, margin=0.0)[1:].all())
+
+        if clear(q0, q1):
+            return None
+        q_ready = q0.clone()
+        q_ready[idx_of[arm]] = th.tensor(M.ARM_READY_Q[arm], dtype=q0.dtype)
+        if clear(q0, q_ready) and clear(q_ready, q1):
+            return None
+        where = "the stance" if s_T is None else f"the drive-back pose at s_T {float(s_T):.2f}"
+        return f"transit check: the straight {arm}-arm ramp from {where} to the pre-grasp witness penetrates (direct and via ready)"
+
+    def _shelf_backoff_transit_why(self, manip: Stance, grasp: GraspRecord, arm: str, fingers: Optional[float] = None) -> Optional[str]:
+        """:meth:`shelf_transit_why` with the back-off and / or the reach limit (oracle-fix 2026-11-06). The pre-grasp witness (exact IK); with
+        ``generation.shelf_transit_max_reach_rad`` a witness farther than that (largest arm-joint change) from the posture the transit
+        starts in is re-solved - the chain [pre-grasp, grasp] seeded at that posture, then at ``ARM_READY_Q`` - and rejected when no solution
+        is within it (t03tip5_kmuacd_s5: the shoulder-flipped twin [-3.23, 2.63, 2.16, ...] 3.23 rad from untucked, an 11.5 s swing up to
+        z 1.90 and 0.47 m behind the base; a near branch 1.37 rad away exists for the same pose); then :meth:`_shelf_ramp_why` - with the
+        back-off at the drive-back pose ``s + generation.shelf_backoff_transit_m`` (at the stance the near branch's ramp passes over the
+        bookcase top: 55 / 70 ramp configurations within 4 cm of it; backed off 0.15-0.25 m: 0 / 70) - and with the back-off the
+        backed-off transition itself (:meth:`_shelf_backoff_transition`). A passing grasp keeps its pre-grasp joints (``_transit_q``), the
+        transition (``_backoff_tr``) and the facts (``shelf_transit``); None when it passes, else why."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        kw = {"fingers": fingers} if fingers is not None else {}
+        r = self.ikc.exact([grasp.pre_grasp], manip, arm, cache=False, **kw)
+        if not r.ok or r.q is None:
+            return f"transit check: no pre-grasp witness ({r.reason})"
+        back = self.shelf_backoff_m()
+        s_T = self._shelf_backoff_floor(manip) if back > 0.0 else None
+        q0 = self._shelf_transit_start(manip, s_T, fingers)
+        idx = self.kit.robot.arm_control_idx[arm]
+        q_pre = G.t(r.q).to(q0.dtype)[idx].clone()
+        reach = float((q_pre - q0[idx]).abs().max())
+        facts: Dict[str, Any] = {"reach_rad": round(reach, 3)}
+        reach_max = self.gen("shelf_transit_max_reach_rad")
+        if reach_max is not None and reach > float(reach_max):
+            found = None
+            for label, seed in (("the transit's start posture", q0[idx]), ("ready", th.tensor(M.ARM_READY_Q[arm], dtype=q0.dtype))):
+                q_seed = self.ikc.q_locked(manip, fingers=fingers).clone()
+                q_seed[idx] = seed.to(q_seed.dtype)
+                r2 = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, arm, q_seed=q_seed, cache=False, scale_key=self.choice.models["target"].scale, **kw)
+                q2 = self.ikc.solutions.get((arm, self.ikc._pose_key(grasp.pre_grasp))) if r2.ok else None
+                if q2 is None:
+                    continue
+                q2 = G.t(q2).to(q0.dtype)[idx].clone()
+                reach2 = float((q2 - q0[idx]).abs().max())
+                if reach2 <= float(reach_max):
+                    found = (label, q2, reach2)
+                    break
+            if found is None:
+                TT._count(self, "shelf_transit.reach_rejected")
+                return (f"transit check: the pre-grasp witness lies {reach:.2f} rad from the transit's start posture (> generation.shelf_transit_max_reach_rad "
+                        f"{float(reach_max):.2f}) and no re-solve from that posture / ready is nearer")
+            TT._count(self, "shelf_transit.reach_resolved")
+            facts = {"reach_rad": round(found[2], 3), "first_reach_rad": round(reach, 3), "resolved_from": found[0]}
+            q_pre = found[1]
+        why = self._shelf_ramp_why(manip, arm, q_pre, s_T, fingers)
+        if why is not None:
+            return why
+        if back > 0.0:
+            tr, why = self._shelf_backoff_transition(manip, arm, q_pre, fingers)
+            if tr is None:
+                return why
+            grasp.extras["_backoff_tr"] = tr
+            facts.update({"backoff_m": round(back, 4), "s_T": round(float(tr.stand_off), 4)})
+        grasp.extras["_transit_q"] = q_pre
+        grasp.extras["shelf_transit"] = facts
+        return None
+
+    def _shelf_backoff_transition(self, manip: Stance, arm: str, q_arm: th.Tensor, fingers: Optional[float]):
+        """``(Transition, "")`` of the backed-off arrival into ``manip`` - ``NAV.transition`` from the recorded arrival's stances and trunk with
+        s_T >= :meth:`_shelf_backoff_floor` (the stand-off + ``generation.shelf_backoff_transit_m``), the sweep and the drive-in with the arms at
+        :meth:`_shelf_backoff_arms` (``arms_to_q``) and the pre-shaped ``fingers``, the drive-back from the path's end as recorded; the ramp
+        checked again at a larger s_T - or ``(None, why)``. Nothing is recorded."""
+        from ispatialgym.sampling.v2 import navigation as NAV
+
+        back = self.shelf_backoff_m()
+        arr = self._shelf_arrival(manip)
+        frm = self.sidecar.stances.get(arr.frm)
+        s_min = self._shelf_backoff_floor(manip)
+        tr = NAV.transition(self.kit, frm, manip, min_standoff=s_min, path_end_standoff=self.path_end_standoff(frm, manip), trunk_from=arr.trunk_from,
+                            extra_max=max(NAV.TRANSITION_EXTRA_MAX, s_min - float(manip.stand_off or 0.0) + 0.3), blame=self.ikc._collision_blame,
+                            arms_to_q=self._shelf_backoff_arms(manip, arm, q_arm),
+                            fingers=fingers)
+        if tr is None:
+            return None, (f"shelf back-off: no s_T >= {s_min:.2f} of {frm.name} -> {manip.name} is swept collision-free with the {arm} arm at its pre-grasp "
+                          f"(generation.shelf_backoff_transit_m {back:.2f})")
+        if abs(float(tr.stand_off) - s_min) > 1e-6:
+            why = self._shelf_ramp_why(manip, arm, q_arm, float(tr.stand_off), fingers)
+            if why is not None:
+                return None, why
+        return tr, ""
+
+    def record_shelf_backoff(self, manip: Stance, grasp: GraspRecord, arm: str, fingers: Optional[float] = None):
+        """Opt-in ``generation.shelf_backoff_transit_m`` (oracle-fix 2026-11-06): the arrival transition into ``manip`` replaced by the backed-off
+        one :meth:`_shelf_backoff_transit_why` checked for ``grasp`` (checked here when the transit check did not run). Its record carries
+        what the oracle runs (``execute_transition``): ``arms_q`` (the working arm's pre-grasp joints, the other arm's idle posture) - the
+        arms go there after the drive-back, a straight ramp first (``move_idle_arms``), so the grasp's own transit is ~0 rad - and
+        ``preshape_m`` (the fingers pre-shaped before the arms move, the pre-grasp checked so); ``backoff_m``. Returns the transition;
+        ``Reject`` when the check fails."""
+        if grasp.extras.get("_backoff_tr") is None:
+            why = self._shelf_backoff_transit_why(manip, grasp, arm, fingers)
+            if why is not None:
+                raise Reject("no_transition" if why.startswith("shelf back-off") else "grasp_unreachable", why)
+        tr = grasp.extras["_backoff_tr"]
+        arr = self._shelf_arrival(manip)
+        tr.holding = arr.holding
+        tr.extras.update(arr.extras or {})
+        tr.extras["arms_q"] = {a: [round(float(v), 5) for v in q.tolist()] for a, q in self._shelf_backoff_arms(manip, arm, grasp.extras["_transit_q"]).items()}
+        if fingers is not None:
+            tr.extras["preshape_m"] = {arm: round(float(fingers), 5)}
+        tr.extras["backoff_m"] = round(self.shelf_backoff_m(), 4)
+        tr.extras["backoff_arm"] = arm
+        self.sidecar.transitions[self.sidecar.transitions.index(arr)] = tr
+        if isinstance(manip.extras.get("init_travel"), dict):
+            manip.extras["init_travel"]["transition_stand_off_m"] = round(float(tr.stand_off), 4)
+        TT._count(self, "shelf_backoff.recorded")
+        log.info("%s: shelf back-off - %s -> %s at s_T %.2f (stand-off %.2f + %.2f), the %s arm to its pre-grasp after the drive-back (reach %.2f rad)",
+                 self.gp.variant, arr.frm, manip.name, float(tr.stand_off), float(manip.stand_off or 0.0), self.shelf_backoff_m(), arm,
+                 float((grasp.extras.get("shelf_transit") or {}).get("reach_rad", float("nan"))))
+        return tr
+
+    def shelf_backoff_witness_why(self) -> Optional[str]:
+        """The program check's pre-grasp witness of the backed-off arm (``sidecar.ik_witnesses``, what the oracle's grasp plans to) against the
+        joints the backed-off transition carries that arm to (``arms_q``): farther than :data:`SHELF_BACKOFF_WITNESS_GAP_RAD` (largest arm
+        joint) the grasp's own transit would be another swing (a witness re-solved in another branch after the settle) - why, else None
+        (also without a back-off record)."""
+        for tr in self.sidecar.transitions:
+            ex = tr.extras or {}
+            arm = ex.get("backoff_arm")
+            if not ex.get("backoff_m") or arm not in (ex.get("arms_q") or {}):
+                continue
+            idx = self.kit.robot.arm_control_idx[arm]
+            w = next((e for e in (getattr(self.sidecar, "ik_witnesses", None) or []) if e.get("name") == "grasp" and e.get("arm") == arm
+                      and isinstance((e.get("targets") or {}).get("pre_grasp"), dict)), None)
+            if w is None or w["targets"]["pre_grasp"].get("q") is None:
+                return f"shelf back-off: no pre-grasp witness of the {arm} arm's grasp after the backed-off transition"
+            q_w = th.as_tensor(w["targets"]["pre_grasp"]["q"], dtype=th.float32).reshape(-1)[idx]
+            gap = float((q_w - th.as_tensor(ex["arms_q"][arm], dtype=th.float32)).abs().max())
+            if gap > SHELF_BACKOFF_WITNESS_GAP_RAD:
+                return (f"shelf back-off: the {arm} arm's pre-grasp witness lies {gap:.2f} rad from the joints the backed-off transition carries the arm to "
+                        f"(> {SHELF_BACKOFF_WITNESS_GAP_RAD:.2f}: the grasp's transit would swing it into another branch)")
+        return None
+
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        """:meth:`SamplerV2.program_check`, then :meth:`shelf_backoff_witness_why` (oracle-fix 2026-11-06; a no-op without a back-off record)."""
+        report = super().program_check(draft)
+        why = self.shelf_backoff_witness_why()
+        if why is not None:
+            raise Reject("program_check_failed", why)
+        return report
 
     def shelf_tip(self) -> bool:
         """Shelf layout with ``generation.shelf_tip_release`` (oracle-fix 2026-11-04 round 4, touching#03: every push class failed at its pre-pose
@@ -3373,6 +3608,9 @@ class IORSSmall(SamplerV2):
         as the recorded turn's; the pre-place -> place descent and the lift of ``after_goal_check`` with the object attached; touching:
         the place from the push stance with its retreat clear pose (``place_infeasible_why``) and the carried drive there swept again
         at this turn's lift configuration. None when every check passes, else the first failure."""
+        if any((t.extras or {}).get("backoff_m") for t in self.sidecar.transitions):
+            # oracle-fix 2026-11-06: the backed-off transition carries the arm to the recorded turn's pre-grasp joints (``arms_q``)
+            raise TT.TurnNotOffered("the backed-off init -> manipulation transition carries the arm to this turn's pre-grasp (generation.shelf_backoff_transit_m)")
         tgt, manip = self.obj("target"), self.sidecar.stance("manipulation")
         scale = self.choice.models["target"].scale
         kw = {"ignore_for_last": self.support_objects(), "scale_key": scale, "cache": False, "approached": [tgt]}

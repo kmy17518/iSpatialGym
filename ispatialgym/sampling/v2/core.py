@@ -824,10 +824,17 @@ class SamplerV2(TaskSampler):
                 else:
                     dep = self.departure_of(tr.frm, tr.to)
                     s_to = float(to.stand_off if to.stand_off is not None else 0.0)
+                    # oracle-fix 2026-11-06 (the shelf back-off): a record that carries the arms the oracle moves to after the drive-back
+                    # (``arms_q``) and the pre-shaped fingers (``preshape_m``) is re-swept with them, and keeps them
+                    arms_to_q, fingers_rec = NAV.recorded_arms_to(tr.extras)
                     new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
                                          min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to), arm_q_override=override,
                                          trunk_from=dep.trunk_to if dep is not None else None,
-                                         extra_max=max(NAV.TRANSITION_EXTRA_MAX, float(tr.stand_off) - s_to + NAV.TRANSITION_EXTRA_MAX))
+                                         extra_max=max(NAV.TRANSITION_EXTRA_MAX, float(tr.stand_off) - s_to + NAV.TRANSITION_EXTRA_MAX),
+                                         arms_to_q=arms_to_q, fingers=fingers_rec)
+                    if new is not None and arms_to_q:
+                        new.holding = tr.holding
+                        new.extras.update(tr.extras)
             if new is None:
                 joints = {n: [round(float(v), 3) for v in o.get_joint_positions().tolist()] for n, o in self.objects.items() if getattr(o, "n_joints", 0)}
                 raise Reject("no_transition", f"{tr.frm} -> {tr.to}{' (departure)' if tr.departure else ''}: no swept-free s_T >= the recorded {tr.stand_off:.2f} "

@@ -894,6 +894,20 @@ def _record_arms_q(action) -> Dict[str, th.Tensor]:
     return out
 
 
+def _record_preshape(action) -> Optional[float]:
+    """oracle-fix 2026-11-06 (the shelf back-off): the finger opening an oracle-side transition record pre-shapes to before its arms move
+    (``preshape_m``: arm -> m, the widest; written by ``IORSSmall.record_shelf_backoff``), None without it."""
+    rec = getattr(action, "transition", None)
+    shape = ((getattr(rec, "extra", None) or {}).get("preshape_m") if rec is not None else None) or {}
+    vals = []
+    for v in shape.values() if isinstance(shape, dict) else ():
+        try:
+            vals.append(float(v))
+        except (TypeError, ValueError):
+            continue
+    return max(vals) if vals else None
+
+
 class _released_placed:
     """Context: every object a ``Place`` before ``upto`` set down (and the tracker did not advance already, i.e. not a block) stands
     at its release pose - ``place ∘ inv(T_obj→eef)`` of its grasp record - for the travel sweeps, so the hand hovering where it
@@ -2887,8 +2901,13 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             elif goal is not None:
                 checks.append((goal, to_trunk))
         rec_arms = _record_arms_q(action) if name in ("navigate", "transition") else {}
+        # oracle-fix 2026-11-06 (the shelf back-off): a transition whose record pre-shapes the fingers before the arms move (``preshape_m``)
+        # visits its poses with them so
+        rec_fingers = _record_preshape(action) if name == "transition" else None
         for pose2d, trunk in checks:
             r_arm, l_arm, fingers_st = sampler.ikc.arm_vectors(stance)
+            if rec_fingers is not None:
+                fingers_st = rec_fingers
             q_arms = {"right": r_arm, "left": l_arm}
             q_arms.update(rec_arms)  # owner 2026-09-24: the arms the record was swept with (``arms_q``) when it carries them
             drive_ctx = attached(sampler.kit, None, None)
