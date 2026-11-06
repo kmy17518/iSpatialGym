@@ -426,13 +426,21 @@ def _same(a, b) -> bool:
 
 def instance_record(demo: "Demo") -> Dict[str, Any]:
     """The demo's instance summary (``<iid>.summary.json`` next to its TRO) and its variant / subtask (the demo's meta.json first)."""
-    rec: Dict[str, Any] = {"summary": None, "variant": None, "subtask": None}
+    rec: Dict[str, Any] = {"summary": None, "variant": None, "subtask": None, "tracked": None}
     meta_p = os.path.join(demo.dir, "meta.json")
     if os.path.exists(meta_p):
         try:
             m = json.load(open(meta_p))
             rec["variant"], rec["subtask"] = m.get("variant"), m.get("subtask")
+            if m.get("tracked_objects"):
+                rec["tracked"] = sorted(set((m.get("tracked_objects") or {}).values()))
         except ValueError:
+            pass
+    if rec["tracked"] is None and demo.tro_path and os.path.exists(demo.tro_path):
+        try:  # the task's objects as the TRO binds them (the oracle judges its tracked objects only)
+            binds = (json.load(open(demo.tro_path)).get("ispatialgym") or {}).get("object_bindings") or {}
+            rec["tracked"] = sorted({b["scene_object_name"] for b in binds.values() if isinstance(b, dict) and b.get("scene_object_name")}) or None
+        except (ValueError, OSError):
             pass
     if demo.tro_path and demo.tro_path.endswith("-tro_state.json"):
         sp = demo.tro_path[: -len("-tro_state.json")] + ".summary.json"
@@ -463,10 +471,11 @@ def needs_occlusion_screen(mode: str, rec: Dict[str, Any]) -> Tuple[bool, str]:
     return True, "not measured by the sampler"
 
 
-def occlusion_screen(scene, render, subtask: Optional[str]) -> Dict[str, Any]:
+def occlusion_screen(scene, render, subtask: Optional[str], tracked: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """:mod:`ispatialgym.eval.goal_occlusion` on the slot's current (loaded) state, as ``Executor.goal_occlusion_report`` screens a
-    demo's last frame: the head camera's settled depth, every target / partner and fixture of the scene; the robot hidden for a
-    second render when a fixture is judged."""
+    demo's last frame: the head camera's settled depth, the task's (``tracked``: the demo's tracked objects) targets / partners and
+    fixtures - every other door / dishwasher of the scene is not the task's; without ``tracked`` the target / partner objects only -; the
+    robot hidden for a second render when a fixture is judged."""
     from omnigibson.utils.constants import JointType
 
     from ispatialgym.eval import goal_occlusion as GO
@@ -480,7 +489,8 @@ def occlusion_screen(scene, render, subtask: Optional[str]) -> Dict[str, Any]:
         return {"status": "no head camera", "occluded": False, "max_occluded": None}
     sensor = robot.sensors[key]
     intr = GO.intrinsics_of(CameraModel.from_sensor(sensor))
-    judged = [o for o in scene.objects if GO.role(getattr(o, "name", ""))]
+    names = set(tracked) if tracked else None
+    judged = [o for o in scene.objects if GO.role(getattr(o, "name", "")) and (o.name in names if names is not None else GO.role(o.name) == "object")]
     depth = settled_depth(sensor, render)
     depth_without = None
     if any(GO.role(o.name) == "fixture" for o in judged):
@@ -753,7 +763,7 @@ def main(argv=None) -> int:
                 if screen:
                     t_o = time.perf_counter()
                     try:
-                        occl = occlusion_screen(s.scene, og.sim.render, rec.get("subtask") or rec.get("variant"))
+                        occl = occlusion_screen(s.scene, og.sim.render, rec.get("subtask") or rec.get("variant"), rec.get("tracked"))
                     except Exception as e:  # noqa: BLE001  (a failed screen keeps the demo and says why)
                         occl = {"status": f"error: {e!r}", "occluded": False, "max_occluded": None}
                     t_ticks["goal_occlusion"] += time.perf_counter() - t_o

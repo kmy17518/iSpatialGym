@@ -38,13 +38,17 @@ def test_instance_record_reads_the_demo_meta_and_the_summary_next_to_the_tro(tmp
     (inst / "a__0000.summary.json").write_text(json.dumps({"visibility": "pending"}))
     demo_dir = tmp_path / "demo" / "a__0000"
     demo_dir.mkdir(parents=True)
-    (demo_dir / "meta.json").write_text(json.dumps({"variant": "v", "subtask": "s"}))
+    (demo_dir / "meta.json").write_text(json.dumps({"variant": "v", "subtask": "s", "tracked_objects": {"cup.n.01_1": "target_cup_0", "door.n.01_1": "door_a_0"}}))
 
     class D:
         dir = str(demo_dir)
         tro_path = str(tro)
 
     rec = RP.instance_record(D())
-    assert rec == {"summary": {"visibility": "pending"}, "variant": "v", "subtask": "s"}
+    assert rec == {"summary": {"visibility": "pending"}, "variant": "v", "subtask": "s", "tracked": ["door_a_0", "target_cup_0"]}
+    # without the meta's tracked objects: the TRO's bindings name them (an untracked door of the scene is never judged)
+    (demo_dir / "meta.json").write_text(json.dumps({"variant": "v"}))
+    tro.write_text(json.dumps({"ispatialgym": {"object_bindings": {"cup.n.01_1": {"scene_object_name": "target_cup_0"}}}}))
+    assert RP.instance_record(D())["tracked"] == ["target_cup_0"]
     D.tro_path = None
     assert RP.instance_record(D())["summary"] is None
