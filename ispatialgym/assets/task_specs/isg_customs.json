@@ -40951,7 +40951,9 @@
     "max_height_m": 0.3
    },
    "partner_max_aspect": 3.2,
-   "push_max_pinch_m": 0.092
+   "push_max_pinch_m": 0.092,
+   "push_height_sweep": true,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried"
   },
   "constraints": [],
   "evaluation": {
@@ -41095,7 +41097,9 @@
     "max_height_m": 0.3
    },
    "partner_max_aspect": 3.2,
-   "push_max_pinch_m": 0.092
+   "push_max_pinch_m": 0.092,
+   "push_height_sweep": true,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried"
   },
   "constraints": [],
   "evaluation": {
@@ -41257,7 +41261,9 @@
     30.0
    ],
    "table_end_margin_m": 0.1,
-   "push_max_pinch_m": 0.092
+   "push_max_pinch_m": 0.092,
+   "push_height_sweep": true,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried"
   },
   "constraints": [],
   "evaluation": {
@@ -41401,7 +41407,9 @@
     "max_height_m": 0.3
    },
    "partner_max_aspect": 3.2,
-   "push_max_pinch_m": 0.092
+   "push_max_pinch_m": 0.092,
+   "push_height_sweep": true,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried"
   },
   "constraints": [],
   "evaluation": {
@@ -41546,7 +41554,9 @@
     20.0,
     30.0
    ],
-   "table_end_margin_m": 0.1
+   "table_end_margin_m": 0.1,
+   "push_height_sweep": true,
+   "_push_height_sweep_note": "oracle-fix 2026-11-06 (owner feedback on the inter_object_relation_satisfaction-touching_small_scale-spray_bottle-* demo: \"for small scale touching, can we make the push push the most reachable center bottom part of the target object so it doesn't wobble so much\"): the push contact swept from the lowest height that clears the table up to half the bottle's height in 1 cm steps, lowest first, on the line through its footprint centre at the hull's cut surface, the hand checked against the hull, the push stance at the lateral with the lowest feasible contact (iors_small.IORSSmall.swept_push_candidates; the touching small-scale default, set here explicitly). Measured on tch04_tol_redemo 0001: every class at mid height failed (push_tip_h / tip_v- / push_h: exact IK at the pre-pose, push_v: knuckle +4 mm, leaning blades: gripper body -17 / -26 / -31 mm from the box - the bottle's box at its 48.6 deg yaw stands ~2 cm proud of its surface), so the palm-clear raised blade pushed the 0.273 m bottle at 0.228 m (83 % of its height, the sprayer head) and it tilted 3.6 -> 20.3 deg; the raised blade is now offered only to targets with height / smallest footprint side <= 1.5 (this bottle: ~3), so a stance without a low contact fails contact_unreachable and another stance is tried"
   },
   "constraints": [],
   "evaluation": {
