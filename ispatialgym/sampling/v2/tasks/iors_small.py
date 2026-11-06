@@ -1941,7 +1941,7 @@ class IORSSmall(SamplerV2):
                     continue
             memo_key = None
             try:
-                ft = getattr(self.ikc, "finger_touch", None)  # oracle-fix 2026-11-04 round 3: the pre-shaped opening when the preshape rule is on
+                ft = getattr(getattr(self, "ikc", None), "finger_touch", None)  # oracle-fix 2026-11-04 round 3: the pre-shaped opening when the preshape rule is on
                 pre_open = ft.opening() if (ft is not None and getattr(ft, "preshape", False) and callable(getattr(ft, "opening", None))) else None
                 per_grasp = bool(self.gen("shelf_transit_check") and self.gen("shelf_transit_per_grasp"))
                 if self.shelf_pose is not None and self.gen("fixed_start_memo"):

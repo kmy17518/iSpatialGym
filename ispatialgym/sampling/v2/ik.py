@@ -984,7 +984,7 @@ class IKChecker:
 
     def _count(self, key: str, n: int = 1) -> None:
         """Add ``n`` to the kit's call counter ``key`` (``RobotKit.stats``: per instance in ``summary.json["kit"]``)."""
-        st = getattr(self.kit, "stats", None)
+        st = getattr(getattr(self, "kit", None), "stats", None)
         if isinstance(st, dict):
             st[key] = st.get(key, 0) + n
 

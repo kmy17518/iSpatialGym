@@ -395,7 +395,8 @@ def test_variant_handle_row_and_pinch_width_floor():
 
 
 def test_load_handle_takes_the_variant_bar_of_the_office_cabinet_door():
-    """The recorded office cabinet door (B4 inventory + icl rows, instance frame): by default the edge pinch j_link_2#F; with
+    """The recorded office cabinet door (B4 inventory + icl rows, instance frame): by default (the 3-80 mm pinch range, owner 2026-11-02;
+    the edge pinch j_link_2#F under the old 15 mm floor) the 8 mm bar j_link_2#C; with
     ``handle_row: j_link_2#C`` and ``pinch_width_min_m: 0.006`` the 8 mm vertical bar (h 0.73 m, approached from the front)
     keeps its grasp slide along its 0.28 m length (the length from the record's bar) and the template facts name the row."""
     gen = {"joint": "j_link_2", "handle_key": "bottom_cabinet__rvunhj"}
@@ -410,7 +411,7 @@ def test_load_handle_takes_the_variant_bar_of_the_office_cabinet_door():
                           joints={"j_link_2": SimpleNamespace(is_revolute=True, lower_limit=0.0, upper_limit=1.5708)})
     al = sampler()
     al.load_handle(obj)
-    assert al.handle["kind"] == "edge" and al.template_facts["handle"]["row"] == "bottom_cabinet__rvunhj:j_link_2#F"
+    assert al.handle["kind"] == "bar" and al.template_facts["handle"]["row"] == "bottom_cabinet__rvunhj:j_link_2#C"
     assert "handle_row" not in al.template_facts["handle"] and "pinch_width_range_mm" not in al.template_facts["handle"]
     gen.update({"handle_row": "j_link_2#C", "pinch_width_min_m": 0.006})
     al = sampler()
