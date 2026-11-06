@@ -539,6 +539,28 @@ class SamplerV2(TaskSampler):
         """Floor footprints (world xy polygons) every recorded path plans around on the local map (default none)."""
         return []
 
+    def gen_seeded(self, key: str, default=None):
+        """``generation.<key>`` of the customs entry, else the subtask's ``generation_defaults`` seed of the key, else ``default``
+        (oracle-fix 2026-11-06, owner feedback on the inside_large#02 demo): for a knob whose default the owner set per subtask in
+        ``generation_defaults`` - ``GroundedProblem.gen`` reads the entry alone, and the counted templates read their own customs copy,
+        seeded before the key existed."""
+        v = self.gp.gen(key)
+        if v is not None:
+            return v
+        from ispatialgym.sampling import generation_defaults as GD
+
+        try:
+            return GD.defaults_for(str(getattr(self.gp, "subtask", "") or "")).get(key, default)
+        except KeyError:
+            return default
+
+    def base_path_style(self, carried: bool) -> str:
+        """How a drive is checked and recorded (``robot.base_path.STYLES``): ``generation.base_path_style`` (owner 2026-09-26) for an
+        empty-handed one, ``generation.carried_base_path_style`` (oracle-fix 2026-11-06, owner feedback on the inside_large#02 demo: "does
+        this use the same navigation module as camera relocalization? the path doesn't seem smooth") for a carried one; "recorded" unless
+        the entry or its subtask's defaults (:meth:`gen_seeded`; IORS large scale: "face_travel") say otherwise."""
+        return str(self.gen_seeded("carried_base_path_style" if carried else "base_path_style", "recorded") or "recorded")
+
     def path_keep_off_footprints(self) -> List[Any]:
         """Opt-in ``generation.path_keep_off`` (oracle-fix 2026-11-04 round 4, pillow 158): ``[{"name": <object>, "margin_m": m}, ...]`` - every
         recorded path keeps its base centre ``margin_m`` off the object's AABB footprint, on the local AND the eroded global map (probe_pillow:
@@ -842,9 +864,9 @@ class SamplerV2(TaskSampler):
         CURRENT grasp record (``tabletop.held_turns``: after ``tabletop.flip_grasp`` the other finger assignment rides there): with
         ``stances`` its carried stances, and its transitions at their recorded stand-off, as :meth:`check_stances_with_objects` sweeps
         them; its paths at their recorded strides as ``NAV.plan_path`` / ``NAV.plan_edge_slide`` swept them (yaw-lag envelope, edge
-        slide), at ``generation.carry_path_margin_m``. ``arm_q`` (per arm): the arms a task drove its carried path with (touching: this
-        assignment's lift configuration); default as :meth:`record_path` (``carry_arm_q``, else the departing stance's arms). Returns why
-        a sweep fails, None when every one passes."""
+        slide; a face_travel record's schedule, ``NAV.record_sweep_poses``), at ``generation.carry_path_margin_m``. ``arm_q`` (per
+        arm): the arms a task drove its carried path with (touching: this assignment's lift configuration); default as :meth:`record_path`
+        (``carry_arm_q``, else the departing stance's arms). Returns why a sweep fails, None when every one passes."""
         from ispatialgym.sampling.v2.ik import stance_arm_vectors
 
         obj, arm, eef_in_object = self.carried_attachment(carried)
@@ -880,10 +902,8 @@ class SamplerV2(TaskSampler):
             frm = self.sidecar.stances.get(p.frm)
             if p.carried != carried or frm is None or len(p.waypoints) < 2:
                 continue
-            if p.mode == NAV.EDGE_SLIDE_MODE:
-                poses = NAV.stride_poses(p.waypoints, p.stride_m)
-            else:
-                poses = NAV.stride_poses(p.waypoints, p.stride_m, yaw_envelope=True)
+            # oracle-fix 2026-11-06: a face_travel record is swept as its schedule (+ the yaw-lag envelope), what the oracle drives
+            poses = NAV.record_sweep_poses(p, yaw_envelope=p.mode != NAV.EDGE_SLIDE_MODE)
             q_arms = arm_q
             if q_arms is None:
                 r, l, _ = stance_arm_vectors(self.kit, frm, p.posture if p.posture != "untucked" else None)
@@ -1117,18 +1137,26 @@ class SamplerV2(TaskSampler):
             # demos failed `collision` on navigate legs: an arm link on a wall, a finger on the neighbouring cabinet)
             margin = float(self.gp.gen("carry_path_margin_m", 0.01)) if (carried and obj is not None) else float(self.gp.gen("path_margin_m", 0.01))
             # owner 2026-09-26: ``generation.base_path_style`` (default "recorded") - a family that opts in has its UNCARRIED drives checked
-            # and recorded as the face_travel schedule (recorded fallback when the schedule collides); carried legs stay recorded, the
-            # schedule only probed at 1 cm for the morning report
+            # and recorded as the face_travel schedule (recorded fallback when the schedule collides)
+            # oracle-fix 2026-11-06 (owner feedback on the inside_large#02 demo: "the path doesn't seem smooth"; the jar's carried leg as recorded:
+            # 17.2 s, 409 deg of rotation for a net -1 deg, the body 59 deg off the travel direction on average - 9.0 s / 102 deg as face_travel):
+            # ``generation.carried_base_path_style`` the same for the CARRIED drives (default "recorded": the schedule only probed at 1 cm for the
+            # morning report); ``generation.face_travel_fallback_cfgs`` (opt-in) = schedule configurations tried after the default one collides;
+            # ``generation.face_travel_max_extra_rotation_deg``: a schedule turning the body more than the polyline (+ this) is not used
             is_carried = bool(carried and obj is not None)
             if axis_leg is not None:
                 p = NAV.plan_axis_leg(self.kit, start, to, back_offs=list(axis_leg), posture=posture, carried=carried, carried_obj=obj, carried_arm=arm,
                                       max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, arm_q=arm_q, margin=margin)
             else:
-                style = "recorded" if is_carried else str(self.gp.gen("base_path_style", "recorded") or "recorded")
+                style = self.base_path_style(is_carried)
+                ft_cfgs = list(self.gen_seeded("face_travel_fallback_cfgs") or []) if style == "face_travel" else []
+                ft_rot = self.gen_seeded("face_travel_max_extra_rotation_deg") if style == "face_travel" else None
                 p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
                                   blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q,
-                                  margin=margin, edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style, probe_face_travel=is_carried,
-                                  **({"global_blocked": keep_off} if keep_off else {}))
+                                  margin=margin, edge_slide=edge_slide, edge_slide_back_m=edge_slide_back_m, style=style,
+                                  probe_face_travel=is_carried and style != "face_travel", **({"global_blocked": keep_off} if keep_off else {}),
+                                  **({"face_travel_cfgs": ft_cfgs} if ft_cfgs else {}),
+                                  **({"face_travel_max_extra_rotation_deg": float(ft_rot)} if ft_rot is not None else {}))
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

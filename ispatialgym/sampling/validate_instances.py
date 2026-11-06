@@ -661,7 +661,8 @@ def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
         sd.add_transition(tr)
     for p in d.get("paths") or []:
         sd.add_path(PathRecord(p["from"], p["to"], p.get("mode", "local"), [tuple(float(v) for v in w) for w in p["waypoints"]],
-                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried"), style=p.get("style"), arms_q=p.get("arms_q")))
+                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried"), style=p.get("style"), arms_q=p.get("arms_q"),
+                               face_travel_cfg=p.get("face_travel_cfg")))  # oracle-fix 2026-11-06: the schedule's own config, as recorded
     for g in d.get("grasps") or []:
         ch = g.get("carry_height", 0.12)
         sd.add_grasp(GraspRecord(g["object"], g["arm"], g.get("grasp_key"), g.get("grasp_name"), float(g.get("yaw", 0.0) or 0.0),

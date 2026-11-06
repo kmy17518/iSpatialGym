@@ -949,7 +949,7 @@ class _released_placed:
 
 def _sweep_travel_record(sidecar: SidecarDraft, sampler, action, override: Dict[str, th.Tensor]) -> Tuple[bool, str, Dict[str, th.Tensor]]:
     """Re-check one recorded travel leg with the acting arm(s) at ``override`` (arm -> 7 joints) instead of the stance posture:
-    a path at its recorded trunk over its strides, an arrival transition's sweep / drive-in at its recorded s_T, a departure
+    a path at its recorded trunk over its strides (a face_travel record: its schedule, ``NAV.record_sweep_poses``), an arrival transition's sweep / drive-in at its recorded s_T, a departure
     transition's drive-back / sweep at its recorded s_T (``NAV.transition`` / ``NAV.departure_transition`` asked for exactly the
     recorded stand-off). Returns ``(ok, why, arms swept with)``."""
     from ispatialgym.sampling.v2 import navigation as NAV
@@ -968,9 +968,12 @@ def _sweep_travel_record(sidecar: SidecarDraft, sampler, action, override: Dict[
         q_arms = {"right": r, "left": l}
         q_arms.update(override)
         trunk = tuple(float(v) for v in rec.trunk) if rec.trunk is not None else (float(frm_st.translate), float(frm_st.tilt))
-        poses = NAV.stride_poses(rec.waypoints, float(rec.stride_m or NAV.STRIDE_M), yaw_envelope=True)  # + the tracker's yaw lag on the turns
+        # the strides + the tracker's yaw lag on the turns; oracle-fix 2026-11-06: a face_travel record as its schedule (what the oracle drives -
+        # the polyline was swept here for an empty-handed face_travel leg too, up to 0.15 m off the drive)
+        poses = NAV.record_sweep_poses(rec)
         ok, bad = NAV.path_collision_free(kit, poses, trunk, q_arms=q_arms, fingers=f, margin=DEPARTURE_SWEEP_MARGIN)
-        return ok, "" if ok else f"path {rec.frm} -> {rec.to} collides at swept pose {bad}/{len(poses)} (strides + yaw-lag envelope)", q_arms
+        what = "face_travel schedule" if getattr(rec, "style", None) == "face_travel" else "strides"
+        return ok, "" if ok else f"path {rec.frm} -> {rec.to} collides at swept pose {bad}/{len(poses)} ({what} + yaw-lag envelope)", q_arms
     # a transition: the arriving stance's arms with the override on top (what NAV.transition sweeps with)
     r, l, f = stance_arm_vectors(kit, to_st)
     q_arms = {"right": r, "left": l}

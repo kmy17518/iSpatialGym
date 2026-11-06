@@ -106,6 +106,22 @@ class BasePathConfig:
     spot_turn_deg: float = 90.0
 
 
+def config_with(overrides: Optional[Dict[str, float]] = None, base: Optional[BasePathConfig] = None) -> BasePathConfig:
+    """``base`` (default :class:`BasePathConfig`) with the fields of ``overrides`` replaced — a path record's own schedule
+    configuration (oracle-fix 2026-11-06, ``paths[].face_travel_cfg``: the schedule the sampler checked when the default one
+    collided, ``generation.face_travel_fallback_cfgs``), built alike on both sides. ``ValueError`` for a key that is not a field."""
+    import dataclasses
+
+    base = base or BasePathConfig()
+    if not overrides:
+        return base
+    names = {f.name for f in dataclasses.fields(BasePathConfig)}
+    bad = sorted(set(overrides) - names)
+    if bad:
+        raise ValueError(f"base path config: unknown field(s) {bad} (one of {sorted(names)})")
+    return dataclasses.replace(base, **{k: float(v) for k, v in overrides.items()})
+
+
 @dataclass(frozen=True)
 class Line:
     s0: float

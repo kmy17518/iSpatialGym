@@ -519,7 +519,9 @@ class Navigate(Action):
     the stance posture - the executor re-poses only an arm that deviates from them. ``axis_leg`` (owner 2026-10-13, the
     disembedding leg into the place pose; the program sets it after ``robot.base_path.axis_leg_violation`` passed): the
     heading is kept and the moves are forward / backward or left / right only - the tracker stops at every corner and the
-    postcondition checks the driven heading and corridor.
+    postcondition checks the driven heading and corridor. ``face_travel_cfg`` (sidecar ``paths[].face_travel_cfg``, oracle-fix
+    2026-11-06; None when absent or not driven as ``face_travel``): the record's own ``robot.base_path.BasePathConfig`` overrides
+    (``robot.base_path.config_with``) - the schedule the sampler checked when the default one collided.
     """
 
     name: str = "navigate"
@@ -527,7 +529,7 @@ class Navigate(Action):
     obstacles: Tuple[str, ...] = ()
     style: Optional[str] = None
     axis_leg: bool = False
-    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style", "arms_q", "axis_leg")
+    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style", "arms_q", "axis_leg", "face_travel_cfg")
 
     def __post_init__(self):
         super().__post_init__()
@@ -535,16 +537,21 @@ class Navigate(Action):
             raise ValueError(f"navigate: unknown style {self.style!r} (one of {BP.STYLES})")
         if self.axis_leg and self.style not in (None, BP.RECORDED):
             raise ValueError(f"navigate: an axis-aligned leg is driven as recorded, not {self.style!r}")
+        if (self.path.extra or {}).get("face_travel_cfg"):
+            BP.config_with(self.path.extra["face_travel_cfg"])  # ValueError for a key robot.base_path.BasePathConfig does not have
 
     def targets(self, sidecar, state):
+        style = BP.RECORDED if self.axis_leg else (self.style or (self.path.extra or {}).get("style") or BP.RECORDED)
+        cfg = (self.path.extra or {}).get("face_travel_cfg") if style == BP.FACE_TRAVEL else None
         return {
             "waypoints": [list(w) for w in self.path.waypoints],
             "goal": self.path.goal,
             "posture": self.path.posture,
             "carried": self.path.carried,
-            "style": BP.RECORDED if self.axis_leg else (self.style or (self.path.extra or {}).get("style") or BP.RECORDED),
+            "style": style,
             "arms_q": _arms_q_of(self.path.extra),
             "axis_leg": bool(self.axis_leg),
+            "face_travel_cfg": {str(k): float(v) for k, v in cfg.items()} if isinstance(cfg, dict) and cfg else None,
         }
 
     def annotate(self, sidecar):

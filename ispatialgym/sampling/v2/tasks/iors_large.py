@@ -3021,7 +3021,8 @@ class IORSLarge(SamplerV2):
         has a pose (``record_leg_a_b`` runs with the target parked), so its sweep never saw where the target ends up - harmless for
         a target on a table, not for one on the floor B drives up to. Re-sweep the recorded A -> B path (its strides + the
         yaw-lag envelope, the trunk and arms it was checked with, the floor relaxation of the original check) with the target
-        placed at ``t_pose``; returns the reason when it collides, None when it clears (or when there is no path)."""
+        placed at ``t_pose`` (a face_travel record: its schedule, ``NAV.record_sweep_poses``); returns the reason when it collides, None
+        when it clears (or when there is no path)."""
         path_ab = next((p for p in self.sidecar.paths if p.to == manip.name), None)
         if path_ab is None or len(path_ab.waypoints) < 2:
             return None
@@ -3039,7 +3040,8 @@ class IORSLarge(SamplerV2):
             tgt.set_position_orientation(*t_pose)
             tgt.keep_still()
             self.kit.sync_world()
-            poses = NAV.stride_poses(path_ab.waypoints, float(path_ab.stride_m or NAV.STRIDE_M), yaw_envelope=True)
+            # oracle-fix 2026-11-06: a face_travel A -> B record is swept as its schedule (+ the yaw-lag envelope), what the oracle drives
+            poses = NAV.record_sweep_poses(path_ab)
             with self._floor_relaxed():
                 ok, bad = NAV.path_collision_free(self.kit, poses, trunk, path_ab.posture, margin=0.01, q_arms=q_arms)
         finally:
