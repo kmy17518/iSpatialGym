@@ -385,7 +385,20 @@ def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, o
     sampler.template_meta.update(meta_extra or {})
     try:
         sampler.setup()
-        written = sampler.run_instances(n_instances, max_attempts=max_attempts, start_index=start_index, indices=indices)
+        prof_path = os.environ.get("ISPATIALGYM_SAMPLER_PROFILE")
+        if prof_path:
+            # oracle-fix 2026-11-05 (speed): cProfile of the attempts, enabled with the simulator up (the Kit launch replaces the thread's profile
+            # hook: a profiler enabled before it saw the whole run as the launch's module import); SamplerV2.log_attempt_stages dumps it per attempt
+            import cProfile
+
+            sampler._sampler_profile = cProfile.Profile()
+            sampler._sampler_profile.enable()
+        try:
+            written = sampler.run_instances(n_instances, max_attempts=max_attempts, start_index=start_index, indices=indices)
+        finally:
+            if prof_path and getattr(sampler, "_sampler_profile", None) is not None:
+                sampler._sampler_profile.dump_stats(prof_path)
+                sampler._sampler_profile = None
         entry = sampler.template_summary(len(written), time.time() - t0)
         entry["written"] = [os.path.relpath(p, out_root) for p in written]
         return entry

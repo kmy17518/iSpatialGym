@@ -1800,7 +1800,9 @@ class IKChecker:
                                                  **({"pose_per_grasp": True} if pose_per_grasp else {}), **({"pre": pre_tag or "custom"} if pre_of is not None else {})})
             hit = cache_get(key)
             if hit is not None:
+                self._count("feasible_sets.hit")  # oracle-fix 2026-11-05 (speed): hits / misses in the attempt's kit line
                 return {int(i): [(float(yaw), by_name[gn]) for yaw, gn in lst if gn in by_name] for i, lst in hit.items()}
+            self._count("feasible_sets.miss")
         pairs, index = [], []
         for i, cell in enumerate(cells):
             for yaw in yaws:

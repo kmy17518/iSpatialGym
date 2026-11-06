@@ -1466,6 +1466,10 @@ class SamplerV2(TaskSampler):
         ``*_problems`` / ``*_configs`` key of ``RobotKit.stats_snapshot``, whatever the kit counts)."""
         log.info("%s: instance %d attempt %d stages: %s", self.gp.variant, index, attempt, clock.stages_text())
         log.info("%s: instance %d attempt %d kit: %s", self.gp.variant, index, attempt, format_kit_delta(clock.total_kit()))
+        prof = getattr(self, "_sampler_profile", None)
+        if prof is not None:  # the profile so far after every attempt (a cancelled job keeps it); dump_stats disables the profiler
+            prof.dump_stats(os.environ["ISPATIALGYM_SAMPLER_PROFILE"])
+            prof.enable()
 
     def run_instances(self, n: int, max_attempts: int = 30, start_index: Optional[int] = None, indices: Optional[Sequence[int]] = None) -> List[str]:
         """Per attempt: sample (task module) -> apply -> settle + BEHAVIOR validation -> goal feasibility (robot parked per
