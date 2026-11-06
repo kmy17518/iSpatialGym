@@ -3331,12 +3331,13 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                 screened[a] = True
                 F_of[a] = ev_F(a) or []
         F = pool_of(F_of)
-    if not F and fixed is None and fast_on("TILT_SNAP") and not all(ev_unreachable(a) for a in offered):
-        # TILT_SNAP (owner 2026-11-01, inside_02): Phase 2 stances take continuous tilts between the band's grid tilts, and a far cell the
-        # band holds at the grid tilt may be out of reach at the stance's (x 0.96 m at 0.25 / -1.2, not at 0.25 / -1.07). An empty F at the
-        # stance's tilt: the stance moves to the grid tilt its band cells came from when it stays collision-free and Phase 2's work-camera
-        # rules (axis angle, target in frame) still pass there, and F is screened there; otherwise the cell is kept only when both grid
-        # tilts around the stance's tilt hold it - else it is out of reach at this trunk (evidence: unreachable, never re-screened).
+    if not F and fixed is None and fast_on("TILT_SNAP", default=False) and not all(ev_unreachable(a) for a in offered):
+        # TILT_SNAP (owner 2026-11-01, inside_02; default off since 2026-11-01: it lowered inside_02's yield). Phase 2 stances take continuous
+        # tilts between the band's grid tilts, and a far cell the band holds at the grid tilt may be out of reach at the stance's (x 0.96 m at
+        # 0.25 / -1.2, not at 0.25 / -1.07). An empty F at the stance's tilt: the stance moves to the grid tilt its band cells came from when it
+        # stays collision-free and Phase 2's work-camera rules (axis angle, target in frame) still pass there, and F is screened there;
+        # otherwise the cell is kept only when both grid tilts around the stance's tilt hold it - else it is out of reach at this trunk
+        # (evidence: unreachable, never re-screened).
         F_snap, snap_facts = _tilt_snap(s, manip, st_of, offered, band_of, fx, yaws, grasps, pose_at, ignore_for_grasp, eef_of)
         if F_snap:
             for a in offered:

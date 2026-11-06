@@ -229,6 +229,53 @@ class SleepAssist:
         #: wall time of step() by phase (report: cost_ms_per_step) and the number of steps
         self.cost_s: Dict[str, float] = {}
         self.n_steps = 0
+        #: per tracked object, its links' local convex-hull points (computed once; :meth:`_aabb`), False = OmniGibson's own obj.aabb
+        self.hulls: Dict[str, Any] = {}
+
+    def _aabb(self, inst: str, obj):
+        """``obj.aabb`` (EntityPrim: min / max over every link's ``collision_boundary_points_world``) with each link's local convex-hull
+        points computed once per episode: ``RigidPrim.collision_boundary_points_local`` is an uncached property that re-reads every
+        collision mesh and re-runs qhull on each call (3-29 ms per object per control step in the collectors, 2026-11-02), while a rigid
+        link's local hull cannot change. The world transform (``transform_local_points_to_world``), the link order and the reduction are
+        OmniGibson's, so the box is the same tensor bit for bit. A cloth, or an object whose links do not provide the points, uses obj.aabb."""
+        hull = self.hulls.get(inst)
+        if hull is None:
+            hull = False
+            try:
+                from omnigibson.utils.constants import PrimType
+
+                if getattr(obj, "prim_type", None) != PrimType.CLOTH:
+                    pts = [(link, link.collision_boundary_points_local) for link in obj.links.values()]
+                    hull = [(link, p) for link, p in pts if p is not None] or False
+            except Exception:  # noqa: BLE001
+                hull = False
+            self.hulls[inst] = hull
+        if hull is False:
+            return obj.aabb
+        points = th.cat([link.transform_local_points_to_world(p) for link, p in hull], dim=0)
+        return th.min(points, dim=0).values, th.max(points, dim=0).values
+
+    def _aabb_center(self, inst: str, obj):
+        """``obj.aabb_center`` over :meth:`_aabb`."""
+        lo, hi = self._aabb(inst, obj)
+        return (hi + lo) / 2.0
+
+    def _near(self, inst: str, obj, eefs: Dict[str, Any]) -> Tuple[bool, float]:
+        """(near, distance): the closest MOVING end effector (>= 0.3 mm per control step = 1 cm/s; a parked one does not approach) to the
+        object's axis-aligned box (0 inside) against the wake radius. No end effector moving: no box is computed (the answer is no)."""
+        moving = [pe for arm, pe in eefs.items() if self.eef_speed.get(arm, 0.0) >= 0.0003]
+        if not moving:
+            return False, float("inf")
+        try:
+            lo, hi = self._aabb(inst, obj)
+            lo, hi = th.as_tensor(lo), th.as_tensor(hi)
+            dmin = float("inf")
+            for pe in moving:
+                gap = th.maximum(th.maximum(lo - pe, pe - hi), th.zeros(3))
+                dmin = min(dmin, float(th.linalg.norm(gap)))
+            return dmin < self.wake_m, dmin
+        except Exception:  # noqa: BLE001
+            return False, float("inf")
 
     def trim(self, step: int) -> None:
         """The executor rolled the world back to its checkpoint after control step ``step`` (``Executor.restore``; ``run_isg_vec`` never
@@ -321,23 +368,13 @@ class SleepAssist:
             except Exception:  # noqa: BLE001
                 asleep = False
             lap("asleep")
-            # proactive wake: a gripper approaching a slept object wakes it before the contact (sleep mode)
-            near = False
-            if self.mode == "sleep" and self.wake_m > 0:
-                try:
-                    lo, hi = obj.aabb  # the distance from each MOVING end effector to the object's axis-aligned box (0 inside)
-                    lo, hi = th.as_tensor(lo), th.as_tensor(hi)
-                    dmin = float("inf")
-                    for arm, pe in eefs.items():
-                        if self.eef_speed.get(arm, 0.0) < 0.0003:  # parked (< 0.3 mm per control step = 1 cm/s): no approach
-                            continue
-                        gap = th.maximum(th.maximum(lo - pe, pe - hi), th.zeros(3))
-                        dmin = min(dmin, float(th.linalg.norm(gap)))
-                    near = dmin < self.wake_m
-                except Exception:  # noqa: BLE001
-                    near = False
+            # proactive wake: a gripper approaching a slept object wakes it before the contact (sleep mode). The box test runs only
+            # where its answer decides something: an object the assist slept (here), an object about to be slept (below)
+            sleep_mode = self.mode == "sleep" and self.wake_m > 0
+            if sleep_mode and asleep and self.slept.get(inst):
+                near, dmin = self._near(inst, obj, eefs)
                 lap("near")
-                if near and asleep and self.slept.get(inst):
+                if near:
                     try:
                         obj.wake()
                         self.slept[inst] = False
@@ -363,9 +400,9 @@ class SleepAssist:
                     if debug:
                         print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
             lap("touch")
-            if asleep or near or len(hist) < W:
+            if asleep or len(hist) < W:
                 if debug:
-                    print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: asleep={asleep} near={near} hist={len(hist)}", flush=True)
+                    print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: asleep={asleep} hist={len(hist)}", flush=True)
                 continue
             p0, q0 = hist[0]
             dp = max(float(th.linalg.norm(pp - p0)) for pp, _ in hist)
@@ -375,7 +412,8 @@ class SleepAssist:
                 if debug:
                     print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: moving dp={dp * 1000:.2f}mm dq={dq * 1000:.2f}mrad", flush=True)
                 continue
-            if Touching is not None and hasattr(obj, "states") and Touching in obj.states:
+            has_touching = Touching is not None and hasattr(obj, "states") and Touching in obj.states
+            if has_touching:
                 try:
                     if bool(obj.states[Touching].get_value(self.robot)):
                         if debug:
@@ -384,14 +422,20 @@ class SleepAssist:
                 except Exception as ex:  # noqa: BLE001
                     if debug:
                         print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: Touching(robot) failed {ex!r}", flush=True)
+            # a moving gripper within the wake radius keeps the object awake (sleep mode)
+            if sleep_mode:
+                near, dmin = self._near(inst, obj, eefs)
+                lap("near")
+                if near:
+                    if debug:
+                        print(f"SLEEP_ASSIST_DEBUG {self.name} step {step} {inst}: at rest but a moving gripper is {dmin * 100:.1f} cm from its box", flush=True)
+                    continue
+            if has_touching:
                 # never sleep a SUPPORT while an awake tracked free body rests on it: putting the support to sleep under it jolts it
                 # (kielbasa, step 751). "Rests on" = touching and higher (its box centre above this object's); the top of a stack sleeps
                 # first, the support follows once everything on it is asleep (a symmetric rule deadlocked pack and platter).
                 blocked = False
-                try:
-                    z_self = float(th.as_tensor(obj.aabb_center)[2])
-                except Exception:  # noqa: BLE001
-                    z_self = float(pos[2])
+                z_self = None  # this object's box centre height, computed once an awake free body is there to compare
                 for inst2, obj2 in self.tracked.items():
                     if inst2 == inst or not self.free.get(inst2):
                         continue
@@ -399,7 +443,12 @@ class SleepAssist:
                         asleep2 = obj2.is_asleep() if callable(getattr(obj2, "is_asleep", None)) else bool(getattr(obj2, "is_asleep", False))
                         if asleep2:
                             continue
-                        z2 = float(th.as_tensor(obj2.aabb_center)[2])
+                        if z_self is None:
+                            try:
+                                z_self = float(th.as_tensor(self._aabb_center(inst, obj))[2])
+                            except Exception:  # noqa: BLE001
+                                z_self = float(pos[2])
+                        z2 = float(th.as_tensor(self._aabb_center(inst2, obj2))[2])
                         if z2 > z_self and bool(obj.states[Touching].get_value(obj2)):
                             blocked = True
                             break

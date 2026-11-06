@@ -280,3 +280,46 @@ def test_a_config_turns_the_physics_flags_off(tmp_path, entry):
     assert RUN.run_options(child) == RUN.run_options(args)
     (tmp_path / "on.yaml").write_text("sleep_assist: on\n")
     assert RUN.parse_args(argv + ["--config", str(tmp_path / "on.yaml")]).sleep_assist == SA.SLEEP_ASSIST
+
+
+class HullLink:
+    """A link with OmniGibson's two calls the box needs; counts how often the local hull is computed."""
+
+    def __init__(self, points, pose):
+        self.points, self.pose, self.hull_calls = th.tensor(points, dtype=th.float32), pose, 0
+
+    @property
+    def collision_boundary_points_local(self):
+        self.hull_calls += 1
+        return self.points
+
+    def transform_local_points_to_world(self, points):
+        return points + self.pose()
+
+
+def test_the_box_is_omnigibsons_with_each_hull_computed_once(world):
+    robot, apple = Robot(), Body(world, "apple", [0, 0, 1])
+    links = {"base_link": HullLink([[-0.03, -0.02, -0.01], [0.03, 0.02, 0.01]], lambda: apple.pos),
+             "meta": HullLink([[0.0, 0.0, 0.05]], lambda: apple.pos)}
+    apple.links = links
+    sa = SA.SleepAssist(robot, {"apple": apple}, "s0", config=(3, 0.001, 0.003))
+    for _ in range(3):
+        apple.pos = apple.pos + th.tensor([0.1, 0.0, 0.0])
+        pts = th.cat([l.collision_boundary_points_local + apple.pos for l in links.values()])
+        want = (th.min(pts, dim=0).values, th.max(pts, dim=0).values)  # EntityPrim.aabb over collision_boundary_points_world
+        got = sa._aabb("apple", apple)
+        assert th.equal(got[0], want[0]) and th.equal(got[1], want[1])
+    assert [l.hull_calls for l in links.values()] == [4, 4]  # 3 for the reference above, 1 for the assist
+    assert th.equal(sa._aabb_center("apple", apple), (want[1] + want[0]) / 2.0)
+
+
+def test_no_box_is_computed_while_every_gripper_is_parked(world):
+    robot, apple = Robot(), Body(world, "apple", [0, 0, 1])
+    calls = []
+    type(apple).aabb = property(lambda self: calls.append(1) or (self.pos - self.half, self.pos + self.half))
+    sa = SA.SleepAssist(robot, {"apple": apple}, "s0", config=(3, 0.001, 0.003))
+    run(sa, 3)
+    assert apple.asleep and calls == []  # slept with the grippers parked: no box needed
+    robot.eef["right"] = th.tensor([0.0, 0.06, 1.0])
+    sa.step(4)
+    assert not apple.asleep and calls == [1]

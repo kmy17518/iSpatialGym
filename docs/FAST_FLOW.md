@@ -8,7 +8,8 @@ later by the kinematic replay (the Vast replay of isg-1020-b1k, or the vectorize
 Base: `merge/v3.0-reconciled+lab-vec-eval-next` at 43ad206a (contains all 21 snapshot commits that produced isg-1020) + the train85
 spa2still patch (start per attempt, oracle still exit). Cluster worktree `/vision/u/minyeong/projects/ispatialgym-train-fast`, record
 `/vision/u/minyeong/projects/isg_home/trainfast/` (DECISIONS.md, scripts/, out/<tag>/<key>/g<start>-<end>/), lambda mirror
-`~/Desktop/projects/ispatialgym-train-fast`.
+`~/Desktop/projects/ispatialgym-train-fast`. The commits, the experiments and how to re-run them:
+[TRAIN_FAST_README.md](TRAIN_FAST_README.md).
 
 ## Where production's time went (train85, 487 jobs)
 
@@ -45,25 +46,31 @@ same code). Each logs once when first consulted. Off = the base code's behaviour
 | PARK_ONCE, PARK_SPAWNED | core.py, tasks/base.py | park cell cached per attempt loop; spawned task objects parked at every attempt start |
 | SAMPLER_CAMERAS | sample_isg.py, sim_utils.py | camera-free sampler world for the families that use no pixels (iors, axial, attachment, block design, articulation); `visibility: pending` in the summary; pixel families keep their cameras |
 | SPA_CACHE | v2/tasks/iors_small.py, v2/tabletop.py, cache.py | the start-per-attempt draw memoised per (edge, 2 cm lateral cell) in-process and on disk; the attempt draws edge order, lateral and side from its rng as before |
-| BATCH_SIZE_FIT, SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL, REMEMBERED_WITH_SEED, BATCH_IK_SEEDS | oracle/curobo_planner.py, sampling/robot_utils.py, v2/ik.py | batched IK solver sized to the query (8/16/32/64) instead of always 64 padded slots; single 32-seed re-solves instead of padded batches for one pose; `return_all` solve picks the max-margin branch so `away_from_limits` rarely re-solves; remembered witnesses also accepted with a seed |
+| BATCH_SIZE_FIT, SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL, REMEMBERED_WITH_SEED, BATCH_IK_SEEDS | oracle/curobo_planner.py, sampling/robot_utils.py, v2/ik.py | batched IK solver sized to the query (8/16/32/64) instead of always 64 padded slots; single 32-seed re-solves instead of padded batches for one pose; `return_all` solve picks the max-margin branch so `away_from_limits` rarely re-solves; remembered witnesses also accepted with a seed. SINGLE_RETRY_EXACT, LIMIT_RETRY_RETURN_ALL and REMEMBERED_WITH_SEED are **off** since 2026-11-01 (they change the recorded witness branch: robot stutters on touching_large_03) |
+| SCENE_CROP (`full` / `rooms` / `region`, region radius 2.5 m) | sampling/scene_crop.py, sample_isg.py, sim_utils.py, v2/core.py | the sampler's world loads a cropped copy of the scene: `full` for camera relocalization and alignment-world_vertical, `rooms` for large-scale IORS / large articulation / object scaling / mental rotation, `region` (support + 2.5 m) for small IORS, small articulation, attachment, block design, alignment-axial and disembedding, `full` for any other family; the uncropped scene stays the template.json merge source; the crop is part of the world pool key (2026-11-01) |
+| CROP_NEIGHBOUR_FLOORS | sampling/scene_crop.py | OmniGibson loads floors only with their room: the floors of the neighbour rooms are crop candidates and their rooms join the loaded rooms (without it bases beyond the task room's floor stood 1.5 cm low) (2026-11-01) |
+| PARTIAL_SCENE | oracle/run_isg.py, recorder.py, multienv/replay.py | the collector of a cropped template builds the cropped world and writes the crop into the hdf5 header; `multienv.replay --scene full` replays the demo in the full template merged with its recorded objects (`auto`: full for a cropped demo) (2026-11-01) |
 | EARLY_FRAME_GATE, SYNC_ONLY_OBJECTS, ATTACH_REUSE | v2/program_check.py | the fingertip-in-frame gate for every static target before any IK; cuRobo world syncs of only the moved objects |
 | PHYSICS_ONLY_TRIM | oracle/run_isg.py, executor.py | physics-only collectors skip the texture wait / init image / reset re-renders, small camera buffers |
 | STRAIGHT_ARM | oracle/motions.py | a straight joint-space ramp to the sidecar's IK witness, collision-checked in one batched call, before trajopt (trajopt stays the fallback) |
 | PLAN_LADDER (TRAJOPT_SEEDS, PLAN_ATTEMPTS, WITNESS_PLAN_RETRIES) | run_isg.py, motions.py | 2 trajopt seeds, 2 attempts, 1 witness retry |
-| COLLECTOR_PREBUILD (TEMPLATE_TOL_M 0.005) | oracle/run_isg.py, scripts/job_fast.sh | collectors build their world from a job-local copy of the counted eval template while the sampler loads (`run_isg --queue --prebuild <tro>`); the first instance reuses it when its template identity matches and its scene agrees within 5 mm (robot, bound objects, sleep flags and velocities excluded), else `prebuild.mismatch` and a restart without prebuild |
+| COLLECTOR_PREBUILD (TEMPLATE_TOL_M 0.005) | oracle/run_isg.py, scripts/job_fast.sh | collectors build their world from a job-local copy of the counted eval template while the sampler loads (`run_isg --queue --prebuild <tro>`); the first instance reuses it when its template identity matches and its scene agrees within 5 mm (robot, bound objects, sleep flags and velocities excluded), else `prebuild.mismatch` and a restart without prebuild; since 2026-11-02 the job script takes only a copy whose scene crop request is the job's (`scripts/trainfast/prebuild_crop.py`: a full-scene copy made every collector of a cropped job rebuild its world, ~8 min each) |
 | STRAIGHT_ARM_VIA | oracle/motions.py | when the direct ramp collides: two checked straight legs through the ready / untucked posture before trajopt (round 2) |
 | BAND_FEASIBLE_REUSE (**off** since 2026-11-01) | v2/tabletop.py | the feasible set a sampler stored in the band for the same (trunk, focus cell) instead of the two padded IK screens (round 2); superseded by BAND_EVIDENCE (a reused set that ran dry was never re-screened) |
 | BAND_EVIDENCE (BAND_PAIR_FAIL_K 3, BAND_CELL_EMPTY_M 3, BAND_RESCREEN_P 0.25) | v2/band_evidence.py, v2/tabletop.py | counts per (world, trunk, cell, yaw, grasp) instead of verdicts: F = union of every pair a screen passed minus pairs the exact IK demoted (3 failures and > 2x its confirmations); a cell dies only after 3 empty screens with no pair ever; 1 attempt in 4 re-screens a known cell (F grows); a reused F that runs dry is re-screened once; the band itself is no longer rewritten (2026-11-01) |
 | BAND_JOB_LOCAL | sampling/reach_bands.py | a band found outside `ISPATIALGYM_REACH_BANDS` is copied into the job's band directory and the copy loaded, and the job's copy wins over the same file elsewhere (the newest-first order let one committed band, rewritten by a job, become every job's shared file) (2026-11-01) |
 | BAND_SHARE (**off**) | scripts/job_fast.sh, v2/band_evidence.py | opt-in sharing between the campaign's jobs: the campaign's published bands copied in, the band evidence fetched at job start / published per job at its end (`$F/band_evidence/<variant>/<band>.evidence.<job>.json`, merged by summing; no file written by two jobs) (2026-11-01) |
 | IK_FRESH_P (0.2), IK_CACHE_GROW (IK_BRANCH_MIN_RAD 0.2, IK_CACHE_MAX_CHAINS 6) | v2/ik.py | one exact-IK call in 5 with a cache entry solves afresh; an entry keeps every distinct branch found (verified hits tried in a random order) (2026-11-01) |
-| BAND_REFINE (BAND_REFINE_K 2, BAND_REFINE_ADD_P 0.1, BAND_REFINE_INIT bracket) | v2/band_refine.py, reach_bands.py, v2/tabletop.py | bands refined per ACTUAL stance trunk (0.01 rad key) from the bracketing grid tilts' common cells; only verified reachability failures (re-checked with the task-spawned objects out of the collision world, K = 2) blacklist cells / pairs; lattice neighbours found reachable are added; world-independent sidecar `<band>.refine.json` (supersedes BAND_EVIDENCE's counting while on) (2026-11-01) |
+| BAND_REFINE (BAND_REFINE_K 2, BAND_REFINE_ADD_P 0.1, BAND_REFINE_INIT nearest since 2026-11-01, was bracket) | v2/band_refine.py, reach_bands.py, v2/tabletop.py | bands refined per ACTUAL stance trunk (0.01 rad key) from a copy of the nearest grid trunk (`bracket`: the bracketing grid tilts' common cells, which halved ontop_small_01's yield in the refine A/B); only verified reachability failures (re-checked with the task-spawned objects out of the collision world, K = 2) blacklist cells / pairs; lattice neighbours found reachable are added; world-independent sidecar `<band>.refine.json` (supersedes BAND_EVIDENCE's counting while on) (2026-11-01) |
 | BAND_VERIFY_STORE | v2/tabletop.py | the base band write-back deletes a cell on an empty screen only when the screen is still empty with the task objects out (2026-11-01) |
-| TILT_SNAP | v2/tabletop.py | an empty F at a stance's continuous tilt: snap to the band's grid tilt when collision-free and Phase 2's camera rules pass, else keep the tilt and keep the cell only if both bracketing grid tilts hold it (2026-11-01) |
+| TILT_SNAP (**off** since 2026-11-01: it lowered inside_02's yield) | v2/tabletop.py | an empty F at a stance's continuous tilt: snap to the band's grid tilt when collision-free and Phase 2's camera rules pass, else keep the tilt and keep the cell only if both bracketing grid tilts hold it (2026-11-01) |
 | IK_CACHE_SHARE_CROP | v2/ik.py, v2/core.py | the exact-IK cache key of a cropped world uses the full world's rooms and no crop: crop and full share verified entries (2026-11-01) |
 | REPEAT_MEASURED | sampling/instance_separation.py | the train-repeat rule compares what the task measures (TRO pose / articulation / group targets at their own tolerances) + the robot start base; eval indexes rebuilt (`$F/eval_index_v2`) (2026-11-01) |
 | RECORD_CHANGED_ONLY (RECORD_CHANGE_TOL 1e-5) | oracle/executor.py | per-step recorded states keep only awake objects whose pose / joints changed since their last recorded state (static-but-awake scenery was re-posed every replay step: 2x slower replay, disturbed temporal history) (2026-11-01) |
 | DIAG_EMPTY_F (**off**) | v2/tabletop.py | diagnostic: on an empty F, the screen with every scene object out and with each nearby object out (2026-11-01) |
+| COLLECTOR_GPU_DYNAMICS (**off**) | oracle/run_isg.py | GPU PhysX for the single-scene collector (gm.USE_GPU_DYNAMICS, sim device cpu); measured 1.2-2.1x slower per env step than CPU PhysX alone on a TITAN RTX and another physics realisation (follow-up F1, 2026-11-01) |
+| COLLECTOR_PHYSX_THREADS (0 = PhysX's own 8) | oracle/run_isg.py | caps the collector's CPU PhysX worker threads (carb `/persistent/physics/numThreads` + `set_thread_count`; meta `loader.physx_threads`); 2 or 4 threads changed neither the speed of co-located collectors nor the demo (2026-11-02, packing test E16) |
+| COLLECTOR_PIN (on since 2026-11-02 04:41; COLLECTOR_CPUS 3) | scripts/job_fast.sh, scripts/trainfast/cpu_split.py, job_pair.sh | the sampler and each collector on CPUs of their own (`taskset`): unpinned Kit processes on one job's CPUs slow each other ~4x (two de03 collectors 334 ms per step each, 95 alone); pinned to 3 CPUs each they step at 63-65 ms with a third of the CPU and record the same demo. Job-level A/B (n=24): de03 30.6-32.6 successes per GPU-hour on TITAN against 12.9 unpinned, 52.7-64.0 on L40S against 13.0-14.7; the de03 sampler went from 77 to 35-39 s per attempt; a pinned L40S pair of de03 jobs made 104.6 (32.2 unpinned). Needs (K + 1) x 3 CPUs, else off (`PIN off` in job.txt); a pair (`job_pair.sh`) gives each member half the physical cores (`cpu_split.py halves`) (E16) |
 | SPLIT_CONE_RESTORE | v2/core.py | start-per-attempt: the template's full candidate list is restored before the split-cone pools are rebuilt (they were rebuilt from the previous attempt's one position, so every attempt after the first drew that position; only iors_small rebuilds its list) - a bug of the train85 spa2still patch (2026-11-01) |
 | ATTACH_FAST | oracle/curobo_planner.py | collision-mesh geometry cached per prim; the sphere-fit cache key rounds the eef-frame pose to 1 mm so repeated attaches of one grasp hit (round 2) |
 | CR_GEODESIC_FIELD (CR_FIELD_TOL_M 0.15) | v2/tasks/camera_relocalization.py | one 8-connected Dijkstra from the init cell on the eroded map (BEHAVIOR's A* metric); goal points drawn among the room's cells whose geodesic lies in the bucket; the A* bucket check stays (2026-11-01) |
@@ -85,10 +92,16 @@ in the sample log and the instance summary; `program_check.last_stats`; meta.jso
 
 1. GPU PhysX for a single-scene collector: one-instance A/B against CPU PhysX on the same TRO (per-step time, GPU/CPU use, grasp / settle /
    still-exit verdicts; the checks and the vec_next sleep-threshold fix were tuned on CPU dynamics).
+   **Done 2026-11-01 (TRAIN_FAST_README.md E17):** 1.2-2.1x slower per step on three families, +1.1 GB GPU memory, another physics
+   realisation (same verdicts, different step counts). Kept off (COLLECTOR_GPU_DYNAMICS).
 2. Vectorized oracle collector: N scenes per process with GPU physics on the vec_next world build. Needs the oracle restructured to step N
    independent skill programs and the 48 synchronous planner calls made non-blocking; bounded by ~31 ms of Python per scene per step on the
-   main thread, so ~3-4x per GPU at best. **Not built** (owner, 2026-11-01 after the vec-eval-next merge): `run_isg_vec` replays and runs
-   policies only; the partial stepping / replay numbers measured before the decision are in `$F/merge_vecnext/DECISIONS.md`.
+   main thread, so ~3-4x per GPU at best.
+   **Not built (2026-11-01, E17):** it depends on GPU PhysX (slower here, item 1) and on the vec_next merge; collectors are idle most
+   of the time in the sampler-bound families; and the same "more scenes per GPU" is reached by more collector processes, which pin
+   to their own CPUs at the alone speed (COLLECTOR_PIN, E16).
+   The owner's decision after the vec-eval-next merge (2026-11-01): not built; `run_isg_vec` replays and runs policies only, the
+   partial stepping / replay numbers measured before the decision are in `$F/merge_vecnext/DECISIONS.md`.
 
 ## The vec-eval-next merge (branch `train-fast-vecnext`, 2026-11-01)
 
@@ -107,8 +120,10 @@ removed is train-fast's again. What it changes for this flow:
 | demo QA | `run_isg --qa` (default on) replaces `--demo-gating` / `--stream-qa`: BEHAVIOR's QA metrics plus the former gates as HARD metrics that fail an oracle demo at once without a retry - new: `robot_touching_objects`, `robot_touching_itself`, `pause`, `jerky_motion`, `ghost_hand`; former gates: `object_tilt` (root_moved), `robot_wobble`, `bad_release` (release_commanded), `goal_occlusion`, `arm_stutter` (train-fast's gate, now a metric). `placed_orientation` is a fact, no longer a verdict; replays and policies only log |
 | run_isg flags | `--record-view` replaces `--video` / `--dev`; new `--task`, `--settle-eval`, `--success-metric`, `--tolerance-scale`, `--wallclock`, `--config`; the sampler's `--sub-variant` is gone (block design draws its pattern from `generation.patterns`) |
 | switches | every `ISPATIALGYM_FAST_*` switch and default unchanged (`fastflags.py` identical; the same 60 switches at the same call sites); PHYSICS_ONLY_TRIM also skips QA's goal-occlusion render (recorded as skipped, never judged) |
-| Behavior-1K | 6a6194600 + vec_next's overlay (`scripts/vec_eval/apply_b1k_overlay.sh`, 12 files); the single-scene collectors run on it too |
-| vectorized | `python -m ispatialgym.oracle.run_isg_vec` (N scenes per process, replay / policy), its rigid sleep threshold 0.005 and sleep assist (driver only, not in `run_isg`), the batch restore fix |
+| Behavior-1K | 6a6194600 + vec_next's overlay (`scripts/vec_eval/apply_b1k_overlay.sh`, 12 files); the single-scene collectors run on it too, with the overlay's default-on build speed-ups (asset preparation cache, mesh cache, lazy particle systems, the shared assisted-grasp contact view) |
+| physics (both drivers) | owner 2026-11-01: `run_isg` generates the demos and `run_isg_vec` evaluates, with the same physics - `oracle/sleep_assist.py`, the same flags and defaults in both: `--rigid-sleep-threshold 0.005` (PhysX's default instead of OmniGibson's 5e-5 on every free non-articulated object: the scene's at the build, the task objects at every restore; articulations and the robot keep 5e-5), `--sleep-assist 30,1,3` (a free task object of at most 5 kg that moved less than 1 mm / 3 mrad over 30 steps, does not touch the robot, has no moving gripper within 5 cm and nothing awake resting on it, is put to sleep and woken again when a moving gripper comes within 5 cm; a rollback to a checkpoint trims its record), `--lean-step` (no per-object `update_visuals` pass). `meta.driver_physics`, `meta.sleep_assist` (with `cost_ms_per_step`), `fast.step_costs.sleep_assist_s`. Off (the collector before 2026-11-02): `--sleep-assist off --rigid-sleep-threshold 0 --no-lean-step` |
+| asset cache | vec_next's persistent asset-geometry cache (overlay `utils/isg_asset_cache.py`, content-keyed): `ISG_VEC_ASSET_CACHE_DIR=<shared dir>` in the job env (sampler and collectors); a process writes a shard only when it computed something new. Off unless set |
+| vectorized | `python -m ispatialgym.oracle.run_isg_vec` (N scenes per process, replay / policy; no collector, owner 2026-11-01), the batch restore fix |
 
 Validation (2026-11-01, svl TITAN RTX, n=8 jobs of this flow on the merged code): artic_open_small_01 8/8 demos successful, touching_01
 6/7, axial_01 4/8 (rule2 baseline 50 %), ontop_small_01 5/8 cropped and 0/3 in the full scene against 85-100 % before - lost to
@@ -116,6 +131,27 @@ Validation (2026-11-01, svl TITAN RTX, n=8 jobs of this flow on the merged code)
 settle window). The collectors' per-step costs are unchanged (QA 17-25 ms per step before and after); the kinematic replay renders at
 6.96 env-steps/s as before; vec_next's apple and teapot-bar verifications pass at N=8. Unit tests: the base failures plus
 `test_eval_instances::test_step_budget`, which fails on the release's own code (`$F/merge_vecnext/new_base_fails.txt`).
+
+Owner decisions on that validation (2026-11-01): `robot_touching_objects` stays as the release defines it (the torso must not touch the
+table: those demos are failures); vec_next's physics goes into `run_isg` (the row above); the block_design board problem keeps its tray
+outside `targets_group`.
+
+Validation of the shared physics (2026-11-02, svl TITAN RTX; `$F/merge_vecnext/DECISIONS.md`):
+- Drivers: `run_isg_vec` N=1 is bit-identical to before the code moved (apple, teapot-bar). `run_isg --mode replay` of an eval demo vs
+  `run_isg_vec` N=1: apple bit-identical; teapot-bar the same verdict, success step, sleep / wake events and robot rows, object poses
+  within 0.5 mm after the lid's attachment (step ~765) - the same with every switch off in both drivers and with `--no-qa`, so a
+  difference between the drivers' task evaluation that predates the shared physics.
+- Collectors, rerun on the instances of the merge's validation jobs (`job_recollect.sh`: the sampled TROs restored, no sampler): the
+  same verdicts per alias (axial_01 4/8, artic_open_small_01 8/8, touching_01 6/7, ontop_small_01 5/8 cropped and 0/3 full scene);
+  ontop's `not_settled` demos became a success and `symbolic_only` (the kielbasa pack lands 0.43-0.44 rad off its goal orientation);
+  touching's one `not_settled` stays (the gripper keeps passing the boxes). With identical starts the new physics parts from the old at
+  step 12, when PhysX first sleeps the resting objects; two runs of the same code are bit-identical (the collector is deterministic).
+- Cost: the env step is unchanged (cropped ontop 107 ms off vs 103-106 ms on; full scene 156 vs 154-166 ms; lean step nothing
+  measurable); the assist costs 3-4 ms per control step (it was 14-31 ms until `SleepAssist` stopped re-running OmniGibson's per-call
+  convex hull in `aabb` - every demo bit-identical before and after). The asset cache, warm, shortens the first world load by 22 %
+  (full scene 441 -> 344 s) with bit-identical demos; it is on in the `tfvn_*` test jobs (`merge_vecnext/scripts/fast_env.sh`).
+- The sampler keeps OmniGibson's physics: none of the 228 sampler attempts of those jobs was rejected for settling (paths, reach,
+  partner placement), so the threshold would only change which instances it accepts.
 
 ## Measuring
 
