@@ -145,7 +145,7 @@ def submit(a):
         spa = int(c.get("start_per_attempt") or 0) if reg else (1 if a.key in st.affected_keys() else 0)
         # one trunk (2026-11-06): the snapshot's isg_customs.json for every alias (the validated settings live there; a counted
         # template's pre-rename variant resolves through customs.entry_key); --customs template = the counted run's copy
-        customs = a.customs or c.get("customs") or "trunk"
+        customs = a.customs or (c.get("customs") if reg else None) or "trunk"  # a counted row's "customs" column is its run's path
         env = {"ALIAS": c["alias"], "ALIAS_KEY": a.key, "PICK": c["pick"], "TAG": c["tag"], "COUNTED_RUN": c["run_dir"],
                "ISGE_CODE": os.path.abspath(a.code), "COUNTED_SNAPSHOT": c["isg_root"], "TEMPLATE": tmpl, "TEMPLATE_ID": c["template_id"],
                "COUNTED_TEMPLATE": c["template_dir"], "EVAL_INDEX": c["eval_index"] if reg else eval_index_of(a.key), "FAMILY": fam,
