@@ -890,6 +890,16 @@ def _bench(args):
           f"sphere FK {n} in {time.time() - t1:.3f}s; setup {w.setup_s:.1f}s; peak {th.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
 
 
+def _map_meta_matches(path: str, arm: str, kind: str) -> bool:
+    """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count)."""
+    try:
+        with open(path) as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return m.get("arm", "right") == arm and m.get("kind", "tabletop") == kind
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1011,7 +1021,10 @@ def _compute_cli(a):
             if not r.stable or not lib.grasps(rid):
                 continue
             for anc in anchors_j:
-                if a.skip_existing and glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json")):
+                # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
+                # did not: a left-arm run after the right-arm one into the same root computed nothing)
+                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind)
+                                           for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:
                     meta, arrays = compute_map(w, lib, rid, float(anc["height"]), anc, geom=geom, cfg=cfg, kind=a.kind)
