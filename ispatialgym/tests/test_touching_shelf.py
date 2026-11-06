@@ -494,6 +494,26 @@ def test_the_oracle_refuses_a_shelf_record_with_a_brace_or_another_pushing_hand(
     assert any("right gripper pushes" in p for p in Sidecar.from_dict(plain).problems())
 
 
+def test_the_shelf_tip_release_is_the_nextto_chain_without_a_push():
+    """oracle-fix 2026-11-04 round 4 (generation.shelf_tip_release): grasps[0].place_kind "shelf_tip" and no contacts.push - the sidecar
+    validates, the program is pick, carry, place, retreat; a tip record that still carries a push is refused."""
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.oracle.sidecar import Sidecar
+    from ispatialgym.sampling.v2.program_check import check_blocks
+
+    d = _shelf_record()
+    push = d["contacts"].pop("push")
+    d["grasps"][0]["place_kind"] = "shelf_tip"
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc
+    actions = expand(sc.variant, sc)
+    assert [a.name for a in actions] == ["transition", "grasp", "lift", "place", "retreat"]
+    assert not any("contacts.push" in p for p in check_blocks("inter_object_relation_satisfaction-touching_small_scale", d))
+    with_push = copy.deepcopy(d)
+    with_push["contacts"]["push"] = push
+    assert any("shelf tip" in p for p in Sidecar.from_dict(with_push).problems())
+
+
 def test_shelf_pose_facts_keep_the_lean_sign():
     """The shelf pose facts name the side ('left' / 'right'); merged into the shelf start they must not replace the lean sign the
     push arm, the partner's lean and the goal side compute with (s3 touching#03 c6_k0: float('left') in shelf_push_sign)."""
@@ -547,3 +567,32 @@ def test_the_side_board_ray_takes_only_a_face_of_the_supports_own_body():
     with pytest.raises(Reject) as e:
         TT.shelf_lean_pose(sampler("inside"), _book_hull(), th.tensor(BU_REST_XYZW), top, edge, support, 1.0)
     assert e.value.reason == "shelf_wall" and "starts inside" in str(e.value)
+
+
+def test_the_lift_away_offset_reaches_the_oracle_lift_and_the_sampler_lift_end():
+    """oracle-fix 2026-11-04 round 4: ``grasps[0].lift_away`` - the oracle's Lift ends carry_height up plus the offset, and program_check.lift_end_pose
+    (the sampler's lift checks) agrees; without it the lift stays straight up."""
+    from ispatialgym.oracle.programs import expand
+    from ispatialgym.oracle.sidecar import Sidecar
+    from ispatialgym.sampling.v2.program_check import lift_end_pose
+
+    class _Hand:
+        def eef_pose(self, arm):
+            return th.tensor([1.0, 2.0, 0.8]), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    d = _shelf_record()
+    d["contacts"].pop("push")
+    d["grasps"][0]["place_kind"] = "shelf_tip"
+    d["grasps"][0]["lift_away"] = [0.03, 0.0, 0.0]
+    sc = Sidecar.from_dict(d)
+    lift = [a for a in expand(sc.variant, sc) if a.name == "lift"][0]
+    start, end = lift._segment(sc, _Hand())
+    h = float(d["grasps"][0]["carry_height"])
+    assert [float(e) - float(s) for e, s in zip(end.position, start.position)] == pytest.approx([0.03, 0.0, h], abs=1e-6)
+    assert "away from the board" in lift.annotate(sc)[1]
+    g = SimpleNamespace(grasp=([1.0, 2.0, 0.8], [0.0, 0.0, 0.0, 1.0]), carry_height=0.04, extras={"lift_away": [0.03, 0.0, 0.0]})
+    p, _ = lift_end_pose(g)
+    assert p.tolist() == pytest.approx([1.03, 2.0, 0.84], abs=1e-6)
+    g.extras = {}
+    p, _ = lift_end_pose(g)
+    assert p.tolist() == pytest.approx([1.0, 2.0, 0.84], abs=1e-6)

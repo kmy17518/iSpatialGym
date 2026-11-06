@@ -1093,6 +1093,22 @@ class ArticulationLarge(SamplerV2):
             log.info("%s: counterbalance on %s/%s: gravity off on %s, joint damping %.2f (axis %s)", self.gp.variant, obj.name, self.joint_name, applied["links"], damping,
                      [round(float(v), 3) for v in axis_world0.tolist()])
         self.template_facts["counterbalance"] = self.counterbalance
+        # oracle-fix 2026-11-04 round 3 (bottom_cabinet_rvunhj #03): opt-in generation.other_joints_init {joint: q} - other joints of the target held
+        # there in the template world and in the instance's init / goal joint vectors (the neighbouring door's bar stands 70 mm from j_link_2's: the
+        # closed gripper on the bar jams against the closed neighbour door - the door never moved in 53 demos)
+        self.other_joints_init = {str(n): float(v) for n, v in (self.gp.gen("other_joints_init") or {}).items() if n in obj.joints and n != self.joint_name}
+        if self.other_joints_init:
+            names_ = list(obj.joints)
+            qs_ = obj.get_joint_positions().clone()
+            for n, v in self.other_joints_init.items():
+                qs_[names_.index(n)] = v
+            obj.set_joint_positions(qs_)
+            obj.keep_still()
+            self.template_facts["other_joints_init"] = dict(self.other_joints_init)
+            from ispatialgym.sampling import constraints as CS_
+
+            CS_.restrict_openable_joints(obj, [self.joint_name])  # (not (open target)) / (open target) read the moved joint only
+            log.info("%s: other joints of %s held at %s", self.gp.variant, obj.name, self.other_joints_init)
         # generation.joint_friction (2026-09-18; as articulation_small): the PhysX articulation joint friction of the moved
         # joint, a number or a list of candidates tried in order until an open value holds. The stock 0.2 × (|F| + |T|)
         # brake holds the ynrhuk dishwasher door (7.5 kg, COM 0.30 m above the bottom hinge) below ≈ 41° only; 0.31+
@@ -1255,7 +1271,9 @@ class ArticulationLarge(SamplerV2):
     def draw_joint_targets(self, rng: np.random.Generator) -> Tuple[float, float]:
         if self.direction == "open":
             return self.lower, float(self.stable[int(rng.integers(len(self.stable)))])
-        return float(self.stable[int(rng.integers(len(self.stable)))]), self.lower
+        # oracle-fix 2026-11-04 round 3 (close_large#03): opt-in generation.close_goal_margin_rad - the close ends this far short of the closed stop
+        # (inside the joint tolerance; the demos' torso bend peaked at the follow's last step, the door pressed into its stop)
+        return float(self.stable[int(rng.integers(len(self.stable)))]), self.lower + float(self.gp.gen("close_goal_margin_rad", 0.0) or 0.0)
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         obj = self.target
@@ -1728,6 +1746,14 @@ class ArticulationLarge(SamplerV2):
         missing = [fraction_key(k) for k in required if not arm_reach.get(fraction_key(k), False)]
         if missing:
             return False, f"no arm-only IK at the required waypoints {missing}"
+        # oracle-fix 2026-11-03 (owner: the dishwasher follows arm only, else sequential): an arm-only pull longer than
+        # ``hybrid_follow.arm_only_max_travel_rad`` does not count as working - the torso sags with the pull's length (dishwasher open
+        # 0075: robot_wobble after 0.43 rad) - and the follow goes to the sequential search; None = no cap, as before
+        cap = (self.gp.gen("hybrid_follow") or {}).get("arm_only_max_travel_rad")
+        self.arm_only_capped = False
+        if cap is not None and abs(float(q_goal) - float(q_init)) > float(cap) + 1e-9:
+            self.arm_only_capped = True
+            return False, f"arm-only travel {abs(float(q_goal) - float(q_init)):.3f} rad > hybrid_follow.arm_only_max_travel_rad {float(cap):.3f}"
         k_last = max(required)
         w = by_k[k_last]
         sign = 1.0 if q_goal >= q_init else -1.0
@@ -1813,7 +1839,8 @@ class ArticulationLarge(SamplerV2):
                 # the rigid eef->base sweep about the hinge is blocked (a door next to furniture) / no hybrid path: the
                 # oracle's secondary mode carries the instance when the arm alone reaches every required waypoint (§5.3
                 # "arm-only IK at each waypoint ... as the oracle's secondary mode"); otherwise the candidate is rejected
-                if all(arm_reach.get(fraction_key(k), False) for k in required):
+                if all(arm_reach.get(fraction_key(k), False) for k in required) and not getattr(self, "arm_only_capped", False):
+                    # (not when the arm-only follow was ruled out by arm_only_max_travel_rad: then the sequential follow or nothing)
                     mode, base_follow, base_follow_reason = "arm", None, f"{e.reason}: {e}"
                     log.info("%s: %s-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.variant, self.mode, e)
                 else:
@@ -1865,7 +1892,7 @@ class ArticulationLarge(SamplerV2):
         q_now = obj.get_joint_positions().clone()
         q_init_vec = q_now.clone()
         for n, j in obj.joints.items():
-            q_init_vec[names.index(n)] = float(j.lower_limit)
+            q_init_vec[names.index(n)] = float(getattr(self, "other_joints_init", {}).get(n, j.lower_limit))
         q_init_vec[names.index(self.joint_name)] = float(q_init)
         q_goal_vec = q_init_vec.clone()
         q_goal_vec[names.index(self.joint_name)] = float(q_goal)
@@ -1882,7 +1909,9 @@ class ArticulationLarge(SamplerV2):
             # the loader re-applies it (run_isg._restore_constraints); the stable set / passive probes above ran with it
             constraints.append({"type": "joint_friction", "object": tname, "joint": self.joint_name, "friction": float(self.joint_friction),
                                 "stock_friction": 0.2, "note": "PhysX articulation joint friction of the moved joint (generation.joint_friction): the brake "
-                                                                  "|F_resist| <= mu (|F| + |T|) that holds the link where the hand leaves it"})
+                                                                  "|F_resist| <= mu (|F| + |T|) that holds the link where the hand leaves it",
+                                # oracle-fix 2026-11-04 round 3: with other_joints_init (a neighbouring door held open) Open must read the target joint only
+                                **({"openable_joints": [self.joint_name]} if getattr(self, "other_joints_init", None) else {})})
         if constraints:
             d.extras["constraints"] = constraints
         tols = dict(self.gp.gen("tolerances") or {})

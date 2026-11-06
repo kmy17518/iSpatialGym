@@ -317,7 +317,9 @@ def test_customs_set_the_keys_on_touching02s_bar_variant_only():
     with_open = [a for a, v in customs.items() if isinstance(v, dict) and "brace_open_when_wide" in (v.get("generation") or {})]
     assert with_open == [BAR]
     with_speed = [a for a, v in customs.items() if isinstance(v, dict) and "push_speed_m_s" in (v.get("generation") or {})]
-    assert set(with_speed) - {BAR} == {a for a in with_speed if "nextto_large_scale" in a}  # the large-scale base push's own knob
+    # the large-scale base push's own knob: the nextto aliases and (oracle-fix 2026-11-03) the touching base push (generation.touching_push "base")
+    base_push = {a for a in with_speed if "nextto_large_scale" in a or str((customs[a].get("generation") or {}).get("touching_push") or "") == "base"}
+    assert set(with_speed) - {BAR} == base_push
 
 
 # ----------------------------------------------------------------------------------------------------------------

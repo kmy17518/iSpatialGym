@@ -83,6 +83,10 @@ DEFAULTS: Dict[str, Any] = {
     # elbow folds past its limit when the handle has come close - and cost a base move per 8 deg (dishwasher_wide 0921-030918)
     "release_retreat_m": [C.PRE_DIST, 0.07, 0.05],
     "min_move_m": 0.10,  # a sequential base move shorter than this AND turning less than min_move_deg is not worth its release / re-grasp
+    # oracle-fix 2026-11-03 (owner: the dishwasher follows ARM ONLY, else SEQUENTIAL - never the base): a sequential arm segment ends once
+    # it pulled the joint this far from where it began (rad; None = to the arm's limit, as before). The torso sags with the length of an
+    # arm-only pull (dishwasher open 0075: past the 1 deg robot_wobble gate after 0.43 rad of travel, 0074 0.91 deg after 0.45 rad)
+    "seq_max_pull_rad": None,
     "min_move_deg": 10.0,
     # every IK solution of the search must clear cuRobo's self-collision padding by this much (the arm embodiment, the trunk
     # where the stance puts it): the demo's trunk is not exactly there and the oracle refuses to plan from a start
@@ -969,8 +973,11 @@ class FollowSearch:
                 hard = float(self.k.get("hard_margin_rad", self.ikc.JOINT_LIMIT_MARGIN)) + float(self.k["retreat_margin_slack_rad"])
                 ladder = [float(v) for v in (self.k.get("release_retreat_m") or [C.PRE_DIST])]
                 i_seg0 = i
+                seq_cap = self.k.get("seq_max_pull_rad")
                 while i < n:
                     q_i = float(q_values[i])
+                    if seq_cap is not None and seg and abs(q_i - float(q_from)) > float(seq_cap) + 1e-9:
+                        break  # the pull is long enough: release / move / re-grasp next (seq_max_pull_rad)
                     s.pose_joint(q_i)
                     w = s.h([q_i])[0]
                     leaf_i = self.footprint_at(q_i)
@@ -1224,7 +1231,11 @@ def check_program_follow(sidecar, sampler, action, targets: Dict[str, Any], stan
             q = sampler.ikc.q_locked(st_b, right_arm=arm_q if arm == "right" else None, left_arm=arm_q if arm == "left" else None)
             if path.get("idle_arm_q") is not None and path.get("idle_arm") in ("left", "right"):
                 q[sampler.kit.robot.arm_control_idx[path["idle_arm"]]] = th.tensor([float(v) for v in path["idle_arm_q"]], dtype=th.float32)
-            with sampler.ikc.ignoring(ignore):
+            # oracle-fix 2026-11-04 round 3 (articulation #03, bottom_cabinet_rvunhj_0): poses[0] IS the grasp at q_init, which step 5a checked
+            # with the whole object out of the world (the open fingers 70 mm from the neighbouring door's bar); opt-in
+            # ``generation.follow_first_pose_ignore_object`` checks it the same way instead of with the body present
+            first_as_grasp = i == 0 and bool(sampler.gp.gen("follow_first_pose_ignore_object", False)) if hasattr(sampler, "gp") else False
+            with sampler.ikc.ignoring(list(ignore) + ([obj] if first_as_grasp else [])):
                 q_pol, residual = sampler.ikc.polish_witness(q, eef, arm, ignore=())
                 free = bool(sampler.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0])
             n += 1

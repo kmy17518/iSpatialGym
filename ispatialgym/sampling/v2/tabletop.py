@@ -244,12 +244,13 @@ def upright_shelf_facts(grasp_key: Optional[str], rest_quat) -> Optional[Dict[st
             "context": meta.get("context")}
 
 
-def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support) -> Tuple[Optional[float], Dict[str, Any]]:
+def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support, lateral0: float = 0.0) -> Tuple[Optional[float], Dict[str, Any]]:
     """Lateral position (m along ``edge.tangent`` from ``edge.mid``, + = the robot's left) of the inner face of the support's side
-    board on the robot's ``side``: a horizontal ray at height ``z``, ``depth`` behind the edge line, from the edge midpoint outward.
+    board on the robot's ``side``: a horizontal ray at height ``z``, ``depth`` behind the edge line, from the edge midpoint (shifted
+    ``lateral0`` along the tangent: the compartment of ``generation.shelf_bay_lateral_m``, oracle-fix 2026-11-04 round 3) outward.
     None when it meets nothing, another object first (a room wall behind a plank), or a body it starts in (a hit within
     :data:`SHELF_RAY_MIN_HIT_M` of the start: the midpoint inside a divider)."""
-    start = edge.mid + edge.inward * float(depth)
+    start = edge.mid + edge.inward * float(depth) + edge.tangent * float(lateral0)
     end = start + edge.tangent * float(side) * (0.5 * float(edge.length) + 0.30)
     h = s.world.raycast(th.tensor([[float(start[0]), float(start[1]), float(z)]]), th.tensor([[float(end[0]), float(end[1]), float(z)]]))[0]
     paths = tuple(str(l.prim_path) for l in support.links.values())
@@ -259,7 +260,7 @@ def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, 
         return None, fact
     if not h.get("hit") or not str(h.get("rigidBody", "")).startswith(paths):
         return None, fact
-    return float(side) * float(h["distance"]), fact
+    return float(lateral0) + float(side) * float(h["distance"]), fact
 
 
 def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support, lean_side: float) -> Tuple[Pose, Dict[str, Any]]:
@@ -272,9 +273,15 @@ def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support
     spine = -float(pts[:, 0].min())
     lat_ext = float(pts[:, 1].max()) if lean_side > 0 else -float(pts[:, 1].min())
     height = float(pts[:, 2].max() - pts[:, 2].min())
-    depth = -0.5 * float(top.resolution) + SHELF_SPINE_BEHIND_EDGE_M + spine
+    # oracle-fix 2026-11-04 round 3 (touching#03): ``generation.shelf_spine_behind_edge_m`` (the spine 1 cm behind the edge left the book's
+    # bottom-front corners under the start camera's frame border at every kmuacd_0 cell) and ``generation.shelf_bay_lateral_m`` {support: lateral} (the compartment)
+    gen = getattr(s, "gen", None)
+    spine_behind = float(gen("shelf_spine_behind_edge_m", SHELF_SPINE_BEHIND_EDGE_M)) if callable(gen) else SHELF_SPINE_BEHIND_EDGE_M
+    bays = gen("shelf_bay_lateral_m") if callable(gen) else None  # {support name: lateral of the compartment's centre, m along the edge tangent}
+    bay = float((bays or {}).get(getattr(support, "name", ""), 0.0)) if isinstance(bays, dict) else 0.0
+    depth = -0.5 * float(top.resolution) + spine_behind + spine
     z_ray = float(top.z) + 0.8 * height
-    wall, ray = shelf_wall_lateral(s, edge, depth, z_ray, lean_side, support)
+    wall, ray = shelf_wall_lateral(s, edge, depth, z_ray, lean_side, support, bay)
     facts: Dict[str, Any] = {"edge": edge.name, "lean_side": "left" if lean_side > 0 else "right", "depth_m": round(depth, 4), "ray_z": round(z_ray, 4), "ray": ray}
     if wall is None:
         _reject("shelf_wall", f"{support.name}: no side board on the {facts['lean_side']} at {z_ray:.2f} m ({ray})")
@@ -317,7 +324,7 @@ def mirrored_lean_quat(quat, edge: EdgeFrame, lean_side: float, lean_deg: float)
 
 
 def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_for_grasp: Sequence[Any], yaw: float, *, arm: str = "right",
-                  scale_key: Any = None, object_name: Optional[str] = None) -> GraspRecord:
+                  scale_key: Any = None, object_name: Optional[str] = None, fingers: Optional[float] = None) -> GraspRecord:
     """The first library grasp of ``grasps`` whose pre-grasp and grasp at the fixed object ``pose`` pass the exact IK from ``manip``
     with ``arm`` (the upright shelf start: the pose is set by the shelf, not drawn from F). The library pinch serves either hand
     (the two grippers and their wrist cameras are alike in the eef frame); with ``generation.grasp_twins`` it is offered in both
@@ -327,6 +334,8 @@ def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_fo
     IK = _ik()
     name = object_name or s.bindings.one("target").name
     exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+    if fingers is not None:  # oracle-fix 2026-11-04 round 3: the pre-shaped opening the oracle approaches with (touching#03's side-board finger)
+        exact_kw["fingers"] = float(fingers)
     twins = grasp_twins_on(s)
     reasons = []
     for g in grasps:
@@ -965,7 +974,13 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     bc = RB.BandComputer(world, kit, arms=(spec.arm,), lattice=lattice)
     bc.deadline = getattr(s, "deadline", None)
     tc_key = RB.band_trunk_check(bc, spec.arm)
-    stance = bc.stance_at_edge(top, support, RB.STAND_OFF, edge.name if edge is not None else None)
+    try:
+        stance = bc.stance_at_edge(top, support, RB.STAND_OFF, edge.name if edge is not None else None)
+    except RuntimeError as e:
+        # oracle-fix 2026-11-03 (disembedding#06 c3_k0, breakfast_table_rhjoby_0: "no stance on free floor around ..." killed the template
+        # setup with a traceback, no instance in 508 s): no band stance on free floor at any edge of this top is a normal rejection of
+        # the (support, edge) - the sampler goes on to its next candidate - not a crash of the run
+        _reject("no_manipulation_stance", f"band stance of {top.name}: {e}", support=top.name, edge=edge.name if edge is not None else None)
     z = float(spec.z_support) if spec.z_support is not None else float(top.z)
     lattice_world = spec.lattice_world if spec.lattice_world is not None else top.cells(free_only=True)
     ignore = [support] + list(spec.ignore)
@@ -1967,6 +1982,28 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     return out
 
 
+def shifted_init_stance(s, edge: EdgeFrame, stand_off: float) -> Optional[Stance]:
+    """Opt-in ``generation.init_edge_laterals_m`` (oracle-fix 2026-11-03, alias 151 hardback-desk: the desk's only open edge has its
+    midpoint stance against the goal bookcase): when the Phase-1a midpoint stance collides, the first of these shifts along the edge
+    (within the edge, 0.30 m from its ends) whose stance is on floor and collision-free stands in for it. Phase 1c still draws the lateral."""
+    lats = s.gen("init_edge_laterals_m", None) if hasattr(s, "gen") else None
+    if not lats:
+        return None
+    half = 0.5 * float(edge.length) - 0.30
+    for lat in (float(v) for v in lats):
+        if abs(lat) > half:
+            continue
+        xy = edge.base_xy(stand_off, lat)
+        if not s.kit.trav_free(xy):
+            continue
+        st = Stance("init", (float(xy[0]), float(xy[1]), edge.yaw), 0.5, 0.0, float(stand_off), edge, lateral=lat)
+        if s.ikc.stance_collision_free(st):
+            log.info("phase 1a: edge %s midpoint stance collides; shifted %+.2f m along the edge (generation.init_edge_laterals_m) to %s",
+                     edge.name, lat, [round(float(v), 2) for v in xy.tolist()])
+            return st
+    return None
+
+
 def edge_candidates(s, top, rng=None, stand_off: float = STAND_OFF) -> Iterator[Tuple[EdgeFrame, Stance]]:
     """§4.2 survivors in random order: the edge stance is on free floor and whole-body collision-free at trunk (0.5, 0)
     with untucked arms. Task modules that retry edges (axial ``edge_not_visible``) iterate this."""
@@ -1978,9 +2015,17 @@ def edge_candidates(s, top, rng=None, stand_off: float = STAND_OFF) -> Iterator[
             log.info("phase 1a: edge %s (L %.2f, overhang %.2f) skipped: %s", edge.name, edge.length, edge.overhang, skipped[edge.name])
             continue
         if not s.ikc.stance_collision_free(st):
-            skipped[edge.name] = f"stance at {[round(float(v), 2) for v in st.base_xy.tolist()]} collides at trunk (0.5, 0)"
-            log.info("phase 1a: edge %s (L %.2f, overhang %.2f) skipped: %s", edge.name, edge.length, edge.overhang, skipped[edge.name])
-            continue
+            shifted = shifted_init_stance(s, edge, stand_off)
+            if shifted is None:
+                skipped[edge.name] = f"stance at {[round(float(v), 2) for v in st.base_xy.tolist()]} collides at trunk (0.5, 0)"
+                if os.environ.get("ISPATIALGYM_STANCE_BLAME"):  # oracle-fix 2026-11-03: name the body (IKChecker._collision_blame; opt-in, costs world syncs)
+                    try:
+                        skipped[edge.name] += " - " + s.ikc._collision_blame(s.ikc.q_locked(st), (), margin=0.01)
+                    except Exception as e:  # noqa: BLE001
+                        skipped[edge.name] += f" - blame failed ({e!r})"
+                log.info("phase 1a: edge %s (L %.2f, overhang %.2f) skipped: %s", edge.name, edge.length, edge.overhang, skipped[edge.name])
+                continue
+            st = shifted
         log.info("phase 1a: edge %s (L %.2f, overhang %.2f) stance at %s", edge.name, edge.length, edge.overhang, [round(float(v), 2) for v in st.base_xy.tolist()])
         s._tabletop_top = top
         yield edge, st

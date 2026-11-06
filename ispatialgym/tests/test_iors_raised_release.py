@@ -142,6 +142,10 @@ def test_program_place_avoids_the_partner_only_for_a_raised_release():
 def test_nextto03_variant_alone_carries_the_key():
     customs = json.load(open(CUSTOMS))
     keyed = sorted(a for a, e in customs.items() if isinstance(e, dict) and (e.get("generation") or {}).get("raised_release") is not None)
-    assert keyed == ["inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table"]
-    gen = customs[keyed[0]]["generation"]
+    # oracle-fix 2026-11-03: nextto#01's four marker / colored pencil aliases carry nextto#03's key too (the opening jaw swept the pencil)
+    marker = [f"inter_object_relation_satisfaction-nextto_small_scale-marker-colored_pencil-{s}" for s in ("breakfast_table", "conference_table", "cubicle", "desk")]
+    assert keyed == sorted(["inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table"] + marker)
+    gen = customs["inter_object_relation_satisfaction-nextto_small_scale-tablespoon-chopstick-breakfast_table"]["generation"]
     assert set(gen["raised_release"]) <= set(IS.RAISED_RELEASE_DEFAULTS) and gen["pair_goal_align"]["facing"] == "away" and gen["init_align_support"] is True
+    for a in marker:
+        assert customs[a]["generation"]["raised_release"] == gen["raised_release"]

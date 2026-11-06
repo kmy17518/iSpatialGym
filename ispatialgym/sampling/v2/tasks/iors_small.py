@@ -46,6 +46,7 @@ from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
+from ispatialgym.sampling.v2 import program_check as PC
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
 from ispatialgym.sampling.v2.core import start_per_attempt  # noqa: E402  (train85)
@@ -176,6 +177,9 @@ RAISED_RELEASE_DEFAULTS = {"partner_clearance_m": 0.005, "max_raise_m": 0.03, "s
 #: touching#03 shelf layout: the lift of the target before it is slid along the board to the partner's side (it never passes over
 #: the partner); 5 mm under the headroom the interior raster keeps above the tallest book at every free cell
 SHELF_CARRY_HEIGHT_M = TT.INTERIOR_HEADROOM_MARGIN_M - 0.005
+#: ``grasps[0].place_kind`` of the shelf layout's tip release (``generation.shelf_tip_release``, oracle-fix 2026-11-04 round 4): the book is
+#: released at the goal check's start pose and tips onto the partner - no push
+SHELF_TIP_PLACE_KIND = "shelf_tip"
 #: owner 2026-10-12 item 4A: the lifted target's bottom (on the table at init) clears what the carry passes over by this much
 #: (``generation.carry_clearance_m``)
 CARRY_CLEARANCE_M = 0.03
@@ -651,6 +655,14 @@ class IORSSmall(SamplerV2):
         if not attachable:
             raise Reject("no_attachable_grasp", f"{self.grasp_key}: every library grasp self-collides once the object is attached")
         self.grasps = attachable
+        # oracle-fix 2026-11-04 round 3 (touching#03): opt-in generation.approach_finger_support_touch here too (IORSLarge.setup_finger_touch's rule):
+        # the approach checked with the fingers at the oracle's pre-shape instead of fully open (the board-side finger filled the ~6 cm to the side board)
+        p_touch = IK.finger_touch_params(self.gen("approach_finger_support_touch"))
+        if p_touch:
+            ws = [TT.grasp_pinch_width(g) for g in self.grasps]
+            op = None if not ws or None in ws else min(C.FINGER_OPEN, max(0.5 * w + IK.ORACLE_PRESHAPE_MARGIN_M for w in ws))
+            self.ikc.set_finger_touch(IK.FingerTouch(p_touch["margin_m"], p_touch["max_penetration_m"], p_touch["preshape"], supports=self.support_objects,
+                                                     opening=lambda: op))
         # pinch centring (oracle-B, run 0916-202403: a pinch off the object's centre along the closing axis lets one pad reach
         # the object first and drag it until the other lands - +15.4 mm at the closure): the pinch centre is moved onto
         # the hull's centre along c when it sits farther than ``pinch_offset_max_m`` from it (the pads close until contact,
@@ -758,6 +770,8 @@ class IORSSmall(SamplerV2):
             # the right board), the other arm has no role; Phase 2's foci come from that arm's band (its own, else the mirror)
             arm = self.shelf_push_arm()
             self.segment_arms = [arm]
+            if self.gen("shelf_working_arm_default"):  # oracle-fix 2026-11-04 round 3: stances checked with the pushing arm working (idle-posture rejects)
+                self.ikc.default_working_arms = [arm]
             self.arm_offer_why = f"touching shelf layout: the {arm} arm on the target's side grasps, places and pushes it; nothing braces the partner"
             self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=self.bands)
             phase2_band = {"bands": self.band_of_arm(arm)}
@@ -1633,7 +1647,8 @@ class IORSSmall(SamplerV2):
                         "table_end_margin": self.table_end_margin, "partner_gap_extra": self.partner_gap_extra, "support_margin": self.margin_support,
                         "partner_side": self.gen("partner_side"), "meta_link": self.meta_link(), "start_region_on_neighbors": bool(self.gen("start_region_on_neighbors", False)),
                         "push_stance": self.gen("push_stance", True), "reach_screen_place": self.gen("reach_screen_place", True),
-                        "shelf_free_span_min_m": float(self.gen("shelf_free_span_min_m", 0.15))},
+                        "shelf_free_span_min_m": float(self.gen("shelf_free_span_min_m", 0.15)),
+                        "shelf_spine_behind_edge_m": self.gen("shelf_spine_behind_edge_m"), "shelf_bay_lateral_m": self.gen("shelf_bay_lateral_m")},
                 "sides": [float(sd) for sd in self.template_sides()], "pair": {"g_NT": (self.pair or {}).get("g_NT"), "handedness": (self.pair or {}).get("handedness")},
                 "segment_arms": arms, "bands": {a: self._spa_band_signature(self.band_of_arm(a)) for a in arms},
                 "shelf_start": None if self.shelf_start is None else {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg")},
@@ -1937,7 +1952,15 @@ class IORSSmall(SamplerV2):
                 # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
                 if self.shelf_pose is not None:
                     t_pose = self.shelf_pose
-                    grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale)
+                    ft = getattr(self.ikc, "finger_touch", None)  # oracle-fix 2026-11-04 round 3: the pre-shaped opening when the preshape rule is on
+                    pre_open = ft.opening() if (ft is not None and getattr(ft, "preshape", False) and callable(getattr(ft, "opening", None))) else None
+                    grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale,
+                                             fingers=pre_open)
+                    if pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
+                        grasp.extras["preshape_transit"] = True
+                    why_transit = self.shelf_transit_why(manip, grasp, default, pre_open) if self.gen("shelf_transit_check") else None
+                    if why_transit is not None:
+                        raise Reject("grasp_unreachable", why_transit)
                 else:
                     t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
                 if grasp.arm != default:
@@ -2650,6 +2673,42 @@ class IORSSmall(SamplerV2):
 
     # ------------------------------------------------------------------ touching shelf layout (touching#03, owner 2026-10-11 11:46)
 
+    def shelf_transit_why(self, manip: Stance, grasp: GraspRecord, arm: str, fingers: Optional[float] = None) -> Optional[str]:
+        """Opt-in ``generation.shelf_transit_check`` (oracle-fix 2026-11-04 round 4, touching#03: 8 / 8 demos failed the transit to the shelf
+        pre-grasp - the straight ramp into bookcase_opryhp_1 / the support, via "ready" too, and trajopt after it): the oracle's first strategies
+        re-checked here - the straight joint ramp from the stance's configuration to the pre-grasp witness, else the two ramps via the "ready"
+        arm posture (``r1pro_model.ARM_READY_Q``), each waypoint penetration-free (self + world); None when one passes, else why."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        kw = {"fingers": fingers} if fingers is not None else {}
+        r = self.ikc.exact([grasp.pre_grasp], manip, arm, cache=False, **kw)
+        if not r.ok or r.q is None:
+            return f"transit check: no pre-grasp witness ({r.reason})"
+        q0 = self.ikc.q_locked(manip)
+        q1 = G.t(r.q).to(q0.dtype).clone()
+        idx = self.kit.robot.arm_control_idx[arm]
+
+        def clear(qa: th.Tensor, qb: th.Tensor) -> bool:
+            n = max(8, int(math.ceil(float((qb[idx] - qa[idx]).abs().max()) / 0.02)))
+            prof = 0.5 * (1.0 - th.cos(th.linspace(0.0, math.pi, n + 1, dtype=qa.dtype)))
+            ramp = qa.unsqueeze(0) + prof.unsqueeze(1) * (qb - qa).unsqueeze(0)
+            return bool(self.kit.collision_free(ramp, margin=0.0)[1:].all())
+
+        if clear(q0, q1):
+            return None
+        q_ready = q0.clone()
+        q_ready[idx] = th.tensor(M.ARM_READY_Q[arm], dtype=q0.dtype)
+        if clear(q0, q_ready) and clear(q_ready, q1):
+            return None
+        return f"transit check: the straight {arm}-arm ramp from the stance to the pre-grasp witness penetrates (direct and via ready)"
+
+    def shelf_tip(self) -> bool:
+        """Shelf layout with ``generation.shelf_tip_release`` (oracle-fix 2026-11-04 round 4, touching#03: every push class failed at its pre-pose
+        inside the 0.33 m compartment from every lateral): the carried book is released at the drafted goal - the AABB-contact lean the goal
+        check settles from - and tips onto the partner by itself (``shelf_tip_max_nudges`` 1 mm nudges at most); no push stance, no
+        ``contacts.push``; ``grasps[0].place_kind`` :data:`SHELF_TIP_PLACE_KIND`."""
+        return self.shelf_start is not None and bool(self.gen("shelf_tip_release", False))
+
     def shelf_push_sign(self) -> float:
         """The shelf layout's push along the edge tangent, toward the partner leaning against the board opposite the target's: -1
         (the robot's right) for a target leaning against the left board."""
@@ -2743,10 +2802,22 @@ class IORSSmall(SamplerV2):
                          "turns_deg": [round(v, 1) for v in turns]}
         return cands[k]
 
+    def shelf_pre_place(self, place: G.Pose) -> G.Pose:
+        """The pre-place of the touching shelf layout's place (oracle-fix 2026-11-04 round 3, touching#03): with
+        ``generation.shelf_pre_place_up_m`` the place raised that much straight up (the book carried into the compartment over its board;
+        10 cm back along the level approach the attached book's sphere fit sat in the board - every place screening failed at pose 1 of 2),
+        else ``IK.pre_pose``."""
+        up = self.gen("shelf_pre_place_up_m") if self.shelf_start is not None else None
+        if up is None:
+            return IK.pre_pose(place)
+        return G.t(place[0]) + th.tensor([0.0, 0.0, float(up)]), G.t(place[1])
+
     def pre_place_of(self, place: G.Pose) -> G.Pose:
         """The pre-place of a place eef pose: ``PRE_DIST`` back along the approach; a standing target ``PRE_DIST`` straight above, so
         the descent lowers it into its release over the opening (its grasp approaches it sideways there: along the approach the
         target would come in over the rim)."""
+        if self.shelf_start is not None and self.gen("shelf_pre_place_up_m") is not None:
+            return self.shelf_pre_place(place)  # oracle-fix 2026-11-04 round 3: every caller (the draw's screening too) uses the shelf's vertical pre-place
         if self.up_axis() is None:
             return IK.pre_pose(place)
         return G.t(place[0]) + th.tensor([0.0, 0.0, float(IK.PRE_DIST)]), G.t(place[1])
@@ -3269,7 +3340,7 @@ class IORSSmall(SamplerV2):
         push = self.sidecar.stances.get("push") if self.relation == "touching" else None
         st_place = push or manip
         ign = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
-        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        lift_end = PC.lift_end_pose(grasp)
         arm_q = None
         with attached(self.kit, grasp.arm, tgt, eef_in_object=grasp.eef_in_object):
             r = self.ikc.exact([grasp.pre_place, grasp.place], st_place, grasp.arm, ignore_for_last=ign, scale_key=scale, cache=False, approached=ign)
@@ -3315,7 +3386,8 @@ class IORSSmall(SamplerV2):
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         if self.relation == "touching":
-            self._nudge_until_touching(tname, pname)
+            # the tip release (no push follows): the settle itself must bring the book onto the partner, a few 1 mm nudges at most
+            self._nudge_until_touching(tname, pname, max_steps=int(self.gen("shelf_tip_max_nudges", 3)) if self.shelf_tip() else 25)
         super().refine_targets_from_goal(draft)
         if self.relation == "inside":
             self._check_inside_protrusion(tname, pname)
@@ -3400,8 +3472,18 @@ class IORSSmall(SamplerV2):
                     place_pos = goal_pos - self.shelf_push_direction(manip) * self.place_gap()
                 self._touching_place_pos = place_pos
                 draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4)}
+                if self.shelf_tip():
+                    # oracle-fix 2026-11-04 round 4: the lift moves the book shelf_lift_away_m toward the partner too - straight up it stayed against the
+                    # side board it leans on (t03tip2b: the carried drive's first swept pose, attached book + left gripper on bookcase_opryhp_0)
+                    away = self.shelf_push_direction(manip) * float(self.gen("shelf_lift_away_m", 0.03))
+                    grasp.extras["lift_away"] = [round(float(v), 4) for v in away]
+                    # the release where the goal check's settle started (the drafted goal: the AABB-contact lean); that settle tipped the
+                    # book onto the partner, so the oracle's release does the same and nothing pushes
+                    place_pos, goal_quat = G.t(draft.goal_poses[tname][0]).float(), G.t(draft.goal_poses[tname][1]).float()
+                    self._touching_place_pos = place_pos
+                    draft.summary["touching"] = {"place_gap_m": 0.0, "tip_release": True, "nudge_steps": getattr(self, "_nudge_steps", None)}
             place = IK.grasp_pose((place_pos, goal_quat), grasp.eef_in_object)
-            pre_place = IK.pre_pose(place)
+            pre_place = self.shelf_pre_place(place)
             ignore = self.support_objects() + [self.obj("partner")]
             if self.relation in ("nextto", "touching"):
                 # open-jaw footprint facts at the recorded place (touching: the nextto position the push starts from)
@@ -3499,7 +3581,7 @@ class IORSSmall(SamplerV2):
                                                                  f"approach) from the {st_place.name} stance: {r_clear.reason}")
         # the lift (oracle ``Lift``): grasp pose raised by carry_height with the object attached, support ignored (the
         # object leaves it); the pre-place is where the carry ends, so the lift end must be IK-feasible too
-        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        lift_end = PC.lift_end_pose(grasp)
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             # tracked from the grasp configuration (one IK branch along the lift), support ignored throughout
             r_lift = self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(), cache=False, approached=[])
@@ -3510,6 +3592,9 @@ class IORSSmall(SamplerV2):
         # the pre-poses join the check (owner 2026-09-16 10:15 item 1b): the oracle's FOV monitor arms from the pre-pose
         self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp})
         self.require_in_frame(cam_place, {"pre-place": pre_place, "place": place})
+        if self.shelf_tip():
+            grasp.extras["place_kind"] = SHELF_TIP_PLACE_KIND  # the program: pick, carry, place (the book tips onto the partner), retreat
+            return
         if self.relation == "touching":
             # the push (+ brace) from the stance the box was placed from (the second base pose when recorded)
             cam = cam_place
@@ -3614,6 +3699,7 @@ class IORSSmall(SamplerV2):
         n_brace = int(self.gen("brace_search_candidates", 12))
         with self.posed("target", t_place_pose):
             chosen, _dec, _fails = self._touching_push_choice(st, t_place_pose, p_init, t_face_z, direction, dist, ignore_push)
+            self._push_chain_fails = list(_fails)  # oracle-fix 2026-11-04: named in push_stance's "no class" entries
             if chosen is None:
                 return None
             push_kind = chosen.proposal.payload[0]
@@ -3632,7 +3718,7 @@ class IORSSmall(SamplerV2):
         place = IK.grasp_pose(t_place_pose, grasp.eef_in_object)
         ign = self.support_objects() + [self.obj("partner")]
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-            r = self.ikc.exact([IK.pre_pose(place), place], st, grasp.arm, ignore_for_last=ign, scale_key=self.choice.models["target"].scale, cache=False, approached=ign)
+            r = self.ikc.exact([self.shelf_pre_place(place), place], st, grasp.arm, ignore_for_last=ign, scale_key=self.choice.models["target"].scale, cache=False, approached=ign)
         if not r.ok:
             return f"descent: {r.reason}"
         r2 = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
@@ -3701,10 +3787,25 @@ class IORSSmall(SamplerV2):
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
             probe = cand if cand is not None else manip
+            if self.shelf_tip():
+                # oracle-fix 2026-11-04 round 4: the tip release keeps the second base pose for the PLACE (where the place passed under the push
+                # mode) and pushes nothing - the first lateral whose place descent + clear pose pass
+                place_why = self.place_infeasible_why(probe, t_place_pose, grasp)
+                tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: tip release{'; place: ' + place_why if place_why else ''}")
+                if place_why is None:
+                    st, manip_ok = cand, cand is None
+                    break
+                continue
+            self._push_chain_fails = []
             kind = self.push_chain_feasible(probe, t_place_pose, p_pose)
+            no_class = "no class"
+            if kind is None:  # oracle-fix 2026-11-04: the distinct failure reasons of the classes tried (count x reason, numbers kept)
+                import collections
+                reasons = collections.Counter(f.split(": ", 1)[-1][:120] for f in self._push_chain_fails)
+                no_class = f"no class [{len(self._push_chain_fails)} cands: " + " | ".join(f"{n}x {r}" for r, n in reasons.most_common(4)) + "]"
             place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
             both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True) if (kind is not None and place_why is None and want_brace) else None
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}{'; place: ' + place_why if place_why else ''}"
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{'; place: ' + place_why if place_why else ''}"
                          f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}")
             if kind is not None and place_why is None:
                 if both is not None or not want_brace:
@@ -3718,6 +3819,8 @@ class IORSSmall(SamplerV2):
         if st is None:
             if manip_ok:
                 return None  # the manipulation stance itself passes: no second base pose
+            if self.shelf_tip():
+                raise Reject("place_unreachable", f"touching tip release: the place fails from every lateral ({'; '.join(tried)})")
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
         log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
         try:
@@ -3733,7 +3836,7 @@ class IORSSmall(SamplerV2):
             self.auto_carry_height(draft, grasp, manip, st, p_pose)
         # the drive is swept with the arm at the LIFT configuration (the box carry_height above the grasp, as the oracle drives
         # it), not the stance's untucked arms - the box posed in the untucked hand stands inside the table (0918-165104)
-        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        lift_end = PC.lift_end_pose(grasp)
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
         if not r_lift.ok or r_lift.q is None:
@@ -3777,10 +3880,20 @@ class IORSSmall(SamplerV2):
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
-        with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not."""
+        with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not. Opt-in
+        ``generation.grasp_frame_rule: "fingertip"`` (oracle-fix 2026-11-04 round 4, IORSLarge's rule): QA's own criterion instead - the fingertip
+        point (``conventions.fingertip``) inside the image with the 5 % margin (t03tip3 opryhp: the shelf pre-grasp's +-6 cm eef box left the image)."""
+        tip_rule = str(self.gen("grasp_frame_rule") or "box") == "fingertip"
         for what, pose in poses.items():
-            if pose is not None and not self.ikc.eef_in_frame(pose, cam):
-                raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %)")
+            if pose is None:
+                continue
+            if tip_rule:
+                tip = C.fingertip((G.t(pose[0]).float(), G.t(pose[1]).float()))
+                ok = bool(self.kit.world.camera_model.all_inside(cam, G.t(tip).reshape(1, 3), IK.IN_FRAME_MARGIN))
+            else:
+                ok = self.ikc.eef_in_frame(pose, cam)
+            if not ok:
+                raise Reject("gripper_not_in_frame", f"{what} {'fingertip' if tip_rule else 'eef pose'} outside the manipulation image (5 %)")
 
     def touching_contacts(self, draft: Draft, manip: Stance):
         """§6.11 touching: push contact on the target's right face (right arm) toward the partner, brace pre-contact +
@@ -4333,10 +4446,13 @@ class IORSSmall(SamplerV2):
         direction = self.sidecar.stance("manipulation").tangent
         if self.shelf_start is not None:  # toward the partner on the other side board
             direction = self.shelf_push_direction(self.sidecar.stance("manipulation"))[:2]
-        for _ in range(max_steps):
+        for k in range(max_steps + 1):
             self.world.wake([t, p])
             if t.states[Touching].get_value(p):
+                self._nudge_steps = k
                 return
+            if k == max_steps:
+                break
             pos, quat = t.get_position_orientation()
             t.set_position_orientation(pos + th.tensor([float(direction[0]) * step, float(direction[1]) * step, 0.0]), quat)
             t.keep_still()
