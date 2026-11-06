@@ -340,3 +340,23 @@ def test_skip_existing_counts_only_the_runs_arm_and_kind(tmp_path):
     bad = tmp_path / "map__broken.json"
     bad.write_text("{")
     assert not RM._map_meta_matches(str(bad), "right", "tabletop")
+
+
+def test_find_with_an_anchor_set_returns_the_map_at_the_anchor(tmp_path):
+    # of-v2maps 2026-11-06 (v2smoke1): the anchor lookup's kind ("exact") overwrote find's map kind ("tabletop"), so with an anchor set every
+    # map failed the kind test - "reach map miss" at an existing map's height for every alias
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling import reach_maps as RM
+
+    lib = SimpleNamespace(identity_key=lambda: "obj-key")
+    base = tmp_path / "map__cat__model__h0.8126__k"
+    meta = {"schema": RM.SCHEMA, "kind": "tabletop", "object_key": "obj-key", "rest_id": "r0", "arm": "left", "height": {"value": 0.8126}}
+    (tmp_path / (base.name + ".json")).write_text(json.dumps(meta))
+    np.savez_compressed(str(base) + ".npz", cells=np.zeros((1, 2)), yaws=np.zeros(8))
+    A = HA.AnchorSet.from_surfaces([_surf("a", "board", 0.81, prec=1e-2, surface="interior"), _surf("a", "t1", 0.8126)])
+    rm = RM.ReachMap.find(str(tmp_path), lib, 0.8126, rest_id="r0", arm="left", anchors=A)
+    assert rm is not None and rm.path.endswith("h0.8126__k.json")
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8131, rest_id="r0", arm="left", anchors=A) is None  # 0.8131 resolves to the 0.81 anchor: no map there
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8126, rest_id="r0", arm="right", anchors=A) is None  # another arm's map is not this one
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8126, rest_id="r0", arm="left", anchors=A, kind="brace") is None

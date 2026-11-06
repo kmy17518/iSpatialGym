@@ -694,7 +694,9 @@ class ReachMap:
         metadata (object identity, rest, policy, schema are all checked)."""
         target = height
         if anchors is not None:
-            a, kind = anchors.lookup(height)
+            # of-v2maps 2026-11-06: the lookup's kind (exact / approx) used to overwrite the MAP kind argument ("tabletop"), so with an anchor
+            # file every map failed the kind test below - no sampler map lookup could hit (v2smoke1: "reach map miss" at an existing map's height)
+            a, _how = anchors.lookup(height)
             if a is None:
                 return None
             target = a["height"]
