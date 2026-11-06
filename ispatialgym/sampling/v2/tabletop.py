@@ -324,13 +324,17 @@ def mirrored_lean_quat(quat, edge: EdgeFrame, lean_side: float, lean_deg: float)
 
 
 def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_for_grasp: Sequence[Any], yaw: float, *, arm: str = "right",
-                  scale_key: Any = None, object_name: Optional[str] = None, fingers: Optional[float] = None) -> GraspRecord:
+                  scale_key: Any = None, object_name: Optional[str] = None, fingers: Optional[float] = None,
+                  accept: Optional[Callable[[GraspRecord], Optional[str]]] = None, prescreen: bool = False) -> GraspRecord:
     """The first library grasp of ``grasps`` whose pre-grasp and grasp at the fixed object ``pose`` pass the exact IK from ``manip``
     with ``arm`` (the upright shelf start: the pose is set by the shelf, not drawn from F). The library pinch serves either hand
     (the two grippers and their wrist cameras are alike in the eef frame); with ``generation.grasp_twins`` it is offered in both
     turns by the orientation rule (:func:`pick_twin`, as the segment fallback takes a pinch with the other arm), the wrist camera
     checked against the world only - the board under the object is no infinite plane, a camera in front of its edge is clear.
-    ``Reject("grasp_unreachable")`` otherwise."""
+    ``accept(record) -> why or None`` (oracle-fix 2026-11-05, speed): a further check of each passing grasp; one it refuses is skipped
+    for the next. ``prescreen`` (oracle-fix 2026-11-05, speed): every row's [pre-grasp, grasp] and its twin's in one batched screen
+    (``IKChecker.screen_pairs``, the feasible-set screen) first - a row whose row and twin both fail it gets no exact IK (touching#03:
+    83 % of the attempt time in this function's exact IK, most rows failing at the pre-grasp). ``Reject("grasp_unreachable")`` otherwise."""
     IK = _ik()
     name = object_name or s.bindings.one("target").name
     exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
@@ -338,7 +342,26 @@ def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_fo
         exact_kw["fingers"] = float(fingers)
     twins = grasp_twins_on(s)
     reasons = []
-    for g in grasps:
+    screened = None
+    if prescreen and grasps:
+        pairs = []
+        for g in grasps:
+            eef = IK.grasp_pose(pose, g.pose)
+            pairs.append([IK.pre_pose(eef), eef])
+            if twins and getattr(g, "name", None):
+                eef_t = C.twin_pose((_t(eef[0]), _t(eef[1])))
+                pairs.append([IK.pre_pose(eef_t), eef_t])
+        ok = s.ikc.screen_pairs(pairs, manip, arm, ignore_for_last=list(ignore_for_grasp), fingers=fingers).tolist()
+        screened, i = [], 0
+        for g in grasps:
+            n = 2 if (twins and getattr(g, "name", None)) else 1
+            screened.append(any(ok[i:i + n]))
+            i += n
+    for k, g in enumerate(grasps):
+        if screened is not None and not screened[k]:
+            _count(s, "fixed_start_prescreen.dropped")
+            reasons.append(f"{getattr(g, 'name', '?')}: neither the row nor its twin passes the batched screen")
+            continue
         eio = g.pose
         eef = IK.grasp_pose(pose, eio)
         pre = IK.pre_pose(eef)
@@ -355,6 +378,10 @@ def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_fo
         if pick is not None:
             rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
         rec.stance = manip.name
+        why = accept(rec) if accept is not None else None
+        if why is not None:
+            reasons.append(f"{getattr(g, 'name', '?')}: {why}"[:160])
+            continue
         return rec
     _reject("grasp_unreachable", f"no library grasp reaches the fixed start pose from {manip.name}: {reasons[:4]}")
 

@@ -3527,10 +3527,38 @@ class IORSLarge(SamplerV2):
         TT._count(self, "grasp_reach_margin.rejected")
         return str(res.reason)
 
+    def _b_frame_options(self, opts_facts, stance: Stance, where: str) -> Tuple[Optional[Tuple[List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]], str]:
+        """Opt-in ``generation.b_fingertip_frame_check`` (oracle-fix 2026-11-05, speed): :meth:`_b_options`' finger assignments whose pre-grasp
+        and grasp keep the fingertip point inside the image of ``stance`` by the program check's own gate (``program_check.fingertips_in_frame``,
+        5 % + its slack), in their order; ``(None, why)`` when none does. brief15 (under_large#02): 60 of 123 rejected attempts failed that gate at
+        ``grasp.pre_grasp`` in the program check, 144 s each after the sample / settle / goal stages. Unchanged without the key."""
+        if not self.gp.gen("b_fingertip_frame_check"):
+            return opts_facts, ""
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        opts, facts = opts_facts
+        kept, why = [], []
+        for o in opts:
+            out = PCK.fingertips_in_frame(self, stance, "grasp", [("pre_grasp", [o[2]]), ("approach", [o[1]])])
+            if out is None:
+                kept.append(o)
+            else:
+                why.append(f"{getattr(o[0], 'name', o[0])}: {out['key']} fingertip outside the image (5 %): u {out['u']}, v {out['v']}, depth {out['depth_m']} m")
+                TT._count(self, "b_frame.rejected")
+        if not kept:
+            return None, f"[{where}] " + "; ".join(why)
+        if facts is not None and kept[0] is not opts[0]:
+            facts = dict(facts, chosen="twin" if kept[0][3] else "row", frame_flip=f"the {'twin' if opts[0][3] else 'row'} fails the fingertip frame gate: {why[0]}")
+        return (kept, facts), ""
+
     def _b_margin_options(self, opts_facts, stance: Stance, arm: str, where: str) -> Tuple[Optional[Tuple[List[Tuple[Any, G.Pose, G.Pose, bool]], Optional[Dict[str, Any]]]], str]:
         """:meth:`_b_options`' finger assignments that keep the grasp reach margin (:meth:`grasp_margin_fails`), in their order, and the
         ``twin_choice`` (``chosen`` follows the first one kept; ``reach_margin_flip`` names the dropped first one); ``(None, why)`` when none
-        does. Unchanged without ``generation.grasp_reach_margin_m``. One INFO line 'grasp reach margin [..]: ...' per grasp checked."""
+        does. Unchanged without ``generation.grasp_reach_margin_m``. One INFO line 'grasp reach margin [..]: ...' per grasp checked.
+        First :meth:`_b_frame_options` (opt-in ``generation.b_fingertip_frame_check``)."""
+        opts_facts, why_f = self._b_frame_options(opts_facts, stance, where)
+        if opts_facts is None:
+            return None, why_f
         m = self.grasp_reach_margin()
         if m is None:
             return opts_facts, ""
@@ -4097,6 +4125,24 @@ class IORSLarge(SamplerV2):
         return (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
                 tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
 
+    def _overhang_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
+        """Opt-in ``generation.overhang_fail_memo_persist`` (oracle-fix 2026-11-05, speed): the failed-pick memo of
+        :meth:`_overhang_memo_key` in the sampling cache (``ISPATIALGYM_SAMPLING_CACHE``; job_val.sh SHARED_SAMPLING_CACHE shares it between
+        the jobs of one alias), keyed with the IK cache scope (scene, rooms, crop) and the alias's whole generation block - a customs change
+        is another key. The hardback's attempt 0 spent ~1100 s re-proving picks earlier jobs had failed (only witnesses are cached). With
+        ``why``: stores the failure; without: the stored failure or None."""
+        if not bool(self.gp.gen("overhang_fail_memo_persist") or False):
+            return None
+        from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
+
+        gen = {k: v for k, v in (getattr(self.gp, "generation", None) or {}).items() if not str(k).startswith("_")}
+        ck = cache_key("overhang_fail_v1", {"scope": getattr(self.ikc, "cache_scope", {}), "variant": self.gp.variant, "generation": gen, "key": list(key)})
+        if why is not None:
+            cache_put(ck, {"why": str(why)[:900]})
+            return why
+        hit = cache_get(ck)
+        return None if not isinstance(hit, dict) else hit.get("why")
+
     def _overhang_grasp_stances(self, st: Stance, arm: str, opts: Dict[str, Any]) -> List[Stance]:
         """The grasp stances of the two-stance overhang pick (stance ``"pick"``): B backed off along its axis by ``grasp_back_offs_m``,
         at B's trunk then ``grasp_trunks``, B's arms and idle posture, on free floor and whole-body collision-free (memoised per B and arm
@@ -4575,6 +4621,11 @@ class IORSLarge(SamplerV2):
                         # owner 2026-10-13 ~03:15 item 4: the direct pick failed - push the object to B's support edge, grasp the overhang
                         key_ov = self._overhang_memo_key(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b)
                         memo_ov = self.__dict__.setdefault("_overhang_fail_memo", {})
+                        if key_ov is not None and key_ov not in memo_ov:
+                            persisted = self._overhang_memo_persisted(key_ov)
+                            if persisted is not None:
+                                TT._count(self, "pick_overhang.memo_persisted_hit")
+                                memo_ov[key_ov] = persisted
                         if key_ov is not None and key_ov in memo_ov:
                             TT._count(self, "pick_overhang.memo_hit")
                             overhang, why_ov = None, f"{memo_ov[key_ov]} (remembered: the same pick failed in an earlier attempt)"
@@ -4582,6 +4633,7 @@ class IORSLarge(SamplerV2):
                             overhang, why_ov = self._overhang_pick(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b, ov_opts)
                             if overhang is None and key_ov is not None:
                                 memo_ov[key_ov] = why_ov
+                                self._overhang_memo_persisted(key_ov, why_ov)
                         if overhang is not None:
                             res, t_pose, eef, pre, pick, yaw = overhang["res"], overhang["t_pose"], overhang["eef"], overhang["pre"], overhang["pick"], yaw0
                             b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), overhang["grasp_stance"], overhang["arm"], "B, overhang")

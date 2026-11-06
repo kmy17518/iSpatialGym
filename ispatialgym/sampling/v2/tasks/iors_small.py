@@ -1939,7 +1939,25 @@ class IORSSmall(SamplerV2):
                 if not arms_here:
                     errors.append(f"candidate {int(k)}: no offered arm meets the {TT.side_name(self.region_side)} partner's reach rule")
                     continue
+            memo_key = None
             try:
+                ft = getattr(self.ikc, "finger_touch", None)  # oracle-fix 2026-11-04 round 3: the pre-shaped opening when the preshape rule is on
+                pre_open = ft.opening() if (ft is not None and getattr(ft, "preshape", False) and callable(getattr(ft, "opening", None))) else None
+                per_grasp = bool(self.gen("shelf_transit_check") and self.gen("shelf_transit_per_grasp"))
+                if self.shelf_pose is not None and self.gen("fixed_start_memo"):
+                    # oracle-fix 2026-11-05 (speed, opt-in): the fixed start's grasp verdict per stance - the start pose is the template's and the
+                    # stances come from the cached start cells, so the same exact IK / transit check failed again and again (t03tip5: 762 'no library
+                    # grasp reaches the fixed start pose' at 19.5 s and 1551 transit rejections at 29.8 s, 97 % of 17.6 h)
+                    memo_key = self._fixed_start_memo_key(manip, default, pre_open, per_grasp)
+                    hit = self.__dict__.setdefault("_fixed_start_memo", {}).get(memo_key)
+                    if hit is None:
+                        hit = self._fixed_start_memo_persisted(memo_key)
+                        if hit is not None:
+                            TT._count(self, "fixed_start_memo.persisted_hit")
+                            self._fixed_start_memo[memo_key] = hit
+                    if hit is not None:
+                        TT._count(self, "fixed_start_memo.hit")
+                        raise Reject("grasp_unreachable", f"{hit} (remembered: this stance's fixed-start grasp failed in an earlier attempt)")
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
                 try:
@@ -1952,15 +1970,22 @@ class IORSSmall(SamplerV2):
                 # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
                 if self.shelf_pose is not None:
                     t_pose = self.shelf_pose
-                    ft = getattr(self.ikc, "finger_touch", None)  # oracle-fix 2026-11-04 round 3: the pre-shaped opening when the preshape rule is on
-                    pre_open = ft.opening() if (ft is not None and getattr(ft, "preshape", False) and callable(getattr(ft, "opening", None))) else None
-                    grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale,
-                                             fingers=pre_open)
-                    if pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
-                        grasp.extras["preshape_transit"] = True
-                    why_transit = self.shelf_transit_why(manip, grasp, default, pre_open) if self.gen("shelf_transit_check") else None
-                    if why_transit is not None:
-                        raise Reject("grasp_unreachable", why_transit)
+                    try:
+                        # oracle-fix 2026-11-05 (speed, opt-in generation.shelf_transit_per_grasp): the transit check judges each grasp that passes
+                        # the IK - the first with a clear transit is taken - instead of failing the stance on the first grasp's transit
+                        accept = (lambda rec: self.shelf_transit_why(manip, rec, default, pre_open)) if per_grasp else None
+                        grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale,
+                                                 fingers=pre_open, accept=accept, prescreen=bool(self.gen("fixed_start_prescreen")))
+                        if pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
+                            grasp.extras["preshape_transit"] = True
+                        why_transit = self.shelf_transit_why(manip, grasp, default, pre_open) if (self.gen("shelf_transit_check") and not per_grasp) else None
+                        if why_transit is not None:
+                            raise Reject("grasp_unreachable", why_transit)
+                    except Reject as e:
+                        if memo_key is not None:
+                            self._fixed_start_memo[memo_key] = str(e)[:300]
+                            self._fixed_start_memo_persisted(memo_key, str(e)[:300])
+                        raise
                 else:
                     t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
                 if grasp.arm != default:
@@ -2672,6 +2697,31 @@ class IORSSmall(SamplerV2):
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
 
     # ------------------------------------------------------------------ touching shelf layout (touching#03, owner 2026-10-11 11:46)
+
+    def _fixed_start_memo_key(self, manip: Stance, arm: str, fingers: Optional[float], per_grasp: bool) -> Tuple[Any, ...]:
+        """The key of the fixed start's grasp verdict at ``manip`` (``generation.fixed_start_memo``): the base pose, trunk and locked
+        configuration (both arms' postures), the working arm, the pre-shaped opening and whether the transit is judged per grasp; the start
+        pose and the grasp library are the template's."""
+        q = self.ikc.q_locked(manip)
+        return (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
+                tuple(round(float(v), 3) for v in G.t(q).flatten().tolist()), arm, None if fingers is None else round(float(fingers), 4), bool(per_grasp))
+
+    def _fixed_start_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
+        """Opt-in ``generation.fixed_start_memo_persist`` (oracle-fix 2026-11-05, speed): :meth:`_fixed_start_memo_key`'s failures in the
+        sampling cache (job_val.sh SHARED_SAMPLING_CACHE: shared by the jobs of one alias), keyed with the IK cache scope, the variant, the
+        alias's whole generation block and the template's start pose. With ``why``: stores it; without: the stored failure or None."""
+        if not bool(self.gen("fixed_start_memo_persist") or False) or self.shelf_pose is None:
+            return None
+        from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
+
+        gen = {k: v for k, v in (getattr(self.gp, "generation", None) or {}).items() if not str(k).startswith("_")}
+        pose = [G.t(self.shelf_pose[0]).tolist(), G.t(self.shelf_pose[1]).tolist()]
+        ck = cache_key("fixed_start_fail_v1", {"scope": getattr(self.ikc, "cache_scope", {}), "variant": self.gp.variant, "generation": gen, "start": pose, "key": list(key)})
+        if why is not None:
+            cache_put(ck, {"why": str(why)[:900]})
+            return why
+        hit = cache_get(ck)
+        return None if not isinstance(hit, dict) else hit.get("why")
 
     def shelf_transit_why(self, manip: Stance, grasp: GraspRecord, arm: str, fingers: Optional[float] = None) -> Optional[str]:
         """Opt-in ``generation.shelf_transit_check`` (oracle-fix 2026-11-04 round 4, touching#03: 8 / 8 demos failed the transit to the shelf
