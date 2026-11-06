@@ -40,6 +40,15 @@ hdf5 attr ``isg_scene_crop``) records the cropped world's scene file. ``full`` b
 recorded object's entry taken from the demo (:func:`merge_partial_scene_file`); the per-step states then load by object hash into
 the full scene and the objects outside the crop keep the template's state. ``recorded``: the recorded scene file, as before.
 ``auto`` (default): ``full`` when the first demo is cropped, else ``recorded``.
+
+``--goal-occlusion`` (owner 2026-11-05: goal occlusion is screened in the sampler for mental_rotation and disembedding, in this replay
+stage for every other family): at a demo's last frame - its settled end - the oracle's screen of :mod:`ispatialgym.eval.goal_occlusion`
+(the head camera's depth, the box screen of every target / partner, the panel screen of a fixture from a second depth render with the
+slot's robot hidden; an inside goal judges its partner; camera relocalization is exempt). A demo with a judged object at least
+``GO.THRESHOLD`` (50 %) hidden is left out of the dataset (its episode is dropped, ``REPLAY_DEMO.kept`` false) and every verdict is
+printed as ``REPLAY_OCCLUSION {json}`` (alias, demo, max_occluded, worst, per-object shares). ``auto`` (default) screens a demo whose
+instance the sampler did not measure (its ``summary.json`` carries ``"visibility": "pending"`` - sampled camera-free - or no measured
+``goal_occlusion``); ``on`` every demo; ``off`` none. Not with ``--tiled`` (no per-slot depth annotator).
 """
 
 from __future__ import annotations
@@ -410,6 +419,84 @@ def _same(a, b) -> bool:
     return a == b
 
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# 2026-11-05 one trunk (owner): goal occlusion screened at the replay stage for the families the sampler does not screen
+# ----------------------------------------------------------------------------------------------------------------------------
+
+
+def instance_record(demo: "Demo") -> Dict[str, Any]:
+    """The demo's instance summary (``<iid>.summary.json`` next to its TRO) and its variant / subtask (the demo's meta.json first)."""
+    rec: Dict[str, Any] = {"summary": None, "variant": None, "subtask": None}
+    meta_p = os.path.join(demo.dir, "meta.json")
+    if os.path.exists(meta_p):
+        try:
+            m = json.load(open(meta_p))
+            rec["variant"], rec["subtask"] = m.get("variant"), m.get("subtask")
+        except ValueError:
+            pass
+    if demo.tro_path and demo.tro_path.endswith("-tro_state.json"):
+        sp = demo.tro_path[: -len("-tro_state.json")] + ".summary.json"
+        if os.path.exists(sp):
+            try:
+                rec["summary"] = json.load(open(sp))
+            except ValueError:
+                pass
+    return rec
+
+
+def needs_occlusion_screen(mode: str, rec: Dict[str, Any]) -> Tuple[bool, str]:
+    """(screen, why) under ``--goal-occlusion`` ``mode`` for a demo's :func:`instance_record`."""
+    from ispatialgym.eval import goal_occlusion as GO
+
+    sub = rec.get("subtask") or rec.get("variant")
+    if mode == "off":
+        return False, "off"
+    if GO.exempt(sub):
+        return False, "exempt subtask"
+    if mode == "on":
+        return True, "on"
+    summ = rec.get("summary") or {}
+    if summ.get("visibility") == "pending":
+        return True, "visibility pending (sampled camera-free)"
+    if (summ.get("goal_occlusion") or {}).get("max_occluded") is not None or "occluded" in (summ.get("goal_occlusion") or {}):
+        return False, "measured by the sampler"
+    return True, "not measured by the sampler"
+
+
+def occlusion_screen(scene, render, subtask: Optional[str]) -> Dict[str, Any]:
+    """:mod:`ispatialgym.eval.goal_occlusion` on the slot's current (loaded) state, as ``Executor.goal_occlusion_report`` screens a
+    demo's last frame: the head camera's settled depth, every target / partner and fixture of the scene; the robot hidden for a
+    second render when a fixture is judged."""
+    from omnigibson.utils.constants import JointType
+
+    from ispatialgym.eval import goal_occlusion as GO
+    from ispatialgym.oracle.head_depth import settled_depth
+    from ispatialgym.oracle.qa import CameraModel
+    from ispatialgym.oracle.r1pro_model import HEAD_CAMERA_SENSOR_SUFFIX
+
+    robot = scene.robots[0]
+    key = next((k for k in robot.sensors if k.endswith(HEAD_CAMERA_SENSOR_SUFFIX)), None)
+    if key is None:
+        return {"status": "no head camera", "occluded": False, "max_occluded": None}
+    sensor = robot.sensors[key]
+    intr = GO.intrinsics_of(CameraModel.from_sensor(sensor))
+    judged = [o for o in scene.objects if GO.role(getattr(o, "name", ""))]
+    depth = settled_depth(sensor, render)
+    depth_without = None
+    if any(GO.role(o.name) == "fixture" for o in judged):
+        robot.visible = False
+        try:
+            depth_without = settled_depth(sensor, render)
+        finally:
+            robot.visible = True
+            for _ in range(3):
+                render()
+    cp, cq = sensor.get_position_orientation()
+    objects = GO.screen_scene(depth, (cp.float().tolist(), cq.float().tolist()), intr, judged, depth_without_robot=depth_without,
+                              revolute=JointType.JOINT_REVOLUTE, subtask=subtask)
+    return GO.report(objects, method="replay head-camera depth", camera_key=key, resolution=[intr[0], intr[1]])
+
+
 class Slot:
     def __init__(self, k: int, scene, writer, robot_name: str, scene_mode: str = "recorded"):
         self.k = k
@@ -506,6 +593,9 @@ def main(argv=None) -> int:
                          "full template (task rooms + neighbours; objects outside the crop at the template state), 'recorded' in its "
                          "recorded scene file (as before); 'auto': full for a cropped first demo, else recorded")
     ap.add_argument("--results", default=None, help="append REPLAY_DEMO / REPLAY_SUMMARY json lines here")
+    ap.add_argument("--goal-occlusion", choices=("auto", "on", "off"), default="auto",
+                    help="screen the goal occlusion at each demo's last frame and leave an occluded demo out of the dataset (module doc); "
+                         "auto: the demos the sampler did not measure")
     ap.add_argument("--profile-ticks", default=None, help="START:COUNT: cProfile those ticks, stats to <results>.prof.txt (or stdout)")
     args = ap.parse_args(argv)
 
@@ -589,6 +679,7 @@ def main(argv=None) -> int:
             out.flush()
 
     t_ticks = defaultdict(float)
+    n_occl = defaultdict(int)  # goal-occlusion verdicts: kept / dropped / not_screened
     n_ticks = n_steps = 0
     objs_in = objs_loaded = 0
     idle_s = 0.0
@@ -654,9 +745,33 @@ def main(argv=None) -> int:
             if s.i == d.T:
                 # the last action; the observation it led to is not a frame (the writer pairs it with no action)
                 s.writer.step(d.action[d.T - 1], obs, float(d.reward[d.T - 1]), bool(d.terminated[d.T - 1]), bool(d.truncated[d.T - 1]))
-                index = s.writer.end(save=True)
+                keep, occl = True, None
+                rec = instance_record(d)
+                screen, why = needs_occlusion_screen(args.goal_occlusion, rec)
+                if screen and tiled:
+                    screen, why = False, "not measured: tiled rendering"
+                if screen:
+                    t_o = time.perf_counter()
+                    try:
+                        occl = occlusion_screen(s.scene, og.sim.render, rec.get("subtask") or rec.get("variant"))
+                    except Exception as e:  # noqa: BLE001  (a failed screen keeps the demo and says why)
+                        occl = {"status": f"error: {e!r}", "occluded": False, "max_occluded": None}
+                    t_ticks["goal_occlusion"] += time.perf_counter() - t_o
+                    keep = not occl.get("occluded")
+                    n_occl[("dropped" if not keep else "kept")] += 1
+                else:
+                    n_occl["not_screened"] += 1
+                emit("REPLAY_OCCLUSION", {"demo": d.dir, "variant": rec.get("variant"), "screened": screen, "why": why, "kept": keep,
+                                          "max_occluded": (occl or {}).get("max_occluded"), "worst": (occl or {}).get("worst"),
+                                          "occluded": (occl or {}).get("occluded"), "status": (occl or {}).get("status"),
+                                          "objects": {k: {kk: v.get(kk) for kk in ("status", "occluded", "judged", "visible_px", "total_px") if kk in v}
+                                                      for k, v in ((occl or {}).get("objects") or {}).items()},
+                                          "sampler_predicted": ((rec.get("summary") or {}).get("goal_occlusion") or {}).get("max_occluded")})
+                index = s.writer.end(save=keep)
                 emit("REPLAY_DEMO", {"demo": d.dir, "slot": s.k, "frames": d.T, "episode_index": index, "wall_s": round(time.time() - s.t0, 2),
-                                     "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}")})
+                                     "dataset": os.path.join(args.root, f"{args.repo_prefix}_slot{s.k}"), "kept": keep,
+                                     "goal_occlusion": None if occl is None else {"max_occluded": occl.get("max_occluded"), "worst": occl.get("worst"),
+                                                                                  "occluded": occl.get("occluded")}})
                 s.demo = None
         fill_idle()
         t5 = time.perf_counter()
@@ -686,7 +801,7 @@ def main(argv=None) -> int:
         "objects_per_state": round(objs_in / max(1, n_steps), 1) if args.delta_load else None,
         "objects_loaded_per_state": round(objs_loaded / max(1, n_steps), 1) if args.delta_load else None,
         "renders": args.renders, "first_renders": args.first_renders, "omp_threads": os.environ.get("OMP_NUM_THREADS"),
-        "scene": scene, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
+        "scene": scene, "goal_occlusion": {"mode": args.goal_occlusion, **n_occl}, "n_objects_scene": slots[0].n_objects_scene, "n_objects_recorded": n_objects_recorded_first,
         "cpus_allowed": len(os.sched_getaffinity(0)), "host": os.uname().nodename, "pid": os.getpid()})
     if out is not None:
         out.close()

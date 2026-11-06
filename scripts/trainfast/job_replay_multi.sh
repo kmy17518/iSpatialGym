@@ -7,7 +7,10 @@ JOBDIR=$1; CODE=$2; P=$3; OUT=$4
 F=/vision/u/minyeong/projects/isg_home/trainfast
 source $JOBDIR/job.env
 export ISGE_CODE=$CODE
-source $F/scripts/env_fast.sh
+# one trunk (2026-11-05): the replay code's own scripts; goal occlusion screened here for the families the sampler does not screen
+# (multienv/replay.py --goal-occlusion auto, REPLAY_GOAL_OCCLUSION=on|off overrides)
+S=$CODE/scripts/trainfast; [ -f $S/env_fast.sh ] || S=$F/scripts
+source $S/env_fast.sh
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR=$JB/numba_cache ISPATIALGYM_HEAD_CAMERA_ONLY=1
 trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.r* 2>/dev/null' EXIT
 mkdir -p $OUT
@@ -28,7 +31,7 @@ for p in $(seq 0 $(( P - 1 ))); do
   app=${OMNIGIBSON_APPDATA_PATH}.r$p; rsync -a --exclude 'local/logs' $OMNIGIBSON_APPDATA_PATH/ $app/ 2>/dev/null
   ( export OMNIGIBSON_APPDATA_PATH=$app TMPDIR=$app/tmp; mkdir -p $TMPDIR
     python -m ispatialgym.multienv.replay --demos @$OUT/demos_$p.txt --root $OUT/lerobot_$p --task $ALIAS --slots 1 ${REPLAY_BATCHED:---batched-usd-edits} --async-flush \
-      --proprio loaded --warmup-s 15 --repo-prefix replay ${REPLAY_EXTRA:-} --results $OUT/replay_$p.jsonl > $OUT/replay_$p.log 2>&1 ) &
+      --proprio loaded --warmup-s 15 --repo-prefix replay --goal-occlusion ${REPLAY_GOAL_OCCLUSION:-auto} ${REPLAY_EXTRA:-} --results $OUT/replay_$p.jsonl > $OUT/replay_$p.log 2>&1 ) &
   PIDS="$PIDS $!"
 done
 wait $PIDS
