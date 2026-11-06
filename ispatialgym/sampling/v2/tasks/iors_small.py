@@ -219,6 +219,20 @@ SPA_CELL_KIND = "spa_cell_v1"
 #: the rejections of one lateral cell that the per-attempt draw retries on another cell / edge (every other rejection ends the attempt)
 SPA_CELL_REJECTS = ("no_workspace", "edge_too_short", "stance_collision", "shelf_width", "no_manipulation_stance", "no_start_region")
 _SPA_CACHE_ANNOUNCED = False
+#: oracle-fix 2026-11-06 (owner on the touching#04 spray-bottle demo, ``generation.push_height_sweep``): the lowest contact height (m above
+#: the target's bottom = the support top) of each push class at which the hand clears the support - the vertical blade's fingertips 5 mm
+#: (the old blade's height), a leaning blade's fingertips ``blade_lean_tip_above_m`` (its leading edge dips below the tips), the horizontal
+#: hand of the fingertip / pad pushes closing horizontally 5 cm (the gripper body, r 4 cm on the eef axis, 1 cm clear), the vertically
+#: closing ones 6.2 cm (the lower knuckle 4.2 cm below the pads, r 1.5 cm, 5 mm clear)
+PUSH_SWEEP_MIN_HEIGHT_M = {"blade": 0.005, "tip_h": 0.05, "tip_v": 0.062}
+#: the push contact's window around the centre line (m, across it and in height): the outermost material within it is the face the
+#: fingertips stop ``stop_clearance_m`` before (no part of them starts inside the target)
+PUSH_SWEEP_WINDOW_M = 0.01
+#: the footprint the push line goes through: the target's hull cut this far above its bottom (the part it stands on)
+PUSH_SWEEP_BASE_CUT_M = 0.005
+#: the raised blade (palm above the top) is the sweep's last resort only for a target this tall over its smallest footprint side or less
+#: (``generation.push_raised_max_aspect``): a taller one rocks when pushed near its top (the spray bottle: 3.6 -> 20.3 deg)
+PUSH_RAISED_MAX_ASPECT = 1.5
 
 
 def _spa_json_default(o):
@@ -318,6 +332,115 @@ def face_run_at(hull_w: th.Tensor, z: float, outward: th.Tensor, side_h: th.Tens
     face = cut[off >= float(off.max()) - face_depth_tol]
     s = face @ G.t(side_h)[:2].float()
     return float(s.min()), float(s.max())
+
+
+def polygon_centroid(poly) -> Optional[th.Tensor]:
+    """The area centroid (xy) of a convex polygon (V, 2; CCW corners); the corners' mean for a degenerate one, None for an empty one."""
+    p = G.t(poly).float().reshape(-1, 2)
+    if len(p) == 0:
+        return None
+    q = th.roll(p, -1, dims=0)
+    cross = p[:, 0] * q[:, 1] - q[:, 0] * p[:, 1]
+    a = 0.5 * float(cross.sum())
+    if abs(a) < 1e-12:
+        return p.mean(dim=0)
+    return th.stack([((p[:, 0] + q[:, 0]) * cross).sum(), ((p[:, 1] + q[:, 1]) * cross).sum()]) / (6.0 * a)
+
+
+def point_triangle_distances(pts: np.ndarray, tris: np.ndarray) -> np.ndarray:
+    """Euclidean distance (N, F) from every point of ``pts`` (N, 3) to every triangle of ``tris`` (F, 3, 3): the closest point on each
+    triangle by its Voronoi regions (vertex, edge, face; Ericson, Real-Time Collision Detection 5.1.5), vectorised."""
+    p = np.asarray(pts, dtype=float).reshape(-1, 1, 3)
+    t = np.asarray(tris, dtype=float).reshape(1, -1, 3, 3)
+    a, b, c = t[:, :, 0], t[:, :, 1], t[:, :, 2]
+    ab, ac = b - a, c - a
+    ap, bp, cp = p - a, p - b, p - c
+    d1, d2 = (ab * ap).sum(-1), (ac * ap).sum(-1)
+    d3, d4 = (ab * bp).sum(-1), (ac * bp).sum(-1)
+    d5, d6 = (ab * cp).sum(-1), (ac * cp).sum(-1)
+    va, vb, vc = d3 * d6 - d5 * d4, d5 * d2 - d1 * d6, d1 * d4 - d3 * d2
+
+    def div(n, m):
+        return n / np.where(np.abs(m) > 1e-18, m, 1e-18)
+
+    s = va + vb + vc
+    q = a + ab * div(vb, s)[..., None] + ac * div(vc, s)[..., None]  # inside the face region
+    # the regions in reverse priority, each overriding the ones after it
+    q = np.where(((va <= 0) & (d4 - d3 >= 0) & (d5 - d6 >= 0))[..., None], b + (c - b) * div(d4 - d3, (d4 - d3) + (d5 - d6))[..., None], q)
+    q = np.where(((vb <= 0) & (d2 >= 0) & (d6 <= 0))[..., None], a + ac * div(d2, d2 - d6)[..., None], q)
+    q = np.where(((d6 >= 0) & (d5 <= d6))[..., None], c, q)
+    q = np.where(((vc <= 0) & (d1 >= 0) & (d3 <= 0))[..., None], a + ab * div(d1, d1 - d3)[..., None], q)
+    q = np.where(((d3 >= 0) & (d4 <= d3))[..., None], b, q)
+    q = np.where(((d1 <= 0) & (d2 <= 0))[..., None], a, q)
+    return np.linalg.norm(p - q, axis=-1)
+
+
+class HullSections:
+    """oracle-fix 2026-11-06 (``generation.push_height_sweep``): a convex hull given by its points (world xyz) - its horizontal cuts
+    (:meth:`cut`), the outermost material of a cut on a line (:meth:`outermost`), a cut's area centroid and the distance of points to the
+    hull (:meth:`distance`). qhull's triangles give the hull's edges (a cut's corners are where they cross the plane: a few dozen points,
+    where :func:`hull_cut_points` pairs every point below with every point above) and its faces (the exact point-to-hull distance). Without
+    qhull (a flat or degenerate point set) the cuts are :func:`hull_cut_points`' and :meth:`distance` is None."""
+
+    def __init__(self, hull_w):
+        self.pts = G.t(hull_w).float().reshape(-1, 3)
+        self.z_lo, self.z_hi = float(self.pts[:, 2].min()), float(self.pts[:, 2].max())
+        self.edges = self.tris = self.planes = None
+        self._cuts: Dict[float, th.Tensor] = {}
+        try:
+            from scipy.spatial import ConvexHull
+
+            P = self.pts.double().numpy()
+            ch = ConvexHull(P)
+            s = ch.simplices
+            e = np.unique(np.sort(np.concatenate([s[:, [0, 1]], s[:, [1, 2]], s[:, [2, 0]]]), axis=1), axis=0)
+            self.edges, self.tris, self.planes = (P[e[:, 0]], P[e[:, 1]]), P[s], ch.equations
+        except Exception:  # noqa: BLE001 - a flat / degenerate point set (or no scipy): the all-pairs cut, no distance
+            pass
+
+    def cut(self, z: float) -> th.Tensor:
+        """The cut at height ``z`` (CCW corners, (V, 2) world xy; empty when the hull does not reach ``z``)."""
+        key = round(float(z), 5)
+        poly = self._cuts.get(key)
+        if poly is None:
+            if self.edges is None:
+                pts = hull_cut_points(self.pts, float(z))
+            else:
+                a, b = self.edges
+                za, zb = a[:, 2] - float(z), b[:, 2] - float(z)
+                hit = (np.minimum(za, zb) <= 0.0) & (np.maximum(za, zb) >= 0.0)
+                a, b, za, zb = a[hit], b[hit], za[hit], zb[hit]
+                span = zb - za
+                t = np.where(np.abs(span) > 1e-12, -za / np.where(np.abs(span) > 1e-12, span, 1.0), 0.0)
+                pts = th.tensor(a[:, :2] + t[:, None] * (b[:, :2] - a[:, :2]), dtype=th.float32).reshape(-1, 2)
+            poly = G.convex_hull_2d(pts) if len(pts) >= 3 else th.zeros(0, 2)
+            self._cuts[key] = poly
+        return poly
+
+    def outermost(self, z: float, normal, tangent, t0: float) -> Optional[float]:
+        """The largest coordinate along ``normal`` of the cut at ``z`` on the line {p · ``tangent`` = ``t0``} (``iors_large_nextto.outermost_on_line``);
+        None when the line misses it."""
+        from ispatialgym.sampling.v2.tasks.iors_large_nextto import outermost_on_line
+
+        poly = self.cut(z)
+        if len(poly) < 3:
+            return None
+        return outermost_on_line([poly], normal, tangent, t0)
+
+    def centroid(self, z: float) -> Optional[th.Tensor]:
+        """The area centroid (xy) of the cut at ``z``; None when the hull does not reach it."""
+        poly = self.cut(z)
+        return polygon_centroid(poly) if len(poly) >= 3 else None
+
+    def distance(self, pts) -> Optional[th.Tensor]:
+        """Distance (m) of each point (N, 3; world) to the hull, 0 inside; None without qhull's faces."""
+        if self.tris is None:
+            return None
+        P = G.t(pts).double().reshape(-1, 3).numpy()
+        inside = (P @ self.planes[:, :3].T + self.planes[:, 3]).max(axis=1) <= 0.0
+        d = point_triangle_distances(P, self.tris).min(axis=1)
+        d[inside] = 0.0
+        return th.tensor(d, dtype=th.float32)
 
 
 def footprint_laterals(pts: th.Tensor, tangent) -> Tuple[float, float]:
@@ -3696,14 +3819,29 @@ class IORSSmall(SamplerV2):
                 "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
                 **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
 
-    def hand_overlap(self, eef_pose: G.Pose, role: str, obj_pose: G.Pose, margin: float = 0.005) -> Optional[str]:
+    def hand_overlap(self, eef_pose: G.Pose, role: str, obj_pose: G.Pose, margin: float = 0.005, against: str = "box") -> Optional[str]:
         """Which part of the hand beyond the finger profile (``HAND_SPHERES_EEF``: wrist camera, knuckles, gripper body) comes
         within ``margin`` of the role's hull box at ``obj_pose`` for the eef pose — None when all clear. The IK check ignores the
-        pushed object at its contact pose, so the camera hanging over the box top was invisible to it (owner 2026-09-18 19:39)."""
+        pushed object at its contact pose, so the camera hanging over the box top was invisible to it (owner 2026-09-18 19:39).
+        ``against="hull"`` (oracle-fix 2026-11-06, :meth:`push_height_sweep_on`): the distance to the hull itself (:class:`HullSections`) -
+        the box in the object's frame stood ~2 cm proud of the spray bottle's surface where the leaning blades' gripper body came
+        (touching#04: 'gripper body -17 mm from the box'); the box when qhull cannot build the hull."""
         hull = G.t(self.hull[role])
+        eef = (G.t(eef_pose[0]), G.t(eef_pose[1]))
+        if against == "hull":
+            sec = HullSections(self.world.hull_at(self.hull[role], obj_pose))
+            worst = None
+            for part, (centres, r) in HAND_SPHERES_EEF.items():
+                dist = sec.distance(C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
+                if dist is None:
+                    break
+                dmin = float(dist.min())
+                if dmin < r + margin and (worst is None or dmin - r < worst[1]):
+                    worst = (part, dmin - r)
+            else:
+                return None if worst is None else f"{worst[0]} {worst[1] * 1000:+.0f} mm from the hull (margin {margin * 1000:.0f} mm)"
         lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
         inv = C.invert((G.t(obj_pose[0]), G.t(obj_pose[1])))
-        eef = (G.t(eef_pose[0]), G.t(eef_pose[1]))
         worst = None
         for part, (centres, r) in HAND_SPHERES_EEF.items():
             pts_o = C.transform_points(inv, C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
@@ -3715,21 +3853,25 @@ class IORSSmall(SamplerV2):
             return None
         return f"{worst[0]} {worst[1] * 1000:+.0f} mm from the box (margin {margin * 1000:.0f} mm)"
 
-    def push_hand_overlap(self, push_init: G.Pose, push_goal: G.Pose, t_place_pose: G.Pose, direction: th.Tensor, dist: float) -> Optional[str]:
-        """The hand at the push contact (box at the place) and at the push goal (box pushed ``dist``): the first overlap, or None."""
-        bad = self.hand_overlap(push_init, "target", t_place_pose)
+    def push_hand_overlap(self, push_init: G.Pose, push_goal: G.Pose, t_place_pose: G.Pose, direction: th.Tensor, dist: float,
+                          against: str = "box") -> Optional[str]:
+        """The hand at the push contact (box at the place) and at the push goal (box pushed ``dist``): the first overlap, or None.
+        ``against``: :meth:`hand_overlap`'s."""
+        bad = self.hand_overlap(push_init, "target", t_place_pose, against=against)
         if bad is None:
             pushed = (G.t(t_place_pose[0]) + G.t(direction) * float(dist), G.t(t_place_pose[1]))
-            bad = self.hand_overlap(push_goal, "target", pushed)
+            bad = self.hand_overlap(push_goal, "target", pushed, against=against)
         return bad
 
-    def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose, with_brace: bool = False) -> Optional[str]:
+    def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose, with_brace: bool = False,
+                            height_range: Optional[Tuple[Optional[float], Optional[float]]] = None) -> Optional[str]:
         """The first push class whose [pre, init, goal] chain and retreat clear pose pass the exact IK from ``st`` with the box
         posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes. With
         ``with_brace`` the class must also admit a left brace in the two-arm solve (``exact_both_arms``, the right arm locked
         at its push goal) — the first ``brace_search_candidates`` brace candidates are tried; the returned kind is then
         ``"<push kind>+<brace kind>"``. Shelf layout: the push along the shelf push direction by the arm on the target's side
-        (:meth:`_touching_push_choice`), never braced."""
+        (:meth:`_touching_push_choice`), never braced. ``height_range`` (oracle-fix 2026-11-06, :meth:`push_height_sweep_on`): only
+        the candidates whose contact height lies in it; the passing class's height is left in ``self._push_chain_height``."""
         tangent = st.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
         p_init, b_point = self.touching_points(t_place_pose, p_pose, st)
@@ -3748,11 +3890,12 @@ class IORSSmall(SamplerV2):
         ignore_brace = self.support_objects() + [self.obj("partner")]
         n_brace = int(self.gen("brace_search_candidates", 12))
         with self.posed("target", t_place_pose):
-            chosen, _dec, _fails = self._touching_push_choice(st, t_place_pose, p_init, t_face_z, direction, dist, ignore_push)
+            chosen, _dec, _fails = self._touching_push_choice(st, t_place_pose, p_init, t_face_z, direction, dist, ignore_push, height_range=height_range)
             self._push_chain_fails = list(_fails)  # oracle-fix 2026-11-04: named in push_stance's "no class" entries
             if chosen is None:
                 return None
             push_kind = chosen.proposal.payload[0]
+            self._push_chain_height = chosen.proposal.payload[2].get("contact_height_m")
             if not with_brace:
                 return push_kind
             b_chosen, _bdec, _bfails = self._touching_brace_choice(st, chosen.proposal.chain, t_place_pose, p_pose, b_point, face_z, direction, dist, p_hull, p_init,
@@ -3834,6 +3977,11 @@ class IORSSmall(SamplerV2):
         st, tried, manip_ok = None, [], False
         fallback: Optional[Tuple[Optional[Stance], bool]] = None  # (stance or None for the manipulation stance, manip_ok)
         want_brace = bool(self.gen("brace_stance_search", True)) and (self._brace_gate or {}).get("ok") is not False
+        # oracle-fix 2026-11-06 (owner on the touching#04 spray-bottle demo, push_height_sweep_on): every lateral is searched and the one whose
+        # feasible push contact is LOWEST wins (with a brace on a tie, then the order); a later lateral only tries contacts up to the best
+        # height found so far
+        sweep = self.push_height_sweep_on()
+        best: Optional[Tuple[Tuple[float, int], Optional[Stance], bool]] = None  # ((height, unbraced), stance or None for the manipulation stance, manip_ok)
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
             probe = cand if cand is not None else manip
@@ -3847,22 +3995,36 @@ class IORSSmall(SamplerV2):
                     break
                 continue
             self._push_chain_fails = []
-            kind = self.push_chain_feasible(probe, t_place_pose, p_pose)
+            self._push_chain_height = None
+            cap = (None, best[0][0]) if (sweep and best is not None) else None
+            kind = self.push_chain_feasible(probe, t_place_pose, p_pose, height_range=cap)
+            h = getattr(self, "_push_chain_height", None) if kind is not None else None
             no_class = "no class"
             if kind is None:  # oracle-fix 2026-11-04: the distinct failure reasons of the classes tried (count x reason, numbers kept)
                 import collections
                 reasons = collections.Counter(f.split(": ", 1)[-1][:120] for f in self._push_chain_fails)
-                no_class = f"no class [{len(self._push_chain_fails)} cands: " + " | ".join(f"{n}x {r}" for r, n in reasons.most_common(4)) + "]"
+                no_class = f"no class{f' at or below {100 * cap[1]:.1f} cm' if cap else ''} [{len(self._push_chain_fails)} cands: " + \
+                    " | ".join(f"{n}x {r}" for r, n in reasons.most_common(4)) + "]"
             place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
-            both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True) if (kind is not None and place_why is None and want_brace) else None
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{'; place: ' + place_why if place_why else ''}"
+            both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True, height_range=(h, h) if (sweep and h is not None) else None) \
+                if (kind is not None and place_why is None and want_brace) else None
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{f' @ {100 * h:.1f} cm' if (sweep and h is not None) else ''}"
+                         f"{'; place: ' + place_why if place_why else ''}"
                          f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}")
             if kind is not None and place_why is None:
+                if sweep:
+                    rank = (round(float(h), 4) if h is not None else math.inf, 0 if (both is not None or not want_brace) else 1)
+                    if best is None or rank < best[0]:
+                        best = (rank, cand, cand is None)
+                    continue
                 if both is not None or not want_brace:
                     st, manip_ok = cand, cand is None
                     break
                 if fallback is None:
                     fallback = (cand, cand is None)
+        if best is not None:
+            st, manip_ok = best[1], best[2]
+            draft.summary.setdefault("touching", {})["push_stance_lowest_contact_m"] = None if math.isinf(best[0][0]) else best[0][0]
         if st is None and fallback is not None:
             st, manip_ok = fallback
         draft.summary.setdefault("touching", {})["push_stance_search"] = tried
@@ -4065,7 +4227,7 @@ class IORSSmall(SamplerV2):
             self.sidecar.contacts.pop("brace", None)
 
     def _touching_push_choice(self, st: Stance, t_pose: G.Pose, p_init: th.Tensor, t_face_z: Tuple[float, float], direction: th.Tensor, dist: float,
-                              ignore_push: Sequence[Any], arm: Optional[str] = None):
+                              ignore_push: Sequence[Any], arm: Optional[str] = None, height_range: Optional[Tuple[Optional[float], Optional[float]]] = None):
         """The push of the touching task (the box posed at the place by the caller): ``touching_push_candidates`` in their order,
         a class's two wrist turns chosen by ``orient.choose`` (owner 2026-09-27). A candidate passes when (0) the hand beyond the
         finger profile (wrist camera, knuckles, body) clears the box at the contact and the goal, (1) the [pre, init, goal] chain
@@ -4074,22 +4236,33 @@ class IORSSmall(SamplerV2):
         configuration (a class without one dies in the program check, 9/16 of 0918-173814). ``arm``: the push arm (default the
         right arm; the shelf layout's :meth:`shelf_push_arm`). :meth:`pair_goal_align`'s ``push_max_height_m``: only the candidates whose
         contact (the fingertips of a blade, else the eef's height at the face) is at most that high above the target's bottom.
-        Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
+        :meth:`push_height_sweep_on` (oracle-fix 2026-11-06): the candidates by contact height (:meth:`swept_push_candidates`), the hand
+        checked against the hull, within ``height_range`` (m above the target's bottom, either end None = open) when given; the labels
+        carry the height (``push_tip_h-@5.0cm``). Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
         if arm is None:
             arm = self.shelf_push_arm() if self.shelf_start is not None else "right"
-        cands = self.touching_push_candidates(st, p_init, t_face_z, direction)
+        sweep = t_pose is not None and self.push_height_sweep_on()
+        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=self.world.hull_at(self.hull["target"], t_pose) if sweep else None)
         pair = self.pair_goal_align()
         if pair is not None and pair["push_max_height_m"] is not None:
             h_max = float(pair["push_max_height_m"])
             cands = (c for c in cands if float(c[2].get("fingertip_z") or G.t(c[1][0])[2]) - float(t_face_z[0]) <= h_max + 1e-9)
+        if height_range is not None:
+            lo, hi = (None if v is None else float(v) for v in height_range)
+            cands = (c for c in cands if c[2].get("contact_height_m") is None
+                     or ((lo is None or float(c[2]["contact_height_m"]) >= lo - 1e-6) and (hi is None or float(c[2]["contact_height_m"]) <= hi + 1e-6)))
 
         def chain(c):
             _kind, init, extras = c
             return [IK.pre_pose(init, float(extras.get("pre_dist_m") or IK.PRE_DIST)), init, (init[0] + direction * dist, init[1])]
 
+        def label(c):
+            h = c[2].get("contact_height_m")
+            return c[0] if h is None else f"{c[0]}@{100.0 * float(h):.1f}cm"
+
         def evaluate(p):
             pre, init, goal = p.chain
-            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist)
+            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist, against="hull" if sweep else "box")
             if overlap is not None:
                 return False, None, None, overlap
             r_push = self.ikc.exact(p.chain, st, arm, ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED, q_first=p.q_first)
@@ -4101,7 +4274,7 @@ class IORSSmall(SamplerV2):
                 return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
             return True, r_push, qs, ""
 
-        return O.choose_first(self.ikc, arm, cands, key=lambda c: c[1], label=lambda c: c[0],
+        return O.choose_first(self.ikc, arm, cands, key=lambda c: c[1], label=label,
                               chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
 
     def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],
@@ -4146,13 +4319,18 @@ class IORSSmall(SamplerV2):
         return O.choose_first(self.ikc, "left", stream, key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=evaluate,
                               q_start=self.ikc.q_locked(st), stage="touching brace")
 
-    def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+    def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
+                                 t_hull_w: Optional[th.Tensor] = None):
         """Push poses of the closed right gripper at the target's right face (``face_point``, mid height), pushing along
         ``direction`` (robot's left, into the partner), in the order to try: (1) the pads on the face — pad centre on the
         point, approach along ``direction``, closing horizontal then vertical; (2) the top-down blade beside the face
         (``tabletop.blade_standoff`` over the target's face height above the tips, pitched per ``approach_pitch_order``,
         pads' faces parallel to the pushed face, either wrist turn) — a sideways pad push 10 cm right of the target was
-        out of reach for the right arm on every attempt of the sanitary-napkins loop. Yields ``(kind, eef pose, extras)``."""
+        out of reach for the right arm on every attempt of the sanitary-napkins loop. Yields ``(kind, eef pose, extras)``.
+        ``t_hull_w`` (the target's hull at the place, given under :meth:`push_height_sweep_on`): :meth:`swept_push_candidates` instead."""
+        if t_hull_w is not None:
+            yield from self.swept_push_candidates(manip, t_hull_w, face_point, face_z, direction)
+            return
         d = C.unit(G.t(direction))
         outward = -d  # the pushed (right) face's outward normal
         z0, z1 = face_z
@@ -4285,6 +4463,166 @@ class IORSSmall(SamplerV2):
             yield f"push_blade_0_high{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
                 "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
                 "palm_clear": True, "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "palm_clear"}
+
+    # -- push height sweep (oracle-fix 2026-11-06, owner on the touching#04 spray-bottle demo: "for small scale touching, can we make the push
+    #    push the most reachable center bottom part of the target object so it doesn't wobble so much") --
+
+    def push_height_sweep_on(self) -> bool:
+        """``generation.push_height_sweep`` (oracle-fix 2026-11-06; on for touching small scale through ``generation_defaults``, ``false`` =
+        the classes at today's heights): the push contact as low on the target's centre line as the hand allows
+        (:meth:`swept_push_candidates`), the hand beyond the fingers checked against the hull (:meth:`hand_overlap`), the push stance at the
+        lateral whose feasible contact is lowest (:meth:`push_stance`). The tabletop layout only: the shelf layout's book leans against a
+        side board, and a push at its foot slides the foot from under the lean."""
+        return self.relation == "touching" and self.shelf_start is None and bool(TT.phase2_gen(self, "push_height_sweep", False))
+
+    def swept_push_candidates(self, manip: Stance, t_hull_w: th.Tensor, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+        """:meth:`push_height_sweep_on` (touching#04: every class at mid height failed, so the palm-clear raised blade pushed the 27 cm
+        spray bottle at 83 % of its height and it tilted 3.6 -> 20.3 deg): today's push classes - the fingertip pushes ``push_tip_h`` /
+        ``push_tip_v-``, the pad pushes ``push_h`` / ``push_v``, the leaning blades ``blade_lean_deg``, the vertical blade - at every
+        contact height (m above the target's bottom, the support top) from the class's lowest that clears the support
+        (:data:`PUSH_SWEEP_MIN_HEIGHT_M`; a leaning blade's ``blade_lean_tip_above_m``) in ``push_height_step_m`` (0.01) steps up to
+        ``push_max_height_fraction`` (0.5) x the target's height, yielded by contact height (a blade's fingertips, else the pads / tips;
+        today's class order breaks ties, a class's two wrist turns stay together). The contact lies on the line through the target's
+        footprint centre (the area centroid of its hull's cut :data:`PUSH_SWEEP_BASE_CUT_M` above the bottom: the part it stands on, not
+        the trigger head the whole hull's outermost point was) along the push, on the hull's cut there: the outermost material within
+        :data:`PUSH_SWEEP_WINDOW_M` of the line and of the height, so the tips start ``stop_clearance_m`` off everything they face; a
+        blade stands off from the cut over its whole finger section (``TT.FINGER_PROFILE``). The hand above the fingers is left to
+        :meth:`hand_overlap` against the hull (a vertical blade beside a tall face fails there: its palm and knuckles reach into it), so
+        a blade that passes keeps its recorded height (``palm_clear``: the oracle does not raise it). The raised blade comes last and only
+        for a target that is not tall (height / smallest footprint side <= ``push_raised_max_aspect``, :data:`PUSH_RAISED_MAX_ASPECT`);
+        a tall target without a low contact fails ``contact_unreachable`` at the stance, and another stance is tried. Yields
+        ``(kind, eef pose, extras)``; the extras carry ``contact_height_m``, ``height_fraction`` and ``contact_point`` (world)."""
+        d = C.unit(G.t(direction).float())
+        outward = -d
+        d2 = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
+        side2, out2 = th.tensor([-float(d2[1]), float(d2[0])]), -d2
+        z0, z1 = float(face_z[0]), float(face_z[1])
+        height = max(z1 - z0, 1e-6)
+        sec = HullSections(t_hull_w)
+        centre = sec.centroid(z0 + PUSH_SWEEP_BASE_CUT_M)
+        if centre is None:
+            centre = polygon_centroid(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
+        t0 = float(centre @ side2)
+        clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
+        step = max(float(TT.phase2_gen(self, "push_height_step_m", 0.01)), 0.002)
+        h_cap = float(TT.phase2_gen(self, "push_max_height_fraction", 0.5)) * height
+        tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
+        knob = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_height_sweep"}
+
+        def face(z: float, dz: float = PUSH_SWEEP_WINDOW_M) -> Optional[float]:
+            """The outermost material (along ``outward``) within the window around the centre line at height ``z``; None where the line
+            itself misses the cut."""
+            if sec.outermost(z, out2, side2, t0) is None:
+                return None
+            zs = [zz for zz in ((z - dz, z, z + dz) if dz > 0 else (z,)) if z0 <= zz <= z1] or [z]
+            vals = [sec.outermost(zz, out2, side2, t0 + k * 0.5 * PUSH_SWEEP_WINDOW_M) for zz in zs for k in (-2, -1, 0, 1, 2)]
+            return max(v for v in vals if v is not None)
+
+        def point(s: float, z: float) -> th.Tensor:
+            xy = side2 * t0 + out2 * float(s)
+            return th.tensor([float(xy[0]), float(xy[1]), float(z)])
+
+        def heights(h_min: float) -> List[float]:
+            return [round(h_min + k * step, 4) for k in range(int(math.floor((h_cap - h_min) / step + 1e-6)) + 1)] if h_min <= h_cap + 1e-9 else []
+
+        def facts(h: float, contact: th.Tensor) -> Dict[str, Any]:
+            return {"contact_height_m": round(h, 4), "height_fraction": round(h / height, 3), "contact_point": [round(float(v), 4) for v in contact],
+                    "push_height_sweep": True, **knob}
+
+        def tips(h: float) -> List[Tuple[str, G.Pose, Dict[str, Any]]]:  # push_tip_h / push_tip_h- (closing horizontal)
+            s = face(z0 + h)
+            if s is None:
+                return []
+            fp, h_axis = point(s, z0 + h), C.default_closing_axis(d)
+            return [(f"push_tip_h{'' if c > 0 else '-'}", C.fingertip_eef(fp, d, c * h_axis, clearance),
+                     {"blade_half_thickness_m": None, "pre_dist_m": tip_pre, "tip_front": True, "stop_clearance_m": clearance, **facts(h, fp)}) for c in PUSH_WRIST_TURNS]
+
+        def tip_v(h: float):  # push_tip_v- (closing vertical, the camera up)
+            s = face(z0 + h)
+            if s is None:
+                return []
+            fp = point(s, z0 + h)
+            return [("push_tip_v-", C.fingertip_eef(fp, d, th.tensor([0.0, 0.0, -1.0]), clearance),
+                     {"blade_half_thickness_m": None, "pre_dist_m": tip_pre, "tip_front": True, "stop_clearance_m": clearance, **facts(h, fp)})]
+
+        def pad(h: float, vertical: bool):  # push_h / push_v (the pad centre on the face)
+            s = face(z0 + h)
+            if s is None:
+                return []
+            fp = point(s, z0 + h)
+            pose = IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])) if vertical else IK.contact_eef(fp, d)
+            return [("push_v" if vertical else "push_h", (G.t(pose[0]), G.t(pose[1])), {"blade_half_thickness_m": None, **facts(h, fp)})]
+
+        def section_standoff(z_tip: float, lean: float) -> Optional[Tuple[float, float, float]]:
+            """``(tip offset along outward, the face at the tips, the thickest half)``: the fingertip axis this far out that every finger
+            section (``TT.FINGER_PROFILE``, receding h·sin(lean) when leaning) keeps ``clearance`` off the cut; None without material."""
+            th_l = math.radians(lean)
+            need, half_max, h_prev = None, 0.0, 0.0
+            for h_sec, half in TT.FINGER_PROFILE:
+                for hf in np.linspace(h_prev, float(h_sec), max(2, int(math.ceil((float(h_sec) - h_prev) / 0.01)) + 1)):
+                    zz = z_tip + float(hf) * math.cos(th_l)
+                    if not (z0 <= zz <= z1):
+                        continue
+                    s = face(zz, dz=0.0)
+                    if s is None:
+                        continue
+                    v = s + float(half) - float(hf) * math.sin(th_l)
+                    need, half_max = (v if need is None else max(need, v)), max(half_max, float(half))
+                h_prev = float(h_sec)
+            s_tip = face(z_tip)
+            if need is None or s_tip is None:
+                return None
+            return need + clearance, s_tip, half_max
+
+        def blade(h: float):  # push_blade_0 / push_blade_0- (vertical, beside the face)
+            z_tip = z0 + h
+            so = section_standoff(z_tip, 0.0)
+            if so is None:
+                return []
+            s_o, s_tip, half = so
+            a_vec = TT.pitched_approach(0.0, manip.forward)
+            origin = point(s_o, z_tip + C.FINGERTIP_LENGTH)
+            return [(f"push_blade_0{'' if c > 0 else '-'}", (origin, C.eef_quat(a_vec, c * outward)),
+                     {"blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": round(s_o - s_tip, 4), "fingertip_z": z_tip, "palm_clear": True,
+                      **facts(h, point(s_tip, z_tip))}) for c in PUSH_WRIST_TURNS]
+
+        def leaning(h: float, lean: float):  # push_blade_lean<deg> (the tips lead, the palm recedes)
+            z_tip = z0 + h
+            so = section_standoff(z_tip, lean)
+            if so is None:
+                return []
+            s_o, s_tip, _half = so
+            theta = math.radians(lean)
+            a_vec = C.unit(th.tensor([0.0, 0.0, -math.cos(theta)]) + th.tensor([float(d[0]), float(d[1]), 0.0]) * math.sin(theta))
+            origin = point(s_o, z_tip) - a_vec * C.FINGERTIP_LENGTH
+            return [(f"push_blade_lean{lean:.0f}{'' if c > 0 else '-'}", (origin, C.eef_quat(a_vec, c * outward)),
+                     {"blade_half_thickness_m": float(TT.FINGER_PROFILE[0][1]), "stop_clearance_m": clearance, "blade_standoff_m": round(s_o - s_tip, 4),
+                      "fingertip_z": float(z_tip), "palm_clear": True, "lean_deg": float(lean), **facts(h, point(s_tip, z_tip))}) for c in PUSH_WRIST_TURNS]
+
+        leans = self.gen("blade_lean_deg", [20.0, 12.0, 8.0])
+        leans = [float(v) for v in (leans if isinstance(leans, (list, tuple)) else [leans]) if float(v) > 0]
+        pitches = [float(p) for p in (self.gen("push_blade_pitches_deg", None) or [0.0])]
+        lean_tip = float(self.gen("blade_lean_tip_above_m", 0.025))
+        # (height, class rank = today's order, builder): the fingertip and pad pushes, the leaning blades, the vertical blade
+        groups: List[Tuple[float, int, Any]] = []
+        groups += [(h, 0, (lambda h=h: tips(h))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"])]
+        groups += [(h, 1, (lambda h=h: tip_v(h))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_v"])]
+        groups += [(h, 2, (lambda h=h: pad(h, False))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"])]
+        groups += [(h, 3, (lambda h=h: pad(h, True))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["tip_v"])]
+        for i, lean in enumerate(leans):
+            groups += [(h, 4 + i, (lambda h=h, lean=lean: leaning(h, lean))) for h in heights(lean_tip)]
+        if 0.0 in pitches:
+            groups += [(h, 4 + len(leans), (lambda h=h: blade(h))) for h in heights(PUSH_SWEEP_MIN_HEIGHT_M["blade"])]
+        for _h, _rank, build in sorted(groups, key=lambda g: (g[0], g[1])):
+            yield from build()
+        # the raised blade (palm above the top: the fingers push its top PALM_FROM_TIP) - the last resort of a target that is not tall
+        _ang, _long, short, _c = min_area_rect(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
+        aspect = height / max(short, 1e-6)
+        if aspect <= float(self.gen("push_raised_max_aspect", PUSH_RAISED_MAX_ASPECT)) + 1e-9 and z1 - z0 > TT.PALM_FROM_TIP:
+            z_tip = z1 - TT.PALM_FROM_TIP + float(self.gen("blade_palm_clear_m", 0.025))
+            for kind, pose, extras in self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, z_tip):
+                yield kind, pose, dict(extras, contact_height_m=round(z_tip - z0, 4), height_fraction=round((z_tip - z0) / height, 3), push_height_sweep="raised_last",
+                                       aspect=round(aspect, 2))
 
     def wide_stop_spread(self, partner_hull_w: th.Tensor, b_point: th.Tensor, outward: th.Tensor, side_h: th.Tensor, s_push: float,
                          spreads: Sequence[float] = (0.09, 0.07, 0.05), end_margin: float = 0.01, face_depth_tol: float = 0.01, band: float = 0.03) -> Optional[float]:

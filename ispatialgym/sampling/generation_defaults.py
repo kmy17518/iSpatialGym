@@ -483,6 +483,12 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "max_nudges": 25,  # §6.11 (≤ 25)
         "partner_stability": {"base_contact_fraction": 0.25, "foot_width_fractions": [0.6, 0.45], "max_height_over_extent": 2.5},  # §6.11
         "target_pushability": {"max_min_extent_m": 0.089, "max_long_side_m": 0.30, "max_height_m": 0.30},  # §6.11
+        # oracle-fix 2026-11-06 (owner on the touching#04 spray-bottle demo: "push the most reachable center bottom part of the target object so
+        # it doesn't wobble so much"): every push class at contact heights from the lowest that clears the support up to the fraction of the
+        # target's height, lowest first, on the line through its footprint centre (iors_small.IORSSmall.swept_push_candidates); false = today's
+        "push_height_sweep": True,
+        "push_height_step_m": 0.01,
+        "push_max_height_fraction": 0.5,
     },
     "inter_object_relation_satisfaction-ontop_large_scale": {
         **COMMON,
