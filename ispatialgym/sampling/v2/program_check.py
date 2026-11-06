@@ -1823,6 +1823,20 @@ def _slab_off(action) -> bool:
     return bool(_push_kind(push) is not None and (getattr(getattr(push, "contact", None), "extra", None) or {}).get("ground_ignored"))
 
 
+def push_open_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
+    """The finger joints an open-hand push and the retreat after it are checked with: the push record's ``fingers_opening_m`` - the opening
+    ``execute_push`` holds the gripper at instead of closing it (the overhang pick's open hand; oracle-fix 2026-11-06, touching's
+    ``generation.push_gripper_open``, whose sampler checks the chain, the retreat clear pose and the two-arm brace with it); None otherwise."""
+    if name == "push":
+        rec = getattr(action, "contact", None)
+    elif name == "retreat" and after_name == "push":
+        rec = getattr(getattr(action, "after", None), "contact", None)
+    else:
+        return None
+    v = (getattr(rec, "extra", None) or {}).get("fingers_opening_m") if rec is not None else None
+    return None if v is None else float(v)
+
+
 def _two_point_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
     """The finger joints a two-point push-under (``contacts.push.push_contact_form`` = ``"two_point"``, owner 2026-10-13 ~04:30 item 2) and the
     retreat after it are checked with: the record's ``fingers_opening_m`` (the oracle opens the gripper to it); None for anything else."""
@@ -2437,10 +2451,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     # pose 1 of 3 ... after push' on 7/16 attempts of touching 0918-181010)
     after_name = getattr(getattr(action, "after", None), "name", None)
     fingers = 0.0 if name in ("push", "brace", "base_push") or (name == "retreat" and after_name in ("push", "base_push")) else None
-    push_c = getattr(action, "contact", None) if name == "push" else (getattr(getattr(action, "after", None), "contact", None) if name == "retreat" and after_name == "push" else None)
-    push_open = (getattr(push_c, "extra", None) or {}).get("fingers_opening_m") if push_c is not None else None
+    push_open = push_open_fingers(action, name, after_name)
     if push_open is not None:
-        fingers = float(push_open)  # an open-hand push (the overhang pick's): pushed and left with the fingers at the recorded opening
+        fingers = push_open  # an open-hand push (the overhang pick's, touching's open push): pushed and left with the fingers at the recorded opening
     if name == "brace":  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49)
         wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
         if wide is not None:

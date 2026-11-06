@@ -1102,7 +1102,9 @@ class Place(Action):
 class Push(Action):
     """Push with the closed gripper (``contacts.push`` / a block's ``push_row`` / ``push_col``): ``gripper(close)`` →
     ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; postcondition: eef at the goal contact and the pushed object
-    moved (``no_motion`` otherwise). ``failed_grasp`` is not checked (``qa_exempt``).
+    moved (``no_motion`` otherwise). ``failed_grasp`` is not checked (``qa_exempt``). A record with ``fingers_opening_m``
+    (:func:`push_is_open`: the overhang pick's open hand, touching's open push) holds the fingers at that opening instead of closing
+    them, and is annotated so.
 
     targets: ``{"pre": Pose, "waypoints": [Pose, ...], "direction": [x, y, z], "distance_m": float}`` — the
     recorded contact key poses ``init, (mid,) goal`` (the sampler's ``arc_waypoints`` outputs); a straight push
@@ -1170,9 +1172,16 @@ class Push(Action):
                        + f" from {_xyz(c.init.position)}")
             return fine, numbers
         arc = " along the recorded arc" if c.mid is not None else ""
-        fine = f"push {obj} {word} with the closed {_hand(c.arm)}"
-        numbers = f"push {obj} {_cm(c.distance_m)} {word}{arc} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
+        hand = "open" if push_is_open(c) else "closed"  # oracle-fix 2026-11-06: touching's open push (generation.push_gripper_open)
+        fine = f"push {obj} {word} with the {hand} {_hand(c.arm)}"
+        numbers = f"push {obj} {_cm(c.distance_m)} {word}{arc} with the {hand} {_hand(c.arm)} from {_xyz(c.init.position)}"
         return fine, numbers
+
+
+def push_is_open(contact) -> bool:
+    """An open-hand push (oracle-fix 2026-11-06, touching's ``generation.push_gripper_open``): the record's ``fingers_opening_m`` (> 0), the
+    opening ``execute_push`` holds the fingers at instead of closing them (as :func:`brace_is_open` for a wide stop)."""
+    return brace_is_open(contact)
 
 
 _BRACE_WORDS = {

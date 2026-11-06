@@ -32,7 +32,8 @@ Behaviour per action (§3.6 / §6.1):
   part where it rests on its partner.
 * ``Push``       ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(init → mid → goal)``; post: eef at the goal
   contact, the pushed object moved (``no_motion``). A record with a stroke plan (``strokes``) pushes in strokes, the object measured and the
-  blade re-aimed before each.
+  blade re-aimed before each. A record with ``fingers_opening_m`` (the overhang pick's open hand, touching's open push) opens the gripper
+  to it instead of closing it.
 * ``Brace``      ``gripper(close)`` → ``arm_to(pre)`` → ``arm_along(pre → contact)``; held (no further command).
 * ``BaseFollow`` ``base_follow(b_k)`` with the arm locked, or ``arm_along(h(q_k))`` in arm mode; post: joint at
   ``q_goal`` (spec §8 tolerance) or ``passive_from`` reached.
@@ -4869,8 +4870,11 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         ctx["push_speed_m_s"] = pad_speed  # every pad leg below (_push_leg, _push_arc_closed_loop, _speed_kw) and the base nudges' cap
     _hook(ctx, "fov")(False)
     if extra0.get("fingers_opening_m") is not None:
-        # an open-hand push (the overhang pick's: the open fingers straddle the object's far rim, a cradle it cannot slide off)
+        # an open-hand push (the overhang pick's: the open fingers straddle the object's far rim, a cradle it cannot slide off; oracle-fix
+        # 2026-11-06, the touching push of generation.push_gripper_open: both open fingertips on the face, the lower one low): held at the
+        # recorded opening through the transit, the push legs and the retreat after it (which leaves the gripper as it is)
         yield from motions.gripper_opening(arm, float(extra0["fingers_opening_m"]))
+        ctx["push_gripper"] = {"open": True, "fingers_opening_m": float(extra0["fingers_opening_m"]), "pose_class": extra0.get("pose_class")}
     else:
         yield from motions.gripper(arm, close=True)
     pick_push = str(extra0.get("kind") or "") == "pick_overhang"
