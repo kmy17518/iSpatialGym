@@ -48259,12 +48259,12 @@
     "require": {
      "grasps": "floating"
     },
-    "representative": "cfzneb",
+    "representative": "hgvzdm",
     "orientation_equivalences": {
-     "soup_ladle/cfzneb": []
+     "soup_ladle/hgvzdm": []
     },
     "grasp_keys": {
-     "soup_ladle/cfzneb": "soup_ladle__cfzneb"
+     "soup_ladle/hgvzdm": "soup_ladle__hgvzdm"
     }
    },
    "floor": {
@@ -48284,14 +48284,15 @@
     "whitelist": {
      "target": {
       "soup_ladle": [
-       "cfzneb"
+       "hgvzdm"
       ]
      }
     },
     "blacklist": {
      "target": {
       "soup_ladle": {
-       "gxsrhh": "ground_isg 2026-10-11: heldout"
+       "gxsrhh": "ground_isg 2026-10-11: heldout",
+       "cfzneb": "owner 2026-11-05: chrome handle + glossy black bowl invisible in the head camera; hgvzdm replaces it"
       }
      }
     }
@@ -49219,9 +49220,9 @@
     "require": {
      "grasps": "floating"
     },
-    "representative": "ubazru",
+    "representative": "pvabxf",
     "grasp_keys": {
-     "bottle_of_pop/ubazru": "bottle_of_pop__ubazru"
+     "bottle_of_pop/pvabxf": "bottle_of_pop__pvabxf"
     }
    },
    "floor": {
@@ -49241,7 +49242,7 @@
     "whitelist": {
      "target": {
       "bottle_of_pop": [
-       "ubazru"
+       "pvabxf"
       ]
      }
     },
@@ -49249,7 +49250,8 @@
      "target": {
       "bottle_of_pop": {
        "iynssk": "ground_isg 2026-10-13: heldout",
-       "jnoksl": "owner 2026-10-13 ~19:00 (COMPLAINTS.md object_scaling#02): blacklisted, ubazru replaces it"
+       "jnoksl": "owner 2026-10-13 ~19:00 (COMPLAINTS.md object_scaling#02): blacklisted, ubazru replaces it",
+       "ubazru": "owner 2026-11-05: black cola body reads as a black silhouette in the head camera; pvabxf replaces it"
       }
      }
     }
