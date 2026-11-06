@@ -239,6 +239,35 @@ PUSH_SWEEP_BASE_CUT_M = 0.005
 #: 1.5 (it rocked 3.6 -> 20.3 deg pushed near its top); with 1.5 for every alias touching_02's cereal box lost its only feasible class
 #: (fix1 2026-11-06: 1 instance in 146 attempts vs trainfast's 33 per instance, 9 goal-check contact_unreachable)
 PUSH_RAISED_MAX_ASPECT = math.inf
+#: oracle-fix 2026-11-06 (owner on touching#02's cereal box, ``generation.push_gripper_open``): the open push's finger joint opening (m per
+#: finger, ``generation.push_open_opening_m``): the fingertip centres 7.7 cm apart - closing vertically at the knuckle's lowest eef height
+#: (6.2 cm) the lower tip pushes 2.35 cm above the support, the upper one 10.05 cm (the x0.8 cereal box's middle: 10.9 cm), the lower
+#: finger's base sphere 8.5 mm clear of the support
+PUSH_OPEN_OPENING_M = 0.035
+#: the fingertip centre's offset from the closing plane at the finger joint opening 0 (the tip sphere of ``tabletop.FINGER_SPHERES_EEF``:
+#: y 3.5 mm, r 5 mm); open by ``q`` a tip's centre lies ``q`` + this from the eef axis
+OPEN_TIP_CENTRE_M = 0.0035
+#: the open fingers' lowest point above the support (m): the eef axis of an open push is raised until the lower finger clears it by this
+PUSH_OPEN_SUPPORT_CLEARANCE_M = 0.005
+
+
+def push_fingers(extras: Optional[Dict[str, Any]]) -> float:
+    """oracle-fix 2026-11-06 (``generation.push_gripper_open``): the finger joints a push candidate / record is checked with - its
+    ``fingers_opening_m`` (the open push: the oracle holds the gripper there, ``execute_push``; the program check replays with it), else
+    closed."""
+    v = (extras or {}).get("fingers_opening_m")
+    return IK.FINGER_CLOSED if v is None else float(v)
+
+
+def open_fingers_drop_below(eef_quat, opening: float) -> float:
+    """How far the OPEN fingers (``tabletop.FINGER_SPHERES_EEF`` moved ``opening`` outward along the closing axis) reach below the eef origin
+    at the eef orientation ``eef_quat`` (m; the hand above them is ``tabletop.hand_drop_below``)."""
+    R = C.quat_to_mat(G.t(eef_quat).float())
+    worst = -math.inf
+    for (x, y, z), r in TT.FINGER_SPHERES_EEF:
+        c = R @ th.tensor([x, y + math.copysign(float(opening), y), z], dtype=th.float32)
+        worst = max(worst, -float(c[2]) + float(r))
+    return worst
 
 
 def _spa_json_default(o):
@@ -4282,7 +4311,9 @@ class IORSSmall(SamplerV2):
         at its push goal) — the first ``brace_search_candidates`` brace candidates are tried; the returned kind is then
         ``"<push kind>+<brace kind>"``. Shelf layout: the push along the shelf push direction by the arm on the target's side
         (:meth:`_touching_push_choice`), never braced. ``height_range`` (oracle-fix 2026-11-06, :meth:`push_height_sweep_on`): only
-        the candidates whose contact height lies in it; the passing class's height is left in ``self._push_chain_height``."""
+        the candidates whose contact height lies in it; the passing class's height is left in ``self._push_chain_height``.
+        :meth:`push_gripper_open_on` (oracle-fix 2026-11-06): with ``with_brace`` and no brace joining the open push, today's (closed)
+        classes are tried with the brace (``"<closed kind>+<brace kind>"``) before the stance counts as push-only."""
         tangent = st.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
         p_init, b_point = self.touching_points(t_place_pose, p_pose, st)
@@ -4310,9 +4341,21 @@ class IORSSmall(SamplerV2):
             if not with_brace:
                 return push_kind
             b_chosen, _bdec, _bfails = self._touching_brace_choice(st, chosen.proposal.chain, t_place_pose, p_pose, b_point, face_z, direction, dist, p_hull, p_init,
-                                                                   ignore_push, ignore_brace, limit=n_brace, diagnose=False)
+                                                                   ignore_push, ignore_brace, limit=n_brace, diagnose=False,
+                                                                   push_fingers_q=push_fingers(chosen.proposal.payload[2]))
             if b_chosen is not None:
                 return f"{push_kind}+{b_chosen.proposal.payload[2]}"
+            if push_fingers(chosen.proposal.payload[2]) != IK.FINGER_CLOSED:
+                # oracle-fix 2026-11-06 (push_gripper_open_on): no brace joins the open push from this stance - today's classes with the brace
+                # (the open push never costs the stance its brace: touching_02's wide partner face requires it, brace_open_when_wide)
+                closed, _cdec, _cfails = self._touching_push_choice(st, t_place_pose, p_init, t_face_z, direction, dist, ignore_push, height_range=height_range,
+                                                                    open_classes=False)
+                if closed is not None:
+                    b_closed, _bdec2, _bfails2 = self._touching_brace_choice(st, closed.proposal.chain, t_place_pose, p_pose, b_point, face_z, direction, dist, p_hull,
+                                                                             p_init, ignore_push, ignore_brace, limit=n_brace, diagnose=False)
+                    if b_closed is not None:
+                        self._push_chain_height = closed.proposal.payload[2].get("contact_height_m")
+                        return f"{closed.proposal.payload[0]}+{b_closed.proposal.payload[2]}"
             return None  # the push class passes but no brace joins it from this stance
         return None
 
@@ -4421,9 +4464,13 @@ class IORSSmall(SamplerV2):
             place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
             both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True, height_range=(h, h) if (sweep and h is not None) else None) \
                 if (kind is not None and place_why is None and want_brace) else None
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{f' @ {100 * h:.1f} cm' if (sweep and h is not None) else ''}"
+            # oracle-fix 2026-11-06 (push_gripper_open_on): an open class's height is named too (today's mid-height classes carry none), and a
+            # brace that joined today's class instead of the open push names that class
+            both_push = both.split("+", 1)[0] if both else None
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{f' @ {100 * h:.1f} cm' if h is not None else ''}"
                          f"{'; place: ' + place_why if place_why else ''}"
-                         f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}")
+                         f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}"
+                         f"{f' (with {both_push})' if both_push and both_push != kind else ''}")
             if kind is not None and place_why is None:
                 if sweep:
                     rank = (round(float(h), 4) if h is not None else math.inf, 0 if (both is not None or not want_brace) else 1)
@@ -4597,6 +4644,7 @@ class IORSSmall(SamplerV2):
         ignore_brace = self.support_objects() + [self.obj("partner")]
         push_chosen = None  # (kind, pre, init, goal, extras, q of the right arm)
         brace_chosen = None  # (pre, contact, kind, extras)
+        open_fallback: Optional[Dict[str, Any]] = None  # oracle-fix 2026-11-06: the open push given up for today's class + the brace
         # the collision world holds the target at its INIT pose, but the push happens after the place: the box is posed at the
         # place for the chain's checks (the pre-contact of the placed box lies inside the box at its init pose otherwise -
         # 0918-170804: 'exact IK failed at pose 1 of 3' on 6/12 attempts)
@@ -4610,8 +4658,23 @@ class IORSSmall(SamplerV2):
                 # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
                 if try_brace:
                     b_chosen, dec_b, fails_b = self._touching_brace_choice(manip, chosen.proposal.chain, t_pose, p_pose, b_point, face_z, direction, dist, p_hull, p_init,
-                                                                           ignore_push, ignore_brace)
+                                                                           ignore_push, ignore_brace, push_fingers_q=push_fingers(push_extras))
                     why.extend(f"{push_kind}/{w}" for w in fails_b)
+                    if b_chosen is None and push_fingers(push_extras) != IK.FINGER_CLOSED:
+                        # oracle-fix 2026-11-06 (push_gripper_open_on): no brace joins the open push - today's (closed) classes with the brace
+                        # before the open push is kept alone (it never costs the instance its brace; push_chain_feasible chose the stance so)
+                        closed, dec_c, fails_c = self._touching_push_choice(manip, t_pose, p_init, t_face_z, direction, dist, ignore_push, open_classes=False)
+                        why.extend(fails_c)
+                        if closed is not None:
+                            b_closed, dec_bc, fails_bc = self._touching_brace_choice(manip, closed.proposal.chain, t_pose, p_pose, b_point, face_z, direction, dist,
+                                                                                     p_hull, p_init, ignore_push, ignore_brace)
+                            why.extend(f"{closed.proposal.payload[0]}/{w}" for w in fails_bc)
+                            if b_closed is not None:
+                                open_fallback = {"open_push": push_kind, "kept": closed.proposal.payload[0], "why": "no brace joins the open push"}
+                                push_kind, push_init, push_extras = closed.proposal.payload
+                                push_pre, _, push_goal = closed.proposal.chain
+                                push_chosen = (push_kind, push_pre, push_init, push_goal, _with_orient(push_extras, dec_c))
+                                b_chosen, dec_b = b_closed, dec_bc
                     if b_chosen is not None:
                         pre, contact, kind, extras = b_chosen.proposal.payload
                         brace_chosen = (pre, contact, kind, _with_orient(extras, dec_b))
@@ -4635,6 +4698,10 @@ class IORSSmall(SamplerV2):
         if speed is not None:
             push_extras = dict(push_extras, push_speed_m_s=speed)  # the oracle's pad speed for every leg of this push
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
+        if self.push_gripper_open_on():
+            # oracle-fix 2026-11-06: the hand the push records - the open class, or today's class after the brace fallback
+            draft.summary["touching"]["push_gripper_open"] = {"open": push_fingers(push_extras) != IK.FINGER_CLOSED, "fingers_opening_m": push_extras.get("fingers_opening_m"),
+                                                              **(open_fallback or {})}
         log.info("%s: touching push class %s from the %s stance%s", self.gp.variant, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         if self.shelf_start is not None:
@@ -4662,7 +4729,8 @@ class IORSSmall(SamplerV2):
             self.sidecar.contacts.pop("brace", None)
 
     def _touching_push_choice(self, st: Stance, t_pose: G.Pose, p_init: th.Tensor, t_face_z: Tuple[float, float], direction: th.Tensor, dist: float,
-                              ignore_push: Sequence[Any], arm: Optional[str] = None, height_range: Optional[Tuple[Optional[float], Optional[float]]] = None):
+                              ignore_push: Sequence[Any], arm: Optional[str] = None, height_range: Optional[Tuple[Optional[float], Optional[float]]] = None,
+                              open_classes: bool = True):
         """The push of the touching task (the box posed at the place by the caller): ``touching_push_candidates`` in their order,
         a class's two wrist turns chosen by ``orient.choose`` (owner 2026-09-27). A candidate passes when (0) the hand beyond the
         finger profile (wrist camera, knuckles, body) clears the box at the contact and the goal, (1) the [pre, init, goal] chain
@@ -4673,11 +4741,21 @@ class IORSSmall(SamplerV2):
         contact (the fingertips of a blade, else the eef's height at the face) is at most that high above the target's bottom.
         :meth:`push_height_sweep_on` (oracle-fix 2026-11-06): the candidates by contact height (:meth:`swept_push_candidates`), the hand
         checked against the hull, within ``height_range`` (m above the target's bottom, either end None = open) when given; the labels
-        carry the height (``push_tip_h-@5.0cm``). Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
+        carry the height (``push_tip_h-@5.0cm``). :meth:`push_gripper_open_on` (oracle-fix 2026-11-06): the open gripper's classes
+        (:meth:`open_push_candidates`) before them, checked with their open fingers (:func:`push_fingers`) and the hand against the hull;
+        ``open_classes=False``: today's classes alone (the brace fallback of :meth:`touching_contacts` / :meth:`push_chain_feasible`).
+        Returns ``orient.choose_first``'s ``(chosen, decision, failures)``."""
         if arm is None:
             arm = self.shelf_push_arm() if self.shelf_start is not None else "right"
         sweep = t_pose is not None and self.push_height_sweep_on()
-        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=self.world.hull_at(self.hull["target"], t_pose) if sweep else None)
+        open_push = t_pose is not None and open_classes and self.push_gripper_open_on()
+        hull_w = self.world.hull_at(self.hull["target"], t_pose) if (sweep or open_push) else None
+        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=hull_w if sweep else None)
+        if open_push:
+            import itertools
+
+            # oracle-fix 2026-11-06 (owner on touching#02's cereal box): the open gripper low on the face first, today's classes after it
+            cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction), cands)
         pair = self.pair_goal_align()
         if pair is not None and pair["push_max_height_m"] is not None:
             h_max = float(pair["push_max_height_m"])
@@ -4697,14 +4775,15 @@ class IORSSmall(SamplerV2):
 
         def evaluate(p):
             pre, init, goal = p.chain
-            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist, against="hull" if sweep else "box")
+            fingers = push_fingers(p.payload[2])  # closed, or the open push's opening (oracle-fix 2026-11-06)
+            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist, against="hull" if (sweep or fingers != IK.FINGER_CLOSED) else "box")
             if overlap is not None:
                 return False, None, None, overlap
-            r_push = self.ikc.exact(p.chain, st, arm, ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED, q_first=p.q_first)
+            r_push = self.ikc.exact(p.chain, st, arm, ignore_for_last=ignore_push, cache=False, fingers=fingers, q_first=p.q_first)
             if not r_push.ok:
                 return False, r_push, None, f"{arm}: {r_push.reason}"
             qs = O.chain_qs(self.ikc, arm, p.chain)
-            r_ret = self.ikc.exact([IK.pre_pose(goal)], st, arm, ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+            r_ret = self.ikc.exact([IK.pre_pose(goal)], st, arm, ignore_for_last=ignore_push, cache=False, fingers=fingers)
             if not r_ret.ok:
                 return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
             return True, r_push, qs, ""
@@ -4714,7 +4793,7 @@ class IORSSmall(SamplerV2):
 
     def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],
                                direction: th.Tensor, dist: float, p_hull: th.Tensor, p_init: th.Tensor, ignore_push: Sequence[Any], ignore_brace: Sequence[Any],
-                               limit: Optional[int] = None, diagnose: bool = True):
+                               limit: Optional[int] = None, diagnose: bool = True, push_fingers_q: float = IK.FINGER_CLOSED):
         """The left brace joining the chosen push: ``touching_brace_candidates`` in their order (the first ``limit``), a class's two
         wrist turns chosen by ``orient.choose``. A candidate passes when the hand beyond the finger profile clears the braced
         partner, the two-arm solve holds with the right arm locked at its push GOAL, and the brace arm's retreat after its release
@@ -4722,7 +4801,9 @@ class IORSSmall(SamplerV2):
         left_arm_joint7's limit there). Owner 2026-09-18 22:29: with the box still at the place the right fingertips locked at the
         goal sit ~5 cm inside it and every whole-body configuration read 'in collision' (0918-211933 .. 220534) - the box is posed
         where the push leaves it and leaves the collision world for the two-arm solve (the tips 5 mm before its face sat inside
-        the checker's margin, 0918-223037 attempt 2); the push chain itself was validated with its own ignores."""
+        the checker's margin, 0918-223037 attempt 2); the push chain itself was validated with its own ignores. ``push_fingers_q``
+        (oracle-fix 2026-11-06, :meth:`push_gripper_open_on`): the finger joints of the two-arm solve - the push's (:func:`push_fingers`; the
+        program check checks the push with the brace locked at that value too)."""
         import itertools
 
         pushed = (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))
@@ -4733,7 +4814,7 @@ class IORSSmall(SamplerV2):
             if overlap is not None:
                 return False, None, None, overlap
             with self.posed("target", pushed), self.ikc.ignoring([self.obj("target")]):
-                res = self.ikc.exact_both_arms(("right", list(push_chain)), ("left", [pre, contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED,
+                res = self.ikc.exact_both_arms(("right", list(push_chain)), ("left", [pre, contact]), st, ignore_push, ignore_brace, fingers=push_fingers_q,
                                                q_first_other=p.q_first)
             if not res.ok:
                 if not diagnose:
@@ -5058,6 +5139,116 @@ class IORSSmall(SamplerV2):
             for kind, pose, extras in self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, z_tip):
                 yield kind, pose, dict(extras, contact_height_m=round(z_tip - z0, 4), height_fraction=round((z_tip - z0) / height, 3), push_height_sweep="raised_last",
                                        aspect=round(aspect, 2))
+
+    # -- the open-gripper push (oracle-fix 2026-11-06, owner on touching#02's cereal box: "cereal box - does it right now push with gripper
+    #    open? if it doesn't can you try with gripper open at lower height and see if it improves yield?") --
+
+    def push_gripper_open_on(self) -> bool:
+        """``generation.push_gripper_open`` (oracle-fix 2026-11-06, default off): the touching push tries the OPEN right gripper low on the
+        target's face first (:meth:`open_push_candidates`), today's (closed) classes after it; the chain, its retreat clear pose and the
+        two-arm brace solve are checked with the open fingers (:func:`push_fingers`), the record's ``fingers_opening_m`` is the opening the
+        oracle holds through pre-contact -> push -> retreat (``execute_push``) and the program check replays with; a brace that joins only
+        today's class keeps that class (:meth:`push_chain_feasible`, :meth:`touching_contacts`). The tabletop layout only (the shelf
+        layout's book leans on a side board and is pushed by the hand that carried it)."""
+        return self.relation == "touching" and self.shelf_start is None and bool(TT.phase2_gen(self, "push_gripper_open", False))
+
+    def open_push_candidates(self, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+        """:meth:`push_gripper_open_on`: the right gripper open ``push_open_opening_m`` per finger (:data:`PUSH_OPEN_OPENING_M`), approaching
+        along the push with both fingertips ``stop_clearance_m`` before the face on the line through the target's footprint centre (as
+        :meth:`swept_push_candidates`). ``push_open_v-``: closing vertical, the wrist camera up (``push_tip_v-``'s turn) - the tips one above
+        the other on the line, the lower one the contact, the hand above it by the half opening; ``push_open_h-`` / ``push_open_h``: closing
+        horizontal - the tips side by side at the contact height (the wider contact). A class's eef axis runs from its lowest
+        (:data:`PUSH_SWEEP_MIN_HEIGHT_M`: the lower knuckle 4.2 cm below the axis / the gripper body; raised until the open fingers clear the
+        support by :data:`PUSH_OPEN_SUPPORT_CLEARANCE_M`) in ``push_height_step_m`` steps up to ``push_max_height_fraction`` x the target's
+        height; both tips must land on the face's flat run :data:`BRACE_OPEN_END_MARGIN_M` from its ends, their outermost material within
+        :data:`BRACE_OPEN_FACE_DEPTH_TOL_M` of each other (one tip leading would yaw the target). Yielded by the lower fingertip's height
+        (``contact_height_m``), ``push_open_v-`` first on a tie; the extras carry ``fingers_opening_m`` (the oracle's opening),
+        ``tip_heights_m``, ``eef_height_m``, ``tip_spread_m``, ``hand_clearance_m`` (the hand's lowest point - knuckle, gripper body, camera or
+        the open fingers - above the support) and ``contact_point`` (world: the lower tip / the tips' middle on the face)."""
+        d = C.unit(G.t(direction).float())
+        d2 = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
+        side2, out2 = th.tensor([-float(d2[1]), float(d2[0])]), -d2
+        side3, out3 = th.tensor([float(side2[0]), float(side2[1]), 0.0]), th.tensor([float(out2[0]), float(out2[1]), 0.0])
+        z0, z1 = float(face_z[0]), float(face_z[1])
+        height = max(z1 - z0, 1e-6)
+        sec = HullSections(t_hull_w)
+        centre = sec.centroid(z0 + PUSH_SWEEP_BASE_CUT_M)
+        if centre is None:
+            centre = polygon_centroid(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
+        t0 = float(centre @ side2)
+        clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
+        step = max(float(TT.phase2_gen(self, "push_height_step_m", 0.01)), 0.002)
+        h_cap = float(TT.phase2_gen(self, "push_max_height_fraction", 0.5)) * height
+        tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
+        q_open = min(float(C.FINGER_OPEN), max(0.0, float(TT.phase2_gen(self, "push_open_opening_m", PUSH_OPEN_OPENING_M))))
+        tip_off = q_open + OPEN_TIP_CENTRE_M  # a fingertip centre from the eef axis
+        tip_half = float(TT.FINGER_SIDE_PROFILE[0][1])  # a fingertip's half width across the closing axis
+        knob = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_gripper_open"}
+        down = th.tensor([0.0, 0.0, -1.0])
+        h_axis = C.default_closing_axis(d)
+
+        def face_at(z: float, t: float) -> Optional[float]:
+            """The outermost material (along ``outward``) within a fingertip's window around (``t``, ``z``); None where the line misses the cut."""
+            if not (z0 <= z <= z1) or sec.outermost(z, out2, side2, t) is None:
+                return None
+            vals = [sec.outermost(zz, out2, side2, t + k * tip_half) for zz in (z - PUSH_SWEEP_WINDOW_M, z, z + PUSH_SWEEP_WINDOW_M) if z0 <= zz <= z1
+                    for k in (-1, 0, 1)]
+            return max(v for v in vals if v is not None)
+
+        def on_run(z: float, lo: float, hi: float) -> bool:
+            run = face_run_at(t_hull_w, z, out3, side3, BRACE_OPEN_FACE_DEPTH_TOL_M)
+            return run is not None and run[0] + BRACE_OPEN_END_MARGIN_M <= lo + 1e-9 and hi <= run[1] - BRACE_OPEN_END_MARGIN_M + 1e-9
+
+        def point(s: float, t: float, z: float) -> th.Tensor:
+            xy = side2 * float(t) + out2 * float(s)
+            return th.tensor([float(xy[0]), float(xy[1]), float(z)])
+
+        def facts(h_lo: float, h_hi: float, h_eef: float, contact: th.Tensor, pose: G.Pose) -> Dict[str, Any]:
+            drop = max(TT.hand_drop_below(pose[1]), open_fingers_drop_below(pose[1], q_open))
+            return {"blade_half_thickness_m": None, "pre_dist_m": tip_pre, "tip_front": True, "stop_clearance_m": clearance, "push_gripper_open": True,
+                    "fingers_opening_m": round(q_open, 4), "tip_spread_m": round(2.0 * tip_off, 4), "contact_height_m": round(h_lo, 4),
+                    "height_fraction": round(h_lo / height, 3), "tip_heights_m": [round(h_lo, 4), round(h_hi, 4)], "eef_height_m": round(h_eef, 4),
+                    "hand_clearance_m": round(float(pose[0][2]) - drop - z0, 4), "contact_point": [round(float(v), 4) for v in contact], **knob}
+
+        def open_v(h_eef: float):  # push_open_v- (closing vertical, the camera up): the tips at the axis -/+ tip_off
+            z_ax = z0 + h_eef
+            z_lo, z_hi = z_ax - tip_off, z_ax + tip_off
+            s_lo, s_hi = face_at(z_lo, t0), face_at(z_hi, t0)
+            if s_lo is None or s_hi is None or abs(s_lo - s_hi) > BRACE_OPEN_FACE_DEPTH_TOL_M:
+                return []
+            if not (on_run(z_lo, t0 - tip_half, t0 + tip_half) and on_run(z_hi, t0 - tip_half, t0 + tip_half)):
+                return []
+            pose = C.fingertip_eef(point(max(s_lo, s_hi), t0, z_ax), d, down, clearance)  # eef +y = down: the camera (eef -y side) up
+            pose = (G.t(pose[0]), G.t(pose[1]))
+            return [("push_open_v-", pose, facts(z_lo - z0, z_hi - z0, h_eef, point(s_lo, t0, z_lo), pose))]
+
+        def open_h(h_eef: float):  # push_open_h- / push_open_h (closing horizontal): the tips at the line -/+ tip_off
+            z = z0 + h_eef
+            if not on_run(z, t0 - tip_off - tip_half, t0 + tip_off + tip_half):
+                return []
+            vals = [face_at(z, t) for t in (t0 - tip_off, t0 + tip_off)]
+            if any(v is None for v in vals) or abs(vals[0] - vals[1]) > BRACE_OPEN_FACE_DEPTH_TOL_M:
+                return []
+            out = []
+            for c in PUSH_WRIST_TURNS:
+                pose = C.fingertip_eef(point(max(vals), t0, z), d, c * h_axis, clearance)
+                pose = (G.t(pose[0]), G.t(pose[1]))
+                ex = facts(h_eef, h_eef, h_eef, point(max(vals), t0, z), pose)
+                if ex["hand_clearance_m"] >= PUSH_OPEN_SUPPORT_CLEARANCE_M - 1e-6:  # the camera-down turn hangs its camera 7.4 cm below the axis
+                    out.append((f"push_open_h{'' if c > 0 else '-'}", pose, ex))
+            return out
+
+        def heights(h_min: float) -> List[float]:
+            return [round(h_min + k * step, 4) for k in range(int(math.floor((h_cap - h_min) / step + 1e-6)) + 1)] if h_min <= h_cap + 1e-9 else []
+
+        # the eef axis's lowest per class: the hand's (the lower knuckle / the gripper body), raised until the open lower finger clears the support
+        q_v = C.eef_quat(d, down)
+        v_min = max(PUSH_SWEEP_MIN_HEIGHT_M["tip_v"], open_fingers_drop_below(q_v, q_open) + PUSH_OPEN_SUPPORT_CLEARANCE_M)
+        h_min = max(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"], open_fingers_drop_below(C.eef_quat(d, h_axis), q_open) + PUSH_OPEN_SUPPORT_CLEARANCE_M)
+        groups: List[Tuple[float, int, Any]] = [(h - tip_off, 0, (lambda h=h: open_v(h))) for h in heights(round(v_min, 4))]
+        groups += [(h, 1, (lambda h=h: open_h(h))) for h in heights(round(h_min, 4))]
+        for _h, _rank, build in sorted(groups, key=lambda g: (round(g[0], 4), g[1])):
+            yield from build()
 
     def wide_stop_spread(self, partner_hull_w: th.Tensor, b_point: th.Tensor, outward: th.Tensor, side_h: th.Tensor, s_push: float,
                          spreads: Sequence[float] = (0.09, 0.07, 0.05), end_margin: float = 0.01, face_depth_tol: float = 0.01, band: float = 0.03) -> Optional[float]:
