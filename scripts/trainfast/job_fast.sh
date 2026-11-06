@@ -13,23 +13,31 @@ JOBDIR=$1
 F=/vision/u/minyeong/projects/isg_home/trainfast
 T85=/vision/u/minyeong/projects/isg_home/train85
 source $JOBDIR/job.env
+# one trunk (owner 2026-11-05): the scripts come from the job's frozen code snapshot (submit_fast.py writes ISGF_SCRIPTS=<snapshot>/scripts/trainfast;
+# unset = the campaign's live $F/scripts) and the job's outputs go under its root (ISGF_ROOT: $F for production, $OFH for alias validation)
+S=${ISGF_SCRIPTS:-$F/scripts}
+ROOT=${ISGF_ROOT:-$F}
 K=${KCOLLECT:-2}
 T_START=$(date +%s)
 JOB_END=${SLURM_JOB_END_TIME:-$(( T_START + TIME_LIMIT_S ))}
 KIT_RC=1
 export ISGE_BAND_STORE=1 ISGE_CODE
 [ -n "${TRUNK_CHECK:-}" ] && export ISGE_BAND_TRUNK_CHECK=$TRUNK_CHECK
-source $F/scripts/env_fast.sh
+source $S/env_fast.sh
 [ -n "${ISGE_BAND_TRUNK_CHECK:-}" ] && export ISPATIALGYM_BAND_TRUNK_CHECK=$ISGE_BAND_TRUNK_CHECK
 export PYTHONDONTWRITEBYTECODE=1 NUMBA_CACHE_DIR=$JB/numba_cache
 if [ "${START_PER_ATTEMPT:-0}" = 1 ]; then export ISPATIALGYM_START_PER_ATTEMPT=1; else unset ISPATIALGYM_START_PER_ATTEMPT; fi
 if [ "${STILL_EXIT:-0}" = 1 ]; then export ISPATIALGYM_ORACLE_STILL_EXIT=1; else unset ISPATIALGYM_ORACLE_STILL_EXIT; fi
 CUSTOMS_ARG=""
-[ "${START_PER_ATTEMPT:-0}" = 1 ] && CUSTOMS_ARG="--customs $ISGE_CODE/ispatialgym/assets/task_specs/isg_customs.json"
+# the snapshot's customs for a start-per-attempt alias and for CUSTOMS=trunk (submit_fast.py --customs trunk: an alias whose validated settings
+# live in the trunk's isg_customs.json); otherwise multiply_isg reads the template's own copy (the counted run's customs)
+{ [ "${START_PER_ATTEMPT:-0}" = 1 ] || [ "${CUSTOMS:-template}" = trunk ]; } && CUSTOMS_ARG="--customs $ISGE_CODE/ispatialgym/assets/task_specs/isg_customs.json"
 # ---- the fast flow's settings (shared by sampler and collectors; see docs/FAST_FLOW.md in the worktree) ----
-source $F/scripts/fast_env.sh
-# per-job switch overrides given at submission (submit_fast.py --extra-env ISPATIALGYM_FAST_<NAME>=0 lands in job.env): exported
-for v in $(grep -o "^ISPATIALGYM_[A-Z0-9_]*" $JOBDIR/job.env); do export $v; done
+source $S/fast_env.sh
+# per-job overrides given at submission (submit_fast.py --extra-env NAME=VALUE lands in job.env) win over env_fast.sh / fast_env.sh: their
+# ISPATIALGYM_* / ISG_* assignments are applied again here, after both (until 2026-11-05 only the names were re-exported, so an override of
+# a variable those scripts set - SEEDED_SPHERE_FIT, GOAL_OCCLUSION, HEAD_CAMERA_ONLY, ... - was silently lost)
+set -a; source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' $JOBDIR/job.env); set +a
 # the campaign-wide sampling cache (start-draw cells, exact IK witnesses) instead of the job-private one
 export ISPATIALGYM_SAMPLING_CACHE=${ISGF_SAMPLING_CACHE:-$F/cache/sampling}
 mkdir -p $ISPATIALGYM_SAMPLING_CACHE
@@ -41,9 +49,12 @@ echo "$SLURM_JOB_ID" > $JOBDIR/jobid
 # evidence of earlier jobs only with the share on
 BAND_SHARE=${ISPATIALGYM_FAST_BAND_SHARE:-0}
 for B in $T85/bands_train/$ALIAS_KEY $( [ "$BAND_SHARE" = 1 ] && echo $F/bands_train/$ALIAS_KEY ); do [ -d "$B" ] && cp -n --preserve=timestamps $B/* $ISPATIALGYM_REACH_BANDS/ 2>/dev/null; done
+# the alias's static band stores (submit_fast.py BAND_STORES, e.g. the bands an oracle-fix run persisted with the campaign's grasp library):
+# copied over every store above, so the store's band of a name wins (job_val.sh's OF_BANDS order); read only, never written (no sharing)
+for B in ${BAND_STORES:-}; do [ -d "$B" ] && cp --preserve=timestamps $B/*.json $B/*.npz $ISPATIALGYM_REACH_BANDS/ 2>/dev/null; [ -d "$B" ] && echo "BAND_STORE $B $(ls $B/*.json 2>/dev/null | wc -l) bands" >> $JOBDIR/job.txt; done
 if [ "$BAND_SHARE" = 1 ]; then python -m ispatialgym.sampling.v2.band_evidence fetch $ISPATIALGYM_REACH_BANDS $F/band_evidence/$ALIAS_KEY 2>&1 | tee -a $JOBDIR/job.txt; fi
 GPU=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)
-HEAD="key=$ALIAS_KEY alias=$ALIAS host=$(hostname -s) gpu=\"$GPU\" isg=$(git -C $R rev-parse --short HEAD) b1k=$(git -C $R/Behavior-1K rev-parse --short HEAD)"
+HEAD="key=$ALIAS_KEY alias=$ALIAS host=$(hostname -s) gpu=\"$GPU\" isg=$(cat $R/.snapshot_isg 2>/dev/null || git -C $R rev-parse --short HEAD) b1k=$(cat $R/.snapshot_b1k 2>/dev/null || git -C $R/Behavior-1K rev-parse --short HEAD)"
 echo "ISGF_SAMPLE $SLURM_JOB_ID $HEAD flow=fast k=$K variant=${CODE_VARIANT:-fast} start_per_attempt=${ISPATIALGYM_START_PER_ATTEMPT:-0} still_exit=${ISPATIALGYM_ORACLE_STILL_EXIT:-0} start_index=$START n=$N max_attempts=$MAX_ATTEMPTS limit_s=$SAMPLE_LIMIT_S job_end=$JOB_END appdata=$OMNIGIBSON_APPDATA_PATH jb=$JB start=$(date -Is)" | tee -a $JOBDIR/job.txt
 env | grep "^ISPATIALGYM_\|^ISG_\|^OMNIGIBSON_" | sort > $JOBDIR/env.txt
 DEADLINE=$(( JOB_END - DEMO_LIMIT_S - 420 ))
@@ -56,7 +67,7 @@ MONPID=$!
 # successes per GPU-hour on TITAN against 12.9 unpinned, 52.7-64.0 on L40S against 13.0-14.7 ----
 PINS=()
 if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PIN:-1}" != 0 ]; then
-  PINS=( $(python3 $F/scripts/cpu_split.py $K ${ISPATIALGYM_FAST_COLLECTOR_CPUS:-3}) )
+  PINS=( $(python3 $S/cpu_split.py $K ${ISPATIALGYM_FAST_COLLECTOR_CPUS:-3}) )
   if [ ${#PINS[@]} -gt 0 ]; then
     echo "PIN sampler=${PINS[0]} $(for i in $(seq 1 $K); do printf "c$i=%s " ${PINS[$i]}; done)" | tee -a $JOBDIR/job.txt
   else
@@ -81,16 +92,16 @@ collector() {
   while true; do
     [ $(date +%s) -ge $DEADLINE ] && { echo "COLLECT_DEADLINE c$i" | tee -a $JOBDIR/job.txt; break; }
     [ $barren -ge 3 ] && { echo "COLLECT_GIVE_UP c$i: three processes in a row ended without a result" | tee -a $JOBDIR/job.txt; break; }
-    if [ -e $JOBDIR/sampling.done ] && [ "$(python $F/scripts/queue_watch.py $JOBDIR left)" -eq 0 ]; then echo "COLLECT_DONE c$i" | tee -a $JOBDIR/job.txt; break; fi
+    if [ -e $JOBDIR/sampling.done ] && [ "$(python $S/queue_watch.py $JOBDIR left)" -eq 0 ]; then echo "COLLECT_DONE c$i" | tee -a $JOBDIR/job.txt; break; fi
     q=$(( q + 1 ))
     local r0=$(cat $JOBDIR/results.jsonl 2>/dev/null | wc -l) t1=$(date +%s)
-    echo "ISGF_COLLECT $SLURM_JOB_ID c$i q=$q left=$(python $F/scripts/queue_watch.py $JOBDIR left) deadline=$DEADLINE start=$(date -Is)" | tee -a $JOBDIR/job.txt
+    echo "ISGF_COLLECT $SLURM_JOB_ID c$i q=$q left=$(python $S/queue_watch.py $JOBDIR left) deadline=$DEADLINE start=$(date -Is)" | tee -a $JOBDIR/job.txt
     $(pin_of $i) python -m ispatialgym.oracle.run_isg --queue $JOBDIR/inst --claims $JOBDIR/claims --done-file $JOBDIR/sampling.done --poll-s 15 \
       --results $JOBDIR/results.jsonl --deadline $DEADLINE --mode oracle --out $JOBDIR/demo --record hdf5 $COLLECT_EXTRA $( [ -e $JOBDIR/prebuild.mismatch ] || echo $PREBUILD_ARG ) > $JOBDIR/collect_c${i}_q$q.log 2>&1 &
     local qpid=$! killed=""
     while kill -0 $qpid 2>/dev/null; do
       sleep 20
-      local over=$(python $F/scripts/queue_watch.py $JOBDIR over $qpid $DEMO_LIMIT_S)
+      local over=$(python $S/queue_watch.py $JOBDIR over $qpid $DEMO_LIMIT_S)
       if [ -n "$over" ]; then
         echo "DEMO_TIMEOUT $over c$i pid=$qpid limit_s=$DEMO_LIMIT_S" | tee -a $JOBDIR/job.txt; echo "$over" >> $JOBDIR/demo_timeouts.txt
         kill -INT $qpid 2>/dev/null; sleep 60; kill -KILL $qpid 2>/dev/null; killed=1; break
@@ -114,10 +125,10 @@ if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PREBUILD
   # 2026-11-02: only a copy whose scene crop request is this job's (scripts/prebuild_crop.py) - the 11-01 packing fleet took full4's
   # SCENE_CROP=full copies for cropped jobs and every collector rebuilt its world after its first instance (prebuild.mismatch)
   SRC=""; NSKIP=0
-  for d in $(ls -td $F/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID /vision/u/minyeong/projects/isg_home/train85/out/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID 2>/dev/null) ${COUNTED_TEMPLATE:-}; do
+  for d in $(ls -td $( [ "$ROOT" != "$F" ] && echo $ROOT/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID ) $F/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID /vision/u/minyeong/projects/isg_home/train85/out/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID 2>/dev/null) ${COUNTED_TEMPLATE:-}; do
     case "$d" in $JOBDIR/*) continue ;; esac
     if [ -f "$d/template.json" ] && ls $d/instances/*-tro_state.json >/dev/null 2>&1; then
-      fit=$(python $F/scripts/prebuild_crop.py $d 2>/dev/null || echo "skip prebuild_crop.py failed")
+      fit=$(python $S/prebuild_crop.py $d 2>/dev/null || echo "skip prebuild_crop.py failed")
       if [ "$fit" = fits ]; then SRC=$d; break; fi
       NSKIP=$(( NSKIP + 1 )); [ $NSKIP -le 3 ] && echo "PREBUILD_SKIP $d $fit" | tee -a $JOBDIR/job.txt
     fi
@@ -141,14 +152,14 @@ SAMPLE_RC=$(cat $JOBDIR/sample.rc 2>/dev/null || echo 1)
 echo "SAMPLE_EXIT $SAMPLE_RC wall_s=$(( $(date +%s) - t0 )) written=$(grep -c ' written (attempt ' $JOBDIR/sample.log)" | tee -a $JOBDIR/job.txt
 if [ "$BAND_SHARE" = 1 ]; then
   mkdir -p $F/bands_train/$ALIAS_KEY
-  python $F/scripts/publish_job_bands.py "$ISPATIALGYM_REACH_BANDS" "$F/bands_train/$ALIAS_KEY" "$t0" "$SLURM_JOB_ID" 2>&1 | tee -a $JOBDIR/job.txt
+  python $S/publish_job_bands.py "$ISPATIALGYM_REACH_BANDS" "$F/bands_train/$ALIAS_KEY" "$t0" "$SLURM_JOB_ID" 2>&1 | tee -a $JOBDIR/job.txt
   python -m ispatialgym.sampling.v2.band_evidence publish $ISPATIALGYM_REACH_BANDS $F/band_evidence/$ALIAS_KEY $SLURM_JOB_ID 2>&1 | tee -a $JOBDIR/job.txt
 fi
-python $F/scripts/train_predemo.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
+python $S/train_predemo.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
 touch $JOBDIR/sampling.done
 wait $CPIDS
 kill $MONPID 2>/dev/null
 QRC=0; for i in $(seq 1 $K); do r=$(cat $JOBDIR/collect_c$i.rc 2>/dev/null || echo 1); [ "$r" -ne 0 ] && QRC=$r; done
-python $F/scripts/fast_check.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
+python $S/fast_check.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
 case "$SAMPLE_RC" in 0|2) [ "$QRC" -eq 0 ] && KIT_RC=0 ;; esac
 echo "ISGF_END $SLURM_JOB_ID wall_s=$(( $(date +%s) - T_START )) kit_rc=$KIT_RC end=$(date -Is)" | tee -a $JOBDIR/job.txt
