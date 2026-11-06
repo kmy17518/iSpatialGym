@@ -1,0 +1,37 @@
+[
+ {
+  "task": "IORS",
+  "relation": "ontop",
+  "category": "steak",
+  "model": "lcebsq",
+  "key": "steak__lcebsq__t060",
+  "pipeline": "a1",
+  "mode": null,
+  "constraint": "tabletop",
+  "bbox": [
+   0.1292010726928711,
+   0.2506627426147461,
+   0.06308231353759766
+  ],
+  "ready": true,
+  "base_key": "steak__lcebsq__t",
+  "scale": [
+   0.6,
+   0.6,
+   0.6
+  ],
+  "scale_rule": "uniform_owner_lying",
+  "bbox_scaled": [
+   0.0775,
+   0.1504,
+   0.0378
+  ],
+  "orig_n_valid": 5,
+  "provenance": {
+   "decision": "owner 2026-11-06 on the ontop_small#02 steak demo (rs_ontop_small02 0000): \"want to scale down steak so it can be grasped lying down & fits inside the floor of the frying pan (right now it's standing up)\" - steak__lcebsq__t has the one rest x_down (lying widths 12.9 / 25.1 cm exceed the a1 generator's 8.89 cm aperture, so it stands on its 6.3 cm edge); at x0.6 it lies 7.75 x 15.0 x 3.8 cm (bbox; collision hull 7.95 x 15.2 x 4.0): the top pinch across 7.8-8.0 cm fits the aperture and the footprint fits frying_pan/jpzusm's floor disc (radius 0.096 m, iors_small.ContainerFloor on the grasp-bands export)",
+   "b1k_commit": "6a6194600",
+   "scripts": "runlogs/grasp_library_20260905/scripts with the job's paths (scripts/oracle_fix/job_glib_scaled_key.sh; = isg_home/eval85/scratch_spatula076/scripts)",
+   "pipeline": "a1 / tabletop = the pipeline and constraint of the base key steak__lcebsq__t: ontop_small_scale.iddl requires (grasps target tabletop); the canonical rest (lying) is required - the job fails when gen_candidates falls back to a side rest; the key sorts after steak__lcebsq__t"
+  }
+ }
+]
