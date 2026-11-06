@@ -23,3 +23,26 @@ export ISPATIALGYM_FAST_BATCH_IK_SEEDS=${ISGF_BATCH_IK_SEEDS:-8}
 # -22 % warm, demos bit-identical filling or reading it (merge_vecnext 2026-11-02). ISGF_ASSET_CACHE= (empty) turns it off.
 ISGF_ASSET_CACHE=${ISGF_ASSET_CACHE-/vision/u/minyeong/projects/isg_home/oracle_fix/asset_cache}
 if [ -n "$ISGF_ASSET_CACHE" ]; then export ISG_VEC_ASSET_CACHE_DIR=$ISGF_ASSET_CACHE; mkdir -p $ISGF_ASSET_CACHE; else unset ISG_VEC_ASSET_CACHE_DIR; fi
+# of-v2maps 2026-11-06: the grasp / reach-band source, ISGF_GRASPS (job.env, written by submit_fast.py --grasps): legacy (default) | v2.
+# v2 = grasp library v2 + scene-independent reach maps + their height anchors: submit_fast.py writes ISPATIALGYM_GRASP_LIBRARY_V2,
+# ISPATIALGYM_REACH_MAPS and ISPATIALGYM_REACH_MAP_ANCHORS into job.env (re-sourced after this file, so the sampler, the collectors and a
+# later recollect of the job - prep_recollect.py copies job.env - all run on the same library: grasp names differ between the libraries).
+# legacy unsets the three; a registry row's own ISPATIALGYM_GRASP_LIBRARY_V2 (the umbrella's validated library) comes back with job.env.
+# STRICT stays off (ISPATIALGYM_REACH_MAPS_STRICT rejects every alias without a v2 entry too); a miss logs 'reach map miss' and keeps the
+# legacy band path. isgf_grasps_record <jobdir> (after the job.env re-source): checks the v2 paths exist and writes the GRASPS line to job.txt.
+ISGF_GRASPS=${ISGF_GRASPS:-legacy}
+case "$ISGF_GRASPS" in
+  legacy) unset ISPATIALGYM_GRASP_LIBRARY_V2 ISPATIALGYM_REACH_MAPS ISPATIALGYM_REACH_MAP_ANCHORS ISPATIALGYM_REACH_MAPS_STRICT ;;
+  v2) ;;
+  *) echo "ISGF_GRASPS=$ISGF_GRASPS: expected legacy or v2" >&2; exit 2 ;;
+esac
+isgf_grasps_record() {
+  local jd=$1
+  if [ "$ISGF_GRASPS" = v2 ]; then
+    local p
+    for p in "${ISPATIALGYM_GRASP_LIBRARY_V2:-}" "${ISPATIALGYM_REACH_MAPS:-}" "${ISPATIALGYM_REACH_MAP_ANCHORS:-}"; do
+      if [ -z "$p" ] || [ ! -e "$p" ]; then echo "GRASPS v2 MISSING '$p' (glib / maps / anchors must all exist)" | tee -a $jd/job.txt; exit 2; fi
+    done
+  fi
+  echo "GRASPS $ISGF_GRASPS glib=${ISPATIALGYM_GRASP_LIBRARY_V2:-} maps=${ISPATIALGYM_REACH_MAPS:-} anchors=${ISPATIALGYM_REACH_MAP_ANCHORS:-} strict=${ISPATIALGYM_REACH_MAPS_STRICT:-0}" | tee -a $jd/job.txt
+}

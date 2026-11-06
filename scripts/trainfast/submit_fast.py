@@ -4,7 +4,7 @@ validation (owner 2026-11-05: one pipeline; validation differs only in its outpu
 
     submit_fast.py submit <key> <n> --flow base|fast --code <frozen snapshot> [--gres titanrtx|l40s] [--acct vision] [--part svl]
                    [--kcollect K] [--sample-limit-s S] [--time-s T] [--tag name] [--customs template|trunk] [--extra-env NAME=VALUE ...]
-                   [--root DIR] [--ledger TSV] [--base-index N] [--job-prefix isgf_] [--registry TSV] [--dry-run]
+                   [--root DIR] [--ledger TSV] [--base-index N] [--job-prefix isgf_] [--registry TSV] [--grasps legacy|v2] [--dry-run]
     submit_fast.py recollect <source job dir> --code <frozen snapshot> [--name N] [--iids IID ...] [--root DIR] [--job-prefix P] ...
     submit_fast.py template <alias> <key> --code <frozen snapshot> --seed-index K [--scene S] [--support SUP] [--support-row ROW] [--n N]
                    [--budget-s B] [--root DIR] [--job-prefix P] ...   (sample_isg at an eval seed: the template for register_alias.py)
@@ -54,6 +54,13 @@ spec.loader.exec_module(st)
 #: 2026-11-01 (REPEAT_MEASURED, owner): train85 per-alias eval indexes rebuilt with the measured entries (scripts/build_eval_index_v2.py);
 #: an alias without a rebuilt index keeps train85's (the old repeat rule then applies to it)
 EVAL_INDEX_V2 = os.path.join(F, "eval_index_v2", "per_alias")
+
+#: of-v2maps 2026-11-06 (--grasps v2, fast_env.sh ISGF_GRASPS): the campaign-owned grasp library v2, reach maps and height anchors
+#: (docs/GRASP_BANDS.md "Fast-flow pipeline"); written into job.env, so the collectors and a later recollect use the same library
+OFH = "/vision/u/minyeong/projects/isg_home/oracle_fix"
+V2_ROOT = os.path.join(OFH, "v2maps_20261106")  # glib/ (the library), maps/ (the reach maps), anchors.json, logs/
+GRASPS_V2 = {"ISPATIALGYM_GRASP_LIBRARY_V2": os.path.join(V2_ROOT, "glib"), "ISPATIALGYM_REACH_MAPS": os.path.join(V2_ROOT, "maps"),
+             "ISPATIALGYM_REACH_MAP_ANCHORS": os.path.join(V2_ROOT, "anchors.json")}
 
 
 def eval_index_of(key):
@@ -161,6 +168,10 @@ def submit(a):
         for kv in (c.get("extra_env") or "").split() if reg else []:  # the registry's per-alias switches (validated settings)
             k, v = kv.split("=", 1)
             env[k] = v
+        # of-v2maps: the grasp / band source; v2 replaces a registry row's own library (the umbrella's entry is in the campaign library)
+        env["ISGF_GRASPS"] = a.grasps
+        if a.grasps == "v2":
+            env.update(GRASPS_V2)
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
@@ -191,7 +202,7 @@ def submit(a):
             fh.write("\t".join(str(row[k]) for k in LEDGER_COLS) + "\n")
         print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
               f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect} customs={customs} "
-              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} root={a.root}")
+              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root}")
     finally:
         unlock(lock)
     return 0
@@ -236,7 +247,8 @@ def recollect(a):
     jobid = res.stdout.strip().split(";")[0]
     with open(os.path.join(a.root, "manifests", "recollect.tsv"), "a") as fh:
         fh.write("\t".join([time.strftime("%Y-%m-%dT%H:%M:%S"), key, src, job_dir, jobid, os.path.abspath(a.code), " ".join(a.iids or [])]) + "\n")
-    print(f"SUBMITTED {jobid} recollect {key} {job_dir} {gres} time={st.hms(time_s)} k={a.kcollect}")
+    print(f"SUBMITTED {jobid} recollect {key} {job_dir} {gres} time={st.hms(time_s)} k={a.kcollect} "
+          f"grasps={shlex.split(env0.get('ISGF_GRASPS', 'legacy'))[0]} (the source job's)")
     return 0
 
 
@@ -301,6 +313,8 @@ def main():
                    help="the sampler's customs: the snapshot's isg_customs.json (default) or the template's own copy (the counted run's)")
     s.add_argument("--ledger", default=None, help="default: <root>/manifests/allocations.tsv")
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
+    s.add_argument("--grasps", default="legacy", choices=["legacy", "v2"],
+                   help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     r = sub.add_parser("recollect")
     r.add_argument("src")
     common(r)

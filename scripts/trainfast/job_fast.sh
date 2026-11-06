@@ -38,6 +38,7 @@ source $S/fast_env.sh
 # ISPATIALGYM_* / ISG_* assignments are applied again here, after both (until 2026-11-05 only the names were re-exported, so an override of
 # a variable those scripts set - SEEDED_SPHERE_FIT, GOAL_OCCLUSION, HEAD_CAMERA_ONLY, ... - was silently lost)
 set -a; source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' $JOBDIR/job.env); set +a
+isgf_grasps_record $JOBDIR   # of-v2maps: ISGF_GRASPS legacy | v2 (fast_env.sh), the GRASPS line in job.txt
 # the campaign-wide sampling cache (start-draw cells, exact IK witnesses) instead of the job-private one
 export ISPATIALGYM_SAMPLING_CACHE=${ISGF_SAMPLING_CACHE:-$F/cache/sampling}
 mkdir -p $ISPATIALGYM_SAMPLING_CACHE
