@@ -84,6 +84,7 @@ class _SurfaceStub:
     init_support_fallback = IL.IORSLarge.init_support_fallback
     num = IL.IORSLarge.num
     _prepare_bindings = IL.IORSLarge._prepare_bindings
+    bind_init_surface = IL.IORSLarge.bind_init_surface
 
     def __init__(self, relation, support, distances, categories=None, **gen):
         self.subtask = f"inter_object_relation_satisfaction-{relation}_large_scale"

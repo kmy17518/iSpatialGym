@@ -1050,24 +1050,39 @@ class IORSLarge(SamplerV2):
             cands = [self.obj("floor")] if kind == "floor" else [self.partner]
         if not cands:
             raise Reject("no_init_surface", f"{self.gp.variant}: no candidate of the init-surface class {kind!r}")
-        rng = np.random.default_rng(self.ctx.base_seed)
-        order = [cands[int(i)] for i in rng.permutation(len(cands))]
-        errors = []
-        for cand in order:
-            try:
-                self.try_surface(kind, cand, rng)
-            except Reject as e:
-                errors.append(f"{cand.name}: {e.reason}: {e}")
-                continue
-            if kind == "floor":
-                self.variant_role("support", self.bindings.one("floor"))
-            elif kind == "partner":
-                self.variant_role("support", self.bindings.one("partner"))
-            else:
-                self.bind_scene_object("support", cand)
-            self.template_facts["init_surface"] = {"class": kind, "name": cand.name, "tried": len(errors) + 1,
-                                                   **({"fallback": self.init_fallback} if self.init_fallback is not None else {})}
-            return
+        self.bind_init_surface(kind, cands)
+
+    def bind_init_surface(self, kind: str, cands: List[Any]) -> None:
+        """The init surface of the template: the candidates in random order (the template seed's stream), the first that admits stances
+        A–C bound as the support role; ``Reject("no_init_surface")`` when none does.
+
+        oracle-fix 2026-11-06 (opt-in ``generation.init_setup_draws``, inside_large#03): the template seed is the same in every train job
+        (multiply_isg: split_seed(train, variant) * 7919, whatever the start index), so one unlucky draw of the init edge / lateral rejects
+        the template in every job (bar_egwapq_0 +u, the only collision-free edge: lateral -0.03, the free top beside the sink 37-45 deg off
+        the camera axis, 0 Phase-2 pairs within 30 deg in every survey1 / trainfast / train85 job); up to that many more draws from the
+        derived streams ``[base_seed, k]`` (train85's spa2 setup draws, iors_small's ``SamplerV2.spa_template_start``). Draw 0 is today's."""
+        errors: List[str] = []
+        for k in range(1 + max(0, int(self.gp.gen("init_setup_draws", 0) or 0))):
+            rng = np.random.default_rng(self.ctx.base_seed if k == 0 else [int(self.ctx.base_seed), k])
+            order = [cands[int(i)] for i in rng.permutation(len(cands))]
+            for cand in order:
+                try:
+                    self.try_surface(kind, cand, rng)
+                except Reject as e:
+                    errors.append(f"{f'setup draw {k}: ' if k else ''}{cand.name}: {e.reason}: {e}")
+                    continue
+                if kind == "floor":
+                    self.variant_role("support", self.bindings.one("floor"))
+                elif kind == "partner":
+                    self.variant_role("support", self.bindings.one("partner"))
+                else:
+                    self.bind_scene_object("support", cand)
+                self.template_facts["init_surface"] = {"class": kind, "name": cand.name, "tried": len(errors) + 1, **({"setup_draw": k} if k else {}),
+                                                       **({"fallback": self.init_fallback} if self.init_fallback is not None else {})}
+                if k:
+                    log.info("%s: init surface %s found on setup draw %d (generation.init_setup_draws; %d earlier tries failed)", self.gp.variant,
+                             cand.name, k, len(errors))
+                return
         raise Reject("no_init_surface", f"{self.gp.variant}: no {kind} candidate admits stances A–C: " + "; ".join(errors[-3:]))
 
     # ------------------------------------------------------------------ partner geometry for C
@@ -3054,6 +3069,13 @@ class IORSLarge(SamplerV2):
             dep = self.record_departure_transition(init, manip, b_trunk)
             r, l, _ = stance_arm_vectors(self.kit, manip)  # the oracle moves both arms to B's posture before the sweep
             path = self.record_path(init, manip, trunk=b_trunk, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(init, dep.stand_off))
+            # oracle-fix 2026-11-06 (survey1 under_large#02: 3 / 3 demos 'collision | navigate | right_realsense_link in contact with
+            # walls_mrghjk_0'): the path is swept with B's arms (the departure put them there), so the record carries them as
+            # core.record_edge_travel's does (2297006d) - without paths[].arms_q the oracle's navigate re-posed the empty right arm from
+            # B's 'ready' to untucked and drove the untucked wrist camera into the wall at (18.17, -11.47), where the primary
+            # navigate-then-torso sweep (untucked, trunk 0.5 / 0) had already found the leg colliding
+            if not path.carried and path.arms_q is None:
+                path.arms_q = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
             log.info("%s: A -> B: navigate-then-torso impossible (%s); torso-then-navigate at A (s_T %.2f, drive at trunk %s)", self.gp.variant, errors[-1], dep.stand_off,
                      tuple(round(v, 2) for v in b_trunk))
             return {"order": "torso_then_navigate", "s_T": dep.stand_off, "path_m": round(path.length_m, 3), "primary_error": errors[-1]}

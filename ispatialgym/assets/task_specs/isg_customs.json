@@ -9566,7 +9566,7 @@
    },
    "direction": "close",
    "prompt0": {
-    "beta_max_deg": 20.0,
+    "beta_max_deg": 40.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
     "d_scan_max_m": 1.1,
@@ -9612,7 +9612,8 @@
    "_r3e_note": "oracle-fix 2026-11-04 round 3 (cabinet diagnosis): in all 53 cabinet demos j_link_2 moved <= 0.0006 rad - the door is friction-locked (stock PhysX 0.2 x (|F| + |T|) loaded by the leaf weight and the pull, r 0.365 m lever), the hand stalls, arm lag 1.8-40 deg, the torso bends linearly to > 1 deg (the robot_wobble), the re-grasp then closes 36-72 mm off the bar (failed_grasp). The dishwasher passes with the counterbalance record: counterbalance true (gravity off on the leaf, damping 5) + joint_friction [0.05]",
    "_neighbour_note": "oracle-fix 2026-11-04 round 3: the AG joint holds link_2 (logged) yet the door never moves: j_link_2's 8 mm bar stands 70 mm from the neighbouring door's bar (j_link_0#B; the double door's centre) - the closed gripper jams against the closed neighbour. other_joints_init j_link_0 1.4 rad (held open in the template and the instance; Open restricted to j_link_2 via the joint_friction record's openable_joints)",
    "floor_collision_filter": false,
-   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success"
+   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success",
+   "_prompt0_beta_max_deg_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 articulation close / open_large#03: repeats_eval 46 of 60 / most rejections, 0 written in 3579 s): the measured goal (the cabinet's link poses) is the template's own - every train attempt matches the eval's at 0.00 m / 0 deg - so the start base alone separates them, and Phase 1 draws it on a bearing U(-20, 20) deg at the nearest seeing distance: two draws within 15 deg / 0.25 m of each other ~60 % of the time per eval instance (rejected gaps 0.00-0.25 m / 0-14 deg); bearings U(-40, 40) deg halve that (~34 %), an infeasible bearing is redrawn by Phase 1"
   },
   "constraints": []
  },
@@ -12328,7 +12329,7 @@
    },
    "direction": "open",
    "prompt0": {
-    "beta_max_deg": 20.0,
+    "beta_max_deg": 40.0,
     "d_min_m": 0.5,
     "d_max_m": 2.5,
     "d_scan_max_m": 1.1
@@ -12362,7 +12363,8 @@
    "_r3e_note": "oracle-fix 2026-11-04 round 3 (cabinet diagnosis): in all 53 cabinet demos j_link_2 moved <= 0.0006 rad - the door is friction-locked (stock PhysX 0.2 x (|F| + |T|) loaded by the leaf weight and the pull, r 0.365 m lever), the hand stalls, arm lag 1.8-40 deg, the torso bends linearly to > 1 deg (the robot_wobble), the re-grasp then closes 36-72 mm off the bar (failed_grasp). The dishwasher passes with the counterbalance record: counterbalance true (gravity off on the leaf, damping 5) + joint_friction [0.05]",
    "_neighbour_note": "oracle-fix 2026-11-04 round 3: the AG joint holds link_2 (logged) yet the door never moves: j_link_2's 8 mm bar stands 70 mm from the neighbouring door's bar (j_link_0#B; the double door's centre) - the closed gripper jams against the closed neighbour. other_joints_init j_link_0 1.4 rad (held open in the template and the instance; Open restricted to j_link_2 via the joint_friction record's openable_joints)",
    "floor_collision_filter": false,
-   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success"
+   "_floor_note": "oracle-fix 2026-11-04 round 3 (simulator probe, isg_home/oracle_fix/probe_cab): the lower door slab (link_2 collision__0) sits 5.6 mm INTO floors_ovpbsn_0 at every angle - its only contact; the floor's friction pins the door against 150 N m in both directions (counterbalance / friction / the neighbour door could never help). The loader filters the cabinet x floor collision (run_isg.InstanceLoader._apply_floor_filters): probe demos 5 / 6 success",
+   "_prompt0_beta_max_deg_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 articulation close / open_large#03: repeats_eval 46 of 60 / most rejections, 0 written in 3579 s): the measured goal (the cabinet's link poses) is the template's own - every train attempt matches the eval's at 0.00 m / 0 deg - so the start base alone separates them, and Phase 1 draws it on a bearing U(-20, 20) deg at the nearest seeing distance: two draws within 15 deg / 0.25 m of each other ~60 % of the time per eval instance (rejected gaps 0.00-0.25 m / 0-14 deg); bearings U(-40, 40) deg halve that (~34 %), an infeasible bearing is redrawn by Phase 1"
   },
   "constraints": []
  },
@@ -23844,7 +23846,11 @@
     ],
     "dropped": []
    },
-   "destination_side": "left"
+   "destination_side": "left",
+   "place_inhand_reaim": true,
+   "_place_inhand_reaim_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 disembedding_07: 0 / 4 demos): the rim pinch tilted the roll 36 deg in the hand in one demo (in-hand rotation 0.63 rad at the place), it was set down tilted and fell flat at the release (0.32 rad, 31.5 mm); the support place is re-aimed to the measured in-hand pose",
+   "target_orientation_equivalences": true,
+   "_target_orientation_equivalences_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 disembedding_07): the roll's goal pose had no orientation equivalences although roles.target tags it [x2, zinf]: the opening fingers turned it 15.5 deg about its own axis at the release (2 demos 0.26 / 0.32 rad over the 0.1 rad tolerance, closest approach before the release 0.032 rad); the pose target now carries the tags' rotation group"
   },
   "constraints": []
  },
@@ -25449,7 +25455,9 @@
     ],
     "dropped": []
    },
-   "destination_side": "left"
+   "destination_side": "left",
+   "place_inhand_reaim": true,
+   "_place_inhand_reaim_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1 disembedding_10: 0 / 4 demos): the fork turned 7.2 / 10.0 / 14.6 deg about z under the closing fingers (in-hand rotation at the place 0.135 / 0.173 / 0.256 rad), the place set it down with that turn - 3 demos symbolic_only at 0.131 / 0.170 / 0.256 rad over the 0.1 rad tolerance, position 1-3 mm; the support place is re-aimed to the measured in-hand pose (reaim_place_for_inhand_pose) so the fork, not the hand, lands on its recorded place"
   },
   "constraints": []
  },
@@ -31264,7 +31272,9 @@
     "max_penetration_m": 0.005,
     "preshape": true
    },
-   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)",
+   "init_setup_draws": 8,
+   "_init_setup_draws_note": "oracle-fix 2026-11-06 (owner: investigate the aliases with low yield / long sampling and fix them; survey1: inside_large#03 never made an attempt): the train template seed is the same in every job, and its one draw stands at bar_egwapq_0 +u (the only edge whose stance is collision-free; -v / -u / +v collide at trunk (0.5, 0)) at lateral -0.03 m, in front of the drop-in sink: the free bar top beside the sink lies 0.56-0.64 m to the side, 37-45 deg off the camera axis at all 30 trunk candidates, 0 (stance, focus) pairs within 30 deg -> no_init_surface in survey1, trainfast large / large_base / pilot3 and every train85 job's first draw; train85's spa2 setup draws found lateral -0.07 (fail) then +0.54 (44 pairs, 27 survivors) on draw 2, the eval instance stands at +0.62 (45 pairs); up to 8 more setup draws from the derived streams [base_seed, k], draw 0 unchanged"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~20:30 inside03v inter_object_relation_satisfaction-inside_large_scale#03 variant V3: plate/luhkiz into drop_in_sink_lkklqs_0 (set in bar_egwapq_0) from bar_egwapq_0 (the sink's own bar, ~0.3-1.2 m along it) / bar_byvbuc_0 (the L-joined bar along -y, ~1.7 m); the order pins one per step; the partner is the sheet's held-out drop_in_sink_lkklqs_0 (house_double_floor_lower kitchen_0); hand-made as aliases 121 / 122 (no candidates rows for the subtask: the grounder skips it), generation = alias 121's block with the V3 inside keys, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
