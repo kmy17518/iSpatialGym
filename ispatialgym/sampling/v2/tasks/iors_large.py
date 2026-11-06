@@ -3054,6 +3054,13 @@ class IORSLarge(SamplerV2):
             dep = self.record_departure_transition(init, manip, b_trunk)
             r, l, _ = stance_arm_vectors(self.kit, manip)  # the oracle moves both arms to B's posture before the sweep
             path = self.record_path(init, manip, trunk=b_trunk, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(init, dep.stand_off))
+            # oracle-fix 2026-11-06 (survey1 under_large#02: 3 / 3 demos 'collision | navigate | right_realsense_link in contact with
+            # walls_mrghjk_0'): the path is swept with B's arms (the departure put them there), so the record carries them as
+            # core.record_edge_travel's does (2297006d) - without paths[].arms_q the oracle's navigate re-posed the empty right arm from
+            # B's 'ready' to untucked and drove the untucked wrist camera into the wall at (18.17, -11.47), where the primary
+            # navigate-then-torso sweep (untucked, trunk 0.5 / 0) had already found the leg colliding
+            if not path.carried and path.arms_q is None:
+                path.arms_q = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
             log.info("%s: A -> B: navigate-then-torso impossible (%s); torso-then-navigate at A (s_T %.2f, drive at trunk %s)", self.gp.variant, errors[-1], dep.stand_off,
                      tuple(round(v, 2) for v in b_trunk))
             return {"order": "torso_then_navigate", "s_T": dep.stand_off, "path_m": round(path.length_m, 3), "primary_error": errors[-1]}
