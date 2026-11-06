@@ -50339,10 +50339,10 @@
     0.325
    ],
    "push_stand_offs_m": [
-    0.45,
-    0.4,
-    0.5,
-    0.55
+    0.6,
+    0.65,
+    0.55,
+    0.7
    ],
    "push_trunks": [
     [
@@ -50381,7 +50381,12 @@
     0.03,
     0.008
    ],
-   "_face_note": "oracle-fix 2026-11-03 19:58: the first run found no push face on any side at 0.24-0.33 m with the default +-2 cm vertical probes (96 / 96 no_push_face): the 0.36 m table's top is a thin slab over recessed legs - the hand on the top's edge (0.325-0.345 m) with +-8 mm vertical probes"
+   "_face_note": "oracle-fix 2026-11-03 19:58: the first run found no push face on any side at 0.24-0.33 m with the default +-2 cm vertical probes (96 / 96 no_push_face): the 0.36 m table's top is a thin slab over recessed legs - the hand on the top's edge (0.325-0.345 m) with +-8 mm vertical probes",
+   "push_pitches_deg": [
+    20.0,
+    35.0
+   ],
+   "_push_standoff_note": "oracle-fix 2026-11-06 (owner feedback on the coffee table demo: 'wouldn't IK to the push positions be easier to solve if the robot moves a bit backwards?'): every coffee_hsf2 instance stood at d 0.50 - the closer d 0.40 / 0.45 stances (tried first: the candidates sort by reach margin, capped at 0.25) died on 'pre fingertip out of frame' (projected v 1106 / 1027 px vs <= 1005), d 0.50 passed by ~50 px; at d 0.50 the right j2 / j6 sat 0.18-0.35 rad from their limits and both arms needed the planner ladder + a PROTECT via-above. Offline IK at trunk (0.95, -0.6), pitch 20: joint margin at contact / pre-contact 0.43 / 0.22 rad (d 0.50) -> 0.53 / 0.43 (0.60), 0.52 / 0.52 (0.65); reach margin 0.24 -> 0.20 / 0.18 (window [0.03, 0.45]). push_stand_offs_m [0.45, 0.40, 0.50, 0.55] -> [0.60, 0.65, 0.55, 0.70] (the closer values removed, not reordered: d 0.50 alone in the 0.25 tier would still be tried first); push_pitches_deg [20, 35] (pitch 0 had no solution with any joint margin at any trunk / stand-off)."
   },
   "constraints": [],
   "_note": "oracle-fix 2026-11-03 inter_object_relation_satisfaction-nextto_large_scale#03: coffee_table/osroux pushed next to sofa_ukfaaz_0 (house_double_floor_upper living_room_0) by the base; hand-made as alias 156 (copy of 149), BDDL = problem149 with the new synsets; registry mode test"
