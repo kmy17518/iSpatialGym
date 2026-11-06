@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """trainfast: aggregate the jobs of one or more tags (out/<tag>/<key>/g*/) into successes per GPU-hour and the cost breakdown.
 
-    fleet_summary.py [--tag base --tag fast ...] [--md]
+    fleet_summary.py [--tag base --tag fast ...] [--md] [--root DIR]   (--root: alias validation under $OFH, one trunk 2026-11-05)
 
 GPU-hours = job wall (ISGF_END); for a job cancelled or killed before it, slurm's Elapsed (sacct); for a running job, now - start
 (ISGF_SAMPLE line). A job's statistics come from job_stats.json
@@ -71,7 +71,7 @@ def stats_of(job):
     p = os.path.join(job, "job_stats.json")
     wall, state = job_wall(job)
     if state != "done" or not os.path.exists(p):
-        subprocess.run([sys.executable, os.path.join(F, "scripts", "fast_check.py"), job], capture_output=True)
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fast_check.py"), job], capture_output=True)
     try:
         st = json.load(open(p))
     except Exception:
@@ -84,11 +84,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", action="append", default=None)
     ap.add_argument("--md", action="store_true")
+    ap.add_argument("--root", default=F, help="the root whose out/<tag>/<key>/g*/ jobs are summarized (default: trainfast)")
     a = ap.parse_args()
-    tags = a.tag or sorted(os.path.basename(d) for d in glob.glob(os.path.join(F, "out", "*")))
+    root = a.root
+    tags = a.tag or sorted(os.path.basename(d) for d in glob.glob(os.path.join(root, "out", "*")))
     rows = []
     for tag in tags:
-        for job in sorted(glob.glob(os.path.join(F, "out", tag, "*", "g*"))):
+        for job in sorted(glob.glob(os.path.join(root, "out", tag, "*", "g*"))):
             st = stats_of(job)
             if st is None:
                 continue
