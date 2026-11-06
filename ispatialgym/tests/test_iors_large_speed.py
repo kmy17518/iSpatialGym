@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -159,3 +160,77 @@ def test_grasp_at_pose_prescreen_skips_rows_whose_row_and_twin_fail_the_batched_
         assert "g0: neither the row nor its twin passes the batched screen" in str(e.value) and len(exact) == 2
     finally:
         T.pick_twin = orig
+
+
+def test_dead_at_b_holds_only_when_every_drawable_pair_failed_at_b():
+    """generation.c_skip_dead_b (oracle-fix 2026-11-06; under_large_scale_01: 41 of 42 C tries of a B exhausted by the cached B failures alone,
+    after their push chains): a C is dead when every pair of F_live its draws can take keys into the B cache as None (failed) or has no
+    aligned goal yaw; an unknown or solved pair, or no candidate pair at all, keeps it."""
+    step = math.pi / 8
+    g0, g1 = SimpleNamespace(name="g0"), SimpleNamespace(name="g1")
+    F = [(0.0, g0), (step, g0), (step, g1)]
+    dead = {(0, "g0"): None, (1, "g0"): None, (1, "g1"): None}
+    assert IL.dead_at_b(F, dead, step)
+    assert not IL.dead_at_b(F, {(0, "g0"): None, (1, "g0"): None}, step)  # (1, g1) not tried at B yet
+    assert not IL.dead_at_b(F, {**dead, (1, "g1"): {"yaw": step}}, step)  # (1, g1) solved at B
+    assert not IL.dead_at_b([], dead, step)  # nothing to draw: the C loop's own rule
+    # the push-under yaw lock's buckets: only the kept yaws' pairs count
+    assert IL.dead_at_b(F, {(0, "g0"): None}, step, buckets={0})
+    assert not IL.dead_at_b(F, {(0, "g0"): None}, step, buckets={0, 1})
+    assert not IL.dead_at_b(F, dead, step, buckets={5})  # no pair at a kept bucket
+    # aligned init yaws (the touching mode): the draw's key is the aligned yaw; False (no aligned goal yaw) is a dead draw too
+    assert IL.dead_at_b(F, {(0.1234, "g0"): None, (0.1234, "g1"): None}, step, end_aligned=lambda y: 0.12341)
+    assert not IL.dead_at_b(F, dead, step, end_aligned=lambda y: 0.12341)
+    assert IL.dead_at_b(F, {}, step, end_aligned=lambda y: False)
+
+
+def test_c_dead_at_b_narrows_to_the_push_under_lock_kept_yaws():
+    """_c_dead_at_b: the carry yaw offset of the C (C yaw - B yaw, 0 with carry_yaw 'world') feeds the lock's heel-first rule; with the lock
+    off (or not a push) every pair counts; a lock that keeps every yaw or none leaves the judgement to the plain check / the C loop."""
+    step = math.pi / 8
+    g0 = SimpleNamespace(name="g0")
+    F = [(0.0, g0), (math.pi, g0)]
+    cache = {(0, "g0"): None}  # the yaw-0 pair failed at B, the yaw-pi pair never tried
+
+    class _L:
+        _c_dead_at_b = IL.IORSLarge._c_dead_at_b
+        end_aligned_init_yaw = IL.IORSLarge.end_aligned_init_yaw
+
+        def __init__(self, lock, push=True, **gen):
+            self.gp, self.push_under, self._lock, self.rest = _GP(**gen), push, lock, th.tensor([0.0, 0.0, 0.0, 1.0])
+            self.offs = []
+
+        def push_yaw_lock(self):
+            return self._lock
+
+        def push_contact_offset(self, q, d):
+            return None if self.gp.gen("no_offset") else 0.12
+
+        def push_yaw_kept(self, q, d, off):  # keeps the world yaw near pi/2 (the heel first along +y) with a contact offset only
+            self.offs.append(off)
+            yaw = IL.G.yaw_of(q)
+            return off > 0 and abs(math.remainder(yaw - math.pi / 2, 2 * math.pi)) < 0.3
+
+    place = SimpleNamespace(yaw=math.pi / 2, extras={"push_dir": [0.0, 1.0]})
+    manip = SimpleNamespace(yaw=0.0)
+    s = _L("heel_first")
+    assert s._c_dead_at_b(F, cache, place, manip, step) and s.offs == [0.12, 0.12]  # d_yaw pi/2: init yaw 0 kept only, and it failed at B
+    assert not _L(None)._c_dead_at_b(F, cache, place, manip, step)  # no lock: the yaw-pi pair is live
+    assert not _L("heel_first", push=False)._c_dead_at_b(F, cache, place, manip, step)
+    assert not _L("heel_first", carry_yaw="world")._c_dead_at_b(F, cache, place, manip, step)  # d_yaw 0: no init yaw kept -> the C loop's rule
+    s = _L("heel_first", no_offset=True)
+    assert not s._c_dead_at_b(F, cache, place, manip, step) and s.offs == [-1.0, -1.0]  # no contact offset: -1 as the C loop's offs
+    assert _L("heel_first")._c_dead_at_b(F, {(0, "g0"): None, (8, "g0"): None}, place, manip, step)
+
+
+def test_c_skip_dead_b_runs_before_the_push_chain_and_the_f_goal_screen_and_is_opt_in():
+    """The C loop of IORSLarge._couple asks _c_dead_at_b only with generation.c_skip_dead_b, at the top of a C try: before the carry-margin
+    probe, the drop trunks, the chain-first push chains and the F_goal / release-tilt screens."""
+    import inspect
+
+    src = inspect.getsource(IL.IORSLarge._couple)
+    i_skip = src.index("if skip_dead_b and self._c_dead_at_b(F_live, b_ik_cache, place, manip, yaw_step)")
+    assert 'bool(self.gp.gen("c_skip_dead_b", False))' in src
+    for later in ("if base_key in carry_failed_bases", "self._push_under_chain(", "self.release_feasible(", "self.screen_release_tilts("):
+        assert src.index(later) > i_skip, later
+    assert src.index("F_live = [yg for yg in F_init") < i_skip

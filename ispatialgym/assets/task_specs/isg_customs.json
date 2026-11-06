@@ -30469,7 +30469,9 @@
    "base_path_style": "face_travel",
    "_base_path_style_note": "oracle-fix 2026-11-06 (owner feedback on the inside_large#02 demo: \"does this use the same navigation module as camera relocalization? the path doesn't seem smooth\"): the IORS large-scale default (generation_defaults.IORS_LARGE_PATHS) written here for the alias. The empty-handed drives (init -> B) are checked and recorded as the robot.base_path face_travel schedule camera relocalization drives (programs.py Navigate(style=FACE_TRAVEL)), the polyline where the schedule collides.",
    "carried_base_path_style": "face_travel",
-   "_carried_base_path_style_note": "oracle-fix 2026-11-06 (owner feedback on the inside_large#02 demo: \"does this use the same navigation module as camera relocalization? the path doesn't seem smooth\"): the IORS large-scale default (generation_defaults.IORS_LARGE_PATHS) written here for the alias. The carried B -> C leg (record_path: carried legs were always 'recorded') is checked with the jar attached, the carry arms and the carry margin as the face_travel schedule and recorded so where it clears (the polyline where it collides, or where the schedule turns the body more than 10 deg beyond the polyline: face_travel_max_extra_rotation_deg from the defaults). The jar6_s070_s3 0000 carry as recorded: 17.2 s, 3.71 m for 2.73 m straight, 409 deg of rotation for a net -1 deg, the body 59 deg off the travel direction on average; the same polyline as face_travel (offline Motions._base_reference): 9.0 s / 102 deg; the sampler's 1 cm probe found that leg's schedule clear."
+   "_carried_base_path_style_note": "oracle-fix 2026-11-06 (owner feedback on the inside_large#02 demo: \"does this use the same navigation module as camera relocalization? the path doesn't seem smooth\"): the IORS large-scale default (generation_defaults.IORS_LARGE_PATHS) written here for the alias. The carried B -> C leg (record_path: carried legs were always 'recorded') is checked with the jar attached, the carry arms and the carry margin as the face_travel schedule and recorded so where it clears (the polyline where it collides, or where the schedule turns the body more than 10 deg beyond the polyline: face_travel_max_extra_rotation_deg from the defaults). The jar6_s070_s3 0000 carry as recorded: 17.2 s, 3.71 m for 2.73 m straight, 409 deg of rotation for a net -1 deg, the body 59 deg off the travel direction on average; the same polyline as face_travel (offline Motions._base_reference): 9.0 s / 102 deg; the sampler's 1 cm probe found that leg's schedule clear.",
+   "c_skip_dead_b": true,
+   "_c_skip_dead_b_note": "oracle-fix 2026-11-06 (owner: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): skip a C whose every drawable F_init pair already failed its exact IK at B (IORSLarge._c_dead_at_b). fix1 (24 attempts at 875 s, 1 instance in 6.1 GPU-h): 34 of 564 C tries were exhausted by the cached B failures alone, each after its F_goal / release-tilt screens (the attempts' larger cost is the B -> C carry leg: 280 C tries end at 'B -> C path / transition')."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 inside02 inter_object_relation_satisfaction-inside_large_scale#02: jar_of_spaghetti_sauce/exmsmm onto fridge_petcxr_0's 1.20 m shelf (left door open) from breakfast_table_xftrki_0 (0.6 m, sheet ~T3); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone"
@@ -35076,7 +35078,9 @@
    "partner_view_min_points": 1,
    "init_support_max_geodesic_m": 10.0,
    "init_support_fallback": true,
-   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0"
+   "_iors_large_note": "owner 2026-10-12 ~15:55 (iors_large): partner_view_min_points 1, init_support_max_geodesic_m 10.0, init_support_fallback true and max_partner_geodesic_m 10 (was 3.0) for the large-scale picks; floor_init.max_geodesic_m stays 3.0",
+   "c_skip_dead_b": true,
+   "_c_skip_dead_b_note": "oracle-fix 2026-11-06 (owner: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): skip a C whose every drawable F_init pair already failed its exact IK at B (IORSLarge._c_dead_at_b). trainfast pilot3 (6 attempts, 1033 s each, ik_batch 60-70 % of the attempt): 15 of 125 C tries were exhausted by the cached B failures alone, each after its F_goal / release-tilt screens."
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~15:55 iors_large inter_object_relation_satisfaction-ontop_large_scale#01 c2: soap_dispenser/zwudcz onto countertop_fjkase_0 from the floor of utility_room_0; hand-made: ground_isg's grounding of inter_object_relation_satisfaction-ontop_large_scale#01~T5 on the sheet rows (scratch sheet), with inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor's generation block and the iors_large keys; registry mode test, so a re-ground leaves it alone"
@@ -44540,7 +44544,22 @@
     ]
    ],
    "push_under_yaw": "heel_first",
-   "push_under_stroke_m": 0.12
+   "push_under_stroke_m": 0.12,
+   "c_skip_dead_b": true,
+   "_c_skip_dead_b_note": "oracle-fix 2026-11-06 (owner: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): skip a C whose every drawable F_init pair already failed its exact IK at B (IORSLarge._c_dead_at_b; the B side does not depend on C). trainfast crop4 / full4 (5 + 5 attempts, 1748 / 1954 s each, 5 of 10 ending at the 3000 s attempt budget): a B's C loop ran 42 C tries exhausted by 'B: [pre-grasp, grasp] exact IK (cached)' alone (41 of 42), each after its push chains (3.7-4.7 s per chain from the kit's ik + ik_path seconds) and F_goal screen; 365 of attempt 0's 508 chains came after B was dead (~1700 of 3005 s).",
+   "floor_trunks": [
+    [
+     2.0,
+     0.0
+    ],
+    [
+     1.75,
+     0.0
+    ]
+   ],
+   "_floor_trunks_note": "oracle-fix 2026-11-06 (owner: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): the push stance C at the ground trunks only (RB.GROUND_TRUNKS; default FLOOR_TRUNKS adds (0.75 | 0.95, -0.9 | -1.2)). With today's keys (push_under_stand_offs_m 0.76-0.80, heel_first, strokes) no push chain ever solved at a deep trunk: trainfast crop4 / full4 + survey1 1826 deep-trunk chains, 0 solved (every one 'exact IK failed at pose 1 of 4', the blade pre-pose); eval85 stroke_* runs 532 deep-trunk chains, 0 solved, 123 of 123 solved chains at (2.0, 0.0) / (1.75, 0.0); every written instance (trainfast, survey1, eval85 stroke_c1_k0 / c3_k0 / c3_k1, c3_k0) pushes from (2.0, 0.0). The deep trunks were 72-78 % of each long attempt's chains (~1300-1850 s of the 3000 s budget).",
+   "c_tries": 72,
+   "_c_tries_note": "oracle-fix 2026-11-06 (owner: \"start investigating aliases that have low yield & take long time to sample/collect demo, and fix them\"): C tries per (B, arm) loop with floor_trunks at the ground trunks: the default cap max(c_tries 36, side survivors) was 196-224 with the deep-trunk side stances (edge +y: 168, deep only), ~70 of them ground-trunk Cs in travel order; 72 keeps that ground-trunk coverage (without the key the side survivors drop and the cap falls to 36)."
   },
   "constraints": []
  },
