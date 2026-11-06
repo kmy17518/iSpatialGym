@@ -4316,8 +4316,12 @@ def _push_arc_closed_loop(motions: Motions, state, arm: str, obj: str, waypoints
     ctx["push_first_contact"] = {"approach_steps": first_contact, "swept_rad": round(abs(swept()), 4), "approach_total_steps": k}
 
     motions.stop_requested = False
+    # oracle-fix 2026-11-06 (axial#01 / #05, opt-in generation.push_arc_stall_ends_arc): 10 consecutive differential-IK misses at the
+    # arm's reach end (the elbow straight) end the arc instead of failing the push - the residual decides (re-push, re-contact, the goal)
+    stall_ends = bool(variant_generation(ctx).get("push_arc_stall_ends_arc", False))
     gen = motions.arm_arc_closed_loop(arm, geom.pivot, axis, as_world_pose(waypoints[-1]), swept, float(geom.angle), speed=arc_speed,
-                                      band_rad=float(margin) if margin is not None else 0.005, lag_factor=cfg.push_arc_lag_factor)
+                                      band_rad=float(margin) if margin is not None else 0.005, lag_factor=cfg.push_arc_lag_factor,
+                                      **({"stall_ends": True} if stall_ends else {}))
     k = 0
     info: Optional[Dict[str, Any]] = None
     try:
