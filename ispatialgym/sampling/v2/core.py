@@ -1078,7 +1078,7 @@ class SamplerV2(TaskSampler):
                     # arms the departure puts in the arriving stance's posture, so the record carries them - the oracle's navigate keeps an
                     # empty arm at a record's arms_q; without them it re-posed the arm to untucked and the arrival moved it out again
                     # (~360 of 887 steps in 78 / 101 isg-1020 blender-close demos)
-                    if not path.carried and path.arms_q is None:
+                    if not getattr(path, "carried", False) and getattr(path, "arms_q", None) is None:
                         path.arms_q = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
                     return path, dep, self.record_transition(frm, to, trunk_from=travel)
                 except Reject as e:

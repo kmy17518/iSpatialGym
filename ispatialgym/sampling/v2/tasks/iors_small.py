@@ -3904,7 +3904,7 @@ class IORSSmall(SamplerV2):
         as the recorded turn's; the pre-place -> place descent and the lift of ``after_goal_check`` with the object attached; touching:
         the place from the push stance with its retreat clear pose (``place_infeasible_why``) and the carried drive there swept again
         at this turn's lift configuration. None when every check passes, else the first failure."""
-        if any((t.extras or {}).get("backoff_m") for t in self.sidecar.transitions):
+        if any((t.extras or {}).get("backoff_m") for t in getattr(self.sidecar, "transitions", None) or ()):
             # oracle-fix 2026-11-06: the backed-off transition carries the arm to the recorded turn's pre-grasp joints (``arms_q``)
             raise TT.TurnNotOffered("the backed-off init -> manipulation transition carries the arm to this turn's pre-grasp (generation.shelf_backoff_transit_m)")
         tgt, manip = self.obj("target"), self.sidecar.stance("manipulation")
