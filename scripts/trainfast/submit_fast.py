@@ -169,9 +169,13 @@ def submit(a):
             k, v = kv.split("=", 1)
             env[k] = v
         # of-v2maps: the grasp / band source; v2 replaces a registry row's own library (the umbrella's entry is in the campaign library)
-        env["ISGF_GRASPS"] = a.grasps
-        if a.grasps == "v2":
+        env["ISGF_GRASPS"] = "v2" if a.grasps == "v2only" else a.grasps
+        if a.grasps in ("v2", "v2only"):
             env.update(GRASPS_V2)
+        if a.grasps == "v2only":
+            # of-v2maps 2026-11-07 (owner: no legacy band, v2 grasps + v2 reach maps only): every legacy band load / compute is refused
+            # (reach_bands.block_legacy_band -> legacy_band_blocked), a map miss rejects (missing_map), the support policy is on from the start
+            env.update({"ISPATIALGYM_V2_ONLY": "1", "ISPATIALGYM_REACH_MAPS_STRICT": "1", "ISPATIALGYM_SUPPORT_POLICY": "grasp"})
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
@@ -313,7 +317,7 @@ def main():
                    help="the sampler's customs: the snapshot's isg_customs.json (default) or the template's own copy (the counted run's)")
     s.add_argument("--ledger", default=None, help="default: <root>/manifests/allocations.tsv")
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
-    s.add_argument("--grasps", default="legacy", choices=["legacy", "v2"],
+    s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     r = sub.add_parser("recollect")
     r.add_argument("src")

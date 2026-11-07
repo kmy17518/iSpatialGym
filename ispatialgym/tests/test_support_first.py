@@ -72,3 +72,20 @@ def test_v2_rest_h_root_placement_is_opt_in(monkeypatch):
     assert abs(float(p[2]) - (0.75 + 0.0185)) < 1e-6
     p, _ = TT.object_pose_on(s, th.zeros(4, 3), th.tensor([0.0, 0.0, 0.7071, 0.7071]), (0.1, 0.2), 0.3, 0.75)  # an unregistered rest
     assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
+
+
+def test_v2_only_blocks_every_legacy_band(monkeypatch):
+    # of-v2maps 2026-11-07 (owner: no legacy band): ReachBands.load / BandComputer refuse under ISPATIALGYM_V2_ONLY=1
+    import pytest
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    monkeypatch.setenv("ISPATIALGYM_V2_ONLY", "1")
+    with pytest.raises(Reject) as e:
+        RB.ReachBands.load("house_single_floor", "breakfast_table_rhjoby_0", "apple", "apple__x")
+    assert e.value.reason == "legacy_band_blocked"
+    with pytest.raises(Reject):
+        RB.BandComputer(None, None)
+    monkeypatch.delenv("ISPATIALGYM_V2_ONLY")
+    with pytest.raises(FileNotFoundError):  # off: the former behaviour (a cache miss)
+        RB.ReachBands.load("no_such_scene", "no_such_support", "apple", "apple__x", dirs=[])

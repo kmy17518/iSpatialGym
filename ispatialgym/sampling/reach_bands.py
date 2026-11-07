@@ -438,6 +438,25 @@ def _same_scale(a, b) -> bool:
     return all(abs(float(x) - float(y)) < 1e-3 for x, y in zip(a, b)) and len(a) == len(b)
 
 
+
+def v2_only() -> bool:
+    """of-v2maps 2026-11-07 (owner: "our goal is to NOT USE THE LEGACY BAND and only use the v2 grasps and reach bands"; opt-in
+    ``ISPATIALGYM_V2_ONLY=1``, set by ``submit_fast.py --grasps v2only``): every legacy per-scene band - loaded (:meth:`ReachBands.load`)
+    or computed in-process (:class:`BandComputer`) - is refused with ``Reject("legacy_band_blocked")`` naming the band, so an alias that
+    still needs one shows up as v2-blocked instead of running legacy."""
+    return os.environ.get("ISPATIALGYM_V2_ONLY", "") == "1"
+
+
+def block_legacy_band(what: str) -> None:
+    if v2_only():
+        import logging
+
+        from ispatialgym.sampling.sim_utils import Reject
+
+        logging.getLogger("ispatialgym.sampling.v2").info("LEGACY_BAND_BLOCKED %s", what)  # visible even where a caller catches broadly
+        raise Reject("legacy_band_blocked", f"v2 only: {what} needs a legacy per-scene band (no v2 map of this kind)")
+
+
 @dataclass
 class ReachBands:
     """Reachable cells per trunk in base coordinates (x ahead, lateral + = robot's left) at the stance
@@ -599,6 +618,8 @@ class ReachBands:
 
             ReachBands.load(scene, "floor", obj, "generic", under=partner, under_edge=True)
         """
+        block_legacy_band(f"ReachBands.load(scene={scene}, support={support}, object={object}, grasp_key={grasp_key}, mode={mode}, placed={list(placed)}, "
+                          f"surface_z={surface_z}, contact_set={contact_set})")
         paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, arm=arm,
                                 contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs, surface_z=surface_z, support_joints=support_joints)
         if not paths:
@@ -1186,6 +1207,7 @@ class BandComputer:
     TRUNK_BOUND = True
 
     def __init__(self, world, kit, arms: Sequence[str] = ("right",), lattice: float = LATTICE, seeds: int = 12):
+        block_legacy_band(f"BandComputer (an in-process legacy band, arms {list(arms)})")
         from ispatialgym.oracle import r1pro_model as M
         from ispatialgym.sampling import geometry as G
 
