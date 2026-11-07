@@ -29,6 +29,7 @@ import json
 import logging
 import math
 import os
+import re
 import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -64,6 +65,48 @@ SHELF_BACKOFF_WITNESS_GAP_RAD = 0.3
 #: both books' leaning starts pass the side-board rays, the board and the free span (``shelf_wall`` / ``shelf_board`` / ``shelf_width``)
 SHELF_DRAW_TRIES = 8
 SHELF_DRAW_REJECTS = ("shelf_wall", "shelf_board", "shelf_width")
+#: i7-t03 2026-11-08 (owner request item 1, DEFAULT OFF until the owner decides): when the shelf layout's fixed start fails the grasp or the
+#: transit check at a manipulation candidate, the base is moved along the edge - first to the COMPUTED stance (the book at
+#: :data:`SHELF_STANCE_BOOK_LATERAL_M` from the robot's centre line, same stand-off / trunk), then a scan (shifts x ``tabletop.STAND_OFFS``,
+#: the computed stance first) - every stance through the same exact checks (``IORSSmall.shelf_fixed_start``). "1" on, else off.
+SHELF_STANCE_SHIFT_ENV = "ISPATIALGYM_SHELF_STANCE_SHIFT"
+#: the book's lateral from the robot's centre line (m, + = the robot's left) for the LEFT working arm in every written touching_03 demo:
+#: fix1_t03nr x 3 (bay 0, base lateral -0.065) +0.185, fix2_t03init x 4 (bay -0.37, base lateral -0.465) +0.189 / +0.191 / +0.190 / +0.200 -
+#: all at stand-off 0.55, trunk (0.25, 0.0), the book 0.687 m base-forward (``generation.shelf_stance_book_lateral_m``); the right arm mirrored
+SHELF_STANCE_BOOK_LATERAL_M = 0.19
+#: the scan's shifts along the edge (m) relative to the computed stance (``generation.shelf_stance_scan_shifts_m``), x the stand-offs
+SHELF_STANCE_SCAN_SHIFTS_M = (0.0, 0.05, -0.05, 0.10, -0.10)
+#: stances the scan tries per attempt beyond the computed ones (``generation.shelf_stance_scan_max``): each costs a fixed-start grasp check
+SHELF_STANCE_SCAN_MAX = 6
+#: a pre-grasp witness farther than this (largest arm joint, rad) from the transit's start posture is reported as the FLIPPED branch
+SHELF_FLIPPED_REACH_RAD = 2.5
+
+
+def shelf_stance_shift_on() -> bool:
+    """``ISPATIALGYM_SHELF_STANCE_SHIFT`` = "1" (i7-t03 item 1; default off)."""
+    return os.environ.get(SHELF_STANCE_SHIFT_ENV, "").strip().lower() in ("1", "on", "true")
+
+
+def shelf_need_of(err: Reject) -> Optional[str]:
+    """Why a candidate's fixed start failed, for the stance shift: ``"transit"`` (the transit / back-off checks), ``"grasp"`` (no library
+    grasp reaches the fixed start pose), None for anything the base position cannot change (the shift is not tried)."""
+    msg = str(err)
+    if msg.startswith(f"[{err.reason}] "):
+        msg = msg[len(err.reason) + 3:]
+    if err.reason == "grasp_unreachable" and msg.startswith("transit check"):
+        return "transit"
+    if err.reason == "no_transition" and msg.startswith("shelf back-off"):
+        return "transit"
+    if err.reason == "grasp_unreachable":
+        return "grasp"
+    return None
+
+
+def reach_branch(reach: Optional[float]) -> str:
+    """``"flipped"`` / ``"near"`` / ``"-"`` of a transit reach (rad, :data:`SHELF_FLIPPED_REACH_RAD`)."""
+    if reach is None or not math.isfinite(float(reach)):
+        return "-"
+    return "flipped" if float(reach) > SHELF_FLIPPED_REACH_RAD else "near"
 
 
 # i7-contact 2026-11-07: the touching pose rules' constants and hull helpers live in ``contact_poses`` (the sampler and the contact maps share
@@ -2034,6 +2077,7 @@ class IORSSmall(SamplerV2):
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         d = Draft()
+        self._stance_shift_budget = {"scan": 0, "seen": set()}  # i7-t03 item 1: the scan's per-attempt budget
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         init = self.init_stance
         self.sidecar.add_stance(init)
@@ -2106,21 +2150,31 @@ class IORSSmall(SamplerV2):
                 # fixed, its grasp confirmed with nothing ignored (the board above and the side walls are obstacles at the grasp pose)
                 if self.shelf_pose is not None:
                     t_pose = self.shelf_pose
-                    try:
+
+                    def fixed_start(m: Stance, _manip=manip, _pre_open=pre_open, _per_grasp=per_grasp, _default=default) -> GraspRecord:
+                        if m is not _manip:  # i7-t03 item 1: a shifted stance travels from init itself (the candidate's travel is recorded above)
+                            self.sidecar.transitions.clear()
+                            self.record_stance_travel(init, m)
                         # oracle-fix 2026-11-05 (speed, opt-in generation.shelf_transit_per_grasp): the transit check judges each grasp that passes
                         # the IK - the first with a clear transit is taken - instead of failing the stance on the first grasp's transit
-                        accept = (lambda rec: self.shelf_transit_why(manip, rec, default, pre_open)) if per_grasp else None
-                        grasp = TT.grasp_at_pose(self, manip, t_pose, self.grasps, [], self.edge.yaw, arm=default, scale_key=self.choice.models["target"].scale,
-                                                 fingers=pre_open, accept=accept, prescreen=bool(self.gen("fixed_start_prescreen")))
-                        if pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
-                            grasp.extras["preshape_transit"] = True
-                        why_transit = self.shelf_transit_why(manip, grasp, default, pre_open) if (self.gen("shelf_transit_check") and not per_grasp) else None
+                        accept = (lambda rec: self.shelf_transit_why(m, rec, _default, _pre_open)) if _per_grasp else None
+                        g = TT.grasp_at_pose(self, m, t_pose, self.grasps, [], self.edge.yaw, arm=_default, scale_key=self.choice.models["target"].scale,
+                                             fingers=_pre_open, accept=accept, prescreen=bool(self.gen("fixed_start_prescreen")))
+                        if _pre_open is not None:  # oracle-fix 2026-11-04 round 4: checked pre-shaped -> the oracle's transit to the pre-grasp pre-shaped too
+                            g.extras["preshape_transit"] = True
+                        why_transit = self.shelf_transit_why(m, g, _default, _pre_open) if (self.gen("shelf_transit_check") and not _per_grasp) else None
                         if why_transit is not None:
                             raise Reject("grasp_unreachable", why_transit)
                         if self.shelf_backoff_m() > 0.0:
                             # oracle-fix 2026-11-06 (owner feedback on the touching#03 demo, opt-in generation.shelf_backoff_transit_m): the arrival
                             # transition recorded again backed off, the arm carried to the pre-grasp inside it (:meth:`record_shelf_backoff`)
-                            self.record_shelf_backoff(manip, grasp, default, pre_open)
+                            self.record_shelf_backoff(m, g, _default, _pre_open)
+                        return g
+
+                    try:
+                        # i7-t03 2026-11-08 (owner item 1, ISPATIALGYM_SHELF_STANCE_SHIFT, default off): a failure the base position can change
+                        # tries the computed / scanned stances along the edge with the same checks (shelf_fixed_start); off = fixed_start(manip)
+                        manip, grasp = self.shelf_fixed_start(init, cand, manip, default, fixed_start)
                     except Reject as e:
                         if memo_key is not None:
                             self._fixed_start_memo[memo_key] = str(e)[:300]
@@ -3131,6 +3185,142 @@ class IORSSmall(SamplerV2):
             return
         raise Reject(last.reason if last is not None else "shelf_wall", f"shelf_start_draw: no drawn layout of the {TT.side_name(side)} board passes in "
                                                                        f"{int(spec['tries'])} tries ({'; '.join(tried[-3:])})")
+
+    # ------------------------------------------------------------------ the stance shift at the fixed start (i7-t03 2026-11-08, item 1)
+
+    def shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
+        """``[(label, stance, shift_m), ...]`` the stance shift tries for the manipulation candidate ``cand`` (its trunk, the working ``arm``):
+        the COMPUTED stance first - ``cand`` moved along the edge so the fixed start's book lies at ``generation.shelf_stance_book_lateral_m``
+        (:data:`SHELF_STANCE_BOOK_LATERAL_M`; mirrored for the right arm) from the robot's centre line, as ``push_stance_for`` places the push
+        contact, same stand-off and trunk - then the scan: ``generation.shelf_stance_scan_shifts_m`` (relative to the computed lateral) x
+        ``tabletop.STAND_OFFS`` (``cand``'s stand-off first), the computed stance not repeated. ``shift_m`` = the move along the edge from
+        ``cand`` (m, + = the robot's left). Pure geometry: nothing is checked here (:meth:`shelf_stance_ok`)."""
+        if self.shelf_pose is None or cand.edge is None:
+            return []
+        want = float(self.gen("shelf_stance_book_lateral_m", SHELF_STANCE_BOOK_LATERAL_M) or SHELF_STANCE_BOOK_LATERAL_M)
+        want = want if arm == "left" else -want
+        _, lat_book = cand.local(G.t(self.shelf_pose[0])[:2])
+        dlat = float(lat_book) - want  # moving the base +d along the tangent moves the book -d in the robot's frame
+        so0 = float(cand.stand_off if cand.stand_off is not None else TT.STAND_OFF)
+        sos = [so0] + [float(v) for v in TT.STAND_OFFS if abs(float(v) - so0) > 1e-6]
+        shifts = [float(v) for v in (self.gen("shelf_stance_scan_shifts_m") or SHELF_STANCE_SCAN_SHIFTS_M)]
+        out: List[Tuple[str, Stance, float]] = []
+        seen = set()
+        for sh in [0.0] + shifts:
+            for so in sos:
+                key = (round(sh, 4), round(so, 4))
+                if key in seen:
+                    continue
+                seen.add(key)
+                st = cand.shifted(stand_off=so, lateral=float(cand.lateral) + dlat + sh, name="manipulation")
+                out.append(("computed" if not out else "scan", st, round(dlat + sh, 4)))
+        return out
+
+    def _shelf_camera_rule(self, cand: Stance) -> Tuple[float, Any]:
+        """``(max angle rad, boxed(stance, cam, focus))`` - Phase 2's work-camera rule for the class ``cand`` was admitted under: the split
+        cone's work class (``phase2_angle_classes``) for a split-cone survivor (``init_view_angle`` in its extras), else the plain Phase 2's
+        loose class (the split cone's ``fallback_classes_deg`` when it has them); the box = the target's half extent / height around the focus
+        (``default_in_frame``, as Phase 2 without an ``in_frame_fn``)."""
+        classes = TT.phase2_angle_classes(self)
+        opts = TT.split_cone_opts(self)
+        if "init_view_angle" not in cand.extras and opts is not None and opts.get("fallback_classes_deg"):
+            classes = opts["fallback_classes_deg"]
+        half = TT.half_extent(self.hull["target"], self.rest["target"])
+        height = TT.height_of(self.hull["target"], self.rest["target"])
+
+        def boxed(st, cam, focus) -> bool:
+            return bool(TT.default_in_frame(self, st, cam, focus, None, float(half), float(height), TT.IN_FRAME_MARGIN))
+
+        return math.radians(float(classes[1])), boxed
+
+    def shelf_stance_ok(self, st: Stance, cand: Stance, arm: str) -> Tuple[Optional[Stance], str]:
+        """The stance-level checks of a shifted stance, as Phase 2 checked ``cand``: the base on the free floor, whole-body collision-free with
+        ``arm`` working and the other arm in its first collision-free idle posture (``stance_for_arm``), and the work camera's rule
+        (:meth:`_shelf_camera_rule`) at the fixed start (the focus = the book's xy at ``cand``'s focus height). ``(stance, "")`` or
+        ``(None, "floor" | "collision" | "camera")``."""
+        if not self.kit.trav_free(st.base_xy):
+            return None, "floor"
+        st.arms, st.idle_posture = "untucked", None  # stance_for_arm checks (and idles the other arm) only a stance not yet working ``arm``
+        st_arm = TT.stance_for_arm(self, st.with_trunk(st.translate, st.tilt, "manipulation"), arm)
+        if st_arm is None:
+            return None, "collision"
+        TT.adopt_arm(st, st_arm)
+        fz = float(cand.focus[2]) if cand.focus is not None else float(G.t(self.shelf_pose[0])[2])
+        bx = G.t(self.shelf_pose[0])
+        focus = th.tensor([float(bx[0]), float(bx[1]), fz])
+        max_ang, boxed = self._shelf_camera_rule(cand)
+        cam = TT.stance_cameras(self, [st])[0]
+        ang = float(self.world.camera_model.angle_off_axis(cam, focus))
+        if ang > max_ang or not boxed(st, cam, focus):
+            return None, "camera"
+        st.focus = focus
+        st.extras["axis_angle"] = ang
+        return st, ""
+
+    def shelf_fixed_start(self, init: Stance, cand: Stance, manip: Stance, arm: str, try_fn) -> Tuple[Stance, GraspRecord]:
+        """The fixed start's checks at ``manip`` (``try_fn(stance) -> GraspRecord``: the init -> manipulation travel, ``grasp_at_pose`` with
+        every grasp and twin, the transit check, the back-off - :meth:`sample_instance`'s own; ``Reject`` on failure). With the stance shift on
+        (:data:`SHELF_STANCE_SHIFT_ENV`, i7-t03 item 1) a failure the base position can change (:func:`shelf_need_of`) tries the stances of
+        :meth:`shelf_stance_shift` (the same ``try_fn``); a candidate that passes is never shifted. Returns ``(stance, grasp)``."""
+        try:
+            return manip, try_fn(manip)
+        except Reject as e:
+            need = shelf_need_of(e)
+            if not shelf_stance_shift_on() or self.shelf_pose is None or need is None:
+                raise
+            return self.shelf_stance_shift(init, cand, manip, arm, e, need, try_fn)
+
+    def shelf_stance_shift(self, init: Stance, cand: Stance, manip: Stance, arm: str, err: Reject, need: str, try_fn) -> Tuple[Stance, GraspRecord]:
+        """i7-t03 item 1: the shifted stances of :meth:`shelf_shift_stances` in order - the computed stance, then the scan (at most
+        ``generation.shelf_stance_scan_max`` scan stances per attempt, :data:`SHELF_STANCE_SCAN_MAX`; a stance tried earlier in the attempt is
+        not tried again) - each through :meth:`shelf_stance_ok` and ``try_fn`` (the same exact checks as ``manip``); the first that passes is
+        the manipulation stance (``extras["stance_shift"]``: offset, label, need, reach before / after and the witness branch). Kit counters
+        ``stance_shift.need.<grasp|transit>``, ``.computed_tried`` / ``.computed_passed``, ``.scan_tried`` / ``.scan_passed``,
+        ``.rejected.<floor|collision|camera|check>``, ``.offset.<+0.00>``. Raises ``err`` when none passes."""
+        TT._count(self, f"stance_shift.need.{need}")
+        m0 = re.search(r"lies ([0-9.]+) rad", str(err))
+        reach0 = float(m0.group(1)) if m0 else None
+        budget = self.__dict__.setdefault("_stance_shift_budget", {"scan": 0, "seen": set()})
+        scan_max = int(self.gen("shelf_stance_scan_max", SHELF_STANCE_SCAN_MAX) or 0)
+        tried: List[str] = []
+        for label, st, shift in self.shelf_shift_stances(cand, arm):
+            key = (tuple(round(float(v), 3) for v in st.base_pose2d), round(float(st.translate), 3), round(float(st.tilt), 3), arm)
+            if key in budget["seen"]:
+                continue
+            if label == "scan" and budget["scan"] >= scan_max:
+                break
+            budget["seen"].add(key)
+            if label == "scan":
+                budget["scan"] += 1
+            TT._count(self, f"stance_shift.{label}_tried")
+            st.extras.update(cand.extras)
+            st.extras.pop("_position", None)  # the shifted stance's travel is the axis-aligned leg (core.record_stance_travel)
+            st.extras["stance_shift"] = {"label": label, "shift_m": round(float(shift), 4), "stand_off": round(float(st.stand_off or 0.0), 3), "need": need,
+                                         "from_lateral": round(float(cand.lateral), 4), "reach_before_rad": reach0, "branch_before": reach_branch(reach0)}
+            st_ok, why = self.shelf_stance_ok(st, cand, arm)
+            if st_ok is None:
+                TT._count(self, f"stance_shift.rejected.{why}")
+                tried.append(f"{label} {shift:+.2f}/{float(st.stand_off or 0.0):.2f}: {why}")
+                continue
+            try:
+                grasp = try_fn(st_ok)
+            except Reject as e2:
+                TT._count(self, "stance_shift.rejected.check")
+                self.drop_travel_records(init.name, st_ok.name)
+                tried.append(f"{label} {shift:+.2f}/{float(st_ok.stand_off or 0.0):.2f}: [{e2.reason}] {str(e2)[:90]}")
+                continue
+            facts = grasp.extras.get("shelf_transit") or {}
+            reach1 = facts.get("reach_rad")
+            st_ok.extras["stance_shift"].update(reach_after_rad=reach1, branch_after=reach_branch(reach1), grasp=grasp.grasp_name)
+            TT._count(self, f"stance_shift.{label}_passed")
+            TT._count(self, f"stance_shift.offset.{shift:+.2f}")
+            log.info("%s: stance shift (%s, need %s): base moved %+.3f m along the edge at stand-off %.2f (book lateral %+.3f), grasp %s; reach %s (%s) -> %s (%s)%s",
+                     self.gp.variant, label, need, shift, float(st_ok.stand_off or 0.0), float(st_ok.local(G.t(self.shelf_pose[0])[:2])[1]), grasp.grasp_name,
+                     "-" if reach0 is None else f"{reach0:.2f}", reach_branch(reach0), "-" if reach1 is None else f"{float(reach1):.2f}", reach_branch(reach1),
+                     f"; tried before: {'; '.join(tried)}" if tried else "")
+            return st_ok, grasp
+        log.info("%s: stance shift (need %s) found no stance for candidate at lateral %+.3f: %s", self.gp.variant, need, float(cand.lateral), "; ".join(tried) or "none left")
+        raise err
 
     def _fixed_start_memo_key(self, manip: Stance, arm: str, fingers: Optional[float], per_grasp: bool) -> Tuple[Any, ...]:
         """The key of the fixed start's grasp verdict at ``manip`` (``generation.fixed_start_memo``): the base pose, trunk and locked
