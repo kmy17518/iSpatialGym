@@ -556,6 +556,37 @@ sweep, lever, geo = approach + blades), the NMS representatives, and the physics
     entries: the 684 "geometry" drops are all `finger_blade_in_object`.
   - The held-motion thresholds are the tabletop validator's provisional ones.
 
+#### Owner decisions 2026-11-07, item 4 (i7-floating b671313f)
+
+- **The held-motion check matches the task** (`validate_floating` v2). Per (candidate, task), 3 motions are drawn with the sampler's own
+  functions and screening IK:
+  - mental_rotation: `draw_rotation_starts` / `draw_rotation_goals`, keeping goals whose orbit key poses the batch IK reaches from the start;
+  - object_scaling: the depth window, then `draw_start_goal`.
+
+  Each motion closes the gripper at its START configuration with the held sampler's closure and is tracked by `arm_along`. The motions
+  tested are recorded per trial.
+  - Drift is judged by the task's goal tolerance: mental_rotation 0.15 rad, object_scaling max(0.02 m, 0.2 |dd|).
+  - Calibration (`$OFH/floating_20261107/drift_demos.json`): 63 successful collected held-object demos, the largest in-hand drift 0.24 mm /
+    4.4 mrad. All of them pass.
+  - The achieved-vs-candidate offset is recorded, not judged.
+  - Re-validation of the 20 (`val2`):
+    - every entry keeps its valid count;
+    - 23 candidate verdicts changed (mostly `held_motion_unreachable` -> valid), so 9 mental_rotation entries have other rows;
+    - no drop or drift failure: object_scaling 180 / 180 motions ok; mental_rotation 122 ok, 10 unreachable, 12 `ag_not_formed`.
+- **Re-seed** (`graspgen_floating.py --n-points 4096 --n-seeds 4 --num-grasps 4000 --topk 1000`):
+
+  | entry | before (geometry-ok / reps / valid) | after |
+  |---|---|---|
+  | mug | 2 / 1 / 1 | 7 / 5 / 5 |
+  | statue | 2 / 2 / 2 | 20 / 6 / 6 |
+  | teaspoon | 12 / 3 / 1 | 142 / 10 / 3 |
+
+  The teaspoon's other 7 representatives fail the assisted grasp at every drawn start (4-5 mm pinches): a physical limit, not forced.
+- **Statue N 4** (`i7_float4s`): 3 / 3 collected demos ok with no stutter; the 4th errored on a missing `tro_state.json` in the collector.
+  The stutter did not repeat, so there is no sampler or oracle change.
+- **Staged root.** `$OFH/floating_20261107/v2maps_i7float2` = v2maps_i7 + the `val2` entries (the re-seeded mug / statue / teaspoon), with
+  `legacy_keys` links; all 37 links resolve. It rides along in the next scheduled run.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
