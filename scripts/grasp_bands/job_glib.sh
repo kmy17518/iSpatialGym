@@ -19,6 +19,8 @@
 # python -m ispatialgym.grasping.lean manifest), logs glib_lean_<shard>.log; GB_KIND=interior + GB_INTERIOR=<registry name or spec json>
 # (ispatialgym/assets/interiors/interiors.json) = the interior maps of the lean entries at the spec's board height (no anchors / heights):
 #   GB_STAGES="lean maps" GB_KIND=interior GB_INTERIOR=bookcase_kmuacd_0@0.8354 GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<lean jobs.json> ...
+# a STABLE rest in a compartment (the fridge jar, inside_large_scale_02): GB_INTERIOR=<registry.json>::<name> (the interiors measure CLI's file;
+# the spec carries its stand-offs, joints and open-door box), GB_MANIFEST = the stable entry's job
 #SBATCH --job-name=isggb
 #SBATCH --account=vision
 #SBATCH --partition=svl

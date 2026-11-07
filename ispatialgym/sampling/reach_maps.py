@@ -45,7 +45,10 @@ rest's ``board_face_y_m``: the compartment follows the cell laterally), one obje
 toward the robot), cells on the board (``board_x_range``). Every hand / sphere check of a problem runs in its compartment's frame; the
 IK never sees the interior (as a slab map's slab). Meta ``plane: "interior"``, ``interior`` (the spec, its digest), ``lean`` (the rest's
 lean identity + board face) - all in the key; ``ReachMap.find(kind="interior", interior=spec)`` checks them. Config:
-:func:`interior_config` (``n_yaws`` 1, ``x_max_m`` = max d_e + depth, ``interior`` = the spec digest).
+:func:`interior_config` (``n_yaws`` 1, ``x_max_m`` = max d_e + depth, ``interior`` = the spec digest). A STABLE rest in a compartment
+(i7-lean, the fridge jar of inside_large_scale_02): the compartment fixed in the map (lateral centre ``centre_y_m``), the footprint on
+the board and between the walls, the yaw axis kept, the spec's stand-offs (0.35-0.65) and its open-door box (an obstacle at the spec's
+joint values) - meta ``interior_placement`` "fixed" (a lean rest's: "lean_wall").
 
     python -m ispatialgym.sampling.reach_maps bench
     python -m ispatialgym.sampling.reach_maps compute --jobs M.json --glib ROOT --anchors anchors.json [--heights 0.7351 ...] --out MAPS
@@ -138,8 +141,13 @@ CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None, "f
 KINDS = ("tabletop", "brace", "floor", "interior")
 #: the support plane a map's cells stand on (meta ``plane``; a map without the field is a slab map)
 PLANE_OF_KIND = {"tabletop": "slab", "brace": "slab", "floor": "floor", "interior": "interior"}
-#: i7-lean 2026-11-07: the rest kind each map kind is computed at (an interior map at a LEAN rest only, every other kind at a stable rest)
-REST_KIND_OF_KIND = {"tabletop": "stable", "brace": "stable", "floor": "stable", "interior": "lean"}
+#: i7-lean 2026-11-07: the rest kinds each map kind is computed at (a lean rest in interior maps only; an interior map also at a stable rest:
+#: the fridge shelf's jar, inside_large_scale_02)
+REST_KINDS_OF_KIND = {"tabletop": ("stable",), "brace": ("stable",), "floor": ("stable",), "interior": ("stable", "lean")}
+
+
+def rest_kind_ok(kind: str, rest_kind: str) -> bool:
+    return rest_kind in REST_KINDS_OF_KIND.get(kind, ("stable",))
 #: the floor kind (the legacy floor band's raster, ``reach_bands`` floor mode: cells 0.2 m ahead of the base, lateral +-STRIP_HALF_WIDTH):
 #: one "edge distance" 0.0 (no edge: the floor is everywhere), the lattice from FLOOR_X_MIN_M, laterals +-FLOOR_Y_HALF_M, height 0
 FLOOR_EDGE_DISTANCES: Tuple[float, ...] = (0.0,)
@@ -162,13 +170,15 @@ def floor_config(**kw) -> MapConfig:
     return MapConfig(**kw)
 
 
-def interior_config(spec, **kw) -> MapConfig:
-    """i7-lean 2026-11-07: the :class:`MapConfig` of an interior map of compartment ``spec`` (``interiors.InteriorSpec``): one object yaw
-    (the lean rest is measured against its board), the lattice from the nearest front plane to the farthest board back, the spec's digest;
-    ``kw`` sets the other fields (arm, lattice, seeds, edge distances, ...)."""
+def interior_config(spec, rest_kind: str = "lean", **kw) -> MapConfig:
+    """i7-lean 2026-11-07: the :class:`MapConfig` of an interior map of compartment ``spec`` (``interiors.InteriorSpec``) at a ``rest_kind``
+    rest: the spec's stand-offs (``edge_distances``), one object yaw at a LEAN rest (measured against its board; a stable rest keeps the
+    yaw axis), the lattice from the nearest front plane to the farthest board back, the spec's digest; ``kw`` sets the other fields (arm,
+    lattice, seeds, edge distances, ...)."""
     kw = dict(kw)
-    d_es = tuple(kw.pop("edge_distances", MapConfig.edge_distances))
-    cfg = {"n_yaws": 1, "edge_distances": d_es, "x_max_m": round(max(d_es) + float(spec.depth_m), 4), "interior": spec.digest(), **kw}
+    d_es = tuple(kw.pop("edge_distances", tuple(spec.edge_distances)))
+    cfg = {"n_yaws": 1 if rest_kind == "lean" else MapConfig.n_yaws, "edge_distances": d_es, "x_max_m": round(max(d_es) + float(spec.depth_m), 4),
+           "interior": spec.digest(), **kw}
     return MapConfig(**cfg)
 
 
@@ -191,16 +201,22 @@ def lattice(cfg: MapConfig) -> np.ndarray:
 
 
 def support_mask(cells: np.ndarray, reach_back: np.ndarray, edge_distance: float, kind: str = "tabletop", reach_front: Optional[np.ndarray] = None,
-                 interior=None) -> np.ndarray:
+                 interior=None, lateral: Optional[Tuple[np.ndarray, np.ndarray, float]] = None) -> np.ndarray:
     """(C, Y) bool: the object (root at each cell, footprint reaching ``reach_back`` (Y,) toward the robot at each yaw) stands on the
     support. A slab map: the footprint behind the near edge ``edge_distance`` (cell + reach_back >= d_e). A floor map: everywhere (the
     floor has no edge; the lattice starts FLOOR_X_MIN_M ahead of the base). An interior map (i7-lean): the footprint (``reach_back`` ..
-    ``reach_front``) on the compartment's board (``interior.board_x_range(d_e)``)."""
+    ``reach_front``) on the compartment's board (``interior.board_x_range(d_e)``); ``lateral`` = (footprint y min (Y,), y max (Y,), the
+    compartment's lateral centre) - a compartment fixed in the map (a stable rest): the footprint also between its walls."""
     if kind == "floor":
         return np.ones((len(cells), len(reach_back)), dtype=bool)
     if kind == "interior":
         x0, x1 = interior.board_x_range(edge_distance)
-        return ((cells[:, None, 0] + reach_back[None, :]) >= x0) & ((cells[:, None, 0] + np.asarray(reach_front)[None, :]) <= x1)
+        m = ((cells[:, None, 0] + reach_back[None, :]) >= x0) & ((cells[:, None, 0] + np.asarray(reach_front)[None, :]) <= x1)
+        if lateral is not None:
+            ylo, yhi, yc = lateral
+            w = 0.5 * float(interior.width_m)
+            m &= ((cells[:, None, 1] + np.asarray(ylo)[None, :]) >= yc - w) & ((cells[:, None, 1] + np.asarray(yhi)[None, :]) <= yc + w)
+        return m
     return (cells[:, None, 0] + reach_back[None, :]) >= edge_distance
 
 
@@ -570,21 +586,24 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         raise ValueError(f"a floor map's floor_fingers is one of {FLOOR_FINGER_RULES} (got {cfg.floor_fingers!r})")
     if not floor and cfg.floor_fingers is not None:
         raise ValueError(f"floor_fingers is a floor map's field (kind {kind!r}, got {cfg.floor_fingers!r})")
-    # i7-lean 2026-11-07: the rest kind of the map kind (an interior map at a lean rest, every other kind at a stable rest) - never crossed
+    # i7-lean 2026-11-07: the rest kinds of the map kind (a lean rest in interior maps only; every other kind at a stable rest) - never crossed
     r_kind = getattr(rest, "kind", "stable")
-    if r_kind != REST_KIND_OF_KIND[kind]:
-        raise ValueError(f"a {kind} map is computed at a {REST_KIND_OF_KIND[kind]} rest (rest {rest_id!r} of {lib.path} is a {r_kind} rest)")
+    if not rest_kind_ok(kind, r_kind):
+        raise ValueError(f"a {kind} map is computed at a {' / '.join(REST_KINDS_OF_KIND[kind])} rest (rest {rest_id!r} of {lib.path} is a {r_kind} rest)")
     interior_kind = kind == "interior"
+    lean_placed = interior_kind and r_kind == "lean"
+    lean_rec: Dict[str, Any] = {}
     if interior_kind:
         if interior is None:
             raise ValueError("an interior map needs its compartment (interiors.InteriorSpec)")
-        if cfg.interior != interior.digest() or int(cfg.n_yaws) != 1:
+        if cfg.interior != interior.digest() or (lean_placed and int(cfg.n_yaws) != 1):
             raise ValueError(f"an interior map is computed with interior_config(spec) (config interior {cfg.interior!r} / n_yaws {cfg.n_yaws}, spec {interior.digest()})")
         if abs(float(height) - float(interior.height_m)) > 1e-9:
             raise ValueError(f"an interior map is computed at its board height {interior.height_m} (got {height})")
-        lean_rec = getattr(rest, "lean", None) or {}
-        if lean_rec.get("board_face_y_m") is None or lean_rec.get("side") not in ("left", "right"):
-            raise ValueError(f"rest {rest_id!r}: a lean rest record without its side / board face")
+        if lean_placed:
+            lean_rec = getattr(rest, "lean", None) or {}
+            if lean_rec.get("board_face_y_m") is None or lean_rec.get("side") not in ("left", "right"):
+                raise ValueError(f"rest {rest_id!r}: a lean rest record without its side / board face")
     elif interior is not None or cfg.interior is not None:
         raise ValueError(f"interior is an interior map's field (kind {kind!r})")
     # i7-floorfix 2026-11-07: the support (the floor) out of the pre-grasp / grasp IK - the fingers then meet it only through the hull rule
@@ -627,14 +646,16 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         V = np.asarray(geom.union.vertices) @ Rr.T
         reach_back = np.array([float((V @ R.T)[:, 0].min()) for R in Ry])  # most negative x of the footprint at each yaw
         reach_front = np.array([float((V @ R.T)[:, 0].max()) for R in Ry])
+        reach_ylo = np.array([float((V @ R.T)[:, 1].min()) for R in Ry])
+        reach_yhi = np.array([float((V @ R.T)[:, 1].max()) for R in Ry])
     else:
         V = None
-        reach_back = np.zeros(nY)
-        reach_front = np.zeros(nY)
+        reach_back = reach_front = reach_ylo = reach_yhi = np.zeros(nY)
     # i7-lean 2026-11-07: the interior's compartment per problem (its lateral centre follows the cell: the lean-side wall's inner face at
     # cell_y + board_face_y_m); every hand / sphere query of a problem is shifted by it into the compartment frame (the boxes at y = 0)
     yc_dev = None
-    if interior_kind:
+    lateral_fit = None
+    if lean_placed:
         from ispatialgym.sampling import interiors as IN
 
         sg = 1.0 if lean_rec["side"] == "left" else -1.0
@@ -646,6 +667,11 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                                  f"the {interior.width_m} m compartment {interior.name}")
         yc_cell = IN.compartment_offsets(cells[:, 1].astype(float), face, sg, interior.width_m)
         yc_dev = th.as_tensor(np.repeat(yc_cell, nY * nG), dtype=th.float32, device=dev)
+    elif interior_kind:
+        # i7-lean 2026-11-07 (the fridge): a stable rest's compartment is FIXED in the map - its lateral centre at the spec's centre_y_m (a stance
+        # square to the opening's centre), the footprint between its walls (support_mask)
+        yc_dev = th.full((N,), float(interior.centre_y_m), dtype=th.float32, device=dev)
+        lateral_fit = (reach_ylo, reach_yhi, float(interior.centre_y_m))
     tim["targets_s"] = round(time.time() - t0, 3)
     # -- the hand vs the slab per d_e (IK-independent): pre-grasp, approach, grasp, closing sweep
     t0 = time.time()
@@ -722,7 +748,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     # off-support per (d_e, cell, yaw)
     onsup = {}
     for d_e in cfg.edge_distances:
-        m = support_mask(cells, reach_back, d_e, kind, reach_front=reach_front, interior=interior)  # (C, Y)
+        m = support_mask(cells, reach_back, d_e, kind, reach_front=reach_front, interior=interior, lateral=lateral_fit)  # (C, Y)
         onsup[d_e] = th.as_tensor(np.repeat(m[:, :, None], nG, axis=2).reshape(-1), device=dev)
     # -- arm-vs-object planes (object at each cell / yaw): world-frame planes per (cell, yaw) are built on the fly
     pieces = []
@@ -933,11 +959,19 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         meta["plane"] = PLANE_OF_KIND["interior"]
         meta["slab"] = None
         meta["interior"] = interior.to_json()
-        meta["lean"] = {"digest": lean_rec.get("digest"), "tag": lean_rec.get("tag"), "deg": lean_rec.get("deg"), "side": lean_rec.get("side"),
-                        "measured_deg": lean_rec.get("measured_deg"), "board_face_y_m": float(lean_rec["board_face_y_m"]), "board": lean_rec.get("board")}
-        meta["interior_note"] = ("one object yaw (0: the lean rest as measured against its board); the compartment follows the cell laterally "
-                                 "(its lean-side wall's inner face at cell_y + lean.board_face_y_m); the board policed, the other boxes normal "
-                                 "obstacles for every part; hull failures hand_policy, sphere failures slab_spheres, off the board off_support")
+        if lean_placed:
+            meta["lean"] = {"digest": lean_rec.get("digest"), "tag": lean_rec.get("tag"), "deg": lean_rec.get("deg"), "side": lean_rec.get("side"),
+                            "measured_deg": lean_rec.get("measured_deg"), "board_face_y_m": float(lean_rec["board_face_y_m"]), "board": lean_rec.get("board")}
+            meta["interior_placement"] = "lean_wall"
+            meta["interior_note"] = ("one object yaw (0: the lean rest as measured against its board); the compartment follows the cell laterally "
+                                     "(its lean-side wall's inner face at cell_y + lean.board_face_y_m); the board policed, the other boxes normal "
+                                     "obstacles for every part; hull failures hand_policy, sphere failures slab_spheres, off the board off_support")
+        else:
+            meta["interior_placement"] = "fixed"
+            meta["interior_note"] = (f"a stable rest: the compartment fixed in the map, its lateral centre at y = {float(interior.centre_y_m)} (a stance "
+                                     "square to the opening's centre), the footprint on the board and between the walls; the board policed, the other "
+                                     "boxes (board above, walls, back, open doors) normal obstacles for every part; hull failures hand_policy, sphere "
+                                     "failures slab_spheres, off the board / walls off_support")
     if floor:
         # i7-floor 2026-11-07: the support plane is part of the identity (map_key, ReachMap.find); slab maps carry no field (their keys stay)
         meta["plane"] = PLANE_OF_KIND["floor"]
@@ -1018,8 +1052,8 @@ class ReachMap:
             want_interior = interior if isinstance(interior, str) else interior.digest()
         r = (getattr(lib, "rests", None) or {}).get(rest_id)
         r_kind = getattr(r, "kind", "stable") if r is not None else "stable"
-        if r_kind != REST_KIND_OF_KIND.get(kind, "stable"):
-            return None  # i7-lean: a lean rest is looked up in interior maps only, a stable rest never there
+        if not rest_kind_ok(kind, r_kind):
+            return None  # i7-lean: a lean rest is looked up in interior maps only
         want_lean = ((getattr(r, "lean", None) or {}).get("digest")) if r_kind == "lean" else None
         target = height
         if anchors is not None:
@@ -1723,7 +1757,7 @@ def _compute_cli(a):
             print(f"GB_MAP_NOTE {json.dumps({'kind': 'interior', 'note': '--heights / --heights-by-id ignored: an interior map is at its board height'})}", flush=True)
         aset, by_id = None, {}
         anchors = [{"key": f"interior:{spec.name}", "height": float(spec.height_m), "surfaces": [f"{sc}/{nm}" for sc, nm in spec.supports]}]
-        cfg = interior_config(spec, **kw)
+        cfg = interior_config(spec, **kw)  # the world's (arm, batch, seeds); each rest gets its own (one yaw at a lean rest)
     elif floor:
         # i7-floor 2026-11-07: one map per (entry, stable rest, arm) at the floor (h 0, the synthetic FLOOR_ANCHOR); no anchor file, no heights
         if a.heights or a.heights_by_id:
@@ -1752,16 +1786,17 @@ def _compute_cli(a):
         for rid, r in lib.rests.items():
             if not r.stable or not lib.grasps(rid):
                 continue
-            if getattr(r, "kind", "stable") != REST_KIND_OF_KIND[a.kind]:  # i7-lean: lean rests in interior maps only, stable rests in the others
+            if not rest_kind_ok(a.kind, getattr(r, "kind", "stable")):  # i7-lean: lean rests in interior maps only
                 continue
+            cfg_r = interior_config(spec, rest_kind=getattr(r, "kind", "stable"), **kw) if interior_kind else cfg
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
-                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind, cfg.floor_fingers, cfg.interior)
+                if a.skip_existing and any(_map_meta_matches(p, cfg_r.arm, a.kind, cfg_r.floor_fingers, cfg_r.interior)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:
-                    meta, arrays = compute_map(w, lib, rid, float(anc["height"]), anc, geom=geom, cfg=cfg, kind=a.kind,
+                    meta, arrays = compute_map(w, lib, rid, float(anc["height"]), anc, geom=geom, cfg=cfg_r, kind=a.kind,
                                                **({"interior": spec} if interior_kind else {}))
                     p = save(os.path.join(a.out, j["id"]), meta, arrays)
                     nf = {t["key"]: t.get("n_feasible") for t in meta["trunks"] if t.get("eligible")}

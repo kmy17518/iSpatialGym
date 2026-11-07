@@ -1220,7 +1220,7 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
     return map_bands(s, spec, top, arm)
 
 
-def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.ReachBands:
+def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joints: Optional[Dict[str, float]] = None, police: bool = True) -> RB.ReachBands:
     """i7-lean 2026-11-07 (owner decision; prompt I item 7, the INTERIOR kind): the interior reach map of the spec's LEAN rest
     (``reach_maps`` kind ``interior``) inside the compartment the sampler works on, as a band view (``map_sampling.as_bands``, overhang 0:
     the stand-offs = the map's edge distances to the compartment's front plane). The compartment is the registry's spec of the support at
@@ -1229,7 +1229,10 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.
     the compartment digest, the lean identity, the contact policy key, the robot model and ``ISPATIALGYM_REACH_MAP_REQUIRE``. A hit
     registers the board's measured plane for the grasp approach's support policy (the board policed; the walls / board above stay
     obstacles: the support split registered in :func:`support_surface`). Any miss logs one MAP_REQUEST (kind interior) and rejects
-    ``missing_map`` - there is no legacy fallback for a lean rest."""
+    ``missing_map`` - there is no legacy fallback for a lean rest. ``joints`` (the fridge, inside_large_scale_02): the support's joint values
+    (``generation.partner_joint_init`` applied) - the spec must have been measured at them (the door's open box is in its identity).
+    ``police`` False: no support-policy registration (a PLACE band - the goal side of iors_large_inside: the grasp scope never polices it).
+    The entry's rest is the key's (a lean key: its lean rest; a plain key: the stable rest)."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
     from ispatialgym.sampling import interiors as IN
@@ -1240,6 +1243,8 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.
     h = float(top.z) - floor_z
     support, scene = str(getattr(top, "name", "")), str(getattr(s.world, "scene_model", ""))
     req = dict(kind="interior", plane="interior", h=round(h, 4), arm=arm, support=support, scene=scene, grasp_key=spec.grasp_key)
+    if joints:
+        req["joints"] = {str(k): round(float(v), 4) for k, v in joints.items()}
 
     def miss(why: str):
         log.info("interior reach map miss for %s (%s) in %s at h %.4f, %s arm: %s", spec.object, spec.grasp_key, support, h, arm, why)
@@ -1252,11 +1257,11 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.
     lib, rid = ent
     entry = os.path.basename(os.path.dirname(lib.path))
     req.update(entry=entry, rest_id=rid)
-    ispec = IN.spec_for_support(scene, support, h)
+    ispec = IN.spec_for_support(scene, support, h, joints=joints)
     if ispec is None:
-        miss(f"no interior spec of {scene}/{support} at {h:.4f} m ({IN.REGISTRY})")
+        miss(f"no interior spec of {scene}/{support} at {h:.4f} m{f' with joints {joints}' if joints else ''} ({os.environ.get('ISPATIALGYM_INTERIORS') or IN.REGISTRY})")
     req["interior"] = ispec.name
-    why = IN.live_mismatch(ispec, top, floor_z)
+    why = IN.live_mismatch(ispec, top, floor_z, joints=joints)
     if why is not None:
         miss(f"the live interior is not {ispec.name}: {why}")
     if not map_sampling_root():
@@ -1266,9 +1271,10 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.
                             robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec)
     if rm is None:
         miss(f"no map of {ispec.name} ({ispec.digest()}) in {root}")
-    _register_map_policy(s, lib, rid, {support: float(top.z)})
+    if police:
+        _register_map_policy(s, lib, rid, {support: float(top.z)})
     view = MS.as_bands(rm, overhang=0.0)
-    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid})
+    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid, "rest_id": rid})
     log.info("interior reach map hit for %s in %s (%s) at h %.4f, %s arm: %s", spec.object, support, ispec.name, h, arm, rm.path)
     return view
 

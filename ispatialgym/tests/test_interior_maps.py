@@ -81,7 +81,7 @@ def test_interior_config_enters_the_key_and_other_keys_stay():
     assert abs(cells[:, 0].min() - 0.35) < 1e-9 and cells[:, 0].max() <= 0.55 + 0.3056 + 1e-9
     m = RM.support_mask(np.array([[0.50, 0.0], [0.60, 0.0], [0.70, 0.0]]), np.array([-0.085]), 0.45, "interior", reach_front=np.array([0.085]), interior=sp)
     assert m[:, 0].tolist() == [False, True, False]  # the footprint on the board (0.4567 .. 0.7556)
-    assert "interior" in RM.KINDS and RM.PLANE_OF_KIND["interior"] == "interior" and RM.REST_KIND_OF_KIND == {"tabletop": "stable", "brace": "stable", "floor": "stable", "interior": "lean"}
+    assert "interior" in RM.KINDS and RM.PLANE_OF_KIND["interior"] == "interior" and RM.REST_KINDS_OF_KIND == {"tabletop": ("stable",), "brace": ("stable",), "floor": ("stable",), "interior": ("stable", "lean")}
 
 
 # ------------------------------------------------------------------------------------------------------------------ a lean library entry
@@ -227,8 +227,6 @@ def test_compute_never_crosses_rest_kinds(fake_world):
     world, geom, cfg = fake_world
     sp = IN.spec_named(KMUACD)
     anchor = {"key": "x", "height": sp.height_m}
-    with pytest.raises(ValueError, match="lean rest"):
-        RM.compute_map(world, _stable_lib(), "r0", sp.height_m, anchor, geom=geom, cfg=cfg, kind="interior", interior=sp)
     with pytest.raises(ValueError, match="stable rest"):
         RM.compute_map(world, _lean_lib(), LEAN.tag(), 0.8126, anchor, geom=geom, cfg=RM.MapConfig(), kind="tabletop")
     with pytest.raises(ValueError, match="interior_config"):

@@ -778,13 +778,27 @@ class InsideMode:
     def inside_band(self, arm: str) -> Optional[RB.ReachBands]:
         """The goal-side band of ``arm`` (the target on the partner's interior surface, ``surface_z`` = the variant's requested height): the
         arm's own band, else (the other arm) the default arm's mirrored, else None - no band filter, the reach margin orders the trunks.
-        An empty band counts as none. Never computed in-process (a band job publishes it)."""
+        An empty band counts as none. Never computed in-process (a band job publishes it). i7-lean 2026-11-07 (owner: inside_large_scale_02
+        under v2 only): with ``ISPATIALGYM_V2_ONLY`` the arm's own INTERIOR reach map (``tabletop.interior_map_bands``: the partner's
+        compartment spec at the live board height and the applied ``partner_joint_init`` - the open door an obstacle box in it -, the map's
+        stand-offs, the target's v2 stable rest) - a miss rejects ``missing_map``: no legacy band, no mirror, no band-less fallback."""
         memo = self.__dict__.setdefault("_inside_bands", {})
         if arm in memo:
             return memo[arm]
         c = self.choice.models["target"]
         z = float(self.place["z_requested"])
         joints = (self.template_facts.get("partner_joint_init") or {}).get("applied") or None  # the band of the partner with its door open
+        if RB.v2_only():
+            # i7-lean 2026-11-07 (owner: unblock inside_large_scale_02 under v2 only): the arm's own INTERIOR reach map of the target in the
+            # partner's compartment (the registry's spec at the live board height and joint values: walls, back, the board above, the open door;
+            # tabletop.interior_map_bands) - a miss rejects missing_map (no legacy band, no mirror, no band-less fallback)
+            spec = TT.BandSpec(object=f"{c.category}/{c.model}", grasp_key=self.grasp_key, scale=list(c.scale) if c.scale else None, arm=arm)
+            rb = TT.interior_map_bands(self, spec, self.place["top"], arm, joints=joints, police=False)
+            log.info("%s: inside goal-side interior map (%s arm, board %.4f%s): %s", self.gp.variant, arm, float(self.place["z"]),
+                     f", support joints {joints}" if joints else "", rb.meta.get("map_path"))
+            self.template_facts.setdefault("inside_bands", {})[arm] = {**(TT.band_facts(rb) or {}), "interior": rb.meta.get("interior")}
+            memo[arm] = rb
+            return rb
         rb, why = None, ""
         try:
             rb = RB.ReachBands.load(self.world.scene_model, self.partner.name, f"{c.category}/{c.model}", self.grasp_key, scale=c.scale, arm=arm, surface_z=z,
