@@ -318,3 +318,53 @@ def test_real_hand_hulls_against_a_board_and_a_slab():
     c_plane = IK.finger_hull_clearance(hc, T, plane, fq)
     assert c_plane == pytest.approx(float(hc.clearance(T, plane, fq)["finger"][0])) and c_plane == pytest.approx(-0.0015, abs=1e-5)
     assert IK.finger_hull_clearance(hc, T, slab, fq) == pytest.approx(c_plane, abs=1e-5)
+
+
+# ------------------------------------------------------------------------------------------------ the A/B's shadow verdict counter
+
+
+def test_shadow_counts_flipped_verdicts_without_changing_them(monkeypatch, caplog):
+    """ISPATIALGYM_FINGER_TOUCH_SHADOW=1: the other rule judges the same configurations; the active rule still decides. The DEEP hull
+    (2.86 mm in, the spheres clear): the sphere rule passes, geometry refuses - the flipped group counted from either side."""
+    monkeypatch.setenv(IK.FINGER_TOUCH_SHADOW_ENV, "1")
+    for rule, want_ok in (("spheres", True), ("geometry", False)):
+        kit = _kit()
+        with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+            caplog.clear()
+            assert _approach(_checker(kit, rule, _FakeHands(DEEP)), kit).ok is want_ok
+        st = kit.stats
+        assert st.get("finger_touch.decision_changed", 0) >= 1, (rule, st)  # the refusing geometry arm tries the approach twice
+        assert st.get("finger_touch.verdict_changed.spheres_passes", 0) >= 1 and not st.get("finger_touch.verdict_changed.geometry_passes")
+        assert st.get("finger_touch.shadow.checked", 0) >= st.get("finger_touch.verdict_changed")
+        msg = [r.getMessage() for r in caplog.records if "decision changed (shadow)" in r.getMessage()]
+        assert len(msg) == st["finger_touch.decision_changed"] and "finger hulls -2.86 mm" in msg[0] and "body free" in msg[0] and "non-finger links clear" in msg[0], msg
+        if rule == "spheres":
+            # the geometry shadow is quiet: none of its counters or log lines appear under the sphere arm
+            assert not any(k.startswith("finger_touch.geometry.") for k in st), st
+            assert not any(r.getMessage().startswith("approach finger-support touch refused") for r in caplog.records)
+
+
+def test_shadow_agreeing_rules_and_off_by_default(monkeypatch):
+    kit = _kit()
+    monkeypatch.delenv(IK.FINGER_TOUCH_SHADOW_ENV, raising=False)
+    assert _approach(_checker(kit, "spheres", _FakeHands(SHALLOW)), kit).ok
+    assert not any(k.startswith("finger_touch.shadow") or k.startswith("finger_touch.verdict") for k in kit.stats)
+    monkeypatch.setenv(IK.FINGER_TOUCH_SHADOW_ENV, "0")
+    assert not IK.finger_touch_shadow_on()
+    monkeypatch.setenv(IK.FINGER_TOUCH_SHADOW_ENV, "1")
+    kit = _kit()
+    assert _approach(_checker(kit, "geometry", _FakeHands(SHALLOW)), kit).ok
+    assert kit.stats.get("finger_touch.shadow.checked", 0) >= 1 and "finger_touch.verdict_changed" not in kit.stats
+
+
+def test_shadow_failure_never_changes_the_verdict(monkeypatch):
+    monkeypatch.setenv(IK.FINGER_TOUCH_SHADOW_ENV, "1")
+    kit = _kit()
+    ikc = _checker(kit, "spheres", _FakeHands(DEEP))
+
+    def boom(*a, **k):
+        raise RuntimeError("shadow")
+
+    ikc._finger_touch_geometry_ok = boom
+    assert _approach(ikc, kit).ok
+    assert kit.stats.get("finger_touch.shadow.error", 0) >= 1

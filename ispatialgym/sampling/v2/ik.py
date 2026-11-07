@@ -417,6 +417,18 @@ FINGER_TOUCH_RULES = ("spheres", "geometry")
 FINGER_TOUCH_GEOMETRY_VERSION = 1
 
 
+#: i7-fingertouch A/B (2026-11-07, owner part B item 2): ``=1`` judges every configuration the active rule judges under the OTHER rule too
+#: (no verdict changes: the active rule decides) and counts where they disagree - kit counters ``finger_touch.shadow.checked`` /
+#: ``.decision_changed`` (a collision group of a segment whose pass / fail flips) / ``finger_touch.verdict_changed`` (configurations) and
+#: ``.verdict_changed.{geometry,spheres}_passes``, one INFO line per flipped group with the finger hull and sphere clearances; default off
+FINGER_TOUCH_SHADOW_ENV = "ISPATIALGYM_FINGER_TOUCH_SHADOW"
+
+
+def finger_touch_shadow_on() -> bool:
+    """``ISPATIALGYM_FINGER_TOUCH_SHADOW`` set and not ``0`` (the A/B's verdict counter)."""
+    return os.environ.get(FINGER_TOUCH_SHADOW_ENV, "").strip() not in ("", "0")
+
+
 def finger_touch_rule() -> str:
     """``ISPATIALGYM_FINGER_TOUCH_RULE`` (i7-fingertouch 2026-11-07): ``"spheres"`` (unset / empty: the default) or ``"geometry"``;
     ``ValueError`` for anything else (a typo must not run the other arm of the A/B silently)."""
@@ -1741,11 +1753,98 @@ class IKChecker:
         against the support), (c) the finger links - at the oracle's pre-shaped opening when ``FingerTouch.preshape`` - are clear of the world
         at ``margin_m - max_penetration_m`` (the light contact with the support; (a) already holds them clear of everything else).
         i7-fingertouch 2026-11-07: ``FingerTouch.rule == "geometry"`` -> :meth:`_finger_touch_geometry_ok` (the spec's 2 mm on the finger hulls)."""
+        ft = self.finger_touch
+        rule = getattr(ft, "rule", "spheres") if ft is not None else "spheres"
+        if rule == "geometry":
+            ok, pen = self._finger_touch_geometry_ok(qs, arm, ignored, touch)
+        else:
+            ok, pen = self._finger_touch_spheres_ok(qs, arm, ignored, touch)
+        if ft is not None and finger_touch_shadow_on() and int(G.t(qs).shape[0]):
+            try:
+                self._finger_touch_shadow(qs, arm, ignored, touch, rule, ok)
+            except Exception as e:  # noqa: BLE001 - the shadow is a diagnostic: it never changes a verdict or fails the attempt
+                self._count("finger_touch.shadow.error")
+                log.warning("approach finger-support touch shadow failed (%r): the active rule %s decided", e, rule)
+        return ok, pen
+
+    def _finger_touch_shadow(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any], rule: str, ok: th.Tensor) -> None:
+        """i7-fingertouch A/B (``ISPATIALGYM_FINGER_TOUCH_SHADOW=1``): the same configurations under the other rule; counts the
+        configurations (``finger_touch.verdict_changed``, ``.verdict_changed.{geometry,spheres}_passes``) and the collision groups whose
+        pass / fail flips (``finger_touch.decision_changed``: every hit configuration of a group must pass for the segment to go on), and
+        logs each flipped group with the numbers of its first changed configuration (:meth:`_finger_touch_numbers`)."""
+        qs = G.t(qs)
+        if rule == "geometry":
+            other, (ok2, _) = "spheres", self._finger_touch_spheres_ok(qs, arm, ignored, touch)
+        else:
+            other, (ok2, _) = "geometry", self._finger_touch_geometry_ok(qs, arm, ignored, touch, quiet=True)
+        ok, ok2 = ok.to(th.bool).cpu(), ok2.to(th.bool).cpu()
+        self._count("finger_touch.shadow.checked", int(qs.shape[0]))
+        self._count("finger_touch.shadow.groups")
+        diff = ok != ok2
+        nd = int(diff.sum())
+        if not nd:
+            return
+        geo_ok = ok if rule == "geometry" else ok2
+        n_geo = int((diff & geo_ok).sum())
+        self._count("finger_touch.verdict_changed", nd)
+        for key, v in (("geometry_passes", n_geo), ("spheres_passes", nd - n_geo)):
+            if v:
+                self._count(f"finger_touch.verdict_changed.{key}", v)
+        if bool(ok.all()) == bool(ok2.all()):
+            return
+        self._count("finger_touch.decision_changed")
+        i = int(th.nonzero(diff).flatten()[0])
+        nums = self._finger_touch_numbers(qs[i], arm, ignored, touch)
+        log.info("approach finger-support touch decision changed (shadow): %s %s, %s %s the group (%d of %d configurations differ); first: "
+                 "finger hulls %s mm vs %s (cap %.1f mm), finger spheres %s mm (pre-shaped, cap %.1f mm), non-finger links %s, body %s",
+                 rule, "passes" if bool(ok.all()) else "refuses", other, "passes" if bool(ok2.all()) else "refuses", nd, int(qs.shape[0]),
+                 nums["hull_mm"], nums["hull_vs"], nums["hull_cap_mm"], nums["sphere_mm"], nums["sphere_cap_mm"], nums["others"], nums["body"])
+
+    def _finger_touch_numbers(self, q: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Dict[str, Any]:
+        """The A/B's numbers of one approach configuration (both rules' inputs): ``hull_mm`` - the finger hulls' clearance to the touched
+        supports at the rule's opening (mm, < 0 = penetration; None when a support is unmeasured), ``sphere_mm`` - the finger spheres'
+        clearance to the world with ``ignored`` out (mm, bisected to 0.1 mm in [-50, 20]; the sphere rule's quantity), ``others`` - every
+        non-finger link clear of the world at margin 0, ``body`` - the whole body free with ``touch`` out too."""
+        from ispatialgym.grasping import contact_policy as CP
         from ispatialgym.oracle import r1pro_model as M
 
         ft = self.finger_touch
-        if ft is not None and getattr(ft, "rule", "spheres") == "geometry":
-            return self._finger_touch_geometry_ok(qs, arm, ignored, touch)
+        q = G.t(q).reshape(1, -1)
+        opening = ft.opening() if ft.preshape else None
+        q_f = q.clone()
+        grip = self.kit.robot.gripper_control_idx[arm]
+        if opening is not None:
+            q_f[:, grip] = float(opening)
+        geoms = [self._touch_geometry(sp) for sp in touch]
+        hull = None
+        if geoms and all(g is not None for g, _ in geoms):
+            fq = float(opening) if opening is not None else float(q[0, grip].float().mean())
+            T = self._eef_matrix(q[0], arm)
+            hull = min(finger_hull_clearance(self._touch_hand_checker(arm), T, g, (fq, fq)) for g, _ in geoms)
+        fingers = list(M.FINGER_LINKS[arm])
+        with self.ignoring(list(ignored) + list(touch)):
+            body = bool(self.kit.collision_free(q, margin=0.0)[0])
+        with self.ignoring(list(ignored)):
+            others = bool(self.kit.links_clear(q, self._non_finger_links(arm), 0.0)[0])
+            lo, hi = -0.05, 0.02  # links_clear(m) is True for m <= the clearance: bisect the largest such m
+            if bool(self.kit.links_clear(q_f, fingers, hi)[0]):
+                sph = f">= {1000 * hi:.1f}"
+            elif not bool(self.kit.links_clear(q_f, fingers, lo)[0]):
+                sph = f"< {1000 * lo:.1f}"
+            else:
+                while hi - lo > 1e-4:
+                    mid = 0.5 * (lo + hi)
+                    lo, hi = (mid, hi) if bool(self.kit.links_clear(q_f, fingers, mid)[0]) else (lo, mid)
+                sph = f"{1000 * lo:.1f}"
+        return {"hull_mm": "unmeasured" if hull is None else f"{1000 * hull:.2f}", "hull_vs": [d for _, d in geoms],
+                "hull_cap_mm": -1000 * CP.DEFAULT.finger_support_max_penetration_m, "sphere_mm": sph,
+                "sphere_cap_mm": 1000 * (ft.margin_m - ft.max_penetration_m), "others": "clear" if others else "touch", "body": "free" if body else "collides"}
+
+    def _finger_touch_spheres_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
+        """The sphere rule of :meth:`_finger_touch_ok` ((a) - (c) there; ``FingerTouch.rule == "spheres"``, the default)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        ft = self.finger_touch
         qs = G.t(qs)
         out = th.zeros(qs.shape[0], dtype=th.bool)
         fingers = list(M.FINGER_LINKS[arm])
@@ -1772,7 +1871,8 @@ class IKChecker:
                         break
         return ok, pen_mm
 
-    def _finger_touch_geometry_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
+    def _finger_touch_geometry_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any],
+                                  quiet: bool = False) -> Tuple[th.Tensor, float]:
         """i7-fingertouch 2026-11-07 (owner decision: the spec's finger-GEOMETRY rule, P1 §2, replaces the 5 mm on the finger spheres):
         ``(ok (K,) bool, the deepest finger-hull penetration in mm over the passing ones)`` of approach configurations that collide with
         ``touch`` (the grasp's support) while ``ignored`` is out of the world:
@@ -1786,7 +1886,8 @@ class IKChecker:
             registered plane (``support_plane_z``) when it has one, else its convex collision pieces (a vertical board / a sink wall
             through its own faces). A support whose geometry cannot be read fails (c) (counted, one warning).
 
-        The fingers meet the support ONLY through (c) - their spheres are not checked against it. Counters ``finger_touch.geometry.*``."""
+        The fingers meet the support ONLY through (c) - their spheres are not checked against it. Counters ``finger_touch.geometry.*``
+        (``quiet``: neither counters nor the log line - the A/B's shadow evaluation, :meth:`_finger_touch_shadow`)."""
         from ispatialgym.grasping import contact_policy as CP
 
         ft = self.finger_touch
@@ -1797,7 +1898,8 @@ class IKChecker:
         others = self._non_finger_links(arm)
         if ft is None or n == 0 or not others:
             return out, 0.0
-        self._count("finger_touch.geometry.checked", n)
+        count = (lambda *a: None) if quiet else self._count
+        count("finger_touch.geometry.checked", n)
         with self.ignoring(list(ignored) + list(touch)):
             ok = self.kit.collision_free(qs, margin=0.0).clone()
         n_body = int((~ok).sum())
@@ -1827,8 +1929,8 @@ class IKChecker:
         for key, v in (("rejected_body", n_body), ("rejected_non_finger_link", n_links), ("rejected_finger_penetration", len(refused)),
                        ("rejected_unmeasured", unmeasured), ("passed", int(ok.sum()))):
             if v:
-                self._count(f"finger_touch.geometry.{key}", v)
-        if refused:
+                count(f"finger_touch.geometry.{key}", v)
+        if refused and not quiet:
             log.info("approach finger-support touch refused: max penetration %.2f mm (rule geometry: finger hulls, cap %.1f mm; %s fingers vs %s; "
                      "%d of %d configurations)", 1000 * max(refused), 1000 * allow, arm,
                      [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)], len(refused), n)
