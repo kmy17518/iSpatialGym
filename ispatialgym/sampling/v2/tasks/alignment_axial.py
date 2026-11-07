@@ -470,7 +470,7 @@ class AlignmentAxial(SamplerV2):
                             self.kit.sync_world()
                         brace_reason = "present" if brace_found is not None else ("brace_ik_failed" if brace_fails else "brace_sweep_blocked")
                     else:
-                        brace_reason = "no_joint_cell" if not jp["brace_ok"] else "brace_class_failed"
+                        brace_reason = "brace_map_missing" if jp.get("brace_map_missing") else ("no_joint_cell" if not jp["brace_ok"] else "brace_class_failed")
                     dist = abs(d_goal) * float(th.linalg.norm(r_xy))
                     push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pts, d_stop, pitch)
                     push_orient = dec_push
@@ -525,14 +525,10 @@ class AlignmentAxial(SamplerV2):
         return draft
 
     def axial_maps(self):
-        """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm) and ``axial_brace`` map (left arm) at the
-        top (``tabletop.contact_map``); a miss rejects ``missing_map`` (the ``MAP_REQUEST`` line names it)."""
-        pm = TT.contact_map(self, "push_blade", "target", self.top)
-        bm = TT.contact_map(self, "axial_brace", "target", self.top)
-        missing = [k for k, m in (("push_blade", pm), ("axial_brace", bm)) if m is None]
-        if missing:
-            raise Reject("missing_map", f"no {' / '.join(missing)} contact map at {self.top.name}'s height (MAP_REQUEST logged)")
-        return pm, bm
+        """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm: REQUIRED, a miss rejects ``missing_map``)
+        and ``axial_brace`` map (left arm: OPTIONAL, owner 2026-11-07 item 5 - a miss returns None, the brace step is skipped and the push
+        runs by its own rule) at the top (``tabletop.need_contact_map``; both log the ``MAP_REQUEST`` line)."""
+        return TT.need_contact_map(self, "push_blade", "target", self.top), TT.need_contact_map(self, "axial_brace", "target", self.top)
 
     def map_joint_placement(self, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float) -> Dict[str, Any]:
         """The A1 joint placement on the contact maps (``TT.joint_placement``'s dict): the WORK side = the target's root at its init pose in
@@ -548,8 +544,12 @@ class AlignmentAxial(SamplerV2):
             return a is not None and math.copysign(1.0, float(a)) == spin and (t_near is None or abs(abs(float(a)) - t_near) < 1e-4)
 
         w = TT.contact_map_check(pm, manip, pose, keep=keep_push)
-        b = TT.contact_map_check(bm, manip, goal_pose, keep=lambda r: float((r.get("goal") or {}).get("spin", spin)) == spin)
+        if bm is None:  # no axial_brace map: the optional brace step is skipped (push-only), the push placement stands on its own map
+            b = {"ok": False, "why": "no axial_brace map: the optional brace step is skipped (MAP_REQUEST logged)"}
+        else:
+            b = TT.contact_map_check(bm, manip, goal_pose, keep=lambda r: float((r.get("goal") or {}).get("spin", spin)) == spin)
         return {"ok": bool(w["ok"] and b["ok"]), "work_ok": bool(w["ok"]), "brace_ok": bool(b["ok"]), "brace_class_ok": True, "left_band": False,
+                "brace_map_missing": bm is None,
                 "maps": {"push_blade": {k: w.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}, "turn_class_rad": t_near,
                          "axial_brace": {k: b.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}},
                 # the map's class labels are the library's (no band class names: the pitch order and the brace's passing classes keep their defaults)

@@ -4380,13 +4380,9 @@ class IORSSmall(SamplerV2):
 
     def contact_maps_of_pair(self):
         """i7-contact 2026-11-07 (step 3, under v2only): the target's ``touch_push`` map (right arm) and the partner's ``touch_brace`` map
-        (left arm) at the top (``tabletop.contact_map``); a miss rejects ``missing_map`` (the ``MAP_REQUEST`` line names it)."""
-        pm = TT.contact_map(self, "touch_push", "target", self.top)
-        bm = TT.contact_map(self, "touch_brace", "partner", self.top)
-        missing = [k for k, m in (("touch_push", pm), ("touch_brace", bm)) if m is None]
-        if missing:
-            raise Reject("missing_map", f"no {' / '.join(missing)} contact map at {self.top.name}'s height (MAP_REQUEST logged)")
-        return pm, bm
+        (left arm) at the top (``tabletop.need_contact_map``: the brace gate is a REQUIRED step, owner 2026-11-07 item 5 - a miss rejects
+        ``missing_map``, the ``MAP_REQUEST`` line names it)."""
+        return TT.need_contact_map(self, "touch_push", "target", self.top), TT.need_contact_map(self, "touch_brace", "partner", self.top)
 
     def contact_map_gate(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """The A1 joint gate on the contact maps (i7-contact, under v2only): the TARGET's root at its place pose in the ``touch_push`` map

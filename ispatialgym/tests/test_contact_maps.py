@@ -253,3 +253,40 @@ def test_the_touching_gate_and_the_axial_placement_read_their_maps(monkeypatch):
     assert jp["ok"] and jp["work_ok"] and jp["brace_ok"] and jp["left_band"] is False and jp["maps"]["turn_class_rad"] == pytest.approx(0.785)
     assert seen == [("push_blade", ["b@t45"]), ("axial_brace", ["+end+spin_v"])]  # the spin's class at the nearest turn; the spin's brace
     assert jp["classes"] is None and jp["brace_classes"] is None  # the band class orders keep their defaults
+
+
+def test_a_missing_map_skips_an_optional_step_and_rejects_a_required_one(monkeypatch):
+    """Owner decision 2026-11-07 (item 5): under v2only a missing OPTIONAL map (the axial stop brace) skips the step - the placement stands on
+    the push map, the brace reason is ``brace_map_missing``, the skip counted once in ``contact_map_skipped.axial_brace``; a missing REQUIRED
+    map (the axial push, both sides of the touching brace gate) rejects ``missing_map``."""
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    assert set(TT.CONTACT_MAP_OPTIONAL) == {"axial_brace"} and {"touch_push", "touch_brace", "push_blade"} <= set(TT.CONTACT_MAP_REQUIRED)
+    maps = {"push_blade": SimpleNamespace(meta={"kind": "push_blade", "classes": [{"class": "b@t45", "arc_turn_rad": 0.785}]}),
+            "touch_push": SimpleNamespace(meta={"kind": "touch_push", "classes": [{"class": "push_tip_h-"}]}),
+            "touch_brace": SimpleNamespace(meta={"kind": "touch_brace", "classes": [{"class": "brace_wide_h-"}]})}
+    monkeypatch.setattr(TT, "contact_map", lambda s, kind, role, top, arm=None: maps.get(kind))
+    monkeypatch.setattr(TT, "contact_map_check", lambda cm, st, pose, keep=None, tol=0.06: {"ok": True, "why": None, "cell": [0.6, -0.1], "feasible": ["x"]})
+    st = _stance(translate=0.5)
+    pose = (th.tensor([0.6, -0.1, 0.9]), C.IDENTITY_QUAT.clone())
+    ax = SimpleNamespace(top=SimpleNamespace(name="desk_0"), kit=SimpleNamespace(stats={}))
+    ax.axial_maps = lambda: AX.AlignmentAxial.axial_maps(ax)
+    for _ in range(3):
+        jp = AX.AlignmentAxial.map_joint_placement(ax, st, pose, pose, 1.0, 0.8)
+    assert jp["work_ok"] and not jp["brace_ok"] and not jp["ok"] and jp["brace_map_missing"]  # push-only: the brace step skipped
+    assert "skipped" in jp["maps"]["axial_brace"]["why"] and ax.kit.stats == {"contact_map_skipped.axial_brace": 1}
+    maps.pop("push_blade")
+    with pytest.raises(Reject) as ex:
+        AX.AlignmentAxial.axial_maps(ax)
+    assert ex.value.reason == "missing_map"
+    me = SimpleNamespace(top=SimpleNamespace(name="bar_0"), kit=SimpleNamespace(stats={}))
+    assert IS.IORSSmall.contact_maps_of_pair(me) == (maps["touch_push"], maps["touch_brace"])
+    for kind in ("touch_push", "touch_brace"):
+        m = maps.pop(kind)
+        with pytest.raises(Reject) as ex:
+            IS.IORSSmall.contact_maps_of_pair(me)
+        assert ex.value.reason == "missing_map" and kind in str(ex.value)
+        maps[kind] = m
+    assert me.kit.stats == {}  # a required miss is a rejection, not a skip

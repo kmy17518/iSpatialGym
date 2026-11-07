@@ -1404,6 +1404,37 @@ def contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
     return cm
 
 
+#: owner decision 2026-11-07 (item 5): what a missing contact map does under v2only. An OPTIONAL step is skipped (the action runs by its own
+#: rule; the MAP_REQUEST line is still logged and the skip counted in the kit counter ``contact_map_skipped.<kind>``); a REQUIRED step
+#: rejects ``missing_map``. kind -> why
+CONTACT_MAP_OPTIONAL: Dict[str, str] = {
+    "axial_brace": "the axial stop brace is optional (owner 2026-09-16: axial = push-only, the brace recorded only with a joint placement): "
+                   "no map -> no brace, the push runs by its own rule (push-only instance)"}
+CONTACT_MAP_REQUIRED: Dict[str, str] = {
+    "touch_push": "the touching brace gate (owner 2026-11-07 item 5: a required step) - its push side: the push is the task's action",
+    "touch_brace": "the touching brace gate (owner 2026-11-07 item 5: a required step) - its brace side",
+    "push_blade": "the axial push is the task's action: the joint placement's work side decides the target's placement",
+    "floor_push": "the push-under is the task's action (no consumer wired yet: no floor library)"}
+
+
+def need_contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
+    """:func:`contact_map` with the owner's rule for a miss (:data:`CONTACT_MAP_OPTIONAL` / :data:`CONTACT_MAP_REQUIRED`): an optional step's
+    miss returns None (the caller skips the step; the skip counted once per (kind, role, support, arm) in ``contact_map_skipped.<kind>``), a
+    required step's rejects ``missing_map``. Both log the MAP_REQUEST line (:func:`contact_map`)."""
+    cm = contact_map(s, kind, role, top, arm=arm)
+    if cm is not None:
+        return cm
+    if kind in CONTACT_MAP_OPTIONAL:
+        seen = s.__dict__.setdefault("_contact_map_skips", set()) if hasattr(s, "__dict__") else set()
+        ck = (kind, role, str(getattr(top, "name", "")), arm)
+        if ck not in seen:
+            seen.add(ck)
+            _count(s, f"contact_map_skipped.{kind}")
+        log.info("contact map %s of the %s missing: the optional step is skipped (%s)", kind, role, CONTACT_MAP_OPTIONAL[kind])
+        return None
+    _reject("missing_map", f"no {kind} contact map of the {role} at {getattr(top, 'name', '?')}'s height (MAP_REQUEST logged): {CONTACT_MAP_REQUIRED.get(kind, 'required')}")
+
+
 def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06) -> Dict[str, Any]:
     """``ContactMap.lookup`` at ``stance`` for the object at ``pose`` (world): its ROOT xy in the base frame, its yaw from the stance (about z,
     over the rest the map's entries stand on: ``meta["entry_rest_quat_xyzw"]``), the stance's stand-off and trunk; ``tol`` the in-band
