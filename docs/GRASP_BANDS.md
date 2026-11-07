@@ -381,6 +381,29 @@ counted `contact_map_skipped.axial_brace`). Pipeline: `scripts/grasp_bands/job_c
 under `$OFH` only. Run E (2026-11-07): the touching_02 push replay tips (validator friction / mass, not the criterion), the axial replays
 need the task's COM hinge in the validator world (not yet); see `$OFH/DECISIONS.md` 2026-11-07 (i7-contact).
 
+### i7-contact round 2 (2026-11-07 evening: 8e798b51, e99b45a3)
+
+- **Axial brace lookup** (i7_contact: brace present 0 / 11). Not the yaw slot (goal 180.0 deg from the stance, err 0), the trunk (translate
+  exact, tilt nearest), the stand-off (0.35 / 0.45 / 0.55 = the map's edge distances) or the cell (goal roots x 0.79-0.94, y -0.29..0.00, all
+  within 6 cm of a cell). The maps held only the `+end+spin` classes: the validator's 48-entry cap round-robined per yaw over a library
+  ordered yaw -> end -> spin -> class (6 `+end+spin` per yaw), the maps take the validated entries, and the joint placement tested both ends
+  against the same classes. At goal yaw 180 the `+end`'s stop face is the far face of the robot-right end: ik_pre / reach_bound for the
+  left arm at all 11 roots (the `-end`, by symmetry the `+end` at yaw 0, is feasible at 7 / 11). Fix: `map_joint_placement(end_sign)` keeps
+  the classes of the pair's end and spin (`contact_maps.axial_end_spin`, the map library's `long_axis` in meta `library.params`);
+  `validate_contacts.entry_order` round-robins (yaw, end-spin group); `--skip-validated` keeps an earlier run's verdicts uncounted.
+- **axial_02**: paperback jhaltj at its spawn scale s1x1x2.5 - v2 export (`glib_jobs_axial02_20261107.json`, job_glib.sh) and a manifest
+  entry in `contact_jobs_axial_20261107.json`.
+- **Friction** (touching_02 push replay, `set_slab_friction`): mu 0.50 (= the PhysX default) tips 0.463 rad as unbound; mu <= 0.30 passes
+  (tilt 0.000, gap <= 2 mm).
+- **touching_02 contact_unreachable** (`TOUCH_PUSH_DIAG`): the placed target's root lies 0.80-0.92 m ahead of the push stance; the
+  `touch_push` map has no feasible class there (feasible x <= 0.75 m at trunk (0.25, -0.3), <= 0.83 m at (0.0, -0.6)) and the exact chain
+  agrees (the 7 unscreened classes fail the IK at their pre-pose, the 8 others the hand screen). The map gate's push side is not enforced
+  (`_brace_gate ok False` and the partner pose is kept), so the attempt dies ~30 s later in goal_check.
+- **Hand-overlap screen** (owner item 3): the hand model is the real gripper (base plate +-54 mm vs the knuckle spheres +-57 mm); the
+  overlaps are real; physically valid napkins 42 / 48, cereal 2 / 9, spray 1 / 23, the napkins' screened pushes load the box into the slab
+  with 143 N median (live 4 N). Default-off switches: `ISPATIALGYM_HAND_OVERLAP_RANK=1` (sampler: the overlap ranks, not rejects) and
+  `validate_contacts --screen-as-rank`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
