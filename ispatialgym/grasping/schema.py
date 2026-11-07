@@ -103,10 +103,12 @@ def model_id(category: str, model: str, scale=None) -> str:
     return f"{category}__{model}__{scale_tag(scale)}"
 
 
-def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None, overhang=None) -> str:
+def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None, overhang=None,
+             validate_arm: Optional[str] = None) -> str:
     """Library entry id: ``<category>__<model>__<scale tag>`` + ``__<constraint>`` (non-tabletop) + ``__r<digest>`` (a designated
     non-canonical rest) + ``__<lean tag>`` (i7-lean: a lean rest, ``lean.LeanSpec.tag``) + ``__<overhang tag>`` (i7-overhang: an overhang
-    rest, ``overhang.OverhangSpec.tag``) - one directory per (model, scale, constraint, designated rest, lean / overhang rest)."""
+    rest, ``overhang.OverhangSpec.tag``) + ``__val<arm>`` (i7-overhang: a LEAN entry validated with an arm other than the right one,
+    ``validate_arm``) - one directory per (model, scale, constraint, designated rest, lean / overhang rest, validating arm)."""
     out = model_id(category, model, scale)
     if constraint and constraint != "tabletop":
         out += f"__{constraint}"
@@ -120,12 +122,14 @@ def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop"
         from ispatialgym.grasping import overhang as OV
 
         out += "__" + OV.OverhangSpec.from_json(overhang).tag()
+    if validate_arm not in (None, "right"):
+        out += f"__val{validate_arm}"
     return out
 
 
 def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None,
-              overhang=None) -> str:
-    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang))
+              overhang=None, validate_arm: Optional[str] = None) -> str:
+    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang, validate_arm))
 
 
 def job_lean(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -138,9 +142,16 @@ def job_overhang(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return job.get("overhang") if job.get("rest_kind") == "overhang" and isinstance(job.get("overhang"), dict) else None
 
 
+def job_validate_arm(job: Dict[str, Any]) -> Optional[str]:
+    """The arm a LEAN job is physics-validated with (``validate_arm``, i7-overhang 2026-11-07 owner decision: a left-arm lean validator),
+    None for the right arm and for every other job (their directories as before)."""
+    a = job.get("validate_arm")
+    return a if job.get("rest_kind") == "lean" and a not in (None, "right") else None
+
+
 def job_dir(job: Dict[str, Any], root: Optional[str] = None) -> str:
     return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"), job_lean(job),
-                     job_overhang(job))
+                     job_overhang(job), job_validate_arm(job))
 
 
 def digest(obj: Any, n: int = 12) -> str:
@@ -359,7 +370,10 @@ class ModelLibrary:
                 d.update({"rest_kind": r.kind, "lean": ln.get("digest"), "board_face_y_m": None if ln.get("board_face_y_m") is None else round(float(ln["board_face_y_m"]), 6)})
             return d
 
-        return {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
+        extra = {}
+        if self.data.get("validate_arm") not in (None, "right"):  # i7-overhang: a lean entry validated with the left arm (right ones as before)
+            extra["validate_arm"] = self.data["validate_arm"]
+        return {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale), **extra,
                 "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
                 "rests": {k: rest_ident(r) for k, r in self.rests.items()},
                 "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
@@ -407,11 +421,12 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
 
 
 def load_model(category: str, model: str, scale=None, root: Optional[str] = None, *, constraint: str = "tabletop", rest_hint_wxyz=None,
-               require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None) -> Optional[ModelLibrary]:
+               require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None,
+               validate_arm: Optional[str] = None) -> Optional[ModelLibrary]:
     """The v2 entry of (category, model, scale, constraint, designated rest[, lean rest]), checked against ``require`` (kwargs of
     :func:`check_compatible`); None when there is no v2 entry - a legacy library entry is never substituted (it has no measured rest).
     ``lean`` (i7-lean): the lean entry of that spec (its own directory); ``overhang`` (i7-overhang): the overhang entry of that spec."""
-    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang)
+    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang, validate_arm)
     data = load_json(os.path.join(d, "library.json"))
     if data is None:
         return None

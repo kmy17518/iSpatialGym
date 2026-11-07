@@ -296,15 +296,22 @@ def base_quat(job: Dict[str, Any]) -> np.ndarray:
     return np.array([0.0, 0.0, 0.0, 1.0]) if q is None else xyzw(q)
 
 
-def make_job(base_job: Dict[str, Any], spec: LeanSpec, q_up_xyzw, *, base_key: Optional[str] = None, base_facts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def make_job(base_job: Dict[str, Any], spec: LeanSpec, q_up_xyzw, *, base_key: Optional[str] = None, base_facts: Optional[Dict[str, Any]] = None,
+             validate_arm: str = "right") -> Dict[str, Any]:
     """The pipeline job of one lean rest of ``base_job``'s model (same category / model / scale / dataset): its own entry id
     (``schema.entry_id(..., lean=)``), ``rest_kind: "lean"``, the spec, the upright start orientation, the stable / legacy key it leans
-    (``lean_keys``: the sampler's lookup; ``legacy_key`` stays None, so no stable lookup ever lists the entry)."""
+    (``lean_keys``: the sampler's lookup; ``legacy_key`` stays None, so no stable lookup ever lists the entry). ``validate_arm`` (i7-overhang
+    2026-11-07, owner decision: a LEFT-arm validator for lean rests): the arm its candidates are generated for and its physics trials run
+    with (``pipeline lean --arm``); a left one is recorded in the job / entry and its id (``__valleft``)."""
     j = {k: base_job.get(k) for k in ("category", "model", "scale", "dataset") if k in base_job}
     j.update({"constraint": "tabletop", "rest_hint_wxyz": None, "rest_kind": REST_KIND_LEAN, "lean": spec.to_json(), "lean_base_wxyz": wxyz(q_up_xyzw),
               "lean_base": dict(base_facts or {}), "lean_keys": [base_key] if base_key else [], "legacy_key": None, "kind": "lean", "source": "lean"})
+    if validate_arm not in ("right", "left"):
+        raise ValueError(f"validate_arm must be right or left, got {validate_arm!r}")
+    if validate_arm != "right":
+        j["validate_arm"] = validate_arm
     j["scale"] = list(S.canonical_scale(j.get("scale")))
-    j["id"] = S.entry_id(j["category"], j["model"], j["scale"], "tabletop", None, lean=j["lean"])
+    j["id"] = S.entry_id(j["category"], j["model"], j["scale"], "tabletop", None, lean=j["lean"], validate_arm=j.get("validate_arm"))
     return j
 
 
@@ -343,13 +350,18 @@ def legacy_upright(key: str, root: Optional[str] = None) -> Tuple[Dict[str, Any]
     return base, upright(q), facts
 
 
-def manifest(keys: Sequence[str], degs: Sequence[float], side: str, board: Board = Board(), gap_m: float = 0.002) -> List[Dict[str, Any]]:
+def manifest(keys: Sequence[str], degs: Sequence[float], side: str, board: Board = Board(), gap_m: float = 0.002, validate_arm: str = "right") -> List[Dict[str, Any]]:
     out = []
     for k in keys:
         base, q_up, facts = legacy_upright(k)
         for d in degs:
-            out.append(make_job(base, LeanSpec(float(d), side, board, gap_m), q_up, base_key=k, base_facts=facts))
+            out.append(make_job(base, LeanSpec(float(d), side, board, gap_m), q_up, base_key=k, base_facts=facts, validate_arm=validate_arm))
     return out
+
+
+def job_arm(job: Dict[str, Any]) -> str:
+    """The arm a lean job is validated with (``validate_arm``; right when absent)."""
+    return str(job.get("validate_arm") or "right")
 
 
 def main(argv=None):
@@ -363,9 +375,10 @@ def main(argv=None):
     m.add_argument("--board-height", type=float, default=Board.height_m)
     m.add_argument("--board-depth", type=float, default=Board.depth_m)
     m.add_argument("--gap", type=float, default=0.002)
+    m.add_argument("--validate-arm", default="right", choices=["right", "left"], help="the arm the lean rest is validated with (pipeline lean --arm)")
     m.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    jobs = manifest(a.legacy_key, a.deg, a.side, Board(a.board_thickness, a.board_height, a.board_depth), a.gap)
+    jobs = manifest(a.legacy_key, a.deg, a.side, Board(a.board_thickness, a.board_height, a.board_depth), a.gap, a.validate_arm)
     S.save_json(a.out, jobs)
     for j in jobs:
         print(j["id"], j["lean"]["tag"])

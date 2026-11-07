@@ -54,9 +54,12 @@ if [[ " $STAGES " == *" glib "* ]]; then
 fi
 if [[ " $STAGES " == *" lean "* ]]; then
   t0=$(date +%s)
-  python -u -m ispatialgym.grasping.pipeline lean --jobs $M --root $OUT/glib --shard $I/$N --workers ${SLURM_CPUS_PER_TASK:-8} >> $OUT/logs/glib_lean_$I.log 2>&1
+  # i7-overhang 2026-11-07: GB_VAL_ARM (default right) = the lean validation world's arm (left: the left-arm validator, the manifest's lean
+  # jobs with validate_arm left; logs glib_lean_<shard>_left.log)
+  VA=${GB_VAL_ARM:-right}; LSFX=$([ "$VA" = right ] && echo "" || echo "_$VA")
+  python -u -m ispatialgym.grasping.pipeline lean --arm $VA --jobs $M --root $OUT/glib --shard $I/$N --workers ${SLURM_CPUS_PER_TASK:-8} >> $OUT/logs/glib_lean_$I$LSFX.log 2>&1
   rc=$?
-  grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_lean_$I.log || rc=${rc/#0/1}
+  grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_lean_$I$LSFX.log || rc=${rc/#0/1}
   [ $KIT_RC = 0 ] && KIT_RC=$rc
   echo "GB_STAGE lean rc=$rc s=$(( $(date +%s) - t0 ))"
 fi

@@ -820,6 +820,12 @@ class TabletopWorld:
         return np.linalg.inv(S.pose_mat(p.numpy(), q.numpy())) @ S.pose_mat(ep.numpy(), eq.numpy())
 
 
+def mirrored_offsets(offsets: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:
+    """``ValidateConfig.base_offsets`` (the object to the robot's RIGHT, for the right arm) mirrored to the robot's left for the LEFT arm
+    (i7-overhang 2026-11-07: the left-arm lean validator; ``validate_artic.mirrored_offsets``'s rule)."""
+    return tuple((float(x), -float(y)) for x, y in offsets)
+
+
 def _box_distance_2d(sup: CP.Support, x: float, y: float) -> float:
     cx, cy = sup.centre[0], sup.centre[1]
     hx, hy = sup.half[0], sup.half[1]
@@ -843,10 +849,21 @@ def _Rang(A, B) -> float:
 # ------------------------------------------------------------------------------------------------ one model
 
 
+def check_job_arm(job: Dict[str, Any], arm: str) -> None:
+    """i7-overhang 2026-11-07: a LEAN job is validated with its own arm only (``validate_arm``, right when absent; the left-arm validator:
+    ``pipeline lean --arm left``); every other job with the right arm. ``ValueError`` otherwise (nothing loaded)."""
+    from ispatialgym.grasping import lean as LN
+
+    want = LN.job_arm(job) if LN.is_lean_job(job) else "right"
+    if want != arm:
+        raise ValueError(f"{job.get('id')}: validated with the {want} arm, the validation world's arm is {arm} (left: lean jobs only)")
+
+
 def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict[str, Any]:
     """Rest, placement and trials of one model; writes ``rests.json``, ``validation.json`` and ``library.json``."""
     cfg = world.cfg
     t0 = time.time()
+    check_job_arm(job, cfg.arm)
     cand_doc = S.load_json(os.path.join(model_dir, "candidates.json"))
     if cand_doc is None:
         raise FileNotFoundError(f"{model_dir}: no candidates.json")
@@ -962,14 +979,14 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
     S.save_json(os.path.join(model_dir, "rests.json"), {"schema": S.REST, "rests": rests})
     S.save_json(os.path.join(model_dir, "validation.json"), {"schema": S.TRIAL, "validator": VALIDATOR_VERSION, "config": asdict(cfg),
                                                              "policy_key": world.policy.key(cfg.arm), "trials": trials, "timing": timing, "created": S.now()})
-    lib = build_library(job, cand_doc, rests, trials, world.policy, world.physics_profile)
+    lib = build_library(job, cand_doc, rests, trials, world.policy, world.physics_profile, validate_arm=cfg.arm)
     S.save_json(os.path.join(model_dir, "library.json"), lib)
     return {"id": job.get("id"), "n_reps": len(reps), "n_valid": sum(1 for t in trials if t.get("verdict") == "valid"), "timing": timing,
             "rests": {k: {"stable": v["stable"], "h_root": v["h_root"], "tilt": v["tilt_from_intended_rad"]} for k, v in rests.items()},
             "reasons": [t.get("reasons") or t.get("error") for t in trials if t.get("verdict") != "valid"]}
 
 
-def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physics_profile) -> Dict[str, Any]:
+def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physics_profile, validate_arm: str = "right") -> Dict[str, Any]:
     by_name = {c["name"]: c for c in cand_doc["candidates"]}
     grasps = []
     for t in trials:
@@ -994,6 +1011,8 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
         # i7-lean 2026-11-07: a lean entry - its kind, its lean identity and the keys it leans (the sampler's lean index, never legacy_key)
         extra = {"rest_kind": "lean", "lean": job["lean"], "lean_keys": list(job.get("lean_keys") or []), "lean_base_wxyz": job.get("lean_base_wxyz"),
                  "lean_base": job.get("lean_base")}
+        if validate_arm != "right":  # i7-overhang: the arm the lean rest was validated with (in the entry id and the identity)
+            extra["validate_arm"] = validate_arm
     return {"schema": S.LIBRARY, **extra, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
             "dataset": job.get("dataset"), "constraint": job.get("constraint"), "legacy_key": job.get("legacy_key"), "arm": policy_arm(cand_doc),
             "policy_key": policy.key(policy_arm(cand_doc)), "policy": policy.meta(policy_arm(cand_doc)), "physics_profile": physics_profile,

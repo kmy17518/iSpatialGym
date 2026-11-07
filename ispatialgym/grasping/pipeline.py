@@ -4,7 +4,7 @@
     python -m ispatialgym.grasping.pipeline candidates --jobs M.json [--workers 8]                  # CPU: candidates + families
     python -m ispatialgym.grasping.pipeline validate   --jobs M.json [--shard i/n]                  # GPU: rests + physics trials
     python -m ispatialgym.grasping.pipeline all        --jobs M.json [--only ID ...]                # the three, one process (pilots)
-    python -m ispatialgym.grasping.pipeline lean       --jobs M.json [--shard i/n]                  # GPU: the lean jobs end to end
+    python -m ispatialgym.grasping.pipeline lean       --jobs M.json [--shard i/n] [--arm left]     # GPU: the lean jobs end to end
     python -m ispatialgym.grasping.pipeline overhang   --jobs M.json [--shard i/n]                  # GPU: the overhang jobs end to end
     python -m ispatialgym.grasping.pipeline summary    --jobs M.json
 
@@ -21,6 +21,12 @@ the ``overhang`` stage settles each overhang job's object on the slab whose edge
 that slab. ``all`` runs it between export and candidates for the manifest's overhang jobs; ``overhang`` runs export + overhang settle +
 candidates + validate for the overhang jobs only (``job_glib.sh`` ``GB_STAGES=overhang``). Overhang jobs skip the settle-first survey and the
 measured-rest retry.
+
+Left-arm lean validation (i7-overhang 2026-11-07, owner decision; lean rests only): ``lean --arm left`` runs the validation world with the
+LEFT arm and the object mirrored to the robot's left (``validate_tabletop.mirrored_offsets``, as ``validate_artic motions --arm left``),
+generates the lean jobs' candidates for the left hand and validates only the manifest's lean jobs whose ``validate_arm`` is that arm
+(``lean manifest --validate-arm left``: their own entries ``...__valleft``, the arm in the library and its identity). Every other stage
+and job runs the right arm as before.
 
 ``--root`` (default ``ISPATIALGYM_GRASP_LIBRARY_V2`` or ``runlogs/grasp_library_v2``) holds ``models/<entry id>/``; finished stages are
 skipped per model (``--force`` redoes them). Every stage appends one json line per model to ``<root>/logs/<stage>_<shard>.jsonl``
@@ -111,7 +117,7 @@ def validate_overrides():
 
 
 def _cand_one(payload):
-    j, root, force = payload
+    j, root, force = payload[:3]
     from ispatialgym.grasping import candidates as CA
     from ispatialgym.grasping import lean as LN
 
@@ -125,7 +131,9 @@ def _cand_one(payload):
         return {"id": j["id"], "ok": True, "skipped": True}
     try:
         cfg, densify = candidate_overrides()
-        out = CA.generate(j, d, cfg=cfg, densify=densify)
+        # i7-overhang: a lean job validated with the left arm gets the left hand's candidates (every other job: the right hand as before)
+        arm = LN.job_arm(j) if LN.is_lean_job(j) else "right"
+        out = CA.generate(j, d, cfg=cfg, densify=densify, arm=arm)
         n_ok = sum(1 for c in out["candidates"] if c["geometry"]["ok"])
         fams = out["families"]
         return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "n_candidates": len(out["candidates"]), "n_geometry_ok": n_ok,
@@ -153,9 +161,16 @@ def stage_candidates(args, jobs):
 
 
 def _world(args):
+    from dataclasses import replace
+
     from ispatialgym.grasping import validate_tabletop as VT
 
-    return VT.TabletopWorld(validate_overrides())  # of-v2maps 2026-11-07: ISG_GLIB_VAL_OVERRIDES (default: ValidateConfig())
+    cfg = validate_overrides()  # of-v2maps 2026-11-07: ISG_GLIB_VAL_OVERRIDES (default: ValidateConfig())
+    arm = getattr(args, "arm", None) or "right"
+    if arm != "right":
+        # i7-overhang 2026-11-07 (owner: a left-arm validator for lean rests): the left arm, the object mirrored to the robot's left
+        cfg = replace(cfg, arm=arm, base_offsets=VT.mirrored_offsets(cfg.base_offsets))
+    return VT.TabletopWorld(cfg)
 
 
 def stage_validate(args, jobs, world=None):
@@ -420,7 +435,11 @@ def main(argv=None):
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--arm", default="right", choices=["right", "left"],
+                    help="the validation world's arm (i7-overhang: left for the lean stage only - the lean jobs whose validate_arm is left)")
     args = ap.parse_args(argv)
+    if args.arm != "right" and args.stage not in ("lean", "summary"):
+        raise SystemExit(f"--arm {args.arm}: the left-arm validator is for the lean stage only (owner 2026-11-07: lean rests only)")
     jobs = _jobs(args)
     if args.stage == "summary":
         summary(args, jobs)
@@ -431,7 +450,10 @@ def main(argv=None):
         from ispatialgym.grasping import lean as LN
 
         jobs = [j for j in jobs if LN.is_lean_job(j)]
-        print(f"GB_LEAN_JOBS {len(jobs)}", flush=True)
+        # i7-overhang: the lean jobs validated with this run's arm (``--arm``; a job's ``validate_arm``, right when absent)
+        skipped = [j["id"] for j in jobs if LN.job_arm(j) != args.arm]
+        jobs = [j for j in jobs if LN.job_arm(j) == args.arm]
+        print(f"GB_LEAN_JOBS {len(jobs)} (arm {args.arm}{f'; other arms skipped: {skipped}' if skipped else ''})", flush=True)
     if args.stage == "overhang":
         # i7-overhang 2026-11-07: the manifest's overhang jobs end to end (export, the settle at the slab edge, candidates, validation)
         from ispatialgym.grasping import overhang as OV

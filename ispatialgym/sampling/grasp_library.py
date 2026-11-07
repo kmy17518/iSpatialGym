@@ -256,7 +256,8 @@ def v2_entry(key: str):
         d = json.load(f)
     lib = S.load_model(d["category"], d["model"], d.get("scale"), root, constraint=d.get("constraint") or "tabletop",
                        rest_hint_wxyz=d.get("rest_hint_wxyz") if "rest_hint_wxyz" in d else _v2_hint(p),
-                       lean=d.get("lean") if tag is not None else None, overhang=d.get("overhang") if otag is not None else None)
+                       lean=d.get("lean") if tag is not None else None, overhang=d.get("overhang") if otag is not None else None,
+                       validate_arm=d.get("validate_arm") if tag is not None else None)
     _check_v2_policy(lib, d)
     return lib
 

@@ -1886,7 +1886,7 @@ def _compute_cli(a):
     for j in jobs:
         anchors_j = [x for x in aset.anchors if x["key"] in set(by_id[j["id"]])] if (aset is not None and j["id"] in by_id) else anchors
         lib = S.load_model(j["category"], j["model"], j.get("scale"), a.glib, constraint=j.get("constraint") or "tabletop", rest_hint_wxyz=j.get("rest_hint_wxyz"),
-                           lean=S.job_lean(j), overhang=S.job_overhang(j))  # i7-lean / i7-overhang: a lean / overhang job's own entry
+                           lean=S.job_lean(j), overhang=S.job_overhang(j), validate_arm=S.job_validate_arm(j))  # i7-lean / i7-overhang: a lean / overhang job's own entry
         if lib is None or not lib.grasps():
             print(f"GB_MAP {json.dumps({'id': j['id'], 'ok': False, 'reason': 'no v2 library entry with validated grasps'})}", flush=True)
             continue
