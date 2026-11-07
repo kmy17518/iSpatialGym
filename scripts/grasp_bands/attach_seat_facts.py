@@ -50,6 +50,13 @@ def main(argv=None):
     t0 = time.time()
     env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120}, "scene": {"type": "Scene"}})
     scene = env.scene
+    from omnigibson.objects.primitive_object import PrimitiveObject
+
+    slab = PrimitiveObject(name="seat_slab", primitive_type="Cube", fixed_base=True, size=1.0, scale=th.tensor([0.5, 0.5, 0.05]))
+    scene.add_object(slab)  # one rigid body before the first object (the validation world's slab)
+    slab.set_position_orientation(th.tensor([5.0, 5.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    for _ in range(3):
+        og.sim.step()
     print(f"SEAT_FACTS_SETUP {round(time.time() - t0, 1)} s", flush=True)
 
     def load(spec, name, pos):
@@ -57,10 +64,13 @@ def main(argv=None):
         sc = [float(v) for v in (spec.get("scale") or [1.0, 1.0, 1.0])]
         if any(abs(v - 1.0) > 1e-9 for v in sc):
             kw["scale"] = th.tensor(sc, dtype=th.float32)
+        # as the validation world loads its objects (validate_tabletop.TabletopWorld.load): free base, then posed and kept still; every
+        # pose below is read relative to the object's live root pose, so a settling step does not matter
         o = DatasetObject(name=name, category=spec["category"], model=spec["model"], dataset_name=spec.get("dataset") or "behavior-1k-assets",
-                          fixed_base=True, **kw)
+                          fixed_base=False, **kw)
         scene.add_object(o)
         o.set_position_orientation(th.tensor(pos, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        o.keep_still()
         return o
 
     table = []
@@ -127,7 +137,7 @@ def main(argv=None):
                             prec["error"] = "no matching female link"
                 except Exception as e:  # noqa: BLE001
                     prec["error"] = repr(e)
-                    prec["tb"] = traceback.format_exc()[-600:]
+                    prec["tb"] = traceback.format_exc()[-2500:]
                 finally:
                     if partner is not None:
                         scene.remove_object(partner)
@@ -135,7 +145,7 @@ def main(argv=None):
                 rec["partners"].append(prec)
         except Exception as e:  # noqa: BLE001
             rec["error"] = repr(e)
-            rec["tb"] = traceback.format_exc()[-600:]
+            rec["tb"] = traceback.format_exc()[-2500:]
         finally:
             if male is not None:
                 scene.remove_object(male)
