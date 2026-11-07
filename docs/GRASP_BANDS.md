@@ -383,6 +383,51 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - The support policy polices only supports with a registered plane. world_vertical + articulation_large went from 0 to 36 written / 34 ok under v2only.
 - Floor maps: the fingers meet the floor only through the policy's floor allowance (`floor_fingers: "policy"`). The umbrella went from 0 to 71-73 cells per reaching trunk.
 
+### Overhang rests (i7-overhang, 2026-11-07; hardback bqvvvx, inside_large_01)
+
+Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pick's PRIMARY path (`luhkiz` keeps it as its step 4).
+
+- Measured first (`$OFH/jobs/v2build/oh_measure.py` over 67 records of the alias under `$OFH/out` / `$OFH/runs`): the push the demos
+  produced is 0.160-0.165 m (every successful demo 0.1602: hb30_desk_s41 and its 51 fast-flow copies); the pinched spine ends
+  0.0294 m beyond the desk edge at the pinch line (0.0269-0.0294 over the distinct picks), the centre of mass 0.051-0.057 m inside, the
+  book 41-45 deg off flush in every pick (the flush yaw failed the legacy grasps' IK). The legacy `hardback__bqvvvx__bo` rows: the eef
+  1.8 mm outside the spine, the pads ~1 cm on it, proxy table edge 0.03 m inside the spine (`overhang_m` 0.03). The overhang rest is
+  side -y, 0.0294 m (the successful demos' number), flush.
+- `grasping/overhang.py`: `OverhangSpec` (side, distance, flush edge, slab thickness) -> digest / tag `overhang_yn_29mm_6c7148` = rest id,
+  entry suffix (`hardback__bqvvvx__s1__overhang_yn_29mm_6c7148`) and grasp key `hardback__bqvvvx__bo@overhang_yn_29mm_6c7148`
+  (`overhang_keys`; `legacy_key` None, never in the stable index). validate_tabletop settles the object on a slab whose edge lies the
+  distance inside the face (measured 0.0296, centre of mass 0.0555 inside, flush within 0.06 deg); candidates use that slab BOX as the
+  support and let a side grasp retreat along its approach before the lift (the legacy rows' pad-tip pinch).
+- Library entry: 12 candidates -> 12 geometry-ok -> 7 representatives -> 6 physics-valid (one ag_not_formed / slipped). Every valid grasp
+  is a spine-edge pinch across the thickness, the eef 1.1-1.7 cm inside the spine, approach 30 / 60 deg off the spine normal, its exact
+  finger hulls within -0.9..+0.6 mm of the slab box (inside the policy's 2 mm); the straight (0 deg) pinch failed physics.
+- Map kind `overhang` (reach_maps): the synthetic slab's near edge at d_e under the object, one yaw (the face toward the robot), per
+  d_e one row of lateral cells (the root `edge_along_m` behind the edge), d_e 0.35-0.75 (B and B backed off 0.10 / 0.20), lattice 0.04,
+  the overhang rest's digest in the config and the key; `find(kind="overhang")` checks it. Maps at the desk height 0.7671 (anchor added
+  to the staged root): right 5163 / left 4902 feasible (cell, grasp) entries over trunks x d_e.
+- Consumer (IORSLarge, `pick_overhang_push` mode only, a v2 + maps root): the key's overhang rest; the stance search reads the overhang
+  map as INIT cells (feasible post-push cells moved back by `v2_init_push_m` 0.12 / 0.16 / 0.20); the pairs at B = the face flush with B's
+  edge and the rows the arm's map holds feasible at the post-push cell (the map-hit step); the push = the library rest (the face 0.0296
+  beyond the edge). The legacy finger-box sweep rule (1 cm on the conservative open-width box) is replaced by the library's
+  hull-validated rest (the box reads 3.6-7.3 mm over the edge for these pinches; with the 5 cm centre-of-mass margin no push satisfies both
+  at a flush rest); `v2_finger_clearance_m` re-imposes it. Every exact check after the map stays.
+- Goal side: `generation.inside_goal_lean` (hardback__bqvvvx__bu at 16.7 deg: 52 / 52 written instances settled leaning 16.7 deg on the
+  bay's left board) -> the interior map of that v2 LEAN entry on the arm's shelf side in `bookcase_jaysra_0@0.9472` (measured: width
+  0.30, depth 0.332, headroom 0.364, open front / back). Lean entries: left 1 valid grasp (a pinch at the page block, deep in the bay:
+  its maps 0 feasible for both arms; a 24000 x 24 candidate re-run validated 0 - the right-arm validator's placement hits the left board),
+  right 1 valid (right arm 128, left arm 107 feasible at d_e 0.65-0.85). So under v2 only the LEFT arm has no stance C (its map is
+  empty: a library gap). Owner decision 2026-11-07: no NO_BAND_TRUNKS fallback under v2 only; `ISPATIALGYM_INSIDE_NO_BAND_FALLBACK=1`
+  (committed, default off) is never set.
+- Validation `--grasps v2only` N 4 on inside_large_01 (v2-root `$OFH/v2maps_i7oh`): official `i7_oh_m` (trunk_b8245422): 7 attempts,
+  4 written, 4 demos, 2 successes, 0.234 GPU-h per success, rejections program_check_failed 2 / target_placement 1, missing_map 0,
+  MAP_REQUEST 0. Pre-merge `i7_oh` (trunk_b5ed5e75): 10 / 4 / 4 / 2, 0.262 GPU-h per success. Funnel over both: map-hit 46.7 % of the
+  pair lookups at B (the arm's map keeps 3 of 6 grasps), exact 19 / 57 overhang picks, 8 written, oracle 4 / 8 (the physical pick 7 / 8;
+  failures robot_wobble x 2 at the place - the torso 1.01 / 1.03 deg off its command -, robot_touching_itself x 1 at the place,
+  plan_failed x 1 at the grasp). Every pick and place by the right arm.
+- inside_large_03 (the plate into drop_in_sink_lkklqs_0, basin 0.775, rim 0.886): the interior kind does not model a basin (no rim /
+  front wall, open top; measure's wall rays at mid headroom pass above the rim) - a basin spec is needed, not built; the plate has no
+  v2 grasps yet.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
