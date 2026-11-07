@@ -46830,7 +46830,12 @@
     "partner",
     "target"
    ],
-   "partner_side": "left"
+   "partner_side": "left",
+   "approach_finger_support_touch": {
+    "margin_m": 0.0,
+    "max_penetration_m": 0.005,
+    "preshape": true
+   }
   },
   "constraints": []
  },
