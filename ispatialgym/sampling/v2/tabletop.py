@@ -275,6 +275,28 @@ def _lean_rest_cached(root: Optional[str], grasp_key: str) -> Optional[Dict[str,
     return None if lib is None else lib.data.get("lean")
 
 
+def lean_admissibility_rest(grasp_key: Optional[str]) -> Optional[th.Tensor]:
+    """i7-lean 2026-11-07: the orientation the touching pair check (``IORSSmall.pair_admissibility``: pushability / g_NT) measures a LEAN key's
+    target at - the pose the legacy upright-shelf path measured it at: the base key's own rest (its legacy ``rest_quat_wxyz``, e.g.
+    hardback__acbrnv__bu's 15 deg lean), else the lean entry's upright base (``lean_base_wxyz``). The lean rest itself (a 20 deg lean is
+    0.105 m across, past the 0.089 m pinch limit the 15 deg rest passes at 0.088) stays the start, the grasps' and the map's rest. None
+    for a plain key (its own rest, as before)."""
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.sampling import grasp_library as GL
+
+    base, tag = GL.lean_key_parts(grasp_key)
+    if tag is None:
+        return None
+    try:
+        rq = ((GL._candidates(base) or {}).get("ispatialgym") or {}).get("rest_quat_wxyz")
+    except (FileNotFoundError, ValueError):
+        rq = None
+    if rq is None:
+        lib = GL.v2_entry(grasp_key)
+        rq = None if lib is None else lib.data.get("lean_base_wxyz")
+    return None if rq is None else th.tensor(LN.xyzw(rq), dtype=th.float32)
+
+
 def lean_rest_side(grasp_key: Optional[str]) -> Optional[float]:
     """+1 / -1: the board side of a lean grasp key's rest (left = the robot's left), None for a plain key."""
     ln = lean_rest_of_key(grasp_key)

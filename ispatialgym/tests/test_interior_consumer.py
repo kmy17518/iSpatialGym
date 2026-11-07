@@ -165,3 +165,32 @@ def test_iors_small_keeps_the_library_lean_rest(v2):
     t2, _ = s.shelf_rests(1.0, 17.0, 14.0)
     assert not th.allclose(t2, rest0)
     assert math.isclose(LN.lean_of(t2.double().numpy(), LN.up_axis_local(rest0.double().numpy()))["deg"], 17.0, abs_tol=0.05)
+
+
+def test_pair_admissibility_of_a_lean_key_measures_the_legacy_pose(v2):
+    """The touching pair check (pushability) of a v2 lean key at the legacy upright-shelf pose (the base key's own 15 deg rest: the
+    extents the legacy template recorded, 0.0875 m across), not at the 20 deg lean rest (0.105 m: target_not_pushable for every template)."""
+    IS = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_small")
+    from ispatialgym.grasping import manifest as MF
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    if not os.path.exists(os.path.join(MF.LEGACY_ROOT, "cands", f"{HB_KEY}.yaml")):
+        pytest.skip("legacy library not in this checkout")
+    lo, hi = [-0.11137, -0.08724, -0.0156], [0.11137, 0.08428, 0.0156]  # hardback acbrnv's collision bbox
+    hull = th.tensor([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])], dtype=th.float32)
+    q_key = LN.xyzw([0.5609855267969309, 0.4304593345768794, 0.43045933457687935, -0.5609855267969309])
+    q20 = LN.lean_quat(LN.upright(q_key), LN.LeanSpec(20.0, "left"))
+    s = IS.IORSSmall.__new__(IS.IORSSmall)
+    s.gen = lambda k, d=None: d
+    s.relation = "touching"
+    s.hull = {"target": hull, "partner": hull.clone()}
+    s.rest = {"target": th.tensor(q20, dtype=th.float32), "partner": TT.upright_lean_quat(hull, -1.0, 20.0)}
+    s.grasp_key = v2.k20
+    adm = TT.lean_admissibility_rest(v2.k20)
+    assert adm is not None and S.tilt_distance(adm.double().numpy(), q_key) < 1e-6 and TT.lean_admissibility_rest(HB_KEY) is None
+    out = s.pair_admissibility()
+    assert sorted(out["target_extent"][:2])[0] == pytest.approx(0.0875, abs=5e-4) and "target_extent_at" in out
+    s.grasp_key = HB_KEY  # a plain key keeps measuring its own rest (here the 20 deg lean: not pushable)
+    with pytest.raises(Reject) as e:
+        s.pair_admissibility()
+    assert e.value.reason == "target_not_pushable"

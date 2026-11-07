@@ -1342,9 +1342,14 @@ class IORSSmall(SamplerV2):
         centre, any yaw) + the margin within the partner's floor disc (:meth:`container_floor`), tier ``floor_disc``; the box tiers when the
         partner shows no floor disc."""
         up = self.up_axis() if self.gen("target_up_axis") is not None else None
-        t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else self.rest["target"])
+        # i7-lean 2026-11-07: a v2 LEAN rest is measured at the pose the legacy upright-shelf path measured (the base key's own rest:
+        # tabletop.lean_admissibility_rest) - the lean rest stays the start / grasps / map rest
+        adm = TT.lean_admissibility_rest(getattr(self, "grasp_key", None)) if up is None else None
+        t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else (adm if adm is not None else self.rest["target"]))
         p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
         out: Dict[str, Any] = {"target_extent": t_ext.tolist(), "partner_extent": p_ext.tolist(), "relation": self.relation}
+        if adm is not None:
+            out["target_extent_at"] = "the upright-shelf key's own rest (the legacy pair check's pose; the v2 lean rest is the start)"
         if up is not None:
             out["target_up_axis"] = up
         tx, ty = sorted([float(t_ext[0]), float(t_ext[1])])
