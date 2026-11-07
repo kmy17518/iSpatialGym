@@ -118,6 +118,8 @@ def _v2_index(root: str) -> Dict[str, str]:
         keys = [k for k in [d.get("legacy_key"), *(d.get("legacy_keys") or [])] if k]
         if not keys:
             continue
+        if _is_lean_library(d):
+            continue  # i7-lean 2026-11-07: a lean entry never serves a stable key (:func:`_v2_lean_index` lists it)
         rests = d.get("rests") or {}
         stable = any(bool((r or {}).get("stable")) for r in rests.values())
         eid = os.path.basename(os.path.dirname(p))
@@ -127,12 +129,67 @@ def _v2_index(root: str) -> Dict[str, str]:
     return {k: sorted(v)[0][1] for k, v in cand.items()}
 
 
+def _is_lean_library(d: Dict[str, Any]) -> bool:
+    """i7-lean 2026-11-07: a library.json of a lean entry (``rest_kind: "lean"``, or any lean rest record)."""
+    if str(d.get("rest_kind") or "stable") == "lean":
+        return True
+    return any(str((r or {}).get("rest_kind") or "stable") == "lean" for r in (d.get("rests") or {}).values())
+
+
+@lru_cache(maxsize=4)
+def _v2_lean_index(root: str) -> Dict[Tuple[str, str], str]:
+    """i7-lean 2026-11-07: ``(base key, lean tag) -> library.json`` of the LEAN entries (``lean_keys`` + ``legacy_key``; the tag is the
+    entry's ``lean.tag``: angle, side, board, gap). Deterministic: the entry with valid grasps, then the shortest id, then the path."""
+    cand: Dict[Tuple[str, str], List[Tuple[Tuple[Any, ...], str]]] = {}
+    for p in sorted(glob.glob(os.path.join(root, "models", "*", "library.json"))):
+        try:
+            with open(p) as f:
+                d = json.load(f)
+        except Exception:
+            continue
+        if not _is_lean_library(d) or not isinstance(d.get("lean"), dict):
+            continue
+        tag = d["lean"].get("tag")
+        if not tag:
+            continue
+        eid = os.path.basename(os.path.dirname(p))
+        for k in dict.fromkeys(k for k in [d.get("legacy_key"), *(d.get("lean_keys") or [])] if k):
+            cand.setdefault((k, tag), []).append(((not bool(d.get("grasps")), len(eid), p), p))
+    return {k: sorted(v)[0][1] for k, v in cand.items()}
+
+
+def lean_key_parts(key: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """``(base key, lean tag or None)`` of a sampler grasp key (``<base>@<lean tag>``: ``grasping.lean.lean_key``)."""
+    from ispatialgym.grasping import lean as LN
+
+    return LN.split_lean_key(key)
+
+
+def v2_lean_tags(base_key: str) -> List[Tuple[str, Dict[str, Any]]]:
+    """i7-lean: the lean rests the v2 library holds for ``base_key``: ``[(tag, lean json)]`` sorted by (side, angle) - only entries with
+    physics-validated grasps."""
+    root = v2_root()
+    if not root:
+        return []
+    out = []
+    for (k, tag), p in _v2_lean_index(root).items():
+        if k != base_key:
+            continue
+        with open(p) as f:
+            d = json.load(f)
+        if d.get("grasps"):
+            out.append((tag, d["lean"]))
+    return sorted(out, key=lambda t: (t[1].get("side"), float(t[1].get("deg", 0.0)), t[0]))
+
+
 def v2_entry(key: str):
-    """The v2 ``ModelLibrary`` that replaces legacy ``key`` (None: no v2 root, or no entry)."""
+    """The v2 ``ModelLibrary`` that replaces legacy ``key`` (None: no v2 root, or no entry). i7-lean: a lean key (``<base>@<lean tag>``)
+    is served by the lean entry of exactly that tag, a plain key never by a lean entry."""
     root = v2_root()
     if not root:
         return None
-    p = _v2_index(root).get(key)
+    base, tag = lean_key_parts(key)
+    p = _v2_lean_index(root).get((base, tag)) if tag is not None else _v2_index(root).get(key)
     if p is None:
         return None
     from ispatialgym.grasping import schema as S
@@ -140,7 +197,8 @@ def v2_entry(key: str):
     with open(p) as f:
         d = json.load(f)
     lib = S.load_model(d["category"], d["model"], d.get("scale"), root, constraint=d.get("constraint") or "tabletop",
-                       rest_hint_wxyz=d.get("rest_hint_wxyz") if "rest_hint_wxyz" in d else _v2_hint(p))
+                       rest_hint_wxyz=d.get("rest_hint_wxyz") if "rest_hint_wxyz" in d else _v2_hint(p),
+                       lean=d.get("lean") if tag is not None else None)
     _check_v2_policy(lib, d)
     return lib
 
@@ -158,13 +216,22 @@ def _check_v2_policy(lib, d: Dict[str, Any]) -> None:
         raise ValueError(f"v2 entry {getattr(lib, 'path', '?')}: policy {pk} != the shared {want}")
 
 
-def v2_rest_id(lib) -> Optional[str]:
+def v2_rest_id(lib, lean: Optional[str] = None) -> Optional[str]:
     """The rest a v2 entry is used at (of-v2maps 2026-11-07): its stable rests first, then the id - deterministic; None without a stable rest
-    (the spec: a measured, stable rest is required)."""
+    (the spec: a measured, stable rest is required). i7-lean 2026-11-07: only rests of kind "stable" unless the caller asks for a lean rest
+    (``lean`` = its tag): then that lean rest only (stable, of that tag) - a lean rest never serves a stable lookup, nor the reverse."""
     if lib is None or not lib.rests:
         return None
-    stable = [r for r in lib.rests if lib.rests[r].stable]
+    if lean is not None:
+        r = lib.rests.get(lean)
+        return lean if (r is not None and r.stable and getattr(r, "kind", "stable") == "lean") else None
+    stable = [r for r in lib.rests if lib.rests[r].stable and getattr(lib.rests[r], "kind", "stable") == "stable"]
     return sorted(stable)[0] if stable else None
+
+
+def v2_rest_id_for_key(lib, key: Optional[str]) -> Optional[str]:
+    """:func:`v2_rest_id` of the rest a grasp key names (a lean key: its lean tag; a plain key: the stable rest)."""
+    return v2_rest_id(lib, lean=lean_key_parts(key)[1])
 
 
 def _v2_hint(path: str):
@@ -216,10 +283,12 @@ def rest_quat_xyzw(key: str) -> Optional[th.Tensor]:
     (``ISPATIALGYM_GRASP_LIBRARY_V2``): its measured rest (xyzw, reference yaw included)."""
     lib = v2_entry(key)
     if lib is not None and lib.rests:
-        rid = v2_rest_id(lib)
+        rid = v2_rest_id_for_key(lib, key)
         if rid is None:
-            raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} has no stable rest")
+            raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} has no stable rest" + (" of that lean" if lean_key_parts(key)[1] else ""))
         return th.tensor([float(v) for v in lib.rests[rid].quat_xyzw], dtype=th.float32)
+    if lean_key_parts(key)[1] is not None:
+        raise ValueError(f"lean grasp key {key!r}: no v2 lean entry (ISPATIALGYM_GRASP_LIBRARY_V2 {v2_root()!r})")
     d = _candidates(key)
     rq = (d.get("ispatialgym") or {}).get("rest_quat_wxyz")
     if rq is None or (d.get("ispatialgym") or {}).get("rest_pose", "canonical") == "canonical":
@@ -235,6 +304,9 @@ def v2_only() -> bool:
 
 def load_grasps(key: str, require_clean: bool = True) -> List[Grasp]:
     lib = v2_entry(key)
+    if lib is None and lean_key_parts(key)[1] is not None:
+        # i7-lean 2026-11-07: a lean key is served by its lean entry only (never the legacy library, never a stable entry)
+        raise ValueError(f"lean grasp key {key!r} has no v2 lean entry with that lean rest")
     if lib is None and v2_only() and v2_root() and not str(key).startswith(("attach:", "generic")):
         # of-v2maps 2026-11-07 (prompt I; owner: only the v2 grasps): v2only served the LEGACY library for a key without a v2 entry -
         # v2only_before wrote 20 aliases (mental_rotation, object_scaling) on legacy grasps
@@ -244,7 +316,12 @@ def load_grasps(key: str, require_clean: bool = True) -> List[Grasp]:
         raise ValueError(f"v2 only: grasp key {key!r} has no v2 library entry (legacy grasps are not served)")
     if lib is not None:
         # of-v2maps 2026-11-07 (P1 §3a: each grasp belongs to its rest_id): only the grasps of the rest the object is placed at
-        out = grasps_from_v2(lib, key, rest_id=v2_rest_id(lib))
+        tag = lean_key_parts(key)[1]
+        if tag is None:
+            out = grasps_from_v2(lib, key, rest_id=v2_rest_id(lib))  # a plain key: exactly as before
+        else:  # i7-lean: a lean key's own lean rest only
+            rid = v2_rest_id(lib, lean=tag)
+            out = grasps_from_v2(lib, key, rest_id=rid) if rid is not None else []
         if not out:
             raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} has no physics-validated grasps")
         return out

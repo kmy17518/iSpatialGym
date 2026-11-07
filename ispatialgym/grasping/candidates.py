@@ -21,6 +21,11 @@ Per model (its exported collision pieces, :mod:`object_geometry`) and designated
    failing candidate is kept in the file with its reason but never becomes a representative;
 8. symmetry families (:mod:`symmetry`) and deduplication: the representatives are what physics validation tests.
 
+Lean rests (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`): a lean job is generated at its MEASURED lean rest
+(``generation_rest_wxyz``, written by the pipeline's ``lean`` stage) with the board it leans on as a NORMAL obstacle for every hand part
+(``lean_rest.board_in_root``: a box in the rest frame) - screened right after the support step (the hulls at the pre-shape, every role
+>= 0) and in the full policy geometry and the symmetry members' check (``contact_policy.check_grasp_geometry(obstacles=)``).
+
 Output ``candidates.json`` (schema ``CANDIDATES``) in the model's library directory.
 """
 
@@ -352,6 +357,14 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     if geom0 is None:
         raise FileNotFoundError(f"no geometry.json in {model_dir} (run the export stage)")
     constraint = job.get("constraint") or "tabletop"
+    from ispatialgym.grasping import lean as LN
+
+    obstacles: Tuple[CP.Support, ...] = ()
+    if LN.is_lean_job(job):
+        # i7-lean 2026-11-07: the measured lean rest (the lean stage) and its board as a normal obstacle in the rest frame
+        if not job.get("generation_rest_wxyz") or not job.get("lean_rest"):
+            raise ValueError(f"{job.get('id')}: a lean job's candidates need its measured lean rest (run the pipeline's lean stage first)")
+        obstacles = (LN.board_obstacle_in_rest(job["lean_rest"]),)
     # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): a surveyed rest generates the candidates (generation_rest_wxyz), the designated hint names the entry
     R = rest_rotation(job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz"))
     geom = geom0.rotated(R)  # the rest frame: the tabletop is z = z_min
@@ -426,6 +439,14 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             T[:, 2, 3] += deficit
             shift = deficit
         L["n_support"] = int(len(T))
+        if obstacles and len(T):
+            # i7-lean: the hand at the grasp pose, pre-shaped, clear of the lean board (every role, the fingers included)
+            keep = np.zeros(len(T), dtype=bool)
+            for q in np.unique(np.round(pre_q, 3)):
+                idx = np.where(np.round(pre_q, 3) == q)[0]
+                keep[idx] = hc.check_obstacles(th.as_tensor(T[idx], dtype=th.float32), obstacles, (float(q), float(q)))[0].numpy()
+            T, width, pre_q, shift = T[keep], width[keep], pre_q[keep], shift[keep]
+            L["n_obstacle_clear"] = int(len(T))
         if len(T) == 0:
             log[mode] = L
             continue
@@ -516,7 +537,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         # 7) the full policy geometry: pre-grasp, approach, closing sweep (fingers from the pre-shape to the contact opening)
         Ts = T[sel]
         contact_q = np.clip(0.5 * feats["width"][sel] + pad_face_offset(arm), 0.0, FINGER_OPEN)  # joint value at the pads' first touch
-        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])))
+        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])), obstacles=obstacles)
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         blades, deep = finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q)
         for r, i in enumerate(sel):
@@ -551,7 +572,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                 return clear_fn(Tm, q) - cfg.obj_margin_m + 1e-9
 
             def support_ok(Tm, c=c):  # the member under the contact policy against the rest's tabletop (pre-grasp, approach, sweep)
-                return CP.check_grasp_geometry(hc, th.as_tensor(Tm, dtype=th.float32), support, [c["contact_q"]] * len(Tm), open_q=c["preshape_q"])["ok"].numpy()
+                return CP.check_grasp_geometry(hc, th.as_tensor(Tm, dtype=th.float32), support, [c["contact_q"]] * len(Tm), open_q=c["preshape_q"],
+                                               obstacles=obstacles)["ok"].numpy()
 
             fam = SY.detect(Tr, union, idx, width_fn, clear_obj, rest_R=np.eye(4), cfg=sym_cfg, contact_z=CONTACT_Z, support_fn=support_ok)
             fams[c["name"]] = _family_to_object(fam, R)
@@ -567,6 +589,9 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     log["symmetry_s"] = round(time.time() - t_sym, 2)
     out = {"schema": S.CANDIDATES, "pipeline": PIPELINE, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
            "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "generation_rest_wxyz": job.get("generation_rest_wxyz"), "legacy_key": job.get("legacy_key"),
+           **({"rest_kind": "lean", "lean": job.get("lean"), "lean_rest": job.get("lean_rest"),
+               "obstacles": [{"name": o.name, "centre": list(o.centre), "half": list(o.half), "frame": "rest frame (the support frame's axes, the root at the origin)"}
+                             for o in obstacles]} if obstacles else {}),
            "arm": arm, "policy": policy.meta(arm), "policy_key": policy.key(arm), "config": asdict(cfg), "symmetry_config": asdict(sym_cfg),
            "candidates": out_cands, "families": families, "representatives": rep_names, "log": log, "t_s": round(time.time() - t0, 2),
            "created": S.now(), "review_instructions": "docs/GRASP_REVIEW.md (symmetry annotations required)"}

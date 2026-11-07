@@ -4,7 +4,15 @@
     python -m ispatialgym.grasping.pipeline candidates --jobs M.json [--workers 8]                  # CPU: candidates + families
     python -m ispatialgym.grasping.pipeline validate   --jobs M.json [--shard i/n]                  # GPU: rests + physics trials
     python -m ispatialgym.grasping.pipeline all        --jobs M.json [--only ID ...]                # the three, one process (pilots)
+    python -m ispatialgym.grasping.pipeline lean       --jobs M.json [--shard i/n]                  # GPU: the lean jobs end to end
     python -m ispatialgym.grasping.pipeline summary    --jobs M.json
+
+Lean rests (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`; jobs from ``python -m ispatialgym.grasping.lean manifest``): the
+``lean`` stage settles each lean job's object against the vertical board (``TabletopWorld.settle(lean=)``) and writes
+``<entry>/lean_settle.json``; the candidates are then generated at that MEASURED rest with the board as an obstacle and validated with the
+board present. ``all`` runs it between export and candidates for the manifest's lean jobs; ``lean`` runs export + lean settle +
+candidates + validate for the lean jobs only (``job_glib.sh`` ``GB_STAGES=lean``). Lean jobs skip the settle-first survey and the
+measured-rest retry (a lean rest that leans elsewhere keeps its ``<tag>_other`` record and serves nothing).
 
 ``--root`` (default ``ISPATIALGYM_GRASP_LIBRARY_V2`` or ``runlogs/grasp_library_v2``) holds ``models/<entry id>/``; finished stages are
 skipped per model (``--force`` redoes them). Every stage appends one json line per model to ``<root>/logs/<stage>_<shard>.jsonl``
@@ -97,8 +105,10 @@ def validate_overrides():
 def _cand_one(payload):
     j, root, force = payload
     from ispatialgym.grasping import candidates as CA
+    from ispatialgym.grasping import lean as LN
 
     d = S.job_dir(j, root)
+    j = LN.resolve_job(j, d)  # i7-lean: a lean job's measured rest from its lean_settle.json
     t0 = time.time()
     if not force and os.path.exists(os.path.join(d, "candidates.json")):
         return {"id": j["id"], "ok": True, "skipped": True}
@@ -146,8 +156,11 @@ def stage_validate(args, jobs, world=None):
         return world
     if world is None:
         world = _world(args)
+    from ispatialgym.grasping import lean as LN
+
     for j in todo:
         d = S.job_dir(j, args.root)
+        j = LN.resolve_job(j, d)  # i7-lean: a lean job's measured rest from its lean_settle.json
         try:
             rec = VT.run_model(world, j, d)
             rec["ok"] = True
@@ -174,11 +187,16 @@ def stage_settle(args, jobs, world=None):
     from ispatialgym.grasping import object_geometry as OG
     from ispatialgym.grasping import settle_first as SF
 
+    from ispatialgym.grasping import lean as LN
+
     if world is None:
         world = _world(args)
     cfg = world.cfg
     out: List[Dict[str, Any]] = []
     for j in jobs:
+        if LN.is_lean_job(j):  # i7-lean: a lean rest is settled against its board (stage_lean), never surveyed on the bare slab
+            out.append(j)
+            continue
         d = S.job_dir(j, args.root)
         t0 = time.time()
         path = os.path.join(d, "settle_first.json")
@@ -224,12 +242,63 @@ def stage_settle(args, jobs, world=None):
     return out, world
 
 
+def stage_lean(args, jobs, world=None):
+    """i7-lean 2026-11-07: per lean job, the object settled against the vertical board (``TabletopWorld.settle(lean=)`` from the job's
+    upright base leaned to its spec: ``lean.lean_quat``), the measured lean rest written to ``<entry>/lean_settle.json`` (schema
+    ``lean.SETTLE_SCHEMA``: the spec, the start, the rest record); returns the jobs (each lean job with its measured rest:
+    ``lean.job_at_rest``) and the world. Other jobs pass unchanged."""
+    import numpy as np
+
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.grasping import object_geometry as OG
+
+    out: List[Dict[str, Any]] = []
+    for j in jobs:
+        if not LN.is_lean_job(j):
+            out.append(j)
+            continue
+        d = S.job_dir(j, args.root)
+        path = os.path.join(d, LN.SETTLE_FILE)
+        t0 = time.time()
+        try:
+            doc = None if args.force else S.load_json(path)
+            if doc is None:
+                if world is None:
+                    world = _world(args)
+                spec = LN.spec_of(j)
+                quat0 = LN.lean_quat(LN.base_quat(j), spec)
+                obj = world.load(j, d)
+                try:
+                    rest, _ = world.settle(obj, OG.load(d), quat0, lean=spec)
+                finally:
+                    world.unload(obj)
+                ok = bool(rest["lean"]["lean_ok"]) and bool(rest["stable"])
+                rest["rest_id"] = spec.rest_id() if ok else spec.rest_id() + "_other"
+                doc = {"schema": LN.SETTLE_SCHEMA, "id": j["id"], "lean": spec.to_json(), "start_quat_xyzw": [round(float(v), 7) for v in np.asarray(quat0)],
+                       "lean_base_wxyz": j.get("lean_base_wxyz"), "lean_base": j.get("lean_base"), "rest": rest, "ok": ok,
+                       "wall_s": round(time.time() - t0, 2), "created": S.now()}
+                os.makedirs(d, exist_ok=True)
+                S.save_json(path, doc)
+            out.append(LN.job_at_rest(j, doc["rest"]))
+            r = doc["rest"]
+            _log(args, "lean", {"id": j["id"], "ok": True, "lean_ok": doc.get("ok"), "rest_id": r.get("rest_id"), "measured_deg": r["lean"].get("measured_deg"),
+                                "side": r["lean"].get("measured_side"), "h_root": r.get("h_root"), "board_face_y_m": r["lean"].get("board_face_y_m"),
+                                "board_load_ratio": r["lean"].get("board_load_ratio"), "why": r["lean"].get("lean_why"), "s": doc.get("wall_s")})
+        except Exception as e:  # noqa: BLE001
+            out.append(j)
+            _log(args, "lean", {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]})
+    print("GB_LEAN_DONE", flush=True)
+    return out, world
+
+
 def rest_retry_jobs(args, jobs) -> List[Dict[str, Any]]:
     """Jobs whose object settled in a rest other than the designated one (``rests.json``: ``intended`` False) and got no valid grasp:
     derived jobs designated at that MEASURED rest (``rest_hint_wxyz`` = its quaternion, wxyz), candidates generated for it - a new model
     with an unstable canonical pose gets its grasps on the rest it really takes."""
     out = []
     for j in jobs:
+        if j.get("rest_kind") == "lean":  # i7-lean: a lean rest is never retried as a stable one
+            continue
         d = S.job_dir(j, args.root)
         lib = S.load_json(os.path.join(d, "library.json")) or {}
         if lib.get("grasps"):
@@ -277,7 +346,7 @@ def summary(args, jobs):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("stage", choices=["export", "settle", "candidates", "validate", "retry", "all", "summary"])
+    ap.add_argument("stage", choices=["export", "settle", "lean", "candidates", "validate", "retry", "all", "summary"])
     ap.add_argument("--jobs", required=True)
     ap.add_argument("--root", default=None)
     ap.add_argument("--shard", default=None, help="i/n")
@@ -290,13 +359,21 @@ def main(argv=None):
         summary(args, jobs)
         return
     world = None
-    if args.stage in ("export", "all"):
+    if args.stage == "lean":
+        # i7-lean 2026-11-07: the manifest's lean jobs end to end (export, the settle against the board, candidates, validation)
+        from ispatialgym.grasping import lean as LN
+
+        jobs = [j for j in jobs if LN.is_lean_job(j)]
+        print(f"GB_LEAN_JOBS {len(jobs)}", flush=True)
+    if args.stage in ("export", "all", "lean"):
         world = stage_export(args, jobs, world)
     if args.stage == "settle" or (args.stage == "all" and settle_first_on()):
         jobs, world = stage_settle(args, jobs, world)  # of-v2maps 2026-11-07: GB_SETTLE_FIRST - the measured rests first
-    if args.stage in ("candidates", "all"):
+    if args.stage in ("all", "lean"):
+        jobs, world = stage_lean(args, jobs, world)  # i7-lean: the lean jobs' measured rests (other jobs pass unchanged)
+    if args.stage in ("candidates", "all", "lean"):
         stage_candidates(args, jobs)
-    if args.stage in ("validate", "all"):
+    if args.stage in ("validate", "all", "lean"):
         world = stage_validate(args, jobs, world)
     if args.stage in ("retry", "all"):
         derived = rest_retry_jobs(args, jobs)
