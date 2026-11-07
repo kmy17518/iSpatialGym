@@ -1130,6 +1130,19 @@ class RootWatch:
         return {"objects": objects, "skipped": dict(self.skipped), "steps_observed": int(self.steps), "band": {"pos_m": pos_m, "tilt_rad": tilt_rad}}
 
 
+#: oracle-fix 2026-11-07 (owner prompt B, the hardback's open-pitch-40 push): the elbow pair link3 / link5 of each arm, whose collision
+#: hulls graze within the joint-4 limit (left: hull distance +4.3 mm at q4 -2.045, -1.2 mm at the limit -2.0944; right >= 6.9 mm; the
+#: cuRobo spheres >= 16.8 mm apart, the pair not in r1pro.yaml's disabled_collision_pairs) - a collision-mesh artifact, not a fold
+ELBOW_GRAZE_PAIRS: Tuple[Tuple[str, str], ...] = tuple(tuple(sorted((f"{arm}_arm_link3", f"{arm}_arm_link5"))) for arm in ("left", "right"))
+SELF_EXCLUDE_SWITCH = "ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW"
+
+
+def self_excluded_pairs() -> List[Tuple[str, str]]:
+    """The robot link pairs ``robot_touching_itself`` leaves out: :data:`ELBOW_GRAZE_PAIRS` with the opt-in ``ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW=1``
+    (oracle-fix 2026-11-07), else none (the former metric). Their contacts are still recorded (``robot_touching_itself.excluded``)."""
+    return list(ELBOW_GRAZE_PAIRS) if os.environ.get(SELF_EXCLUDE_SWITCH, "") == "1" else []
+
+
 class _Spans:
     """Runs of consecutive steps per key (``first_step`` / ``last_step`` / ``n`` plus the fields of the run's first step), at
     most ``cap`` runs (later runs are counted in ``dropped``)."""
@@ -1272,6 +1285,8 @@ class QA:
         cap = self.t.max_runs
         self.touch_objects = _Spans(cap)
         self.touch_self = _Spans(cap)
+        self.self_excluded = set(self_excluded_pairs())  # oracle-fix 2026-11-07: opt-in, recorded in the report
+        self.touch_self_excluded = _Spans(cap)
         self.arm_hand = _Spans(cap)
         self.out_of_view = _Spans(cap)
         self.wobble = _Spans(cap)
@@ -1471,7 +1486,7 @@ class QA:
         if not pairs:
             return
         prefix = self.robot_prefix
-        objects, selfs, hands = set(), set(), set()
+        objects, selfs, hands, excluded = set(), set(), set(), set()
         for own, other in pairs:
             if not own.startswith(prefix):
                 continue  # a held object's contact (the retry rule's query includes them)
@@ -1480,7 +1495,7 @@ class QA:
                 pair = tuple(sorted((own_link, other.rsplit("/", 1)[1])))
                 # the two fingers of one gripper meet in the closed fist of a push / brace
                 if other != own and not any(set(pair) <= fingers for fingers in self._finger_sets):
-                    selfs.add(pair)
+                    (excluded if pair in self.self_excluded else selfs).add(pair)
                 continue
             name = self._object(other)
             if name is None:
@@ -1494,6 +1509,8 @@ class QA:
             self.touch_objects.add(step, (link, name), link=link, object=name, action=self.action_name)
         for pair in sorted(selfs):
             self.touch_self.add(step, pair, links=list(pair), action=self.action_name)
+        for pair in sorted(excluded):
+            self.touch_self_excluded.add(step, pair, links=list(pair), action=self.action_name)
         for link, name in sorted(hands):
             self.arm_hand.add(step, (link, name), link=link, object=name, task_object=name in self.task_objects, action=self.action_name)
         if objects:
@@ -1737,7 +1754,8 @@ class QA:
         t = self.t
         m: Dict[str, Dict[str, Any]] = {}
         m["robot_touching_objects"] = {"limit_steps": 0, **self.touch_objects.report()}
-        m["robot_touching_itself"] = {"limit_steps": 0, **self.touch_self.report()}
+        m["robot_touching_itself"] = {"limit_steps": 0, **self.touch_self.report(), "switch": SELF_EXCLUDE_SWITCH,
+                                      "excluded_pairs": [list(p) for p in sorted(self.self_excluded)], "excluded": self.touch_self_excluded.report()}
         m["pause"] = {"limit_steps": t.pause_steps, "vel_threshold": t.pause_vel, "max_pause_steps": self.max_pause, "runs": list(self.pause_runs)}
         m["jerky_motion"] = dict(self.jerky or {"measured": False})
         m["ghost_hand"] = {"threshold_rad": t.ghost_rad, "limit_while_ungrasping": 0,
