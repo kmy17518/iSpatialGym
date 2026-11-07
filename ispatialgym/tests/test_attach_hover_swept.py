@@ -55,16 +55,18 @@ def _scene(monkeypatch, lift=0.10, dx=0.0, part_dx=0.0, partner=None, finger_pie
     return action, motions, state, targets
 
 
-def test_the_switch_defaults_to_the_box_rule(monkeypatch, caplog):
+def test_the_switch_defaults_to_the_swept_rule(monkeypatch, caplog):
     monkeypatch.delenv("ISPATIALGYM_ATTACH_HOVER", raising=False)
-    assert EX.ExecuteConfig().attach_hover_rule == "box" and EX.attach_hover_rule(EX.ExecuteConfig()) == "box"
+    assert EX.ExecuteConfig().attach_hover_rule == "swept" and EX.attach_hover_rule(EX.ExecuteConfig()) == "swept"  # owner 2026-11-07
+    monkeypatch.setenv("ISPATIALGYM_ATTACH_HOVER", "box")
+    assert EX.attach_hover_rule(EX.ExecuteConfig()) == "box"
     monkeypatch.setenv("ISPATIALGYM_ATTACH_HOVER", "swept")
     assert EX.attach_hover_rule(EX.ExecuteConfig()) == "swept"
     monkeypatch.setenv("ISPATIALGYM_ATTACH_HOVER", " Swept ")
     assert EX.attach_hover_rule(EX.ExecuteConfig()) == "swept"
     monkeypatch.setenv("ISPATIALGYM_ATTACH_HOVER", "sweep")
     with caplog.at_level(logging.WARNING, logger=EX.log.name):
-        assert EX.attach_hover_rule(EX.ExecuteConfig()) == "box"
+        assert EX.attach_hover_rule(EX.ExecuteConfig()) == "swept"
     assert "not one of box/swept" in caplog.text
 
 

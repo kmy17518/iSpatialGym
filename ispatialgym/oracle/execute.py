@@ -109,6 +109,10 @@ class PrivilegedState(Protocol):
     def init_pose(self, name: str) -> Optional[Tuple[th.Tensor, th.Tensor]]: ...  # the object's pose at the program start
 
 
+#: the attach hover rule the oracle runs unless ``ISPATIALGYM_ATTACH_HOVER`` says otherwise (OWNER DECISION 2026-11-07: swept)
+ATTACH_HOVER_DEFAULT = "swept"
+
+
 @dataclass
 class ExecuteConfig:
     #: base at the last path waypoint / drive-in pose (m, rad)
@@ -320,8 +324,9 @@ class ExecuteConfig:
     #: so the touchdown's ``attach_hover_clear_m + attach_touchdown_extra_m`` reaches the first touch with the extra to spare (the
     #: box rule took the stockpot's loop handles, outside the lid, for its top: the hover 29 mm above the first touch, the 7 mm
     #: touchdown never touched in 37 / 37 and the lid dropped 22 mm). A swept miss (no pair meets) falls back to the box rule.
-    #: Env ``ISPATIALGYM_ATTACH_HOVER``; the default stays ``box`` until the owner's A/B on attachment_01-04.
-    attach_hover_rule: str = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ATTACH_HOVER", "box"))
+    #: Env ``ISPATIALGYM_ATTACH_HOVER``; the default is ``swept`` (OWNER DECISION 2026-11-07, after the A/B on attachment_01-04: box i7_ah
+    #: vs swept i7_ahs, touched 5 / 9 vs 11 / 11, drop <= 22.2 vs <= 0.1 mm, protected_contact 4 -> 0); ``box`` = the former rule.
+    attach_hover_rule: str = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ATTACH_HOVER", ATTACH_HOVER_DEFAULT))
     #: ... aligns the male link there with the female one - laterally (across the seat axis) and in yaw about it modulo the part's
     #: symmetry, the height and the tilt kept - in the closed-loop passes of the task's correction regime (``AttachCorrection``),
     #: then TOUCHES DOWN (owner 2026-10-10: released at the hover, the contact hold's squeeze let go at once kicked the cap 8 mm
@@ -3380,17 +3385,17 @@ def _seat_axis(state, action: Place) -> Optional[th.Tensor]:
     return PRED.seat_axis(state.object(action.object), state.object(action.on), links[1].body_name).float()
 
 
-#: ``ExecuteConfig.attach_hover_rule`` / ``ISPATIALGYM_ATTACH_HOVER``: the hover from the partner's top under the part (``box``,
-#: the default) or from the part's swept first touch (``swept``, owner 2026-11-07 option B)
+#: ``ExecuteConfig.attach_hover_rule`` / ``ISPATIALGYM_ATTACH_HOVER``: the hover from the partner's top under the part (``box``, the
+#: former rule) or from the part's swept first touch (``swept``, owner 2026-11-07 option B; the default since the owner's decision)
 ATTACH_HOVER_RULES = ("box", "swept")
 
 
 def attach_hover_rule(cfg: ExecuteConfig) -> str:
-    """The configured hover rule (``ATTACH_HOVER_RULES``); anything else is the box rule, with a warning."""
-    rule = str(getattr(cfg, "attach_hover_rule", None) or "box").strip().lower()
+    """The configured hover rule (``ATTACH_HOVER_RULES``); anything else is the default (:data:`ATTACH_HOVER_DEFAULT`), with a warning."""
+    rule = str(getattr(cfg, "attach_hover_rule", None) or ATTACH_HOVER_DEFAULT).strip().lower()
     if rule not in ATTACH_HOVER_RULES:
-        log.warning("ISPATIALGYM_ATTACH_HOVER=%r is not one of %s - the box rule", rule, "/".join(ATTACH_HOVER_RULES))
-        return "box"
+        log.warning("ISPATIALGYM_ATTACH_HOVER=%r is not one of %s - the default %s rule", rule, "/".join(ATTACH_HOVER_RULES), ATTACH_HOVER_DEFAULT)
+        return ATTACH_HOVER_DEFAULT
     return rule
 
 

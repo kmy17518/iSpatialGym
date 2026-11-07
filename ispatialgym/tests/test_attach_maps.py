@@ -147,20 +147,30 @@ def test_box_rule_is_the_oracles_attach_hover_targets(monkeypatch):
     state = NS(object=lambda n: part if n == "lid_0" else pot, eef_pose=lambda arm: (th.tensor(T_now_eef[:3, 3], dtype=th.float32), th.tensor(q_now, dtype=th.float32)))
     motions = NS(robot=NS(finger_links={"right": [finger]}))
     targets = {"place": EX.Pose(position=T_seat_eef[:3, 3].tolist(), orientation=list(q_now)), "descent": [], "retreat": []}
-    ctx = {}
-    EX.attach_hover_targets(NS(object="lid_0", on="pot_0", arm="right"), motions, state, targets, ctx, EX.ExecuteConfig())
-    rec = ctx["attach"]["hover"]
-    mine = AM.hover_table(spec, LID, hand, [{"name": "g", "T": T_OE, "finger_q": fq}], [yaw], PARAMS_BOX)[0][0]
-    assert rec["applied"] and rec["height_above_seat_m"] == pytest.approx(mine["h_m"], abs=2e-4)
-    assert rec["part_clearance_m"] == pytest.approx(mine["part_clearance_m"], abs=2e-4) and rec["partner_top_z"] == pytest.approx(mine["box_top_z"] + 0.80, abs=1e-4)
-    cfg = EX.ExecuteConfig()
-    assert mine["depth_m"] == pytest.approx(float(rec["part_clearance_m"] or cfg.attach_hover_clear_m) + cfg.attach_touchdown_extra_m, abs=2e-4)
+    for rule, params in (("box", PARAMS_BOX), ("swept", PARAMS_SWEPT)):
+        if rule == "swept" and not hasattr(EX, "swept_first_touch"):
+            continue  # an oracle without the swept rule
+        ctx = {}
+        cfg = EX.ExecuteConfig(attach_hover_rule=rule)
+        EX.attach_hover_targets(NS(object="lid_0", on="pot_0", arm="right"), motions, state, targets, ctx, cfg)
+        rec = ctx["attach"]["hover"]
+        mine = AM.hover_table(spec, LID, hand, [{"name": "g", "T": T_OE, "finger_q": fq}], [yaw], params)[0][0]
+        assert rec["applied"] and rec.get("source", "box") == mine["source"] == rule
+        assert rec["height_above_seat_m"] == pytest.approx(mine["h_m"], abs=2e-4) and rec["part_clearance_m"] == pytest.approx(mine["part_clearance_m"], abs=2e-4)
+        if rule == "box":
+            assert rec["partner_top_z"] == pytest.approx(mine["box_top_z"] + 0.80, abs=1e-4)
+        else:
+            assert rec["first_touch_m"] == pytest.approx(mine["first_touch_m"], abs=1e-5)  # the oracle's convex_sweep = the map's Minkowski cast
+        assert mine["depth_m"] == pytest.approx(float(rec["part_clearance_m"] or cfg.attach_hover_clear_m) + cfg.attach_touchdown_extra_m, abs=2e-4)
 
 
-def test_hover_params_come_from_the_oracle_and_this_oracle_runs_the_box_rule():
+def test_hover_params_come_from_the_oracle_and_follow_its_switch(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_ATTACH_HOVER", raising=False)
     p = AM.oracle_hover_params()
     cfg = EX.ExecuteConfig()
-    assert p["rule"] == AM.oracle_hover_rule() and (p["rule"] == "box" or hasattr(cfg, "attach_hover_rule"))
+    assert p["rule"] == AM.oracle_hover_rule() == EX.attach_hover_rule(cfg) == "swept"  # owner 2026-11-07: swept is the oracle's default
+    monkeypatch.setenv("ISPATIALGYM_ATTACH_HOVER", "box")
+    assert AM.oracle_hover_params()["rule"] == "box"  # the map the sampler reads follows the rule the oracle runs
     assert (p["clear_m"], p["footprint_margin_m"], p["touchdown_extra_m"]) == (cfg.attach_hover_clear_m, cfg.attach_hover_footprint_margin_m, cfg.attach_touchdown_extra_m)
     assert AM.oracle_hover_params("swept")["rule"] == "swept"
     with pytest.raises(ValueError):
