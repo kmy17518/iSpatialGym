@@ -130,6 +130,72 @@ def stage_validate(args, jobs, world=None):
     return world
 
 
+def settle_first_on() -> bool:
+    """Opt-in ``GB_SETTLE_FIRST=1`` (of-v2maps 2026-11-07): the settle survey runs before the candidates (:mod:`settle_first`)."""
+    return os.environ.get("GB_SETTLE_FIRST", "") == "1"
+
+
+def stage_settle(args, jobs, world=None):
+    """``GB_SETTLE_FIRST``: per job, :data:`settle_first.SURVEY_YAWS_DEG` x :data:`settle_first.SURVEY_DROPS_M` drops from the designated
+    rest (``TabletopWorld.settle_survey``), clustered into distinct rests (``settle_first.cluster_rests``) and written to
+    ``<job dir>/settle_first.json``; returns the jobs to generate and validate (``settle_first.jobs_for_rests``: the job at its most
+    frequent stable rest under its own id, a derived job per other stable rest seen twice or more) and the world. A survey that finds
+    no stable rest keeps the job as it was (designated)."""
+    import numpy as np
+
+    from ispatialgym.grasping import object_geometry as OG
+    from ispatialgym.grasping import settle_first as SF
+
+    if world is None:
+        world = _world(args)
+    cfg = world.cfg
+    out: List[Dict[str, Any]] = []
+    for j in jobs:
+        d = S.job_dir(j, args.root)
+        t0 = time.time()
+        path = os.path.join(d, "settle_first.json")
+        try:
+            doc = None if args.force else S.load_json(path)
+            if doc is None:
+                obj = world.load(j, d)
+                geom = OG.load(d)
+                hint = j.get("rest_hint_wxyz")
+                q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
+                quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
+                try:
+                    outcomes = world.settle_survey(obj, geom, quat0, SF.survey_plan())
+                finally:
+                    world.unload(obj)
+                clusters = SF.cluster_rests(outcomes, geom.union.vertices, designated_xyzw=quat0)
+                doc = {"schema": "isg-settle-first/1", "id": j["id"], "method": SF.METHOD, "designated_quat_xyzw": [round(float(v), 7) for v in quat0],
+                       "plan": [{"yaw0": round(y, 5), "drop_m": dm} for y, dm in SF.survey_plan()], "clusters": clusters,
+                       "outcomes": [{k: o.get(k) for k in ("yaw0", "drop_m", "quat_xyzw", "h_root", "stable", "tilt_from_intended_rad", "settle_steps",
+                                                         "lowest_point_gap_m", "support_load_N", "weight_N")} for o in outcomes],
+                       "wall_s": round(time.time() - t0, 2), "created": S.now()}
+                os.makedirs(d, exist_ok=True)
+                S.save_json(path, doc)
+            new = SF.jobs_for_rests(j, doc["clusters"]) or [j]
+            for nj in new:
+                if nj.get("derived_from"):
+                    nd = S.job_dir(nj, args.root)
+                    os.makedirs(nd, exist_ok=True)
+                    S.save_json(os.path.join(nd, "job.json"), nj)
+                    geo = os.path.join(d, "geometry.json")
+                    if os.path.exists(geo) and not os.path.exists(os.path.join(nd, "geometry.json")):
+                        import shutil
+
+                        shutil.copy2(geo, os.path.join(nd, "geometry.json"))
+            out.extend(new)
+            _log(args, "settle", {"id": j["id"], "ok": True, "s": doc.get("wall_s"), "rests": [(c["rest_id"], c["n"], c["n_stable"], c["h_root"],
+                                                                                              c["tilt_from_designated_rad"], len(c["roll_merged"])) for c in doc["clusters"]],
+                                  "jobs": [nj["id"] for nj in new]})
+        except Exception as e:  # noqa: BLE001
+            out.append(j)
+            _log(args, "settle", {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]})
+    print("GB_SETTLE_DONE", flush=True)
+    return out, world
+
+
 def rest_retry_jobs(args, jobs) -> List[Dict[str, Any]]:
     """Jobs whose object settled in a rest other than the designated one (``rests.json``: ``intended`` False) and got no valid grasp:
     derived jobs designated at that MEASURED rest (``rest_hint_wxyz`` = its quaternion, wxyz), candidates generated for it - a new model
@@ -183,7 +249,7 @@ def summary(args, jobs):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("stage", choices=["export", "candidates", "validate", "retry", "all", "summary"])
+    ap.add_argument("stage", choices=["export", "settle", "candidates", "validate", "retry", "all", "summary"])
     ap.add_argument("--jobs", required=True)
     ap.add_argument("--root", default=None)
     ap.add_argument("--shard", default=None, help="i/n")
@@ -198,6 +264,8 @@ def main(argv=None):
     world = None
     if args.stage in ("export", "all"):
         world = stage_export(args, jobs, world)
+    if args.stage == "settle" or (args.stage == "all" and settle_first_on()):
+        jobs, world = stage_settle(args, jobs, world)  # of-v2maps 2026-11-07: GB_SETTLE_FIRST - the measured rests first
     if args.stage in ("candidates", "all"):
         stage_candidates(args, jobs)
     if args.stage in ("validate", "all"):

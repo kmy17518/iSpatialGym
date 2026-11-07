@@ -340,9 +340,22 @@ class TabletopWorld:
             self.slab.scale = sc
         self.support = CP.Support.box(centre, [d / 2 for d in dims], name="slab")
 
-    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0)) -> Tuple[Dict[str, Any], Any]:
-        """Drop and settle the object on the slab with the robot parked; the measured rest record and the scene snapshot."""
+    def settle_survey(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, plan: Sequence[Tuple[float, float]]) -> List[Dict[str, Any]]:
+        """of-v2maps 2026-11-07 (``GB_SETTLE_FIRST``, :mod:`ispatialgym.grasping.settle_first`): one :meth:`settle` per ``(yaw0, drop_m)`` of
+        ``plan`` from the designated rest ``quat0`` turned by ``yaw0`` about +z; the rest records with ``yaw0`` / ``drop_m`` (no snapshot)."""
+        out = []
+        for yaw0, drop in plan:
+            q = S.quat_mul(S.quat_yaw(float(yaw0)), np.asarray(quat0, dtype=float))
+            rec, _ = self.settle(obj, geom, q, drop_m=float(drop))
+            rec.update(yaw0=round(float(yaw0), 5), drop_m=float(drop))
+            out.append(rec)
+        return out
+
+    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0), drop_m: Optional[float] = None) -> Tuple[Dict[str, Any], Any]:
+        """Drop and settle the object on the slab with the robot parked; the measured rest record and the scene snapshot. ``drop_m``:
+        the drop height (default ``cfg.drop_m``; the settle-first survey varies it)."""
         th, cfg = self.th, self.cfg
+        drop = cfg.drop_m if drop_m is None else float(drop_m)
         t0 = time.time()
         V = geom.union.vertices
         R0 = S.quat_to_mat(quat0)
@@ -351,7 +364,7 @@ class TabletopWorld:
         centre, dims = self.slab_pose_for(obj_xy, radius)
         self.park()
         self.place_slab(centre, dims)
-        z0 = cfg.slab_top_z + bottom + cfg.drop_m
+        z0 = cfg.slab_top_z + bottom + drop
         obj.set_position_orientation(th.tensor([obj_xy[0], obj_xy[1], z0], dtype=th.float32), th.tensor(quat0, dtype=th.float32))
         obj.keep_still()
         a = self.hold_action()
@@ -394,7 +407,7 @@ class TabletopWorld:
                "pose_support": {"position": [round(float(p[0] - obj_xy[0]), 6), round(float(p[1] - obj_xy[1]), 6), round(float(p[2] - cfg.slab_top_z), 6)],
                                 "orientation_xyzw": [round(float(v), 7) for v in q]},
                "tilt_from_intended_rad": round(S.tilt_distance(q, quat0), 5), "yaw_from_reference_rad": round(S.yaw_of_quat(q) - cfg.reference_yaw, 5),
-               "lowest_point_gap_m": round(float(Vw[:, 2].min() - cfg.slab_top_z), 6), "drop_m": cfg.drop_m,
+               "lowest_point_gap_m": round(float(Vw[:, 2].min() - cfg.slab_top_z), 6), "drop_m": drop,
                "stable": bool(stable and contact), "pose_still": bool(stable), "contact": bool(contact),
                "support_load_N": round(support_load, 3), "weight_N": round(weight, 3), "contact_rule": "awake support load > 0.5 x weight",
                "settle_steps": steps, "settle_time_s": round(steps / 30.0, 3),
@@ -693,6 +706,9 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
         rest.update({"category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))), "dataset": job.get("dataset"),
                      "asset": {"category": job["category"], "model": job["model"], "dataset": job.get("dataset") or "behavior-1k-assets"},
                      "provenance": {"job": job.get("id"), "legacy_key": job.get("legacy_key"), "validator": VALIDATOR_VERSION}})
+        if job.get("settle_first"):
+            # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): the surveyed rest the candidates were generated at; this settle is the guard
+            rest["settle_first"] = dict(job["settle_first"], designated_rest_hint_wxyz=job.get("designated_rest_hint_wxyz"))
         rests[rest["rest_id"]] = rest
         timing["settle_s"] = rest["wall_s"]
         p, q = obj.get_position_orientation()
