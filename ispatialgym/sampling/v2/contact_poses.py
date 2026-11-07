@@ -315,6 +315,39 @@ def touching_points(t_hull_w: th.Tensor, p_hull_w: th.Tensor, tangent) -> Tuple[
     return work, brace
 
 
+def hand_overlap(eef_pose, hull_local, obj_pose, margin: float = 0.005, against: str = "box", hull_w: Optional[th.Tensor] = None) -> Optional[str]:
+    """Which part of the hand beyond the finger profile (``HAND_SPHERES_EEF``: wrist camera, knuckles, gripper body) comes within ``margin`` of
+    the object - its box in its own frame (``against="box"``) or its hull (``"hull"``: :class:`HullSections` of ``hull_w``, the hull in world
+    points; default ``hull_local`` posed at ``obj_pose``; the box when qhull cannot build it) - at the eef pose; None when all clear
+    (``IORSSmall.hand_overlap``: the IK ignores the pushed / braced object at its contact pose, this is what sees the hand there)."""
+    hull = G.t(hull_local)
+    eef = (G.t(eef_pose[0]), G.t(eef_pose[1]))
+    if against == "hull":
+        sec = HullSections(hull_w if hull_w is not None else C.transform_points((G.t(obj_pose[0]), G.t(obj_pose[1])), hull))
+        worst = None
+        for part, (centres, r) in HAND_SPHERES_EEF.items():
+            dist = sec.distance(C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
+            if dist is None:
+                break
+            dmin = float(dist.min())
+            if dmin < r + margin and (worst is None or dmin - r < worst[1]):
+                worst = (part, dmin - r)
+        else:
+            return None if worst is None else f"{worst[0]} {worst[1] * 1000:+.0f} mm from the hull (margin {margin * 1000:.0f} mm)"
+    lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
+    inv = C.invert((G.t(obj_pose[0]), G.t(obj_pose[1])))
+    worst = None
+    for part, (centres, r) in HAND_SPHERES_EEF.items():
+        pts_o = C.transform_points(inv, C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
+        d = th.clamp(lo - pts_o, min=0.0) + th.clamp(pts_o - hi, min=0.0)
+        dist = float(th.linalg.norm(d, dim=1).min())
+        if dist < r + margin and (worst is None or dist - r < worst[1]):
+            worst = (part, dist - r)
+    if worst is None:
+        return None
+    return f"{worst[0]} {worst[1] * 1000:+.0f} mm from the box (margin {margin * 1000:.0f} mm)"
+
+
 # ------------------------------------------------------------------------------------------------ the push rules
 
 

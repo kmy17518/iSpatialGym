@@ -287,12 +287,16 @@ def test_validate_library_writes_each_entrys_verdict_and_the_timing(glib):
 
     cfg = VC.ContactValidateConfig(max_entries=len(lib["entries"]))
     tim = VC.validate_library(World(), lib, None, None, np.zeros((8, 3)), cfg, "right")
-    assert calls == [("settle", 0.0), ("settle", 180.0)]  # one settled rest per yaw slot
+    assert calls == [("settle", 0.0), ("settle", 180.0)]  # one settled rest per yaw slot (screened entries are not settled for)
     v = {e["class"]: e["validation"] for e in lib["entries"] if e["yaw_deg"] == 0.0}
-    assert all(x["verdict"] == "valid" for k, x in v.items() if "tip" in k)
-    pads = [x for k, x in v.items() if k.startswith("push_h")]
-    assert pads and all(x["verdict"] == "invalid" and x["reasons"] == ["no_placement"] for x in pads)
-    assert all(x["reasons"] == ["short"] for k, x in v.items() if k.startswith("push_blade"))
+    screened = {k for k, x in v.items() if x["verdict"] == "screened"}
+    assert all(v[k]["reasons"] == ["sampler_hand_overlap"] and v[k]["screen"] for k in screened)  # the sampler never records these: no trial
+    assert all(e["validation"]["verdict"] == "screened" for e in lib["entries"] if (e.get("sampler_screen") or {}).get("hand_overlap"))
+    assert all(x["verdict"] == "valid" for k, x in v.items() if "tip" in k and k not in screened)
+    pads = [x for k, x in v.items() if k.startswith("push_h") and k not in screened]
+    assert all(x["verdict"] == "invalid" and x["reasons"] == ["no_placement"] for x in pads)
+    assert all(x["reasons"] == ["short"] for k, x in v.items() if k.startswith("push_blade") and k not in screened)
+    assert any(x["verdict"] == "valid" for x in v.values())
     assert tim["kind"] == "push" and tim["rest_id"] == "r0" and tim["n_entries"] == len(lib["entries"]) and set(tim) >= {"settle_s", "plan_s", "trials_s", "total_s"}
     assert lib["validated"]["oracle_config"]["push_pre_dist_m"] == 0.04 and lib["validation_timing"] is tim
 
@@ -342,3 +346,165 @@ def test_the_axial_brace_load_pushes_at_the_arriving_end():
     path = VC.pusher_path(e, T, pts, cfg, 1.0 / 30.0)
     assert path[0][1] == pytest.approx(0.11) and path[-1][0] + cfg.brace_pusher_size_m[0] / 2 == pytest.approx(0.6 - 0.10 + cfg.brace_press_m)
     assert path[0][2] == pytest.approx(0.8126 + cfg.brace_pusher_size_m[2] / 2 + 0.001)  # the 5 cm box above the support, not in it
+
+
+# ---------------------------------------------------------------------------------------------------------------- the first cluster run's fixes
+
+
+def test_an_entry_that_cannot_run_fails_alone_and_the_model_goes_on(glib):
+    """(b) an entry whose pre-contact the oracle cannot reach (``SkillError plan_failed``) is ``unreachable``, a chain whose contact / goal has no
+    IK from the placement is ``unreachable`` without a trial, any other error ``invalid`` - the other entries are validated."""
+    from ispatialgym.oracle.motions import SkillError
+
+    lib = CL.build_job(_job("box_of_cereal__iucshm__s0.8", ["touching_push"], params={"touching_push": {"yaws": 1}}), glib)["push"]
+    live = [e for e in lib["entries"] if not (e.get("sampler_screen") or {}).get("hand_overlap")][:4]
+    lib["entries"] = live
+    names = [e["class"] for e in live]
+
+    class World:
+        def settle(self, obj, geom, quat):
+            return {"rest_id": "r0", "world_position": [0.0, 0.0, 0.81], "world_quat_xyzw": list(quat)}, "state"
+
+        def plan_entry(self, obj, geom, entry, T, arm):
+            assert T is not None and T[2, 3] == pytest.approx(0.81)  # the SETTLED rest pose, not the live object
+            return {"q": th.zeros(28), "base": [0, 0, 0], "trunk": [0.5, 0.0], "chain_unreachable": ["goal"] if entry["class"] == names[1] else []}
+
+        def trial_push(self, obj, entry, plan, state, rest, arm):
+            if entry["class"] == names[0]:
+                raise SkillError("plan_failed", "arm_to(right, pose): IK failed: goal pose unreachable")
+            if entry["class"] == names[2]:
+                raise RuntimeError("boom")
+            return {"verdict": "valid", "reasons": []}
+
+    tim = VC.validate_library(World(), lib, None, None, np.zeros((8, 3)), VC.ContactValidateConfig(), "right")
+    v = [e["validation"] for e in lib["entries"]]
+    assert v[0]["verdict"] == "unreachable" and v[0]["reasons"] == ["oracle:plan_failed", "unreachable"]
+    assert v[1]["verdict"] == "unreachable" and v[1]["reasons"] == ["chain_unreachable"] and v[1]["trials"] == []
+    assert v[2]["verdict"] == "invalid" and v[2]["reasons"] == ["error:RuntimeError"] and v[3]["verdict"] == "valid"
+    assert tim["n_errors"] == 2 and tim["n_entries"] == 4
+
+
+def test_the_validator_reads_the_model_dir_the_build_read(glib):
+    """(c) the build records the model directory it read (``object.source``: a manifest's ``model_dir``); the validator's job uses it."""
+    d = os.path.join(glib, "models", "box_of_cereal__dkhgxn__s1")
+    job = {**_job("box_of_cereal__dkhgxn__s1", ["touching_brace"]), "entry": None, "model_dir": d}
+    lib = CL.build_job(job, None)["brace"]
+    assert lib["object"]["source"] == d
+    vj = VC.library_job(lib, "box_of_cereal__dkhgxn__s1")
+    assert vj["model_dir"] == d and CL.load_object("/nonexistent/glib", vj)[1] == "r0"
+
+
+def test_the_trial_trace_names_the_mechanism():
+    """(a) the per-trial debug record: the object's first motion BEFORE the hand reached the contact (flung by the arm / the start pose) vs
+    after it, with the loads of that step and a sampled trace."""
+    T0 = np.eye(4)
+    Tc = np.eye(4)
+    Tc[:3, 3] = [0.0, -0.1, 0.05]
+    tr = VC.TrialTrace(T0, Tc, every=2)
+    E = np.eye(4)
+    E[:3, 3] = [0.0, -0.3, 0.3]
+    flung = np.eye(4)
+    flung[:3, 3] = [0.0, 0.02, 0.0]
+    tr(T0, E, {"finger_obj": 0.0, "other_slab": 0.0, "other_link": None})
+    tr(flung, E, {"finger_obj": 0.0, "other_slab": 1.5, "other_link": "right_arm_link6"})
+    rec = tr.end(flung, E)
+    assert rec["first_motion"]["step"] == 2 and rec["first_motion"]["before_contact"] and rec["first_motion"]["eef_to_contact_m"] > 0.2
+    assert rec["first_motion"]["loads"]["other_link"] == "right_arm_link6" and rec["at_contact"] is None and len(rec["trace"]) == 1 and rec["steps"] == 2
+    tr2 = VC.TrialTrace(T0, Tc)
+    tr2(T0, Tc)
+    pushed = np.eye(4)
+    pushed[:3, 3] = [0.0, 0.01, 0.0]
+    tr2(pushed, Tc)
+    assert tr2.rec["at_contact"]["step"] == 1 and tr2.rec["first_motion"]["before_contact"] is False
+
+
+def test_the_start_pose_avoids_a_hand_inside_the_object(glib):
+    """(a) the robot is TELEPORTED to the trial's start: the executed pre-contact when the hand beyond the fingers clears the object, else the
+    recorded one, else no trial; and the builder records the sampler's own hand screen (entries it never records are not validated)."""
+    lib = CL.build_job(_job("box_of_cereal__iucshm__s0.8", ["touching_push"], params={"touching_push": {"yaws": 1}}), glib)["push"]
+    pts = np.array(_box_geometry(*CEREAL)["vertices"])
+    T = CL.object_frame([0, 0, 0, 1.0], 0.0, 0.0)
+    tips = [e for e in lib["entries"] if e["class"].startswith("push_tip_h-@") and not e["sampler_screen"]["hand_overlap"]]
+    assert tips and VC.start_pose_of(tips[0], pts, T) == "executed"
+    assert all("hand_overlap" in e["sampler_screen"] and e["sampler_screen"]["against"] == "hull" for e in lib["entries"])
+    fat = pts * np.array([1.0, 2.5, 1.0])  # the pushed face 2.5x farther out: the hand at both pre-contacts inside the object
+    assert VC.start_pose_of(tips[0], fat, T) is None
+
+
+def test_touching_checks_the_wide_brace_at_its_opening(monkeypatch):
+    """The touching sampler's two-arm solve, its diagnostic and the brace retreat use the brace record's opening (a wide stop's
+    ``fingers_opening_m``), as the oracle and the program check; ``ISPATIALGYM_TOUCH_BRACE_AT_OPENING=0`` = the checks of before."""
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+    from ispatialgym.tests import test_touching_brace_open_push_speed as BO
+
+    calls = []
+
+    class IKC:
+        def exact_both_arms(self, work, other, st, ig_w, ig_o, fingers=None, q_first_other=None, **kw):
+            calls.append(("both", fingers, kw.get("fingers_other", "absent")))
+            return SimpleNamespace(ok=False, reason="no")
+
+        def exact(self, poses, st, arm, ignore_for_last=(), cache=True, fingers=None, **kw):
+            calls.append(("exact", arm, fingers))
+            return SimpleNamespace(ok=True, reason="")
+
+        def ignoring(self, objs):
+            import contextlib
+
+            return contextlib.nullcontext()
+
+        def q_locked(self, st, **kw):
+            return None
+
+    def choose_first(ikc, arm, stream, key, label, chain, evaluate, q_start, stage):
+        c = next(iter(stream))
+        evaluate(SimpleNamespace(chain=chain(c), payload=c, q_first=None))
+        return None, {"options": []}, []
+
+    monkeypatch.setattr(IS.O, "choose_first", choose_first)
+    s = BO._sampler(gen={"brace_open_when_wide": True})
+    s.ikc, s.obj = IKC(), (lambda role: role)
+    s.posed = lambda role, pose: __import__("contextlib").nullcontext()
+    s.hand_overlap = lambda *a, **k: None
+    s._touching_brace_choice = IS.IORSSmall._touching_brace_choice.__get__(s)
+    st, p_init, b_point, p_hull, face_z = BO._brace_inputs(s)
+    s._touching_brace_choice(st, [], BO.T_PLACE, BO.P_POSE, b_point, face_z, BO.DIRECTION, 0.05, p_hull, p_init, [], [], push_fingers_q=0.0)
+    opening = next(iter(s.touching_brace_candidates(st, b_point, face_z, -BO.DIRECTION, partner_hull_w=p_hull, push_point=p_init)))[3]["fingers_opening_m"]
+    assert opening == pytest.approx(0.0315)
+    assert calls[0] == ("both", 0.0, pytest.approx(0.0315)) and calls[1] == ("exact", "left", pytest.approx(0.0315))  # the solve, the diagnostic
+    calls.clear()
+    monkeypatch.setenv("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "0")
+    s._touching_brace_choice(st, [], BO.T_PLACE, BO.P_POSE, b_point, face_z, BO.DIRECTION, 0.05, p_hull, p_init, [], [], push_fingers_q=0.0)
+    assert calls[0] == ("both", 0.0, "absent") and calls[1] == ("exact", "left", 0.0)  # before: the push's fingers, the diagnostic closed
+
+
+def test_exact_both_arms_puts_the_other_arms_fingers_on_its_own_gripper():
+    from ispatialgym.sampling.v2 import ik as IK
+
+    ikc = IK.IKChecker.__new__(IK.IKChecker)
+    robot = SimpleNamespace(arm_control_idx={"left": th.tensor([0, 1]), "right": th.tensor([2, 3])},
+                            gripper_control_idx={"left": th.tensor([4, 5]), "right": th.tensor([6, 7])})
+    ikc.kit = SimpleNamespace(robot=robot, collision_free=lambda q, margin=0.0: [True])
+    seen = []
+
+    def exact(poses, stance, arm, ignore=(), q_seed=None, cache=True, fingers=None, q_first=None, **kw):
+        seen.append((arm, None if q_seed is None else q_seed.clone(), fingers))
+        q = th.zeros(8) if q_seed is None else q_seed.clone()
+        if q_seed is None:
+            q[4:8] = float(fingers)  # both grippers at the working arm's fingers
+        return SimpleNamespace(ok=True, q=q, reason="")
+
+    ikc.exact = exact
+    ikc.ignoring = lambda objs: __import__("contextlib").nullcontext()
+    r = ikc.exact_both_arms(("right", [1]), ("left", [2]), None, fingers=0.0, fingers_other=0.0315)
+    assert r.ok and seen[1][0] == "left" and seen[1][2] == pytest.approx(0.0315)
+    assert th.allclose(seen[1][1][4:6], th.tensor([0.0315, 0.0315])) and th.allclose(seen[1][1][6:8], th.zeros(2))  # the brace hand open, the push hand closed
+    seen.clear()
+    ikc.exact_both_arms(("right", [1]), ("left", [2]), None, fingers=0.0)
+    assert th.allclose(seen[1][1][4:8], th.zeros(4)) and seen[1][2] == 0.0  # as before
+
+
+def test_the_validation_order_samples_every_yaw():
+    es = [{"yaw_deg": y, "class": f"c{k}"} for y in (0.0, 45.0, 90.0) for k in range(3)]
+    order = [(e["yaw_deg"], e["class"]) for e in VC.entry_order(es)]
+    assert order[:3] == [(0.0, "c0"), (45.0, "c0"), (90.0, "c0")] and order[3] == (0.0, "c1") and len(order) == 9

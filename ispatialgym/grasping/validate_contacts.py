@@ -45,7 +45,7 @@ import time
 import traceback
 from dataclasses import asdict, dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -280,40 +280,82 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
 # ------------------------------------------------------------------------------------------------ one model (any world with the KitContactWorld surface)
 
 
+def entry_order(entries: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The validation order: the yaw slots round-robin (each slot's entries in library order), so a ``max_entries`` cap samples every yaw
+    instead of the first slot's lowest classes (the first run validated 48 of the spray bottle's 1104 push entries, all at yaw 0)."""
+    by_yaw: Dict[float, List[Dict[str, Any]]] = {}
+    for e in entries:
+        by_yaw.setdefault(round(float(e.get("yaw_deg", 0.0)), 4), []).append(e)
+    out: List[Dict[str, Any]] = []
+    lists = list(by_yaw.values())
+    for i in range(max((len(v) for v in lists), default=0)):
+        out.extend(v[i] for v in lists if i < len(v))
+    return out
+
+
+def _error_trial(e: BaseException) -> Dict[str, Any]:
+    """A trial the oracle could not run: an unreachable motion (``SkillError`` ``plan_failed`` / an IK failure) is ``unreachable``, anything
+    else ``error`` - the entry fails alone, the model goes on."""
+    reason = getattr(e, "reason", None)
+    unreachable = reason in ("plan_failed", "ik_failed", "unreachable") or "IK failed" in str(e)
+    return {"schema": TRIAL_SCHEMA, "verdict": "unreachable" if unreachable else "invalid",
+            "reasons": ["unreachable" if unreachable else f"error:{type(e).__name__}"] + ([f"oracle:{reason}"] if reason else []), "error": str(e)[:600]}
+
+
 def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarray, cfg: ContactValidateConfig, arm: str) -> Dict[str, Any]:
     """Validate the entries of one library (``lib_k``: one kind) of a loaded object in ``world`` (the :class:`KitContactWorld` surface:
-    ``settle(obj, geom, quat)``, ``plan_entry(obj, geom, entry, obj_pose, arm)``, ``trial_push / trial_brace(obj, entry, plan, state, rest,
-    arm)``); writes each entry's ``validation`` and returns the timing (per model / rest / kind)."""
+    ``settle(obj, geom, quat)``, ``plan_entry(obj, geom, entry, T_world_obj, arm)``, ``trial_push / trial_brace(obj, entry, plan, state, rest,
+    arm)``); writes each entry's ``validation`` (verdict ``valid`` / ``invalid`` / ``unreachable``) and returns the timing (per model / rest /
+    kind). Every entry is planned against its yaw's SETTLED rest pose and tried from the restored rest snapshot, and an entry that cannot be
+    placed or run fails alone (``no_placement``, ``chain_unreachable``, ``unreachable``, ``error:...``)."""
     from ispatialgym.sampling.v2 import contact_poses as CPZ
 
     t_all = time.time()
-    tim = {"settle_s": 0.0, "plan_s": 0.0, "trials_s": 0.0, "n_trials": 0, "n_entries": 0}
+    tim = {"settle_s": 0.0, "plan_s": 0.0, "trials_s": 0.0, "n_trials": 0, "n_entries": 0, "n_errors": 0}
     rest_q = np.asarray(lib_k["object"]["rest"]["quat_xyzw"], dtype=float)
     settled: Dict[float, Tuple[Dict[str, Any], Any]] = {}
-    for e in lib_k["entries"][: cfg.max_entries]:
+    for e in entry_order(lib_k["entries"])[: cfg.max_entries]:
         yaw = round(float(e.get("yaw_deg", 0.0)), 4)
-        t0 = time.time()
-        if yaw not in settled:
-            q0 = S.quat_mul(S.quat_yaw(math.radians(yaw)), rest_q)
-            settled[yaw] = world.settle(obj, geom, q0)
-        rest, state = settled[yaw]
-        tim["settle_s"] += time.time() - t0
-        T_obj = S.pose_mat(rest["world_position"], rest["world_quat_xyzw"]) if "world_position" in rest else None
-        t0 = time.time()
-        plan = world.plan_entry(obj, geom, e, T_obj, arm)
-        tim["plan_s"] += time.time() - t0
         tim["n_entries"] += 1
+        screen = (e.get("sampler_screen") or {}).get("hand_overlap")
+        if screen:
+            # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute
+            e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
+            continue
+        try:
+            t0 = time.time()
+            if yaw not in settled:
+                q0 = S.quat_mul(S.quat_yaw(math.radians(yaw)), rest_q)
+                settled[yaw] = world.settle(obj, geom, q0)
+            rest, state = settled[yaw]
+            tim["settle_s"] += time.time() - t0
+            T_obj = S.pose_mat(rest["world_position"], rest["world_quat_xyzw"]) if "world_position" in rest else None
+            t0 = time.time()
+            plan = world.plan_entry(obj, geom, e, T_obj, arm)
+            tim["plan_s"] += time.time() - t0
+        except Exception as ex:  # noqa: BLE001 - this entry fails, the model goes on
+            tim["n_errors"] += 1
+            e["validation"] = dict(_error_trial(ex), trials=[], stage="settle/plan")
+            continue
         if plan is None or plan.get("q") is None:
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "invalid", "reasons": ["no_placement"], "plan_fail": (plan or {}).get("fail"), "trials": []}
+            continue
+        if plan.get("chain_unreachable"):
+            e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "unreachable", "reasons": ["chain_unreachable"], "plan": _plan_facts(plan), "trials": []}
             continue
         trials = []
         t0 = time.time()
         for _k in range(cfg.trials_per_entry):
-            trials.append(world.trial_push(obj, e, plan, state, rest, arm) if lib_k["kind"] == "push" else world.trial_brace(obj, e, plan, state, rest, arm))
+            try:
+                trials.append(world.trial_push(obj, e, plan, state, rest, arm) if lib_k["kind"] == "push" else world.trial_brace(obj, e, plan, state, rest, arm))
+            except Exception as ex:  # noqa: BLE001 - the oracle's SkillError (an unreachable pre-contact) or anything else: this entry alone
+                tim["n_errors"] += 1
+                trials.append(dict(_error_trial(ex), plan=_plan_facts(plan)))
             tim["n_trials"] += 1
         tim["trials_s"] += time.time() - t0
-        ok = all(t["verdict"] == "valid" for t in trials)
-        e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "valid" if ok else "invalid", "reasons": sorted({r for t in trials for r in t["reasons"]}),
+        verdicts = {t["verdict"] for t in trials}
+        verdict = "valid" if verdicts == {"valid"} else ("unreachable" if verdicts == {"unreachable"} else "invalid")
+        e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": verdict, "reasons": sorted({r for t in trials for r in t["reasons"]}),
                            "trials": trials, "config": asdict(cfg), "entry_digest": e.get("digest"), "calibrated": False}
     tim = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in tim.items()}
     tim["total_s"] = round(time.time() - t_all, 2)
@@ -326,13 +368,85 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     return tim
 
 
+def start_pose_of(entry: Dict[str, Any], pts_obj: np.ndarray, T_obj: np.ndarray, margin: float = 0.003) -> Optional[str]:
+    """Where a trial sets the robot (it is teleported there, no approach): the EXECUTED pre-contact when the hand clears the object there (the
+    hand beyond the fingers by ``contact_poses.hand_overlap`` against its hull, the finger spheres at the entry's opening), else the RECORDED one
+    (the oracle plans its own way down to the executed pre), else None (``start_in_object``: no trial)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    w = CPZ.entry_world(entry, T_obj)
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    obj_pose = (th.tensor(T_obj[:3, 3], dtype=th.float32), th.tensor(S.mat_to_quat(T_obj[:3, :3]), dtype=th.float32))
+    sec = CPZ.HullSections(C.transform_points(obj_pose, hull))
+    q = float(entry["fingers"]["opening_m"])
+    # the fingers too (``hand_overlap`` covers the hand beyond them): the finger spheres moved ``q`` outward along the closing axis
+    fingers = th.tensor([[x, y + math.copysign(q, y), z] for (x, y, z), _r in TT.FINGER_SPHERES_EEF], dtype=th.float32)
+    radii = th.tensor([r for _c, r in TT.FINGER_SPHERES_EEF], dtype=th.float32)
+    for key, pose in (("executed", w["pre_executed"]), ("recorded", w["pre"])):
+        if CPZ.hand_overlap(pose, hull, obj_pose, margin=margin, against="hull") is not None:
+            continue
+        d = sec.distance(C.transform_points((th.as_tensor(pose[0]).float(), th.as_tensor(pose[1]).float()), fingers))
+        if d is not None and bool((d < radii + margin).any()):
+            continue
+        return key
+    return None
+
+
+def _entry_world(entry: Dict[str, Any], T_obj: np.ndarray) -> Dict[str, Any]:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.entry_world(entry, T_obj)
+
+
+def _plan_facts(plan: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: plan.get(k) for k in ("base", "trunk", "cost", "start_lift_m", "chain_reach", "chain_unreachable")}
+
+
+def _pose7(T: np.ndarray) -> List[float]:
+    return [round(float(v), 4) for v in T[:3, 3]] + [round(float(v), 4) for v in S.mat_to_quat(T[:3, :3])]
+
+
+class TrialTrace:
+    """The per-trial debug record (the first cluster run's spray bottle was flung with no trace of how): the object / hand poses at the start,
+    at the contact (the first step the eef is within ``contact_tol_m`` of the contact pose), at the first object motion (> ``motion_tol_m``)
+    and at the end, the step and the hand's distance to the contact when the object first moved, the probe's loads at that step (fingers on
+    the object, a non-finger link on the slab), and every ``every``-th step (object xyz + tilt, eef xyz, loads)."""
+
+    def __init__(self, T_obj0: np.ndarray, contact_T: np.ndarray, every: int = 10, contact_tol_m: float = 0.01, motion_tol_m: float = 0.005):
+        self.T0, self.Tc, self.every, self.ctol, self.mtol = T_obj0, contact_T, int(every), float(contact_tol_m), float(motion_tol_m)
+        self.k = 0
+        self.rec: Dict[str, Any] = {"obj_start": _pose7(T_obj0), "contact_pose": _pose7(contact_T), "at_contact": None, "first_motion": None, "trace": []}
+
+    def __call__(self, T_obj: np.ndarray, T_eef: np.ndarray, loads: Optional[Dict[str, Any]] = None) -> None:
+        self.k += 1
+        moved = float(np.linalg.norm(T_obj[:3, 3] - self.T0[:3, 3]))
+        d_c = float(np.linalg.norm(T_eef[:3, 3] - self.Tc[:3, 3]))
+        loads = {k: (round(float(v), 3) if isinstance(v, (int, float)) else v) for k, v in (loads or {}).items()}
+        if self.rec["at_contact"] is None and d_c <= self.ctol:
+            self.rec["at_contact"] = {"step": self.k, "obj": _pose7(T_obj), "eef": _pose7(T_eef), "obj_moved_m": round(moved, 4)}
+        if self.rec["first_motion"] is None and moved > self.mtol:
+            self.rec["first_motion"] = {"step": self.k, "obj": _pose7(T_obj), "eef": _pose7(T_eef), "eef_to_contact_m": round(d_c, 4),
+                                        "before_contact": self.rec["at_contact"] is None, "loads": loads}
+        if self.k % self.every == 0:
+            self.rec["trace"].append([self.k, _pose7(T_obj)[:3], round(_tilt(self.T0[:3, :3], T_obj[:3, :3]), 4), _pose7(T_eef)[:3],
+                                      loads.get("finger_obj"), loads.get("other_slab"), loads.get("other_link")])
+
+    def end(self, T_obj: np.ndarray, T_eef: np.ndarray) -> Dict[str, Any]:
+        self.rec.update(obj_end=_pose7(T_obj), eef_end=_pose7(T_eef), steps=self.k)
+        return self.rec
+
+
 # ------------------------------------------------------------------------------------------------ the Isaac Sim world (GPU node; not unit-tested)
 
 
 class KitContactWorld:
     """``validate_tabletop.TabletopWorld`` for contacts: the base yaw fixed to the rule frame (``base_yaws`` 1: the robot facing +x), the base
     offsets on the arm's side, the oracle's ``Motions`` with the cuRobo backend as its planner, ``executor.SimState`` over a task stub (the
-    object and the slab in scope), ``ForceProbe`` for the slab loads, a kinematic pusher box for the brace load."""
+    object and the slab in scope), the world's own ``ForceProbe`` (``TabletopWorld.step``) and its sleep assist, a kinematic pusher box for
+    the brace load created ONCE before any object (adding / removing prims under a live probe invalidated the physics tensor views)."""
 
     def __init__(self, cfg: ContactValidateConfig, arm: str):
         from ispatialgym.grasping import validate_tabletop as VT
@@ -342,6 +456,7 @@ class KitContactWorld:
         self.tw = VT.TabletopWorld(self.vcfg)
         self.cfg, self.arm, self.VT = cfg, arm, VT
         self._pusher = None
+        self._pusher_obj()  # before any object: no prim is added while an object's probe view is live
 
     def load(self, job: Dict[str, Any], model_dir: str):
         return self.tw.load(job, model_dir)
@@ -356,14 +471,36 @@ class KitContactWorld:
         return rest, state
 
     def plan_entry(self, obj, geom, entry, T_obj, arm):
+        """The configuration at the entry's EXECUTED pre-contact (``TabletopWorld.plan``) against the SETTLED rest pose ``T_obj`` (not the live
+        object, which a previous trial may have moved), then the chain's other poses (the contact, a push's goal) checked by IK from that
+        base / trunk (``chain_reach``; ``chain_unreachable`` names the ones without a solution)."""
         from ispatialgym.sampling.v2 import contact_poses as CPZ
 
-        cand = {"name": entry["digest"], "T_object_eef": entry["pre"]["executed"], "preshape_q": float(entry["fingers"]["opening_m"])}
-        p, q = obj.get_position_orientation()
-        best = self.tw.plan(obj, geom, [cand], (p.numpy(), q.numpy()))
+        if T_obj is None:
+            T_obj = CPZ._mat(obj.get_position_orientation())
+        from ispatialgym.grasping.contact_library import hull_points
+
+        start = start_pose_of(entry, hull_points(geom), T_obj)
+        if start is None:
+            return {"q": None, "fail": "start_in_object: the hand beyond the fingers meets the object at both pre-contacts (the robot is set there)"}
+        cand = {"name": entry["digest"], "T_object_eef": entry["pre"][start], "preshape_q": float(entry["fingers"]["opening_m"])}
+        pq = (T_obj[:3, 3].copy(), S.mat_to_quat(T_obj[:3, :3]))
+        best = self.tw.plan(obj, geom, [cand], pq)
         b = best.get(entry["digest"])
-        if b is not None and b.get("q") is not None:
-            b = dict(b, T_world_obj=CPZ._mat((p, q)))
+        if b is None or b.get("q") is None:
+            return b
+        b = dict(b, T_world_obj=T_obj, start=start)
+        w = CPZ.entry_world(entry, T_obj)
+        poses = {"contact": w["contact"]} if w["goal"] is None else {"contact": w["contact"], "goal": w["goal"]}
+        try:
+            q_seed = b["q"].clone()
+            q_seed[self.tw.robot.gripper_control_idx[arm]] = float(entry["fingers"]["opening_m"])
+            succ, _qs = self.tw.backend.solve_ik_batch(f"{arm}_arm", self.tw.M.EEF_LINK[arm], list(poses.values()), q_seed, batch_size=8, seeds=self.vcfg.ik_seeds)
+            reach = {k: bool(v) for k, v in zip(poses, succ.tolist())}
+        except Exception as ex:  # noqa: BLE001 - the reach check is advisory: the trial decides
+            reach = {"error": str(ex)[:200]}
+        b["chain_reach"] = reach
+        b["chain_unreachable"] = [k for k, v in reach.items() if v is False]
         return b
 
     def _motions_state(self, obj):
@@ -376,83 +513,115 @@ class KitContactWorld:
         return motions, SimState(self.tw.env, task, self.tw.robot)
 
     def _start(self, obj, entry, plan, state, rest):
-        th_ = self.tw.th
+        """The rest snapshot restored (verified), the robot set at the planned configuration with the entry's fingers, the drive targets held,
+        two hold steps with the sleep assist (as ``validate_tabletop``'s trial)."""
         rec = self.tw.restore(obj, state, rest)
         q = plan["q"].clone()
         q[self.tw.robot.gripper_control_idx[self.arm]] = float(entry["fingers"]["opening_m"])
         self.tw.robot.set_joint_positions(q)
         self.tw.robot.keep_still()
         obj.wake()
-        probe = self.VT.ForceProbe(self.tw.robot, self.tw.slab, obj, self.arm)
-        probe.install()
-        return rec, probe, th_
+        sa = self.tw.SA.SleepAssist(self.tw.robot, {obj.name: obj}, "gc") if self.vcfg.sleep_assist else None
+        self.tw.probe.take()  # the restore's own contact samples are not the trial's
+        return rec, sa
 
-    def _step_fn(self, probe, series):
+    def _stepper(self, obj, sim, arm, sa, series, trace):
+        k = [0]
+
         def step(a):
-            self.tw.step(a)
-            f = probe.take()
+            f = self.tw.step(a, sa, k[0])  # the world's probe (TabletopWorld.load), the sleep assist
+            k[0] += 1
             series.append(float(f.get("other_slab", 0.0) or 0.0))
+            if trace is not None:
+                trace(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm)), f)
+            return f
         return step
+
+    def _hold(self, motions, step, n: int) -> None:
+        for a in motions.hold(n):
+            step(a)
 
     def trial_push(self, obj, entry, plan, state, rest, arm):
         t0 = time.time()
-        rec, probe, _ = self._start(obj, entry, plan, state, rest)
+        rec, sa = self._start(obj, entry, plan, state, rest)
         series: List[float] = []
+        from ispatialgym.grasping.contact_library import hull_points
+
+        pts = hull_points(self._geom_of(obj))
+        motions, sim = self._motions_state(obj)
+        T_start = _T(obj.get_position_orientation())
+        w = _entry_world(entry, T_start)
+        trace = TrialTrace(T_start, _T(w["contact"]))
+        trace.rec.update(obj_rest=[round(float(v), 4) for v in rest.get("world_position", [])] + [round(float(v), 4) for v in rest.get("world_quat_xyzw", [])],
+                         eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec)
+        step = self._stepper(obj, sim, arm, sa, series, trace)
+        self._hold(motions, step, self.vcfg.init_hold_steps)
+        T0 = _T(obj.get_position_orientation())
+        act = entry_action(entry, T0, obj.name, arm, touches=(self.tw.slab.name,))
+        track = PeakTracker(entry, T0, pts)
+
+        def step_track(a):
+            step(a)
+            track(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm)))
+
         try:
-            T0 = _T(obj.get_position_orientation())
-            from ispatialgym.grasping.contact_library import hull_points
-
-            pts = hull_points(self._geom_of(obj))
-            motions, sim = self._motions_state(obj)
-            act = entry_action(entry, T0, obj.name, arm, touches=(self.tw.slab.name,))
-            track = PeakTracker(entry, T0, pts)
-            step0 = self._step_fn(probe, series)
-
-            def step(a):
-                step0(a)
-                track(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm)))
-
-            run = run_oracle(act, motions, sim, step, self.cfg.max_steps)
-            T1 = _T(obj.get_position_orientation())
-            Te = _T(sim.eef_pose(arm))
-        finally:
-            probe.uninstall()
+            run = run_oracle(act, motions, sim, step_track, self.cfg.max_steps)
+        except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
+            out = _error_trial(ex)
+            return dict(out, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), debug=trace.end(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm))),
+                        wall_s=round(time.time() - t0, 3))
+        T1, Te = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
         out = judge_push(entry, T0, T1, Te, pts, self.cfg, run, max(series) if series else 0.0, tip_gap_m=track.gap)
-        return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, wall_s=round(time.time() - t0, 3))
+        return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te),
+                    wall_s=round(time.time() - t0, 3))
 
     def trial_brace(self, obj, entry, plan, state, rest, arm):
         t0 = time.time()
-        rec, probe, th_ = self._start(obj, entry, plan, state, rest)
+        rec, sa = self._start(obj, entry, plan, state, rest)
         series: List[float] = []
-        try:
-            T_start = _T(obj.get_position_orientation())
-            motions, sim = self._motions_state(obj)
-            act = entry_action(entry, T_start, obj.name, arm)
-            run = run_oracle(act, motions, sim, self._step_fn(probe, series), self.cfg.max_steps)
-            T0, Te0 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
-            from ispatialgym.grasping.contact_library import hull_points
+        th_ = self.tw.th
+        from ispatialgym.grasping.contact_library import hull_points
 
-            pts = hull_points(self._geom_of(obj))
+        pts = hull_points(self._geom_of(obj))
+        motions, sim = self._motions_state(obj)
+        T_start = _T(obj.get_position_orientation())
+        w = _entry_world(entry, T_start)
+        trace = TrialTrace(T_start, _T(w["contact"]))
+        trace.rec.update(eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec)
+        step = self._stepper(obj, sim, arm, sa, series, trace)
+        self._hold(motions, step, self.vcfg.init_hold_steps)
+        act = entry_action(entry, _T(obj.get_position_orientation()), obj.name, arm)
+        try:
+            run = run_oracle(act, motions, sim, step, self.cfg.max_steps)
+            T0, Te0 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
+            trace.rec["braced"] = {"obj": _pose7(T0), "eef": _pose7(Te0)}
             pusher = self._pusher_obj()
-            step = self._step_fn(probe, series)
             for c in pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0) + [None] * self.cfg.brace_hold_steps:
                 if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
                     pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0]))
-                for a in motions.hold(1):
-                    step(a)
-            pusher.set_position_orientation(th_.tensor([5.0, 5.0, -1.0]), th_.tensor([0.0, 0.0, 0.0, 1.0]))
-            T1, Te1 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
+                self._hold(motions, step, 1)
+        except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
+            out = _error_trial(ex)
+            return dict(out, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), debug=trace.end(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm))),
+                        wall_s=round(time.time() - t0, 3))
         finally:
-            probe.uninstall()
+            self._park_pusher()
+        T1, Te1 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
         load = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
         out = judge_brace(entry, T0, T1, Te0, Te1, load, self.cfg, run, max(series) if series else 0.0)
-        return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, wall_s=round(time.time() - t0, 3))
+        return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
+                    wall_s=round(time.time() - t0, 3))
 
     def _geom_of(self, obj):
         return getattr(obj, "_isg_geom")
 
+    def _park_pusher(self):
+        if self._pusher is not None:
+            self._pusher.set_position_orientation(self.tw.th.tensor([5.0, 5.0, -1.0]), self.tw.th.tensor([0.0, 0.0, 0.0, 1.0]))
+
     def _pusher_obj(self):
-        """The brace load's pusher: a kinematic box (``kinematic_only``: set_position drives it into the partner, PhysX pushes it out)."""
+        """The brace load's pusher: a kinematic box (``kinematic_only``: set_position drives it into the partner, PhysX pushes it out), parked
+        below the floor 5 m away between loads."""
         if self._pusher is None:
             from omnigibson.objects.primitive_object import PrimitiveObject
 
@@ -460,11 +629,22 @@ class KitContactWorld:
             self._pusher = PrimitiveObject(name="isg_brace_pusher", primitive_type="Cube", size=1.0, kinematic_only=True, rgba=(0.2, 0.6, 0.9, 1.0),
                                            scale=self.tw.th.tensor([sy, sx, sz]))
             self.tw.scene.add_object(self._pusher)
-            self._pusher.set_position_orientation(self.tw.th.tensor([5.0, 5.0, -1.0]), self.tw.th.tensor([0.0, 0.0, 0.0, 1.0]))
+            self._park_pusher()
+            self.tw.og.sim.step()
         return self._pusher
 
 
 # ------------------------------------------------------------------------------------------------ CLI
+
+
+def library_job(lib_k: Dict[str, Any], eid: str) -> Dict[str, Any]:
+    """The object job of a library: its model directory as the BUILD read it (``object.source``: a manifest's ``model_dir``, e.g. a roles_all
+    entry read in place under $GBH), else ``entry`` under ``--glib``."""
+    o = lib_k["object"]
+    job = {"id": eid, "category": o["category"], "model": o["model"], "scale": o["scale"], "entry": o["entry"]}
+    if o.get("source") and os.path.isdir(o["source"]):
+        job["model_dir"] = o["source"]
+    return job
 
 
 def validate_cli(a) -> None:
@@ -495,8 +675,7 @@ def validate_cli(a) -> None:
         t1 = time.time()
         try:
             lib_k = CL.load_library(path)
-            o = lib_k["object"]
-            job = {"id": eid, "category": o["category"], "model": o["model"], "scale": o["scale"], "entry": o["entry"]}
+            job = library_job(lib_k, eid)
             mlib, _rid, geom = CL.load_object(a.glib, job)
             obj = world.load(dict(job, rest_hint_wxyz=None), os.path.dirname(mlib.path))
             obj._isg_geom = geom
@@ -508,7 +687,7 @@ def validate_cli(a) -> None:
             S.save_json(path, lib_k)
             v = [e.get("validation", {}).get("verdict") for e in lib_k["entries"]]
             CL._log(a.root, "validate", a.shard, {"id": eid, "kind": a.kind, "arm": arm, "ok": True, "s": round(time.time() - t1, 2), "timing": tim,
-                                                  "valid": v.count("valid"), "invalid": v.count("invalid"), "skipped": v.count(None)})
+                                                  "valid": v.count("valid"), "invalid": v.count("invalid"), "unreachable": v.count("unreachable"), "skipped": v.count(None)})
         except Exception as e:  # noqa: BLE001
             CL._log(a.root, "validate", a.shard, {"id": eid, "kind": a.kind, "ok": False, "error": repr(e), "tb": traceback.format_exc()[-1200:]})
     print("GB_CONTACT_VALIDATE_DONE", flush=True)

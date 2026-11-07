@@ -124,10 +124,16 @@ def build_touching_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params
                 cls += "#"
             seen.add(cls)
             pre = C.pre_pose(init, CPZ.recorded_pre_dist(extras))
+            # the sampler's screen of the class (IORSSmall._touching_push_choice: push_hand_overlap - against the hull under the sweep or with
+            # open fingers, else the box; the pushed object moves with the hand, so the goal's verdict is the init's)
+            against = "hull" if (sweep or CPZ.contact_fingers(extras) != 0.0) else "box"
+            overlap = CPZ.hand_overlap(init, th.as_tensor(pts_obj, dtype=th.float32), _tpose(T), against=against,
+                                       hull_w=hull_w if against == "hull" else None)
             e = CPZ.contact_entry("push", cls, "touching_push", "work", T, init, pre, dict(extras, pose_class=kind),
                                   face_rule="the target's -y face (the push contact of touching_points), the footprint centre line under the sweep",
                                   direction=D, stroke_m=stroke, support_z=0.0, object_height=face_z[1] - face_z[0], executor="push")
             e["yaw_deg"] = round(math.degrees(yaw), 4)
+            e["sampler_screen"] = {"hand_overlap": overlap, "against": against}
             out.append(e)
     return out
 
@@ -156,6 +162,8 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
                                   face_rule="the partner's +y face (the brace point of touching_points), approached along -y",
                                   support_z=0.0, object_height=face_z[1] - face_z[0], pitch_deg=extras.get("pitch_deg"))
             e["yaw_deg"] = round(math.degrees(yaw), 4)
+            # the sampler's screen (IORSSmall._touching_brace_choice: hand_overlap against the partner's box)
+            e["sampler_screen"] = {"hand_overlap": CPZ.hand_overlap(contact, th.as_tensor(pts_obj, dtype=th.float32), _tpose(T), against="box"), "against": "box"}
             e["load"] = {"direction": [float(v) for v in TOUCH_DIRECTION], "what": "the touching push drives the target into the partner along +y"}
             out.append(e)
     return out

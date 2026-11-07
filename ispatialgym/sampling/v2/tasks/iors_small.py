@@ -217,6 +217,13 @@ SPA_CELL_REJECTS = ("no_workspace", "edge_too_short", "stance_collision", "shelf
 _SPA_CACHE_ANNOUNCED = False
 
 
+def brace_at_opening_on() -> bool:
+    """i7-contact 2026-11-07 (``ISPATIALGYM_TOUCH_BRACE_AT_OPENING``, default "1"): the touching brace's checks put the brace hand at its record's
+    opening (``contact_poses.contact_fingers``: a wide stop's ``fingers_opening_m``, else closed) - the opening ``execute_brace`` braces at and
+    the program check checks - instead of the push's fingers on both hands / closed; "0" = the checks of before (the records are the same)."""
+    return os.environ.get("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "1").strip() != "0"
+
+
 def push_fingers(extras: Optional[Dict[str, Any]]) -> float:
     """oracle-fix 2026-11-06 (``generation.push_gripper_open``): the finger joints a push candidate / record is checked with - its
     ``fingers_opening_m`` (the open push: the oracle holds the gripper there, ``execute_push``; the program check replays with it), else
@@ -4378,32 +4385,9 @@ class IORSSmall(SamplerV2):
         ``against="hull"`` (oracle-fix 2026-11-06, :meth:`push_height_sweep_on`): the distance to the hull itself (:class:`HullSections`) -
         the box in the object's frame stood ~2 cm proud of the spray bottle's surface where the leaning blades' gripper body came
         (touching#04: 'gripper body -17 mm from the box'); the box when qhull cannot build the hull."""
-        hull = G.t(self.hull[role])
-        eef = (G.t(eef_pose[0]), G.t(eef_pose[1]))
-        if against == "hull":
-            sec = HullSections(self.world.hull_at(self.hull[role], obj_pose))
-            worst = None
-            for part, (centres, r) in HAND_SPHERES_EEF.items():
-                dist = sec.distance(C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
-                if dist is None:
-                    break
-                dmin = float(dist.min())
-                if dmin < r + margin and (worst is None or dmin - r < worst[1]):
-                    worst = (part, dmin - r)
-            else:
-                return None if worst is None else f"{worst[0]} {worst[1] * 1000:+.0f} mm from the hull (margin {margin * 1000:.0f} mm)"
-        lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
-        inv = C.invert((G.t(obj_pose[0]), G.t(obj_pose[1])))
-        worst = None
-        for part, (centres, r) in HAND_SPHERES_EEF.items():
-            pts_o = C.transform_points(inv, C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
-            d = th.clamp(lo - pts_o, min=0.0) + th.clamp(pts_o - hi, min=0.0)
-            dist = float(th.linalg.norm(d, dim=1).min())
-            if dist < r + margin and (worst is None or dist - r < worst[1]):
-                worst = (part, dist - r)
-        if worst is None:
-            return None
-        return f"{worst[0]} {worst[1] * 1000:+.0f} mm from the box (margin {margin * 1000:.0f} mm)"
+        # i7-contact 2026-11-07: the shared rule (contact_poses.hand_overlap; the libraries screen their entries with it)
+        hull_w = self.world.hull_at(self.hull[role], obj_pose) if against == "hull" else None
+        return CPZ.hand_overlap(eef_pose, self.hull[role], obj_pose, margin=margin, against=against, hull_w=hull_w)
 
     def push_hand_overlap(self, push_init: G.Pose, push_goal: G.Pose, t_place_pose: G.Pose, direction: th.Tensor, dist: float,
                           against: str = "box") -> Optional[str]:
@@ -4919,24 +4903,29 @@ class IORSSmall(SamplerV2):
         import itertools
 
         pushed = (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))
+        at_opening = brace_at_opening_on()
 
         def evaluate(p):
             pre, contact = p.chain
+            # i7-contact 2026-11-07 (brace_at_opening_on, default on): the brace hand at the opening the oracle braces at (a wide stop's
+            # fingers_opening_m, else closed) in the two-arm solve, the diagnostic and the retreat - as the program check checks it
+            brace_q = CPZ.contact_fingers(p.payload[3], "brace") if at_opening else None
             overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
             if overlap is not None:
                 return False, None, None, overlap
             with self.posed("target", pushed), self.ikc.ignoring([self.obj("target")]):
                 res = self.ikc.exact_both_arms(("right", list(push_chain)), ("left", [pre, contact]), st, ignore_push, ignore_brace, fingers=push_fingers_q,
-                                               q_first_other=p.q_first)
+                                               q_first_other=p.q_first, **({"fingers_other": brace_q} if at_opening else {}))
             if not res.ok:
                 if not diagnose:
                     return False, res, None, str(res.reason)
                 # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass here names
                 # the two-arm combination (self-collision / the locked right arm) as the blocker
-                alone = self.ikc.exact([pre, contact], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED)
+                alone = self.ikc.exact([pre, contact], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED if brace_q is None else brace_q)
                 return False, res, None, f"{res.reason} [left alone: {'ok' if alone.ok else alone.reason}]"
             qs = O.chain_qs(self.ikc, "left", [pre, contact])
-            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False)
+            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False,
+                                   **({"fingers": brace_q} if at_opening else {}))
             if not r_ret.ok:
                 return False, res, None, f"brace retreat clear pose: {r_ret.reason}"
             return True, res, qs, ""
