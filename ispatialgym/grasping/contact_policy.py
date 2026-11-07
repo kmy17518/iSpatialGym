@@ -49,6 +49,11 @@ POLICY_NAME = "isg-support-contact"
 
 REASONS = ("ok", "finger_penetration", "palm_contact", "wrist_camera_contact", "wrist_contact", "link_sphere_contact", "obstacle_contact")
 ROLE_REASON = {"palm": "palm_contact", "wrist_camera": "wrist_camera_contact", "wrist": "wrist_contact"}
+#: the robot model's cuRobo sphere buffer (``r1pro_model.build_curobo_robot_dict(collision_sphere_buffer=0.002)``, the value of OmniGibson's
+#: shipped ``r1pro_description_curobo_default.yaml``): ONE global padding of every collision sphere of every link, used by every cuRobo
+#: query (planner, IK, the sampler's checks) - not a margin the contact policy chose for the non-finger links (its own sphere margin is
+#: ``sphere_support_margin_m`` = 0); i7-plateqtf2 2026-11-08 (owner item 1): the hull fallback's "narrow" bound
+MODEL_SPHERE_BUFFER_M = 0.002
 #: i7-lean 2026-11-07: the clearance every robot part keeps from a NORMAL obstacle box (the lean board, an interior's board above / side
 #: walls / back panel) - no allowance for any part, the fingers included (they touch only the policed support, rule 2)
 OBSTACLE_MARGIN_M = 0.0
