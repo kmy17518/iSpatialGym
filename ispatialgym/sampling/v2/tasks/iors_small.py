@@ -2220,6 +2220,14 @@ class IORSSmall(SamplerV2):
         # A1: the target starts in the start region of the attempt's partner side (7e: never on a candidate dropped for its travel)
         cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
         order = rng.permutation(len(cands))
+        if os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" and self.shelf_pose is None and self.relation != "touching" and cands:
+            # oracle-fix 2026-11-07 (owner prompt E 2, opt-in): the candidates whose expected place sits deepest in their manipulation image first
+            # (stance_frame_aim: the head camera from base + trunk, no IK); the random order breaks ties
+            aim = {int(i): self.stance_frame_aim(cands[int(i)]) for i in order}
+            order = sorted(order, key=lambda i: -aim[int(i)] if math.isfinite(aim[int(i)]) else 1e9)
+            for i, v in aim.items():
+                cands[i].extras["frame_aim_px"] = round(v, 1) if math.isfinite(v) else None
+            self.counters["frame_aim.ranked"] = self.counters.get("frame_aim.ranked", 0) + 1
         if self.shelf_pose is not None:  # the start is fixed: the stances whose focus is nearest it first
             sx = self.shelf_pose[0][:2]
             order = sorted(order, key=lambda i: float(th.linalg.norm(cands[int(i)].focus[:2] - sx)) if cands[int(i)].focus is not None else 1e9)
@@ -2554,6 +2562,23 @@ class IORSSmall(SamplerV2):
                                      "cell_interval_m": (manip.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))}
                 return pose
         raise Reject("partner_placement", f"no meta-link spot of {len(spots)} takes the partner on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
+
+    def stance_frame_aim(self, cand: Stance) -> float:
+        """oracle-fix 2026-11-07 (owner prompt E 2, ``ISPATIALGYM_STANCE_FRAME_AIM``): the frame margin (px, ``IKChecker.eef_frame_margin``) of
+        an upright eef box at the EXPECTED place - the partner's centre at the mid gap of the candidate's start-region interval on the attempt's
+        side (focus + left x side x (mid gap + both half extents)), at the partner's top + the target's height - in the candidate's head
+        image; -inf without a focus. A ranking proxy (the grasp's place orientation is not known yet), not a rule."""
+        if cand.focus is None:
+            return float("-inf")
+        side = self.region_side if self.region_side is not None else self.template_sides()[0]
+        reg = (cand.extras.get(TT.START_REGION) or {}).get(TT.side_name(side))
+        gap = 0.5 * (float(reg[0]) + float(reg[1])) if reg else 0.05
+        r_t = TT.half_extent(self.hull["target"], self.rest["target"])
+        r_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
+        xy = G.t(cand.focus)[:2] + G.t(cand.left) * float(side) * (gap + r_t + r_p)
+        z = float(self.top.z) + TT.height_of(self.hull["partner"], self.rest["partner"]) + TT.height_of(self.hull["target"], self.rest["target"])
+        aim = (th.tensor([float(xy[0]), float(xy[1]), z]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        return self.ikc.eef_frame_margin(aim, self.camera_pose_at(cand))
 
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose, frame_score=None) -> G.Pose:
         """§4.6 step 2 with the A1 start region (owner 2026-10-12): the partner on the attempt's side (``region_side``, fixed before the target
