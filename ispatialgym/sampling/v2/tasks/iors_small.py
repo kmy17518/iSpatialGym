@@ -118,6 +118,17 @@ def _tabletop():
 
 from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band, nearer_side_lateral  # noqa: E402,F401  (pure rules, tested there)
 
+#: i7-plateqtf2 (owner decision 2026-11-08 02:35 item 3): the draw's pre-place frame rule - ``fingertip`` (default: the program check's
+#: fingertip point + 2 cm slack, ``IORSSmall.pre_place_frame_ok``) or ``box`` (the eef box, the rule before)
+PREPLACE_FRAME_RULE_ENV = "ISPATIALGYM_PREPLACE_FRAME_RULE"
+
+
+def pre_place_frame_rule() -> str:
+    v = (os.environ.get(PREPLACE_FRAME_RULE_ENV, "") or "fingertip").strip().lower()
+    if v not in ("fingertip", "box"):
+        raise ValueError(f"{PREPLACE_FRAME_RULE_ENV}={v!r}: expected fingertip or box")
+    return v
+
 
 def left_contact_band_cells(s, trunk: Tuple[float, float], height: float, stance=None):
     """Base-frame cells of the left-arm generic CONTACT band (closed gripper, brace approach; one band per object height
@@ -2417,7 +2428,7 @@ class IORSSmall(SamplerV2):
 
             def frame_score(pp, _cam=cam_m):
                 place_g = IK.grasp_pose(self.goal_pose(t_pose, pp), grasp.eef_in_object)
-                return min(self.ikc.eef_frame_margin(place_g, _cam), self.ikc.eef_frame_margin(self.pre_place_of(place_g), _cam))
+                return min(self.ikc.eef_frame_margin(place_g, _cam), self.pre_place_frame_margin(self.pre_place_of(place_g), _cam))
             # goal_pose reads the sidecar's manipulation stance (abv2_rank 2026-11-07: KeyError 'manipulation' in 21 / 21 iors_small runs): it is
             # registered here, before the partner draw, instead of after it (the caller pops it again when this candidate is rejected)
             self.sidecar.add_stance(manip)
@@ -2476,11 +2487,14 @@ class IORSSmall(SamplerV2):
             goal_guess = self.goal_pose(t_pose, p_pose)
             place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
             for what, pose in (("place", place_guess), ("pre-place", self.pre_place_of(place_guess))):
-                if not self.ikc.eef_in_frame(pose, cam_manip):
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 3): the place (a contact pose) keeps the eef box; the pre-place is judged as the
+                # program check judges it (the fingertip point, QA's 5 % + 2 cm slack: pre_place_frame_ok)
+                if not (self.ikc.eef_in_frame(pose, cam_manip) if what == "place" else self.pre_place_frame_ok(pose, cam_manip)):
                     # of-v2maps 2026-11-06: opt-in ISPATIALGYM_FRAME_DIAG (the projected box / fingers, a rendered image for the first few)
                     TT.frame_diag(self, manip, grasp.arm, pose, what, obj=self.obj("target"), obj_pose=goal_guess, cam_pose=cam_manip,
                                   tag=f"candidate {int(k)} grasp {getattr(grasp, 'grasp_name', '')}")
-                    raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
+                    rule = "eef pose" if what == "place" or pre_place_frame_rule() == "box" else "fingertip (+2 cm slack)"
+                    raise Reject("gripper_not_in_frame", f"{what} {rule} outside the manipulation image (5 %) for candidate {int(k)} "
                                                          f"(trunk {manip.translate}, {manip.tilt:.2f})")
         # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the
         # object attached must pass the exact IK (margin + reach quality) from THIS candidate's stance - else the
@@ -4956,6 +4970,28 @@ class IORSSmall(SamplerV2):
         if over:
             log.info("%s: the carried drive to the push stance passes %.3f m from the partner: the lift clears its top (%.2f m)", self.gp.variant, gap, grasp.carry_height)
 
+    def pre_place_frame_ok(self, pose: G.Pose, cam: G.Pose) -> bool:
+        """i7-plateqtf2 (owner decision 2026-11-08 02:35 item 3, a camera-frame rule change): the draw's pre-place frame check is the program
+        check's (``program_check.fingertip_frame_margin``: the fingertip point inside QA's 5 % margin plus 2 cm slack at the fingertip) instead
+        of the eef box (``IKChecker.eef_in_frame``), which was stricter than both the program check and QA (fingertip only) there.
+        ``ISPATIALGYM_PREPLACE_FRAME_RULE=box``: the box as before. Kit ``preplace_frame.checked`` / ``.rejected`` / ``.removed`` (the box
+        would have rejected, the fingertip rule passes)."""
+        if pre_place_frame_rule() == "box":
+            return bool(self.ikc.eef_in_frame(pose, cam))
+        fm = PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)
+        TT._count(self, "preplace_frame.checked")
+        if not fm["inside"]:
+            TT._count(self, "preplace_frame.rejected")
+        elif not self.ikc.eef_in_frame(pose, cam):
+            TT._count(self, "preplace_frame.removed")
+        return bool(fm["inside"])
+
+    def pre_place_frame_margin(self, pose: G.Pose, cam: G.Pose) -> float:
+        """The pre-place's frame margin (px; >= 0 passes) under :func:`pre_place_frame_rule` (the frame ranking's score)."""
+        if pre_place_frame_rule() == "box":
+            return float(self.ikc.eef_frame_margin(pose, cam))
+        return float(PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)["margin_px"])
+
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
         with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not. Opt-in
@@ -4964,6 +5000,11 @@ class IORSSmall(SamplerV2):
         tip_rule = str(self.gen("grasp_frame_rule") or "box") == "fingertip"
         for what, pose in poses.items():
             if pose is None:
+                continue
+            if what == "pre-place" and pre_place_frame_rule() == "fingertip":
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 3): the program check's criterion at the pre-place (fingertip + 2 cm slack)
+                if not self.pre_place_frame_ok(pose, cam):
+                    raise Reject("gripper_not_in_frame", f"{what} fingertip (+2 cm slack) outside the manipulation image (5 %)")
                 continue
             if tip_rule:
                 tip = C.fingertip((G.t(pose[0]).float(), G.t(pose[1]).float()))
