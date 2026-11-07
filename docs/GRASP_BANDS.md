@@ -383,6 +383,23 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - The support policy polices only supports with a registered plane. world_vertical + articulation_large went from 0 to 36 written / 34 ok under v2only.
 - Floor maps: the fingers meet the floor only through the policy's floor allowance (`floor_fingers: "policy"`). The umbrella went from 0 to 71-73 cells per reaching trunk.
 
+### Lean rests and interior maps (branch i7-lean, 2026-11-07)
+
+- **Lean rest kind** (`grasping/lean.py`): the object settled in the synthetic world against a vertical board at an angle / side; the rest id,
+  the entry-id suffix and the sampler key `<key>@lean_<side>_<deg>_<d6>` carry the lean identity (angle, side, board, gap); a lean rest never
+  serves a stable lookup or the reverse. `pipeline lean` (job_glib `GB_STAGES=lean`), manifests from `python -m ispatialgym.grasping.lean manifest`.
+  touching_03: hardback acbrnv at 11 / 20 deg on the left board (partner_side right); 11 deg has no geometry-ok grasp; the pair check measures
+  the key's own 15 deg rest (893d7e61).
+- **Interior map kind** (`reach_maps --kind interior --interior <name | registry.json::name>`, specs in `sampling/interiors.py` +
+  `assets/interiors/interiors.json`): the support board (policed), the board above, side walls, back panel, open sides, extra oriented boxes
+  (an open door at the spec's joint values, a cabinet over a basin), the stand-offs and the joints - all in the spec digest, the map key and
+  `ReachMap.find`. A lean rest's compartment follows the cell (its board-side wall); a stable rest's is fixed at `centre_y_m`, the footprint
+  between the walls, and its trunks keep the idle posture clear of the obstacles (b4230177: the fridge's untucked idle arm stood in the open
+  door - 0 feasible). Open-top basins: open when the walls' rim is >= 0.10 m under the headroom (a sink under a cabinet), the near wall and the
+  overhead body as boxes. `interiors measure` (a Kit job) writes a spec from the live scene.
+- **Consumers:** touching_03's shelf path (`tabletop.interior_map_bands`, a miss = `missing_map`); `iors_large_inside.inside_band` under
+  v2only (fridge inside_large_02, sink inside_large_03, bookcase inside_large_01): the arm's own interior map, a miss = `missing_map`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
