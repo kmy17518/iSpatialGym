@@ -1313,6 +1313,59 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
 - **Consumers:** touching_03's shelf path (`tabletop.interior_map_bands`, a miss = `missing_map`); `iors_large_inside.inside_band` under
   v2only (fridge inside_large_02, sink inside_large_03, bookcase inside_large_01): the arm's own interior map, a miss = `missing_map`.
 
+### Owner decisions 2026-11-07: contact follow-ups, inside_large_01 place stance, per-alias outcome memory
+
+Recorded in DECISIONS 2026-11-08 01:45 UTC. No shared gate or QA rule changes.
+
+**A. Contact follow-ups** (branch i7-contactfu, from i7-contact 521dc344).
+- **A1, touching_02.** The push stance also moves forward and backward.
+  - The stand-off is chosen from the touch_push map: the target is 0.66-0.93 m, the map's ~0.75 m.
+  - It is limited by the base's minimum table distance. Sampler only.
+  - A partner whose push side fails the map everywhere is redrawn or rejected. Validate at N 4.
+- **A2, touching_02 tipping.** The legacy demos do not tip.
+  - Find what differs between the demo scene and the validator world: bar / box physics materials and box mass, read from a scene load.
+  - Make the validator match. Do not change the scene. Report numbers.
+- **A3.** The hand-overlap screen stays ENFORCED, and its switches stay off. Valid push entries: napkins 26, cereal 12, spray 28.
+- **A4, axial_02 repeats.** With maps, 57 of 60 attempts repeat an eval instance (repeats_eval); before maps it was 7-11 of ~20-26.
+  - First compare the push map's feasible cells with the eval instances' start poses.
+  - Propose a fix with numbers. Ask before changing the repeat rule.
+- **A5, axial brace.** Per stance and allowed goal orientation, the push map and the brace map are taken on the SAME pushed end.
+  - The first fitting pair is used, else push-only. Map lookups only.
+  - Kit counters axial_brace.paired / .push_only. Validate axial_01 / 03 / 04 at N 4.
+- **A6, contact-entry validation is STRATIFIED.**
+  - 2-3 physics-valid entries per (yaw x end x spin) group a map uses. Maps are built from validated entries only.
+  - Maps then learn from real runs: a success overlay per map identity, written in per-job shards and merged offline into a new versioned
+    map.
+  - An entry joins only after a real oracle success or a physics validation.
+  - Report the cost against today and the counts per library.
+
+**B. inside_large_01 place stance** (branch i7-placeorder, from i7-overhang c53a3a3b).
+- The 0.70 m cap is replaced by the trunk-extension ORDERING. The stand-off range is restored.
+- Stance C order: least trunk translate first, then nearest stand-off. Kit stance_c.extended_used. No stance is removed; exact IK and QA
+  are unchanged.
+- First, a campaign-wide table of place-time failures (wobble / self-contact / plan_failed) against the place stance's trunk translate /
+  tilt and stand-off, over all collected demos.
+  - If trunk extension drives the failures, the ordering becomes the default for all aliases.
+  - Otherwise, report and ask.
+- Validate inside_large_01 at N 4 with C on.
+
+**C. Per-alias OUTCOME MEMORY, unattended** (branch i7-memory, from of-v2maps b03f1dca). C works on top of B's order.
+- **Record.** Per demo, a configuration key (alias, arm, stand-off bin, trunk translate / tilt, grasp family, goal yaw slot) plus the failure
+  type and stage, in per-job shards.
+  - A failure is attributed to the choice that precedes its stage.
+  - Infrastructure failures and known bugs are excluded.
+- **Aggregate.** Offline per batch, into a versioned memory per alias. Keys are hierarchical and back off when sparse. Jobs pin the version
+  in job.env.
+- **Sample.** Per (alias, bin) from a Beta posterior (Thompson-style), with an exploration floor of ~5 %. Kit alias_memory.*.
+- **Forget** when the snapshot, entry, map keys or alias customs change.
+- **Guardrails.**
+  - A per-batch report and alerts; shared-fix candidates are flagged.
+  - It never changes shared rules.
+  - Provenance per instance.
+  - Never used for eval-instance generation.
+- **Thresholds** are proposed from the logs by a replay over $OFH/out. It must catch inside_large_01's 0.85 m / 0.50 failures and flag
+  nothing healthy.
+
 ## Integration (2026-11-08, of-v2maps)
 
 The owner's direction of 2026-11-07: merge the finished branches one at a time, owner-decided defaults land with their branch, nothing new is
