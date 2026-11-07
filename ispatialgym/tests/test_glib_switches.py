@@ -245,3 +245,21 @@ def test_new_builds_record_both_switches_on(monkeypatch):
     assert S.candidate_switches(asdict(CA.CandidateConfig())) == {"blade_contact_at_retreat": True, "retreat_shift_exact": True}
     cfg, _ = PL.candidate_overrides({"cand_overrides": {"blade_contact_at_retreat": False, "retreat_shift_exact": False}})
     assert S.candidate_switches(asdict(cfg)) == {"blade_contact_at_retreat": False, "retreat_shift_exact": False}
+
+
+def test_force_diagnostics_name_the_phase_of_the_sustained_load():
+    """i7-switches (gym shoe round 2): the trial's per-phase peaks and the longest window above each limit, with its phases - the record of
+    an object_pressed_into_table rejection; the verdict's own window (_sustained) is the same run."""
+    from ispatialgym.grasping import validate_tabletop as VT
+
+    ratio = [0.5, 0.6, 2.5, 2.6, 2.7, 2.8, 2.2, 1.0, 3.0, 0.0]
+    finger = [0.0, 0.0, 1.0, 12.0, 11.0, 2.0, 0.0, 0.0, 0.0, 0.0]
+    phases = ["init", "init", "close", "close", "close", "hold", "hold", "hold", "hold", "unload"]
+    d = VT.force_diagnostics({"obj_slab_ratio": ratio, "finger_slab": finger}, phases, 4.9, 2.0, 10.0)
+    assert d["weight_N"] == 4.9 and d["by_phase"]["close"] == {"steps": 3, "obj_slab_ratio_max": 2.7, "finger_slab_max_N": 12.0}
+    w = d["obj_slab_ratio_window"]
+    assert (w["start_step"], w["steps"], w["phases"], w["peak"]) == (2, 5, ["close", "hold"], 2.8)
+    assert w["steps"] == VT._sustained(ratio, 2.0, 10)[1]
+    f = d["finger_slab_window"]
+    assert (f["start_step"], f["steps"], f["phases"], f["peak"]) == (3, 2, ["close"], 12.0)
+    assert VT._longest_run([0.0, 0.0], 1.0) == (-1, 0)
