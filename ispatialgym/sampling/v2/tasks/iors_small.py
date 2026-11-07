@@ -1829,7 +1829,13 @@ class IORSSmall(SamplerV2):
         """The template's candidates for ``side`` not dropped for their travel (7e): every split-cone position's (``tabletop.split_cone_draw``
         replaces ``manip_candidates`` per attempt), else ``manip_candidates``."""
         cands = getattr(self, "_split_cone_cands", None)
-        return [c for c in (self.manip_candidates if cands is None else cands) if TT.in_start_region(c, side) and TRAVEL_DROPPED not in c.extras]
+        out = [c for c in (self.manip_candidates if cands is None else cands) if TT.in_start_region(c, side) and TRAVEL_DROPPED not in c.extras]
+        # i7-plateqtf 2026-11-07 (ISPATIALGYM_FAST_MAP_TILT_INHERIT): a candidate whose focus stands on an inherited map cell invalidated for
+        # its tilt meanwhile (v2/map_tilt.py) leaves the draws - a start cell cached before the invalidation still lists it
+        live = [c for c in out if not TT.map_tilt_focus_dead(self, c)]
+        if len(live) < len(out):
+            TT._countn(self, "map_tilt.candidates_dropped", len(out) - len(live))
+        return live
 
     def drop_candidate(self, cand: Stance, err: Reject) -> None:
         """7e (owner 2026-10-12; touching#02 c5_k0 redrew its only candidate 407 times, each one ``no_transition``): ``cand``'s init ->
@@ -1947,7 +1953,8 @@ class IORSSmall(SamplerV2):
         # and the support-first switch changes the cells Phase 2 keeps
         return {**(TT.band_facts(bands) or {}), "key": meta.get("key") or meta.get("map_key"), "map_path": os.path.basename(str(meta.get("map_path") or "")) or None,
                 "lattice": meta.get("lattice"), "n_trunks": len(meta.get("trunks") or []),
-                "support_first": TT.support_first_tag(sampler, bands)}  # i7-unblock: forced on / off, or the automatic rule's tag
+                "support_first": TT.support_first_tag(sampler, bands),  # i7-unblock: forced on / off, or the automatic rule's tag
+                **({"map_tilt": meta["map_tilt"]} if meta.get("map_tilt") else {})}  # i7-plateqtf: the expanding map's rule + overlay version
 
     @staticmethod
     def _spa_cell_centre(lo: float, hi: float, cell_m: float, i: int) -> float:

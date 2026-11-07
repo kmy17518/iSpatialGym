@@ -661,6 +661,23 @@ class ReachBands:
             return None
         return min(cands, key=lambda k: abs(k[1] - tilt))
 
+    def _col(self, translate: float, tilt: float, stand_off: Optional[float] = None):
+        """``(key, cells, pairs, classes)`` of the column a ``(translate, tilt)`` query reads: the grid trunk with the same translate and
+        the nearest tilt - or, for a reach-map view with ``ISPATIALGYM_FAST_MAP_TILT_INHERIT`` (i7-plateqtf 2026-11-07), the INHERITED
+        column of a tilt between two built tilts (``v2/map_tilt.py``: the union of the two, pruned by verified reachability failures).
+        ``key`` None when no trunk shares the translate."""
+        if self.meta.get("mode") == "map_view":
+            from ispatialgym.sampling.v2 import map_tilt as MT
+
+            col = MT.view_column(self, translate, tilt, stand_off)
+            if col is not None:
+                return col.key, col.cells, col.pairs, col.classes
+        cells, pairs, classes = self._maps(stand_off)
+        k = self.nearest_trunk(translate, tilt, stand_off)
+        if k is None:
+            return None, np.zeros((0, 2)), None, None
+        return k, cells[k], pairs.get(k), classes.get(k)
+
     def band(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> np.ndarray:
         """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides);
         ``stand_off``: the cells of the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
@@ -672,20 +689,18 @@ class ReachBands:
             out = BR.refined_cells(self, translate, tilt)
             if out is not None:
                 return out
-        cells = self._maps(stand_off)[0]
-        k = self.nearest_trunk(translate, tilt, stand_off)
-        return cells[k] if k is not None else np.zeros((0, 2))
+        k, cells, _, _ = self._col(translate, tilt, stand_off)
+        return cells if k is not None else np.zeros((0, 2))
 
     def union_extent(self) -> Tuple[float, float]:
         lat = np.concatenate([c[:, 1] for c in self.cells.values() if len(c)]) if self.cells else np.zeros(0)
         return (float(lat.min()), float(lat.max())) if len(lat) else (0.0, 0.0)
 
     def cell_index(self, translate: float, tilt: float, cell, stand_off: Optional[float] = None) -> Optional[int]:
-        cells = self._maps(stand_off)[0]
-        k = self.nearest_trunk(translate, tilt, stand_off)
-        if k is None or not len(cells[k]):
+        k, cells, _, _ = self._col(translate, tilt, stand_off)
+        if k is None or not len(cells):
             return None
-        d = np.linalg.norm(cells[k] - np.asarray(cell, dtype=float)[None, :2], axis=1)
+        d = np.linalg.norm(cells - np.asarray(cell, dtype=float)[None, :2], axis=1)
         i = int(np.argmin(d))
         return i if d[i] <= 0.51 * float(self.meta.get("lattice", LATTICE)) else None
 
@@ -693,11 +708,10 @@ class ReachBands:
         """Recorded feasible (yaw offset [rad, relative to the base yaw], grasp name) pairs of the band cell nearest to
         ``cell`` (generic pinch: ``("generic", candidate index)``); the seed of the feasible set F of spec 4.6.
         ``stand_off``: the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
-        k = self.nearest_trunk(translate, tilt, stand_off)
+        k, _, p, _ = self._col(translate, tilt, stand_off)
         i = self.cell_index(translate, tilt, cell, stand_off)
         if k is None or i is None:
             return []
-        p = self._maps(stand_off)[1].get(k)
         if p is None or not len(p):
             return []
         names = self.meta.get("grasp_names") or []
@@ -718,24 +732,21 @@ class ReachBands:
         """Pose classes that passed at the band cell nearest to ``cell`` (generic / contact bands; ``[]`` for library-grasp
         bands or when the cell is not in the band). Placement prefers a class from this list (e.g. the shallowest pitch).
         ``stand_off``: the nearest stored stand-off of a multi-distance band (``None`` = the reference)."""
-        k = self.nearest_trunk(translate, tilt, stand_off)
+        k, _, _, m = self._col(translate, tilt, stand_off)
         i = self.cell_index(translate, tilt, cell, stand_off)
-        classes = self._maps(stand_off)[2]
-        m = classes.get(k) if k is not None else None
-        if i is None or m is None or i >= len(m):
+        if k is None or i is None or m is None or i >= len(m):
             return []
         bits = int(m[i])
         return [n for b, n in enumerate(self.class_names) if bits & (1 << b)]
 
     def band_for_class(self, translate: float, tilt: float, class_name: str, stand_off: Optional[float] = None) -> np.ndarray:
         """Cells of the trunk (same translate, nearest tilt) at which the given pose class passed."""
-        cells, _, classes = self._maps(stand_off)
-        k = self.nearest_trunk(translate, tilt, stand_off)
-        if k is None or k not in classes or class_name not in self.class_names:
+        k, cells, _, m = self._col(translate, tilt, stand_off)
+        if k is None or m is None or class_name not in self.class_names:
             return np.zeros((0, 2))
         b = self.class_names.index(class_name)
-        m = classes[k]
-        return cells[k][(m & (1 << b)) != 0] if len(m) == len(cells[k]) else np.zeros((0, 2))
+        m = np.asarray(m)
+        return cells[(m & (1 << b)) != 0] if len(m) == len(cells) else np.zeros((0, 2))
 
     def posture(self, translate: float, tilt: float, stand_off: Optional[float] = None) -> Optional[Dict[str, Any]]:
         """Idle-arm posture recorded for the trunk (same translate, nearest tilt): ``{"posture": name, "idle_arm_q": {arm: [7]}}``
