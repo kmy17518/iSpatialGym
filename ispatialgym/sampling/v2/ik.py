@@ -24,7 +24,7 @@ import math
 import os
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
@@ -408,18 +408,109 @@ def _quat_mat(q: th.Tensor) -> th.Tensor:
                       [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
 
 
+#: i7-fingertouch 2026-11-07 (owner decision): which rule ``approach_finger_support_touch`` judges the fingers vs the support by
+FINGER_TOUCH_RULE_ENV = "ISPATIALGYM_FINGER_TOUCH_RULE"
+#: "spheres" = the customs' allowance on the padded cuRobo finger spheres (``max_penetration_m``, 5 mm; the default until the owner's A/B);
+#: "geometry" = the spec's finger-GEOMETRY rule (P1 §2): the finger collision HULLS within the contact policy's 2 mm of the support
+FINGER_TOUCH_RULES = ("spheres", "geometry")
+#: version of the geometry rule's measurement (part of the cache scope under "geometry")
+FINGER_TOUCH_GEOMETRY_VERSION = 1
+
+
+def finger_touch_rule() -> str:
+    """``ISPATIALGYM_FINGER_TOUCH_RULE`` (i7-fingertouch 2026-11-07): ``"spheres"`` (unset / empty: the default) or ``"geometry"``;
+    ``ValueError`` for anything else (a typo must not run the other arm of the A/B silently)."""
+    v = os.environ.get(FINGER_TOUCH_RULE_ENV, "").strip().lower() or "spheres"
+    if v not in FINGER_TOUCH_RULES:
+        raise ValueError(f"{FINGER_TOUCH_RULE_ENV}={v!r}: expected one of {list(FINGER_TOUCH_RULES)}")
+    return v
+
+
 @dataclass
 class FingerTouch:
     """``generation.approach_finger_support_touch`` (owner 2026-10-13 ~03:15 item 3): along a tracked grasp approach the acting arm's
-    finger links may touch the grasp's support - their spheres may come within ``margin_m - max_penetration_m`` of it (light contact);
-    every other link, and the finger links against every other object, keep the approach tracking's margin (0). ``preshape``: the finger
-    links are checked at the opening the oracle pre-shapes to before the approach (``opening()``; None = the configuration's own)."""
+    finger links may touch the grasp's support lightly; every other link, and the finger links against every other object, keep the
+    approach tracking's margin (0). ``preshape``: the finger links are checked at the opening the oracle pre-shapes to before the approach
+    (``opening()``; None = the configuration's own).
+
+    ``rule`` (i7-fingertouch 2026-11-07, owner decision; default :func:`finger_touch_rule`, the ``ISPATIALGYM_FINGER_TOUCH_RULE`` switch):
+    ``"spheres"`` - the finger SPHERES may come within ``margin_m - max_penetration_m`` of the support (the customs' 5 mm); ``"geometry"`` -
+    the spec's rule (P1 §2): the finger collision HULLS (``contact_policy.HandChecker``) may penetrate the support by at most the contact
+    policy's ``finger_support_max_penetration_m`` (2 mm; ``margin_m`` / ``max_penetration_m`` are not read), every other link clear of it
+    as the policy's sphere stage (:meth:`IKChecker._finger_touch_geometry_ok`)."""
 
     margin_m: float = 0.0
     max_penetration_m: float = 0.005
     preshape: bool = True
     supports: Callable[[], Sequence[Any]] = lambda: ()
     opening: Callable[[], Optional[float]] = lambda: None
+    rule: str = field(default_factory=finger_touch_rule)
+
+    def __post_init__(self):
+        if self.rule not in FINGER_TOUCH_RULES:
+            raise ValueError(f"FingerTouch.rule {self.rule!r}: expected one of {list(FINGER_TOUCH_RULES)}")
+
+
+class ConvexPieces:
+    """i7-fingertouch 2026-11-07: a support's collision geometry as its convex pieces in the world - what the geometry rule of
+    :class:`FingerTouch` measures the finger hulls against when the support has no registered horizontal plane (a bookcase's shelf boards,
+    side walls and back, a sink's basin walls, a table top in a legacy-band run). Each piece is its vertices' convex hull as half-spaces
+    ``A p <= b`` (unit outward normals; B1K collision meshes are convex pieces, one cuRobo mesh each - a non-convex piece is read as its
+    hull: more penetration, never less). ``sdf(p)`` = min over pieces of max over faces of ``A p - b``: inside a piece exactly minus the
+    depth to its nearest face (the penetration, whatever the face's orientation: a vertical board is measured through its side face), outside
+    a positive lower bound of the distance (clamped at :data:`CULL_M`). At the seam of two pieces the union's depth can be under-read (the
+    depth into one piece). Duck-types ``contact_policy.Support`` for ``HandChecker.clearance`` (``sdf``, ``name``)."""
+
+    #: points farther than this outside a piece's AABB are not evaluated against it (clear: the value is clamped here)
+    CULL_M = 0.01
+
+    def __init__(self, halfspaces: Sequence[Tuple[th.Tensor, th.Tensor]], boxes: Sequence[Tuple[th.Tensor, th.Tensor]], name: str = "support",
+                 n_skipped: int = 0):
+        self.halfspaces = list(halfspaces)
+        self.boxes = list(boxes)
+        self.name = name
+        self.kind = "pieces"
+        self.n_skipped = int(n_skipped)
+
+    @staticmethod
+    def from_vertices(pieces: Sequence[Any], name: str = "support") -> "ConvexPieces":
+        """From each piece's world vertices ((N, 3)); a degenerate piece (fewer than 4 points, flat: no volume to penetrate) is skipped."""
+        import numpy as np
+        from scipy.spatial import ConvexHull
+
+        hs, boxes, skipped = [], [], 0
+        for v in pieces:
+            P = np.asarray(v.detach().cpu().numpy() if hasattr(v, "detach") else v, dtype=np.float64).reshape(-1, 3)
+            try:
+                eq = ConvexHull(P).equations  # (F, 4): n . x + d <= 0 inside, n unit
+            except Exception:  # noqa: BLE001 - scipy's QhullError (flat / too few points)
+                skipped += 1
+                continue
+            hs.append((th.as_tensor(eq[:, :3], dtype=th.float32), th.as_tensor(-eq[:, 3], dtype=th.float32)))
+            boxes.append((th.as_tensor(P.min(0), dtype=th.float32), th.as_tensor(P.max(0), dtype=th.float32)))
+        return ConvexPieces(hs, boxes, name=name, n_skipped=skipped)
+
+    def sdf(self, p: th.Tensor) -> th.Tensor:
+        """Signed distance (...) of points ``p`` (..., 3) to the union of the pieces (see the class)."""
+        p = th.as_tensor(p, dtype=th.float32)
+        flat = p.reshape(-1, 3)
+        out = th.full((flat.shape[0],), float(self.CULL_M), dtype=flat.dtype, device=flat.device)
+        for (A, b), (lo, hi) in zip(self.halfspaces, self.boxes):
+            A, b, lo, hi = A.to(flat.device), b.to(flat.device), lo.to(flat.device), hi.to(flat.device)
+            near = ((flat >= lo - self.CULL_M) & (flat <= hi + self.CULL_M)).all(dim=1)
+            if not bool(near.any()):
+                continue
+            d = (flat[near] @ A.T - b).max(dim=1).values
+            out[near] = th.minimum(out[near], d)
+        return out.reshape(p.shape[:-1])
+
+
+def finger_hull_clearance(hc: Any, T_eef: th.Tensor, support: Any, finger_q: Tuple[float, float]) -> float:
+    """i7-fingertouch 2026-11-07: the contact policy's finger clearance (m, < 0 = penetration) - ``HandChecker.clearance(...)["finger"]``,
+    the minimum signed distance of both finger links' collision hulls (vertices + face samples, each finger at its opening) to ``support``
+    (a ``contact_policy.Support`` plane or :class:`ConvexPieces`) at the eef pose ``T_eef`` (4x4)."""
+    cl = hc.clearance(th.as_tensor(T_eef, dtype=th.float32), support, (float(finger_q[0]), float(finger_q[1])))
+    return float(th.as_tensor(cl["finger"]).reshape(-1)[0])
 
 
 def finger_touch_params(value: Any) -> Optional[Dict[str, Any]]:
@@ -665,10 +756,17 @@ class IKChecker:
             self._policy_opening = prev
 
     def set_finger_touch(self, touch: Optional[FingerTouch]) -> None:
-        """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope."""
+        """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope - the
+        sphere rule's as before (its entries stay valid), the geometry rule's with its name, the policy's finger allowance / sphere margin
+        and :data:`FINGER_TOUCH_GEOMETRY_VERSION` (i7-fingertouch: the two arms of the A/B never share an exact-IK verdict)."""
         self.finger_touch = touch
         if touch is None:
             self.cache_scope.pop("finger_touch", None)
+        elif getattr(touch, "rule", "spheres") == "geometry":
+            from ispatialgym.grasping import contact_policy as CP
+
+            self.cache_scope["finger_touch"] = ["geometry", round(CP.DEFAULT.finger_support_max_penetration_m, 4), round(CP.DEFAULT.sphere_support_margin_m, 4),
+                                                bool(touch.preshape), FINGER_TOUCH_GEOMETRY_VERSION]
         else:
             self.cache_scope["finger_touch"] = [round(touch.margin_m, 4), round(touch.max_penetration_m, 4), bool(touch.preshape)]
 
@@ -1581,9 +1679,17 @@ class IKChecker:
             self._count("finger_touch_allowed")
             ft = self.finger_touch
             opening = ft.opening() if ft.preshape else None
-            log.info("approach finger-support touch allowed: max penetration %.0f mm (cap %.0f mm, margin %.0f mm; %s fingers vs %s; finger opening %s; %.3f m segment)",
-                     max(touched), ft.max_penetration_m * 1000, ft.margin_m * 1000, arm, [getattr(o, "name", str(o)) for o in touch],
-                     "configuration's own" if opening is None else f"{opening:.4f} m (pre-shaped)", dist)
+            op_txt = "configuration's own" if opening is None else f"{opening:.4f} m (pre-shaped)"
+            if getattr(ft, "rule", "spheres") == "geometry":
+                from ispatialgym.grasping import contact_policy as CP
+
+                # i7-fingertouch: the measured finger-HULL penetration (0.01 mm) and what it was measured against per support
+                log.info("approach finger-support touch allowed: max penetration %.2f mm (rule geometry: finger hulls, cap %.1f mm; %s fingers vs %s; "
+                         "finger opening %s; %.3f m segment)", max(touched), CP.DEFAULT.finger_support_max_penetration_m * 1000, arm,
+                         [f"{getattr(o, 'name', str(o))} ({self._touch_geometry(o)[1]})" for o in touch], op_txt, dist)
+            else:
+                log.info("approach finger-support touch allowed: max penetration %.0f mm (cap %.0f mm, margin %.0f mm; %s fingers vs %s; finger opening %s; %.3f m segment)",
+                         max(touched), ft.max_penetration_m * 1000, ft.margin_m * 1000, arm, [getattr(o, "name", str(o)) for o in touch], op_txt, dist)
         return traj[-1].clone(), "ok"
 
     def _policy_tail(self, traj, m: int, dist: float, arm: str, pose_from: Pose, pose_to: Pose, near_end, near_start, both,
@@ -1633,10 +1739,13 @@ class IKChecker:
         support) while ``ignored`` is out of the world: (a) the whole body is collision-free at margin 0 with ``touch`` removed too (every
         other object, self-collision), (b) every link but ``arm``'s finger links is clear of the world at margin 0 (the palm, wrist, arm
         against the support), (c) the finger links - at the oracle's pre-shaped opening when ``FingerTouch.preshape`` - are clear of the world
-        at ``margin_m - max_penetration_m`` (the light contact with the support; (a) already holds them clear of everything else)."""
+        at ``margin_m - max_penetration_m`` (the light contact with the support; (a) already holds them clear of everything else).
+        i7-fingertouch 2026-11-07: ``FingerTouch.rule == "geometry"`` -> :meth:`_finger_touch_geometry_ok` (the spec's 2 mm on the finger hulls)."""
         from ispatialgym.oracle import r1pro_model as M
 
         ft = self.finger_touch
+        if ft is not None and getattr(ft, "rule", "spheres") == "geometry":
+            return self._finger_touch_geometry_ok(qs, arm, ignored, touch)
         qs = G.t(qs)
         out = th.zeros(qs.shape[0], dtype=th.bool)
         fingers = list(M.FINGER_LINKS[arm])
@@ -1662,6 +1771,142 @@ class IKChecker:
                         pen_mm = float(k)
                         break
         return ok, pen_mm
+
+    def _finger_touch_geometry_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
+        """i7-fingertouch 2026-11-07 (owner decision: the spec's finger-GEOMETRY rule, P1 §2, replaces the 5 mm on the finger spheres):
+        ``(ok (K,) bool, the deepest finger-hull penetration in mm over the passing ones)`` of approach configurations that collide with
+        ``touch`` (the grasp's support) while ``ignored`` is out of the world:
+
+        (a) the whole body collision-free at margin 0 with ``touch`` removed too (every other object, self-collision) - as the sphere rule;
+        (b) the contact policy's sphere stage: every link but ``arm``'s finger links clear of the world WITH ``touch`` at
+            ``CP.DEFAULT.sphere_support_margin_m`` (the palm, camera, wrist, arm, torso, base against the support);
+        (c) the contact policy's finger rule: the finger collision HULLS (``HandChecker``; at the oracle's pre-shape when
+            ``FingerTouch.preshape``, else the configuration's opening) at most ``CP.DEFAULT.finger_support_max_penetration_m`` (2 mm) into
+            every touched support (:func:`finger_hull_clearance` >= -0.002 m), measured by :meth:`_touch_geometry`: the support's
+            registered plane (``support_plane_z``) when it has one, else its convex collision pieces (a vertical board / a sink wall
+            through its own faces). A support whose geometry cannot be read fails (c) (counted, one warning).
+
+        The fingers meet the support ONLY through (c) - their spheres are not checked against it. Counters ``finger_touch.geometry.*``."""
+        from ispatialgym.grasping import contact_policy as CP
+
+        ft = self.finger_touch
+        pol = CP.DEFAULT
+        qs = G.t(qs)
+        n = int(qs.shape[0])
+        out = th.zeros(n, dtype=th.bool)
+        others = self._non_finger_links(arm)
+        if ft is None or n == 0 or not others:
+            return out, 0.0
+        self._count("finger_touch.geometry.checked", n)
+        with self.ignoring(list(ignored) + list(touch)):
+            ok = self.kit.collision_free(qs, margin=0.0).clone()
+        n_body = int((~ok).sum())
+        with self.ignoring(list(ignored)):
+            ok &= self.kit.links_clear(qs, others, pol.sphere_support_margin_m)
+        n_links = int((~ok).sum()) - n_body
+        allow = float(pol.finger_support_max_penetration_m)
+        opening = ft.opening() if ft.preshape else None
+        grip = self.kit.robot.gripper_control_idx[arm]
+        geoms = [self._touch_geometry(sp) for sp in touch]
+        deepest, refused, unmeasured = 0.0, [], 0
+        idx = th.nonzero(ok).flatten().tolist()
+        hc = self._touch_hand_checker(arm) if idx else None
+        for i in idx:
+            if any(g is None for g, _ in geoms):
+                ok[i] = False
+                unmeasured += 1
+                continue
+            fq = float(opening) if opening is not None else float(qs[i, grip].float().mean())
+            T = self._eef_matrix(qs[i], arm)
+            cl = min(finger_hull_clearance(hc, T, g, (fq, fq)) for g, _ in geoms)
+            if cl < -allow - 1e-9:  # HandChecker.check's finger test
+                ok[i] = False
+                refused.append(-cl)
+            else:
+                deepest = max(deepest, -cl)
+        for key, v in (("rejected_body", n_body), ("rejected_non_finger_link", n_links), ("rejected_finger_penetration", len(refused)),
+                       ("rejected_unmeasured", unmeasured), ("passed", int(ok.sum()))):
+            if v:
+                self._count(f"finger_touch.geometry.{key}", v)
+        if refused:
+            log.info("approach finger-support touch refused: max penetration %.2f mm (rule geometry: finger hulls, cap %.1f mm; %s fingers vs %s; "
+                     "%d of %d configurations)", 1000 * max(refused), 1000 * allow, arm,
+                     [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)], len(refused), n)
+        return ok, round(1000.0 * max(0.0, deepest), 2)
+
+    def _touch_hand_checker(self, arm: str) -> Any:
+        """The contact policy's ``HandChecker`` for ``arm`` (shared with :meth:`support_policy_eval`: ``_hand_checker``)."""
+        hc = getattr(self, "_hand_checker", None)
+        if hc is None or getattr(hc, "arm", None) != arm:
+            from ispatialgym.grasping import contact_policy as CP
+
+            hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+        return hc
+
+    def _eef_matrix(self, q: th.Tensor, arm: str) -> th.Tensor:
+        """The 4x4 world pose of ``arm``'s eef at ``q`` (the backend's FK, as :meth:`support_policy_eval`)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+        T = th.eye(4)
+        T[:3, :3] = _quat_mat(G.t(eef[1]).float())
+        T[:3, 3] = G.t(eef[0]).float()
+        return T
+
+    def _touch_geometry(self, sp: Any) -> Tuple[Optional[Any], str]:
+        """i7-fingertouch 2026-11-07: what the geometry rule measures the finger hulls against for the touched support ``sp`` and how
+        (for the log): ``(contact_policy.Support.plane, "plane z ..., registered")`` when the sampler registered its plane
+        (``support_plane_z``: a map hit's measured top, an interior board, a tray floor - the plane the support policy polices), else
+        ``(ConvexPieces, "N convex pieces")`` of the pieces the touch ignore takes out of the world (the support split's ``Plan.off`` when it
+        splits ``sp``, else every collision piece) - the support's own geometry whatever its orientation: a bookcase's shelf board, side
+        wall and back, a sink's basin walls, an unregistered table top; ``(None, why)`` when neither can be read. Cached per support and pose."""
+        from ispatialgym.grasping import contact_policy as CP
+
+        name = getattr(sp, "name", None)
+        planes = getattr(self, "support_plane_z", None)
+        if isinstance(planes, dict) and name in planes:
+            z = float(planes[name])
+            return CP.Support.plane(z, name=str(name)), f"plane z {z:.4f}, registered"
+        plan = SS.plan_for(self, sp, count=False) if SS.split_on() else None
+        try:
+            p, q = sp.get_position_orientation()
+            root = tuple(round(float(v), 4) for v in list(G.t(p).tolist()) + list(G.t(q).tolist()))
+        except Exception:  # noqa: BLE001
+            root = None
+        key = (name if name is not None else id(sp), root, None if plan is None else plan.cls.digest)
+        cache = self.__dict__.setdefault("_touch_geometry_cache", {})
+        if key not in cache:
+            verts = self._support_pieces_world(sp, None if plan is None else plan.off)
+            geom = ConvexPieces.from_vertices(verts, name=str(name)) if verts else None
+            if geom is not None and not geom.halfspaces:
+                geom = None
+            if geom is None:
+                why = "no collision pieces readable: unmeasured"
+                log.warning("approach finger-support touch (rule geometry): %s - %s; its touches are refused", name, why)
+            else:
+                why = f"{len(geom.halfspaces)} convex pieces" + (f" of the split's {plan.cls.digest}" if plan is not None else "") + \
+                      (f", {geom.n_skipped} flat skipped" if geom.n_skipped else "")
+            cache[key] = (geom, why)
+        return cache[key]
+
+    def _support_pieces_world(self, sp: Any, only: Optional[Any] = None) -> List[Any]:
+        """The world vertices ((N, 3) numpy) of ``sp``'s collision pieces (``support_split.piece_geometry``: the backend's mesh geometry at
+        the piece prims' poses), only the prim paths in ``only`` when given; [] when the backend cannot read them or any one piece (a
+        finger in an unread piece would go unmeasured: the support counts as unmeasured)."""
+        backend = getattr(self.kit, "backend", None)
+        if not callable(getattr(backend, "_mesh_geometry", None)):
+            return []
+        out = []
+        for prim, cm in SS._pieces(sp):
+            if only is not None and prim not in only:
+                continue
+            try:
+                v, _faces, (p, R) = SS.piece_geometry(backend, cm)
+            except Exception as e:  # noqa: BLE001
+                log.info("finger touch geometry: piece %s of %s unreadable (%r): the support is unmeasured", prim, getattr(sp, "name", "?"), e)
+                return []
+            out.append(v @ R.T + p)
+        return out
 
     def _non_finger_links(self, arm: str) -> List[str]:
         """Every link with collision spheres in the whole-body model but ``arm``'s finger links ([] when the backend does not say)."""
