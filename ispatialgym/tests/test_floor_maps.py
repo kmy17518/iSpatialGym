@@ -374,7 +374,7 @@ def test_support_policy_eval_polices_a_registered_floor_in_floor_mode():
     chk.kit = SimpleNamespace(backend=backend, links_clear=links_clear, robot=SimpleNamespace(gripper_control_idx={"right": [0, 1]}))
     chk.ignoring = lambda objs: contextlib.nullcontext()
     chk._hand_checker = SimpleNamespace(arm="right", check=check)
-    chk.support_plane_z = {"floors_0": 0.004}
+    chk.support_plane_z = {"floors_0": 0.004, "table_0": 0.75}  # 2026-11-07: only registered supports are policed
     chk.support_floor_names = {"floors_0"}
     q = th.zeros(28)
     ev = chk.support_policy_eval(q, "right", [floor], [])

@@ -280,10 +280,26 @@ def support_policy_on() -> bool:
     return os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") not in ("", "0", "off", "false")
 
 
-def policed_supports(supports: Sequence[Any], approached: Optional[Sequence[Any]]) -> List[Any]:
+def registered_supports_only() -> bool:
+    """of-v2maps 2026-11-07 (owner prompt "supports with protrusions": what counts as the support plane, the policy unchanged): the support
+    policy polices only the supports whose plane the sampler REGISTERED (``IKChecker.support_plane_z``: a map hit's measured top, a tray floor,
+    the floor) - an ignored object without one (a wall braced or pushed on, a door / dishwasher whose handle is grasped) is not a horizontal
+    support: its AABB top as the plane put every hand pose of world_vertical / articulation_large 0.06-1.5 m "below the support"
+    (v2only_before: push_unreachable / handle_unreachable on 11 / 11 aliases; i_nopol with the policy off 4 / 5 and 3 / 6 succeed).
+    ``ISPATIALGYM_SUPPORT_POLICY_REGISTERED=0``: the AABB-top fallback for unregistered supports as before."""
+    return os.environ.get("ISPATIALGYM_SUPPORT_POLICY_REGISTERED", "1") != "0"
+
+
+def policed_supports(supports: Sequence[Any], approached: Optional[Sequence[Any]], planes: Optional[Dict[str, float]] = None,
+                     registered_only: Optional[bool] = None) -> List[Any]:
     """of-v2maps 2026-11-06: the ignored objects the support policy polices - those the chain does NOT approach (the support under a grasped
-    object); an object the hand is meant to touch (``approached``: the grasped target, a pushed box) is not a support of the approach."""
-    return [sp for sp in supports if all(sp is not a for a in (approached or ()))]
+    object); an object the hand is meant to touch (``approached``: the grasped target, a pushed box) is not a support of the approach.
+    2026-11-07: with :func:`registered_supports_only` (default) only the supports with a registered plane (``planes``) - pass ``planes`` to apply it."""
+    out = [sp for sp in supports if all(sp is not a for a in (approached or ()))]
+    ro = registered_supports_only() if registered_only is None else registered_only
+    if ro and planes is not None:
+        out = [sp for sp in out if getattr(sp, "name", None) in planes]
+    return out
 
 
 def floor_support_names(ikc: Any) -> set:
@@ -569,7 +585,12 @@ class IKChecker:
         # of-v2maps 2026-11-06: only the SUPPORTS under the approach are policed - an ignored object the hand is meant to touch (a pushed box,
         # approached by the chain) is not (v2scope1: touching_01 / 02 'touching push: no push class passes', 'finger_penetration on
         # target_box_of_sanitary_napkins'); a chain with no such support is not a grasp on a support
-        supports = policed_supports(supports, approached)
+        all_supports = list(supports)
+        supports = policed_supports(all_supports, approached, planes=dict(getattr(self, "support_plane_z", None) or {}))
+        skipped = [getattr(sp, "name", "?") for sp in policed_supports(all_supports, approached, registered_only=False) if sp not in supports]
+        if skipped:
+            self._count("support_policy_unregistered_skipped")
+            out["unregistered_skipped"] = skipped
         if not supports:
             return out
         floors = floor_support_names(self)
@@ -1523,7 +1544,7 @@ class IKChecker:
             if not idxs:
                 continue
             appr = self.approached_objects(pose)
-            if not policed_supports(sup, appr):
+            if not policed_supports(sup, appr, planes=dict(getattr(self, "support_plane_z", None) or {})):
                 continue
             for i in idxs:
                 ev = self.support_policy_eval(traj[i], arm, sup, appr)

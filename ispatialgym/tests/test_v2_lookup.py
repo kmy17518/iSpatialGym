@@ -148,6 +148,7 @@ def test_the_approach_tail_is_policed_where_the_support_is_ignored(monkeypatch):
     table = SimpleNamespace(name="table", aabb=([0, 0, 0], [1, 1, 0.8]))
     chk = IK.IKChecker.__new__(IK.IKChecker)
     chk.kit = SimpleNamespace(backend=SimpleNamespace(), stats={})
+    chk.support_plane_z = {"table": 0.8}  # 2026-11-07: only registered supports are policed
     chk.approached_objects = lambda pose: []
     evals = []
     chk.support_policy_eval = lambda q, arm, sup, appr: evals.append(int(q)) or {"ok": int(q) != 9, "reason": "finger_penetration"}
@@ -232,3 +233,14 @@ def test_map_bands_miss_logs_the_map_to_build(v2root, tmp_path, monkeypatch, cap
     reqs = [json.loads(r.getMessage().split(" ", 1)[1]) for r in caplog.records if r.getMessage().startswith("MAP_REQUEST")]
     assert [(r["kind"], r["arm"], r["h"], r["support"], r["rest_id"]) for r in reqs] == [("tabletop", "right", 0.8126, "table_0", "r0"),
                                                                                          ("tabletop", "left", 0.8126, "table_0", "r0")]
+
+
+def test_only_registered_supports_are_policed(monkeypatch):
+    from ispatialgym.sampling.v2 import ik as IK
+
+    table, wall = SimpleNamespace(name="table_0"), SimpleNamespace(name="walls")
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY_REGISTERED", raising=False)
+    assert IK.policed_supports([table, wall], None, planes={"table_0": 0.81}) == [table]  # a wall has no registered plane
+    assert IK.policed_supports([table, wall], None) == [table, wall]  # no planes passed: as before
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY_REGISTERED", "0")
+    assert IK.policed_supports([table, wall], None, planes={"table_0": 0.81}) == [table, wall]
