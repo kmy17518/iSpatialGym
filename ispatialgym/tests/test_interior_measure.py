@@ -136,3 +136,44 @@ def test_a_basin_with_nothing_above_and_a_closed_compartment():
 def test_the_registered_digests_do_not_move():
     reg = IN.load_registry(IN.REGISTRY)
     assert reg["bookcase_kmuacd_0@0.8354"].digest() == "b58d4e5c790e" and reg["fridge_petcxr_0@0.7064/j_left_door2.3"].digest() == "c623427d265d"
+
+
+def test_an_open_door_is_boxed_per_collision_piece(monkeypatch):
+    """The fridge door (job 18368160: one box over the door and its bins held the idle shoulder at every near stand-off): one oriented box
+    per collision piece of the moved link by default, one box over all of them with door_boxes="link" (the registered fridge spec's)."""
+    import sys
+    import types
+
+    fake_tu = types.ModuleType("omnigibson.utils.transform_utils")
+    fake_tu.transform_points = lambda pts, tf: th.as_tensor(pts, dtype=th.float32)
+    monkeypatch.setitem(sys.modules, "omnigibson", types.ModuleType("omnigibson"))
+    utils = types.ModuleType("omnigibson.utils")
+    utils.transform_utils = fake_tu
+    monkeypatch.setitem(sys.modules, "omnigibson.utils", utils)
+    monkeypatch.setitem(sys.modules, "omnigibson.utils.transform_utils", fake_tu)
+    z0 = BOARD_Z
+    c = "/World/fridge/base_link"
+    boxes = [(c, [0.0, -0.20, z0 - 0.02], [0.40, 0.20, z0]), (c, [0.0, -0.20, z0 + 0.24], [0.40, 0.20, z0 + 0.26]),
+             (c, [0.0, 0.17, z0], [0.40, 0.20, z0 + 0.24]), (c, [0.0, -0.20, z0], [0.40, -0.17, z0 + 0.24]), (c, [0.40, -0.20, z0], [0.42, 0.20, z0 + 0.24])]
+    fr = _support("fridge", boxes)
+    yaw = 0.8
+    R = th.tensor([[math.cos(yaw), -math.sin(yaw), 0.0], [math.sin(yaw), math.cos(yaw), 0.0], [0.0, 0.0, 1.0]])
+
+    def piece(lo, hi):  # a convex piece in the door's frame, turned by the door's yaw, hinged at (-0.05, 0.22)
+        P = th.tensor([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+        return SimpleNamespace(points_in_parent_frame=P @ R.T + th.tensor([-0.05, 0.22, 0.0]))
+
+    door = SimpleNamespace(name="left_door", prim_path="/World/fridge/left_door", scaled_transform=None,
+                           collision_meshes={"panel": piece([0.0, 0.0, 0.0], [0.04, 0.44, 1.9]), "bin": piece([0.04, 0.05, 0.9], [0.25, 0.39, 1.0])},
+                           get_position_orientation=lambda: (th.zeros(3), th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])))
+    fr.links["left_door"] = door
+    r = _raster(0.0, 0.40, -0.17, 0.17, 0.235)
+    r.open_edges = ["-u"]
+    w = Scene(boxes, r, [fr])
+    sp = IN.measure(w, fr, 0.77, name="f", scene="s", z_margin=0.03, joints=None, moved_links=["left_door"])
+    names = [b[0] for b in sp.extra_boxes]
+    assert names == ["door_left_door_0", "door_left_door_1"] and all(abs(b[3] - yaw) < 1e-5 for b in sp.extra_boxes)
+    panel, bin_ = sp.extra_boxes
+    assert sorted(round(v, 3) for v in panel[2]) == [0.02, 0.22, 0.95] and sorted(round(v, 3) for v in bin_[2]) == [0.05, 0.105, 0.17]
+    one = IN.measure(w, fr, 0.77, name="f", scene="s", z_margin=0.03, moved_links=["left_door"], door_boxes="link")
+    assert [b[0] for b in one.extra_boxes] == ["door_left_door"] and one.extra_boxes[0][2][0] > 0.12 and sp.source["door_boxes"] == "pieces"

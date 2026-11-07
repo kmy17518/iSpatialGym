@@ -353,7 +353,7 @@ def link_yaw_in(link_quat_xyzw, tangent) -> float:
 
 def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Optional[str] = None, joints: Optional[Dict[str, float]] = None,
             moved_links: Sequence[str] = (), edge_distances: Sequence[float] = (0.35, 0.45, 0.55), z_margin: float = 0.03, thickness_m: float = 0.02,
-            static_aabb=None, side=None, open_top: Optional[bool] = None) -> InteriorSpec:
+            static_aabb=None, side=None, open_top: Optional[bool] = None, door_boxes: str = "pieces") -> InteriorSpec:
     """The :class:`InteriorSpec` of ``support``'s compartment at ``z_surface`` (m above the floor) in the live ``world`` (``SimWorld``; the
     support's joints already set to ``joints``, e.g. by ``reach_bands.apply_support_joints``). Measured, in the compartment frame of the
     open raster edge ``edge`` (default the first open edge; origin = its midpoint moved out to the front plane, the support's static AABB
@@ -372,7 +372,9 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     (``front_wall_x_m``) a ray toward the robot at half the rim, and the body the up rays meet above the board (a cabinet over the sink) an
     extra obstacle box ``above_<object>`` (its AABB in the compartment frame, clipped :data:`OVERHEAD_CLIP_M` around the compartment) when its
     bottom is under :data:`OVERHEAD_MAX_Z_M`. ``side`` (a world xy direction, the stance side) picks the raster edge whose outward normal
-    faces it when no raster edge is open."""
+    faces it when no raster edge is open. ``door_boxes`` "pieces" (default since 2026-11-07 15:5x: one box per collision piece of a moved
+    link - the fridge door's single box with its bins, 0.29 x 0.44 x 1.98 m, held the idle shoulder at every near stand-off) or "link" (one
+    box over the link's pieces: the registered fridge spec's)."""
     import math
 
     import torch as th
@@ -465,11 +467,12 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
         if not pts:
             a, b = (th.as_tensor(v, dtype=th.float32) for v in link.aabb)
             pts = [th.tensor([[float(x), float(y), float(z)] for x in (a[0], b[0]) for y in (a[1], b[1]) for z in (a[2], b[2])])]
-        W = th.cat(pts)
-        Pc = th.stack([(W[:, :2] - origin) @ inward, (W[:, :2] - origin) @ tangent - lc, W[:, 2] - zb], dim=1).numpy()
         yaw = link_yaw_in(link.get_position_orientation()[1].numpy(), tangent.numpy())
-        ctr, half = oriented_box(Pc, yaw)
-        extra.append((f"door_{link_name}", ctr, half, yaw))
+        groups = pts if door_boxes == "pieces" else [th.cat(pts)]
+        for k, W in enumerate(groups):
+            Pc = th.stack([(W[:, :2] - origin) @ inward, (W[:, :2] - origin) @ tangent - lc, W[:, 2] - zb], dim=1).numpy()
+            ctr, half = oriented_box(Pc, yaw)
+            extra.append((f"door_{link_name}" + (f"_{k}" if len(groups) > 1 else ""), ctr, half, yaw))
     overhead = None
     if open_top:
         # what the up rays meet above the board (a cabinet / shelf over the sink): its link's AABB, an obstacle when within the arm's reach
@@ -508,7 +511,7 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
                        f"wall rays {left} / {right}, back ray {back}, moved links {list(moved_links)}, wall rim {rim_found} vs headroom {hr:.4f} "
                        f"(open top {open_top}{'' if auto_open == open_top else ', overridden'})",
            **({"overhead": overhead} if overhead else {}),
-           "joints_settled": {k: round(float(joints_set.get(k, v)), 4) for k, v in (joints or {}).items()},
+           "joints_settled": {k: round(float(joints_set.get(k, v)), 4) for k, v in (joints or {}).items()}, "door_boxes": door_boxes,
            "assumed": f"board / board above / walls / back thickness {thickness_m} m; long_m = the walls' outer span"}
     return InteriorSpec(name=name, height_m=round(zb - floor_z, 4), depth_m=round(depth, 4), width_m=round(width, 4), headroom_m=round(hr, 4),
                         board_thickness_m=thickness_m, top_thickness_m=thickness_m, wall_thickness_m=thickness_m, long_m=round(width + 2 * thickness_m, 4),
@@ -551,6 +554,7 @@ def main(argv=None):
     m.add_argument("--edge", default=None)
     m.add_argument("--side", default=None, help="world direction the stance side faces (+x / -x / +y / -y; write --side=-x): picks the raster edge of an open-top basin")
     m.add_argument("--open-top", default="auto", choices=["auto", "yes", "no"], help="override the open-top rule (the wall rim well under the headroom)")
+    m.add_argument("--door-boxes", default="pieces", choices=["pieces", "link"], help="a moved link (an open door) as one box per collision piece or one box")
     m.add_argument("--stand-offs", nargs="+", type=float, default=[0.35, 0.45, 0.55])
     m.add_argument("--thickness", type=float, default=0.02)
     m.add_argument("--name", required=True)
@@ -577,7 +581,7 @@ def main(argv=None):
         side = {"+x": (1.0, 0.0), "-x": (-1.0, 0.0), "+y": (0.0, 1.0), "-y": (0.0, -1.0)}[a.side]
     spec = measure(world, support, a.surface_z, name=a.name, scene=a.scene, edge=a.edge, joints=joints, moved_links=[n for n in moved if n != root],
                    edge_distances=a.stand_offs, z_margin=a.surface_tol, thickness_m=a.thickness, static_aabb=static, side=side,
-                   open_top={"auto": None, "yes": True, "no": False}[a.open_top])
+                   open_top={"auto": None, "yes": True, "no": False}[a.open_top], door_boxes=a.door_boxes)
     write_registry(a.out, [spec])
     print("INTERIOR_SPEC " + json.dumps(spec.to_json()), flush=True)
     import omnigibson as og
