@@ -361,6 +361,8 @@ def test_select_and_prepare_write_json_inputs_and_strips(tmp_path, monkeypatch):
     batch = tmp_path / "batch"
     AS.main(["select", "--manifest", str(man), "--roots", str(root), "--batch", str(batch)])
     AS.main(["prepare", "--batch", str(batch)])
+    os.chmod(batch / "CONTRACT.md", 0o444)  # a copy from a read-only snapshot: a second prepare still runs
+    AS.main(["prepare", "--batch", str(batch), "--force"])
     doc = json.load(open(batch / "inputs" / "box__x__s1.json"))
     assert doc["contract"] == LD.CONTRACT and doc["geometry"]["extents_mm"] == [30.0, 50.0, 40.0] and doc["markers"][0]["marker"] == "A"
     assert doc["history"]["geometry_reasons"] == {"top/finger_blade_in_object": 1} and doc["history"]["physics_reasons"] == {"no_placement": 1}

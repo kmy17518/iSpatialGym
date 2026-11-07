@@ -85,8 +85,11 @@ def cmd_prepare(a):
     from ispatialgym.grasping import object_geometry as OG
 
     customs = S.load_json(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")) or {}
-    for name in ("CONTRACT.md", "contract.schema.json"):
-        shutil.copy2(os.path.join(HERE, name), os.path.join(a.batch, name))
+    for name in ("CONTRACT.md", "contract.schema.json"):  # copyfile: a frozen snapshot's files are read-only, the batch's copy is not
+        dst = os.path.join(a.batch, name)
+        if os.path.exists(dst):
+            os.chmod(dst, 0o644)
+        shutil.copyfile(os.path.join(HERE, name), dst)
     for e in _entries(a.batch):
         j, src = e["job"], e["src_dir"]
         if a.only and j["id"] not in a.only:
