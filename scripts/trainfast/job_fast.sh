@@ -50,6 +50,9 @@ isgf_grasps_record $JOBDIR   # of-v2maps: ISGF_GRASPS legacy | v2 (fast_env.sh),
 # the campaign-wide sampling cache (start-draw cells, exact IK witnesses) instead of the job-private one
 export ISPATIALGYM_SAMPLING_CACHE=${ISGF_SAMPLING_CACHE:-$F/cache/sampling}
 mkdir -p $ISPATIALGYM_SAMPLING_CACHE
+# i7-plateqtf 2026-11-07: the expanding reach map's corrections (v2/map_tilt.py) - this job's own overlay shards (one file per process,
+# never the frozen maps; merged offline by `python -m ispatialgym.sampling.v2.map_tilt merge`)
+export ISPATIALGYM_MAP_OVERLAY_SHARDS=${ISPATIALGYM_MAP_OVERLAY_SHARDS:-$JOBDIR/map_overlay}
 trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*|${ISGF_JB_NFS:-$F/jobs}/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null' EXIT
 mkdir -p $JOBDIR/claims
 echo "$SLURM_JOB_ID" > $JOBDIR/jobid

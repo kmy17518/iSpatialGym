@@ -1101,6 +1101,19 @@ def map_request(s, **fields) -> None:
     log.info("MAP_REQUEST %s", key)
 
 
+def map_view_of(s, rm) -> RB.ReachBands:
+    """``map_sampling.as_bands(rm)`` for the sampler ``s``: i7-plateqtf 2026-11-07 (owner 23:40 item 3) - the view carries the sampler (the
+    expanding map's kit counters, ``v2/map_tilt.py``) and ``meta["map_tilt"]`` = :func:`map_tilt.view_tag` (None when the switch is off;
+    else the rule and the merged overlay version read - part of the view's identity for the start-cell caches)."""
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    view = MS.as_bands(rm, overhang=0.0)
+    view._map_tilt_sampler = s
+    view.meta["map_tilt"] = MT.view_tag(str(rm.meta.get("key")))
+    return view
+
+
 def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
     """of-v2maps 2026-11-07 (prompt I item 7, the shared dispatch of :func:`ensure_bands` and :func:`map_view_arm_band`): the v2 map view of
     a band spec by its kind - a placed TRAY (disembedding: ``placed`` tray tokens and ``z_support`` = the tray's inner floor) reads the
@@ -1143,7 +1156,6 @@ def generic_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Opti
     registers the support's measured top (``ikc.support_plane_z``) as :func:`map_bands` does; the push, the picks and every IK stay exact."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
-    from ispatialgym.sampling import map_sampling as MS
     from ispatialgym.sampling import reach_maps as RMAP
     from ispatialgym.sampling.height_anchors import AnchorSet
 
@@ -1179,7 +1191,7 @@ def generic_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Opti
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
         SS.register_top(s, None, top, plane=float(top.z))  # i7-split: the support split's plane + tolerance next to it
-    view = MS.as_bands(rm, overhang=0.0)
+    view = map_view_of(s, rm)
     view.meta["anchor_lookup"] = dict(getattr(rm, "lookup", None) or {})
     log.info("generic reach map hit at h %.4f (%s, map h %.4f), %s arm: %s", h, view.meta["anchor_lookup"].get("how"), float(rm.meta["height"]["value"]), arm, rm.path)
     return view
@@ -1242,7 +1254,6 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
     ``arm`` (default ``spec.arm``): the arm whose map is looked up (:func:`arm_band`'s other segment arm)."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
-    from ispatialgym.sampling import map_sampling as MS
     from ispatialgym.sampling import reach_maps as RMAP
     from ispatialgym.sampling.height_anchors import AnchorSet
 
@@ -1292,7 +1303,7 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
         if getattr(o, "name", None) and getattr(s, "ikc", None) is not None and SS.registration(s.ikc, o.name) is None:
             SS.register(s.ikc, o, z_plane, SS.Tolerance.none("no_raster"), what=plane)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
-    return MS.as_bands(rm, overhang=0.0)
+    return map_view_of(s, rm)
 
 
 #: i7-floor 2026-11-07: a floor map is computed with the object on the plane the robot stands on (h 0); the floor the object rests on
@@ -1311,7 +1322,6 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
     :data:`FLOOR_DATUM_TOL_M`. None on a miss (one ``MAP_REQUEST`` line with ``kind: floor``)."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
-    from ispatialgym.sampling import map_sampling as MS
     from ispatialgym.sampling import reach_maps as RMAP
 
     ent = _v2_map_entry(s, spec)
@@ -1358,7 +1368,7 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
         # datum + 3 mm stays an obstacle; at the floor's AABB-top datum every piece is support)
         SS.register(s.ikc, floor, z_plane, SS.Tolerance.fixed(SS.MIN_TOL_M, "floor: no raster, the minimum tolerance"), what="floor")
     log.info("reach map hit for %s on the floor (datum %+.4f m), %s arm: %s", spec.object, datum, arm, rm.path)
-    return MS.as_bands(rm, overhang=0.0)
+    return map_view_of(s, rm)
 
 
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
@@ -4129,6 +4139,15 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     def pose_at(cell, yaw):
         return object_pose_on(s, hull, rest_quat, cell, yaw, z if support_z is not None else NB.z_at(top, cell))
 
+    # i7-plateqtf 2026-11-07 (owner 23:40 item 3, ISPATIALGYM_FAST_MAP_TILT_INHERIT): the inherited map column cell each offered arm's focus
+    # stands on (v2/map_tilt.py); a focus whose cell is invalidated for this tilt on every offered arm is not screened again
+    mt_fe = map_tilt_entries(s, band_of, st_of, offered, fx) if fixed is None else {}
+    if mt_fe and len(mt_fe) == len(offered) and all(fe.overlay.dead(fe.entry) for fe in mt_fe.values()):
+        for fe in mt_fe.values():
+            MT_count(s, "map_tilt.skipped_invalidated", fe.map_key)
+        _reject("grasp_unreachable", f"inherited map cell invalidated for trunk {manip.translate:.2f}/{manip.tilt:+.2f} at the focus "
+                                     f"{[round(float(v), 3) for v in fx.tolist()]} (repeated reachability failures; map_tilt)")
+
     F_of: Dict[str, List[Tuple[float, Any]]] = {}
     # train-fast 2026-11-01 (BAND_EVIDENCE, default on; replaces BAND_FEASIBLE_REUSE and, while on, the band write-back that deleted a
     # cell on one empty screen): F = every pair a screen of this (world, trunk, cell) ever passed minus the pairs the exact IK demoted;
@@ -4320,6 +4339,8 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                          draw=(rng, float(focus_radius), float(jitter), int(n_positions)))
     if not F and fast_on("DIAG_EMPTY_F", default=False):
         _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp, eef_of)
+    if not F and mt_fe:
+        map_tilt_empty_f(s, mt_fe, fx, yaws, grasps, pose_at, st_of, ignore_for_grasp, eef_of)
     if not F:
         _reject("grasp_unreachable", f"empty feasible set F at the focus {[round(float(v), 3) for v in fx.tolist()]} (trunk {manip.translate:.2f}/{manip.tilt:+.2f}, "
                                      f"{len(yaws)} yaws x {len(grasps)} grasps{', arms ' + str(offered) if len(offered) > 1 else ''})")
@@ -4337,6 +4358,12 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
         if isinstance(out, tuple):
             if mf_key is not None:
                 MF.width_of(s).update(mf_key, True)
+            fe = mt_fe.get(out[1].arm)
+            if fe is not None:
+                from ispatialgym.sampling.v2 import map_tilt as MT
+
+                yaw0 = min(yaws, key=lambda y: abs(C.wrap_angle(float(out[1].yaw) - float(y))))
+                MT.note(s, fe, "ok", yaw=float(yaw0), grasp=C.split_twin(str(out[1].grasp_name or ""))[0])
             return out
         last_reason = out or last_reason
         if not (ev_on and not all(screened.get(a, True) for a in offered)):
@@ -4353,7 +4380,104 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     if mf_key is not None:
         MF.width_of(s).update(mf_key, False)
         _count(s, "map_F.exhausted")
+    if mt_fe:
+        map_tilt_exhausted(s, mt_fe, st_of, exact_kw)
     _reject("grasp_unreachable", f"F ({n_pairs} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
+
+
+def MT_count(s, name: str, map_key: Optional[str] = None) -> None:
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    MT._count(s, name, 1, map_key)
+
+
+def map_tilt_entries(s, band_of: Dict[str, Any], st_of: Dict[str, Stance], offered: Sequence[str], fx) -> Dict[str, Any]:
+    """i7-plateqtf 2026-11-07: ``{arm: map_tilt.FocusEntry}`` of the offered arms whose band is a map view read at an INHERITED column at
+    their stance (v2/map_tilt.py); ``{}`` with the switch off (``ISPATIALGYM_FAST_MAP_TILT_INHERIT``) or no such arm."""
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    if not MT.on():
+        return {}
+    s.__dict__.pop("_map_tilt_last_fail", None)
+    out = {}
+    for a in offered:
+        b = band_of.get(a)
+        if b is None or not is_map_view(b) or a not in st_of:
+            continue
+        fe = MT.focus_entry(b, st_of[a], [float(v) for v in _t(fx).tolist()[:2]], band_stand_off(b, st_of[a]))
+        if fe is not None:
+            out[a] = fe
+    return out
+
+
+def map_tilt_focus_dead(s, st: Stance) -> bool:
+    """i7-plateqtf 2026-11-07: whether ``st``'s focus stands on an inherited map cell invalidated for its tilt (the default arm's band;
+    a candidate cached before the invalidation leaves the draws: ``iors_small.live_candidates``)."""
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    if not MT.on() or getattr(st, "focus", None) is None:
+        return False
+    b = getattr(s, "bands", None)
+    if b is None or not is_map_view(b):
+        return False
+    fe = MT.focus_entry(b, st, [float(v) for v in _t(st.focus).tolist()[:2]], band_stand_off(b, st))
+    return bool(fe is not None and fe.overlay.dead(fe.entry))
+
+
+def _scene_collision_objects(s) -> List[Any]:
+    world = getattr(s, "world", None)
+    scene = getattr(world, "scene", None)
+    return [o for o in (getattr(scene, "objects", None) or []) if o is not getattr(s, "robot", None) and not getattr(o, "visual_only", False)]
+
+
+def map_tilt_empty_f(s, mt_fe: Dict[str, Any], fx, yaws, grasps, pose_at, st_of, ignore_for_grasp, eef_of) -> None:
+    """i7-plateqtf 2026-11-07: an empty F on an inherited map cell - the screen again with EVERY scene object out of the collision world
+    (whole, as DIAG_EMPTY_F): still empty = a reachability failure of the cell at this tilt (counted toward its invalidation), pairs found
+    = the scene caused it (never counted against the cell)."""
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    scene = _scene_collision_objects(s)
+    for a, fe in mt_fe.items():
+        MT_count(s, "map_tilt.empty_f_on_inherited", fe.map_key)
+        try:
+            with SS.whole_ignoring(s.ikc, scene):
+                try:
+                    found = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of, cache=False).get(0, [])
+                except TypeError:  # a stand-in checker without the cache switch (tests)
+                    found = s.ikc.feasible_sets([fx], list(yaws), grasps, pose_at, st_of[a], a, list(ignore_for_grasp), eef_of).get(0, [])
+        except Exception as e:  # noqa: BLE001 - the verification is advisory: unverified counts nothing
+            log.info("map_tilt: empty-F verification failed: %r", e)
+            continue
+        outcome = "other_fail" if found else "reach_fail"
+        MT.note(s, fe, outcome, why=f"empty F; scene out: {len(found)} pairs")
+        log.info("MAP_TILT %s: empty F at %s %s arm %s -> %s (scene out: %d pairs) rec %s", getattr(getattr(s, "gp", None), "variant", "?"), fe.col, fe.cell,
+                 a, outcome, len(found), fe.overlay.rec(fe.entry))
+
+
+def map_tilt_exhausted(s, mt_fe: Dict[str, Any], st_of, exact_kw) -> None:
+    """i7-plateqtf 2026-11-07: F exhausted on an inherited map cell - the last failing pair's exact IK again with every scene object out:
+    a persisting failure with a reachability reason (``map_tilt.reach_reason``: IK / reach bound / joint limit) counts toward the cell's
+    (and the yaw pair's) invalidation; anything else is recorded as ``other_fail`` (never against it)."""
+    from ispatialgym.sampling.v2 import map_tilt as MT
+
+    lf = s.__dict__.pop("_map_tilt_last_fail", None)
+    if lf is None:
+        return
+    pre, eef, a0, yaw0, gn, reason = lf
+    fe = mt_fe.get(a0)
+    if fe is None:
+        return
+    outcome = "other_fail"
+    if MT.reach_reason(reason):
+        try:
+            if verified_exact_failure(s, pre, eef, st_of[a0], a0, exact_kw, _scene_collision_objects(s)):
+                outcome = "reach_fail"
+        except Exception as e:  # noqa: BLE001
+            log.info("map_tilt: exhausted-F verification failed: %r", e)
+            return
+    MT.note(s, fe, outcome, yaw=yaw0, grasp=gn, why=f"F exhausted: {reason}")
+    log.info("MAP_TILT %s: F exhausted at %s %s arm %s -> %s (%s) rec %s", getattr(getattr(s, "gp", None), "variant", "?"), fe.col, fe.cell, a0, outcome,
+             str(reason)[:100], fe.overlay.rec(fe.entry))
 
 
 def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str], band_of, fx, yaws, grasps, pose_at, ignore_for_grasp,
@@ -4625,6 +4749,7 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                 fails["ik"] += 1
                 last_reason = res.reason
                 last_fail = (pre, eef)
+                s.__dict__["_map_tilt_last_fail"] = (pre, eef, a0, float(yaw0), gname(g), str(res.reason))  # i7-plateqtf: map_tilt_exhausted
                 continue
             if ev_of is not None and ev_of.get(a0) is not None:
                 e = ev_of[a0]
