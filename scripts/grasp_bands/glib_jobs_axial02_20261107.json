@@ -1,0 +1,17 @@
+[
+ {
+  "id": "paperback_book__jhaltj__s1x1x2.5",
+  "legacy_key": null,
+  "category": "paperback_book",
+  "model": "jhaltj",
+  "scale": [
+   1.0,
+   1.0,
+   2.5
+  ],
+  "dataset": "behavior-1k-assets",
+  "rest_hint_wxyz": null,
+  "constraint": "tabletop",
+  "note": "i7-contact 2026-11-07: alignment-axial_02 spawns paperback jhaltj at s1x1x2.5; its v2 model dir (geometry + measured rest) for the contact library"
+ }
+]

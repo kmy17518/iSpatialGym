@@ -294,3 +294,51 @@ def test_a_missing_map_skips_an_optional_step_and_rejects_a_required_one(monkeyp
         assert ex.value.reason == "missing_map" and kind in str(ex.value)
         maps[kind] = m
     assert me.kit.stats == {}  # a required miss is a rejection, not a skip
+
+
+def test_the_axial_placement_matches_the_pushed_end(monkeypatch):
+    """i7-contact 2026-11-07 (axial brace present 0 / 11 on i7_contact): the joint placement tested every end against the same classes, so a
+    pair's brace was looked up at the stop face of whichever end the map held. The work and brace classes are now those of the pair's END
+    and spin (``axial_end_spin``: the brace's goal record, else the ``[+-]end[+-]spin`` label), in the map library's long-axis convention
+    (flipped for an opposite axis; the spin only for another axis)."""
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+
+    assert CMAP.axial_end_spin({"class": "-end+spin_0-@t25"}) == (-1.0, 1.0)
+    assert CMAP.axial_end_spin({"class": "x", "goal": {"end_sign": 1.0, "spin": -1.0}}) == (1.0, -1.0)
+    assert CMAP.axial_end_spin({"class": "push_tip_h-"}) == (None, None) and CMAP.axial_end_spin(None) == (None, None)
+    seen = []
+
+    def fake_check(cm, st, pose, keep=None, tol=0.06):
+        kept = [r["class"] for r in cm.meta["classes"] if r and (keep is None or keep(r))]
+        seen.append((cm.meta["kind"], kept))
+        return {"ok": bool(kept), "why": None if kept else "no class", "cell": [0.8, 0.0], "feasible": kept}
+
+    def maps(axis):
+        lib = {"params": {"f": {"long_axis": axis}}} if axis is not None else {}
+        return {"push_blade": SimpleNamespace(meta={"kind": "push_blade", "library": lib, "classes": [
+                    {"class": f"{e}end{s}spin_0@t45", "arc_turn_rad": 0.785 * (1 if s == "+" else -1)} for e in "+-" for s in "+-"]}),
+                "axial_brace": SimpleNamespace(meta={"kind": "axial_brace", "library": lib, "classes": [
+                    {"class": f"{e}end{s}spin_blade_0@f0", "goal": {"end_sign": 1.0 if e == "+" else -1.0, "spin": 1.0 if s == "+" else -1.0}}
+                    for e in "+-" for s in "+-"]})}
+
+    cur = {}
+    monkeypatch.setattr(TT, "contact_map", lambda s, kind, role, top, arm=None: cur.get(kind))
+    monkeypatch.setattr(TT, "contact_map_check", fake_check)
+    st = _stance(translate=0.5)
+    pose = (th.tensor([0.8, 0.0, 0.9]), C.IDENTITY_QUAT.clone())
+    ax = SimpleNamespace(top=SimpleNamespace(name="desk_0"), long_axis=th.tensor([0.0, 1.0, 0.0]))
+    ax.axial_maps = lambda: AX.AlignmentAxial.axial_maps(ax)
+    for axis, want in (([0, 1, 0], "-end"), ([0, -1, 0], "+end"), (None, "-end")):
+        cur.clear(); cur.update(maps(axis)); seen.clear()
+        jp = AX.AlignmentAxial.map_joint_placement(ax, st, pose, pose, 1.0, math.radians(45.0), end_sign=-1.0)
+        assert seen == [("push_blade", [f"{want}+spin_0@t45"]), ("axial_brace", [f"{want}+spin_blade_0@f0"])], (axis, seen)
+        assert jp["ok"] and jp["maps"]["end_sign"] == -1.0
+    cur.clear(); cur.update(maps([1, 0, 0])); seen.clear()  # another axis: the spin only
+    AX.AlignmentAxial.map_joint_placement(ax, st, pose, pose, -1.0, math.radians(45.0), end_sign=1.0)
+    assert seen == [("push_blade", ["+end-spin_0@t45", "-end-spin_0@t45"]), ("axial_brace", ["+end-spin_blade_0@f0", "-end-spin_blade_0@f0"])]
+    # a map holding only the +end (the i7_contact maps): the -end pair has no class on either side
+    cur.clear(); cur.update(maps([0, 1, 0]))
+    for k in cur:
+        cur[k].meta["classes"] = [r for r in cur[k].meta["classes"] if r["class"].startswith("+end+spin")]
+    jp = AX.AlignmentAxial.map_joint_placement(ax, st, pose, pose, 1.0, math.radians(45.0), end_sign=-1.0)
+    assert not jp["work_ok"] and not jp["brace_ok"]

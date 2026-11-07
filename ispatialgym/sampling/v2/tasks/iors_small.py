@@ -4508,6 +4508,26 @@ class IORSSmall(SamplerV2):
             return f"clear pose: {r2.reason}"
         return None
 
+    def _push_stance_diag(self, lat: float, st: Stance, is_manip: bool, t_place_pose: G.Pose) -> Dict[str, Any]:
+        """DIAGNOSTIC (i7-contact 2026-11-07, touching_02's contact_unreachable): one push-stance lateral without a push class, in numbers - the
+        stance (base, trunk, stand-off), the placed target's root in its base frame and its yaw from the stance, the ``touch_push`` map's
+        lookup there (under v2only) and every candidate's failure (``label: reason``)."""
+        out: Dict[str, Any] = {"lateral": lat, "manipulation": is_manip, "base_pose2d": [round(float(v), 4) for v in G.t(st.base_pose2d).tolist()],
+                               "translate": round(float(st.translate), 3), "tilt": round(float(st.tilt), 3), "stand_off": getattr(st, "stand_off", None),
+                               "fails": list(getattr(self, "_push_chain_fails", []) or [])[:24]}
+        try:
+            xy = st.world_to_base(G.t(t_place_pose[0])[:2])
+            out["root_base"] = [round(float(v), 4) for v in xy.tolist()]
+            out["root_z"] = round(float(G.t(t_place_pose[0])[2]), 4)
+            if TT.contact_maps_on():
+                cm = TT.contact_map(self, "touch_push", "target", self.top)
+                if cm is not None:
+                    r = TT.contact_map_check(cm, st, t_place_pose)
+                    out["map"] = {k: r.get(k) for k in ("ok", "why", "cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "trunk", "edge_distance")}
+        except Exception as e:  # noqa: BLE001 - a diagnostic never rejects
+            out["diag_error"] = repr(e)[:200]
+        return out
+
     def push_stance_for(self, manip: Stance, t_place_pose: G.Pose, lateral: Optional[float] = None) -> Optional[Stance]:
         """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge, same
         trunk, so that the push contact (the placed box's right face) lies at ``push_contact_lateral_m`` from the robot's centre
@@ -4572,6 +4592,7 @@ class IORSSmall(SamplerV2):
         sweep = self.push_height_sweep_on()
         best: Optional[Tuple[Tuple[float, int], Optional[Stance], bool]] = None  # ((height, unbraced), stance or None for the manipulation stance, manip_ok)
         tip_ok: List[Optional[Stance]] = []  # the tip release's laterals whose place passes (None = the manipulation stance itself)
+        diag: List[Dict[str, Any]] = []  # i7-contact 2026-11-07: the laterals without a push class, in numbers (TOUCH_PUSH_DIAG)
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
             probe = cand if cand is not None else manip
@@ -4596,6 +4617,8 @@ class IORSSmall(SamplerV2):
                 reasons = collections.Counter(f.split(": ", 1)[-1][:120] for f in self._push_chain_fails)
                 no_class = f"no class{f' at or below {100 * cap[1]:.1f} cm' if cap else ''} [{len(self._push_chain_fails)} cands: " + \
                     " | ".join(f"{n}x {r}" for r, n in reasons.most_common(4)) + "]"
+            if kind is None:
+                diag.append(self._push_stance_diag(lat, probe, cand is None, t_place_pose))
             place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
             both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True, height_range=(h, h) if (sweep and h is not None) else None) \
                 if (kind is not None and place_why is None and want_brace) else None
@@ -4644,6 +4667,7 @@ class IORSSmall(SamplerV2):
                 return None  # the manipulation stance itself passes: no second base pose
             if self.shelf_tip():
                 raise Reject("place_unreachable", f"touching tip release: the place fails from every lateral ({'; '.join(tried)})")
+            log.info("TOUCH_PUSH_DIAG %s", json.dumps({"variant": self.gp.variant, "laterals": diag}, default=str))
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
         log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
         return self._record_push_stance(draft, manip, grasp, st, t_place_pose, p_pose)

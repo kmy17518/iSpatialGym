@@ -14,6 +14,8 @@
 # validate.support_z), written to GC_MAPS_OUT (default $GC_ROOT/maps: <entry>/cmap__<kind>__*; the sampler reads them from the maps root
 # ISPATIALGYM_REACH_MAPS beside the grasp maps). Logs $GC_ROOT/logs/maps_<i>_<kind>.log + $GC_MAPS_OUT/logs/maps_<kind>_<i>of<N>.jsonl:
 #   GC_STAGES=maps GC_MANIFEST=none GC_GLIB=none GC_ROOT=<library root> GC_NSHARD=N ISG_GB_ROOT=<snapshot> sbatch --array=0-$((N-1)) job_contacts.sh
+# A re-validation in a new order that keeps the earlier verdicts (i7-contact 2026-11-07: the axial (end, spin) groups): GC_VALIDATE_ARGS=--skip-validated
+# on a cp -a of the library root.
 #SBATCH --job-name=isgcontact
 #SBATCH --account=vision
 #SBATCH --partition=svl

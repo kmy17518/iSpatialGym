@@ -50,6 +50,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import re
 import time
 import traceback
 from dataclasses import asdict, dataclass
@@ -98,6 +99,9 @@ class ContactValidateConfig:
     #: DIAGNOSTIC (run E, owner question 2): validate the entries the sampler's hand_overlap screen removes INSTEAD of the live ones - is the
     #: screen over-strict physically? Their verdicts carry ``diagnostic``; the screen itself is unchanged (a library run with it goes to its own root)
     diagnose_screened: bool = False
+    #: keep the verdicts an earlier run wrote (``validation.verdict`` set): those entries are neither re-run nor counted against
+    #: ``max_entries`` - a re-run in a new order adds its sample to the old one (i7-contact 2026-11-07: the axial (end, spin) groups)
+    skip_validated: bool = False
     #: the object in the base frame (ahead of the slab edge, to the arm's side): the right arm's; the left arm's lateral is mirrored
     base_offsets: Tuple[Tuple[float, float], ...] = ((0.0, -0.15), (0.0, -0.28), (0.08, -0.05), (0.08, -0.22))
     max_steps: int = 1800
@@ -524,16 +528,28 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
 # ------------------------------------------------------------------------------------------------ one model (any world with the KitContactWorld surface)
 
 
+def axial_group(entry: Dict[str, Any]) -> str:
+    """An axial entry's (pushed end, turn sense) group - the class label's ``+end+spin`` / ``+end-spin`` / ``-end+spin`` / ``-end-spin``
+    prefix (``contact_library.build_axial_push`` / ``build_axial_brace``); ``""`` for every other family."""
+    m = re.match(r"^([+-]end[+-]spin)", str(entry.get("class", "")))
+    return m.group(1) if m else ""
+
+
 def entry_order(entries: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The validation order: the entries the sampler would try (not ``sampler_screen``ed) first, their yaw slots round-robin (each slot's in
-    library order = the sampler's order), then the screened ones - so the ``max_entries`` cap samples every yaw's first candidates (the first
-    run validated 48 of the spray bottle's 1104 entries, all at yaw 0; the second 48 screened napkins blades the sampler rejects too)."""
+    """The validation order: the entries the sampler would try (not ``sampler_screen``ed) first, round-robin over their (yaw slot, axial
+    group) - each group in library order = the sampler's order -, then the screened ones - so the ``max_entries`` cap samples every yaw's
+    and every axial (end, spin)'s first candidates (the first run validated 48 of the spray bottle's 1104 entries, all at yaw 0; the second
+    48 screened napkins blades the sampler rejects too; the axial run on the hinge 48 entries of the ``+end+spin`` group only - the library
+    loops yaw -> end -> spin -> class, 6 per yaw -, so its maps held no other end or turn sense: i7-contact 2026-11-07)."""
     def round_robin(es):
-        by_yaw: Dict[float, List[Dict[str, Any]]] = {}
+        groups: Dict[Tuple[float, str], List[Dict[str, Any]]] = {}
         for e in es:
-            by_yaw.setdefault(round(float(e.get("yaw_deg", 0.0)), 4), []).append(e)
+            groups.setdefault((round(float(e.get("yaw_deg", 0.0)), 4), axial_group(e)), []).append(e)
+        # within a round: group by group, each over the yaw slots in library order (a non-axial library: one group, the order as before)
+        names = sorted({g for _y, g in groups})
+        yaws = list(dict.fromkeys(y for y, _g in groups))
+        lists = [groups[k] for k in sorted(groups, key=lambda k: (names.index(k[1]), yaws.index(k[0])))]
         out: List[Dict[str, Any]] = []
-        lists = list(by_yaw.values())
         for i in range(max((len(v) for v in lists), default=0)):
             out.extend(v[i] for v in lists if i < len(v))
         return out
@@ -574,6 +590,9 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
             # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
             tim["n_screened"] = tim.get("n_screened", 0) + 1
+            continue
+        if cfg.skip_validated and (e.get("validation") or {}).get("verdict") is not None:
+            tim["n_kept"] = tim.get("n_kept", 0) + 1
             continue
         if n_live >= cfg.max_entries:
             continue
@@ -1029,18 +1048,17 @@ class KitContactWorld:
         import omnigibson.lazy as lazy
 
         def bind():
-            with self.tw.og.sim.editing_usd():  # a USD edit (the material prim, its binding) outside it raises in OmniGibson
-                _bind()
-            self.tw.og.sim.update_handles()
-            self.tw.og.sim.step()
-
-        def _bind():
-            pm = lazy.isaacsim.core.api.materials.physics_material.PhysicsMaterial(prim_path=f"{self.tw.slab.prim_path}/Looks/diag_physics_mat_{int(round(mu * 1000))}",
-                                                                                   name=f"diag_physics_mat_{int(round(mu * 1000))}", static_friction=float(mu),
-                                                                                   dynamic_friction=float(mu), restitution=0.0)
+            # the material prim is a USD edit (outside editing_usd it raises: sweep 18368438-41); the binding opens its own editing_usd
+            # (GeomPrim.apply_physics_material) and nesting raises (sweep 18369352-55), so it runs after the first block closes
+            with self.tw.og.sim.editing_usd():
+                pm = lazy.isaacsim.core.api.materials.physics_material.PhysicsMaterial(
+                    prim_path=f"{self.tw.slab.prim_path}/Looks/diag_physics_mat_{int(round(mu * 1000))}", name=f"diag_physics_mat_{int(round(mu * 1000))}",
+                    static_friction=float(mu), dynamic_friction=float(mu), restitution=0.0)
             for link in self.tw.slab.links.values():
                 for m in link.collision_meshes.values():
                     m.apply_physics_material(pm)
+            self.tw.og.sim.update_handles()
+            self.tw.og.sim.step()
 
         self._reprobe(obj, bind)
 
@@ -1290,7 +1308,7 @@ def library_job(lib_k: Dict[str, Any], eid: str) -> Dict[str, Any]:
 def validate_cli(a) -> None:
     from ispatialgym.grasping import contact_library as CL
 
-    cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)))
+    cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)), skip_validated=bool(getattr(a, "skip_validated", False)))
     arm = a.arm or (cfg.work_arm if a.kind == "push" else cfg.brace_arm)
     base = os.path.join(a.root, a.kind, "models")
     if getattr(a, "jobs", None):
@@ -1397,6 +1415,7 @@ def main(argv=None):
     ap.add_argument("--shard", default=None)
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--diagnose-screened", action="store_true", help="DIAGNOSTIC: validate the hand_overlap-screened entries (their own root)")
+    ap.add_argument("--skip-validated", action="store_true", help="keep the entries an earlier run validated (not re-run, not counted against max_entries)")
     ap.add_argument("--jobs", default=None, help="the build manifest: validate the shard's job ids (the build's partition)")
     validate_cli(ap.parse_args(argv))
 

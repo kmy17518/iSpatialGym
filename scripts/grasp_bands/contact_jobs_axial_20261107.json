@@ -70,6 +70,45 @@
   }
  },
  {
+  "id": "paperback_book__jhaltj__s1x1x2.5",
+  "category": "paperback_book",
+  "model": "jhaltj",
+  "scale": [
+   1.0,
+   1.0,
+   2.5
+  ],
+  "model_dir": "/vision/u/minyeong/projects/isg_home/oracle_fix/contact_glib_20261107h/glib/models/paperback_book__jhaltj__s1x1x2.5",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_02 (support 0.6854): the alias's SPAWN scale s1x1x2.5 (i7-contact 2026-11-07; the s1 entry above is not what it spawns)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's); the model dir is the v2 export of the spawn scale (scripts/grasp_bands/glib_jobs_axial02_20261107.json, job_glib.sh)",
+  "validate": {
+   "support_z": 0.6854,
+   "variant": "alignment-axial-paperback_book-desk"
+  }
+ },
+ {
   "id": "keyboard__injrgc__s1",
   "category": "keyboard",
   "model": "injrgc",

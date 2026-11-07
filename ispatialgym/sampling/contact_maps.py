@@ -181,6 +181,21 @@ def problems(grid: Dict[Tuple[int, int], Dict[str, Any]], cells: np.ndarray, hei
             "n_chain": np.asarray(nch, dtype=np.int64), "fingers": np.asarray(fq, dtype=float), "To": np.asarray(tos, dtype=float).reshape(-1, 4, 4), "K": K}
 
 
+def axial_end_spin(row: Optional[Dict[str, Any]]) -> Tuple[Optional[float], Optional[float]]:
+    """``(end_sign, spin)`` of an axial class row (``push_blade`` / ``axial_brace``): the brace's ``goal`` record, else the class label's
+    ``[+-]end[+-]spin`` prefix (``contact_library.build_axial_push`` / ``build_axial_brace``: end +1 = the ``long_axis`` side); ``(None, None)``
+    for a row that names neither."""
+    if not row:
+        return None, None
+    g = row.get("goal") or {}
+    if g.get("end_sign") is not None and g.get("spin") is not None:
+        return float(g["end_sign"]), float(g["spin"])
+    c = str(row.get("class", ""))
+    if len(c) >= 9 and c[0] in "+-" and c[1:4] == "end" and c[4] in "+-" and c[5:9] == "spin":
+        return (1.0 if c[0] == "+" else -1.0), (1.0 if c[4] == "+" else -1.0)
+    return None, None
+
+
 def entry_rest_quat(entry: Dict[str, Any]) -> List[float]:
     """The rest the entry's object stands on (xyzw): ``Rz(-yaw_deg) R(T_rule_object)`` - the library's v2 rest, an axial entry's identity
     rest (``contact_library.axial_rest``); a sampler's object yaw is read over it (:func:`yaw_of`)."""
@@ -396,7 +411,9 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
     meta = {"schema": SCHEMA, "kind": kind, "arm": cfg.arm, "plane": spec["plane"], "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
             "cell": f"the object ROOT xy at its {spec['frame']} pose", "object": obj, "rest_id": obj.get("rest_id"),
             "entry_rest_quat_xyzw": entry_rest_quat(entries[0]),
-            "library": {"digest": lib_k.get("digest"), "validate": lib_k.get("validate"), "families": sorted(lib_k.get("families") or {})},
+            "library": {"digest": lib_k.get("digest"), "validate": lib_k.get("validate"), "families": sorted(lib_k.get("families") or {}),
+                        # the builders' params (an axial library's long_axis: the side its +end classes push) - the consumer checks its own axis
+                        "params": {f: (v or {}).get("params") for f, v in (lib_k.get("families") or {}).items() if f in spec["families"]}},
             "height": {"value": float(height), "anchor_key": anchor.get("key"), "anchor_surfaces": list(anchor.get("surfaces", []))[:50]},
             "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "robot": RM.robot_digest(),
             "pose_set": pset, "classes": [class_row(grid[(y, g)]) if (y, g) in grid else None for y in range(nY) for g in range(nG)],

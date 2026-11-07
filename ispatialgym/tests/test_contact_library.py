@@ -858,3 +858,42 @@ def test_the_screened_diagnostic_validates_only_the_screened_entries(glib):
     VC.validate_library(World(), lib, None, None, np.zeros((8, 3)), VC.ContactValidateConfig(max_entries=len(lib["entries"]), diagnose_screened=True), "right")
     assert all(e["validation"]["verdict"] == "valid" and e["validation"]["diagnostic"] and e["validation"]["screen"] for e in scr)
     assert all("validation" not in e for e in lib["entries"] if e not in scr)
+
+
+def test_the_validation_order_samples_every_axial_end_and_turn_sense():
+    """i7-contact 2026-11-07: the axial libraries loop yaw -> end -> spin -> class, so the per-yaw round-robin validated the ``+end+spin``
+    group only (48 = 6 per yaw x 8) and the maps held no other end or turn sense (axial brace present 0 / 11 on i7_contact: every written
+    instance's stop face was the +end's, at the goal 180 deg from the stance - ik_pre). The order now round-robins the (yaw, end-spin) groups;
+    a non-axial library keeps its order."""
+    es = [{"yaw_deg": y, "class": f"{g}_blade_0@f{k}"} for y in (0.0, 45.0, 90.0) for g in ("+end+spin", "+end-spin", "-end+spin", "-end-spin")
+          for k in range(3)]
+    order = VC.entry_order(es)
+    first = {(e["yaw_deg"], VC.axial_group(e)) for e in order[:12]}
+    assert len(first) == 12 and all(e["class"].endswith("@f0") for e in order[:12])  # every (yaw, end, spin) once before any second class
+    assert [VC.axial_group(e) for e in order[:3]] == ["+end+spin"] * 3 and [e["yaw_deg"] for e in order[:3]] == [0.0, 45.0, 90.0]
+    assert VC.axial_group({"class": "push_tip_h-@5.0cm"}) == "" and VC.axial_group({"class": "-end+spin_30-@t45"}) == "-end+spin"
+    touch = [{"yaw_deg": y, "class": f"c{k}"} for y in (0.0, 45.0) for k in range(2)]
+    assert [(e["yaw_deg"], e["class"]) for e in VC.entry_order(touch)] == [(0.0, "c0"), (45.0, "c0"), (0.0, "c1"), (45.0, "c1")]
+
+
+def test_a_rerun_keeps_the_earlier_verdicts_when_asked():
+    """``skip_validated``: the entries an earlier run validated are neither re-run nor counted against ``max_entries`` (the new order's sample
+    adds to the old one)."""
+    es = [{"yaw_deg": 0.0, "class": f"{g}_blade_0@f0"} for g in ("+end+spin", "+end-spin", "-end+spin", "-end-spin")]
+    es[0]["validation"] = {"verdict": "valid", "trials": ["kept"]}
+    ran = []
+
+    class World:
+        def settle(self, obj, geom, q):
+            return {}, None
+
+        def plan_entry(self, obj, geom, e, T, arm):
+            ran.append(e["class"])
+            return None
+
+    lib = {"kind": "brace", "object": {"rest": {"quat_xyzw": [0.0, 0.0, 0.0, 1.0]}}, "entries": es}
+    tim = VC.validate_library(World(), lib, None, None, np.zeros((1, 3)), VC.ContactValidateConfig(max_entries=2, skip_validated=True), "left")
+    assert ran == ["+end-spin_blade_0@f0", "-end+spin_blade_0@f0"] and tim["n_kept"] == 1 and es[0]["validation"]["trials"] == ["kept"]
+    ran.clear()
+    VC.validate_library(World(), lib, None, None, np.zeros((1, 3)), VC.ContactValidateConfig(max_entries=2), "left")
+    assert ran == ["+end+spin_blade_0@f0", "+end-spin_blade_0@f0"]  # the default re-runs from the top
