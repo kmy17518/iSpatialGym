@@ -1013,6 +1013,8 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
                  "lean_base": job.get("lean_base")}
         if validate_arm != "right":  # i7-overhang: the arm the lean rest was validated with (in the entry id and the identity)
             extra["validate_arm"] = validate_arm
+        if isinstance(job.get("access_region"), dict):  # i7-overhang: the interior goal's accessible region (entry id + identity)
+            extra.update({"access_region": job["access_region"], "interior_goal": job.get("interior_goal")})
     return {"schema": S.LIBRARY, **extra, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
             "dataset": job.get("dataset"), "constraint": job.get("constraint"), "legacy_key": job.get("legacy_key"), "arm": policy_arm(cand_doc),
             "policy_key": policy.key(policy_arm(cand_doc)), "policy": policy.meta(policy_arm(cand_doc)), "physics_profile": physics_profile,

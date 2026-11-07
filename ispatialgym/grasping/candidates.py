@@ -400,6 +400,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                                          gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
                                          orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
+    # i7-overhang 2026-11-07: an entry used at an interior goal - the accessible region (access_region.py) and the goal's boards in the rest frame
+    from ispatialgym.grasping import access_region as AR
+
+    region = AR.region_of_job(job)
+    region_boxes = []
+    if region is not None:
+        lr = job.get("lean_rest") or {}
+        side = 1.0 if (job.get("lean") or {}).get("side", "left") == "left" else -1.0
+        region_boxes = AR.goal_boxes(region, lr, z_min, side)
     # i7-overhang: the measured slab box (its edge under the object) instead of the unbounded tabletop plane
     support = OV.support_in_rest(job["overhang_rest"], z_min) if overhang else CP.Support.plane(z_min, name="tabletop")
     side_steps = np.arange(0.002, cfg.tip_max_m - CONTACT_Z + 1e-9, 0.002) if overhang else np.zeros(0)
@@ -570,6 +579,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             score = score + 5.0 * np.exp(-((t - w_c) / 0.15) ** 2) - 1.0 * across
             feats["stem_t"], feats["pinch_across"] = t, across
             L["n_flower"] = int(len(T))
+        if region is not None and len(T):
+            # i7-overhang 2026-11-07 (owner: an entry used at an interior goal): only the goal's accessible region, ranked by board clearance
+            ok_r, clr, cnt = AR.evaluate(T, cz, union.vertices, region_boxes, region, arm)
+            L["region"] = cnt
+            T, score, cz, pre_q, clr = T[ok_r], score[ok_r], cz[ok_r], pre_q[ok_r], clr[ok_r]
+            feats = {k: v[ok_r] for k, v in feats.items()}
+            feats["board_clearance_m"] = clr
+            score = 1000.0 * clr + 1e-3 * score  # the board clearance first, the old score breaks ties
+            L["n_region"] = int(len(T))
         if len(T) == 0:
             log[mode] = L
             continue
@@ -633,6 +651,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
            **({"rest_kind": "overhang", "overhang": job.get("overhang"), "overhang_rest": job.get("overhang_rest"),
                "support": {"kind": support.kind, "centre": list(support.centre), "half": list(support.half),
                            "frame": "rest frame (the support frame's axes, the root at the origin; the slab's edge under the object)"}} if overhang else {}),
+           **({"access_region": region, "region_boxes": [{"name": b.name, "centre": list(b.centre), "half": list(b.half)} for b in region_boxes]} if region else {}),
            **({"rest_kind": "lean", "lean": job.get("lean"), "lean_rest": job.get("lean_rest"),
                "obstacles": [{"name": o.name, "centre": list(o.centre), "half": list(o.half), "frame": "rest frame (the support frame's axes, the root at the origin)"}
                              for o in obstacles]} if obstacles else {}),

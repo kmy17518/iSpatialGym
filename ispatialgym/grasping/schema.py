@@ -104,7 +104,7 @@ def model_id(category: str, model: str, scale=None) -> str:
 
 
 def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None, overhang=None,
-             validate_arm: Optional[str] = None) -> str:
+             validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> str:
     """Library entry id: ``<category>__<model>__<scale tag>`` + ``__<constraint>`` (non-tabletop) + ``__r<digest>`` (a designated
     non-canonical rest) + ``__<lean tag>`` (i7-lean: a lean rest, ``lean.LeanSpec.tag``) + ``__<overhang tag>`` (i7-overhang: an overhang
     rest, ``overhang.OverhangSpec.tag``) + ``__val<arm>`` (i7-overhang: a LEAN entry validated with an arm other than the right one,
@@ -124,12 +124,14 @@ def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop"
         out += "__" + OV.OverhangSpec.from_json(overhang).tag()
     if validate_arm not in (None, "right"):
         out += f"__val{validate_arm}"
+    if access_region:  # i7-overhang 2026-11-07: an entry restricted to an interior goal's accessible region (access_region.region_identity tag)
+        out += f"__{access_region}"
     return out
 
 
 def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None,
-              overhang=None, validate_arm: Optional[str] = None) -> str:
-    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang, validate_arm))
+              overhang=None, validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> str:
+    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang, validate_arm, access_region))
 
 
 def job_lean(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -149,9 +151,16 @@ def job_validate_arm(job: Dict[str, Any]) -> Optional[str]:
     return a if job.get("rest_kind") == "lean" and a not in (None, "right") else None
 
 
+def job_access_region(job: Dict[str, Any]) -> Optional[str]:
+    """The tag of a LEAN job's accessible region (``access_region``, i7-overhang 2026-11-07: an entry used at an interior goal), else None."""
+    from ispatialgym.grasping import access_region as AR
+
+    return AR.tag_of(AR.region_of_job(job))
+
+
 def job_dir(job: Dict[str, Any], root: Optional[str] = None) -> str:
     return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"), job_lean(job),
-                     job_overhang(job), job_validate_arm(job))
+                     job_overhang(job), job_validate_arm(job), job_access_region(job))
 
 
 def digest(obj: Any, n: int = 12) -> str:
@@ -373,6 +382,8 @@ class ModelLibrary:
         extra = {}
         if self.data.get("validate_arm") not in (None, "right"):  # i7-overhang: a lean entry validated with the left arm (right ones as before)
             extra["validate_arm"] = self.data["validate_arm"]
+        if isinstance(self.data.get("access_region"), dict):  # i7-overhang: an interior goal's accessible region (entries without one as before)
+            extra["access_region"] = self.data["access_region"].get("digest")
         return {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale), **extra,
                 "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
                 "rests": {k: rest_ident(r) for k, r in self.rests.items()},
@@ -422,11 +433,11 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
 
 def load_model(category: str, model: str, scale=None, root: Optional[str] = None, *, constraint: str = "tabletop", rest_hint_wxyz=None,
                require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None,
-               validate_arm: Optional[str] = None) -> Optional[ModelLibrary]:
+               validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> Optional[ModelLibrary]:
     """The v2 entry of (category, model, scale, constraint, designated rest[, lean rest]), checked against ``require`` (kwargs of
     :func:`check_compatible`); None when there is no v2 entry - a legacy library entry is never substituted (it has no measured rest).
     ``lean`` (i7-lean): the lean entry of that spec (its own directory); ``overhang`` (i7-overhang): the overhang entry of that spec."""
-    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang, validate_arm)
+    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang, validate_arm, access_region)
     data = load_json(os.path.join(d, "library.json"))
     if data is None:
         return None
