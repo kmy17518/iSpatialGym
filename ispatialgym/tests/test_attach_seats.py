@@ -62,12 +62,13 @@ def _rot(seed):
 # ------------------------------------------------------------------------------------------------ the switch
 
 
-def test_attach_axis_defaults_to_meta_z_and_opts_in_per_entry(monkeypatch):
+def test_attach_axis_defaults_to_seat_and_meta_z_per_entry(monkeypatch):
+    """Owner decision 2026-11-07 item 2: the oracle's seat axis is the default; the old rule stays reachable per entry."""
     monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
-    assert CA.CandidateConfig().attach_axis == "meta_z"
-    cork = {"id": "cork__ncxgpe__s1__attachment_free", "cand_overrides": {"attach_axis": "seat"}}
-    assert PL.candidate_overrides(cork)[0].attach_axis == "seat"
-    assert PL.candidate_overrides({"id": "cap__xxqyrt__s1__attachment_free"})[0].attach_axis == "meta_z"
+    assert CA.CandidateConfig().attach_axis == "seat"
+    old = {"id": "cork__ncxgpe__s1__attachment_free", "cand_overrides": {"attach_axis": "meta_z"}}
+    assert PL.candidate_overrides(old)[0].attach_axis == "meta_z"
+    assert PL.candidate_overrides({"id": "cap__xxqyrt__s1__attachment_free"})[0].attach_axis == "seat"
 
 
 # ------------------------------------------------------------------------------------------------ every attach object of the libraries

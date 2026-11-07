@@ -98,13 +98,13 @@ class CandidateConfig:
     # grasp cleared at 10 mm records 15 mm and the closing sweep re-measures the width 5 mm off its contact (luhkiz: 57 of 62 top grasps
     # lose their width there; 59 of 62 pass the sweep at the real displacement).
     retreat_shift_exact: bool = False
-    # i7-attach 2026-11-07, OWNER DECISION (default "meta_z" = the shared behaviour): the attachment rule's mating direction. "meta_z" =
-    # the male meta link frame's -z (as written). "seat" = the oracle's seat axis (``predicates.seat_axis``, what the attach program
+    # i7-attach 2026-11-07: the attachment rule's mating direction - DEFAULT "seat" (owner decision 2026-11-07 item 2). "meta_z" =
+    # the male meta link frame's -z (as written before; every entry built before has it). "seat" = the oracle's seat axis (``predicates.seat_axis``, what the attach program
     # descends along), recorded per pair in ATTACH_SEATS_FILE: a male seats with its link frame on the female's, so its mating direction
     # is -(R_male_link @ loc), loc = the seat axis in the female link frame. cork ncxgpe: its frame (0.5, -0.5, 0.5, 0.5) turns -z into
-    # +y, the oracle seats it along its own -z. An entry without a seat record keeps "meta_z" (logged). Opt in per entry with the
-    # manifest's ``cand_overrides`` ({"attach_axis": "seat"}).
-    attach_axis: str = "meta_z"
+    # +y, the oracle seats it along its own -z. An entry without a seat record keeps "meta_z" (logged). The axis is part of the entry
+    # identity off "meta_z" (schema.ModelLibrary.attach_axis). The old rule per entry: ``cand_overrides`` ({"attach_axis": "meta_z"}).
+    attach_axis: str = "seat"
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
