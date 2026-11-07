@@ -1240,9 +1240,10 @@ class SamplerV2(TaskSampler):
         :mod:`witness_check`) before the instance is written; a miss rejects the attempt (``witness_unreachable``)."""
         from ispatialgym.sampling.v2 import witness_check as WC
 
-        if not WC.enabled() or not self.sidecar.ik_witnesses:
+        wit = getattr(getattr(self, "sidecar", None), "ik_witnesses", None)  # a sampler stub (tests) has no sidecar
+        if not WC.enabled() or not wit:
             return
-        bad = WC.witness_violations(self.sidecar.ik_witnesses)
+        bad = WC.witness_violations(wit)
         if bad:
             raise Reject("witness_unreachable", f"{len(bad)} recorded IK witness target(s) miss their pose", worst=sorted(bad, key=lambda e: -e["pos_m"])[:3])
 
