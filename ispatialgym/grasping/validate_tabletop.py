@@ -188,6 +188,40 @@ def _sustained(series: Sequence[float], thr: float, window: int) -> Tuple[bool, 
     return best >= window, best
 
 
+def _longest_run(series: Sequence[float], thr: float) -> Tuple[int, int]:
+    """``(start index, length)`` of the longest run of values above ``thr`` (``(-1, 0)``: none) - the window ``_sustained`` judges."""
+    run = best = 0
+    start = best_start = -1
+    for i, v in enumerate(series):
+        if v > thr:
+            if run == 0:
+                start = i
+            run += 1
+            if run > best:
+                best, best_start = run, start
+        else:
+            run = 0
+    return best_start, best
+
+
+def force_diagnostics(series: Dict[str, List[float]], phases: Sequence[str], weight_N: float, load_thr: float, finger_thr: float) -> Dict[str, Any]:
+    """i7-switches 2026-11-07 (owner: log every object_pressed_into_table): per trial phase (init = the pre-shaped hand at the grasp, close,
+    hold, unload) the peak object load (x weight) and finger force on the slab, and the longest window above each limit with the phases it
+    lies in and its peak - where the sustained load the verdict reads happens. Diagnostics only: no verdict reads it."""
+    out: Dict[str, Any] = {"weight_N": round(float(weight_N), 4), "by_phase": {}}
+    for ph in dict.fromkeys(phases):
+        idx = [i for i, p in enumerate(phases) if p == ph]
+        out["by_phase"][ph] = {"steps": len(idx), "obj_slab_ratio_max": round(max(series["obj_slab_ratio"][i] for i in idx), 3),
+                               "finger_slab_max_N": round(max(series["finger_slab"][i] for i in idx), 3)}
+    for key, thr in (("obj_slab_ratio", load_thr), ("finger_slab", finger_thr)):
+        st, n = _longest_run(series[key], thr)
+        win = list(range(st, st + n)) if n else []
+        out[f"{key}_window"] = {"start_step": st, "steps": n, "phases": list(dict.fromkeys(phases[i] for i in win)),
+                                "peak": round(max((series[key][i] for i in win), default=0.0), 3),
+                                "first_step_of_phase": {ph: phases.index(ph) for ph in dict.fromkeys(phases[i] for i in win)}}
+    return out
+
+
 def _summ(series: Sequence[float]) -> Dict[str, float]:
     if not series:
         return {"max": 0.0, "mean": 0.0, "p90": 0.0, "n": 0}
@@ -557,6 +591,7 @@ class TabletopWorld:
         p_rest, q_rest = (x.clone() for x in obj.get_position_orientation())
         series: Dict[str, List[float]] = {"finger_slab": [], "other_slab": [], "obj_slab_ratio": [], "finger_obj": []}
         other_links: List[str] = []
+        phases: List[str] = []  # the trial phase of every series step (force_diagnostics)
         weight = float(obj.mass) * 9.81
         k = [0]
 
@@ -578,6 +613,7 @@ class TabletopWorld:
                 series["other_slab"].append(f["other_slab"])
                 series["obj_slab_ratio"].append(f["obj_slab_z"] / max(weight, 1e-6))
                 series["finger_obj"].append(f["finger_obj"])
+                phases.append(phase)
                 if f["other_slab"] > cfg.non_finger_contact_N and f["other_link"]:
                     other_links.append(f"{phase}:{f['other_link']}")
         run(motions.hold(cfg.init_hold_steps), "init", wake=True)
@@ -647,7 +683,8 @@ class TabletopWorld:
                        "obj_slab_ratio": _summ(series["obj_slab_ratio"]), "obj_slab_ratio_sustained_steps": load_run,
                        "finger_obj": _summ(series["finger_obj"]),
                        "thresholds": {"finger_force_max_N": cfg.finger_force_max_N, "object_load_ratio_max": cfg.object_load_ratio_max,
-                                      "force_window_steps": cfg.force_window, "non_finger_contact_N": cfg.non_finger_contact_N, "calibrated": False}},
+                                      "force_window_steps": cfg.force_window, "non_finger_contact_N": cfg.non_finger_contact_N, "calibrated": False},
+                       "diagnostics": force_diagnostics(series, phases, weight, cfg.object_load_ratio_max, cfg.finger_force_max_N)},
             "eef_in_object_used": plan.get("T_object_eef_used", cand["T_object_eef"]), "start_lift_m": plan.get("start_lift_m", 0.0),
             "object_asleep_steps": asleep[0], "steps": k[0], "wall_s": round(time.time() - t0, 3),
         })
@@ -797,6 +834,8 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
             "policy_key": policy.key(policy_arm(cand_doc)), "policy": policy.meta(policy_arm(cand_doc)), "physics_profile": physics_profile,
             "rests": {k: v for k, v in rests.items()}, "families": fams, "grasps": grasps,
             "twins": "finger-swapped twins (eef turned pi about +z) are NOT stored: reach maps evaluate them with their own IK / policy checks",
+            # i7-switches 2026-11-07: the candidate switches the grasps were generated with (part of the entry identity when one is on)
+            "candidate_switches": S.candidate_switches(cand_doc.get("config")),
             "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "created": S.now()}}
 
 

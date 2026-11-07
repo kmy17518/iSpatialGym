@@ -89,15 +89,17 @@ class CandidateConfig:
     family_max_pool: int = 40000  # a family pool larger than this is subsampled (seeded)
     # ISG_GLIB_GATE_DUMP=1: per pool and gate, the counts and the measures of the dropped candidates -> gate_dump.json (diagnostics only)
     gate_dump: bool = field(default_factory=lambda: os.environ.get("ISG_GLIB_GATE_DUMP", "") == "1")
-    # OWNER DECISION (default False = the shared behaviour): finger_blades_clear's pinched pieces looked up at the retreated contact
-    # (CONTACT_Z + shift) instead of CONTACT_Z. The call site passes no contact_z, so a retreated top grasp's real pinched piece is not left
-    # out and the pad's own lip contact counts as a blade in the object (luhkiz L3: 4 of its 5 lip pinches pass at the real contact).
-    blade_contact_at_retreat: bool = False
-    # OWNER DECISION (default False = the shared behaviour): the top mode's object-clearance retreats keep the shift equal to the eef's
-    # real displacement. As written, a failed try (absolute retreats 5, 10, ... mm from the unmoved pose) still adds to the shift, so a
+    # OWNER DECISION, ADOPTED 2026-11-07 (i7-switches: default True for new builds after the count on the campaign library; False = the
+    # behaviour before, which every entry generated without the field reads as - schema.candidate_switches): finger_blades_clear's pinched
+    # pieces looked up at the retreated contact (CONTACT_Z + the real retreat) instead of CONTACT_Z. Without it a retreated top grasp's real
+    # pinched piece is not left out and the pad's own lip contact counts as a blade in the object (luhkiz L3: 4 of its 5 lip pinches pass at
+    # the real contact). The state is part of the entry identity (schema.ModelLibrary.identity when on).
+    blade_contact_at_retreat: bool = True
+    # OWNER DECISION, ADOPTED 2026-11-07 (i7-switches, as above): the top mode's object-clearance retreats keep the shift equal to the eef's
+    # real displacement. Without it a failed try (absolute retreats 5, 10, ... mm from the unmoved pose) still adds to the shift, so a
     # grasp cleared at 10 mm records 15 mm and the closing sweep re-measures the width 5 mm off its contact (luhkiz: 57 of 62 top grasps
     # lose their width there; 59 of 62 pass the sweep at the real displacement).
-    retreat_shift_exact: bool = False
+    retreat_shift_exact: bool = True
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -785,7 +787,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])))
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
-        blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default off)
+        blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default on since i7-switches)
         blades, deep = finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, **blade_kw)
         if dump.on:  # diagnostics: the blade depth with the pinched pieces looked up at the real contact (what the switch would do)
             deep_at = deep if blade_kw else finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, contact_z=cz_real[sel].reshape(-1, 1))[1]
@@ -873,8 +875,9 @@ def _clear_grouped(clear_fn, T, pre_q):
 def _object_retreats(clear_fn, T, pre_q, shift, clear, ok, cfg: CandidateConfig) -> np.ndarray:
     """The object-aware retreat of top grasps, in place on ``T`` / ``shift`` / ``clear`` / ``ok``: a pose whose hand spheres are not clear
     of the object tries ``cfg.retreats_m`` (absolute retreats from its pose) while its contact stays within ``tip_max_m``. Returns the
-    eef's real displacement along the approach (``shift`` on entry + the retreat that cleared). As written (shared behaviour) a failed
-    try still adds to ``shift`` - with ``cfg.retreat_shift_exact`` (owner decision, default off) the shift is the real displacement."""
+    eef's real displacement along the approach (``shift`` on entry + the retreat that cleared). Without ``cfg.retreat_shift_exact`` (the
+    behaviour before i7-switches) a failed try still adds to ``shift``; with it (owner decision, default on since i7-switches) the shift is
+    the real displacement."""
     real = shift.copy()
     for ds in cfg.retreats_m:
         bad = np.where(~ok & ((CONTACT_Z + shift + ds) <= cfg.tip_max_m))[0]

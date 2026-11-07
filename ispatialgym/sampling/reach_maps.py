@@ -106,18 +106,113 @@ class MapConfig:
     # spheres in the IK against the slab). None for a slab map (left out of key(): their keys stay); a floor map without the field
     # was computed with "spheres" (CONFIG_LEGACY_DEFAULTS)
     floor_fingers: Optional[str] = None
+    # i7-unblock 2026-11-07 (owner decision: the former rule was a bug, nextto_04): the trunk eligibility rule (TRUNK_ELIGIBILITY_RULES,
+    # :func:`trunk_posture_groups`) - "per_d_e": a trunk is ineligible only at the edge distances where every idle-arm posture collides
+    # (self or the slab); "all_d_e" / None: the former rule (one posture free of the slab at EVERY d_e, else the whole trunk is dropped).
+    # None is left out of key() (the maps computed before the field existed keep their keys; CONFIG_LEGACY_DEFAULTS reads them as "all_d_e").
+    # i7-unblock 2026-11-07 (owner decision): "per_d_e" is the default of new builds; a floor map (one edge distance: both rules give the
+    # same map) stays None (floor_config), so its key does not move
+    trunk_eligibility: Optional[str] = "per_d_e"  # = TRUNK_ELIGIBILITY_DEFAULT
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility"):
             if d.get(k) is None:
                 d.pop(k)
         return d
 
 
 #: the value a config field had before it existed (maps written earlier carry no such field)
-CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None, "floor_fingers": "spheres"}
+CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None, "floor_fingers": "spheres", "trunk_eligibility": "all_d_e"}
+#: i7-unblock 2026-11-07: the trunk eligibility rules (``MapConfig.trunk_eligibility``; None = "all_d_e", the former rule)
+TRUNK_ELIGIBILITY_RULES: Tuple[str, ...] = ("all_d_e", "per_d_e")
+#: the rule of new builds (MapConfig's default; the --skip-existing matchers' default)
+TRUNK_ELIGIBILITY_DEFAULT = "per_d_e"
+
+
+def trunk_rule(cfg: "MapConfig") -> str:
+    """The trunk eligibility rule of ``cfg`` (``MapConfig.trunk_eligibility``; None = "all_d_e")."""
+    rule = cfg.trunk_eligibility or "all_d_e"
+    if rule not in TRUNK_ELIGIBILITY_RULES:
+        raise ValueError(f"trunk_eligibility {rule!r} is not one of {TRUNK_ELIGIBILITY_RULES}")
+    return rule
+
+
+def trunk_posture_groups(postures: Sequence[str], n_de: int, free_of, rule: str = "all_d_e", obstacle_free_of=None
+                         ) -> Tuple[List[Tuple[str, List[int]]], Dict[str, List[bool]]]:
+    """A trunk's idle-arm posture per edge distance (pure; i7-unblock 2026-11-07). ``free_of(posture)`` -> None when the posture
+    self-collides, else its slab (support) clearance per edge distance (``n_de`` bools, the map's ``edge_distances`` order). Returns
+    ``(groups, collide)``: ``groups`` = ``[(posture, [d_e index, ...]), ...]`` in posture order (no group: the trunk is ineligible
+    everywhere), ``collide`` = the ``slab_collide_by_posture`` record (the self-free postures that collide with the slab at some d_e).
+
+    Both rules first take a posture free of the slab at EVERY d_e - the first one (the postures after it are not evaluated), one group over
+    all d_e: the former choice, so a trunk eligible under the former rule keeps its posture and its cells. Without such a posture,
+    "all_d_e" (the former rule) drops the trunk; "per_d_e" gives each d_e the first posture free of the slab there, and a d_e no posture
+    clears stays ineligible.
+
+    ``obstacle_free_of(posture)`` (optional; i7-lean b4230177's interior rule for a FIXED compartment): its clearance of the compartment's
+    obstacles per d_e. Among the postures free of the slab at every d_e the first free of the obstacles at the most d_e is taken (the
+    search stops at one free of them everywhere); in the "per_d_e" fallback each d_e takes the first slab-free posture there that is also
+    obstacle-free there, else the first slab-free one."""
+    collide: Dict[str, List[bool]] = {}
+    evaluated: List[Tuple[str, List[bool]]] = []
+    best: Optional[Tuple[int, str]] = None
+    obs: Dict[str, List[bool]] = {}
+    for p in postures:
+        f = free_of(p)
+        if f is None:
+            continue
+        f = [bool(v) for v in f]
+        if len(f) != n_de:
+            raise ValueError(f"posture {p}: {len(f)} slab verdicts for {n_de} edge distances")
+        if not all(f):
+            collide[p] = f
+            evaluated.append((p, f))
+            continue
+        if obstacle_free_of is None:
+            return [(p, list(range(n_de)))], collide
+        o = [bool(v) for v in obstacle_free_of(p)]
+        obs[p] = o
+        if best is None or sum(o) > best[0]:
+            best = (sum(o), p)
+        if all(o):
+            break
+    if best is not None:
+        return [(best[1], list(range(n_de)))], collide
+    if rule == "all_d_e":
+        return [], collide
+    if rule != "per_d_e":
+        raise ValueError(f"trunk_eligibility {rule!r} is not one of {TRUNK_ELIGIBILITY_RULES}")
+    if obstacle_free_of is not None:
+        for p, _ in evaluated:
+            obs[p] = [bool(v) for v in obstacle_free_of(p)]
+    choice: Dict[int, Optional[str]] = {}
+    for k in range(n_de):
+        free_here = [p for p, f in evaluated if f[k]]
+        clear_here = [p for p in free_here if obs.get(p, [True] * n_de)[k]]
+        choice[k] = (clear_here or free_here or [None])[0]
+    return [(p, [k for k in range(n_de) if choice[k] == p]) for p, _ in evaluated if any(choice[k] == p for k in range(n_de))], collide
+
+
+def mark_partial(rec: Dict[str, Any], groups: Sequence[Tuple[str, Sequence[int]]], edge_distances: Sequence[float], status: Dict[float, Any],
+                 arrays: Dict[str, np.ndarray], key: str, shape: Tuple[int, ...]) -> None:
+    """A trunk eligible at some edge distances only ("per_d_e"): ``rec`` records the posture per eligible d_e (``posture_by_d_e``) and the
+    ineligible ones (``ineligible_d_e``), whose status arrays are ``trunk_ineligible``; a trunk with one posture over every d_e is left as the
+    former rule records it (no new fields)."""
+    covered = {k for _, ks in groups for k in ks}
+    if len(groups) == 1 and len(covered) == len(edge_distances):
+        return
+    rec["posture_by_d_e"] = {f"{edge_distances[k]:.2f}": p for p, ks in groups for k in ks}
+    rec["ineligible_d_e"] = [float(edge_distances[k]) for k in range(len(edge_distances)) if k not in covered]
+    rec["eligibility"] = "per_d_e"
+    for k in range(len(edge_distances)):
+        if k in covered:
+            continue
+        d_e = edge_distances[k]
+        if status.get(d_e) is not None:
+            status[d_e].fill_(STATUS["trunk_ineligible"])
+        arrays[f"s{d_e:.2f}_{key}"] = np.full(shape, STATUS["trunk_ineligible"], dtype=np.uint8)
 
 #: the map kinds (``--kind``): ``tabletop`` (library grasps of an object on a slab edge), ``brace`` (contact classes on a slab edge),
 #: ``floor`` (i7-floor 2026-11-07: library grasps of an object on the floor plane the robot stands on - h = 0, no edge)
@@ -142,7 +237,8 @@ FLOOR_FINGERS = "policy"
 def floor_config(**kw) -> MapConfig:
     """The :class:`MapConfig` of a floor map (``kind="floor"``): no edge (one distance 0.0), cells from FLOOR_X_MIN_M, laterals
     +-FLOOR_Y_HALF_M, the finger rule :data:`FLOOR_FINGERS`; ``kw`` sets the other fields (arm, lattice, seeds, ...)."""
-    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, "floor_fingers": FLOOR_FINGERS, **kw}
+    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, "floor_fingers": FLOOR_FINGERS,
+          "trunk_eligibility": None, **kw}  # one edge distance: the trunk eligibility rules coincide (i7-unblock: the floor keys stay)
     return MapConfig(**kw)
 
 
@@ -641,44 +737,17 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     obj_xy = th.as_tensor(cells, dtype=th.float32, device=dev).view(nC, 1, 1, 2).repeat(1, nY, nG, 1).reshape(-1, 2)
     t_ik = t_chk = 0.0
     n_ik = 0
-    for tr, ti in trunks:
-        key = f"t{tr:.2f}_k{ti:+.1f}"
-        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
-        status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
-        # eligibility: the first idle-arm posture free of self-collision and of the slab at every d_e (support factor, shared by objects)
-        posture, q_lock = None, None
-        for p in cfg.postures:
-            q = world.q_config(tr, ti, p)
-            free = not bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0])
-            if not free:
-                continue
-            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
-            slab_free = [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg))[0][0]) for d_e in cfg.edge_distances]
-            if all(slab_free):
-                posture, q_lock = p, q
-                break
-            rec.setdefault("slab_collide_by_posture", {})[p] = slab_free
-        rec["posture"] = posture
-        if q_lock is None:
-            rec["eligible"] = False
-            rec["reason"] = "every idle-arm posture collides (self or the slab at some d_e)"
-            for d_e in cfg.edge_distances:
-                status[d_e].fill_(STATUS["trunk_ineligible"])
-                arrays[f"s{d_e:.2f}_{key}"] = status[d_e].view(nC, nY, nG).cpu().numpy()
-            meta_trunks.append(rec)
-            continue
-        rec["eligible"] = True
-        sh, L = world.shoulder(tr, ti)
-        sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
-        reach = L + cfg.reach_margin_m
-        in_reach = (th.linalg.norm(TE_flat[:, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(TP_flat[:, :3, 3] - sh_t, dim=1) <= reach)
-        rec.update({"shoulder": [round(float(v), 4) for v in sh], "arm_len": round(L, 4)})
+    def solve_group(rec: Dict[str, Any], key: str, status: Dict[float, th.Tensor], q_lock: th.Tensor, des: Sequence[float], in_reach: th.Tensor) -> None:
+        """The trunk's IK pass and per-d_e checks with the idle-arm posture ``q_lock`` for the edge distances ``des`` (i7-unblock 2026-11-07:
+        a trunk whose postures are free of the slab at different d_e (``trunk_eligibility`` "per_d_e") runs one pass per posture group; a
+        trunk with one posture free at every d_e runs exactly the former single pass over all of them)."""
+        nonlocal t_ik, t_chk, n_ik
         any_hand = th.zeros(N, dtype=th.bool, device=dev)
-        for d_e in cfg.edge_distances:
+        for d_e in des:
             any_hand |= hand_ok[d_e] & onsup[d_e]
         cand = in_reach & any_hand
         idx = th.nonzero(cand).flatten()
-        rec["n_problems"] = int(idx.numel())
+        rec["n_problems"] = rec.get("n_problems", 0) + int(idx.numel())
         # accelerated mode: one round of the robot-facing yaws first; cells with no pre-grasp in it skip the rest
         if cfg.mode == "accelerated" and idx.numel() > 0:
             yaw_of = obj_idx_y[idx]
@@ -727,8 +796,8 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         t_ik += time.time() - ta
         tb = time.time()
         # per d_e post checks over the seeds of each grasp solution (first passing seed counts)
-        feas = {d_e: th.zeros(sel.numel(), dtype=th.bool, device=dev) for d_e in cfg.edge_distances}
-        why = {d_e: th.full((sel.numel(),), STATUS["ik_grasp"], dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        feas = {d_e: th.zeros(sel.numel(), dtype=th.bool, device=dev) for d_e in des}
+        why = {d_e: th.full((sel.numel(),), STATUS["ik_grasp"], dtype=th.uint8, device=dev) for d_e in des}
         if sel.numel():
             qp = q_pre1[sel]
             for s in range(cfg.seeds):
@@ -738,7 +807,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 qg = q_g[:, s]
                 jump = (qg - qp).abs().max(dim=1).values > cfg.branch_max_rad
                 cand_s = ok_s & ~jump
-                for d_e in cfg.edge_distances:
+                for d_e in des:
                     cur = cand_s & ~feas[d_e]
                     why[d_e] = th.where(ok_s & jump & ~feas[d_e], th.full_like(why[d_e], STATUS["branch_jump"]), why[d_e])
                     if not bool(cur.any()):
@@ -787,7 +856,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                     w = th.where(w_obj, th.full_like(w, STATUS["object_arm"]), w)
                     why[d_e][ii] = w
         t_chk += time.time() - tb
-        for d_e in cfg.edge_distances:
+        for d_e in des:
             st = status[d_e]
             st.fill_(STATUS["unevaluated"])
             st[~in_reach] = STATUS["reach_bound"]
@@ -804,6 +873,46 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             arrays[f"s{d_e:.2f}_{key}"] = st.view(nC, nY, nG).cpu().numpy()
             rec.setdefault("n_feasible", {})[f"{d_e:.2f}"] = int((st == STATUS["feasible"]).sum())
             rec.setdefault("n_skipped", {})[f"{d_e:.2f}"] = int((st == STATUS["skipped"]).sum())
+
+    for tr, ti in trunks:
+        key = f"t{tr:.2f}_k{ti:+.1f}"
+        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
+        status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        # eligibility (i7-unblock 2026-11-07, owner decision: the former rule was a bug): the first idle-arm posture free of self-collision and of
+        # the slab at every d_e (support factor, shared by objects); "per_d_e" (MapConfig.trunk_eligibility, the default of new builds) keeps
+        # that choice when it exists and otherwise judges each d_e alone - the first posture free there - so the trunk is ineligible only at
+        # the d_e where every posture collides (nextto_04: t0.95 collided at d_e 0.35 only, and the whole trunk was dropped)
+        q_of: Dict[str, th.Tensor] = {}
+
+        def free_of(p: str, tr=tr, ti=ti) -> Optional[List[bool]]:
+            q = world.q_config(tr, ti, p)
+            if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
+                return None
+            q_of[p] = q
+            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
+            return [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg))[0][0]) for d_e in cfg.edge_distances]
+
+        groups, collide = trunk_posture_groups(cfg.postures, len(cfg.edge_distances), free_of, trunk_rule(cfg))
+        if collide:
+            rec["slab_collide_by_posture"] = collide
+        rec["posture"] = groups[0][0] if groups else None
+        if not groups:
+            rec["eligible"] = False
+            rec["reason"] = "every idle-arm posture collides (self or the slab at some d_e)" if trunk_rule(cfg) == "all_d_e" else "every idle-arm posture collides (self or the slab) at every d_e"
+            for d_e in cfg.edge_distances:
+                status[d_e].fill_(STATUS["trunk_ineligible"])
+                arrays[f"s{d_e:.2f}_{key}"] = status[d_e].view(nC, nY, nG).cpu().numpy()
+            meta_trunks.append(rec)
+            continue
+        rec["eligible"] = True
+        mark_partial(rec, groups, cfg.edge_distances, status, arrays, key, (nC, nY, nG))
+        sh, L = world.shoulder(tr, ti)
+        sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
+        reach = L + cfg.reach_margin_m
+        in_reach = (th.linalg.norm(TE_flat[:, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(TP_flat[:, :3, 3] - sh_t, dim=1) <= reach)
+        rec.update({"shoulder": [round(float(v), 4) for v in sh], "arm_len": round(L, 4)})
+        for p, ks in groups:
+            solve_group(rec, key, status, q_of[p], [cfg.edge_distances[k] for k in ks], in_reach)
         meta_trunks.append(rec)
     tim.update({"ik_s": round(t_ik, 2), "checks_s": round(t_chk, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)})
     meta = {"schema": SCHEMA, "kind": kind, "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
@@ -904,6 +1013,7 @@ class ReachMap:
                 return None
             target = a["height"]
         want = lib.identity_key()
+        fallback: Optional[str] = None
         for fn in sorted(os.listdir(maps_root)) if os.path.isdir(maps_root) else []:
             if not fn.endswith(".json") or not fn.startswith("map__"):
                 continue
@@ -925,8 +1035,13 @@ class ReachMap:
                 continue  # ... nor one computed under another configuration (e.g. preshape "max")
             if abs(float(m["height"]["value"]) - target) > 1e-6:
                 continue
+            if config_value(m, "trunk_eligibility") != "per_d_e" and not (config_require and "trunk_eligibility" in config_require):
+                # i7-unblock 2026-11-07: both trunk eligibility rules serve; a root holding a map of each for this lookup serves the per_d_e
+                # one (the corrected rule) - the first former-rule match is kept in case none follows
+                fallback = fallback or p
+                continue
             return ReachMap(p)
-        return None
+        return ReachMap(fallback) if fallback else None
 
     def trunks(self) -> List[Tuple[float, float]]:
         return [(t["translate"], t["tilt"]) for t in self.meta["trunks"] if t.get("eligible")]
@@ -1090,39 +1205,14 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
     links = world.link_of_sphere()
     t_ik = t_chk = 0.0
     n_ik = 0
-    for tr, ti in trunks:
-        key = f"t{tr:.2f}_k{ti:+.1f}"
-        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
-        status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
-        posture, q_lock = None, None
-        for p in cfg.postures:
-            q = world.q_config(tr, ti, p, fingers=fq)
-            if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
-                continue
-            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
-            slab_free = [bool(CP.sphere_support_ok(sph, ln, slab(height, d_e, cfg), cfg.arm, policy)[0][0]) for d_e in cfg.edge_distances]
-            if all(slab_free):
-                posture, q_lock = p, q
-                break
-            rec.setdefault("slab_collide_by_posture", {})[p] = slab_free
-        rec["posture"] = posture
-        if q_lock is None:
-            rec.update(eligible=False, reason="every idle-arm posture collides (self or the slab at some d_e)")
-            for d_e in cfg.edge_distances:
-                arrays[f"s{d_e:.2f}_{key}"] = np.full((nC, 1, nG), STATUS["trunk_ineligible"], dtype=np.uint8)
-            meta_trunks.append(rec)
-            continue
-        rec["eligible"] = True
-        sh, L = world.shoulder(tr, ti)
-        sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
-        reach = L + cfg.reach_margin_m
-        in_reach = (th.linalg.norm(TE_flat[:, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(TP_flat[:, :3, 3] - sh_t, dim=1) <= reach)
-        rec.update({"shoulder": [round(float(v), 4) for v in sh], "arm_len": round(L, 4)})
+    def solve_group(rec: Dict[str, Any], key: str, status: Dict[float, th.Tensor], q_lock: th.Tensor, des: Sequence[float], in_reach: th.Tensor) -> None:
+        """:func:`compute_map`'s ``solve_group`` for the generic pose set: one IK pass with ``q_lock`` over the edge distances ``des``."""
+        nonlocal t_ik, t_chk, n_ik
         any_hand = th.zeros(N, dtype=th.bool, device=dev)
-        for d_e in cfg.edge_distances:
+        for d_e in des:
             any_hand |= hand_ok[d_e] & onsup[d_e]
         order = th.nonzero(in_reach & any_hand).flatten()
-        rec["n_problems"] = int(order.numel())
+        rec["n_problems"] = rec.get("n_problems", 0) + int(order.numel())
         ta = time.time()
         succ_pre, q_pre = _solve(world, entry, TP_flat[order], q_lock)
         n_ik += int(order.numel())
@@ -1136,8 +1226,8 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
         n_ik += int(sel.numel())
         t_ik += time.time() - ta
         tb = time.time()
-        feas = {d_e: th.zeros(sel.numel(), dtype=th.bool, device=dev) for d_e in cfg.edge_distances}
-        why = {d_e: th.full((sel.numel(),), STATUS["ik_grasp"], dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        feas = {d_e: th.zeros(sel.numel(), dtype=th.bool, device=dev) for d_e in des}
+        why = {d_e: th.full((sel.numel(),), STATUS["ik_grasp"], dtype=th.uint8, device=dev) for d_e in des}
         if sel.numel():
             qp = q_pre1[sel]
             for s in range(cfg.seeds):
@@ -1147,7 +1237,7 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
                 qg = q_g[:, s]
                 jump = (qg - qp).abs().max(dim=1).values > cfg.branch_max_rad
                 cand_s = ok_s & ~jump
-                for d_e in cfg.edge_distances:
+                for d_e in des:
                     cur = cand_s & ~feas[d_e]
                     why[d_e] = th.where(ok_s & jump & ~feas[d_e], th.full_like(why[d_e], STATUS["branch_jump"]), why[d_e])
                     if not bool(cur.any()):
@@ -1172,7 +1262,7 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
                     w = th.where(w_hand, th.full_like(w, STATUS["hand_policy"]), w)
                     why[d_e][ii] = w
         t_chk += time.time() - tb
-        for d_e in cfg.edge_distances:
+        for d_e in des:
             st = status[d_e]
             st.fill_(STATUS["unevaluated"])
             st[~in_reach] = STATUS["reach_bound"]
@@ -1187,6 +1277,42 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
             arrays[f"s{d_e:.2f}_{key}"] = a
             rec.setdefault("n_feasible", {})[f"{d_e:.2f}"] = int((a == STATUS["feasible"]).sum())
             rec.setdefault("class_counts", {})[f"{d_e:.2f}"] = {r["name"]: int((a[:, 0, g] == STATUS["feasible"]).sum()) for g, r in enumerate(rows)}
+
+    for tr, ti in trunks:
+        key = f"t{tr:.2f}_k{ti:+.1f}"
+        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
+        status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        q_of: Dict[str, th.Tensor] = {}
+
+        def free_of(p: str, tr=tr, ti=ti) -> Optional[List[bool]]:
+            q = world.q_config(tr, ti, p, fingers=fq)
+            if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
+                return None
+            q_of[p] = q
+            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
+            return [bool(CP.sphere_support_ok(sph, ln, slab(height, d_e, cfg), cfg.arm, policy)[0][0]) for d_e in cfg.edge_distances]
+
+        # i7-unblock 2026-11-07: the eligibility rule of compute_map (trunk_posture_groups, MapConfig.trunk_eligibility)
+        groups, collide = trunk_posture_groups(cfg.postures, len(cfg.edge_distances), free_of, trunk_rule(cfg))
+        if collide:
+            rec["slab_collide_by_posture"] = collide
+        rec["posture"] = groups[0][0] if groups else None
+        if not groups:
+            rec.update(eligible=False, reason="every idle-arm posture collides (self or the slab at some d_e)" if trunk_rule(cfg) == "all_d_e"
+                       else "every idle-arm posture collides (self or the slab) at every d_e")
+            for d_e in cfg.edge_distances:
+                arrays[f"s{d_e:.2f}_{key}"] = np.full((nC, 1, nG), STATUS["trunk_ineligible"], dtype=np.uint8)
+            meta_trunks.append(rec)
+            continue
+        rec["eligible"] = True
+        mark_partial(rec, groups, cfg.edge_distances, status, arrays, key, (nC, 1, nG))
+        sh, L = world.shoulder(tr, ti)
+        sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
+        reach = L + cfg.reach_margin_m
+        in_reach = (th.linalg.norm(TE_flat[:, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(TP_flat[:, :3, 3] - sh_t, dim=1) <= reach)
+        rec.update({"shoulder": [round(float(v), 4) for v in sh], "arm_len": round(L, 4)})
+        for p, ks in groups:
+            solve_group(rec, key, status, q_of[p], [cfg.edge_distances[k] for k in ks], in_reach)
         meta_trunks.append(rec)
     tim.update({"ik_s": round(t_ik, 2), "checks_s": round(t_chk, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)})
     meta = {"schema": SCHEMA, "kind": GENERIC_KIND, "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
@@ -1226,6 +1352,7 @@ def find_generic(maps_root: str, height: float, *, arm: str = "right", pose_set:
             return None
         target = float(a["height"])
     want_ps = json.dumps(pose_set, sort_keys=True) if pose_set is not None else None
+    fallback: Optional[str] = None
     for fn in sorted(os.listdir(maps_root)) if os.path.isdir(maps_root) else []:
         if not fn.endswith(".json") or not fn.startswith("map__"):
             continue
@@ -1247,18 +1374,27 @@ def find_generic(maps_root: str, height: float, *, arm: str = "right", pose_set:
             continue
         if abs(float(m["height"]["value"]) - target) > 1e-6 or m.get("key") != generic_map_key(m):
             continue
-        rm = ReachMap(p)
-        rm.lookup = {"how": how, "query_h": round(float(height), 4), "map_h": float(m["height"]["value"])}
-        return rm
-    return None
+        if config_value(m, "trunk_eligibility") != "per_d_e" and not (config_require and "trunk_eligibility" in config_require):
+            fallback = fallback or p  # i7-unblock 2026-11-07: a per_d_e map of the same lookup serves first (ReachMap.find)
+            continue
+        fallback = p
+        break
+    if fallback is None:
+        return None
+    rm = ReachMap(fallback)
+    rm.lookup = {"how": how, "query_h": round(float(height), 4), "map_h": float(rm.meta["height"]["value"])}
+    return rm
 
 
-def _generic_meta_matches(path: str, arm: str, pose_set: Dict[str, Any]) -> bool:
-    """``--skip-existing`` of a generic job: the map ``path`` is this run's arm, the generic kind and the job's pose set."""
+def _generic_meta_matches(path: str, arm: str, pose_set: Dict[str, Any], trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT) -> bool:
+    """``--skip-existing`` of a generic job: the map ``path`` is this run's arm, the generic kind, the job's pose set and its trunk eligibility
+    rule (i7-unblock 2026-11-07; None = "all_d_e")."""
     try:
         with open(path) as f:
             m = json.load(f)
     except (OSError, ValueError):
+        return False
+    if config_value(m, "trunk_eligibility") != (trunk_eligibility or "all_d_e"):
         return False
     return m.get("arm") == arm and m.get("kind") == GENERIC_KIND and json.dumps(m.get("pose_set"), sort_keys=True) == json.dumps(pose_set, sort_keys=True)
 
@@ -1287,7 +1423,7 @@ def _compute_generic_cli(a) -> None:
         print(f"GB_MAP {json.dumps({'kind': GENERIC_KIND, 'ok': True, 'reason': 'no generic entry in this shard'})}", flush=True)
         print("GB_MAP_DONE", flush=True)
         raise SystemExit(0)  # no synthetic world was started: nothing to shut down
-    cfg = MapConfig(mode="full", lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=False)
+    cfg = MapConfig(mode="full", lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=False, **_trunk_kw(a))
     w = SynthWorld(cfg)
     known = {x["key"] for x in aset.anchors}
     for j in jobs:
@@ -1298,7 +1434,7 @@ def _compute_generic_cli(a) -> None:
         out = os.path.join(a.out, j.get("dir") or GENERIC_DIR)
         for anc in anchors_j:
             h = float(anc["height"])
-            if a.skip_existing and any(_generic_meta_matches(p, cfg.arm, ps) for p in glob.glob(os.path.join(out, f"map__{GENERIC_KIND}__h{h:.4f}__*.json"))):
+            if a.skip_existing and any(_generic_meta_matches(p, cfg.arm, ps, cfg.trunk_eligibility) for p in glob.glob(os.path.join(out, f"map__{GENERIC_KIND}__h{h:.4f}__*.json"))):
                 continue
             try:
                 meta, arrays = compute_generic_map(w, h, anc, cfg=cfg, pose_set=ps)
@@ -1455,15 +1591,19 @@ def _bench(args):
           f"sphere FK {n} in {time.time() - t1:.3f}s; setup {w.setup_s:.1f}s; peak {th.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
 
 
-def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None) -> bool:
+def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT) -> bool:
     """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
-    its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one)."""
+    its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one), and its
+    trunk eligibility rule (i7-unblock 2026-11-07: ``trunk_eligibility``, None = "all_d_e"; a map of the former rule does not stand in for
+    a "per_d_e" one)."""
     try:
         with open(path) as f:
             m = json.load(f)
     except (OSError, ValueError):
         return False
     if kind == "floor" and floor_fingers is not None and config_value(m, "floor_fingers") != floor_fingers:
+        return False
+    if config_value(m, "trunk_eligibility") != (trunk_eligibility or "all_d_e"):
         return False
     return m.get("arm", "right") == arm and m.get("kind", "tabletop") == kind
 
@@ -1493,6 +1633,9 @@ def main(argv=None):
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
+    c.add_argument("--trunk-eligibility", default=None, choices=list(TRUNK_ELIGIBILITY_RULES),
+                   help="the trunk eligibility rule (MapConfig.trunk_eligibility; default: MapConfig's, per_d_e). all_d_e = the former rule (the field is left out "
+                        "of the map's config and key); per_d_e = a trunk is ineligible only at the edge distances where every idle-arm posture collides")
     pf = sub.add_parser("prefix")
     pf.add_argument("--artic-lib", nargs="+", required=True, help="artic_library.json files (validate_artic)")
     pf.add_argument("--anchors", required=True)
@@ -1539,6 +1682,15 @@ def main(argv=None):
         og.shutdown()
 
 
+def _trunk_kw(a) -> Dict[str, Any]:
+    """``--trunk-eligibility`` as MapConfig keyword(s): {} when not given (MapConfig's default), "all_d_e" -> None (the former rule, left out
+    of the map's config and key: such a build reproduces the earlier maps and their keys), "per_d_e" as given."""
+    rule = getattr(a, "trunk_eligibility", None)
+    if rule is None:
+        return {}
+    return {"trunk_eligibility": None if rule == "all_d_e" else rule}
+
+
 def _compute_cli(a):
     from ispatialgym.grasping import object_geometry as OG
     from ispatialgym.sampling.height_anchors import AnchorSet
@@ -1574,7 +1726,7 @@ def _compute_cli(a):
     else:
         jobs += derived
     floor = a.kind == "floor"
-    kw = dict(mode=a.mode, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=a.kind != "brace")
+    kw = dict(mode=a.mode, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=a.kind != "brace", **_trunk_kw(a))
     if floor:
         # i7-floor 2026-11-07: one map per (entry, stable rest, arm) at the floor (h 0, the synthetic FLOOR_ANCHOR); no anchor file, no heights
         if a.heights or a.heights_by_id:
@@ -1605,7 +1757,7 @@ def _compute_cli(a):
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
-                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind, cfg.floor_fingers)
+                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind, cfg.floor_fingers, cfg.trunk_eligibility)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:

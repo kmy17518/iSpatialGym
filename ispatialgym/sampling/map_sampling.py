@@ -77,7 +77,8 @@ def as_bands(rm: RM.ReachMap, overhang: float = 0.0):
                 classes_so.setdefault(so, {})[key] = bits[ci]
             else:
                 pairs_so[so][key] = np.array([[remap[int(c)], int(y), int(g)] for c, y, g in p], dtype=np.int32).reshape(-1, 3)
-            meta["trunks"].append({"translate": key[0], "tilt": key[1], "stand_off": so, "posture": t.get("posture")})
+            # i7-unblock 2026-11-07: a per_d_e trunk may idle another posture at this d_e (reach_maps posture_by_d_e)
+            meta["trunks"].append({"translate": key[0], "tilt": key[1], "stand_off": so, "posture": (t.get("posture_by_d_e") or {}).get(f"{float(d_e):.2f}", t.get("posture"))})
     ref = meta["stand_offs"][len(meta["stand_offs"]) // 2]
     meta["stand_off"] = ref
     return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, dict(classes_so.get(ref, {})), cells_so, pairs_so, classes_so)

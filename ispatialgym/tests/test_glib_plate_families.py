@@ -45,10 +45,11 @@ def _cfg(**kw) -> CA.CandidateConfig:
 # ------------------------------------------------------------------------------------------------ switches and overrides
 
 
-def test_families_and_owner_switches_default_off(monkeypatch):
+def test_families_off_and_owner_switches_default_on(monkeypatch):
+    # i7-switches 2026-11-07: the two owner-decision switches are the default for new builds (adopted after the count)
     monkeypatch.delenv("ISG_GLIB_GATE_DUMP", raising=False)
     c = CA.CandidateConfig()
-    assert tuple(c.families) == () and not c.gate_dump and not c.blade_contact_at_retreat and not c.retreat_shift_exact
+    assert tuple(c.families) == () and not c.gate_dump and c.blade_contact_at_retreat and c.retreat_shift_exact
     monkeypatch.setenv("ISG_GLIB_GATE_DUMP", "1")
     assert CA.CandidateConfig().gate_dump
     assert set(CA.FAMILIES) == {"lip_shallow", "rim_straddle"}
