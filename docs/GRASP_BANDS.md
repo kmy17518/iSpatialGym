@@ -513,6 +513,25 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
      change to the shared stance or QA rules.
    - If the cap leaves an arm no stance, that is reported, not widened.
 
+### Owner decision 2026-11-07: gym shoe kmcbym (nextto_04) after the switch default
+
+With the two plate switches on (the default), the rebuild of gym_shoe__kmcbym__s1 has 0 physics-valid grasps: its new representative
+fails object_pressed_into_table.
+- **Meanwhile:** nextto_04 keeps the old switches-off entry (1 valid), staged. The switch state is in the entry identity, so the two
+  builds cannot be confused.
+- **Ladder round 2, with the switches on:**
+  - the existing retry ladder (more representatives validated, a denser pool, a wider cone);
+  - per-object fixes from the gate logs: gate_dump on, and for every object_pressed_into_table rejection the measured load
+    (x weight, finger peak) and the stage where it is read;
+  - a check of whether the old valid grasp (or its family) is still among the switches-on candidates, and why it was not selected or
+    did not validate.
+- **If round 2 gives >= 1 valid:** it replaces the old entry, with maps at 0.3471 (both arms) built once under the per-stand-off
+  trunk-eligibility rule. It is staged in place of the old entry: the old entry and maps go to _superseded_switches_off in the staged
+  copy, and legacy_keys are kept.
+- **If round 2 gives 0:** ladder step 3 (agent proposal), same gates and physics, source "agent". The old entry stays staged until step 3
+  yields >= 1 valid grasp.
+- No legacy grasps (step 4) without asking.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
