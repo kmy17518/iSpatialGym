@@ -63,6 +63,38 @@ GRASPS_V2 = {"ISPATIALGYM_GRASP_LIBRARY_V2": os.path.join(V2_ROOT, "glib"), "ISP
              "ISPATIALGYM_REACH_MAP_ANCHORS": os.path.join(V2_ROOT, "anchors.json")}
 
 
+#: of-v2maps 2026-11-07 (owner: sampler jobs on shiyuc's GPUs too; shiyuc writes ONLY under this folder): submit --shiyuc - run as
+#: shiyuc@svl11, every write of the job (root: out / slurm / manifests, the sampling + exact-IK cache, the asset cache, the per-job HOME
+#: fallback, the kit template / texture stores, the EXP_PATH overlay, the predemo root) under SY; the read stores minyeong keeps mode 600
+#: come from staged copies under SY/stores; band sharing stays off; indices start at SHIYUC_BASE_INDEX (minyeong's ledgers: 100000 /
+#: 300000), so no index is used by both accounts.
+SY = "/vision/u/shiyuc/minyeong"
+SHIYUC_BASE_INDEX = 600000
+
+
+def shiyuc_env(a):
+    """The job.env entries of shiyuc mode (raises when a write path would leave SY or an input is unreadable)."""
+    root = os.path.abspath(a.root)
+    if not root.startswith(SY + "/"):
+        raise SystemExit(f"--shiyuc: --root {root} is not under {SY}")
+    if a.base_index < SHIYUC_BASE_INDEX:
+        raise SystemExit(f"--shiyuc: --base-index {a.base_index} < {SHIYUC_BASE_INDEX} (minyeong's ranges)")
+    if a.ledger and not os.path.abspath(a.ledger).startswith(SY + "/"):
+        raise SystemExit(f"--shiyuc: --ledger {a.ledger} is not under {SY}")
+    st_ = os.path.join(SY, "stores")
+    env = {"ISGF_SAMPLING_CACHE": os.path.join(SY, "cache", "sampling"), "ISGF_ASSET_CACHE": os.path.join(SY, "asset_cache"),
+           "ISGF_JB_NFS": os.path.join(SY, "jobs"), "KIT_TPL_NFS_ROOT": os.path.join(SY, "kit_templates"),
+           "KIT_TEX_STORE": os.path.join(SY, "kit_textures"), "ISGF_EXP_PATH": os.path.join(SY, "isaacsim_overlay", "apps"),
+           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISGF_PREDEMO_ROOT": root,
+           "ISGF_LAB_BAND_STORE": os.path.join(st_, "lab_reach_bands"), "ISGF_EVAL_BANDS": os.path.join(st_, "bands_eval"),
+           "ISGF_REACH_VOLUME_SRC": os.path.join(st_, "reach_volume"), "ISGF_T85_BANDS": os.path.join(st_, "bands_train")}
+    for k in ("ISGF_SAMPLING_CACHE", "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_PREDEMO_ROOT"):
+        assert env[k].startswith(SY + "/"), k
+    if not os.path.isdir(env["ISGF_EXP_PATH"]):
+        raise SystemExit(f"--shiyuc: no EXP_PATH overlay at {env['ISGF_EXP_PATH']}")
+    return env
+
+
 def eval_index_of(key):
     p = os.path.join(EVAL_INDEX_V2, key + ".json")
     return p if os.path.exists(p) else os.path.join(st.EVAL_INDEX_DIR, key + ".json")
@@ -182,6 +214,11 @@ def submit(a):
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
+        if getattr(a, "shiyuc", False):
+            env.update(shiyuc_env(a))  # after --extra-env: no override moves a write out of SY
+            for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS", "ISPATIALGYM_REACH_MAP_ANCHORS", "TEMPLATE", "EVAL_INDEX"):
+                if env.get(k) and not os.access(env[k], os.R_OK):
+                    raise SystemExit(f"--shiyuc: {k}={env[k]} is not readable by this account (stage a copy under {SY})")
         script = os.path.join(env["ISGF_SCRIPTS"], f"job_{a.flow}.sh")
         cmd, gres = sbatch(a, f"{a.job_prefix}{st.short_of(a.key)}", p["TIME_LIMIT_S"], script, job_dir)
         if a.dry_run:
@@ -321,6 +358,7 @@ def main():
     s.add_argument("--ledger", default=None, help="default: <root>/manifests/allocations.tsv")
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
     s.add_argument("--v2-root", default=None, help="with --grasps v2 / v2only: the v2 data root (default V2_ROOT, v2maps_20261106)")
+    s.add_argument("--shiyuc", action="store_true", help="run as shiyuc: every write under " + SY + " (shiyuc_env); --root / --base-index / --v2-root there")
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     r = sub.add_parser("recollect")

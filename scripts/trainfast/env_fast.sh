@@ -5,6 +5,8 @@
 # Sourced by the job scripts with ISGE_CODE = a frozen snapshot (snapshot.sh): code, Behavior-1K and the OmniGibson data path
 # (Behavior-1K/datasets of the snapshot, ispatialgym-assets = the snapshot's own custom assets) all come from it.
 # Reads only: the conda env, the shared datasets. Writes only the job's own directories (or under $E outside a job).
+# of-v2maps 2026-11-07 (shiyuc mode, submit_fast.py --shiyuc): ISGF_JB_NFS / ISGF_LAB_BAND_STORE / ISGF_EVAL_BANDS / ISGF_REACH_VOLUME_SRC
+# from job.env move the NFS fallback and the read stores to /vision/u/shiyuc/minyeong (unset: as before).
 E=/vision/u/minyeong/projects/isg_home/eval85
 R=${ISGE_CODE:?set ISGE_CODE to a snapshot made by $E/snapshot.sh}
 if [ -n "${SLURM_JOB_ID:-}" ]; then
@@ -40,7 +42,7 @@ if [ -n "${SLURM_JOB_ID:-}" ]; then
   if [ "$(df --output=avail -k /tmp 2>/dev/null | tail -1)" -gt 30000000 ] 2>/dev/null && mkdir -p /tmp/$USER/isge_$SLURM_JOB_ID 2>/dev/null; then
     JB=/tmp/$USER/isge_$SLURM_JOB_ID
   else
-    JB=/vision/u/minyeong/projects/isg_home/trainfast/jobs/$SLURM_JOB_ID
+    JB=${ISGF_JB_NFS:-/vision/u/minyeong/projects/isg_home/trainfast/jobs}/$SLURM_JOB_ID   # shiyuc mode: under /vision/u/shiyuc/minyeong
   fi
   mkdir -p $JB/home
   export HOME=$JB/home XDG_CACHE_HOME=$JB/home/.cache TORCHINDUCTOR_CACHE_DIR=$JB/inductor TRITON_CACHE_DIR=$JB/triton HF_LEROBOT_HOME=$JB/lerobot_home
@@ -52,11 +54,11 @@ if [ -n "${SLURM_JOB_ID:-}" ]; then
   # the 55-task jobs (ISGE_BAND_STORE=1, job_cand.sh; owner plan 2026-10-11 13:25 W6): also the band session's finished bands, read-only
   # (a copy in the job; the store is never written)
   if [ "${ISGE_BAND_STORE:-0}" = 1 ]; then
-    cp --preserve=timestamps /vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/reach_bands/* $ISPATIALGYM_REACH_BANDS/ 2>/dev/null
+    cp --preserve=timestamps ${ISGF_LAB_BAND_STORE:-/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/reach_bands}/* $ISPATIALGYM_REACH_BANDS/ 2>/dev/null
     # and the bands the eval session computed itself from its own snapshots (owner 2026-10-11 W2 rule; touching contact bands, scaled targets)
-    cp --preserve=timestamps $E/bands_eval/*.json $E/bands_eval/*.npz $ISPATIALGYM_REACH_BANDS/ 2>/dev/null
+    cp --preserve=timestamps ${ISGF_EVAL_BANDS:-$E/bands_eval}/*.json ${ISGF_EVAL_BANDS:-$E/bands_eval}/*.npz $ISPATIALGYM_REACH_BANDS/ 2>/dev/null
   fi
-  [ -n "$(ls -A $ISPATIALGYM_REACH_VOLUME 2>/dev/null)" ] || cp --preserve=timestamps /vision/u/minyeong/projects/isg_home/.cache/ispatialgym-vecenv/reach_volume/* $ISPATIALGYM_REACH_VOLUME/ 2>/dev/null
+  [ -n "$(ls -A $ISPATIALGYM_REACH_VOLUME 2>/dev/null)" ] || cp --preserve=timestamps ${ISGF_REACH_VOLUME_SRC:-/vision/u/minyeong/projects/isg_home/.cache/ispatialgym-vecenv/reach_volume}/* $ISPATIALGYM_REACH_VOLUME/ 2>/dev/null
   NCPU=${SLURM_CPUS_PER_TASK:-8}
   export MKL_NUM_THREADS=$NCPU OPENBLAS_NUM_THREADS=$NCPU
 fi

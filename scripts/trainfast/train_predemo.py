@@ -18,7 +18,7 @@ import re
 import shlex
 import sys
 
-TRAIN = "/vision/u/minyeong/projects/isg_home/trainfast"
+TRAIN = os.environ.get("ISGF_PREDEMO_ROOT") or "/vision/u/minyeong/projects/isg_home/trainfast"  # shiyuc mode: the account's own root
 TRO = "-tro_state.json"
 RX_WRITTEN = re.compile(r"\] (\S+): instance (\d+) written \(attempt (\d+), ([\d.]+)s\)")
 

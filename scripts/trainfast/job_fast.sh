@@ -13,6 +13,11 @@ JOBDIR=$1
 F=/vision/u/minyeong/projects/isg_home/trainfast
 T85=/vision/u/minyeong/projects/isg_home/train85
 source $JOBDIR/job.env
+# of-v2maps 2026-11-07 (shiyuc mode, submit_fast.py --shiyuc): OmniGibson copies its .kit into $EXP_PATH on every launch - the account's own
+# overlay (job.env ISGF_EXP_PATH); the kit stores come through KIT_TPL_NFS_ROOT / KIT_TEX_STORE in job.env (kit_appdata.sh reads them)
+[ -n "${ISGF_EXP_PATH:-}" ] && export EXP_PATH=$ISGF_EXP_PATH
+[ -n "${KIT_TPL_NFS_ROOT:-}" ] && export KIT_TPL_NFS_ROOT
+[ -n "${KIT_TEX_STORE:-}" ] && export KIT_TEX_STORE
 # one trunk (owner 2026-11-05): the scripts come from the job's frozen code snapshot (submit_fast.py writes ISGF_SCRIPTS=<snapshot>/scripts/trainfast;
 # unset = the campaign's live $F/scripts) and the job's outputs go under its root (ISGF_ROOT: $F for production, $OFH for alias validation)
 S=${ISGF_SCRIPTS:-$F/scripts}
@@ -42,14 +47,14 @@ isgf_grasps_record $JOBDIR   # of-v2maps: ISGF_GRASPS legacy | v2 (fast_env.sh),
 # the campaign-wide sampling cache (start-draw cells, exact IK witnesses) instead of the job-private one
 export ISPATIALGYM_SAMPLING_CACHE=${ISGF_SAMPLING_CACHE:-$F/cache/sampling}
 mkdir -p $ISPATIALGYM_SAMPLING_CACHE
-trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null' EXIT
+trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*|${ISGF_JB_NFS:-$F/jobs}/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null' EXIT
 mkdir -p $JOBDIR/claims
 echo "$SLURM_JOB_ID" > $JOBDIR/jobid
 # 2026-11-01: sharing between this campaign's jobs is opt-in (ISPATIALGYM_FAST_BAND_SHARE=1; default off after the contamination of
 # 2026-11-01): train85's published bands (static, isg-1020's) are read as before; the campaign's own published bands and the band
 # evidence of earlier jobs only with the share on
 BAND_SHARE=${ISPATIALGYM_FAST_BAND_SHARE:-0}
-for B in $T85/bands_train/$ALIAS_KEY $( [ "$BAND_SHARE" = 1 ] && echo $F/bands_train/$ALIAS_KEY ); do [ -d "$B" ] && cp -n --preserve=timestamps $B/* $ISPATIALGYM_REACH_BANDS/ 2>/dev/null; done
+for B in ${ISGF_T85_BANDS:-$T85/bands_train}/$ALIAS_KEY $( [ "$BAND_SHARE" = 1 ] && echo $F/bands_train/$ALIAS_KEY ); do [ -d "$B" ] && cp -n --preserve=timestamps $B/* $ISPATIALGYM_REACH_BANDS/ 2>/dev/null; done
 # the alias's static band stores (submit_fast.py BAND_STORES, e.g. the bands an oracle-fix run persisted with the campaign's grasp library):
 # copied over every store above, so the store's band of a name wins (job_val.sh's OF_BANDS order); read only, never written (no sharing)
 for B in ${BAND_STORES:-}; do [ -d "$B" ] && cp --preserve=timestamps $B/*.json $B/*.npz $ISPATIALGYM_REACH_BANDS/ 2>/dev/null; [ -d "$B" ] && echo "BAND_STORE $B $(ls $B/*.json 2>/dev/null | wc -l) bands" >> $JOBDIR/job.txt; done
@@ -131,6 +136,8 @@ if [ "${ISPATIALGYM_FAST:-1}" != 0 ] && [ "${ISPATIALGYM_FAST_COLLECTOR_PREBUILD
   SRC=""; NSKIP=0
   for d in $(ls -td $( [ "$ROOT" != "$F" ] && echo $ROOT/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID ) $F/out/*/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID /vision/u/minyeong/projects/isg_home/train85/out/$ALIAS_KEY/g*/inst/*/$TEMPLATE_ID 2>/dev/null) ${COUNTED_TEMPLATE:-}; do
     case "$d" in $JOBDIR/*) continue ;; esac
+    # shiyuc mode (2026-11-07): a source this account cannot read completely is skipped (a partial copy would make every collector rebuild)
+    [ -n "$(find "$d" -maxdepth 2 ! -readable -print -quit 2>/dev/null)" ] && continue
     if [ -f "$d/template.json" ] && ls $d/instances/*-tro_state.json >/dev/null 2>&1; then
       fit=$(python $S/prebuild_crop.py $d 2>/dev/null || echo "skip prebuild_crop.py failed")
       if [ "$fit" = fits ]; then SRC=$d; break; fi
@@ -159,7 +166,7 @@ if [ "$BAND_SHARE" = 1 ]; then
   python $S/publish_job_bands.py "$ISPATIALGYM_REACH_BANDS" "$F/bands_train/$ALIAS_KEY" "$t0" "$SLURM_JOB_ID" 2>&1 | tee -a $JOBDIR/job.txt
   python -m ispatialgym.sampling.v2.band_evidence publish $ISPATIALGYM_REACH_BANDS $F/band_evidence/$ALIAS_KEY $SLURM_JOB_ID 2>&1 | tee -a $JOBDIR/job.txt
 fi
-python $S/train_predemo.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
+ISGF_PREDEMO_ROOT=${ISGF_PREDEMO_ROOT:-} python $S/train_predemo.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
 touch $JOBDIR/sampling.done
 wait $CPIDS
 kill $MONPID 2>/dev/null
