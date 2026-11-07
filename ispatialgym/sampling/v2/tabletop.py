@@ -2565,6 +2565,112 @@ def default_in_frame(s, stance: Stance, cam: Pose, focus: th.Tensor, info: Any, 
     return in_frame(s, cam, box_corners(focus[:2], half_extent, z0, z0 + height), margin)
 
 
+def map_support_first_on() -> bool:
+    """Opt-in ``ISPATIALGYM_MAP_SUPPORT_FIRST=1`` (of-v2maps 2026-11-07, owner prompt G): Phase 2's focus cells of a MAP VIEW are the
+    support's own eroded top raster cells, each read from the nearest feasible map lattice point (:func:`support_first_keep`)."""
+    return os.environ.get("ISPATIALGYM_MAP_SUPPORT_FIRST", "") == "1"
+
+
+def map_lattice_diag_on() -> bool:
+    """Opt-in ``ISPATIALGYM_MAP_LATTICE_DIAG=1``: Phase 2 logs, per call, the lattice-vs-raster counts (``MAP_LATTICE {json}``)."""
+    return os.environ.get("ISPATIALGYM_MAP_LATTICE_DIAG", "") == "1"
+
+
+def is_map_view(b) -> bool:
+    return isinstance(getattr(b, "meta", None), dict) and b.meta.get("mode") == "map_view"
+
+
+#: the support-first tolerance (fraction of the map lattice) and the once-widened one of the bounded recovery
+SUPPORT_FIRST_TOL_FRAC = 0.5
+SUPPORT_FIRST_WIDEN_FRAC = 1.0
+
+
+def support_raster_cells(s, top, erosion: float) -> th.Tensor:
+    """The support's free top raster cells (world xy, its 2 cm raster) inside the top eroded by ``erosion`` (the object footprint's
+    half extent + margin, Phase 2's erosion); cached per (top, erosion)."""
+    cache = s.__dict__.setdefault("_support_raster_cache", {})
+    key = (id(top), round(float(erosion), 4))
+    if key not in cache:
+        cells = top.cells(free_only=True)
+        keep = [c for c in cells if top.contains(c, erosion)]
+        cache[key] = th.stack(keep).float() if keep else th.zeros(0, 2)
+    return cache[key]
+
+
+def support_first_cells(band, st: Stance, raster: th.Tensor, tol_frac: float = SUPPORT_FIRST_TOL_FRAC) -> Tuple[th.Tensor, Dict[str, Any]]:
+    """The raster cells (world xy) that have a FEASIBLE lattice point of the map view ``band`` (the stance's trunk / stand-off cells,
+    base frame) within ``tol_frac`` x the lattice step (Chebyshev, base frame) - the map read as a prior at the support's own cells -
+    and the facts: raster / lattice counts, the kept cells' mean distance to their lattice point and the neighbour agreement (feasible
+    lattice points within one step / 4, capped at 1)."""
+    L = float(band.meta.get("lattice") or 0.08)
+    lat = np.asarray(band.band(float(st.translate), float(st.tilt), **band_kw(band, st)), dtype=float).reshape(-1, 2)
+    facts: Dict[str, Any] = {"n_raster": int(len(raster)), "n_lattice": int(len(lat)), "n_kept": 0, "tol_m": round(tol_frac * L, 4)}
+    if len(raster) == 0 or len(lat) == 0:
+        return th.zeros(0, 2), facts
+    rb = band.to_base(raster.numpy(), st.base_pose2d)
+    d = np.abs(rb[:, None, :] - lat[None, :, :]).max(axis=2)
+    dmin = d.min(axis=1)
+    keep = dmin <= tol_frac * L + 1e-6
+    if keep.any():
+        agree = np.minimum((d[keep] <= L + 1e-6).sum(axis=1) / 4.0, 1.0)
+        facts.update(n_kept=int(keep.sum()), dist_mean_m=round(float(dmin[keep].mean()), 4), agree_mean=round(float(agree.mean()), 3))
+    return raster[th.as_tensor(keep)], facts
+
+
+def support_first_keep(s, st: Stance, top, erosion: float, bands, arm_bands: Dict[str, Any], keep: List[th.Tensor],
+                       cell_arms: Dict[Tuple[float, float], List[str]]) -> Tuple[List[th.Tensor], Dict[Tuple[float, float], List[str]]]:
+    """Phase 2's focus cells at stance ``st`` with ``ISPATIALGYM_MAP_SUPPORT_FIRST`` (map views only; anything else unchanged): the eroded
+    raster cells with a feasible lattice point of the (each offered arm's) map view within half a step, ``cell_arms`` rebuilt for them;
+    when none is found at the stance, the bounded recovery widens the tolerance once to a full step (counter ``support_first.widened``).
+    With ``ISPATIALGYM_MAP_LATTICE_DIAG`` the per-stance counts accumulate in ``s._lattice_acc`` (logged by :func:`_log_lattice_acc`)."""
+    sf, diag = map_support_first_on(), map_lattice_diag_on()
+    views = dict(arm_bands) if arm_bands else {"_": bands}
+    if not (sf or diag) or not any(is_map_view(b) for b in views.values()):
+        return keep, cell_arms
+    raster = support_raster_cells(s, top, erosion)
+    out_cells: Dict[Tuple[float, float], th.Tensor] = {}
+    out_arms: Dict[Tuple[float, float], List[str]] = {}
+    facts_all = []
+    for tol in (SUPPORT_FIRST_TOL_FRAC, SUPPORT_FIRST_WIDEN_FRAC):
+        for a, b in views.items():
+            if not is_map_view(b):
+                continue
+            cells, facts = support_first_cells(b, st, raster, tol_frac=tol)
+            facts_all.append(dict(facts, arm=a, tol_frac=tol))
+            for c in cells:
+                k = (round(float(c[0]), 3), round(float(c[1]), 3))
+                out_cells.setdefault(k, c)
+                out_arms.setdefault(k, [])
+                if a != "_" and a not in out_arms[k]:
+                    out_arms[k].append(a)
+        if out_cells or not sf:
+            break
+        _count(s, "support_first.widened")
+    if diag:
+        acc = s.__dict__.setdefault("_lattice_acc", {"stances": 0, "raster": 0, "lattice_kept_today": 0, "support_first": 0, "today_empty_sf_not": 0,
+                                                     "both_empty": 0, "widened": 0})
+        acc["stances"] += 1
+        acc["raster"] += int(len(raster))
+        acc["lattice_kept_today"] += len(keep)
+        acc["support_first"] += len(out_cells)
+        acc["today_empty_sf_not"] += int(not keep and bool(out_cells))
+        acc["both_empty"] += int(not keep and not out_cells)
+        acc["widened"] += int(any(f["tol_frac"] == SUPPORT_FIRST_WIDEN_FRAC for f in facts_all))
+    if not sf:
+        return keep, cell_arms
+    _count(s, "support_first.stances")
+    if not out_cells:
+        _count(s, "support_first.empty")
+        return [], {}
+    return list(out_cells.values()), (out_arms if arm_bands else cell_arms)
+
+
+def _log_lattice_acc(s, where: str) -> None:
+    acc = s.__dict__.pop("_lattice_acc", None)
+    if acc is not None:
+        log.info("MAP_LATTICE %s", json.dumps(dict(acc, where=where, support_first=bool(map_support_first_on()))))
+
+
 def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, target_height: Optional[float] = None,
                                in_frame_fn: Optional[Callable[..., bool]] = None, focus_candidates: Optional[Callable[..., List[Tuple[th.Tensor, Any]]]] = None,
                                stand_offs: Sequence[float] = STAND_OFFS, translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES,
@@ -2656,6 +2762,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
         if len(cells) == 0:
             continue
         keep = [c for c in cells if top.contains(c, erosion)]
+        keep, cell_arms = support_first_keep(s, st, top, erosion, bands, arm_bands, keep, cell_arms)  # of-v2maps 2026-11-07 (opt-in)
         if not keep:
             continue
         cw = th.stack(keep)
@@ -2711,6 +2818,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             log.info("phase 2: surviving (stand-off, translate, tilt): %s", trunks)
     if order == "reach" and out:
         out = sorted(out, key=lambda c: -min(round(best_reach_margin(s, c, c.focus, c.extras.get("focus_arms") or ("right",))[0] / 0.05) * 0.05, 0.30))
+    _log_lattice_acc(s, "phase2")  # of-v2maps 2026-11-07: ISPATIALGYM_MAP_LATTICE_DIAG
     return out
 
 
@@ -2809,6 +2917,7 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
         else:
             cells = band_cells_world(bands, st)
         keep = [c for c in cells if top.contains(c, erosion)]
+        keep, cell_arms = support_first_keep(s, st, top, erosion, bands, arm_bands, keep, cell_arms)  # of-v2maps 2026-11-07 (opt-in)
         if not keep:
             continue
         foci = focus_candidates(s, st, cam, th.stack(keep)) if focus_candidates is not None else [(c, None) for c in keep]
@@ -2847,6 +2956,7 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
              "and %.0f° of the init camera, %d survivors at %d positions (%d within %.0f° of the init view)", len(cands), list(lateral_shifts), n_pairs,
              math.degrees(w1), math.degrees(iv1), len(out), len({c.extras["_position"] for c in out}),
              len({c.extras["_position"] for c in out if c.extras["init_view_class"] == 0}), math.degrees(iv0))
+    _log_lattice_acc(s, "phase2_split_cone")  # of-v2maps 2026-11-07: ISPATIALGYM_MAP_LATTICE_DIAG
     return out
 
 
