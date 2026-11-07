@@ -360,3 +360,20 @@ def test_find_with_an_anchor_set_returns_the_map_at_the_anchor(tmp_path):
     assert RM.ReachMap.find(str(tmp_path), lib, 0.8131, rest_id="r0", arm="left", anchors=A) is None  # 0.8131 resolves to the 0.81 anchor: no map there
     assert RM.ReachMap.find(str(tmp_path), lib, 0.8126, rest_id="r0", arm="right", anchors=A) is None  # another arm's map is not this one
     assert RM.ReachMap.find(str(tmp_path), lib, 0.8126, rest_id="r0", arm="left", anchors=A, kind="brace") is None
+
+
+def test_support_policy_scope_and_the_holding_arm(monkeypatch):
+    # of-v2maps 2026-11-06: map_bands turns the policy on for the GRASP approach only (v2maps1: the policy, applied to every chain with an
+    # ignore_for_last, rejected places / releases - touching_02 62 / 66 place_unreachable); "1" keeps the 2026-11-02 behaviour
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import ik as IK
+
+    for v, on, scope in (("", False, "all"), ("0", False, "all"), ("1", True, "all"), ("grasp", True, "grasp")):
+        monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", v)
+        assert IK.support_policy_on() is on and IK.support_policy_scope() == scope
+    chk = IK.IKChecker.__new__(IK.IKChecker)
+    chk.kit = SimpleNamespace(backend=SimpleNamespace(_attached={"left": {"obj": "book"}}))
+    assert chk._holding("left") and not chk._holding("right")
+    chk.kit = SimpleNamespace(backend=SimpleNamespace())  # a backend without attachments: never holding
+    assert not chk._holding("left")

@@ -1000,7 +1000,8 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
     if rm is None:
         log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
         return None
-    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "1")
+    # of-v2maps 2026-11-06: the grasp approach only (ik.support_policy_scope) - "1" also policed places / carries / releases
+    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 

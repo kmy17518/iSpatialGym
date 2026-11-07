@@ -279,6 +279,16 @@ def support_policy_on() -> bool:
     return os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") not in ("", "0", "off", "false")
 
 
+def support_policy_scope() -> str:
+    """of-v2maps 2026-11-06: which exact-IK chains the support policy polices - ``"grasp"`` (``ISPATIALGYM_SUPPORT_POLICY=grasp``, what
+    ``tabletop.map_bands`` turns on): only chains whose arm holds nothing (the empty hand closing on an object at rest on its support - the
+    pose the policy is written for); ``"all"`` (``=1`` / any other on value, the 2026-11-02 behaviour): every chain with an
+    ``ignore_for_last`` - places, carries and releases included (v2maps1: 62 / 66 touching_02 attempts died at the place screen on
+    'non-finger link touches the support', ontop_small_03 25 x 'palm_contact on partner_soap_dish' at the place onto the partner;
+    with the policy off the same aliases wrote 4 / 7, 4 / 10, 4 / 9)."""
+    return "grasp" if os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") == "grasp" else "all"
+
+
 def _quat_mat(q: th.Tensor) -> th.Tensor:
     x, y, z, w = q.tolist()
     return th.tensor([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)], [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
@@ -374,6 +384,12 @@ class IKChecker:
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
         self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
+
+    def _holding(self, arm: str) -> bool:
+        """``arm`` has an object attached in the planner (``navigation.attached`` / ``R1ProCuRobo.attach_object``: a place, carry or release
+        check), so its chain is not a grasp approach (:func:`support_policy_scope`)."""
+        held = getattr(getattr(self.kit, "backend", None), "_attached", None)
+        return isinstance(held, dict) and arm in held
 
     def support_policy_ok(self, q: th.Tensor, arm: str, supports: Sequence[Any], approached: Optional[Sequence[Any]] = None) -> Tuple[bool, str]:
         """The shared support-contact policy (``ispatialgym.grasping.contact_policy``) on a grasp configuration whose last pose was solved with
@@ -833,7 +849,7 @@ class IKChecker:
                 q = q_pol
                 qs[-1] = q
                 self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
-        if q is not None and ignore_for_last and support_policy_on():
+        if q is not None and ignore_for_last and support_policy_on() and not (support_policy_scope() == "grasp" and self._holding(arm)):
             ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, approached)
             if not ok_p:
                 q, why = None, f"support_policy: {why_p}"
