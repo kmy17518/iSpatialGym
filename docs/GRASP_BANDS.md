@@ -386,6 +386,60 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - The support policy polices only supports with a registered plane. world_vertical + articulation_large went from 0 to 36 written / 34 ok under v2only.
 - Floor maps: the fingers meet the floor only through the policy's floor allowance (`floor_fingers: "policy"`). The umbrella went from 0 to 71-73 cells per reaching trunk.
 
+### Owner decisions 2026-11-07: a grasp ladder for every v2 entry; floating grasps from GraspGen
+
+**The ladder.** Every library entry climbs these steps until it has physics-valid grasps:
+1. Round 1: the standard build.
+2. Round 2: the retry for missing grasps (the existing retry ladder, plus per-object fixes read from the gate logs).
+3. Agent proposal, run automatically for any entry still at 0 physics-valid grasps after round 2. It works like the
+   articulation library's handle grasps (geometric proposals, rendered strips, reviewer agents under a contract:
+   `runlogs/grasp_library_20260905/artic/handle_review_contract.md`) and reuses that interface.
+   - The agent proposes grasps from the object's geometry (collision pieces, extents, meta-links) and its task role.
+   - The proposals go through the SAME v2 gates and physics validation; no gate is relaxed for them.
+   - The entry records source "agent".
+   - When a gate rejects every proposal, the gate and its measured values are logged (gate_dump) and reported.
+4. Last resort: the legacy grasps (`runlogs/grasp_library_20260905`), re-validated by the v2 gates and physics. Every
+   alias that would end here is reported to the owner before they are used.
+
+**The four objects** (round-2 fixes first, then steps 3-4 if still at 0):
+- **Cork ncxgpe (attachment_03).** The attachment rule passes 0 of 28,181. It reads the mating face through the meta-link
+  frame [0.5, -0.5, 0.5, 0.5], which turns -z into +y.
+  - Fix: derive the mating face from the same transform as the oracle's seat axis.
+  - A unit test for every attach object checks that the rule's axis equals the oracle's seat axis.
+  - The rule is shared by every attach object: the entries whose counts change are listed for the owner before adoption.
+- **Tape kavsnx (disembedding_07).**
+  - First, gate_dump shows which n_sweep test rejects it: finite width, min width or pad sweep.
+  - Then the plate families (6e418172) are tried through cand_overrides: lip_shallow, and rim_straddle with the inner
+    finger in the core hole.
+  - If the cause is a fingertip clearance stricter than the spec's 2 mm finger-geometry rule, it is reported first,
+    because it is a shared gate.
+- **Cap xxqyrt (attachment_02).**
+  - Validate every attachment-rule survivor, not just 1 (max_representatives / topk).
+  - Densify the top pool and gate_dump the final finger_blade_in_object margins.
+  - Check whether the cork's frame issue also affects the cap.
+- **Storage box eicujj (touching_large_03).** It never had a v2 run. Add it to a manifest, build and validate it, then
+  build the maps its MAP_REQUEST lines ask for.
+
+**Floating grasps.** The legacy floating grasps came from GraspGen. That generator is ported into the v2 library as a
+"floating" constraint (no support).
+- Physics validation for a held object: in hand, under gravity, plus the task's held motions.
+- Floating goes into the entry identity.
+- The floating keys are linked: mental_rotation x10 and object_scaling x10, refused today as legacy (held_object §2.2).
+- Maps are built only where these aliases' consumers ask for them (their MAP_REQUEST lines under v2only are read first).
+
+**Validation** (only what is needed):
+- Per object and per ladder step: candidates -> gates (gate_dump) -> physics-valid.
+- Unit tests for every changed rule; existing keys, rests and choices stay unchanged.
+- `--grasps v2only` N 4 on attachment_02, attachment_03, disembedding_07 and touching_large_03.
+- Floating: `--grasps v2only` N 1 on the 20 aliases, and N 4 on one mental_rotation and one object_scaling alias.
+- No wider no-regression run: the 20 map aliases ride along in the next scheduled run.
+
+**Ask the owner before:**
+- changing the shared contact-policy defaults;
+- any gate shared by all objects (including the attach-rule fix if it changes other entries);
+- any oracle program change;
+- using legacy grasps (step 4).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
