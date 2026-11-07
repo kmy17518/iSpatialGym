@@ -31,6 +31,9 @@ Compatibility: a consumer passes what it requires (scale, rest_id, policy key, s
 has its own directory (``entry_id(..., lean=)``: ``__lean_<side>_<deg>_<digest6>``), and a lookup asks for one kind - a lean rest never
 serves a stable-rest lookup, nor the reverse (``check_compatible(rest_kind=, lean=)``). A legacy library entry (``runlogs/grasp_library_20260905``) has no measured rest and
 is never substituted for a v2 record (:func:`load_model` returns None; ``grasp_library.load_grasps`` keeps serving legacy keys).
+Overhang rests (i7-overhang 2026-11-07, :mod:`ispatialgym.grasping.overhang`): ``rest_kind: "overhang"`` (settled on a slab whose edge lies
+under the object, one face ``distance_m`` beyond it); its own directory (``entry_id(..., overhang=)``: ``__overhang_<axis><n|p>_<mm>mm_
+<digest6>``), never crossed with a stable or lean lookup (``check_compatible(rest_kind="overhang", overhang=)``).
 """
 
 from __future__ import annotations
@@ -100,10 +103,10 @@ def model_id(category: str, model: str, scale=None) -> str:
     return f"{category}__{model}__{scale_tag(scale)}"
 
 
-def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None) -> str:
+def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None, overhang=None) -> str:
     """Library entry id: ``<category>__<model>__<scale tag>`` + ``__<constraint>`` (non-tabletop) + ``__r<digest>`` (a designated
-    non-canonical rest) + ``__<lean tag>`` (i7-lean: a lean rest, ``lean.LeanSpec.tag``) - one directory per (model, scale, constraint,
-    designated rest, lean rest)."""
+    non-canonical rest) + ``__<lean tag>`` (i7-lean: a lean rest, ``lean.LeanSpec.tag``) + ``__<overhang tag>`` (i7-overhang: an overhang
+    rest, ``overhang.OverhangSpec.tag``) - one directory per (model, scale, constraint, designated rest, lean / overhang rest)."""
     out = model_id(category, model, scale)
     if constraint and constraint != "tabletop":
         out += f"__{constraint}"
@@ -113,11 +116,16 @@ def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop"
         from ispatialgym.grasping import lean as LN
 
         out += "__" + LN.LeanSpec.from_json(lean).tag()
+    if overhang is not None:
+        from ispatialgym.grasping import overhang as OV
+
+        out += "__" + OV.OverhangSpec.from_json(overhang).tag()
     return out
 
 
-def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None) -> str:
-    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean))
+def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None,
+              overhang=None) -> str:
+    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang))
 
 
 def job_lean(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -125,8 +133,14 @@ def job_lean(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return job.get("lean") if job.get("rest_kind") == "lean" and isinstance(job.get("lean"), dict) else None
 
 
+def job_overhang(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The overhang spec of an overhang job (``rest_kind: "overhang"``, i7-overhang), else None."""
+    return job.get("overhang") if job.get("rest_kind") == "overhang" and isinstance(job.get("overhang"), dict) else None
+
+
 def job_dir(job: Dict[str, Any], root: Optional[str] = None) -> str:
-    return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"), job_lean(job))
+    return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"), job_lean(job),
+                     job_overhang(job))
 
 
 def digest(obj: Any, n: int = 12) -> str:
@@ -259,6 +273,12 @@ class Rest:
         ln = self.record.get("lean")
         return ln if self.kind == "lean" and isinstance(ln, dict) else None
 
+    @property
+    def overhang(self) -> Optional[Dict[str, Any]]:
+        """The overhang block of an overhang rest (``overhang.overhang_record``), None for any other rest (i7-overhang)."""
+        ov = self.record.get("overhang")
+        return ov if self.kind == "overhang" and isinstance(ov, dict) else None
+
 
 def place_object(rest: Rest, yaw: float, cell_xy: Sequence[float], support_z: float) -> np.ndarray:
     """T_world_object of the placement contract (module docstring)."""
@@ -319,7 +339,8 @@ class ModelLibrary:
 
     @property
     def rest_kind(self) -> str:
-        """The entry's rest kind (i7-lean): ``"lean"`` for a lean entry (``library.json`` ``rest_kind``), else ``"stable"``."""
+        """The entry's rest kind (i7-lean): ``"lean"`` for a lean entry (``library.json`` ``rest_kind``), ``"overhang"`` for an overhang entry
+        (i7-overhang), else ``"stable"``."""
         return str(self.data.get("rest_kind") or "stable")
 
     def identity(self) -> Dict[str, Any]:
@@ -328,7 +349,12 @@ class ModelLibrary:
         (the identity keys of stable entries do not move)."""
         def rest_ident(r: Rest) -> Dict[str, Any]:
             d = {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)}
-            if r.kind != "stable":
+            if r.kind == "overhang":  # i7-overhang: the overhang identity and the measured edge relative to the root
+                ov = r.overhang or {}
+                d.update({"rest_kind": r.kind, "overhang": ov.get("digest"),
+                          "edge_along_m": None if ov.get("edge_along_m") is None else round(float(ov["edge_along_m"]), 6),
+                          "measured_distance_m": None if ov.get("measured_distance_m") is None else round(float(ov["measured_distance_m"]), 6)})
+            elif r.kind != "stable":
                 ln = r.lean or {}
                 d.update({"rest_kind": r.kind, "lean": ln.get("digest"), "board_face_y_m": None if ln.get("board_face_y_m") is None else round(float(ln["board_face_y_m"]), 6)})
             return d
@@ -344,7 +370,8 @@ class ModelLibrary:
 
 
 def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = None, policy_key: Optional[str] = None,
-                     schema: str = LIBRARY, rest_kind: str = "stable", lean: Optional[Dict[str, Any]] = None) -> None:
+                     schema: str = LIBRARY, rest_kind: str = "stable", lean: Optional[Dict[str, Any]] = None,
+                     overhang: Optional[Dict[str, Any]] = None) -> None:
     """Raise :class:`IncompatibleRecord` when ``lib`` does not satisfy the consumer's requirements. i7-lean: a required ``rest_id`` must
     be of ``rest_kind`` (default "stable": a lean rest never serves a stable consumer, nor a stable rest a lean one) and, for a lean
     consumer passing ``lean`` (a ``lean.LeanSpec`` json), of that lean identity (angle, side, board, gap)."""
@@ -366,6 +393,12 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
             want = LN.LeanSpec.from_json(lean).digest()
             if (r.lean or {}).get("digest") != want:
                 raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} has lean {(r.lean or {}).get('digest')!r}, required {want!r}")
+        if overhang is not None:  # i7-overhang: the overhang identity (side, distance, edge, slab)
+            from ispatialgym.grasping import overhang as OV
+
+            want = OV.OverhangSpec.from_json(overhang).digest()
+            if (r.overhang or {}).get("digest") != want:
+                raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} has overhang {(r.overhang or {}).get('digest')!r}, required {want!r}")
     if policy_key is not None and lib.policy_key != policy_key:
         raise IncompatibleRecord(f"{lib.path}: contact policy {lib.policy_key!r} != required {policy_key!r}")
     for g in lib.data.get("grasps", []):
@@ -374,11 +407,11 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
 
 
 def load_model(category: str, model: str, scale=None, root: Optional[str] = None, *, constraint: str = "tabletop", rest_hint_wxyz=None,
-               require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None) -> Optional[ModelLibrary]:
+               require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None) -> Optional[ModelLibrary]:
     """The v2 entry of (category, model, scale, constraint, designated rest[, lean rest]), checked against ``require`` (kwargs of
     :func:`check_compatible`); None when there is no v2 entry - a legacy library entry is never substituted (it has no measured rest).
-    ``lean`` (i7-lean): the lean entry of that spec (its own directory)."""
-    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean)
+    ``lean`` (i7-lean): the lean entry of that spec (its own directory); ``overhang`` (i7-overhang): the overhang entry of that spec."""
+    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang)
     data = load_json(os.path.join(d, "library.json"))
     if data is None:
         return None

@@ -47,6 +47,14 @@ Extra rejections: ``robot_board_contact`` (any robot link, fingers included, on 
 ``object_pressed_into_board`` (the object's load on the board above ``object_load_ratio_max`` x its weight for ``force_window`` steps).
 A stable job's world, rest, trials and records are unchanged.
 
+Overhang rests (i7-overhang 2026-11-07, owner decision; :mod:`ispatialgym.grasping.overhang`): a job with ``rest_kind: "overhang"`` places the
+slab so that its EDGE lies under the object (``overhang.slab_for``: the named face ``distance_m`` beyond the edge, the edge flush with it,
+the slab on the object's side); the rest is settled there (:meth:`TabletopWorld.settle` with ``overhang``: still, pressing on the slab, the
+face within ``overhang.DISTANCE_TOL_M`` of the requested overhang, the centre of mass inside, flush) and recorded as an overhang rest
+(``rest_kind: "overhang"``, ``overhang``: ``overhang.overhang_record``); the representatives are re-checked against that slab box (the
+policy's 2 mm finger rule on the box: beyond the edge the space below the slab top is free), placed and tried with it, and the unload drops
+it as for a stable rest. No other rule changes.
+
 Fidelity notes: the approach is not executed (the hand starts at the grasp pose with the pre-shaped fingers, as the oracle's approach
 ends); a policy-passing start can still carry <= 2 mm finger/table overlap that PhysX resolves in the first step. The slab is a box
 with the primitive's default physics material, not the scene table's; its edge sits at the configuration's own distance.
@@ -269,6 +277,7 @@ class TabletopWorld:
         # i7-lean 2026-11-07: the lean board (created on the first lean job: a stable-only run never has it) and the model's lean spec
         self.board = None
         self.lean = None
+        self.overhang = None  # i7-overhang 2026-11-07: the model's overhang spec (a stable / lean job: None)
         self.obstacles: Tuple[CP.Support, ...] = ()
         self.t_setup = time.time() - t0
         self.timing: Dict[str, float] = {"setup_s": round(self.t_setup, 2)}
@@ -323,6 +332,9 @@ class TabletopWorld:
             from ispatialgym.grasping import lean as LN
 
             self.lean = LN.spec_of(job) if LN.is_lean_job(job) else None
+            from ispatialgym.grasping import overhang as OV
+
+            self.overhang = OV.spec_of(job) if OV.is_overhang_job(job) else None  # i7-overhang: the slab edge under the object
             self.obstacles = ()
             if self.lean is not None:
                 self.ensure_board()
@@ -421,12 +433,16 @@ class TabletopWorld:
             out.append(rec)
         return out
 
-    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0), drop_m: Optional[float] = None, lean=None) -> Tuple[Dict[str, Any], Any]:
+    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0), drop_m: Optional[float] = None, lean=None,
+               overhang=None) -> Tuple[Dict[str, Any], Any]:
         """Drop and settle the object on the slab with the robot parked; the measured rest record and the scene snapshot. ``drop_m``:
         the drop height (default ``cfg.drop_m``; the settle-first survey varies it). ``lean`` (i7-lean 2026-11-07, a ``lean.LeanSpec``):
         the object (``quat0``: leaning ``lean.deg`` toward ``lean.side``) settles against the board placed ``lean.gap_m`` beyond its
         extreme point (``lean.initial_pose``); the record is a lean rest (``rest_kind: "lean"``, ``lean``: ``lean.lean_record``) - stable
-        when still, pressing on the slab and on the board, on the requested side within ``lean_tol_deg``."""
+        when still, pressing on the slab and on the board, on the requested side within ``lean_tol_deg``. ``overhang`` (i7-overhang
+        2026-11-07, an ``overhang.OverhangSpec``): the slab's edge under the object, the named face ``distance_m`` beyond it
+        (``overhang.slab_for``); the record is an overhang rest (``rest_kind: "overhang"``, ``overhang``: ``overhang.overhang_record``) -
+        stable when still, pressing on the slab, at the requested overhang, the centre of mass inside, flush (``overhang.overhang_ok``)."""
         th, cfg = self.th, self.cfg
         drop = cfg.drop_m if drop_m is None else float(drop_m)
         t0 = time.time()
@@ -437,6 +453,12 @@ class TabletopWorld:
         if lean is not None:
             radius += float(lean.board.thickness_m) + float(lean.gap_m)  # the slab also carries the board
         centre, dims = self.slab_pose_for(obj_xy, radius)
+        ov_slab = None
+        if overhang is not None:
+            from ispatialgym.grasping import overhang as OV
+
+            ov_slab = OV.slab_for(V @ R0.T, overhang, obj_xy, half=radius + cfg.slab_half_m, slab_top_z=cfg.slab_top_z)
+            centre, dims = ov_slab["centre"], ov_slab["dims"]
         self.park()
         self.place_slab(centre, dims)
         z0 = cfg.slab_top_z + bottom + drop
@@ -510,6 +532,16 @@ class TabletopWorld:
                                                                  "board_face_y": round(lean_start["board_face_y"], 6)}})
             rec.update({"rest_kind": LN.REST_KIND_LEAN, "lean": ln, "stable": bool(rec["stable"] and ok),
                         "contact_rule": rec["contact_rule"] + "; lean: " + ln["board_contact_rule"]})
+        if overhang is not None:
+            from ispatialgym.grasping import overhang as OV
+
+            com = np.asarray(geom.union.center_mass if geom.union.volume > 1e-9 else geom.union.centroid, dtype=float)
+            ov = OV.overhang_record(overhang, V, q, p, ov_slab["edge_world"], com, centre, dims, quat0)
+            ok, why = OV.overhang_ok(ov)
+            ov.update({"overhang_ok": ok, "overhang_why": why, "start": {"quat_xyzw": [round(float(v), 7) for v in quat0], "edge_world": round(float(ov_slab["edge_world"]), 6)}})
+            rec.update({"rest_kind": OV.REST_KIND_OVERHANG, "overhang": ov, "stable": bool(rec["stable"] and ok),
+                        "contact_rule": rec["contact_rule"] + "; overhang: the face beyond the slab edge within "
+                                        f"{OV.DISTANCE_TOL_M} m of the request, the centre of mass >= {OV.COM_MIN_INSIDE_M} m inside, flush"})
         state = self.scene.dump_state(serialized=False)
         return rec, state
 
@@ -828,8 +860,21 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
     from ispatialgym.grasping import lean as LN
 
     lean = LN.spec_of(job) if LN.is_lean_job(job) else None
+    from ispatialgym.grasping import overhang as OV
+
+    ovs = OV.spec_of(job) if OV.is_overhang_job(job) else None
     try:
-        if lean is not None:
+        if ovs is not None:
+            # i7-overhang 2026-11-07: the guard settle on the slab whose edge lies under the object (the overhang stage's start: the
+            # designated rest at the reference yaw); the measured overhang rest is the rest (its own id: the spec's tag; "<tag>_other"
+            # when it does not overhang as requested / is not still)
+            hint = job.get("rest_hint_wxyz")
+            q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
+            quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
+            rest, state = world.settle(obj, geom, quat0, overhang=ovs)
+            intended = bool(rest["overhang"]["overhang_ok"])
+            rest["rest_id"] = ovs.rest_id() if intended else ovs.rest_id() + "_other"
+        elif lean is not None:
             # i7-lean 2026-11-07: the guard settle against the board from the lean stage's start (the upright base leaned to the spec);
             # the measured lean rest is the rest (its own id: the spec's tag; "<tag>_other" when it leans elsewhere / not on the board)
             quat0 = LN.lean_quat(LN.base_quat(job), lean)
@@ -850,6 +895,11 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
         if job.get("settle_first"):
             # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): the surveyed rest the candidates were generated at; this settle is the guard
             rest["settle_first"] = dict(job["settle_first"], designated_rest_hint_wxyz=job.get("designated_rest_hint_wxyz"))
+        if ovs is not None and job.get("overhang_rest"):
+            # i7-overhang: the overhang stage's measured rest the candidates were generated at (this settle is the guard: same start, same world)
+            orr = job["overhang_rest"]
+            rest["overhang"]["generated_at"] = {"quat_xyzw": orr.get("quat_xyzw"), "h_root": orr.get("h_root"), "measured_distance_m": orr.get("measured_distance_m"),
+                                                "tilt_from_generation_rad": round(S.tilt_distance(rest["quat_xyzw"], orr["quat_xyzw"]), 5) if orr.get("quat_xyzw") else None}
         if lean is not None and job.get("lean_rest"):
             # i7-lean: the lean stage's measured rest the candidates were generated at (this settle is the guard: same start, same world)
             lr = job["lean_rest"]
@@ -935,7 +985,12 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
         f["physics"] = "representative_only"
         f["members_physics"] = "not tested: identified geometrically (members folded by symmetry.dedup); reach maps / sampling check the member they use"
     extra: Dict[str, Any] = {}
-    if job.get("rest_kind") == "lean":
+    if job.get("rest_kind") == "overhang":
+        # i7-overhang 2026-11-07: an overhang entry - its kind, its overhang identity and the keys it serves (the sampler's overhang index,
+        # never legacy_key)
+        extra = {"rest_kind": "overhang", "overhang": job["overhang"], "overhang_keys": list(job.get("overhang_keys") or []),
+                 "overhang_base": job.get("overhang_base")}
+    elif job.get("rest_kind") == "lean":
         # i7-lean 2026-11-07: a lean entry - its kind, its lean identity and the keys it leans (the sampler's lean index, never legacy_key)
         extra = {"rest_kind": "lean", "lean": job["lean"], "lean_keys": list(job.get("lean_keys") or []), "lean_base_wxyz": job.get("lean_base_wxyz"),
                  "lean_base": job.get("lean_base")}

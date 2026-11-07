@@ -26,6 +26,13 @@ Lean rests (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`): a lean job is
 (``lean_rest.board_in_root``: a box in the rest frame) - screened right after the support step (the hulls at the pre-shape, every role
 >= 0) and in the full policy geometry and the symmetry members' check (``contact_policy.check_grasp_geometry(obstacles=)``).
 
+Overhang rests (i7-overhang 2026-11-07, :mod:`ispatialgym.grasping.overhang`): an overhang job is generated at its MEASURED overhang rest
+(``generation_rest_wxyz``, written by the pipeline's ``overhang`` stage) with the slab BOX as the support (``overhang_rest.slab_in_root``:
+its edge where it was measured, its top at the rest frame's z_min) instead of the unbounded tabletop plane - beyond the edge the space
+below the slab top is free, so a pinch across the object's thickness keeps its lower finger there. A SIDE grasp whose fingers sink into
+the slab first retreats along its approach (2 mm steps, at most ``tip_max_m`` of pad depth - the legacy ``book_overhang`` rows' "pad_ref:
+tip": the pads' tip region on the overhanging edge) and only then is lifted as before; the contact point stays the sampled one.
+
 Output ``candidates.json`` (schema ``CANDIDATES``) in the model's library directory.
 """
 
@@ -365,6 +372,11 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         if not job.get("generation_rest_wxyz") or not job.get("lean_rest"):
             raise ValueError(f"{job.get('id')}: a lean job's candidates need its measured lean rest (run the pipeline's lean stage first)")
         obstacles = (LN.board_obstacle_in_rest(job["lean_rest"]),)
+    from ispatialgym.grasping import overhang as OV
+
+    overhang = OV.is_overhang_job(job)
+    if overhang and (not job.get("generation_rest_wxyz") or not job.get("overhang_rest")):
+        raise ValueError(f"{job.get('id')}: an overhang job's candidates need its measured overhang rest (run the pipeline's overhang stage first)")
     # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): a surveyed rest generates the candidates (generation_rest_wxyz), the designated hint names the entry
     R = rest_rotation(job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz"))
     geom = geom0.rotated(R)  # the rest frame: the tabletop is z = z_min
@@ -388,7 +400,9 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                                          gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
                                          orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
-    support = CP.Support.plane(z_min, name="tabletop")
+    # i7-overhang: the measured slab box (its edge under the object) instead of the unbounded tabletop plane
+    support = OV.support_in_rest(job["overhang_rest"], z_min) if overhang else CP.Support.plane(z_min, name="tabletop")
+    side_steps = np.arange(0.002, cfg.tip_max_m - CONTACT_Z + 1e-9, 0.002) if overhang else np.zeros(0)
     hc = CP.HandChecker(arm, policy, spacing=0.004)
     clear_fn = SphereClearance(geom, arm)
     out_cands: List[Dict[str, Any]] = []
@@ -413,6 +427,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             continue
         # 3) the support under the hand: policy measurement on the exact hulls at the pre-shaped opening
         shift = np.zeros(len(T))
+        side_retreat = np.zeros(len(T))  # i7-overhang: a side grasp's retreat along its approach (the contact moves toward the pad tips)
         pre_q = np.clip(0.5 * width + PRESHAPE_MARGIN, 0.0, FINGER_OPEN)
         deficit = np.zeros(len(T))
         margin = 0.001  # aim 1 mm inside every allowance: the measured rest sits a fraction of a mm off the canonical one
@@ -433,11 +448,35 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             T, s, width, pre_q = T[ok], s[ok], width[ok], pre_q[ok]
             T[:, :3, 3] -= T[:, :3, 2] * s[:, None]
             shift = s
+            side_retreat = np.zeros(len(T))
         else:  # lift along the support normal (lift_grasp_off_support's move); the pads must still close on the object (sweep below)
+            retreat = np.zeros(len(T))
+            if len(side_steps) and len(T):
+                # i7-overhang: at an overhang rest a side grasp first retreats along its approach until every part is within its allowance
+                # of the slab box (the fingers out over the free space beyond the edge); the first step that passes is kept
+                todo = np.where(deficit > 0.0)[0]
+                for ds in side_steps:
+                    if len(todo) == 0:
+                        break
+                    Tb = T[todo].copy()
+                    Tb[:, :3, 3] -= Tb[:, :3, 2] * float(ds)
+                    good = np.zeros(len(todo), dtype=bool)
+                    for q in np.unique(np.round(pre_q[todo], 3)):
+                        sub = np.where(np.round(pre_q[todo], 3) == q)[0]
+                        cl = hc.clearance(th.as_tensor(Tb[sub], dtype=th.float32), support, (float(q), float(q)))
+                        hand = np.minimum(np.minimum(cl["palm"].numpy(), cl["wrist_camera"].numpy()), cl["wrist"].numpy())
+                        good[sub] = (cl["finger"].numpy() >= -policy.finger_support_max_penetration_m + margin) & (hand >= policy.hand_support_margin_m + margin)
+                    idx = todo[good]
+                    T[idx] = Tb[good]
+                    retreat[idx] = float(ds)
+                    deficit[idx] = 0.0
+                    todo = todo[~good]
+                L["n_side_retreat"] = int((retreat > 0).sum())
             ok = deficit <= cfg.side_lift_max_m
-            T, width, pre_q, deficit = T[ok], width[ok], pre_q[ok], deficit[ok]
+            T, width, pre_q, deficit, retreat = T[ok], width[ok], pre_q[ok], deficit[ok], retreat[ok]
             T[:, 2, 3] += deficit
             shift = deficit
+            side_retreat = retreat
         L["n_support"] = int(len(T))
         if obstacles and len(T):
             # i7-lean: the hand at the grasp pose, pre-shaped, clear of the lean board (every role, the fingers included)
@@ -445,7 +484,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             for q in np.unique(np.round(pre_q, 3)):
                 idx = np.where(np.round(pre_q, 3) == q)[0]
                 keep[idx] = hc.check_obstacles(th.as_tensor(T[idx], dtype=th.float32), obstacles, (float(q), float(q)))[0].numpy()
-            T, width, pre_q, shift = T[keep], width[keep], pre_q[keep], shift[keep]
+            T, width, pre_q, shift, side_retreat = T[keep], width[keep], pre_q[keep], shift[keep], side_retreat[keep]
             L["n_obstacle_clear"] = int(len(T))
         if len(T) == 0:
             log[mode] = L
@@ -468,12 +507,12 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                 shift[idx] += ds
                 ok[idx] = True
                 shift[bad[~good]] += ds
-        T, clear, shift, width, pre_q = T[ok], clear[ok], shift[ok], width[ok], pre_q[ok]
+        T, clear, shift, width, pre_q, side_retreat = T[ok], clear[ok], shift[ok], width[ok], pre_q[ok], side_retreat[ok]
         L["n_object_clear"] = int(len(T))
         if len(T) == 0:
             log[mode] = L
             continue
-        cz = CONTACT_Z + (shift if mode == "top" else 0.0)  # the pads' contact height after the retreat
+        cz = CONTACT_Z + (shift if mode == "top" else side_retreat)  # the pads' contact height after the retreat (i7-overhang: a side retreat too)
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
         c, width, antip, cov = contact_features(union, T, cz)
         touch = pad_sweep(union, T)
@@ -485,6 +524,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             continue
         score, perp = _score(T, com, width, antip, cov, clear, size, cz, mode, cfg.weights)
         feats = {"com_perp": perp, "width": width, "antipodal": antip, "coverage": cov, "clearance": clear, "tilt_deg": tilt_deg(T), "shift_m": shift}
+        if overhang and mode != "top":  # i7-overhang: the side grasp's retreat along its approach (cz - CONTACT_Z)
+            feats["side_retreat_m"] = cz - CONTACT_Z
         if constraint != "flower_stem_top":
             keep = perp <= cfg.lever_cap * size
             T, score, cz, pre_q = T[keep], score[keep], cz[keep], pre_q[keep]
@@ -589,6 +630,9 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     log["symmetry_s"] = round(time.time() - t_sym, 2)
     out = {"schema": S.CANDIDATES, "pipeline": PIPELINE, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
            "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "generation_rest_wxyz": job.get("generation_rest_wxyz"), "legacy_key": job.get("legacy_key"),
+           **({"rest_kind": "overhang", "overhang": job.get("overhang"), "overhang_rest": job.get("overhang_rest"),
+               "support": {"kind": support.kind, "centre": list(support.centre), "half": list(support.half),
+                           "frame": "rest frame (the support frame's axes, the root at the origin; the slab's edge under the object)"}} if overhang else {}),
            **({"rest_kind": "lean", "lean": job.get("lean"), "lean_rest": job.get("lean_rest"),
                "obstacles": [{"name": o.name, "centre": list(o.centre), "half": list(o.half), "frame": "rest frame (the support frame's axes, the root at the origin)"}
                              for o in obstacles]} if obstacles else {}),
