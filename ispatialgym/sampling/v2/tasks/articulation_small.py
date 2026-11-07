@@ -1726,24 +1726,26 @@ class ArticulationSmall(SamplerV2):
                     direction = -t_h
                 pre = C.pre_pose(contact, 0.08)
                 touched = _LinkSubset(target, {self.jinfo.get("child_link")})
+                # i7-braceopen 2026-11-07: the stop is checked with its fingers where the oracle braces (``execute_brace`` opens the gripper
+                # to the record's ``fingers_opening_m`` = ``opening``; the retreat leaves it so) - the fist closed, the brace hand open
                 res = TT.brace_second_arm(self, st, arm, list(pair), brace_arm, [pre, contact], ignore_work_last=[support, target], ignore_brace_last=[target],
-                                          fingers=C.FINGER_CLOSED, ignore_while_locked=[touched] if touched.links else [target])
+                                          fingers=C.FINGER_CLOSED, ignore_while_locked=[touched] if touched.links else [target], brace_fingers=opening)
                 if res.ok:
                     # the brace's lift-off (program check 0920-232450: left_arm_joint7 within 96 mrad of its limit at the retreat pose) - the
                     # clear pose 10 cm back along -a, solved with the fist locked at its contact, must keep the joint-limit margin
                     ret = C.pre_pose(contact, float(self.gen("close_push_brace_retreat_m", 0.06)))
                     # the other arm has retreated from the flap by then (its exact configuration is not known here): the brace arm alone
-                    r_ret = self.ikc.exact([ret], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
+                    r_ret = self.ikc.exact([ret], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=opening)
                     m_ret = self.ikc.joint_limit_margin(r_ret.q, brace_arm)[0] if r_ret.ok else -1.0
                     if not r_ret.ok or m_ret < float(getattr(self.ikc, "JOINT_LIMIT_MARGIN", 0.0)) + 0.01:
                         return None, f"{kind}: brace ok but its lift-off pose {'has no solution' if not r_ret.ok else f'sits {1000 * m_ret:.0f} mrad from a joint limit'}"
                 if not res.ok:
                     b = st.world_to_base(pre[0][:2])
-                    r_free = self.ikc.exact([pre], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED)
+                    r_free = self.ikc.exact([pre], st, brace_arm, ignore_for_last=[support, target], cache=False, fingers=opening)
                     if not r_free.ok:
                         why_d = "unreachable alone (box ignored)"
                     else:
-                        r_box = self.ikc.exact([pre], st, brace_arm, ignore_for_last=[support], cache=False, fingers=C.FINGER_CLOSED)
+                        r_box = self.ikc.exact([pre], st, brace_arm, ignore_for_last=[support], cache=False, fingers=opening)
                         if not r_box.ok:
                             q_c = r_free.q
                             with self.ikc.ignoring([support]):
@@ -2347,17 +2349,22 @@ class ArticulationSmall(SamplerV2):
                           "note": "two-flap v4: the pinching hand, open, holds the box against the lever's shove (owner 2026-09-20 21:20)"}
                 bk = "opposite_face"
             set_flaps(self.q_init, q0o)
-            r = self.ikc.exact([pre, contact], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=C.FINGER_CLOSED, q_seed=q_seed)
+            # i7-braceopen 2026-11-07: the wide stop is solved, probed and locked with the brace hand at the record's ``fingers_opening_m`` (the
+            # oracle's opening; ``exact`` takes the fingers from a seed) and the lever hand closed, as it presses
+            b_fingers = TT.brace_fingers(extras)
+            seed_b = None if q_seed is None else TT.with_gripper(self.kit, q_seed, main_arm, b_fingers)
+            r = self.ikc.exact([pre, contact], st, main_arm, ignore_for_last=[support, target], cache=False, fingers=b_fingers, q_seed=seed_b)
             if not r.ok:
                 b = st.world_to_base(pre[0][:2])
                 return None, f"brace ({main_arm}, {kind}, {'near' if near_i == 0 else 'far'} end of the hinge-side face, base depth {float(b[0]):.2f} lateral {float(b[1]):+.2f} z {float(pre[0][2]):.2f}): {str(r.reason)[:80]}"
+            q_b = TT.with_gripper(self.kit, r.q, lever_arm, C.FINGER_CLOSED)
             rec = TT.BraceRecord("brace", main_arm, pre, contact, direction=-n_face, brace_kind=bk, object=tname, stance="manipulation", extras=extras)
             # a PROBE configuration with the blade pushed 1.2 cm into the face (owner 2026-09-22 11:27, run 0922-132940: the braced blade 2 mm
             # off the wall had no world offender in one IK branch, the wall stayed in the world and every yawed fist variant collided with
             # it) - its offenders name the braced wall piece(s) reliably
             probe = (contact[0] - n_face * 0.012, contact[1])
-            rp = self.ikc.exact([probe], st, main_arm, ignore_for_last=[support, target], q_seed=r.q, cache=False, fingers=C.FINGER_CLOSED)
-            return rec, (r.q.clone(), rp.q.clone() if rp.ok else None)
+            rp = self.ikc.exact([probe], st, main_arm, ignore_for_last=[support, target], q_seed=q_b, cache=False, fingers=b_fingers)
+            return rec, (q_b.clone(), rp.q.clone() if rp.ok else None)
 
         def brace_in_pinch_solution(st: Stance, v, seed_posture, o, pinch, brace_rec, q_lock):
             """Owner 2026-09-30 (first-demo v3.0 F3, carton lever 0928-043925: the brace recorded at [0.94, -3.14, -0.67, ...], joint 2 at

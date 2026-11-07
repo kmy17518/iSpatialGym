@@ -2894,8 +2894,9 @@ class BlockDesign(SamplerV2):
             return bool(r_b.ok), r_b, None, str(r_b.reason)
 
         def pushes_with(sc):
-            # the pushes, one per cube, each checked with the brace arm locked at its contact
-            q_seed = self.ikc.q_locked(manip, fingers=0.0).clone()
+            # the pushes, one per cube, each checked with the brace arm locked at its contact - its fingers at the brace's opening, as the
+            # oracle holds them (i7-braceopen 2026-11-07: the seed's 0.0 closed the braced hand for every push check), the push hand closed
+            q_seed = TT.with_gripper(self.kit, self.ikc.q_locked(manip, fingers=0.0), brace_arm, q_open)
             q_seed[idx_b] = sc.result.q[idx_b]
             push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, sc.proposal.label)
             if push_recs is None:

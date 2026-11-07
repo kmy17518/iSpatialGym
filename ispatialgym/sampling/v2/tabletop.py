@@ -2327,6 +2327,22 @@ class BraceRecord(ContactRecord):
         return d
 
 
+def brace_fingers(extras: Optional[Dict[str, Any]]) -> float:
+    """The finger joints a brace record's checks use - the opening the oracle executes it at (``execute_brace``: the record's
+    ``fingers_opening_m``, else the gripper closed) - for the brace's exact IK, its two-arm solve, its probes and its retreat."""
+    v = (extras or {}).get("fingers_opening_m")
+    return float(C.FINGER_CLOSED) if v is None else float(v)
+
+
+def with_gripper(kit, q: th.Tensor, arm: str, opening: Optional[float]) -> th.Tensor:
+    """A clone of the 28-D configuration ``q`` with ``arm``'s finger joints at ``opening`` (``q`` itself cloned when ``opening`` is None):
+    the IK of one arm keeps the other arm's fingers from its seed (``kit.q_config`` puts ONE opening on both grippers)."""
+    out = _t(q).clone()
+    if opening is not None:
+        out[kit.robot.gripper_control_idx[arm]] = float(opening)
+    return out
+
+
 def union_extent(*bands: Optional[RB.ReachBands]) -> Optional[Tuple[float, float]]:
     """§4.4 (A1): the lateral extent [λ_min, λ_max] of the union of the given bands (the right grasp band and the left
     contact band), None when none has cells."""
@@ -4999,7 +5015,7 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
                      brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None,
-                     q_first_brace: Optional[th.Tensor] = None):
+                     q_first_brace: Optional[th.Tensor] = None, brace_fingers: Optional[float] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -5009,12 +5025,17 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
     a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
     touches the target, is not in the picture. ``q_first_brace``: the brace chain starts from this arm configuration (``exact``'s
-    ``q_first``; a wrist-flipped solution, ``orient``). Returns the ``IKResult``."""
+    ``q_first``; a wrist-flipped solution, ``orient``). ``brace_fingers`` (i7-braceopen 2026-11-07): the brace arm's finger joints when
+    they differ from ``fingers`` - a wide stop's ``fingers_opening_m`` (:func:`brace_fingers`), the opening the oracle braces at - for the
+    brace chain, the combined check and ``brace_only_check``; the working arm keeps ``fingers``. None = ``fingers`` for both hands, as
+    before. Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
     if not r1.ok:
         return IK.IKResult(False, None, f"{work_arm}: {r1.reason}")
+    # the brace chain is seeded from the working arm's solution: its fingers are the seed's (``exact`` ignores ``fingers`` with a seed)
+    q_b0 = with_gripper(s.kit, r1.q, brace_arm, brace_fingers)
     # owner 2026-09-20 21:20: the working arm is locked at its CONTACT (touching the target) while the brace chain is solved - with
     # the target in the world every configuration of the brace chain read "in collision" through the locked arm's own contact
     # before the brace arm was even evaluated (carton close 0920-191145 / 204807: 'the arms are in each other's way'). The objects
@@ -5023,12 +5044,12 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
     q_f = None
     if q_first_brace is not None:
-        q_f = r1.q.clone()
+        q_f = q_b0.clone()
         idx_b = s.kit.robot.arm_control_idx[brace_arm]
         q_f[idx_b] = _t(q_first_brace)[idx_b]
     with ikc.ignoring(locked_ign):
-        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers,
-                       q_first=q_f)
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=q_b0, cache=False,
+                       fingers=fingers if brace_fingers is None else brace_fingers, q_first=q_f)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]
@@ -5038,7 +5059,7 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
         return IK.IKResult(False, None, "combined configuration collides")
     if brace_only_check is not None:
         ignored, margin = brace_only_check
-        q_b = ikc.q_locked(stance, fingers=fingers).clone()
+        q_b = with_gripper(s.kit, ikc.q_locked(stance, fingers=fingers), brace_arm, brace_fingers)
         idx = s.kit.robot.arm_control_idx[brace_arm]
         q_b[idx] = r2.q[idx]
         with ikc.ignoring(list(ignored)):
@@ -5119,7 +5140,8 @@ __all__ = [
     "BandSpec", "ensure_bands", "compute_bands", "band_cells_world", "band_union_cells", "workspace", "store_feasible_set",
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_bounds", "phase1c_lateral", "tilt_scan",
-    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
+    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "brace_fingers", "with_gripper",
+    "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
     "gap_masks_why", "partner_pose_at", "partner_pose_why", "meta_link_world_points", "meta_spot_gaps", "pose_centred_on",

@@ -1263,7 +1263,8 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                 with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None):
                     n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj,
                                                         q_seed_prev=q_prev, q_end_prev=q_end_prev,
-                                                        held_since_init=tracker.carried is not None and tracker.carried_arm is None)
+                                                        held_since_init=tracker.carried is not None and tracker.carried_arm is None,
+                                                        locked_fingers=tracker.locked_fingers(action))
                 end_q = witnesses.pop("__arm_end_q__", None)
                 partial_leg = witnesses.pop("__partial__", None)
                 repose_note = witnesses.pop("__repose__", None)
@@ -1379,6 +1380,9 @@ class _Tracker:
         self.sidecar = sidecar
         #: arm -> its 7 arm-joint values while it braces (from the brace action's ``contact`` witness)
         self.arm_q: Dict[str, th.Tensor] = {}
+        #: arm -> the finger opening a WIDE brace holds while locked (its ``fingers_opening_m``; i7-braceopen 2026-11-07) - a closed
+        #: brace has no entry (its hand keeps the acting arm's opening, as before)
+        self.arm_fingers: Dict[str, float] = {}
         #: arm -> the (sampler-frame, 28-D) configuration the previous arm action ended in (block design chaining); reset by
         #: every base motion
         self.arm_end_q: Dict[str, th.Tensor] = {}
@@ -1588,6 +1592,12 @@ class _Tracker:
         acting = set(getattr(action, "arms", ()) or [])
         return {a: q for a, q in self.arm_q.items() if a not in acting}
 
+    def locked_fingers(self, action) -> Dict[str, float]:
+        """The finger openings of the arms :meth:`locked_arms` holds while ``action`` runs - a wide brace's ``fingers_opening_m`` (the
+        oracle keeps the stop open through the other arm's push and retreat); closed braces are not listed."""
+        locked = self.locked_arms(action)
+        return {a: f for a, f in self.arm_fingers.items() if a in locked}
+
     def before(self, action) -> Tuple[str, Optional[str]]:
         name = getattr(action, "name", "")
         carried = self.carried
@@ -1662,8 +1672,14 @@ class _Tracker:
             if w is not None and w.get("q") is not None:
                 q = th.tensor(w["q"], dtype=th.float32)
                 self.arm_q[arms[0]] = q[sampler.kit.robot.arm_control_idx[arms[0]]].clone()
+                wide = brace_open_fingers(action, name, None)
+                if wide is not None:
+                    self.arm_fingers[arms[0]] = wide
+                else:
+                    self.arm_fingers.pop(arms[0], None)
         elif name == "retreat" and arms:
             self.arm_q.pop(arms[0], None)
+            self.arm_fingers.pop(arms[0], None)
 
 
 def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: Dict[str, Any], stance: Stance, arm: str, witnesses: Dict[str, Any]) -> int:
@@ -1851,6 +1867,35 @@ def push_open_fingers(action, name: str, after_name: Optional[str]) -> Optional[
         return None
     v = (getattr(rec, "extra", None) or {}).get("fingers_opening_m") if rec is not None else None
     return None if v is None else float(v)
+
+
+def brace_open_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
+    """The finger joints a WIDE brace (owner 2026-09-19 00:49) and the retreat after it are checked with: the brace record's
+    ``fingers_opening_m`` - ``execute_brace`` pre-shapes the gripper to it, and ``execute_retreat`` leaves a brace's gripper as it is
+    (i7-braceopen 2026-11-07: the retreat was checked with the stance's open fingers); None for anything else (a closed brace)."""
+    if name == "brace":
+        rec = getattr(action, "contact", None)
+    elif name == "retreat" and after_name == "brace":
+        rec = getattr(getattr(action, "after", None), "contact", None)
+    else:
+        return None
+    v = (getattr(rec, "extra", None) or {}).get("fingers_opening_m") if rec is not None else None
+    return None if v is None else float(v)
+
+
+def locked_seed(sampler, stance: Stance, fingers: Optional[float], locked: Dict[str, th.Tensor],
+                locked_fingers: Optional[Dict[str, float]] = None) -> th.Tensor:
+    """The IK seed / locked-joint source of an action while other arms hold their contacts: the stance configuration at the acting
+    arm's ``fingers``, every arm of ``locked`` put at its contact configuration and - i7-braceopen 2026-11-07 - its finger joints at
+    ``locked_fingers`` (a wide brace held open at its ``fingers_opening_m`` through the other arm's push and retreat; the acting arm's
+    opening was put on both hands before)."""
+    q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+    for a, qa in locked.items():
+        q_seed[sampler.kit.robot.arm_control_idx[a]] = th.as_tensor(qa, dtype=th.float32)
+    for a, f in (locked_fingers or {}).items():
+        if a in locked and f is not None:
+            q_seed[sampler.kit.robot.gripper_control_idx[a]] = float(f)
+    return q_seed
 
 
 def _two_point_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
@@ -2422,7 +2467,7 @@ def _early_frame_gate(sidecar: SidecarDraft, sc, sampler, actions: Sequence[Any]
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
                          locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None,
                          q_seed_prev: Optional[th.Tensor] = None, q_end_prev: Optional[th.Tensor] = None,
-                         held_since_init: bool = False) -> Tuple[int, Dict[str, Any]]:
+                         held_since_init: bool = False, locked_fingers: Optional[Dict[str, float]] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -2433,7 +2478,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     action runs (the brace arm at its contact during the push and the push arm's retreat): those arms are **locked at
     that configuration** for every IK / collision check here — a two-arm exact IK as the wall / axial modules solve it —
     instead of the stance's idle posture; a pre-pose without a solution in that world is a rejection
-    (``program_check_failed``), never a witness the oracle has to plan through the braced arm.
+    (``program_check_failed``), never a witness the oracle has to plan through the braced arm. ``locked_fingers``
+    (i7-braceopen 2026-11-07, ``_Tracker.locked_fingers``): arm -> the finger opening a locked arm holds - a wide brace's
+    ``fingers_opening_m`` (the acting arm's opening was put on both hands before, closing the open stop for the push).
 
     ``stance_obj``: an in-memory stance that replaces the recorded ``stance_name`` — where a hybrid ``base_follow`` left
     the base (``_Tracker.stance_obj``), so the retreat after it is checked from there.
@@ -2477,10 +2524,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     push_open = push_open_fingers(action, name, after_name)
     if push_open is not None:
         fingers = push_open  # an open-hand push (the overhang pick's, touching's open push): pushed and left with the fingers at the recorded opening
-    if name == "brace":  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49)
-        wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
-        if wide is not None:
-            fingers = float(wide)
+    wide = brace_open_fingers(action, name, after_name)
+    if wide is not None:
+        fingers = wide  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49) and lifts off with them so
     two_point = _two_point_fingers(action, name, after_name)
     if two_point is not None:
         fingers = two_point
@@ -2502,9 +2548,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     q_seed = None
     q_held: Optional[th.Tensor] = None
     if locked:
-        q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
-        for a, qa in locked.items():
-            q_seed[sampler.kit.robot.arm_control_idx[a]] = th.as_tensor(qa, dtype=th.float32)
+        q_seed = locked_seed(sampler, stance, fingers, locked, locked_fingers)
     elif q_seed_prev is not None and (name in _END_KEY or name == "push"):
         # the acting arm continues from the previous action's end (block design chaining) / a press's recorded branch (q_hint);
         # trunk / other arm from the stance
