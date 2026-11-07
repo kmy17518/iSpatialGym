@@ -295,3 +295,26 @@ def test_inside_goal_key_takes_the_lean_entry_on_the_arms_side(tmp_path, monkeyp
     assert ILI.InsideMode.inside_goal_key(s, "left") is None
     for f in (GL._v2_index, GL._v2_lean_index, GL._v2_overhang_index):
         f.cache_clear()
+
+
+# ------------------------------------------------------------------------------------------------------------------ owner decisions 2026-11-07
+
+
+def test_the_v2_overhang_finger_rule_defaults_to_the_library_rest_and_the_switch_restores_the_box_rule():
+    """Owner 2026-11-07: on the v2 overhang path the pick goes to the library's physics-validated rest (no finger-box clearance); the
+    off-by-default ``v2_finger_clearance_m`` restores the box rule there; the legacy path keeps the box rule (finger_clearance_m)."""
+    assert OH.DEFAULTS["v2_finger_clearance_m"] is None and OH.options(True)["v2_finger_clearance_m"] is None
+    yaw = OH.flush_yaw([0.0, -1.0], (1.0, 0.0))
+    # a pinch 3 cm deeper into the book than the legacy row: its finger box ends over the desk at the library rest
+    deep = SimpleNamespace(name="deep", pose=(th.tensor([0.0348, -0.0579, 0.0019]), th.tensor(TR.BO_GRASP_T["orientation_xyzw"])), meta={"width": 0.0305})
+    s = _Book(v2=_v2())
+    t_pose = s.pose_on((0.95, 0.0), yaw, H)
+    geo, why = s._overhang_geometry(t_pose, deep, (1.0, 0.0), H, OH.options({"mode": "only"}))
+    assert geo is not None, why
+    assert geo["v2_rest"]["finger_rule"] == "library rest" and geo["v2_rest"]["box_sweep_beyond_edge_m"] < 0  # the box over the desk: still the rest
+    assert geo["ladder_m"] == [geo["v2_rest"]["push_m"]]
+    geo2, why2 = s._overhang_geometry(t_pose, deep, (1.0, 0.0), H, OH.options({"mode": "only", "v2_finger_clearance_m": 0.01}))
+    assert geo2 is None and "finger box 0.010" in why2  # the switch: the box rule again
+    # the legacy path (no v2 rest): the box rule's ladder, its first rung the fingers' 1 cm clearance
+    legacy = _Book(v2=None)._overhang_geometry(t_pose, deep, (1.0, 0.0), H, OH.options({"mode": "only"}))
+    assert legacy[0] is None or "v2_rest" not in legacy[0]
