@@ -5067,6 +5067,20 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                     fb = support_policy_fallback(s, st_of.get(arm_c, st_of[a0]), arm_c, pose, hull, eef_in_object, exact_kw)
                     if fb is not None:
                         res, eef, pre, eef_in_object, sp_note = fb["res"], fb["eef"], fb["pre"], fb["eio"], fb["note"]
+            if not res.ok and getattr(s, "overhang_fallback_enabled", False):
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 2): a SIDE grasp failing for a reason the sampler cannot fix (the support policy)
+                # falls back to the overhang pick - push the object over the support edge, grasp the overhang (v2/overhang_fallback.py)
+                from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+                fb_ov = OF.try_fallback(s, st_of[a0], a0, g, pose, str(res.reason), twins, name, eef_of)
+                if fb_ov is not None:
+                    t_ov, rec = fb_ov
+                    NB.note_grasp_from(top, fp, rec)
+                    if st_of[rec.arm] is not manip:
+                        adopt_arm(manip, st_of[rec.arm])
+                    rec.stance = manip.name
+                    _scene_mask_draw_note(s, yaw0, g, a0, fails_at, fails, "ok")
+                    return t_ov, rec
             n_ik += 1
             if not res.ok:
                 fails["ik"] += 1

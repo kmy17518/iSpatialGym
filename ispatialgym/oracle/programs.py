@@ -1179,17 +1179,20 @@ def _second_hand(push: PushContact) -> Optional[PushContact]:
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:
-    """init → manipulation stance → grasp → lift (orientation kept) → place at the recorded goal pose (centre of the
+    """init → manipulation stance → [push → retreat: the overhang pick, ``contacts.push_pick``] → grasp → lift (orientation kept) → place at the recorded goal pose (centre of the
     partner; nearest satisfying position for nextto; inside: drop into the fillable volume) → retreat. A nextto place with
     ``grasps[0].raised_release`` (the sampler's ``generation.raised_release``, owner 2026-10-14 ~01:51: the place raised until the
     fully open jaw clears the partner, the target let go at the open command drops onto the table) must not touch the partner
     (``Place.avoid``)."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
-    grasp, lift = _pick(g)
+    # i7-plateqtf2 (owner decision 2026-11-08 02:35 item 2, the oracle program change): the overhang pick's push before the grasp when the
+    # sampler recorded one (``contacts.push_pick``, kind ``pick_overhang``: the side grasp's overhang fallback, v2/overhang_fallback.py) -
+    # push -> retreat -> grasp -> lift (:func:`_pick_actions`); without it grasp -> lift, as before
+    pick = _pick_actions(sc, g)
     kind = "drop" if relation == "inside" else "support"
     word = _IORS_RELATION_WORDS["under_small" if relation == "under" else relation]
     avoid = (g.place_on,) if relation == "nextto" and g.place_on and g.extra.get("raised_release") else ()
-    return _travel(sc, "init", "manipulation") + [grasp, lift] + _place_and_retreat(g, kind, word, avoid=avoid)
+    return _travel(sc, "init", "manipulation") + pick + _place_and_retreat(g, kind, word, avoid=avoid)
 
 
 def program_iors_touching(sc: Sidecar) -> List[Action]:

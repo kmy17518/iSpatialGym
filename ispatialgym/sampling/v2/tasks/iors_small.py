@@ -42,11 +42,12 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put, cache_root  # train-fast 2026-10-31: the SPA lateral-cell memo on disk
 from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
-from ispatialgym.sampling.tasks.base import Draft
+from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
+from ispatialgym.sampling.v2 import overhang_fallback as OF
 from ispatialgym.sampling.v2 import program_check as PC
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
@@ -829,6 +830,15 @@ def place_approached(s, inside: Optional[bool] = None) -> List[Any]:
 @register(*RELATION_OF_SUBTASK)
 class IORSSmall(SamplerV2):
     """One class for the five small-scale relations; the relation comes from the subtask id."""
+
+    @property
+    def overhang_fallback_enabled(self) -> bool:
+        """i7-plateqtf2 (owner 2026-11-08 02:35 item 2): the side grasp's overhang fallback in ``tabletop._phase3_draw``
+        (``v2/overhang_fallback.py``) - for the relations whose program is ``programs.program_iors_small`` (its pick takes the recorded
+        push: ``_pick_actions``); touching's program picks without it."""
+        from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+        return OF.on() and getattr(self, "relation", None) != "touching"
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -2372,6 +2382,7 @@ class IORSSmall(SamplerV2):
                             raise
                         self.sidecar.stances.pop("manipulation", None)
                         self.sidecar.grasps.clear()
+                        OF.drop_records(self)
                         g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=self.support_objects(),
                                                        scale_key=self.choice.models["target"].scale, support_z=float(self.top.z), why=f"[{e.reason}] {e}")
                         if g2 is None:
@@ -2412,6 +2423,7 @@ class IORSSmall(SamplerV2):
                 errors.append(f"candidate {int(k)}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.grasps.clear()
+                OF.drop_records(self)
         if self.start_region_exhausted():
             raise TemplateExhausted("target_placement", f"start region exhausted: no candidate left after {self.counters.get('travel_dropped', 0)} deterministic "
                                                         f"init -> manipulation travel failures ({'; '.join(errors[-3:])})")
@@ -2479,6 +2491,8 @@ class IORSSmall(SamplerV2):
         grasp.place_on = pname
         self.sidecar.add_stance(manip)
         self.sidecar.add_grasp(grasp)  # (popped again by the caller when this candidate is rejected)
+        if OF.record(self, grasp):  # i7-plateqtf2: the overhang fallback's push (contacts.push_pick) and grasps[0].pick_overhang
+            d.summary["pick_overhang"] = _jsonable(OF.summary(grasp))
         # the place / pre-place of this candidate must project into its manipulation image (owner 1b: the FOV
         # monitor arms from the pre-pose): checked here, before the settle, so the next candidate is tried instead of
         # the attempt dying in the goal check (inside: release rim + 4-5 cm and the pre-place 10 cm above it)
@@ -4189,7 +4203,11 @@ class IORSSmall(SamplerV2):
         self.note_pair_goal(draft, goal, (p.clone(), q.clone()), self.sidecar.stance("manipulation"))
         # the recorded grasp poses follow the settled target pose (what the oracle re-derives from the loaded instance)
         grasp = self.sidecar.grasp_of(tname)
-        if grasp is not None and grasp.eef_in_object is not None:
+        if grasp is not None and (grasp.extras or {}).get("pick_overhang"):
+            # i7-plateqtf2 (item 2): an overhang grasp is taken where the push leaves the object (the record's post_push_pose, settled by
+            # the overhang pick's own physics settle) - not re-derived from the settled INIT pose, never re-selected there
+            draft.summary["target_settle"] = self.settle_motion(draft, tname)
+        elif grasp is not None and grasp.eef_in_object is not None:
             grasp.grasp = IK.grasp_pose(draft.object_poses[tname], grasp.eef_in_object)
             grasp.pre_grasp = IK.pre_pose(grasp.grasp)
             manip = self.sidecar.stance("manipulation")
@@ -4534,7 +4552,7 @@ class IORSSmall(SamplerV2):
                                       approached=approached_place)
 
         res = descent(pre_place, place)
-        if not res.ok and res.code and "self-collision (attached_object" in res.reason:
+        if not res.ok and res.code and "self-collision (attached_object" in res.reason and not (grasp.extras or {}).get("pick_overhang"):
             # A7 relay (oracle, 2026-09-16 21:07): a collision appearing along the descent between the carried object and the
             # forearm / torso / head is a genuine infeasibility of *this* grasp yaw / approach class, not a hand-fixed pair
             # (those are not checked) — try the other library grasps at the settled init pose before rejecting
