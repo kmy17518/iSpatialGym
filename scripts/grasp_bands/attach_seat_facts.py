@@ -39,24 +39,18 @@ def main(argv=None):
     args = ap.parse_args(argv)
     pairs = json.load(open(args.pairs))
 
-    import omnigibson as og
-    import torch as th
+    # the grasp library's own validation world (robot, slab, cuRobo): objects added to a playing simulator the way it adds them
+    from ispatialgym.grasping import validate_tabletop as VT
+
+    t0 = time.time()
+    world = VT.TabletopWorld()
+    og, th, scene = world.og, world.th, world.scene
     import omnigibson.utils.transform_utils as T
     from omnigibson.objects.dataset_object import DatasetObject
     from omnigibson.object_states import AttachedTo
 
     from ispatialgym.sampling import predicates as PRED
 
-    t0 = time.time()
-    env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120}, "scene": {"type": "Scene"}})
-    scene = env.scene
-    from omnigibson.objects.primitive_object import PrimitiveObject
-
-    slab = PrimitiveObject(name="seat_slab", primitive_type="Cube", fixed_base=True, size=1.0, scale=th.tensor([0.5, 0.5, 0.05]))
-    scene.add_object(slab)  # one rigid body before the first object (the validation world's slab)
-    slab.set_position_orientation(th.tensor([5.0, 5.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    for _ in range(3):
-        og.sim.step()
     print(f"SEAT_FACTS_SETUP {round(time.time() - t0, 1)} s", flush=True)
 
     def load(spec, name, pos):
