@@ -7,6 +7,7 @@ campaign libraries: the rule's axis equals the oracle's seat axis, the table equ
 
 import json
 import math
+import os
 from types import SimpleNamespace
 
 import numpy as np
@@ -233,3 +234,68 @@ def test_generate_on_a_cork_meta_z_rejects_every_pinch_and_seat_keeps_them(tmp_p
     assert g0["records"][0]["mates"][0]["dir"][1] == pytest.approx(1.0, abs=1e-6)  # the frame rule's +y
     # the seat record of another model is never used
     assert CA.attach_seat_record({"category": "cork", "model": "other", "scale": 1}) is None
+
+
+# ------------------------------------------------------------------------------------------------ the axis in the entry identity
+
+
+def _attach_lib_data(**extra):
+    rest = {"schema": S.REST, "rest_id": "r0", "quat_xyzw": [0.0, 0.0, 0.0, 1.0], "h_root": 0.0183, "reference_yaw": 0.0, "stable": True}
+    d = {"schema": S.LIBRARY, "category": "cork", "model": "synthetic", "scale": [1.0, 1.0, 1.0], "dataset": "behavior-1k-assets",
+         "constraint": "attachment_free", "policy_key": "pk0", "rests": {"r0": rest}, "families": {"f0": {"type": "none", "representative": "top_0"}},
+         "grasps": [{"name": "top_0", "rest_id": "r0", "family_id": "f0", "T_object_eef": {"position": [0.0, 0.0, 0.1], "orientation_xyzw": [1.0, 0.0, 0.0, 0.0]},
+                     "finger_q": [0.01, 0.01], "width_m": 0.0176}]}
+    d.update(extra)
+    return d
+
+
+def _lib(data, path="x"):
+    return S.ModelLibrary(path=path, data=data, rests={k: S.Rest.from_record(v) for k, v in data["rests"].items()})
+
+
+def _write(root, data, cand_config=None):
+    d = S.model_dir(data["category"], data["model"], data["scale"], str(root), constraint=data.get("constraint", "tabletop"))
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "library.json"), "w") as f:
+        json.dump(data, f)
+    if cand_config is not None:
+        with open(os.path.join(d, "candidates.json"), "w") as f:
+            json.dump({"schema": S.CANDIDATES, "config": cand_config, "candidates": [], "representatives": []}, f)
+    return d
+
+
+def test_the_attach_axis_is_in_the_identity_only_off_the_legacy_axis(tmp_path):
+    """Every existing key stays: an attach entry generated before i7-attach (no field: "meta_z"), an explicit "meta_z" record and any
+    non-attach entry (the rule never runs; its config's attach_axis is ignored) keep the key computed without the axis. A "seat" entry -
+    the record or, validated before the record, its candidates.json config - gets its own key; check_compatible can require an axis."""
+    base = _lib(_attach_lib_data())
+    key0 = base.identity_key()
+    assert base.attach_axis() == "meta_z" and "attach_axis" not in base.identity()
+    assert _lib(_attach_lib_data(attach_axis="meta_z")).identity_key() == key0
+    seat = _lib(_attach_lib_data(attach_axis="seat"))
+    assert seat.attach_axis() == "seat" and seat.identity()["attach_axis"] == "seat" and seat.identity_key() != key0
+    tab = _attach_lib_data(constraint="tabletop", attach_axis="seat")
+    assert _lib(tab).attach_axis() is None and "attach_axis" not in _lib(tab).identity()
+    for i, (cfg, want) in enumerate(((None, "meta_z"), ({"n_candidates": 6000}, "meta_z"), ({"attach_axis": "seat"}, "seat"))):
+        root = tmp_path / f"r{i}"
+        _write(root, _attach_lib_data(), cfg)
+        got = S.load_model("cork", "synthetic", [1, 1, 1], str(root), constraint="attachment_free")
+        assert got.attach_axis() == want and (got.identity_key() == key0) == (want == "meta_z")
+    S.check_compatible(seat, attach_axis="seat")
+    with pytest.raises(S.IncompatibleRecord):
+        S.check_compatible(base, attach_axis="seat")
+
+
+def test_build_library_records_the_attach_axis_for_attach_entries_only():
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.grasping import validate_tabletop as VT
+
+    cand = {"pipeline": "a1v2", "constraint": "attachment_free", "config": {"attach_axis": "seat"}, "candidates": [], "representatives": [],
+            "families": {}, "arm": "right"}
+    job = {"category": "cork", "model": "synthetic", "scale": [1, 1, 1], "constraint": "attachment_free"}
+    rec = VT.build_library(job, cand, {}, [], CP.DEFAULT, {})
+    assert rec["attach_axis"] == "seat"
+    rec = VT.build_library(job, dict(cand, config={}), {}, [], CP.DEFAULT, {})
+    assert rec["attach_axis"] == "meta_z"
+    rec = VT.build_library(dict(job, constraint="tabletop"), dict(cand, constraint="tabletop"), {}, [], CP.DEFAULT, {})
+    assert "attach_axis" not in rec

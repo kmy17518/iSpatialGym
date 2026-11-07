@@ -76,6 +76,19 @@ def candidate_switches(config: Optional[Dict[str, Any]]) -> Dict[str, bool]:
     return {k: bool((config or {}).get(k, False)) for k in CANDIDATE_SWITCHES}
 
 
+#: i7-attach 2026-11-07: the attachment rule's axis an attach entry (constraint ``attachment_free``) was generated with
+#: (``candidates.CandidateConfig.attach_axis``). A config without the field - every entry before i7-attach - was generated "meta_z".
+ATTACH_AXIS_LEGACY = "meta_z"
+
+
+def attach_axis(config: Optional[Dict[str, Any]], constraint: Optional[str]) -> Optional[str]:
+    """The attachment-rule axis of a candidates config (``candidates.json`` ``config`` or a ``library.json`` record): None for an entry
+    the rule never runs on (constraint other than ``attachment_free``), else the recorded axis (missing field: ``"meta_z"``)."""
+    if constraint != "attachment_free":
+        return None
+    return str((config or {}).get("attach_axis") or ATTACH_AXIS_LEGACY)
+
+
 def library_root(root: Optional[str] = None) -> str:
     return root or os.environ.get("ISPATIALGYM_GRASP_LIBRARY_V2", DEFAULT_ROOT)
 
@@ -323,6 +336,17 @@ class ModelLibrary:
             self._switches = candidate_switches((doc or {}).get("config"))
         return dict(self._switches)
 
+    def attach_axis(self) -> Optional[str]:
+        """i7-attach: the attachment-rule axis this entry was generated with - the ``library.json`` record, else its ``candidates.json``
+        config, else "meta_z"; None for a non-attach entry."""
+        constraint = self.data.get("constraint")
+        if "attach_axis" in self.data:
+            return attach_axis({"attach_axis": self.data.get("attach_axis")}, constraint)
+        doc = None
+        if self.path and os.path.exists(self.path):
+            doc = load_json(os.path.join(os.path.dirname(self.path), "candidates.json"))
+        return attach_axis((doc or {}).get("config"), constraint)
+
     def identity(self) -> Dict[str, Any]:
         """Every result-affecting factor of this library entry (for reach-map cache keys). i7-switches: the candidate switches only when
         one is on (an entry generated without them keeps its key)."""
@@ -334,6 +358,9 @@ class ModelLibrary:
         sw = self.candidate_switches()
         if any(sw.values()):
             out["candidate_switches"] = sw
+        ax = self.attach_axis()  # i7-attach: only an attach entry generated off the legacy axis (every existing key unchanged)
+        if ax is not None and ax != ATTACH_AXIS_LEGACY:
+            out["attach_axis"] = ax
         return out
 
     def identity_key(self) -> str:
@@ -341,9 +368,11 @@ class ModelLibrary:
 
 
 def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = None, policy_key: Optional[str] = None,
-                     schema: str = LIBRARY, candidate_switches: Optional[Dict[str, bool]] = None) -> None:
+                     schema: str = LIBRARY, candidate_switches: Optional[Dict[str, bool]] = None, attach_axis: Optional[str] = None) -> None:
     """Raise :class:`IncompatibleRecord` when ``lib`` does not satisfy the consumer's requirements (``candidate_switches``: the state
     of each named switch, i7-switches)."""
+    if attach_axis is not None and lib.attach_axis() not in (None, attach_axis):
+        raise IncompatibleRecord(f"{lib.path}: attach_axis {lib.attach_axis()!r} != required {attach_axis!r}")
     if candidate_switches is not None:
         have = lib.candidate_switches()
         bad = {k: have.get(k) for k, v in candidate_switches.items() if have.get(k) is not bool(v)}

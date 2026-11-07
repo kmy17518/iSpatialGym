@@ -799,6 +799,9 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
             "twins": "finger-swapped twins (eef turned pi about +z) are NOT stored: reach maps evaluate them with their own IK / policy checks",
             # i7-switches 2026-11-07: the candidate switches the grasps were generated with (part of the entry identity when one is on)
             "candidate_switches": S.candidate_switches(cand_doc.get("config")),
+            # i7-attach 2026-11-07: the attachment rule's axis (attach entries only; part of the identity when not "meta_z")
+            **({"attach_axis": S.attach_axis(cand_doc.get("config"), cand_doc.get("constraint") or job.get("constraint"))}
+               if (cand_doc.get("constraint") or job.get("constraint")) == "attachment_free" else {}),
             "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "created": S.now()}}
 
 
