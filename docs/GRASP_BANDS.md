@@ -470,6 +470,65 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
    example, a missing axial brace map means no brace, and the push runs by its own rule. A missing map for a REQUIRED step (e.g. the
    touching brace gate) still rejects missing_map. Every i7-contact consumer is classified as optional or required.
 
+### i7-switches 2026-11-07: the plate switches adopted (identity, count, rebuild, default)
+
+Owner decision 1 above, done on branch `i7-switches` (884279fd identity, 16a0e27b default). Record: `$OFH/switches_20261107`.
+
+**Identity (884279fd).** The switch state was NOT in the entry identity. `library.json` did not carry it, and
+`ModelLibrary.identity()` (the reach maps' `object_key`) did not read it. Only the `GB_CANDIDATES` log line named
+`blade_contact_at_retreat`, and it did not name `retreat_shift_exact`. So an entry built with the switches and one built without could be
+told apart only by their grasp poses.
+- `library.json` now records `candidate_switches` (from the candidates' `config`).
+- `ModelLibrary.candidate_switches()` reads that record. For an entry validated before the record it reads `candidates.json`'s config.
+  A config without the fields (every entry before 6e418172) reads all off.
+- `identity()` adds the state only when a switch is on. Every existing key is unchanged (a golden-key test, and every map of
+  `v2maps_i7` still matches its entry under the new code).
+- `check_compatible(candidate_switches=)` / `load_model(require=)` let a reader require a state.
+- Tests: `ispatialgym/tests/test_glib_switches.py`.
+
+**Count** (candidates only, CPU; the switches off / blade only / shift only / both on; each entry's recorded config and densify;
+`count/count_table.md`, trunk_884279fd).
+- Scope: 44 entries. These are the 38 of `v2maps_i7`, plus the ladder probe's tape kavsnx and storage box eicujj, plus the 4 hardback
+  lean / overhang entries of `v2maps_i7lean` / `v2maps_i7oh`. The hardback entries were counted on lambda with the i7-overhang code and a
+  scratch port of the two switches. Plate luhkiz is excluded. The other staged roots hold no other entries.
+- With the switches off, the count reproduces every recorded `candidates.json`: all candidates, poses, shifts, verdicts and
+  representatives.
+- 19 entries do not move, including all 4 hardback entries: their only top candidates fail before the switches act.
+- 25 entries move (candidates / geometry-ok / representatives, off -> on):
+  - Geometry-ok up on 14 entries. Examples: tape 30/3/3 -> 30/20/16 (blade), tablefork 12/5/4 -> 12/11/10 (blade), jigsaw 7/4/3 -> 11/10/8,
+    plate qtfzeq 12/3/3 -> 22/7/7 (shift), garlic 12/4/3 -> 12/8/5, briefcase 5/1/1 -> 6/2/2.
+  - Geometry-ok down on 2 entries: salt shaker 24/23/8 -> 24/20/5 (the blade gate rejects 3 representatives that passed before) and
+    storage box 38/36/11 -> 38/35/11.
+  - The other 9 keep their geometry-ok count and move in their candidates' poses or recorded retreat shifts (5 mm). Box of cereal,
+    carton of milk and teacup keep their representatives; gym shoe, soap dispenser, napkins, shampoo and lid pbmsji swap 1, pencil
+    case swaps 2.
+
+**Rebuild** (validate + maps, switches on, everything else as built: the densify passes and validation overrides of each entry's build,
+its maps' kinds / anchor heights / arms).
+- Run as shiyuc, because minyeong was at its GPU cap (`sy_switches.sh`, trunk_884279fd). The 25 entries were copied back into
+  `$OFH/switches_20261107/{glib,maps}`.
+- Physics-valid grasps, old -> new:
+  - Up on 9 entries: tape 2 -> 12, tablefork 3 -> 6, plate qtfzeq 1 -> 4, hard candy 3 -> 5, briefcase 1 -> 2, lid tnwisp 1 -> 2,
+    lid pbmsji 3 -> 4, jigsaw 2 -> 3, marker 5 -> 6.
+  - Equal on 14 entries.
+  - Down on 2 entries:
+    - pencil case 2 -> 1. Its two valid top grasps are no longer selected, and the new top_0 fails object_pressed_into_table.
+    - gym shoe 1 -> 0. Its only representative changed, and the new one fails object_pressed_into_table.
+- 52 maps were built ok. Gym shoe has no maps (0 valid). Plate qtfzeq's reviewed rotational family of side_9 (owner prompt A 2a) was
+  carried by pose and its 2 maps rebuilt after that, because the families digest is in the identity.
+- `legacy_keys` / `_campaign_link` were carried from the old `library.json`.
+
+**Staged** `$OFH/v2maps_i7sw` = `cp -a v2maps_i7`. Each rebuilt v2maps_i7 entry with >= 1 valid grasp and all of its maps replaces the
+old one, which moves to `glib/_superseded_switches` / `maps/_superseded_switches` (`STAGED.txt`). 22 entries are staged.
+- Not staged:
+  - gym shoe kmcbym: 0 valid, so the switches-off entry stays. This needs an owner decision.
+  - tape / storage box: they are not `v2maps_i7` entries; their rebuilt entries are only in `$OFH/switches_20261107`.
+- The aliases of the rebuilt entries ride along in the next scheduled run.
+
+**Default (16a0e27b).** Both switches are on for new builds. False in `cand_overrides` reproduces the old build. The overhang
+branch's side-grasp retreat (i7-overhang, not merged) still looks the blade's pinched pieces up at CONTACT_Z, as the switch does for
+every side grasp. Whether the switch should cover that retreat is a question for the merge.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
