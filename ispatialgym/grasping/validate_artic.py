@@ -431,6 +431,10 @@ class MotionConfig:
     rest_drops_m: Tuple[float, ...] = (0.003, 0.02, 0.05)
     max_trials: int = 48
     pre_ik_seeds: int = 12
+    #: no placement at the task's face yaw (``ValidateConfig(base_yaws=1)``): retry over this many base yaws (0 = no fallback); labelled
+    yaw_fallback_base_yaws: int = 8
+    #: the oracle's approach from the pre-grasp failed to track: rerun the trial from the contact pose (labelled ``start_at`` contact_retry)
+    contact_retry: bool = True
 
 
 def alias_slug(alias: str) -> str:
@@ -550,11 +554,34 @@ class MotionWorld:
             quat0 = S.quat_yaw(float(motion["face_yaw_offset"]))
             rest0, state0 = self.w.settle(obj, geom, quat0)
             profile = self.profile(obj, motion, state0, rest0)
+            profile["force_probe"] = self.refresh_probe(obj)
             rest, state, outcomes = self.rest(obj, geom, quat0, motion)
         except Exception:
             self.w.unload(obj)
             raise
         return {"entry": entry, "dir": d, "obj": obj, "geom": geom, "motion": motion, "profile": profile, "rest": rest, "state": state, "outcomes": outcomes}
+
+    def refresh_probe(self, obj) -> Dict[str, Any]:
+        """A new :class:`validate_tabletop.ForceProbe` after the profile's USD edits. ``constraints.apply_hinge_drive`` ends with
+        ``og.sim.update_handles()``, which creates a NEW physics simulation view: the probe made at ``load`` keeps the old one, its force
+        matrix raises on every read and ``ForceProbe.read`` swallows that - every support load read 0 N, so ``settle``'s contact test (awake
+        load > 0.5 x weight) failed and no rest was stable (artic_prefix_20261107: 4 / 4 aliases, rest_stable false, 0 trials). The new
+        probe is read once here; a probe that still cannot read raises instead of reporting no contact."""
+        import omnigibson as og
+
+        from ispatialgym.grasping import validate_tabletop as VT
+
+        try:
+            self.w.probe.uninstall()
+        except Exception:  # noqa: BLE001
+            pass
+        self.w.probe = VT.ForceProbe(self.w.robot, self.w.slab, obj, self.w.cfg.arm)
+        self.w.probe.install()
+        try:
+            F = self.w.probe.view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"the force probe cannot read after the profile's USD edits ({e!r}): the rest's contact test would read 0 N") from e
+        return {"refreshed": True, "shape": [int(v) for v in F.shape], "why": "og.sim.update_handles() after the joint drive edits replaces the physics view"}
 
     def set_start(self, obj, motion: Dict[str, Any], q_target: float) -> None:
         """The target joint at ``q_target``, every other joint at its closed value (``articulation_small._close_push_flow``'s rule)."""
@@ -650,6 +677,18 @@ class MotionWorld:
     # -- one trial
 
     def trial(self, obj, motion: Dict[str, Any], variant: Dict[str, Any], state, rest_sim: Dict[str, Any], geom) -> Dict[str, Any]:
+        """One variant (module section above); when the oracle's approach from the pre-grasp does not track, the trial is rerun from the
+        contact pose (``contact_retry``; the first attempt's stop is kept as ``retry_of``)."""
+        rec = self._trial(obj, motion, variant, state, rest_sim, geom, from_pre=True)
+        if self.mcfg.contact_retry and rec.get("stop") == "approach_failed" and (rec.get("stance") or {}).get("start_at") == "pre":
+            first = {k: rec.get(k) for k in ("stop", "error", "stance")}
+            rec = self._trial(obj, motion, variant, state, rest_sim, geom, from_pre=False)
+            rec["retry_of"] = first
+            if (rec.get("stance") or {}).get("start_at") == "contact":
+                rec["stance"]["start_at"] = "contact_retry"
+        return rec
+
+    def _trial(self, obj, motion: Dict[str, Any], variant: Dict[str, Any], state, rest_sim: Dict[str, Any], geom, from_pre: bool = True) -> Dict[str, Any]:
         import torch as th
 
         from ispatialgym.grasping import validate_tabletop as VT
@@ -684,12 +723,22 @@ class MotionWorld:
         cand_g = {"name": variant["name"], "T_object_eef": S.mat_pose(T_oe), "preshape_q": pre_q, "contact_q": con_q, "width_m": float(variant.get("width_m") or 0.0)}
         plans = w.plan(obj, geom, [cand_g], (p0.numpy(), q0.numpy()))
         pl = plans.get(variant["name"])
+        yaw_fallback = False
+        if (pl is None or pl.get("q") is None) and mcfg.yaw_fallback_base_yaws > w.cfg.base_yaws:
+            # no stance at the face yaw: the object-relative motion is what the map reads, so the stance may stand at another base yaw
+            n0 = w.cfg.base_yaws
+            w.cfg.base_yaws = int(mcfg.yaw_fallback_base_yaws)
+            try:
+                pl = w.plan(obj, geom, [cand_g], (p0.numpy(), q0.numpy())).get(variant["name"])
+            finally:
+                w.cfg.base_yaws = n0
+            yaw_fallback = True
         if pl is None or pl.get("q") is None:
-            rec.update({"stop": "no_placement", "fail": None if pl is None else pl.get("fail"), "wall_s": round(time.time() - t0, 2)})
+            rec.update({"stop": "no_placement", "fail": None if pl is None else pl.get("fail"), "yaw_fallback": yaw_fallback, "wall_s": round(time.time() - t0, 2)})
             return rec
         T_oe_used = S.pose_of(pl["T_object_eef_used"])
         rec["T_object_eef_used"] = pl["T_object_eef_used"]
-        rec["stance"] = {"base": pl["base"], "trunk": pl["trunk"], "start_lift_m": pl.get("start_lift_m")}
+        rec["stance"] = {"base": pl["base"], "trunk": pl["trunk"], "start_lift_m": pl.get("start_lift_m"), "yaw_fallback": yaw_fallback}
         T_g = T_wo0 @ T_oe_used
         T_pre = T_g.copy()
         T_pre[:3, 3] -= C.PRE_DIST * T_g[:3, 2]
@@ -700,9 +749,10 @@ class MotionWorld:
         q_start = pl["q"].clone()
         start_at = "contact"
         try:
-            succ, qq = w.backend.solve_ik_batch(f"{arm}_arm", w.M.EEF_LINK[arm], [pose_t(T_pre)], pl["q"], batch_size=8, seeds=mcfg.pre_ik_seeds)
-            if bool(succ[0]):
-                q_start, start_at = qq[0].clone(), "pre"
+            if from_pre:
+                succ, qq = w.backend.solve_ik_batch(f"{arm}_arm", w.M.EEF_LINK[arm], [pose_t(T_pre)], pl["q"], batch_size=8, seeds=mcfg.pre_ik_seeds)
+                if bool(succ[0]):
+                    q_start, start_at = qq[0].clone(), "pre"
         except Exception as e:  # noqa: BLE001 - the pre-grasp IK is a convenience: the trial then starts at the contact (labelled)
             rec["pre_ik_error"] = repr(e)[:200]
         rec["stance"]["start_at"] = start_at
@@ -864,6 +914,8 @@ def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False
 
 
 def _motions_main(argv) -> None:
+    from collections import Counter
+
     ap = argparse.ArgumentParser(description="validate_artic rest / motions: the oracle's small-articulation motions per alias (artic_motions)")
     ap.add_argument("cmd", choices=["rest", "motions"])
     ap.add_argument("--aliases", nargs="+", required=True)
@@ -884,7 +936,10 @@ def _motions_main(argv) -> None:
                                                     "face_yaw_offset": m["face_yaw_offset"], "arms_offered": m["arms_offered"], "n_variants": len(m["variants"]),
                                                     "rest_stable": r["rest"].get("stable"), "rest_quat": r["rest"].get("quat_xyzw"), "h_root": r["rest"].get("h_root"),
                                                     "brake": r["profile"].get("brake_candidate"), "stable_set": r["profile"].get("stable_set"), "error": r.get("error"),
-                                                    "trials": [{k: t.get(k) for k in ("variant", "stop", "validated_travel_rad", "achieved_rad", "steps")} for t in r["trials"]],
+                                                    "rest_outcomes": [{k: o.get(k) for k in ("drop_m", "stable", "pose_still", "contact", "tilt_from_intended_rad")} for o in r["rest"].get("outcomes") or []],
+                                                    "support_load_N": r["rest"].get("support_load_N"), "weight_N": r["rest"].get("weight_N"),
+                                                    "stops": dict(Counter(str(t.get("stop")).split(":")[0] for t in r["trials"])),
+                                                    "trials": [{k: t.get(k) for k in ("variant", "stop", "validated_travel_rad", "achieved_rad", "steps")} | {"start_at": (t.get("stance") or {}).get("start_at")} for t in r["trials"]],
                                                     "n_segments": r.get("n_segments"), "library": r.get("library"), "wall_s": r.get("wall_s")}, default=str), flush=True)
         except Exception as e:  # noqa: BLE001
             print("GB_ARTIC_MOTION " + json.dumps({"alias": alias, "cmd": a.cmd, "error": repr(e), "tb": traceback.format_exc()[-1500:]}), flush=True)

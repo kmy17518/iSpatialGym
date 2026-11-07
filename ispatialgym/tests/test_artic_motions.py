@@ -101,3 +101,67 @@ def test_segment_from_trial_keeps_the_validated_monotone_part():
     assert seg["q_list"] == [1.0, 0.95, 0.9] and seg["validated_travel_rad"] == pytest.approx(0.1)
     lib = VA.build_motion_library(dict(m, category="c", model="m", scale=[1, 1, 1], q_start=0.0, handle_arm="right"), {"rest_id": "r0"}, {}, [tr], VA.MotionConfig(wp_step_m=1.0), {"validator": "v"})
     assert lib["schema"] == VA.LIBRARY_V2 and lib["n_segments"] == 1 and lib["rests"] == {"r0": {"rest_id": "r0"}}
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# validate_artic: the probe after the profile's USD edits, the contact retry
+# ------------------------------------------------------------------------------------------------------------------
+
+
+def test_refresh_probe_replaces_the_stale_probe_and_raises_when_it_cannot_read(monkeypatch):
+    # artic_prefix_20261107: apply_hinge_drive's og.sim.update_handles() made the load-time probe stale - every support load read 0 N
+    from types import SimpleNamespace
+
+    import omnigibson as og
+
+    from ispatialgym.grasping import validate_tabletop as VT
+
+    made = []
+
+    class Probe:
+        def __init__(self, robot, slab, obj, arm, fail=False):
+            self.fail, self.installed = fail, False
+            self.view = SimpleNamespace(get_contact_force_matrix=self._read)
+            made.append(self)
+
+        def _read(self, dt):
+            if self.fail:
+                raise RuntimeError("invalid view")
+            return th.zeros(3, 2, 3)
+
+        def install(self):
+            self.installed = True
+
+        def uninstall(self):
+            self.installed = False
+
+    old = Probe(None, None, None, "right")
+    w = SimpleNamespace(probe=old, robot=None, slab=None, cfg=SimpleNamespace(arm="right"))
+    mw = VA.MotionWorld.__new__(VA.MotionWorld)
+    mw.w = w
+    monkeypatch.setattr(VT, "ForceProbe", Probe)
+    monkeypatch.setattr(og, "sim", SimpleNamespace(get_physics_dt=lambda: 1 / 120.0), raising=False)
+    out = mw.refresh_probe(None)
+    assert out["refreshed"] and w.probe is made[-1] and w.probe is not old and w.probe.installed and not old.installed
+    monkeypatch.setattr(VT, "ForceProbe", lambda *a: Probe(*a, fail=True))
+    with pytest.raises(RuntimeError):
+        mw.refresh_probe(None)
+
+
+def test_an_approach_that_does_not_track_is_rerun_from_the_contact():
+    calls = []
+
+    def fake(obj, motion, variant, state, rest, geom, from_pre=True):
+        calls.append(from_pre)
+        if from_pre:
+            return {"stop": "approach_failed", "error": "IK", "stance": {"start_at": "pre"}}
+        return {"stop": "limit_reached", "stance": {"start_at": "contact"}}
+
+    mw = VA.MotionWorld.__new__(VA.MotionWorld)
+    mw.mcfg = VA.MotionConfig()
+    mw._trial = fake
+    rec = mw.trial(None, {}, {}, None, {}, None)
+    assert calls == [True, False] and rec["stop"] == "limit_reached" and rec["stance"]["start_at"] == "contact_retry" and rec["retry_of"]["stop"] == "approach_failed"
+    mw.mcfg = VA.MotionConfig(contact_retry=False)
+    calls.clear()
+    assert mw.trial(None, {}, {}, None, {}, None)["stop"] == "approach_failed" and calls == [True]
