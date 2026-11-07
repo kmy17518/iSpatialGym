@@ -894,13 +894,16 @@ class IORSLarge(SamplerV2):
         """``generation.approach_finger_support_touch`` (owner 2026-10-13 ~03:15 item 3; default off = today's approach check): the IK
         checker's :class:`IK.FingerTouch` - along a tracked grasp approach (the draw at B, the program check's grasp) the acting arm's
         finger links may touch :meth:`grasp_ignore_objects` lightly, checked at :meth:`preshape_opening`. Returns the error of a bad value
-        (the rule stays off; :meth:`bind_scene_roles` rejects the template ``spec``)."""
+        (the rule stays off; :meth:`bind_scene_roles` rejects the template ``spec``). i7-fingertouch 2026-11-07: the fingers vs the support
+        by ``ISPATIALGYM_FINGER_TOUCH_RULE`` (``FingerTouch.rule``: "geometry" = the contact policy's 2 mm on the finger hulls, the default since
+        the A/B of 2026-11-07; "spheres" = the key's ``max_penetration_m`` on the finger spheres); a bad switch value is the same ``spec`` rejection."""
         try:
             p = IK.finger_touch_params(self.gp.gen("approach_finger_support_touch"))
+            ft = None if p is None else IK.FingerTouch(p["margin_m"], p["max_penetration_m"], p["preshape"], supports=self.grasp_ignore_objects,
+                                                       opening=self.preshape_opening, rule=IK.finger_touch_rule())
         except ValueError as e:
             return str(e)
-        self.ikc.set_finger_touch(None if p is None else IK.FingerTouch(p["margin_m"], p["max_penetration_m"], p["preshape"],
-                                                                         supports=self.grasp_ignore_objects, opening=self.preshape_opening))
+        self.ikc.set_finger_touch(ft)
         return None
 
     def preshape_opening(self) -> Optional[float]:
