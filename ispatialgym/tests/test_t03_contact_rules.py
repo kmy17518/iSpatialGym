@@ -173,3 +173,23 @@ def test_cache_scope_only_when_on(monkeypatch):
     assert "contact_rejudge" not in IK.IKChecker(kit).cache_scope
     monkeypatch.setenv(IK.SPLIT_FINGER_TOUCH_ENV, "1")
     assert IK.IKChecker(kit).cache_scope["contact_rejudge"][:2] == ["on", "shadow"]
+
+
+@pytest.mark.parametrize("mode,ok,counter", [("1", True, "witness.hull_fallback_passed"), ("shadow", False, "witness.hull_fallback_shadow_pass"),
+                                             ("0", False, None)])
+def test_item3a_policy_fallback_on_split_kept_pieces(monkeypatch, mode, ok, counter):
+    """3a: the support policy's side_9 fallback (contact_policy.hull_fallback, i7-plateqtf2 1f368d64) fails 'other_obstacle' when the hand
+    meets the policed support's split-kept side board; with the switch the whole support goes out of the sphere world and the kept pieces'
+    hulls join the geometry."""
+    monkeypatch.setenv(IK.WITNESS_HULL_FALLBACK_ENV, mode)
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M", raising=False)
+    chk, _ = _checker(monkeypatch, side={PALM: -0.0009}, hull={"palm": 0.001})
+    chk.support_plane_z = {BOOKCASE.name: 0.8354}
+    chk.kit.backend.fk = lambda ls, q: {M.EEF_LINK[ARM]: (th.tensor([0.5, 0.0, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0]))}
+    chk._hand_checker = SimpleNamespace(arm=ARM, clearance=lambda T, g, fq: {r: th.tensor([0.001 if r == "palm" else 0.05]) for r in CP.H.ROLES})
+    out = chk._hull_fallback(th.zeros(28), ARM, [PALM], [BOOKCASE], set())
+    assert bool(out["ok"]) is ok
+    if counter:
+        assert chk.kit.stats[counter] == 1
+    else:
+        assert out["why"] == "other_obstacle" and "split_pieces" not in out
