@@ -391,8 +391,13 @@ need the task's COM hinge in the validator world (not yet); see `$OFH/DECISIONS.
   left arm at all 11 roots (the `-end`, by symmetry the `+end` at yaw 0, is feasible at 7 / 11). Fix: `map_joint_placement(end_sign)` keeps
   the classes of the pair's end and spin (`contact_maps.axial_end_spin`, the map library's `long_axis` in meta `library.params`);
   `validate_contacts.entry_order` round-robins (yaw, end-spin group); `--skip-validated` keeps an earlier run's verdicts uncounted.
+- **Rerun i7_contact2** (trunk_8e798b51, maps re-validated in the (yaw, end, spin) order): axial_01 / 03 / 04 53 attempts, 11 written, 11 / 11
+  demos ok, 0.047 GPU-h per success (i7_contact 0.069); brace present still 0 / 11, now a true outcome: at every goal root the end the
+  right arm can push (+end: 11 / 11 feasible) has no reachable stop brace (0 / 11), and the end whose stop face the left arm reaches (-end:
+  7 / 11) has no feasible push (0 / 11).
 - **axial_02**: paperback jhaltj at its spawn scale s1x1x2.5 - v2 export (`glib_jobs_axial02_20261107.json`, job_glib.sh) and a manifest
-  entry in `contact_jobs_axial_20261107.json`.
+  entry in `contact_jobs_axial_20261107.json`; library push 30 / 48 valid (s1: 3), brace 48 / 48. i7_contact2: 60 attempts, 0 written -
+  the maps hit, every sampled instance repeats an eval instance (`repeats_eval` 52: start base 0.08 m, target 0.00 m / 1-5 deg).
 - **Friction** (touching_02 push replay, `set_slab_friction`): mu 0.50 (= the PhysX default) tips 0.463 rad as unbound; mu <= 0.30 passes
   (tilt 0.000, gap <= 2 mm).
 - **touching_02 contact_unreachable** (`TOUCH_PUSH_DIAG`): the placed target's root lies 0.80-0.92 m ahead of the push stance; the
