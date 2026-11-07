@@ -609,6 +609,13 @@ class InstanceLoader:
         # (i7_attswept: attachment_01 300114 lid 103.8 mm / teapot 81.6 mm, 300115 lid 76.6 mm, attachment_04 300116 lid 549 mm,
         # attachment_03 300020 bottle 40 mm - each the instance after a joined episode on the same collector world)
         self.report["attachments_detached_before_reuse"] = detach_scene_attachments(self.env.scene)
+        # ... and the attach rule's pair records reset (as the vectorized loader's cleanup does): a joined pair stays collision-FILTERED in
+        # USD across the state load and its deferred un-filter (a stop / play) ran in the next episode's restore - i7af_v (trunk_b4d8f3d4)
+        # still met the pair 95-240 mm / 0.6-3.1 rad off its TRO there (the pose check re-applied it); the un-filter now runs here, before
+        # the state load
+        from ispatialgym.sampling import predicates as PRED
+
+        self.report["pair_records_reset"] = PRED.reset_pair_records(self.env.scene)
         # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
         # only the TRO decides where this instance starts - as in a fresh process
         self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)

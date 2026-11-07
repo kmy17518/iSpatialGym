@@ -185,3 +185,30 @@ def test_witness_fk_reaches_the_recorded_pose_and_a_moved_one_is_caught():
     assert len(bad) == 1 and abs(bad[0]["pos_m"] - 0.0767) < 2e-3
     # a q-only target (base_follow regrasp) is skipped
     assert WC.witness_errors([{"name": "x", "arm": "right", "targets": {"regrasp[0]": {"q": W115["q"]}}}], fk) == []
+
+
+def test_reset_pair_records_unfilters_the_joined_pair_and_clears_the_pending(monkeypatch):
+    """run_isg.Loader.attach now calls it before the state load (as the vectorized loader's cleanup): the un-filter of the previous
+    episode's joined pair (a stop / play) must not run inside the next instance's restore."""
+    from ispatialgym.sampling import predicates as PRED
+
+    calls = []
+
+    def fake_filter(child, parent, filtered):
+        calls.append((child.name, parent.name, filtered))
+        PRED._FILTERED.discard(PRED._pair_key(child, parent))
+        return True
+
+    monkeypatch.setattr(PRED, "set_pair_collision_filter", fake_filter)
+    scene = types.SimpleNamespace(idx=0)
+    lid = types.SimpleNamespace(name="target_lid", scene=scene)
+    teapot = types.SimpleNamespace(name="partner_teapot", scene=scene)
+    scene.object_registry = lambda attr, name: {"target_lid": lid, "partner_teapot": teapot}.get(name)
+    key = PRED._pair_key(lid, teapot)
+    monkeypatch.setattr(PRED, "_FILTERED", {key})
+    monkeypatch.setattr(PRED, "_PENDING_UNFILTER", {key})
+    monkeypatch.setattr(PRED, "_PENDING_FILTER", set())
+    monkeypatch.setattr(PRED, "_RELEASED_TOUCHING", set())
+    out = PRED.reset_pair_records(scene)
+    assert calls == [("target_lid", "partner_teapot", False)] and out == {"unfiltered": 1, "pending_cleared": 1}
+    assert not PRED._FILTERED and not PRED._PENDING_UNFILTER
