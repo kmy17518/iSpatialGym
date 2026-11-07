@@ -32,7 +32,7 @@ map identity (the map's ``key``):
 
 No true column is ever built here (no GPU): the union prior, pruned during normal sampling, is the whole mechanism.
 
-Switch: ``ISPATIALGYM_FAST_MAP_TILT_INHERIT`` (:func:`on`). ``ISPATIALGYM_FAST_MAP_TILT_K`` (default :data:`K`).
+Switch: ``ISPATIALGYM_FAST_MAP_TILT_INHERIT`` (:func:`on`; default on since the i7-plateqtf default commit, ``=0`` off). ``ISPATIALGYM_FAST_MAP_TILT_K`` (default :data:`K`).
 Kit counters (per attempt; plus ``map_tilt.by_map.<key>.<name>``): ``map_tilt.inherited_columns`` / ``.inherited_feasible`` (cells of
 the new columns) / ``.cells_invalidated`` / ``.cells_confirmed`` / ``.empty_f_on_inherited`` / ``.reach_fail`` / ``.other_fail`` /
 ``.skipped_invalidated``; ``map_yaw.pairs_confirmed`` / ``.pairs_invalidated``.
@@ -64,9 +64,11 @@ NOT_REACH = ("support_policy", "collid", "collision", "frame", "camera", "touche
 
 
 def on() -> bool:
+    """i7-plateqtf 2026-11-07: default ON (the owner's mechanism instead of TILT_SNAP); ``ISPATIALGYM_FAST_MAP_TILT_INHERIT=0`` = the
+    nearest built tilt as before."""
     from ispatialgym.fastflags import fast_on
 
-    return fast_on("MAP_TILT_INHERIT", default=False)
+    return fast_on("MAP_TILT_INHERIT", default=True)
 
 
 def k() -> int:
