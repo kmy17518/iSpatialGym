@@ -363,7 +363,8 @@ The full numbers are in `$OFH/DECISIONS.md`, from "2026-11-07 ... ROUND 4" on.
 | stand-off | `d_e` = the base's distance to the physical edge = the stance's stand-off (`map_bands` overhang 0) - docs reconciled | - |
 
 Not linked on purpose: held-object floating keys (mental_rotation / object_scaling) - `held_object` refuses another pipeline's grasps
-(§2.2), and the v2 library has no floating constraint. Map types without a consumer (brace, floor, interior, tray, articulation prefix)
+(§2.2), and the v2 library has no floating constraint (i7-floating 2026-11-07 added it and links them in a staged root: "Floating grasps
+from GraspGen" below). Map types without a consumer (brace, floor, interior, tray, articulation prefix)
 keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I) and `tmp/outputs/round4_reports.md` (I).
 
 ### Owner decisions 2026-11-07 (after prompt I item 7)
@@ -439,6 +440,121 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - any gate shared by all objects (including the attach-rule fix if it changes other entries);
 - any oracle program change;
 - using legacy grasps (step 4).
+
+### Floating grasps from GraspGen (i7-floating, 2026-11-07)
+
+**How the legacy floating grasps were made** (`runlogs/grasp_library_20260905`, 285 held-object models; read only):
+- On lambda, in the `graspgen` conda env: GraspGen 2dd8852, the Franka Panda checkpoint `GraspGenModels/checkpoints/graspgen_franka_panda.yml`.
+- Inputs: `export_meshes_batch.py` wrote each model's COLLISION meshes (OmniGibson collision prims, root frame) to OBJ. `graspgen_batch.py`
+  sampled 2000 surface points, centred them and ran the diffusion planner (2000 grasps, threshold -1, top 500, no outlier removal).
+- Re-targeting (`gen_candidates.run_graspgen`): `T_CONV = Rz(90 deg) @ Tz(PANDA_DEPTH 0.10527 - CONTACT_Z -0.01186)`. The pad centre sits
+  on the Panda TCP, and the closing axis goes from Panda x to R1Pro y.
+- Filters: hand spheres 1 mm clear at full open, width 3 mm..aperture. Ranking per mode: C / V = confidence gate, then CoM with a soft 40 %
+  lever cap; H = confidence-first; knives = `handle_half` (t <= 0.5). Then NMS to the top 12.
+- Validation (`ag_validate_render.py`): the object teleported into the open gripper (gravity off), the gripper closed, AG attached and held
+  for 30 steps under gravity; stop at 5 valid. Reviewer agents then judged the rendered strips.
+- The cluster has the same env and checkpoint (`/vision/u/minyeong/projects/graspgen`, conda env `graspgen`). Its `pointnet2_ops` is built
+  for sm_80/86/89 only, but the checkpoint's ptv3 path does not use it. The TITAN RTX smoke test (18367953) passed, at 0.66 s per object
+  warm. No new env or install was needed.
+
+**The v2 port** (`grasping/floating.py`, `validate_floating.py`; i7-floating 8c29166e / 89e8edae):
+- **Identity.** Constraint `floating`. The entry id is `<cat>__<model>__<scale>__floating`, so it never aliases the tabletop entry
+  `<cat>__<model>__<scale>`. A floating entry has no rest: `rests` is empty and every grasp has `rest_id` None.
+  - `schema.check_compatible` enforces this, and `ModelLibrary.identity` adds the constraint (for floating entries only).
+  - `grasp_library.rest_quat_xyzw` raises for a floating entry, so it never serves a placement.
+  - `load_grasps` serves all of its grasps.
+- **Proposals.** GraspGen on the v2 export's collision geometry (`geometry.json`), with the legacy settings, seeded per entry
+  (`scripts/grasp_bands/graspgen_floating.py`, graspgen env). No visual asset is decoded or written.
+- **Gates** (the v2 ones that apply without a support; none relaxed):
+  - width / antipodal cone (30 deg);
+  - hand spheres clear of the object at the HELD sampler's opening (fully open: `establish_grasp` teleports the object into the open hand);
+  - closing sweep;
+  - lever cap (40 %);
+  - [knives: handle half];
+  - the approach from the pre-grasp, and the finger blades through the closure.
+
+  The support gates (finger allowance, palm / camera / wrist vs the support, retreat / lift) do not apply. Then the legacy mode ranking and
+  NMS (12), with no symmetry folding (the held sampler draws rows, never family members). `ISG_GLIB_GATE_DUMP=1` writes `gate_dump.json`.
+- **Physics** (`validate_floating`, in the tabletop validation world with its slab parked; same physics profile):
+  1. The task's fixed hold, solved by IK: mental_rotation roll 15, object_scaling roll 90.
+  2. The held sampler's own closure: 1 mm/step advance, 4 mm press, the 90-step AG window, then 30 steps of gravity.
+  3. The task's held motions, tracked by the oracle's `Motions.arm_along`, each out and back to the hold:
+     - mental_rotation: an orbit about the object root per signed base axis, at the largest of 90 / 60 / 45 deg the arm tracks;
+     - object_scaling: lines along the optical axis, -0.25 m and +0.05 m.
+  4. Acceptance: AG formed and held; on target (15 mm / 15 deg); after gravity and after every leg the object still attached, with its in-hand
+     drift <= 1 cm / 0.1 rad; >= 2 rotation axes / 1 line executed.
+
+  The first build (8c29166e) chained +90 / -180 / +90 about x and y. A failed diff-IK leg does not move the arm, so the next leg started
+  180 deg away and 5 of 6 legs were unreachable. 89e8edae replaced the chain with out-and-back motions.
+- **Sampler guard** (`held_object.check_v2_floating`, the v2 path only): a v2 entry serving a floating key must be a floating entry, else
+  `missing_grasps:floating`. A spawn scale other than the entry's is logged `V2_SCALE_MISMATCH` and rejects `v2_scale_mismatch` under v2only.
+- **Pipeline.** Floating jobs dispatch in `candidates` / `validate`, with no settle survey and no rest retry. `manifest --floating-keys`
+  builds them (`legacy_key` = the floating key; scale / dataset / mode / task come from the legacy result's metadata, never its grasps).
+  `scripts/grasp_bands/job_floating.sh` runs export, graspgen, candidates and validate.
+
+**Entries** (`$OFH/floating_20261107`: manifest `floating20.json`, one job per legacy floating key that the 20 aliases use; build 18368108,
+validation 18368389). Columns: GraspGen proposals, then the count after each gate (w/a = width / antipodal, clear = sphere clearance,
+sweep, lever, geo = approach + blades), the NMS representatives, and the physics-valid grasps (stop at 6):
+
+| entry (task) | mode | GraspGen | w/a | clear | sweep | lever | geo | reps | valid | invalid trials |
+|---|---|---|---|---|---|---|---|---|---|---|
+| apple omzprq (OS) | C | 500 | 496 | 496 | 496 | 496 | 496 | 10 | 6 | - |
+| beefsteak tomato ogpans (OS) | C | 500 | 478 | 478 | 435 | 435 | 435 | 10 | 6 | - |
+| beeswax candle nhdnje (OS) | C | 500 | 499 | 499 | 498 | 489 | 489 | 10 | 6 | - |
+| bell pepper ukkycp (OS) | C | 500 | 394 | 394 | 330 | 330 | 195 | 10 | 6 | - |
+| bottle of catsup hvxkso (OS) | C | 500 | 485 | 484 | 349 | 314 | 314 | 10 | 6 | - |
+| bottle of medicine kqkwoq (OS) | C | 500 | 323 | 323 | 36 | 36 | 28 | 8 | 6 | - |
+| bottle of pop pvabxf (OS) | C | 500 | 438 | 438 | 437 | 437 | 422 | 10 | 6 | - |
+| can of soda opivig (OS) | C | 500 | 489 | 489 | 489 | 489 | 489 | 10 | 6 | - |
+| canned food ycbspm (OS) | C | 500 | 482 | 476 | 469 | 469 | 352 | 10 | 6 | - |
+| pack of cigarettes kienyo (OS) | C | 500 | 500 | 497 | 496 | 489 | 489 | 10 | 6 | - |
+| carving knife alekva (MR) | H+handle | 500 | 339 | 330 | 330 | 250 (handle 153) | 153 | 10 | 6 | 1 motion unreachable |
+| classroom mock-up isgsma (MR) | C | 500 | 466 | 466 | 381 | 363 | 232 | 10 | 6 | 2 motion unreachable |
+| crab ohjsdr (MR) | C | 500 | 385 | 382 | 380 | 376 | 365 | 10 | 6 | 2 motion unreachable |
+| hook hewhtl (MR) | H | 500 | 263 | 262 | 245 | 245 | 81 | 10 | 6 | 1 ag_not_formed (4-6 mm wire) |
+| mug ppzttc (MR) | V | 500 | 203 | 182 | 11 | 11 | 2 | 1 | 1 | - |
+| soup ladle hgvzdm (MR) | H | 500 | 271 | 251 | 200 | 148 | 134 | 10 | 6 | 1 motion unreachable |
+| statue tuldri (MR) | C | 500 | 62 | 62 | 4 | 4 | 2 | 2 | 2 | - |
+| teaspoon eilfij s1x1x2 (MR) | C | 500 | 135 | 134 | 134 | 13 | 12 | 3 | 1 | 2 ag_not_formed (4.9 mm) |
+| toy figure zuntus (MR) | C | 500 | 154 | 148 | 77 | 77 | 53 | 10 | 6 | 2 motion unreachable |
+| walker glrsok (MR) | C | 500 | 267 | 267 | 86 | 86 | 33 | 10 | 6 | 2 motion unreachable |
+
+- **Held motions.** No grasp dropped or slipped in any executed leg (largest in-hand drift 0.22 mm).
+- **Executed motions** (in the valid trials):
+  - object_scaling: the 0.25 m line toward the camera and back. The +0.05 m leg away from the camera is out of reach at the hold for every
+    entry.
+  - mental_rotation: rot -x 45 deg, rot +y 90 deg, rot -z 60 / 90 deg. The +-x rotations at 90 / 60 deg and most of -y / +-z are out of reach
+    from the 15 deg hold.
+- **The thin pools.** For the mug, the sweep gate drops 171 of 182: the pads meet the handle / rim first at full opening. For the statue, the
+  antipodal cone drops 438 of 500 on its relief. For the teaspoon, the lever cap drops 121 of 134: GraspGen pinches the handle end.
+  All of these are gates the legacy floating path did not have (it checked width and spheres only).
+
+**Links and validation.**
+- **The staged root.** `$OFH/floating_20261107/v2maps_i7float` = `cp -a v2maps_i7` plus the 20 entries (`stage_floating.py`):
+  - each STAGED `library.json` gets `legacy_keys` = [its floating key] - that, not `links.json`, is what `_v2_index` reads;
+  - `links.json` gets the 20 links, and the 20 keys leave `skipped`.
+
+  All 37 links resolve under v2only to their entry: 20 floating, and the 17 tabletop links unchanged.
+- **Maps.** The held-object samplers log no `MAP_REQUEST` under v2only: the hold, starts and goals read no reach map. No map is built.
+- **N 1 on the 20 aliases** (tag `i7_float1`, trunk_89e8edae; `v2only_before` on legacy grasps: 20 / 20 ok):
+  - 20 / 20 written, 19 / 20 demos ok, 28 attempts, 2.79 GPU-h = 0.147 / success;
+  - every instance on a v2 floating row (`gg_*`);
+  - 0 `LEGACY_GRASPS_BLOCKED` / `legacy_band_blocked`, 0 `missing_grasps`, 0 `V2_SCALE_MISMATCH` (the teaspoon at s1x1x2).
+
+  The failed demo is `mental_rotation-statue`. It reached the goal (orientation error 0.013 rad, tolerance 0.093), but QA hard
+  `jerky_motion` + `arm_stutter` stopped it: the right arm jolted 4 times in steps 15-19 of the reorient, up to 1.08 rad/s. That is the oracle's
+  tracking of the rotation, not the grasp, and the oracle was not changed.
+- **N 4** (tag `i7_float4`), both 0 `MAP_REQUEST`, 0 blocked, one reject (`goal_occluded`); together 9 attempts, 0.30 GPU-h = 0.038 / success:
+  - `mental_rotation-crab`: 4 / 4 demos ok, rows gg_0 / gg_2 / gg_5 / gg_7;
+  - `object_scaling-bottle_of_catsup`: 4 / 4 ok, rows gg_1..gg_4. The held sampler's spread order gives each instance its own row.
+- **Open for the owner.**
+  - The floating entries live only in the staged root; adopting them into the campaign root is the owner's call.
+  - Three entries have few rows: mug 1, statue 2, teaspoon 1. None is at 0, so the ladder did not trigger. More GraspGen seeds would be a
+    round-2 retry.
+  - The statue's QA stutter is in the oracle's reorient tracking.
+  - The approach gate is applied although a held task has no approach, as one of the hand / object gates. It never fired on these 20
+    entries: the 684 "geometry" drops are all `finger_blade_in_object`.
+  - The held-motion thresholds are the tabletop validator's provisional ones.
 
 ## Limitations / not done
 
