@@ -32,6 +32,7 @@ the same support height (the band is robot-relative, §4.1: "the stand-off is no
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import math
@@ -213,7 +214,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     if isinstance(tf, dict):
         tf["support_surface"] = fact
     # i7-split 2026-11-07: the interior board is the support's split plane - its walls, back panel and the board above stay obstacles
-    # wherever the support is ignored (no policy plane: interiors have no map kind yet)
+    # wherever the support is ignored (the policy plane only at an interior map hit: interior_map_bands, i7-lean)
     SS.register_top(s, support, itop, what="interior")
     return NB.union_top(s, support, itop, spec, ignore=ignore)
 
@@ -231,22 +232,100 @@ def upright_shelf_facts(grasp_key: Optional[str], rest_quat) -> Optional[Dict[st
     """Facts of an upright-shelf grasp key (library ``rest_pose: upright_shelf``, e.g. ``hardback__acbrnv__bu``): the book stands
     on its bottom edge leaning against a wall in its rest orientation, its spine toward the approach (rest-frame -x). ``lean_side``
     = +1 when the top edge leans toward rest-frame +y (with the spine toward the robot: the robot's left), -1 toward -y;
-    ``lean_deg`` from the rest orientation. None for any other key."""
+    ``lean_deg`` from the rest orientation. None for any other key. i7-lean 2026-11-07: a lean key (``<base>@<lean tag>``, the v2 library's
+    lean rest: :func:`shelf_lean_key`) always is one - its facts from its measured rest, ``lean_rest`` = its tag."""
     from ispatialgym.sampling import grasp_library as GL
 
     if not grasp_key:
         return None
+    base, tag = GL.lean_key_parts(grasp_key)
     try:
-        meta = (GL._candidates(grasp_key) or {}).get("ispatialgym") or {}
+        meta = (GL._candidates(base) or {}).get("ispatialgym") or {}
     except (FileNotFoundError, ValueError):
-        return None
-    if meta.get("rest_pose") != "upright_shelf":
+        if tag is None:
+            return None
+        meta = {}
+    if tag is None and meta.get("rest_pose") != "upright_shelf":
         return None
     R = C.transform_points((th.zeros(3), _t(rest_quat)), th.eye(3))  # rows: the local axes in the rest frame
     a = int(th.argmax(R[:, 2].abs()))
     up = R[a] * (1.0 if float(R[a, 2]) > 0 else -1.0)  # the book's bottom -> top direction
-    return {"key": grasp_key, "lean_side": 1.0 if float(up[1]) > 0 else -1.0, "lean_deg": round(math.degrees(math.asin(min(1.0, float(th.linalg.norm(up[:2]))))), 2),
-            "context": meta.get("context")}
+    out = {"key": grasp_key, "lean_side": 1.0 if float(up[1]) > 0 else -1.0, "lean_deg": round(math.degrees(math.asin(min(1.0, float(th.linalg.norm(up[:2]))))), 2),
+           "context": meta.get("context")}
+    if tag is not None:
+        out.update({"lean_rest": tag, "context": meta.get("context") or "v2 lean rest"})
+    return out
+
+
+def lean_rest_of_key(grasp_key: Optional[str]) -> Optional[Dict[str, Any]]:
+    """i7-lean 2026-11-07: the lean identity (``lean.LeanSpec.to_json``) of a lean grasp key's v2 entry, else None (a plain key). Read once
+    per (library root, key): the shelf draw asks per try."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    if GL.lean_key_parts(grasp_key)[1] is None:
+        return None
+    return _lean_rest_cached(GL.v2_root(), grasp_key)
+
+
+@functools.lru_cache(maxsize=32)
+def _lean_rest_cached(root: Optional[str], grasp_key: str) -> Optional[Dict[str, Any]]:
+    from ispatialgym.sampling import grasp_library as GL
+
+    lib = GL.v2_entry(grasp_key) if root else None
+    return None if lib is None else lib.data.get("lean")
+
+
+def lean_rest_side(grasp_key: Optional[str]) -> Optional[float]:
+    """+1 / -1: the board side of a lean grasp key's rest (left = the robot's left), None for a plain key."""
+    ln = lean_rest_of_key(grasp_key)
+    return None if not ln else (1.0 if ln.get("side") == "left" else -1.0)
+
+
+def shelf_lean_key(s, base_key: str) -> Optional[str]:
+    """i7-lean 2026-11-07 (owner decision: touching_03 starts its book at a LEAN rest of the v2 library): the template's lean grasp key
+    (``<base_key>@<lean tag>``, ``grasping.lean.lean_key``) when the v2 library (``ISPATIALGYM_GRASP_LIBRARY_V2``) and the maps root
+    (``ISPATIALGYM_REACH_MAPS``) are set and the library holds lean rests of ``base_key`` (``grasp_library.v2_lean_tags``); None otherwise
+    (the key's path as before). The side from the task: ``generation.partner_side`` (the target leans against the other board: partner
+    "right" -> the left board), else the base key's own lean side (its legacy rest); the angle among the library's lean rests on that side
+    within ``generation.shelf_start_draw.lean_deg`` (when given), one per template (``ctx.base_seed``). ``Reject("missing_grasps:lean")``
+    when the library has lean rests of the key but none on that side / in that range. Facts: ``template_facts["shelf_lean"]``."""
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.sampling import grasp_library as GL
+
+    if not base_key or not GL.v2_root() or not map_sampling_root():
+        return None
+    tags = GL.v2_lean_tags(base_key)
+    if not tags:
+        return None
+    gen = getattr(s, "gen", None)
+    assigned = gen("partner_side") if callable(gen) else None
+    side, why = None, None
+    if assigned in ("left", "right"):
+        side, why = ("right" if assigned == "left" else "left"), f"generation.partner_side {assigned}: the target on the other board"
+    else:
+        try:
+            rq = ((GL._candidates(base_key) or {}).get("ispatialgym") or {}).get("rest_quat_wxyz")
+            if rq is not None:
+                side, why = LN.side_name(LN.lean_of(LN.xyzw(rq))["side"]), f"{base_key}'s own lean side"
+        except (FileNotFoundError, ValueError):
+            pass
+    pool = [(t, ln) for t, ln in tags if side is None or ln.get("side") == side]
+    draw = gen("shelf_start_draw") if callable(gen) else None
+    rng_deg = draw.get("lean_deg") if isinstance(draw, dict) else None
+    if isinstance(rng_deg, (list, tuple)) and len(rng_deg) == 2:
+        pool = [(t, ln) for t, ln in pool if float(rng_deg[0]) - 1e-6 <= float(ln.get("deg", -1.0)) <= float(rng_deg[1]) + 1e-6]
+    if not pool:
+        _reject("missing_grasps:lean", f"{base_key}: the v2 library's lean rests {[t for t, _ in tags]} have none on the {side} board"
+                                        f"{'' if not rng_deg else f' within {list(rng_deg)} deg'} ({why})")
+    seed = int(getattr(getattr(s, "ctx", None), "base_seed", 0) or 0)
+    k = int(np.random.default_rng([seed & 0xFFFFFFFF, 1107]).integers(len(pool)))
+    tag, ln = pool[k]
+    tf = getattr(s, "template_facts", None)
+    if isinstance(tf, dict):
+        tf["shelf_lean"] = {"base_key": base_key, "lean_key": LN.lean_key(base_key, tag), "tag": tag, "deg": ln.get("deg"), "side": ln.get("side"),
+                            "board": ln.get("board"), "pool": [t for t, _ in pool], "side_why": why, "lean_deg_range": list(rng_deg) if rng_deg else None}
+    log.info("%s: the v2 lean rest %s (%s board, %s deg; %s) of %s", getattr(getattr(s, "gp", None), "variant", "?"), tag, ln.get("side"), ln.get("deg"), why, base_key)
+    return LN.lean_key(base_key, tag)
 
 
 def shelf_wall_lateral(s, edge: EdgeFrame, depth: float, z: float, side: float, support, lateral0: float = 0.0) -> Tuple[Optional[float], Dict[str, Any]]:
@@ -829,7 +908,7 @@ def v2_rest_info(s, hull, rest_quat=None) -> Optional[Dict[str, Any]]:
             from ispatialgym.sampling import grasp_library as GL
 
             lib = GL.v2_entry(key)
-            rid = GL.v2_rest_id(lib) if lib is not None else None
+            rid = GL.v2_rest_id_for_key(lib, key) if lib is not None else None  # i7-lean: a lean key's lean rest (a plain key: as before)
             if rid is not None and getattr(lib.rests[rid], "h_root", None) is not None:
                 info = {"role": role, "grasp_key": key, "entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid,
                         "h_root": float(lib.rests[rid].h_root), "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
@@ -970,9 +1049,11 @@ PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert"
                     "": "floating", "attachment": "attachment", "a": "attachment", "handle_half": "floating", "h": "floating"}
 
 
-def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None):
+def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False):
     """``(grasps, key, rest_quat)`` of the role's model for the pipeline the customs entry requires (``roles.<role>.
-    require.grasps``); ``Reject("missing_grasps:<pipeline>")`` when the library has no admissible row."""
+    require.grasps``); ``Reject("missing_grasps:<pipeline>")`` when the library has no admissible row. ``lean`` (i7-lean 2026-11-07, the
+    touching shelf layout): the key's v2 LEAN rest when the library holds one (:func:`shelf_lean_key`: the key becomes ``<key>@<lean tag>``,
+    its grasps and rest the lean entry's), else as before."""
     from ispatialgym.sampling import grasp_library as GL
 
     choice = s.choice.models[role]
@@ -980,6 +1061,8 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
     kinds = list(kinds) if kinds else [pipeline]
     try:
         key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, kinds)
+        if lean:
+            key = shelf_lean_key(s, key) or key
         grasps = GL.load_grasps(key)
     except (FileNotFoundError, ValueError) as e:
         _reject(f"missing_grasps:{pipeline}", f"{choice.category}/{choice.model}: {e}")
@@ -1062,9 +1145,10 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
     scene, support = s.world.scene_model, top.name
     gkey = "generic" if spec.generic_pinch else spec.grasp_key
     surface = surface_band_kwargs(s)
-    if map_sampling_root() and (RB.v2_only() or (not spec.generic_pinch and not spec.placed and not surface)):
+    lean = is_lean_spec(spec)  # i7-lean 2026-11-07: a lean rest reads its interior map whatever the mode (a miss rejects missing_map)
+    if map_sampling_root() and (RB.v2_only() or lean or (not spec.generic_pinch and not spec.placed and not surface)):
         # of-v2maps 2026-11-07 (prompt I item 7): v2only dispatches every spec kind to its map (v2_map_view); other modes as before
-        mb = v2_map_view(s, spec, top) if RB.v2_only() else map_bands(s, spec, top)
+        mb = v2_map_view(s, spec, top) if (RB.v2_only() or lean) else map_bands(s, spec, top)
         if mb is not None:
             s.bands = mb
             return s.bands
@@ -1101,12 +1185,26 @@ def map_request(s, **fields) -> None:
     log.info("MAP_REQUEST %s", key)
 
 
+def is_lean_spec(spec: Optional["BandSpec"]) -> bool:
+    """i7-lean 2026-11-07: the band spec's object is at a v2 LEAN rest (its grasp key ``<base>@<lean tag>``)."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    return spec is not None and not spec.generic_pinch and GL.lean_key_parts(spec.grasp_key)[1] is not None
+
+
 def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
     """of-v2maps 2026-11-07 (prompt I item 7, the shared dispatch of :func:`ensure_bands` and :func:`map_view_arm_band`): the v2 map view of
     a band spec by its kind - a placed TRAY (disembedding: ``placed`` tray tokens and ``z_support`` = the tray's inner floor) reads the
     tabletop map at the tray-floor height (an EXACT anchor only), a plain spec the tabletop map at the top, a generic pinch the generic map
-    at the top (:func:`generic_map_bands`, i7-generic); attach / interior specs have no map kind yet (None + MAP_REQUEST). Every lookup
+    at the top (:func:`generic_map_bands`, i7-generic); attach specs have no map kind yet (None + MAP_REQUEST), nor interior specs of a
+    stable rest. i7-lean 2026-11-07: a LEAN rest (:func:`is_lean_spec`) reads the INTERIOR map on an interior surface
+    (:func:`interior_map_bands`) and rejects ``missing_map`` on any miss - also on a top surface (no lean map kind there). Every lookup
     enforces the item-11 identity (:func:`map_bands`, :func:`generic_map_bands`)."""
+    if is_lean_spec(spec):
+        if surface_band_kwargs(s):
+            return interior_map_bands(s, spec, top, arm)
+        map_request(s, kind="lean_top", support=getattr(top, "name", None), object=spec.object, grasp_key=spec.grasp_key, arm=arm or spec.arm)
+        _reject("missing_map", f"no reach map kind for {spec.object} ({spec.grasp_key}) at a lean rest on the top of {getattr(top, 'name', None)}")
     if spec.generic_pinch:
         return generic_map_bands(s, spec, top, arm)
     if spec.placed:
@@ -1120,6 +1218,59 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
                     grasp_key=spec.grasp_key, arm=arm or spec.arm)
         return None
     return map_bands(s, spec, top, arm)
+
+
+def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> RB.ReachBands:
+    """i7-lean 2026-11-07 (owner decision; prompt I item 7, the INTERIOR kind): the interior reach map of the spec's LEAN rest
+    (``reach_maps`` kind ``interior``) inside the compartment the sampler works on, as a band view (``map_sampling.as_bands``, overhang 0:
+    the stand-offs = the map's edge distances to the compartment's front plane). The compartment is the registry's spec of the support at
+    the live board height (``interiors.spec_for_support``: scene, support, +-1 cm), checked against the live raster
+    (``interiors.live_mismatch``: height, headroom, open sides); the lookup enforces the entry (the lean key's own lean entry and rest),
+    the compartment digest, the lean identity, the contact policy key, the robot model and ``ISPATIALGYM_REACH_MAP_REQUIRE``. A hit
+    registers the board's measured plane for the grasp approach's support policy (the board policed; the walls / board above stay
+    obstacles: the support split registered in :func:`support_surface`). Any miss logs one MAP_REQUEST (kind interior) and rejects
+    ``missing_map`` - there is no legacy fallback for a lean rest."""
+    arm = arm or spec.arm
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import interiors as IN
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling import reach_maps as RMAP
+
+    floor_z = float(getattr(s.world, "floor_z", 0.0))
+    h = float(top.z) - floor_z
+    support, scene = str(getattr(top, "name", "")), str(getattr(s.world, "scene_model", ""))
+    req = dict(kind="interior", plane="interior", h=round(h, 4), arm=arm, support=support, scene=scene, grasp_key=spec.grasp_key)
+
+    def miss(why: str):
+        log.info("interior reach map miss for %s (%s) in %s at h %.4f, %s arm: %s", spec.object, spec.grasp_key, support, h, arm, why)
+        map_request(s, **req, why=why[:200])
+        _reject("missing_map", f"no interior reach map for {spec.object} ({spec.grasp_key}) in {support} at {h:.4f} m, {arm} arm: {why}")
+
+    ent = _v2_map_entry(s, spec)
+    if ent is None:
+        miss("no v2 lean entry / lean rest for the key")
+    lib, rid = ent
+    entry = os.path.basename(os.path.dirname(lib.path))
+    req.update(entry=entry, rest_id=rid)
+    ispec = IN.spec_for_support(scene, support, h)
+    if ispec is None:
+        miss(f"no interior spec of {scene}/{support} at {h:.4f} m ({IN.REGISTRY})")
+    req["interior"] = ispec.name
+    why = IN.live_mismatch(ispec, top, floor_z)
+    if why is not None:
+        miss(f"the live interior is not {ispec.name}: {why}")
+    if not map_sampling_root():
+        miss("no maps root (ISPATIALGYM_REACH_MAPS)")
+    root = os.path.join(map_sampling_root(), entry)
+    rm = RMAP.ReachMap.find(root, lib, float(ispec.height_m), rest_id=rid, arm=arm, anchors=None, kind="interior", policy_key=CP.DEFAULT.key(arm),
+                            robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec)
+    if rm is None:
+        miss(f"no map of {ispec.name} ({ispec.digest()}) in {root}")
+    _register_map_policy(s, lib, rid, {support: float(top.z)})
+    view = MS.as_bands(rm, overhang=0.0)
+    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid})
+    log.info("interior reach map hit for %s in %s (%s) at h %.4f, %s arm: %s", spec.object, support, ispec.name, h, arm, rm.path)
+    return view
 
 
 def generic_map_pose_set(spec: BandSpec) -> Dict[str, Any]:
@@ -1195,7 +1346,7 @@ def _v2_map_entry(s, spec: BandSpec):
     lib = GL.v2_entry(spec.grasp_key) if spec.grasp_key else None
     if lib is None or not lib.rests:
         return None
-    rid = GL.v2_rest_id(lib)  # of-v2maps 2026-11-07: the stable rest, deterministic (the grasps / rest quat of the same rest)
+    rid = GL.v2_rest_id_for_key(lib, spec.grasp_key)  # of-v2maps 2026-11-07: the stable rest, deterministic (i7-lean: a lean key's lean rest)
     if rid is None:
         return None
     if spec.scale is not None and GS.canonical_scale(spec.scale) != lib.scale:
@@ -1608,7 +1759,7 @@ def map_view_arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None,
     arm's legacy band (cached, or computed in-process as :func:`ensure_bands` would) mirrored. One INFO line names the choice."""
     sp = spec or getattr(s, "band_spec", None) or BandSpec.from_sampler(s)
     t = _top(s, top)
-    own = v2_map_view(s, sp, t, arm=arm) if RB.v2_only() else map_bands(s, sp, t, arm=arm)
+    own = v2_map_view(s, sp, t, arm=arm) if (RB.v2_only() or is_lean_spec(sp)) else map_bands(s, sp, t, arm=arm)  # i7-lean: a lean rest's own
     if own is not None:
         log.info("%s-arm reach band: the %s-arm reach map (%s)", arm, arm, own.meta.get("map_path"))
         return own
