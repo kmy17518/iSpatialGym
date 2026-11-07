@@ -109,7 +109,8 @@ stall, wobble, grasp lost, tracking failure), sequential hybrid (release, retrea
 
 Synthetic world: the R1Pro alone (floor cuboid + self-collision in cuRobo); slab top at the anchor height, near edge at the edge distance
 `d_e` (0.35 / 0.45 / 0.55 = the base centre's distance to the support's physical edge = the scene stance's stand-off: an edge stance stands `stand_off + overhang` outside the RASTER edge, the overhang being the AABB lip beyond the raster, `stances.EdgeFrame`; reconciled 2026-11-07, prompt I item 8), 1.2 m deep, 3.2 m long, 4 cm thick. Per trunk (`reach_bands.trunk_grid(h)`; eligible
-when the idle posture untucked / ready / tucked is free of itself and of the slab at every `d_e`): lattice 8 cm x 8 yaws x grasps
+when the idle posture untucked / ready / tucked is free of itself and of the slab at every `d_e`; since i7-unblock 2026-11-07 the default
+`per_d_e` rule makes a trunk ineligible only at the `d_e` where every posture collides - see "i7-unblock" below): lattice 8 cm x 8 yaws x grasps
 (validated reps, twins unless stored, 4 samples of non-yaw-equivalent families incl. endpoints + the tested representative). Shoulder
 reach bound; the hand hulls vs the slab per `d_e` (pre-grasp, approach every 2 cm, two sweep openings); tensor-native batched IK of the
 pre-grasp (8 seeds, all kept), the grasp seeded from it (branch: max joint step <= 1 rad); per `d_e` and seed: whole-robot spheres at the
@@ -439,6 +440,83 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - any gate shared by all objects (including the attach-rule fix if it changes other entries);
 - any oracle program change;
 - using legacy grasps (step 4).
+
+### i7-unblock (2026-11-07): nextto_04, under_small_03, camera_relocalization teddy_bear
+
+Branch `i7-unblock` (from of-v2maps a4620a1e). Records: `$OFH/unblock_20261107/` (count, plan, builds, compare, staging), DECISIONS.md
+"i7-unblock" lines.
+
+**Trunk eligibility per d_e (owner decision: the former rule was a bug; default of new builds).**
+- `reach_maps.trunk_posture_groups` (pure). Both rules first take the first idle posture (untucked / ready / tucked) clear of itself and
+  of the slab at every `d_e` - the former choice, so a trunk eligible before keeps its posture and its cells. Without one, `per_d_e`
+  gives each `d_e` the first posture clear there; a `d_e` that no posture clears stays `trunk_ineligible`. The record gets
+  `posture_by_d_e`, `ineligible_d_e`, `eligibility: per_d_e`. `compute_map` / `compute_generic_map` run one IK pass per posture group.
+- Identity: `MapConfig.trunk_eligibility` (default `per_d_e`, in config / key). `None` / `--trunk-eligibility all_d_e` = the former rule,
+  left out of config and key, so old maps keep their keys and read as `all_d_e` (`CONFIG_LEGACY_DEFAULTS`). Floor maps keep `None`:
+  with one edge distance the two rules give the same map. `--skip-existing` matches the rule. `job_glib.sh GB_TRUNK_ELIGIBILITY`.
+- Sampler: both rules serve; there is no config_require change. `ReachMap.find` / `find_generic` prefer a `per_d_e` map when a root holds
+  both for one lookup; the first former-rule map is the fallback. An explicit `ISPATIALGYM_REACH_MAP_REQUIRE={"trunk_eligibility": ...}`
+  selects either one.
+- i7-lean b4230177 (interior obstacle ranking) is compatible: `trunk_posture_groups(..., obstacle_free_of=)` ranks the postures that are
+  free of the board at every `d_e` by their obstacle clearance, exactly as b4230177 does. The `per_d_e` fallback then takes, per `d_e`,
+  the first board-free posture that is also obstacle-free. The i7-lean block should call the helper with `obstacle_free_of` when the
+  compartment is fixed.
+- Count (campaign roots, each distinct map once, from the stored trunk records): 116 maps, 108 served. 88 served maps gain columns:
+  374 trunks, 614 (trunk, d_e) columns. Of these, 74 tabletop + 6 generic were rebuilt (trunk_58cd9939), and every one changes cells.
+  The 6 interior + 2 overhang maps wait for the merge: their builders are on i7-lean / i7-oh. `/v2maps_i7unblock` = v2maps_i7 + 78
+  merged maps: 338 trunk-maps, 544 columns, feasible cells (column-summed) 166628 -> 195528. The 2 plate luhkiz maps are in
+  `unblock_20261107/build_plate/merged`. The merged staging keeps the former map's arrays wherever the former rule held the trunk
+  eligible, and takes the rebuild's arrays only at the added columns. A rebuild flips 0.2-0.3 % of the entries in the old columns
+  (feasible <-> branch_jump / ik_pre), because the IK seeds are random. No posture choice of an eligible trunk changed.
+
+**nextto_04 (gym_shoe kmcbym on bench_pfjnnj_0, h 0.3471).**
+- The bench is not slatted at its raster. The inventory top is one rectangle of 1102 free cells: 19 x 58 at 2 cm, 0.36 x 1.14 m, hull
+  area = cell area, no gaps.
+- What blocks Phase 2 is the map lattice against the eroded top. The erosion is the shoe's circumscribed half extent 0.154 m + 0.02, so
+  on a 0.36 m deep bench it leaves a single 2 cm row of 40 raster cells on the centre line.
+- The 8 cm lattice never lands on that row. MAP_LATTICE (g_sf): 0 lattice points kept at 538 + 39 stances. The v2only logs show no
+  "per trunk candidate" line, i.e. no focus survived the containment test.
+- The per-d_e eligibility adds t0.95 at d_e 0.45 / 0.55 (5 trunks, 10 columns, cells 1158 -> 1483 right), but the same lattice does not
+  meet the row either.
+- The opt-in support-first lookup (`ISPATIALGYM_MAP_SUPPORT_FIRST=1`, owner prompt G) reads the map at the raster's own cells. Its
+  earlier nextto_04 "0 / 208" (g_sf) was a stale SPA cache: a2f5fb06 had no map key / support-first switch in the start-cell key
+  (bc616c4e added them), so the per-attempt cells were hits of earlier rejections. The setup's own Phase 2 there had 266 survivors and
+  7 start cells.
+- v2only N 4 on `/v2maps_i7unblock`: the per_d_e maps alone give 0 attempts (setup no_manipulation_stance). With
+  `ISPATIALGYM_MAP_SUPPORT_FIRST=1`: 13 attempts, 4 written, 4 / 4 demos, 0.058 GPU-h per success. Whether support-first becomes the
+  default is the owner's decision (it is a shared Phase-2 rule).
+
+**under_small_03 (plate qtfzeq s1x1x3, the one v2 grasp side_9).**
+- side_9 approaches nearly horizontally (17.6 deg down), 32 deg off radial, with the closing axis 20 deg from vertical: one finger goes
+  under the rim. The legacy grasp_0 approaches from above (60 deg) and straddles the rim radially.
+- The approach is tracked with the fingers fully open (0.05 / finger, the stance's configuration). The oracle and the map use the
+  pre-shape (width / 2 + 10 mm = 0.018). Fully open, the lower pad passes 0.5-1.0 cm above the table in the body of the approach;
+  pre-shaped, 3.4-3.9 cm. That gives the 27 / 60 "F exhausted" cases (21 approach_untrackable against breakfast_table, 3.6-5.5 cm from
+  the start).
+- The fix is in the alias's customs: `approach_finger_support_touch` {0, 0.005, preshape}, the plate-in-sink variants' rule.
+- The 33 / 60 empty F all sit at trunk 0.25 / -0.53. The map's cells come from grid tilt -0.6, and the empty F is kinematic (round 4:
+  0 pairs with every scene object out).
+- The opt-in TILT_SNAP returned `no_band` for every map view. It now reads a map view at the stance's stand-off. It stays off by
+  default; it was A/B'd for this alias only.
+- v2only N 4 with side_9, customs only: 60 attempts / 0 written. Breakdown: 37 empty F (DIAG 4 / 4: 0 pairs with no scene object) and
+  16 F exhausted, mostly the support policy's "non-finger link touches the support"; 478 finger touches were allowed. With TILT_SNAP:
+  empty F 0 / 60 (40 snaps), but 0 written - 39 F exhausted and the place stage fails.
+- Grasp ladder step 2 (`unblock_20261107/plate_qtfzeq`): the opt-in families lip_shallow + rim_straddle (cand_overrides, default gates)
+  give 36 candidates -> 27 geometry-ok -> 10 representatives -> 6 physics-valid rim_straddle top grasps. Maps at 0.8126 for both arms,
+  staged in `/v2maps_i7unblock2` (the entry keeps legacy_key plate__qtfzeq__st). The v2only N 4 result is in DECISIONS (i7-unblock).
+
+**camera_relocalization teddy_bear_1: slow, not blocked.**
+- BEHAVIOR's `astar` builds a score table of every map cell on each call: 2.6 s on house_single_floor's 862 x 862 map, 8.6 s for an
+  unreachable goal. A goal search makes about 20 calls, and an obstacle cell 1-2.
+- `navigation.astar_exact` is the same search, step for step, without the table: 12 / 12 identical paths on the real map, 0.36 s mean.
+  It is behind `CR_FAST_ASTAR` (default on).
+- `CR_OBSTACLE_HEADROOM` (default on) skips a goal whose free geodesic leaves less than the bucket's minimum detour below the bucket top.
+  No obstacle cell can pass `detour_failure` there, which is exact under float subtraction. Example: 8 / 8 too_long at 4.86 m in (3, 5].
+- Sampling budget: `SAMPLE_LIMIT_S` = 2 x fixed + N x budget_s (train85 `params`; 2400 s at N 1, 8766 s at N 4). The knob is
+  `submit_fast.py --sample-limit-s`.
+- The camera-frame rule is unchanged.
+- v2only N 4: 8 attempts, 4 written, 4 / 4 demos, sample wall 822 s, 0.063 GPU-h per success. Before: N 1 timed out at 2400 s
+  (attempts 131-707 s); now attempts take 9-61 s. The headroom skip did not act in this run.
 
 ## Limitations / not done
 
