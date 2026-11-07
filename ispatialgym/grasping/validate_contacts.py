@@ -259,14 +259,17 @@ def judge_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T
 
 def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig, dt: float) -> List[np.ndarray]:
     """The brace load's pusher centres (world, one per control step): from ``brace_pusher_gap_m`` off the partner's face opposite the load
-    (its extreme against ``load.direction``) at the partner's mid height to ``brace_press_m`` past it, at ``brace_pusher_speed_m_s``."""
+    (its extreme against ``load.direction``) to ``brace_press_m`` past it, at ``brace_pusher_speed_m_s``, on the line through ``load.point_object``
+    (the axial push's arriving end) or the partner's centre, at its mid height (the box's bottom above the support)."""
     d = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
     d[2] = 0.0
     d = d / max(float(np.linalg.norm(d)), 1e-12)
     pts = pts_obj @ T_obj[:3, :3].T + T_obj[:3, 3]
     face = float((pts[:, :2] @ d[:2]).min())
-    c = pts.mean(axis=0)
-    z = 0.5 * float(pts[:, 2].min() + pts[:, 2].max())
+    load = entry.get("load") or {}
+    # on the line through the load point (the axial push's arriving end, goal object frame), else through the partner's centre
+    c = T_obj[:3, :3] @ np.asarray(load["point_object"], dtype=float) + T_obj[:3, 3] if load.get("point_object") is not None else pts.mean(axis=0)
+    z = max(0.5 * float(pts[:, 2].min() + pts[:, 2].max()), float(pts[:, 2].min()) + 0.5 * float(cfg.brace_pusher_size_m[2]) + 0.001)  # above the support
     half = 0.5 * float(cfg.brace_pusher_size_m[0])
     start = np.array([c[0], c[1], z]) + d * (face - float(c[:2] @ d[:2]) - cfg.brace_pusher_gap_m - half)
     travel = cfg.brace_pusher_gap_m + cfg.brace_press_m

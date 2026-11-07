@@ -253,6 +253,50 @@ def nextto_wall_axial_scenarios():
     return out
 
 
+def axial_brace_scenarios():
+    """``(name, callable -> jsonable)``: ``AlignmentAxial._stop_geometry`` + ``_brace_candidates`` (the stop brace of the axial push) on a
+    stand-in (the methods of the class on a namespace: hull, centre of mass, extents, the support top) for a thin and a taller target."""
+    import types
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+    from ispatialgym.tests import test_iors_small_lift as LIFT
+
+    def stand_in(dims, com_z):
+        hull = th.tensor([[sx * dims[0] / 2, sy * dims[1] / 2, z] for sx in (-1, 1) for sy in (-1, 1) for z in (0.0, dims[2])]
+                         + [[dims[0] / 4, dims[1] / 2, dims[2] / 2], [-dims[0] / 3, -dims[1] / 2, dims[2] / 3]], dtype=th.float32)
+        st = SimpleNamespace(hull=hull, com_local=th.tensor([0.0, 0.0, com_z]), extents={"height": dims[2], "long": dims[0]}, top=SimpleNamespace(z=0.7351),
+                             gen=lambda k, d=None: d, _blade_skips={}, long_axis=th.tensor([1.0, 0.0, 0.0]))
+        for n in ("_push_height", "_face_z_range", "_blade_geometry", "_stop_geometry", "_stop_face_points", "_brace_candidates"):
+            setattr(st, n, types.MethodType(getattr(AX.AlignmentAxial, n), st))
+        return st
+
+    out = []
+
+    def case(name, dims, com_z, yaw0_deg, yaw_goal_deg, end_sign, passing=None):
+        def run():
+            s = stand_in(dims, com_z)
+            manip = LIFT._stance()
+            q0 = C.quat_from_yaw(math.radians(yaw0_deg))
+            pose = (th.tensor([0.62, -0.05, 0.7351]), q0)
+            com = G.t(pose[0]) + C.quat_rotate(q0, s.com_local)
+            long_w = C.quat_rotate(q0, s.long_axis)
+            end = com + long_w * end_sign * (0.5 * dims[0] - 0.03)
+            d_goal = C.wrap_angle(math.radians(yaw_goal_deg) - math.radians(yaw0_deg))
+            spin = 1.0 if d_goal > 0 else -1.0
+            z_brace = 0.7351 + 0.75 * dims[2]
+            goal_pose, stop_pts, d_stop = s._stop_geometry(pose, end, com, spin, math.radians(yaw_goal_deg), z_brace)
+            rows = [[_pose(pre), _pose(c), k, _jsonable(e)] for pre, c, k, e in s._brace_candidates(manip, stop_pts, d_stop, passing, pose, com, d_goal)]
+            return {"goal_pose": _pose(goal_pose), "stop_pts": _jsonable(stop_pts), "d_stop": _jsonable(d_stop), "candidates": rows, "skips": dict(s._blade_skips)}
+        out.append((name, run))
+
+    case("magazine_thin", (0.28, 0.20, 0.012), 0.006, 40.0, 90.0, 1.0)
+    case("magazine_thin_back", (0.28, 0.20, 0.012), 0.006, 140.0, 90.0, -1.0)
+    case("keyboard_taller", (0.44, 0.13, 0.045), 0.02, 60.0, 0.0, 1.0, passing=["near_h"])
+    case("spoon_short_face", (0.17, 0.035, 0.02), 0.008, -30.0, 20.0, -1.0)
+    return out
+
+
 def run_all() -> Dict[str, Any]:
     out: Dict[str, Any] = {"push": {}, "brace": {}}
     for name, fn in push_scenarios():
@@ -261,6 +305,7 @@ def run_all() -> Dict[str, Any]:
         out["brace"][name] = [[k, _pose(pre), _pose(c), _jsonable(e)] for pre, c, k, e in fn()]
     out["large"] = {name: fn() for name, fn in large_scenarios()}
     out["other"] = {name: fn() for name, fn in nextto_wall_axial_scenarios()}
+    out["axial_brace"] = {name: fn() for name, fn in axial_brace_scenarios()}
     return out
 
 

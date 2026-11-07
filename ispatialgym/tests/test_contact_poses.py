@@ -296,3 +296,35 @@ def test_the_axial_blade_geometry_and_extreme_point_are_the_samplers_former_bodi
                 sel_pts = pts[sel]
         old = sel_pts[int(th.argmax(sel_pts[:, :2] @ dxy))]
         assert th.equal(AX.AlignmentAxial._extreme_point(s, pose, th.tensor(direction), near=near), old)
+
+
+@pytest.mark.parametrize("name", ["magazine_thin", "magazine_thin_back", "keyboard_taller", "spoon_short_face"])
+def test_the_axial_stop_brace_produces_the_golden_candidates(name):
+    """``AlignmentAxial._stop_geometry`` / ``_brace_candidates`` on the shared rules (``axial_stop_geometry``, ``axial_brace_candidates``): the
+    goal pose, the stop points, every candidate in its order and the skip counts as at 45b9ba61 (before the move)."""
+    got = dict(CS.axial_brace_scenarios())[name]()
+    _close(_golden()["axial_brace"][name], CS._jsonable(got), name)
+
+
+def test_the_full_open_brace_switch(monkeypatch):
+    """Owner decision 2026-11-07: ``ISPATIALGYM_BRACE_FULL_OPEN=1`` puts the full-open spread (2 x 0.05 + 0.027 = 0.127 m, 0.05 per finger)
+    first; "0" (default) keeps today's spreads and records (the golden lists above run with it off)."""
+    from ispatialgym.tests import test_iors_small_lift as LIFT
+    from ispatialgym.tests import test_touching_brace_open_push_speed as BO
+
+    monkeypatch.delenv(CPZ.BRACE_FULL_OPEN_ENV, raising=False)
+    gs = CPZ.PoseGen({})
+    assert CPZ.BRACE_FULL_OPEN_SPREAD_M == 0.127 and CPZ.brace_wide_spreads(gs) == [0.09, 0.07, 0.05] and not CPZ.brace_full_open_on()
+
+    def first_wide(partner):
+        s = BO._sampler(gen={"brace_open_when_wide": True}, partner=partner)
+        st, p_init, b_point, p_hull, face_z = BO._brace_inputs(s)
+        _p, _c, k, e = next(iter(s.touching_brace_candidates(st, b_point, face_z, -BO.DIRECTION, partner_hull_w=p_hull, push_point=p_init)))
+        return k, e["stop_width_m"], e["fingers_opening_m"]
+
+    wide, narrow = LIFT._box(0.08, 0.20, 0.24), LIFT._box(0.08, 0.12, 0.24)
+    assert first_wide(wide) == ("brace_wide_h-", 0.09, 0.0315) and first_wide(None) == ("brace_wide_h-", 0.09, 0.0315)
+    monkeypatch.setenv(CPZ.BRACE_FULL_OPEN_ENV, "1")
+    assert CPZ.brace_wide_spreads(gs) == [0.127, 0.09, 0.07, 0.05] and CPZ.brace_wide_spreads(CPZ.PoseGen({"brace_wide_spreads_m": [0.127, 0.05]})) == [0.127, 0.05]
+    assert first_wide(wide) == ("brace_wide_h-", 0.127, 0.05)  # the 20 cm face takes the full spread
+    assert first_wide(narrow) == ("brace_wide_h-", 0.09, 0.0315) and first_wide(None) == ("brace_wide_h-", 0.09, 0.0315)  # narrower faces: the widest that fits

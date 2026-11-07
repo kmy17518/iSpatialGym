@@ -18,7 +18,9 @@ entry's ``validation`` (trials, verdict, reasons, measures). The object needs co
 directory: ``geometry.json`` + ``rests.json`` / ``library.json``) - validated GRASPS are not needed.
 
 Families (:data:`FAMILIES`): ``touching_push`` / ``touching_brace`` (touching small scale 01/02/04: the pushed target / the braced partner;
-``IORSSmall`` record builders), ``axial_push`` (alignment-axial 01-05: the blade at a long-axis end along the end's arc). Registered without a
+``IORSSmall`` record builders), ``axial_push`` (alignment-axial 01-05: the blade at a long-axis end along the end's arc), ``axial_brace``
+(alignment-axial 01-05: the stop brace at the goal - ``AlignmentAxial._brace_candidates``' rule; the flat targets' v2 entries have rests but no
+grasps, which a brace entry does not need). Registered without a
 pure builder yet (``builder`` None: the record builders are interleaved with the samplers' IK and still need factoring): ``block_push`` /
 ``block_brace`` (block_design_01), ``floor_blade`` / ``floor_flat`` / ``floor_pitched`` (under_large 01-03, touching_large_03: the push-under
 chains need ``contact_offset_along`` / ``pitched_turns`` factored), ``base_push`` (nextto_large 01-03, touching_large_01: the face points of
@@ -159,6 +161,83 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
     return out
 
 
+def axial_rest(rest) -> Any:
+    """The axial program's placement: the target upright at the IDENTITY orientation turned about z (``object_pose_on(..., IDENTITY_QUAT, ...)``,
+    the goal ``quat_from_yaw(yaw_goal)``) with the v2 entry's measured root height - the v2 rest must be that upright rest (tilt <= 0.05 rad),
+    else ``ValueError``."""
+    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > 0.05:
+        raise ValueError(f"the v2 rest {list(np.round(rest.quat_xyzw, 4))} is not the axial program's upright identity rest")
+    return S.Rest(rest_id=rest.rest_id, quat_xyzw=np.array([0.0, 0.0, 0.0, 1.0]), h_root=float(rest.h_root), reference_yaw=0.0, record=rest.record)
+
+
+def _axial_long(pts_obj: np.ndarray, params: Dict[str, Any]) -> np.ndarray:
+    """The target's long axis in its own frame (``params["long_axis"]``: the customs / icl frame record; default the footprint's longer side)."""
+    if params.get("long_axis") is not None:
+        a = np.asarray(params["long_axis"], dtype=float)
+        return a / np.linalg.norm(a)
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    ang = CPZ.min_area_rect(th.as_tensor(pts_obj[:, :2], dtype=th.float32))[0]
+    return np.array([math.cos(ang), math.sin(ang), 0.0])
+
+
+def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The axial STOP BRACE entries (``contact_poses.axial_stop_geometry`` + ``axial_brace_candidates`` - ``AlignmentAxial._stop_geometry`` /
+    ``_brace_candidates``' rule): per GOAL yaw slot (relative to the stance; the object's root at its goal pose), long-axis end
+    (``AXIAL_END_INSET_M`` inside it) and turn sense, the push turning the end ``turn_deg`` into the goal; the closed left gripper at the stop
+    face the end arrives at (at 3/4 of the height): the top-down blade beside it (straight / pitched, both wrist turns; first for a target
+    under 4 cm) and the pads on it (closing v / h, pad centre 5 mm outside the goal face), each clear of the target's sweep from its init
+    pose. The entries are in the object frame AT THE GOAL POSE (the brace holds the object there while the push completes); ``load`` = the
+    direction the end arrives in (``d_stop``, rule frame) and the end's point (goal object frame)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    r0 = axial_rest(rest)
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    turn = math.radians(float(params.get("turn_deg", AXIAL_TURN_DEG)))
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
+    proj = (hull - com_local) @ long_local
+    h = float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
+    out = []
+    for yaw_goal in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
+        for end_sign in (1.0, -1.0):
+            half_len = float(proj.max() if end_sign > 0 else -proj.min()) - AXIAL_END_INSET_M
+            for spin in (1.0, -1.0):
+                d_goal = spin * turn
+                yaw0 = yaw_goal - d_goal
+                q0 = C.quat_from_yaw(yaw0)
+                pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
+                com = pose_init[0] + C.quat_rotate(q0, com_local)
+                end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace)
+                T_goal = CPZ._mat(goal_pose)
+                Ti = np.linalg.inv(T_goal)
+                end_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), end - pose_init[0])) + goal_pose[0]
+                skips: Dict[str, int] = {}
+                seen = set()
+                for pre, contact, kind, extras in CPZ.axial_brace_candidates(CPZ.MAP_FRAME, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push,
+                                                                             face_z=face_z, height=h, skips=skips):
+                    cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+                    while cls in seen:
+                        cls += "#"
+                    seen.add(cls)
+                    pitch = float(str(extras["pose_class"])[len("blade_"):]) if str(extras.get("pose_class", "")).startswith("blade_") else 0.0
+                    e = CPZ.contact_entry("brace", cls, "axial_brace", "brace", T_goal, contact, pre, dict(extras, kind=kind),
+                                          face_rule="the goal hull's stop face the pushed end arrives at (d_stop), at 3/4 of the height; the blade at the push height",
+                                          support_z=0.0, object_height=h, pitch_deg=pitch)
+                    e["yaw_deg"] = round(math.degrees(yaw_goal), 4)
+                    e["goal"] = {"yaw_goal_deg": round(math.degrees(yaw_goal), 4), "turn_rad": round(d_goal, 6), "end_sign": end_sign, "spin": spin,
+                                 "init_yaw_deg": round(math.degrees(yaw0), 4), "skips": dict(skips)}
+                    e["load"] = {"frame": "rule", "direction": [round(float(v), 6) for v in d_stop.tolist()],
+                                 "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ end_goal.double().numpy() + Ti[:3, 3])],
+                                 "what": "the right arm's axial push brings the end into the stop at the goal"}
+                    out.append(e)
+    return out
+
+
 def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The axial push entries (``AlignmentAxial._sample_with``'s classes on the shared rules: ``axial_push_height``, ``axial_blade_geometry``,
     ``extreme_point``, ``axial_push_chain``) of the target at each yaw slot: per long-axis end (``AXIAL_END_INSET_M`` inside it) and turn sense,
@@ -174,6 +253,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     turn = math.radians(float(params.get("turn_deg", AXIAL_TURN_DEG)))
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = params.get("long_axis")
+    rest = axial_rest(rest)  # the axial program's upright identity placement
     out = []
     for yaw in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
@@ -231,6 +311,9 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
     "touching_push": {"kind": "push", "arm_role": "work", "builder": build_touching_push, "scope": "touching small scale 01 / 02 / 04: the pushed targets"},
     "touching_brace": {"kind": "brace", "arm_role": "brace", "builder": build_touching_brace, "scope": "touching small scale 01 / 02 / 04: the braced partners"},
     "axial_push": {"kind": "push", "arm_role": "work", "builder": build_axial_push, "scope": "alignment-axial 01-05: the pushed targets"},
+    "axial_brace": {"kind": "brace", "arm_role": "brace", "builder": build_axial_brace,
+                    "scope": "alignment-axial 01-05: the stop brace holding the target at its goal (board_game qgvsnb 0.8126, paperback 0.6854, keyboard 0.7853, "
+                             "magazine 0.7351, tablespoon tqqwys 0.8126)"},
     "block_push": {"kind": "push", "arm_role": "work", "builder": None, "scope": "block_design_01",
                    "missing": "block_design's push builder (block_design.py ~2960 / ~3110) is not factored into contact_poses yet"},
     "block_brace": {"kind": "brace", "arm_role": "brace", "builder": None, "scope": "block_design_01", "missing": "block_design's brace builder is not factored"},
@@ -305,8 +388,11 @@ def resolved_knobs(family: str, knobs: Dict[str, Any], subtask: Optional[str]) -
                               "contact_height_extra_m", "push_raised_max_aspect"],
             "touching_brace": ["stop_clearance_m", "brace_open_when_wide", "brace_tip_first", "push_tip_pre_dist_m", "brace_tip_min_above_m", "brace_wide_stop",
                                "brace_wide_spreads_m", "brace_tip_pitches_deg", "blade_palm_clear_m", "contact_height_extra_m"],
-            "axial_push": ["contact_height_extra_m"]}.get(family, [])
+            "axial_push": ["contact_height_extra_m"], "axial_brace": ["contact_height_extra_m"]}.get(family, [])
     out = {k: gs.gen(k) for k in keys}
+    if family == "touching_brace":
+        # the wide stop's spreads as the rule reads them (ISPATIALGYM_BRACE_FULL_OPEN prepends the full-open 0.127 m)
+        out.update(brace_wide_spreads_m=CPZ.brace_wide_spreads(gs), brace_full_open=CPZ.brace_full_open_on())
     if family == "touching_push":
         out.update({k: TT.phase2_gen(gs, k, None) for k in ("push_height_sweep", "push_height_step_m", "push_max_height_fraction", "push_gripper_open",
                                                               "push_open_opening_m")})

@@ -1,0 +1,157 @@
+[
+ {
+  "id": "board_game__qgvsnb__s1",
+  "category": "board_game",
+  "model": "qgvsnb",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/board_game__qgvsnb__s1",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     0,
+     1,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_01 (support 0.8126)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+ },
+ {
+  "id": "paperback_book__jhaltj__s1",
+  "category": "paperback_book",
+  "model": "jhaltj",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/paperback_book__jhaltj__s1",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_02 (support 0.6854; the alias spawns s1x1x2.5 - this entry is s1)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+ },
+ {
+  "id": "keyboard__injrgc__s1",
+  "category": "keyboard",
+  "model": "injrgc",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/keyboard__injrgc__s1",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     0,
+     1,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_03 (support 0.7853)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+ },
+ {
+  "id": "magazine__tfovwy__s1",
+  "category": "magazine",
+  "model": "tfovwy",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/magazine__tfovwy__s1",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_04 (support 0.7351)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+ },
+ {
+  "id": "tablespoon__tqqwys__s1",
+  "category": "tablespoon",
+  "model": "tqqwys",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/tablespoon__tqqwys__s1",
+  "families": [
+   "axial_push",
+   "axial_brace"
+  ],
+  "subtask": "alignment-axial",
+  "generation": {},
+  "params": {
+   "axial_push": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   },
+   "axial_brace": {
+    "long_axis": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  "alias": "alignment-axial_05 (support 0.8126; stable rest r0_other, 2.5 deg tilt)",
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+ }
+]

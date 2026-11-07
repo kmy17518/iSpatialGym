@@ -516,45 +516,15 @@ class AlignmentAxial(SamplerV2):
         return draft
 
     def _stop_geometry(self, pose: TT.Pose, end: th.Tensor, com: th.Tensor, spin: float, yaw_goal: float, z_brace: float):
-        """§6.10 stop edge of the pushed ``end``: the goal pose (COM fixed, yaw = aligned), the direction the end moves in
-        at the goal (``d_stop``) and the stop point = the goal hull's extreme point along it + 5 mm clearance at the
-        brace height. Returns ``(goal_pose, stop_pt, d_stop)``."""
-        z_axis = th.tensor([0.0, 0.0, 1.0])
-        q_goal = C.quat_from_yaw(yaw_goal)
-        goal_pose = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
-        r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
-        d_stop = spin * th.cross(z_axis, th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
-        d_stop = d_stop / th.linalg.norm(d_stop)
-        # the stop face = the goal hull's extreme along d_stop (a whole long face for a box). Only the part of that face
-        # near the pushed end's arrival is free of the object before the goal (the rest of the face rises through the
-        # blade's position while the object turns: ``tabletop.blade_sweep_clear`` — the pilot's blocked demo had its
-        # blade on the swept part). Candidates run from 2 cm inside that corner toward the far end; the first one whose
-        # blade clears the sweep is used. Points are ON the goal hull's face (no clearance): every brace pose adds its own
-        # stand-off along d_stop. Returns ``(goal_pose, stop_pts (nearest the pushed end first), d_stop)``.
-        stop_pts = self._stop_face_points(goal_pose, d_stop, near=com + r_goal, z=z_brace)
-        return goal_pose, stop_pts, d_stop
+        """§6.10 stop edge of the pushed ``end``: ``(goal_pose, stop_pts, d_stop)`` (``contact_poses.axial_stop_geometry``, the rule the brace
+        library shares): the goal pose (COM fixed, yaw = aligned), the direction the end moves in at the goal and the points of the goal hull's
+        face along it at the brace height - only the part of that face near the pushed end's arrival is free of the object before the goal,
+        so the candidates run from that corner toward the far end."""
+        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace)
 
     def _stop_face_points(self, goal_pose: TT.Pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=(0.08, 0.2, 0.35, 0.5, 0.65, 0.8)) -> List[th.Tensor]:
-        """Points of the goal hull's face extreme along ``d_stop`` (projection within 3 mm of the maximum) at the given
-        fractions of the face's span from the end nearest ``near`` (the pushed end's arrival) to the far end, at height
-        ``z``; a face shorter than 6 cm yields its midpoint only."""
-        pts = C.transform_points(goal_pose, self.hull)
-        dxy = th.tensor([float(d_stop[0]), float(d_stop[1])])
-        dxy = dxy / th.linalg.norm(dxy)
-        proj = pts[:, :2] @ dxy
-        face = pts[proj >= float(proj.max()) - 0.003]
-        f = TT._t(near)[:2]
-        dist = th.linalg.norm(face[:, :2] - f, dim=1)
-        p_near, p_far = face[int(th.argmin(dist))], face[int(th.argmax(dist))]
-        span = float(th.linalg.norm(p_far[:2] - p_near[:2]))
-        if span < 0.06:
-            mid = 0.5 * (p_near + p_far)
-            return [th.tensor([float(mid[0]), float(mid[1]), float(z)])]
-        out = []
-        for t in fractions:
-            p = p_near + (p_far - p_near) * t
-            out.append(th.tensor([float(p[0]), float(p[1]), float(z)]))
-        return out
+        """``contact_poses.axial_stop_face_points``: the goal hull's stop face points at ``fractions`` of its span from the end nearest ``near``."""
+        return CPZ.axial_stop_face_points(self.hull, goal_pose, d_stop, near, z, fractions)
 
     def _face_z_range(self) -> Tuple[float, float]:
         """World z range of the target's side faces (standing on the top)."""
@@ -568,65 +538,15 @@ class AlignmentAxial(SamplerV2):
         return CPZ.axial_blade_geometry(self._push_height(), self._face_z_range(), pitch, clearance, side=side)  # i7-contact: the shared rule
 
     def _brace_candidates(self, manip: Stance, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init: TT.Pose, com: th.Tensor, d_goal: float):
-        """Brace poses of the closed left gripper at the stop face (``stop_pts`` on the goal hull, the pushed end's
-        corner side first), in the order to try: B3's contact classes with the pads on the face (approach −d_stop into
-        the face, pad centre ``STOP_CLEARANCE`` outside it; closing axis vertical ``_v`` then horizontal ``_h``; the
-        classes the left band recorded as passing at the cell first), and the top-down blade beside the stop face
-        (straight down / pitched, either wrist turn) whose eef origin stands ``finger half thickness (profile over the
-        face height above the tips) + STOP_CLEARANCE`` outside the face and which stays clear of the target's footprint
-        over the whole rotation from the init pose to the goal (``tabletop.blade_sweep_clear``; a point of the face that
-        the turning object sweeps through is skipped). Yields ``(pre, contact, kind, extras)``; thin targets (< 4 cm) get
-        the blade first (a side contact at ¾ of their height puts the wrist on the table)."""
-        z_axis = th.tensor([0.0, 0.0, 1.0])
-        a = -d_stop  # into the stop face
-        side_h = C.unit(th.cross(z_axis, d_stop, dim=0))
-        contact_classes = []
-        for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
-            name = TT.contact_class(manip, a, c_axis)
-            contact_classes.append((name or f"side_{suffix}", c_axis))
-        if passing:
-            contact_classes.sort(key=lambda nc: 0 if nc[0] in passing else 1)
-        r_side = TT.finger_half_thickness(0.0, side=True) or 0.007
-
-        def side_contacts():
-            for i, stop_pt in enumerate(stop_pts):
-                point = stop_pt + d_stop * STOP_CLEARANCE  # pad centre 5 mm outside the goal face
-                # the pads' footprint (a finger's width across, a finger's thickness deep) must be clear of the sweep too
-                ok, gap = TT.blade_sweep_clear(self.hull, pose_init, com[:2], d_goal, (point + d_stop * r_side)[:2], r_side, STOP_CLEARANCE)
-                if not ok:
-                    self._blade_skips["sweep"] = self._blade_skips.get("sweep", 0) + 1
-                    continue
-                for name, c_axis in contact_classes:
-                    for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
-                        brace = C.contact_eef(point, a, c_sign * c_axis)
-                        yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": STOP_CLEARANCE, "pose_class": name,
-                                                                                               "stop_face_fraction": i, "sweep_min_gap_m": gap}
-
-        def blades():
-            z_push = self._push_height()
-            for pitch in TT.approach_pitch_order(None):
-                geo = self._blade_geometry(pitch, STOP_CLEARANCE)
-                if geo is None:
-                    self._blade_skips["palm"] = self._blade_skips.get("palm", 0) + 1
-                    continue
-                standoff, half, z_tip = geo
-                a_vec = TT.pitched_approach(pitch, manip.forward)
-                for i, stop_pt in enumerate(stop_pts):
-                    origin = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * standoff
-                    # the blade must not meet the rotating target before the goal (the face rising through it, a corner)
-                    ok, gap = TT.blade_sweep_clear(self.hull, pose_init, com[:2], d_goal, origin[:2], max(half, r_side), STOP_CLEARANCE)
-                    if not ok:
-                        self._blade_skips["sweep"] = self._blade_skips.get("sweep", 0) + 1
-                        continue
-                    for c_sign in (1.0, -1.0):
-                        brace = (origin, C.eef_quat(a_vec, c_sign * d_stop))
-                        yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
-                            "blade_half_thickness_m": half, "stop_clearance_m": STOP_CLEARANCE, "blade_standoff_m": standoff, "fingertip_z": z_tip,
-                            "sweep_min_gap_m": gap, "pose_class": f"blade_{pitch:.0f}", "stop_face_fraction": i}
-
-        order = (blades, side_contacts) if self.extents["height"] < THIN_TARGET_HEIGHT else (side_contacts, blades)
-        for gen in order:
-            yield from gen()
+        """The stop brace's poses of the closed left gripper at the stop face (``contact_poses.axial_brace_candidates``, the rule the brace
+        library shares): the pads on the face (closing ``_v`` / ``_h``, the left band's passing classes first) and the top-down blade beside it,
+        each clear of the target's sweep from the init pose to the goal; thin targets (< 4 cm) get the blade first. Yields ``(pre, contact,
+        kind, extras)``; the skips counted in ``self._blade_skips``."""
+        if getattr(self, "_blade_skips", None) is None:
+            self._blade_skips = {}
+        yield from CPZ.axial_brace_candidates(manip, self.hull, stop_pts, d_stop, passing, pose_init, com, d_goal, z_push=self._push_height(),
+                                              face_z=self._face_z_range(), height=self.extents["height"], stop_clearance=STOP_CLEARANCE,
+                                              thin_height=THIN_TARGET_HEIGHT, skips=self._blade_skips)
 
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of

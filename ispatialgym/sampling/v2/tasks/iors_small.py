@@ -4800,7 +4800,7 @@ class IORSSmall(SamplerV2):
                 why_open = f"no joint two-arm placement ({gate.get('why')})"
             elif open_rule["spread_m"] is None:
                 why_open = (f"the push line lies {open_rule['push_line_from_face_centre_m']:+.3f} m off the face's centre: no open spread "
-                            f"{self.gen('brace_wide_spreads_m', [0.09, 0.07, 0.05])} straddles it {BRACE_OPEN_END_MARGIN_M:.2f} m from the face's ends")
+                            f"{CPZ.brace_wide_spreads(self)} straddles it {BRACE_OPEN_END_MARGIN_M:.2f} m from the face's ends")
             else:
                 why_open = f"no open-finger stop passed ({'; '.join([w for w in why if '/' in w][-3:]) or 'no candidate at a brace height'})"
             raise Reject("brace_open_required", f"touching: the partner's braced face is {open_rule['face_width_m']:.3f} m wide at the brace height "

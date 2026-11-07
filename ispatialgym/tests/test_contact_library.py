@@ -295,3 +295,50 @@ def test_validate_library_writes_each_entrys_verdict_and_the_timing(glib):
     assert all(x["reasons"] == ["short"] for k, x in v.items() if k.startswith("push_blade"))
     assert tim["kind"] == "push" and tim["rest_id"] == "r0" and tim["n_entries"] == len(lib["entries"]) and set(tim) >= {"settle_s", "plan_s", "trials_s", "total_s"}
     assert lib["validated"]["oracle_config"]["push_pre_dist_m"] == 0.04 and lib["validation_timing"] is tim
+
+
+def test_an_axial_brace_library_is_the_axial_programs_stop_brace_at_the_goal(glib, tmp_path):
+    """``axial_brace`` (the axial program's own ``_brace_candidates`` rule): per goal yaw, end and turn sense, the stop brace at the goal - the
+    thin magazine (1.2 cm) gets the blade first; the entries are in the goal object frame and are the rule's own poses; the load is the
+    arriving end's direction; a v2 rest that is not the upright identity one is refused."""
+    lib = CL.build_job(_job("magazine__flat__s1", ["axial_brace"], params={"axial_brace": {"yaws": 2, "turn_deg": 40.0, "long_axis": [0.0, 1.0, 0.0]}}), glib)["brace"]
+    e = lib["entries"]
+    assert e and all(x["family"] == "axial_brace" and x["arm_role"] == "brace" and x["kind"] == "brace" and x["stop"] == CPZ.brace_stop_rule() for x in e)
+    assert {x["yaw_deg"] for x in e} == {0.0, 180.0} and e[0]["class"].split("_", 1)[1].startswith("blade_0")  # thin: the blade first
+    assert any("_h" in x["class"] or "_v" in x["class"] for x in e)  # the pads on the stop face too
+    x = e[0]
+    g = x["goal"]
+    # the rule itself on the same inputs gives the entry's contact at the goal pose
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    pts = np.array(_box_geometry(0.20, 0.28, 0.012)["vertices"])
+    hull = th.as_tensor(pts, dtype=th.float32)
+    com_local = hull.mean(dim=0)
+    q0 = C.quat_from_yaw(math.radians(g["init_yaw_deg"]))
+    pose_init = (th.tensor([0.0, 0.0, 0.0]), q0)
+    com = pose_init[0] + C.quat_rotate(q0, com_local)
+    long_l = th.tensor([0.0, 1.0, 0.0])
+    proj = (hull - com_local) @ long_l
+    half = float(proj.max() if g["end_sign"] > 0 else -proj.min()) - CL.AXIAL_END_INSET_M
+    end = com + C.quat_rotate(q0, long_l) * g["end_sign"] * half
+    goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, g["spin"], math.radians(g["yaw_goal_deg"]), TT.contact_height(0.0, 0.012))
+    _pre, contact, kind, _x = next(iter(CPZ.axial_brace_candidates(CPZ.MAP_FRAME, hull, stop_pts, d_stop, None, pose_init, com, g["turn_rad"],
+                                                                     z_push=CPZ.axial_push_height(0.0, 0.012), face_z=(0.0, 0.012), height=0.012)))
+    w = CPZ.entry_world(x, goal_pose)
+    assert kind == x["extras"]["kind"] and th.allclose(w["contact"][0], contact[0], atol=1e-5) and C.quat_angle(w["contact"][1], contact[1]) < 1e-4
+    assert np.allclose(x["load"]["direction"], d_stop.numpy(), atol=1e-5)
+    root = str(tmp_path / "g2")
+    _model_dir(root, "magazine__lying__s1", (0.20, 0.28, 0.012), rest_q=(0.7071068, 0.0, 0.0, 0.7071068))
+    with pytest.raises(ValueError, match="identity"):
+        CL.build_job(_job("magazine__lying__s1", ["axial_brace"]), root)
+
+
+def test_the_axial_brace_load_pushes_at_the_arriving_end():
+    cfg = VC.ContactValidateConfig()
+    pts = np.array(_box_geometry(0.20, 0.28, 0.012)["vertices"])
+    T = np.eye(4)
+    T[:3, 3] = [0.6, 0.0, 0.8126]
+    e = {"load": {"direction": [1.0, 0.0, 0.0], "point_object": [0.0, 0.11, 0.006]}}
+    path = VC.pusher_path(e, T, pts, cfg, 1.0 / 30.0)
+    assert path[0][1] == pytest.approx(0.11) and path[-1][0] + cfg.brace_pusher_size_m[0] / 2 == pytest.approx(0.6 - 0.10 + cfg.brace_press_m)
+    assert path[0][2] == pytest.approx(0.8126 + cfg.brace_pusher_size_m[2] / 2 + 0.001)  # the 5 cm box above the support, not in it
