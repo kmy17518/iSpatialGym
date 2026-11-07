@@ -43,14 +43,14 @@ if [[ " $STAGES " == *" replay "* ]]; then
   t0=$(date +%s)
   SPEC=$(sed -n "$((I + 1))p" ${GC_REPLAY_SPECS:?})
   read -r RK RM RI <<< "$SPEC"
-  python -u -m ispatialgym.grasping.validate_contacts replay --kind $RK --model-dir $RM --instance $RI >> $ROOT/logs/replay_$I.log 2>&1
+  python -u -m ispatialgym.grasping.validate_contacts replay --kind $RK --model-dir $RM --instance $RI ${GC_REPLAY_ARGS:-} >> $ROOT/logs/replay_$I.log 2>&1
   rc=$?; grep -q "GB_CONTACT_REPLAY" $ROOT/logs/replay_$I.log || rc=${rc/#0/1}; RC=$rc
   echo "GC_STAGE replay rc=$rc s=$(( $(date +%s) - t0 ))"
 fi
 if [[ " $STAGES " == *" validate "* ]]; then
   for KIND in ${GC_KINDS:-push brace}; do
     t0=$(date +%s)
-    python -u -m ispatialgym.grasping.validate_contacts --root $ROOT --kind $KIND --glib $GLIB --jobs $M --shard $I/$N >> $ROOT/logs/validate_${I}_$KIND.log 2>&1
+    python -u -m ispatialgym.grasping.validate_contacts --root $ROOT --kind $KIND --glib $GLIB --jobs $M --shard $I/$N ${GC_VALIDATE_ARGS:-} >> $ROOT/logs/validate_${I}_$KIND.log 2>&1
     rc=$?; grep -q "GB_CONTACT_VALIDATE_DONE" $ROOT/logs/validate_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
     echo "GC_STAGE validate kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
   done

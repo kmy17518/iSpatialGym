@@ -95,6 +95,9 @@ class ContactValidateConfig:
     brace_arm: str = "left"
     trials_per_entry: int = 1
     max_entries: int = 48
+    #: DIAGNOSTIC (run E, owner question 2): validate the entries the sampler's hand_overlap screen removes INSTEAD of the live ones - is the
+    #: screen over-strict physically? Their verdicts carry ``diagnostic``; the screen itself is unchanged (a library run with it goes to its own root)
+    diagnose_screened: bool = False
     #: the object in the base frame (ahead of the slab edge, to the arm's side): the right arm's; the left arm's lateral is mirrored
     base_offsets: Tuple[Tuple[float, float], ...] = ((0.0, -0.15), (0.0, -0.28), (0.08, -0.05), (0.08, -0.22))
     max_steps: int = 1800
@@ -203,6 +206,37 @@ def oracle_ctx(variant: Optional[str] = None) -> Dict[str, Any]:
     """The oracle action's ``ctx`` at its start: the variant as the sidecar's (``execute.variant_generation`` reads its customs
     ``generation``; the oracle's other sidecar reads are ``getattr(..., None)``), else empty."""
     return {} if not variant else {"sidecar": SimpleNamespace(variant=str(variant))}
+
+
+#: the families (and replayed variants) whose demos run on the task's vertical COM hinge (``AlignmentAxial.after_settle``)
+AXIAL_FAMILIES = ("axial_push", "axial_brace")
+
+
+def axial_hinged(entry: Dict[str, Any], variant: Optional[str]) -> bool:
+    """Whether a trial runs on the axial task's COM hinge: an axial library entry, or a replayed record of an alignment-axial variant."""
+    return entry.get("family") in AXIAL_FAMILIES or str(variant or "").startswith("alignment-axial")
+
+
+def axial_hinge_spec(variant: Optional[str], mass_kg: float, footprint_long_short: Tuple[float, float]) -> Dict[str, Any]:
+    """The hinge ``AlignmentAxial.after_settle`` installs, from the variant's customs ``generation`` over the alignment-axial defaults:
+    ``sink_m`` (``hinge_sink_m``: the anchor that far below the support top, on the COM's vertical) and the resistance
+    (``AlignmentAxial.hinge_resistance``: None - frictionless - unless the variant sets one of ``HINGE_RESISTANCE_KEYS``; then
+    ``constraints.hinge_resistance`` of the mass over the footprint, the world vertical's defaults for the keys left out)."""
+    from ispatialgym.oracle import execute as EX
+    from ispatialgym.sampling import constraints as CN
+    from ispatialgym.sampling import generation_defaults as GD
+
+    keys = ("hinge_stop_decel_rad_s2", "hinge_viscous_tau_s", "hinge_brake_omega_rad_s")  # alignment_axial.HINGE_RESISTANCE_KEYS
+    gen = dict(GD.defaults_for("alignment-axial"))
+    gen.update(EX.variant_generation(oracle_ctx(variant)) if variant else {})
+    vals = {k: gen.get(k) for k in keys}
+    res = None
+    if any(v is not None for v in vals.values()):
+        d = dict(zip(keys, (CN.HINGE_STOP_DECEL_RAD_S2, CN.HINGE_VISCOUS_TAU_S, CN.HINGE_BRAKE_OMEGA_RAD_S)))
+        res = CN.hinge_resistance(float(mass_kg), tuple(float(v) for v in footprint_long_short), decel=float(vals[keys[0]] if vals[keys[0]] is not None else d[keys[0]]),
+                                  tau=float(vals[keys[1]] if vals[keys[1]] is not None else d[keys[1]]),
+                                  omega_brake=float(vals[keys[2]] if vals[keys[2]] is not None else d[keys[2]]))
+    return {"sink_m": float(gen.get("hinge_sink_m", 0.001)), "resistance": res}
 
 
 def run_oracle(action, motions, state, step, max_steps: int, variant: Optional[str] = None) -> Dict[str, Any]:
@@ -534,7 +568,9 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     for e in entry_order(lib_k["entries"]):
         yaw = round(float(e.get("yaw_deg", 0.0)), 4)
         screen = (e.get("sampler_screen") or {}).get("hand_overlap")
-        if screen:
+        if cfg.diagnose_screened and not screen:
+            continue  # the diagnostic validates the screened entries only; the live ones keep their record
+        if screen and not cfg.diagnose_screened:
             # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
             tim["n_screened"] = tim.get("n_screened", 0) + 1
@@ -578,6 +614,8 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
         verdict = "valid" if verdicts == {"valid"} else ("unreachable" if verdicts == {"unreachable"} else "invalid")
         e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": verdict, "reasons": sorted({r for t in trials for r in t["reasons"]}),
                            "trials": trials, "config": asdict(cfg), "entry_digest": e.get("digest"), "calibrated": False}
+        if screen:
+            e["validation"].update(diagnostic="a screened entry validated (the sampler's hand_overlap removes it: never executed)", screen=screen)
     tim = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in tim.items()}
     tim["total_s"] = round(time.time() - t_all, 2)
     tim["rest_id"] = lib_k["object"].get("rest_id")
@@ -835,6 +873,7 @@ class KitContactWorld:
         goal = goal_pose(entry, T_start)
         motions, sim = self._motions_state(obj, goal)
         stop = self._place_stop(entry, T_start, pts)
+        hinge = self._hinge_on(obj, entry, pts)  # the axial task's COM hinge (the demos' world)
         w = _entry_world(entry, T_start)
         trace = TrialTrace(T_start, _T(w["contact"]))
         trace.rec.update(obj_rest=[round(float(v), 4) for v in rest.get("world_position", [])] + [round(float(v), 4) for v in rest.get("world_quat_xyzw", [])],
@@ -856,11 +895,14 @@ class KitContactWorld:
             run = run_oracle(act, motions, sim, step_track, self.cfg.max_steps, variant=self.variant)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
             self._park(self._stop, 1)
+            self._hinge_off(hinge, obj)
             out = _error_trial(ex)
             return dict(out, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), debug=trace.end(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm))),
                         wall_s=round(time.time() - t0, 3))
         T1, Te = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
         self._park(self._stop, 1)  # after the end pose is read (a target leaning on it is judged where it stands)
+        self._hinge_off(hinge, obj)
+        trace.rec["hinge"] = None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"}
         out = judge_push(entry, T0, T1, Te, pts, self.cfg, run, max(series) if series else 0.0, tip_gap_m=track.gap, goal=goal,
                          touch_gap_m=touch_gap(stop, T1, pts))
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te),
@@ -876,9 +918,10 @@ class KitContactWorld:
         pts = hull_points(self._geom_of(obj))
         motions, sim = self._motions_state(obj)
         T_start = _T(obj.get_position_orientation())
+        hinge = self._hinge_on(obj, entry, pts)  # the axial task's COM hinge (the demos' world)
         w = _entry_world(entry, T_start)
         trace = TrialTrace(T_start, _T(w["contact"]))
-        trace.rec.update(eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec)
+        trace.rec.update(eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec, hinge=None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"})
         step = self._stepper(obj, sim, arm, sa, series, trace)
         self._hold(motions, step, self.vcfg.init_hold_steps)
         act = entry_action(entry, _T(obj.get_position_orientation()), obj.name, arm)
@@ -892,12 +935,15 @@ class KitContactWorld:
                     pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0]))
                 self._hold(motions, step, 1)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
+            self._park_pusher()
+            self._hinge_off(hinge, obj)
             out = _error_trial(ex)
             return dict(out, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), debug=trace.end(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm))),
                         wall_s=round(time.time() - t0, 3))
         finally:
             self._park_pusher()
         T1, Te1 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
+        self._hinge_off(hinge, obj)
         load = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
         out = judge_brace(entry, T0, T1, Te0, Te1, load, self.cfg, run, max(series) if series else 0.0)
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
@@ -949,6 +995,77 @@ class KitContactWorld:
 
     def _geom_of(self, obj):
         return getattr(obj, "_isg_geom")
+
+    def _reprobe(self, obj, fn):
+        """``fn()`` (a hinge prim added / removed: ``og.sim.update_handles``) with the world's contact probe uninstalled before and rebuilt
+        after - the physics views a prim change invalidates (run C, finding (d))."""
+        try:
+            self.tw.probe.uninstall()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            return fn()
+        finally:
+            self.tw.probe = self.VT.ForceProbe(self.tw.robot, self.tw.slab, obj, self.arm)
+            self.tw.probe.install()
+
+    def physics_facts(self, obj) -> Dict[str, Any]:
+        """The contact physics of the trial (run E diagnosis): the object's mass and the physics materials bound to its and the slab's
+        collision meshes (static / dynamic friction, restitution; None = the PhysX default material, 0.5 / 0.5 / 0)."""
+        def mats(o):
+            out = []
+            for link in o.links.values():
+                for name, m in link.collision_meshes.items():
+                    pm = m.get_applied_physics_material()
+                    out.append({"mesh": name, "material": None if pm is None else
+                                {"static_friction": float(pm.get_static_friction()), "dynamic_friction": float(pm.get_dynamic_friction()),
+                                 "restitution": float(pm.get_restitution()), "path": pm.prim_path}})
+            return out
+
+        return {"object_mass_kg": round(float(obj.mass), 5), "object": mats(obj), "slab": mats(self.tw.slab)}
+
+    def set_slab_friction(self, obj, mu: float) -> None:
+        """DIAGNOSTIC: bind a physics material of friction ``mu`` (static = dynamic, restitution 0) to the slab's collision meshes."""
+        import omnigibson.lazy as lazy
+
+        def bind():
+            pm = lazy.isaacsim.core.api.materials.physics_material.PhysicsMaterial(prim_path=f"{self.tw.slab.prim_path}/Looks/diag_physics_mat_{int(round(mu * 1000))}",
+                                                                                   name=f"diag_physics_mat_{int(round(mu * 1000))}", static_friction=float(mu),
+                                                                                   dynamic_friction=float(mu), restitution=0.0)
+            for link in self.tw.slab.links.values():
+                for m in link.collision_meshes.values():
+                    m.apply_physics_material(pm)
+            self.tw.og.sim.step()
+
+        self._reprobe(obj, bind)
+
+    def _hinge_on(self, obj, entry, pts) -> Optional[Dict[str, Any]]:
+        """The axial task's COM hinge (``AlignmentAxial.after_settle``: ``constraints.create_hinge`` at the object's PhysX COM on its vertical,
+        ``hinge_sink_m`` below the slab top, parented to the slab, the variant's resistance) for an axial trial at the object's start pose;
+        None for every other trial."""
+        if not axial_hinged(entry, self.variant):
+            return None
+        from ispatialgym.sampling import constraints as CN
+        from ispatialgym.sampling.v2.tasks.alignment_axial import _com_local
+
+        T = _T(obj.get_position_orientation())
+        com = T[:3, :3] @ np.asarray(_com_local(obj).tolist(), dtype=float) + T[:3, 3]
+        ext = pts[:, :2].max(axis=0) - pts[:, :2].min(axis=0)
+        spec = axial_hinge_spec(self.variant, float(obj.mass), (float(ext.max()), float(ext.min())))
+        anchor = [float(com[0]), float(com[1]), float(self.tw.cfg.slab_top_z) - spec["sink_m"]]
+        res = spec["resistance"]
+        h = self._reprobe(obj, lambda: CN.create_hinge(obj, self.tw.th.tensor(anchor), self.tw.th.tensor([0.0, 0.0, 1.0]), parent_link=self.tw.slab.root_link,
+                                                       name="isg_validate_hinge", friction=None if res is None else res["friction"],
+                                                       damping=None if res is None else res["damping"]))
+        return {"hinge": h, "anchor": [round(v, 4) for v in anchor], "sink_m": spec["sink_m"],
+                "resistance": None if res is None else {k: v for k, v in res.items() if isinstance(v, (int, float))}}
+
+    def _hinge_off(self, hinge: Optional[Dict[str, Any]], obj) -> None:
+        if hinge is None:
+            return
+        from ispatialgym.sampling import constraints as CN
+
+        self._reprobe(obj, lambda: CN.remove_hinge(hinge["hinge"]))
 
     def _stop_obj(self):
         """The touching push's PARTNER stand-in: a kinematic box (``stop_size_m``) the target is pushed into - the stop at the place gap that
@@ -1168,7 +1285,7 @@ def library_job(lib_k: Dict[str, Any], eid: str) -> Dict[str, Any]:
 def validate_cli(a) -> None:
     from ispatialgym.grasping import contact_library as CL
 
-    cfg = ContactValidateConfig()
+    cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)))
     arm = a.arm or (cfg.work_arm if a.kind == "push" else cfg.brace_arm)
     base = os.path.join(a.root, a.kind, "models")
     if getattr(a, "jobs", None):
@@ -1227,6 +1344,8 @@ def replay_cli(argv) -> None:
     ap.add_argument("--instance", nargs="+", required=True, help="the instances' *.oracle.json (their -tro_state.json beside them)")
     ap.add_argument("--kind", required=True, choices=["push", "brace"])
     ap.add_argument("--model-dir", required=True)
+    ap.add_argument("--slab-friction", type=float, default=None,
+                    help="DIAGNOSTIC (run E, touching_02's tipping): a physics material of this static = dynamic friction on the slab; default the PhysX default")
     a = ap.parse_args(argv)
     cfg = ContactValidateConfig()
     world = None
@@ -1242,7 +1361,10 @@ def replay_cli(argv) -> None:
                           "rest_hint_wxyz": None}, a.model_dir)
         obj._isg_geom = geom
         try:
-            res = world.replay(sit, obj, geom)
+            if a.slab_friction is not None:
+                world.set_slab_friction(obj, a.slab_friction)
+            phys = world.physics_facts(obj)
+            res = dict(world.replay(sit, obj, geom), physics=phys)
         except Exception as e:  # noqa: BLE001
             import traceback
 
@@ -1269,6 +1391,7 @@ def main(argv=None):
     ap.add_argument("--arm", default=None, choices=["right", "left"], help="default: push right, brace left")
     ap.add_argument("--shard", default=None)
     ap.add_argument("--only", nargs="*", default=None)
+    ap.add_argument("--diagnose-screened", action="store_true", help="DIAGNOSTIC: validate the hand_overlap-screened entries (their own root)")
     ap.add_argument("--jobs", default=None, help="the build manifest: validate the shard's job ids (the build's partition)")
     validate_cli(ap.parse_args(argv))
 

@@ -819,3 +819,42 @@ def test_the_validator_ik_runs_in_a_clean_world():
     kw.tw = SimpleNamespace(slab="slab", backend=SimpleNamespace(update_world=lambda ignore_objects=(): calls.append(list(ignore_objects))))
     kw.clean_world("obj")
     assert calls == [["slab", "obj", "pusher", "stop"]]
+
+
+def test_an_axial_trial_runs_on_the_tasks_com_hinge():
+    """Run E: the axial demos turn the target on the vertical COM hinge ``AlignmentAxial.after_settle`` installs (``hinge_sink_m`` below the
+    top, the variant's resistance); without it the replays drifted 6.8 / 19.5 cm and the arc lagged. The validator installs the same hinge for
+    the axial families and the alignment-axial replays, nothing for the others."""
+    assert VC.axial_hinged({"family": "axial_push"}, None) and VC.axial_hinged({"family": "axial_brace"}, None)
+    assert VC.axial_hinged({"family": "replay"}, "alignment-axial-board_game-breakfast_table")
+    assert not VC.axial_hinged({"family": "touching_push"}, "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar")
+    board = VC.axial_hinge_spec("alignment-axial-board_game-breakfast_table", 0.5, (0.4, 0.3))
+    assert board["resistance"] is None and board["sink_m"] == pytest.approx(0.001)  # the frictionless hinge
+    paper = VC.axial_hinge_spec("alignment-axial-paperback_book-desk", 0.3, (0.2, 0.13))
+    assert paper["resistance"] is not None and paper["resistance"]["friction"] > 0 and paper["resistance"]["damping"] > 0  # its customs resistance
+    kw = VC.KitContactWorld.__new__(VC.KitContactWorld)
+    kw.variant = None
+    assert kw._hinge_on(None, {"family": "touching_brace"}, np.zeros((8, 3))) is None
+    kw._hinge_off(None, None)  # no hinge: nothing to remove
+
+
+def test_the_screened_diagnostic_validates_only_the_screened_entries(glib):
+    """Run E owner question 2 (a DIAGNOSTIC, its own root): ``diagnose_screened`` runs the physics trial on the entries the sampler's hand_overlap
+    screen removes - their verdicts carry ``diagnostic`` and the screen - and leaves the live entries' records alone; the screen is unchanged."""
+    lib = CL.build_job(_job("box_of_cereal__iucshm__s0.8", ["touching_push"], params={"touching_push": {"yaws": 1}}), glib)["push"]
+    scr = [e for e in lib["entries"] if (e.get("sampler_screen") or {}).get("hand_overlap")]
+    assert scr and len(scr) < len(lib["entries"])
+
+    class World:
+        def settle(self, obj, geom, quat):
+            return {"rest_id": "r0", "world_position": [0.0, 0.0, 0.81], "world_quat_xyzw": list(quat)}, "state"
+
+        def plan_entry(self, obj, geom, entry, T, arm):
+            return {"q": th.zeros(28), "base": [0, 0, 0], "trunk": [0.5, 0.0]}
+
+        def trial_push(self, obj, entry, plan, state, rest, arm):
+            return {"verdict": "valid", "reasons": []}
+
+    VC.validate_library(World(), lib, None, None, np.zeros((8, 3)), VC.ContactValidateConfig(max_entries=len(lib["entries"]), diagnose_screened=True), "right")
+    assert all(e["validation"]["verdict"] == "valid" and e["validation"]["diagnostic"] and e["validation"]["screen"] for e in scr)
+    assert all("validation" not in e for e in lib["entries"] if e not in scr)
