@@ -112,7 +112,7 @@ def _cand_one(payload):
         out = CA.generate(j, d, cfg=cfg, densify=densify)
         n_ok = sum(1 for c in out["candidates"] if c["geometry"]["ok"])
         fams = out["families"]
-        pools = tuple(cfg.modes) + tuple(cfg.families)
+        pools = tuple(cfg.modes) + tuple(f for f in cfg.families if f not in CA.POSE_FAMILIES)
         by_pool: Dict[str, Dict[str, Any]] = {p: {"n": 0, "geometry_ok": 0, "reasons": {}} for p in pools}
         for c in out["candidates"]:  # i7-plate: per pool (mode / family) the selected candidates and the gate each one failed
             b = by_pool.setdefault(c.get("family") or c["mode"], {"n": 0, "geometry_ok": 0, "reasons": {}})
@@ -124,7 +124,9 @@ def _cand_one(payload):
                                                               "blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape")},
                 "densify": [list(x) for x in densify], "densified_from": (out["log"] or {}).get("densified_from") is not None,
                 "n_representatives": len(out["representatives"]), "n_families": len(fams),
-                "family_types": sorted({f.get("type") for f in fams.values()}), "log": {k: out["log"][k] for k in out["log"] if k in pools + ("n_sampled",)},
+                "family_types": sorted({f.get("type") for f in fams.values()}),
+                # i7-ladder: a given-pose family logs one pool per proposal / legacy grasp (agent_p<i>[_side], legacy_<name>[_side])
+                "log": {k: out["log"][k] for k in out["log"] if k in pools + ("n_sampled",) or (isinstance(out["log"][k], dict) and "source" in out["log"][k])},
                 "by_pool": by_pool, "gate_dump": CA.GATE_DUMP_FILE if cfg.gate_dump else None,
                 "reasons": sorted({c["geometry"]["reason"] for c in out["candidates"] if not c["geometry"]["ok"]})}
     except Exception as e:  # noqa: BLE001

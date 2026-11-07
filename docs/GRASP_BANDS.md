@@ -927,6 +927,110 @@ selected, topk / reps 60):
 - Not changed (an oracle change): for the skateboard deck and the recreational_vehicle partner of wreath / holly, the oracle's 45-deg rule
   picks the centroid->female direction, and "seat" copies it.
 
+### i7-ladder 2026-11-07: the tape, the storage box, ladder steps 3 and 4 (branch i7-ladder)
+
+Record: `$OFH/ladder_20261107/{tape,tape_sw,box,tape_on,box_on}` (builds; `_on` = both owner switches on, the new default),
+`$OFH/ladder_agent/r2zero_20261107{,_build2}` (step 3), `$OFH/v2maps_i7ladder{,_probe,2,3,4}` (validation roots: `cp -a v2maps_i7` + the two
+entries, their maps and links, `legacy_keys` set in the staged library.json; `ladder_20261107/stage_ladder.py`; 4 = the switches-on
+one). Builds ran on the template's knobs (48000 x 48, cone 60, densify 2x1,4x2,
+30 reps / 30 trials).
+
+**Tape kavsnx (disembedding_07): climbs at round 2 with the plate families.** gate_dump, default gates, densest pass (192000 x 96):
+- top: 33894 -> width / cone 6279 -> support 5876 -> object clear 3388 -> sweep **0**. All 3388 fail the pad sweep proper (`touch`);
+  none fail finite width or min width (widths 3.05-13.57 mm: the ring wall). touch 41-48.5 mm vs limit 9.5-14.8 mm.
+- The cause: the pad sweep casts its rays from the FULLY OPEN pads (`PAD_OPEN_HALF` 48.5 mm). A wall pinch (contact r 23.8-25 mm about
+  the axis) puts the open inner pad at r ~ -24 mm, inside the OPPOSITE wall of the ~35 mm core hole. The oracle pre-shapes to
+  width / 2 + 10 mm = 16.8 mm, inside the hole. Same class as a1117046 and the validator guard's widest pre-shape. It is NOT a fingertip
+  clearance against the 2 mm rule; it is a shared gate, so it is not changed (owner question below).
+- side: 62784 -> 41648 -> support lift 1973 -> 206 -> sweep 0, all `width_lost` (non-finite width): the lift (19-30 mm, driven by
+  wrist / wrist camera / palm on the table) puts the pinch line above the 22 mm roll.
+- With `families: [lip_shallow, rim_straddle]` (cand_overrides, default gates): lip_shallow 29380 -> 8450 -> 6889 -> 2968 -> sweep 20 ->
+  11 selected -> **3 geometry ok** (8 finger_blade_in_object) -> 3 reps -> **2 physics-valid** (1 object_pressed_into_table, load 20x).
+  The two: near-vertical (0.2 deg), contact 24 mm toward the tips, 1.9 mm below the roll top, across the 13.6 mm wall.
+  rim_straddle 18000 -> 11995 -> 10350 -> 9763 -> 1487 -> 19 selected -> 0 (19 finger_blade_in_object by the call-site lookup: blade
+  -1.6..-4.4 mm; at the real contact -0.15..-1.7 mm).
+- rim_straddle "inner finger in the core hole" needs no new parameter: `rim_profile` finds the inner face from the free axis (the hole),
+  the contact sits midway (r 21.6-22.4 mm), the inner finger at the pre-shape is in the hole.
+- Owner switch arm (`blade_contact_at_retreat` alone, `tape_sw`): rim_straddle 15 / 19 geometry ok, lip 5 / 11; 16 reps -> 12
+  physics-valid (the same counts as both switches on below: `retreat_shift_exact` does not change the tape).
+- Maps: the alias's MAP_REQUEST asks h 0.6791, plane `tray_floor` (the tape rests in the source tray), not the ledger's h_live 0.6737
+  (the conference table). A tray floor takes an EXACT anchor only (`v2_map_view`), so 0.6789 does not serve it: the validation root
+  `v2maps_i7ladder3` adds the exact anchor 0.6791 (as `prep_tray.py` did for the other trays; 0.6789's range becomes [0.6733, 0.679])
+  with tray-floor maps right + left at 0.6791. Roots `v2maps_i7ladder` (+ 0.6737) and `v2maps_i7ladder2` (maps at 0.6789) are superseded.
+- Validation, v2only N 4, switches OFF (the a4620a1e default; the 2-grasp entry, `v2maps_i7ladder3`, tag i7_ladder3): 8 attempts,
+  4 written, **4 / 4 demos**, 0.21 GPU-h (0.053 per success), no missing_map; grasps lip_shallow_2 / _4 and their twins.
+- **Switches ON** (the owner adopted `blade_contact_at_retreat` + `retreat_shift_exact` as the default for new builds, i7-switches
+  16a0e27b; my rebuild `ladder_20261107/tape_on` sets both through cand_overrides on a4620a1e): 30 candidates / **20 geometry ok / 16 reps
+  -> 12 physics-valid** (rim_straddle 11 of 15 geometry-ok, lip_shallow 1 of 5; ag_not_formed 2, object_pressed_into_table 1,
+  grasp_off_target 1). Without the families the switches give nothing (lambda CPU, switches on, families off: top 3619 -> sweep 0 all
+  `touch`, side 206 -> 0 `width_lost`): the plate families are what make the tape graspable; the switches turn rim_straddle (the inner
+  finger in the core hole) from 0 to 15 geometry-ok. Validation v2only N 4 (`v2maps_i7ladder4` = v2maps_i7 + anchor 0.6791 + the _on
+  entries and their maps, tag i7_ladder_on): 9 attempts, 4 written, **4 / 4 demos**, 0.34 GPU-h, no missing_map, no legacy grasp; the
+  demos use rim_straddle grasps (_4, _10, _12, _18). The families add everything on top of the switches: without them the tape has 0.
+
+**Storage box eicujj (touching_large_03): round 1 is enough.** Manifest `ladder_20261107/box/manifest.json` (scale [1,1,1] = the
+customs' null scale, legacy key storage_box__eicujj__t, support = the floor of house_double_floor_upper living_room_0, h_live 0.0).
+top 5314 -> 3686 -> 3606 -> 1938 -> 1927 -> 1825 -> 36 selected -> 36 geometry ok; side 27879 -> ... -> 2 (approach_hits_object);
+11 reps -> **11 physics-valid** (rim pinches of the 3.0-3.7 mm wall, tilts 0-37.5 deg). MAP_REQUEST (v2only probe i7_ladder_boxprobe):
+`{"kind": "floor", "h": 0.0, "arm": "right", "rest_id": "r0", "support": "floors_rfqizg_0"}` -> floor maps right + left
+(`GB_KIND=floor`, 86 grasp members each). Validation, v2only N 4 (`v2maps_i7ladder`, tag i7_ladder): 4 attempts, 4 written,
+**3 / 4 demos** (1 `oracle_failed:not_settled`), 0.35 GPU-h, no missing_map, no legacy grasp; grasps top_3~r180, top_4, top_5~r180.
+Switches ON (`ladder_20261107/box_on`): 38 / 35 / 11 -> **11 physics-valid**, floor maps rebuilt; v2only N 4 (`v2maps_i7ladder4`, tag
+i7_ladder_on): 4 attempts, 4 written, **3 / 4 demos** (1 `not_settled`), 0.32 GPU-h; grasps top_4, top_5~r180.
+
+**Step 3, agent proposals** (`ispatialgym/grasping/ladder.py`, `scripts/grasp_ladder/`; contract `isg-grasp-proposal/1`,
+`scripts/grasp_ladder/CONTRACT.md` + `contract.schema.json`, after the artic handle_review2 contract):
+- `agent_step.py select` picks every manifest entry built in a round root and valid in none; `prepare --regen` writes per entry
+  `inputs/<id>.json` (rest-frame geometry summary, task role, gripper facts, the rounds' gate counts and reasons, markers A-H = the
+  rounds' near misses from the gate dump - regenerated from the round's recorded config when it kept none) and `strips/<id>.png`
+  (orthographic views, two sections, oblique; the collision export only).
+- `propose --runner codex` runs `codex exec --approve-for-me --skip-git-repo-check --ephemeral -i <strip> --output-schema
+  contract.schema.json -o proposals/<id>.json` per entry (the Stanford baseline overrides `--yolo`), checks the answer against the
+  contract and asks once more with the errors; `--runner manual` lists what is missing. `run_agent_step.sh` chains it unattended
+  (cluster CPU job -> lambda codex -> cluster build -> report), JSON / PNG only between the machines.
+- `submit` makes each proposal a given-pose pool (`candidates.agent_proposal_poses`: the pinch centre, closing axis, approach, pad
+  offsets; expanded by tilts 0 / +-10 deg, turns 0 / +-15 deg, slides 0 / +-3 mm) through every gate of its mode, with the LAST ROUND's
+  gates (`ladder.round_gates`: its recorded thresholds and switches, e.g. cone 60), and the usual physics validation. Candidates and
+  grasps carry `source: "agent"` and the proposal index; the library gets `source` and the `ladder` record. `report` gives per proposal
+  poses -> each gate -> selected -> geometry ok -> reps -> valid, and the killing gate with its measured values.
+- Round-2 zeros this round (batch r2zero_20261107; the cap, cork and both hardbacks excluded: other agents' round 2): board game,
+  paperback, keyboard, magazine, paper towel dispenser, license plate. I acted as the proposer: the four slabs are infeasible under the
+  gates (wider than 89 mm both ways, a thickness pinch needs a finger under the support, every corner chord is 97-164 mm from the CoM
+  over the lever caps 87-123 mm). Keyboard: 2 back-corner chords; dispenser: 4 vertical-corner chords. Build (`r2zero_20261107_build2`, the round's cone 60):
+  - keyboard p0: 81 poses -> width / cone 0 (antipodal 0.02-0.48 < 0.5: the back corner is bevelled); p1: 81 -> 3 -> 3 -> object clear 0
+    (sphere clearance -1.74..-1.37 mm vs +1 mm).
+  - dispenser p0-p3: 54 each -> 30 / 30 / 48 / 48 -> support all -> object clear 0 (best sphere clearance -0.12 / +0.71 / -10.8 / -6.5 mm
+    vs +1 mm: a flat pad at 30-45 deg to a face digs its edge in) -> **0 physics-valid**.
+  - The dispenser's designated upright rest is not a rest: validation settles it at `r0_other`, tilt 1.575 rad (a wedge bottom: a
+    wall-mounted dispenser). Its entry needs the lying rest first (round 1/2 business), not more proposals.
+
+**Step 4, legacy grasps (code only, not run):** `legacy_step.py list` (the entries still at 0 after step 3, their legacy grasps and
+aliases) and `submit --owner-approved` (refuses without it); the legacy yaml's eef poses as given poses (`legacy_grasp_poses`) through
+the same gates (the last round's) and physics. The legacy root is the snapshot's `runlogs/grasp_library_20260905` (the main
+checkout's copy lacks some keys, e.g. the hardbacks, the box, the plate).
+- Would end at step 4 (owner decides before any use): none of the tape / box / cap / plate (they have grasps); none of the six step-3
+  entries (no legacy key: board game, paperback, keyboard, magazine for alignment-axial_01-04; dispenser, license plate for
+  alignment-world_vertical_03 / 05 - they end with no grasps at all). Pending other agents' round 2: cork ncxgpe (attachment_03,
+  `cork__ncxgpe`: 12 legacy grasps, 5 held in the legacy validation) if `attach_axis="seat"` is not adopted and step 3 finds none;
+  hardback bqvvvx (inside_large_01, `hardback__bqvvvx__bo`: 12 / 5) and acbrnv (touching_03, `hardback__acbrnv__bu`: 9 / 9) if their
+  overhang / lean entries stay at 0.
+
+**Owner questions:** (1) the pad sweep starts at the fully open pads, not the oracle's pre-shape (the tape's top grasps, any object with
+a hole or a nearby wall); (2) the slab entries of alignment-axial_01-04 / world_vertical_05 have no pinch from their flat rest under the lever cap and no
+legacy key: push-only programs or an overhang entry (like the hardback) are the options; (3) the dispenser (world_vertical_03) needs its
+lying rest; (4) the tray-floor anchor 0.6791 (office_cubicles_right conference_table_fpkmyw_0 source tray) joins the campaign anchors
+when the tape entry is merged (0.6789's range shrinks to [0.6733, 0.679]).
+
+**Correction 2026-11-07 (owner decision, after the report above).** The step-3 run on board game / paperback / keyboard / magazine /
+paper towel dispenser / license plate was a SELECTION ERROR and is void: alignment targets are pushed and braced, never grasped; their
+task-spec roles require `contacts`, not `grasps`, and their v2 path is the contact libraries and maps. The lines above that suggested
+"push-only programs or an overhang entry" and a lying rest for the dispenser do not apply - they need no grasps. The run's batch and builds
+moved to `$OFH/ladder_agent/_void_not_grasped/` (VOID.txt). Fix: the step-3 / step-4 selectors take an entry only when a task-spec role with
+`require.grasps` names its model (`ladder.grasping_roles`: same category, and the model as the role's representative, a `grasp_keys`
+"category/model" key or a scene whitelist); `agent_step.py select` reports the others as NOT_GRASPED, `legacy_step.py list` skips them.
+Chosen over the v2only missing_grasps / MAP_REQUEST lines because it needs no sampler run and is what the oracle reads. Test:
+`test_grasp_ladder.py::test_only_grasped_entries_climb_the_ladder`. With it, no round-2 zero entry in my scope reaches step 3.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

@@ -114,6 +114,12 @@ class CandidateConfig:
     # +y, the oracle seats it along its own -z. An entry without a seat record keeps "meta_z" (logged). The axis is part of the entry
     # identity off "meta_z" (schema.ModelLibrary.attach_axis). The old rule per entry: ``cand_overrides`` ({"attach_axis": "meta_z"}).
     attach_axis: str = "seat"
+    # i7-ladder 2026-11-07 (owner: the grasp ladder, steps 3 and 4): GIVEN poses as pools through the same gates. Both default () = off;
+    # set per entry through the manifest's cand_overrides by scripts/grasp_ladder (with "families": ["agent"] / ["legacy"]).
+    # agent_proposals: the step-3 proposer's pinches (scripts/grasp_ladder/CONTRACT.md, :func:`agent_proposal_poses`), rest frame.
+    # legacy_grasps: the step-4 legacy grasps ({"name", "position", "quat_xyzw"}: the eef in the canonical object frame).
+    agent_proposals: Tuple[Dict[str, Any], ...] = ()
+    legacy_grasps: Tuple[Dict[str, Any], ...] = ()
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -565,6 +571,113 @@ def straddle_family_poses(T_all: np.ndarray, geom: OG.ObjectGeometry, cfg: Candi
 FAMILIES = {"lip_shallow": lip_family_poses, "rim_straddle": straddle_family_poses}
 
 
+# ------------------------------------------------------------------------------------------------ given poses (i7-ladder steps 3 / 4)
+#
+# Owner decision 2026-11-07 (the grasp ladder): an entry still at 0 physics-valid grasps after round 2 gets agent proposals (step 3); the
+# last resort is its legacy grasps (step 4). Both are GIVEN poses: each proposal / legacy grasp is its own pool (``agent_p<i>`` /
+# ``legacy_<name>``) through every gate of a mode unchanged - a pose with an approach below ``side_tilt_deg[0]`` from vertical takes the top
+# gates (retreat along the approach), the others the side gates (lift along the support normal) in a ``..._side`` pool. Nothing is relaxed.
+
+POSE_FAMILIES = ("agent", "legacy")
+AGENT_EXPAND_DEFAULT = {"tilt_deg": (0.0, -10.0, 10.0), "yaw_deg": (0.0, -15.0, 15.0), "slide_mm": (0.0, -3.0, 3.0)}
+AGENT_EXPAND_MAX = 400  # poses per proposal (after the expansion), at most
+
+
+def _unit(v) -> np.ndarray:
+    v = np.asarray(v, dtype=float).reshape(3)
+    n = float(np.linalg.norm(v))
+    if not math.isfinite(n) or n < 1e-9:
+        raise ValueError(f"zero / non-finite direction {v.tolist()}")
+    return v / n
+
+
+def _rot(axis, ang: float) -> np.ndarray:
+    a = _unit(axis)
+    K = np.array([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
+    return np.eye(3) + math.sin(ang) * K + (1 - math.cos(ang)) * (K @ K)
+
+
+def proposal_frame(approach, closing) -> np.ndarray:
+    """The eef rotation of a pinch: +z = ``approach`` (the direction the hand moves), +y = ``closing`` made orthogonal to it, x = y x z.
+    Raises ``ValueError`` when the two are closer than 60 deg (no pinch: the fingers would close along the approach)."""
+    z = _unit(approach)
+    c = _unit(closing)
+    if abs(float(c @ z)) > 0.5:
+        raise ValueError(f"closing axis {c.round(3).tolist()} within 60 deg of the approach {z.round(3).tolist()}")
+    y = _unit(c - (c @ z) * z)
+    x = np.cross(y, z)
+    return np.stack([x, y, z], axis=1)
+
+
+def agent_proposal_poses(prop: Dict[str, Any], cfg: CandidateConfig) -> Tuple[np.ndarray, np.ndarray]:
+    """One step-3 proposal (CONTRACT.md: ``contact_mm`` = the pinch centre midway between the pads, ``closing_axis``, ``approach``,
+    ``pad_offset_mm`` = the contact this far toward the fingertips from the pad centre, a number or a list; optional ``expand`` with
+    ``tilt_deg`` (turns of the approach about the closing axis), ``yaw_deg`` (turns about the approach), ``slide_mm`` (the contact moved
+    along the pads' width axis x)), all in the REST frame -> ``(T (N, 4, 4), shift0 (N,))``. Every expanded pose keeps its contact at
+    ``CONTACT_Z + shift0`` along its approach. Offsets past the fingertips (``tip_max_m``) are dropped; at most
+    :data:`AGENT_EXPAND_MAX` poses."""
+    c0 = np.asarray(prop["contact_mm"], dtype=float).reshape(3) / 1000.0
+    R0 = proposal_frame(prop["approach"], prop["closing_axis"])
+    po = prop.get("pad_offset_mm", 0.0)
+    offs = [float(v) / 1000.0 for v in (po if isinstance(po, (list, tuple)) else [po])]
+    offs = [s for s in offs if s >= 0.0 and CONTACT_Z + s <= cfg.tip_max_m + 1e-9]
+    ex = {**AGENT_EXPAND_DEFAULT, **(prop.get("expand") or {})}
+    Ts, ss = [], []
+    for tl in ex["tilt_deg"]:
+        for yw in ex["yaw_deg"]:
+            R = R0 @ _rot([0, 1.0, 0], math.radians(float(tl))) @ _rot([0, 0, 1.0], math.radians(float(yw)))
+            for sl in ex["slide_mm"]:
+                c = c0 + R[:, 0] * float(sl) / 1000.0
+                for s in offs:
+                    T = np.eye(4)
+                    T[:3, :3] = R
+                    T[:3, 3] = c - R[:, 2] * (CONTACT_Z + s)
+                    Ts.append(T)
+                    ss.append(s)
+                    if len(Ts) >= AGENT_EXPAND_MAX:
+                        return np.stack(Ts), np.array(ss)
+    if not Ts:
+        return np.zeros((0, 4, 4)), np.zeros(0)
+    return np.stack(Ts), np.array(ss)
+
+
+def given_poses_only(cfg: CandidateConfig) -> bool:
+    """No mode and only given-pose families (an agent / legacy run): the antipodal samples are not needed."""
+    return not cfg.modes and bool(cfg.families) and all(f in POSE_FAMILIES for f in cfg.families)
+
+
+def legacy_grasp_poses(g: Dict[str, Any], R: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """One step-4 legacy grasp (``position`` / ``quat_xyzw`` of the eef in the canonical object frame, the legacy library's
+    ``right_eef_link`` in ``base_link``: the same +z approach / +y closing / CONTACT_Z convention) in the rest frame ``R`` -> one pose,
+    shift0 0 (the contact at the pad centre, as the legacy generator placed it)."""
+    T = S.pose_mat(g["position"], g["quat_xyzw"])
+    return (np.asarray(R) @ T)[None], np.zeros(1)
+
+
+def pose_family_pools(fam: str, cfg: CandidateConfig, R: np.ndarray) -> List[Tuple[str, str, np.ndarray, np.ndarray, Dict[str, Any]]]:
+    """The pools of a given-pose family: ``[(pool, mode, T, shift0, meta)]``, one (or a top + a side) pool per proposal / legacy grasp
+    (meta: source, index / name - copied into each candidate). A proposal that cannot be made into a pose is a pool of 0 with its
+    ``error``."""
+    out = []
+    items = cfg.agent_proposals if fam == "agent" else cfg.legacy_grasps
+    for i, it in enumerate(items):
+        name = f"agent_p{i}" if fam == "agent" else f"legacy_{it.get('name', i)}"
+        meta = {"source": fam, "proposal": i} if fam == "agent" else {"source": fam, "legacy_grasp": str(it.get("name", i))}
+        try:
+            T, s0 = agent_proposal_poses(it, cfg) if fam == "agent" else legacy_grasp_poses(it, R)
+        except (KeyError, ValueError, TypeError) as e:
+            out.append((name, "top", np.zeros((0, 4, 4)), np.zeros(0), {**meta, "error": repr(e)}))
+            continue
+        side = tilt_deg(T) >= cfg.side_tilt_deg[0] if len(T) else np.zeros(0, dtype=bool)
+        if (~side).any() or not side.any():
+            out.append((name, "top", T[~side], s0[~side], meta))
+        if side.any():
+            # the side gates measure the contact at the pad centre: a side pose keeps only its offset-0 copies (CONTRACT.md)
+            k = side & (s0 <= 1e-9)
+            out.append((name + "_side", "side", T[k], s0[k], {**meta, "dropped_side_offsets": int((side & ~k).sum())}))
+    return out
+
+
 # ------------------------------------------------------------------------------------------------ gate dump (ISG_GLIB_GATE_DUMP=1)
 
 GATE_DUMP_FILE = "gate_dump.json"
@@ -658,6 +771,8 @@ def generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig = Candida
     representatives come out empty is sampled again denser (``densify``: candidate x orientation multipliers; small features such as
     a lid's knob draw few of the uniform surface samples - the legacy lid__pbmsji__s065 run used 48000 x 48)."""
     dumps: List[Dict[str, Any]] = []
+    if given_poses_only(cfg):
+        densify = ()  # i7-ladder: given poses do not change with denser sampling
     out = _generate(job, model_dir, cfg, policy, sym_cfg, arm, dumps)
     for mc, mo in densify:
         if out["representatives"]:
@@ -699,11 +814,14 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                     for e in (v.values() if isinstance(v, dict) else v):
                         if isinstance(e, dict) and "position" in e:
                             e["position"] = (R[:3, :3] @ np.array(e["position"])).tolist()
-    su = _isaac_sampler()
-    T_all = np.array(su.sample_antipodal(_MeshProxy(union), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
-                                         gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
-                                         gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
-                                         orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
+    if given_poses_only(cfg):
+        T_all = np.zeros((0, 4, 4))  # i7-ladder: given poses only (no mode, no sampled family) - nothing reads the samples
+    else:
+        su = _isaac_sampler()
+        T_all = np.array(su.sample_antipodal(_MeshProxy(union), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
+                                             gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
+                                             gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
+                                             orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
     support = CP.Support.plane(z_min, name="tabletop")
     hc = CP.HandChecker(arm, policy, spacing=0.004)
@@ -719,9 +837,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         tl = tilt_deg(T_all)
         m = tl <= cfg.top_max_tilt_deg if mode == "top" else (tl >= cfg.side_tilt_deg[0]) & (tl <= cfg.side_tilt_deg[1])
         pools.append((mode, mode, T_all[m].copy(), None))
+    pool_meta: Dict[str, Dict[str, Any]] = {}  # i7-ladder: a given-pose pool's source (copied into its candidates)
     for fam in cfg.families:
+        if fam in POSE_FAMILIES:
+            for pname, pmode, Tf, sf, meta in pose_family_pools(fam, cfg, R):
+                pools.append((pname, pmode, Tf, sf))
+                pool_meta[pname] = meta
+            continue
         if fam not in FAMILIES:
-            raise ValueError(f"unknown candidate family {fam!r} (known: {sorted(FAMILIES)})")
+            raise ValueError(f"unknown candidate family {fam!r} (known: {sorted(FAMILIES) + list(POSE_FAMILIES)})")
         Tf, sf = FAMILIES[fam](T_all, geom, cfg)
         pools.append((fam, "top", Tf, sf))
     n_named: Dict[str, int] = {}
@@ -734,10 +858,12 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         cm = Tm[:, :3, 3] + Tm[:, :3, 2] * czm[:, None]
         return {"contact_mm": cm * 1000, "contact_r_mm": np.hypot(cm[:, 0] - ax_x, cm[:, 1] - ax_y) * 1000,
                 "contact_azimuth_deg": np.degrees(np.arctan2(cm[:, 1] - ax_y, cm[:, 0] - ax_x)), "tilt_deg": tilt_deg(Tm),
-                "contact_offset_mm": (czm - CONTACT_Z) * 1000}
+                "contact_offset_mm": (czm - CONTACT_Z) * 1000,
+                # i7-ladder: the pinch's axes x 1000 (the step-3 markers draw and hand on the dropped poses; vectors: no stats)
+                "approach_k": Tm[:, :3, 2] * 1000, "closing_k": Tm[:, :3, 1] * 1000}
 
     for pool, mode, T, shift0 in pools:
-        L: Dict[str, Any] = {}
+        L: Dict[str, Any] = {k: v for k, v in pool_meta[pool].items()} if pool in pool_meta else {}
         if T is None:
             log[pool] = L
             continue
@@ -942,6 +1068,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             }
             if is_family:
                 cand["family"] = pool
+            if pool in pool_meta:  # i7-ladder: the given pose's source ("agent" / "legacy") and which proposal / legacy grasp it came from
+                cand.update({k: v for k, v in pool_meta[pool].items() if k in ("source", "proposal", "legacy_grasp")})
             out_cands.append(cand)
             if dump.on:
                 recs.append({"name": name, "reason": reason, "stage": geo["stage"][r], "approach_object_clear": bool(appr[r]),

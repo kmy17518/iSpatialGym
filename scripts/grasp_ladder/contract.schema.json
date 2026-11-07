@@ -1,0 +1,40 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "isg-grasp-proposal/1",
+ "type": "object",
+ "additionalProperties": false,
+ "required": ["contract", "id", "feasible", "proposals", "object_note"],
+ "properties": {
+  "contract": {"type": "string", "enum": ["isg-grasp-proposal/1"]},
+  "id": {"type": "string"},
+  "feasible": {"type": "boolean"},
+  "object_note": {"type": "string"},
+  "proposals": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["from_marker", "contact_mm", "closing_axis", "approach", "pad_offset_mm", "expand", "rationale", "confidence"],
+    "properties": {
+     "from_marker": {"type": ["string", "null"]},
+     "contact_mm": {"type": "array", "items": {"type": "number"}},
+     "closing_axis": {"type": "array", "items": {"type": "number"}},
+     "approach": {"type": "array", "items": {"type": "number"}},
+     "pad_offset_mm": {"type": "array", "items": {"type": "number"}},
+     "expand": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["tilt_deg", "yaw_deg", "slide_mm"],
+      "properties": {
+       "tilt_deg": {"type": "array", "items": {"type": "number"}},
+       "yaw_deg": {"type": "array", "items": {"type": "number"}},
+       "slide_mm": {"type": "array", "items": {"type": "number"}}
+      }
+     },
+     "rationale": {"type": "string"},
+     "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+    }
+   }
+  }
+ }
+}
