@@ -682,6 +682,26 @@ default off, with the full open 0.127 m spread first, the close_push / v4 stop o
 
 **Merge order:** both land after i7-contact's current work; i7-braceopen together with i7-contact.
 
+### Owner direction 2026-11-07: start the integration now
+
+- **One branch at a time.** The finished branches are merged into of-v2maps one at a time, and every other branch folds in as soon as
+  its own work and validation finish. Owner-decided defaults land with their branch; nothing new is decided at a merge.
+- **Ready now** (in order): i7-switches, i7-padsweep, i7-attach, i7-ladder, i7-floating.
+- **Later:** i7-unblock, i7-overhang, i7-contact (+ i7-braceopen, one switch), i7-attachmap + i7-attachhover (as a pair; i7-attach-swept),
+  i7-lean, i7-artic, i7-plateqtf and i7-fingertouch.
+- **Per merge:**
+  - Conflicts resolved preserving every owner-decided default; duplicated implementations (cherry-picks, duplicate switches) are kept
+    once, and which one is said.
+  - pyflakes; the full suite vs the baseline; the golden-key / identity tests pass.
+  - The merged tip is snapshotted.
+- **One consolidated v2 root** (new, $OFH/v2maps_int1), updated as branches fold in:
+  - built from v2maps_i7 plus the merged branches' staged roots, with the anchors added so far and legacy_keys in the staged
+    library.json files;
+  - superseded entries are moved aside, 0 key mismatches, every link resolving.
+- **Validation:** only on the aliases each merge affects (v2only N 4 from the merged snapshot and the consolidated root, batched where
+  they overlap); aliases with nothing observable changed are skipped. The full 100-alias pass is a separate decision, after every branch
+  is in.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
