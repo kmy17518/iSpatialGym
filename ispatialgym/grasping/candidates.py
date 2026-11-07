@@ -100,6 +100,13 @@ class CandidateConfig:
     # grasp cleared at 10 mm records 15 mm and the closing sweep re-measures the width 5 mm off its contact (luhkiz: 57 of 62 top grasps
     # lose their width there; 59 of 62 pass the sweep at the real displacement).
     retreat_shift_exact: bool = True
+    # OWNER DECISION, ADOPTED 2026-11-07 (i7-padsweep, a shared gate - approved; default True for new builds after the count on the campaign
+    # library, 44 entries / 6 move; False = the behaviour before, which every entry generated without the field reads as): the closing
+    # sweep (pad_sweep) starts at each grasp's pre-shape as the oracle executes it (execute.execute_grasp: pinch width / 2 +
+    # MotionsConfig.gripper_preshape_margin per finger, :func:`oracle_preshape_q`) instead of the fully open pads. From the fully open
+    # pads a pinch across a wall next to a hole (tape kavsnx: the 35 mm core) starts its inner pad inside the opposite wall, which the
+    # oracle never does. Part of the entry identity when on (schema.CANDIDATE_SWITCHES).
+    sweep_from_preshape: bool = True
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -199,19 +206,52 @@ PAD_X = np.array([-0.01, 0.0, 0.01])
 PAD_OPEN_HALF = 0.0485
 
 
-def pad_sweep(union, T):
-    """Largest half-width at which a closing pad meets the object (rays from the open pad faces inward over the pad footprint)."""
+def pad_sweep(union, T, open_half=None, pieces=None):
+    """Largest half-width at which a closing pad meets the object (rays from the open pad faces inward over the pad footprint).
+    ``open_half`` (i7-padsweep, ``CandidateConfig.sweep_from_preshape``): per pose the half-width the pads start from (default: the fully
+    open pads, ``PAD_OPEN_HALF`` - the behaviour before); a ray that starts inside one of ``pieces`` (convex pieces' face planes, see
+    :func:`_inside_any`) meets the object at its start (touch = its start half-width)."""
     n = len(T)
     best = np.zeros(n)
     y, x, z = T[:, :3, 1], T[:, :3, 0], T[:, :3, 2]
     base = T[:, :3, 3]
+    if open_half is None:
+        for dz in PAD_Z:
+            for dx in PAD_X:
+                o = base + z * dz + x * dx
+                for sgn in (1.0, -1.0):
+                    d, _ = hits(union, o + y * (sgn * PAD_OPEN_HALF), -sgn * y)
+                    best = np.maximum(best, np.where(np.isfinite(d), PAD_OPEN_HALF - d, 0.0))
+        return best
+    h0 = np.broadcast_to(np.asarray(open_half, dtype=float), (n,))
     for dz in PAD_Z:
         for dx in PAD_X:
             o = base + z * dz + x * dx
             for sgn in (1.0, -1.0):
-                d, _ = hits(union, o + y * (sgn * PAD_OPEN_HALF), -sgn * y)
-                best = np.maximum(best, np.where(np.isfinite(d), PAD_OPEN_HALF - d, 0.0))
+                start = o + y * (sgn * h0)[:, None]
+                d, _ = hits(union, start, -sgn * y)
+                t = np.where(np.isfinite(d), h0 - d, 0.0)
+                if pieces is not None:
+                    t = np.where(_inside_any(start, pieces), h0, t)
+                best = np.maximum(best, t)
     return best
+
+
+def oracle_preshape_q(width) -> np.ndarray:
+    """The finger opening (m per finger) the oracle pre-shapes a pinch of ``width`` to before the descent - ``execute.execute_grasp``:
+    ``0.5 * grasp_pinch_width + motions.cfg.gripper_preshape_margin`` (the library's ``width_m``; ``MotionsConfig`` default), at most
+    fully open (as the validator's trial, ``validate_tabletop.TabletopWorld.trial``)."""
+    from ispatialgym.oracle.motions import MotionsConfig
+
+    return np.minimum(FINGER_OPEN, 0.5 * np.asarray(width, dtype=float) + float(MotionsConfig().gripper_preshape_margin))
+
+
+def preshape_pad_half(width) -> np.ndarray:
+    """The pads' start half-width for the closing sweep at the oracle's pre-shape (:func:`oracle_preshape_q`), in the sweep's own open-pad
+    convention: ``PAD_OPEN_HALF`` at the fully open fingers, less what the pre-shape closed (a non-finite width: fully open)."""
+    w = np.asarray(width, dtype=float)
+    q = np.where(np.isfinite(w), oracle_preshape_q(np.where(np.isfinite(w), w, 0.0)), FINGER_OPEN)
+    return PAD_OPEN_HALF - (FINGER_OPEN - q)
 
 
 class SphereClearance:
@@ -609,6 +649,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     n_named: Dict[str, int] = {}
     top_z = float(hi[2])
     ax_x, ax_y, _ = plate_axis(union)
+    piece_planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces] if cfg.sweep_from_preshape else None
 
     def _where(Tm, czm):  # dump: where a candidate pinches (rest frame, about the plate axis), its tilt and its contact offset toward the tips
         czm = np.broadcast_to(np.asarray(czm, dtype=float), (len(Tm),))
@@ -704,7 +745,10 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         cz = CONTACT_Z + (shift if mode == "top" else 0.0)  # the pads' contact height after the retreat
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
         c, width, antip, cov = contact_features(union, T, cz)
-        touch = pad_sweep(union, T)
+        if cfg.sweep_from_preshape:  # OWNER DECISION (i7-padsweep, default on): the pads start at the oracle's pre-shape of the recorded width
+            touch = pad_sweep(union, T, open_half=preshape_pad_half(width), pieces=piece_planes)
+        else:
+            touch = pad_sweep(union, T)
         keep = np.isfinite(width) & (width >= cfg.min_width_m) & (touch <= width / 2 + cfg.sweep_margin_m)
         if dump.on:
             # the stage holds two tests: the pinch line still meets the object after the support move (width_lost: e.g. a side lift

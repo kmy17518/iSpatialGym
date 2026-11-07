@@ -790,6 +790,31 @@ Owner decision 20:20. Record: `$OFH/switches_20261107/gymshoe_r2`.
   38 entries, 88 maps, 0 key mismatches.
 - nextto_04 `--grasps v2only` N 4 with ISPATIALGYM_MAP_SUPPORT_FIRST=1, tag `i7_sw_gs_sf`: see DECISIONS.
 
+### i7-padsweep 2026-11-07: the closing sweep from the oracle's pre-shape (adopted)
+
+Owner decision (a shared gate, approved after the tape's diagnosis: the sweep started at the fully open pads, so a wall pinch next to a
+hole started its inner pad inside the opposite wall). Branch `i7-padsweep` (47b27893 switch + identity, f6dc7183 default). Record:
+`$OFH/padsweep_20261107`.
+- **Rule.** `candidates.oracle_preshape_q(width)` = `execute.execute_grasp`'s opening, 0.5 x the recorded pinch width +
+  `MotionsConfig().gripper_preshape_margin` (read from the oracle's config), capped at fully open as the validator's trial. The sweep starts
+  at `preshape_pad_half` (its own open-pad convention: `PAD_OPEN_HALF` at the fully open fingers, less what the pre-shape closed); a ray
+  that starts inside a piece meets the object at its start. Off, `pad_sweep` is the code it was.
+- **Identity.** `sweep_from_preshape` is a candidate switch (`schema.CANDIDATE_SWITCHES`, recorded in library.json). The identity keeps
+  the plate switches as the pair 884279fd wrote and adds the new switch only when on: no existing key changes.
+- **Count** (candidates only, plate switches on; `count/count_table.md`, trunk_47b27893). 44 entries: v2maps_i7's 38 + tape + storage box
+  (cluster) + the 4 hardback lean / overhang entries (lambda, the i7-overhang code with a scratch port; off reproduces each, on = off).
+  6 move (c/g/r): tape 30/20/16 -> 96/19/15, jigsaw 11/10/8 -> 36/31/17, sandal 12/12/10 -> 13/13/10, teacup 13/5/4 -> 14/6/5, gym shoe
+  1/1/1 -> 5/4/4, pillow 2/1/1 -> 1/1/1 (a geometry-failed pose gone, representatives the same). 38 do not. The "on" arm differs from the
+  switches count's own on arm on bottle of milk, hard candy and sunflower by 1-3 borderline poses (no sweep involved: ps = on there) - a
+  run-to-run difference of the same code on another node.
+- **Tape without the plate families:** the top grasps now pass the sweep (top 1030 -> sweep 301, was 0) -> 36 selected -> 4 geometry ok
+  (32 finger_blade_in_object) -> 4 reps.
+- **Rebuild** (validate + maps; gym shoe excluded: ladder round 2 by i7-switches). Valid old -> new: tape 12 -> 12, jigsaw 3 -> 6,
+  sandal 6 -> 6, teacup 4 -> 5, pillow 1 -> 1. 14 maps ok (tape tray floor 0.6791 r + l; sandal floor + 0.4923; jigsaw 0.8126 / 0.8186).
+- **Staged** `$OFH/v2maps_i7ps` = `cp -a v2maps_i7sw` + the 5 entries (old ones in `glib/_superseded_padsweep` /
+  `maps/_superseded_padsweep`); the tape added with the exact tray-floor anchor 0.6791, `legacy_keys` and its link (`STAGED.txt`).
+- **Default (f6dc7183).** On for new builds; False in `cand_overrides` reproduces the old build.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

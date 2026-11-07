@@ -34,7 +34,9 @@ switches that change which candidates an entry holds and their recorded poses (:
 state (``candidate_switches``, from its candidates' ``config``); an entry written before that record reads its ``candidates.json`` config,
 and a config without the fields (every entry before 6e418172) reads all off. The state enters :meth:`ModelLibrary.identity` (the reach maps'
 ``object_key``) only when a switch is on - every existing key is unchanged, and an entry built with a switch on never matches a map of one
-built without; ``check_compatible(candidate_switches=)`` lets a reader require a state.
+built without; ``check_compatible(candidate_switches=)`` lets a reader require a state. i7-padsweep 2026-11-07: ``sweep_from_preshape``
+(the closing sweep from the oracle's pre-shape) is a candidate switch too; it enters the identity only when on, the two plate switches stay
+a pair (``_IDENTITY_PAIR``), so no key written before it changes.
 """
 
 from __future__ import annotations
@@ -68,7 +70,10 @@ class IncompatibleRecord(ValueError):
 
 
 #: i7-switches 2026-11-07: the candidate-generation switches that are part of an entry's identity (module docstring)
-CANDIDATE_SWITCHES = ("blade_contact_at_retreat", "retreat_shift_exact")
+CANDIDATE_SWITCHES = ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape")
+#: the switches of 884279fd: in the identity as a pair whenever either is on (as they were); a later switch enters only when on, so every
+#: key written before it existed is unchanged (i7-padsweep 2026-11-07: sweep_from_preshape)
+_IDENTITY_PAIR = ("blade_contact_at_retreat", "retreat_shift_exact")
 
 
 def candidate_switches(config: Optional[Dict[str, Any]]) -> Dict[str, bool]:
@@ -332,8 +337,10 @@ class ModelLibrary:
                "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
                "families": digest(self.data.get("families", {}))}
         sw = self.candidate_switches()
-        if any(sw.values()):
-            out["candidate_switches"] = sw
+        idsw = {k: sw[k] for k in _IDENTITY_PAIR} if any(sw[k] for k in _IDENTITY_PAIR) else {}
+        idsw.update({k: True for k in CANDIDATE_SWITCHES if k not in _IDENTITY_PAIR and sw.get(k)})  # i7-padsweep: a later switch only when on
+        if idsw:
+            out["candidate_switches"] = idsw
         return out
 
     def identity_key(self) -> str:
