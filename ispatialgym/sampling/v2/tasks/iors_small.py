@@ -2397,6 +2397,24 @@ class IORSSmall(SamplerV2):
             # goal_pose reads the sidecar's manipulation stance (abv2_rank 2026-11-07: KeyError 'manipulation' in 21 / 21 iors_small runs): it is
             # registered here, before the partner draw, instead of after it (the caller pops it again when this candidate is rejected)
             self.sidecar.add_stance(manip)
+        from ispatialgym.sampling.v2 import map_f as MF
+
+        if MF.release_on() and self.relation in ("nextto", "under") and MF.is_view(self.band_of_arm(grasp.arm if getattr(grasp, "arm", None) else "right")):
+            # of-v2maps 2026-11-07 (owner prompt I item 6, opt-in ISPATIALGYM_MAP_RELEASE=1): the valid partner poses ranked first by whether
+            # the map holds an entry at the place eef pose (map_sampling.release_candidates), then by the frame margin when FRAME_RANK is on
+            view = self.band_of_arm(grasp.arm if getattr(grasp, "arm", None) else "right")
+            fs0 = frame_score
+            self.sidecar.add_stance(manip)
+
+            def frame_score(pp, _fs=fs0, _view=view):
+                place_g = IK.grasp_pose(self.goal_pose(t_pose, pp), grasp.eef_in_object)
+                T = np.eye(4)
+                T[:3, :3] = C.quat_to_mat(G.t(place_g[1])).double().numpy()
+                T[:3, 3] = G.t(place_g[0]).double().numpy()
+                n = MF.release_count(_view, manip, T, grasp.grasp_name, float(getattr(self.world, "floor_z", 0.0)), float(self.top.z))
+                self.counters["map_release." + ("none" if n is None else ("hit" if n else "miss"))] = self.counters.get(
+                    "map_release." + ("none" if n is None else ("hit" if n else "miss")), 0) + 1
+                return (1e4 if n else 0.0) + (float(_fs(pp)) if _fs is not None else 0.0)
         p_pose = self.place_partner(rng, t_pose, manip, cam_init, frame_score=frame_score)
         if frame_score is not None and isinstance(self.partner_draw, dict) and self.partner_draw.get("frame_rank"):
             d.summary.setdefault("frame_rank", []).append(self.partner_draw["frame_rank"])

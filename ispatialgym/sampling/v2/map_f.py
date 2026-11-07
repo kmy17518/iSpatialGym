@@ -180,3 +180,40 @@ def diag_compare(s, count, mc: MapCell, F_screen: Sequence[Tuple[float, Any]], y
     count(s, "map_F.diag.both", len(S & M))
     count(s, "map_F.diag.screen_only", len(S - M))
     count(s, "map_F.diag.map_only", len(M - S))
+
+
+# ------------------------------------------------------------------------------------------------ release ranking (prompt I item 6)
+
+
+def release_on() -> bool:
+    """``ISPATIALGYM_MAP_RELEASE=1``: the place draw ranks its valid partner poses by :func:`release_count` (map entries matching the
+    place eef pose) - an ordering only: an empty answer means "no compatible map entry", never infeasible, and every place keeps its
+    exact checks (the support policy's scope unchanged)."""
+    return os.environ.get("ISPATIALGYM_MAP_RELEASE", "") == "1"
+
+
+def release_count(view, stance, place_eef_world, grasp_name: str, floor_z: float, place_support_z: float) -> Optional[int]:
+    """How many feasible map entries (``map_sampling.release_candidates``: same grasp row, the map's own support height, 4 cm / 0.35 rad)
+    lie at the place eef pose in the stance's base frame; None when the view is no map, the place support is not at the map's height
+    (+-1 cm) or the stance's trunk is not in the map."""
+    if not is_view(view):
+        return None
+    rm = reach_map_of(view)
+    h = float(rm.meta["height"]["value"])
+    if abs((float(place_support_z) - float(floor_z)) - h) > 0.01:
+        return None
+    so = stance.stand_off if getattr(stance, "stand_off", None) is not None else view.meta.get("stand_off")
+    if so is None:
+        return None
+    d_e = min((float(d) for d in rm.meta["edge_distances"]), key=lambda d: abs(d - float(so)))
+    same = [(float(t["translate"]), float(t["tilt"])) for t in rm.meta["trunks"] if t.get("eligible") and abs(float(t["translate"]) - float(stance.translate)) < 1e-6]
+    if not same:
+        return None
+    tr = min(same, key=lambda t: abs(t[1] - float(stance.tilt)))
+    x0, y0, yaw = (float(v) for v in stance.base_pose2d)
+    T_wb = np.eye(4)
+    T_wb[:3, :3] = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
+    T_wb[:3, 3] = [x0, y0, float(floor_z)]
+    T_q = np.linalg.inv(T_wb) @ np.asarray(place_eef_world, dtype=float)
+    name = str(grasp_name).split("@")[0]
+    return len(MS.release_candidates(rm, d_e, tr[0], tr[1], T_q, name))

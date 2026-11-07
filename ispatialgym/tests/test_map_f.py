@@ -76,3 +76,27 @@ def test_draw_order_is_the_permutation_without_weights():
     w = {(0.0, "a"): 1e-6, (1.0, "b"): 1e6}
     assert list(MF.draw_order(np.random.default_rng(1), F, w))[0] == 1  # the heavy pair first
     assert sorted(MF.draw_order(np.random.default_rng(1), F, {(0.0, "a"): 1.0})) == [0, 1]  # a pair without weight: the plain permutation
+
+
+def test_release_count_matches_the_place_pose_in_the_base_frame(tmp_path):
+    from ispatialgym.grasping import schema as S
+
+    MF._RM.clear()
+    path = _map(tmp_path)
+    m = json.load(open(path))
+    T_oe = {"position": [0.0, 0.0, 0.1], "orientation_xyzw": [1.0, 0.0, 0.0, 0.0]}
+    for g in m["grasps"]:
+        g["T_object_eef"] = T_oe
+    m["object"] = {"rests": {"r0": {"quat_xyzw": [0, 0, 0, 1.0], "h_root": 0.02}}}
+    m["rest_id"] = "r0"
+    open(path, "w").write(json.dumps(m))
+    view = _view(path)
+    stance = SimpleNamespace(stand_off=0.45, translate=0.25, tilt=-1.0, base_pose2d=(1.0, 2.0, 0.0))
+    # the map entry (cell (0.51, 0), yaw 0, top_0): eef in the base frame at (0.51, 0, 0.8 + 0.02 + 0.1); in the world + base offset
+    T = np.eye(4)
+    T[:3, :3] = S.quat_to_mat([1.0, 0.0, 0.0, 0.0])
+    T[:3, 3] = [1.0 + 0.51, 2.0, 0.0 + 0.92]
+    assert MF.release_count(view, stance, T, "top_0", floor_z=0.0, place_support_z=0.8) >= 1
+    assert MF.release_count(view, stance, T, "top_0", floor_z=0.0, place_support_z=0.9) is None  # not the map's height
+    T2 = T.copy(); T2[0, 3] += 0.3
+    assert MF.release_count(view, stance, T2, "top_0", floor_z=0.0, place_support_z=0.8) == 0  # no entry there ("no compatible entry")
