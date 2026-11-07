@@ -501,6 +501,8 @@ class ArticulationSmall(SamplerV2):
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
+                if e.reason == "missing_map" and RB.v2_only():
+                    raise  # i7-artic 2026-11-07: the prefix map lookup of _brace_band does not depend on the edge - a miss rejects missing_map
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
         if self.init_stance is None:
@@ -829,6 +831,13 @@ class ArticulationSmall(SamplerV2):
         q_init and q_goal screened with the handle arm (support ignored for the grasp); a cell is in the band when both
         are feasible for a yaw (``meta.trunks[i].feasible`` like the CLI's brace mode, ``brace_kinds = ["left_band"]``:
         the brace comes from the left contact band at instance time, owner decision 2026-09-16 item 2)."""
+        if RB.v2_only():
+            # i7-artic 2026-11-07 (owner: handles stay with the articulation library): under v2 only the band is the handle-only view of the
+            # alias motion's prefix map (validate_artic's physics-validated segments; sampling.v2.artic_prefix) - read BEFORE the in-process
+            # BandComputer below (blocked there); a miss rejects missing_map. The exact handle IK, follow, brace and settle stay as they are
+            from ispatialgym.sampling.v2 import artic_prefix as APX
+
+            return APX.prefix_band(self, edge, st)
         cache_key = {"scene": self.world.scene_model, "support": self.top.name, "target": f"{self.choice.models[self.role].category}/{self.choice.models[self.role].model}",
                      "joint": self.joint_name}
         kit, world = self.kit, self.world
