@@ -21,6 +21,11 @@
 #   GB_STAGES="lean maps" GB_KIND=interior GB_INTERIOR=bookcase_kmuacd_0@0.8354 GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<lean jobs.json> ...
 # a STABLE rest in a compartment (the fridge jar, inside_large_scale_02): GB_INTERIOR=<registry.json>::<name> (the interiors measure CLI's file;
 # the spec carries its stand-offs, joints and open-door box), GB_MANIFEST = the stable entry's job
+# i7-overhang 2026-11-07: GB_STAGES token "overhang" = the manifest's OVERHANG jobs end to end (grasping.pipeline overhang: export, the settle
+# on a slab whose edge lies under the object, candidates at the measured overhang rest with the slab box as the support, validation on that
+# slab; manifest from python -m ispatialgym.grasping.overhang manifest), logs glib_overhang_<shard>.log; GB_KIND=overhang = the overhang maps
+# of the overhang entries (the slab's near edge under the object, one yaw, reach_maps.overhang_config) at GB_HEIGHTS (anchor keys, as tabletop):
+#   GB_STAGES="overhang maps" GB_KIND=overhang GB_HEIGHTS=0.7671 GB_ANCHORS=<anchors.json> GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<overhang jobs.json> ...
 #SBATCH --job-name=isggb
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -54,6 +59,14 @@ if [[ " $STAGES " == *" lean "* ]]; then
   grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_lean_$I.log || rc=${rc/#0/1}
   [ $KIT_RC = 0 ] && KIT_RC=$rc
   echo "GB_STAGE lean rc=$rc s=$(( $(date +%s) - t0 ))"
+fi
+if [[ " $STAGES " == *" overhang "* ]]; then
+  t0=$(date +%s)
+  python -u -m ispatialgym.grasping.pipeline overhang --jobs $M --root $OUT/glib --shard $I/$N --workers ${SLURM_CPUS_PER_TASK:-8} >> $OUT/logs/glib_overhang_$I.log 2>&1
+  rc=$?
+  grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_overhang_$I.log || rc=${rc/#0/1}
+  [ $KIT_RC = 0 ] && KIT_RC=$rc
+  echo "GB_STAGE overhang rc=$rc s=$(( $(date +%s) - t0 ))"
 fi
 if [[ " $STAGES " == *" maps "* ]]; then
   BYID=(); [ -n "${GB_HEIGHTS_BY_ID:-}" ] && BYID=(--heights-by-id $GB_HEIGHTS_BY_ID)
