@@ -249,3 +249,22 @@ def test_detour_headroom_is_exact_for_detour_failure():
             assert admissible == []  # no blocked path can pass: the goal is skipped without losing an instance
         else:
             assert CR.detour_failure(hi, free, hi, 0.3, by) is None  # and with headroom a blocked path at the bucket's top would pass
+
+
+def test_astar_exact_equals_behavior_astar_on_a_fixed_map():
+    """A fixed 30 x 40 map (two walls with one gap each, a blocked pocket): the exact search returns BEHAVIOR's path cell for cell."""
+    import torch as th
+
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    m = np.full((30, 40), 255, dtype=np.uint8)
+    m[10, :] = 0
+    m[10, 33] = 255
+    m[20, :] = 0
+    m[20, 4] = 255
+    m[24:28, 15:25] = 0
+    m = th.tensor(m)
+    ref = _behavior_astar(m, (2, 3), (28, 37))
+    got = NAV.astar_exact(m, (2, 3), (28, 37))
+    assert ref is not None and got.tolist() == ref.tolist() and len(got) == 93
+    assert NAV.astar_exact(m, (2, 3), (25, 20)) is None and _behavior_astar(m, (2, 3), (25, 20)) is None  # inside the blocked pocket

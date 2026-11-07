@@ -535,6 +535,20 @@ Branch `i7-unblock` (from of-v2maps a4620a1e). Records: `$OFH/unblock_20261107/`
 - Sampling budget: `SAMPLE_LIMIT_S` = 2 x fixed + N x budget_s (train85 `params`; 2400 s at N 1, 8766 s at N 4). The knob is
   `submit_fast.py --sample-limit-s`.
 - The camera-frame rule is unchanged.
+- Off / on test (owner 23:10; sampling only, same start indices, headroom off in both; `unblock_20261107/cr_ab.py`):
+
+  | variant | instances | s / attempt, off -> on | sample wall, off -> on |
+  |---|---|---|---|
+  | vacuum | 4 / 4 equal | 208 -> 28 | 3761 -> 888 s |
+  | toy_car | 3 / 4 equal | 130 -> 50 | 997 -> 777 s |
+  | trash_can | 1 / 4 equal | 202 -> 45 | 2938 -> 949 s |
+  | teddy | 3 / 4 equal | 202 -> 47 | 1683 -> 749 s |
+
+  - The 6 differing instances differ between two runs of the same "on" code too. A repeat on2 differs on exactly the same 6.
+  - The cause is run-to-run nondeterminism: trash_can's and teddy's templates hash differently in every job, and toy_car 310001 differs
+    in a render visibility check. It is not the search: the paths are identical.
+  - CR_FAST_ASTAR is the camera-relocalization default (a fast switch, on unless `=0`).
+  - CR_OBSTACLE_HEADROOM (unchanged) would have skipped 14 / 5 / 6 / 0 goals on vacuum / trash_can / teddy / toy_car.
 - v2only N 4: 8 attempts, 4 written, 4 / 4 demos, sample wall 822 s, 0.063 GPU-h per success. Before: N 1 timed out at 2400 s
   (attempts 131-707 s); now attempts take 9-61 s. The headroom skip did not act in this run.
 

@@ -455,7 +455,9 @@ class CameraRelocalizationV2(SamplerV2):
     def geodesic(self, a_xy, b_xy):
         """``RobotKit.geodesic`` (BEHAVIOR's ``get_shortest_path`` on the eroded map); i7-unblock 2026-11-07 (CR_FAST_ASTAR, default on): the
         same path and geodesic through ``navigation.shortest_path_exact`` - BEHAVIOR's A* without its per-call score table of every map cell
-        (2.6 s a call on house_single_floor: 130 s of a goal search of 20 candidates, most of an obstacle attempt's 333-707 s)."""
+        (2.6 s a call on house_single_floor: 130 s of a goal search of 20 candidates, most of an obstacle attempt's 333-707 s). The DEFAULT for
+        camera relocalization (owner 2026-11-07 23:10, after the off / on test i7_cr_astar_*: per attempt 3.3-7x faster, every instance the
+        same as the old search's wherever repeated runs of one code agree); ``ISPATIALGYM_FAST_CR_FAST_ASTAR=0`` = the old search."""
         if fast_on("CR_FAST_ASTAR"):
             return NAV.shortest_path_exact(self.world.scene.trav_map, 0, G.t(a_xy)[:2], G.t(b_xy)[:2], robot=self.kit.robot)
         return self.kit.geodesic(a_xy, b_xy)
