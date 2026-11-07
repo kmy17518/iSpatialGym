@@ -621,6 +621,22 @@ For touching_03's acbrnv lean entries, only whether they would change is reporte
    - The held-motion check matches the task, not stricter: it validates the motions each task's sampler draws, with the robot placed so
      they are reachable, and drift thresholds calibrated on the collected demos. Entries are rebuilt only if their verdicts change.
 
+### Owner decision 2026-11-07: CR_FAST_ASTAR (camera_relocalization obstructed)
+
+**Context.** teddy_bear was slow, not blocked: each BEHAVIOR A* call rebuilt a whole-map score table (2.6 s per call, 8.6 s when the goal
+is unreachable). CR_FAST_ASTAR (i7-unblock 72d684a8) runs the same search without the table.
+- Identical paths 12/12 on the real map.
+- teddy_bear N 4: 8 attempts, 4 written, 4/4 demos, 0.063 GPU-h per success; attempts take 9-61 s, were 131-707 s.
+
+**Decision.** CR_FAST_ASTAR becomes the camera_relocalization default if a same-instance test passes. It lands with the integration.
+1. **The test:** the slow obstructed variants (vacuum_1, toy_car_1, trash_can_1, with teddy_bear_1 as the reference), each sampled twice
+   from the same seeds, CR_FAST_ASTAR off vs on, with CR_OBSTACLE_HEADROOM off in both.
+2. **Compared:** written instances, paths, attempts and rejections per stage, and wall time. Any differing instance is a finding to
+   explain before adoption.
+3. **If all match and it is faster:** CR_FAST_ASTAR becomes the default in a separate commit; the old search stays reachable by the
+   switch, and a unit test checks for the same path on a fixed map.
+4. **CR_OBSTACLE_HEADROOM:** only how often it would skip goals is reported; its default is unchanged.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
