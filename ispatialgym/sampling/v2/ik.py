@@ -299,6 +299,28 @@ def support_plane_z(sp: Any, planes: Optional[Dict[str, float]]) -> Optional[flo
         return None
 
 
+def finger_link_clearance(hc: Any, T_eef: th.Tensor, plane: Any, finger_q: Tuple[float, float]) -> Dict[str, float]:
+    """of-v2maps 2026-11-06 (the support-policy diagnostic): the minimum signed clearance (m) of each finger link's collision hulls to
+    ``plane`` at the eef pose ``T_eef`` (4x4), with the hull points of ``contact_policy.HandChecker.points`` (vertices + face samples at
+    the checker's spacing, each finger shifted along its axis by its opening)."""
+    import numpy as np
+
+    from ispatialgym.grasping import hand_geometry as HG
+
+    out: Dict[str, float] = {}
+    T = th.as_tensor(T_eef, dtype=th.float32)
+    for lk in hc.geom.links:
+        if lk.role != "finger":
+            continue
+        qf = finger_q[0] if lk.link.endswith("1") else finger_q[1]
+        s = np.concatenate([HG._hull_surface(lk.link, pc.tobytes(), hc.spacing) for pc in (lk.pieces or [lk.points])])
+        p = s + (float(qf) * lk.axis[None] if lk.axis is not None else 0.0)
+        P = th.as_tensor(p, dtype=th.float32)
+        W = P @ T[:3, :3].T + T[:3, 3]
+        out[lk.link] = float(plane.sdf(W[None])[0].min())
+    return out
+
+
 def support_policy_scope() -> str:
     """of-v2maps 2026-11-06: which exact-IK chains the support policy polices - ``"grasp"`` (``ISPATIALGYM_SUPPORT_POLICY=grasp``, what
     ``tabletop.map_bands`` turns on): only chains whose arm holds nothing (the empty hand closing on an object at rest on its support - the
@@ -417,22 +439,72 @@ class IKChecker:
         left out, as the approach left it), and the hand's collision hulls against each support's top plane - the fingers within the 2 mm
         allowance, the palm, the wrist camera and the wrist not below it. Replaces the whole-support ignore of the last pose when
         ``ISPATIALGYM_SUPPORT_POLICY=1``. ``(ok, reason)``."""
+        ev = self.support_policy_eval(q, arm, supports, approached)
+        return bool(ev["ok"]), str(ev["reason"])
+
+    def _support_policy_diag(self, q: th.Tensor, arm: str, supports: Sequence[Any], approached: Sequence[Any], target: Pose, why: str) -> Dict[str, Any]:
+        """Opt-in ``ISPATIALGYM_SUPPORT_POLICY_DIAG`` (of-v2maps 2026-11-06): one ``SUPPORT_POLICY_DIAG {json}`` line per rejection - the
+        penetration per finger hull, the plane z used (measured vs AABB), the approached object's scene z against the v2 rest's expected z
+        (``support_policy_rest``: the plane + the rest's ``h_root``, registered by ``tabletop.map_bands``), and the IK residual of the
+        configuration against the target pose."""
+        import json
+
+        from ispatialgym.oracle import r1pro_model as M
+
+        ev = self.support_policy_eval(q, arm, supports, approached, finger_links=True)
+        rec: Dict[str, Any] = {"why": why, "arm": arm, "stage": ev["stage"], "support": ev["support"], "plane_z": ev["plane_z"], "plane_src": ev["plane_src"],
+                               "aabb_top": ev["aabb_top"], "finger_mm": {k[-1:]: round(1000 * v, 2) for k, v in ev["finger_by_link"].items()},
+                               "clearance_mm": {k: round(1000 * v, 2) for k, v in ev["clearance"].items()}}
+        try:
+            eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+            rec["ik_pos_mm"] = round(1000 * float(th.linalg.norm(G.t(eef[0]).float() - G.t(target[0]).float())), 2)
+            rec["ik_rot_mrad"] = round(1000 * float(G.quat_angle(G.t(eef[1]).float(), G.t(target[1]).float())), 2)
+            rec["eef_z"] = round(float(G.t(eef[0])[2]), 4)
+        except Exception as e:  # noqa: BLE001
+            rec["ik_err"] = repr(e)[:80]
+        rest = getattr(self, "support_policy_rest", None) or {}
+        objs = []
+        for o in approached or ():
+            try:
+                pos = o.get_position_orientation()[0]
+                lo = o.aabb[0]
+                d = {"name": getattr(o, "name", "?"), "z": round(float(pos[2]), 4), "aabb_min_z": round(float(lo[2]), 4)}
+                if rest.get("h_root") is not None and ev["plane_z"] is not None:
+                    d["expected_z"] = round(float(ev["plane_z"]) + float(rest["h_root"]), 4)
+                    d["dz_mm"] = round(1000 * (d["z"] - d["expected_z"]), 2)
+                    d["bottom_above_plane_mm"] = round(1000 * (float(lo[2]) - float(ev["plane_z"])), 2)
+                objs.append(d)
+            except Exception as e:  # noqa: BLE001
+                objs.append({"err": repr(e)[:80]})
+        rec["objects"], rec["rest"] = objs, {k: rest.get(k) for k in ("entry", "rest_id", "h_root")}
+        log.info("SUPPORT_POLICY_DIAG %s", json.dumps(rec))
+        return rec
+
+    def support_policy_eval(self, q: th.Tensor, arm: str, supports: Sequence[Any], approached: Optional[Sequence[Any]] = None,
+                            finger_links: bool = False) -> Dict[str, Any]:
+        """:meth:`support_policy_ok` with its measurements (of-v2maps 2026-11-06): ``ok``, ``reason``, ``stage`` (``spheres`` | ``hulls`` |
+        ``-``), the policed ``support`` and its ``plane_z`` / ``plane_src`` (``measured`` | ``aabb``) / ``aabb_top``, the hand hulls'
+        ``clearance`` per role (m, the support the check failed on, else the last), ``finger_clearance`` (m) and with ``finger_links`` the
+        clearance per finger link (``finger_by_link``)."""
         from ispatialgym.grasping import contact_policy as CP
         from ispatialgym.oracle import r1pro_model as M
 
+        out: Dict[str, Any] = {"ok": True, "reason": "", "stage": "-", "support": None, "plane_z": None, "plane_src": None, "aabb_top": None,
+                               "clearance": {}, "finger_clearance": None, "finger_by_link": {}}
         others = self._non_finger_links(arm)
         if not others:
-            return True, ""
+            return out
         # of-v2maps 2026-11-06: only the SUPPORTS under the approach are policed - an ignored object the hand is meant to touch (a pushed box,
         # approached by the chain) is not (v2scope1: touching_01 / 02 'touching push: no push class passes', 'finger_penetration on
         # target_box_of_sanitary_napkins'); a chain with no such support is not a grasp on a support
         supports = policed_supports(supports, approached)
         if not supports:
-            return True, ""
+            return out
         drop = [o for o in (approached or ()) if all(o is not sp for sp in supports)]
         with self.ignoring(drop):
             if not bool(self.kit.links_clear(q, others, CP.DEFAULT.sphere_support_margin_m)[0]):
-                return False, "non-finger link touches the support"
+                out.update(ok=False, reason="non-finger link touches the support", stage="spheres")
+                return out
         hc = getattr(self, "_hand_checker", None)
         if hc is None or hc.arm != arm:
             hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
@@ -441,14 +513,26 @@ class IKChecker:
         T[:3, :3] = _quat_mat(G.t(eef[1]).float())
         T[:3, 3] = G.t(eef[0]).float()
         fq = float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean())
+        planes = getattr(self, "support_plane_z", None)
         for sp in supports:
-            top = support_plane_z(sp, getattr(self, "support_plane_z", None))
+            top = support_plane_z(sp, planes)
             if top is None:  # a support without an AABB (a wall): the sphere rule above only
                 continue
-            ok, reason, _ = hc.check(T, CP.Support.plane(top, name=getattr(sp, "name", "support")), (fq, fq))
+            name = getattr(sp, "name", "support")
+            plane = CP.Support.plane(top, name=name)
+            ok, reason, cl = hc.check(T, plane, (fq, fq))
+            try:
+                aabb_top = float(sp.aabb[1][2])
+            except Exception:  # noqa: BLE001
+                aabb_top = None
+            out.update(support=name, plane_z=float(top), plane_src="measured" if planes and name in planes else "aabb", aabb_top=aabb_top,
+                       clearance={r: float(v[0]) for r, v in cl.items()}, finger_clearance=float(cl["finger"][0]), stage="hulls")
+            if finger_links:
+                out["finger_by_link"] = finger_link_clearance(hc, T, plane, (fq, fq))
             if not bool(ok[0]):
-                return False, f"{reason[0]} on {getattr(sp, 'name', 'support')}"
-        return True, ""
+                out.update(ok=False, reason=f"{reason[0]} on {name}")
+                return out
+        return out
 
     def set_finger_touch(self, touch: Optional[FingerTouch]) -> None:
         """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope."""
@@ -877,8 +961,11 @@ class IKChecker:
         if q is not None and ignore_for_last and support_policy_on() and not (support_policy_scope() == "grasp" and self._holding(arm)):
             # of-v2maps 2026-11-06: the objects the last pose closes in on (as the IK's own last-pose ignore infers them) - a push that
             # passes no ``approached`` has its pushed box exempted as the grasp's target is, the support under it stays policed
-            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, approached if approached is not None else self.approached_objects(poses[-1]))
+            appr = approached if approached is not None else self.approached_objects(poses[-1])
+            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, appr)
             if not ok_p:
+                if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
+                    self._support_policy_diag(q, arm, ignore_for_last, appr, poses[-1], why_p)
                 q, why = None, f"support_policy: {why_p}"
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached

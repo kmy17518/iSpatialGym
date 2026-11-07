@@ -1008,6 +1008,8 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         if not isinstance(getattr(ikc, "support_plane_z", None), dict):
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
+        # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
+        ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root)}
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 

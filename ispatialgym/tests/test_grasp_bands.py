@@ -396,3 +396,24 @@ def test_policed_supports_and_the_measured_top_plane():
     assert IK.support_plane_z(table, {"table_0": 0.8126}) == 0.8126  # the measured top wins over the AABB's 0.83
     assert IK.support_plane_z(table, {}) == 0.83 and IK.support_plane_z(table, None) == 0.83
     assert IK.support_plane_z(SimpleNamespace(name="wall"), None) is None
+
+
+def test_finger_link_clearance_per_hull():
+    # of-v2maps 2026-11-06 (the support-policy diagnostic): each finger link's own minimum clearance to the plane
+    from types import SimpleNamespace
+
+    import torch as th
+
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling.v2 import ik as IK
+
+    cube = np.array([[x, y, z] for x in (-0.005, 0.005) for y in (-0.005, 0.005) for z in (0.0, 0.01)], dtype=np.float64)
+    l1 = SimpleNamespace(link="right_gripper_finger_link1", role="finger", pieces=[cube], points=cube, axis=np.array([0.0, 1.0, 0.0]))
+    l2 = SimpleNamespace(link="right_gripper_finger_link2", role="finger", pieces=[cube - np.array([0.0, 0.0, 0.003])], points=cube, axis=np.array([0.0, -1.0, 0.0]))
+    palm = SimpleNamespace(link="right_gripper_link", role="palm", pieces=[cube], points=cube, axis=None)
+    hc = SimpleNamespace(geom=SimpleNamespace(links=[l1, l2, palm]), spacing=0.003)
+    T = th.eye(4)
+    T[2, 3] = 0.80  # the hull bottoms at z 0.800 and 0.797
+    d = IK.finger_link_clearance(hc, T, CP.Support.plane(0.801), (0.02, 0.02))
+    assert set(d) == {"right_gripper_finger_link1", "right_gripper_finger_link2"}
+    assert abs(d["right_gripper_finger_link1"] - (-0.001)) < 1e-6 and abs(d["right_gripper_finger_link2"] - (-0.004)) < 1e-6
