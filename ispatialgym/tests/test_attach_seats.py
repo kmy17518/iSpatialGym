@@ -126,13 +126,16 @@ def test_the_rule_axis_equals_the_oracle_seat_axis_for_every_attach_object():
             old = _meta_frames_as_written(info, np.eye(4))
             assert all(np.array_equal(d0, d1) for (_, d0), (_, d1) in zip(old, mates)), rec["id"]
             continue
-        dirs = [np.asarray(s["dir"]) for s in src if s["source"] == "seat"]
+        dirs = [m for (_, m), s in zip(mates, src) if s["source"] == "seat"]  # unrounded (``sources`` rounds to 1e-6)
         for _, d, who in oracle:
             n_seat += 1
             assert any(float(np.dot(d, x)) > math.cos(math.radians(0.01)) for x in dirs), (rec["id"], who, d.tolist(), [x.tolist() for x in dirs])
-        for (_, m), s in zip(mates, src):  # every frame the rule uses is one of the oracle's (or a meta link without a partner female)
+        live = {ml["meta_link_id"]: ml for ml in (rec["male"].get("links") or {}).values()}
+        for (p, m), s in zip(mates, src):  # every frame the rule uses is one of the oracle's (or a meta link without a partner female)
             if s["source"] == "seat":
                 assert any(float(np.dot(m, d)) > math.cos(math.radians(0.01)) for _, d, _ in oracle), rec["id"]
+                # the point: the male link where the simulator puts it (the applied scale included), not the metadata position
+                assert np.allclose(p, live[s["meta_link"].split("/")[1]]["position_root"], atol=1e-9), rec["id"]
     assert n_seat > 0
 
 

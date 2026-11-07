@@ -298,10 +298,12 @@ def attachment_frames(info, R: np.ndarray, seat: Optional[Dict[str, Any]] = None
     (identity orientation: straight down, onto the partner). No meta link: the bottom centre, mating downward.
 
     i7-attach: with ``seat`` (the entry's record of ATTACH_SEATS_FILE, :func:`attach_seat_record`; ``CandidateConfig.attach_axis`` =
-    "seat") the direction is the ORACLE's: ``-(R_male_link @ loc)`` for every partner female link the male link matches (``loc`` = the
-    seat axis in the female link frame, :func:`seat_mating_dirs`; partners with the same seat give one frame); a meta link without a
-    matched female keeps its frame's -z. ``sources`` (optional list) receives one record per frame: the meta link, point and direction
-    (object frame), the source ("meta_z" / "seat" / "bottom_centre") and the partner."""
+    "seat") a meta link the record matches to a partner female link takes the ORACLE's transform: the male link pose as the simulator
+    loads it (the record's ``position_root`` / ``orientation_root_xyzw``: the USD frame - cork ncxgpe's is 10.6 deg off its metadata
+    quaternion - and the applied scale, which the metadata position lacks) and the direction ``-(R_male_link @ loc)`` for every matched
+    female (``loc`` = the seat axis in the female link frame, :func:`seat_mating_dirs`; partners with the same seat give one frame). A
+    meta link without a matched female keeps the frame as written. ``sources`` (optional list) receives one record per frame: the meta
+    link, point and direction (object frame), the source ("meta_z" / "seat" / "bottom_centre") and the partner."""
     seat_dirs = seat_mating_dirs(seat) if seat else {}
     out = []
     for link, ml in (info.get("meta_links") or {}).items():
@@ -314,7 +316,13 @@ def attachment_frames(info, R: np.ndarray, seat: Optional[Dict[str, Any]] = None
                     Rm = S.quat_to_mat(q)
                     p = np.asarray(e["position"], dtype=float)
                     dirs: List[Tuple[np.ndarray, str, Optional[str]]] = []
-                    for loc, partner in seat_dirs.get((str(k), str(sub)), []):
+                    sd = seat_dirs.get((str(k), str(sub)))
+                    if sd and sd["locs"]:  # the oracle's male link pose (live)
+                        if sd.get("orientation") is not None:
+                            Rm = S.quat_to_mat(sd["orientation"])
+                        if sd.get("position") is not None:
+                            p = np.asarray(sd["position"], dtype=float)
+                    for loc, partner in (sd or {}).get("locs", []):
                         d = -(Rm @ np.asarray(loc, dtype=float))
                         d = d / np.linalg.norm(d)
                         if not any(np.allclose(d, d0, atol=1e-9) for d0, _, _ in dirs):
@@ -359,18 +367,20 @@ def attach_seat_record(job: Dict[str, Any], path: Optional[str] = None) -> Optio
     return None
 
 
-def seat_mating_dirs(seat: Dict[str, Any]) -> Dict[Tuple[str, str], List[Tuple[List[float], str]]]:
-    """``{(male meta link id, sub id): [(loc, "partner category/model:female link")]}`` of a seat record: per male link, the oracle's seat
-    axis in the female link frame of every partner female link it matches (``loc``; a seated male link frame = the female link frame)."""
+def seat_mating_dirs(seat: Dict[str, Any]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """``{(male meta link id, sub id): {"position", "orientation", "locs": [(loc, "partner category/model:female link")]}}`` of a seat
+    record: per male link its live pose in the male root frame (None when not recorded) and the oracle's seat axis in the female link
+    frame of every partner female link it matches (``loc``; a seated male link frame = the female link frame)."""
     links = (seat.get("male") or {}).get("links") or {}
-    out: Dict[Tuple[str, str], List[Tuple[List[float], str]]] = {}
+    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for prt in seat.get("partners") or []:
         for f in prt.get("female") or []:
             ml = links.get(f.get("child_link"))
             if ml is None or f.get("loc") is None:
                 continue
-            out.setdefault((str(ml["meta_link_id"]), str(ml.get("sub_id", "0"))), []).append(
-                (f["loc"], f"{prt['category']}/{prt['model']}:{f.get('parent_link')}"))
+            rec = out.setdefault((str(ml["meta_link_id"]), str(ml.get("sub_id", "0"))),
+                                 {"position": ml.get("position_root"), "orientation": ml.get("orientation_root_xyzw"), "locs": []})
+            rec["locs"].append((f["loc"], f"{prt['category']}/{prt['model']}:{f.get('parent_link')}"))
     return out
 
 
