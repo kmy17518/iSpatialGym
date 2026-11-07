@@ -1667,7 +1667,9 @@ Down-weights configurations that keep failing for an alias. It runs unattended, 
   - Off per job: `--alias-memory off`.
 
 **Proposed thresholds** come from the replay over `$OFH/out`:
-- source: `$OFH/memory_20261108/replay`, 2375 demos, 88 batches (tags in finish order), snapshot `trunk_9f4302b1`;
+- source: `$OFH/memory_20261108/replay_61d4024d`, 2375 demos, 88 batches (tags in finish order), snapshot `trunk_61d4024d`;
+- excluded: 3 status error, 1 timeout, 2 attach recorded-IK known bug;
+- seed version: `memory_20261108/alias_memory/v0002`;
 - check: for every demo, the memory of the batches before it, in its own context.
 
 | setting | inside_large_01 0.50 caught | 0.25 caught | later demos in flagged bins (ok) | (alias, context) findings |
