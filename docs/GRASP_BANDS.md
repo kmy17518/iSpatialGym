@@ -194,6 +194,80 @@ python -m pytest ispatialgym/tests/test_contact_policy.py ispatialgym/tests/test
 python3 scripts/grasp_bands/aggregate.py --run $GBH/out/<tag> --jobs <manifest>
 ```
 
+## Fast-flow pipeline (branch `of-v2maps`, 2026-11-06)
+
+The oracle-fix fast flow can run on v2 grasps and reach maps. The switch is per job, and nothing else in the pipeline changes:
+sampling, collection, replay, customs, registry, ledger, snapshots and validation are the fast flow as before.
+
+**Switch.** `submit_fast.py submit ... --grasps v2` (the default is `legacy`) writes `ISGF_GRASPS=v2` and the campaign's
+`ISPATIALGYM_GRASP_LIBRARY_V2`, `ISPATIALGYM_REACH_MAPS` and `ISPATIALGYM_REACH_MAP_ANCHORS` into `job.env` (`GRASPS_V2`).
+- The sampler and the collectors source the same `job.env`. A `recollect` copies it, so the instances keep the library they were
+  sampled with; grasp names differ between the libraries.
+- `fast_env.sh` validates the choice. With `legacy` it unsets the three variables, but a registry row's own library comes back with
+  `job.env`: the umbrella's, as before.
+- `job.txt` records `GRASPS <legacy|v2> glib= maps= anchors= strict=`. A v2 job whose paths are missing stops before sampling.
+- `ISPATIALGYM_REACH_MAPS_STRICT` stays off. It would reject every alias without a v2 entry, not just map misses. A miss logs
+  `reach map miss for ...` and keeps the legacy band path.
+
+**What decides the path.** `tabletop.ensure_bands` uses a reach map only when all of these hold:
+- it is a library grasp (not a generic pinch);
+- the band is not placed and is not an interior surface band;
+- the grasp key has a v2 entry with valid grasps, linked by `legacy_key`;
+- a map exists at the support's anchor for that arm.
+
+The library's contents decide which aliases change. A v2 job of an alias without an entry in it keeps its legacy grasps and
+bands, so the campaign library holds only the entries meant to change.
+
+**Data** (`$OFH/v2maps_20261106`, campaign-owned; the grasp-bands record is only read):
+- `glib/` (21 entries):
+  - 10 copied from `roles_all_20261102` and 7 from `pilot_isg1020` (the aliases' legacy keys at their spawn scale; roles_all has
+    those with `legacy_key: null` or only at scale 1);
+  - the umbrella from `$OFH/glib_v2`;
+  - every copied file md5-identical to its source;
+  - 3 from a glib run (`job_glib.sh` with `GBH=$OFH GB_OUT=...`, 331 s): steak s0.6, carving knife s1×1×1.25, spray bottle s1.
+- Excluded: entries with 0 valid grasps and a legacy key (cap, cork, hard candy, cellulose tape, pillow), because `load_grasps`
+  would raise `missing_grasps` on every template of their alias.
+- `anchors.json`: the 8 live support heights of these aliases at 1e-4 (the sampler's `top.z - world.floor_z`), with no authored
+  1e-2 anchors. All 20 aliases resolve to their own anchor exactly.
+- `maps/`: 40 maps (20 entries × right and left arm at their aliases' anchors), median 40 s, compute 1,781 s, wall 0.76 GPU-h
+  over 4 shards.
+- The build scripts are under `$OFH/jobs/v2build/`.
+
+**Fixes the pipeline needed** (none of the 2026-11-02 runs exercised the sampler with an anchor file or two segment arms):
+- `ReachMap.find` with an anchor set overwrote its map kind with the lookup's kind, so every map failed the kind test. No sampler
+  lookup could hit.
+- `AnchorSet.lookup` returned an authored 1e-2 anchor (0.81) before the measured 0.8126. It now prefers the finest exact match.
+- `tabletop.arm_band` mirrored a map view, which raises for two-arm aliases. It now uses the other arm's own map, and on a miss that
+  arm's legacy band.
+- `reach_maps compute --skip-existing` now checks the arm and kind.
+- `job_glib.sh` takes the output root, code root, library, per-id heights and arms as variables.
+- The support policy: `ISPATIALGYM_SUPPORT_POLICY=grasp`, the value a map hit now sets, polices only the grasp approach (chains whose
+  arm holds nothing). `1` keeps the 2026-11-02 scope, which also policed places, carries and releases.
+
+**A/B** (fast flow, 20 aliases × N 4, kcollect 2; `$OFH/out/<tag>`; tables from `$OFH/jobs/v2build/v2_ab.py` and `v2_rej.py`):
+
+| Arm | Tag (snapshot) | Written / attempts | Demos ok |
+|---|---|---|---|
+| legacy | `v2legacy1` (f5decd42) | 73 / 344 (21%) | 57 / 73 |
+| v2, policy on every chain | `v2maps1` (f5decd42) | 6 / 1,248 (0.5%) | 4 / 6 |
+| v2, policy off (6 aliases) | `v2nopol1` (f5decd42) | 15 / 127 | 11 / 15 |
+| v2, policy on the grasp approach | `v2scope1` (73d3b572; 13 / 20 jobs done) | 42 / 361 (12%) | 31 / 42 |
+| v2, policy on supports, measured top | `v2scope2` (5316ca4d; 10 aliases, early) | 13 / 50 | 6 / 7 |
+
+- **Policy on every chain:** places and releases died. touching_02 lost 62 of 66 attempts at the place screen; ontop_small_03 hit
+  `palm_contact` on the partner. Grasp names and the eef frame agree with the legacy library (same positions).
+- **Scoped policy:** 10 aliases are at par with legacy (written ≥ legacy − 1): attachment_01/04, inside_01, nextto_01/02,
+  ontop_small_01/02/03, under_small_01/02. Some sample faster per instance: attachment_04 337 s vs 1,024 s, inside_01 181 s vs 544 s.
+- **Still worse on v2:**
+  - inside_03, nextto_03, ontop_small_04 (thin objects lying flat): `finger_penetration on <table>` on the grasp, 130–770 rejections
+    each, even against the measured top plane. Legacy demos succeed there.
+  - touching_01/02/04: 'touching push: no push class passes'. This is not the policy (0 rejections in v2scope2); the cause is unknown.
+  - under_small_03: the plate's one v2 grasp has an empty feasible set at the map's cells.
+  - nextto_04: the template setup fails (`no_manipulation_stance`; gym shoe, one v2 grasp, a 0.35 m bench).
+  - under_small_04: 2 written against legacy's 4.
+- **The map views are optimistic.** They are wider than the scene's legacy bands: the salt shaker at trunk (0.25, −0.9), stand-off
+  0.45, has 103 map cells against 31 band cells. Map proposals therefore meet more exact-check rejections.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
