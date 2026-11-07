@@ -279,7 +279,20 @@ class AlignmentAxial(SamplerV2):
             lo, hi = TT.union_extent(self.bands)[1], TT.union_extent(self.left_bands)[0]
             mid = 0.5 * (min(lo, hi) + max(lo, hi))
             order.sort(key=lambda k: abs(self.manip_candidates[k].local(self.manip_candidates[k].focus[:2])[1] - mid))
-        for k in order[:6]:
+        plan: List[Tuple[int, Any]] = [(int(k), None) for k in order[:6]]
+        self._a5_scan = None
+        if TT.contact_maps_on():
+            # owner A5 (2026-11-08, map lookups only): per candidate stance the placement draws until one has a PAIR (the push map and the
+            # brace map fit on the SAME pushed end); the candidates with a pair first, then the push-only ones
+            for o in self.world.spawned.values():
+                self.world.park(o, list(self.world.spawned).index(o.name))
+            self.kit.sync_world()
+            scan = self._scan_candidates(rng, init, order[:6])
+            plan = [(k, (d, f)) for k, d, f in scan]
+            self._a5_scan = {"candidates": len(order[:6]), "push_feasible": len(scan), "paired": sum(1 for _k, d, _f in scan if self._draw_paired(d))}
+            if not plan:
+                raise Reject("target_placement", f"no manipulation candidate of {len(order[:6])} has a push-feasible placement on the push_blade map")
+        for k, pre in plan:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, ["right"]  # the left arm joins only when a stop brace is recorded
@@ -289,13 +302,13 @@ class AlignmentAxial(SamplerV2):
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
             try:
-                return self._sample_with(rng, init, manip, int(k))
+                return self._sample_with(rng, init, manip, int(k), pre=pre)
             except Reject as e:
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
-    def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
+    def _sample_with(self, rng, init: Stance, manip: Stance, k: int, pre=None) -> Draft:
         draft = Draft()
         tname = self.tname
         target, support = self.obj("target"), self.obj("support")
@@ -303,7 +316,6 @@ class AlignmentAxial(SamplerV2):
         yaw_goal = self._aligned_yaw(manip)
         cam_init = self.camera_pose_at(init)
         ev = self.g("edge_visibility") or {}
-        bands, left_bands = self.bands, self.left_bands
         z_push = self._push_height()
         z_brace = TT.contact_height(self.top.z, self.extents["height"])
         half_len = 0.5 * self.extents["long"] - END_INSET
@@ -315,53 +327,11 @@ class AlignmentAxial(SamplerV2):
             raise Reject("target_placement", f"target {self.extents['height']:.2f} m tall: its face reaches the palm section of the closed fingers, no blade push")
         push_half = geo0[1]
         self._blade_skips = {}
-        chosen = None
-        fails = {"support": 0, "frame": 0, "work_off_band": 0, "brace_off_band": 0, "brace_class_failed": 0}
-        for _ in range(12):
-            yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
-            r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
-            xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
-            pose = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw0, self.top.z)
-            if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
-                fails["support"] += 1
-                continue
-            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull, pose), TT.IN_FRAME_MARGIN):
-                fails["frame"] += 1
-                continue
-            com = self._com_world(pose)
-            long_w = C.quat_rotate(pose[1], self.long_axis)
-            ends = [com + long_w * s * half_len for s in (1.0, -1.0)]
-            d_goal0 = C.wrap_angle(yaw_goal - yaw0)
-            spin0 = 1.0 if d_goal0 > 0 else -1.0
-            # A1 joint placement per end: the blade's contact point beside the end (right arm, work point) must lie in
-            # a right band cell AND the stop point of that end at the goal (left arm, brace point) in a left contact
-            # band cell at the manipulation trunk, with the brace's contact class passing when the band records classes
-            pairs = []
-            for end_sign, e in zip((1.0, -1.0), ends):
-                r_xy = th.tensor([float(e[0] - com[0]), float(e[1] - com[1]), 0.0])
-                d = spin0 * th.cross(z_axis, r_xy, dim=0)
-                d = d / th.linalg.norm(d)
-                side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
-                contact_xy = side_pt[:2] - d[:2] * push_half
-                goal_pose, stop_pts, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
-                stop_pt = stop_pts[0]  # the band test uses the corner-side point (the brace candidates run along the face)
-                if TT.contact_maps_on():
-                    pairs.append((e, self.map_joint_placement(manip, pose, goal_pose, spin0, abs(d_goal0), end_sign=end_sign), goal_pose, stop_pts, d_stop))
-                    continue
-                jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, z_axis), tol_brace=BRACE_CELL_TOL)
-                if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
-                    jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)), tol_brace=BRACE_CELL_TOL)
-                pairs.append((e, jp, goal_pose, stop_pts, d_stop))
-            # owner decision 2026-09-16 08:10 (axial = push-only, the stop brace optional): the placement needs the push work
-            # point in the right band; a brace is recorded only when the joint two-arm placement exists for that end
-            if not any(jp["work_ok"] for _, jp, _, _, _ in pairs):
-                fails["work_off_band"] += 1
-                continue
-            for _, jp, _, _, _ in pairs:
-                if jp["work_ok"] and not jp["ok"]:
-                    fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
-            chosen = (pose, yaw0, delta, com, pairs)
-            break
+        if pre is not None:  # owner A5: the draw the candidate scan chose (``_scan_candidates``)
+            chosen, fails = pre[0], dict(pre[1])
+        else:
+            draws, fails = self._placement_draws(rng, manip, cam_init, yaw_goal, push_half, z_brace, half_len, stop_at="pair" if TT.contact_maps_on() else "work")
+            chosen = self._pick_draw(draws)
         if chosen is None:
             raise Reject("target_placement", f"no (yaw, position) with a long-axis end whose push point lies in the right band at this trunk ({fails})")
         pose, yaw0, delta, com, pairs = chosen
@@ -390,6 +360,11 @@ class AlignmentAxial(SamplerV2):
             d = spin * th.cross(z_axis, r_xy, dim=0)
             motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pts, d_stop))
         motions.sort(key=lambda m: float(th.dot(m[6][:2], manip.inward)))
+        paired = TT.contact_maps_on() and self._draw_paired(chosen)
+        if TT.contact_maps_on():
+            # owner A5 (2026-11-08): the end whose push AND stop brace fit on the maps (the same pushed end in both) first
+            motions.sort(key=lambda m: 0 if (m[1]["ok"] and m[1]["work_ok"]) else 1)
+            TT._count(self, "axial_brace.paired" if paired else "axial_brace.push_only")
         brace_reason = "no_joint_cell"
         for e, jp, d, r_xy, goal_pose, stop_pts, d_stop in motions:
             if not jp["work_ok"]:
@@ -440,6 +415,7 @@ class AlignmentAxial(SamplerV2):
                         push_fails.extend(f"{pitch:.0f}°: {o.get('why', '')}" for o in dec_push["options"] if not o.get("ok"))
                         continue
                     p_pre, p_init, p_mid, p_goal = chosen.proposal.chain
+                    push_label = chosen.proposal.label
                     n_push_ok += 1
                     # the stop brace is optional (owner decision 2026-09-16 08:10: axial = push-only, the oracle's push closure
                     # is the stop): tried only when the joint two-arm placement exists for this end (work point in the right
@@ -474,6 +450,7 @@ class AlignmentAxial(SamplerV2):
                         brace_reason = "brace_map_missing" if jp.get("brace_map_missing") else ("no_joint_cell" if not jp["brace_ok"] else "brace_class_failed")
                     dist = abs(d_goal) * float(th.linalg.norm(r_xy))
                     push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pts, d_stop, pitch)
+                    push_end_sign = 1.0 if float(th.dot(e - com, C.quat_rotate(pose[1], self.long_axis))) > 0 else -1.0
                     push_orient = dec_push
                     break
                 if push is not None:
@@ -520,10 +497,131 @@ class AlignmentAxial(SamplerV2):
         draft.summary.update({"yaw_goal": yaw_goal, "yaw_init": yaw0, "deviation_deg": math.degrees(delta), "push_end": end.tolist(), "push_distance_m": dist,
                           "manipulation_candidate": k, "spin": spin, "push_pitch_deg": float(pitch), "brace_class": brace_kind,
                           "brace": "present" if brace_found is not None else "none", "brace_reason": brace_reason,
-                          "joint_placement": {"left_band": self.left_bands is not None, "fails": fails}})
+                          "joint_placement": {"left_band": self.left_bands is not None, "fails": fails,
+                                              **({"map_pair": bool(paired), "scan": getattr(self, "_a5_scan", None)} if TT.contact_maps_on() else {})}})
+        if TT.contact_maps_on():
+            self._note_contacts(draft, manip, pose, goal_pose, spin, abs(d_goal), push_end_sign, push_label, brace_found)
         self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
         self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
         return draft
+
+    def _note_contacts(self, draft: Draft, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float, end_sign: float,
+                       push_label: Optional[str], brace_found) -> None:
+        """Owner A6 (2026-11-08): the library entries this instance executes, for the contact maps' learned overlay
+        (``contact_overlay.note_used``; the harvest after a successful demo): the push as ``<end><spin>spin_<pitch label>@t<turn>`` in the
+        push_blade map's library convention, the brace as ``<end><spin>spin_<kind>@f<stop face fraction>``. Advisory: never rejects."""
+        from ispatialgym.sampling import contact_overlay as CO
+
+        try:
+            pm, bm = self.axial_maps()
+            sp = "+" if spin > 0 else "-"
+            e_push = AlignmentAxial._map_end_sign(self, pm, end_sign)
+            if push_label and e_push is not None:
+                turns = sorted({abs(float(r["arc_turn_rad"])) for r in pm.meta["classes"] if r and r.get("arc_turn_rad") is not None})
+                t_near = min(turns, key=lambda t: abs(t - turn)) if turns else None
+                cls = f"{'+' if e_push > 0 else '-'}end{sp}spin_{push_label}" + (f"@t{math.degrees(t_near):.0f}" if t_near is not None and len(turns) > 1 else "")
+                CO.note_used(draft.summary, pm, "push_blade", cls, TT.contact_map_check(pm, manip, pose), "target")
+            if brace_found is not None and bm is not None:
+                e_b = AlignmentAxial._map_end_sign(self, bm, end_sign)
+                kind, extras = brace_found[2], brace_found[3] or {}
+                if e_b is not None:
+                    cls = f"{'+' if e_b > 0 else '-'}end{sp}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+                    CO.note_used(draft.summary, bm, "axial_brace", cls, TT.contact_map_check(bm, manip, goal_pose), "target")
+        except Exception as ex:  # noqa: BLE001 - the overlay is advisory
+            log.info("%s: contact overlay note skipped: %r", self.gp.variant, ex)
+
+    def _placement_draws(self, rng, manip: Stance, cam_init, yaw_goal: float, push_half: float, z_brace: float, half_len: float, n: int = 12,
+                         stop_at: str = "work") -> Tuple[List[Tuple[Any, ...]], Dict[str, int]]:
+        """The target placement draws at ``manip`` (``n`` tries: a start yaw ``aligned +- U(deviation range)``, a position in the focus
+        disc; on the support, in the init image) with their per-end A1 joint placement (``pairs``: the contact maps' :meth:`map_joint_placement`
+        under v2only, else the bands' ``TT.joint_placement``). Returns ``(draws, fails)``: every draw with a push-feasible end, in draw order,
+        stopping at the first push-feasible draw (``stop_at="work"``: the rule before owner A5) or at the first draw with a PAIR - an end
+        whose push AND stop brace both fit (``"pair"``, owner A5 2026-11-08; map lookups only)."""
+        target_z_axis = th.tensor([0.0, 0.0, 1.0])
+        bands, left_bands = self.bands, self.left_bands
+        fails = {"support": 0, "frame": 0, "work_off_band": 0, "brace_off_band": 0, "brace_class_failed": 0}
+        draws: List[Tuple[Any, ...]] = []
+        for _ in range(n):
+            yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
+            r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
+            xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
+            pose = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw0, self.top.z)
+            if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
+                fails["support"] += 1
+                continue
+            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull, pose), TT.IN_FRAME_MARGIN):
+                fails["frame"] += 1
+                continue
+            com = self._com_world(pose)
+            long_w = C.quat_rotate(pose[1], self.long_axis)
+            ends = [com + long_w * s * half_len for s in (1.0, -1.0)]
+            d_goal0 = C.wrap_angle(yaw_goal - yaw0)
+            spin0 = 1.0 if d_goal0 > 0 else -1.0
+            # A1 joint placement per end: the blade's contact point beside the end (right arm, work point) must lie in
+            # a right band cell AND the stop point of that end at the goal (left arm, brace point) in a left contact
+            # band cell at the manipulation trunk, with the brace's contact class passing when the band records classes
+            pairs = []
+            for end_sign, e in zip((1.0, -1.0), ends):
+                r_xy = th.tensor([float(e[0] - com[0]), float(e[1] - com[1]), 0.0])
+                d = spin0 * th.cross(target_z_axis, r_xy, dim=0)
+                d = d / th.linalg.norm(d)
+                side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
+                contact_xy = side_pt[:2] - d[:2] * push_half
+                goal_pose, stop_pts, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
+                stop_pt = stop_pts[0]  # the band test uses the corner-side point (the brace candidates run along the face)
+                if TT.contact_maps_on():
+                    pairs.append((e, self.map_joint_placement(manip, pose, goal_pose, spin0, abs(d_goal0), end_sign=end_sign), goal_pose, stop_pts, d_stop))
+                    continue
+                jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, target_z_axis), tol_brace=BRACE_CELL_TOL)
+                if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
+                    jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(target_z_axis, d_stop, dim=0)), tol_brace=BRACE_CELL_TOL)
+                pairs.append((e, jp, goal_pose, stop_pts, d_stop))
+            # owner decision 2026-09-16 08:10 (axial = push-only, the stop brace optional): the placement needs the push work
+            # point in the right band; a brace is recorded only when the joint two-arm placement exists for that end
+            if not any(jp["work_ok"] for _, jp, _, _, _ in pairs):
+                fails["work_off_band"] += 1
+                continue
+            for _, jp, _, _, _ in pairs:
+                if jp["work_ok"] and not jp["ok"]:
+                    fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
+            draws.append((pose, yaw0, delta, com, pairs))
+            if stop_at == "work" or (stop_at == "pair" and self._draw_paired(draws[-1])):
+                break
+        return draws, fails
+
+    @staticmethod
+    def _draw_paired(draw) -> bool:
+        """A draw has a PAIR (owner A5): one end whose push and stop brace both fit (``jp["ok"]``)."""
+        return any(jp["ok"] and jp["work_ok"] for _, jp, _, _, _ in draw[4])
+
+    def _pick_draw(self, draws):
+        """Owner A5 (2026-11-08): the first draw with a pair, else the first push-feasible draw (push-only)."""
+        for d in draws:
+            if self._draw_paired(d):
+                return d
+        return draws[0] if draws else None
+
+    def _scan_candidates(self, rng, init: Stance, order: List[int]) -> List[Tuple[int, Any, Dict[str, int]]]:
+        """Owner A5 (2026-11-08, under v2only; map lookups only): every manipulation candidate of ``order`` in turn, its placement draws on the
+        push_blade / axial_brace maps until a draw has a pair (an end whose push and stop brace fit). Returns ``(k, draw, fails)`` per
+        candidate with a push-feasible draw - the candidates with a pair first (in order), then the push-only ones (their first draw)."""
+        paired, push_only = [], []
+        cam_init = self.camera_pose_at(init)
+        z_brace = TT.contact_height(self.top.z, self.extents["height"])
+        half_len = 0.5 * self.extents["long"] - END_INSET
+        geo0 = self._blade_geometry(0.0, 0.0)
+        if geo0 is None:
+            return []
+        for k in order:
+            cand = self.manip_candidates[int(k)]
+            manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
+            manip.focus = cand.focus
+            draws, fails = self._placement_draws(rng, manip, cam_init, self._aligned_yaw(manip), geo0[1], z_brace, half_len, stop_at="pair")
+            d = self._pick_draw(draws)
+            if d is None:
+                continue
+            (paired if self._draw_paired(d) else push_only).append((int(k), d, fails))
+        return paired + push_only
 
     def axial_maps(self):
         """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm: REQUIRED, a miss rejects ``missing_map``)
