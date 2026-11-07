@@ -178,5 +178,7 @@ wait $CPIDS
 kill $MONPID 2>/dev/null
 QRC=0; for i in $(seq 1 $K); do r=$(cat $JOBDIR/collect_c$i.rc 2>/dev/null || echo 1); [ "$r" -ne 0 ] && QRC=$r; done
 python $S/fast_check.py $JOBDIR 2>&1 | tee -a $JOBDIR/job.txt
+# i7-memory (owner 2026-11-08 part C): this job's outcome shard for the per-alias memory (<job dir>/alias_memory_shard.jsonl; one writer per job)
+python -m ispatialgym.sampling.alias_memory record $JOBDIR 2>&1 | tail -1 | sed 's/^/ALIAS_MEMORY_SHARD /' | tee -a $JOBDIR/job.txt
 case "$SAMPLE_RC" in 0|2) [ "$QRC" -eq 0 ] && KIT_RC=0 ;; esac
 echo "ISGF_END $SLURM_JOB_ID wall_s=$(( $(date +%s) - T_START )) kit_rc=$KIT_RC end=$(date -Is)" | tee -a $JOBDIR/job.txt

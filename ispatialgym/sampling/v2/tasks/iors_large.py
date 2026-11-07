@@ -141,6 +141,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym import REPO_ROOT
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling import reach_bands as RB
@@ -4750,6 +4751,11 @@ class IORSLarge(SamplerV2):
             order.sort(key=lambda k: (round(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) / 0.25), int(c_pool[k].extras.get("edge_rank", 0))))
         else:
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
+        # i7-memory (owner 2026-11-08 01:45 part C): the per-alias outcome memory reweights the C order from outcomes. The order above is
+        # the PRIOR and is kept; the candidates of an (arm, trunk[, stand-off]) bin the memory down-weighted move to the end unless the
+        # bin keeps its place this coupling (Thompson draw, never below the exploration floor). No memory / nothing down-weighted = the
+        # order unchanged and no random number drawn (alias_memory.reorder; kit alias_memory.place.*; provenance in the stance extras)
+        order, mem_prov = AM.reorder(self, "place", order, [AM.place_cfg(arm, c) for c in c_pool], rng, max_level=AM.PLACE_HOOK_LEVELS)
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         seg = seg or SegmentArms({arm: manip}, {arm: list(F_init)}, yaw_step=yaw_step)
@@ -4773,6 +4779,8 @@ class IORSLarge(SamplerV2):
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
             place.focus, place.arms = c_pool[int(kc)].focus, [arm]
             place.extras = dict(c_pool[int(kc)].extras)
+            if int(kc) in mem_prov:
+                place.extras["alias_memory"] = mem_prov[int(kc)]  # provenance: the memory version, bin and weight this C was drawn with
             gc = place.extras["goal_cell"]
             push = self.push_under
             if skip_dead_b and self._c_dead_at_b(F_live, b_ik_cache, place, manip, yaw_step):

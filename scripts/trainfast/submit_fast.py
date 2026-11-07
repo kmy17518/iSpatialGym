@@ -95,6 +95,36 @@ def shiyuc_env(a):
     return env
 
 
+def alias_memory_pin(a):
+    """i7-memory (owner 2026-11-08 part C): the outcome-memory VERSION the job reads, pinned in job.env (ISPATIALGYM_ALIAS_MEMORY):
+    --alias-memory auto (default) = <root>/alias_memory/LATEST when one exists, else off; off; or a version dir / a memory root (its LATEST)."""
+    v = getattr(a, "alias_memory", "auto") or "auto"
+    if v == "off":
+        return "off"
+    root = os.path.join(os.path.abspath(a.root), "alias_memory") if v == "auto" else os.path.abspath(v)
+    if os.path.exists(os.path.join(root, "meta.json")):
+        return root
+    try:
+        ver = open(os.path.join(root, "LATEST")).read().strip()
+    except OSError:
+        if v != "auto":
+            raise SystemExit(f"--alias-memory {v}: neither a version (meta.json) nor a memory root (LATEST)")
+        return "off"
+    return os.path.join(root, ver) if ver and os.path.isdir(os.path.join(root, ver)) else "off"
+
+
+def memory_job(a, gpu_jobid, code):
+    """The batch's aggregation job (job_memory.sh: CPU, afterany the GPU job; it aggregates only when the tag's last job is done)."""
+    script = os.path.join(scripts_of(code), "job_memory.sh")
+    if not os.path.exists(script):
+        return None
+    cmd = ["sbatch", "--parsable", "-J", f"{a.job_prefix}mem", "-A", a.acct, "-p", a.part, "--time=1:00:00", f"--exclude={EXCLUDE}", "-c", "2",
+           "--mem=8G", f"--dependency=afterany:{gpu_jobid}", "-o", os.path.join(a.root, "slurm", "%x_%j.log"), script, os.path.abspath(a.root),
+           a.tag or a.flow, os.path.abspath(code)]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    return res.stdout.strip().split(";")[0] if res.returncode == 0 else f"failed ({res.stderr.strip()[:80]})"
+
+
 def eval_index_of(key):
     p = os.path.join(EVAL_INDEX_V2, key + ".json")
     return p if os.path.exists(p) else os.path.join(st.EVAL_INDEX_DIR, key + ".json")
@@ -211,6 +241,9 @@ def submit(a):
             # of-v2maps 2026-11-07 (owner: no legacy band, v2 grasps + v2 reach maps only): every legacy band load / compute is refused
             # (reach_bands.block_legacy_band -> legacy_band_blocked), a map miss rejects (missing_map), the support policy is on from the start
             env.update({"ISPATIALGYM_V2_ONLY": "1", "ISPATIALGYM_REACH_MAPS_STRICT": "1", "ISPATIALGYM_SUPPORT_POLICY": "grasp"})
+        # i7-memory (owner 2026-11-08 part C, unattended): the per-alias outcome memory version this job's sampler reads (train only)
+        env["ISPATIALGYM_ALIAS_MEMORY"] = alias_memory_pin(a)
+        env["ISPATIALGYM_ALIAS_MEMORY_ALIAS"] = a.key
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
@@ -248,9 +281,11 @@ def submit(a):
             if new:
                 fh.write("\t".join(LEDGER_COLS) + "\n")
             fh.write("\t".join(str(row[k]) for k in LEDGER_COLS) + "\n")
+        mem_id = memory_job(a, jobid, a.code) if getattr(a, "memory_aggregate", True) else None
         print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
               f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect} customs={customs} "
-              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root}")
+              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root} alias_memory={env['ISPATIALGYM_ALIAS_MEMORY']}"
+              + (f" memory_job={mem_id}" if mem_id else ""))
     finally:
         unlock(lock)
     return 0
@@ -365,6 +400,11 @@ def main():
     s.add_argument("--shiyuc", action="store_true", help="run as shiyuc: every write under " + SY + " (shiyuc_env); --root / --base-index / --v2-root there")
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
+    s.add_argument("--alias-memory", default="auto",
+                   help="i7-memory: the per-alias outcome memory the sampler reads, pinned in job.env - auto (default: <root>/alias_memory/LATEST "
+                        "if any, else off), off, or a version dir / memory root")
+    s.add_argument("--no-memory-aggregate", dest="memory_aggregate", action="store_false",
+                   help="i7-memory: do not queue the batch's aggregation job (job_memory.sh, CPU, afterany this job)")
     r = sub.add_parser("recollect")
     r.add_argument("src")
     common(r)
