@@ -227,14 +227,26 @@ def test_held_sampler_refuses_a_non_floating_entry_and_enforces_scale(v2root, mo
 # ------------------------------------------------------------------------------------------------ the validator (pure parts)
 
 
-def test_held_motion_legs_return_to_the_hold():
-    legs = VF.rotation_legs(("x", "y"), 90.0)
-    assert [n for n, _, _ in legs] == ["rot_x+90", "rot_x-180", "rot_x+90b", "rot_y+90", "rot_y-180", "rot_y+90b"]
-    for ax in (0, 3):
-        assert math.isclose(sum(a for _, _, a in legs[ax:ax + 3]), 0.0, abs_tol=1e-12)
-    assert sum(d for _, d in VF.line_legs((-0.25, 0.25))) == 0.0
+def test_held_motions_are_out_and_back_per_axis_and_line():
+    cfg = VF.FloatingValidateConfig()
+    rot = VF.motion_plan("mental_rotation", cfg)
+    assert [m["name"] for m in rot] == ["rotx", "rot-x", "roty", "rot-y", "rotz", "rot-z"] and all(m["tries"] == [90.0, 60.0, 45.0] for m in rot)
+    out, back = VF.leg_of(rot[1], 60.0), VF.leg_of(rot[1], 60.0, back=True)
+    assert np.allclose(out["axis"], [-1, 0, 0]) and math.isclose(out["angle"], math.radians(60)) and math.isclose(back["angle"], -out["angle"])
+    assert back["name"] == "rot-x:60:back"
+    lines = VF.motion_plan("object_scaling", cfg)
+    assert [m["tries"] for m in lines] == [[-0.25], [0.05]] and VF.leg_of(lines[0], -0.25, back=True)["d"] == 0.25
+    assert VF.min_motions_of(cfg, "mental_rotation") == 2 and VF.min_motions_of(cfg, "object_scaling") == 1
     assert VF.held_tasks_of({"held_tasks": ["object_scaling"]}) == ["object_scaling"]
     assert VF.held_tasks_of({}) == ["mental_rotation", "object_scaling"]
+    import os as _os
+
+    _os.environ["ISG_GLIB_FLOAT_VAL_OVERRIDES"] = '{"rotation_degs": [60], "min_motions": {"mental_rotation": 3}}'
+    try:
+        c = PL.floating_validate_overrides()
+        assert c.rotation_degs == (60,) and VF.min_motions_of(c, "mental_rotation") == 3
+    finally:
+        del _os.environ["ISG_GLIB_FLOAT_VAL_OVERRIDES"]
 
 
 def test_validator_closure_constants_are_the_held_samplers():

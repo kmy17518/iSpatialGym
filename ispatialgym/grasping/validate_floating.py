@@ -14,15 +14,16 @@ Per job (``run_model``) and per hold of its held tasks (``job["held_tasks"]``: `
    the fingers advanced ``grasp_finger_advance_m_per_step`` per control step until both pads touch, ``grasp_press_m`` past the contact
    through the assisted-grasp window - the object re-posed every step until the joint exists - gravity on for ``GRASP_GRAVITY_STEPS``);
 3. **held motions** (the object attached, the gripper target at the contact like the recorded start's controller targets): the oracle's
-   own arm tracking (``Motions.arm_along``, the ``Reorient`` executor's call, default speeds) through the task's key poses -
-   ``mental_rotation``: orbits about the object root (``conventions.orbit_waypoints``, 3 intermediate + the goal) by +a, -2a, +a about
-   the base x and the base y axes (a = ``rotation_deg``: the object's weight turned through four directions relative to the grasp);
-   ``object_scaling``: straight lines along the optical axis (``conventions.line_waypoints``) by ``line_offsets_m`` (toward the camera
-   and back) - each leg followed by ``leg_settle_steps`` of hold;
+   own arm tracking (``Motions.arm_along``, the ``Reorient`` executor's call, default speeds) through the task's key poses, each motion
+   out and back to the hold (:func:`motion_plan`) - ``mental_rotation``: an orbit about the object root (``conventions.orbit_waypoints``,
+   3 intermediate + the goal) per signed base axis (+-x, +-y, +-z) at the largest of ``rotation_degs`` (90, 60, 45 deg) the arm tracks
+   (the sampler likewise keeps only the rotations its IK reaches); ``object_scaling``: straight lines along the optical axis
+   (``conventions.line_waypoints``) by ``line_offsets_m`` (0.25 m toward the camera, 0.05 m away) - each leg followed by
+   ``leg_settle_steps`` of hold;
 4. **acceptance**: the assisted grasp formed and holds after gravity; the achieved grasp within ``on_target_*`` of the candidate; after
    gravity and after every executed leg the object still attached with its in-hand pose within ``retain_*`` of the post-gravity pose;
-   at least ``min_legs`` executed legs per held task (a leg the arm cannot track - ``plan_failed`` - is recorded as unreachable: a reach
-   limit of the test pose, not a property of the grasp).
+   at least ``min_motions`` executed motions per held task (2 rotation axes / 1 line; a leg the arm cannot track - ``plan_failed``,
+   which does not move the arm - is recorded as unreachable: a reach limit of the test pose, not a property of the grasp).
 
 Fidelity notes: the hold is the sampler's fixed hold at a base at the origin (the instance's base pose does not change the in-hand
 physics); the oracle's ``finish`` fallback of a stalled leg is not used (a stalled leg counts as unreachable). Thresholds are the
@@ -64,11 +65,15 @@ class FloatingValidateConfig:
     on_target_pos_m: float = 0.015
     on_target_rot_rad: float = math.radians(15.0)
     # held motions
-    rotation_deg: float = 90.0
-    rotation_axes: Tuple[str, ...] = ("x", "y")
-    line_offsets_m: Tuple[float, ...] = (-0.25, 0.25)
+    #: mental_rotation: one out-and-back orbit about the object root per signed base axis, at the largest of ``rotation_degs`` the arm tracks
+    rotation_axes: Tuple[str, ...] = ("x", "-x", "y", "-y", "z", "-z")
+    rotation_degs: Tuple[float, ...] = (90.0, 60.0, 45.0)
+    #: object_scaling: one out-and-back line along the optical axis per offset (- = toward the camera; the hold is at depth 0.50 of the
+    #: task's 0.15 - 0.55 m window)
+    line_offsets_m: Tuple[float, ...] = (-0.25, 0.05)
     leg_settle_steps: int = 10
-    min_legs: int = 1
+    #: executed motions required per task (a motion = its out leg and its way back)
+    min_motions: Tuple[Tuple[str, int], ...] = (("mental_rotation", 2), ("object_scaling", 1))
     ik_seeds: int = 16
     sleep_assist: bool = True
     #: the arm at the hold: the eef within this of the hold pose (diagnostic of the IK / drive; the object is placed at the actual eef)
@@ -88,19 +93,29 @@ def hold_of(task: str):
     return HO.HoldConstants.from_generation(GD.defaults_for(task)["hold"])
 
 
-def rotation_legs(axes: Sequence[str], deg: float) -> List[Tuple[str, np.ndarray, float]]:
-    """``(name, world axis, angle rad)`` of the rotation legs: +a, -2a, +a about each axis (back at the hold after each axis)."""
-    out = []
-    a = math.radians(float(deg))
-    for ax in axes:
-        v = {"x": np.array([1.0, 0, 0]), "y": np.array([0, 1.0, 0]), "z": np.array([0, 0, 1.0])}[ax]
-        out += [(f"rot_{ax}+{deg:g}", v, a), (f"rot_{ax}-{2 * deg:g}", v, -2 * a), (f"rot_{ax}+{deg:g}b", v, a)]
-    return out
+AXES = {"x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "y": (0.0, 1.0, 0.0), "-y": (0.0, -1.0, 0.0), "z": (0.0, 0.0, 1.0), "-z": (0.0, 0.0, -1.0)}
 
 
-def line_legs(offsets: Sequence[float]) -> List[Tuple[str, float]]:
-    """``(name, displacement m along the optical axis, + = away from the camera)`` of the line legs."""
-    return [(f"line{d:+.2f}", float(d)) for d in offsets]
+def motion_plan(task: str, cfg: "FloatingValidateConfig") -> List[Dict[str, Any]]:
+    """The held motions of ``task``: ``[{"name", "kind", "axis"?, "tries": [values, largest first]}]`` - each motion is an out leg at the
+    first value the arm tracks and the same leg reversed (back at the hold). mental_rotation: an orbit about the object root per signed
+    base axis by ``rotation_degs`` (deg); object_scaling: a line along the optical axis per ``line_offsets_m`` (m)."""
+    if task == "mental_rotation":
+        return [{"name": f"rot{ax}", "kind": "orbit", "axis": np.asarray(AXES[ax]), "tries": [float(d) for d in cfg.rotation_degs]} for ax in cfg.rotation_axes]
+    return [{"name": f"line{d:+.2f}", "kind": "line", "tries": [float(d)]} for d in cfg.line_offsets_m]
+
+
+def leg_of(motion: Dict[str, Any], value: float, back: bool = False) -> Dict[str, Any]:
+    """The out (or back) leg of ``motion`` at ``value``: an orbit by +-value deg about its axis, or a line by +-value m."""
+    sgn = -1.0 if back else 1.0
+    name = f"{motion['name']}:{value:g}" + (":back" if back else "")
+    if motion["kind"] == "orbit":
+        return {"name": name, "kind": "orbit", "axis": motion["axis"], "angle": sgn * math.radians(value)}
+    return {"name": name, "kind": "line", "d": sgn * value}
+
+
+def min_motions_of(cfg: "FloatingValidateConfig", task: str) -> int:
+    return int(dict(cfg.min_motions).get(task, 1))
 
 
 def _pose_err(Ta: np.ndarray, Tb: np.ndarray) -> Tuple[float, float]:
@@ -272,11 +287,48 @@ class FloatingRunner:
 
     # ------------------------------------------------------------------ the held motions
 
-    def legs_for(self, task: str, rec: Dict[str, Any], obj) -> List[Dict[str, Any]]:
-        """The legs of ``task`` as functions of the current eef pose / object root (computed when the leg starts)."""
-        if task == "mental_rotation":
-            return [{"name": n, "kind": "orbit", "axis": v, "angle": a} for n, v, a in rotation_legs(self.cfg.rotation_axes, self.cfg.rotation_deg)]
-        return [{"name": n, "kind": "line", "d": d} for n, d in line_legs(self.cfg.line_offsets_m)]
+    def run_motions(self, task: str, rec: Dict[str, Any], obj, motions, run, T_g: np.ndarray, reasons: List[str]) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Every motion of :func:`motion_plan`: the out leg at the first value the arm tracks (a leg it cannot track - ``plan_failed`` - does
+        not move the arm), then the way back. After each leg: still attached, in-hand drift from the post-gravity pose within ``retain_*``.
+        A drop / slip / crash ends the motions with its reason in ``reasons``; a way back the arm cannot track ends them too (the arm is
+        off the hold). Returns ``(legs, executed motion names)``."""
+        cfg, arm = self.cfg, self.cfg.arm
+        legs: List[Dict[str, Any]] = []
+        done: List[str] = []
+
+        def judge(r) -> bool:
+            r["held"] = self.robot._ag_obj_in_hand.get(arm) is obj
+            if r["held"]:
+                d = _pose_err(self._T_oe(obj), T_g)
+                r["drift"] = [round(d[0], 5), round(d[1], 5)]
+                r["slipped"] = d[0] > cfg.retain_pos_m or d[1] > cfg.retain_rot_rad
+            legs.append(r)
+            if r.get("error"):
+                reasons.append(f"leg_error:{r['name']}")
+            elif not r["held"]:
+                reasons.append(f"dropped_in_motion:{r['name']}")
+            elif r.get("slipped"):
+                reasons.append(f"slipped_in_motion:{r['name']}")
+            else:
+                return True
+            return False
+
+        for m in motion_plan(task, cfg):
+            for v in m["tries"]:
+                out = self.run_leg(leg_of(m, v), rec, obj, motions, run)
+                if not judge(out):
+                    return legs, done
+                if not out.get("executed"):
+                    continue
+                back = self.run_leg(leg_of(m, v, back=True), rec, obj, motions, run)
+                if not judge(back):
+                    return legs, done
+                if not back.get("executed"):
+                    back["back_unreachable"] = True
+                    return legs, done
+                done.append(f"{m['name']}:{v:g}")
+                break
+        return legs, done
 
     def run_leg(self, leg: Dict[str, Any], rec: Dict[str, Any], obj, motions, run) -> Dict[str, Any]:
         from ispatialgym.oracle.motions import SkillError
@@ -364,25 +416,9 @@ class FloatingRunner:
             motions = Motions(w.env, w.backend, cfg=MotionsConfig(), robot=self.robot)
             motions.state.hold_current()
             motions.state.gripper_cmd[arm] = cl["gripper_cmd"]
-            for leg in self.legs_for(task, rec, obj):
-                r = self.run_leg(leg, rec, obj, motions, run)
-                r["held"] = self.robot._ag_obj_in_hand.get(arm) is obj
-                if r["held"]:
-                    d = _pose_err(self._T_oe(obj), T_g)
-                    r["drift"] = [round(d[0], 5), round(d[1], 5)]
-                    r["slipped"] = d[0] > cfg.retain_pos_m or d[1] > cfg.retain_rot_rad
-                legs.append(r)
-                if r.get("error"):
-                    reasons.append(f"leg_error:{r['name']}")
-                    break
-                if not r["held"]:
-                    reasons.append(f"dropped_in_motion:{r['name']}")
-                    break
-                if r.get("slipped"):
-                    reasons.append(f"slipped_in_motion:{r['name']}")
-                    break
-            n_exec = sum(1 for r in legs if r.get("executed"))
-            if not reasons and n_exec < cfg.min_legs:
+            legs, done = self.run_motions(task, rec, obj, motions, run, T_g, reasons)
+            tr["motions_executed"] = done
+            if not reasons and len(done) < min_motions_of(cfg, task):
                 reasons.append("held_motion_unreachable")
         fingers = self.robot.get_joint_positions()[self.robot.gripper_control_idx[arm]].tolist()
         tr.update({"verdict": "valid" if not reasons else "invalid", "reasons": reasons,
@@ -468,7 +504,8 @@ def build_library(job, cand_doc, trials, tasks: Sequence[str], policy: CP.Contac
                        "T_object_eef": c["T_object_eef"], "T_object_eef_at_attach": (first.get("achieved") or {}).get("T_object_eef_at_attach"),
                        "width_m": c["width_m"], "preshape_q": c["preshape_q"], "finger_q": first["closure"]["fingers_final_m"],
                        "graspgen_conf": c.get("graspgen_conf"), "physics": "tested",
-                       "held_motions": {t: {"legs_executed": x["legs_executed"], "legs_unreachable": x["legs_unreachable"]} for t, x in by_task.items()}})
+                       "held_motions": {t: {"motions_executed": x.get("motions_executed"), "legs_executed": x["legs_executed"],
+                                            "legs_unreachable": x["legs_unreachable"]} for t, x in by_task.items()}})
     arm = cand_doc.get("arm", "right")
     return {"schema": S.LIBRARY, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
             "dataset": job.get("dataset"), "constraint": "floating", "legacy_key": job.get("legacy_key"), "arm": arm,
