@@ -223,11 +223,6 @@ def floating_validate_overrides():
     from ispatialgym.grasping import validate_floating as VF
 
     ov = json.loads(os.environ.get("ISG_GLIB_FLOAT_VAL_OVERRIDES") or "{}")
-    for k in ("rotation_axes", "rotation_degs", "line_offsets_m"):
-        if k in ov:
-            ov[k] = tuple(ov[k])
-    if "min_motions" in ov:
-        ov["min_motions"] = tuple((str(t), int(n)) for t, n in (ov["min_motions"].items() if isinstance(ov["min_motions"], dict) else ov["min_motions"]))
     return VF.FloatingValidateConfig(**ov)
 
 

@@ -227,26 +227,25 @@ def test_held_sampler_refuses_a_non_floating_entry_and_enforces_scale(v2root, mo
 # ------------------------------------------------------------------------------------------------ the validator (pure parts)
 
 
-def test_held_motions_are_out_and_back_per_axis_and_line():
-    cfg = VF.FloatingValidateConfig()
-    rot = VF.motion_plan("mental_rotation", cfg)
-    assert [m["name"] for m in rot] == ["rotx", "rot-x", "roty", "rot-y", "rotz", "rot-z"] and all(m["tries"] == [90.0, 60.0, 45.0] for m in rot)
-    out, back = VF.leg_of(rot[1], 60.0), VF.leg_of(rot[1], 60.0, back=True)
-    assert np.allclose(out["axis"], [-1, 0, 0]) and math.isclose(out["angle"], math.radians(60)) and math.isclose(back["angle"], -out["angle"])
-    assert back["name"] == "rot-x:60:back"
-    lines = VF.motion_plan("object_scaling", cfg)
-    assert [m["tries"] for m in lines] == [[-0.25], [0.05]] and VF.leg_of(lines[0], -0.25, back=True)["d"] == 0.25
-    assert VF.min_motions_of(cfg, "mental_rotation") == 2 and VF.min_motions_of(cfg, "object_scaling") == 1
+def test_drift_limits_are_the_tasks_goal_tolerances_and_the_verdict_rule(monkeypatch):
+    mr, os_small, os_big = VF.drift_limits("mental_rotation"), VF.drift_limits("object_scaling", 0.05), VF.drift_limits("object_scaling", -0.30)
+    assert mr == {"pos_m": None, "rot_rad": 0.15}
+    assert os_small == {"pos_m": 0.02, "rot_rad": None} and math.isclose(os_big["pos_m"], 0.06)
+    # every collected successful demo (largest in-hand drift 0.24 mm / 4.4 mrad) passes
+    assert VF.drift_ok((0.00024, 0.0044), mr) and VF.drift_ok((0.00024, 0.0044), os_small)
+    assert not VF.drift_ok((0.0, 0.2), mr) and VF.drift_ok((0.05, 0.0), mr) and not VF.drift_ok((0.03, 0.0), os_small)
+    ok, ag, unr = {"outcome": "ok"}, {"outcome": "ag_not_formed"}, {"outcome": "unreachable"}
+    assert VF.verdict_of([ok, ag, unr]) == ("valid", [])
+    assert VF.verdict_of([ok, {"outcome": "dropped_in_motion"}]) == ("invalid", ["dropped_in_motion"])
+    assert VF.verdict_of([ok, {"outcome": "drift_beyond_task_tolerance"}])[0] == "invalid"
+    assert VF.verdict_of([]) == ("invalid", ["no_drawn_motion"]) and VF.verdict_of([ag, ag]) == ("invalid", ["ag_not_formed"])
+    assert VF.verdict_of([ag, unr]) == ("invalid", ["held_motion_unreachable"])
+    a, b = VF.motion_rng("e", "gg_0", "mental_rotation").random(3), VF.motion_rng("e", "gg_0", "mental_rotation").random(3)
+    assert np.allclose(a, b) and not np.allclose(a, VF.motion_rng("e", "gg_1", "mental_rotation").random(3))
     assert VF.held_tasks_of({"held_tasks": ["object_scaling"]}) == ["object_scaling"]
     assert VF.held_tasks_of({}) == ["mental_rotation", "object_scaling"]
-    import os as _os
-
-    _os.environ["ISG_GLIB_FLOAT_VAL_OVERRIDES"] = '{"rotation_degs": [60], "min_motions": {"mental_rotation": 3}}'
-    try:
-        c = PL.floating_validate_overrides()
-        assert c.rotation_degs == (60,) and VF.min_motions_of(c, "mental_rotation") == 3
-    finally:
-        del _os.environ["ISG_GLIB_FLOAT_VAL_OVERRIDES"]
+    monkeypatch.setenv("ISG_GLIB_FLOAT_VAL_OVERRIDES", '{"motion_pairs": 5}')
+    assert PL.floating_validate_overrides().motion_pairs == 5
 
 
 def test_validator_closure_constants_are_the_held_samplers():

@@ -11,6 +11,10 @@ digest), so a rerun reproduces the proposals on the same GPU / library versions.
 
     source /vision/u/minyeong/projects/graspgen/env_graspgen.sh
     python scripts/grasp_bands/graspgen_floating.py --jobs M.json --root <glib root> [--shard i/n] [--force]
+
+Re-seed (owner 2026-11-07 item 4.1, entries with few rows): ``--n-points`` (surface points), ``--n-seeds`` (inference runs, each its own
+seed and point sample; the proposals are concatenated), ``--num-grasps`` / ``--topk`` (generated / kept per run). The defaults are the
+legacy settings (2000, 1, 2000, 500).
 """
 
 import argparse
@@ -49,6 +53,10 @@ def main(argv=None):
     ap.add_argument("--shard", default=None, help="i/n")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--n-points", type=int, default=SETTINGS["n_points"])
+    ap.add_argument("--n-seeds", type=int, default=1)
+    ap.add_argument("--num-grasps", type=int, default=SETTINGS["num_grasps"])
+    ap.add_argument("--topk", type=int, default=SETTINGS["topk_num_grasps"])
     a = ap.parse_args(argv)
     with open(a.jobs) as f:
         jobs = [j for j in json.load(f) if (j.get("constraint") or "tabletop") == "floating"]
@@ -83,25 +91,34 @@ def main(argv=None):
             geo = os.path.join(d, "geometry.json")
             if not os.path.exists(geo):
                 raise FileNotFoundError(f"{geo} (run the export stage first)")
-            seed = (a.seed + int(hashlib.sha1(j["id"].encode()).hexdigest()[:8], 16)) % (2 ** 31)
-            np.random.seed(seed)
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed_all(seed)
-            xyz, gd = points_of(geo, SETTINGS["n_points"], seed)
-            centre = xyz.mean(0)
-            pc = xyz - centre
-            torch.cuda.synchronize()
-            t1 = time.time()
-            grasps, conf = GraspGenSampler.run_inference(pc, sampler, grasp_threshold=SETTINGS["grasp_threshold"], num_grasps=SETTINGS["num_grasps"],
-                                                         topk_num_grasps=SETTINGS["topk_num_grasps"], remove_outliers=SETTINGS["remove_outliers"])
-            torch.cuda.synchronize()
-            dt = time.time() - t1
-            G = grasps.cpu().numpy().astype(np.float64) if len(grasps) else np.zeros((0, 4, 4))
-            C = conf.cpu().numpy().astype(np.float64) if len(conf) else np.zeros((0,))
-            G[:, :3, 3] += centre[None].astype(np.float64)  # back to the object frame (the point cloud was centred on its mean)
+            settings = {**SETTINGS, "n_points": a.n_points, "num_grasps": a.num_grasps, "topk_num_grasps": a.topk, "n_seeds": a.n_seeds}
+            seed0 = (a.seed + int(hashlib.sha1(j["id"].encode()).hexdigest()[:8], 16)) % (2 ** 31)
+            Gs, Cs, centres, dt = [], [], [], 0.0
+            for r in range(a.n_seeds):
+                seed = (seed0 + r) % (2 ** 31)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
+                torch.cuda.manual_seed_all(seed)
+                xyz, gd = points_of(geo, a.n_points, seed)
+                centre = xyz.mean(0)
+                pc = xyz - centre
+                torch.cuda.synchronize()
+                t1 = time.time()
+                grasps, conf = GraspGenSampler.run_inference(pc, sampler, grasp_threshold=SETTINGS["grasp_threshold"], num_grasps=a.num_grasps,
+                                                             topk_num_grasps=a.topk, remove_outliers=SETTINGS["remove_outliers"])
+                torch.cuda.synchronize()
+                dt += time.time() - t1
+                G1 = grasps.cpu().numpy().astype(np.float64) if len(grasps) else np.zeros((0, 4, 4))
+                C1 = conf.cpu().numpy().astype(np.float64) if len(conf) else np.zeros((0,))
+                G1[:, :3, 3] += centre[None].astype(np.float64)  # back to the object frame (the point cloud was centred on its mean)
+                Gs.append(G1)
+                Cs.append(C1)
+                centres.append([round(float(v), 6) for v in centre])
+            G, C = np.concatenate(Gs), np.concatenate(Cs)
+            seed, centre = seed0, np.asarray(centres[0])
             np.savez(out, T=G, conf=C)
-            meta = {"schema": "isg-graspgen-floating/1", "id": j["id"], "checkpoint": CHECKPOINT, "graspgen_commit": commit, "settings": SETTINGS,
-                    "seed": seed, "centre": [round(float(v), 6) for v in centre], "n": int(len(G)),
+            meta = {"schema": "isg-graspgen-floating/1", "id": j["id"], "checkpoint": CHECKPOINT, "graspgen_commit": commit, "settings": settings,
+                    "seed": seed, "seeds": [(seed0 + r) % (2 ** 31) for r in range(a.n_seeds)], "centres": centres, "n": int(len(G)),
                     "conf": {"max": round(float(C.max()), 5) if len(C) else None, "min": round(float(C.min()), 5) if len(C) else None},
                     "geometry": {"format": gd.get("format"), "n_pieces": len(gd.get("pieces", [])), "scale": gd.get("scale")},
                     "frames": "T = Panda base (GraspGen: approach +z, closing x) in the object base_link frame", "t_inference_s": round(dt, 3),

@@ -4,7 +4,7 @@
 #     sbatch -A vision -p svl --exclude=svl9 --gres=gpu:titanrtx:1 --array=0-$((N-1)) -o <log> job_floating.sh
 # Stages (GB_STAGES, default "export graspgen candidates validate"), each skipped per entry when its output exists:
 #   export     - the collision geometry (pipeline export, Isaac env): <out>/glib/models/<id>/geometry.json
-#   graspgen   - GraspGen proposals in the graspgen env (scripts/grasp_bands/graspgen_floating.py; GRASPGEN_ENV, default the legacy run's
+#   graspgen   - GraspGen proposals (GB_GG_ARGS: e.g. "--n-points 4096 --n-seeds 4 --num-grasps 4000 --topk 1000", the re-seed) in the graspgen env (scripts/grasp_bands/graspgen_floating.py; GRASPGEN_ENV, default the legacy run's
 #                /vision/u/minyeong/projects/graspgen/env_graspgen.sh - the Franka Panda checkpoint): graspgen.npz / graspgen.json
 #   candidates - the floating gates + legacy mode ranking (floating.generate; ISG_GLIB_GATE_DUMP=1 writes gate_dump.json)
 #   validate   - in hand, gravity, the held motions (validate_floating): validation.json, library.json
@@ -33,7 +33,7 @@ for ST in $STAGES; do
       # its own env (python 3.10, torch + GraspGen), in a subshell: the Isaac env above stays as it was for the next stages
       ( unset PYTHONPATH; source ${GRASPGEN_ENV:-/vision/u/minyeong/projects/graspgen/env_graspgen.sh}
         export MPLCONFIGDIR=${JB:-/tmp/$USER}/mpl TORCH_EXTENSIONS_DIR=${JB:-/tmp/$USER}/torch_ext
-        python -u $R/scripts/grasp_bands/graspgen_floating.py --jobs $M --root $OUT/glib --shard $I/$N ) >> $LOG 2>&1; rc=$?
+        python -u $R/scripts/grasp_bands/graspgen_floating.py --jobs $M --root $OUT/glib --shard $I/$N ${GB_GG_ARGS:-} ) >> $LOG 2>&1; rc=$?
       grep -q "GB_GRASPGEN_DONE" $LOG || rc=${rc/#0/1} ;;
     *) echo "unknown stage $ST"; rc=2 ;;
   esac

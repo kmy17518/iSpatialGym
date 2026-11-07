@@ -3,35 +3,38 @@ through the held motions of its task - in the persistent validation world of :mo
 control / 120 Hz physics, the JoyLo R1Pro with assisted grasping, the evaluator's base mass, the task's AG rules - FixedJoint, pad-clear
 release - the rigid sleep threshold and the sleep assist). Its slab stays parked: a floating object has no support.
 
-Per job (``run_model``) and per hold of its held tasks (``job["held_tasks"]``: ``mental_rotation`` roll 15 deg, ``object_scaling`` roll
-90 deg - ``generation_defaults``' ``hold``; default both):
+Per job (``run_model``), per candidate and per held task of the job (``job["held_tasks"]``), the MOTIONS THAT TASK'S SAMPLER DRAWS
+(owner 2026-11-07 item 4.3: match the task, not stricter), each its own closure:
 
-1. **hold**: the robot at the base origin, trunk ``hold.trunk``, the idle arm at the JoyLo reset (zeros), the holding arm at a cuRobo IK
-   solution of the hold eef pose (``held_object.hold_eef_pose``: the pad centre on the head camera's optical axis at ``hold.depth_m``,
-   approach base +y, closing = world down rolled ``roll_deg`` about it); a snapshot of that state;
-2. **grasp** (per family representative, from the snapshot, verified): the object put into the fully open hand at the candidate's
-   ``T_object_eef`` with gravity off, and the HELD SAMPLER's closure (:func:`close_like_held_sampler` = ``HeldObjectV2.establish_grasp``:
-   the fingers advanced ``grasp_finger_advance_m_per_step`` per control step until both pads touch, ``grasp_press_m`` past the contact
-   through the assisted-grasp window - the object re-posed every step until the joint exists - gravity on for ``GRASP_GRAVITY_STEPS``);
-3. **held motions** (the object attached, the gripper target at the contact like the recorded start's controller targets): the oracle's
-   own arm tracking (``Motions.arm_along``, the ``Reorient`` executor's call, default speeds) through the task's key poses, each motion
-   out and back to the hold (:func:`motion_plan`) - ``mental_rotation``: an orbit about the object root (``conventions.orbit_waypoints``,
-   3 intermediate + the goal) per signed base axis (+-x, +-y, +-z) at the largest of ``rotation_degs`` (90, 60, 45 deg) the arm tracks
-   (the sampler likewise keeps only the rotations its IK reaches); ``object_scaling``: straight lines along the optical axis
-   (``conventions.line_waypoints``) by ``line_offsets_m`` (0.25 m toward the camera, 0.05 m away) - each leg followed by
-   ``leg_settle_steps`` of hold;
-4. **acceptance**: the assisted grasp formed and holds after gravity; the achieved grasp within ``on_target_*`` of the candidate; after
-   gravity and after every executed leg the object still attached with its in-hand pose within ``retain_*`` of the post-gravity pose;
-   at least ``min_motions`` executed motions per held task (2 rotation axes / 1 line; a leg the arm cannot track - ``plan_failed``,
-   which does not move the arm - is recorded as unreachable: a reach limit of the test pose, not a property of the grasp).
+1. **the task's hold** (``generation_defaults`` ``hold``: mental_rotation roll 15 deg, object_scaling roll 90 deg): the robot at the base
+   origin, trunk ``hold.trunk``, the idle arm at the JoyLo reset (zeros), the holding arm at a cuRobo IK solution of the hold eef pose
+   (``held_object.hold_eef_pose``);
+2. **the drawn motions** (:meth:`FloatingRunner.draw_motions`, the sampler's own draws and its screening IK, base at the origin - the IK
+   places every drawn motion where the arm reaches it): mental_rotation - starts = the hold's object turned about its root by
+   ``draw_rotation_starts`` (axis uniform, ``init_angle_range_deg``), the start configuration by batch IK from the hold; goals = the start
+   turned by ``draw_rotation_goals`` (``goal_angle_range_deg``, signed), kept when the batch IK reaches its 3 intermediate key poses + the
+   goal (``orbit_key_poses``) from the start; object_scaling - the grasp's depth window (``depth_grid`` over ``depth_search_range_m``,
+   the screening IK of the slid hand poses, ``depth_window`` with ``depth_margin_m``), then ``draw_start_goal`` (``min_depth_change_m``),
+   the start configuration by IK, the line key poses (``line_key_poses``). ``motion_pairs`` motions per (candidate, task), seeded by the
+   entry, the candidate and the task. Not applied: the sampler's in-frame / visibility checks (rendering) and its whole-body collision
+   check at a scene base pose;
+3. per motion: the robot at the START configuration, the object put into the fully open hand at the candidate's ``T_object_eef`` (gravity
+   off), the HELD SAMPLER's closure (:func:`close_like_held_sampler` = ``HeldObjectV2.establish_grasp``), gravity, then the oracle's own
+   tracking of the recorded key poses (``Motions.arm_along``, the ``Reorient`` executor's call) and ``leg_settle_steps`` of hold;
+4. **acceptance** (the task's own rules): the object still attached after gravity and after the motion, its in-hand drift (from the
+   post-gravity pose) within the TASK's goal tolerance - mental_rotation rotation <= ``tolerances.orientation`` (0.15 rad), object_scaling
+   position <= ``depth_tolerance(dd)`` = max(0.02 m, 0.20 |dd|) - a drift the goal check would absorb is not a failure. Calibration on the
+   collected held-object demos (``$OFH/floating_20261107/drift_demos.json``: 63 successful demos, largest in-hand drift 0.24 mm /
+   4.4 mrad): every successful demo passes. A grasp is valid when at least ``min_executed`` drawn motions ran and none dropped or drifted
+   past its tolerance; a closure that does not attach is recorded per motion (the sampler then tries another row); a motion the arm cannot
+   track (``plan_failed``) is recorded as unreachable. The achieved-vs-candidate offset is recorded, not judged (the sampler records the
+   realised grasp and the goal follows it).
 
-Fidelity notes: the hold is the sampler's fixed hold at a base at the origin (the instance's base pose does not change the in-hand
-physics); the oracle's ``finish`` fallback of a stalled leg is not used (a stalled leg counts as unreachable). Thresholds are the
-tabletop validator's (PROVISIONAL, uncalibrated)."""
+Fidelity notes: base at the origin (the instance's base pose does not change the in-hand physics); the oracle's ``finish`` fallback of a
+stalled leg is not used."""
 
 from __future__ import annotations
 
-import math
 import os
 import time
 import traceback
@@ -44,7 +47,7 @@ from ispatialgym.grasping import contact_policy as CP
 from ispatialgym.grasping import schema as S
 from ispatialgym.grasping import validate_tabletop as VT
 
-VALIDATOR_VERSION = "isg-floating-validator/1"
+VALIDATOR_VERSION = "isg-floating-validator/2"
 HELD_TASKS = ("mental_rotation", "object_scaling")
 
 
@@ -59,21 +62,13 @@ class FloatingValidateConfig:
     press_m: float = 0.004
     attach_steps: int = 90
     gravity_steps: int = 30
-    # acceptance (validate_tabletop.ValidateConfig's values)
-    retain_pos_m: float = 0.01
-    retain_rot_rad: float = 0.10
-    on_target_pos_m: float = 0.015
-    on_target_rot_rad: float = math.radians(15.0)
-    # held motions
-    #: mental_rotation: one out-and-back orbit about the object root per signed base axis, at the largest of ``rotation_degs`` the arm tracks
-    rotation_axes: Tuple[str, ...] = ("x", "-x", "y", "-y", "z", "-z")
-    rotation_degs: Tuple[float, ...] = (90.0, 60.0, 45.0)
-    #: object_scaling: one out-and-back line along the optical axis per offset (- = toward the camera; the hold is at depth 0.50 of the
-    #: task's 0.15 - 0.55 m window)
-    line_offsets_m: Tuple[float, ...] = (-0.25, 0.05)
+    # the drawn motions (owner 2026-11-07 item 4.3): per (candidate, task) this many motions the task's sampler draws, from these many draws
+    motion_pairs: int = 3
+    start_draws: int = 64
+    goal_draws: int = 48
+    min_executed: int = 1
     leg_settle_steps: int = 10
-    #: executed motions required per task (a motion = its out leg and its way back)
-    min_motions: Tuple[Tuple[str, int], ...] = (("mental_rotation", 2), ("object_scaling", 1))
+    seed: int = 0
     ik_seeds: int = 16
     sleep_assist: bool = True
     #: the arm at the hold: the eef within this of the hold pose (diagnostic of the IK / drive; the object is placed at the actual eef)
@@ -93,29 +88,28 @@ def hold_of(task: str):
     return HO.HoldConstants.from_generation(GD.defaults_for(task)["hold"])
 
 
-AXES = {"x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "y": (0.0, 1.0, 0.0), "-y": (0.0, -1.0, 0.0), "z": (0.0, 0.0, 1.0), "-z": (0.0, 0.0, -1.0)}
+def drift_limits(task: str, delta_depth: float = 0.0) -> Dict[str, Optional[float]]:
+    """The in-hand drift a held motion may leave: the task's goal tolerance (``generation_defaults`` ``tolerances``) - mental_rotation
+    rotation <= ``orientation`` (position unconstrained: the target is the orientation), object_scaling position <= max(``depth_min_m``,
+    ``depth_fraction`` |dd|) (rotation unconstrained: the target is the depth)."""
+    from ispatialgym.sampling import generation_defaults as GD
+    from ispatialgym.sampling.v2.tasks import held_object as HO
 
-
-def motion_plan(task: str, cfg: "FloatingValidateConfig") -> List[Dict[str, Any]]:
-    """The held motions of ``task``: ``[{"name", "kind", "axis"?, "tries": [values, largest first]}]`` - each motion is an out leg at the
-    first value the arm tracks and the same leg reversed (back at the hold). mental_rotation: an orbit about the object root per signed
-    base axis by ``rotation_degs`` (deg); object_scaling: a line along the optical axis per ``line_offsets_m`` (m)."""
+    tol = dict(GD.defaults_for(task)["tolerances"])
     if task == "mental_rotation":
-        return [{"name": f"rot{ax}", "kind": "orbit", "axis": np.asarray(AXES[ax]), "tries": [float(d) for d in cfg.rotation_degs]} for ax in cfg.rotation_axes]
-    return [{"name": f"line{d:+.2f}", "kind": "line", "tries": [float(d)]} for d in cfg.line_offsets_m]
+        return {"pos_m": None, "rot_rad": float(tol.get("orientation", 0.15))}
+    return {"pos_m": HO.depth_tolerance(delta_depth, tol), "rot_rad": None}
 
 
-def leg_of(motion: Dict[str, Any], value: float, back: bool = False) -> Dict[str, Any]:
-    """The out (or back) leg of ``motion`` at ``value``: an orbit by +-value deg about its axis, or a line by +-value m."""
-    sgn = -1.0 if back else 1.0
-    name = f"{motion['name']}:{value:g}" + (":back" if back else "")
-    if motion["kind"] == "orbit":
-        return {"name": name, "kind": "orbit", "axis": motion["axis"], "angle": sgn * math.radians(value)}
-    return {"name": name, "kind": "line", "d": sgn * value}
+def drift_ok(drift: Tuple[float, float], limits: Dict[str, Optional[float]]) -> bool:
+    return (limits["pos_m"] is None or drift[0] <= limits["pos_m"]) and (limits["rot_rad"] is None or drift[1] <= limits["rot_rad"])
 
 
-def min_motions_of(cfg: "FloatingValidateConfig", task: str) -> int:
-    return int(dict(cfg.min_motions).get(task, 1))
+def motion_rng(entry: str, cand: str, task: str, seed: int = 0) -> np.random.Generator:
+    import hashlib
+
+    h = int(hashlib.sha1(f"{entry}|{cand}|{task}".encode()).hexdigest()[:8], 16)
+    return np.random.default_rng(np.random.SeedSequence([int(seed), h]))
 
 
 def _pose_err(Ta: np.ndarray, Tb: np.ndarray) -> Tuple[float, float]:
@@ -161,26 +155,10 @@ class FloatingRunner:
             raise RuntimeError(f"{task}: no IK solution for the hold eef pose {pos.tolist()}")
         qh = qs[0].clone()
         axis = C.quat_rotate(C.as_pose(cam)[1], th.tensor([0.0, 0.0, -1.0]))
-        rec = {"task": task, "hold": hold.to_json(), "q": qh, "eef": (pos.float(), quat.float()), "pad": pad.float(), "camera": cam,
+        rec = {"task": task, "hold": hold.to_json(), "q": qh, "q_default": q.clone(), "eef": (pos.float(), quat.float()), "pad": pad.float(), "camera": cam,
                "optical_axis": axis.float(), "arm_q": [round(float(v), 5) for v in qh[self.robot.arm_control_idx[cfg.arm]].tolist()]}
         self.holds[task] = rec
         return rec
-
-    def set_hold(self, rec: Dict[str, Any], obj, park_xyz=(3.0, -3.0, 1.0)):
-        th = self.th
-        for arm in ("left", "right"):
-            try:
-                self.robot.release_grasp_immediately(arm)
-            except Exception:  # noqa: BLE001
-                pass
-        obj.disable_gravity()
-        obj.set_position_orientation(th.tensor(park_xyz, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
-        obj.keep_still()
-        self.robot.set_joint_positions(rec["q"])
-        self.robot.keep_still()
-        a = self.world.hold_action()
-        for _ in range(4):
-            self.world.step(a)
 
     # ------------------------------------------------------------------ the held sampler's closure
 
@@ -287,152 +265,220 @@ class FloatingRunner:
 
     # ------------------------------------------------------------------ the held motions
 
-    def run_motions(self, task: str, rec: Dict[str, Any], obj, motions, run, T_g: np.ndarray, reasons: List[str]) -> Tuple[List[Dict[str, Any]], List[str]]:
-        """Every motion of :func:`motion_plan`: the out leg at the first value the arm tracks (a leg it cannot track - ``plan_failed`` - does
-        not move the arm), then the way back. After each leg: still attached, in-hand drift from the post-gravity pose within ``retain_*``.
-        A drop / slip / crash ends the motions with its reason in ``reasons``; a way back the arm cannot track ends them too (the arm is
-        off the hold). Returns ``(legs, executed motion names)``."""
-        cfg, arm = self.cfg, self.cfg.arm
-        legs: List[Dict[str, Any]] = []
-        done: List[str] = []
+    def ik(self, poses, q_seed):
+        """Batch IK of the holding arm (cuRobo, the robot alone): ``(ok list, q list)``."""
+        from ispatialgym.oracle import r1pro_model as M
 
-        def judge(r) -> bool:
-            r["held"] = self.robot._ag_obj_in_hand.get(arm) is obj
-            if r["held"]:
-                d = _pose_err(self._T_oe(obj), T_g)
-                r["drift"] = [round(d[0], 5), round(d[1], 5)]
-                r["slipped"] = d[0] > cfg.retain_pos_m or d[1] > cfg.retain_rot_rad
-            legs.append(r)
-            if r.get("error"):
-                reasons.append(f"leg_error:{r['name']}")
-            elif not r["held"]:
-                reasons.append(f"dropped_in_motion:{r['name']}")
-            elif r.get("slipped"):
-                reasons.append(f"slipped_in_motion:{r['name']}")
-            else:
-                return True
-            return False
+        if not poses:
+            return [], []
+        succ, qs = self.world.backend.solve_ik_batch(f"{self.cfg.arm}_arm", M.EEF_LINK[self.cfg.arm], [(p.float(), q.float()) for p, q in poses],
+                                                     q_seed, batch_size=64, seeds=self.cfg.ik_seeds)
+        return [bool(v) for v in succ.tolist()], [qs[i].clone() for i in range(len(poses))]
 
-        for m in motion_plan(task, cfg):
-            for v in m["tries"]:
-                out = self.run_leg(leg_of(m, v), rec, obj, motions, run)
-                if not judge(out):
-                    return legs, done
-                if not out.get("executed"):
-                    continue
-                back = self.run_leg(leg_of(m, v, back=True), rec, obj, motions, run)
-                if not judge(back):
-                    return legs, done
-                if not back.get("executed"):
-                    back["back_unreachable"] = True
-                    return legs, done
-                done.append(f"{m['name']}:{v:g}")
+    def draw_motions(self, task: str, rec: Dict[str, Any], eef_in_object, rng: np.random.Generator) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """Up to ``motion_pairs`` motions of ``task`` as its sampler draws them for this grasp (module docstring, 2.): ``[{"q0", "eef0",
+        "obj0", "wps", "info"}]`` and the draw statistics."""
+        from ispatialgym.robot import conventions as C
+        from ispatialgym.sampling import generation_defaults as GD
+        from ispatialgym.sampling.v2.tasks import held_object as HO
+
+        cfg, th = self.cfg, self.th
+        g = GD.defaults_for(task)
+        n_wp = int(g.get("waypoints", 3))
+        eef_hold = rec["eef"]
+        obj_hold = C.compose(eef_hold, C.invert(eef_in_object))
+        out: List[Dict[str, Any]] = []
+        st: Dict[str, Any] = {}
+        if task == "mental_rotation":
+            starts = HO.draw_rotation_starts(rng, g["init_angle_range_deg"], cfg.start_draws)
+            obj0s = [HO.turned_about_root(obj_hold, 0.0, ax, ang) for ax, ang in starts]
+            eef0s = [C.compose(o, eef_in_object) for o in obj0s]
+            ok, qs = self.ik(eef0s, rec["q"])
+            st.update(starts=len(starts), starts_reached=sum(ok), goals_screened=0, goals_reached=0)
+            for i in [k for k, v in enumerate(ok) if v]:
+                goals = HO.draw_rotation_goals(rng, g["goal_angle_range_deg"], cfg.goal_draws)
+                cands = []
+                for ax, ang in goals:
+                    eef1 = C.compose(HO.turned_about_root(obj0s[i], 0.0, ax, ang), eef_in_object)
+                    dq = C.qmul(C.as_tensor(eef1[1]), C.qinv(C.as_tensor(eef0s[i][1])))
+                    cands.append((ax, ang, HO.orbit_key_poses(eef0s[i], C.as_tensor(obj0s[i][0]), dq, n_wp)))
+                okw, _ = self.ik([p for _, _, w in cands for p in w], qs[i])  # one batch, as the sampler's screening IK
+                st["goals_screened"] += len(cands)
+                for j, (ax, ang, wps) in enumerate(cands):
+                    if all(okw[j * (n_wp + 1):(j + 1) * (n_wp + 1)]):
+                        st["goals_reached"] += 1
+                        out.append({"q0": qs[i], "eef0": eef0s[i], "obj0": obj0s[i], "wps": wps,
+                                    "info": {"start": {"axis_base": [round(float(v), 4) for v in starts[i][0].tolist()], "angle_deg": round(float(starts[i][1]), 2)},
+                                             "goal": {"axis_base": [round(float(v), 4) for v in ax.tolist()], "angle_deg": round(float(ang), 2)}}, "delta_depth": 0.0})
+                        break
+                if len(out) >= cfg.motion_pairs:
+                    break
+            return out, st
+        cam = rec["camera"]
+        axis = rec["optical_axis"]
+        cam_p = C.as_tensor(cam[0]).float()
+        grid = HO.depth_grid(g["depth_search_range_m"], float(g["depth_search_grid_m"]))
+        d_ref = float(th.dot(C.as_tensor(obj_hold[0]).float() - cam_p, axis))
+        slid = [HO.slide_to_depth(eef_hold, eef_in_object, cam_p, axis, d) for d in grid]
+        ok, _ = self.ik([e for e, _ in slid], rec["q_default"])
+        window, run = HO.depth_window(grid, ok, d_ref, float(g["depth_margin_m"]))
+        st.update(depths=len(grid), depths_reached=sum(ok), reference_depth=round(d_ref, 4), window=window, run=run)
+        min_change = float(g["min_depth_change_m"])
+        if window is None or window[1] - window[0] <= min_change:
+            return out, st
+        for _ in range(cfg.motion_pairs * 4):
+            d0, d1 = HO.draw_start_goal(rng, window, min_change)
+            eef0, obj0 = HO.slide_to_depth(eef_hold, eef_in_object, cam_p, axis, d0)
+            eef1, _ = HO.slide_to_depth(eef_hold, eef_in_object, cam_p, axis, d1)
+            ok0, q0 = self.ik([eef0], rec["q_default"])
+            if not ok0[0]:
+                continue
+            out.append({"q0": q0[0], "eef0": eef0, "obj0": obj0, "wps": HO.line_key_poses(eef0, eef1, n_wp),
+                        "info": {"start_depth_m": round(d0, 4), "goal_depth_m": round(d1, 4)}, "delta_depth": d1 - d0})
+            if len(out) >= cfg.motion_pairs:
                 break
-        return legs, done
+        return out, st
 
-    def run_leg(self, leg: Dict[str, Any], rec: Dict[str, Any], obj, motions, run) -> Dict[str, Any]:
-        from ispatialgym.oracle.motions import SkillError
+    def set_start(self, q0, obj):
+        """The robot at a motion's start configuration (fingers fully open), the object parked, gravity off."""
+        for arm in ("left", "right"):
+            try:
+                self.robot.release_grasp_immediately(arm)
+            except Exception:  # noqa: BLE001
+                pass
+        th = self.th
+        obj.disable_gravity()
+        obj.set_position_orientation(th.tensor([3.0, -3.0, 1.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        obj.keep_still()
+        q = q0.clone()
+        q[self.robot.gripper_control_idx[self.cfg.arm]] = 0.05
+        self.robot.set_joint_positions(q)
+        self.robot.keep_still()
+        a = self.world.hold_action()
+        for _ in range(4):
+            self.world.step(a)
+
+    def run_motion(self, obj, cand: Dict[str, Any], m: Dict[str, Any], task: str) -> Dict[str, Any]:
+        """One drawn motion: the start, the held sampler's closure there, gravity, the oracle's tracking of its key poses, the judgement."""
+        from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError
         from ispatialgym.robot import conventions as C
 
-        th, arm = self.th, self.cfg.arm
-        start = motions.eef_pose(arm)
-        if leg["kind"] == "orbit":
-            pivot = obj.get_position_orientation()[0].float().clone()
-            dq = C.quat_from_axis_angle(th.as_tensor(leg["axis"], dtype=th.float32), float(leg["angle"]))
-            wps = C.orbit_waypoints(start, pivot, dq, n=4)
-        else:
-            end = (start[0] + rec["optical_axis"] * float(leg["d"]), start[1].clone())
-            wps = C.line_waypoints(start, end, 4)
+        cfg, w, arm, th = self.cfg, self.world, self.cfg.arm, self.th
         t0 = time.time()
-        out: Dict[str, Any] = {"name": leg["name"], "kind": leg["kind"]}
-        try:
-            run(motions.arm_along(arm, wps), leg["name"])
-            out["executed"] = True
-        except SkillError as e:
-            out["executed"] = False
-            out["unreachable"] = f"{getattr(e, 'reason', 'skill_error')}: {str(e)[:160]}"
-        except Exception as e:  # noqa: BLE001 - a crash of the tracking is recorded (the trial is invalid: leg_error), the next trial runs
-            out["executed"] = False
-            out["error"] = repr(e)[:300]
-            out["traceback"] = traceback.format_exc()[-1200:]
-        run(motions.hold(self.cfg.leg_settle_steps), leg["name"] + ":settle")
-        goal = wps[-1]
-        now = motions.eef_pose(arm)
-        out["eef_err_m"] = round(float(th.linalg.norm(now[0] - goal[0])), 5)
-        out["eef_err_rad"] = round(float(C.quat_angle(now[1], goal[1])), 5)
-        out["wall_s"] = round(time.time() - t0, 2)
-        return out
-
-    # ------------------------------------------------------------------ one trial
-
-    def trial(self, obj, cand: Dict[str, Any], task: str) -> Dict[str, Any]:
-        from ispatialgym.oracle.motions import Motions, MotionsConfig
-
-        cfg, w, arm = self.cfg, self.world, self.cfg.arm
-        t0 = time.time()
-        rec = self.hold_q(task)
-        self.set_hold(rec, obj)
+        self.set_start(m["q0"], obj)
         ep, eq = self.robot.eef_links[arm].get_position_orientation()
         T_we = S.pose_mat(ep.numpy(), eq.numpy())
-        hold_err = _pose_err(T_we, S.pose_mat(rec["eef"][0].numpy(), rec["eef"][1].numpy()))
+        start_err = _pose_err(T_we, S.pose_mat(C.as_tensor(m["eef0"][0]).numpy(), C.as_tensor(m["eef0"][1]).numpy()))
         T_c = S.pose_of(cand["T_object_eef"])
         T_wo = T_we @ np.linalg.inv(T_c)
         pose = (T_wo[:3, 3].astype(np.float32), S.mat_to_quat(T_wo[:3, :3]).astype(np.float32))
-        tr: Dict[str, Any] = {"schema": S.TRIAL, "candidate": cand["name"], "family_id": None, "rest_id": None, "mode": "floating", "task": task,
-                              "hold": rec["hold"], "hold_eef_err": [round(hold_err[0], 5), round(hold_err[1], 5)], "hold_arm_q": rec["arm_q"]}
-        if hold_err[0] > cfg.hold_tol_m:
-            tr.update({"verdict": "invalid", "reasons": ["hold_not_reached"]})
-            return tr
+        r: Dict[str, Any] = {**m["info"], "start_eef_err": [round(start_err[0], 5), round(start_err[1], 5)]}
+        limits = drift_limits(task, m.get("delta_depth", 0.0))
+        r["drift_limits"] = limits
         obj.wake()
         sa = w.SA.SleepAssist(self.robot, {obj.name: obj}, "gbf") if cfg.sleep_assist else None
         k = [0]
         fo: List[float] = []
 
-        def step(a, phase=""):
+        def step(a):
             f = w.step(a, sa, k[0])
             k[0] += 1
             fo.append(f.get("finger_obj", 0.0))
 
-        def run(gen, phase):
-            for a in gen:
-                step(a, phase)
-
         cl = self.close_like_held_sampler(obj, pose, step)
-        reasons: List[str] = []
-        if cl.get("fail"):
-            reasons.append("ag_not_formed" if not cl["attached"] else "dropped_under_gravity")
-        legs: List[Dict[str, Any]] = []
+        r["ag"] = {"formed": bool(cl["attached"]), "attached_after_steps": cl.get("attached_after_steps"), "held_after_gravity": bool(cl["held_after_gravity"]),
+                   "fail": cl.get("fail"), "q_contact": cl.get("q_contact")}
         if cl["attached"]:
             off = _pose_err(cl["T_object_eef_at_attach"], T_c)
-            tr["achieved"] = {"T_object_eef_at_attach": S.mat_pose(cl["T_object_eef_at_attach"]), "off_target_m": round(off[0], 5), "off_target_rad": round(off[1], 5)}
-            if off[0] > cfg.on_target_pos_m or off[1] > cfg.on_target_rot_rad:
-                reasons.append("grasp_off_target")
-        if cl["held_after_gravity"]:
+            r["achieved_off_target"] = [round(off[0], 5), round(off[1], 5)]
+        if not cl["attached"]:
+            r["outcome"] = "ag_not_formed"
+        elif not cl["held_after_gravity"]:
+            r["outcome"] = "dropped_under_gravity"
+        else:
             T_g = self._T_oe(obj)
-            dg = _pose_err(T_g, cl["T_object_eef_at_attach"])
-            tr["gravity_drift"] = [round(dg[0], 5), round(dg[1], 5)]
-            if dg[0] > cfg.retain_pos_m or dg[1] > cfg.retain_rot_rad:
-                reasons.append("slipped_under_gravity")
             motions = Motions(w.env, w.backend, cfg=MotionsConfig(), robot=self.robot)
             motions.state.hold_current()
             motions.state.gripper_cmd[arm] = cl["gripper_cmd"]
-            legs, done = self.run_motions(task, rec, obj, motions, run, T_g, reasons)
-            tr["motions_executed"] = done
-            if not reasons and len(done) < min_motions_of(cfg, task):
-                reasons.append("held_motion_unreachable")
-        fingers = self.robot.get_joint_positions()[self.robot.gripper_control_idx[arm]].tolist()
-        tr.update({"verdict": "valid" if not reasons else "invalid", "reasons": reasons,
-                   "ag": {"formed": bool(cl["attached"]), "attached_after_steps": cl.get("attached_after_steps"), "held_after_gravity": bool(cl["held_after_gravity"]),
-                          "fail": cl.get("fail"), "q_contact": cl.get("q_contact")},
-                   "closure": {"held_sampler": True, "advance_m_per_step": cfg.advance_m_per_step, "press_m": cfg.press_m, "fingers_final_m": [round(float(v), 5) for v in fingers]},
-                   "legs": legs, "legs_executed": sum(1 for r in legs if r.get("executed")), "legs_unreachable": [r["name"] for r in legs if not r.get("executed")],
-                   "forces": {"finger_obj": VT._summ(fo)}, "steps": k[0], "wall_s": round(time.time() - t0, 2)})
+            try:
+                for a in motions.arm_along(arm, m["wps"]):
+                    step(a)
+                r["executed"] = True
+            except SkillError as e:
+                r["executed"] = False
+                r["unreachable"] = f"{getattr(e, 'reason', 'skill_error')}: {str(e)[:160]}"
+            except Exception as e:  # noqa: BLE001
+                r["executed"] = False
+                r["error"] = repr(e)[:300]
+                r["traceback"] = traceback.format_exc()[-1200:]
+            for a in motions.hold(cfg.leg_settle_steps):
+                step(a)
+            now = motions.eef_pose(arm)
+            goal = m["wps"][-1]
+            r["eef_err_m"] = round(float(th.linalg.norm(now[0] - C.as_tensor(goal[0]))), 5)
+            r["eef_err_rad"] = round(float(C.quat_angle(now[1], C.as_tensor(goal[1]))), 5)
+            held = self.robot._ag_obj_in_hand.get(arm) is obj
+            r["held"] = held
+            if held:
+                d = _pose_err(self._T_oe(obj), T_g)
+                r["drift"] = [round(d[0], 6), round(d[1], 6)]
+            if r.get("error"):
+                r["outcome"] = "error"
+            elif not held:
+                r["outcome"] = "dropped_in_motion"
+            elif not drift_ok(tuple(r["drift"]), limits):
+                r["outcome"] = "drift_beyond_task_tolerance"
+            else:
+                r["outcome"] = "ok" if r["executed"] else "unreachable"
+        r["forces"] = {"finger_obj": VT._summ(fo)}
+        r["steps"] = k[0]
+        r["wall_s"] = round(time.time() - t0, 2)
         if sa is not None:
             try:
-                tr["sleep_assist"] = {"sleeps": sa.sleeps, "wakes": sa.wakes}
+                r["sleep_assist"] = {"sleeps": sa.sleeps, "wakes": sa.wakes}
             except Exception:  # noqa: BLE001
                 pass
-        return tr
+        return r
+
+    # ------------------------------------------------------------------ one trial
+
+    def trial(self, obj, cand: Dict[str, Any], task: str, entry: str = "") -> Dict[str, Any]:
+        """The candidate under ``task``'s drawn motions (module docstring); the verdict from the motions' outcomes (:func:`verdict_of`)."""
+        from ispatialgym.robot import conventions as C
+
+        t0 = time.time()
+        rec = self.hold_q(task)
+        T_c = S.pose_of(cand["T_object_eef"])
+        pose = S.mat_pose(T_c)
+        eef_in_object = (C.as_tensor(pose["position"]).float(), C.as_tensor(pose["orientation_xyzw"]).float())
+        rng = motion_rng(entry, cand["name"], task, self.cfg.seed)
+        drawn, st = self.draw_motions(task, rec, eef_in_object, rng)
+        motions = [self.run_motion(obj, cand, m, task) for m in drawn]
+        verdict, reasons = verdict_of(motions, self.cfg.min_executed)
+        fingers = [m.get("ag", {}).get("q_contact") for m in motions]
+        return {"schema": S.TRIAL, "candidate": cand["name"], "family_id": None, "rest_id": None, "mode": "floating", "task": task, "hold": rec["hold"],
+                "hold_arm_q": rec["arm_q"], "draws": st, "motions": motions, "motions_tested": [m.get("info") for m in drawn],
+                "motions_executed": sum(1 for m in motions if m.get("outcome") == "ok"), "verdict": verdict, "reasons": reasons,
+                "closure": {"held_sampler": True, "advance_m_per_step": self.cfg.advance_m_per_step, "press_m": self.cfg.press_m,
+                            "fingers_final_m": next((f for f in fingers if f), [])}, "wall_s": round(time.time() - t0, 2)}
+
+
+def verdict_of(motions: Sequence[Dict[str, Any]], min_executed: int = 1) -> Tuple[str, List[str]]:
+    """``("valid" | "invalid", reasons)``: invalid when any motion dropped the object, drifted past its task tolerance or crashed, or fewer
+    than ``min_executed`` ran (``no_drawn_motion`` when the sampler's draws found none, ``ag_not_formed`` when no closure attached,
+    ``held_motion_unreachable`` when the arm tracked none); a closure that does not attach in some of the motions is not a reason (the
+    sampler retries another row - recorded per motion)."""
+    bad = [m["outcome"] for m in motions if m.get("outcome") in ("dropped_under_gravity", "dropped_in_motion", "drift_beyond_task_tolerance", "error")]
+    if bad:
+        return "invalid", sorted(set(bad))
+    n_ok = sum(1 for m in motions if m.get("outcome") == "ok")
+    if n_ok >= min_executed:
+        return "valid", []
+    if not motions:
+        return "invalid", ["no_drawn_motion"]
+    if all(m.get("outcome") == "ag_not_formed" for m in motions):
+        return "invalid", ["ag_not_formed"]
+    return "invalid", ["held_motion_unreachable"]
 
 
 def run_model(world: VT.TabletopWorld, job: Dict[str, Any], model_dir: str, cfg: Optional[FloatingValidateConfig] = None,
@@ -466,7 +512,7 @@ def run_model(world: VT.TabletopWorld, job: Dict[str, Any], model_dir: str, cfg:
             per = []
             for t in tasks:
                 try:
-                    per.append(runner.trial(obj, c, t))
+                    per.append(runner.trial(obj, c, t, entry=job.get("id", "")))
                 except Exception as e:  # noqa: BLE001 - one trial's crash is that trial's verdict; the next candidate runs
                     per.append({"schema": S.TRIAL, "candidate": c["name"], "task": t, "verdict": "invalid", "reasons": ["trial_error"], "error": repr(e)[:300],
                                 "traceback": traceback.format_exc()[-1500:]})
@@ -504,8 +550,8 @@ def build_library(job, cand_doc, trials, tasks: Sequence[str], policy: CP.Contac
                        "T_object_eef": c["T_object_eef"], "T_object_eef_at_attach": (first.get("achieved") or {}).get("T_object_eef_at_attach"),
                        "width_m": c["width_m"], "preshape_q": c["preshape_q"], "finger_q": first["closure"]["fingers_final_m"],
                        "graspgen_conf": c.get("graspgen_conf"), "physics": "tested",
-                       "held_motions": {t: {"motions_executed": x.get("motions_executed"), "legs_executed": x["legs_executed"],
-                                            "legs_unreachable": x["legs_unreachable"]} for t, x in by_task.items()}})
+                       "held_motions": {t: {"motions_executed": x.get("motions_executed"), "motions_tested": x.get("motions_tested")}
+                                        for t, x in by_task.items()}})
     arm = cand_doc.get("arm", "right")
     return {"schema": S.LIBRARY, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
             "dataset": job.get("dataset"), "constraint": "floating", "legacy_key": job.get("legacy_key"), "arm": arm,
