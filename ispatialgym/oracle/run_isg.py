@@ -495,10 +495,21 @@ class InstanceLoader:
         # overrides of the scene's free objects in the same stop / play (VecInstanceLoader.build_env)
         ov = self.physics_overrides
 
-        def _rigid():
-            self.report["physics_overrides"] = SA.apply_to_scenes([self.env.scene], ov)
+        # oracle-fix 2026-11-07 (owner prompt B, opt-in ISPATIALGYM_PHYSX_FILTER_ELBOW=1): the elbow pair link3 / link5 of each arm filtered in
+        # PhysX in the same stop (the hulls graze within the joint-4 limit; the fix3_hb pitch-40 push with the QA exclusion: 29-30 contact steps,
+        # the hand slowed 0.103 -> 0.028 m/s and joint 4 chattered at up to 21 rad/s^2); recorded as meta.loader.physx_filtered_robot_pairs
+        elbow = os.environ.get(M.PHYSX_FILTER_ELBOW_SWITCH, "") == "1"
+        self.report["physx_filtered_robot_pairs"] = []
 
-        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot, while_stopped=_rigid if ov else None)
+        def _rigid():
+            if ov:
+                self.report["physics_overrides"] = SA.apply_to_scenes([self.env.scene], ov)
+            if elbow:
+                from ispatialgym.oracle import qa as QA
+
+                self.report["physx_filtered_robot_pairs"] = M.filter_link_pairs_stopped(self.robot, QA.ELBOW_GRAZE_PAIRS)
+
+        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot, while_stopped=_rigid if (ov or elbow) else None)
         log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.report["base_link_mass_kg"]["before"], self.report["base_link_mass_kg"]["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cam_key = _first_key(self.robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
         if self.cam_key is None:

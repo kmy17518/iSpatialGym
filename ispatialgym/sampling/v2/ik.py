@@ -1959,6 +1959,24 @@ class IKChecker:
                     pts.append(p + G.rotate(q, th.tensor([dx, dy, dz])))
         return self.kit.world.camera_model.all_inside(camera_pose, th.stack(pts), margin)
 
+    def eef_frame_margin(self, pose: Pose, camera_pose: Pose, margin: float = IN_FRAME_MARGIN, eef_extent: float = 0.06) -> float:
+        """oracle-fix 2026-11-07 (owner prompt E, frame ranking): how far :meth:`eef_in_frame`'s eef box sits inside the image border of
+        ``margin`` - the smallest signed distance (px) of its 8 corners to that border (negative: outside it; ``-inf`` behind the camera).
+        ``eef_in_frame`` <=> margin >= 0."""
+        p, q = G.t(pose[0]), G.t(pose[1])
+        pts = []
+        for dx in (-eef_extent, eef_extent):
+            for dy in (-eef_extent, eef_extent):
+                for dz in (-0.02, 0.06):
+                    pts.append(p + G.rotate(q, th.tensor([dx, dy, dz])))
+        cm = self.kit.world.camera_model
+        uv, depth = cm.project(camera_pose, th.stack(pts))
+        if bool((depth <= 0.05).any()):
+            return float("-inf")
+        mu, mv = margin * cm.width, margin * cm.height
+        d = th.stack([uv[:, 0] - mu, cm.width - mu - uv[:, 0], uv[:, 1] - mv, cm.height - mv - uv[:, 1]], dim=1)
+        return float(d.min())
+
     def camera_pose(self, stance: Stance) -> Pose:
         """Head-camera pose at a stance through the shared FK (``conventions.camera_pose``, base on the measured floor, the
         kit's measured sensor offset) — the same model the oracle's FOV monitor projects with."""

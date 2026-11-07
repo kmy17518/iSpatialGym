@@ -3284,6 +3284,69 @@ class IORSLarge(SamplerV2):
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
 
+    #: oracle-fix 2026-11-07 (owner prompt A 3c, the hardback): compact carry poses probed at the TRAVEL trunk (B's base, the torso straightened),
+    #: in front of the chest and higher than the lift: (ahead, lateral toward the arm's side (right arm -), world z); fix3b_hb: every carry
+    #: pose of CARRY_POSES failed at B (5 x out of the head camera frame, 1 x joint 4 / 6 within 2 mrad) and all 12 instances carried at the
+    #: lift configuration (hand 0.51 m ahead, z 0.90), whose leg at C swept the book into bookcase_jaysra_0 (81 carry-leg-at-C failures)
+    CARRY_COMPACT_PROBE_POSES = tuple((a, l, z) for a in (0.30, 0.38, 0.46) for l in (0.0, -0.12, -0.24) for z in (1.00, 1.10, 1.20))
+    CARRY_COMPACT_PROBE_MAX = 12
+
+    def carry_compact_probe(self, manip: Stance, place: Stance, arm: str, tname: str, target, g, eef: G.Pose, pre_place: G.Pose, place_eef: G.Pose,
+                            ignore_place, lift_h: float) -> Optional[Dict[str, Any]]:
+        """Opt-in ``ISPATIALGYM_CARRY_COMPACT_PROBE=1`` (oracle-fix 2026-11-07, a diagnostic: nothing recorded changes): after a carry leg at C
+        failed, each :data:`CARRY_COMPACT_PROBE_POSES` pose (the lift's orientation) at B's base with the travel trunk - the head camera's
+        eef box there (``eef_in_frame``), the exact IK with the object attached (joint-limit margins included), the in-hand line from the
+        current carry configuration, and the carry leg at C from it (:meth:`_carry_track_at_c`, the carry configuration swapped in and
+        restored). One ``CARRY_COMPACT_PROBE {json}`` line; at most :data:`CARRY_COMPACT_PROBE_MAX` probes per process."""
+        if os.environ.get("ISPATIALGYM_CARRY_COMPACT_PROBE", "") != "1":
+            return None
+        n = self.__dict__.setdefault("_compact_probe_n", [0])
+        if n[0] >= self.CARRY_COMPACT_PROBE_MAX:
+            return None
+        n[0] += 1
+        from ispatialgym.oracle import r1pro_model as M
+
+        tt = tuple((getattr(self, "_leg_bc", None) or {}).get("travel_trunk") or (manip.translate, 0.0))
+        st = manip.with_trunk(float(tt[0]), float(tt[1]), name=f"{manip.name}~compact_probe")
+        cam = self.camera_pose_at(st)
+        idx = self.kit.robot.arm_control_idx[arm]
+        q_keep = self.carry_arm_q.get(tname)
+        q_now = self.ikc.q_locked(st).clone()
+        if q_keep is not None:
+            q_now[idx] = q_keep
+        h_now = self.kit.fk([M.EEF_LINK[arm]], q_now)[M.EEF_LINK[arm]]
+        rows: List[Dict[str, Any]] = []
+        s = arm_sign(arm)
+        try:
+            for ahead, lat, z in self.CARRY_COMPACT_PROBE_POSES:
+                xy = st.base_xy + st.forward * float(ahead) + st.left * (s * float(lat))
+                pose = (th.tensor([float(xy[0]), float(xy[1]), float(z)]), eef[1])
+                row: Dict[str, Any] = {"pose": [ahead, s * lat, z], "in_frame": bool(self.ikc.eef_in_frame(pose, cam))}
+                with attached(self.kit, arm, target, eef_in_object=g.pose):
+                    r = self.ikc.exact([pose], st, arm, cache=False)
+                    row["ik"] = "ok" if r.ok else str(r.reason)[:120]
+                    if r.ok and r.q is not None:
+                        wps = list(C.line_waypoints((G.t(h_now[0]), G.t(h_now[1])), pose, 4))
+                        ok = self.ikc.waypoints_ok([(G.t(h_now[0]), G.t(h_now[1]))] + wps, st, arm, cache=False)
+                        row["line"] = "ok" if ok.ok else str(ok.reason)[:120]
+                        row["line_in_frame"] = bool(all(self.ikc.eef_in_frame(w, cam) for w in wps))
+                if r.ok and r.q is not None:
+                    self.carry_arm_q[tname] = r.q[idx].clone()
+                    res = self._carry_track_at_c(place, arm, tname, target, g, pre_place, place_eef, ignore_place)
+                    row["leg_at_c"] = res[3] if res[3] == "ok" else f"{res[3]}: {str(res[2])[:160]}"
+                rows.append(row)
+        finally:
+            if q_keep is not None:
+                self.carry_arm_q[tname] = q_keep
+            else:
+                self.carry_arm_q.pop(tname, None)
+        summ = {"n": len(rows), "in_frame": sum(r["in_frame"] for r in rows), "ik_ok": sum(r.get("ik") == "ok" for r in rows),
+                "line_ok": sum(r.get("line") == "ok" for r in rows), "leg_ok": sum(r.get("leg_at_c") == "ok" for r in rows),
+                "leg_ok_in_frame": sum(r.get("leg_at_c") == "ok" and r["in_frame"] and r.get("line_in_frame", False) for r in rows)}
+        rec = {"travel_trunk": [round(float(v), 3) for v in tt], "lift_m": lift_h, "stance_c": place.name, "summary": summ, "rows": rows}
+        log.info("CARRY_COMPACT_PROBE %s", json.dumps(rec))
+        return rec
+
     def lift_arm_q(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[th.Tensor]:
         """The 7 arm-joint values of the LIFT pose (the grasp raised ``carry_height`` straight up, orientation kept) solved
         from stance B with the object attached — the configuration the oracle carries with (``program_check`` solves the
@@ -4978,6 +5041,7 @@ class IORSLarge(SamplerV2):
                         if track_in_loop:
                             carry_c = self._carry_track_at_c(place, arm, tname, target, g, pre_place, place_eef, ignore_place)
                             if carry_c[3] != "ok":
+                                self.carry_compact_probe(pick_st, place, arm, tname, target, g, eef, pre_place, place_eef, ignore_place, h)  # opt-in diagnostic
                                 carry_errors.append(f"lift {h:.2f} m, {label}: carry leg at C {carry_c[3]}: {str(carry_c[2])[:400]}")
                                 track_fails += 1
                                 path_bc, carry_c = None, None

@@ -114,6 +114,32 @@ def apply_eval_base_mass(robot, mass_kg: Optional[float] = None, while_stopped: 
         og.sim.update_handles()
     return {"before": before, "after": float(link.mass)}
 
+
+#: oracle-fix 2026-11-07 (owner prompt B): opt-in ``ISPATIALGYM_PHYSX_FILTER_ELBOW=1`` - the elbow pair link3 / link5 of each arm filtered
+#: in PhysX (qa.ELBOW_GRAZE_PAIRS; the QA exclusion is ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW)
+PHYSX_FILTER_ELBOW_SWITCH = "ISPATIALGYM_PHYSX_FILTER_ELBOW"
+
+
+def filter_link_pairs_stopped(robot, pairs) -> List[List[str]]:
+    """Filter the collisions of the robot link pairs ``pairs`` ((link, link) names) in PhysX: the USD filtered-pairs relationship of both
+    links (UsdPhysics.FilteredPairsAPI, applied when missing). Call with the simulation STOPPED (``apply_eval_base_mass``'s
+    ``while_stopped``): an edit while playing leaves the tensor views dead (predicates.set_pair_collision_filter). A runtime overlay on
+    the loaded robot - the robot asset and r1pro.yaml are not touched. Returns the pairs filtered (a pair with a missing link skipped)."""
+    import omnigibson as og
+
+    from ispatialgym.sampling.predicates import _filtered_pairs_rel
+
+    done: List[List[str]] = []
+    with og.sim.editing_usd():
+        for a, b in pairs:
+            la, lb = robot.links.get(a), robot.links.get(b)
+            if la is None or lb is None:
+                continue
+            _filtered_pairs_rel(la).AddTarget(lb.prim_path)
+            _filtered_pairs_rel(lb).AddTarget(la.prim_path)
+            done.append([a, b])
+    return done
+
 # --------------------------------------------------------------------------------------
 # JoyLo trunk keyframes (joylo/gello/utils/og_teleop_cfg.py, r1pro entry)
 # --------------------------------------------------------------------------------------

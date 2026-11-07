@@ -28,6 +28,7 @@ import hashlib
 import json
 import logging
 import math
+import os
 import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -209,6 +210,8 @@ PAIR_STAGGER_MAX_M = 0.03
 START_REGION_LATERAL_DRAWS = 4
 #: A1: partner orientations tried per attempt, each with the start region's gap interval re-evaluated at the drawn target pose
 PARTNER_YAW_DRAWS = 16
+#: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
+FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
 BAND_DEPTH_WINDOW_M = 0.12
 #: A1: extras key of a Phase-2 candidate: ``{"left" | "right": [arm, ...]}``, the arms whose band meets the side's reach rule there
@@ -2363,7 +2366,17 @@ class IORSSmall(SamplerV2):
         """The draw's checks of the segment after its grasp, with the grasp's arm: §4.6 step 2 (the partner in that arm's band), step 4
         (frame), the place in the manipulation image and the place screening. Records the stance and the grasp; returns the partner pose."""
         # §4.6 step 2: partner on the attempt's side (A1) at a gap of the start region's interval
-        p_pose = self.place_partner(rng, t_pose, manip, cam_init)
+        frame_score = None
+        if os.environ.get("ISPATIALGYM_FRAME_RANK", "") == "1" and self.relation != "touching":
+            # oracle-fix 2026-11-07 (owner prompt E 3): the partner draw ranked by the place / pre-place eef box margin in this candidate's image
+            cam_m = self.camera_pose_at(manip)
+
+            def frame_score(pp, _cam=cam_m):
+                place_g = IK.grasp_pose(self.goal_pose(t_pose, pp), grasp.eef_in_object)
+                return min(self.ikc.eef_frame_margin(place_g, _cam), self.ikc.eef_frame_margin(self.pre_place_of(place_g), _cam))
+        p_pose = self.place_partner(rng, t_pose, manip, cam_init, frame_score=frame_score)
+        if frame_score is not None and isinstance(self.partner_draw, dict) and self.partner_draw.get("frame_rank"):
+            d.summary.setdefault("frame_rank", []).append(self.partner_draw["frame_rank"])
         if self.edge_aligned():
             d.summary["edge_alignment"] = {
                 "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
@@ -2545,7 +2558,7 @@ class IORSSmall(SamplerV2):
                 return pose
         raise Reject("partner_placement", f"no meta-link spot of {len(spots)} takes the partner on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
 
-    def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
+    def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose, frame_score=None) -> G.Pose:
         """§4.6 step 2 with the A1 start region (owner 2026-10-12): the partner on the attempt's side (``region_side``, fixed before the target
         was placed; touching the robot's left) at a gap of the start region's interval re-evaluated at the drawn target pose
         (:meth:`draw_partner_pose`: on the top, both footprints ``table_end_margin_m`` from the edge's ends, in the init image, and the reach
@@ -2578,14 +2591,32 @@ class IORSSmall(SamplerV2):
             else:
                 yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip)
                 yaws = [float(rng.uniform(-math.pi, math.pi)) for _ in range(PARTNER_YAW_DRAWS)] + [yaw0, yaw0 + math.pi / 2]
+            # oracle-fix 2026-11-07 (owner prompt E 3, opt-in ISPATIALGYM_FRAME_RANK=1 via ``frame_score``): up to FRAME_RANK_K valid partner
+            # poses, the one whose place / pre-place eef box sits deepest inside the manipulation image (frame_score: px margin) is kept -
+            # the same draws, the same rules, the frame rule itself unchanged (it still rejects below)
+            ranked: List[Tuple[float, G.Pose, Any]] = []
             for yaw in yaws:
                 p_pose, why = self.draw_partner_pose(rng, side, t_pose, manip, cam, yaw)
                 if p_pose is not None:
                     if self.partner_aligned_to_target():
                         self.partner_draw["long_axes_deg"] = round(long_axes_angle_deg(self.world.footprint(self.hull["target"], t_pose),
                                                                                        self.world.footprint(self.hull["partner"], p_pose)), 2)
-                    return p_pose
+                    if frame_score is None:
+                        return p_pose
+                    ranked.append((float(frame_score(p_pose)), p_pose, dict(self.partner_draw or {})))
+                    if len(ranked) >= FRAME_RANK_K:
+                        break
+                    continue
                 misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
+            if ranked:
+                best = max(range(len(ranked)), key=lambda i: ranked[i][0])
+                score, p_pose, facts = ranked[best]
+                self.partner_draw = dict(facts, frame_rank={"n": len(ranked), "margins_px": [round(r[0], 1) if math.isfinite(r[0]) else None for r in ranked],
+                                                            "chosen": best, "first_in_frame": bool(ranked[0][0] >= 0.0)})
+                self.counters["frame_rank.partner"] = self.counters.get("frame_rank.partner", 0) + 1
+                if ranked[0][0] < 0.0 <= score:
+                    self.counters["frame_rank.partner_rescued"] = self.counters.get("frame_rank.partner_rescued", 0) + 1
+                return p_pose
             raise Reject("partner_placement", f"no partner yaw of {len(yaws)} admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
         # A1 with the brace optional (owner 2026-09-16 17:10, the axial rule): a partner position whose push work point (the
         # target's right face at the *place* position) lies in the right band and whose brace point (partner's far / left

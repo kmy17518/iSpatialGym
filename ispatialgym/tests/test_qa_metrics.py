@@ -110,6 +110,36 @@ def test_contacts_split_by_link_group_and_the_first_hard_one_stops_the_oracle():
     assert rep["stopped_by"] == "robot_touching_itself" and rep["mode"] == "oracle"
 
 
+def test_the_opt_in_elbow_graze_exclusion_records_the_pair_and_keeps_the_rest_hard(monkeypatch):
+    # oracle-fix 2026-11-07 (owner prompt B): left / right arm link3 - link5 (the hulls graze within the joint-4 limit) leave
+    # robot_touching_itself only with ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW=1; their contacts are still recorded, any other pair still stops
+    table = FakeObject("table_0", [1.0, 0.0, 0.4], category="breakfast_table")
+    monkeypatch.delenv(QA.SELF_EXCLUDE_SWITCH, raising=False)
+    robot, qa, c = world(objects=(table,))
+    P = robot.prim_path
+    qa.begin_action(GRASP, intended=set())
+    c.pairs = {(f"{P}/left_arm_link3", f"{P}/left_arm_link5")}
+    v = qa.observe(1, hold(robot))
+    assert v is not None and v.category == "robot_touching_itself"  # off: the former metric
+    assert qa.report()["metrics"]["robot_touching_itself"]["excluded_pairs"] == []
+    monkeypatch.setenv(QA.SELF_EXCLUDE_SWITCH, "1")
+    robot, qa, c = world(objects=(table,))
+    P = robot.prim_path
+    qa.begin_action(GRASP, intended=set())
+    c.pairs = {(f"{P}/left_arm_link5", f"{P}/left_arm_link3")}
+    assert qa.observe(1, hold(robot)) is None and qa.observe(2, hold(robot)) is None
+    c.pairs = {(f"{P}/right_arm_link3", f"{P}/right_arm_link5")}
+    assert qa.observe(3, hold(robot)) is None
+    c.pairs = {(f"{P}/left_arm_link3", f"{P}/left_arm_link6")}
+    v = qa.observe(4, hold(robot))
+    assert v is not None and v.category == "robot_touching_itself"
+    m = qa.report()["metrics"]["robot_touching_itself"]
+    assert m["excluded_pairs"] == [["left_arm_link3", "left_arm_link5"], ["right_arm_link3", "right_arm_link5"]]
+    assert [(r["links"], r["first_step"], r["n"]) for r in m["excluded"]["runs"]] == [(["left_arm_link3", "left_arm_link5"], 1, 2),
+                                                                                    (["right_arm_link3", "right_arm_link5"], 3, 1)]
+    assert [r["links"] for r in m["runs"]] == [["left_arm_link3", "left_arm_link6"]] and m["switch"] == QA.SELF_EXCLUDE_SWITCH
+
+
 def test_a_stream_logs_every_metric_and_never_stops():
     cup = FakeObject("cup_0", [0.6, 0.0, 0.8], category="cup")
     robot, qa, c = world(oracle=False, objects=(cup,), task_objects=["cup_0"], camera=QA.CameraModel.from_hfov())

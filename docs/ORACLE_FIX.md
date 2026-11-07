@@ -901,3 +901,53 @@ the arrival leaves the arm, where the sampler tracked it through a carry waypoin
 - Restricting the pitch list doesn't work. With [0, 20] the pitch-0 push itself failed (`ik_joint_limit`, joint2 within 3 mrad);
   the pitch list likely changes the B ranking (`rank_b`). The fix would be a sampler-side self-proximity check on that push witness.
 - How often pitch 40 is taken varies by run (fix3_hb 8 of 22 picks, fix3b_hb 1 of 28).
+
+## 13. Round 4 (2026-11-07): the pitch-40 elbow graze, the hardback carry at C
+
+### The pitch-40 push: `robot_touching_itself` (left_arm_link3 / left_arm_link5)
+- **Where it occurs.** Across `$OFH/out` (19 tags, 467 demos) there are 7 `robot_touching_itself` failures, all on left link3 / link5:
+  - 5 in the hardback push (fix3_hb 300023 / 24 / 28 / 29 / 33);
+  - 1 in the nextto_04 gym-shoe grasp;
+  - 1 in the ontop_large_01 soap-dispenser lift.
+  The right arm has 0, and so does under_large_scale.
+
+  Each is one step: the hard QA stops the run at the first contact. Left joint 4 is at −2.075..−2.090, against a limit of −2.0944.
+- **What touches.** At those steps the collision hulls `link3_col_1` / `link5_col_0` are −0.1..0.0 mm apart, while the cuRobo spheres are 17.1–18.1 mm apart.
+  - Sweep: +4.3 mm at q4 −2.045, and −0.9..−1.2 mm at the limit.
+  - Demos that passed close by stayed ≥ 2.0 mm apart.
+  - The right arm stays ≥ 6.9 mm apart at the limit.
+
+  The pair is in neither cuRobo's ignore list nor r1pro.yaml's disabled pairs, and the USD has no FilteredPairs. This is a convex-hull graze within the joint limits, not a fold.
+- **The QA exclusion (trunk acdea64e), opt-in `ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW=1`.**
+  - Left and right link3 / link5 leave `robot_touching_itself`.
+  - Their contacts are still recorded in `qa.metrics.robot_touching_itself.excluded`.
+  - Every report names the switch and `excluded_pairs`.
+
+  Recollect selfx1 of the 5 failed instances: 5 / 5 succeed. The contact lasted 29–30 steps and perturbed the motion:
+  - the hand slowed from 0.103 to 0.028 m/s;
+  - joint 4 accelerated at up to 19–21 rad/s², against 0.76 in a pitch-40 push without the contact.
+- **The PhysX filter (trunk 52f91f19), opt-in `ISPATIALGYM_PHYSX_FILTER_ELBOW=1`.**
+  - `r1pro_model.filter_link_pairs_stopped` sets both links' FilteredPairsAPI targets on the loaded robot, with the sim stopped, in `apply_eval_base_mass`'s stop.
+  - It is recorded in `meta.loader.physx_filtered_robot_pairs`.
+  - No robot asset is touched.
+
+  Recollect selfx2 (both switches): 5 / 5 succeed, with 0 excluded contacts. Joint 4 peaks at 0.82–0.85 rad/s², and its velocity stays within −0.008..+0.034 rad/s.
+
+  Hardback selfx_hb (QA switch, 6 × N 2): 12 written in 29 attempts, demos 11 / 11 at the time of writing. That attempt count isn't comparable with fix3b_hb's 104, because of the persisted overhang memo and caches.
+- **Open item.** A replay or evaluation world of these demos must apply the PhysX switch too. Today only `run_isg.build_env` applies it.
+
+### The hardback carry (fix3b_hb)
+- **Carried legs.**
+  - face_travel is used on 8 of 12.
+  - The other 4 are 0.41–0.44 m legs into C where face_travel would turn the body 81° against the polyline's 32°, beyond the +10° rule. They stay recorded on purpose.
+  - There is no base hit in 66 carried paths since the straight arrival.
+- **The limiter is the carry leg at C** (81 failures):
+  - mostly the lift configuration's line sweeping the book into bookcase_jaysra_0, 150–246 mm into the leg;
+  - differential-IK stalls at 13–14 / 41;
+  - 11 branch failures.
+
+  Every CARRY_POSES pose at B failed: 5 were out of the head camera frame, and 1 had joint 4 / 6 within 2 mrad of its limit. So all 12 instances carried at the lift configuration.
+- **The compact-carry probe (trunk 340a0a3e, diagnostic only), opt-in `ISPATIALGYM_CARRY_COMPACT_PROBE=1`.**
+  - It tests 27 chest poses at the travel trunk, logged as `CARRY_COMPACT_PROBE`: head camera box, IK with the book, in-hand line, and the carry leg at C from each.
+  - Running as hbprobe1.
+  - A real compact carry needs new plumbing: a transition never moves the holding arm (`execute.move_idle_arms`).
