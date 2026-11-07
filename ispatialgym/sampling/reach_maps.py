@@ -109,8 +109,10 @@ class MapConfig:
     # i7-unblock 2026-11-07 (owner decision: the former rule was a bug, nextto_04): the trunk eligibility rule (TRUNK_ELIGIBILITY_RULES,
     # :func:`trunk_posture_groups`) - "per_d_e": a trunk is ineligible only at the edge distances where every idle-arm posture collides
     # (self or the slab); "all_d_e" / None: the former rule (one posture free of the slab at EVERY d_e, else the whole trunk is dropped).
-    # None is left out of key() (the maps computed before the field existed keep their keys; CONFIG_LEGACY_DEFAULTS reads them as "all_d_e")
-    trunk_eligibility: Optional[str] = None
+    # None is left out of key() (the maps computed before the field existed keep their keys; CONFIG_LEGACY_DEFAULTS reads them as "all_d_e").
+    # i7-unblock 2026-11-07 (owner decision): "per_d_e" is the default of new builds; a floor map (one edge distance: both rules give the
+    # same map) stays None (floor_config), so its key does not move
+    trunk_eligibility: Optional[str] = "per_d_e"  # = TRUNK_ELIGIBILITY_DEFAULT
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -125,6 +127,8 @@ class MapConfig:
 CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None, "floor_fingers": "spheres", "trunk_eligibility": "all_d_e"}
 #: i7-unblock 2026-11-07: the trunk eligibility rules (``MapConfig.trunk_eligibility``; None = "all_d_e", the former rule)
 TRUNK_ELIGIBILITY_RULES: Tuple[str, ...] = ("all_d_e", "per_d_e")
+#: the rule of new builds (MapConfig's default; the --skip-existing matchers' default)
+TRUNK_ELIGIBILITY_DEFAULT = "per_d_e"
 
 
 def trunk_rule(cfg: "MapConfig") -> str:
@@ -233,7 +237,8 @@ FLOOR_FINGERS = "policy"
 def floor_config(**kw) -> MapConfig:
     """The :class:`MapConfig` of a floor map (``kind="floor"``): no edge (one distance 0.0), cells from FLOOR_X_MIN_M, laterals
     +-FLOOR_Y_HALF_M, the finger rule :data:`FLOOR_FINGERS`; ``kw`` sets the other fields (arm, lattice, seeds, ...)."""
-    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, "floor_fingers": FLOOR_FINGERS, **kw}
+    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, "floor_fingers": FLOOR_FINGERS,
+          "trunk_eligibility": None, **kw}  # one edge distance: the trunk eligibility rules coincide (i7-unblock: the floor keys stay)
     return MapConfig(**kw)
 
 
@@ -1381,7 +1386,7 @@ def find_generic(maps_root: str, height: float, *, arm: str = "right", pose_set:
     return rm
 
 
-def _generic_meta_matches(path: str, arm: str, pose_set: Dict[str, Any], trunk_eligibility: Optional[str] = None) -> bool:
+def _generic_meta_matches(path: str, arm: str, pose_set: Dict[str, Any], trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT) -> bool:
     """``--skip-existing`` of a generic job: the map ``path`` is this run's arm, the generic kind, the job's pose set and its trunk eligibility
     rule (i7-unblock 2026-11-07; None = "all_d_e")."""
     try:
@@ -1586,7 +1591,7 @@ def _bench(args):
           f"sphere FK {n} in {time.time() - t1:.3f}s; setup {w.setup_s:.1f}s; peak {th.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
 
 
-def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = None) -> bool:
+def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT) -> bool:
     """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
     its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one), and its
     trunk eligibility rule (i7-unblock 2026-11-07: ``trunk_eligibility``, None = "all_d_e"; a map of the former rule does not stand in for
@@ -1629,7 +1634,7 @@ def main(argv=None):
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
     c.add_argument("--trunk-eligibility", default=None, choices=list(TRUNK_ELIGIBILITY_RULES),
-                   help="the trunk eligibility rule (MapConfig.trunk_eligibility; default: MapConfig's). all_d_e = the former rule (the field is left out "
+                   help="the trunk eligibility rule (MapConfig.trunk_eligibility; default: MapConfig's, per_d_e). all_d_e = the former rule (the field is left out "
                         "of the map's config and key); per_d_e = a trunk is ineligible only at the edge distances where every idle-arm posture collides")
     pf = sub.add_parser("prefix")
     pf.add_argument("--artic-lib", nargs="+", required=True, help="artic_library.json files (validate_artic)")

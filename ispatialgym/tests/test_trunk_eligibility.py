@@ -95,6 +95,8 @@ def test_the_interior_obstacle_ranking_of_i7_lean_is_kept():
 
 
 def test_the_rule_is_in_the_config_and_old_keys_stay():
+    assert RM.MapConfig().trunk_eligibility == "per_d_e" and RM.MapConfig().key()["trunk_eligibility"] == "per_d_e"  # new builds (owner)
+    assert "trunk_eligibility" not in RM.floor_config().key()  # one edge distance: the rules coincide, the floor keys stay
     assert "trunk_eligibility" not in RM.MapConfig(trunk_eligibility=None).key()  # the former rule: the config (and key) as before
     k = RM.MapConfig(trunk_eligibility="per_d_e").key()
     assert k["trunk_eligibility"] == "per_d_e"
