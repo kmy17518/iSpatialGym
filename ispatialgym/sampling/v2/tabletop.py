@@ -773,9 +773,21 @@ def axial_init_yaw(rng, aligned_yaw: float, deviation_range_deg: Sequence[float]
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def v2_rest_h_root(s, rest_quat) -> Optional[float]:
+    """The measured h_root of the v2 rest whose quaternion is ``rest_quat`` (registered by :func:`map_bands`), else None."""
+    reg = getattr(s, "_v2_rest_h", None) or {}
+    return reg.get(tuple(round(float(v), 5) for v in _t(rest_quat).tolist()))
+
+
 def object_pose_on(s, hull: th.Tensor, rest_quat, xy, yaw: float, z_support: float, drop: float = Z_OFFSET) -> Pose:
-    """§3.2: orientation ``R_z(yaw) ∘ rest``, z = support top + bottom offset + 3 mm."""
+    """§3.2: orientation ``R_z(yaw) ∘ rest``, z = support top + bottom offset + 3 mm. of-v2maps 2026-11-07 (the isg1020 spec, Prompt 1 §3a /
+    Prompt 2 §4; opt-in ``ISPATIALGYM_V2_REST_H_ROOT=1``): a v2 rest with a measured h_root (registered by map_bands) is placed at
+    z = support top + h_root - no 3 mm, no recomputed bottom offset."""
     quat = C.qmul(C.quat_from_yaw(yaw), _t(rest_quat))
+    if os.environ.get("ISPATIALGYM_V2_REST_H_ROOT", "") == "1":
+        h = v2_rest_h_root(s, rest_quat)
+        if h is not None:
+            return th.tensor([float(xy[0]), float(xy[1]), float(z_support) + float(h)]), quat
     pos = th.tensor([float(xy[0]), float(xy[1]), float(z_support) + s.world.bottom_offset(hull, quat) + float(drop)])
     return pos, quat
 
@@ -1012,6 +1024,12 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
         ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
                                  "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
+    # of-v2maps 2026-11-07 (ISPATIALGYM_V2_REST_H_ROOT, object_pose_on): the measured h_root of every rest of the entry, by its quaternion
+    reg = s.__dict__.setdefault("_v2_rest_h", {})
+    for r in lib.rests.values():
+        if getattr(r, "h_root", None) is not None:
+            for sgn in (1.0, -1.0):  # q and -q are one rotation
+                reg[tuple(round(sgn * float(v), 5) for v in r.quat_xyzw)] = float(r.h_root)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 

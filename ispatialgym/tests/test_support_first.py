@@ -58,3 +58,17 @@ def test_support_first_keep_is_off_by_default_and_ignores_scene_bands(monkeypatc
     scene_band = SimpleNamespace(meta={"mode": "band"})
     out, arms = TT.support_first_keep(SimpleNamespace(), _stance(), None, 0.17, scene_band, {}, keep, {})
     assert out is keep  # a legacy scene band is untouched
+
+
+def test_v2_rest_h_root_placement_is_opt_in(monkeypatch):
+    # of-v2maps 2026-11-07 (the isg1020 spec: z = support + h_root, no 3 mm, no recomputed bottom offset)
+    s = SimpleNamespace(world=SimpleNamespace(bottom_offset=lambda hull, q: 0.02), _v2_rest_h={(0.0, 0.0, 0.0, 1.0): 0.0185, (-0.0, -0.0, -0.0, -1.0): 0.0185})
+    q = th.tensor([0.0, 0.0, 0.0, 1.0])
+    monkeypatch.delenv("ISPATIALGYM_V2_REST_H_ROOT", raising=False)
+    p, _ = TT.object_pose_on(s, th.zeros(4, 3), q, (0.1, 0.2), 0.3, 0.75)
+    assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
+    monkeypatch.setenv("ISPATIALGYM_V2_REST_H_ROOT", "1")
+    p, _ = TT.object_pose_on(s, th.zeros(4, 3), q, (0.1, 0.2), 0.3, 0.75)
+    assert abs(float(p[2]) - (0.75 + 0.0185)) < 1e-6
+    p, _ = TT.object_pose_on(s, th.zeros(4, 3), th.tensor([0.0, 0.0, 0.7071, 0.7071]), (0.1, 0.2), 0.3, 0.75)  # an unregistered rest
+    assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
