@@ -2006,6 +2006,94 @@ The owner's BRACE OPENING rule (2026-11-07): an open brace opens fully (0.05 per
   (`$OFH/contactbrace_20261108/libs_on/maps`, staged in `$OFH/v2maps_icb_on`). Not exercised by any alias: the pack brace (no block_4
   pack-tail alias) and the carton-v4 wide stop (every alias `blade_down`).
 
+### i7-attachfix (2026-11-08): the attachment aliases diagnosed with numbers (owner direction 2026-11-08 02:20)
+
+Branch i7-attachfix from of-v2maps 386ab2b4; record `$OFH/attachfix_20261108`. Run diagnosed: i7_attswept (trunk_54439eee, 62 att / 16
+written / 6 ok).
+
+**One class: the held object / partner not where the plan thinks (items 2b, 3, 4).** Every failing instance of that class was the
+instance AFTER a joined episode on the same reused collector world (`run_isg --queue`): the live start pose vs the TRO
+(meta.start_state vs tro_state) - attachment_01 300114 lid 103.8 mm + teapot 81.6 mm (after 300113 joined), 300115 lid 76.6 mm
+(after 300112), attachment_04 300116 lid 549 mm (after 300114), attachment_03 300020 wine bottle 40 mm (after 300019); every other
+of the 16 demos 0.0 mm. The off lid sat exactly at the PREBUILD instance's pose (300108 / 300110: the world's `scene_state0`).
+`Loader.attach` released the grasps / hinges / planner attachments but not the BEHAVIOR attachment joint the attach rule made;
+`scene.load_state(scene_state0)` then detached it inside the load (`AttachedTo._load_state -> _detach -> og.sim.update_handles()`)
+and the TRO pose of the pair did not stick. Consequences: (3) the oracle's grasp target = live lid o eef_in_object, the sidecar's
+witness = the TRO lid: the "77.1 / 576 mm witness residual" plan_failed is that offset (the witness itself reaches its pose: the hand
+at the witness ended 2.8 mm from the recorded pre-grasp); (4) 300114 grasped the displaced lid correctly (in-hand 0.7 mm / 0.002 rad
+vs eef_in_object, rigid through the carry), the arm reached the recorded place within 4.8 mm - over where the TRO puts the teapot,
+82 mm from where it stood; the release check was right; (2b) 300020: in-hand 0.8-1.9 mm / 0.06 rad through the carry (the AG
+attachment rigid, no slip, the executed grasp on the recorded one), the bottle 40 mm off -> the seat pose inside the bottle.
+Also: meta.attach_joins listed the PREVIOUS episodes' joins (PRED.JOINS is per process).
+Fix (d9de0ff1, `oracle/run_isg.py`, the loader - not an oracle program): `detach_scene_attachments` before the state load; after the
+restore every TRO object is compared with its TRO root pose (`tro_pose_mismatches`, 5 mm / 0.05 rad), re-applied once, else
+LoadError; `meta.attach_joins` = this episode's joins only. First validation (i7af_v, trunk_b4d8f3d4): the check still met the pair off
+after a joined episode (attachment_01: lid 113 mm / 2.11 rad + teapot 240 mm / 3.06 rad; lid 95 mm / 0.64 rad) and re-applied it (the
+episodes ran from the TRO). Remaining cause: the joined pair stays collision-FILTERED in USD across the state load and its deferred
+un-filter (`predicates.set_pair_collision_filter`: dump, stop, edit, play, load) ran inside the next restore - the vectorized loader's
+cleanup already calls `predicates.reset_pair_records`, the single-world `attach` did not. 74fef537: `attach` resets the pair records
+(un-filter) before the state load.
+
+**Recorded IK witnesses (item 3).** Independent numpy FK of the planner's holonomic URDF over every written sidecar under `$OFH/out`
+(2463 sidecars, 24399 witness targets; 120 q-only regrasp targets skipped): FK vs pose p50 0.43 / p99 1.60 / max 3.46 mm, rotation
+max 0.010 rad; 0 above 5 mm or 0.05 rad; 18 instances with a target 2-3.5 mm (push / base_push pre-poses, the sampler's looser pre
+limit); the recorded fk_residual_m agrees with this FK to 0.024 mm. Guard (d0a96dda): `sampling/v2/witness_check.py` runs the same FK
+on every witness before an instance is written (`witness_unreachable` > 5 mm / 0.05 rad; ISPATIALGYM_WITNESS_WRITE_CHECK=0 off).
+
+**Cap xxqyrt (item 1).** Rest r0 = canonical, open side DOWN (confirmed: top disc piece z 1.20-3.47 mm, seven wall pieces radius
+22.6-26.2 mm (3 mm wall) z -7.76..+2.2 mm, nothing on the axis below z 1.2: the cavity opens onto the table); 52.3 mm x 11.2 mm, 16 g;
+gripper max opening 96.9 mm. Pieces: the hulls of 20-70 deg wall arcs bridge INWARD (chords into the cavity), none bulges outward.
+Causes (generation): (a) the Isaac sampler asks `multiple_hits=True` and keeps the furthest hit within the aperture, but embree here
+returns only the FIRST hit, so every antipodal pair spans one 3 mm wall, the 2.3 mm disc or a piece-cut face (local reproduction:
+4000 samples, 100 % of the pad centres inside a collision piece, widths p50 2.3 mm, max 18.1 mm = piece 1's cut faces; the gate dump's
+top width drops 0.09-12.7 mm): no pinch across the diameter was ever proposed, the 33 "selected" were tangential piece-cut pinches
+(top_0 = width 18.07 mm across piece 1's cut faces) - hence finger_blade_in_object by 1.5-2.7 mm and the single physics-valid
+top_0 that does not hold in the demo; (b) the width rays started at the pad centre (in the cavity: the inner wall); (c) the top support
+retreat stops the fingers 1 mm below the table, the attachment rule then needs them 2 mm above the rim (face_gap): every retreated
+grasp of the 11 mm cap dropped at face_gap -1.0 mm (27 / 27). Side pool: every side grasp loses its width after the support lift
+(lift 30-106 mm: the wrist camera / palm sink into the table beside an 11 mm object; the pinch line ends 2.6-27.8 mm above the cap
+top) - geometry, unchanged under the pre-shape sweep (the sweep never runs: width_lost first). The 4 pick failures: failed_grasp "not
+in the right hand after closing" twice each (AG never formed), fingers closed to 0, executed eef-in-cap 4.3-7.3 mm / 0.02-0.12 rad off
+the recorded (the cap pushed 2.9-6.1 mm by the closing fingers of the piece-cut pinch).
+Fix (b4d8f3d4, opt-in, identity when on): `CandidateConfig.outer_pinch` (every ray hit - repeated first-hit casts; width / antipodal /
+the blade check's pinched points measured from outside along the closing axis) + `attach_face_retreat` (an attach top grasp retreats
+until the fingers clear the rule's face gap; the rule unchanged). Local candidates (default density): both on 16 selected / 16
+geometry-ok, diametric pinches 50.9-51.0 mm, tilts 2-31 deg; outer_pinch alone 1264 -> 0 at face_gap; face retreat alone 0 at
+object clearance; off 0.
+Rebuild (trunk_b4d8f3d4, `$OFH/attachfix_20261108/cap`, manifest cand_overrides {outer_pinch, attach_face_retreat, gate_dump}; job
+18372013 glib + maps 0.8126 right + left; job 18372014 attach maps box + swept right, both ok): 10 representatives -> 6 PHYSICS-VALID
+(top_1..top_6; top_0 object_pressed_into_table) - was 1 (top_0, the piece-cut pinch). Staged root `$OFH/attachfix_20261108/v2maps_af`
+(cp -a v2maps_int1 + this entry and its maps; the int1 cap entry -> `_superseded_attachfix`; legacy_keys cap__xxqyrt; links.json).
+Next blocker (i7af_v, trunk_b4d8f3d4: 300026 / 300030 QA pause in the grasp, fingers closed to 0, the cap pushed 5 mm): the cap
+aliases' own custom `generation.grasp_height_extra_m` 5 mm (isg_customs, only the four cap aliases; the knob lift made for the legacy
+grasps) lifted every written grasp by 2.5 mm (clipped: "fingertips 3 mm below the male's top") - the validated pinch's contact z 0 mm
+-> 2.1-2.5 mm (rim edge), tips 0.5 mm above the cap's bottom. d4f1bdcd (`attachment._apply_grasp_height_extra`): that alias lift is
+not applied to a v2 library grasp (validated at its own height); the support / partner floors still apply (cap: 1.4 mm finger
+envelope). Lid / cork aliases have no such custom (their lifts are floors) - unchanged.
+
+**Cork ncxgpe (item 2).** (a) 24 of 41 attempts rejected for the rest (rest_unstable 20 + unstable_init 4), mean 189.5 s each
+(4549 s, 71 % of the attempt time; the ~180 s sample stage runs before the settle / nudge, attachment.py after_settle :1656-1698):
+the entry's only rest r0 = standing on the TAPERED male end (ring radius 6.1-6.5 mm under a CoM ~18 mm up; tipping margin 0.33 vs 0.48
+on the wide end); the 2 deg nudge tilts it 4.7-25 deg (12) or tips it over 61-93 deg (8). r0 was called stable from one 36-step settle
+(no perturbation; final angular velocity 0.148 rad/s; no settle-first survey, so no other rest exists). The fallback
+`_rest_flip_forced` (attachment.py:1694) is never read again. NOT FIXED (owner decision): a nudge test in the rest survey is a shared
+validation gate, and a stable rest of this cork that keeps the male end down probably does not exist (the wide end down needs a 180 deg
+in-hand turn, lying needs a 90 deg reorient). (b) = the restore bug above. (c) the left-finger touches (300021 failed protected_contact
+at step 989, 300019 same at 658, retried ok) are the BRACING left arm: the brace's touch-stop pushed the bottle 4.6-5.1 mm / 2.8-3.4 deg,
+the 4 mm back-off left the closed finger where the bottle rocked back upright within 3 steps of the carry; `_check_protected`
+(qa.py:648-666) ignores the brace-allowed pairs. Neither (a) nor (b) explains it (bottle 0.0 mm off its TRO in 300019 / 300021).
+NOT FIXED (an oracle program change): wait for the braced object to stop rocking before backing off / back off by the measured push +
+4 mm, and / or exempt brace-allowed pairs in the run-time protected check.
+
+**Validation (--grasps v2only N 4).** attachment_01 / 03 / 04 from trunk_74fef537 on v2maps_int1 (tag i7af_v2), attachment_02 from
+trunk_d4f1bdcd on `$OFH/attachfix_20261108/v2maps_af` (tag i7af_v3): 01 att 6 / wr 4 / ok 3 (one place plan_failed: the pre-place and
+place witnesses 3.00 rad apart - another class), 02 att 7 / wr 4 / ok 3 (0.41 GPU-h = 0.136 / success; one symbolic_only; the first cap
+successes: hover 13.2 mm, touched, drop <= 0.3 mm, joined), 03 3 written / 3 ok (4th still sampling at the report: 14 target_placement +
+5 rest rejections), 04 att 13 / wr 4 / ok 4. Restore on the final code: 17 demos, 6 after a joined episode (1 joint detached + 1 pair
+un-filtered each), 0 TRO mismatches, 0 re-applies. Earlier snapshots: i7af_v (b4d8f3d4: the check re-applied 2 of 2 off pairs; 01 4 / 4
+ok; 02 cap 2 / 2 QA pause at the grasp - the alias lift, fixed in d4f1bdcd). Suite (8 matched shards, base 386ab2b4 vs tip): 23 failed +
+3 errors on both, the same tests; test_attachfix 9 pass.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

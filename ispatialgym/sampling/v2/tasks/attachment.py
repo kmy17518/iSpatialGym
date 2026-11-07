@@ -118,6 +118,19 @@ def carry_over_ladder(value) -> Tuple[float, ...]:
     return tuple(float(v) for v in (value if isinstance(value, (list, tuple)) else [value]) if v is not None and float(v) > 0.0)
 
 
+def v2_library_lift_off(grasp_key: Optional[str]) -> bool:
+    """i7-attachfix: the male's grasps come from a v2 library entry (validated at their own height): the alias's generation lift
+    ``grasp_height_extra_m`` is not applied to them (``_apply_grasp_height_extra``; its floors still are)."""
+    if not grasp_key:
+        return False
+    from ispatialgym.sampling import grasp_library as GL
+
+    try:
+        return GL.v2_entry(grasp_key) is not None
+    except Exception:  # noqa: BLE001 - no v2 root / unreadable entry: as before
+        return False
+
+
 @dataclass
 class CarryPlan:
     """The carry from the lifted grasp to the pre-attach that :meth:`Attachment._carry_to_pre_attach` settled on (or tried last):
@@ -1206,6 +1219,15 @@ class Attachment(SamplerV2):
         closure): the pads' fingertip-side end must stay >= PAD_TABLE_CLEARANCE_M ABOVE the support surface (the pinch band
         is the rim's upper half) - that lift is required even with the knob at 0 - and the fingertips <= 3 mm below the top."""
         x = max(0.0, float(self.gen("grasp_height_extra_m", 0.0) or 0.0))
+        x_v2 = v2_library_lift_off(self.grasp_key)
+        if x_v2 and x > 0.0:
+            # i7-attachfix 2026-11-08 (cap xxqyrt, attachment_02): the alias's knob lift (isg_customs: grasp_height_extra_m 5 mm, the cap
+            # aliases only) was made for the LEGACY grasps; a v2 library grasp was physics-validated at its own height (the cap's diametric
+            # fingertip pinches: contact z 0 mm on the 11 mm cap) and the lift moved it 2.5 mm up onto the rim edge (contact z 2.1-2.5 mm,
+            # tips 0.5 mm above the cap's bottom): i7af_v 300026 / 300030 closed the fingers to 0 and pushed the cap 5 mm (QA pause).
+            # The support / partner floors below still apply.
+            grasp.extras["grasp_height_extra_param_m"] = x
+            x = 0.0
         if grasp.eef_in_object is None or grasp.grasp is None:
             grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "no grasp pose"})
             return

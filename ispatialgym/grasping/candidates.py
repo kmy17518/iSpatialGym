@@ -132,6 +132,21 @@ class CandidateConfig:
     # legacy_grasps: the step-4 legacy grasps ({"name", "position", "quat_xyzw"}: the eef in the canonical object frame).
     agent_proposals: Tuple[Dict[str, Any], ...] = ()
     legacy_grasps: Tuple[Dict[str, Any], ...] = ()
+    # i7-attachfix 2026-11-08 (owner direction item 1, cap xxqyrt): OPT-IN candidate switches (default off = the behaviour before; part
+    # of the entry identity when on - schema.CANDIDATE_SWITCHES). Measured on the cap (a 52.3 mm x 11.2 mm cup resting open side down,
+    # walls 3 mm): the Isaac sampler asks ``multiple_hits=True`` and takes the furthest hit within the aperture, but the embree
+    # intersector returns ONLY the first hit, so every antipodal pair spans one wall / disc / piece-cut thickness (4000 samples: 100 %
+    # of the pad centres inside a collision piece, widths 0.1-18 mm) and no pinch across the diameter was ever proposed; the width /
+    # antipodal features ray from the pad centre, so a pinch whose centre lies in the cavity measured the INNER wall.
+    # outer_pinch: the sampler gets every hit along its ray (repeated first-hit casts), and the pinch width / antipodal cone / the
+    # blade check's pinched points are measured from OUTSIDE along the closing axis (rays from +-aperture/2 toward the pad centre: the
+    # surfaces the closing pads meet). Identical for a convex single-piece object.
+    outer_pinch: bool = False
+    # attach_face_retreat: an attachment_free top grasp's support retreat also clears the attachment rule's face gap (the fingers
+    # ``ATTACH_FACE_GAP_M`` inside the male's mating face) when that face rests on the support - before, the retreat stopped the fingers
+    # 1 mm below the support (the support policy's allowance) and the rule then dropped every retreated grasp at face_gap -1.0 mm (cap
+    # xxqyrt: 27 of 27 rule drops). The rule itself is unchanged.
+    attach_face_retreat: bool = False
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -167,20 +182,56 @@ def _isaac_sampler():
 
 
 class _RayProxy:
-    """embree returns only the self-hit for rays starting on a face: offset origins 0.1 mm along the ray."""
+    """embree returns only the self-hit for rays starting on a face: offset origins 0.1 mm along the ray. ``all_hits``
+    (i7-attachfix, ``CandidateConfig.outer_pinch``): ``multiple_hits=True`` returns every hit along each ray - embree in this
+    environment returns only the first one - by casting again from just past each hit (:func:`all_ray_hits`)."""
 
-    def __init__(self, ray):
+    def __init__(self, ray, all_hits: bool = False):
         self.ray = ray
+        self.all_hits = bool(all_hits)
 
     def intersects_location(self, origins, dirs, multiple_hits=True):
         o = np.asarray(origins, float) + 1e-4 * np.asarray(dirs, float)
+        if multiple_hits and self.all_hits:
+            return all_ray_hits(self.ray, o, np.asarray(dirs, float))
         return self.ray.intersects_location(o, dirs, multiple_hits=multiple_hits)
 
 
+def all_ray_hits(ray, origins: np.ndarray, dirs: np.ndarray, max_hits: int = 32, step: float = 1e-5):
+    """Every intersection along each ray ``(locations, ray index, triangle index)`` from repeated FIRST-hit casts (each from ``step``
+    past the previous hit) - what ``intersects_location(multiple_hits=True)`` promises."""
+    n = len(origins)
+    locs, ridx, tidx = [], [], []
+    live = np.arange(n)
+    o = np.asarray(origins, float).copy()
+    d = np.asarray(dirs, float)
+    for _ in range(int(max_hits)):
+        if len(live) == 0:
+            break
+        loc, idx, tri = ray.intersects_location(o[live], d[live], multiple_hits=False)
+        if len(idx) == 0:
+            break
+        # one hit per ray (the nearest)
+        dist = np.linalg.norm(loc - o[live][idx], axis=1)
+        order = np.lexsort((dist, idx))
+        idx, loc, tri = idx[order], loc[order], tri[order]
+        first = np.unique(idx, return_index=True)[1]
+        idx, loc, tri = idx[first], loc[first], tri[first]
+        g = live[idx]
+        locs.append(loc)
+        ridx.append(g)
+        tidx.append(tri)
+        o[g] = loc + step * d[g]
+        live = g
+    if not locs:
+        return np.zeros((0, 3)), np.zeros(0, dtype=int), np.zeros(0, dtype=int)
+    return np.concatenate(locs), np.concatenate(ridx), np.concatenate(tidx)
+
+
 class _MeshProxy:
-    def __init__(self, m):
+    def __init__(self, m, all_hits: bool = False):
         self.m = m
-        self.ray = _RayProxy(m.ray)
+        self.ray = _RayProxy(m.ray, all_hits=all_hits)
         self.face_normals = m.face_normals
 
     def sample(self, *a, **k):
@@ -208,21 +259,41 @@ def hits(union, origins, dirs):
     return d, cosang
 
 
-def contact_features(union, T, cz):
+def outer_hits(union, c, y, half: float):
+    """i7-attachfix (``outer_pinch``): the surfaces two closing pads meet along the line ``c + t y``: rays from ``c +- half y`` toward
+    ``c``. ``(width, cos_plus, cos_minus, d_plus, d_minus)`` with ``d_*`` the distance of each surface from ``c`` (``half`` - the ray's
+    travel; NaN / inf where a ray misses, i.e. no object on that side within ``half``)."""
+    tp, cp = hits(union, c + y * half, -y)
+    tm, cm = hits(union, c - y * half, y)
+    dp, dm = half - tp, half - tm
+    return dp + dm, cp, cm, dp, dm
+
+
+def contact_features(union, T, cz, outer_half: Optional[float] = None):
+    """Pad centre, pinch width, antipodal cosine and coverage of poses ``T`` with the contact ``cz`` along the approach. Default: rays
+    from the pad centre outward (the first surface each way); ``outer_half`` (``CandidateConfig.outer_pinch``): from ``+-outer_half``
+    along the closing axis inward - the outer surfaces the pads close on (:func:`outer_hits`)."""
     cz = np.asarray(cz, dtype=float).reshape(-1, 1) if np.ndim(cz) else cz
     c = T[:, :3, 3] + T[:, :3, 2] * cz
     y, x = T[:, :3, 1], T[:, :3, 0]
-    dp, cp = hits(union, c, y)
-    dm, cm = hits(union, c, -y)
-    width = dp + dm
+    if outer_half is not None:
+        width, cp, cm, _, _ = outer_hits(union, c, y, float(outer_half))
+    else:
+        dp, cp = hits(union, c, y)
+        dm, cm = hits(union, c, -y)
+        width = dp + dm
     antipodal = np.minimum(cp, cm)
     cov = np.zeros(len(T))
     for off in (-0.01, -0.005, 0.005, 0.01):
         o = c + x * off
-        d1, _ = hits(union, o, y)
-        d2, _ = hits(union, o, -y)
+        if outer_half is not None:
+            w2 = outer_hits(union, o, y, float(outer_half))[0]
+        else:
+            d1, _ = hits(union, o, y)
+            d2, _ = hits(union, o, -y)
+            w2 = d1 + d2
         with np.errstate(invalid="ignore"):
-            cov += (np.isfinite(d1 + d2) & (np.abs(d1 + d2 - width) < 0.01)).astype(float)
+            cov += (np.isfinite(w2) & (np.abs(w2 - width) < 0.01)).astype(float)
     return c, width, antipodal, cov / 4.0
 
 
@@ -843,7 +914,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         T_all = np.zeros((0, 4, 4))  # i7-ladder: given poses only (no mode, no sampled family) - nothing reads the samples
     else:
         su = _isaac_sampler()
-        T_all = np.array(su.sample_antipodal(_MeshProxy(union), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
+        T_all = np.array(su.sample_antipodal(_MeshProxy(union, all_hits=cfg.outer_pinch), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
                                              gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
                                              gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
                                              orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
@@ -888,6 +959,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     top_z = float(hi[2])
     ax_x, ax_y, _ = plate_axis(union)
     piece_planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces] if cfg.sweep_from_preshape else None
+    oh = 0.5 * cfg.aperture_m if cfg.outer_pinch else None  # i7-attachfix: the pinch measured from outside (CandidateConfig.outer_pinch)
+    # i7-attachfix (attach_face_retreat): the attachment rule's mating frames, known before the support step so a top grasp's retreat
+    # also clears the rule's face gap where the mating face rests on the support
+    face_mates: List[Tuple[np.ndarray, float]] = []
+    if constraint == "attachment_free" and cfg.attach_face_retreat:
+        if cfg.attach_axis not in ("meta_z", "seat"):
+            raise ValueError(f"unknown attach_axis {cfg.attach_axis!r} (meta_z | seat)")
+        for _pm, m_dir in attachment_frames(info, R, seat=attach_seat_record(job) if cfg.attach_axis == "seat" else None):
+            face_mates.append((np.asarray(m_dir, dtype=float), float((union.vertices @ m_dir).max())))
 
     def _where(Tm, czm):  # dump: where a candidate pinches (rest frame, about the plate axis), its tilt and its contact offset toward the tips
         czm = np.broadcast_to(np.asarray(czm, dtype=float), (len(Tm),))
@@ -912,7 +992,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         cz0 = CONTACT_Z + shift0 if is_family else CONTACT_Z  # a family pose may start with its contact toward the tips
         if not is_family:
             shift0 = np.zeros(len(T))
-        _, width, antip, cov = contact_features(union, T, cz0)
+        _, width, antip, cov = contact_features(union, T, cz0, outer_half=oh)
         keep = np.isfinite(width) & (width >= cfg.min_width_m) & (width <= cfg.aperture_m) & (antip >= math.cos(math.radians(cfg.cone_deg)))
         if dump.on:
             ok_w = np.isfinite(width) & (width >= cfg.min_width_m) & (width <= cfg.aperture_m)
@@ -947,6 +1027,11 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         a = T[:, :3, 2]
         if mode == "top":  # retreat along the approach (as before; the support's normal component of the retreat lifts the hand)
             s = deficit / np.maximum(-a[:, 2], 1e-3)
+            if face_mates and len(T):
+                s_face = attach_face_retreat_m(hc, T, pre_q, face_mates, margin)
+                if dump.on:
+                    L["n_face_retreat"] = int((s_face > s + 1e-9).sum())
+                s = np.maximum(s, s_face)
             ok = (CONTACT_Z + shift0 + s) <= cfg.tip_max_m + 1e-9  # the contact no further out than the tip surface (gen_candidates TIP_MAX)
             if dump.on:
                 dump.gate(pool, "support_retreat", len(T), int(ok.sum()), np.where(~ok)[0],
@@ -1020,7 +1105,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             continue
         cz = CONTACT_Z + (shift if mode == "top" else side_retreat)  # the pads' contact height after the retreat (i7-overhang: a side retreat too)
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
-        c, width, antip, cov = contact_features(union, T, cz)
+        c, width, antip, cov = contact_features(union, T, cz, outer_half=oh)
         if cfg.sweep_from_preshape:  # OWNER DECISION (i7-padsweep, default on): the pads start at the oracle's pre-shape of the recorded width
             touch = pad_sweep(union, T, open_half=preshape_pad_half(width), pieces=piece_planes)
         else:
@@ -1130,9 +1215,10 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
         blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default on since i7-switches)
+        blade_kw["outer_half"] = oh
         blades, deep = finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, **blade_kw)
         if dump.on:  # diagnostics: the blade depth with the pinched pieces looked up at the real contact (what the switch would do)
-            deep_at = deep if blade_kw else finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, contact_z=cz_real[sel].reshape(-1, 1))[1]
+            deep_at = deep if "contact_z" in blade_kw else finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, contact_z=cz_real[sel].reshape(-1, 1), outer_half=oh)[1]
         recs = []
         for r, i in enumerate(sel):
             T_obj = np.linalg.inv(R) @ Ts[r]  # back to the canonical object frame
@@ -1171,7 +1257,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         idx = SY.SurfaceIndex(union, n=sym_cfg.n_surface)
 
         def width_fn(Tm):
-            _, w, _, _ = contact_features(union, Tm, CONTACT_Z)
+            _, w, _, _ = contact_features(union, Tm, CONTACT_Z, outer_half=oh)
             return w
 
         for c in good:
@@ -1214,6 +1300,29 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
            "created": S.now(), "review_instructions": "docs/GRASP_REVIEW.md (symmetry annotations required)"}
     S.save_json(os.path.join(model_dir, "candidates.json"), out)
     return out
+
+
+#: the attachment rule's face gap (``_generate``: the fingers at least this far inside the male's mating face)
+ATTACH_FACE_GAP_M = 0.002
+
+
+def attach_face_retreat_m(hc: CP.HandChecker, T: np.ndarray, pre_q: np.ndarray, mates: Sequence[Tuple[np.ndarray, float]],
+                          margin: float) -> np.ndarray:
+    """i7-attachfix (``CandidateConfig.attach_face_retreat``): per top pose the retreat along its approach (m, >= 0) that puts the
+    pre-shaped fingers ``ATTACH_FACE_GAP_M + margin`` inside every mating face ``(direction m, face offset max(V @ m))`` - the rule's
+    face_gap measure. A pose whose approach does not move the fingers off the face (``a @ m <= 0.2``) gets 0 (the rule decides)."""
+    s = np.zeros(len(T))
+    for q in np.unique(np.round(pre_q, 3)):
+        idx = np.where(np.round(pre_q, 3) == q)[0]
+        P, _ = hc.geom.points(("finger",), (float(q), float(q)))
+        for m, face in mates:
+            v = np.einsum("nji,j->ni", T[idx, :3, :3], m)  # R^T m per pose: P @ v = the finger points along m (eef frame)
+            reach = (P @ v.T).max(axis=0) + T[idx, :3, 3] @ m
+            need = reach - (face - ATTACH_FACE_GAP_M - margin)
+            am = T[idx, :3, 2] @ m
+            ok = (need > 0.0) & (am > 0.2)
+            s[idx] = np.maximum(s[idx], np.where(ok, need / np.maximum(am, 1e-3), 0.0))
+    return s
 
 
 def _clear_grouped(clear_fn, T, pre_q):
@@ -1274,7 +1383,7 @@ def pad_face_offset(arm: str = "right") -> float:
 
 
 def finger_blades_clear(geom: OG.ObjectGeometry, hc: CP.HandChecker, T, pre_q, contact_q, steps: int = 6, face_band_m: float = 0.0015,
-                        tol_m: float = 0.0005, contact_z: float = CONTACT_Z) -> Tuple[np.ndarray, np.ndarray]:
+                        tol_m: float = 0.0005, contact_z: float = CONTACT_Z, outer_half: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
     """The finger blades' exact hulls stay outside the object's collision pieces (within ``tol_m``) from the pre-shape down to the pads'
     first touch (``contact_q`` + 0.5 mm) - the lid__pbmsji__s065 rule (sphere-cleared knob pinches put the blades 0.3-1.4 mm into the
     lid's dome; that run cleared "every piece but the pinched one by >= 1 mm"). Left out, as what the closure meets by design: the pads'
@@ -1292,8 +1401,11 @@ def finger_blades_clear(geom: OG.ObjectGeometry, hc: CP.HandChecker, T, pre_q, c
     Tn = np.asarray(T)
     c = Tn[:, :3, 3] + Tn[:, :3, 2] * contact_z
     y = Tn[:, :3, 1]
-    dp, _ = hits(geom.union, c, y)
-    dm, _ = hits(geom.union, c, -y)
+    if outer_half is not None:  # i7-attachfix (outer_pinch): the pinched points are the outer surfaces the pads close on
+        _, _, _, dp, dm = outer_hits(geom.union, c, y, float(outer_half))
+    else:
+        dp, _ = hits(geom.union, c, y)
+        dm, _ = hits(geom.union, c, -y)
     T = th.as_tensor(Tn, dtype=th.float32)
     deep = np.full(len(T), np.inf)
     for i in range(len(T)):
