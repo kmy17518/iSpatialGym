@@ -115,6 +115,9 @@ def test_the_push_stand_off_is_chosen_from_the_map_and_limited_by_the_collision_
     assert [(lat, round(c.stand_off, 2)) for lat, c, _f in rows][:2] == [(-0.12, 0.25), (-0.12, 0.2)]
     a = me.push_map_any(manip, t_place, p_pose)
     assert a["push_any"] and not a["pair_any"]
+    # the partner draw's test includes the collision limit: when every map-feasible stand-off collides, no push stance is left
+    me_blocked = _touching_me({"touch_push": "pm", "touch_brace": "bm"}, free=lambda st: st.stand_off is None or st.stand_off >= 0.35 - 1e-6)
+    assert not me_blocked.push_map_any(manip, t_place, p_pose)["push_any"]
     # a target beyond the map from every stand-off: no candidate - the partner draw rejects it (A1 part 2)
     far = (th.tensor(manip.base_to_world(th.tensor([1.05, -0.10])).tolist() + [1.1]), C.IDENTITY_QUAT.clone())
     assert not me.push_map_any(manip, far, p_pose)["push_any"]

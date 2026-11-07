@@ -4657,10 +4657,12 @@ class IORSSmall(SamplerV2):
         return out, {"candidates": n_all, "map_feasible": n_map, "collision_free": n_free}
 
     def push_map_any(self, manip: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
-        """Owner A1 (2026-11-08): the touch_push / touch_brace maps over every push stance candidate (:meth:`push_stance_candidates`
-        without the collision check; map lookups only): ``{"push_any", "pair_any", "n"}``."""
+        """Owner A1 (2026-11-08): the touch_push / touch_brace maps over every push stance candidate (:meth:`push_stance_candidates`: map
+        lookups and the batched whole-body collision check of the map-feasible stances - the base's limit at the table; i7_contactfu on the
+        bar: the map fitted only at stand-offs < 0.35 m, where the base collides, so a map-only test passed 65 partner draws that died in
+        goal_check): ``{"push_any", "pair_any", "n"}``."""
         laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
-        rows, facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose, collision=False)
+        rows, facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose, collision=True)
         return {"push_any": bool(rows), "pair_any": any(f["brace_map"] for _l, _c, f in rows), "n": facts}
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
@@ -4701,6 +4703,7 @@ class IORSSmall(SamplerV2):
             # at the manipulation stand-off as before (the exact chain decides, TOUCH_PUSH_DIAG explains)
             a1, a1_facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose)
             draft.summary.setdefault("touching", {})["push_stance_a1"] = dict(a1_facts, tried=[{k: f[k] for k in ("lateral", "stand_off", "brace_map")} for _l, _c, f in a1[:PUSH_STANCE_MAX_EXACT]])
+            log.info("%s: A1 push stances %s: %s", self.gp.variant, json.dumps(a1_facts), [(f["lateral"], f["stand_off"], f["brace_map"]) for _l, _c, f in a1[:PUSH_STANCE_MAX_EXACT]])
             if a1:
                 plan = [(lat, cand) for lat, cand, _f in a1[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]]
             else:
