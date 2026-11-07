@@ -727,6 +727,15 @@ the nearest built tilt as before; TILT_SNAP unchanged, opt-in).
 - Tests: `test_map_tilt.py` (union of the neighbours, yaw union, built tilt / yaw / switch off unchanged, repeated reach failure invalidates
   and collision / policy / frame never, the empty-F verification and the dropped candidate, the overlay never touches the map + merge).
 
+**Validation** (`--grasps v2only` N 4, tag `i7_pq_merged`, trunk_590a6642, `/v2maps_i7pq`): 32 attempts, 3 written (the 4th instance hit its
+15-attempt cap), demos 3 / 3 ok, 1.34 GPU-h = 0.448 per success (every earlier v2 arm: 60 / 0). Written grasps: lip_shallow_5~r180 (2), top_4.
+All 29 rejections are target_placement, now mostly at the place stage (place screening: place_unreachable / approach_untrackable / joint
+limit; gripper_not_in_frame at the pre-place; partner_placement), empty F in a minority. Counters (sum): inherited_columns 8,
+inherited_feasible 450, empty_f_on_inherited 133, reach_fail 132 (every empty F stayed empty with the scene out), other_fail 3,
+cells_invalidated 32, cells_confirmed 57, skipped_invalidated 5, map_yaw.pairs_confirmed 82. Merged overlay v1
+(`$OFH/plateqtf_20261107/map_overlay`): right map ce1af987a8df9d69 129 entries / 22 invalidated / 107 confirmed, left b2f36adb26c194ad
+45 / 9 / 32 - not read by any job yet.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
