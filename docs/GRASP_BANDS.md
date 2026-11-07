@@ -546,6 +546,29 @@ fails object_pressed_into_table.
      keyboard, license plate, paper towel dispenser). That work is void and is not used.
    - The selector now filters on the grasp role.
 
+### Owner decision 2026-11-07: support-first map lookup as an automatic per-support fallback
+
+**Context.** nextto_04 works under v2only only with `ISPATIALGYM_MAP_SUPPORT_FIRST` on (13 attempts, 4 written, 4/4 demos, 0.058 GPU-h
+per success). The bench's eroded top is one ~2 cm row, and the 8 cm map lattice never lands on it, so map-first finds no cell.
+
+**The decision:** support-first is a generic, automatic fallback, not a global default.
+1. nextto_04 gets it now as an alias option, so it does not depend on the automatic rule.
+2. **The generic rule, per support:**
+   - Primary trigger, geometric and decided before sampling: the support's usable region (the eroded top raster the sampler uses)
+     cannot hold a map lattice cell. Its narrowest usable extent is below the map's lattice spacing, or no lattice point falls inside it
+     at the template's stand-offs. The map's own lattice from its config is used, not a constant.
+   - Safety net: if map-first yields zero cells on the support for a template, that template is retried support-first once.
+   - Everything else keeps map-first; aliases where neither trigger fires are unchanged (same cells, same choices).
+   - Exact checks stay exact; support-first changes only where candidate cells come from.
+3. **Logging:** kit `map_support_first.geometric` / `.fallback`, with the support, the usable width and the lattice, plus one log line
+   per support where it fires.
+4. **Override:** a per-alias force on / force off stays available.
+5. **Unit tests:** the narrow bench triggers it; a normal tabletop does not and its cells are identical; the zero-cell fallback fires
+   once and is counted; the override works.
+
+**Before adopting:** a report of where either trigger would fire, over the 20 map aliases and the 100 aliases (from the existing v2only
+sample logs / supports). Anywhere besides nextto_04 is the A/B scope.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
