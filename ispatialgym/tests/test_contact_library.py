@@ -297,7 +297,7 @@ def test_validate_library_writes_each_entrys_verdict_and_the_timing(glib):
     assert all(x["verdict"] == "invalid" and x["reasons"] == ["no_placement"] for x in pads)
     assert all(x["reasons"] == ["short"] for k, x in v.items() if k.startswith("push_blade") and k not in screened)
     assert any(x["verdict"] == "valid" for x in v.values())
-    assert tim["kind"] == "push" and tim["rest_id"] == "r0" and tim["n_entries"] == len(lib["entries"]) and set(tim) >= {"settle_s", "plan_s", "trials_s", "total_s"}
+    assert tim["kind"] == "push" and tim["rest_id"] == "r0" and tim["n_entries"] + tim.get("n_screened", 0) == len(lib["entries"]) and set(tim) >= {"settle_s", "plan_s", "trials_s", "total_s"}
     assert lib["validated"]["oracle_config"]["push_pre_dist_m"] == 0.04 and lib["validation_timing"] is tim
 
 
@@ -508,3 +508,88 @@ def test_the_validation_order_samples_every_yaw():
     es = [{"yaw_deg": y, "class": f"c{k}"} for y in (0.0, 45.0, 90.0) for k in range(3)]
     order = [(e["yaw_deg"], e["class"]) for e in VC.entry_order(es)]
     assert order[:3] == [(0.0, "c0"), (45.0, "c0"), (90.0, "c0")] and order[3] == (0.0, "c1") and len(order) == 9
+
+
+# ---------------------------------------------------------------------------------------------------------------- the second cluster run's fixes
+
+#: box_of_sanitary_napkins/humkqw's collision box (its v2 geometry.json, root at the box centre) and the classes the SAMPLER rejected before it
+#: executed push_blade_lean20@3.5cm on touching_01 ($OFH/out/abv2_aim2/inter_object_relation_satisfaction-touching_01/g300068-300071, instances
+#: 300068-300070: summary.touching.classes_failed, identical in the three)
+HUMKQW = (0.069541, 0.095778, 0.109204)
+RECORDED_FAILED = ["push_blade_0-@0.5cm: knuckle -15 mm from the hull (margin 5 mm)", "push_blade_0@0.5cm: knuckle -15 mm from the hull (margin 5 mm)",
+                   "push_blade_0-@1.5cm: knuckle -15 mm from the hull (margin 5 mm)", "push_blade_0@1.5cm: knuckle -15 mm from the hull (margin 5 mm)",
+                   "push_blade_lean20-@2.5cm: knuckle -3 mm from the hull (margin 5 mm)", "push_blade_lean20@2.5cm: knuckle -3 mm from the hull (margin 5 mm)"]
+
+
+def test_the_librarys_hand_screen_is_the_samplers_on_a_recorded_touching_instance(tmp_path):
+    """(1) the second run validated 48 / 48 napkins entries as ``screened``: not a frame bug - the round-robin's first entries per yaw were the
+    lowest swept blades, which the SAMPLER rejects the same way (the recorded ``classes_failed``) before it executes push_blade_lean20@3.5cm;
+    the library's screen reproduces those six verdicts message for message and passes the executed class. The validator now caps the
+    entries the sampler would try (screened ones are marked, not counted)."""
+    root = str(tmp_path / "glib")
+    d = _model_dir(root, "box_of_sanitary_napkins__humkqw__s1", HUMKQW, h_root=HUMKQW[2] / 2)
+    g = json.load(open(os.path.join(d, "geometry.json")))
+    g["pieces"][0]["vertices"] = [[x, y, z - HUMKQW[2] / 2] for x, y, z in g["pieces"][0]["vertices"]]  # the root at the box centre, as humkqw
+    S.save_json(os.path.join(d, "geometry.json"), g)
+    lib = CL.build_job(_job("box_of_sanitary_napkins__humkqw__s1", ["touching_push"], params={"touching_push": {"yaws": 4}}), root)["push"]
+    e0 = [e for e in lib["entries"] if e["yaw_deg"] == 0.0]
+    got = [f"{e['class']}: {e['sampler_screen']['hand_overlap']}" for e in e0[:6]]
+    assert got == RECORDED_FAILED
+    first_ok = next(e for e in e0 if not e["sampler_screen"]["hand_overlap"])
+    assert first_ok["class"] in ("push_blade_lean20-@3.5cm", "push_blade_lean20@3.5cm")  # the executed class (its '-' turn failed the IK there)
+    # the validation order: the sampler's candidates only, every yaw, in the sampler's order within a yaw
+    order = VC.entry_order(lib["entries"])
+    assert all(not (e.get("sampler_screen") or {}).get("hand_overlap") for e in order[:8]) and order[0]["class"] == first_ok["class"]
+    assert {e["yaw_deg"] for e in order[:4]} == {0.0, 90.0, 180.0, 270.0}
+
+
+def test_the_base_placement_is_the_samplers_stance_relation():
+    """(2) the trial's base: the contact ``ahead`` / ``lateral`` of the base as measured on the demos (the touching push 0.69-0.84 m ahead,
+    0.06-0.20 m right; the brace on the left), turned into ``TabletopWorld.plan``'s object-relative offsets."""
+    contact, obj = (0.70, -0.10), (0.70, -0.06)
+    offs = VC.placement_offsets("touching_push", contact, obj, 0.25, 0.30)
+    rel = VC.STANCE_RELATIONS["touching_push"]
+    assert len(offs) == len(rel["ahead_m"]) * len(rel["lateral_m"])
+    for (off0, off1), (ah, la) in zip(offs, [(a, b) for a in rel["ahead_m"] for b in rel["lateral_m"]]):
+        bx, by = obj[0] - (0.25 + 0.30 + off0), obj[1] - off1  # TabletopWorld.plan's base at yaw 0
+        assert (contact[0] - bx, contact[1] - by) == (pytest.approx(ah), pytest.approx(la))
+    assert all(la < 0 for la in rel["lateral_m"]) and all(la >= 0 for la in VC.STANCE_RELATIONS["touching_brace"]["lateral_m"])
+    assert set(VC.STANCE_RELATIONS) >= {"touching_push", "touching_brace", "axial_push", "axial_brace"}
+
+
+def test_an_arc_push_is_judged_by_its_turn():
+    """(2) the axial push turns the target about its centre of mass: the straight rules (moved along d, sideways slip, tip gap) do not apply."""
+    cfg = VC.ContactValidateConfig()
+    e = {"push": {"direction": [0.0, 1.0, 0.0], "stroke_m": 0.1, "arc": True}, "arc": {"turn_rad": 0.7}, "extras": {}}
+    T0 = np.eye(4)
+
+    def turned(a, dx=0.0, tilt=0.0):
+        T = np.eye(4)
+        c, s_, ct, st = math.cos(a), math.sin(a), math.cos(tilt), math.sin(tilt)
+        T[:3, :3] = np.array([[c, -s_, 0], [s_, c, 0], [0, 0, 1.0]]) @ np.array([[1, 0, 0], [0, ct, -st], [0, st, ct]])
+        T[0, 3] = dx
+        return T
+
+    run = {"completed": True, "postcondition": None}
+    ok = VC.judge_push(e, T0, turned(0.62), np.eye(4), np.zeros((8, 3)), cfg, run)
+    assert ok["verdict"] == "valid" and ok["measures"]["needed_rad"] == pytest.approx(0.5)
+    assert VC.judge_push(e, T0, turned(0.3), np.eye(4), np.zeros((8, 3)), cfg, run)["reasons"] == ["short_turn"]
+    assert VC.judge_push(e, T0, turned(-0.7), np.eye(4), np.zeros((8, 3)), cfg, run)["reasons"] == ["short_turn"]  # the wrong sense
+    assert VC.judge_push(e, T0, turned(0.7, dx=0.08), np.eye(4), np.zeros((8, 3)), cfg, run)["reasons"] == ["drift"]
+    assert "topple" in VC.judge_push(e, T0, turned(0.7, tilt=0.4), np.eye(4), np.zeros((8, 3)), cfg, run)["reasons"]
+
+
+def test_the_verdict_table(tmp_path, glib):
+    lib = CL.build_job(_job("box_of_cereal__iucshm__s0.8", ["touching_push"], params={"touching_push": {"yaws": 1}}, validate={"support_z": 1.0505}), glib)["push"]
+    assert lib["validate"] == {"support_z": 1.0505}
+    for i, e in enumerate(lib["entries"]):
+        ok = i % 2 == 0
+        e["validation"] = {"verdict": "valid" if ok else "invalid", "reasons": [] if ok else ["short"],
+                           "trials": [{"verdict": "valid" if ok else "invalid", "measures": {"moved_along_m": 0.07 if ok else 0.03}}]}
+    root = str(tmp_path / "c")
+    CL.save_library(root, lib, "box_of_cereal__iucshm__s0.8")
+    rows = {r["class"]: r for r in CL.verdict_table(root)}
+    assert CL.class_family("push_tip_h-@5.0cm") == "push_tip_h-" and CL.class_family("+end-spin_blade_0@f2#") == "+end-spin_blade_0"
+    r = next(iter(rows.values()))
+    assert sum(r["verdicts"].values()) >= 1 and all(set(m) <= {"valid", "invalid"} for m in (x["measures"] for x in rows.values()))
+    assert any("valid" in x["measures"] and x["measures"]["valid"]["moved_along_m"]["median"] == 0.07 for x in rows.values())

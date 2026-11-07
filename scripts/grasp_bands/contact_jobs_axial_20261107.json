@@ -28,7 +28,10 @@
    }
   },
   "alias": "alignment-axial_01 (support 0.8126)",
-  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
+  "validate": {
+   "support_z": 0.8126
+  }
  },
  {
   "id": "paperback_book__jhaltj__s1",
@@ -59,7 +62,10 @@
    }
   },
   "alias": "alignment-axial_02 (support 0.6854; the alias spawns s1x1x2.5 - this entry is s1)",
-  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
+  "validate": {
+   "support_z": 0.6854
+  }
  },
  {
   "id": "keyboard__injrgc__s1",
@@ -90,7 +96,10 @@
    }
   },
   "alias": "alignment-axial_03 (support 0.7853)",
-  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
+  "validate": {
+   "support_z": 0.7853
+  }
  },
  {
   "id": "magazine__tfovwy__s1",
@@ -121,7 +130,10 @@
    }
   },
   "alias": "alignment-axial_04 (support 0.7351)",
-  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
+  "validate": {
+   "support_z": 0.7351
+  }
  },
  {
   "id": "tablespoon__tqqwys__s1",
@@ -152,6 +164,9 @@
    }
   },
   "alias": "alignment-axial_05 (support 0.8126; stable rest r0_other, 2.5 deg tilt)",
-  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)"
+  "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
+  "validate": {
+   "support_z": 0.8126
+  }
  }
 ]

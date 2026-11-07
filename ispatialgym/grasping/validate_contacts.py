@@ -55,6 +55,31 @@ from ispatialgym.grasping import schema as S
 TRIAL_SCHEMA = "isg-contact-trial/1"
 
 
+#: the base placement of a trial per family (owner 2026-11-07, the second cluster run: "reproduce the stance the SAMPLER uses"): the CONTACT
+#: point ahead of / lateral to the base (base frame: +x ahead, +y left; the base yaw = the rule frame's) and the trunks, as measured on the
+#: successful demos' sidecars ($OFH/out/*/<alias>/.../instances/*.oracle.json, contacts.<kind> vs stances.<its stance>.base_pose2d):
+STANCE_RELATIONS: Dict[str, Dict[str, Any]] = {
+    # 227 touching_01/02/04 demos: the push contact 0.69-0.84 m ahead, 0.06-0.20 m right of the push stance; trunks of those stances
+    "touching_push": {"ahead_m": (0.72, 0.78, 0.84, 0.69), "lateral_m": (-0.08, -0.12, -0.15, -0.20),
+                      "trunks": ((0.0, -0.61), (0.25, -0.53), (0.25, -0.27), (0.5, -0.45), (0.5, -0.23), (0.0, -0.31), (0.25, -0.8), (0.0, -0.92)),
+                      "source": "227 touching_01/02/04 demos: push contact 0.69-0.84 m ahead, 0.06-0.20 m right of the push stance"},
+    # the same demos' braces: the brace contact at the push's depth, 0.02-0.18 m LEFT of the same stance (one two-arm stance)
+    "touching_brace": {"ahead_m": (0.72, 0.78, 0.84, 0.69), "lateral_m": (0.02, 0.07, 0.12, 0.18),
+                       "trunks": ((0.0, -0.61), (0.25, -0.53), (0.25, -0.27), (0.5, -0.45), (0.5, -0.23), (0.0, -0.31), (0.25, -0.8), (0.0, -0.92)),
+                       "source": "the touching demos' braces: 0.69-0.84 m ahead, 0.02-0.18 m left of the push stance"},
+    # 207 axial_01-05 demos: the push init 0.49-1.10 m ahead, 0.41 m right to 0.03 m left of the manipulation stance
+    "axial_push": {"ahead_m": (0.70, 0.80, 0.62, 0.90), "lateral_m": (-0.10, -0.18, -0.03, -0.28),
+                   "trunks": ((0.0, -0.92), (0.0, -0.61), (0.25, -0.8), (0.25, -0.53), (0.5, -0.45), (0.5, -0.68), (0.75, -0.38), (0.75, -0.19), (0.95, -0.16),
+                              (0.95, -0.31)),
+                   "source": "207 axial_01-05 demos: push init 0.49-1.10 m ahead, -0.41..+0.03 m lateral of the manipulation stance"},
+    # no braced axial demo (0 / 107): the axial stance's depths, the stop face to the left arm's side (the near-stop end)
+    "axial_brace": {"ahead_m": (0.70, 0.80, 0.62, 0.90), "lateral_m": (0.0, 0.08, 0.16, 0.25),
+                    "trunks": ((0.0, -0.92), (0.0, -0.61), (0.25, -0.8), (0.25, -0.53), (0.5, -0.45), (0.5, -0.68), (0.75, -0.38), (0.75, -0.19), (0.95, -0.16),
+                               (0.95, -0.31)),
+                    "source": "derived (0 braced axial demos): the axial stance's depths, the stop face on the left arm's side"},
+}
+
+
 @dataclass
 class ContactValidateConfig:
     work_arm: str = "right"
@@ -66,6 +91,9 @@ class ContactValidateConfig:
     max_steps: int = 1800
     # push acceptance
     push_short_tol_m: float = 0.01
+    #: an ARC push (the axial push): the object turned >= |turn| - this (the axial orientation tolerance), its root drifted <= arc_drift_max_m
+    push_turn_tol_rad: float = 0.2
+    arc_drift_max_m: float = 0.05
     push_lateral_max_m: float = 0.02
     push_yaw_max_rad: float = 0.2
     contact_lost_m: float = 0.02
@@ -182,6 +210,8 @@ def judge_push(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_
                run: Dict[str, Any], other_slab_N: float = 0.0, tip_gap_m: float = None) -> Dict[str, Any]:
     """The push acceptance (module docstring): ``{"verdict", "reasons", "measures"}``. ``tip_gap_m``: the fingertips' gap to the face at the
     push's farthest object position (the trial's per-step :func:`tip_gap`; the oracle backs the hand off after the push), else at the end."""
+    if entry.get("arc") is not None:
+        return judge_arc_push(entry, T_obj0, T_obj1, cfg, run, other_slab_N)
     d = T_obj0[:3, :3] @ np.asarray(entry["push"]["direction"], dtype=float)
     d[2] = 0.0
     d = d / max(float(np.linalg.norm(d)), 1e-12)
@@ -229,6 +259,35 @@ class PeakTracker:
         along = float((T_obj[:3, 3] - self.T0[:3, 3]) @ self.d)
         if self.gap is None or along > self.best + 1e-5:  # the first step at the farthest position (the back-off after it does not count)
             self.best, self.gap = along, tip_gap(self.entry, self.T0, T_obj, T_eef, self.pts)
+
+
+def judge_arc_push(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, cfg: ContactValidateConfig, run: Dict[str, Any],
+                   other_slab_N: float = 0.0) -> Dict[str, Any]:
+    """An ARC push (the axial push turns the target about its centre of mass): it passes when the object turned in the arc's sense by at least
+    ``|turn| - push_turn_tol_rad``, did not topple, its root drifted <= ``arc_drift_max_m``, no non-finger slab load, the oracle's postcondition
+    clean and the action finished (the straight push's along / sideways / tip-gap rules do not apply to a rotation)."""
+    turn = float(entry["arc"]["turn_rad"])
+    dyaw = math.atan2(math.sin(_yaw(T_obj1[:3, :3]) - _yaw(T_obj0[:3, :3])), math.cos(_yaw(T_obj1[:3, :3]) - _yaw(T_obj0[:3, :3])))
+    turned = dyaw * (1.0 if turn >= 0 else -1.0)
+    drift = float(np.linalg.norm((T_obj1[:3, 3] - T_obj0[:3, 3])[:2]))
+    tilt = _tilt(T_obj0[:3, :3], T_obj1[:3, :3])
+    need = abs(turn) - cfg.push_turn_tol_rad
+    reasons = []
+    if not run.get("completed", True):
+        reasons.append("incomplete")
+    if run.get("postcondition"):
+        reasons.append(f"oracle:{run['postcondition']}")
+    if turned < need:
+        reasons.append("short_turn")
+    if tilt > cfg.topple_tilt_rad:
+        reasons.append("topple")
+    if drift > cfg.arc_drift_max_m:
+        reasons.append("drift")
+    if other_slab_N > cfg.non_finger_contact_N:
+        reasons.append("non_finger_contact")
+    return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
+            "measures": {"turned_rad": round(turned, 5), "needed_rad": round(need, 5), "turn_rad": round(turn, 5), "root_drift_m": round(drift, 5),
+                         "tilt_change_rad": round(tilt, 5), "other_slab_N": round(float(other_slab_N), 4)}}
 
 
 def judge_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, load_dir_world: np.ndarray,
@@ -281,16 +340,22 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
 
 
 def entry_order(entries: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The validation order: the yaw slots round-robin (each slot's entries in library order), so a ``max_entries`` cap samples every yaw
-    instead of the first slot's lowest classes (the first run validated 48 of the spray bottle's 1104 push entries, all at yaw 0)."""
-    by_yaw: Dict[float, List[Dict[str, Any]]] = {}
-    for e in entries:
-        by_yaw.setdefault(round(float(e.get("yaw_deg", 0.0)), 4), []).append(e)
-    out: List[Dict[str, Any]] = []
-    lists = list(by_yaw.values())
-    for i in range(max((len(v) for v in lists), default=0)):
-        out.extend(v[i] for v in lists if i < len(v))
-    return out
+    """The validation order: the entries the sampler would try (not ``sampler_screen``ed) first, their yaw slots round-robin (each slot's in
+    library order = the sampler's order), then the screened ones - so the ``max_entries`` cap samples every yaw's first candidates (the first
+    run validated 48 of the spray bottle's 1104 entries, all at yaw 0; the second 48 screened napkins blades the sampler rejects too)."""
+    def round_robin(es):
+        by_yaw: Dict[float, List[Dict[str, Any]]] = {}
+        for e in es:
+            by_yaw.setdefault(round(float(e.get("yaw_deg", 0.0)), 4), []).append(e)
+        out: List[Dict[str, Any]] = []
+        lists = list(by_yaw.values())
+        for i in range(max((len(v) for v in lists), default=0)):
+            out.extend(v[i] for v in lists if i < len(v))
+        return out
+
+    screened = [e for e in entries if (e.get("sampler_screen") or {}).get("hand_overlap")]
+    live = [e for e in entries if not (e.get("sampler_screen") or {}).get("hand_overlap")]
+    return round_robin(live) + screened  # the sampler's candidates first (it never records a screened class)
 
 
 def _error_trial(e: BaseException) -> Dict[str, Any]:
@@ -314,14 +379,19 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     tim = {"settle_s": 0.0, "plan_s": 0.0, "trials_s": 0.0, "n_trials": 0, "n_entries": 0, "n_errors": 0}
     rest_q = np.asarray(lib_k["object"]["rest"]["quat_xyzw"], dtype=float)
     settled: Dict[float, Tuple[Dict[str, Any], Any]] = {}
-    for e in entry_order(lib_k["entries"])[: cfg.max_entries]:
+    n_live = 0
+    for e in entry_order(lib_k["entries"]):
         yaw = round(float(e.get("yaw_deg", 0.0)), 4)
-        tim["n_entries"] += 1
         screen = (e.get("sampler_screen") or {}).get("hand_overlap")
         if screen:
-            # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute
+            # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
+            tim["n_screened"] = tim.get("n_screened", 0) + 1
             continue
+        if n_live >= cfg.max_entries:
+            continue
+        n_live += 1
+        tim["n_entries"] += 1
         try:
             t0 = time.time()
             if yaw not in settled:
@@ -368,6 +438,19 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     return tim
 
 
+def placement_offsets(family: str, contact_xy, obj_xy, support_half_x: float, edge_clear: float) -> Tuple[Tuple[float, float], ...]:
+    """The family's stance relation (:data:`STANCE_RELATIONS`: the contact ``ahead`` / ``lateral`` of the base, yaw 0) as
+    ``TabletopWorld.plan``'s object-relative base offsets (it puts the base ``support half + edge clear + off[0]`` behind the OBJECT and
+    ``off[1]`` to its side): the base at ``contact - (ahead, lateral)``."""
+    rel = STANCE_RELATIONS[family]
+    out = []
+    for ah in rel["ahead_m"]:
+        for la in rel["lateral_m"]:
+            bx, by = float(contact_xy[0]) - ah, float(contact_xy[1]) - la
+            out.append((round(float(obj_xy[0]) - bx - float(support_half_x) - float(edge_clear), 5), round(float(obj_xy[1]) - by, 5)))
+    return tuple(out)
+
+
 def start_pose_of(entry: Dict[str, Any], pts_obj: np.ndarray, T_obj: np.ndarray, margin: float = 0.003) -> Optional[str]:
     """Where a trial sets the robot (it is teleported there, no approach): the EXECUTED pre-contact when the hand clears the object there (the
     hand beyond the fingers by ``contact_poses.hand_overlap`` against its hull, the finger spheres at the entry's opening), else the RECORDED one
@@ -402,7 +485,7 @@ def _entry_world(entry: Dict[str, Any], T_obj: np.ndarray) -> Dict[str, Any]:
 
 
 def _plan_facts(plan: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: plan.get(k) for k in ("base", "trunk", "cost", "start_lift_m", "chain_reach", "chain_unreachable")}
+    return {k: plan.get(k) for k in ("base", "trunk", "cost", "start_lift_m", "chain_reach", "chain_unreachable", "start", "relation")}
 
 
 def _pose7(T: np.ndarray) -> List[float]:
@@ -470,28 +553,55 @@ class KitContactWorld:
         rest = dict(rest, world_position=[float(v) for v in p.tolist()], world_quat_xyzw=[float(v) for v in q.tolist()])  # the restore keys stay
         return rest, state
 
+    def set_support_height(self, z: Optional[float]) -> None:
+        """The slab top of the next library (the alias family's support height: its reach and the arm's posture depend on it); None = the
+        world's default (``ValidateConfig.slab_top_z``)."""
+        import dataclasses
+
+        self.tw.cfg = dataclasses.replace(self.vcfg, slab_top_z=float(z) if z is not None else self.vcfg.slab_top_z)
+
     def plan_entry(self, obj, geom, entry, T_obj, arm):
-        """The configuration at the entry's EXECUTED pre-contact (``TabletopWorld.plan``) against the SETTLED rest pose ``T_obj`` (not the live
-        object, which a previous trial may have moved), then the chain's other poses (the contact, a push's goal) checked by IK from that
-        base / trunk (``chain_reach``; ``chain_unreachable`` names the ones without a solution)."""
+        """The configuration at the trial's start pose (:func:`start_pose_of`) against the SETTLED rest pose ``T_obj`` (not the live object, which
+        a previous trial may have moved), the base placed by the family's measured stance relation (:data:`STANCE_RELATIONS`: the contact
+        ahead / lateral of the base, the trunks of the demos; ``TabletopWorld.plan``: batched IK, the whole robot's contact policy against the
+        slab, the arm clear of the object, the most comfortable solution), then the chain's other poses (the contact, an arc's mid and goal,
+        a straight push's goal) by IK from that base / trunk (``chain_reach``; ``chain_unreachable`` names the ones without a solution).
+        ``no_placement`` = no relation x trunk had an IK solution of the start pose passing those checks (``fail``: the worst link, or none)."""
+        import dataclasses
+
+        from ispatialgym.grasping.contact_library import hull_points
         from ispatialgym.sampling.v2 import contact_poses as CPZ
 
         if T_obj is None:
             T_obj = CPZ._mat(obj.get_position_orientation())
-        from ispatialgym.grasping.contact_library import hull_points
-
         start = start_pose_of(entry, hull_points(geom), T_obj)
         if start is None:
-            return {"q": None, "fail": "start_in_object: the hand beyond the fingers meets the object at both pre-contacts (the robot is set there)"}
-        cand = {"name": entry["digest"], "T_object_eef": entry["pre"][start], "preshape_q": float(entry["fingers"]["opening_m"])}
-        pq = (T_obj[:3, 3].copy(), S.mat_to_quat(T_obj[:3, :3]))
-        best = self.tw.plan(obj, geom, [cand], pq)
-        b = best.get(entry["digest"])
-        if b is None or b.get("q") is None:
-            return b
-        b = dict(b, T_world_obj=T_obj, start=start)
+            return {"q": None, "fail": "start_in_object: the hand meets the object at both pre-contacts (the robot is set there)"}
         w = CPZ.entry_world(entry, T_obj)
-        poses = {"contact": w["contact"]} if w["goal"] is None else {"contact": w["contact"], "goal": w["goal"]}
+        fam = entry.get("family")
+        cfg0 = self.tw.cfg
+        if fam in STANCE_RELATIONS:
+            offs = placement_offsets(fam, w["contact"][0][:2].tolist(), T_obj[:2, 3], float(self.tw.support.half[0]), cfg0.slab_edge_clear_m)
+            self.tw.cfg = dataclasses.replace(cfg0, base_yaws=1, base_offsets=offs, trunks=tuple(STANCE_RELATIONS[fam]["trunks"]))
+        try:
+            cand = {"name": entry["digest"], "T_object_eef": entry["pre"][start], "preshape_q": float(entry["fingers"]["opening_m"])}
+            best = self.tw.plan(obj, geom, [cand], (T_obj[:3, 3].copy(), S.mat_to_quat(T_obj[:3, :3])))
+        finally:
+            self.tw.cfg = cfg0
+        b = best.get(entry["digest"])
+        if b is None:
+            return {"q": None, "fail": f"no IK of the {start} pre-contact from any of the {fam} stance relation's placements x trunks"}
+        if b.get("q") is None:
+            return dict(b, fail=f"IK found, the contact policy / arm-object check failed: {b.get('fail')}")
+        b = dict(b, T_world_obj=T_obj, start=start, relation=fam)
+        poses = {"contact": w["contact"]}
+        if entry.get("arc") is not None:
+            To = CPZ._mat(T_obj) if not isinstance(T_obj, np.ndarray) else T_obj
+            for k in ("mid", "goal"):
+                Tk = To @ S.pose_of(entry["arc"][f"{k}_object"])
+                poses[k] = (th.tensor(Tk[:3, 3], dtype=th.float32), th.tensor(S.mat_to_quat(Tk[:3, :3]), dtype=th.float32))
+        elif w["goal"] is not None:
+            poses["goal"] = w["goal"]
         try:
             q_seed = b["q"].clone()
             q_seed[self.tw.robot.gripper_control_idx[arm]] = float(entry["fingers"]["opening_m"])
@@ -677,6 +787,7 @@ def validate_cli(a) -> None:
             lib_k = CL.load_library(path)
             job = library_job(lib_k, eid)
             mlib, _rid, geom = CL.load_object(a.glib, job)
+            world.set_support_height((lib_k.get("validate") or {}).get("support_z"))
             obj = world.load(dict(job, rest_hint_wxyz=None), os.path.dirname(mlib.path))
             obj._isg_geom = geom
             try:

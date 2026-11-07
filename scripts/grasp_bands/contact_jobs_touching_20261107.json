@@ -10,7 +10,11 @@
   ],
   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "generation": {},
-  "alias": "touching_01 target"
+  "alias": "touching_01 target",
+  "validate": {
+   "support_z": 0.8126,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  },
  {
   "id": "box_of_tissues__ntbrtz__s1__r1b93c2",
@@ -23,7 +27,11 @@
   ],
   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "generation": {},
-  "alias": "touching_01 partner"
+  "alias": "touching_01 partner",
+  "validate": {
+   "support_z": 0.8126,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  },
  {
   "id": "box_of_cereal__iucshm__s0.8",
@@ -40,7 +48,11 @@
    "push_gripper_open": false,
    "push_speed_m_s": 0.02
   },
-  "alias": "touching_02 target (the bar variant's knobs)"
+  "alias": "touching_02 target (the bar variant's knobs)",
+  "validate": {
+   "support_z": 1.0505,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  },
  {
   "id": "box_of_cereal__dkhgxn__s1",
@@ -55,7 +67,11 @@
   "generation": {
    "brace_open_when_wide": true
   },
-  "alias": "touching_02 partner"
+  "alias": "touching_02 partner",
+  "validate": {
+   "support_z": 1.0505,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  },
  {
   "id": "spray_bottle__miqtui__s1",
@@ -71,7 +87,11 @@
    "push_height_sweep": true,
    "push_raised_max_aspect": 1.5
   },
-  "alias": "touching_04 target"
+  "alias": "touching_04 target",
+  "validate": {
+   "support_z": 0.8668,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  },
  {
   "id": "bottle_of_detergent__gkpmii__s1",
@@ -83,6 +103,10 @@
   ],
   "subtask": "inter_object_relation_satisfaction-touching_small_scale",
   "generation": {},
-  "alias": "touching_04 partner - NO v2 entry yet: glib stage first"
+  "alias": "touching_04 partner - NO v2 entry yet: glib stage first",
+  "validate": {
+   "support_z": 0.8668,
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+  }
  }
 ]

@@ -28,6 +28,7 @@ chains need ``contact_offset_along`` / ``pitched_turns`` factored), ``base_push`
 
     python -m ispatialgym.grasping.contact_library build --jobs J.json --glib GLIB --root ROOT [--shard i/n] [--only ID ...]
     python -m ispatialgym.grasping.contact_library summary --root ROOT
+    python -m ispatialgym.grasping.contact_library table --root ROOT     (per class family: verdicts, reasons, the trials' measures)
 """
 
 from __future__ import annotations
@@ -436,6 +437,8 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
                                   "build_s": round(time.time() - t0, 3)}
         lib_k["entries"].extend(entries)
     for k, lib_k in out.items():
+        # the validation setup of the alias family (the support height the trials stand the object at; not part of the library's identity)
+        lib_k["validate"] = dict(job.get("validate") or {})
         lib_k["digest"] = _library_digest(lib_k)
     return out
 
@@ -516,6 +519,44 @@ def summary(root: str) -> List[Dict[str, Any]]:
     return rows
 
 
+def class_family(cls: str) -> str:
+    """A class label without its height / face-point / duplicate suffix (``push_tip_h-@5.0cm`` -> ``push_tip_h-``, ``+end-spin_blade_0@f2`` ->
+    ``+end-spin_blade_0``): the rows of the verdict table."""
+    return str(cls).split("@")[0].rstrip("#")
+
+
+def verdict_table(root: str) -> List[Dict[str, Any]]:
+    """Per (kind, model, class family): the verdict counts and, per verdict, the trials' measures (median, min, max) - the calibration data
+    of the provisional thresholds."""
+    rows = []
+    for kind in LIB_KINDS:
+        base = os.path.join(root, kind, "models")
+        for eid in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+            p = os.path.join(base, eid, "library.json")
+            if not os.path.exists(p):
+                continue
+            d = load_library(p)
+            groups: Dict[str, Dict[str, Any]] = {}
+            for e in d["entries"]:
+                v = e.get("validation")
+                if v is None:
+                    continue
+                g = groups.setdefault(class_family(e["class"]), {"kind": kind, "id": eid, "class": class_family(e["class"]), "verdicts": {}, "reasons": {},
+                                                                 "measures": {}})
+                g["verdicts"][v["verdict"]] = g["verdicts"].get(v["verdict"], 0) + 1
+                for r in v.get("reasons") or []:
+                    g["reasons"][r] = g["reasons"].get(r, 0) + 1
+                for t in v.get("trials") or []:
+                    for mk, mv in (t.get("measures") or {}).items():
+                        if isinstance(mv, (int, float)):
+                            g["measures"].setdefault(t.get("verdict", "?"), {}).setdefault(mk, []).append(float(mv))
+            for g in groups.values():
+                g["measures"] = {vd: {mk: {"median": round(float(np.median(xs)), 4), "min": round(min(xs), 4), "max": round(max(xs), 4), "n": len(xs)}
+                                      for mk, xs in ms.items()} for vd, ms in g["measures"].items()}
+                rows.append(g)
+    return rows
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -527,9 +568,14 @@ def main(argv=None):
     b.add_argument("--shard", default=None)
     s = sub.add_parser("summary")
     s.add_argument("--root", required=True)
+    t = sub.add_parser("table", help="per (kind, model, class family): verdict counts, reasons, the trials' measures")
+    t.add_argument("--root", required=True)
     a = ap.parse_args(argv)
     if a.cmd == "build":
         build_cli(a)
+    elif a.cmd == "table":
+        for r in verdict_table(a.root):
+            print(json.dumps(r))
     else:
         for r in summary(a.root):
             print(json.dumps(r))
