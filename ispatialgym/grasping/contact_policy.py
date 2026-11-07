@@ -23,6 +23,12 @@ Rules (``ContactPolicy`` defaults, version :data:`POLICY_VERSION`):
 Sphere padding vs actual geometry: the cuRobo finger spheres (r 5-10 mm + 2 mm buffer) sit inside the finger bodies and do not reach
 their pad faces; a 2 mm allowance on those spheres would allow ~0-9 mm on the real finger depending on where it touches. That is why
 rule 2 is evaluated on the hulls; ``tests/test_contact_policy.py`` measures the sphere-vs-hull offsets per finger.
+
+Several boxes (i7-lean 2026-11-07, owner decision: the lean rest's vertical board, the interior reach maps' boards / walls): the
+policed support stays ONE support (rules 2-3: the fingers' 2 mm allowance); every other box is a NORMAL OBSTACLE - every hand part, the
+fingers included, keeps clearance >= :data:`OBSTACLE_MARGIN_M` on its exact hulls (:meth:`HandChecker.check_obstacles`), every
+enabled sphere of every link >= that margin (:func:`spheres_clear`); :func:`check_grasp_geometry` takes them as ``obstacles``. The
+policy's fields and key are unchanged: obstacles are no part of the (finger, support) allowance.
 """
 
 from __future__ import annotations
@@ -41,8 +47,11 @@ from ispatialgym.grasping import hand_geometry as H
 POLICY_VERSION = 1
 POLICY_NAME = "isg-support-contact"
 
-REASONS = ("ok", "finger_penetration", "palm_contact", "wrist_camera_contact", "wrist_contact", "link_sphere_contact")
+REASONS = ("ok", "finger_penetration", "palm_contact", "wrist_camera_contact", "wrist_contact", "link_sphere_contact", "obstacle_contact")
 ROLE_REASON = {"palm": "palm_contact", "wrist_camera": "wrist_camera_contact", "wrist": "wrist_contact"}
+#: i7-lean 2026-11-07: the clearance every robot part keeps from a NORMAL obstacle box (the lean board, an interior's board above / side
+#: walls / back panel) - no allowance for any part, the fingers included (they touch only the policed support, rule 2)
+OBSTACLE_MARGIN_M = 0.0
 
 
 @dataclass(frozen=True)
@@ -182,6 +191,65 @@ class HandChecker:
         ok &= ~bad_f
         return ok, reasons, cl
 
+    def obstacle_clearance(self, T_eef, obstacles: Sequence[Support], finger_q: Tuple[float, float] = (0.05, 0.05)) -> Dict[str, th.Tensor]:
+        """Per-role minimum signed distance (N,) of the hand hulls to the nearest of ``obstacles`` (+inf without any)."""
+        out: Optional[Dict[str, th.Tensor]] = None
+        for ob in obstacles:
+            cl = self.clearance(T_eef, ob, finger_q)
+            out = cl if out is None else {r: th.minimum(out[r], cl[r]) for r in out}
+        if out is None:
+            n = _as_mats(T_eef).shape[0]
+            out = {r: th.full((n,), float("inf"), device=self.device) for r in H.ROLES}
+        return out
+
+    def check_obstacles(self, T_eef, obstacles: Sequence[Support], finger_q: Tuple[float, float] = (0.05, 0.05),
+                        margin: float = OBSTACLE_MARGIN_M) -> Tuple[th.Tensor, List[str], Dict[str, th.Tensor]]:
+        """i7-lean 2026-11-07: ``(ok (N,), reason per pose, clearances)`` of the hand hulls against NORMAL obstacle boxes: every role,
+        the fingers included, >= ``margin`` (reason ``obstacle_contact``); all pass without obstacles."""
+        cl = self.obstacle_clearance(T_eef, obstacles, finger_q)
+        n = next(iter(cl.values())).shape[0]
+        worst = th.stack([cl[r] for r in H.ROLES]).min(dim=0).values
+        ok = worst >= margin - 1e-9
+        reasons = ["ok" if bool(o) else "obstacle_contact" for o in ok.tolist()] if n else []
+        return ok, reasons, cl
+
+    def check_with_obstacles(self, T_eef, support: Support, obstacles: Sequence[Support] = (), finger_q: Tuple[float, float] = (0.05, 0.05),
+                             floor: bool = False) -> Tuple[th.Tensor, List[str], Dict[str, th.Tensor]]:
+        """:meth:`check` against the policed ``support`` and :meth:`check_obstacles` against ``obstacles`` (the support's reason first);
+        the clearances are the support's. Without obstacles exactly :meth:`check`."""
+        ok, reasons, cl = self.check(T_eef, support, finger_q, floor=floor)
+        if not obstacles:
+            return ok, reasons, cl
+        ob_ok, _, _ = self.check_obstacles(T_eef, obstacles, finger_q)
+        for i in th.nonzero(~ob_ok.to(ok.device) & ok).flatten().tolist():
+            reasons[i] = "obstacle_contact"
+        return ok & ob_ok.to(ok.device), reasons, cl
+
+
+def spheres_clear(spheres_world: th.Tensor, link_of_sphere: Sequence[str], obstacles: Sequence[Support], margin: float = OBSTACLE_MARGIN_M,
+                  skip_links: Sequence[str] = ()) -> Tuple[th.Tensor, List[Optional[str]]]:
+    """i7-lean 2026-11-07: every enabled sphere (r > 0) of every link but ``skip_links`` - the fingers included - clear of every NORMAL
+    obstacle box by ``margin`` (the radii carry the model's buffer). ``(ok (N,), worst offending link per configuration or None)``; all
+    pass without obstacles."""
+    S = th.as_tensor(spheres_world, dtype=th.float32)
+    if S.dim() == 2:
+        S = S.unsqueeze(0)
+    n = S.shape[0]
+    if not obstacles:
+        return th.ones(n, dtype=th.bool, device=S.device), [None] * n
+    skip = set(skip_links)
+    mask = th.tensor([(l not in skip) and bool(l) for l in link_of_sphere], dtype=th.bool, device=S.device)
+    active = mask[None] & (S[..., 3] > 0)
+    d = None
+    for ob in obstacles:
+        di = ob.sdf(S[..., :3]) - S[..., 3]
+        d = di if d is None else th.minimum(d, di)
+    d = th.where(active, d, th.full_like(d, float("inf")))
+    worst = d.min(dim=1)
+    ok = worst.values >= margin - 1e-9
+    links = [None if bool(o) else link_of_sphere[int(i)] for o, i in zip(ok.tolist(), worst.indices.tolist())]
+    return ok, links
+
 
 def sphere_support_ok(spheres_world: th.Tensor, link_of_sphere: Sequence[str], support: Support, arm: str, policy: ContactPolicy = DEFAULT,
                       ground_contact_links: Sequence[str] = (), floor_support: bool = False) -> Tuple[th.Tensor, List[Optional[str]]]:
@@ -243,10 +311,12 @@ def sweep_openings(open_q: float, contact_q: float, steps: int) -> List[Tuple[fl
 
 
 def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contact_q: Sequence[float], open_q: Union[float, Sequence[float]] = 0.05,
-                         floor: bool = False) -> Dict[str, object]:
+                         floor: bool = False, obstacles: Sequence[Support] = ()) -> Dict[str, object]:
     """Rules 2, 3 and 6 for grasp poses (N, 4, 4): the pre-grasp and every approach waypoint at the pre-shape opening, then the closing
     sweep at the grasp pose down to each pose's contact opening. ``{"ok": (N,), "reason": [...], "stage": [...], "finger_min": (N,),
-    "hand_min": (N,)}`` - the reason / stage of the first failing check, the deepest finger and non-finger hand clearances seen."""
+    "hand_min": (N,)}`` - the reason / stage of the first failing check, the deepest finger and non-finger hand clearances seen.
+    ``obstacles`` (i7-lean 2026-11-07: the lean rest's board, an interior's walls): NORMAL obstacles at every stage too
+    (:meth:`HandChecker.check_obstacles`, reason ``obstacle_contact``; ``obstacle_min`` (N,) the closest hull of any role); none = as before."""
     pol = checker.policy
     Tg = _as_mats(T_grasp)
     n = Tg.shape[0]
@@ -255,14 +325,47 @@ def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contac
     reason, stage = ["ok"] * n, [""] * n
     fmin = th.full((n,), float("inf"))
     hmin = th.full((n,), float("inf"))
+    obstacles = tuple(obstacles or ())
+    omin = th.full((n,), float("inf"))
 
-    def fold(o, r, cl, st):
+    def fold(o, r, cl, st, ow=None):
         nonlocal ok
         for i in th.nonzero(~o.cpu() & ok).flatten().tolist():
             reason[i], stage[i] = r[i], st
         ok &= o.cpu()
         fmin.copy_(th.minimum(fmin, cl["finger"].cpu()))
         hmin.copy_(th.minimum(hmin, th.minimum(th.minimum(cl["palm"], cl["wrist_camera"]), cl["wrist"]).cpu()))
+        if ow is not None:
+            omin.copy_(th.minimum(omin, ow.cpu()))
+
+    def chk(T_k, v):
+        """``checker.check`` at opening ``v`` (exactly, without obstacles); with obstacles also :meth:`HandChecker.check_obstacles`
+        (the support's reason first) and the closest obstacle clearance of any role."""
+        o, r, cl = checker.check(T_k, support, (v, v), floor=floor)
+        if not obstacles:
+            return o, r, cl, None
+        ob_ok, _, ocl = checker.check_obstacles(T_k, obstacles, (v, v))
+        ob_ok = ob_ok.to(o.device)
+        r = ["obstacle_contact" if (bool(oo) and not bool(bb)) else rr for rr, oo, bb in zip(r, o.tolist(), ob_ok.tolist())]
+        return o & ob_ok, r, cl, th.stack([ocl[role] for role in H.ROLES]).min(dim=0).values
+
+    def grouped(T_k, groups):
+        if len(groups) == 1:
+            return chk(T_k, next(iter(groups)))
+        o_all = th.ones(n, dtype=th.bool)
+        r_all = ["ok"] * n
+        cl_all = {r: th.full((n,), float("inf")) for r in H.ROLES}
+        ow_all = th.full((n,), float("inf")) if obstacles else None
+        for v, idx in groups.items():
+            o, r, cl, ow = chk(T_k[idx], v)
+            for a, i in enumerate(idx):
+                o_all[i] = o[a]
+                r_all[i] = r[a]
+                for role in H.ROLES:
+                    cl_all[role][i] = cl[role][a]
+                if ow_all is not None:
+                    ow_all[i] = ow[a]
+        return o_all, r_all, cl_all, ow_all
 
     # of-v2maps 2026-11-07 (prompt I item 3; the isg1020 spec P1 §2: one policy at the oracle's opening): ``open_q`` may be one opening per
     # pose (each grasp's own pre-shape) - was one scalar, the validator passed the batch's MAX pre-shape (a thin grasp was checked wider open)
@@ -273,25 +376,9 @@ def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contac
     for i, v in enumerate(oq.tolist()):
         o_groups.setdefault(round(v, 5), []).append(i)
 
-    def check_at_openings(T_k):
-        if len(o_groups) == 1:
-            v = next(iter(o_groups))
-            return checker.check(T_k, support, (v, v), floor=floor)
-        o_all = th.ones(n, dtype=th.bool)
-        r_all = ["ok"] * n
-        cl_all = {r: th.full((n,), float("inf")) for r in H.ROLES}
-        for v, idx in o_groups.items():
-            o, r, cl = checker.check(T_k[idx], support, (v, v), floor=floor)
-            for a, i in enumerate(idx):
-                o_all[i] = o[a]
-                r_all[i] = r[a]
-                for role in H.ROLES:
-                    cl_all[role][i] = cl[role][a]
-        return o_all, r_all, cl_all
-
     for k in range(path.shape[0]):
-        o, r, cl = check_at_openings(path[k])
-        fold(o, r, cl, "pre_grasp" if k == 0 else ("grasp_open" if k == path.shape[0] - 1 else f"approach_{k}"))
+        o, r, cl, ow = grouped(path[k], o_groups)
+        fold(o, r, cl, "pre_grasp" if k == 0 else ("grasp_open" if k == path.shape[0] - 1 else f"approach_{k}"), ow)
     open_q = oq
     cq = th.as_tensor(contact_q, dtype=th.float32).reshape(-1)
     if cq.numel() == 1:
@@ -305,12 +392,18 @@ def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contac
         o_all = th.ones(n, dtype=th.bool)
         r_all = ["ok"] * n
         cl_all = {r: th.full((n,), float("inf")) for r in H.ROLES}
+        ow_all = th.full((n,), float("inf")) if obstacles else None
         for v, idx in groups.items():
-            o, r, cl = checker.check(Tg[idx], support, (v, v), floor=floor)
+            o, r, cl, ow = chk(Tg[idx], v)
             for a, i in enumerate(idx):
                 o_all[i] = o[a]
                 r_all[i] = r[a]
                 for role in H.ROLES:
                     cl_all[role][i] = cl[role][a]
-        fold(o_all, r_all, cl_all, f"sweep_{j + 1}")
-    return {"ok": ok, "reason": reason, "stage": stage, "finger_min": fmin, "hand_min": hmin}
+                if ow_all is not None:
+                    ow_all[i] = ow[a]
+        fold(o_all, r_all, cl_all, f"sweep_{j + 1}", ow_all)
+    out = {"ok": ok, "reason": reason, "stage": stage, "finger_min": fmin, "hand_min": hmin}
+    if obstacles:
+        out["obstacle_min"] = omin
+    return out
