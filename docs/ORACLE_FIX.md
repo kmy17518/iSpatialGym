@@ -859,3 +859,45 @@ split-cone fix's controls ontop_small_01 1.75 / touching_01 2.1 / touching_02 5.
 attempt (875), under_large_01 793 s (1569-2128), ontop_large_01 642 s (1033). Open: ontop_small_01 4 / 12 (the kielbasa tips 21-27 deg
 at the place touchdown; trainfast 78 / 80), ontop_small_04 goal_tipped, inside_04, under_large_02 / 03, disembedding_07 / 10,
 articulation close / open_large_03, the hardback (0 in 4143 attempts).
+
+## 12. The hardback fix (owner 2026-11-06 evening: "fix the alias"; inside_large#01, hardback -> bookcase_jaysra_0)
+
+**Where it failed.** In the spine-out jobs (fix1, 12 × N 1), 0 of 4,746 attempts wrote an instance. The spine-out release was
+reachable in every attempt, and its in-hand place IK failed only 4 times over all tries. What failed was the desk → bookcase carry:
+0 of 369 carry legs passed. hb30, the base without spine-out, passed 3 of 839, all from one rare pick (trunk −0.92, hand 0.41 m ahead).
+- Local reproductions ran on lambda with the job's environment. `ISPATIALGYM_PATH_BLAME=1` turns on the path blame alone; with
+  `STANCE_BLAME` attempts ran 16× slower.
+- Every collision was at the end of the path, while turning into stance C (0.65 m stand-off, 0.39 m from the bed's footprint).
+  With the torso at the pick's tilt, the carried book or arm hit the bookcase. With the torso straightened, the base's wheels touched
+  the bed 0.37 m away. Keeping the path off the bed (0.42 / 0.45 m) only moved the collision to the bookcase on the same turn.
+  Carry poses nearer the body centre failed IK or left the head camera's view.
+
+**The fix:**
+- Code, 65b6e486: opt-in `generation.carry_arrive_straight_m`. The carried path ends that far behind C along C's axis, at C's
+  heading, and drives straight in (`NAV.plan_path arrive_straight_m`); otherwise the plain path is used as before.
+- With 0.35 m, all 8 straight-arrival tries in 2 carry legs still touched the bookcase at the 0.65 m stance or 9 cm before it
+  (`attached_object_left_eef_link`). The common pick's carry configuration holds the book 0.51 m ahead, which is too long for 0.65 m.
+- Customs, dc5ba069: `carry_arrive_straight_m` 0.35 and `inside_stand_offs_m` [0.55, 0.65, 0.75, 0.85] (the default stops at 0.65).
+  At 0.85 m the spine-out release screens F_goal 15 for both rolls; at 0.55–0.65 m it was 10 / 0.
+- Local results: as3 wrote an instance at its 4th attempt, and its demo succeeded (1,771 steps, no QA flags). as4 (0.75 / 0.85 only)
+  wrote 1 in 13 attempts.
+
+**Remaining limiter (local):** the arm's last leg at C, from the carry configuration to the pre-place, touches the bookcase
+(0.84 m from the base) in most coupled tries. The program check rejected 2 of as4's 3 accepted draws: it tracks that leg from where
+the arrival leaves the arm, where the sampler tracked it through a carry waypoint.
+
+**Validation** (fast flow, 6 jobs × N 2, k 1, `$OFH/out/<tag>/inter_object_relation_satisfaction-inside_large_scale_01/g*`):
+
+| Tag | Snapshot | Written / attempts | Demos | Note |
+|---|---|---|---|---|
+| `fix1` (before) | ebd0fb16 | 0 / 4,746 | – | spine-out, every carry collided |
+| `fix3_hb` | dc5ba069 | 7 / 30 | 1 / 6 | 5 × `robot_touching_itself` in push[2], all from picks pushed at open pitch 40− |
+| `fix4_hb` | f2fc6efb (pitches [0, 20]) | 0 / 31 | – | pitch-0 push at joint2's limit everywhere; reverted (89e5bbf8) |
+| `fix3b_hb` | dc5ba069 = the trunk | 12 / 104 | 11 / 12 | 1 `plan_failed`; 2.88 GPU-h, 0.26 GPU-h per successful demo |
+
+- **Open: the pitch-40 push.** The open-pitch-40 push (the "40−" wrist) is written by the sampler, but its demo fails on self-contact
+  in execution (`left_arm_link3 touches left_arm_link5`). It was 4 of 4 in fix3_hb. The sampler's push-chain IK and branch checks
+  don't catch it.
+- Restricting the pitch list doesn't work. With [0, 20] the pitch-0 push itself failed (`ik_joint_limit`, joint2 within 3 mrad);
+  the pitch list likely changes the B ranking (`rank_b`). The fix would be a sampler-side self-proximity check on that push witness.
+- How often pitch 40 is taken varies by run (fix3_hb 8 of 22 picks, fix3b_hb 1 of 28).
