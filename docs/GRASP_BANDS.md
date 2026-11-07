@@ -440,6 +440,84 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - any oracle program change;
 - using legacy grasps (step 4).
 
+### i7-attach (2026-11-07): the attachment rule's seat axis (cork ncxgpe) and the cap xxqyrt, round 2
+
+Branch `i7-attach` (from of-v2maps a4620a1e). Record: `$OFH/attach_20261107/{seats,counts,cork,cap,stage_cork,stage_cap}`.
+
+**Cork ncxgpe: the cause, measured by the pipeline** (gate dump of the attachment rule, new: `side_mm`, `face_gap_mm`, the frames used).
+- The rule (`candidates.attachment_frames`) takes the male meta link frame's -z as the mating direction. The cork's frame is
+  (0.5, -0.5, 0.5, 0.5) in its metadata, so the direction is (0, 1, 0): the cork's +y side (8.78 mm out) is taken as the mating face.
+- No finger may reach past that face by less than 2 mm. Every pinch of the 8.8 mm-radius cork straddles it: top 7087 / 7087 and side
+  1747 / 1747 rejected (48000 x 48 pass). The largest face gap is 0.96 mm (top) and -20.2 mm (side).
+- The oracle seats the cork along its own -z. `predicates.seat_axis` takes the female link's +z unless it is more than 45 deg from the
+  direction partner hull centroid -> female link. On wine_bottle inkqch the angle is 90.4 deg, so the axis is (-0.0091, 0.0076, 0.9999)
+  in the bottle frame (the sampler logs the same value for attachment_03).
+
+**The fix** (`CandidateConfig.attach_axis`, an OWNER DECISION switch: default `"meta_z"` = as written; `"seat"` = the oracle's seat axis).
+- A male seats with its link frame on the female link frame (`AttachedTo`). So in the male link frame the seat axis is
+  `loc` = the oracle's axis in the female link frame, and the mating direction is `-(R_male_link @ loc)`.
+- `loc` is recorded per pair in the simulator: `scripts/grasp_bands/attach_seat_facts.py` (job 18368109) loads each male and every
+  partner with a matching female type (XM <-> XF, both spawned `attachable` like the attachment task) and calls `predicates.seat_axis`.
+  The result is `ispatialgym/assets/grasping/attach_seats.json`: 33 males, 37 female links. Regenerate it if `seat_axis` changes.
+- `"seat"` also takes the male link pose as the simulator loads it.
+  - The USD frames differ from the metadata quaternions: cork ncxgpe 10.6 deg, webcam fabztm 8.1 deg, the wine bottle's female 3.8 deg.
+  - The metadata positions are unscaled: lid pbmsji s0.65 is 4.4 mm off, caps clhquh / yqvild 1.2 mm.
+- A meta link without a matched female keeps the frame as written; an entry without a seat record keeps `"meta_z"`.
+- Opt in per entry with `cand_overrides {"attach_axis": "seat"}`.
+- Tests: `ispatialgym/tests/test_attach_seats.py` (7). For every attach entry of the three libraries (34), the rule's axis equals the
+  oracle's seat axis, rebuilt from the recorded live frames. The table equals what `predicates.seat_axis` computes today (stubs). `"meta_z"`
+  is bit-identical to a4620a1e. A synthetic cork rejects every pinch under `"meta_z"` and keeps them under `"seat"`.
+- Default unchanged, measured: a CPU candidates-only run of all 34 attach entries (round-1 config) on a4620a1e and on i7-attach (default)
+  gives identical candidates, families, representatives and gate logs (`counts/base` vs `counts/off`).
+- Full suite: 23 failed, 40 errors on both a4620a1e and the i7-attach tip, the same tests. The only difference is 7 more passed (the new
+  tests). In this worktree the 3 expected errors read 40.
+
+**Every attach entry, `meta_z` -> `seat`** (CPU, round-1 config 6000 x 12, densify (4,2),(8,4); candidates / geometry ok / representatives;
+`$OFH/attach_20261107/counts/counts_off_on.json`). Ten of 34 change, so the fix stays behind the switch until the owner decides.
+
+| entry | meta_z | seat | the oracle's seat axis (partner) |
+|---|---|---|---|
+| cork ncxgpe | 0 / 0 / 0 | 22 / 22 / 3 | centroid->female 90.4 deg (wine_bottle) |
+| dip_candle poexjo | 0 / 0 / 0 | 24 / 22 / 5 | centroid->female 88.7 deg (candle_holder) |
+| dip_candle poexjo `__rfecdee` (derived rest) | 0 / 0 / 0 | 12 / 12 / 6 | same; `"meta_z"` also rotates its mating point twice at a non-identity rest |
+| light_bulb kfmkwd | 12 / 9 / 6 | 24 / 20 / 10 | centroid->female 90.4 deg (table_lamp) |
+| webcam fabztm | 13 / 4 / 4 | 24 / 8 / 8 | centroid->female 89.4 deg (monitor) |
+| trout kqpeke | 0 / 0 / 0 | 2 / 1 / 1 | centroid->female 88.1 deg (fishing_rod) |
+| skateboard_wheel jljqtt | 24 / 18 / 10 | 24 / 18 / 10 (top 51 -> 25, side 47 -> 33 pass the rule) | centroid->female 95.8 deg: a horizontal axis along the deck |
+| skateboard_wheel acmbvb | 24 / 24 / 10 | 23 / 23 / 10 | centroid->female 108.2 deg: the same |
+| cabinet_door ertkre | 16 / 16 / 10 | 11 / 11 / 4 | centroid->female 86.6 deg (cabinet_base) |
+| wreath rkrxno | 2 / 2 / 2 | 0 / 0 / 0 | wall_nail: +z (as written); recreational_vehicle: centroid->female 115.4 deg - both must hold |
+
+Unchanged (24): every lid and cap, cork uyceta / lseuwf, blackberry, bookcase_baseboard and holly (0 under both), and the six without an
+attachment meta link (lid qhlsdq, dip_candle ghctun / gbaons / mxjejs, light_bulb sxkjea / ymomhw: bottom centre). The campaign libraries
+(v2maps_i7, v2maps_20261106) hold only the two lids: unchanged. Note: for the wall, deck and bush partners, the oracle's own 45-deg rule
+picks the centroid->female direction, which is often not the insertion direction (skateboard deck, recreational_vehicle). `"seat"`
+mirrors the oracle there too, so those entries follow the oracle's picks, questionable or not.
+
+**Cork round 2** (`attach_axis` seat opt-in; L3 config 48000 x 48, cone 60, densify 2x1,4x2, reps 30; job 18368231):
+- Round 1 (roles_all): top 7087 -> 0 and side 1747 -> 0 at the rule. L3 retry: top 28181 -> 0.
+- Now, first pass: top 7087 -> rule 266 (6821 face_gap: the fingertips within 2 mm of the cork's bottom) -> NMS 16 -> geometry 15. Side
+  1747 -> 1597 -> 19 -> 19.
+- 34 geometry-ok -> 5 representatives (rotational families) -> **2 physics-valid** (side_0, top_15). The other three failed:
+  object_pressed_into_table, grasp_off_target, no_placement.
+- Reach maps were built at 0.7853 (desk_mdhelw_1), both arms.
+
+**Cap xxqyrt round 2** (cone 60, first pass 192000 x 96, densify 2x1,4x2 up to 768000 x 192, NMS 1 mm / 1 deg so every rule survivor is
+selected, topk / reps 60):
+- The cork's frame issue does not apply. The male frame is the identity (live = metadata), and all four partners (lemonade, soda water,
+  water bottle, tomato paste can) take the female +z branch at 1.1-5.7 deg. So `"seat"` = `"meta_z"`, with identical counts.
+- A, default gates (job 18368124), 768k pass: top 66817 -> width/cone 39307 -> support 31361 -> object clearance 604 (the shell) -> sweep
+  266 -> lever 100 -> rule 40 -> NMS 33 -> geometry **0**.
+  - The rule drops 60: the fingertips sit 1.0 mm below the cap's bottom face, which is the support allowance.
+  - All 33 fail finger_blade_in_object: the blades are 1.48-2.74 mm into the shell as called (tol 0.5).
+  - At the real (retreated) contact, 9 of 33 are within tolerance: the i7-plate `blade_contact_at_retreat` case. The top grasps retreat
+    25-28 mm.
+  - Side: 9693 -> support lift -> object clearance 5031 -> sweep 0 (all width_lost: after the lift the pinch line misses the cap).
+- B, the same plus `blade_contact_at_retreat` (an i7-plate owner-decision switch, opt-in for this entry only; job 18368125), 384k pass:
+  top rule 18 -> NMS 15 -> geometry 4 -> 1 representative -> **1 physics-valid** (top_0: width 18 mm, tilt 30 deg). Maps at 0.8126, both
+  arms.
+- At default gates the cap stays at 0 physics-valid: ladder step 3 (agent proposals) unless the owner adopts `blade_contact_at_retreat`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
