@@ -383,11 +383,12 @@ def grasp_at_pose(s, manip: Stance, pose: Pose, grasps: Sequence[Any], ignore_fo
         eio = g.pose
         eef = IK.grasp_pose(pose, eio)
         pre = IK.pre_pose(eef)
-        res = s.ikc.exact([pre, eef], manip, arm, **exact_kw)
-        pick = None
-        if twins and getattr(g, "name", None):
-            pick = pick_twin(s, manip, arm, g, eio, eef, pre, res, exact_kw, where="fixed start")
-            g, eio, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
+        with _policy_opening(s, g):  # of-v2maps 2026-11-06: the policy at the grasp's pre-shape
+            res = s.ikc.exact([pre, eef], manip, arm, **exact_kw)
+            pick = None
+            if twins and getattr(g, "name", None):
+                pick = pick_twin(s, manip, arm, g, eio, eef, pre, res, exact_kw, where="fixed start")
+                g, eio, eef, pre, res = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res
         if not (pick.passed if pick is not None else res.ok):
             reasons.append(f"{getattr(g, 'name', '?')}: {res.reason}"[:120])
             continue
@@ -2023,6 +2024,131 @@ def in_frame(s, cam_pose: Pose, points: th.Tensor, margin: float = IN_FRAME_MARG
 
 #: images ``frame_diag`` renders per process (the JSON line is written for every rejection)
 FRAME_DIAG_IMAGES = 6
+
+#: the support-policy fallback's defaults (``ISPATIALGYM_SUPPORT_POLICY_MIN_OVERLAP_M`` overrides the overlap)
+SUPPORT_POLICY_MIN_OVERLAP_M = 0.003
+SUPPORT_POLICY_RAISE_TRIES = 2
+
+
+def policy_opening_of(g) -> Optional[float]:
+    """The finger opening (m per finger) the support policy measures a library grasp ``g`` at (of-v2maps 2026-11-06, v2diag2): the oracle's
+    pre-shape for the descent, pinch width / 2 + the preshape margin (``execute.execute_grasp``, ``grasp_pinch_width`` = ``meta["width"]``,
+    the v2 library's ``width_m``; ``grasping.candidates.PRESHAPE_MARGIN``), at most fully open - the opening the library judged the grasp at
+    (``preshape_q``). None (the configuration's own opening, the former behaviour) for a grasp without a width or with
+    ``ISPATIALGYM_SUPPORT_POLICY_OPENING=q``."""
+    if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_OPENING", "preshape").strip().lower() == "q":
+        return None
+    from ispatialgym.grasping import candidates as GC
+
+    try:
+        w = float((getattr(g, "meta", None) or {}).get("width"))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(w) or w <= 0:
+        return None
+    return min(0.5 * C.GRIPPER_OPEN_M, 0.5 * w + float(GC.PRESHAPE_MARGIN))
+
+
+def _policy_opening(s, g):
+    """``s.ikc.policy_opening(policy_opening_of(g))`` - a no-op context for an IK checker without it (the tests' fakes)."""
+    from contextlib import nullcontext
+
+    f = getattr(s.ikc, "policy_opening", None)
+    return f(policy_opening_of(g)) if callable(f) else nullcontext()
+
+
+def support_policy_fallback_mode() -> str:
+    """Opt-in ``ISPATIALGYM_SUPPORT_POLICY_FALLBACK`` (of-v2maps 2026-11-06): ``""`` off (the rejection stands), ``raise`` (re-solve the
+    grasp raised along -approach), ``raise+relax`` (... else accept the policy-rejected grasp and mark it)."""
+    v = os.environ.get("ISPATIALGYM_SUPPORT_POLICY_FALLBACK", "").strip().lower()
+    return v if v in ("raise", "raise+relax") else ""
+
+
+def support_policy_fallback(s, st: Stance, arm: str, obj_pose: Pose, hull: Optional[th.Tensor], eio: Pose,
+                            exact_kw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The grasp check's fallback for a library grasp (``eio`` = T_obj->eef) the support policy rejected on ``finger_penetration``
+    (of-v2maps 2026-11-06, the thin flat objects; opt-in :func:`support_policy_fallback_mode`):
+
+    1. the policy test as before (one re-solve of the chain; a pass is taken as it is);
+    2. failing by ``d`` (the deepest finger beyond the 2 mm allowance), the eef raised along -approach by ``d`` + 1 mm and re-solved (up to
+       :data:`SUPPORT_POLICY_RAISE_TRIES` times on the new depth), accepted only when the fingers still overlap the object along the approach
+       by ``ISPATIALGYM_SUPPORT_POLICY_MIN_OVERLAP_M`` (:data:`SUPPORT_POLICY_MIN_OVERLAP_M`; ``ik.pad_overlap_m``) - the returned
+       ``eio`` carries the raise (the oracle grasps at ``eef_in_object``);
+    3. ``raise+relax``: else the policy-rejected configuration is accepted as it is, marked.
+
+    Returns ``{"res", "eef", "pre", "eio", "note"}`` (``note``: ``mode`` passed_recheck / raised / relaxed, ``depth_mm``, ``raise_mm``,
+    ``overlap_mm``) or None (the grasp stays rejected); one ``SUPPORT_POLICY_FALLBACK {json}`` line per call."""
+    mode = support_policy_fallback_mode()
+    if not mode:
+        return None
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.v2 import ik as IKm
+
+    IK = _ik()
+    ikc = s.ikc
+    eef = IK.grasp_pose(obj_pose, eio)
+    pre = IK.pre_pose(eef)
+    ikc._last_policy_fail = None
+    r0 = ikc.exact([pre, eef], st, arm, **exact_kw)
+    if r0.ok:
+        note: Dict[str, Any] = {"mode": "passed_recheck"}
+        log.info("SUPPORT_POLICY_FALLBACK %s", json.dumps(note))
+        return {"res": r0, "eef": eef, "pre": pre, "eio": eio, "note": note}
+    lf = getattr(ikc, "_last_policy_fail", None)
+    if lf is None or "finger_penetration" not in str(lf["ev"].get("reason")) or lf["ev"].get("finger_clearance") is None:
+        return None
+    allow = float(CP.DEFAULT.finger_support_max_penetration_m)
+    min_ov = float(os.environ.get("ISPATIALGYM_SUPPORT_POLICY_MIN_OVERLAP_M") or SUPPORT_POLICY_MIN_OVERLAP_M)
+    note = {"depth_mm": round(-1000 * float(lf["ev"]["finger_clearance"]), 2), "allowance_mm": round(1000 * allow, 1),
+            "min_overlap_mm": round(1000 * min_ov, 1), "support": lf["ev"].get("support"), "finger_q_m": lf["ev"].get("finger_q_m")}
+    a = C.approach_axis(_t(eef[1]).float()).float()
+    obj_pts = G.local_points_world(hull, obj_pose) if hull is not None else None
+    raised, total, cur = None, 0.0, lf
+    for k in range(SUPPORT_POLICY_RAISE_TRIES):
+        total += max(0.0, -float(cur["ev"]["finger_clearance"]) - allow) + 0.001
+        cand = (_t(eef[0]).float() - a * total, _t(eef[1]).float())
+        pre2 = IK.pre_pose(cand)
+        ikc._last_policy_fail = None
+        r2 = ikc.exact([pre2, cand], st, arm, **exact_kw)
+        note.update(raise_mm=round(1000 * total, 2), tries=k + 1)
+        if r2.ok:
+            fq = getattr(ikc, "_policy_opening", None)
+            if fq is None:
+                fq = float(_t(r2.q)[s.kit.robot.gripper_control_idx[arm]].float().mean())
+            hc = getattr(ikc, "_hand_checker", None)
+            if hc is None or hc.arm != arm:
+                hc = ikc._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+            T = th.eye(4)
+            T[:3, :3] = C.quat_to_mat(cand[1]).float()
+            T[:3, 3] = cand[0]
+            ov = IKm.pad_overlap_m(IKm.finger_points_world(hc, T, (fq, fq)), obj_pts, a) if obj_pts is not None else float("-inf")
+            note["overlap_mm"] = round(1000 * ov, 2)
+            if ov >= min_ov:
+                raised = (cand, pre2, r2)
+            else:
+                note["raise_rejected"] = "overlap"
+            break
+        cur = getattr(ikc, "_last_policy_fail", None)
+        if cur is None or "finger_penetration" not in str(cur["ev"].get("reason")) or cur["ev"].get("finger_clearance") is None:
+            note["raise_rejected"] = str(r2.reason)[:140]
+            break
+        note["depth_after_mm"] = round(-1000 * float(cur["ev"]["finger_clearance"]), 2)
+    if raised is not None:
+        cand, pre2, r2 = raised
+        note["mode"] = "raised"
+        _count(s, "support_policy_fallback.raised")
+        log.info("SUPPORT_POLICY_FALLBACK %s", json.dumps(note))
+        return {"res": r2, "eef": cand, "pre": pre2, "eio": G.relative(cand, obj_pose), "note": note}
+    if mode == "raise+relax":
+        note["mode"] = "relaxed"
+        _count(s, "support_policy_fallback.relaxed")
+        log.info("SUPPORT_POLICY_FALLBACK %s", json.dumps(note))
+        return {"res": IKm.IKResult(True, lf["q"], "", int(lf["n"])), "eef": eef, "pre": pre, "eio": eio, "note": note}
+    note["mode"] = "rejected"
+    _count(s, "support_policy_fallback.rejected")
+    log.info("SUPPORT_POLICY_FALLBACK %s", json.dumps(note))
+    return None
 
 
 def frame_diag(s, stance: Stance, arm: str, eef_pose: Pose, what: str, obj: Any = None, obj_pose: Optional[Pose] = None,
@@ -3697,17 +3823,25 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             pre = IK.pre_pose(eef)
             if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
                 s.ikc._diag_object = (pose, hull, getattr(g, "name", None))  # of-v2maps: the candidate object pose the policy diagnostic reports
-            res = s.ikc.exact([pre, eef], st_of[a0], a0, **exact_kw)
-            g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
-            if (twins or len(arms_i) > 1) and getattr(g, "name", None):
-                pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z_here, where="phase3_target", arms=arms_i, stances=st_of,
-                                 twins=twins)
-                g_rec, eef_in_object, eef, pre, res, arm_c = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res, pick.arm
-                for o in pick.facts["orient"]["options"]:
-                    if o.get("source") == "ik" and band_of.get(o.get("arm")) is not None and band_of[o["arm"]].meta.get("mirrored_from"):
-                        _count(s, "arm_band_mirrored.ik_tried")
-                        if not o.get("ok"):
-                            _count(s, "arm_band_mirrored.ik_failed")
+            sp_note = None
+            # of-v2maps 2026-11-06: the support policy measures the fingers at the grasp's pre-shape (policy_opening_of), as the oracle descends
+            with _policy_opening(s, g):
+                res = s.ikc.exact([pre, eef], st_of[a0], a0, **exact_kw)
+                g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
+                if (twins or len(arms_i) > 1) and getattr(g, "name", None):
+                    pick = pick_twin(s, st_of[a0], a0, g, eef_in_object, eef, pre, res, exact_kw, support_z=z_here, where="phase3_target", arms=arms_i,
+                                     stances=st_of, twins=twins)
+                    g_rec, eef_in_object, eef, pre, res, arm_c = pick.grasp, pick.eef_in_object, pick.eef, pick.pre, pick.res, pick.arm
+                    for o in pick.facts["orient"]["options"]:
+                        if o.get("source") == "ik" and band_of.get(o.get("arm")) is not None and band_of[o["arm"]].meta.get("mirrored_from"):
+                            _count(s, "arm_band_mirrored.ik_tried")
+                            if not o.get("ok"):
+                                _count(s, "arm_band_mirrored.ik_failed")
+                if not res.ok and "support_policy: finger_penetration" in str(res.reason) and support_policy_fallback_mode():
+                    # of-v2maps 2026-11-06 (opt-in): the raised / relaxed grasp of the chosen turn at the chosen arm's stance
+                    fb = support_policy_fallback(s, st_of.get(arm_c, st_of[a0]), arm_c, pose, hull, eef_in_object, exact_kw)
+                    if fb is not None:
+                        res, eef, pre, eef_in_object, sp_note = fb["res"], fb["eef"], fb["pre"], fb["eio"], fb["note"]
             n_ik += 1
             if not res.ok:
                 fails["ik"] += 1
@@ -3721,6 +3855,8 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             rec = GraspRecord(name, arm_c, getattr(g_rec, "key", None), getattr(g_rec, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_in_object)
             if pick is not None:
                 rec.extras.update({"wrist_flip": pick.twin, "twin_choice": pick.facts})
+            if sp_note is not None:
+                rec.extras["support_policy"] = sp_note
             if len(offered) > 1 or arm_c != arm:
                 rec.extras["arm_bands"] = {a: band_facts(band_of.get(a)) for a in offered}
             NB.note_grasp_from(top, fp, rec)
@@ -3857,8 +3993,9 @@ def segment_fallback_grasp(s, manip: Stance, obj_pose: Pose, rec: GraspRecord, g
     eef = IK.grasp_pose(obj_pose, eio)
     pre = IK.pre_pose(eef)
     kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
-    res = s.ikc.exact([pre, eef], st, arm, **kw)
-    pick = pick_twin(s, st, arm, g, eio, eef, pre, res, kw, support_z=support_z, where="segment fallback", twins=grasp_twins_on(s))
+    with _policy_opening(s, g):  # of-v2maps 2026-11-06: the policy at the grasp's pre-shape
+        res = s.ikc.exact([pre, eef], st, arm, **kw)
+        pick = pick_twin(s, st, arm, g, eio, eef, pre, res, kw, support_z=support_z, where="segment fallback", twins=grasp_twins_on(s))
     _count(s, "segment_fallbacks")
     if not pick.passed:
         log.info("segment fallback: the %s arm cannot take %s at the same pose (%s)", arm, row, str(pick.res.reason)[:120])

@@ -1204,6 +1204,11 @@ class SamplerV2(TaskSampler):
         report = TT.held_arms(self, draft, report, lambda: PC.run(self.gp.variant, self.sidecar, self, subtask=self.subtask))
         self.last_program_check = report
         draft.summary["program_check"] = report
+        # of-v2maps 2026-11-06: the grasps the opt-in support-policy fallback took (tabletop.support_policy_fallback: raised / relaxed, depth_mm)
+        sp = [{"object": g.object, "grasp": g.grasp_name, **g.extras["support_policy"]} for g in self.sidecar.grasps
+              if isinstance((getattr(g, "extras", None) or {}).get("support_policy"), dict)]
+        if sp:
+            draft.summary["support_policy"] = sp
         return report
 
     def oracle_state(self):

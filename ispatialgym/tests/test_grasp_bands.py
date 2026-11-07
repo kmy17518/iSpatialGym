@@ -419,6 +419,46 @@ def test_finger_link_clearance_per_hull():
     assert abs(d["right_gripper_finger_link1"] - (-0.001)) < 1e-6 and abs(d["right_gripper_finger_link2"] - (-0.004)) < 1e-6
 
 
+def test_policy_opening_is_the_oracle_preshape(monkeypatch):
+    # of-v2maps 2026-11-06 (v2diag2): the support policy measures a library grasp at width / 2 + 10 mm (execute.execute_grasp's pre-shape)
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import ik as IKm
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY_OPENING", raising=False)
+    assert abs(TT.policy_opening_of(SimpleNamespace(meta={"width": 0.01169})) - 0.015845) < 1e-6  # tablespoon top_6: preshape_q 0.01585
+    assert TT.policy_opening_of(SimpleNamespace(meta={"width": 0.2})) == 0.05  # at most fully open
+    assert TT.policy_opening_of(SimpleNamespace(meta={})) is None and TT.policy_opening_of(SimpleNamespace(meta=None)) is None
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY_OPENING", "q")
+    assert TT.policy_opening_of(SimpleNamespace(meta={"width": 0.01169})) is None
+    ikc = SimpleNamespace(_policy_opening=None)
+    with IKm.IKChecker.policy_opening(ikc, 0.016):
+        assert ikc._policy_opening == 0.016
+        with IKm.IKChecker.policy_opening(ikc, None):
+            assert ikc._policy_opening is None
+        assert ikc._policy_opening == 0.016
+    assert ikc._policy_opening is None
+
+
+def test_support_policy_fallback_switch_and_pad_overlap(monkeypatch):
+    # of-v2maps 2026-11-06: the opt-in fallback's switch and the overlap of the fingers with the object along the approach
+    import torch as th
+
+    from ispatialgym.sampling.v2 import ik as IKm
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    for v, want in (("", ""), ("raise", "raise"), ("RAISE+relax", "raise+relax"), ("1", "")):
+        monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY_FALLBACK", v)
+        assert TT.support_policy_fallback_mode() == want
+    a = th.tensor([0.0, 0.0, -1.0])  # approach straight down: the fingertips are the lowest points
+    obj = th.tensor([[0.0, 0.0, 0.000], [0.0, 0.0, 0.008]])  # an 8 mm slab, top at z 0.008
+    f1 = th.tensor([[0.01, 0.0, 0.002], [0.01, 0.0, 0.05]])  # finger 1 reaches 6 mm down the slab
+    f2 = th.tensor([[-0.01, 0.0, 0.006], [-0.01, 0.0, 0.05]])  # finger 2 only 2 mm
+    assert abs(IKm.pad_overlap_m({"l1": f1, "l2": f2}, obj, a) - 0.002) < 1e-6
+    assert IKm.pad_overlap_m({"l1": f1 + th.tensor([0.0, 0.0, 0.01])}, obj, a) < 0  # raised past the slab: no overlap
+
+
 def test_frame_diag_projects_the_eef_box_and_flags_the_border(monkeypatch, tmp_path):
     # of-v2maps 2026-11-06 (the plate's gripper_not_in_frame): the 8 box corners eef_in_frame tests, in / out of the 5 % border
     from types import SimpleNamespace

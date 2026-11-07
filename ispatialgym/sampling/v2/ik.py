@@ -23,6 +23,7 @@ import logging
 import math
 import os
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -307,7 +308,17 @@ def finger_link_clearance(hc: Any, T_eef: th.Tensor, plane: Any, finger_q: Tuple
 
     from ispatialgym.grasping import hand_geometry as HG
 
-    out: Dict[str, float] = {}
+    return {link: float(plane.sdf(W[None])[0].min()) for link, W in finger_points_world(hc, T_eef, finger_q).items()}
+
+
+def finger_points_world(hc: Any, T_eef: th.Tensor, finger_q: Tuple[float, float]) -> Dict[str, th.Tensor]:
+    """of-v2maps 2026-11-06: each finger link's collision-hull points (vertices + face samples at the checker's spacing, the finger shifted
+    along its axis by its opening) in the world at the eef pose ``T_eef`` (4x4) - the points ``contact_policy.HandChecker`` measures."""
+    import numpy as np
+
+    from ispatialgym.grasping import hand_geometry as HG
+
+    out: Dict[str, th.Tensor] = {}
     T = th.as_tensor(T_eef, dtype=th.float32)
     for lk in hc.geom.links:
         if lk.role != "finger":
@@ -315,10 +326,21 @@ def finger_link_clearance(hc: Any, T_eef: th.Tensor, plane: Any, finger_q: Tuple
         qf = finger_q[0] if lk.link.endswith("1") else finger_q[1]
         s = np.concatenate([HG._hull_surface(lk.link, pc.tobytes(), hc.spacing) for pc in (lk.pieces or [lk.points])])
         p = s + (float(qf) * lk.axis[None] if lk.axis is not None else 0.0)
-        P = th.as_tensor(p, dtype=th.float32)
-        W = P @ T[:3, :3].T + T[:3, 3]
-        out[lk.link] = float(plane.sdf(W[None])[0].min())
+        out[lk.link] = th.as_tensor(p, dtype=th.float32) @ T[:3, :3].T + T[:3, 3]
     return out
+
+
+def pad_overlap_m(finger_pts: Dict[str, th.Tensor], obj_pts: th.Tensor, approach: th.Tensor) -> float:
+    """of-v2maps 2026-11-06 (the raised-grasp fallback): how far the fingers and the object overlap along the approach axis ``approach`` -
+    min(finger tip extent, object far side) - max(finger root extent, object near side), the smaller over the two fingers (a pinch needs
+    both); negative = the fingers end before the object begins."""
+    a = th.as_tensor(approach, dtype=th.float32)
+    o = th.as_tensor(obj_pts, dtype=th.float32) @ a
+    best = []
+    for W in finger_pts.values():
+        f = W @ a
+        best.append(float(min(float(f.max()), float(o.max())) - max(float(f.min()), float(o.min()))))
+    return min(best) if best else float("-inf")
 
 
 def support_policy_scope() -> str:
@@ -454,7 +476,8 @@ class IKChecker:
         ev = self.support_policy_eval(q, arm, supports, approached, finger_links=True)
         rec: Dict[str, Any] = {"why": why, "arm": arm, "stage": ev["stage"], "support": ev["support"], "plane_z": ev["plane_z"], "plane_src": ev["plane_src"],
                                "aabb_top": ev["aabb_top"], "finger_mm": {k[-1:]: round(1000 * v, 2) for k, v in ev["finger_by_link"].items()},
-                               "clearance_mm": {k: round(1000 * v, 2) for k, v in ev["clearance"].items()}}
+                               "clearance_mm": {k: round(1000 * v, 2) for k, v in ev["clearance"].items()},
+                               "finger_q_m": ev.get("finger_q_m"), "opening_src": ev.get("opening_src"), "finger_q_config_m": ev.get("finger_q_config_m")}
         try:
             eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
             rec["ik_pos_mm"] = round(1000 * float(th.linalg.norm(G.t(eef[0]).float() - G.t(target[0]).float())), 2)
@@ -530,7 +553,14 @@ class IKChecker:
         T = th.eye(4)
         T[:3, :3] = _quat_mat(G.t(eef[1]).float())
         T[:3, 3] = G.t(eef[0]).float()
-        fq = float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean())
+        # of-v2maps 2026-11-06 (v2diag2): the fingers at the opening the oracle descends with - a library grasp's pre-shape (pinch width / 2
+        # + the preshape margin, execute.execute_grasp; :meth:`policy_opening`, set by the grasp check), else the configuration's own
+        # (fully open 0.05 m: the tilted pinches of tablespoon / carving knife / sunflower put the lower finger 4-17 mm into the table there,
+        # +3.5 mm clear at the pre-shape the library validated them at)
+        fq_q = float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean())
+        op = getattr(self, "_policy_opening", None)
+        fq = float(op) if op is not None else fq_q
+        out.update(finger_q_m=round(fq, 5), opening_src="preshape" if op is not None else "q", finger_q_config_m=round(fq_q, 5))
         planes = getattr(self, "support_plane_z", None)
         for sp in supports:
             top = support_plane_z(sp, planes)
@@ -551,6 +581,17 @@ class IKChecker:
                 out.update(ok=False, reason=f"{reason[0]} on {name}")
                 return out
         return out
+
+    @contextmanager
+    def policy_opening(self, opening_m: Optional[float]):
+        """Context manager (of-v2maps 2026-11-06): the support policy measures the fingers at ``opening_m`` per finger (the grasp's pre-shape,
+        ``tabletop.policy_opening_of``) for the exact IKs inside; None = the configuration's own opening (the former behaviour)."""
+        prev = getattr(self, "_policy_opening", None)
+        self._policy_opening = None if opening_m is None else float(opening_m)
+        try:
+            yield
+        finally:
+            self._policy_opening = prev
 
     def set_finger_touch(self, touch: Optional[FingerTouch]) -> None:
         """Switch the approach finger-support touch rule (:class:`FingerTouch`) on (None: off); its parameters join the cache scope."""
@@ -980,10 +1021,14 @@ class IKChecker:
             # of-v2maps 2026-11-06: the objects the last pose closes in on (as the IK's own last-pose ignore infers them) - a push that
             # passes no ``approached`` has its pushed box exempted as the grasp's target is, the support under it stays policed
             appr = approached if approached is not None else self.approached_objects(poses[-1])
-            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, appr)
+            ev_p = self.support_policy_eval(q, arm, ignore_for_last, appr)
+            ok_p, why_p = bool(ev_p["ok"]), str(ev_p["reason"])
             if not ok_p:
                 if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
                     self._support_policy_diag(q, arm, ignore_for_last, appr, poses[-1], why_p)
+                # of-v2maps 2026-11-06: what the grasp-check fallback (tabletop.support_policy_fallback) needs - the rejected configuration
+                # and its measurements (the deepest finger's clearance)
+                self._last_policy_fail = {"q": q.clone(), "ev": ev_p, "n": len(poses), "pose": poses[-1]}
                 q, why = None, f"support_policy: {why_p}"
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
