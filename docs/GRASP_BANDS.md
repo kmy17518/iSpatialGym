@@ -518,6 +518,16 @@ selected, topk / reps 60):
   arms.
 - At default gates the cap stays at 0 physics-valid: ladder step 3 (agent proposals) unless the owner adopts `blade_contact_at_retreat`.
 
+**The aliases under `--grasps v2only`, N 4** (staged roots `stage_cork` / `stage_cap`: `cp -a v2maps_i7`, plus the entry, its maps and
+`legacy_keys` in the staged library.json):
+- attachment_03 (18368426) and attachment_02 (18368413): 0 attempts each. Template setup rejects `no_stance` on every edge with
+  `LEGACY_BAND_BLOCKED ReachBands.load(object=<partner>, grasp_key=attach:<male key>, placed=['attach:<male>'])`.
+- The male's grasps and maps now serve: no missing_grasps or missing_map (before: missing_map).
+- The attach band is the partner's reach band with the male's grasps carried to the seat. `tasks/attachment.py` loads it directly with
+  `ReachBands.load`, not through `ensure_bands` / `v2_map_view`, so no MAP_REQUEST line is written.
+- No v2 map kind covers it, so nothing could be built. It is the same blocker as attachment_01 / 04. The partner's left contact band
+  (`load_left_contact_band`) comes after it and is untested.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
