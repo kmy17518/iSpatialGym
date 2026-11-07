@@ -330,6 +330,7 @@ def test_step4_list_and_owner_gate(tmp_path, monkeypatch):
                                                       {"id": "b", "proposals": 0, "feasible": False},
                                                       {"id": "c", "proposals": 3, "feasible": True, "n_valid": 4}]})
     monkeypatch.setattr(LD, "legacy_grasps", lambda key, root=None: [{"name": "g0", "legacy_physics": True}] if key == "k_a" else [])
+    monkeypatch.setattr(LD, "grasping_roles", lambda job, customs: [{"customs": "x", "role": "target", "grasps": "tabletop"}])
     rows = {r["id"]: r for r in LS.step4_rows(str(batch), legacy_root=str(tmp_path))}
     assert set(rows) == {"a", "b", "d"}  # c got grasps at step 3
     assert rows["a"]["after_step3"] == "0 physics-valid after step 3" and rows["a"]["n_legacy"] == 1 and rows["a"]["n_legacy_held"] == 1
@@ -359,7 +360,9 @@ def test_select_and_prepare_write_json_inputs_and_strips(tmp_path, monkeypatch):
     S.save_json(str(man), [{"id": "box__x__s1", "category": "box", "model": "x", "scale": [1, 1, 1], "constraint": "tabletop", "rest_hint_wxyz": None,
                             "legacy_key": None, "alias_key": "alias_x"}, {"id": "other__y__s1", "category": "other", "model": "y"}])
     batch = tmp_path / "batch"
-    AS.main(["select", "--manifest", str(man), "--roots", str(root), "--batch", str(batch)])
+    cust = tmp_path / "customs.json"
+    S.save_json(str(cust), {"t-box": {"roles": {"target": {"category": "box", "representative": "x", "require": {"grasps": "tabletop"}}}}})
+    AS.main(["select", "--manifest", str(man), "--roots", str(root), "--batch", str(batch), "--customs", str(cust)])
     AS.main(["prepare", "--batch", str(batch)])
     os.chmod(batch / "CONTRACT.md", 0o444)  # a copy from a read-only snapshot: a second prepare still runs
     AS.main(["prepare", "--batch", str(batch), "--force"])
@@ -390,3 +393,29 @@ def test_step3_and_step4_take_the_last_rounds_gates(tmp_path, monkeypatch):
         assert json.loads(json.dumps(getattr(cfg, k))) == json.loads(json.dumps(rc[k])), k
     lj = LD.legacy_job(job, [], "c__m", g)
     assert PL.candidate_overrides(lj)[0].cone_deg == 60.0
+
+
+def test_only_grasped_entries_climb_the_ladder(tmp_path):
+    """Owner 2026-11-07: alignment targets are pushed and braced (their roles require contacts), never grasped - the step-3 / step-4
+    selectors take an entry only when a task-spec role with require.grasps names its model (the r2zero_20261107 run took six alignment
+    targets: void)."""
+    from ispatialgym import REPO_ROOT
+
+    customs = S.load_json(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json"))
+    for cat, model in (("board_game", "qgvsnb"), ("paperback_book", "jhaltj"), ("keyboard", "injrgc"), ("magazine", "tfovwy"),
+                       ("paper_towel_dispenser", "jacqxv"), ("license_plate", "naclac")):
+        assert LD.grasping_roles({"category": cat, "model": model}, customs) == [], (cat, model)
+    for cat, model, need in (("cellulose_tape", "kavsnx", "tabletop"), ("storage_box", "eicujj", "tabletop"), ("cork", "ncxgpe", "attachment"),
+                             ("hardback", "bqvvvx", "tabletop")):
+        roles = LD.grasping_roles({"category": cat, "model": model}, customs)
+        assert roles and all(r["grasps"] == need for r in roles), (cat, model)
+    # the selector: two zero entries, only the grasped one is taken; the other is reported as not grasped
+    root = str(tmp_path / "L3")
+    _entry(root, "cellulose_tape__kavsnx__s1", 0), _entry(root, "board_game__qgvsnb__s1", 0)
+    jobs = [{"id": "cellulose_tape__kavsnx__s1", "category": "cellulose_tape", "model": "kavsnx"},
+            {"id": "board_game__qgvsnb__s1", "category": "board_game", "model": "qgvsnb"}]
+    skipped = {}
+    sel = LD.select_zero(jobs, [root], customs=customs, skipped=skipped)
+    assert [e["job"]["id"] for e in sel] == ["cellulose_tape__kavsnx__s1"] and sel[0]["grasped_by"]
+    assert list(skipped) == ["board_game__qgvsnb__s1"]
+    assert len(LD.select_zero(jobs, [root])) == 2  # without the specs (a library-only caller): no filter

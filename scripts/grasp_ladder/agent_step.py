@@ -50,11 +50,19 @@ def cmd_select(a):
         if j["id"] not in seen:
             seen.add(j["id"])
             uniq.append(j)
-    sel = LD.select_zero(uniq, a.roots, exclude=a.exclude or ())
+    from ispatialgym import REPO_ROOT
+
+    customs = S.load_json(a.customs or os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json"))
+    if not customs:
+        raise SystemExit("select needs the task specs (isg_customs.json): only entries a consumer grasps climb the ladder")
+    skipped = {}
+    sel = LD.select_zero(uniq, a.roots, exclude=a.exclude or (), customs=customs, skipped=skipped)
     os.makedirs(a.batch, exist_ok=True)
     S.save_json(os.path.join(a.batch, "entries.json"), sel)
     S.save_json(os.path.join(a.batch, "select.json"), {"manifests": a.manifest, "roots": a.roots, "exclude": a.exclude or [], "created": S.now(),
-                                                       "n_jobs": len(uniq), "n_selected": len(sel)})
+                                                       "n_jobs": len(uniq), "n_selected": len(sel), "not_grasped": skipped})
+    for i, why in sorted(skipped.items()):
+        print("NOT_GRASPED", i, why)
     for e in sel:
         print("ZERO", e["job"]["id"], e["job"].get("alias_key"), {os.path.basename(os.path.dirname(r)) or r: v for r, v in e["status"].items()})
     print(f"AGENT_SELECT {len(sel)} of {len(uniq)} entries at 0 physics-valid after the given rounds -> {a.batch}/entries.json")
@@ -238,6 +246,7 @@ def main(argv=None):
     p.add_argument("--roots", nargs="+", required=True, help="glib roots of rounds 1-2 (each holds models/<id>/library.json)")
     p.add_argument("--batch", required=True)
     p.add_argument("--exclude", nargs="*")
+    p.add_argument("--customs", default=None, help="the task specs (default: the code's isg_customs.json) - the grasp-role filter")
     p.set_defaults(fn=cmd_select)
     p = sp.add_parser("prepare")
     p.add_argument("--batch", required=True)

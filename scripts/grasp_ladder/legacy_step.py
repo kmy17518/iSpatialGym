@@ -35,6 +35,8 @@ def step4_rows(batch, report=None, legacy_root=LD.LEGACY_ROOT):
     out = []
     for e in entries:
         j = e["job"]
+        if not LD.grasping_roles(j, customs):
+            continue  # i7-ladder 2026-11-07: no consumer grasps it (an alignment target) - never a legacy-grasp candidate
         r = rep.get(j["id"])
         if r is None:
             why = "step 3 not reported"

@@ -534,6 +534,16 @@ legacy key: push-only programs or an overhang entry (like the hardback) are the 
 lying rest; (4) the tray-floor anchor 0.6791 (office_cubicles_right conference_table_fpkmyw_0 source tray) joins the campaign anchors
 when the tape entry is merged (0.6789's range shrinks to [0.6733, 0.679]).
 
+**Correction 2026-11-07 (owner decision, after the report above).** The step-3 run on board game / paperback / keyboard / magazine /
+paper towel dispenser / license plate was a SELECTION ERROR and is void: alignment targets are pushed and braced, never grasped; their
+task-spec roles require `contacts`, not `grasps`, and their v2 path is the contact libraries and maps. The lines above that suggested
+"push-only programs or an overhang entry" and a lying rest for the dispenser do not apply - they need no grasps. The run's batch and builds
+moved to `$OFH/ladder_agent/_void_not_grasped/` (VOID.txt). Fix: the step-3 / step-4 selectors take an entry only when a task-spec role with
+`require.grasps` names its model (`ladder.grasping_roles`: same category, and the model as the role's representative, a `grasp_keys`
+"category/model" key or a scene whitelist); `agent_step.py select` reports the others as NOT_GRASPED, `legacy_step.py list` skips them.
+Chosen over the v2only missing_grasps / MAP_REQUEST lines because it needs no sampler run and is what the oracle reads. Test:
+`test_grasp_ladder.py::test_only_grasped_entries_climb_the_ladder`. With it, no round-2 zero entry in my scope reaches step 3.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

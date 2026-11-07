@@ -53,10 +53,40 @@ def entry_status(entry_id: str, roots: Sequence[str]) -> Dict[str, Optional[int]
     return {r: n_valid(os.path.join(r, "models", entry_id)) for r in roots}
 
 
-def select_zero(jobs: Sequence[Dict[str, Any]], roots: Sequence[str], exclude: Iterable[str] = ()) -> List[Dict[str, Any]]:
+def grasping_roles(job: Dict[str, Any], customs: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The task-spec roles that GRASP this entry's model (owner 2026-11-07: only a grasped object climbs the ladder - alignment targets are
+    pushed and braced, their roles require ``contacts``, never ``grasps``): every customs alias role whose ``require.grasps`` is set, whose
+    category is the entry's and which names the model (``representative``, a ``grasp_keys`` "category/model" key, or a scene whitelist).
+    ``[{"customs", "role", "grasps"}]``; empty = no consumer grasps it."""
+    cat, model = job.get("category"), job.get("model")
+    out = []
+    for k, v in (customs or {}).items():
+        if not isinstance(v, dict):
+            continue
+        for role, r in (v.get("roles") or {}).items():
+            r = r or {}
+            need = (r.get("require") or {}).get("grasps")
+            if not need or r.get("category") != cat:
+                continue
+            named = r.get("representative") == model or f"{cat}/{model}" in (r.get("grasp_keys") or {})
+            if not named:
+                for sc in (v.get("scenes") or {}).values():
+                    wl = (((sc or {}).get("whitelist") or {}).get(role) or {}).get(cat) or []
+                    if model in wl:
+                        named = True
+                        break
+            if named:
+                out.append({"customs": k, "role": role, "grasps": need})
+    return out
+
+
+def select_zero(jobs: Sequence[Dict[str, Any]], roots: Sequence[str], exclude: Iterable[str] = (),
+                customs: Optional[Dict[str, Any]] = None, skipped: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """The entries still at 0 physics-valid grasps after the given rounds: built in at least one root and valid in none (an entry
-    that was never built is not a step-3 entry - it has not had its round 1). Returns ``[{"job", "src_dir", "status"}]`` with
-    ``src_dir`` the latest root (in ``roots`` order) that holds its exported geometry."""
+    that was never built is not a step-3 entry - it has not had its round 1), and GRASPED by a consumer (``customs``: the task specs,
+    :func:`grasping_roles`; i7-ladder 2026-11-07, the alignment targets were selected by mistake before this filter). Returns
+    ``[{"job", "src_dir", "status", "grasped_by"}]`` with ``src_dir`` the latest root (in ``roots`` order) that holds its exported geometry;
+    ``skipped`` (optional) collects the zero entries no consumer grasps, with why."""
     out = []
     ex = set(exclude)
     for j in jobs:
@@ -69,7 +99,12 @@ def select_zero(jobs: Sequence[Dict[str, Any]], roots: Sequence[str], exclude: I
         src = [os.path.join(r, "models", j["id"]) for r in roots if os.path.exists(os.path.join(r, "models", j["id"], "geometry.json"))]
         if not src:
             continue
-        out.append({"job": j, "src_dir": src[-1], "status": st})
+        roles = grasping_roles(j, customs) if customs is not None else None
+        if roles is not None and not roles:
+            if skipped is not None:
+                skipped[j["id"]] = "not grasped: no task-spec role with require.grasps names the model"
+            continue
+        out.append({"job": j, "src_dir": src[-1], "status": st, "grasped_by": roles})
     return out
 
 
