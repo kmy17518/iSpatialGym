@@ -486,6 +486,23 @@ Branch `i7-unblock` (from of-v2maps a4620a1e). Records: `$OFH/unblock_20261107/`
   `ISPATIALGYM_MAP_SUPPORT_FIRST=1`: 13 attempts, 4 written, 4 / 4 demos, 0.058 GPU-h per success. Whether support-first becomes the
   default is the owner's decision (it is a shared Phase-2 rule).
 
+**Support-first as an automatic per-support fallback (owner decision 2026-11-07 21:40; 954bc5bf).**
+- `tabletop.phase2_manipulation_stance` wraps the former Phase 2 for map views.
+- Forced on / off comes first: the job switch `ISPATIALGYM_MAP_SUPPORT_FIRST=1/0`, then the alias's `generation.map_support_first`
+  true / false. Otherwise the rule is automatic:
+  - geometric, decided before any stance: the usable region (the top raster eroded by the footprint half extent + 0.02) is narrower
+    than the map's own `lattice_m`;
+  - safety net: a map-first call whose stances held zero lattice cells on a usable support is run once more support-first.
+- Counters `map_support_first.geometric` / `.fallback`; one `MAP_SUPPORT_FIRST` line per (support, trigger) with the usable width and
+  the lattice.
+- Everything else stays map-first, unchanged. Scene bands are never read support-first.
+- iors_small's start-cell key carries the state (`support_first_tag`).
+- nextto_04's customs set it on explicitly (baf472f8).
+- Scope from the v2only logs (v2only_after, i7_floorfix, i7_tg, v2only_before, g_base; `unblock_20261107/sf_scope.json`): of the 32
+  aliases with map hits, only nextto_04 fires (bench_pfjnnj_0; usable 0.02 m in the sampler vs lattice 0.08). It fired on both
+  triggers: 20 / 20 zero-cell Phase-2 calls, MAP_LATTICE lattice_kept 0 in 8 / 8.
+- ontop_large_03's bed has no inventory record. No other alias fires, so no other alias changes.
+
 **under_small_03 (plate qtfzeq s1x1x3, the one v2 grasp side_9).**
 - side_9 approaches nearly horizontally (17.6 deg down), 32 deg off radial, with the closing axis 20 deg from vertical: one finger goes
   under the rim. The legacy grasp_0 approaches from above (60 deg) and straddles the rim radially.
@@ -503,7 +520,10 @@ Branch `i7-unblock` (from of-v2maps a4620a1e). Records: `$OFH/unblock_20261107/`
   empty F 0 / 60 (40 snaps), but 0 written - 39 F exhausted and the place stage fails.
 - Grasp ladder step 2 (`unblock_20261107/plate_qtfzeq`): the opt-in families lip_shallow + rim_straddle (cand_overrides, default gates)
   give 36 candidates -> 27 geometry-ok -> 10 representatives -> 6 physics-valid rim_straddle top grasps. Maps at 0.8126 for both arms,
-  staged in `/v2maps_i7unblock2` (the entry keeps legacy_key plate__qtfzeq__st). The v2only N 4 result is in DECISIONS (i7-unblock).
+  staged in `/v2maps_i7unblock2` (the entry keeps legacy_key plate__qtfzeq__st).
+- v2only N 4 on the rim_straddle grasps: 60 / 0. The grasp chain now passes, so what still blocks is downstream: 35 empty F (kinematic,
+  DIAG 4 / 4), 11-12 partner_placement ("no partner yaw of 18 admits a gap"), ~13 gripper_not_in_frame at the place / pre-place (the
+  camera-frame rule, not relaxed).
 
 **camera_relocalization teddy_bear_1: slow, not blocked.**
 - BEHAVIOR's `astar` builds a score table of every map cell on each call: 2.6 s on house_single_floor's 862 x 862 map, 8.6 s for an
