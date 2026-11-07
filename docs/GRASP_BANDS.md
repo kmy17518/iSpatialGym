@@ -376,9 +376,35 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - FingerTouch uses the spec's 2 mm finger-geometry rule (P1 §2) instead of the 5 mm allowance on the finger spheres.
   - It applies wherever `approach_finger_support_touch` is set: touching_03 and the inside_large plate-in-sink variants.
   - The contact-policy defaults are unchanged.
-  - Old vs new are A/B'd first: `ISPATIALGYM_FINGER_TOUCH_RULE=spheres` (old, the default) vs `geometry` (new; `ik.FingerTouch.rule`,
+  - Old vs new were A/B'd first: `ISPATIALGYM_FINGER_TOUCH_RULE=spheres` (old) vs `geometry` (new; `ik.FingerTouch.rule`,
     `IKChecker._finger_touch_geometry_ok`). A support without a registered plane (legacy-band runs, a bookcase, a sink) is measured
     against its convex collision pieces.
+  - A/B part B (2026-11-07, i7-fingertouch): both arms ran on the SAME instance indices (one ledger per arm, one cold sampling cache per
+    job). `ISPATIALGYM_FINGER_TOUCH_SHADOW=1` judged every touched configuration under the other rule too (kit counters
+    `finger_touch.shadow.*`, `finger_touch.verdict_changed`, `finger_touch.decision_changed`). Tags `ft2_sph` / `ft2_geo`, table
+    `$OFH/jobs/ft2/ft_tab.py`.
+  - Where the rule acts, the two rules never disagreed: 0 changed verdicts out of 4651 judged configurations (1984 collision groups,
+    710 allowed touches). Every attempt had the same outcome in both arms. The finger hulls never touched the support: the deepest
+    allowed hull penetration was 0.00 mm, against the 2 mm cap.
+
+    | alias (grasps) | configs judged | changed | written / attempts | demos ok | GPU-h per success |
+    |---|---|---|---|---|---|
+    | inside_large_03 (legacy, 300014-29) | 492 | 0 | 16 / 25 both | 11 / 16 both | 0.059 sph / 0.060 geo |
+    | plate-in-sink lkklqs_0-breakfast_table (legacy, 300014-21) | 231 | 0 | 8 / 11 both | 7 / 8 both | 0.049 / 0.044 |
+    | under_small_03 (v2only side_9, 300500-03) | 3928 | 0 | 0 / 60 both | - | 0.33 GPU-h each, 0 written |
+
+  - Where the rule did not act: under_small_03 under legacy grasps never reached it (0 judged configurations). Its 16 instances went
+    15 written / 95 attempts in both arms, with demos 14 vs 15 on identical samples. The plate-drop_in_sink-bar and -countertop variants
+    got no template at eval:0 in 3600 s. touching_03 is still blocked.
+  - The first A/B's 3 extra `approach_untrackable` (ft_geo, inside_large_03 300016 / 300017) were not finger-touch refusals. They are
+    program-check joint jumps on the retreat or carry after the place: 0.24 rad at waypoint 2, 0.23 rad at waypoint 15, 0.21 rad at
+    waypoint 2. Both arms reproduce them on the same instances. The first A/B differed only because its arms drew different indices
+    (300010-13 vs 300014-17).
+  - The implementation is not stricter than the spec. Its non-finger stage is the sphere rule's own check (margin 0), so the
+    geometry arm's `rejected_non_finger_link` (130 / 32) and `rejected_body` (4) are configurations the sphere rule refuses too.
+    It is more lenient in one place: it does not run the spec's exact-hull check of palm / camera / wrist (P1 §3); only their spheres
+    are checked.
+  - Default: `geometry` since the A/B; `spheres` stays available.
 - Carton push-close stop under `ISPATIALGYM_BRACE_FULL_OPEN`: 0.05 opening, corner inset 0.04 -> 0.06.
 - attachment touchdown: the hover is the swept first-touch height + 3 mm, behind `ISPATIALGYM_ATTACH_HOVER`, A/B'd before it becomes the default.
 - The support split is kept ON. A/B, N 4: 97 / 98 demos and 0.182 GPU-h per success, vs 79 / 94 and 0.220 with it off.
