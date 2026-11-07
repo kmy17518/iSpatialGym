@@ -553,6 +553,24 @@ What still fails is upstream of the attach map, or in the oracle's touchdown:
   - the pick's feasible set F is empty (8 attempts);
   - in 2 of 4 demos the touchdown found no contact within 7 mm, so the cork was released but not attached.
 
+**Swept landed with the maps** (owner decision 2026-11-07, branch `i7-attach-swept`):
+- **Commits**: bd9e1671 merges i7-attachhover; 54439eee makes `execute.ATTACH_HOVER_DEFAULT = "swept"`.
+- **Consumer**: it reads the oracle's own resolver, so it now serves the swept maps.
+- **Validation** `i7_attswept` (v2only N 4, 0.57 GPU-h per success over all four):
+
+  | alias | demos ok | GPU-h per success | touched | drop |
+  |---|---|---|---|---|
+  | 01 | 2 / 4 | 0.23 | 3 / 3 | <= 0.1 mm |
+  | 04 | 3 / 4 | 0.18 | 3 / 3 | <= 0.5 mm (box: about 22 mm) |
+  | 02 | 0 / 4 | - | - | - |
+  | 03 (seat) | 1 / 4 | 2.03 GPU-h total | - | - |
+
+- **What still fails**:
+  - 02: the cap's grasp (`failed_grasp`);
+  - 03: the cork's rest stability (23 rejections) and in-hand slip;
+  - the grasp witness residual (`plan_failed`);
+  - one lid joined "not aligned".
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
