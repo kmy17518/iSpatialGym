@@ -197,6 +197,10 @@ def test_the_sampler_reads_the_contact_map_of_its_object_and_a_miss_asks_for_it(
     top = SimpleNamespace(name="bar_0", z=0.8126)
     cm = TT.contact_map(s, "touch_push", "target", top)
     assert cm is not None and cm.path == p and TT.contact_map(s, "touch_push", "target", top) is cm  # cached
+    # without a v2 grasp entry the model's contact-library entry is found by its model id at the spawn scale (a pushed / braced object)
+    monkeypatch.setattr(TT, "_v2_map_entry", lambda s_, spec: None)
+    s2 = SimpleNamespace(choice=SimpleNamespace(models=models), world=SimpleNamespace(floor_z=0.0, scene_model="house"))
+    assert TT.contact_map(s2, "touch_push", "target", top).path == p
     with caplog.at_level("INFO"):
         assert TT.contact_map(s, "touch_brace", "partner", top) is None
     assert any("MAP_REQUEST" in r.getMessage() and '"kind": "touch_brace"' in r.getMessage() for r in caplog.records)

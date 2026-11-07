@@ -1384,18 +1384,28 @@ def contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
     h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
     req = dict(kind=kind, role=role, object=spec.object, grasp_key=spec.grasp_key, h=round(h, 4), arm=arm, support=str(getattr(top, "name", "")),
                scene=str(getattr(s.world, "scene_model", "")))
-    ent = _v2_map_entry(s, spec)
+    from ispatialgym.grasping import schema as GS
+
     cm = None
-    if ent is None:
-        log.info("contact map miss (%s, %s %s): no v2 library entry / stable rest", kind, role, spec.object)
-    elif not map_sampling_root():
+    root = map_sampling_root()
+    # the map's object: the v2 grasp entry of the sampler's key (its stable rest checked) when the campaign library links one, else every
+    # contact-library entry of the model at the spawn scale (``<category>__<model>__<scale tag>[__...]``: a pushed / braced object needs no
+    # grasp entry - the touching partners, the axial targets)
+    ent = _v2_map_entry(s, spec)
+    cands: List[Tuple[str, Optional[str]]] = []
+    if ent is not None:
+        cands.append((os.path.basename(os.path.dirname(ent[0].path)), ent[1]))
+    mid = GS.model_id(mc.category, mc.model, list(mc.scale) if mc.scale else None)
+    if root and os.path.isdir(root):
+        cands += [(d, None) for d in sorted(os.listdir(root)) if (d == mid or d.startswith(mid + "__")) and d not in [c[0] for c in cands]]
+    req.update(entry=cands[0][0] if cands else mid, rest_id=cands[0][1] if cands else None)
+    if not root:
         log.info("contact map miss (%s, %s %s): no maps root", kind, role, spec.object)
-    else:
-        lib, rid = ent
-        entry = os.path.basename(os.path.dirname(lib.path))
-        req.update(entry=entry, rest_id=rid)
-        cm = CMAP.ContactMap.find(map_sampling_root(), kind, entry, h, rest_id=rid, arm=arm, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
+    for entry, rid in cands:
+        cm = CMAP.ContactMap.find(root, kind, entry, h, rest_id=rid, arm=arm, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
                                   anchors=_map_anchors(), config_require=_map_config_require())
+        if cm is not None:
+            break
     if cm is None:
         map_request(s, **req)
     else:
