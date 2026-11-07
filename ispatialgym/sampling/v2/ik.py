@@ -909,6 +909,15 @@ class IKChecker:
                             if not self._witness_ok(q_v, p, arm):
                                 break
                         verified.append(q_v)
+                    if len(verified) == len(poses) and bool(hit.get("ok", True)) and ignore_for_last and support_policy_on() \
+                            and not (support_policy_scope() == "grasp" and self._holding(arm)):
+                        # of-v2maps 2026-11-07 (the isg1020 spec's cache rule: a witness written without the policy - a legacy run's, the
+                        # cache is shared - must not satisfy it): the policy re-checked on the cached witness, a rejection = this chain
+                        # does not verify (the next stored chain / a fresh solve)
+                        appr_c = approached if approached is not None else self.approached_objects(poses[-1])
+                        if not bool(self.support_policy_eval(verified[-1], arm, ignore_for_last, appr_c)["ok"]):
+                            self._count("ik_cache_policy_rejected")
+                            continue
                     if len(verified) == len(poses) and bool(hit.get("ok", True)):
                         for p, q_v in zip(poses, verified):
                             self.solutions[(arm, self._pose_key(p))] = q_v.clone()
