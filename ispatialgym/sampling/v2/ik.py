@@ -410,8 +410,9 @@ def _quat_mat(q: th.Tensor) -> th.Tensor:
 
 #: i7-fingertouch 2026-11-07 (owner decision): which rule ``approach_finger_support_touch`` judges the fingers vs the support by
 FINGER_TOUCH_RULE_ENV = "ISPATIALGYM_FINGER_TOUCH_RULE"
-#: "spheres" = the customs' allowance on the padded cuRobo finger spheres (``max_penetration_m``, 5 mm; the default until the owner's A/B);
-#: "geometry" = the spec's finger-GEOMETRY rule (P1 §2): the finger collision HULLS within the contact policy's 2 mm of the support
+#: "geometry" = the spec's finger-GEOMETRY rule (P1 §2): the finger collision HULLS within the contact policy's 2 mm of the support - the
+#: default since the A/B of 2026-11-07 (ft2_sph / ft2_geo: no verdict changed on the same instances); "spheres" = the former rule, the
+#: customs' allowance on the padded cuRobo finger spheres (``max_penetration_m``, 5 mm)
 FINGER_TOUCH_RULES = ("spheres", "geometry")
 #: version of the geometry rule's measurement (part of the cache scope under "geometry")
 FINGER_TOUCH_GEOMETRY_VERSION = 1
@@ -430,9 +431,10 @@ def finger_touch_shadow_on() -> bool:
 
 
 def finger_touch_rule() -> str:
-    """``ISPATIALGYM_FINGER_TOUCH_RULE`` (i7-fingertouch 2026-11-07): ``"spheres"`` (unset / empty: the default) or ``"geometry"``;
+    """``ISPATIALGYM_FINGER_TOUCH_RULE`` (i7-fingertouch 2026-11-07): ``"geometry"`` (unset / empty: the default since
+    the A/B of 2026-11-07) or ``"spheres"`` (the former rule);
     ``ValueError`` for anything else (a typo must not run the other arm of the A/B silently)."""
-    v = os.environ.get(FINGER_TOUCH_RULE_ENV, "").strip().lower() or "spheres"
+    v = os.environ.get(FINGER_TOUCH_RULE_ENV, "").strip().lower() or "geometry"
     if v not in FINGER_TOUCH_RULES:
         raise ValueError(f"{FINGER_TOUCH_RULE_ENV}={v!r}: expected one of {list(FINGER_TOUCH_RULES)}")
     return v

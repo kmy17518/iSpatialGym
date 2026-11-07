@@ -1,6 +1,6 @@
 """i7-fingertouch 2026-11-07 (owner decision): ``approach_finger_support_touch`` under ``ISPATIALGYM_FINGER_TOUCH_RULE=geometry`` - the
 spec's finger-GEOMETRY rule (P1 §2: the finger collision HULLS at most the contact policy's 2 mm into the support) instead of the customs'
-5 mm on the padded finger spheres ("spheres", the default until the owner's A/B).
+5 mm on the padded finger spheres ("spheres"); "geometry" is the default since the A/B of 2026-11-07.
 
 The toy kit is test_approach_finger_touch's (plate/luhkiz grasp_5 coming down 27.8 deg onto a counter); a fake ``HandChecker`` puts the
 lower finger's hull ``hull_below`` m below its spheres (the real spheres sit inside the finger bodies) and measures it against the support
@@ -77,8 +77,8 @@ def _box(lo, hi) -> np.ndarray:
 
 def test_switch_default_values_and_typos(monkeypatch):
     monkeypatch.delenv(IK.FINGER_TOUCH_RULE_ENV, raising=False)
-    assert IK.finger_touch_rule() == "spheres" and FingerTouch().rule == "spheres"
-    for v, want in (("", "spheres"), ("spheres", "spheres"), ("geometry", "geometry"), (" Geometry ", "geometry")):
+    assert IK.finger_touch_rule() == "geometry" and FingerTouch().rule == "geometry"
+    for v, want in (("", "geometry"), ("spheres", "spheres"), ("geometry", "geometry"), (" Geometry ", "geometry")):
         monkeypatch.setenv(IK.FINGER_TOUCH_RULE_ENV, v)
         assert IK.finger_touch_rule() == want
         # the iors_small call site (sample_template, touching_03) builds it positionally: the rule comes from the switch
@@ -113,8 +113,10 @@ def test_iors_large_setup_reads_the_switch(monkeypatch):
     monkeypatch.setenv(IK.FINGER_TOUCH_RULE_ENV, "geometry")
     assert IORSLarge.setup_finger_touch(s) is None and s.ikc.finger_touch.rule == "geometry"
     assert s.ikc.cache_scope["finger_touch"][0] == "geometry"
-    monkeypatch.delenv(IK.FINGER_TOUCH_RULE_ENV)
+    monkeypatch.setenv(IK.FINGER_TOUCH_RULE_ENV, "spheres")
     assert IORSLarge.setup_finger_touch(s) is None and s.ikc.finger_touch.rule == "spheres"
+    monkeypatch.delenv(IK.FINGER_TOUCH_RULE_ENV)
+    assert IORSLarge.setup_finger_touch(s) is None and s.ikc.finger_touch.rule == "geometry", "the default since the A/B"
     s.ikc.set_finger_touch(None)
     monkeypatch.setenv(IK.FINGER_TOUCH_RULE_ENV, "bogus")
     err = IORSLarge.setup_finger_touch(s)

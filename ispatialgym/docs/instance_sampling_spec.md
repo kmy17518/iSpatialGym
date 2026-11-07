@@ -1759,8 +1759,8 @@ the program check's grasp) a configuration that collides with the grasp's suppor
 body is free of everything else, every link but the acting arm's two finger links is clear of the support (margin 0) and the finger
 links — at the oracle's pre-shaped opening (pinch width / 2 + 10 mm, the widest library row; `preshape: false` = fully open) — sink at
 most `max_penetration_m` below `margin_m`; INFO line 'approach finger-support touch allowed: max penetration N mm'. The finger rule is
-switched by `ISPATIALGYM_FINGER_TOUCH_RULE` (owner 2026‑11‑07): `spheres` (default) = the above, on the padded finger spheres; `geometry`
-= the contact policy's finger rule (P1 §2): the finger collision hulls (`HandChecker`, same opening) at most
+switched by `ISPATIALGYM_FINGER_TOUCH_RULE` (owner 2026‑11‑07): `spheres` = the above, on the padded finger spheres; `geometry` (the
+default since the A/B of 2026‑11‑07) = the contact policy's finger rule (P1 §2): the finger collision hulls (`HandChecker`, same opening) at most
 `finger_support_max_penetration_m` (2 mm) into the support - its registered plane (`support_plane_z`) when it has one, else its convex
 collision pieces (the pieces the touch ignore removes; a vertical board or a sink wall is measured through its own face) - and every
 other link clear of it by the policy's sphere stage; `margin_m` / `max_penetration_m` are not read, the INFO line then carries the

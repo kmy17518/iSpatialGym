@@ -28,6 +28,13 @@ Z_GRASP = 0.0248  # eef above the counter top at the grasp
 PRESHAPE = 0.5 * 0.00783 + 0.010  # grasp_5: pinch width / 2 + the oracle's pre-shape margin
 
 
+@pytest.fixture(autouse=True)
+def _sphere_rule(monkeypatch):
+    """These tests are the SPHERE rule's (``ISPATIALGYM_FINGER_TOUCH_RULE=spheres``; the geometry rule, the default since 2026-11-07, is
+    test_finger_touch_geometry's)."""
+    monkeypatch.setenv(IK.FINGER_TOUCH_RULE_ENV, "spheres")
+
+
 def _finger_bottom(fingers: float) -> float:
     """Lowest point of the lower finger's spheres below the eef (m): -56.4 mm fully open, -26.8 mm at the pre-shape (URDF FK)."""
     return -0.0268 - 0.82 * (float(fingers) - 0.0139)
