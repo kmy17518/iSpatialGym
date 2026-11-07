@@ -427,6 +427,25 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
 - inside_large_03 (the plate into drop_in_sink_lkklqs_0, basin 0.775, rim 0.886): the interior kind does not model a basin (no rim /
   front wall, open top; measure's wall rays at mid headroom pass above the rim) - a basin spec is needed, not built; the plate has no
   v2 grasps yet.
+#### Owner decisions on inside_large_01 (2026-11-07, after the first v2only validation)
+
+1. The v2 overhang path keeps the library rest as its finger rule; `pick_overhang_push.v2_finger_clearance_m` (default off) restores the
+   finger-box rule there (test `test_the_v2_overhang_finger_rule_defaults_to_the_library_rest_and_the_switch_restores_the_box_rule`).
+2. A LEFT-arm validator for lean rests (512e3139): `lean manifest --validate-arm left` -> the job's `validate_arm`, entry
+   `..._lean_<tag>__valleft`; `pipeline lean --arm left` (job_glib `GB_VAL_ARM=left`): the validation world's left arm, the object
+   mirrored to the robot's left (`validate_tabletop.mirrored_offsets`, as `validate_artic motions --arm left`), the left hand's
+   candidates; the library records `validate_arm` and the identity carries it (right-arm entries unchanged). Lean rests only.
+   lean_left of hardback__bqvvvx__bu at 16.7 deg with it: 6000 x 12 candidates 5 -> geometry-ok 1 -> 1 representative -> 1 left-arm
+   valid - the same page-block pinch as the right-arm run, its interior maps 0 / 0 feasible (both arms); 24000 x 24 at seeds 0-3:
+   12 -> 4-8 geometry-ok -> 3-5 representatives -> 0-1 valid (seed 1: a page-block pinch again); every spine-side representative fails
+   the placement with `no_placement:board:left_gripper_finger_link1` (the right-arm runs: `...:right_gripper_finger_link1`) - not an
+   arm effect: the 16 spine- and page-side representatives sit 3.3-4.8 cm below the centre, where the finger meets the board; the valid lean_right spine pinch sits 6.4 cm below.
+3. Nearer places: `generation.inside_stand_off_max_m` (240591df), inside_large_01 0.70 - the stand-offs 0.75 / 0.85 are not laid out.
+   All 8 placements of the first validations were at 0.85 (4 / 4 at trunk translate 0.25 succeeded, 4 / 4 at 0.50 failed).
+   Validation `i7_oh_L` (trunk_512e3139, v2-root `$OFH/v2maps_i7oh2` = v2maps_i7oh with the left-arm lean_left entry and maps): the cap
+   removed 238 of 476 stance-C lattice candidates per arm; the 0.55 / 0.65 rows hold no feasible goal-map cell for either arm (lean_right:
+   right 0 / 0, its left-arm map 0 / 2; lean_left: 0) -> setup rejects no_placement_stance, 0 attempts, 0 written (0.09 GPU-h). Not widened.
+
 ### Lean rests and interior maps (branch i7-lean, 2026-11-07)
 
 - **Lean rest kind** (`grasping/lean.py`): the object settled in the synthetic world against a vertical board at an angle / side; the rest id,
