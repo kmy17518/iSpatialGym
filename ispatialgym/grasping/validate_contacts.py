@@ -1029,13 +1029,18 @@ class KitContactWorld:
         import omnigibson.lazy as lazy
 
         def bind():
+            with self.tw.og.sim.editing_usd():  # a USD edit (the material prim, its binding) outside it raises in OmniGibson
+                _bind()
+            self.tw.og.sim.update_handles()
+            self.tw.og.sim.step()
+
+        def _bind():
             pm = lazy.isaacsim.core.api.materials.physics_material.PhysicsMaterial(prim_path=f"{self.tw.slab.prim_path}/Looks/diag_physics_mat_{int(round(mu * 1000))}",
                                                                                    name=f"diag_physics_mat_{int(round(mu * 1000))}", static_friction=float(mu),
                                                                                    dynamic_friction=float(mu), restitution=0.0)
             for link in self.tw.slab.links.values():
                 for m in link.collision_meshes.values():
                     m.apply_physics_material(pm)
-            self.tw.og.sim.step()
 
         self._reprobe(obj, bind)
 
