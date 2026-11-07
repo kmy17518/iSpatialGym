@@ -1235,6 +1235,17 @@ class SamplerV2(TaskSampler):
         self.template_meta["variant"] = self.gp.variant
         self.template_meta["bddl_variant"] = self.problem.variant
 
+    def check_witness_reach(self) -> None:
+        """i7-attachfix (owner 2026-11-08 item 3): every recorded IK witness reaches its pose (an independent numpy FK,
+        :mod:`witness_check`) before the instance is written; a miss rejects the attempt (``witness_unreachable``)."""
+        from ispatialgym.sampling.v2 import witness_check as WC
+
+        if not WC.enabled() or not self.sidecar.ik_witnesses:
+            return
+        bad = WC.witness_violations(self.sidecar.ik_witnesses)
+        if bad:
+            raise Reject("witness_unreachable", f"{len(bad)} recorded IK witness target(s) miss their pose", worst=sorted(bad, key=lambda e: -e["pos_m"])[:3])
+
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         iid = self.instance_id(index)
         # the TRO records a state at rest: the physics steps of the checks after the settle (``attached`` teleports, program
@@ -1596,6 +1607,8 @@ class SamplerV2(TaskSampler):
                     phase = "program_check"
                     self.program_check(draft)
                     clock.mark("program_check")
+                    phase = "witness_check"
+                    self.check_witness_reach()
                     phase = "write"
                     if self.template_paths is None:
                         self.save_template()
