@@ -1330,8 +1330,12 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
         map_request(s, **req)
         return None
     root = os.path.join(map_sampling_root(), entry)
+    # i7-floorfix 2026-11-07: only a floor map of the finger rule the exact IK applies at a floor grasp (reach_maps.FLOOR_FINGERS "policy": the
+    # floor out of the IK, the fingers by the policy's floor allowance) serves - a map of the former rule ("spheres": the IK's ground slab
+    # failed every grasp whose padded finger spheres touched the floor) does not
+    cfg_req = {**(_map_config_require() or {}), "floor_fingers": RMAP.FLOOR_FINGERS}
     rm = RMAP.ReachMap.find(root, lib, RMAP.FLOOR_HEIGHT, rest_id=rid, arm=arm, anchors=None, kind="floor", policy_key=CP.DEFAULT.key(arm),
-                            robot=RMAP.robot_digest(), config_require=_map_config_require())
+                            robot=RMAP.robot_digest(), config_require=cfg_req)
     if rm is None:
         log.info("reach map miss for %s (%s) on the floor, %s arm (%s)", spec.object, spec.grasp_key, arm, root)
         map_request(s, **req)
