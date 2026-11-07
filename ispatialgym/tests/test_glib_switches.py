@@ -16,6 +16,8 @@ from ispatialgym.grasping import schema as S
 
 #: ``identity_key`` of :func:`_lib_data` computed with the code BEFORE the switch state existed (of-v2maps 33d8ecaf)
 GOLDEN_KEY = "cd78dd8e53bcfdbf"
+#: every candidate switch off (i7-padsweep added the third)
+OFF3 = {"blade_contact_at_retreat": False, "retreat_shift_exact": False, "sweep_from_preshape": False}
 
 
 def _lib_data(**extra):
@@ -48,10 +50,11 @@ def _write_entry(root, data, cand_config=None):
 
 
 def test_switch_state_reads_off_and_keeps_every_existing_key(tmp_path):
-    assert S.CANDIDATE_SWITCHES == ("blade_contact_at_retreat", "retreat_shift_exact")
-    assert S.candidate_switches(None) == S.candidate_switches({}) == {"blade_contact_at_retreat": False, "retreat_shift_exact": False}
+    # i7-padsweep: a third switch (sweep_from_preshape) joined; the record carries it, the identity only when on (keys unchanged)
+    assert S.CANDIDATE_SWITCHES == ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape")
+    assert S.candidate_switches(None) == S.candidate_switches({}) == OFF3
     lib = _lib(_lib_data())
-    assert lib.candidate_switches() == {"blade_contact_at_retreat": False, "retreat_shift_exact": False}
+    assert lib.candidate_switches() == OFF3
     assert "candidate_switches" not in lib.identity() and lib.identity_key() == GOLDEN_KEY
     # an explicit all-off record (every build from now on), an old candidates.json config without the fields, one with them False
     assert _lib(_lib_data(candidate_switches={"blade_contact_at_retreat": False, "retreat_shift_exact": False})).identity_key() == GOLDEN_KEY
@@ -59,7 +62,7 @@ def test_switch_state_reads_off_and_keeps_every_existing_key(tmp_path):
         root = tmp_path / f"r{i}"
         _write_entry(root, _lib_data(), cfg)
         got = S.load_model("plate", "synthetic", [1, 1, 1], str(root))
-        assert got.candidate_switches() == {"blade_contact_at_retreat": False, "retreat_shift_exact": False} and got.identity_key() == GOLDEN_KEY
+        assert got.candidate_switches() == OFF3 and got.identity_key() == GOLDEN_KEY
 
 
 def test_switch_state_on_changes_the_identity():
@@ -67,7 +70,7 @@ def test_switch_state_on_changes_the_identity():
     for sw in ({"blade_contact_at_retreat": True}, {"retreat_shift_exact": True}, {"blade_contact_at_retreat": True, "retreat_shift_exact": True}):
         lib = _lib(_lib_data(candidate_switches=sw))
         full = S.candidate_switches(sw)
-        assert lib.candidate_switches() == full and lib.identity()["candidate_switches"] == full
+        assert lib.candidate_switches() == full and lib.identity()["candidate_switches"] == {k: full[k] for k in S._IDENTITY_PAIR}
         keys[tuple(sorted(sw))] = lib.identity_key()
     assert len(set(keys.values())) == 3 and GOLDEN_KEY not in keys.values()  # the same grasps under each state: three distinct entries
 
@@ -76,7 +79,7 @@ def test_switch_state_from_the_candidates_config_when_library_json_has_no_record
     # an entry generated with the switches (6e418172 opt-in) and validated before library.json recorded them
     _write_entry(tmp_path, _lib_data(), {"blade_contact_at_retreat": True, "retreat_shift_exact": True})
     lib = S.load_model("plate", "synthetic", [1, 1, 1], str(tmp_path))
-    assert lib.candidate_switches() == {"blade_contact_at_retreat": True, "retreat_shift_exact": True}
+    assert lib.candidate_switches() == dict(OFF3, blade_contact_at_retreat=True, retreat_shift_exact=True)
     assert lib.identity_key() != GOLDEN_KEY
     # the library.json record wins over the candidates config
     _write_entry(tmp_path / "rec", _lib_data(candidate_switches={"blade_contact_at_retreat": False, "retreat_shift_exact": False}),
@@ -111,7 +114,7 @@ def test_build_library_records_the_switch_state():
                       ({"blade_contact_at_retreat": True, "retreat_shift_exact": True}, (True, True))):
         cand_doc = {"candidates": [], "families": {}, "arm": "right", "pipeline": "a1v2", **({"config": cfg} if cfg is not None else {})}
         lib = VT.build_library(job, cand_doc, {}, [], CP.DEFAULT, None)
-        assert lib["candidate_switches"] == dict(zip(S.CANDIDATE_SWITCHES, want)) and lib["legacy_key"] == "plate__synthetic"
+        assert lib["candidate_switches"] == dict(zip(S.CANDIDATE_SWITCHES, want + (False,))) and lib["legacy_key"] == "plate__synthetic"
 
 
 def test_a_map_of_the_off_entry_never_serves_the_on_entry(tmp_path):
@@ -242,6 +245,6 @@ def test_new_builds_record_both_switches_on(monkeypatch):
     from ispatialgym.grasping import pipeline as PL
 
     monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
-    assert S.candidate_switches(asdict(CA.CandidateConfig())) == {"blade_contact_at_retreat": True, "retreat_shift_exact": True}
+    assert S.candidate_switches(asdict(CA.CandidateConfig())) == dict(OFF3, blade_contact_at_retreat=True, retreat_shift_exact=True)
     cfg, _ = PL.candidate_overrides({"cand_overrides": {"blade_contact_at_retreat": False, "retreat_shift_exact": False}})
-    assert S.candidate_switches(asdict(cfg)) == {"blade_contact_at_retreat": False, "retreat_shift_exact": False}
+    assert S.candidate_switches(asdict(cfg)) == OFF3
