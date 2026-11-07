@@ -470,6 +470,26 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
    example, a missing axial brace map means no brace, and the push runs by its own rule. A missing map for a REQUIRED step (e.g. the
    touching brace gate) still rejects missing_map. Every i7-contact consumer is classified as optional or required.
 
+### Owner decision 2026-11-07: reach-map trunk eligibility per stand-off (a bug fix, the new default)
+
+**The bug.** reach_maps.py (~648-669) drops a whole trunk when no idle-arm posture is free of the map slab at EVERY stand-off.
+- On nextto_04, the gym_shoe kmcbym map at 0.3471 loses t0.95 entirely: untucked / ready clip the slab at d_e 0.35 only ([False, True, True]).
+- The 0.45 / 0.55 columns the sampler uses are therefore lost too: 0 cells, against 70 per arm in the legacy band.
+
+**The fix.**
+- Eligibility is judged per stand-off: a trunk is ineligible only at the d_e where every posture collides. The other d_e keep their cells.
+- Trunks that were already eligible under the old rule keep their posture choice, so existing cells do not move. If a per-d_e posture
+  choice would change cells of such a trunk, that is reported instead of done.
+- The rule goes in the map identity (config), so maps built under the old and the new rule cannot be confused. Old maps keep loading;
+  their identity reads as the old rule.
+- Unit tests: the nextto_04 case; an all-clear trunk unchanged; an all-colliding trunk still ineligible.
+
+**Count before rebuilding**, on the campaign maps only (v2maps_i7 and the staged roots in use):
+- per map: the trunks / (trunk, d_e) columns that become eligible, and the feasible cells old -> new;
+- rebuild only the maps whose cells change. Then the new rule becomes the default for new map builds.
+
+**Validation:** the count table; `--grasps v2only` N 4 on nextto_04. Aliases with rebuilt maps ride along in the next scheduled run.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
