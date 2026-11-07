@@ -1931,7 +1931,7 @@ class IORSSmall(SamplerV2):
                 "free_sha": hashlib.sha1(np.ascontiguousarray(free.detach().cpu().numpy()).tobytes()).hexdigest()[:16]}
 
     @staticmethod
-    def _spa_band_signature(bands) -> Optional[Dict[str, Any]]:
+    def _spa_band_signature(bands, sampler=None) -> Optional[Dict[str, Any]]:
         """:func:`tabletop.band_facts` plus the band's key / lattice / trunk count: a band recomputed under the same path changes the key."""
         if bands is None:
             return None
@@ -1940,7 +1940,7 @@ class IORSSmall(SamplerV2):
         # and the support-first switch changes the cells Phase 2 keeps
         return {**(TT.band_facts(bands) or {}), "key": meta.get("key") or meta.get("map_key"), "map_path": os.path.basename(str(meta.get("map_path") or "")) or None,
                 "lattice": meta.get("lattice"), "n_trunks": len(meta.get("trunks") or []),
-                "support_first": bool(TT.map_support_first_on() and TT.is_map_view(bands))}
+                "support_first": TT.support_first_tag(sampler, bands)}  # i7-unblock: forced on / off, or the automatic rule's tag
 
     @staticmethod
     def _spa_cell_centre(lo: float, hi: float, cell_m: float, i: int) -> float:
@@ -1972,7 +1972,7 @@ class IORSSmall(SamplerV2):
                         "shelf_free_span_min_m": float(self.gen("shelf_free_span_min_m", 0.15)),
                         "shelf_spine_behind_edge_m": self.gen("shelf_spine_behind_edge_m"), "shelf_bay_lateral_m": self.gen("shelf_bay_lateral_m")},
                 "sides": [float(sd) for sd in self.template_sides()], "pair": {"g_NT": (self.pair or {}).get("g_NT"), "handedness": (self.pair or {}).get("handedness")},
-                "segment_arms": arms, "bands": {a: self._spa_band_signature(self.band_of_arm(a)) for a in arms},
+                "segment_arms": arms, "bands": {a: self._spa_band_signature(self.band_of_arm(a), self) for a in arms},
                 "shelf_start": None if self.shelf_start is None else {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg")},
                 "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
         if shelf_draw_on(self):
