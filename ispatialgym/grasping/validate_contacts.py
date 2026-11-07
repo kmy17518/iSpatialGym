@@ -108,6 +108,14 @@ class ContactValidateConfig:
     #: owner item 3 switch (default OFF; the owner decides): the sampler's hand_overlap screen is a ranking hint - the screened entries are
     #: validated and counted after the live ones (``entry_order``) instead of being marked ``screened`` (the sampler: ISPATIALGYM_HAND_OVERLAP_RANK)
     screen_as_rank: bool = False
+    #: owner A6 (2026-11-08, i7-contactfu): STRATIFIED validation - per (yaw slot x axial end x spin) group (:func:`entry_group`) the live
+    #: entries are validated in library order (round-robin over the groups) until ``per_group_valid`` are physics-valid or ``per_group_max``
+    #: were tried; 0 = off (the ``max_entries`` cap as before). A group with fewer than ``per_group_min`` valid entries is reported ``short``.
+    #: Without ``skip_validated`` the run is FRESH: an entry it does not run loses an earlier verdict (kept as ``validation_prev``), so a map
+    #: built from the library reads only this run's verdicts
+    per_group_valid: int = 0
+    per_group_min: int = 2
+    per_group_max: int = 8
     #: the object in the base frame (ahead of the slab edge, to the arm's side): the right arm's; the left arm's lateral is mirrored
     base_offsets: Tuple[Tuple[float, float], ...] = ((0.0, -0.15), (0.0, -0.28), (0.08, -0.05), (0.08, -0.22))
     max_steps: int = 1800
@@ -541,6 +549,71 @@ def axial_group(entry: Dict[str, Any]) -> str:
     return m.group(1) if m else ""
 
 
+def entry_group(entry: Dict[str, Any]) -> Tuple[float, str]:
+    """The stratification group of an entry (owner A6): its yaw slot and, for an axial entry, its (pushed end, turn sense)."""
+    return round(float(entry.get("yaw_deg", 0.0)), 4), axial_group(entry)
+
+
+def group_key_str(g: Tuple[float, str]) -> str:
+    return f"y{g[0]:g}{g[1]}"
+
+
+class GroupQuota:
+    """Owner A6 (i7-contactfu 2026-11-08): the stratified validation's schedule over the live entries (pure; :func:`validate_library` runs
+    it). Groups (:func:`entry_group`) in their first appearance in library order; within a group the library order (the sampler's). Each
+    round takes the next entry of every group that still needs one (fewer than ``per_valid`` valid and fewer than ``per_max`` tried);
+    ``kept`` verdicts (``skip_validated``) count first and are not re-run. :meth:`next_round` -> the entries to run now;
+    :meth:`done(entry, verdict)` books one."""
+
+    def __init__(self, entries: Sequence[Dict[str, Any]], per_valid: int, per_max: int, keep_verdicts: bool = False):
+        self.per_valid, self.per_max = int(per_valid), int(per_max)
+        self.groups: Dict[Tuple[float, str], List[Dict[str, Any]]] = {}
+        for e in entries:
+            self.groups.setdefault(entry_group(e), []).append(e)
+        self.state = {g: {"valid": 0, "tried": 0, "kept": 0} for g in self.groups}
+        self.pos = {g: 0 for g in self.groups}
+        self.kept_ids = set()
+        if keep_verdicts:
+            for g, es in self.groups.items():
+                for e in es:
+                    v = (e.get("validation") or {}).get("verdict")
+                    if v in ("valid", "invalid", "unreachable"):
+                        self.kept_ids.add(id(e))
+                        self._book(g, v, kept=True)
+
+    def _book(self, g, verdict: str, kept: bool = False) -> None:
+        st = self.state[g]
+        st["tried"] += 1
+        st["kept"] += int(kept)
+        st["valid"] += int(verdict == "valid")
+
+    def needs(self, g) -> bool:
+        st = self.state[g]
+        return st["valid"] < self.per_valid and st["tried"] < self.per_max
+
+    def next_round(self) -> List[Dict[str, Any]]:
+        out = []
+        for g, es in self.groups.items():
+            if not self.needs(g):
+                continue
+            while self.pos[g] < len(es) and id(es[self.pos[g]]) in self.kept_ids:
+                self.pos[g] += 1
+            if self.pos[g] < len(es):
+                out.append(es[self.pos[g]])
+                self.pos[g] += 1
+        return out
+
+    def done(self, entry: Dict[str, Any], verdict: Optional[str]) -> None:
+        self._book(entry_group(entry), verdict or "invalid")
+
+    def summary(self, per_min: int) -> Dict[str, Any]:
+        groups = {group_key_str(g): dict(st, short=st["valid"] < per_min, exhausted=self.pos[g] >= len(self.groups[g]) and self.needs(g))
+                  for g, st in self.state.items()}
+        return {"per_group_valid": self.per_valid, "per_group_max": self.per_max, "per_group_min": per_min, "groups": groups,
+                "n_groups": len(groups), "n_short": sum(1 for v in groups.values() if v["short"]),
+                "valid_hist": {str(k): sum(1 for v in groups.values() if min(v["valid"], self.per_valid) == k) for k in range(self.per_valid + 1)}}
+
+
 def entry_order(entries: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """The validation order: the entries the sampler would try (not ``sampler_screen``ed) first, round-robin over their (yaw slot, axial
     group) - each group in library order = the sampler's order -, then the screened ones - so the ``max_entries`` cap samples every yaw's
@@ -587,22 +660,10 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     rest_q = np.asarray(lib_k["object"]["rest"]["quat_xyzw"], dtype=float)
     settled: Dict[float, Tuple[Dict[str, Any], Any]] = {}
     n_live = 0
-    for e in entry_order(lib_k["entries"]):
+
+    def run_entry(e: Dict[str, Any], screen) -> Optional[str]:
+        """Validate one entry (its ``validation`` written); returns the verdict."""
         yaw = round(float(e.get("yaw_deg", 0.0)), 4)
-        screen = (e.get("sampler_screen") or {}).get("hand_overlap")
-        if cfg.diagnose_screened and not screen:
-            continue  # the diagnostic validates the screened entries only; the live ones keep their record
-        if screen and not cfg.diagnose_screened and not cfg.screen_as_rank:
-            # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
-            e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
-            tim["n_screened"] = tim.get("n_screened", 0) + 1
-            continue
-        if cfg.skip_validated and (e.get("validation") or {}).get("verdict") is not None:
-            tim["n_kept"] = tim.get("n_kept", 0) + 1
-            continue
-        if n_live >= cfg.max_entries:
-            continue
-        n_live += 1
         tim["n_entries"] += 1
         try:
             t0 = time.time()
@@ -618,13 +679,13 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
         except Exception as ex:  # noqa: BLE001 - this entry fails, the model goes on
             tim["n_errors"] += 1
             e["validation"] = dict(_error_trial(ex), trials=[], stage="settle/plan")
-            continue
+            return e["validation"]["verdict"]
         if plan is None or plan.get("q") is None:
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "invalid", "reasons": ["no_placement"], "plan_fail": (plan or {}).get("fail"), "trials": []}
-            continue
+            return "invalid"
         if plan.get("chain_unreachable"):
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "unreachable", "reasons": ["chain_unreachable"], "plan": _plan_facts(plan), "trials": []}
-            continue
+            return "unreachable"
         trials = []
         t0 = time.time()
         for _k in range(cfg.trials_per_entry):
@@ -643,6 +704,53 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
             e["validation"].update(screen=screen, screen_as_rank=True)
         elif screen:
             e["validation"].update(diagnostic="a screened entry validated (the sampler's hand_overlap removes it: never executed)", screen=screen)
+        return verdict
+
+    def screen_of(e):
+        return (e.get("sampler_screen") or {}).get("hand_overlap")
+
+    if cfg.per_group_valid > 0 and not cfg.diagnose_screened:
+        # owner A6: stratified - the live entries (screened ones only with screen_as_rank, after them) per (yaw x end x spin) group
+        live = [e for e in lib_k["entries"] if not screen_of(e)]
+        ranked = [e for e in lib_k["entries"] if screen_of(e)] if cfg.screen_as_rank else []
+        for e in lib_k["entries"]:
+            if screen_of(e) and not cfg.screen_as_rank:
+                e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen_of(e), "trials": []}
+                tim["n_screened"] = tim.get("n_screened", 0) + 1
+        quota = GroupQuota(live + ranked, cfg.per_group_valid, cfg.per_group_max, keep_verdicts=cfg.skip_validated)
+        tim["n_kept"] = len(quota.kept_ids)
+        ran = set(quota.kept_ids)
+        while True:
+            batch = quota.next_round()
+            if not batch:
+                break
+            for e in batch:
+                quota.done(e, run_entry(e, screen_of(e)))
+                ran.add(id(e))
+        if not cfg.skip_validated:
+            # FRESH: an entry this run did not reach keeps no verdict of an earlier run (a map reads only this run's verdicts)
+            for e in live + ranked:
+                if id(e) not in ran and e.get("validation") is not None:
+                    e["validation_prev"] = e.pop("validation")
+                    tim["n_cleared"] = tim.get("n_cleared", 0) + 1
+        lib_k["validation_groups"] = quota.summary(cfg.per_group_min)
+    else:
+        for e in entry_order(lib_k["entries"]):
+            screen = screen_of(e)
+            if cfg.diagnose_screened and not screen:
+                continue  # the diagnostic validates the screened entries only; the live ones keep their record
+            if screen and not cfg.diagnose_screened and not cfg.screen_as_rank:
+                # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
+                e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
+                tim["n_screened"] = tim.get("n_screened", 0) + 1
+                continue
+            if cfg.skip_validated and (e.get("validation") or {}).get("verdict") is not None:
+                tim["n_kept"] = tim.get("n_kept", 0) + 1
+                continue
+            if n_live >= cfg.max_entries:
+                continue
+            n_live += 1
+            run_entry(e, screen)
     tim = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in tim.items()}
     tim["total_s"] = round(time.time() - t_all, 2)
     tim["rest_id"] = lib_k["object"].get("rest_id")
@@ -1324,7 +1432,8 @@ def validate_cli(a) -> None:
     from ispatialgym.grasping import contact_library as CL
 
     cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)), skip_validated=bool(getattr(a, "skip_validated", False)),
-                                 screen_as_rank=bool(getattr(a, "screen_as_rank", False)))
+                                 screen_as_rank=bool(getattr(a, "screen_as_rank", False)), per_group_valid=int(getattr(a, "per_group_valid", 0) or 0),
+                                 per_group_min=int(getattr(a, "per_group_min", 2) or 2), per_group_max=int(getattr(a, "per_group_max", 8) or 8))
     arm = a.arm or (cfg.work_arm if a.kind == "push" else cfg.brace_arm)
     base = os.path.join(a.root, a.kind, "models")
     if getattr(a, "jobs", None):
@@ -1363,7 +1472,9 @@ def validate_cli(a) -> None:
             S.save_json(path, lib_k)
             v = [e.get("validation", {}).get("verdict") for e in lib_k["entries"]]
             CL._log(a.root, "validate", a.shard, {"id": eid, "kind": a.kind, "arm": arm, "ok": True, "s": round(time.time() - t1, 2), "timing": tim,
-                                                  "valid": v.count("valid"), "invalid": v.count("invalid"), "unreachable": v.count("unreachable"), "skipped": v.count(None)})
+                                                  "valid": v.count("valid"), "invalid": v.count("invalid"), "unreachable": v.count("unreachable"), "skipped": v.count(None),
+                                                  **({"groups": {k: lib_k["validation_groups"][k] for k in ("n_groups", "n_short", "valid_hist")}}
+                                                     if lib_k.get("validation_groups") else {})})
         except Exception as e:  # noqa: BLE001
             CL._log(a.root, "validate", a.shard, {"id": eid, "kind": a.kind, "ok": False, "error": repr(e), "tb": traceback.format_exc()[-1200:]})
     print("GB_CONTACT_VALIDATE_DONE", flush=True)
@@ -1434,6 +1545,10 @@ def main(argv=None):
     ap.add_argument("--screen-as-rank", action="store_true", help="owner item 3 switch (default off): validate the hand_overlap-screened entries "
                     "after the live ones, counted, instead of marking them screened")
     ap.add_argument("--skip-validated", action="store_true", help="keep the entries an earlier run validated (not re-run, not counted against max_entries)")
+    ap.add_argument("--per-group-valid", type=int, default=0, help="owner A6: STRATIFIED - validate per (yaw x end x spin) group until this many "
+                    "are valid (0: off, the max_entries cap); without --skip-validated the run is fresh (unreached entries lose old verdicts)")
+    ap.add_argument("--per-group-min", type=int, default=2, help="a group with fewer valid entries is reported short")
+    ap.add_argument("--per-group-max", type=int, default=8, help="at most this many entries tried per group (kept verdicts count)")
     ap.add_argument("--jobs", default=None, help="the build manifest: validate the shard's job ids (the build's partition)")
     validate_cli(ap.parse_args(argv))
 
