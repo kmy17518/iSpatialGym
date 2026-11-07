@@ -472,6 +472,28 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
   re-select from the pre-NMS set; lean_left_20: 2 of 12 in the region (side_9, already the one valid grasp, and side_11 untested at
   +7.5 mm) - its two invalid representatives would not be tested.
 
+#### Stance C trunk-first order (owner decision 2026-11-07, option 1 for inside_large_01; branch i7-placeorder)
+
+Owner's wording: "Remove the 0.70 m cap: generation.inside_stand_off_max_m back to 0.85, or removed, for inside_large_01, so the right arm
+gets its 0.85 m place stances back. Add a stance C ordering option for inside_large_01 only: least trunk translate first, then nearest
+stand-off. More extended trunks are tried only after less extended candidates have failed. It changes the order, not the set: no stance
+removed; exact IK and the QA gates unchanged. Kit stance_c.extended_used. Evidence: no global link between trunk extension and place
+failures. All 3 place failures are inside_large_01 at translate 0.50 / tilt -0.6 / stand-off 0.85; translate 0.25 at 0.85 went 4/4."
+
+- Code: `iors_large.trunk_first_order(c_pool, order)` - a stable sort of the coupling's prior C order (travel / edge rank / the seeded
+  permutation) by (trunk translate, stand-off) ascending; the set and the per-coupling budget (`c_candidates_max`) unchanged. Opt-in
+  `generation.c_order_trunk_first` (default off: every other alias as before), applied in `IORSLarge._couple` right after the prior order and
+  BEFORE the per-alias outcome memory's hook (i7-memory `alias_memory.reorder`, which keeps the order it is given and only defers the
+  candidates of the bins it down-weighted). Kit `stance_c.trunk_first` (couplings ordered) and `stance_c.extended_used` (a coupled C with a
+  trunk translate above the pool's least); the summary's `c_order` {rank, translate, stand_off, least_translate, extended}.
+- inside_large_01 customs: `c_order_trunk_first: true`; `inside_stand_off_max_m` removed (the option itself stays, default none): stance C
+  lays out every stand-off 0.55-0.85 again.
+- The campaign-wide check behind it (`$OFH/placeorder_20261107/demos.jsonl`, 2340 demos under `$OFH/out`; goal-stance failures
+  robot_wobble / robot_touching_itself / plan_failed per demo reaching the goal stance, by its trunk translate): all demos 0.0 19/508,
+  0.25 51/711, 0.50 16/520, 0.75 0/90, 0.95 0/94; pick-and-place 0.0 3/98, 0.25 3/134, 0.50 5/70, 0.75 0/11, 0.95 0/40. The place-time
+  wobble / self-contact are inside_large_01's 3 at (0.50, -0.6) / 0.85; the campaign's other wobbles are grasp-stage.
+- Tests: `test_trunk_first_order.py` (the order, ties kept in the prior order, the set unchanged, the coupling's opt-in, the alias only).
+
 ### Lean rests and interior maps (branch i7-lean, 2026-11-07)
 
 - **Lean rest kind** (`grasping/lean.py`): the object settled in the synthetic world against a vertical board at an angle / side; the rest id,
