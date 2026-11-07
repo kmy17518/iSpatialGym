@@ -805,6 +805,16 @@ def hull_edge_points(pts: th.Tensor, spacing: float = 0.003) -> th.Tensor:
     return th.as_tensor(np.vstack(out), dtype=th.float32)
 
 
+def place_approached(s, inside: Optional[bool] = None) -> List[Any]:
+    """i7-split 2026-11-07: the objects an IORS small place descent closes in on (removed along the whole tracked descent, ``IKChecker.exact``'s
+    ``approached``): the partner placed on / next to. The supports were passed too (``approached=ign``), so the support left the world along
+    the whole descent and its split (rims / walls / rails above its plane) never applied; they stay in the descent's last-pose ignore (their
+    split there), as the program check's place has them (``program_check._approached_for``). ``inside`` (default: ``s.relation``): an inside
+    release keeps the partner in the world - nothing approached."""
+    inside = (getattr(s, "relation", None) == "inside") if inside is None else bool(inside)
+    return [] if inside else [s.obj("partner")]
+
+
 @register(*RELATION_OF_SUBTASK)
 class IORSSmall(SamplerV2):
     """One class for the five small-scale relations; the relation comes from the subtask id."""
@@ -2470,7 +2480,7 @@ class IORSSmall(SamplerV2):
             st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
             with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
                 res_place = self.ikc.exact([self.pre_place_of(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
-                                           scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
+                                           scale_key=self.choice.models["target"].scale, cache=False, approached=place_approached(self))
             if not res_place.ok:
                 raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
                                                                     f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
@@ -4305,7 +4315,8 @@ class IORSSmall(SamplerV2):
         lift_end = PC.lift_end_pose(grasp)
         arm_q = None
         with attached(self.kit, grasp.arm, tgt, eef_in_object=grasp.eef_in_object):
-            r = self.ikc.exact([grasp.pre_place, grasp.place], st_place, grasp.arm, ignore_for_last=ign, scale_key=scale, cache=False, approached=ign)
+            r = self.ikc.exact([grasp.pre_place, grasp.place], st_place, grasp.arm, ignore_for_last=ign, scale_key=scale, cache=False,
+                               approached=place_approached(self))
             if not r.ok:
                 return f"descent: {r.reason}"
             r = self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(), cache=False, approached=[])
@@ -4714,7 +4725,8 @@ class IORSSmall(SamplerV2):
         place = IK.grasp_pose(t_place_pose, grasp.eef_in_object)
         ign = self.support_objects() + [self.obj("partner")]
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-            r = self.ikc.exact([self.shelf_pre_place(place), place], st, grasp.arm, ignore_for_last=ign, scale_key=self.choice.models["target"].scale, cache=False, approached=ign)
+            r = self.ikc.exact([self.shelf_pre_place(place), place], st, grasp.arm, ignore_for_last=ign, scale_key=self.choice.models["target"].scale, cache=False,
+                               approached=place_approached(self, inside=False))
         if not r.ok:
             return f"descent: {r.reason}"
         r2 = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)

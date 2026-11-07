@@ -483,3 +483,39 @@ def test_protrusion_hit_counts_fingers_in_a_rim():
     assert float(pts[:, 2].max()) < ROOT[2] + RIM_TOP and float(pts[:, 0].max()) == pytest.approx(ROOT[0] + 0.197, abs=1e-5)
     assert SS.count_protrusion_hit(s, eef, [tray]) == "tray_source/rim_px" and kit.stats["support_split.protrusion_hits"] == 1
     assert SS.count_protrusion_hit(s, eef, [tray], opening=0.02) is None and kit.stats["support_split.protrusion_hits"] == 1
+
+
+def test_program_check_place_on_a_registered_tray_is_not_approached():
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    dst, partner = _tray("tray_dest"), _Obj("partner", {"p": _box((0, 0, 0), (0.1, 0.1, 0.1))}, model="dish")
+    ikc = IKChecker(_kit([dst, partner]))
+    action = SimpleNamespace(name="place", on="dst", grasp=None)
+    sampler = SimpleNamespace(objects={"dst": dst, "partner": partner}, ikc=ikc)
+    assert PC._approached_for(action, sampler) == [dst]
+    _register_tray(ikc, dst)
+    assert PC._approached_for(action, sampler) == []
+    assert PC._approached_for(SimpleNamespace(name="place", on="partner", grasp=None), sampler) == [partner]
+
+
+def test_iors_small_place_approaches_the_partner_only():
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    partner = object()
+    s = SimpleNamespace(relation="ontop", obj=lambda role: partner if role == "partner" else pytest.fail(role))
+    assert IS.place_approached(s) == [partner]
+    s.relation = "inside"
+    assert IS.place_approached(s) == [] and IS.place_approached(s, inside=False) == [partner]
+
+
+def test_tray_floor_registers_its_split_plane():
+    from ispatialgym.sampling.v2.tasks.disembedding import TrayFloor
+
+    tray = _tray()
+    ikc = IKChecker(_kit([tray]))
+    cells = th.tensor(_floor_cells(), dtype=th.float32)
+    fl = TrayFloor(cells, FLOOR_TOP, 0.02, RIM_TOP, heights=th.zeros(len(cells)))
+    rec = fl.register_split(ikc, tray, ROOT[2] + FLOOR_TOP)
+    assert rec.dz == pytest.approx(FLOOR_TOP) and rec.tol == pytest.approx(SS.MIN_TOL_M) and rec.what == "tray_floor"
+    assert rec.cells.shape == (len(cells), 2)
+    assert TrayFloor(cells, FLOOR_TOP, 0.02, RIM_TOP).register_split(ikc, tray, 0.8).tol is None  # no heights: the whole ignore

@@ -1898,6 +1898,13 @@ def _approached_for(action, sampler) -> Optional[List[Any]]:
     out = [objs[cand]] if cand in objs else []
     if name == "grasp":
         out += [o for o in _may_touch(getattr(action, "grasp", None), objs) if all(o is not x for x in out)]
+    if name == "place":
+        # i7-split 2026-11-07: a REGISTERED support placed on (the destination tray: ``support_split.registered_names``) is not removed along
+        # the whole descent - it is the place's support (its split: the floor off at the last pose, the rims obstacles), as
+        # ``IKChecker.approached_objects`` infers it for the sampler's own place checks
+        from ispatialgym.sampling.v2 import support_split as SS
+
+        out = SS.drop_registered(getattr(sampler, "ikc", None), out)
     return out
 
 

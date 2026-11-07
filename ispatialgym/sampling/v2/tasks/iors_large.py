@@ -1111,6 +1111,11 @@ class IORSLarge(SamplerV2):
             top = self.support_top(partner)
             if int(top.free.sum()) < 50:
                 raise Reject("partner_top_small", f"{partner.name}: too little free top")
+            # i7-split 2026-11-07: the partner's top is its support-split plane - its rails / headboard / rims stay obstacles at the release
+            # (``place_ignores``) and wherever else it is ignored
+            from ispatialgym.sampling.v2 import support_split as SS
+
+            SS.register_top(self, partner, top, what="partner_top")
             cells = top.cells(free_only=True)
             # boundary = raster cells with a missing neighbour (the face outline) — eroded by half-extent + 0.05
             rim = self._raster_rim(top)

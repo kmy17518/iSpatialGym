@@ -48,6 +48,7 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.fastflags import fast_on  # train-fast 2026-10-31: BAND_FEASIBLE_REUSE
 from ispatialgym.sampling.v2 import neighbors as NB
+from ispatialgym.sampling.v2 import support_split as SS  # i7-split 2026-11-07
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -191,6 +192,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
             tf["support_surface"] = fact
         if top is None:
             _reject("support_small", f"{support.name}: no support top ({top_err})")
+        SS.register_top(s, support, top, what="top")  # i7-split: the support split's plane (the policy registers its own at a map hit)
         return NB.union_top(s, support, top, spec, ignore=ignore)
     z_req = float(spec["top_z"])
     try:
@@ -210,6 +212,9 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     tf = getattr(s, "template_facts", None)
     if isinstance(tf, dict):
         tf["support_surface"] = fact
+    # i7-split 2026-11-07: the interior board is the support's split plane - its walls, back panel and the board above stay obstacles
+    # wherever the support is ignored (no policy plane: interiors have no map kind yet)
+    SS.register_top(s, support, itop, what="interior")
     return NB.union_top(s, support, itop, spec, ignore=ignore)
 
 
@@ -1173,6 +1178,7 @@ def generic_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Opti
         if not isinstance(getattr(ikc, "support_plane_z", None), dict):
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
+        SS.register_top(s, None, top, plane=float(top.z))  # i7-split: the support split's plane + tolerance next to it
     view = MS.as_bands(rm, overhang=0.0)
     view.meta["anchor_lookup"] = dict(getattr(rm, "lookup", None) or {})
     log.info("generic reach map hit at h %.4f (%s, map h %.4f), %s arm: %s", h, view.meta["anchor_lookup"].get("how"), float(rm.meta["height"]["value"]), arm, rm.path)
@@ -1279,6 +1285,12 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
         # computed at (the tray's inner floor), not their AABB top (the rim)
         planes.update({str(o.name): z_plane for o in list(spec.ignore or []) if getattr(o, "name", None)})
     _register_map_policy(s, lib, rid, planes)
+    # i7-split 2026-11-07: the support split's plane + tolerance next to each registered plane - the top from its raster; an extra
+    # ignored object at the tray floor keeps a split the task registered from its own raster (disembedding's TrayFloor), else none (whole)
+    SS.register_top(s, None, top, plane=float(top.z))
+    for o in list(spec.ignore or []) if z_support is not None else []:
+        if getattr(o, "name", None) and getattr(s, "ikc", None) is not None and SS.registration(s.ikc, o.name) is None:
+            SS.register(s.ikc, o, z_plane, SS.Tolerance.none("no_raster"), what=plane)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -1337,6 +1349,10 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
         map_request(s, **req)
         return None
     _register_map_policy(s, lib, rid, {fname: z_plane} if floor is not None else {}, floors=[fname] if floor is not None else [])
+    if floor is not None and getattr(s, "ikc", None) is not None:
+        # i7-split 2026-11-07: the floor's split plane - no raster under a house-sized floor: the minimum tolerance (a floor piece above the
+        # datum + 3 mm stays an obstacle; at the floor's AABB-top datum every piece is support)
+        SS.register(s.ikc, floor, z_plane, SS.Tolerance.fixed(SS.MIN_TOL_M, "floor: no raster, the minimum tolerance"), what="floor")
     log.info("reach map hit for %s on the floor (datum %+.4f m), %s arm: %s", spec.object, datum, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -4434,6 +4450,9 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             pose, z_here = (pose, z) if support_z is not None else NB.rest_on(top, pose, fp, NB.z_at(top, xy))
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
+            # i7-split 2026-11-07 (a measurement, nothing rejected): pre-shaped fingers inside a kept protrusion of the support (a rim / wall
+            # the flat-slab map cannot see) - ``support_split.protrusion_hits``
+            SS.count_protrusion_hit(s, eef, exact_kw.get("ignore_for_last") or (), policy_opening_of(g))
             if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
                 s.ikc._diag_object = (pose, hull, getattr(g, "name", None))  # of-v2maps: the candidate object pose the policy diagnostic reports
             sp_note = None
@@ -4502,7 +4521,7 @@ def verified_exact_failure(s, pre: Pose, eef: Pose, stance: Stance, arm: str, ex
     task-spawned objects ``objs`` out of the collision world (the static scene stays). The exact IK's own rules count when they persist
     that way - ``exact IK failed``, ``ik_joint_limit`` (joint-limit margin), ``ik_reach`` (witness residual), ``approach_untrackable``:
     properties of the arm at that stance and pose; a pass means the failure was a collision with a task object."""
-    with s.ikc.ignoring(list(objs)):
+    with SS.whole_ignoring(s.ikc, list(objs)):  # i7-split: out of the world WHOLE (a tray's rims too)
         again = s.ikc.exact([pre, eef], stance, arm, **exact_kw)
     return not again.ok
 
