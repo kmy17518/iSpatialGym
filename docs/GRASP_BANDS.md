@@ -446,6 +446,28 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
    removed 238 of 476 stance-C lattice candidates per arm; the 0.55 / 0.65 rows hold no feasible goal-map cell for either arm (lean_right:
    right 0 / 0, its left-arm map 0 / 2; lean_left: 0) -> setup rejects no_placement_stance, 0 attempts, 0 written (0.09 GPU-h). Not widened.
 
+#### The accessible region of an entry used at an interior goal (owner decision 2026-11-07, 0adc84c9)
+
+- Measured first (`$OFH/overhang_20261107/board_clear.jsonl`, 87 lean candidates of hardback__bqvvvx__bu 16.7 deg over 7 runs): the hand
+  spheres at the validator's placement opening (fully open 0.05 + the 0.002 buffer) vs the lean board separate the outcomes exactly -
+  every physics-valid grasp +0.3..+5.0 mm clear, every `no_placement:board:<arm>_gripper_finger_link1` -5.8..-9.2 mm; the hulls at the
+  pre-shape clear by 1.5-2.9 cm in all of them. Clearing spine pinches existed in the dense lean_left runs (+1.2 mm, 7.1 cm below the
+  centre) but never became representatives.
+- `grasping/access_region.py`: the region from the goal's interior spec - approach into the compartment from the open front (<= 45 deg),
+  the contact within the pads' reach of the front face (0.057 m), every hand sphere at the placement opening clear of the goal's boards
+  (lean board, opposite wall at width_m, board above at headroom_m) by the obstacle gate's margin; candidates restricted to it before the
+  NMS and ranked by that clearance. Identity (digest / tag `ar<d6>`) in the job, the entry id, the library and its identity. No gate changed.
+- lean_left 16.7 deg, `--interior-goal bookcase_jaysra_0@0.9472`, left-arm validator (entry `..._lean_left_16.7_2297df__valleft__ar45e7d8`):
+  69 side candidates -> 46 approached from the front -> 46 in reach -> 20 clear -> 4 selected -> 2 geometry-ok -> 2 reps -> 1 left-arm valid
+  (side_3, a spine pinch 1.9 cm inside the spine; the other `no_placement:left_realsense_link`); interior maps right 188 / 269 / 257 / 231,
+  left 173 / 251 / 226 / 203 feasible at d_e 0.55 / 0.65 / 0.75 / 0.85.
+- Pick compatibility (rule 4, `access_region.pick_compatibility`): the region grasp is 8.7 mm / 34 deg from the overhang entry's
+  side_2~r180 (the overhang pinches approach 30 / 60 deg off the spine normal, this one straight) - outside a 1.5 cm / 30 deg match;
+  lean_right's side_3 3.9 cm / 180 deg. The held grasp at the goal stays the overhang entry's (F_goal is exact); the lean entry is the map.
+- touching_03 acbrnv (report only): lean_left_11's 4 stored candidates are all outside the region (-1.0..-1.6 cm), a rebuild would
+  re-select from the pre-NMS set; lean_left_20: 2 of 12 in the region (side_9, already the one valid grasp, and side_11 untested at
+  +7.5 mm) - its two invalid representatives would not be tested.
+
 ### Lean rests and interior maps (branch i7-lean, 2026-11-07)
 
 - **Lean rest kind** (`grasping/lean.py`): the object settled in the synthetic world against a vertical board at an angle / side; the rest id,
