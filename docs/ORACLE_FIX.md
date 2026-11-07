@@ -893,7 +893,7 @@ the arrival leaves the arm, where the sampler tracked it through a carry waypoin
 | `fix1` (before) | ebd0fb16 | 0 / 4,746 | – | spine-out, every carry collided |
 | `fix3_hb` | dc5ba069 | 7 / 30 | 1 / 6 | 5 × `robot_touching_itself` in push[2], all from picks pushed at open pitch 40− |
 | `fix4_hb` | f2fc6efb (pitches [0, 20]) | 0 / 31 | – | pitch-0 push at joint2's limit everywhere; reverted (89e5bbf8) |
-| `fix3b_hb` | dc5ba069 = the trunk | 6 / 61 (interim) | 6 / 6 | 27 of 28 picks at pitch 0 |
+| `fix3b_hb` | dc5ba069 = the trunk | 12 / 104 | 11 / 12 | 1 `plan_failed`; 2.88 GPU-h, 0.26 GPU-h per successful demo |
 
 - **Open: the pitch-40 push.** The open-pitch-40 push (the "40−" wrist) is written by the sampler, but its demo fails on self-contact
   in execution (`left_arm_link3 touches left_arm_link5`). It was 4 of 4 in fix3_hb. The sampler's push-chain IK and branch checks
