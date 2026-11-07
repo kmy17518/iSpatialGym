@@ -224,6 +224,18 @@ def brace_at_opening_on() -> bool:
     return os.environ.get("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "1").strip() != "0"
 
 
+def hand_overlap_rank_on() -> bool:
+    """i7-contact 2026-11-07, owner item 3 (``ISPATIALGYM_HAND_OVERLAP_RANK``, default "0" = OFF; the owner decides): the touching PUSH's hand-overlap
+    screen (:meth:`IORSSmall.push_hand_overlap`: wrist camera / knuckles / gripper body within 5 mm of the target) is a RANKING hint instead of
+    a rejection - the candidates without an overlap are tried first, the overlapping ones after them in their order, each decided by the
+    exact chain IK (and, in the library, by physics validation: ``validate_contacts --screen-as-rank``); the chosen push's extras name the
+    overlap (``hand_overlap_hint``). The brace's screen is unchanged. Measured (screened diagnostic, contact_libs_20261107e_screendiag): the
+    hand model is the real gripper (its base plate spans +-54 mm, the knuckle spheres +-57 mm), the overlaps are real: physically valid
+    napkins 42 / 48, cereal 2 / 9, spray 1 / 23, and the napkins' screened pushes press the box into the slab with 143 N median at its first
+    motion (live pushes 4 N)."""
+    return os.environ.get("ISPATIALGYM_HAND_OVERLAP_RANK", "0").strip() == "1"
+
+
 def push_fingers(extras: Optional[Dict[str, Any]]) -> float:
     """oracle-fix 2026-11-06 (``generation.push_gripper_open``): the finger joints a push candidate / record is checked with - its
     ``fingers_opening_m`` (the open push: the oracle holds the gripper there, ``execute_push``; the program check replays with it), else
@@ -4928,6 +4940,19 @@ class IORSSmall(SamplerV2):
             _kind, init, extras = c
             return [IK.pre_pose(init, float(extras.get("pre_dist_m") or IK.PRE_DIST)), init, (init[0] + direction * dist, init[1])]
 
+        def overlap_of(c):
+            init, goal = chain(c)[1:]
+            return self.push_hand_overlap(init, goal, t_pose, direction, dist,
+                                          against="hull" if (sweep or push_fingers(c[2]) != IK.FINGER_CLOSED) else "box")
+
+        rank = hand_overlap_rank_on()
+        if rank:  # owner item 3 switch (default off): the overlapping candidates after the clean ones, not rejected
+            clean, hinted = [], []
+            for c in cands:
+                ov = overlap_of(c)
+                (clean if ov is None else hinted).append(c if ov is None else (c[0], c[1], dict(c[2], hand_overlap_hint=ov)))
+            cands = clean + hinted
+
         def label(c):
             h = c[2].get("contact_height_m")
             return c[0] if h is None else f"{c[0]}@{100.0 * float(h):.1f}cm"
@@ -4935,9 +4960,10 @@ class IORSSmall(SamplerV2):
         def evaluate(p):
             pre, init, goal = p.chain
             fingers = push_fingers(p.payload[2])  # closed, or the open push's opening (oracle-fix 2026-11-06)
-            overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist, against="hull" if (sweep or fingers != IK.FINGER_CLOSED) else "box")
-            if overlap is not None:
-                return False, None, None, overlap
+            if not rank:
+                overlap = self.push_hand_overlap(init, goal, t_pose, direction, dist, against="hull" if (sweep or fingers != IK.FINGER_CLOSED) else "box")
+                if overlap is not None:
+                    return False, None, None, overlap
             r_push = self.ikc.exact(p.chain, st, arm, ignore_for_last=ignore_push, cache=False, fingers=fingers, q_first=p.q_first)
             if not r_push.ok:
                 return False, r_push, None, f"{arm}: {r_push.reason}"

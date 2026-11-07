@@ -102,6 +102,9 @@ class ContactValidateConfig:
     #: keep the verdicts an earlier run wrote (``validation.verdict`` set): those entries are neither re-run nor counted against
     #: ``max_entries`` - a re-run in a new order adds its sample to the old one (i7-contact 2026-11-07: the axial (end, spin) groups)
     skip_validated: bool = False
+    #: owner item 3 switch (default OFF; the owner decides): the sampler's hand_overlap screen is a ranking hint - the screened entries are
+    #: validated and counted after the live ones (``entry_order``) instead of being marked ``screened`` (the sampler: ISPATIALGYM_HAND_OVERLAP_RANK)
+    screen_as_rank: bool = False
     #: the object in the base frame (ahead of the slab edge, to the arm's side): the right arm's; the left arm's lateral is mirrored
     base_offsets: Tuple[Tuple[float, float], ...] = ((0.0, -0.15), (0.0, -0.28), (0.08, -0.05), (0.08, -0.22))
     max_steps: int = 1800
@@ -586,7 +589,7 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
         screen = (e.get("sampler_screen") or {}).get("hand_overlap")
         if cfg.diagnose_screened and not screen:
             continue  # the diagnostic validates the screened entries only; the live ones keep their record
-        if screen and not cfg.diagnose_screened:
+        if screen and not cfg.diagnose_screened and not cfg.screen_as_rank:
             # the sampler never records this class here (its hand_overlap rule): not a contact the oracle would execute; not counted
             e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": "screened", "reasons": ["sampler_hand_overlap"], "screen": screen, "trials": []}
             tim["n_screened"] = tim.get("n_screened", 0) + 1
@@ -633,7 +636,9 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
         verdict = "valid" if verdicts == {"valid"} else ("unreachable" if verdicts == {"unreachable"} else "invalid")
         e["validation"] = {"schema": TRIAL_SCHEMA, "verdict": verdict, "reasons": sorted({r for t in trials for r in t["reasons"]}),
                            "trials": trials, "config": asdict(cfg), "entry_digest": e.get("digest"), "calibrated": False}
-        if screen:
+        if screen and cfg.screen_as_rank and not cfg.diagnose_screened:
+            e["validation"].update(screen=screen, screen_as_rank=True)
+        elif screen:
             e["validation"].update(diagnostic="a screened entry validated (the sampler's hand_overlap removes it: never executed)", screen=screen)
     tim = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in tim.items()}
     tim["total_s"] = round(time.time() - t_all, 2)
@@ -1308,7 +1313,8 @@ def library_job(lib_k: Dict[str, Any], eid: str) -> Dict[str, Any]:
 def validate_cli(a) -> None:
     from ispatialgym.grasping import contact_library as CL
 
-    cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)), skip_validated=bool(getattr(a, "skip_validated", False)))
+    cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)), skip_validated=bool(getattr(a, "skip_validated", False)),
+                                 screen_as_rank=bool(getattr(a, "screen_as_rank", False)))
     arm = a.arm or (cfg.work_arm if a.kind == "push" else cfg.brace_arm)
     base = os.path.join(a.root, a.kind, "models")
     if getattr(a, "jobs", None):
@@ -1415,6 +1421,8 @@ def main(argv=None):
     ap.add_argument("--shard", default=None)
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--diagnose-screened", action="store_true", help="DIAGNOSTIC: validate the hand_overlap-screened entries (their own root)")
+    ap.add_argument("--screen-as-rank", action="store_true", help="owner item 3 switch (default off): validate the hand_overlap-screened entries "
+                    "after the live ones, counted, instead of marking them screened")
     ap.add_argument("--skip-validated", action="store_true", help="keep the entries an earlier run validated (not re-run, not counted against max_entries)")
     ap.add_argument("--jobs", default=None, help="the build manifest: validate the shard's job ids (the build's partition)")
     validate_cli(ap.parse_args(argv))

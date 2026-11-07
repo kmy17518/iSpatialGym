@@ -897,3 +897,59 @@ def test_a_rerun_keeps_the_earlier_verdicts_when_asked():
     ran.clear()
     VC.validate_library(World(), lib, None, None, np.zeros((1, 3)), VC.ContactValidateConfig(max_entries=2), "left")
     assert ran == ["+end+spin_blade_0@f0", "+end-spin_blade_0@f0"]  # the default re-runs from the top
+
+
+def test_the_hand_overlap_rank_switch_is_off_by_default_and_ranks_when_on(monkeypatch):
+    """Owner item 3 (2026-11-07): the hand-overlap screen of the touching PUSH is a ranking hint only under the default-off switch - the
+    sampler tries the clean candidates first and the overlapping ones after them (not rejected, the overlap named in the extras); the
+    validator (``screen_as_rank``) validates the screened entries after the live ones, counted, instead of marking them screened."""
+    from ispatialgym.sampling.v2 import orient as O
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    monkeypatch.delenv("ISPATIALGYM_HAND_OVERLAP_RANK", raising=False)
+    assert not IS.hand_overlap_rank_on()
+    pose = (th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    cands = [("push_blade_0", pose, {}), ("push_tip_h", pose, {}), ("push_blade_lean8", pose, {})]
+    over = {"push_blade_0": "knuckle -15 mm from the box (margin 5 mm)", "push_blade_lean8": "knuckle -3 mm from the box (margin 5 mm)"}
+    seen = {}
+
+    def choose_first(ikc, arm, cs, key, label, chain, evaluate, q_start, camera_idx, stage):
+        cs = list(cs)
+        seen["order"] = [c[0] for c in cs]
+        seen["verdicts"] = [evaluate(SimpleNamespace(chain=chain(c), payload=c, q_first=None))[3] for c in cs]
+        seen["hints"] = [c[2].get("hand_overlap_hint") for c in cs]
+        return None, {}, []
+
+    monkeypatch.setattr(O, "choose_first", choose_first)
+    me = SimpleNamespace(shelf_start=None, push_height_sweep_on=lambda: False, push_gripper_open_on=lambda: False, pair_goal_align=lambda: None,
+                         touching_push_candidates=lambda *a, **k: iter(cands),
+                         ikc=SimpleNamespace(exact=lambda *a, **k: SimpleNamespace(ok=True, reason=""), q_locked=lambda st: None))
+    # the overlap is keyed by the candidate (identity of its eef pose tensor)
+    poses = {c[0]: (th.zeros(3) + i, pose[1]) for i, c in enumerate(cands)}
+    cands[:] = [(k, poses[k], x) for k, _p, x in cands]
+    me.push_hand_overlap = lambda init, goal, tp, d, dist, against="box": over.get(next(k for k, p in poses.items() if p[0] is init[0]))
+    monkeypatch.setattr(IS.O, "chain_qs", lambda *a, **k: [])
+    IS.IORSSmall._touching_push_choice(me, None, pose, th.zeros(3), (0.0, 0.1), th.tensor([0.0, 1.0, 0.0]), 0.05, [])
+    assert seen["order"] == ["push_blade_0", "push_tip_h", "push_blade_lean8"] and seen["verdicts"][0].startswith("knuckle") and seen["verdicts"][1] == ""
+    monkeypatch.setenv("ISPATIALGYM_HAND_OVERLAP_RANK", "1")
+    IS.IORSSmall._touching_push_choice(me, None, pose, th.zeros(3), (0.0, 0.1), th.tensor([0.0, 1.0, 0.0]), 0.05, [])
+    assert seen["order"] == ["push_tip_h", "push_blade_0", "push_blade_lean8"] and seen["verdicts"] == ["", "", ""]
+    assert seen["hints"] == [None, over["push_blade_0"], over["push_blade_lean8"]]
+    # the validator: screened entries validated after the live ones, counted
+    es = [{"yaw_deg": 0.0, "class": "a", "sampler_screen": {"hand_overlap": "knuckle -15 mm"}}, {"yaw_deg": 0.0, "class": "b"}]
+    ran = []
+
+    class World:
+        def settle(self, obj, geom, q):
+            return {}, None
+
+        def plan_entry(self, obj, geom, e, T, arm):
+            ran.append(e["class"])
+            return None
+
+    lib = {"kind": "push", "object": {"rest": {"quat_xyzw": [0.0, 0.0, 0.0, 1.0]}}, "entries": es}
+    VC.validate_library(World(), lib, None, None, np.zeros((1, 3)), VC.ContactValidateConfig(), "right")
+    assert ran == ["b"] and es[0]["validation"]["verdict"] == "screened"
+    ran.clear()
+    VC.validate_library(World(), lib, None, None, np.zeros((1, 3)), VC.ContactValidateConfig(screen_as_rank=True), "right")
+    assert ran == ["b", "a"] and es[0]["validation"]["verdict"] == "invalid"
