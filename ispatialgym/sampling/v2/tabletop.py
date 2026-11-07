@@ -980,6 +980,19 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
         _reject(f"missing_grasps:{pipeline}", f"{choice.category}/{choice.model}: {e}")
     if not grasps:
         _reject(f"missing_grasps:{pipeline}", f"{choice.category}/{choice.model}: no admissible grasp row")
+    lib = GL.v2_entry(key)
+    if lib is not None:
+        # of-v2maps 2026-11-07 (P2 §11: the lookup enforces scale): the entry must be the spawned object's scale
+        from ispatialgym.grasping import schema as GS
+
+        try:
+            spawn = s.gp.roles[role].scale_of(choice.category, choice.model)
+        except Exception:  # noqa: BLE001 - a role without a scale spawns at 1
+            spawn = None
+        if GS.canonical_scale(spawn if spawn is not None else 1.0) != lib.scale:
+            log.info("V2_SCALE_MISMATCH %s/%s (%s): spawned %s, entry %s", choice.category, choice.model, key, spawn, lib.scale)
+            if GL.v2_only():
+                _reject("v2_scale_mismatch", f"{key}: spawned at {spawn}, v2 entry {os.path.basename(os.path.dirname(lib.path))} at {lib.scale}")
     try:
         rest = C.rest_quat(key)
     except FileNotFoundError:

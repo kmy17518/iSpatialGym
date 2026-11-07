@@ -172,6 +172,9 @@ def submit(a):
         env["ISGF_GRASPS"] = "v2" if a.grasps == "v2only" else a.grasps
         if a.grasps in ("v2", "v2only"):
             env.update(GRASPS_V2)
+            if a.v2_root:  # of-v2maps 2026-11-07: another campaign data root (glib/, maps/, anchors.json)
+                env.update({"ISPATIALGYM_GRASP_LIBRARY_V2": os.path.join(a.v2_root, "glib"), "ISPATIALGYM_REACH_MAPS": os.path.join(a.v2_root, "maps"),
+                            "ISPATIALGYM_REACH_MAP_ANCHORS": os.path.join(a.v2_root, "anchors.json")})
         if a.grasps == "v2only":
             # of-v2maps 2026-11-07 (owner: no legacy band, v2 grasps + v2 reach maps only): every legacy band load / compute is refused
             # (reach_bands.block_legacy_band -> legacy_band_blocked), a map miss rejects (missing_map), the support policy is on from the start
@@ -317,6 +320,7 @@ def main():
                    help="the sampler's customs: the snapshot's isg_customs.json (default) or the template's own copy (the counted run's)")
     s.add_argument("--ledger", default=None, help="default: <root>/manifests/allocations.tsv")
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
+    s.add_argument("--v2-root", default=None, help="with --grasps v2 / v2only: the v2 data root (default V2_ROOT, v2maps_20261106)")
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     r = sub.add_parser("recollect")

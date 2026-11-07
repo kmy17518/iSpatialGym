@@ -166,3 +166,18 @@ def test_the_approach_tail_is_policed_where_the_support_is_ignored(monkeypatch):
     assert chk._policy_tail(*args, ignore_end=[table], ignore_start=()) == ""  # scope "grasp": a holding arm is not policed
     monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY")
     assert chk._policy_tail(*args, ignore_end=[table], ignore_start=()) == ""  # policy off: as before
+
+
+def test_v2_only_refuses_legacy_grasps_and_campaign_links_serve(v2root, monkeypatch):
+    _entry(v2root, "mug", "ppp", [1, 1, 1], legacy_key=None, rests={"r0": ([0, 0, 0, 1], 0.05, True)}, grasps=[("g", "r0")])
+    p = os.path.join(v2root, "models")
+    d = json.load(open(os.path.join(p, os.listdir(p)[0], "library.json")))
+    d["legacy_keys"] = ["mug__ppp__t", "mug__ppp"]
+    S.save_json(os.path.join(p, os.listdir(p)[0], "library.json"), d)
+    GL._v2_index.cache_clear()
+    idx = GL._v2_index(v2root)
+    assert idx["mug__ppp__t"] == idx["mug__ppp"]  # one entry serves every linked key
+    monkeypatch.setenv("ISPATIALGYM_V2_ONLY", "1")
+    assert [g.name for g in GL.load_grasps("mug__ppp__t")] == ["g"]
+    with pytest.raises(ValueError, match="v2 only"):
+        GL.load_grasps("apple__omzprq")  # no v2 entry: the legacy library is not served

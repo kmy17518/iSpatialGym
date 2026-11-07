@@ -113,13 +113,17 @@ def _v2_index(root: str) -> Dict[str, str]:
                 d = json.load(f)
         except Exception:
             continue
-        if not d.get("legacy_key"):
+        # of-v2maps 2026-11-07 (prompt I): ``legacy_keys`` - the campaign's links of an entry to the sampler keys it serves (a roles_all /
+        # retry entry has legacy_key None; a held-object floating key or a task variant's key names the same model)
+        keys = [k for k in [d.get("legacy_key"), *(d.get("legacy_keys") or [])] if k]
+        if not keys:
             continue
         rests = d.get("rests") or {}
         stable = any(bool((r or {}).get("stable")) for r in rests.values())
         eid = os.path.basename(os.path.dirname(p))
         rank = (not stable, not bool(d.get("grasps")), len(eid), p)
-        cand.setdefault(d["legacy_key"], []).append((rank, p))
+        for k in dict.fromkeys(keys):
+            cand.setdefault(k, []).append((rank, p))
     return {k: sorted(v)[0][1] for k, v in cand.items()}
 
 
@@ -224,8 +228,20 @@ def rest_quat_xyzw(key: str) -> Optional[th.Tensor]:
     return th.tensor([x, y, z, w], dtype=th.float32)
 
 
+def v2_only() -> bool:
+    """``ISPATIALGYM_V2_ONLY=1`` (``submit_fast.py --grasps v2only``; ``reach_bands.v2_only``): no legacy grasps either."""
+    return os.environ.get("ISPATIALGYM_V2_ONLY", "") == "1"
+
+
 def load_grasps(key: str, require_clean: bool = True) -> List[Grasp]:
     lib = v2_entry(key)
+    if lib is None and v2_only() and v2_root() and not str(key).startswith(("attach:", "generic")):
+        # of-v2maps 2026-11-07 (prompt I; owner: only the v2 grasps): v2only served the LEGACY library for a key without a v2 entry -
+        # v2only_before wrote 20 aliases (mental_rotation, object_scaling) on legacy grasps
+        import logging
+
+        logging.getLogger("ispatialgym.sampling.v2").info("LEGACY_GRASPS_BLOCKED %s", key)
+        raise ValueError(f"v2 only: grasp key {key!r} has no v2 library entry (legacy grasps are not served)")
     if lib is not None:
         # of-v2maps 2026-11-07 (P1 §3a: each grasp belongs to its rest_id): only the grasps of the rest the object is placed at
         out = grasps_from_v2(lib, key, rest_id=v2_rest_id(lib))
