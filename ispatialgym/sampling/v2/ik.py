@@ -306,7 +306,7 @@ SUPPORT_HULL_FALLBACK_ENV = "ISPATIALGYM_SUPPORT_HULL_FALLBACK"
 SUPPORT_HULL_FALLBACK_DEFAULT = "0"
 #: the real clearance the hull fallback requires (m): above the measured flatness of the supports it was diagnosed on (breakfast_table
 #: rhjoby: 8 pieces within 0.3 mm of the plane), below side_9's nominal 0.99 mm (``ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M``)
-HULL_FALLBACK_MIN_CLEARANCE_M = 0.0005
+HULL_FALLBACK_MIN_CLEARANCE_M = 0.0005  # == contact_policy.HULL_FALLBACK_MIN_CLEARANCE_M (the reusable check's default)
 
 
 def support_hull_fallback_mode() -> str:
@@ -844,70 +844,51 @@ class IKChecker:
         from ispatialgym.oracle import r1pro_model as M
 
         thr = support_hull_fallback_min_m()
-        out: Dict[str, Any] = {"ok": False, "why": "", "hull_min_m": None, "min_m": thr}
-        hand = [l for l in CP.DEFAULT.hand_rigid_links(arm) if l in set(others)]
-        rest = [l for l in others if l not in set(hand)]
-        margin = float(CP.DEFAULT.sphere_support_margin_m)
-
-        def fail(why: str) -> Dict[str, Any]:
-            out["why"] = why
-            self._count(f"support_policy.hull_fallback_failed.{why}")
-            return out
-
         if any(getattr(sp, "name", None) in floors for sp in supports):
-            return fail("floor")
-        if not hand:
-            return fail("no_hand_link")
-        if rest and not bool(self.kit.links_clear(q, rest, margin)[0]):
-            return fail("non_hand_link")  # an arm / torso / base link: no exact hull to judge it by
-        if not bool(self.kit.links_clear(q, hand, margin - CP.MODEL_SPHERE_BUFFER_M)[0]):
-            return fail("deeper_than_buffer")
-        split_geoms: List[Any] = []
-        with self.ignoring(list(supports)):
-            if not bool(self.kit.links_clear(q, hand, margin)[0]):
-                # i7-t03 2026-11-08 (owner item 3a, ISPATIALGYM_WITNESS_HULL_FALLBACK, default off): the hand may fail only on the pieces the
-                # support split keeps (the walls / side board of the policed support) - judged by the same exact hulls and threshold below
-                mode3 = witness_hull_fallback_mode()
-                kept = [(sp, SS.plan_for(self, sp, count=False)) for sp in supports] if mode3 != "off" and SS.split_on() else []
+            out: Dict[str, Any] = {"ok": False, "why": "floor", "hull_min_m": None, "min_m": thr}
+        else:
+            planes = getattr(self, "support_plane_z", None)
+            tops = [support_plane_z(sp, planes) for sp in supports]
+            geometry = [CP.Support.plane(t, name=getattr(sp, "name", "support")) for sp, t in zip(supports, tops) if t is not None]
+            hc = getattr(self, "_hand_checker", None)
+            if hc is None or hc.arm != arm:
+                hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+            eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+            T = th.eye(4)
+            T[:3, :3] = _quat_mat(G.t(eef[1]).float())
+            T[:3, 3] = G.t(eef[0]).float()
+            fq = float(getattr(self, "_policy_opening", None) or float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean()))
+
+            def check(geom, gout):
+                return CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(q, list(links), m)[0]), list(others), CP.DEFAULT.hand_rigid_links(arm), hc, T,
+                                        geom, threshold=thr, finger_q=(fq, fq), margin=float(CP.DEFAULT.sphere_support_margin_m), geometry_out=gout)
+
+            planes_ok = len(geometry) == len(tops)
+            out = check(geometry if planes_ok else [], lambda: self.ignoring(list(supports)))
+            mode3 = witness_hull_fallback_mode()
+            if out["why"] == "other_obstacle" and planes_ok and mode3 != "off" and SS.split_on():
+                # i7-t03 2026-11-08 (owner item 3a, ISPATIALGYM_WITNESS_HULL_FALLBACK, default off): the hand failed on the pieces the support
+                # split keeps (the policed support's walls / side board) - the same check with the WHOLE support out of the sphere world and
+                # those pieces' convex hulls added to the geometry
+                kept = [(sp, SS.plan_for(self, sp, count=False)) for sp in supports]
                 kept = [(sp, pl) for sp, pl in kept if pl is not None and pl.kept and not pl.clips]
-                ok_split = False
-                if kept:
-                    with self.ignoring([sp for sp, _ in kept], split=False):
-                        ok_split = bool(self.kit.links_clear(q, hand, margin)[0])
-                if not ok_split:
-                    return fail("other_obstacle")
-                split_geoms = [self._pieces_geometry(sp, frozenset(p for p, _ in SS._pieces(sp)) - pl.off) for sp, pl in kept]
-                if any(g is None for g in split_geoms):
-                    return fail("split_pieces_unmeasured")
-        hc = getattr(self, "_hand_checker", None)
-        if hc is None or hc.arm != arm:
-            hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
-        eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
-        T = th.eye(4)
-        T[:3, :3] = _quat_mat(G.t(eef[1]).float())
-        T[:3, 3] = G.t(eef[0]).float()
-        fq = float(getattr(self, "_policy_opening", None) or float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean()))
-        if split_geoms:
-            smin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))[r]).reshape(-1)[0]) for g in split_geoms for r in ("palm", "wrist_camera", "wrist"))
-            out["split_pieces_hull_min_m"] = round(smin, 5)
-            if smin < thr - 1e-9:
-                return fail("split_pieces_hull_clearance")
-            if witness_hull_fallback_mode() == "shadow":
-                self._count("witness.hull_fallback_shadow_pass")
-                return fail("split_pieces_shadow")
-            self._count("witness.hull_fallback_passed")
-        planes = getattr(self, "support_plane_z", None)
-        worst = float("inf")
-        for sp in supports:
-            top = support_plane_z(sp, planes)
-            if top is None:
-                return fail("no_plane")
-            cl = hc.clearance(T, CP.Support.plane(top, name=getattr(sp, "name", "support")), (fq, fq))
-            worst = min(worst, *(float(cl[r][0]) for r in ("palm", "wrist_camera", "wrist")))
-        out["hull_min_m"] = round(worst, 5)
-        if worst < thr - 1e-9:
-            return fail("hull_clearance")
-        out["ok"] = True
+                kept_geoms = [self._pieces_geometry(sp, frozenset(p for p, _ in SS._pieces(sp)) - pl.off) for sp, pl in kept]
+                if kept and all(g is not None for g in kept_geoms):
+                    out3 = check(geometry + kept_geoms, lambda: self.ignoring(list(supports), split=False))
+                    out["split_pieces"] = {"why": out3["why"], "hull_min_m": out3["hull_min_m"]}
+                    if out3["ok"]:
+                        if mode3 == "on":
+                            self._count("witness.hull_fallback_passed")
+                            out = dict(out3, split_pieces=True)
+                        else:
+                            self._count("witness.hull_fallback_shadow_pass")
+                    else:
+                        self._count(f"witness.hull_fallback_failed.{out3['why']}")
+            if out["why"] == "no_geometry":
+                out["why"] = "no_plane"
+        if not out["ok"]:
+            self._count(f"support_policy.hull_fallback_failed.{out['why']}")
+            return out
         self._count("support_policy.hull_fallback_shadow_pass" if support_hull_fallback_mode() == "shadow" else "support_policy.hull_fallback_passed")
         return out
 
@@ -2344,7 +2325,7 @@ class IKChecker:
                 if not bool(rig_narrow[i]):
                     why = "deeper_than_buffer"
                 else:
-                    hmin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))[r]).reshape(-1)[0]) for g in g_kept + g_whole for r in ("palm", "wrist_camera", "wrist"))
+                    hmin = CP.hull_clearance_min(hc, T, g_kept + g_whole, (fq, fq))  # i7-plateqtf2's reusable check (1f368d64)
                     if hmin < thr - 1e-9:
                         why = "hull_clearance"
                 if why is not None:

@@ -131,3 +131,27 @@ def test_a_floor_support_never_takes_the_fallback(on):
     finally:
         TABLE.name = TABLE_NAME
     assert not ev["ok"] and ev["hull_fallback"]["why"] == "floor"
+
+
+def test_the_reusable_check_takes_any_failed_links_geometry_and_threshold():
+    """contact_policy.hull_fallback (reused by i7-t03 for split-off support pieces and the exact-IK witness): the links that failed, the
+    geometry (a box piece here), the threshold - independent of the support policy."""
+    piece = CP.Support.box((0.5, 0.0, 0.80), (0.1, 0.1, 0.01), name="piece_3")
+    sph = {PALM: -0.001}
+    lc = lambda links, m: all(sph.get(l, 0.05) >= m - 1e-12 for l in links)  # noqa: E731
+    seen = []
+
+    def clearance(T, g, fq):
+        seen.append(g.name)
+        return {r: th.tensor([0.0008]) for r in CP.H.ROLES}
+
+    chk = SimpleNamespace(clearance=clearance)
+    hand = CP.DEFAULT.hand_rigid_links("right")
+    out = CP.hull_fallback(lc, [PALM], hand, chk, th.eye(4), [piece], threshold=0.0005)
+    assert out["ok"] and out["hull_min_m"] == pytest.approx(0.0008) and seen == ["piece_3"]
+    assert not CP.hull_fallback(lc, [PALM], hand, chk, th.eye(4), [piece], threshold=0.001)["ok"]  # the caller's threshold
+    assert CP.hull_fallback(lc, ["right_arm_link5"], hand, chk, th.eye(4), [piece])["why"] == "no_hand_link"
+    assert CP.hull_fallback(lc, [PALM], hand, chk, th.eye(4), [])["why"] == "no_geometry"
+    sph[PALM] = -0.003
+    assert CP.narrow_sphere_failure(lc, [PALM], hand) == "deeper_than_buffer"
+    assert IK.HULL_FALLBACK_MIN_CLEARANCE_M == CP.HULL_FALLBACK_MIN_CLEARANCE_M
