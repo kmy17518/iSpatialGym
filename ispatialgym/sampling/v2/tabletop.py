@@ -1351,6 +1351,13 @@ def map_view_of(s, rm) -> RB.ReachBands:
     view = MS.as_bands(rm, overhang=0.0)
     view._map_tilt_sampler = s
     view.meta["map_tilt"] = MT.view_tag(str(rm.meta.get("key")))
+    if view.meta["map_tilt"] is not None:
+        # i7-plateqtf2 (owner 2026-11-08 02:35 item 5): which merged overlay version the view applies and how it was pinned (r<M> = a release)
+        ov = MT.overlay_of(str(rm.meta.get("key")))
+        view.meta["map_overlay"] = {"version": int(ov.base_version), "pin": ov.pin}
+        _count(s, f"map_overlay.read_v{int(ov.base_version)}")
+        if ov.pin == "latest":
+            _count(s, "map_overlay.unpinned")
     return view
 
 

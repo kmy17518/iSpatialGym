@@ -60,6 +60,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_FAST_MAP_TILT_INHERIT", "1")
     monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY", raising=False)
     monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY_VERSION", raising=False)
+    monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", raising=False)
     monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_SHARDS", str(tmp_path / "shards"))
     (tmp_path / "maps").mkdir()
     mp = _map(tmp_path / "maps")
@@ -206,3 +207,85 @@ def test_overlay_never_touches_the_frozen_map(env, monkeypatch):
     assert MT.view_tag(fe.map_key) == "inherit_k2+ov1"
     v2 = MS.as_bands(RM.ReachMap(env.map_path), overhang=0.0)
     assert _xy(v2.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[1, 2]])
+
+
+def _shard(env, name, entry, outcomes, mk="mkey0123456789ab"):
+    ov = MT.Overlay(mk, shard_path=str(env.tmp / "shards" / mk / f"{name}.jsonl"))
+    for o in outcomes:
+        ov.record(entry, o)
+    return ov.shard_path
+
+
+def test_jobs_read_a_pinned_release_not_the_latest(env, monkeypatch):
+    """i7-plateqtf2 (owner 2026-11-08 02:35 item 5): every merge writes a release naming each map key's latest version; a job pinned to a
+    release (ISPATIALGYM_MAP_OVERLAY_RELEASE, job.env) reads exactly those versions - a later merge changes nothing for it - and its view
+    identity names the version it applies."""
+    st = SimpleNamespace(translate=0.25, tilt=-0.53, base_pose2d=(0.0, 0.0, 0.0), stand_off=0.45)
+    entry = MT.focus_entry(env.view, st, CELLS[0], 0.45).entry
+    MT._OVERLAYS.clear()
+    root = str(env.tmp / "overlay")
+    r1 = MT.merge([_shard(env, "a_1", entry, ["reach_fail", "reach_fail"])], root)
+    assert r1["mkey0123456789ab"]["version"] == 1 and r1["mkey0123456789ab"]["release"] == 1
+    assert MT.load_release(root, 1) == {"mkey0123456789ab": 1}
+    assert MT.pinned_env(root) == {"ISPATIALGYM_MAP_OVERLAY": root, "ISPATIALGYM_MAP_OVERLAY_RELEASE": "1"}
+    assert MT.release(root) == 1  # nothing new: the same release
+    # a second batch confirms the cell -> v2, release 2
+    r2 = MT.merge([_shard(env, "b_1", entry, ["ok"])], root)
+    assert r2["mkey0123456789ab"]["version"] == 2 and MT.latest_release(root) == 2
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY", root)
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "1")
+    assert MT.view_tag("mkey0123456789ab") == "inherit_k2+ov1" and MT.overlay_of("mkey0123456789ab").pin == "r1"
+    v1 = MS.as_bands(RM.ReachMap(env.map_path), overhang=0.0)
+    assert _xy(v1.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[1, 2]])  # v1: invalidated
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "2")
+    assert MT.view_tag("mkey0123456789ab") == "inherit_k2+ov2"
+    v2 = MS.as_bands(RM.ReachMap(env.map_path), overhang=0.0)
+    assert _xy(v2.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[0, 1, 2]])  # v2: confirmed (a confirmed cell is never dead)
+    # a map key the release does not name reads no overlay; release 0 (none yet) reads none
+    assert MT.overlay_of("otherkey00000000").base_version == 0 and MT.overlay_of("otherkey00000000").pin == "r2"
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "0")
+    assert MT.view_tag("mkey0123456789ab") == "inherit_k2+ov0"
+    # a pinned release that cannot be read fails, it never falls back to another version
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "7")
+    with pytest.raises(FileNotFoundError):
+        MT.overlay_of("mkey0123456789ab")
+    # unpinned (no release in the environment): the latest version, flagged
+    monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY_RELEASE")
+    assert MT.overlay_of("mkey0123456789ab").pin == "latest" and MT.overlay_of("mkey0123456789ab").base_version == 2
+    assert sorted(os.listdir(os.path.join(root, "releases"))) == ["r1.json", "r2.json"]
+
+
+def test_one_view_never_mixes_overlaid_and_plain_columns(env, monkeypatch):
+    """The in-memory column cache keys on the overlay object (its pin) and its version: the same view read under another overlay pin
+    recomputes the column instead of returning the other pin's pruned cells."""
+    st = SimpleNamespace(translate=0.25, tilt=-0.53, base_pose2d=(0.0, 0.0, 0.0), stand_off=0.45)
+    v = env.view
+    entry = MT.focus_entry(v, st, CELLS[0], 0.45).entry
+    root = str(env.tmp / "overlay")
+    MT.merge([_shard(env, "a_1", entry, ["reach_fail", "reach_fail"])], root)
+    MT._OVERLAYS.clear()
+    assert _xy(v.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[0, 1, 2]])  # no overlay: the union
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY", root)
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "1")
+    assert _xy(v.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[1, 2]])  # the pinned v1 applied, not the cached plain column
+    monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY")
+    monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY_RELEASE")
+    assert _xy(v.band(0.25, -0.53, stand_off=0.45)) == _xy(CELLS[[0, 1, 2]])
+
+
+def test_map_view_records_the_overlay_pin(env, monkeypatch):
+    """tabletop.map_view_of: the view's meta names the applied overlay version and its pin; kit counters map_overlay.read_v<N> / .unpinned."""
+    st = SimpleNamespace(translate=0.25, tilt=-0.53, base_pose2d=(0.0, 0.0, 0.0), stand_off=0.45)
+    entry = MT.focus_entry(env.view, st, CELLS[0], 0.45).entry
+    root = str(env.tmp / "overlay")
+    MT.merge([_shard(env, "a_1", entry, ["reach_fail"])], root)
+    MT._OVERLAYS.clear()
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY", root)
+    monkeypatch.setenv("ISPATIALGYM_MAP_OVERLAY_RELEASE", "1")
+    s = SimpleNamespace(kit=SimpleNamespace(stats={}))
+    view = TT.map_view_of(s, RM.ReachMap(env.map_path))
+    assert view.meta["map_overlay"] == {"version": 1, "pin": "r1"} and view.meta["map_tilt"] == "inherit_k2+ov1"
+    assert s.kit.stats == {"map_overlay.read_v1": 1}
+    monkeypatch.delenv("ISPATIALGYM_MAP_OVERLAY_RELEASE")
+    TT.map_view_of(s, RM.ReachMap(env.map_path))
+    assert s.kit.stats["map_overlay.unpinned"] == 1
