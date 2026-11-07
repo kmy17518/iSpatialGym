@@ -345,6 +345,74 @@ def grid_shortest_path(free: th.Tensor, start: Tuple[int, int], goal: Tuple[int,
     return None
 
 
+#: the 8-connected neighbour order of BEHAVIOR's ``motion_planning_utils.astar`` (its ``get_neighbors``), and the 4-connected one
+_BEHAVIOR_ASTAR_STEPS_8 = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1))
+_BEHAVIOR_ASTAR_STEPS_4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
+
+
+def astar_exact(search_map, start: Tuple[int, int], goal: Tuple[int, int], eight_connected: bool = True) -> Optional[th.Tensor]:
+    """BEHAVIOR's ``omnigibson.utils.motion_planning_utils.astar`` - the same search step for step (the heap of ``(f, cell)`` with its
+    tie order, the neighbour order, the side cost 1 / diagonal sqrt 2 and their int / float arithmetic, the Euclidean heuristic, a popped
+    cell re-expanded however often it was queued, the start never checked, the path) - without its per-call table of every map cell's
+    score (``th.cartesian_prod`` over rows x cols and one ``.item()`` per cell: 2.6 s per call on house_single_floor's 862 x 862 map, the
+    cost of camera relocalization's goal and obstacle search, i7-unblock 2026-11-07) and with the map read as a numpy array. Returns the
+    same ``(N, 2)`` int tensor of cells, or None (tests/test_cr_fast.py compares it with a verbatim copy of BEHAVIOR's on random maps)."""
+    import numpy as np
+
+    m = search_map.detach().cpu().numpy() if isinstance(search_map, th.Tensor) else np.asarray(search_map)
+    free = m != 0
+    rows, cols = free.shape
+    goal_i, goal_j = goal
+    steps = _BEHAVIOR_ASTAR_STEPS_8 if eight_connected else _BEHAVIOR_ASTAR_STEPS_4
+    sqrt2 = math.sqrt(2)
+    inf = float("inf")
+    open_set: List[Tuple[float, Tuple[int, int]]] = [(0, start)]
+    came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    visited = set()
+    g_score: Dict[Tuple[int, int], float] = {start: 0}
+    while open_set:
+        _, current = heapq.heappop(open_set)
+        visited.add(current)
+        if current == goal:
+            path = []
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.append(start)
+            path.reverse()
+            return th.tensor(path)
+        ci, cj = current
+        g_cur = g_score.get(current, inf)
+        for di, dj in steps:
+            ni, nj = ci + di, cj + dj
+            if not (0 <= ni < rows and 0 <= nj < cols) or not free[ni, nj]:
+                continue
+            nb = (ni, nj)
+            if nb in visited:
+                continue
+            tentative = g_cur + (1 if (di == 0 or dj == 0) else sqrt2)
+            if tentative < g_score.get(nb, inf):
+                came_from[nb] = current
+                g_score[nb] = tentative
+                heapq.heappush(open_set, (tentative + math.sqrt((ni - goal_i) ** 2 + (nj - goal_j) ** 2), nb))
+    return None
+
+
+def shortest_path_exact(trav, floor: int, source_world, target_world, robot=None) -> Tuple[Optional[th.Tensor], Optional[float]]:
+    """``TraversableMap.get_shortest_path(floor, source, target, entire_path=True, robot=robot)`` (``RobotKit.geodesic``'s call) with
+    :func:`astar_exact`: the same cells, eroded map, waypoints and geodesic (``(path_world, geodesic m)``, ``(None, None)`` when
+    disconnected)."""
+    source_map = tuple(trav.world_to_map(source_world).tolist())
+    target_map = tuple(trav.world_to_map(target_world).tolist())
+    trav_map = trav._erode_trav_map(th.clone(trav.floor_map[floor]), robot=robot)
+    path_map = astar_exact(trav_map, source_map, target_map)
+    if path_map is None:
+        return None, None
+    path_world = trav.map_to_world(path_map)
+    geodesic_distance = th.sum(th.norm(path_world[1:] - path_world[:-1], dim=1))
+    return path_world[:: trav.waypoint_interval], float(geodesic_distance)
+
+
 def simplify_path(cells: Sequence[Tuple[int, int]], free: th.Tensor) -> List[Tuple[int, int]]:
     """Greedy line-of-sight shortcutting of a grid path (Bresenham visibility on ``free``)."""
     if len(cells) <= 2:

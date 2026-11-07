@@ -3242,6 +3242,84 @@ def map_support_first_on() -> bool:
     return os.environ.get("ISPATIALGYM_MAP_SUPPORT_FIRST", "") == "1"
 
 
+#: i7-unblock 2026-11-07 (owner decision 21:40: support-first is a generic, automatic fallback per support, not a global default): the rule's
+#: tag in cache keys (iors_small's start cells) - bump it when the automatic rule changes
+SUPPORT_FIRST_AUTO_RULE = "auto1"
+
+
+def map_support_first_mode(s) -> Optional[bool]:
+    """Whether Phase 2 reads a map view support-first: True / False forced, None = the automatic rule (:func:`phase2_manipulation_stance`).
+    ``ISPATIALGYM_MAP_SUPPORT_FIRST`` 1 / 0 (a job-level switch) wins, then the alias's ``generation.map_support_first`` (true / false;
+    "auto" or unset: the rule)."""
+    v = os.environ.get("ISPATIALGYM_MAP_SUPPORT_FIRST", "").strip().lower()
+    if v in ("1", "true", "on"):
+        return True
+    if v in ("0", "false", "off"):
+        return False
+    gen = getattr(s, "gen", None)
+    g = gen("map_support_first", None) if callable(gen) else None
+    if isinstance(g, str):
+        g = {"on": True, "true": True, "off": False, "false": False}.get(g.strip().lower())
+    return g if isinstance(g, bool) else None
+
+
+def support_first_tag(s, bands) -> Any:
+    """The support-first state of a map view in a cache key: True / False when forced, :data:`SUPPORT_FIRST_AUTO_RULE` under the automatic
+    rule (its outcome is a function of the keyed support raster, hull, map and stance inputs); False for a scene band (never read
+    support-first: the keys of the legacy paths stay)."""
+    if not is_map_view(bands):
+        return False
+    mode = map_support_first_mode(s)
+    return SUPPORT_FIRST_AUTO_RULE if mode is None else bool(mode)
+
+
+def usable_extent(s, top, erosion: float) -> Optional[Dict[str, Any]]:
+    """The support's usable region for an object of footprint half extent ``erosion - 0.02`` - the free top raster cells inside the top
+    eroded by ``erosion`` (Phase 2's focus region, :func:`support_raster_cells`) - as ``{n, u_m, v_m, narrow_m}``: its extents along the
+    top's local axes (cell-centre span + one raster cell) and the narrower one; None when no cell is usable."""
+    raster = support_raster_cells(s, top, erosion)
+    if len(raster) == 0:
+        return None
+    ax, ay = top.local_axes()
+    u, v = raster @ ax.float(), raster @ ay.float()
+    res = float(getattr(top, "resolution", 0.02))
+    eu, ev = float(u.max() - u.min()) + res, float(v.max() - v.min()) + res
+    return {"n": int(len(raster)), "u_m": round(eu, 4), "v_m": round(ev, 4), "narrow_m": round(min(eu, ev), 4)}
+
+
+def views_lattice(views: Dict[str, Any]) -> Optional[float]:
+    """The lattice spacing of the map views (their config's ``lattice_m``; the coarsest when several arms are offered)."""
+    lat = [float(b.meta.get("lattice")) for b in views.values() if is_map_view(b) and b.meta.get("lattice")]
+    return max(lat) if lat else None
+
+
+def support_first_geometric(s, top, erosion: float, views: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The geometric trigger (decided before Phase 2 scans a stance): the support's usable region is narrower than the map's own lattice
+    spacing, so a lattice cell cannot be held by it whatever the stance - ``{support, usable_m, lattice_m, ...}``, else None. Cached per
+    (top, erosion, lattice)."""
+    lat = views_lattice(views)
+    if lat is None or top is None:
+        return None
+    cache = s.__dict__.setdefault("_sf_geometric_cache", {})
+    key = (id(top), round(float(erosion), 4), round(lat, 4))
+    if key not in cache:
+        ext = usable_extent(s, top, erosion)
+        cache[key] = (None if ext is None or ext["narrow_m"] >= lat - 1e-9 else
+                      {"support": str(getattr(top, "name", "")), "usable_m": ext["narrow_m"], "u_m": ext["u_m"], "v_m": ext["v_m"],
+                       "lattice_m": lat, "raster_cells": ext["n"]})
+    return cache[key]
+
+
+def _support_first_fired(s, kind: str, facts: Dict[str, Any]) -> None:
+    """Count ``map_support_first.<kind>`` (geometric / fallback) and log one line per (support, kind)."""
+    _count(s, f"map_support_first.{kind}")
+    seen = s.__dict__.setdefault("_sf_logged", set())
+    k = (kind, facts.get("support"))
+    if k not in seen:
+        seen.add(k)
+        log.info("MAP_SUPPORT_FIRST %s", json.dumps(dict(facts, trigger=kind)))
+
+
 def map_lattice_diag_on() -> bool:
     """Opt-in ``ISPATIALGYM_MAP_LATTICE_DIAG=1``: Phase 2 logs, per call, the lattice-vs-raster counts (``MAP_LATTICE {json}``)."""
     return os.environ.get("ISPATIALGYM_MAP_LATTICE_DIAG", "") == "1"
@@ -3295,8 +3373,20 @@ def support_first_keep(s, st: Stance, top, erosion: float, bands, arm_bands: Dic
     when none is found at the stance, the bounded recovery widens the tolerance once to a full step (counter ``support_first.widened``).
     With ``ISPATIALGYM_MAP_LATTICE_DIAG`` the per-stance counts accumulate in ``s._lattice_acc`` (logged by :func:`_log_lattice_acc`)."""
     sf, diag = map_support_first_on(), map_lattice_diag_on()
+    state = getattr(s, "__dict__", None)
+    if isinstance(state, dict) and state.get("_sf_active"):
+        sf = True  # i7-unblock: phase2_manipulation_stance decided support-first for this call (forced / geometric / fallback)
     views = dict(arm_bands) if arm_bands else {"_": bands}
-    if not (sf or diag) or not any(is_map_view(b) for b in views.values()):
+    if not any(is_map_view(b) for b in views.values()):
+        return keep, cell_arms
+    probe = state.get("_sf_probe") if isinstance(state, dict) else None
+    if probe is not None and not sf:
+        # i7-unblock: the map-first cells the support held at this stance (the zero-cell fallback's test) and whether it has a usable region
+        probe["kept"] += len(keep)
+        probe["stances"] += 1
+        if probe.get("raster") is None:
+            probe["raster"] = int(len(support_raster_cells(s, top, erosion)))
+    if not (sf or diag):
         return keep, cell_arms
     raster = support_raster_cells(s, top, erosion)
     out_cells: Dict[Tuple[float, float], th.Tensor] = {}
@@ -3342,7 +3432,55 @@ def _log_lattice_acc(s, where: str) -> None:
         log.info("MAP_LATTICE %s", json.dumps(dict(acc, where=where, support_first=bool(map_support_first_on()))))
 
 
-def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, target_height: Optional[float] = None,
+def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, **kw) -> List[Stance]:
+    """§4.5 Phase 2 (:func:`_phase2_manipulation_stance`, every keyword as there) with the support-first decision of a MAP VIEW (i7-unblock
+    2026-11-07, owner decision 21:40: a generic automatic fallback per support, not a global default):
+
+    * forced (:func:`map_support_first_mode`: the job switch, then the alias's ``generation.map_support_first``): on / off as given;
+    * automatic - geometric, before any stance is scanned: the support's usable region (the top raster eroded by the footprint half
+      extent + ``erosion_extra``) is narrower than the map's own lattice (:func:`support_first_geometric`; counter
+      ``map_support_first.geometric``);
+    * automatic - the safety net: a map-first call whose stances held ZERO lattice cells on the support (with a usable region there) is
+      run once more support-first (counter ``map_support_first.fallback``).
+
+    Everything else is the map-first Phase 2 unchanged (same cells, same survivors); support-first changes only where the candidate cells
+    come from, every exact check stays. A scene band (no map view) is never read support-first."""
+    if not hasattr(s, "__dict__"):
+        return _phase2_manipulation_stance(s, init, target_half_extent, **kw)
+    top = _top(s, kw.get("top"))
+    bands = kw.get("bands") or ensure_bands(s, top=top, edge=init.edge)
+    arm_bands = {a: b for a, b in (kw.get("arm_bands") or {}).items() if b is not None}
+    views = arm_bands if len(arm_bands) >= 2 else {"_": bands}
+    if not any(is_map_view(b) for b in views.values()):
+        return _phase2_manipulation_stance(s, init, target_half_extent, **kw)
+    mode = map_support_first_mode(s)
+    erosion = float(target_half_extent) + float(kw.get("erosion_extra", 0.02))
+    prev_active, prev_probe = s.__dict__.get("_sf_active"), s.__dict__.get("_sf_probe")
+    try:
+        if mode is None:
+            geo = support_first_geometric(s, top, erosion, views)
+            if geo is not None:
+                _support_first_fired(s, "geometric", geo)
+                mode = True
+        if mode is not None:
+            s._sf_active, s._sf_probe = bool(mode), None
+            return _phase2_manipulation_stance(s, init, target_half_extent, **kw)
+        s._sf_active, s._sf_probe = False, {"kept": 0, "stances": 0, "raster": None}
+        out = _phase2_manipulation_stance(s, init, target_half_extent, **kw)
+        probe = s._sf_probe
+        if out or probe["kept"] > 0 or not probe["stances"] or not probe["raster"]:
+            return out
+        ext = usable_extent(s, top, erosion) or {}
+        _support_first_fired(s, "fallback", {"support": str(getattr(top, "name", "")), "usable_m": ext.get("narrow_m"), "u_m": ext.get("u_m"),
+                                             "v_m": ext.get("v_m"), "lattice_m": views_lattice(views), "raster_cells": probe["raster"],
+                                             "stances": probe["stances"]})
+        s._sf_active, s._sf_probe = True, None
+        return _phase2_manipulation_stance(s, init, target_half_extent, **kw)
+    finally:
+        s._sf_active, s._sf_probe = prev_active, prev_probe
+
+
+def _phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, target_height: Optional[float] = None,
                                in_frame_fn: Optional[Callable[..., bool]] = None, focus_candidates: Optional[Callable[..., List[Tuple[th.Tensor, Any]]]] = None,
                                stand_offs: Sequence[float] = STAND_OFFS, translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES,
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
@@ -4547,10 +4685,13 @@ def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str
     if isinstance(bands, NB.NeighborBands):
         bands = bands.member_for(st.focus[:2]) if st.focus is not None else None
     facts: Dict[str, Any] = {"from": [float(st.translate), float(st.tilt)]}
-    if bands is None or st.focus is None or not isinstance(getattr(bands, "meta", None), dict) or bands.meta.get("stand_offs"):
+    if bands is None or st.focus is None or not isinstance(getattr(bands, "meta", None), dict) or (bands.meta.get("stand_offs") and not is_map_view(bands)):
         facts["outcome"] = "no_band"
         return None, facts
-    k = bands.nearest_trunk(float(st.translate), float(st.tilt))
+    # i7-unblock 2026-11-07: a reach-map view (multi-distance) is read at the stance's stand-off (its d_e); a legacy multi-distance band
+    # stays "no_band" as before
+    skw = band_kw(bands, st) if is_map_view(bands) else {}
+    k = bands.nearest_trunk(float(st.translate), float(st.tilt), **skw)
     if k is None:
         facts["outcome"] = "no_band"
         return None, facts
@@ -4591,11 +4732,12 @@ def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str
                 outcome = "empty_at_grid"
     facts["first"] = outcome
     # the bracket: the band's grid tilts at this translate just below and above the stance's tilt must both hold the cell
-    tilts = sorted({float(t) for (tr, t) in bands.cells if abs(float(tr) - float(st.translate)) < 1e-6 and len(bands.cells[(tr, t)])})
+    cells_by_trunk = bands._maps(skw["stand_off"])[0] if skw else bands.cells
+    tilts = sorted({float(t) for (tr, t) in cells_by_trunk if abs(float(tr) - float(st.translate)) < 1e-6 and len(cells_by_trunk[(tr, t)])})
     lo = max((t for t in tilts if t <= float(st.tilt) + 1e-6), default=None)
     hi = min((t for t in tilts if t >= float(st.tilt) - 1e-6), default=None)
     cell_base = bands.to_base(np.asarray(st.focus[:2].tolist()), st.base_pose2d)[0]
-    both = lo is not None and hi is not None and all(bands.cell_index(float(st.translate), t, cell_base) is not None for t in {lo, hi})
+    both = lo is not None and hi is not None and all(bands.cell_index(float(st.translate), t, cell_base, **skw) is not None for t in {lo, hi})
     facts.update({"bracket": [lo, hi], "outcome": "in_bracket" if both else "out_of_bracket"})
     return None, facts
 
