@@ -1758,7 +1758,13 @@ height) beside it. `approach_finger_support_touch` (any IORS large-scale mode; d
 the program check's grasp) a configuration that collides with the grasp's support (`grasp_ignore_objects`) passes when the whole
 body is free of everything else, every link but the acting arm's two finger links is clear of the support (margin 0) and the finger
 links — at the oracle's pre-shaped opening (pinch width / 2 + 10 mm, the widest library row; `preshape: false` = fully open) — sink at
-most `max_penetration_m` below `margin_m`; INFO line 'approach finger-support touch allowed: max penetration N mm'. **Goal check**: teleport to the
+most `max_penetration_m` below `margin_m`; INFO line 'approach finger-support touch allowed: max penetration N mm'. The finger rule is
+switched by `ISPATIALGYM_FINGER_TOUCH_RULE` (owner 2026‑11‑07): `spheres` (default) = the above, on the padded finger spheres; `geometry`
+= the contact policy's finger rule (P1 §2): the finger collision hulls (`HandChecker`, same opening) at most
+`finger_support_max_penetration_m` (2 mm) into the support - its registered plane (`support_plane_z`) when it has one, else its convex
+collision pieces (the pieces the touch ignore removes; a vertical board or a sink wall is measured through its own face) - and every
+other link clear of it by the policy's sphere stage; `margin_m` / `max_penetration_m` are not read, the INFO line then carries the
+hull penetration to 0.01 mm ('rule geometry: finger hulls, cap 2.0 mm'). **Goal check**: teleport to the
 release, settle (drop test); `(inside ?target ?partner)` — for a container without a fillable / openfillable meta link the robust
 predicate's rays branch (`predicates.inside_rays`: the inner AABB centre in the container's AABB, the container on both sides along
 ≥ 2 of z and its own x / y) — and the target's top at most `max_protrusion_fraction` (0.5) of its height above the rim (the

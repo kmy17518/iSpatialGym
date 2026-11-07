@@ -376,7 +376,9 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - FingerTouch uses the spec's 2 mm finger-geometry rule (P1 §2) instead of the 5 mm allowance on the finger spheres.
   - It applies wherever `approach_finger_support_touch` is set: touching_03 and the inside_large plate-in-sink variants.
   - The contact-policy defaults are unchanged.
-  - Old vs new are A/B'd first.
+  - Old vs new are A/B'd first: `ISPATIALGYM_FINGER_TOUCH_RULE=spheres` (old, the default) vs `geometry` (new; `ik.FingerTouch.rule`,
+    `IKChecker._finger_touch_geometry_ok`). A support without a registered plane (legacy-band runs, a bookcase, a sink) is measured
+    against its convex collision pieces.
 - Carton push-close stop under `ISPATIALGYM_BRACE_FULL_OPEN`: 0.05 opening, corner inset 0.04 -> 0.06.
 - attachment touchdown: the hover is the swept first-touch height + 3 mm, behind `ISPATIALGYM_ATTACH_HOVER`, A/B'd before it becomes the default.
 - The support split is kept ON. A/B, N 4: 97 / 98 demos and 0.182 GPU-h per success, vs 79 / 94 and 0.220 with it off.
