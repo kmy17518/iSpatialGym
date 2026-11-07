@@ -652,6 +652,81 @@ Branch `i7-unblock` (from of-v2maps a4620a1e). Records: `$OFH/unblock_20261107/`
 - v2only N 4: 8 attempts, 4 written, 4 / 4 demos, sample wall 822 s, 0.063 GPU-h per success. Before: N 1 timed out at 2400 s
   (attempts 131-707 s); now attempts take 9-61 s. The headroom skip did not act in this run.
 
+### i7-plateqtf (2026-11-07): one merged plate qtfzeq entry, side_9, the place stage, the expanding tilt / yaw map
+
+Branch `i7-plateqtf` (i7-unblock e9f79b96 + i7-padsweep ff22a5d9, merge 3556e037). Record: `$OFH/plateqtf_20261107/`, DECISIONS.md
+"i7-plateqtf" lines. Owner decisions 2026-11-07 23:40 (items 1-3).
+
+**1. One merged plate qtfzeq s1x1x3 entry.** One build on trunk_3556e037 (the plate switches and the pre-shape sweep are the defaults there)
+with the families `lip_shallow` + `rim_straddle` via `cand_overrides` (+ `gate_dump`). All grasps are validated together: the default caps
+(`max_representatives` 10, the validator's `max_trials` 10 / `max_valid` 6) cut the merged list at the first 10 representatives (all
+rim_straddle; a first try, `merged_capped`), so the build sets `max_representatives` 40 and `ISG_GLIB_VAL_OVERRIDES` max_trials / max_valid
+40. Funnel: 46 candidates (top 10, side 12, lip_shallow 12, rim_straddle 12) -> 31 geometry-ok (28 top-type, 3 side) -> 30 representatives
+-> 27 physics-valid (rim_straddle 12, lip_shallow 11, top_4 / top_5 / top_6, side_9; lip_shallow_1, side_1, side_8 invalid: no placement
+of the realsense / gripper link). The switches-on entry's 4 valid grasps come back with identical poses. side_9's reviewed rotational family (owner
+prompt A 2a) is carried by pose (`carry_family.py`: f6 -> f29) before the maps are built (the families digest is in the map identity). Maps
+at 0.8126, right + left (one job per arm). Staged `$OFH/v2maps_i7pq` = `cp -a v2maps_i7unblock2` + the merged entry (the rim_straddle-only
+entry and its maps in `_superseded_merged`; `legacy_key` plate__qtfzeq__st in library.json, links.json updated).
+
+**side_9 in sampling (diagnosis).** The rejection "non-finger link touches the support" is the support policy's sphere stage
+(`ik.py` `_support_policy`: every non-finger link's cuRobo spheres against the support, margin 0). The link is the PALM
+(`{arm}_gripper_link`): at side_9's nominal pose its exact hull is +0.99 mm above the table, its lowest sphere (r 15 mm incl. the model's
+2 mm buffer) -0.9 mm - the nominal pose itself fails the rule by 0.9 mm. The library validation (8 yaws x 4 offsets x 4 trunks x 12 seeds,
+any passing configuration) and the map (first passing seed) keep it because an IK solution within the tolerance (5 mm / 0.05 rad) can lift
+the palm; the sampler's exact IK of one witness per pair lands on either side (i7_unblock: 245 end-pose + 241 approach-tail rejections). The
+table is not the cause (8 pieces, spread 0.3 mm about 0.8126). Not fixable by the sampler without changing a shared rule; the options are
+an owner decision (below). With the merged entry side_9 is one of 27 grasps: F is drawn without replacement, so its failure falls through
+to the top grasps.
+
+**Overhang fallback.** Mechanism (1), the sampler-side `pick_overhang_push` (v2/overhang.py, `IORSLarge._overhang_pick`), is the one that
+fits qtfzeq (no library entry or map needed; the palm is past the edge by construction). It exists only in IORSLarge; under_small_03 is
+IORSSmall, and its oracle program (`programs.program_iors_small`) calls `_pick` without the push, so the fallback needs an oracle program
+change (`_pick_actions`) - not wired (owner). Mechanism (2), the i7-overhang library entry + overhang map kind, is not on this branch and its
+consumer reads the overhang key only in mode `only` (no fallback). plate luhkiz never used either; hardback bqvvvx uses (1) on the trunk and
+(2) on i7-overhang (mode only).
+
+**2. The place stage (diagnosis, no rule change).** The task: `(under place_mat plate)` - the MAT is under the plate (problem44, definition
+44); the sampler moves the plate onto the mat (`iors_small.goal_pose`) and the oracle places "on" the mat: they agree (legacy instance 300004:
+the plate settled +2.6 mm on the 2.8 mm mat). gripper_not_in_frame is `iors_small._segment_draw`'s `eef_in_frame` box (+-6 cm, -2..+6 cm
+along the approach, 5 %) at the place AND the pre-place (10 cm back along the approach) from the manipulation stance's head camera. The cause
+is the layout: the mat is 0.46 x 0.57 m, so the plate's goal sits 0.33-0.52 m to the side of the stance; the side of the image facing the
+partner binds, and the pre-place (higher, nearer the camera) is the tightest pose. Rejections by trunk (rim_straddle run): 0.0/-0.61 5+5,
+0.25/-0.53 11+6, 0.5/-0.45 13+3, 0.25/-0.80 3+0 (place + pre-place); the legacy successes all at 0.25/-0.53. CPU reconstruction (pass rate,
+goal 0.86 m ahead, lateral 0.40): rim_straddle 67 %, legacy 74 %, side_9 71 % at 0.25/-0.53; 7 / 25 / 35 % at 0.25/-0.80 - stance tilt and the
+goal's lateral dominate, the grasp moves it 5-15 points. Partner placement ("no partner yaw of 18 admits a gap"): the frame mask needs the
+whole mat in the INIT image (79 % of the yaw lines fail it) and the ends mask the 1.16 m edges; no direct grasp dependence. Finding (rule
+not changed): the draw judges the pre-place with the contact box, while program_check judges in-between poses on the fingertip point (+2 cm
+slack) and QA is fingertip-only - the draw is stricter than both at the pre-place (rim_straddle at lateral 0.40: 67 % -> 100 % under the
+program-check criterion); 14 / 47 rim_straddle and 6 / 9 legacy frame rejections were pre-place.
+
+**3. The expanding, self-correcting reach map** (`v2/map_tilt.py`, c332d214; default ON 590a6642, `ISPATIALGYM_FAST_MAP_TILT_INHERIT=0` =
+the nearest built tilt as before; TILT_SNAP unchanged, opt-in).
+- Inherited columns: a map view read at a stance tilt more than 5 mrad from every built tilt and between two built tilts of the same
+  translate gets a column keyed by the tilt rounded to 0.01: the UNION of the two bracketing built columns (cells; pairs and generic class
+  bits re-indexed). Outside the built range or on a built tilt: unchanged. `ReachBands._col` routes `band` / `cell_index` / `feasible` /
+  `classes_at` / `band_for_class` through it (map views only; a mirrored view keeps the nearest tilt). Yaws: `yaw_union` - an object yaw
+  between two of the 8 slots inherits the union of the two slots' grasps; Phase 3 records the drawn (cell, relative yaw, grasp) outcomes
+  under the same rule. Today no production path reads the map's (yaw, grasp) pairs (F is screened by IK; MAP_F is off), so the yaw entries
+  accumulate evidence only.
+- Invalidation: only reachability counts. An empty F on an inherited cell is screened again with every scene object out of the collision
+  world (as DIAG_EMPTY_F): still empty = `reach_fail`, pairs = the scene (`other_fail`). An exhausted F re-runs its last failing pair's exact
+  IK with the scene out and counts it only for an IK / reach / joint-limit reason (`map_tilt.reach_reason`; the support policy, collisions,
+  the camera frame never). K = 2 reach failures with no success invalidate the cell (and the yaw pair) for that column
+  (`ISPATIALGYM_FAST_MAP_TILT_K`); one exact success confirms it, and a confirmed entry is never invalidated. An invalidated focus is not
+  screened again (`skipped_invalidated`); a cached start-cell candidate standing on it leaves iors_small's draws (`candidates_dropped`).
+- Overlay, never the frozen map: events are keyed by the map key; each process appends JSON lines to its OWN shard
+  `<ISPATIALGYM_MAP_OVERLAY_SHARDS>/<map key>/<host>_<pid>.jsonl` (job_fast.sh: `$JOBDIR/map_overlay`) - one writer per file, no race.
+  `python -m ispatialgym.sampling.v2.map_tilt merge --root <overlay root> <shard globs>` folds them offline into a new
+  `<root>/<map key>/v<N>.json` (temp file + rename; refuses to overwrite; the shards it folded are listed and skipped next time). A job reads
+  a merged version only with `ISPATIALGYM_MAP_OVERLAY=<root>` (latest, or `ISPATIALGYM_MAP_OVERLAY_VERSION`); the version then enters the
+  view's identity (`meta.map_tilt` = `inherit_k2+ov<N>`, part of iors_small's start-cell band signature when the switch is on).
+- No GPU builds of true columns. Kit counters (per attempt, + `map_tilt.by_map.<key8>.*`): `map_tilt.inherited_columns`,
+  `.inherited_feasible` (cells of the new columns), `.cells_invalidated`, `.cells_confirmed`, `.empty_f_on_inherited`, `.reach_fail`,
+  `.other_fail`, `.skipped_invalidated`, `.candidates_dropped`; `map_yaw.pairs_confirmed` / `.pairs_invalidated`; one `MAP_TILT` log line per
+  recorded failure.
+- Tests: `test_map_tilt.py` (union of the neighbours, yaw union, built tilt / yaw / switch off unchanged, repeated reach failure invalidates
+  and collision / policy / frame never, the empty-F verification and the dropped candidate, the overlay never touches the map + merge).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
