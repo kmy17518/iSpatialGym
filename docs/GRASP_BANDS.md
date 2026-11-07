@@ -532,6 +532,20 @@ fails object_pressed_into_table.
   yields >= 1 valid grasp.
 - No legacy grasps (step 4) without asking.
 
+### Owner decisions 2026-11-07: the pad sweep at the oracle's width; no grasps for alignment targets
+
+1. **The pad sweep starts from the oracle's pre-shape width, not the fully open gripper.**
+   - The oracle pre-shapes each grasp to its own width (on the tape, 16.8 mm inside the 35 mm core hole); the sweep started from fully
+     open (48.5 mm), so the inner pad sat inside the opposite wall.
+   - This is a shared gate change, approved by the owner. It follows the switches' pattern: the state in the entry identity, a count on
+     the campaign library, a rebuild of the entries that move, then the default.
+2. **Alignment targets need no grasps.** The axial / world_vertical targets are pushed and braced, never grasped. Their v2 path is the
+   contact libraries and maps.
+   - The ladder (round 2, step 3, step 4) applies only to entries a consumer grasps.
+   - The step-3 selector picked every library entry at 0 valid grasps, including the alignment targets (board game, paperback, magazine,
+     keyboard, license plate, paper towel dispenser). That work is void and is not used.
+   - The selector now filters on the grasp role.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
