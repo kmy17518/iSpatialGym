@@ -1312,6 +1312,55 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
 - **Consumers:** touching_03's shelf path (`tabletop.interior_map_bands`, a miss = `missing_map`); `iors_large_inside.inside_band` under
   v2only (fridge inside_large_02, sink inside_large_03, bookcase inside_large_01): the arm's own interior map, a miss = `missing_map`.
 
+## Integration (2026-11-08, of-v2maps)
+
+The owner's direction of 2026-11-07: merge the finished branches one at a time, owner-decided defaults land with their branch, nothing new is
+decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integration" lines).
+
+**Merges** (one merge commit each, in the given order; snapshots `$OFH/code/trunk_<sha>`):
+
+| # | branch (tip) | merge |
+|---|---|---|
+| 1 | i7-switches (6ad20b33) | f789995a |
+| 2 | i7-padsweep (ff22a5d9) | 061c5565 |
+| 3 | i7-attach (bbac7175) | 50bd14c4 |
+| 4 | i7-ladder (d0ad2afe) | 4924318a |
+| 5 | i7-floating (75b101db) | dafed151 |
+| 6 | i7-overhang (c53a3a3b; carries i7-lean da868175 .. a4a0fa1e) | 62a3f082 |
+| 7 | i7-fingertouch (f1af78aa; not i7-fingertouch-ab-us03) | 405d0c2f |
+
+**Kept once.**
+- The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
+  `ModelLibrary.identity()` holds every addition, each only when present: the plate switch pair, `sweep_from_preshape` when on, `attach_axis` off
+  "meta_z", the floating constraint, lean / overhang rest records, `validate_arm`, `access_region`. Every existing key is unchanged.
+- Per-stand-off trunk eligibility: i7-switches carries i7-unblock's 1527d9b8 / 58cd9939 / 722d687f as identical cherry-picks, so i7-unblock merges
+  without duplication. i7-lean's fixed-compartment posture rule (b4230177) now runs through `trunk_posture_groups(obstacle_free_of=)`.
+- The overhang side retreat merged with i7-plate's families and the exact retreat; its blade lookup stays at CONTACT_Z (the overhang entry was
+  counted with the merged defaults and does not move).
+
+**Checks per merge.** pyflakes (no new messages); the full suite with the trunk PYTHONPATH: 6 failed = the baseline set, 0 errors;
+test_glib_switches (golden key), test_attach_seats, test_glib_padsweep, test_grasp_ladder, test_floating_grasps, the lean / overhang /
+interior tests pass.
+
+**The consolidated root `$OFH/v2maps_int1`** (`jobs/v2build/build_int1.py`, log `INT1.txt`): v2maps_i7 plus one layer per merged branch.
+- switches: 22 entries (v2maps_i7sw).
+- padsweep: 4 rebuilt entries plus the tape (v2maps_i7ps), with anchor 0.6791.
+- gym shoe: the L2 entry, rebuilt.
+- attach: 10 entries (5 from stage_seat, 5 rebuilt).
+- ladder: the storage box, with its floor maps rebuilt (the ladder4 maps were keyed before the switch identity existed).
+- floating: 20 entries (float2).
+- overhang: the hardback overhang entry, lean_right and lean_left valleft (v2maps_i7oh3), with anchor 0.7671 and a record copy of the
+  bookcase_jaysra_0@0.9472 interior spec.
+
+Replaced entries are in `glib|maps/_superseded_<reason>`. Each staged entry was built with every merged default, or does not move under them.
+The integration count (`int1_20261108/count`, `count2`) moved 5 attach entries and the gym shoe L2. Those were rebuilt: cabinet door 4 -> 5,
+webcam 5 -> 6, skateboard jljqtt 6 -> 6, acmbvb 2 -> 1, dip candle poexjo 0 -> 0, gym shoe 6 -> 6.
+
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_405d0c2f: 73 entries, 126 maps, 0 object_key mismatches,
+48 links resolving, anchor ranges by the midpoint rule, 0 errors.
+
+**Validation** (int1_1, `--grasps v2only` N 4 on the affected aliases only): see DECISIONS for the list, the skips and the results.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
