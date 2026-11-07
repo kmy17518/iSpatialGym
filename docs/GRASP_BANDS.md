@@ -1741,6 +1741,127 @@ cells_invalidated 32, cells_confirmed 57, skipped_invalidated 5, map_yaw.pairs_c
 (`$OFH/plateqtf_20261107/map_overlay`): right map ce1af987a8df9d69 129 entries / 22 invalidated / 107 confirmed, left b2f36adb26c194ad
 45 / 9 / 32 - not read by any job yet.
 
+### Owner decisions 2026-11-08 (DECISIONS 02:35): plate qtfzeq follow-ups (i7-plateqtf2)
+
+Work: branch `i7-plateqtf2` (from the integration tip of-v2maps 386ab2b4). Record: `$OFH/plateqtf2_20261108/`, DECISIONS.md "i7-plateqtf2" lines.
+
+The owner's decisions (2026-11-07, relayed 2026-11-08 02:35):
+1. **side_9 / the support policy's palm check.** Keep the padded sphere check as a fast, conservative SCREEN. When it fails NARROWLY (the
+   sphere misses by less than its buffer; here 0.9 of 2 mm), judge with the palm's EXACT hull against the support, requiring a small real
+   clearance (propose the value). Only non-finger links; the 2 mm finger allowance (FingerTouch) unchanged. First find where the 2 mm buffer
+   is set and whether it is a deliberate non-finger margin or a reused constant. Shared gate APPROVED: behind a switch, count before adopting
+   (campaign library + the aliases' sampling logs; who gains), then the default in a separate commit; kit `support_policy.hull_fallback_passed`;
+   unit tests (narrow miss + clear hull passes, real hull contact fails, clear sphere pass unchanged); validate under_small_03 + the aliases the
+   count names.
+2. **Overhang fallback** (APPROVED incl. the oracle program change). When a chosen SIDE grasp fails in sampling for a reason the sampler cannot
+   fix (count the reasons), switch to the overhang approach (push over the support edge, then pick) as pick_overhang_push does in IORSLarge;
+   add the push step to under_small_03's oracle program and generalize to every alias whose pick can fall back this way (list them first);
+   fallback only; kit `overhang_fallback.*`; the same exact checks as IORSLarge (reuse pick_overhang_push / v2/overhang.py); unit tests;
+   validate under_small_03 N 4 + the other alias with the most side-grasp failures.
+3. **Pre-place framing** (camera-frame rule change APPROVED): the draw's pre-place check matches the program check (fingertip point + 2 cm
+   slack) instead of the hand box; QA unchanged; list the call sites; count per alias the rejections removed; unit test; validate under_small_03.
+4. **The expanding tilt / yaw map** (`ISPATIALGYM_FAST_MAP_TILT_INHERIT`): CONFIRMED as the default for all aliases (no change).
+5. **The merged map overlay** (`ISPATIALGYM_MAP_OVERLAY`): jobs START reading it - first confirm the frozen map is never written, the reader
+   applies a PINNED version (job.env + the map identity), the in-memory map cache keys on the overlay version; fix what is not so; the
+   offline merge after each batch makes a new version, jobs pin the version they read; on by default (separate commit).
+Validation: unit tests; under_small_03 `--grasps v2only` N 4 ONCE with 1 + 2 + 3 + 5 (each item's counters) + the extra aliases of items 1 / 2.
+
+**1. The hull fallback** (`ik.IKChecker._hull_fallback`, switch `ISPATIALGYM_SUPPORT_HULL_FALLBACK` = 1 | shadow | 0; 3a2ce4ec, default ON
+6a6731ca). Where the 2 mm comes from: the robot model's cuRobo `collision_sphere_buffer` (`r1pro_model.build_curobo_robot_dict(...,
+collision_sphere_buffer=0.002)`, the value of OmniGibson's shipped `r1pro_description_curobo_default.yaml`, a49d8f54 "Instance sampler v1.0.0")
+- ONE global padding of every sphere of every link in every cuRobo query (planner, IK, the sampler's checks); the contact policy reuses it
+(its own sphere margin `sphere_support_margin_m` is 0; the module doc's rule 3 only names "the model's 2 mm sphere buffer"): a reused
+constant, not a deliberate non-finger margin. Now `contact_policy.MODEL_SPHERE_BUFFER_M`. The rule: the sphere stage (non-finger links vs
+the world minus the approached objects, margin 0) stays first; when it fails, the fallback applies only if (a) every link but the hand's
+rigid links (palm `{arm}_gripper_link`, wrist camera `{arm}_realsense_link`, wrist `{arm}_arm_link7` - the links with exact hulls) is
+clear at the margin, (b) the hand's rigid links are clear at the margin less the buffer (each sphere < 2 mm deep), (c) they are clear at
+the full margin with the policed supports out of the world (the touch is the support's, not another obstacle's), (d) no policed support is
+a floor; then their exact hulls (`HandChecker.clearance`: vertices + face samples) must clear every policed support's plane by
+**0.5 mm** (`HULL_FALLBACK_MIN_CLEARANCE_M`, `ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M`). Why 0.5 mm: the hull-vs-plane clearance is exact
+(a convex hull's minimum over a plane is at a vertex), so the margin only has to cover the support's own unevenness about its measured
+plane (breakfast_table rhjoby: 8 pieces within 0.3 mm) - 0.5 mm covers it with margin and still admits side_9 (1.0 mm nominal); 1.0 mm
+would reject side_9 itself (its nominal hull is 0.99-1.03 mm). The rest of the policy (the hull stage incl. the fingers' 2 mm, rule 2)
+follows unchanged. Kit `support_policy.hull_fallback_passed` / `.hull_fallback_shadow_pass` / `.hull_fallback_failed.<why>` (floor,
+no_hand_link, non_hand_link, deeper_than_buffer, other_obstacle, no_plane, hull_clearance). Tests `test_support_hull_fallback.py` (8).
+COUNT before adopting (`$OFH/plateqtf2_20261108/`): library (`hull_fallback_count.py` over the 102 int1 entries' 260 valid grasps at their
+nominal pose on the rest): 245 clear, **7 narrow with hull >= 0.5 mm** (plate qtfzeq side_9 -0.85 / +1.03 mm, lip_shallow_4 -0.33 / +0.98,
+lip_shallow_5 -0.23 / +1.02; cork ncxgpe side_0 -1.65 / +5.22; brussels sprouts mbkrxe side_10 -0.61 / +1.77; webcam fabztm side_2 -0.73 /
++3.05; hardback lean_right side_3 -0.58 / +1.00), 8 deeper than the buffer (hard candy vwegtt side_2 -2.9 mm; the 6 hardback overhang-rest
+grasps and the lean_left one, whose support is a slab box, not a plane); at 1.0 mm one of the 7 drops. Sampling logs (`count_sphere_logs.py`,
+every v2 run under `$OFH/out`): sphere-stage rejections under_small_03 1434 (side_9 1133 pose + 274 approach tail; lip_shallow 27),
+attachment_03 129 (cork side_0), inside_01 100 (brussels sprouts side_8 96 - an earlier library -, side_10 4), inside_02 47 (hard candy
+side_2: deeper, no gain), touching_04 9, nextto_02 8, disembedding_05 7. Who gains: under_small_03, attachment_03, inside_01 (and the
+entries without logged rejections: webcam fabztm, hardback lean_right).
+
+**2. The overhang fallback** (`v2/overhang_fallback.py`, 1344b250; switch `ISPATIALGYM_OVERHANG_FALLBACK`, default on). Side-grasp failure
+reasons per alias (`count_side_reasons.py`, v2 runs): the support policy (the sampler cannot fix it: the grasp pose is fixed relative to the
+object on its support) under_small_03 1409, disembedding_05 292 (palm_contact 285), attachment_03 129, inside_01 100, inside_02 47,
+touching_04 9, nextto_02 8; the rest are IK / joint limit / tracking / collisions with other objects (another stance or position can fix
+them). Which picks can fall back this way (`side_overhang_list.py`: entries whose SIDE grasps' closing sweep reaches below the support top
+at the nominal pose, i.e. a flat object whose lower finger needs free space): plate qtfzeq side_9 (under_small_03, `program_iors_small`),
+brussels sprouts mbkrxe side_10 (inside_01, `program_iors_small` inside), hard candy vwegtt side_2 (inside_02, idem), cork ncxgpe side_0
+(attachment_03: the attachment program / sampler - not wired: the attachment code is i7-attachfix's; owner), hardback bqvvvx overhang rest
+(inside_large_01: IORSLarge, already its primary path). Mechanism: in `tabletop._phase3_draw`, when a drawn pair's exact IK fails, the
+grasp is library mode `side` and the reason is the support policy (pose or approach tail: `overhang_fallback.reason_class`), IORSSmall (not
+touching: its program picks without the push) calls `overhang_fallback.try_fallback`: IORSLarge's `_overhang_pick` and its helpers
+(`_overhang_geometry` / `_edges` / `_grasp` / `_push_chain` / `_push_branch` / `_touch_ok` / `_drifted` / `_settle`, `overhang_records`)
+bound UNCHANGED on an adapter of the small sampler (`SmallOverhangPick`: per-role target / hull / rest, the support top as `surface`, the
+drawn pose as `pose_on`) - the same exact checks; options `generation.pick_overhang_push` or the defaults (mode fallback, no second grasp
+stance). A failed pick is memoised (stance, trunk, grasp, yaw, cell). The record is written with the grasp (`contacts.push_pick` +
+`grasps[0].pick_overhang`, dropped with a rejected candidate); `after_settle` keeps the overhang grasp (no re-derivation / re-selection at
+the settled init pose). Oracle program (approved): `program_iors_small` picks through `_pick_actions` - push -> retreat -> grasp -> lift
+when `contacts.push_pick` is recorded, unchanged otherwise. Kit `overhang_fallback.trigger.<class>` / `.tried` / `.found` / `.failed` /
+`.memo_hit` + IORSLarge's `pick_overhang.*`. Tests `test_overhang_fallback.py` (6, on test_iors_large_overhang's stubs).
+
+**3. Pre-place framing** (7fce56ee; `ISPATIALGYM_PREPLACE_FRAME_RULE` = fingertip (default) | box). Call sites where a draw checked the
+hand box at the pre-place: `iors_small._segment_draw` (the place / pre-place screen before the settle), `IORSSmall.require_in_frame` (the
+grasp check's `{"pre-place", "place"}`), the FRAME_RANK score in `_segment_draw` (`frame_score`). They now judge the PRE-PLACE by
+`program_check.fingertip_frame_margin` (the criterion `fingertips_in_frame` applies, factored out: the fingertip point inside QA's 5 % plus
+2 cm slack at its depth); the PLACE (a contact pose, `CONTACT_POSE_KEYS`) keeps the eef box, as the program check does. No other draw checks
+a pre-place with the box (block_design's `_chain_in_frame` checks the eef + fingertip points; iors_large / inside / attachment check
+contact poses). Not changed (camera-frame changes beyond item 3 -> owner): the pre-GRASP box in `require_in_frame`, touching's push / brace
+pre-contact boxes, the carry waypoint box in `core.py`. Kit `preplace_frame.checked` / `.rejected` / `.removed`. Tests
+`test_preplace_frame.py` (3). Count (`count_preplace.py`, every run under `$OFH/out`): pre-place box rejections per alias inside_04 2635,
+inside_03 783, ontop_small_02 331, ontop_small_04 318, under_small_04 173, under_small_03 165, ontop_small_01 80, under_small_01 28,
+inside_02 27, under_small_02 18, nextto_03 11, inside_01 8, ontop_small_03 6, nextto_02 / 01 / 04 1-2; only under_small_03 logged the box
+corners (FRAME_DIAG, 19 pre-place rejections): 13 / 19 pass the fingertip rule (fingertip reconstructed from the corners' projections).
+
+**5. The merged map overlay, pinned** (4f374e8c mechanism, 14634552 default). Confirmed: the frozen map is never written (map_tilt writes
+only its shards and merged version files; `test_overlay_never_touches_the_frozen_map`). Not so before, fixed: (a) the reader took the
+LATEST version at first use (per process; another process of the same job or a merge mid-job could read another) - now every merge also
+writes a RELEASE `<root>/releases/r<M>.json` = {map key: version}, `submit_fast.py --map-overlay <root>` pins the root's latest release
+into job.env (`ISPATIALGYM_MAP_OVERLAY` + `ISPATIALGYM_MAP_OVERLAY_RELEASE`; `job_fast.sh` pins at the job's start when job.env has none),
+the reader applies exactly that release's versions (a key it does not name: ov0; an unreadable pinned release fails); unpinned reads are
+logged and counted (`map_overlay.unpinned`); the version applied stays in the view identity (`inherit_k2+ov<N>`, the start-cell caches) and
+in `meta.map_overlay` (kit `map_overlay.read_v<N>`); (b) the process's overlays were keyed by map key only and a view's inherited-column
+cache by the overlay's own-event counter - now keyed by (map key, root, release, version) and by the overlay object + version, so a process
+never mixes an overlaid and a plain view. Default ON: `--map-overlay` defaults to `$OFH/map_overlay` (seeded with the plateqtf overlay v1,
+release r1 = right ce1af987a8df9d69 v1, left b2f36adb26c194ad v1); `--map-overlay off` = none. After each batch: `python -m
+ispatialgym.sampling.v2.map_tilt merge --root $OFH/map_overlay $OFH/out/<tag>/*/g*/map_overlay/*/*.jsonl` (new versions + a new release).
+Tests: `test_map_tilt.py` +3 (pinned release vs latest, never mixed views, the view's pin record).
+
+**Reusable hull check** (1f368d64, for i7-t03: the owner applies the item-1 rule to touching_03 too): `contact_policy.narrow_sphere_failure`
+/ `hull_clearance_min` / `hull_fallback` - input the sphere query and the links that failed, the hand links with hulls, the HandChecker, the
+eef pose, the support / obstacle geometry (planes or boxes, e.g. split-off support pieces), the threshold (`HULL_FALLBACK_MIN_CLEARANCE_M`
+0.5 mm); `IKChecker._hull_fallback` calls it (behaviour unchanged). Cherry-pick 3a2ce4ec (`MODEL_SPHERE_BUFFER_M`) + 1f368d64.
+
+**Validation** (trunk_14634552, v2-root `$OFH/v2maps_int1`, `--grasps v2only` N 4, overlay `$OFH/map_overlay` release r1; counters summed
+over the kit blocks by `$OFH/plateqtf2_20261108/tab_pq2.py`, the same script on i7_pq_merged for "before"):
+- under_small_03 `i7pq2_us03` (18372123; items 1+2+3+5): 36 attempts / 4 written / demos 3 of 4 ok, 1.36 GPU-h = 0.455 per success (i7_pq_merged
+  32 / 3 / 3 of 3, 0.448). Written grasps lip_shallow_6~r180 x 3, top_4. Item 1: `hull_fallback_passed` 16, failed deeper_than_buffer 31 /
+  hull_clearance 9 / non_hand_link 1; side_9 drawn 10 times, never rejected by the support policy (it failed on IK / joint limits: fixable),
+  never chosen. Item 2: no trigger (no side grasp failed on the policy). Item 3: `preplace_frame.checked` 62 / `.removed` 24 / `.rejected` 2;
+  gripper_not_in_frame log lines at the pre-place 12 -> 1, at the place 4 -> 4. The failed demo (300150): `gripper_out_of_fov` in the place's
+  carry (u 122, v 58, depth 0.50 m) after the oracle's PROTECT via-above lifted the carry over the mat; that instance's pre-place passed only
+  under the new rule (`removed` 2 in its written attempt). Item 5: `map_overlay.read_v1`; empty_f_on_inherited 133 -> 95, reach_fail 132 -> 95,
+  cells_invalidated 32 -> 13, cells_confirmed 57 -> 38, map_yaw.pairs_confirmed 82 -> 73.
+- attachment_03 `i7pq2_at03` (18372125; item 1): 39 / 4 / 4 of 4 ok, 0.411 GPU-h per success; `hull_fallback_passed` 9, no sphere-stage
+  rejection (historically 129, cork side_0); written side_0 x 1, top_15~r180 x 3.
+- inside_01 `i7pq2_in01` (18372124; items 1+2): 15 / 4 / 4 of 4 ok, 0.101 GPU-h per success; no support-policy rejection of a side grasp (the
+  int1 entry's side grasps failed on IK / tracking), `hull_fallback_failed.deeper_than_buffer` 1; the overhang fallback did not trigger.
+- Overlay merged after the batch: `$OFH/map_overlay` release r2 (ce1af987a8df9d69 v2 212 entries / 29 invalidated / 179 confirmed,
+  b2f36adb26c194ad v2 92 / 15 / 71, + 3 new map keys of attachment_03 / inside_01).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
