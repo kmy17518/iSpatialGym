@@ -65,3 +65,20 @@ def test_jobs_keep_the_id_at_the_main_rest_and_derive_one_per_other_frequent_res
     assert jobs[0].get("rest_hint_wxyz") is None and S.job_dir(jobs[0]).endswith(job["id"])  # the designated directory is kept
     w, x, y, z = jobs[0]["generation_rest_wxyz"]
     assert abs(S.tilt_distance([x, y, z, w], cl[0]["quat_xyzw"])) < 1e-5 and "members" not in jobs[0]["settle_first"]
+
+
+def test_the_retry_overrides_parse_and_default(monkeypatch):
+    # of-v2maps 2026-11-07: the escalation ladder's opt-in candidate / densify / validation overrides
+    from ispatialgym.grasping import pipeline as P
+
+    monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
+    monkeypatch.delenv("ISG_GLIB_DENSIFY", raising=False)
+    monkeypatch.delenv("ISG_GLIB_VAL_OVERRIDES", raising=False)
+    cfg, dz = P.candidate_overrides()
+    assert cfg.n_candidates == 6000 and dz == ((4, 2), (8, 4)) and P.validate_overrides().max_trials == 10
+    monkeypatch.setenv("ISG_GLIB_CAND_OVERRIDES", '{"n_candidates": 24000, "max_representatives": 20}')
+    monkeypatch.setenv("ISG_GLIB_DENSIFY", "4x2,16x8")
+    monkeypatch.setenv("ISG_GLIB_VAL_OVERRIDES", '{"max_trials": 30}')
+    cfg, dz = P.candidate_overrides()
+    assert cfg.n_candidates == 24000 and cfg.max_representatives == 20 and cfg.n_orientations == 12 and dz == ((4, 2), (16, 8))
+    assert P.validate_overrides().max_trials == 30

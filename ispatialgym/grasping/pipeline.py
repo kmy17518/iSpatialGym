@@ -69,6 +69,31 @@ def stage_export(args, jobs, world=None):
     return world
 
 
+def candidate_overrides():
+    """of-v2maps 2026-11-07 (owner: retry the objects without feasible grasps with more candidates + time, recorded): opt-in
+    ``ISG_GLIB_CAND_OVERRIDES`` (JSON of ``candidates.CandidateConfig`` fields, e.g. n_candidates / n_orientations / max_representatives /
+    topk) and ``ISG_GLIB_DENSIFY`` ("4x2,8x4,16x8": the densify passes, candidate x orientation multipliers; default (4, 2), (8, 4)).
+    Returns ``(CandidateConfig, densify)``."""
+    from dataclasses import asdict
+
+    from ispatialgym.grasping import candidates as CA
+
+    base = CA.CandidateConfig()
+    ov = json.loads(os.environ.get("ISG_GLIB_CAND_OVERRIDES") or "{}")
+    cfg = CA.CandidateConfig(**{**asdict(base), **ov}) if ov else base
+    dz = os.environ.get("ISG_GLIB_DENSIFY", "").strip()
+    densify = tuple(tuple(int(v) for v in p.lower().split("x")) for p in dz.split(",") if p) if dz else ((4, 2), (8, 4))
+    return cfg, densify
+
+
+def validate_overrides():
+    """Opt-in ``ISG_GLIB_VAL_OVERRIDES`` (JSON of ``validate_tabletop.ValidateConfig`` fields, e.g. max_trials / max_valid)."""
+    from ispatialgym.grasping import validate_tabletop as VT
+
+    ov = json.loads(os.environ.get("ISG_GLIB_VAL_OVERRIDES") or "{}")
+    return VT.ValidateConfig(**ov)
+
+
 def _cand_one(payload):
     j, root, force = payload
     from ispatialgym.grasping import candidates as CA
@@ -78,10 +103,13 @@ def _cand_one(payload):
     if not force and os.path.exists(os.path.join(d, "candidates.json")):
         return {"id": j["id"], "ok": True, "skipped": True}
     try:
-        out = CA.generate(j, d)
+        cfg, densify = candidate_overrides()
+        out = CA.generate(j, d, cfg=cfg, densify=densify)
         n_ok = sum(1 for c in out["candidates"] if c["geometry"]["ok"])
         fams = out["families"]
         return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "n_candidates": len(out["candidates"]), "n_geometry_ok": n_ok,
+                "cand_config": {k: getattr(cfg, k) for k in ("n_candidates", "n_orientations", "cone_deg", "max_representatives", "topk")},
+                "densify": [list(x) for x in densify], "densified_from": (out["log"] or {}).get("densified_from") is not None,
                 "n_representatives": len(out["representatives"]), "n_families": len(fams),
                 "family_types": sorted({f.get("type") for f in fams.values()}), "log": {k: out["log"][k] for k in out["log"] if k in ("top", "side", "n_sampled")},
                 "reasons": sorted({c["geometry"]["reason"] for c in out["candidates"] if not c["geometry"]["ok"]})}
@@ -106,7 +134,7 @@ def stage_candidates(args, jobs):
 def _world(args):
     from ispatialgym.grasping import validate_tabletop as VT
 
-    return VT.TabletopWorld(VT.ValidateConfig())
+    return VT.TabletopWorld(validate_overrides())  # of-v2maps 2026-11-07: ISG_GLIB_VAL_OVERRIDES (default: ValidateConfig())
 
 
 def stage_validate(args, jobs, world=None):
