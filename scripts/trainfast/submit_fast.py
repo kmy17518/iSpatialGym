@@ -65,7 +65,7 @@ GRASPS_V2 = {"ISPATIALGYM_GRASP_LIBRARY_V2": os.path.join(V2_ROOT, "glib"), "ISP
 #: releases <root>/releases/r<M>.json written by every offline merge). --map-overlay <root> pins the root's LATEST RELEASE into job.env
 #: (ISPATIALGYM_MAP_OVERLAY + ISPATIALGYM_MAP_OVERLAY_RELEASE): the job reads exactly those versions, whatever is merged meanwhile.
 MAP_OVERLAY_ROOT = os.path.join(OFH, "map_overlay")
-MAP_OVERLAY_DEFAULT = "off"
+MAP_OVERLAY_DEFAULT = MAP_OVERLAY_ROOT  # i7-plateqtf2: ON by default (owner item 5, separate commit); --map-overlay off = none
 
 
 def overlay_release(root):
