@@ -21,7 +21,10 @@ and B → C (≤ ``max_partner_geodesic`` + 1 m, object attached) and the transi
 Reach bands (B3, ``sampling.reach_bands``): loaded through ``ReachBands.load`` for (support, target), (partner-as-
 support, target) and ``--support floor [--under partner]``; on a cache miss they are computed in-process with the
 module's ``BandComputer`` (the function the CLI runs) and written to the cache directory (``ISG_REACH_BANDS_COMPUTE=0``
-turns the compute-on-miss into ``Reject("missing_band")``).
+turns the compute-on-miss into ``Reject("missing_band")``). Under v2 only (``ISPATIALGYM_V2_ONLY=1``, i7-floor 2026-11-07):
+the v2 reach maps instead (``IORSLarge.v2_band``) - the floor map (``tabletop.floor_map_bands``) for the floor init, the top map
+(``tabletop.map_bands``) of the partner's top, each arm's own; a miss logs ``MAP_REQUEST`` and rejects (``missing_map`` under
+``ISPATIALGYM_REACH_MAPS_STRICT``), no legacy band is loaded or computed.
 
 Tabletop phases 1a / 1b / 1c / 2 are ``v2/tabletop.py``'s (edge candidates, init trunk, lateral draw, Phase-2 survivors
 with the (support, target) band). Floor init: Stance A's trunk is the translate whose optical axis is closest to the
@@ -1948,7 +1951,10 @@ class IORSLarge(SamplerV2):
         floor modes (``--support floor [--under partner]``) through :meth:`compute_band` on a miss; memoised per
         (kind, support, under) for the template. ``ISG_REACH_BANDS_COMPUTE=0`` turns a miss into ``Reject("missing_band")``.
         ``arm`` (owner 2026-09-27, first-demo v2.2): that arm's band - the band above when it is that arm's, else
-        :meth:`other_arm_band`."""
+        :meth:`other_arm_band`. Under v2 only (``reach_bands.v2_only``, i7-floor 2026-11-07): :meth:`v2_band` - the v2 reach maps, never a
+        legacy band."""
+        if RB.v2_only():
+            return self.v2_band(kind, support_obj, under_partner, arm)
         c = self.choice.models["target"]
         obj = f"{c.category}/{c.model}"
         support = "floor" if kind == "floor" else support_obj.name
@@ -2003,6 +2009,75 @@ class IORSLarge(SamplerV2):
             rb = None
         memo[key] = rb
         return rb
+
+    def v2_band(self, kind: str, support_obj=None, under_partner=None, arm: Optional[str] = None) -> RB.ReachBands:
+        """i7-floor 2026-11-07, v2 only (owner: no legacy band - v2 grasps and reach maps only): the v2 reach map of a factor set as a band
+        view (``map_sampling.as_bands``) for ``arm`` (default ``tabletop.default_arm``) - each arm's OWN map, never a mirror (a map is computed
+        per arm in the synthetic world):
+
+        * the floor (``kind`` "floor", no ``under_partner``): ``tabletop.floor_map_bands`` - the floor map (h 0, kind / plane "floor") of the
+          target, the floor object policed at :attr:`floor_z` in the policy's floor mode;
+        * a top (``kind`` "tabletop": the partner's top of the ontop place, the init support's): ``tabletop.map_bands`` at that top
+          (:meth:`band_top`); an interior surface of the init support has no map kind yet;
+        * the floor under a partner (``under_partner``): no map kind yet.
+
+        A miss logs ``MAP_REQUEST`` (the lookup's, or this method's for the kinds without a map), then rejects ``missing_map`` under
+        ``ISPATIALGYM_REACH_MAPS_STRICT``, else ``legacy_band_blocked`` (``reach_bands.block_legacy_band``: the legacy band it would need) -
+        never ``ReachBands.load`` / ``BandComputer``. Memoised per (kind, support, under, arm); recorded in
+        ``template_facts["arm_bands_by_factor"]``. Everything downstream stays exact (stance body checks, the camera rules, F_init / F_goal
+        by exact IK, paths, the support-policy re-check)."""
+        arm = arm or TT.default_arm(self)
+        support = "floor" if kind == "floor" else support_obj.name
+        under = under_partner.name if under_partner is not None else None
+        factor = f"{kind}:{support}{'-under-' + under if under else ''}"
+        memo = self.__dict__.setdefault("_bands", {})
+        key = ("v2", kind, support, under, arm)
+        if key in memo:
+            return memo[key]
+        spec = self.make_band_spec()
+        scene = str(getattr(self.world, "scene_model", ""))
+        rb, what = None, factor
+        if kind == "floor" and under_partner is None:
+            rb = TT.floor_map_bands(self, spec, arm, floor=self.obj("floor"), z_floor=self.floor_z)
+            what = "the floor"
+        elif kind == "floor":
+            TT.map_request(self, kind="floor_under", plane="floor", under=under, object=spec.object, grasp_key=spec.grasp_key, arm=arm, scene=scene)
+            what = f"the floor under {under} (no map kind)"
+        else:
+            surface = TT.surface_band_kwargs(self) if support_obj is (getattr(self, "surface", None) or {}).get("obj") else {}
+            if surface:
+                TT.map_request(self, kind="interior", support=support, surface_z=surface.get("surface_z"), object=spec.object, grasp_key=spec.grasp_key,
+                               arm=arm, scene=scene)
+                what = f"{support}'s interior surface (no map kind)"
+            else:
+                rb = TT.map_bands(self, spec, self.band_top(support_obj), arm)
+                what = f"{support}'s top"
+        if rb is None:
+            msg = f"{self.gp.variant}: no {arm}-arm v2 reach map for {spec.object} ({spec.grasp_key}) at {what}"
+            if os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
+                raise Reject("missing_map", msg)
+            RB.block_legacy_band(f"{msg} - the legacy {factor} band")
+            raise Reject("missing_map", msg)  # (not reached: v2 only blocks every legacy band)
+        n_cells = sum(len(c) for cells in (rb.cells_so or {None: rb.cells}).values() for c in cells.values())
+        if n_cells == 0:
+            # the map's verdict (no feasible cell at any trunk) stands - no unfiltered fallback as for an empty legacy band
+            log.warning("%s: the %s-arm reach map of %s at %s is empty", self.gp.variant, arm, spec.object, what)
+            self.template_facts.setdefault("empty_maps", []).append({"factor": factor, "arm": arm, "map": rb.meta.get("map_path")})
+        log.info("%s: %s-arm reach map %s: %s", self.gp.variant, arm, factor, rb.meta.get("map_path"))
+        self.template_facts.setdefault("arm_bands_by_factor", {}).setdefault(factor, {})[arm] = TT.band_facts(rb)
+        memo[key] = rb
+        return rb
+
+    def band_top(self, support_obj):
+        """The measured top of ``support_obj`` a top's band / map is read at: the init surface's top when it is the init support, the
+        partner's top of the ontop place (``place["top"]``) when it is the partner, else ``support_top`` with the target ignored."""
+        surf = getattr(self, "surface", None) or {}
+        if surf.get("obj") is support_obj and surf.get("top") is not None:
+            return surf["top"]
+        place = getattr(self, "place", None) or {}
+        if support_obj is getattr(self, "partner", None) and place.get("top") is not None:
+            return place["top"]
+        return self.support_top(support_obj, ignore=[self.target])
 
     def other_arm_band(self, base: RB.ReachBands, kind: str, support: str, under: Optional[str], arm: str) -> Optional[RB.ReachBands]:
         """``arm``'s band of the factors of ``base`` (the other arm's band; owner 2026-09-27, first-demo v2.2): its own cached band

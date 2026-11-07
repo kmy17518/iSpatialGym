@@ -1117,6 +1117,54 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
     return map_bands(s, spec, top, arm)
 
 
+def _v2_map_entry(s, spec: BandSpec):
+    """The v2 library entry and its stable rest a map lookup of ``spec`` reads (:func:`map_bands`, :func:`floor_map_bands`): ``(lib, rest_id)``,
+    or None without a v2 entry / stable rest; a spawn scale other than the entry's is logged ``V2_SCALE_MISMATCH`` and rejects
+    ``v2_scale_mismatch`` under v2 only (P2 §11: the lookup enforces scale), else None."""
+    from ispatialgym.grasping import schema as GS
+    from ispatialgym.sampling import grasp_library as GL
+
+    lib = GL.v2_entry(spec.grasp_key) if spec.grasp_key else None
+    if lib is None or not lib.rests:
+        return None
+    rid = GL.v2_rest_id(lib)  # of-v2maps 2026-11-07: the stable rest, deterministic (the grasps / rest quat of the same rest)
+    if rid is None:
+        return None
+    if spec.scale is not None and GS.canonical_scale(spec.scale) != lib.scale:
+        # of-v2maps 2026-11-07 (P2 §11: the lookup enforces scale): the entry was generated / mapped at another scale than the spawned object
+        log.info("V2_SCALE_MISMATCH %s (%s): spawned %s, entry %s", spec.object, spec.grasp_key, GS.canonical_scale(spec.scale), lib.scale)
+        if RB.v2_only():
+            _reject("v2_scale_mismatch", f"{spec.grasp_key}: spawned at {GS.canonical_scale(spec.scale)}, v2 entry at {lib.scale}")
+        return None
+    return lib, rid
+
+
+def _map_config_require() -> Optional[Dict[str, Any]]:
+    """``ISPATIALGYM_REACH_MAP_REQUIRE`` (a JSON dict of MapConfig fields, e.g. {"preshape": "grasp"}): the configuration a map must have been
+    computed under (``ReachMap.find(config_require=)``), None when unset."""
+    return json.loads(os.environ.get("ISPATIALGYM_REACH_MAP_REQUIRE") or "{}") or None
+
+
+def _register_map_policy(s, lib, rid: str, planes: Dict[str, float], floors: Sequence[str] = ()) -> None:
+    """A map hit turns the grasp approach's support policy on (``ISPATIALGYM_SUPPORT_POLICY=grasp``: ``ik.support_policy_scope``; "1" also
+    polices places / carries / releases) against the planes the map was computed at (``planes``: support name -> z, the MEASURED top, not the
+    AABB top: ``ik.support_plane_z``), ``floors`` (i7-floor 2026-11-07) policed in the floor mode (``ik.floor_support_names``), and records
+    the v2 rest for the policy diagnostic's expected object z (``ik._support_policy_diag``: the plane + the rest's root height)."""
+    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    ikc = getattr(s, "ikc", None)
+    if ikc is None:
+        return
+    if not isinstance(getattr(ikc, "support_plane_z", None), dict):
+        ikc.support_plane_z = {}
+    ikc.support_plane_z.update({str(k): float(v) for k, v in planes.items()})
+    if floors:
+        if not isinstance(getattr(ikc, "support_floor_names", None), set):
+            ikc.support_floor_names = set()
+        ikc.support_floor_names.update(str(n) for n in floors)
+    ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
+                               "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
+
+
 def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: Optional[float] = None, exact_anchor: bool = False,
               plane: str = "top") -> Optional[RB.ReachBands]:
     """The scene-independent reach map of the sampler's object at the support's actual height above the floor, as a multi-distance band
@@ -1125,25 +1173,15 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
     (``ISPATIALGYM_SUPPORT_POLICY``): exact sampling keeps the support for the palm / wrist camera / arm and the 2 mm finger rule.
     ``arm`` (default ``spec.arm``): the arm whose map is looked up (:func:`arm_band`'s other segment arm)."""
     arm = arm or spec.arm
-    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.grasping import contact_policy as CP
     from ispatialgym.sampling import map_sampling as MS
     from ispatialgym.sampling import reach_maps as RMAP
     from ispatialgym.sampling.height_anchors import AnchorSet
 
-    lib = GL.v2_entry(spec.grasp_key) if spec.grasp_key else None
-    if lib is None or not lib.rests:
+    ent = _v2_map_entry(s, spec)
+    if ent is None:
         return None
-    rid = GL.v2_rest_id(lib)  # of-v2maps 2026-11-07: the stable rest, deterministic (the grasps / rest quat of the same rest)
-    if rid is None:
-        return None
-    from ispatialgym.grasping import schema as GS
-
-    if spec.scale is not None and GS.canonical_scale(spec.scale) != lib.scale:
-        # of-v2maps 2026-11-07 (P2 §11: the lookup enforces scale): the entry was generated / mapped at another scale than the spawned object
-        log.info("V2_SCALE_MISMATCH %s (%s): spawned %s, entry %s", spec.object, spec.grasp_key, GS.canonical_scale(spec.scale), lib.scale)
-        if RB.v2_only():
-            _reject("v2_scale_mismatch", f"{spec.grasp_key}: spawned at {GS.canonical_scale(spec.scale)}, v2 entry at {lib.scale}")
-        return None
+    lib, rid = ent
     z_plane = float(z_support) if z_support is not None else float(top.z)
     h = z_plane - float(getattr(s.world, "floor_z", 0.0))
     anchors = None
@@ -1152,45 +1190,92 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
         with open(ap) as f:
             an = json.load(f)
         anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
-    req = dict(kind="tabletop", plane=plane, entry=os.path.basename(os.path.dirname(lib.path)), rest_id=rid, h=round(h, 4), arm=arm,
-               support=str(getattr(top, "name", "")), scene=str(getattr(s.world, "scene_model", "")))
+    entry = os.path.basename(os.path.dirname(lib.path))
+    req = dict(kind="tabletop", plane=plane, entry=entry, rest_id=rid, h=round(h, 4), arm=arm, support=str(getattr(top, "name", "")),
+               scene=str(getattr(s.world, "scene_model", "")))
     if exact_anchor and (anchors is None or anchors.lookup(h)[1] != "exact"):
         # a tray floor 6 mm above its table must not be served by the table top's map through the +-1 cm anchor range
         log.info("reach map miss for %s (%s) at h %.4f, %s arm: no EXACT anchor for the %s", spec.object, spec.grasp_key, h, arm, plane)
         map_request(s, **req)
         return None
-    root = os.path.join(map_sampling_root(), os.path.basename(os.path.dirname(lib.path)))
-    from ispatialgym.grasping import contact_policy as CP
-
-    # of-v2maps 2026-11-07 (P2 §11): a map computed under another contact policy does not serve
-    # ... and (ISPATIALGYM_REACH_MAP_REQUIRE, a JSON dict of MapConfig fields, e.g. {"preshape": "grasp"}) of the required configuration
-    # (i7-floor 2026-11-07: this was ``req`` too - it overwrote the MAP_REQUEST fields above: a miss raised TypeError on ``** None``, or
-    # logged the config instead of the map to build)
-    require = json.loads(os.environ.get("ISPATIALGYM_REACH_MAP_REQUIRE") or "{}") or None
+    if not map_sampling_root():
+        log.info("reach map miss for %s (%s) at h %.4f, %s arm: no maps root (ISPATIALGYM_REACH_MAPS)", spec.object, spec.grasp_key, h, arm)
+        map_request(s, **req)
+        return None
+    root = os.path.join(map_sampling_root(), entry)
+    # of-v2maps 2026-11-07 (P2 §11): a map computed under another contact policy does not serve, nor one of another required configuration
+    # (i7-floor 2026-11-07: this was ``req`` too - it overwrote the MAP_REQUEST fields, so a miss logged the config or raised TypeError on None)
     rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
-                            config_require=require)
+                            config_require=_map_config_require())
     if rm is None:
         log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
         map_request(s, **req)
         return None
-    # of-v2maps 2026-11-06: the grasp approach only (ik.support_policy_scope) - "1" also policed places / carries / releases
-    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
-    # ... against the support's MEASURED top (the height the map was computed at), not its AABB top (ik.support_plane_z)
-    ikc = getattr(s, "ikc", None)
-    if ikc is not None:
-        if not isinstance(getattr(ikc, "support_plane_z", None), dict):
-            ikc.support_plane_z = {}
-        ikc.support_plane_z[str(top.name)] = float(top.z)
-        if z_support is not None:
-            # of-v2maps 2026-11-07: the objects the grasp ignores besides the support (the source tray) are policed at the plane the map was
-            # computed at (the tray's inner floor), not their AABB top (the rim)
-            for o in list(spec.ignore or []):
-                if getattr(o, "name", None):
-                    ikc.support_plane_z[str(o.name)] = z_plane
-        # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
-        ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
-                                 "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
+    planes = {str(top.name): float(top.z)}
+    if z_support is not None:
+        # of-v2maps 2026-11-07: the objects the grasp ignores besides the support (the source tray) are policed at the plane the map was
+        # computed at (the tray's inner floor), not their AABB top (the rim)
+        planes.update({str(o.name): z_plane for o in list(spec.ignore or []) if getattr(o, "name", None)})
+    _register_map_policy(s, lib, rid, planes)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
+    return MS.as_bands(rm, overhang=0.0)
+
+
+#: i7-floor 2026-11-07: a floor map is computed with the object on the plane the robot stands on (h 0); the floor the object rests on
+#: (the sampler's floor datum, e.g. ``IORSLarge.floor_z`` = the floor object's AABB top) may sit this far from the measured floor under the
+#: robot (``world.floor_z``) and still be served - beyond it the lookup is a miss (MAP_REQUEST with the datum)
+FLOOR_DATUM_TOL_M = 0.02
+
+
+def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None, z_floor: Optional[float] = None) -> Optional[RB.ReachBands]:
+    """i7-floor 2026-11-07: the FLOOR reach map (``reach_maps`` kind ``floor``: the object on the floor plane the robot stands on, h 0, no
+    edge) of the sampler's object as a band view (``map_sampling.as_bands``, overhang 0: one stand-off 0.0, the cells base-relative), beside
+    :func:`map_bands` with the same identity checks (the v2 entry and its stable rest, the spawn scale, the contact policy key, the robot
+    model, ``ISPATIALGYM_REACH_MAP_REQUIRE``, kind + plane "floor"). ``floor``: the floor object the grasp ignores (default ``s.obj("floor")``),
+    registered for the exact support-policy re-check at ``z_floor`` (default ``s.floor_z`` - the floor the object rests on -, else
+    ``world.floor_z``) in the policy's floor mode (:func:`_register_map_policy`). The datum ``z_floor - world.floor_z`` must be within
+    :data:`FLOOR_DATUM_TOL_M`. None on a miss (one ``MAP_REQUEST`` line with ``kind: floor``)."""
+    arm = arm or spec.arm
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling import reach_maps as RMAP
+
+    ent = _v2_map_entry(s, spec)
+    if ent is None:
+        return None
+    lib, rid = ent
+    if floor is None and callable(getattr(s, "obj", None)):
+        try:
+            floor = s.obj("floor")
+        except Exception:  # noqa: BLE001 - a sampler without a floor role: the plane is still the floor, nothing registered by name
+            floor = None
+    w_floor = float(getattr(s.world, "floor_z", 0.0))
+    if z_floor is None:
+        z_floor = getattr(s, "floor_z", None)
+    z_plane = float(z_floor) if z_floor is not None else w_floor
+    datum = z_plane - w_floor
+    entry = os.path.basename(os.path.dirname(lib.path))
+    fname = str(getattr(floor, "name", "") or "floor")
+    req = dict(kind="floor", plane="floor", entry=entry, rest_id=rid, h=RMAP.FLOOR_HEIGHT, datum=round(datum, 4), arm=arm, support=fname,
+               scene=str(getattr(s.world, "scene_model", "")))
+    if abs(datum) > FLOOR_DATUM_TOL_M:
+        log.info("reach map miss for %s (%s) on the floor, %s arm: the floor %s is %.4f m from the robot's floor (> %.2f m)", spec.object, spec.grasp_key,
+                 arm, fname, datum, FLOOR_DATUM_TOL_M)
+        map_request(s, **req)
+        return None
+    if not map_sampling_root():
+        log.info("reach map miss for %s (%s) on the floor, %s arm: no maps root (ISPATIALGYM_REACH_MAPS)", spec.object, spec.grasp_key, arm)
+        map_request(s, **req)
+        return None
+    root = os.path.join(map_sampling_root(), entry)
+    rm = RMAP.ReachMap.find(root, lib, RMAP.FLOOR_HEIGHT, rest_id=rid, arm=arm, anchors=None, kind="floor", policy_key=CP.DEFAULT.key(arm),
+                            robot=RMAP.robot_digest(), config_require=_map_config_require())
+    if rm is None:
+        log.info("reach map miss for %s (%s) on the floor, %s arm (%s)", spec.object, spec.grasp_key, arm, root)
+        map_request(s, **req)
+        return None
+    _register_map_policy(s, lib, rid, {fname: z_plane} if floor is not None else {}, floors=[fname] if floor is not None else [])
+    log.info("reach map hit for %s on the floor (datum %+.4f m), %s arm: %s", spec.object, datum, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
 
@@ -1388,6 +1473,8 @@ def band_facts(bands: Optional[RB.ReachBands]) -> Optional[Dict[str, Any]]:
     if bands is None:
         return None
     d: Dict[str, Any] = {"arm": bands.meta.get("arm", "right"), "path": bands.path}
+    if bands.meta.get("mode") == "map_view":  # i7-floor 2026-11-07: a map view has no band file - name its map
+        d["map_path"] = bands.meta.get("map_path")
     if bands.meta.get("mirrored_from"):
         d.update({"mirrored_from": bands.meta["mirrored_from"], "mirror_source": bands.meta.get("mirror_source")})
     return d

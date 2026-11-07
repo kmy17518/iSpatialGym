@@ -286,6 +286,23 @@ def policed_supports(supports: Sequence[Any], approached: Optional[Sequence[Any]
     return [sp for sp in supports if all(sp is not a for a in (approached or ()))]
 
 
+def floor_support_names(ikc: Any) -> set:
+    """i7-floor 2026-11-07: the names of the supports the sampler registered as the FLOOR the robot stands on (``IKChecker.support_floor_names``,
+    set by ``tabletop.floor_map_bands``) - policed in the contact policy's floor mode (``contact_policy`` rule 5)."""
+    v = getattr(ikc, "support_floor_names", None)
+    return set(v) if v else set()
+
+
+def policy_links(others: Sequence[str], supports: Sequence[Any], floors: set, ground_links: Sequence[str]) -> List[str]:
+    """i7-floor 2026-11-07: the non-finger links the sphere stage of the support policy checks - all of ``others``, but the robot's
+    ground-contact links (wheels, base body: ``R1ProCuRobo.ground_contact_links``) when a policed support is a registered floor (rule 5:
+    they stand on it - not a grasp contact; the IK of the pose still checked them against every other obstacle)."""
+    if not any(getattr(sp, "name", None) in floors for sp in supports):
+        return list(others)
+    gc = set(ground_links or ())
+    return [l for l in others if l not in gc]
+
+
 def support_plane_z(sp: Any, planes: Optional[Dict[str, float]]) -> Optional[float]:
     """of-v2maps 2026-11-06: the support policy's top plane of ``sp`` - the MEASURED top the sampler registered for it
     (``IKChecker.support_plane_z``, set by ``tabletop.map_bands``: the height the reach map was computed at), else its AABB top (the
@@ -537,12 +554,15 @@ class IKChecker:
         """:meth:`support_policy_ok` with its measurements (of-v2maps 2026-11-06): ``ok``, ``reason``, ``stage`` (``spheres`` | ``hulls`` |
         ``-``), the policed ``support`` and its ``plane_z`` / ``plane_src`` (``measured`` | ``aabb``) / ``aabb_top``, the hand hulls'
         ``clearance`` per role (m, the support the check failed on, else the last), ``finger_clearance`` (m) and with ``finger_links`` the
-        clearance per finger link (``finger_by_link``)."""
+        clearance per finger link (``finger_by_link``). i7-floor 2026-11-07: a support registered as the floor (:func:`floor_support_names`,
+        ``tabletop.floor_map_bands``) is policed in the policy's floor mode as the floor reach map was computed - the robot's ground-contact
+        links out of the sphere stage (:func:`policy_links`), the hulls with the fingers' floor allowance (``HandChecker.check(floor=True)``);
+        ``floor`` in the result."""
         from ispatialgym.grasping import contact_policy as CP
         from ispatialgym.oracle import r1pro_model as M
 
         out: Dict[str, Any] = {"ok": True, "reason": "", "stage": "-", "support": None, "plane_z": None, "plane_src": None, "aabb_top": None,
-                               "clearance": {}, "finger_clearance": None, "finger_by_link": {}}
+                               "clearance": {}, "finger_clearance": None, "finger_by_link": {}, "floor": False}
         others = self._non_finger_links(arm)
         if not others:
             return out
@@ -552,6 +572,8 @@ class IKChecker:
         supports = policed_supports(supports, approached)
         if not supports:
             return out
+        floors = floor_support_names(self)
+        others = policy_links(others, supports, floors, getattr(getattr(self.kit, "backend", None), "ground_contact_links", ()))
         drop = [o for o in (approached or ()) if all(o is not sp for sp in supports)]
         with self.ignoring(drop):
             if not bool(self.kit.links_clear(q, others, CP.DEFAULT.sphere_support_margin_m)[0]):
@@ -579,13 +601,14 @@ class IKChecker:
                 continue
             name = getattr(sp, "name", "support")
             plane = CP.Support.plane(top, name=name)
-            ok, reason, cl = hc.check(T, plane, (fq, fq))
+            on_floor = name in floors
+            ok, reason, cl = hc.check(T, plane, (fq, fq), floor=on_floor)
             try:
                 aabb_top = float(sp.aabb[1][2])
             except Exception:  # noqa: BLE001
                 aabb_top = None
             out.update(support=name, plane_z=float(top), plane_src="measured" if planes and name in planes else "aabb", aabb_top=aabb_top,
-                       clearance={r: float(v[0]) for r, v in cl.items()}, finger_clearance=float(cl["finger"][0]), stage="hulls")
+                       clearance={r: float(v[0]) for r, v in cl.items()}, finger_clearance=float(cl["finger"][0]), stage="hulls", floor=on_floor)
             if finger_links:
                 out["finger_by_link"] = finger_link_clearance(hc, T, plane, (fq, fq))
             if not bool(ok[0]):
