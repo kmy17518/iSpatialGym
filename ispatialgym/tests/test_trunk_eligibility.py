@@ -226,6 +226,7 @@ def test_compute_maps_per_d_e(tmp_path, fake, generic):
     if p:
         view = MS.as_bands(RM.ReachMap(p), overhang=0.0)
         assert len(view.band(0.95, 0.0, stand_off=0.35)) == 0 and len(view.band(0.95, 0.0, stand_off=0.45)) > 0
+        assert {(t["stand_off"], t["posture"]) for t in view.meta["trunks"] if (t["translate"], t["tilt"]) == (0.95, 0.0)} == {(0.35, "untucked"), (0.45, "untucked"), (0.55, "untucked")}
 
 
 def t_ref_feasible(meta, key):
