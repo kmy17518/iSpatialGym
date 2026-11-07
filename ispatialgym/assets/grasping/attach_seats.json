@@ -1,0 +1,3965 @@
+{
+ "schema": "isg-attach-seats/1",
+ "created": "2026-11-07T07:33:28",
+ "source": "scripts/grasp_bands/attach_seat_facts.py (predicates.seat_axis on the loaded pair)",
+ "pairs": [
+  {
+   "id": "lid__tnwisp__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "tnwisp",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_tnwispparentM_0_link": {
+      "meta_link_id": "tnwispparentM",
+      "sub_id": "0",
+      "position_root": [
+       8e-08,
+       0.0,
+       0.00610799
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "tnwispparentM": {
+        "0": {
+         "position": [
+          7.828756012991657e-08,
+          -9.658920961570132e-08,
+          0.006107978577041262
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.0473,
+     -0.04805,
+     -0.00792
+    ],
+    "coll_bbox_max": [
+     0.04805,
+     0.04805,
+     0.02019
+    ]
+   },
+   "partners": [
+    {
+     "category": "teapot",
+     "model": "mvrhya",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_tnwispparentM_0_link",
+       "parent_link": "meta__base_link_attachment_tnwispparentF_0_link",
+       "meta_link_id": "tnwispparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00184995,
+        0.0,
+        0.05939442
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        5e-08,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 550,
+       "centroid_root": [
+        -0.00922186,
+        -0.00555696,
+        -0.00349711
+       ],
+       "centroid_to_female_m": 0.063565,
+       "angle_deg": 8.351,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__zkderg__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "zkderg",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_zkdergparentM_0_link": {
+      "meta_link_id": "zkdergparentM",
+      "sub_id": "0",
+      "position_root": [
+       1e-08,
+       0.0,
+       0.00565422
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "zkdergparentM": {
+        "0": {
+         "position": [
+          5.599651640556815e-09,
+          4.694291995389827e-09,
+          0.005654167703971855
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.03845,
+     -0.03819,
+     -0.01119
+    ],
+    "coll_bbox_max": [
+     0.0384,
+     0.0384,
+     0.02267
+    ]
+   },
+   "partners": [
+    {
+     "category": "kettle",
+     "model": "vjbldp",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_zkdergparentM_0_link",
+       "parent_link": "meta__base_link_attachment_zkdergparentF_0_link",
+       "meta_link_id": "zkdergparentF",
+       "sub_id": "0",
+       "position_root": [
+        0.00788959,
+        5.72e-06,
+        0.05988872
+       ],
+       "orientation_root_xyzw": [
+        8.1e-07,
+        1.201e-05,
+        0.70710707,
+        0.70710647
+       ],
+       "axis_root": [
+        1.812e-05,
+        1.584e-05,
+        1.0
+       ],
+       "loc": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        1.812e-05,
+        1.584e-05,
+        1.0
+       ],
+       "n_boundary_points": 172,
+       "centroid_root": [
+        0.00627427,
+        -0.00873794,
+        0.00443219
+       ],
+       "centroid_to_female_m": 0.056165,
+       "angle_deg": 9.108,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__qhlsdq__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "qhlsdq",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {}
+    },
+    "coll_bbox_min": [
+     -0.04513,
+     -0.04514,
+     -0.04038
+    ],
+    "coll_bbox_max": [
+     0.04513,
+     0.04514,
+     0.02962
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "lid__pwgbsb__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "pwgbsb",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_pwgbsbparentM_0_link": {
+      "meta_link_id": "pwgbsbparentM",
+      "sub_id": "0",
+      "position_root": [
+       2e-08,
+       0.0,
+       0.00614834
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "pwgbsbparentM": {
+        "0": {
+         "position": [
+          1.708751576227064e-08,
+          -3.633477763238188e-09,
+          0.00614838122151212
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.0449,
+     -0.0449,
+     -0.00509
+    ],
+    "coll_bbox_max": [
+     0.04484,
+     0.04484,
+     0.01739
+    ]
+   },
+   "partners": [
+    {
+     "category": "teapot",
+     "model": "jlalfc",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_pwgbsbparentM_0_link",
+       "parent_link": "meta__base_link_attachment_pwgbsbparentF_0_link",
+       "meta_link_id": "pwgbsbparentF",
+       "sub_id": "0",
+       "position_root": [
+        0.00231361,
+        -0.0004921,
+        0.07380366
+       ],
+       "orientation_root_xyzw": [
+        -0.00660137,
+        -0.0005078,
+        -0.77270097,
+        0.6347357
+       ],
+       "axis_root": [
+        0.00955713,
+        0.009165,
+        0.99991233
+       ],
+       "loc": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        0.00955713,
+        0.009165,
+        0.99991233
+       ],
+       "n_boundary_points": 637,
+       "centroid_root": [
+        -0.00866257,
+        -0.00169182,
+        -0.00042417
+       ],
+       "centroid_to_female_m": 0.075045,
+       "angle_deg": 7.873,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__ugfmpq__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "ugfmpq",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_ugfmpqparentM_0_link": {
+      "meta_link_id": "ugfmpqparentM",
+      "sub_id": "0",
+      "position_root": [
+       -7.562e-05,
+       -5.72e-06,
+       0.00715017
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "ugfmpqparentM": {
+        "0": {
+         "position": [
+          -7.561671728779415e-05,
+          -6.6692078578395355e-06,
+          0.007150212530283223
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.04478,
+     -0.04464,
+     -0.0088
+    ],
+    "coll_bbox_max": [
+     0.04459,
+     0.04462,
+     0.02292
+    ]
+   },
+   "partners": [
+    {
+     "category": "kettle",
+     "model": "bzisss",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_ugfmpqparentM_0_link",
+       "parent_link": "meta__base_link_attachment_ugfmpqparentF_0_link",
+       "meta_link_id": "ugfmpqparentF",
+       "sub_id": "0",
+       "position_root": [
+        0.03186684,
+        -1.144e-05,
+        0.05019689
+       ],
+       "orientation_root_xyzw": [
+        0.00050167,
+        0.18650131,
+        0.00038664,
+        0.98245454
+       ],
+       "axis_root": [
+        0.3664585,
+        -0.00084152,
+        0.93043402
+       ],
+       "loc": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        0.3664585,
+        -0.00084152,
+        0.93043402
+       ],
+       "n_boundary_points": 335,
+       "centroid_root": [
+        0.00583628,
+        0.00576864,
+        -0.0014541
+       ],
+       "centroid_to_female_m": 0.058128,
+       "angle_deg": 7.713,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__pbmsji__s0.65__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "pbmsji",
+    "scale": [
+     0.65,
+     0.65,
+     0.65
+    ],
+    "links": {
+     "meta__base_link_attachment_pbmsjiparentM_0_link": {
+      "meta_link_id": "pbmsjiparentM",
+      "sub_id": "0",
+      "position_root": [
+       -0.00090818,
+       0.0,
+       0.00813597
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "pbmsjiparentM": {
+        "0": {
+         "position": [
+          -0.0013972013900523425,
+          -2.8750854441651344e-07,
+          0.01251681485117912
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     },
+     "glass": {}
+    },
+    "coll_bbox_min": [
+     -0.11187,
+     -0.11096,
+     -0.02838
+    ],
+    "coll_bbox_max": [
+     0.11005,
+     0.11096,
+     0.0445
+    ]
+   },
+   "partners": [
+    {
+     "category": "stockpot",
+     "model": "oshwps",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_pbmsjiparentM_0_link",
+       "parent_link": "meta__base_link_attachment_pbmsjiparentF_0_link",
+       "meta_link_id": "pbmsjiparentF",
+       "sub_id": "0",
+       "position_root": [
+        -1.45e-06,
+        3.81e-06,
+        0.13507289
+       ],
+       "orientation_root_xyzw": [
+        -5.42e-06,
+        8.46e-06,
+        0.70710588,
+        0.70710778
+       ],
+       "axis_root": [
+        4.29e-06,
+        1.963e-05,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        4.29e-06,
+        1.963e-05,
+        1.0
+       ],
+       "n_boundary_points": 552,
+       "centroid_root": [
+        -0.00423604,
+        -6.65e-05,
+        0.01367538
+       ],
+       "centroid_to_female_m": 0.121471,
+       "angle_deg": 1.998,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__gerjlh__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "gerjlh",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_gerjlhparentM_0_link": {
+      "meta_link_id": "gerjlhparentM",
+      "sub_id": "0",
+      "position_root": [
+       1.901e-05,
+       -3.052e-05,
+       -0.01015759
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       -0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "gerjlhparentM": {
+        "0": {
+         "position": [
+          1.9012666032824562e-05,
+          -3.15664253077631e-05,
+          -0.010157580907619661
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     },
+     "glass": {}
+    },
+    "coll_bbox_min": [
+     -0.14888,
+     -0.15,
+     -0.04629
+    ],
+    "coll_bbox_max": [
+     0.15034,
+     0.15029,
+     0.02493
+    ]
+   },
+   "partners": [
+    {
+     "category": "pressure_cooker",
+     "model": "otyngn",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_gerjlhparentM_0_link",
+       "parent_link": "meta__base_link_attachment_gerjlhparentF_0_link",
+       "meta_link_id": "gerjlhparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00160678,
+        0.00011444,
+        0.21225929
+       ],
+       "orientation_root_xyzw": [
+        3.1e-06,
+        4.097e-05,
+        0.55674446,
+        0.83068383
+       ],
+       "axis_root": [
+        7.153e-05,
+        4.047e-05,
+        1.0
+       ],
+       "loc": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        7.153e-05,
+        4.047e-05,
+        1.0
+       ],
+       "n_boundary_points": 253,
+       "centroid_root": [
+        -0.01467908,
+        -0.00217224,
+        0.14311192
+       ],
+       "centroid_to_female_m": 0.070409,
+       "angle_deg": 10.86,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lid__ppkjuy__s1__attachment_free",
+   "male": {
+    "category": "lid",
+    "model": "ppkjuy",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_ppkjuyparentM_0_link": {
+      "meta_link_id": "ppkjuyparentM",
+      "sub_id": "0",
+      "position_root": [
+       0.0021424,
+       -0.00163651,
+       -0.00027931
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "ppkjuyparentM": {
+        "0": {
+         "position": [
+          0.0021423999128080576,
+          -0.001636523381100458,
+          -0.00027928936489177945
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.1151,
+     -0.1189,
+     -0.03202
+    ],
+    "coll_bbox_max": [
+     0.1194,
+     0.11563,
+     0.03191
+    ]
+   },
+   "partners": [
+    {
+     "category": "steamer_basket",
+     "model": "lageli",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_ppkjuyparentM_0_link",
+       "parent_link": "meta__base_link_attachment_ppkjuyparentF_0_link",
+       "meta_link_id": "ppkjuyparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00087479,
+        -2.861e-05,
+        0.06650501
+       ],
+       "orientation_root_xyzw": [
+        -0.0005367,
+        0.00068058,
+        -0.48060814,
+        0.87693506
+       ],
+       "axis_root": [
+        0.00170954,
+        0.00028712,
+        0.9999985
+       ],
+       "loc": [
+        -0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.00170954,
+        0.00028712,
+        0.9999985
+       ],
+       "n_boundary_points": 1000,
+       "centroid_root": [
+        -0.00302709,
+        -0.00557434,
+        0.01525169
+       ],
+       "centroid_to_female_m": 0.051597,
+       "angle_deg": 6.57,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__hbafeb__s1__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "hbafeb",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_hbafebparentM_0_link": {
+      "meta_link_id": "hbafebparentM",
+      "sub_id": "0",
+      "position_root": [
+       1.82e-06,
+       -3.81e-06,
+       -0.00140947
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "hbafebparentM": {
+        "0": {
+         "position": [
+          1.8167918145557826e-06,
+          -4.560885639378769e-06,
+          -0.0014094663476396196
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.01643,
+     -0.01644,
+     -0.00497
+    ],
+    "coll_bbox_max": [
+     0.01644,
+     0.01643,
+     0.00215
+    ]
+   },
+   "partners": [
+    {
+     "category": "cola_bottle",
+     "model": "oyqdtz",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_hbafebparentM_0_link",
+       "parent_link": "meta__base_link_attachment_hbafebparentF_0_link",
+       "meta_link_id": "hbafebparentF",
+       "sub_id": "0",
+       "position_root": [
+        1.22e-06,
+        1.91e-06,
+        0.12529922
+       ],
+       "orientation_root_xyzw": [
+        0.00046298,
+        0.00018209,
+        -0.00115618,
+        0.99999923
+       ],
+       "axis_root": [
+        0.00036312,
+        -0.00092638,
+        0.9999995
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.00036312,
+        -0.00092638,
+        0.9999995
+       ],
+       "n_boundary_points": 896,
+       "centroid_root": [
+        -0.00034155,
+        0.0002403,
+        0.02080086
+       ],
+       "centroid_to_female_m": 0.104499,
+       "angle_deg": 0.184,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__xxqyrt__s1__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "xxqyrt",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_xxqyrtparentM_0_link": {
+      "meta_link_id": "xxqyrtparentM",
+      "sub_id": "0",
+      "position_root": [
+       2.2e-06,
+       1.91e-06,
+       -0.00214535
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "xxqyrtparentM": {
+        "0": {
+         "position": [
+          2.195714672874732e-06,
+          1.0243082420956638e-06,
+          -0.0021453727646943976
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.02615,
+     -0.02615,
+     -0.00776
+    ],
+    "coll_bbox_max": [
+     0.02616,
+     0.02616,
+     0.00347
+    ]
+   },
+   "partners": [
+    {
+     "category": "water_bottle",
+     "model": "lzdzkk",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_xxqyrtparentM_0_link",
+       "parent_link": "meta__base_link_attachment_xxqyrtparentF_0_link",
+       "meta_link_id": "xxqyrtparentF",
+       "sub_id": "0",
+       "position_root": [
+        -4.241e-05,
+        -4.387e-05,
+        0.13779718
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 329,
+       "centroid_root": [
+        0.0027639,
+        -0.00025974,
+        0.0084015
+       ],
+       "centroid_to_female_m": 0.129426,
+       "angle_deg": 1.246,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    },
+    {
+     "category": "lemonade_bottle",
+     "model": "yprkek",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_xxqyrtparentM_0_link",
+       "parent_link": "meta__base_link_attachment_xxqyrtparentF_0_link",
+       "meta_link_id": "xxqyrtparentF",
+       "sub_id": "0",
+       "position_root": [
+        -4.241e-05,
+        -4.387e-05,
+        0.13779712
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 482,
+       "centroid_root": [
+        0.01383201,
+        -3.24e-06,
+        -0.00113374
+       ],
+       "centroid_to_female_m": 0.139622,
+       "angle_deg": 5.703,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    },
+    {
+     "category": "tomato_paste_can",
+     "model": "krarex",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_xxqyrtparentM_0_link",
+       "parent_link": "meta__base_link_attachment_xxqyrtparentF_0_link",
+       "meta_link_id": "xxqyrtparentF",
+       "sub_id": "0",
+       "position_root": [
+        -4.241e-05,
+        -4.196e-05,
+        0.13779712
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 332,
+       "centroid_root": [
+        0.0025559,
+        0.00093563,
+        0.00280056
+       ],
+       "centroid_to_female_m": 0.135025,
+       "angle_deg": 1.178,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    },
+    {
+     "category": "soda_water_bottle",
+     "model": "upfssc",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_xxqyrtparentM_0_link",
+       "parent_link": "meta__base_link_attachment_xxqyrtparentF_0_link",
+       "meta_link_id": "xxqyrtparentF",
+       "sub_id": "0",
+       "position_root": [
+        -4.241e-05,
+        -4.387e-05,
+        0.13779712
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 326,
+       "centroid_root": [
+        0.00259367,
+        0.00011762,
+        0.00610295
+       ],
+       "centroid_to_female_m": 0.131721,
+       "angle_deg": 1.149,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__vnpjfn__s1__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "vnpjfn",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_vnpjfnparentM_0_link": {
+      "meta_link_id": "vnpjfnparentM",
+      "sub_id": "0",
+      "position_root": [
+       7e-08,
+       0.0,
+       -0.00223207
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "vnpjfnparentM": {
+        "0": {
+         "position": [
+          7.495106226413077e-08,
+          7.222978998345251e-08,
+          -0.002232048323132839
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.03791,
+     -0.03791,
+     -0.00877
+    ],
+    "coll_bbox_max": [
+     0.03791,
+     0.03791,
+     0.00431
+    ]
+   },
+   "partners": [
+    {
+     "category": "jar_of_chilli_powder",
+     "model": "mxhrcl",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_vnpjfnparentM_0_link",
+       "parent_link": "meta__base_link_attachment_vnpjfnparentF_0_link",
+       "meta_link_id": "vnpjfnparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00178913,
+        0.00067329,
+        0.07554746
+       ],
+       "orientation_root_xyzw": [
+        -0.0,
+        0.0,
+        0.03489949,
+        0.99939084
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 383,
+       "centroid_root": [
+        -3.836e-05,
+        0.00346534,
+        0.00237133
+       ],
+       "centroid_to_female_m": 0.07325,
+       "angle_deg": 2.579,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__iqeyba__s1__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "iqeyba",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_iqeybaparentM_0_link": {
+      "meta_link_id": "iqeybaparentM",
+      "sub_id": "0",
+      "position_root": [
+       5e-08,
+       0.0,
+       0.0
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "iqeybaparentM": {
+        "0": {
+         "position": [
+          4.768461808202883e-08,
+          -5.565394322159524e-09,
+          -1.9074189561152366e-08
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.03858,
+     -0.03669,
+     -0.00316
+    ],
+    "coll_bbox_max": [
+     0.03858,
+     0.03669,
+     0.00316
+    ]
+   },
+   "partners": [
+    {
+     "category": "paper_cup",
+     "model": "guobeq",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_iqeybaparentM_0_link",
+       "parent_link": "meta__base_link_attachment_iqeybaparentF_0_link",
+       "meta_link_id": "iqeybaparentF",
+       "sub_id": "0",
+       "position_root": [
+        -1.998e-05,
+        2.67e-05,
+        0.05477113
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 62,
+       "centroid_root": [
+        -0.00178698,
+        0.00047865,
+        0.03701854
+       ],
+       "centroid_to_female_m": 0.017846,
+       "angle_deg": 5.866,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__clhquh__s1x1x1.529__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "clhquh",
+    "scale": [
+     1.0,
+     1.0,
+     1.529
+    ],
+    "links": {
+     "meta__base_link_attachment_clhquhparentM_0_link": {
+      "meta_link_id": "clhquhparentM",
+      "sub_id": "0",
+      "position_root": [
+       -1.5e-07,
+       0.0,
+       -0.00341302
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "clhquhparentM": {
+        "0": {
+         "position": [
+          -1.4770222779854895e-07,
+          -1.8819003333219362e-08,
+          -0.0022322002300334542
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.0381,
+     -0.03813,
+     -0.01405
+    ],
+    "coll_bbox_max": [
+     0.03812,
+     0.0381,
+     0.00722
+    ]
+   },
+   "partners": [
+    {
+     "category": "jar_of_pepper_seasoning",
+     "model": "iuydyz",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_clhquhparentM_0_link",
+       "parent_link": "meta__base_link_attachment_clhquhparentF_0_link",
+       "meta_link_id": "clhquhparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00129949,
+        0.00016785,
+        0.07288772
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 703,
+       "centroid_root": [
+        -0.00422983,
+        -0.00544451,
+        0.01317003
+       ],
+       "centroid_to_female_m": 0.060052,
+       "angle_deg": 6.052,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cap__yqvild__s1x1x1.529__attachment_free",
+   "male": {
+    "category": "cap",
+    "model": "yqvild",
+    "scale": [
+     1.0,
+     1.0,
+     1.529
+    ],
+    "links": {
+     "meta__base_link_attachment_yqvildparentM_0_link": {
+      "meta_link_id": "yqvildparentM",
+      "sub_id": "0",
+      "position_root": [
+       -2e-07,
+       0.0,
+       -0.00341302
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "yqvildparentM": {
+        "0": {
+         "position": [
+          -1.976108320496568e-07,
+          -9.897189662701885e-08,
+          -0.0022322059907029517
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.03811,
+     -0.03814,
+     -0.01405
+    ],
+    "coll_bbox_max": [
+     0.03811,
+     0.03811,
+     0.00722
+    ]
+   },
+   "partners": [
+    {
+     "category": "jar_of_tumeric",
+     "model": "miivhi",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_yqvildparentM_0_link",
+       "parent_link": "meta__base_link_attachment_yqvildparentF_0_link",
+       "meta_link_id": "yqvildparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00051088,
+        -0.00020027,
+        0.07702434
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 190,
+       "centroid_root": [
+        0.00018486,
+        -0.00545629,
+        0.01250304
+       ],
+       "centroid_to_female_m": 0.064739,
+       "angle_deg": 4.698,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dip_candle__poexjo__s1__attachment_free",
+   "male": {
+    "category": "dip_candle",
+    "model": "poexjo",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_dipcandleM_0_link": {
+      "meta_link_id": "dipcandleM",
+      "sub_id": "0",
+      "position_root": [
+       -0.00033806,
+       0.00200272,
+       -0.07300043
+      ],
+      "orientation_root_xyzw": [
+       0.03251418,
+       -0.70554674,
+       0.0101938,
+       0.70784372
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "dipcandleM": [
+        {
+         "position": [
+          -0.00033805730211128,
+          0.0020031060000778936,
+          -0.0730003878380625
+         ],
+         "orientation": [
+          0.032514356724495916,
+          -0.7055466766684215,
+          0.010192973513159306,
+          0.7078437729752931
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.01357,
+     -0.01538,
+     -0.07414
+    ],
+    "coll_bbox_max": [
+     0.01354,
+     0.01553,
+     0.0946
+    ]
+   },
+   "partners": [
+    {
+     "category": "candle_holder",
+     "model": "wiufnv",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_dipcandleM_0_link",
+       "parent_link": "meta__base_link_attachment_dipcandleF_0_link",
+       "meta_link_id": "dipcandleF",
+       "sub_id": "0",
+       "position_root": [
+        -1.4e-06,
+        0.00030136,
+        -0.06476957
+       ],
+       "orientation_root_xyzw": [
+        -0.70710671,
+        1.2e-07,
+        0.70710683,
+        1.2e-07
+       ],
+       "axis_root": [
+        -0.02265862,
+        0.01786864,
+        -0.99958356
+       ],
+       "loc": [
+        0.99958356,
+        -0.01786863,
+        0.02265876
+       ],
+       "z_root": [
+        -1.00000013,
+        3.4e-07,
+        -1.3e-07
+       ],
+       "n_boundary_points": 199,
+       "centroid_root": [
+        0.00143989,
+        -0.00083526,
+        -0.00118645
+       ],
+       "centroid_to_female_m": 0.06361,
+       "angle_deg": 88.702,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.01734158,
+        -0.05063226,
+        0.99856679
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dip_candle__ghctun__s1__attachment_free",
+   "male": {
+    "category": "dip_candle",
+    "model": "ghctun",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {}
+    },
+    "coll_bbox_min": [
+     -0.01146,
+     -0.01148,
+     -0.0524
+    ],
+    "coll_bbox_max": [
+     0.01146,
+     0.01145,
+     0.07032
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "dip_candle__gbaons__s1__attachment_free",
+   "male": {
+    "category": "dip_candle",
+    "model": "gbaons",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {}
+    },
+    "coll_bbox_min": [
+     -0.01866,
+     -0.01866,
+     -0.05697
+    ],
+    "coll_bbox_max": [
+     0.01866,
+     0.01866,
+     0.07055
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "dip_candle__mxjejs__s1__attachment_free",
+   "male": {
+    "category": "dip_candle",
+    "model": "mxjejs",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {}
+    },
+    "coll_bbox_min": [
+     -0.01372,
+     -0.01373,
+     -0.14555
+    ],
+    "coll_bbox_max": [
+     0.0147,
+     0.01469,
+     0.16708
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "cork__ncxgpe__s1__attachment_free",
+   "male": {
+    "category": "cork",
+    "model": "ncxgpe",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_corkbottleM_0_link": {
+      "meta_link_id": "corkbottleM",
+      "sub_id": "0",
+      "position_root": [
+       -4.439e-05,
+       7.629e-05,
+       -0.01833373
+      ],
+      "orientation_root_xyzw": [
+       0.45158377,
+       -0.54412496,
+       0.45158383,
+       0.54412514
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "corkbottleM": [
+        {
+         "position": [
+          -4.4382399145485e-05,
+          7.773169011216313e-05,
+          -0.018333743081953898
+         ],
+         "orientation": [
+          0.5000001735624298,
+          -0.4999999107312268,
+          0.5000001468698767,
+          0.49999976883635383
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.00879,
+     -0.00883,
+     -0.01833
+    ],
+    "coll_bbox_max": [
+     0.00882,
+     0.00878,
+     0.01614
+    ]
+   },
+   "partners": [
+    {
+     "category": "wine_bottle",
+     "model": "inkqch",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_corkbottleM_0_link",
+       "parent_link": "meta__base_link_attachment_corkbottleF_0_link",
+       "meta_link_id": "corkbottleF",
+       "sub_id": "0",
+       "position_root": [
+        -3.114e-05,
+        0.00013733,
+        0.11205691
+       ],
+       "orientation_root_xyzw": [
+        0.48308414,
+        -0.51636207,
+        0.48308414,
+        0.51636195
+       ],
+       "axis_root": [
+        -0.00910349,
+        0.00763331,
+        0.99992943
+       ],
+       "loc": [
+        0.99992943,
+        0.00959094,
+        -0.00701094
+       ],
+       "z_root": [
+        -0.06651891,
+        -0.99778517,
+        -1e-07
+       ],
+       "n_boundary_points": 732,
+       "centroid_root": [
+        0.00100172,
+        -0.00072873,
+        -0.00139333
+       ],
+       "centroid_to_female_m": 0.113458,
+       "angle_deg": 90.402,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.00813449,
+        0.00865858,
+        0.99992943
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cork__uyceta__s1__attachment_free",
+   "male": {
+    "category": "cork",
+    "model": "uyceta",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_uycetaparentM_0_link": {
+      "meta_link_id": "uycetaparentM",
+      "sub_id": "0",
+      "position_root": [
+       4.134e-05,
+       -5.72e-06,
+       -0.00217152
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "uycetaparentM": {
+        "0": {
+         "position": [
+          4.1335801494864255e-05,
+          -6.37169255720132e-06,
+          -0.002171532431468364
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.01774,
+     -0.01787,
+     -0.02482
+    ],
+    "coll_bbox_max": [
+     0.01794,
+     0.01792,
+     0.02047
+    ]
+   },
+   "partners": [
+    {
+     "category": "vinegar_bottle",
+     "model": "hbsbwt",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_uycetaparentM_0_link",
+       "parent_link": "meta__base_link_attachment_uycetaparentF_0_link",
+       "meta_link_id": "uycetaparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00152513,
+        -4.387e-05,
+        0.12850893
+       ],
+       "orientation_root_xyzw": [
+        -0.00019845,
+        -0.00139369,
+        -0.70710415,
+        0.70710802
+       ],
+       "axis_root": [
+        -0.00169033,
+        0.00225161,
+        0.99999604
+       ],
+       "loc": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "z_root": [
+        -0.00169033,
+        0.00225161,
+        0.99999604
+       ],
+       "n_boundary_points": 535,
+       "centroid_root": [
+        -0.00227435,
+        0.00126266,
+        -0.01752076
+       ],
+       "centroid_to_female_m": 0.146037,
+       "angle_deg": 0.751,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cork__lseuwf__s1__attachment_free",
+   "male": {
+    "category": "cork",
+    "model": "lseuwf",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_lseuwfparentM_0_link": {
+      "meta_link_id": "lseuwfparentM",
+      "sub_id": "0",
+      "position_root": [
+       -1.702e-05,
+       -1.526e-05,
+       -0.00082242
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "lseuwfparentM": {
+        "0": {
+         "position": [
+          -1.701622068510871e-05,
+          -1.474049224812771e-05,
+          -0.0008224000933494402
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.00932,
+     -0.00936,
+     -0.01596
+    ],
+    "coll_bbox_max": [
+     0.0095,
+     0.00933,
+     0.01433
+    ]
+   },
+   "partners": [
+    {
+     "category": "rum_bottle",
+     "model": "ueagnt",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_lseuwfparentM_0_link",
+       "parent_link": "meta__base_link_attachment_lseuwfparentF_0_link",
+       "meta_link_id": "lseuwfparentF",
+       "sub_id": "0",
+       "position_root": [
+        7.198e-05,
+        0.0,
+        0.1191479
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ],
+       "axis_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "loc": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "z_root": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "n_boundary_points": 74,
+       "centroid_root": [
+        -0.00022847,
+        -0.0002902,
+        0.03171894
+       ],
+       "centroid_to_female_m": 0.08743,
+       "angle_deg": 0.274,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "light_bulb__kfmkwd__s1__attachment_free",
+   "male": {
+    "category": "light_bulb",
+    "model": "kfmkwd",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_bulblampM_0_link": {
+      "meta_link_id": "bulblampM",
+      "sub_id": "0",
+      "position_root": [
+       0.06352793,
+       -0.0004425,
+       -0.02249646
+      ],
+      "orientation_root_xyzw": [
+       0.13520361,
+       0.59810919,
+       0.7832576,
+       -0.10243504
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "bulblampM": [
+        {
+         "position": [
+          0.06352792376361455,
+          -0.00044242915480967196,
+          -0.022496455724933015
+         ],
+         "orientation": [
+          0.13520355929951772,
+          0.5981091290705854,
+          0.7832576525603069,
+          -0.10243494023469367
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.04754,
+     -0.03546,
+     -0.03004
+    ],
+    "coll_bbox_max": [
+     0.06579,
+     0.036,
+     0.04067
+    ]
+   },
+   "partners": [
+    {
+     "category": "table_lamp",
+     "model": "ehjsdz",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_bulblampM_0_link",
+       "parent_link": "meta__base_link_attachment_bulblampF_0_link",
+       "meta_link_id": "bulblampF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00064971,
+        5.15e-05,
+        0.03257763
+       ],
+       "orientation_root_xyzw": [
+        0.69248503,
+        0.14305401,
+        0.69248509,
+        -0.14305392
+       ],
+       "axis_root": [
+        0.04705195,
+        -0.12699396,
+        0.99078688
+       ],
+       "loc": [
+        0.99078687,
+        0.13524303,
+        -0.00712104
+       ],
+       "z_root": [
+        0.91814226,
+        0.39625093,
+        6e-08
+       ],
+       "n_boundary_points": 270,
+       "centroid_root": [
+        -0.00421426,
+        0.00967229,
+        -0.04248223
+       ],
+       "centroid_to_female_m": 0.075758,
+       "angle_deg": 90.408,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.89083161,
+        -0.04125658,
+        0.45245656
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "light_bulb__sxkjea__s1__attachment_free",
+   "male": {
+    "category": "light_bulb",
+    "model": "sxkjea",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {},
+     "glass": {}
+    },
+    "coll_bbox_min": [
+     -0.08635,
+     -0.02994,
+     -0.01784
+    ],
+    "coll_bbox_max": [
+     0.02124,
+     0.03097,
+     0.04438
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "light_bulb__ymomhw__s1__attachment_free",
+   "male": {
+    "category": "light_bulb",
+    "model": "ymomhw",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "error": "no AttachedTo state",
+    "meta_links": {
+     "base_link": {}
+    },
+    "coll_bbox_min": [
+     -0.10208,
+     -0.05338,
+     -0.04739
+    ],
+    "coll_bbox_max": [
+     0.11018,
+     0.05528,
+     0.05872
+    ]
+   },
+   "partners": []
+  },
+  {
+   "id": "skateboard_wheel_assembly__jljqtt__s1__attachment_free",
+   "male": {
+    "category": "skateboard_wheel_assembly",
+    "model": "jljqtt",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_jljqttparentM_0_link": {
+      "meta_link_id": "jljqttparentM",
+      "sub_id": "0",
+      "position_root": [
+       9.5e-07,
+       -0.00345802,
+       0.00462663
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "jljqttparentM": {
+        "0": {
+         "position": [
+          9.505462507574096e-07,
+          -0.0034581293020655617,
+          0.004626670928463037
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.16483,
+     -0.05989,
+     -0.06426
+    ],
+    "coll_bbox_max": [
+     0.16483,
+     0.05432,
+     0.07236
+    ]
+   },
+   "partners": [
+    {
+     "category": "skateboard_deck",
+     "model": "tgfidu",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_jljqttparentM_0_link",
+       "parent_link": "meta__base_link_attachment_jljqttparentF_0_link",
+       "meta_link_id": "jljqttparentF",
+       "sub_id": "0",
+       "position_root": [
+        0.00021886,
+        0.45660782,
+        -0.06738681
+       ],
+       "orientation_root_xyzw": [
+        4.54e-06,
+        0.01785136,
+        0.99984068,
+        0.00024084
+       ],
+       "axis_root": [
+        0.00301236,
+        0.9905294,
+        -0.13726771
+       ],
+       "loc": [
+        -0.00253523,
+        -0.99479949,
+        -0.10182119
+       ],
+       "z_root": [
+        1.767e-05,
+        0.03569703,
+        0.99936266
+       ],
+       "n_boundary_points": 118,
+       "centroid_root": [
+        -0.00135034,
+        -0.05938008,
+        0.0041189
+       ],
+       "centroid_to_female_m": 0.520921,
+       "angle_deg": 95.844,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.00253523,
+        -0.99479949,
+        -0.10182119
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "skateboard_wheel_assembly__acmbvb__s1__attachment_free",
+   "male": {
+    "category": "skateboard_wheel_assembly",
+    "model": "acmbvb",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_acmbvbparentM_0_link": {
+      "meta_link_id": "acmbvbparentM",
+      "sub_id": "0",
+      "position_root": [
+       -6.789e-05,
+       -0.01083946,
+       0.00632268
+      ],
+      "orientation_root_xyzw": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "acmbvbparentM": {
+        "0": {
+         "position": [
+          -6.788714565444496e-05,
+          -0.010840226533433103,
+          0.006322720120524271
+         ],
+         "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+         ]
+        }
+       }
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.15914,
+     -0.08013,
+     -0.06632
+    ],
+    "coll_bbox_max": [
+     0.159,
+     0.05912,
+     0.07635
+    ]
+   },
+   "partners": [
+    {
+     "category": "skateboard_deck",
+     "model": "tgfidu",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_acmbvbparentM_0_link",
+       "parent_link": "meta__base_link_attachment_acmbvbparentF_0_link",
+       "meta_link_id": "acmbvbparentF",
+       "sub_id": "0",
+       "position_root": [
+        -0.00032133,
+        -0.43610001,
+        -0.03067696
+       ],
+       "orientation_root_xyzw": [
+        -0.11240009,
+        -0.00204109,
+        -0.00109298,
+        0.99366033
+       ],
+       "axis_root": [
+        0.00271992,
+        -0.99575774,
+        -0.09197349
+       ],
+       "loc": [
+        0.00403021,
+        -0.95004367,
+        -0.31209098
+       ],
+       "z_root": [
+        -0.00381061,
+        0.22337947,
+        0.97472411
+       ],
+       "n_boundary_points": 118,
+       "centroid_root": [
+        -0.00135034,
+        -0.05938008,
+        0.0041189
+       ],
+       "centroid_to_female_m": 0.378325,
+       "angle_deg": 108.185,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.00403021,
+        -0.95004367,
+        -0.31209098
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "blackberry__tvpfvb__s1__attachment_free",
+   "male": {
+    "category": "blackberry",
+    "model": "tvpfvb",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_berrybushM_0_link": {
+      "meta_link_id": "berrybushM",
+      "sub_id": "0",
+      "position_root": [
+       0.00850613,
+       0.00029182,
+       -0.00017214
+      ],
+      "orientation_root_xyzw": [
+       -0.25528985,
+       0.65898669,
+       -0.26168215,
+       0.6573326
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "berrybushM": [
+        {
+         "position": [
+          0.008506128847493733,
+          0.00029126823246991703,
+          -0.0001721376048356903
+         ],
+         "orientation": [
+          -0.25528987501232026,
+          0.6589865998147112,
+          -0.26168213030918513,
+          0.6573326430793517
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.01598,
+     -0.01434,
+     -0.01221
+    ],
+    "coll_bbox_max": [
+     0.01155,
+     0.0145,
+     0.01365
+    ]
+   },
+   "partners": [
+    {
+     "category": "bush",
+     "model": "waafqw",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_0_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "0",
+       "position_root": [
+        0.48221171,
+        -0.07156372,
+        0.00197619
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.98215579,
+        -0.13902783,
+        -0.12665412
+       ],
+       "loc": [
+        0.91270619,
+        -0.38849218,
+        -0.126654
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.495555,
+       "angle_deg": 97.276,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.13458857,
+        -0.90456093,
+        -0.40454348
+       ]
+      },
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_1_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "1",
+       "position_root": [
+        0.57525712,
+        -0.2920723,
+        0.33637846
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.82514803,
+        -0.41189921,
+        0.3866132
+       ],
+       "loc": [
+        0.69042375,
+        -0.61142882,
+        0.38661331
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.70261,
+       "angle_deg": 67.256,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.37818968,
+        -0.92140322,
+        -0.08937946
+       ]
+      },
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_2_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "2",
+       "position_root": [
+        0.4416301,
+        0.2772789,
+        0.13081074
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.84045803,
+        0.52738762,
+        0.1244693
+       ],
+       "loc": [
+        0.94831838,
+        0.29188977,
+        0.12446936
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.530818,
+       "angle_deg": 82.85,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.12147175,
+        -0.43260718,
+        -0.89336199
+       ]
+      },
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_3_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "3",
+       "position_root": [
+        0.4416301,
+        0.2772789,
+        0.13081074
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.84045803,
+        0.52738762,
+        0.1244693
+       ],
+       "loc": [
+        0.94831838,
+        0.29188977,
+        0.12446936
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.530818,
+       "angle_deg": 82.85,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.12147175,
+        -0.43260718,
+        -0.89336199
+       ]
+      },
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_4_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "4",
+       "position_root": [
+        0.1495032,
+        0.56036949,
+        -0.2474314
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.23265047,
+        0.85057252,
+        -0.47159321
+       ],
+       "loc": [
+        0.44486833,
+        0.76137507,
+        -0.47159323
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.661951,
+       "angle_deg": 118.138,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.46825604,
+        0.25950196,
+        -0.84462715
+       ]
+      },
+      {
+       "child_link": "meta__base_link_attachment_berrybushM_0_link",
+       "parent_link": "meta__base_link_attachment_berrybushF_5_link",
+       "meta_link_id": "berrybushF",
+       "sub_id": "5",
+       "position_root": [
+        0.37275308,
+        0.11381531,
+        -0.20956349
+       ],
+       "orientation_root_xyzw": [
+        4e-08,
+        5e-08,
+        0.13052672,
+        0.99144483
+       ],
+       "axis_root": [
+        0.78470054,
+        0.24228933,
+        -0.57056195
+       ],
+       "loc": [
+        0.8206717,
+        0.03093714,
+        -0.57056188
+       ],
+       "z_root": [
+        1.1e-07,
+        -6e-08,
+        1.0
+       ],
+       "n_boundary_points": 109,
+       "centroid_root": [
+        -0.00450002,
+        -0.00266786,
+        0.06474021
+       ],
+       "centroid_to_female_m": 0.480761,
+       "angle_deg": 124.789,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.57480203,
+        -0.53050216,
+        -0.62303298
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bookcase_baseboard__hlhneo__s1__attachment_free",
+   "male": {
+    "category": "bookcase_baseboard",
+    "model": "hlhneo",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_shelfbaseM_0_link": {
+      "meta_link_id": "shelfbaseM",
+      "sub_id": "0",
+      "position_root": [
+       -8.17e-06,
+       -0.37116814,
+       2.033e-05
+      ],
+      "orientation_root_xyzw": [
+       -0.50000513,
+       -0.49999496,
+       0.49999467,
+       0.50000536
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "shelfbaseM": [
+        {
+         "position": [
+          -8.181495295980967e-06,
+          -0.37116705313312587,
+          2.0316323328423825e-05
+         ],
+         "orientation": [
+          -0.5000051855771718,
+          -0.499994955432516,
+          0.499994613699602,
+          0.5000052451818483
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.03358,
+     -0.37115,
+     -0.01
+    ],
+    "coll_bbox_max": [
+     0.03358,
+     0.37114,
+     0.01
+    ]
+   },
+   "partners": [
+    {
+     "category": "bookcase_side",
+     "model": "bxfkjj",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_shelfbaseM_0_link",
+       "parent_link": "meta__base_link_attachment_shelfbaseF_0_link",
+       "meta_link_id": "shelfbaseF",
+       "sub_id": "0",
+       "position_root": [
+        -0.05999761,
+        -0.97642517,
+        0.0138551
+       ],
+       "orientation_root_xyzw": [
+        -0.49999994,
+        -0.50000012,
+        -0.49999997,
+        0.5
+       ],
+       "axis_root": [
+        -0.0613246,
+        -0.99801741,
+        0.01416153
+       ],
+       "loc": [
+        0.01416148,
+        -0.06132484,
+        -0.99801739
+       ],
+       "z_root": [
+        -3e-07,
+        1.00000006,
+        -1.2e-07
+       ],
+       "n_boundary_points": 8,
+       "centroid_root": [
+        3.1e-07,
+        4.8e-07,
+        1e-08
+       ],
+       "centroid_to_female_m": 0.978365,
+       "angle_deg": 176.392,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.99801768,
+        0.01414063,
+        0.06132491
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cabinet_door__ertkre__s1__attachment_free",
+   "male": {
+    "category": "cabinet_door",
+    "model": "ertkre",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_doorcabinetM_0_link": {
+      "meta_link_id": "doorcabinetM",
+      "sub_id": "0",
+      "position_root": [
+       -0.00491133,
+       -0.12852669,
+       0.00058436
+      ],
+      "orientation_root_xyzw": [
+       1.0,
+       0.0,
+       -2e-08,
+       1.9e-07
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "doorcabinetM": [
+        {
+         "position": [
+          -0.004911331952792606,
+          -0.12852593828197598,
+          0.0005843947043918458
+         ],
+         "orientation": [
+          -0.9999999999999809,
+          -6.661338147750939e-16,
+          2.1073428467951654e-08,
+          -1.9470718243017412e-07
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.00422,
+     -0.13196,
+     -0.22836
+    ],
+    "coll_bbox_max": [
+     0.01986,
+     0.13059,
+     0.22815
+    ]
+   },
+   "partners": [
+    {
+     "category": "cabinet_base",
+     "model": "dcmhhh",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_doorcabinetM_0_link",
+       "parent_link": "meta__base_link_attachment_doorcabinetF_0_link",
+       "meta_link_id": "doorcabinetF",
+       "sub_id": "0",
+       "position_root": [
+        0.14891514,
+        0.12784195,
+        -9.131e-05
+       ],
+       "orientation_root_xyzw": [
+        -2.4e-07,
+        -2.4e-07,
+        -2.4e-07,
+        1.0
+       ],
+       "axis_root": [
+        0.6691394,
+        0.74078935,
+        0.05902204
+       ],
+       "loc": [
+        0.66913907,
+        0.74078964,
+        0.05902207
+       ],
+       "z_root": [
+        -4.8e-07,
+        4.8e-07,
+        1.0
+       ],
+       "n_boundary_points": 19,
+       "centroid_root": [
+        0.01579323,
+        -0.01953436,
+        -0.01183345
+       ],
+       "centroid_to_female_m": 0.198945,
+       "angle_deg": 86.616,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.66913907,
+        -0.74078966,
+        -0.05902182
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "trout__kqpeke__s1__attachment_free",
+   "male": {
+    "category": "trout",
+    "model": "kqpeke",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_fishrodM_0_link": {
+      "meta_link_id": "fishrodM",
+      "sub_id": "0",
+      "position_root": [
+       0.15052189,
+       0.0075779,
+       0.00162196
+      ],
+      "orientation_root_xyzw": [
+       0.0048718,
+       0.99785209,
+       0.06531895,
+       -0.00098733
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "fishrodM": [
+        {
+         "position": [
+          0.15052188337247963,
+          0.007578867209669247,
+          0.0016219336811071137
+         ],
+         "orientation": [
+          0.004871835584215265,
+          0.9978520569805117,
+          0.06531893121852887,
+          -0.0009873308822202314
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.16954,
+     -0.05437,
+     -0.01973
+    ],
+    "coll_bbox_max": [
+     0.15271,
+     0.05028,
+     0.0223
+    ]
+   },
+   "partners": [
+    {
+     "category": "fishing_rod",
+     "model": "zhmrtc",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_fishrodM_0_link",
+       "parent_link": "meta__base_link_attachment_fishrodF_0_link",
+       "meta_link_id": "fishrodF",
+       "sub_id": "0",
+       "position_root": [
+        0.91065848,
+        -0.00626755,
+        -0.04401195
+       ],
+       "orientation_root_xyzw": [
+        -0.21140251,
+        0.26636553,
+        0.66657519,
+        0.66335207
+       ],
+       "axis_root": [
+        0.9988513,
+        -0.00273135,
+        -0.04783943
+       ],
+       "loc": [
+        -0.0022302,
+        -0.99945406,
+        0.03296376
+       ],
+       "z_root": [
+        0.0715569,
+        0.63557382,
+        0.7687168
+       ],
+       "n_boundary_points": 48,
+       "centroid_root": [
+        -0.0005028,
+        -0.00377599,
+        -0.00037239
+       ],
+       "centroid_to_female_m": 0.912209,
+       "angle_deg": 88.111,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.00766016,
+        -0.98660216,
+        -0.16296474
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "webcam__fabztm__s1__attachment_free",
+   "male": {
+    "category": "webcam",
+    "model": "fabztm",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_webcamcomputerM_0_link": {
+      "meta_link_id": "webcamcomputerM",
+      "sub_id": "0",
+      "position_root": [
+       -0.00148963,
+       3.81e-06,
+       -0.02371705
+      ],
+      "orientation_root_xyzw": [
+       0.5341866,
+       -0.46329749,
+       0.53418684,
+       0.46329743
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "togglebutton": {
+       "0": [
+        {
+         "position": [
+          -0.007313841784651027,
+          0.02845998508834456,
+          0.011790796823004945
+         ],
+         "orientation": [
+          0.0,
+          -0.0,
+          0.7071068407911908,
+          0.7071067215818992
+         ],
+         "type": "sphere",
+         "size": [
+          0.017168624877929688,
+          0.017168624877929688,
+          0.017168624877929688
+         ]
+        }
+       ]
+      },
+      "attachment": {
+       "webcamcomputerM": [
+        {
+         "position": [
+          -0.001489622051851553,
+          2.9548202347689234e-06,
+          -0.023717015676995055
+         ],
+         "orientation": [
+          0.5000000632202726,
+          -0.4999999789265706,
+          0.5000000210734216,
+          0.49999993677972665
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.04192,
+     -0.04591,
+     -0.02404
+    ],
+    "coll_bbox_max": [
+     0.02808,
+     0.04592,
+     0.04147
+    ]
+   },
+   "partners": [
+    {
+     "category": "monitor",
+     "model": "qvpbge",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_webcamcomputerM_0_link",
+       "parent_link": "meta__base_link_attachment_webcamcomputerF_0_link",
+       "meta_link_id": "webcamcomputerF",
+       "sub_id": "0",
+       "position_root": [
+        0.01704243,
+        -0.00125313,
+        0.19785929
+       ],
+       "orientation_root_xyzw": [
+        0.50167984,
+        -0.4982051,
+        0.49832937,
+        0.50177372
+       ],
+       "axis_root": [
+        0.08796722,
+        -0.00963724,
+        0.99607675
+       ],
+       "loc": [
+        0.99665943,
+        -0.08107287,
+        0.00985717
+       ],
+       "z_root": [
+        3.109e-05,
+        -1.00000004,
+        0.00021805
+       ],
+       "n_boundary_points": 78,
+       "centroid_root": [
+        -0.01122451,
+        0.00184367,
+        -0.12221476
+       ],
+       "centroid_to_female_m": 0.321335,
+       "angle_deg": 89.435,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        0.08165175,
+        0.00170753,
+        0.99665946
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "holly_decoration__shmkir__s1__attachment_free",
+   "male": {
+    "category": "holly_decoration",
+    "model": "shmkir",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_displaywallM_0_link": {
+      "meta_link_id": "displaywallM",
+      "sub_id": "0",
+      "position_root": [
+       0.01286225,
+       0.01114845,
+       -0.02294612
+      ],
+      "orientation_root_xyzw": [
+       -0.2430407,
+       0.83698165,
+       -0.00757965,
+       -0.49024025
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "displaywallM": [
+        {
+         "position": [
+          0.012862244664414643,
+          0.011148812802779615,
+          -0.022946114634311968
+         ],
+         "orientation": [
+          0.24304074001760728,
+          -0.8369815852693704,
+          0.007579751892757211,
+          0.49024032063153444
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.06416,
+     -0.05766,
+     -0.0246
+    ],
+    "coll_bbox_max": [
+     0.06004,
+     0.05503,
+     0.04477
+    ]
+   },
+   "partners": [
+    {
+     "category": "recreational_vehicle",
+     "model": "doiucd",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_displaywallM_0_link",
+       "parent_link": "meta__base_link_attachment_displaywallF_0_link",
+       "meta_link_id": "displaywallF",
+       "sub_id": "0",
+       "position_root": [
+        -2.31635618,
+        -0.00341225,
+        -0.56161094
+       ],
+       "orientation_root_xyzw": [
+        -0.0,
+        0.0,
+        1.0,
+        8e-08
+       ],
+       "axis_root": [
+        -0.90329107,
+        0.00189637,
+        -0.42902405
+       ],
+       "loc": [
+        0.90329113,
+        -0.00189623,
+        -0.42902395
+       ],
+       "z_root": [
+        -0.0,
+        -0.0,
+        1.0
+       ],
+       "n_boundary_points": 1711,
+       "centroid_root": [
+        -0.11736932,
+        -0.00802653,
+        0.48281293
+       ],
+       "centroid_to_female_m": 2.434417,
+       "angle_deg": 115.406,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.01111177,
+        -0.2547766,
+        0.9669361
+       ]
+      }
+     ]
+    },
+    {
+     "category": "wall_nail",
+     "model": "wlnail",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_displaywallM_0_link",
+       "parent_link": "meta__base_link_attachment_displaywallF_0_link",
+       "meta_link_id": "displaywallF",
+       "sub_id": "0",
+       "position_root": [
+        2.359e-05,
+        -0.00012779,
+        -0.01481152
+       ],
+       "orientation_root_xyzw": [
+        0.04934568,
+        0.70435971,
+        -0.0554115,
+        0.70595467
+       ],
+       "axis_root": [
+        0.9890234,
+        -0.14773084,
+        0.0028848
+       ],
+       "loc": [
+        0.0,
+        3e-08,
+        1.0
+       ],
+       "z_root": [
+        0.9890235,
+        -0.14773087,
+        0.00288481
+       ],
+       "n_boundary_points": 54,
+       "centroid_root": [
+        5.7e-07,
+        1.4e-07,
+        -5.706e-05
+       ],
+       "centroid_to_female_m": 0.014755,
+       "angle_deg": 90.003,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        -0.81695986,
+        -0.25098469,
+        -0.51921409
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "wreath__rkrxno__s1__attachment_free",
+   "male": {
+    "category": "wreath",
+    "model": "rkrxno",
+    "scale": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "links": {
+     "meta__base_link_attachment_displaywallM_0_link": {
+      "meta_link_id": "displaywallM",
+      "sub_id": "0",
+      "position_root": [
+       0.00534101,
+       -0.00148582,
+       -0.01352507
+      ],
+      "orientation_root_xyzw": [
+       0.70168835,
+       -0.00616857,
+       0.71243048,
+       0.00618679
+      ]
+     }
+    },
+    "meta_links": {
+     "base_link": {
+      "attachment": {
+       "displaywallM": [
+        {
+         "position": [
+          0.00534100832480681,
+          -0.001484670655051327,
+          -0.0135250647169442
+         ],
+         "orientation": [
+          0.7016890171424424,
+          -0.006168553599454431,
+          0.7124297832760463,
+          0.006186765666304103
+         ]
+        }
+       ]
+      }
+     }
+    },
+    "coll_bbox_min": [
+     -0.10055,
+     -0.09908,
+     -0.01532
+    ],
+    "coll_bbox_max": [
+     0.09966,
+     0.09869,
+     0.02642
+    ]
+   },
+   "partners": [
+    {
+     "category": "recreational_vehicle",
+     "model": "doiucd",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_displaywallM_0_link",
+       "parent_link": "meta__base_link_attachment_displaywallF_0_link",
+       "meta_link_id": "displaywallF",
+       "sub_id": "0",
+       "position_root": [
+        -2.31635594,
+        -0.00341034,
+        -0.56161076
+       ],
+       "orientation_root_xyzw": [
+        0.0,
+        -0.0,
+        1.0,
+        8e-08
+       ],
+       "axis_root": [
+        -0.90329675,
+        0.00189775,
+        -0.42901209
+       ],
+       "loc": [
+        0.90329676,
+        -0.00189762,
+        -0.42901208
+       ],
+       "z_root": [
+        0.0,
+        -0.0,
+        1.0
+       ],
+       "n_boundary_points": 1711,
+       "centroid_root": [
+        -0.1173038,
+        -0.00802948,
+        0.48280804
+       ],
+       "centroid_to_female_m": 2.434474,
+       "angle_deg": 115.405,
+       "branch": "centroid->female",
+       "seat_axis_male_root": [
+        -0.44258539,
+        0.00953608,
+        0.89667566
+       ]
+      }
+     ]
+    },
+    {
+     "category": "wall_nail",
+     "model": "wlnail",
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "female": [
+      {
+       "child_link": "meta__base_link_attachment_displaywallM_0_link",
+       "parent_link": "meta__base_link_attachment_displaywallF_0_link",
+       "meta_link_id": "displaywallF",
+       "sub_id": "0",
+       "position_root": [
+        2.359e-05,
+        -0.00012779,
+        -0.01481152
+       ],
+       "orientation_root_xyzw": [
+        0.04934568,
+        0.70435971,
+        -0.0554115,
+        0.70595467
+       ],
+       "axis_root": [
+        0.9890234,
+        -0.14773084,
+        0.0028848
+       ],
+       "loc": [
+        0.0,
+        3e-08,
+        1.0
+       ],
+       "z_root": [
+        0.9890235,
+        -0.14773087,
+        0.00288481
+       ],
+       "n_boundary_points": 54,
+       "centroid_root": [
+        5.7e-07,
+        1.4e-07,
+        -5.706e-05
+       ],
+       "centroid_to_female_m": 0.014755,
+       "angle_deg": 90.003,
+       "branch": "meta link +z",
+       "seat_axis_male_root": [
+        0.99973195,
+        -0.01747178,
+        0.01519087
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "library_entries": [
+  "lid__tnwisp__s1__attachment_free",
+  "lid__zkderg__s1__attachment_free",
+  "lid__qhlsdq__s1__attachment_free",
+  "lid__pwgbsb__s1__attachment_free",
+  "lid__ugfmpq__s1__attachment_free",
+  "lid__pbmsji__s0.65__attachment_free",
+  "lid__gerjlh__s1__attachment_free",
+  "lid__ppkjuy__s1__attachment_free",
+  "cap__hbafeb__s1__attachment_free",
+  "cap__xxqyrt__s1__attachment_free",
+  "cap__vnpjfn__s1__attachment_free",
+  "cap__iqeyba__s1__attachment_free",
+  "cap__clhquh__s1x1x1.529__attachment_free",
+  "cap__yqvild__s1x1x1.529__attachment_free",
+  "dip_candle__poexjo__s1__attachment_free",
+  "dip_candle__ghctun__s1__attachment_free",
+  "dip_candle__gbaons__s1__attachment_free",
+  "dip_candle__mxjejs__s1__attachment_free",
+  "cork__ncxgpe__s1__attachment_free",
+  "cork__uyceta__s1__attachment_free",
+  "cork__lseuwf__s1__attachment_free",
+  "light_bulb__kfmkwd__s1__attachment_free",
+  "light_bulb__sxkjea__s1__attachment_free",
+  "light_bulb__ymomhw__s1__attachment_free",
+  "skateboard_wheel_assembly__jljqtt__s1__attachment_free",
+  "skateboard_wheel_assembly__acmbvb__s1__attachment_free",
+  "blackberry__tvpfvb__s1__attachment_free",
+  "bookcase_baseboard__hlhneo__s1__attachment_free",
+  "cabinet_door__ertkre__s1__attachment_free",
+  "holly_decoration__shmkir__s1__attachment_free",
+  "trout__kqpeke__s1__attachment_free",
+  "webcam__fabztm__s1__attachment_free",
+  "wreath__rkrxno__s1__attachment_free",
+  "dip_candle__poexjo__s1__attachment_free__rfecdee"
+ ],
+ "libraries": [
+  "grasp_bands/out/roles_all_20261102/glib (33 attach jobs + 1 derived rest)",
+  "oracle_fix/v2maps_i7/glib (the two lids)",
+  "oracle_fix/v2maps_20261106/glib (the two lids)"
+ ],
+ "notes": "Per attach male of the libraries, every partner model with a matching female attachment type (BEHAVIOR's XM <-> XF; ispatialgym/assets/icl/roles/constraints_compatible.csv partner_of rows agree), loaded at scale 1 with the ability 'attachable' (the attachment task's spawn); per matched female link the oracle's seat axis from predicates.seat_axis: axis_root (partner root frame), loc (female link frame), the branch and angle. seat_axis_male_root = R_male_link @ loc: the axis in the male's frame when seated (out of the seat); the rule's mating direction is its negative."
+}

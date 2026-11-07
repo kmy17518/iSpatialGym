@@ -107,6 +107,13 @@ class CandidateConfig:
     # pads a pinch across a wall next to a hole (tape kavsnx: the 35 mm core) starts its inner pad inside the opposite wall, which the
     # oracle never does. Part of the entry identity when on (schema.CANDIDATE_SWITCHES).
     sweep_from_preshape: bool = True
+    # i7-attach 2026-11-07: the attachment rule's mating direction - DEFAULT "seat" (owner decision 2026-11-07 item 2). "meta_z" =
+    # the male meta link frame's -z (as written before; every entry built before has it). "seat" = the oracle's seat axis (``predicates.seat_axis``, what the attach program
+    # descends along), recorded per pair in ATTACH_SEATS_FILE: a male seats with its link frame on the female's, so its mating direction
+    # is -(R_male_link @ loc), loc = the seat axis in the female link frame. cork ncxgpe: its frame (0.5, -0.5, 0.5, 0.5) turns -z into
+    # +y, the oracle seats it along its own -z. An entry without a seat record keeps "meta_z" (logged). The axis is part of the entry
+    # identity off "meta_z" (schema.ModelLibrary.attach_axis). The old rule per entry: ``cand_overrides`` ({"attach_axis": "meta_z"}).
+    attach_axis: str = "seat"
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -327,24 +334,95 @@ def attachment_points(info):
     return np.array(pts)
 
 
-def attachment_frames(info, R: np.ndarray) -> List[Tuple[np.ndarray, np.ndarray]]:
+def attachment_frames(info, R: np.ndarray, seat: Optional[Dict[str, Any]] = None, sources: Optional[List[Dict[str, Any]]] = None
+                      ) -> List[Tuple[np.ndarray, np.ndarray]]:
     """``[(point, mating direction)]`` of the attachment meta links in the rest frame (``R``): the direction is the meta link frame's -z
-    (identity orientation: straight down, onto the partner). No meta link: the bottom centre, mating downward."""
+    (identity orientation: straight down, onto the partner). No meta link: the bottom centre, mating downward.
+
+    i7-attach: with ``seat`` (the entry's record of ATTACH_SEATS_FILE, :func:`attach_seat_record`; ``CandidateConfig.attach_axis`` =
+    "seat") a meta link the record matches to a partner female link takes the ORACLE's transform: the male link pose as the simulator
+    loads it (the record's ``position_root`` / ``orientation_root_xyzw``: the USD frame - cork ncxgpe's is 10.6 deg off its metadata
+    quaternion - and the applied scale, which the metadata position lacks) and the direction ``-(R_male_link @ loc)`` for every matched
+    female (``loc`` = the seat axis in the female link frame, :func:`seat_mating_dirs`; partners with the same seat give one frame). A
+    meta link without a matched female keeps the frame as written. ``sources`` (optional list) receives one record per frame: the meta
+    link, point and direction (object frame), the source ("meta_z" / "seat" / "bottom_centre") and the partner."""
+    seat_dirs = seat_mating_dirs(seat) if seat else {}
     out = []
     for link, ml in (info.get("meta_links") or {}).items():
         if not isinstance(ml, dict):
             continue
         for k, v in ml.get("attachment", {}).items():
-            for e in (v.values() if isinstance(v, dict) else v):
+            for sub, e in (v.items() if isinstance(v, dict) else enumerate(v)):
                 if isinstance(e, dict) and "position" in e:
                     q = e.get("orientation") or [0.0, 0.0, 0.0, 1.0]
                     Rm = S.quat_to_mat(q)
-                    out.append((R[:3, :3] @ np.asarray(e["position"], dtype=float), R[:3, :3] @ (Rm @ np.array([0.0, 0.0, -1.0]))))
+                    p = np.asarray(e["position"], dtype=float)
+                    dirs: List[Tuple[np.ndarray, str, Optional[str]]] = []
+                    sd = seat_dirs.get((str(k), str(sub)))
+                    if sd and sd["locs"]:  # the oracle's male link pose (live)
+                        if sd.get("orientation") is not None:
+                            Rm = S.quat_to_mat(sd["orientation"])
+                        if sd.get("position") is not None:
+                            p = np.asarray(sd["position"], dtype=float)
+                    for loc, partner in (sd or {}).get("locs", []):
+                        d = -(Rm @ np.asarray(loc, dtype=float))
+                        d = d / np.linalg.norm(d)
+                        if not any(np.allclose(d, d0, atol=1e-9) for d0, _, _ in dirs):
+                            dirs.append((d, "seat", partner))
+                    if not dirs:  # as written (bit for bit)
+                        dirs = [(Rm @ np.array([0.0, 0.0, -1.0]), "meta_z", None)]
+                    for d, src, partner in dirs:
+                        out.append((R[:3, :3] @ p, R[:3, :3] @ d))
+                        if sources is not None:
+                            sources.append({"meta_link": f"{link}/{k}/{sub}", "point": [round(float(x), 6) for x in p],
+                                            "dir": [round(float(x), 6) for x in d], "source": src, "partner": partner})
     if not out:
         lo, hi = np.array(info["coll_bbox_min"]), np.array(info["coll_bbox_max"])
         c = (lo + hi) / 2
         c[2] = lo[2]
         out.append((c, np.array([0.0, 0.0, -1.0])))
+        if sources is not None:
+            sources.append({"meta_link": None, "point": [round(float(x), 6) for x in c], "dir": [0.0, 0.0, -1.0], "source": "bottom_centre",
+                            "partner": None})
+    return out
+
+
+# i7-attach 2026-11-07: the oracle's seat axis per attach pair, recorded in the simulator by scripts/grasp_bands/attach_seat_facts.py
+# (predicates.seat_axis on the loaded male and partner). Regenerate it when predicates.seat_axis changes (test_attach_seats checks).
+ATTACH_SEATS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "grasping", "attach_seats.json")
+
+
+def _scale_key(scale) -> Tuple[float, ...]:
+    return tuple(round(float(v), 4) for v in S.canonical_scale(scale))
+
+
+def attach_seat_record(job: Dict[str, Any], path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """The seat record of ``job``'s male (category, model, scale) in ATTACH_SEATS_FILE (or ``path``), or None."""
+    d = S.load_json(path or ATTACH_SEATS_FILE)
+    if not d:
+        return None
+    key = (job.get("category"), job.get("model"), _scale_key(job.get("scale")))
+    for rec in d.get("pairs", []):
+        m = rec.get("male") or {}
+        if (m.get("category"), m.get("model"), _scale_key(m.get("scale"))) == key:
+            return rec
+    return None
+
+
+def seat_mating_dirs(seat: Dict[str, Any]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """``{(male meta link id, sub id): {"position", "orientation", "locs": [(loc, "partner category/model:female link")]}}`` of a seat
+    record: per male link its live pose in the male root frame (None when not recorded) and the oracle's seat axis in the female link
+    frame of every partner female link it matches (``loc``; a seated male link frame = the female link frame)."""
+    links = (seat.get("male") or {}).get("links") or {}
+    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for prt in seat.get("partners") or []:
+        for f in prt.get("female") or []:
+            ml = links.get(f.get("child_link"))
+            if ml is None or f.get("loc") is None:
+                continue
+            rec = out.setdefault((str(ml["meta_link_id"]), str(ml.get("sub_id", "0"))),
+                                 {"position": ml.get("position_root"), "orientation": ml.get("orientation_root_xyzw"), "locs": []})
+            rec["locs"].append((f["loc"], f"{prt['category']}/{prt['model']}:{f.get('parent_link')}"))
     return out
 
 
@@ -784,7 +862,13 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             # side of p from the mating direction, and no finger may reach past the object's mating face (the partner's volume).
             # The generic "hand spheres >= 1 cm from p, contact off the side of p" rule rejected every knob pinch of the lids (their
             # anchor sits above the CoM, inside the knob's reach) - the legacy lid__pbmsji__s065 run replaced it with a rim rule.
-            mates = attachment_frames(info, R)
+            # i7-attach: the mating direction from CandidateConfig.attach_axis ("meta_z" as written; "seat" = the oracle's seat axis)
+            if cfg.attach_axis not in ("meta_z", "seat"):
+                raise ValueError(f"unknown attach_axis {cfg.attach_axis!r} (meta_z | seat)")
+            seat = attach_seat_record(job) if cfg.attach_axis == "seat" else None
+            mate_src: List[Dict[str, Any]] = []
+            mates = attachment_frames(info, R, seat=seat, sources=mate_src)
+            log["attach_axis"] = {"mode": cfg.attach_axis, "seat_record": seat is not None, "mates": mate_src}
             cc = T[:, :3, 3] + T[:, :3, 2] * cz.reshape(-1, 1)
             keep = np.ones(len(T), dtype=bool)
             side_m = np.full(len(T), np.inf)
@@ -800,12 +884,17 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                     Pw = P @ T[i, :3, :3].T + T[i, :3, 3]
                     face_gap[i] = min(face_gap[i], Vm_max[k] - float((Pw @ m).max()))
             keep &= face_gap >= 0.002
+            if dump.on:  # the rule's two tests and their measures (side: the contact on the far side of p; face_gap: the fingers 2 mm inside the mating face)
+                why = np.where(side_m < 0.0, np.where(face_gap < 0.002, "side+face_gap", "side"), "face_gap")
+                dump.gate(pool, "attachment_free", len(T), int(keep.sum()), np.where(~keep)[0],
+                          {**_where(T, cz), "side_mm": side_m * 1000, "face_gap_mm": face_gap * 1000, "why": why}, why[~keep],
+                          records=[{"attach_axis": cfg.attach_axis, "mates": mate_src,
+                                    "mating_face_mm": [round(Vm_max[k] * 1000, 2) for k in sorted(Vm_max)]}])
             T, score, cz, pre_q, side_m, face_gap, real = T[keep], score[keep], cz[keep], pre_q[keep], side_m[keep], face_gap[keep], real[keep]
             feats = {k: v[keep] for k, v in feats.items()}
             feats["attach_side_m"], feats["attach_face_gap_m"] = side_m, face_gap
             score = score + 2.0 * np.clip(side_m / 0.03, 0, 1)
             L["n_attachment_free"] = int(len(T))
-            dump.gate(pool, "attachment_free", L.get("n_lever", L["n_sweep"]), len(T))
         elif constraint == "flower_stem_top" and len(T):
             head_pt, axis_dir, Ls = stem_axis(union, lo, hi)
             cc = T[:, :3, 3] + T[:, :3, 2] * cz.reshape(-1, 1)
