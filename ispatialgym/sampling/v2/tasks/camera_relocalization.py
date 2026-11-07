@@ -650,6 +650,12 @@ class CameraRelocalizationV2(SamplerV2):
             if bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
                 fails["bucket"] = fails.get("bucket", 0) + 1
                 continue
+            if self.obstructed and self.obstacle_names and not headroom and fast_value("CR_HEADROOM_DIAG", 0, int):
+                # i7-unblock 2026-11-07 (diagnostic, ISPATIALGYM_FAST_CR_HEADROOM_DIAG=1; never changes the draw): the goals the headroom
+                # prefilter would skip with CR_OBSTACLE_HEADROOM off
+                P_d = self.obstacle_params()
+                if not detour_headroom(float(geo), hi, float(P_d["min_detour_m"]), P_d.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET)):
+                    log.info("CR_HEADROOM_WOULD_SKIP %s: free geodesic %.3f m, bucket (%s, %s]", self.gp.variant, float(geo), lo, hi)
             if headroom and not detour_headroom(float(geo), hi, min_detour, by_bucket):
                 # i7-unblock 2026-11-07 (CR_OBSTACLE_HEADROOM): no obstacle cell of this goal can pass detour_failure - skipped before the
                 # path record, the renders and the obstacle cells (it used to cost the attempt one of its CR_OBSTACLE_GOAL_TRIES)
