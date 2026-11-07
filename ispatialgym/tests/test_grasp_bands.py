@@ -334,9 +334,15 @@ def test_skip_existing_counts_only_the_runs_arm_and_kind(tmp_path):
 
     p = tmp_path / "map__cat__model__h0.8126__abc.json"
     p.write_text(json.dumps({"arm": "right", "kind": "tabletop"}))
-    assert RM._map_meta_matches(str(p), "right", "tabletop")
-    assert not RM._map_meta_matches(str(p), "left", "tabletop")  # a left-arm run computes its own map
-    assert not RM._map_meta_matches(str(p), "right", "brace")
+    # i7-unblock 2026-11-07: a map of the former trunk eligibility rule (no config field) counts for a run of that rule only; a default
+    # (per_d_e) run computes the map again
+    assert RM._map_meta_matches(str(p), "right", "tabletop", trunk_eligibility=None)
+    assert not RM._map_meta_matches(str(p), "right", "tabletop")
+    q = tmp_path / "map__cat__model__h0.8126__def.json"
+    q.write_text(json.dumps({"arm": "right", "kind": "tabletop", "config": {"trunk_eligibility": "per_d_e"}}))
+    assert RM._map_meta_matches(str(q), "right", "tabletop") and not RM._map_meta_matches(str(q), "right", "tabletop", trunk_eligibility=None)
+    assert not RM._map_meta_matches(str(q), "left", "tabletop")  # a left-arm run computes its own map
+    assert not RM._map_meta_matches(str(q), "right", "brace")
     bad = tmp_path / "map__broken.json"
     bad.write_text("{")
     assert not RM._map_meta_matches(str(bad), "right", "tabletop")
