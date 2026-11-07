@@ -21,6 +21,18 @@ Per model (its exported collision pieces, :mod:`object_geometry`) and designated
    failing candidate is kept in the file with its reason but never becomes a representative;
 8. symmetry families (:mod:`symmetry`) and deduplication: the representatives are what physics validation tests.
 
+Lean rests (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`): a lean job is generated at its MEASURED lean rest
+(``generation_rest_wxyz``, written by the pipeline's ``lean`` stage) with the board it leans on as a NORMAL obstacle for every hand part
+(``lean_rest.board_in_root``: a box in the rest frame) - screened right after the support step (the hulls at the pre-shape, every role
+>= 0) and in the full policy geometry and the symmetry members' check (``contact_policy.check_grasp_geometry(obstacles=)``).
+
+Overhang rests (i7-overhang 2026-11-07, :mod:`ispatialgym.grasping.overhang`): an overhang job is generated at its MEASURED overhang rest
+(``generation_rest_wxyz``, written by the pipeline's ``overhang`` stage) with the slab BOX as the support (``overhang_rest.slab_in_root``:
+its edge where it was measured, its top at the rest frame's z_min) instead of the unbounded tabletop plane - beyond the edge the space
+below the slab top is free, so a pinch across the object's thickness keeps its lower finger there. A SIDE grasp whose fingers sink into
+the slab first retreats along its approach (2 mm steps, at most ``tip_max_m`` of pad depth - the legacy ``book_overhang`` rows' "pad_ref:
+tip": the pads' tip region on the overhanging edge) and only then is lifted as before; the contact point stays the sampled one.
+
 Output ``candidates.json`` (schema ``CANDIDATES``) in the model's library directory.
 """
 
@@ -797,6 +809,19 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     if geom0 is None:
         raise FileNotFoundError(f"no geometry.json in {model_dir} (run the export stage)")
     constraint = job.get("constraint") or "tabletop"
+    from ispatialgym.grasping import lean as LN
+
+    obstacles: Tuple[CP.Support, ...] = ()
+    if LN.is_lean_job(job):
+        # i7-lean 2026-11-07: the measured lean rest (the lean stage) and its board as a normal obstacle in the rest frame
+        if not job.get("generation_rest_wxyz") or not job.get("lean_rest"):
+            raise ValueError(f"{job.get('id')}: a lean job's candidates need its measured lean rest (run the pipeline's lean stage first)")
+        obstacles = (LN.board_obstacle_in_rest(job["lean_rest"]),)
+    from ispatialgym.grasping import overhang as OV
+
+    overhang = OV.is_overhang_job(job)
+    if overhang and (not job.get("generation_rest_wxyz") or not job.get("overhang_rest")):
+        raise ValueError(f"{job.get('id')}: an overhang job's candidates need its measured overhang rest (run the pipeline's overhang stage first)")
     # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): a surveyed rest generates the candidates (generation_rest_wxyz), the designated hint names the entry
     R = rest_rotation(job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz"))
     geom = geom0.rotated(R)  # the rest frame: the tabletop is z = z_min
@@ -823,7 +848,18 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                                              gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
                                              orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
-    support = CP.Support.plane(z_min, name="tabletop")
+    # i7-overhang 2026-11-07: an entry used at an interior goal - the accessible region (access_region.py) and the goal's boards in the rest frame
+    from ispatialgym.grasping import access_region as AR
+
+    region = AR.region_of_job(job)
+    region_boxes = []
+    if region is not None:
+        lr = job.get("lean_rest") or {}
+        side = 1.0 if (job.get("lean") or {}).get("side", "left") == "left" else -1.0
+        region_boxes = AR.goal_boxes(region, lr, z_min, side)
+    # i7-overhang: the measured slab box (its edge under the object) instead of the unbounded tabletop plane
+    support = OV.support_in_rest(job["overhang_rest"], z_min) if overhang else CP.Support.plane(z_min, name="tabletop")
+    side_steps = np.arange(0.002, cfg.tip_max_m - CONTACT_Z + 1e-9, 0.002) if overhang else np.zeros(0)
     hc = CP.HandChecker(arm, policy, spacing=0.004)
     clear_fn = SphereClearance(geom, arm)
     out_cands: List[Dict[str, Any]] = []
@@ -890,6 +926,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             continue
         # 3) the support under the hand: policy measurement on the exact hulls at the pre-shaped opening
         shift = np.zeros(len(T))
+        side_retreat = np.zeros(len(T))  # i7-overhang: a side grasp's retreat along its approach (the contact moves toward the pad tips)
         pre_q = np.clip(0.5 * width + PRESHAPE_MARGIN, 0.0, FINGER_OPEN)
         deficit = np.zeros(len(T))
         part = np.zeros(len(T), dtype=int)  # dump: the hand part furthest below its allowance (index into SUPPORT_PARTS)
@@ -918,16 +955,50 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             T, s, width, pre_q, shift0 = T[ok], s[ok], width[ok], pre_q[ok], shift0[ok]
             T[:, :3, 3] -= T[:, :3, 2] * s[:, None]
             shift = shift0 + s
+            side_retreat = np.zeros(len(T))
         else:  # lift along the support normal (lift_grasp_off_support's move); the pads must still close on the object (sweep below)
+            retreat = np.zeros(len(T))
+            if len(side_steps) and len(T):
+                # i7-overhang: at an overhang rest a side grasp first retreats along its approach until every part is within its allowance
+                # of the slab box (the fingers out over the free space beyond the edge); the first step that passes is kept
+                todo = np.where(deficit > 0.0)[0]
+                for ds in side_steps:
+                    if len(todo) == 0:
+                        break
+                    Tb = T[todo].copy()
+                    Tb[:, :3, 3] -= Tb[:, :3, 2] * float(ds)
+                    good = np.zeros(len(todo), dtype=bool)
+                    for q in np.unique(np.round(pre_q[todo], 3)):
+                        sub = np.where(np.round(pre_q[todo], 3) == q)[0]
+                        cl = hc.clearance(th.as_tensor(Tb[sub], dtype=th.float32), support, (float(q), float(q)))
+                        hand = np.minimum(np.minimum(cl["palm"].numpy(), cl["wrist_camera"].numpy()), cl["wrist"].numpy())
+                        good[sub] = (cl["finger"].numpy() >= -policy.finger_support_max_penetration_m + margin) & (hand >= policy.hand_support_margin_m + margin)
+                    idx = todo[good]
+                    T[idx] = Tb[good]
+                    retreat[idx] = float(ds)
+                    deficit[idx] = 0.0
+                    todo = todo[~good]
+                L["n_side_retreat"] = int((retreat > 0).sum())
             ok = deficit <= cfg.side_lift_max_m
             if dump.on:
                 dump.gate(pool, "support_lift", len(T), int(ok.sum()), np.where(~ok)[0],
                           {**_where(T, CONTACT_Z), "lift_mm": deficit * 1000, "part": np.array(SUPPORT_PARTS)[part]}, np.array(SUPPORT_PARTS)[part][~ok])
             lift_part = np.array(SUPPORT_PARTS)[part][ok]
-            T, width, pre_q, deficit, shift0 = T[ok], width[ok], pre_q[ok], deficit[ok], shift0[ok]
+            T, width, pre_q, deficit, shift0, retreat = T[ok], width[ok], pre_q[ok], deficit[ok], shift0[ok], retreat[ok]
             T[:, 2, 3] += deficit
             shift = deficit
+            side_retreat = retreat
         L["n_support"] = int(len(T))
+        if obstacles and len(T):
+            # i7-lean: the hand at the grasp pose, pre-shaped, clear of the lean board (every role, the fingers included)
+            keep = np.zeros(len(T), dtype=bool)
+            for q in np.unique(np.round(pre_q, 3)):
+                idx = np.where(np.round(pre_q, 3) == q)[0]
+                keep[idx] = hc.check_obstacles(th.as_tensor(T[idx], dtype=th.float32), obstacles, (float(q), float(q)))[0].numpy()
+            T, width, pre_q, shift, side_retreat, shift0 = T[keep], width[keep], pre_q[keep], shift[keep], side_retreat[keep], shift0[keep]
+            if mode != "top":
+                lift_part = lift_part[keep]
+            L["n_obstacle_clear"] = int(len(T))
         if len(T) == 0:
             log[pool] = L
             continue
@@ -939,14 +1010,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         if dump.on:
             dump.gate(pool, "object_clear", len(T), int(ok.sum()), np.where(~ok)[0],
                       {**_where(T, CONTACT_Z + (shift if mode == "top" else 0.0)), "sphere_clear_mm": clear * 1000, "shift_mm": shift * 1000})
-        T, clear, shift, width, pre_q, shift0, real = T[ok], clear[ok], shift[ok], width[ok], pre_q[ok], shift0[ok], real[ok]
+        T, clear, shift, width, pre_q, shift0, real, side_retreat = (T[ok], clear[ok], shift[ok], width[ok], pre_q[ok], shift0[ok], real[ok],
+                                                                     side_retreat[ok])
         if mode != "top":
             lift_part = lift_part[ok]
         L["n_object_clear"] = int(len(T))
         if len(T) == 0:
             log[pool] = L
             continue
-        cz = CONTACT_Z + (shift if mode == "top" else 0.0)  # the pads' contact height after the retreat
+        cz = CONTACT_Z + (shift if mode == "top" else side_retreat)  # the pads' contact height after the retreat (i7-overhang: a side retreat too)
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
         c, width, antip, cov = contact_features(union, T, cz)
         if cfg.sweep_from_preshape:  # OWNER DECISION (i7-padsweep, default on): the pads start at the oracle's pre-shape of the recorded width
@@ -974,6 +1046,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         feats = {"com_perp": perp, "width": width, "antipodal": antip, "coverage": cov, "clearance": clear, "tilt_deg": tilt_deg(T), "shift_m": shift}
         if is_family:
             feats["pad_offset_m"] = shift0
+        if overhang and mode != "top":  # i7-overhang: the side grasp's retreat along its approach (cz - CONTACT_Z)
+            feats["side_retreat_m"] = cz - CONTACT_Z
         if constraint != "flower_stem_top":
             keep = perp <= cfg.lever_cap * size
             if dump.on:
@@ -1034,6 +1108,15 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             feats["stem_t"], feats["pinch_across"] = t, across
             L["n_flower"] = int(len(T))
             dump.gate(pool, "flower_stem_top", L["n_sweep"], len(T))
+        if region is not None and len(T):
+            # i7-overhang 2026-11-07 (owner: an entry used at an interior goal): only the goal's accessible region, ranked by board clearance
+            ok_r, clr, cnt = AR.evaluate(T, cz, union.vertices, region_boxes, region, arm)
+            L["region"] = cnt
+            T, score, cz, pre_q, clr, real = T[ok_r], score[ok_r], cz[ok_r], pre_q[ok_r], clr[ok_r], real[ok_r]
+            feats = {k: v[ok_r] for k, v in feats.items()}
+            feats["board_clearance_m"] = clr
+            score = 1000.0 * clr + 1e-3 * score  # the board clearance first, the old score breaks ties
+            L["n_region"] = int(len(T))
         if len(T) == 0:
             log[pool] = L
             continue
@@ -1043,7 +1126,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         # 7) the full policy geometry: pre-grasp, approach, closing sweep (fingers from the pre-shape to the contact opening)
         Ts = T[sel]
         contact_q = np.clip(0.5 * feats["width"][sel] + pad_face_offset(arm), 0.0, FINGER_OPEN)  # joint value at the pads' first touch
-        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])))
+        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])), obstacles=obstacles)
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
         blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default on since i7-switches)
@@ -1098,7 +1181,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                 return clear_fn(Tm, q) - cfg.obj_margin_m + 1e-9
 
             def support_ok(Tm, c=c):  # the member under the contact policy against the rest's tabletop (pre-grasp, approach, sweep)
-                return CP.check_grasp_geometry(hc, th.as_tensor(Tm, dtype=th.float32), support, [c["contact_q"]] * len(Tm), open_q=c["preshape_q"])["ok"].numpy()
+                return CP.check_grasp_geometry(hc, th.as_tensor(Tm, dtype=th.float32), support, [c["contact_q"]] * len(Tm), open_q=c["preshape_q"],
+                                               obstacles=obstacles)["ok"].numpy()
 
             fam = SY.detect(Tr, union, idx, width_fn, clear_obj, rest_R=np.eye(4), cfg=sym_cfg, contact_z=CONTACT_Z, support_fn=support_ok)
             fams[c["name"]] = _family_to_object(fam, R)
@@ -1118,6 +1202,13 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                       "log": {k: v for k, v in log.items() if isinstance(v, dict)}, "pools": dump.pools})
     out = {"schema": S.CANDIDATES, "pipeline": PIPELINE, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
            "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "generation_rest_wxyz": job.get("generation_rest_wxyz"), "legacy_key": job.get("legacy_key"),
+           **({"rest_kind": "overhang", "overhang": job.get("overhang"), "overhang_rest": job.get("overhang_rest"),
+               "support": {"kind": support.kind, "centre": list(support.centre), "half": list(support.half),
+                           "frame": "rest frame (the support frame's axes, the root at the origin; the slab's edge under the object)"}} if overhang else {}),
+           **({"access_region": region, "region_boxes": [{"name": b.name, "centre": list(b.centre), "half": list(b.half)} for b in region_boxes]} if region else {}),
+           **({"rest_kind": "lean", "lean": job.get("lean"), "lean_rest": job.get("lean_rest"),
+               "obstacles": [{"name": o.name, "centre": list(o.centre), "half": list(o.half), "frame": "rest frame (the support frame's axes, the root at the origin)"}
+                             for o in obstacles]} if obstacles else {}),
            "arm": arm, "policy": policy.meta(arm), "policy_key": policy.key(arm), "config": asdict(cfg), "symmetry_config": asdict(sym_cfg),
            "candidates": out_cands, "families": families, "representatives": rep_names, "log": log, "t_s": round(time.time() - t0, 2),
            "created": S.now(), "review_instructions": "docs/GRASP_REVIEW.md (symmetry annotations required)"}

@@ -138,7 +138,7 @@ def test_the_candidates_log_line_names_both_switches(tmp_path, monkeypatch):
     from ispatialgym.grasping import candidates as CA
     from ispatialgym.grasping import pipeline as PL
 
-    def fake_generate(job, d, cfg=None, densify=()):
+    def fake_generate(job, d, cfg=None, densify=(), **kw):  # integration: the pipeline also passes arm= (i7-overhang)
         return {"candidates": [], "families": {}, "representatives": [], "log": {}}
 
     monkeypatch.setattr(CA, "generate", fake_generate)

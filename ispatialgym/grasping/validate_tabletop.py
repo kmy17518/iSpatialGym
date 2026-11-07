@@ -36,6 +36,25 @@ Per model (``run_model``):
    miss). Every force series is summarised in the trial (units: N; ratio: dimensionless, per control step = max over its 4 physics
    steps). The thresholds are PROVISIONAL (not calibrated; the recorded distributions are for calibrating them).
 
+Lean rests (i7-lean 2026-11-07, owner decision; :mod:`ispatialgym.grasping.lean`): a job with ``rest_kind: "lean"`` adds ONE fixed
+vertical board (a primitive cube, default material, created on the first lean job and parked far away otherwise) standing on the slab:
+the rest is settled against it (:meth:`TabletopWorld.settle` with ``lean``: the object leaning ``deg`` toward ``side`` its extreme point
+``gap_m`` short of the board's inner face; still, pressing on the slab AND on the board, within ``lean_tol_deg`` of the angle), the
+representatives are re-checked at the measured rest with the board as a normal obstacle (``contact_policy.check_grasp_geometry
+(obstacles=)``), the placement IK keeps every sphere of the robot clear of it (``contact_policy.spheres_clear``), the trial runs with
+the board in place, and the unload drops the slab AND moves the board ``lean_unload_board_m`` away (the object hangs on the grasp).
+Extra rejections: ``robot_board_contact`` (any robot link, fingers included, on the board above ``non_finger_contact_N``),
+``object_pressed_into_board`` (the object's load on the board above ``object_load_ratio_max`` x its weight for ``force_window`` steps).
+A stable job's world, rest, trials and records are unchanged.
+
+Overhang rests (i7-overhang 2026-11-07, owner decision; :mod:`ispatialgym.grasping.overhang`): a job with ``rest_kind: "overhang"`` places the
+slab so that its EDGE lies under the object (``overhang.slab_for``: the named face ``distance_m`` beyond the edge, the edge flush with it,
+the slab on the object's side); the rest is settled there (:meth:`TabletopWorld.settle` with ``overhang``: still, pressing on the slab, the
+face within ``overhang.DISTANCE_TOL_M`` of the requested overhang, the centre of mass inside, flush) and recorded as an overhang rest
+(``rest_kind: "overhang"``, ``overhang``: ``overhang.overhang_record``); the representatives are re-checked against that slab box (the
+policy's 2 mm finger rule on the box: beyond the edge the space below the slab top is free), placed and tried with it, and the unload drops
+it as for a stable rest. No other rule changes.
+
 Fidelity notes: the approach is not executed (the hand starts at the grasp pose with the pre-shaped fingers, as the oracle's approach
 ends); a policy-passing start can still carry <= 2 mm finger/table overlap that PhysX resolves in the first step. The slab is a box
 with the primitive's default physics material, not the scene table's; its edge sits at the configuration's own distance.
@@ -100,6 +119,10 @@ class ValidateConfig:
     max_trials: int = 10
     max_valid: int = 6
     max_rest_lift_m: float = 0.003
+    # i7-lean 2026-11-07: the lean rests (stable jobs never read these)
+    lean_tol_deg: float = 2.0
+    lean_unload_board_m: float = 0.10
+    lean_board_park: Tuple[float, float, float] = (-6.0, 6.0, 1.0)
 
 
 # ------------------------------------------------------------------------------------------------ force probe
@@ -110,7 +133,7 @@ class ForceProbe:
     (hooked into ``RigidContactAPI.read_from_physx``, which the simulator calls after each one) and folded per control step into the
     maxima the acceptance rules read. Units: N (``get_contact_force_matrix(dt)``)."""
 
-    def __init__(self, robot, slab, obj, arm: str):
+    def __init__(self, robot, slab, obj, arm: str, board=None):
         import omnigibson as og
         from omnigibson.utils.usd_utils import RigidContactAPI
 
@@ -121,7 +144,10 @@ class ForceProbe:
         self.obj_links = [(n, l.prim_path) for n, l in obj.links.items()]
         self.slab_path = slab.root_link.prim_path
         sensors = [p for _, p in self.robot_links] + [p for _, p in self.obj_links]
-        filters = [self.slab_path] + [p for _, p in self.obj_links]
+        # i7-lean 2026-11-07: the lean board as the second filter column (stable jobs: no board, the columns as before)
+        self.board_col = 1 if board is not None else None
+        self.obj_col0 = 2 if board is not None else 1
+        filters = [self.slab_path] + ([board.root_link.prim_path] if board is not None else []) + [p for _, p in self.obj_links]
         # the list form takes one filter list per sensor (omni.physics.tensors SimulationView.create_rigid_contact_view overload 2)
         self.view = og.sim.physics_sim_view.create_rigid_contact_view(sensors, filter_patterns=[list(filters) for _ in sensors], max_contact_data_count=4096)
         self.n_robot = len(self.robot_links)
@@ -134,6 +160,8 @@ class ForceProbe:
 
     def reset(self):
         self.acc = {"finger_slab": 0.0, "finger_slab_z": 0.0, "other_slab": 0.0, "other_link": None, "obj_slab_z": 0.0, "finger_obj": 0.0}
+        if getattr(self, "board_col", None) is not None:
+            self.acc.update({"robot_board": 0.0, "robot_board_link": None, "obj_board": 0.0})
 
     def install(self):
         api = self._api
@@ -171,8 +199,16 @@ class ForceProbe:
                 a["other_slab"] = float(on[k])
                 a["other_link"] = self.robot_links[self.other_rows[k]][0]
         a["obj_slab_z"] = max(a["obj_slab_z"], float(F[self.obj_rows, 0, 2].sum()))
-        if F.shape[1] > 1:
-            a["finger_obj"] = max(a["finger_obj"], float(F[self.finger_rows, 1:].norm(dim=-1).sum()))
+        if F.shape[1] > self.obj_col0:
+            a["finger_obj"] = max(a["finger_obj"], float(F[self.finger_rows, self.obj_col0:].norm(dim=-1).sum()))
+        if self.board_col is not None:
+            rb = F[: self.n_robot, self.board_col].norm(dim=-1)
+            k = int(rb.argmax())
+            if float(rb[k]) > a["robot_board"]:
+                a["robot_board"] = float(rb[k])
+                a["robot_board_link"] = self.robot_links[k][0]
+            # the object's NORMAL load on the board (the board's normal is horizontal: the force's horizontal magnitude)
+            a["obj_board"] = max(a["obj_board"], float(F[self.obj_rows, self.board_col, :2].sum(dim=0).norm()))
 
     def take(self) -> Dict[str, Any]:
         out = dict(self.acc)
@@ -272,6 +308,11 @@ class TabletopWorld:
         self.trunk_limits = (self.robot.joint_lower_limits[self.robot.trunk_control_idx].clone(),
                              self.robot.joint_upper_limits[self.robot.trunk_control_idx].clone())
         self.hand = CP.HandChecker(cfg.arm, policy, spacing=0.004)
+        # i7-lean 2026-11-07: the lean board (created on the first lean job: a stable-only run never has it) and the model's lean spec
+        self.board = None
+        self.lean = None
+        self.overhang = None  # i7-overhang 2026-11-07: the model's overhang spec (a stable / lean job: None)
+        self.obstacles: Tuple[CP.Support, ...] = ()
         self.t_setup = time.time() - t0
         self.timing: Dict[str, float] = {"setup_s": round(self.t_setup, 2)}
         self.physics_profile = {"action_hz": 30, "physics_hz": 120, "gpu_dynamics": False, "base_mass": self.base_mass,
@@ -321,9 +362,20 @@ class TabletopWorld:
             self.SA.apply_to_objects([obj], {"rigid_sleep_threshold": self.SA.RIGID_SLEEP_THRESHOLD})
             if OG.load(model_dir) is None:
                 OG.export_loaded(obj, model_dir, job)
+            # i7-lean 2026-11-07: a lean job gets the board (and its force column); any other job finds it parked
+            from ispatialgym.grasping import lean as LN
+
+            self.lean = LN.spec_of(job) if LN.is_lean_job(job) else None
+            from ispatialgym.grasping import overhang as OV
+
+            self.overhang = OV.spec_of(job) if OV.is_overhang_job(job) else None  # i7-overhang: the slab edge under the object
+            self.obstacles = ()
+            if self.lean is not None:
+                self.ensure_board()
+            self.park_board()
             # the placement IK runs against the floor only (the object and the slab are checked explicitly, contact_policy), so the
             # cuRobo world is never synced with the objects of the persistent world - its mesh store stays empty for any number of models
-            self.probe = ForceProbe(self.robot, self.slab, obj, self.cfg.arm)
+            self.probe = ForceProbe(self.robot, self.slab, obj, self.cfg.arm, board=self.board if self.lean is not None else None)
             self.probe.install()
         except Exception:
             self.scene.remove_object(obj)
@@ -374,6 +426,36 @@ class TabletopWorld:
             self.slab.scale = sc
         self.support = CP.Support.box(centre, [d / 2 for d in dims], name="slab")
 
+    # ------------------------------------------------------------------------------------------ the lean board (i7-lean 2026-11-07)
+
+    def ensure_board(self):
+        """The lean board: one fixed primitive cube (default material) in the persistent world, created on the first lean job."""
+        if self.board is not None:
+            return self.board
+        th = self.th
+        from omnigibson.objects.primitive_object import PrimitiveObject
+
+        self.board = PrimitiveObject(name="gb_lean_board", primitive_type="Cube", fixed_base=True, size=1.0, rgba=(0.45, 0.35, 0.3, 1.0),
+                                     scale=th.tensor([0.4, 0.02, 0.4]))
+        self.scene.add_object(self.board)
+        self.park_board()
+        self.og.sim.step()
+        return self.board
+
+    def park_board(self):
+        if self.board is not None:
+            self.board.set_position_orientation(self.th.tensor(list(self.cfg.lean_board_park), dtype=self.th.float32), self.th.tensor([0.0, 0.0, 0.0, 1.0]))
+        self.obstacles = ()
+
+    def place_board(self, centre, dims):
+        th = self.th
+        self.ensure_board()
+        self.board.set_position_orientation(th.tensor(centre, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        sc = th.tensor(dims, dtype=th.float32)
+        if not th.allclose(self.board.scale, sc, atol=1e-5):
+            self.board.scale = sc
+        self.obstacles = (CP.Support.box(centre, [d / 2 for d in dims], name="lean_board"),)
+
     def settle_survey(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, plan: Sequence[Tuple[float, float]]) -> List[Dict[str, Any]]:
         """of-v2maps 2026-11-07 (``GB_SETTLE_FIRST``, :mod:`ispatialgym.grasping.settle_first`): one :meth:`settle` per ``(yaw0, drop_m)`` of
         ``plan`` from the designated rest ``quat0`` turned by ``yaw0`` about +z; the rest records with ``yaw0`` / ``drop_m`` (no snapshot)."""
@@ -385,9 +467,16 @@ class TabletopWorld:
             out.append(rec)
         return out
 
-    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0), drop_m: Optional[float] = None) -> Tuple[Dict[str, Any], Any]:
+    def settle(self, obj, geom: OG.ObjectGeometry, quat0: np.ndarray, obj_xy=(0.0, 0.0), drop_m: Optional[float] = None, lean=None,
+               overhang=None) -> Tuple[Dict[str, Any], Any]:
         """Drop and settle the object on the slab with the robot parked; the measured rest record and the scene snapshot. ``drop_m``:
-        the drop height (default ``cfg.drop_m``; the settle-first survey varies it)."""
+        the drop height (default ``cfg.drop_m``; the settle-first survey varies it). ``lean`` (i7-lean 2026-11-07, a ``lean.LeanSpec``):
+        the object (``quat0``: leaning ``lean.deg`` toward ``lean.side``) settles against the board placed ``lean.gap_m`` beyond its
+        extreme point (``lean.initial_pose``); the record is a lean rest (``rest_kind: "lean"``, ``lean``: ``lean.lean_record``) - stable
+        when still, pressing on the slab and on the board, on the requested side within ``lean_tol_deg``. ``overhang`` (i7-overhang
+        2026-11-07, an ``overhang.OverhangSpec``): the slab's edge under the object, the named face ``distance_m`` beyond it
+        (``overhang.slab_for``); the record is an overhang rest (``rest_kind: "overhang"``, ``overhang``: ``overhang.overhang_record``) -
+        stable when still, pressing on the slab, at the requested overhang, the centre of mass inside, flush (``overhang.overhang_ok``)."""
         th, cfg = self.th, self.cfg
         drop = cfg.drop_m if drop_m is None else float(drop_m)
         t0 = time.time()
@@ -395,10 +484,24 @@ class TabletopWorld:
         R0 = S.quat_to_mat(quat0)
         bottom = -float((V @ R0.T)[:, 2].min())
         radius = float(np.linalg.norm((V @ R0.T)[:, :2], axis=1).max())
+        if lean is not None:
+            radius += float(lean.board.thickness_m) + float(lean.gap_m)  # the slab also carries the board
         centre, dims = self.slab_pose_for(obj_xy, radius)
+        ov_slab = None
+        if overhang is not None:
+            from ispatialgym.grasping import overhang as OV
+
+            ov_slab = OV.slab_for(V @ R0.T, overhang, obj_xy, half=radius + cfg.slab_half_m, slab_top_z=cfg.slab_top_z)
+            centre, dims = ov_slab["centre"], ov_slab["dims"]
         self.park()
         self.place_slab(centre, dims)
         z0 = cfg.slab_top_z + bottom + drop
+        lean_start = None
+        if lean is not None:
+            from ispatialgym.grasping import lean as LN
+
+            lean_start = LN.initial_pose(V, quat0, lean, cfg.slab_top_z, obj_xy, drop)
+            self.place_board(lean_start["board_centre"], lean_start["board_dims"])
         obj.set_position_orientation(th.tensor([obj_xy[0], obj_xy[1], z0], dtype=th.float32), th.tensor(quat0, dtype=th.float32))
         obj.keep_still()
         a = self.hold_action()
@@ -424,9 +527,11 @@ class TabletopWorld:
         # the support load, measured awake (PhysX reports no contacts of a sleeping body): two steps after a wake
         weight = float(obj.mass) * 9.81
         obj.wake()
-        wl = []
+        wl, bl = [], []
         for _ in range(2):
-            wl.append(self.step(a)["obj_slab_z"])
+            f = self.step(a)
+            wl.append(f["obj_slab_z"])
+            bl.append(f.get("obj_board", 0.0))
         support_load = float(np.mean(wl))
         contact = support_load > 0.5 * weight
         p, q = obj.get_position_orientation()
@@ -451,6 +556,26 @@ class TabletopWorld:
                                 "rot_rad": round(max(_qang(qq, qs[-1]) for qq in qs), 6)},
                "slab": {"centre": centre, "dims": dims}, "physics_profile": self.physics_profile, "policy_key": self.policy.key(self.cfg.arm),
                "validator": VALIDATOR_VERSION, "created": S.now(), "wall_s": round(time.time() - t0, 2)}
+        if lean is not None:
+            from ispatialgym.grasping import lean as LN
+
+            up = LN.up_axis_local(quat0)  # the axis the start leaned (vertical in the upright orientation)
+            ln = LN.lean_record(lean, q, p, lean_start["board_centre"], lean_start["board_dims"], up, float(np.mean(bl)), weight)
+            ok, why = LN.lean_ok(ln, cfg.lean_tol_deg)
+            ln.update({"lean_ok": ok, "lean_why": why, "start": {"quat_xyzw": [round(float(v), 7) for v in quat0], "lat_ext_m": round(lean_start["lat_ext_m"], 6),
+                                                                 "board_face_y": round(lean_start["board_face_y"], 6)}})
+            rec.update({"rest_kind": LN.REST_KIND_LEAN, "lean": ln, "stable": bool(rec["stable"] and ok),
+                        "contact_rule": rec["contact_rule"] + "; lean: " + ln["board_contact_rule"]})
+        if overhang is not None:
+            from ispatialgym.grasping import overhang as OV
+
+            com = np.asarray(geom.union.center_mass if geom.union.volume > 1e-9 else geom.union.centroid, dtype=float)
+            ov = OV.overhang_record(overhang, V, q, p, ov_slab["edge_world"], com, centre, dims, quat0)
+            ok, why = OV.overhang_ok(ov)
+            ov.update({"overhang_ok": ok, "overhang_why": why, "start": {"quat_xyzw": [round(float(v), 7) for v in quat0], "edge_world": round(float(ov_slab["edge_world"]), 6)}})
+            rec.update({"rest_kind": OV.REST_KIND_OVERHANG, "overhang": ov, "stable": bool(rec["stable"] and ok),
+                        "contact_rule": rec["contact_rule"] + "; overhang: the face beyond the slab edge within "
+                                        f"{OV.DISTANCE_TOL_M} m of the request, the centre of mass >= {OV.COM_MIN_INSIDE_M} m inside, flush"})
         state = self.scene.dump_state(serialized=False)
         return rec, state
 
@@ -465,6 +590,9 @@ class TabletopWorld:
         self.scene.load_state(state, serialized=False)
         sl = rest["slab"]
         self.place_slab(sl["centre"], sl["dims"])
+        if rest.get("rest_kind") == "lean":  # i7-lean: the board where the rest was settled against it
+            bp = rest["lean"]["board_pose"]
+            self.place_board(bp["centre"], bp["dims"])
         p, q = obj.get_position_orientation()
         dz = abs(float(p[2]) - self.cfg.slab_top_z - rest["h_root"])
         dr = _qang(q.numpy(), np.asarray(rest["quat_xyzw"]))
@@ -537,6 +665,10 @@ class TabletopWorld:
                     Q = qs[ok_idx]
                     sph, links = self.backend.robot_spheres_world(Q)
                     ok_s, worst = CP.sphere_support_ok(sph, links, self.support, cfg.arm, self.policy)
+                    if self.obstacles:  # i7-lean: every sphere of the robot, the fingers included, clear of the lean board
+                        ok_b, worst_b = CP.spheres_clear(sph, links, self.obstacles)
+                        worst = [w or (None if bool(o) else f"board:{wb}") for w, o, wb in zip(worst, ok_b.tolist(), worst_b)]
+                        ok_s = ok_s & ok_b.to(ok_s.device)
                     # arm spheres (not the hand) clear of the object's pieces
                     hand = set(self.policy.finger_links(cfg.arm)) | set(self.policy.hand_rigid_links(cfg.arm))
                     m = th.tensor([(l not in hand) and bool(l) for l in links])
@@ -590,6 +722,10 @@ class TabletopWorld:
         sa = self.SA.SleepAssist(self.robot, {obj.name: obj}, "gb") if cfg.sleep_assist else None
         p_rest, q_rest = (x.clone() for x in obj.get_position_orientation())
         series: Dict[str, List[float]] = {"finger_slab": [], "other_slab": [], "obj_slab_ratio": [], "finger_obj": []}
+        lean = rest.get("rest_kind") == "lean"
+        if lean:  # i7-lean: the board's force series
+            series.update({"robot_board": [], "obj_board_ratio": []})
+        board_links: List[str] = []
         other_links: List[str] = []
         phases: List[str] = []  # the trial phase of every series step (force_diagnostics)
         weight = float(obj.mass) * 9.81
@@ -616,6 +752,11 @@ class TabletopWorld:
                 phases.append(phase)
                 if f["other_slab"] > cfg.non_finger_contact_N and f["other_link"]:
                     other_links.append(f"{phase}:{f['other_link']}")
+                if lean:
+                    series["robot_board"].append(f.get("robot_board", 0.0))
+                    series["obj_board_ratio"].append(f.get("obj_board", 0.0) / max(weight, 1e-6))
+                    if f.get("robot_board", 0.0) > cfg.non_finger_contact_N and f.get("robot_board_link"):
+                        board_links.append(f"{phase}:{f['robot_board_link']}")
         run(motions.hold(cfg.init_hold_steps), "init", wake=True)
         push = float(th.linalg.norm(obj.get_position_orientation()[0] - p_rest))
         rate, squeeze, thin = EX.closure_for_width(width, mcfg, library=True)
@@ -635,6 +776,12 @@ class TabletopWorld:
         c = list(sl["centre"])
         c[2] -= cfg.unload_drop_m
         self.slab.set_position_orientation(th.tensor(c, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        if lean:  # i7-lean: the board moves away from the object too (along its outward normal): nothing but the grasp holds it
+            bp = rest["lean"]["board_pose"]
+            sg = 1.0 if rest["lean"].get("side", "left") == "left" else -1.0
+            cb = list(bp["centre"])
+            cb[1] += sg * cfg.lean_unload_board_m
+            self.board.set_position_orientation(th.tensor(cb, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
         T_oe0 = self._T_object_eef(obj)
         run(motions.hold(cfg.unload_steps), "unload")
         T_oe1 = self._T_object_eef(obj)
@@ -663,6 +810,13 @@ class TabletopWorld:
             reasons.append("object_pressed_into_table")
         if attached and (off_pos > cfg.on_target_pos_m or off_rot > cfg.on_target_rot_rad):
             reasons.append("grasp_off_target")
+        board_run = 0
+        if lean:  # i7-lean: the board is a normal obstacle for every robot link; the hand must not push the object into it
+            if board_links:
+                reasons.append("robot_board_contact")
+            board_bad, board_run = _sustained(series["obj_board_ratio"], cfg.object_load_ratio_max, cfg.force_window)
+            if board_bad:
+                reasons.append("object_pressed_into_board")
         fingers = self.robot.get_joint_positions()[self.robot.gripper_control_idx[arm]].tolist()
         ag_link = None
         try:
@@ -682,6 +836,8 @@ class TabletopWorld:
                        "other_slab": _summ(series["other_slab"]), "other_links": sorted(set(other_links))[:8],
                        "obj_slab_ratio": _summ(series["obj_slab_ratio"]), "obj_slab_ratio_sustained_steps": load_run,
                        "finger_obj": _summ(series["finger_obj"]),
+                       **({"robot_board": _summ(series["robot_board"]), "board_links": sorted(set(board_links))[:8],
+                           "obj_board_ratio": _summ(series["obj_board_ratio"]), "obj_board_ratio_sustained_steps": board_run} if lean else {}),
                        "thresholds": {"finger_force_max_N": cfg.finger_force_max_N, "object_load_ratio_max": cfg.object_load_ratio_max,
                                       "force_window_steps": cfg.force_window, "non_finger_contact_N": cfg.non_finger_contact_N, "calibrated": False},
                        "diagnostics": force_diagnostics(series, phases, weight, cfg.object_load_ratio_max, cfg.finger_force_max_N)},
@@ -699,6 +855,12 @@ class TabletopWorld:
         p, q = obj.get_position_orientation()
         ep, eq = self.robot.eef_links[self.cfg.arm].get_position_orientation()
         return np.linalg.inv(S.pose_mat(p.numpy(), q.numpy())) @ S.pose_mat(ep.numpy(), eq.numpy())
+
+
+def mirrored_offsets(offsets: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:
+    """``ValidateConfig.base_offsets`` (the object to the robot's RIGHT, for the right arm) mirrored to the robot's left for the LEFT arm
+    (i7-overhang 2026-11-07: the left-arm lean validator; ``validate_artic.mirrored_offsets``'s rule)."""
+    return tuple((float(x), -float(y)) for x, y in offsets)
 
 
 def _box_distance_2d(sup: CP.Support, x: float, y: float) -> float:
@@ -724,10 +886,21 @@ def _Rang(A, B) -> float:
 # ------------------------------------------------------------------------------------------------ one model
 
 
+def check_job_arm(job: Dict[str, Any], arm: str) -> None:
+    """i7-overhang 2026-11-07: a LEAN job is validated with its own arm only (``validate_arm``, right when absent; the left-arm validator:
+    ``pipeline lean --arm left``); every other job with the right arm. ``ValueError`` otherwise (nothing loaded)."""
+    from ispatialgym.grasping import lean as LN
+
+    want = LN.job_arm(job) if LN.is_lean_job(job) else "right"
+    if want != arm:
+        raise ValueError(f"{job.get('id')}: validated with the {want} arm, the validation world's arm is {arm} (left: lean jobs only)")
+
+
 def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict[str, Any]:
     """Rest, placement and trials of one model; writes ``rests.json``, ``validation.json`` and ``library.json``."""
     cfg = world.cfg
     t0 = time.time()
+    check_job_arm(job, cfg.arm)
     cand_doc = S.load_json(os.path.join(model_dir, "candidates.json"))
     if cand_doc is None:
         raise FileNotFoundError(f"{model_dir}: no candidates.json")
@@ -738,13 +911,37 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
     rests: Dict[str, Dict[str, Any]] = {}
     trials: List[Dict[str, Any]] = []
     timing = dict(world.timing)
+    from ispatialgym.grasping import lean as LN
+
+    lean = LN.spec_of(job) if LN.is_lean_job(job) else None
+    from ispatialgym.grasping import overhang as OV
+
+    ovs = OV.spec_of(job) if OV.is_overhang_job(job) else None
     try:
-        hint = job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz")  # of-v2maps 2026-11-07: the surveyed rest (GB_SETTLE_FIRST)
-        q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
-        quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
-        rest, state = world.settle(obj, geom, quat0)
-        intended = rest["tilt_from_intended_rad"] <= cfg.rest_tilt_tol_rad
-        rest["rest_id"] = "r0" if intended else "r0_other"
+        if ovs is not None:
+            # i7-overhang 2026-11-07: the guard settle on the slab whose edge lies under the object (the overhang stage's start: the
+            # designated rest at the reference yaw); the measured overhang rest is the rest (its own id: the spec's tag; "<tag>_other"
+            # when it does not overhang as requested / is not still)
+            hint = job.get("rest_hint_wxyz")
+            q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
+            quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
+            rest, state = world.settle(obj, geom, quat0, overhang=ovs)
+            intended = bool(rest["overhang"]["overhang_ok"])
+            rest["rest_id"] = ovs.rest_id() if intended else ovs.rest_id() + "_other"
+        elif lean is not None:
+            # i7-lean 2026-11-07: the guard settle against the board from the lean stage's start (the upright base leaned to the spec);
+            # the measured lean rest is the rest (its own id: the spec's tag; "<tag>_other" when it leans elsewhere / not on the board)
+            quat0 = LN.lean_quat(LN.base_quat(job), lean)
+            rest, state = world.settle(obj, geom, quat0, lean=lean)
+            intended = bool(rest["lean"]["lean_ok"])
+            rest["rest_id"] = lean.rest_id() if intended else lean.rest_id() + "_other"
+        else:
+            hint = job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz")  # of-v2maps 2026-11-07: the surveyed rest (GB_SETTLE_FIRST)
+            q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
+            quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
+            rest, state = world.settle(obj, geom, quat0)
+            intended = rest["tilt_from_intended_rad"] <= cfg.rest_tilt_tol_rad
+            rest["rest_id"] = "r0" if intended else "r0_other"
         rest["intended"] = bool(intended)
         rest.update({"category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))), "dataset": job.get("dataset"),
                      "asset": {"category": job["category"], "model": job["model"], "dataset": job.get("dataset") or "behavior-1k-assets"},
@@ -752,6 +949,16 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
         if job.get("settle_first"):
             # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): the surveyed rest the candidates were generated at; this settle is the guard
             rest["settle_first"] = dict(job["settle_first"], designated_rest_hint_wxyz=job.get("designated_rest_hint_wxyz"))
+        if ovs is not None and job.get("overhang_rest"):
+            # i7-overhang: the overhang stage's measured rest the candidates were generated at (this settle is the guard: same start, same world)
+            orr = job["overhang_rest"]
+            rest["overhang"]["generated_at"] = {"quat_xyzw": orr.get("quat_xyzw"), "h_root": orr.get("h_root"), "measured_distance_m": orr.get("measured_distance_m"),
+                                                "tilt_from_generation_rad": round(S.tilt_distance(rest["quat_xyzw"], orr["quat_xyzw"]), 5) if orr.get("quat_xyzw") else None}
+        if lean is not None and job.get("lean_rest"):
+            # i7-lean: the lean stage's measured rest the candidates were generated at (this settle is the guard: same start, same world)
+            lr = job["lean_rest"]
+            rest["lean"]["generated_at"] = {"quat_xyzw": lr.get("quat_xyzw"), "h_root": lr.get("h_root"), "measured_deg": lr.get("measured_deg"),
+                                            "tilt_from_generation_rad": round(S.tilt_distance(rest["quat_xyzw"], lr["quat_xyzw"]), 5) if lr.get("quat_xyzw") else None}
         rests[rest["rest_id"]] = rest
         timing["settle_s"] = rest["wall_s"]
         p, q = obj.get_position_orientation()
@@ -761,7 +968,8 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
 
         T_wo = S.pose_mat(*obj_pose)
         Tw = th.as_tensor(np.stack([T_wo @ S.pose_of(c["T_object_eef"]) for c in reps]), dtype=th.float32) if reps else None
-        geo = CP.check_grasp_geometry(world.hand, Tw, world.support, [c["contact_q"] for c in reps], open_q=[c["preshape_q"] for c in reps]) if reps else None
+        geo = CP.check_grasp_geometry(world.hand, Tw, world.support, [c["contact_q"] for c in reps], open_q=[c["preshape_q"] for c in reps],
+                                      obstacles=world.obstacles) if reps else None  # i7-lean: the board a normal obstacle (none: as before)
         # a candidate whose fingers end up just past the allowance at the MEASURED rest (it settles a fraction of a mm off the canonical
         # rest the generator used) is lifted along the support normal by the deficit (<= max_rest_lift_m) and re-checked; the lifted
         # transform is the one tested and recorded
@@ -774,7 +982,8 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
                 continue
             T_l = T_wo @ S.pose_of(c["T_object_eef"])
             T_l[2, 3] += need
-            g1 = CP.check_grasp_geometry(world.hand, th.as_tensor(T_l[None], dtype=th.float32), world.support, [c["contact_q"]], open_q=c["preshape_q"])
+            g1 = CP.check_grasp_geometry(world.hand, th.as_tensor(T_l[None], dtype=th.float32), world.support, [c["contact_q"]], open_q=c["preshape_q"],
+                                         obstacles=world.obstacles)
             if bool(g1["ok"][0]):
                 c["T_object_eef"] = S.mat_pose(np.linalg.inv(T_wo) @ T_l)
                 c["rest_lift_m"] = round(need, 5)
@@ -807,14 +1016,14 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
     S.save_json(os.path.join(model_dir, "rests.json"), {"schema": S.REST, "rests": rests})
     S.save_json(os.path.join(model_dir, "validation.json"), {"schema": S.TRIAL, "validator": VALIDATOR_VERSION, "config": asdict(cfg),
                                                              "policy_key": world.policy.key(cfg.arm), "trials": trials, "timing": timing, "created": S.now()})
-    lib = build_library(job, cand_doc, rests, trials, world.policy, world.physics_profile)
+    lib = build_library(job, cand_doc, rests, trials, world.policy, world.physics_profile, validate_arm=cfg.arm)
     S.save_json(os.path.join(model_dir, "library.json"), lib)
     return {"id": job.get("id"), "n_reps": len(reps), "n_valid": sum(1 for t in trials if t.get("verdict") == "valid"), "timing": timing,
             "rests": {k: {"stable": v["stable"], "h_root": v["h_root"], "tilt": v["tilt_from_intended_rad"]} for k, v in rests.items()},
             "reasons": [t.get("reasons") or t.get("error") for t in trials if t.get("verdict") != "valid"]}
 
 
-def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physics_profile) -> Dict[str, Any]:
+def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physics_profile, validate_arm: str = "right") -> Dict[str, Any]:
     by_name = {c["name"]: c for c in cand_doc["candidates"]}
     grasps = []
     for t in trials:
@@ -831,7 +1040,21 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
     for f in fams.values():
         f["physics"] = "representative_only"
         f["members_physics"] = "not tested: identified geometrically (members folded by symmetry.dedup); reach maps / sampling check the member they use"
-    return {"schema": S.LIBRARY, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
+    extra: Dict[str, Any] = {}
+    if job.get("rest_kind") == "overhang":
+        # i7-overhang 2026-11-07: an overhang entry - its kind, its overhang identity and the keys it serves (the sampler's overhang index,
+        # never legacy_key)
+        extra = {"rest_kind": "overhang", "overhang": job["overhang"], "overhang_keys": list(job.get("overhang_keys") or []),
+                 "overhang_base": job.get("overhang_base")}
+    elif job.get("rest_kind") == "lean":
+        # i7-lean 2026-11-07: a lean entry - its kind, its lean identity and the keys it leans (the sampler's lean index, never legacy_key)
+        extra = {"rest_kind": "lean", "lean": job["lean"], "lean_keys": list(job.get("lean_keys") or []), "lean_base_wxyz": job.get("lean_base_wxyz"),
+                 "lean_base": job.get("lean_base")}
+        if validate_arm != "right":  # i7-overhang: the arm the lean rest was validated with (in the entry id and the identity)
+            extra["validate_arm"] = validate_arm
+        if isinstance(job.get("access_region"), dict):  # i7-overhang: the interior goal's accessible region (entry id + identity)
+            extra.update({"access_region": job["access_region"], "interior_goal": job.get("interior_goal")})
+    return {"schema": S.LIBRARY, **extra, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
             "dataset": job.get("dataset"), "constraint": job.get("constraint"), "legacy_key": job.get("legacy_key"), "arm": policy_arm(cand_doc),
             "policy_key": policy.key(policy_arm(cand_doc)), "policy": policy.meta(policy_arm(cand_doc)), "physics_profile": physics_profile,
             "rests": {k: v for k, v in rests.items()}, "families": fams, "grasps": grasps,

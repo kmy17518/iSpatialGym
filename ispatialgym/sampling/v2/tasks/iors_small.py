@@ -923,7 +923,9 @@ class IORSSmall(SamplerV2):
     def sample_template(self):
         tgt, prt = self.obj("target"), self.obj("partner")
         self.hull["target"], self.hull["partner"] = self.world.local_hull(tgt), self.world.local_hull(prt)
-        self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target")
+        # i7-lean 2026-11-07 (owner decision): touching starts an upright-shelf book at the v2 library's LEAN rest when it holds one (the key
+        # becomes <key>@<lean tag>: its grasps, its measured rest, its interior map - tabletop.shelf_lean_key); otherwise as before
+        self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target", lean=self.relation == "touching")
         # grasps whose attached object self-collides with the gripper palm / wrist (sphere fit vs the robot model) can
         # never pass an attached check (lift, carry, place): they leave the grasp set here, once per template
         attachable = [g for g in self.grasps if self.ikc.attachable(tgt, g.pose, "right")]
@@ -1340,9 +1342,14 @@ class IORSSmall(SamplerV2):
         centre, any yaw) + the margin within the partner's floor disc (:meth:`container_floor`), tier ``floor_disc``; the box tiers when the
         partner shows no floor disc."""
         up = self.up_axis() if self.gen("target_up_axis") is not None else None
-        t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else self.rest["target"])
+        # i7-lean 2026-11-07: a v2 LEAN rest is measured at the pose the legacy upright-shelf path measured (the base key's own rest:
+        # tabletop.lean_admissibility_rest) - the lean rest stays the start / grasps / map rest
+        adm = TT.lean_admissibility_rest(getattr(self, "grasp_key", None)) if up is None else None
+        t_ext = TT.hull_extents(self.hull["target"], self.standing_quats()[0] if up is not None else (adm if adm is not None else self.rest["target"]))
         p_ext = TT.hull_extents(self.hull["partner"], self.rest["partner"])
         out: Dict[str, Any] = {"target_extent": t_ext.tolist(), "partner_extent": p_ext.tolist(), "relation": self.relation}
+        if adm is not None:
+            out["target_extent_at"] = "the upright-shelf key's own rest (the legacy pair check's pose; the v2 lean rest is the start)"
         if up is not None:
             out["target_up_axis"] = up
         tx, ty = sorted([float(t_ext[0]), float(t_ext[1])])
@@ -3224,8 +3231,12 @@ class IORSSmall(SamplerV2):
 
     def shelf_rests(self, side: float, lean_target: float, lean_partner: float) -> Tuple[th.Tensor, th.Tensor]:
         """The two books' rest orientations for a drawn layout: the target's library rest turned to lean ``lean_target`` deg toward ``side``
-        (``tabletop.releaned_quat``), the partner leaning ``lean_partner`` deg toward the other board (``tabletop.upright_lean_quat``)."""
+        (``tabletop.releaned_quat``), the partner leaning ``lean_partner`` deg toward the other board (``tabletop.upright_lean_quat``).
+        i7-lean 2026-11-07: a v2 LEAN rest (the key ``<key>@<lean tag>``) is the target's rest as measured - never re-leaned (its grasps
+        and its interior map are that rest's; :meth:`draw_shelf_side` keeps its board, :meth:`draw_shelf_layout` its angle)."""
         base = self._shelf_template
+        if TT.lean_rest_side(getattr(self, "grasp_key", None)) is not None:
+            return self._shelf_rest0["target"].clone(), TT.upright_lean_quat(self.hull["partner"], -float(side), float(lean_partner))
         t_rest = TT.releaned_quat(self._shelf_rest0["target"], float(base["lean_side"]), float(base["lean_deg"]), side, lean_target)
         return t_rest, TT.upright_lean_quat(self.hull["partner"], -float(side), float(lean_partner))
 
@@ -3243,6 +3254,9 @@ class IORSSmall(SamplerV2):
             why = f"generation.partner_side {assigned}: the target on the {TT.side_name(fixed)} board"
         elif not start_per_attempt():
             fixed, why = float(base["lean_side"]), "no start_per_attempt: the template's arm and candidates"
+        lean_side = TT.lean_rest_side(getattr(self, "grasp_key", None))
+        if lean_side is not None:  # i7-lean 2026-11-07: a v2 lean rest leans on one board (its grasps and its map are that rest's)
+            fixed, why = lean_side, f"v2 lean rest {getattr(self, 'grasp_key', None)}: its board"
         if fixed is not None:
             bays = self.gen("shelf_bay_lateral_m")
             bay0 = float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0
@@ -3275,6 +3289,8 @@ class IORSSmall(SamplerV2):
             if k:
                 bay = float(same[int(rng.integers(len(same)))][0])
             lean_t, lean_p = (float(rng.uniform(*spec["lean_deg"])), float(rng.uniform(*spec["lean_deg"]))) if spec["lean_deg"] else (float(base["lean_deg"]),) * 2
+            if TT.lean_rest_side(getattr(self, "grasp_key", None)) is not None:  # i7-lean: the v2 lean rest's own angle (the partner's lean is still drawn)
+                lean_t = float(base["lean_deg"])
             spine = float(rng.uniform(*spec["spine_behind_edge_m"])) if spec["spine_behind_edge_m"] else None
             rest_t, rest_p = self.shelf_rests(side, lean_t, lean_p)
             label = f"bay {bay:+.2f} {TT.side_name(side)} board, leans {lean_t:.1f} / {lean_p:.1f} deg" + ("" if spine is None else f", spine {spine:.3f} m")

@@ -26,7 +26,10 @@ Placement contract (reach bands, sampling; :func:`place_object`)::
 ``bottom_offset`` is recomputed). ``rest.reference_yaw`` is the yaw the object was dropped at; ``quat_xyzw`` already contains it.
 
 Compatibility: a consumer passes what it requires (scale, rest_id, policy key, schema versions); :func:`check_compatible` raises
-:class:`IncompatibleRecord` on any mismatch. A legacy library entry (``runlogs/grasp_library_20260905``) has no measured rest and
+:class:`IncompatibleRecord` on any mismatch. Rest kinds (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`): a rest record's
+``rest_kind`` is ``"stable"`` (absent: every record before the lean kind) or ``"lean"`` (settled against a vertical board); a lean entry
+has its own directory (``entry_id(..., lean=)``: ``__lean_<side>_<deg>_<digest6>``), and a lookup asks for one kind - a lean rest never
+serves a stable-rest lookup, nor the reverse (``check_compatible(rest_kind=, lean=)``). A legacy library entry (``runlogs/grasp_library_20260905``) has no measured rest and
 is never substituted for a v2 record (:func:`load_model` returns None; ``grasp_library.load_grasps`` keeps serving legacy keys).
 
 Candidate switches (i7-switches 2026-11-07, owner decision: the plate switches adopted after a count): the ``candidates.CandidateConfig``
@@ -37,6 +40,9 @@ and a config without the fields (every entry before 6e418172) reads all off. The
 built without; ``check_compatible(candidate_switches=)`` lets a reader require a state. i7-padsweep 2026-11-07: ``sweep_from_preshape``
 (the closing sweep from the oracle's pre-shape) is a candidate switch too; it enters the identity only when on, the two plate switches stay
 a pair (``_IDENTITY_PAIR``), so no key written before it changes.
+Overhang rests (i7-overhang 2026-11-07, :mod:`ispatialgym.grasping.overhang`): ``rest_kind: "overhang"`` (settled on a slab whose edge lies
+under the object, one face ``distance_m`` beyond it); its own directory (``entry_id(..., overhang=)``: ``__overhang_<axis><n|p>_<mm>mm_
+<digest6>``), never crossed with a stable or lean lookup (``check_compatible(rest_kind="overhang", overhang=)``).
 """
 
 from __future__ import annotations
@@ -133,24 +139,66 @@ def model_id(category: str, model: str, scale=None) -> str:
     return f"{category}__{model}__{scale_tag(scale)}"
 
 
-def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None) -> str:
+def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None, overhang=None,
+             validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> str:
     """Library entry id: ``<category>__<model>__<scale tag>`` + ``__<constraint>`` (non-tabletop) + ``__r<digest>`` (a designated
-    non-canonical rest) - one directory per (model, scale, constraint, designated rest). A floating entry (:data:`FLOATING`) is
-    ``<category>__<model>__<scale tag>__floating``: it never shares a directory with a tabletop / attachment entry of the model."""
+    non-canonical rest) + ``__<lean tag>`` (i7-lean: a lean rest, ``lean.LeanSpec.tag``) + ``__<overhang tag>`` (i7-overhang: an overhang
+    rest, ``overhang.OverhangSpec.tag``) + ``__val<arm>`` (i7-overhang: a LEAN entry validated with an arm other than the right one,
+    ``validate_arm``) - one directory per (model, scale, constraint, designated rest, lean / overhang rest, validating arm). A floating entry
+    (:data:`FLOATING`) is ``<category>__<model>__<scale tag>__floating``: it never shares a directory with a tabletop / attachment entry of
+    the model."""
     out = model_id(category, model, scale)
     if constraint and constraint != "tabletop":
         out += f"__{constraint}"
     if rest_hint_wxyz is not None:
         out += "__r" + digest([round(float(v), 5) for v in rest_hint_wxyz], 6)
+    if lean is not None:
+        from ispatialgym.grasping import lean as LN
+
+        out += "__" + LN.LeanSpec.from_json(lean).tag()
+    if overhang is not None:
+        from ispatialgym.grasping import overhang as OV
+
+        out += "__" + OV.OverhangSpec.from_json(overhang).tag()
+    if validate_arm not in (None, "right"):
+        out += f"__val{validate_arm}"
+    if access_region:  # i7-overhang 2026-11-07: an entry restricted to an interior goal's accessible region (access_region.region_identity tag)
+        out += f"__{access_region}"
     return out
 
 
-def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None) -> str:
-    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz))
+def model_dir(category: str, model: str, scale=None, root: Optional[str] = None, constraint: str = "tabletop", rest_hint_wxyz=None, lean=None,
+              overhang=None, validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> str:
+    return os.path.join(library_root(root), "models", entry_id(category, model, scale, constraint, rest_hint_wxyz, lean, overhang, validate_arm, access_region))
+
+
+def job_lean(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The lean spec of a lean job (``rest_kind: "lean"``), else None (a stable job's directory is as before)."""
+    return job.get("lean") if job.get("rest_kind") == "lean" and isinstance(job.get("lean"), dict) else None
+
+
+def job_overhang(job: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The overhang spec of an overhang job (``rest_kind: "overhang"``, i7-overhang), else None."""
+    return job.get("overhang") if job.get("rest_kind") == "overhang" and isinstance(job.get("overhang"), dict) else None
+
+
+def job_validate_arm(job: Dict[str, Any]) -> Optional[str]:
+    """The arm a LEAN job is physics-validated with (``validate_arm``, i7-overhang 2026-11-07 owner decision: a left-arm lean validator),
+    None for the right arm and for every other job (their directories as before)."""
+    a = job.get("validate_arm")
+    return a if job.get("rest_kind") == "lean" and a not in (None, "right") else None
+
+
+def job_access_region(job: Dict[str, Any]) -> Optional[str]:
+    """The tag of a LEAN job's accessible region (``access_region``, i7-overhang 2026-11-07: an entry used at an interior goal), else None."""
+    from ispatialgym.grasping import access_region as AR
+
+    return AR.tag_of(AR.region_of_job(job))
 
 
 def job_dir(job: Dict[str, Any], root: Optional[str] = None) -> str:
-    return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"))
+    return model_dir(job["category"], job["model"], job.get("scale"), root, job.get("constraint") or "tabletop", job.get("rest_hint_wxyz"), job_lean(job),
+                     job_overhang(job), job_validate_arm(job), job_access_region(job))
 
 
 def digest(obj: Any, n: int = 12) -> str:
@@ -272,6 +320,23 @@ class Rest:
     def stable(self) -> bool:
         return bool(self.record.get("stable"))
 
+    @property
+    def kind(self) -> str:
+        """``"stable"`` (records without ``rest_kind``) or ``"lean"`` (i7-lean: settled against a vertical board)."""
+        return str(self.record.get("rest_kind") or "stable")
+
+    @property
+    def lean(self) -> Optional[Dict[str, Any]]:
+        """The lean block of a lean rest (``lean.lean_record``), None for a stable rest."""
+        ln = self.record.get("lean")
+        return ln if self.kind == "lean" and isinstance(ln, dict) else None
+
+    @property
+    def overhang(self) -> Optional[Dict[str, Any]]:
+        """The overhang block of an overhang rest (``overhang.overhang_record``), None for any other rest (i7-overhang)."""
+        ov = self.record.get("overhang")
+        return ov if self.kind == "overhang" and isinstance(ov, dict) else None
+
 
 def place_object(rest: Rest, yaw: float, cell_xy: Sequence[float], support_z: float) -> np.ndarray:
     """T_world_object of the placement contract (module docstring)."""
@@ -360,15 +425,40 @@ class ModelLibrary:
         """i7-floating 2026-11-07: a ``floating`` entry (held-object grasps, no support, no rest: ``grasping.floating``)."""
         return self.data.get("constraint") == FLOATING
 
+    @property
+    def rest_kind(self) -> str:
+        """The entry's rest kind (i7-lean): ``"lean"`` for a lean entry (``library.json`` ``rest_kind``), ``"overhang"`` for an overhang entry
+        (i7-overhang), else ``"stable"``."""
+        return str(self.data.get("rest_kind") or "stable")
+
     def identity(self) -> Dict[str, Any]:
         """Every result-affecting factor of this library entry (for reach-map cache keys). i7-switches: the candidate switches only when
         one is on (an entry generated without them keeps its key); i7-attach: the attach axis off "meta_z"; i7-floating: a floating entry
-        adds its constraint (the existing entries' identities are unchanged)."""
+        adds its constraint; i7-lean: a LEAN rest adds its kind, its lean digest (angle, side, board geometry, gap) and the measured board
+        face relative to the root; i7-overhang: an overhang rest its identity and measured edge, a left-arm lean validation its arm, an
+        interior goal's accessible region its digest. A stable rest's fields and every entry without these records are as before (the
+        identity keys of existing entries do not move)."""
+        def rest_ident(r: Rest) -> Dict[str, Any]:
+            d = {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)}
+            if r.kind == "overhang":  # i7-overhang: the overhang identity and the measured edge relative to the root
+                ov = r.overhang or {}
+                d.update({"rest_kind": r.kind, "overhang": ov.get("digest"),
+                          "edge_along_m": None if ov.get("edge_along_m") is None else round(float(ov["edge_along_m"]), 6),
+                          "measured_distance_m": None if ov.get("measured_distance_m") is None else round(float(ov["measured_distance_m"]), 6)})
+            elif r.kind != "stable":
+                ln = r.lean or {}
+                d.update({"rest_kind": r.kind, "lean": ln.get("digest"), "board_face_y_m": None if ln.get("board_face_y_m") is None else round(float(ln["board_face_y_m"]), 6)})
+            return d
+
         out = {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
                "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
-               "rests": {k: {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)} for k, r in self.rests.items()},
+               "rests": {k: rest_ident(r) for k, r in self.rests.items()},
                "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
                "families": digest(self.data.get("families", {}))}
+        if self.data.get("validate_arm") not in (None, "right"):  # i7-overhang: a lean entry validated with the left arm (right ones as before)
+            out["validate_arm"] = self.data["validate_arm"]
+        if isinstance(self.data.get("access_region"), dict):  # i7-overhang: an interior goal's accessible region (entries without one as before)
+            out["access_region"] = self.data["access_region"].get("digest")
         sw = self.candidate_switches()
         idsw = {k: sw[k] for k in _IDENTITY_PAIR} if any(sw[k] for k in _IDENTITY_PAIR) else {}
         idsw.update({k: True for k in CANDIDATE_SWITCHES if k not in _IDENTITY_PAIR and sw.get(k)})  # i7-padsweep: a later switch only when on
@@ -386,9 +476,12 @@ class ModelLibrary:
 
 
 def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = None, policy_key: Optional[str] = None,
-                     schema: str = LIBRARY, candidate_switches: Optional[Dict[str, bool]] = None, attach_axis: Optional[str] = None) -> None:
+                     schema: str = LIBRARY, candidate_switches: Optional[Dict[str, bool]] = None, attach_axis: Optional[str] = None,
+                     rest_kind: str = "stable", lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None) -> None:
     """Raise :class:`IncompatibleRecord` when ``lib`` does not satisfy the consumer's requirements (``candidate_switches``: the state
-    of each named switch, i7-switches)."""
+    of each named switch, i7-switches). i7-lean: a required ``rest_id`` must be of ``rest_kind`` (default "stable": a lean rest never serves
+    a stable consumer, nor a stable rest a lean one) and, for a lean consumer passing ``lean`` (a ``lean.LeanSpec`` json), of that lean
+    identity (angle, side, board, gap)."""
     if attach_axis is not None and lib.attach_axis() not in (None, attach_axis):
         raise IncompatibleRecord(f"{lib.path}: attach_axis {lib.attach_axis()!r} != required {attach_axis!r}")
     if candidate_switches is not None:
@@ -406,6 +499,20 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
             raise IncompatibleRecord(f"{lib.path}: no rest {rest_id!r} (has {sorted(lib.rests)})")
         if not r.stable:
             raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} is not a verified stable rest")
+        if r.kind != rest_kind:
+            raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} is a {r.kind} rest, the consumer requires a {rest_kind} rest")
+        if lean is not None:
+            from ispatialgym.grasping import lean as LN
+
+            want = LN.LeanSpec.from_json(lean).digest()
+            if (r.lean or {}).get("digest") != want:
+                raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} has lean {(r.lean or {}).get('digest')!r}, required {want!r}")
+        if overhang is not None:  # i7-overhang: the overhang identity (side, distance, edge, slab)
+            from ispatialgym.grasping import overhang as OV
+
+            want = OV.OverhangSpec.from_json(overhang).digest()
+            if (r.overhang or {}).get("digest") != want:
+                raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} has overhang {(r.overhang or {}).get('digest')!r}, required {want!r}")
     if policy_key is not None and lib.policy_key != policy_key:
         raise IncompatibleRecord(f"{lib.path}: contact policy {lib.policy_key!r} != required {policy_key!r}")
     if lib.data.get("constraint") == FLOATING:
@@ -422,10 +529,12 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
 
 
 def load_model(category: str, model: str, scale=None, root: Optional[str] = None, *, constraint: str = "tabletop", rest_hint_wxyz=None,
-               require: Optional[Dict[str, Any]] = None) -> Optional[ModelLibrary]:
-    """The v2 entry of (category, model, scale, constraint, designated rest), checked against ``require`` (kwargs of
-    :func:`check_compatible`); None when there is no v2 entry - a legacy library entry is never substituted (it has no measured rest)."""
-    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz)
+               require: Optional[Dict[str, Any]] = None, lean: Optional[Dict[str, Any]] = None, overhang: Optional[Dict[str, Any]] = None,
+               validate_arm: Optional[str] = None, access_region: Optional[str] = None) -> Optional[ModelLibrary]:
+    """The v2 entry of (category, model, scale, constraint, designated rest[, lean rest]), checked against ``require`` (kwargs of
+    :func:`check_compatible`); None when there is no v2 entry - a legacy library entry is never substituted (it has no measured rest).
+    ``lean`` (i7-lean): the lean entry of that spec (its own directory); ``overhang`` (i7-overhang): the overhang entry of that spec."""
+    d = model_dir(category, model, scale, root, constraint, rest_hint_wxyz, lean, overhang, validate_arm, access_region)
     data = load_json(os.path.join(d, "library.json"))
     if data is None:
         return None

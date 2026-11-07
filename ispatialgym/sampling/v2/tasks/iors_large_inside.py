@@ -56,6 +56,19 @@ inward axis (past the book's tipping angle: the goal settle tips it onto the boa
 row), until the fully open jaw (``gripper_corners_world``, ``C.GRIPPER_OPEN_M``) and its retreat (``jaw_sweep_m`` back along -a, the
 oracle place's ``RETREAT_DIST``) keep ``jaw_clear_m`` from the board while behind the front edge (:func:`shelf_release_xy`); ``roll_fits``
 checks the footprint there. The facts go to ``summary.release.shelf_place``.
+
+The goal side's interior map at the book's GOAL rest (i7-overhang 2026-11-07, owner: inside_large_01 under v2 only): with
+``generation.inside_goal_lean`` ``{"key": <upright key>, "deg": <lean>}`` the goal-side band of an arm is the INTERIOR map of the v2 LEAN
+entry of that key at that angle on the shelf place's side for the arm (:func:`shelf_lean_side`: "near" = the arm's side) - the book
+standing spine out in the bay, settled leaning on the side board as the shelf place leaves it (inside_large_01's demos: 16.7 deg) - instead
+of the target's own key (whose v2 rest is the pick's). A missing lean entry or map rejects ``missing_map`` with a MAP_REQUEST line.
+``ISPATIALGYM_INSIDE_NO_BAND_FALLBACK=1`` (default off; OWNER DECISION): under v2 only a goal-side map miss keeps the band-less C stance
+search (the :data:`NO_BAND_TRUNKS` trunks per base pose by reach margin) instead of rejecting - measured, never on by default.
+
+Nearer places (i7-overhang 2026-11-07, owner decision for inside_large_01: the far place stand-offs 0.75 / 0.85 m bent the torso past the
+shared robot_wobble gate / put the forearm against the torso; the QA gates stay): ``generation.inside_stand_off_max_m`` (default none =
+every ``inside_stand_offs_m``) drops stance C's stand-offs beyond it; ``placement_stats["stand_off_capped"]`` counts the lattice
+candidates it removed. An arm left without a stance by it is reported, not widened.
 """
 
 from __future__ import annotations
@@ -547,6 +560,32 @@ def _shelf_spec(s, checked: bool = False) -> Optional[Dict[str, Any]]:
     return spec
 
 
+def inside_goal_key(s, arm: str) -> Optional[str]:
+    """i7-overhang 2026-11-07: the v2 LEAN grasp key of the book's goal rest for ``arm`` (``generation.inside_goal_lean`` ``{"key", "deg"}``:
+    the lean entry of ``key`` at ``deg`` (+-0.05) on the shelf place's side for the arm - :func:`shelf_lean_side`, side "near" without a
+    shelf place), or None without the option. A missing lean entry logs MAP_REQUEST (kind interior) and rejects ``missing_map``."""
+    gen = getattr(getattr(s, "gp", None), "gen", None)
+    gl = gen("inside_goal_lean") if callable(gen) else None
+    if not gl:
+        return None
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.sampling import grasp_library as GL
+
+    if not isinstance(gl, dict) or not gl.get("key") or gl.get("deg") is None:
+        raise Reject("spec", f"{s.gp.variant}: generation.inside_goal_lean {gl!r}: expected {{'key': <upright key>, 'deg': <lean>}}")
+    shelf = _shelf_spec(s)
+    side = "left" if shelf_lean_side((shelf or {}).get("side", "near"), arm) > 0 else "right"
+    want = float(gl["deg"])
+    tags = [t for t, ln in GL.v2_lean_tags(str(gl["key"])) if ln.get("side") == side and abs(float(ln.get("deg", -99.0)) - want) <= 0.05]
+    if not tags:
+        TT.map_request(s, kind="interior", plane="interior", support=s.partner.name, grasp_key=str(gl["key"]), arm=arm, lean_side=side, lean_deg=want,
+                       why="no v2 lean entry of the goal rest")
+        raise Reject("missing_map", f"{s.gp.variant}: no v2 lean entry of {gl['key']} at {want} deg on the {side} board (the {arm} arm's goal rest)")
+    key = LN.lean_key(str(gl["key"]), tags[0])
+    s.template_facts.setdefault("inside_goal_lean", {})[arm] = {"key": key, "side": side, "deg": want}
+    return key
+
+
 def _qkey(quat) -> Tuple[float, ...]:
     return tuple(round(float(v), 5) for v in G.t(quat).float().tolist())
 
@@ -778,13 +817,39 @@ class InsideMode:
     def inside_band(self, arm: str) -> Optional[RB.ReachBands]:
         """The goal-side band of ``arm`` (the target on the partner's interior surface, ``surface_z`` = the variant's requested height): the
         arm's own band, else (the other arm) the default arm's mirrored, else None - no band filter, the reach margin orders the trunks.
-        An empty band counts as none. Never computed in-process (a band job publishes it)."""
+        An empty band counts as none. Never computed in-process (a band job publishes it). i7-lean 2026-11-07 (owner: inside_large_scale_02
+        under v2 only): with ``ISPATIALGYM_V2_ONLY`` the arm's own INTERIOR reach map (``tabletop.interior_map_bands``: the partner's
+        compartment spec at the live board height and the applied ``partner_joint_init`` - the open door an obstacle box in it -, the map's
+        stand-offs, the target's v2 stable rest) - a miss rejects ``missing_map``: no legacy band, no mirror, no band-less fallback."""
         memo = self.__dict__.setdefault("_inside_bands", {})
         if arm in memo:
             return memo[arm]
         c = self.choice.models["target"]
         z = float(self.place["z_requested"])
         joints = (self.template_facts.get("partner_joint_init") or {}).get("applied") or None  # the band of the partner with its door open
+        if RB.v2_only():
+            # i7-lean 2026-11-07 (owner: unblock inside_large_scale_02 under v2 only): the arm's own INTERIOR reach map of the target in the
+            # partner's compartment (the registry's spec at the live board height and joint values: walls, back, the board above, the open door;
+            # tabletop.interior_map_bands) - a miss rejects missing_map (no legacy band, no mirror, no band-less fallback)
+            # i7-overhang 2026-11-07: the book's GOAL rest (generation.inside_goal_lean: the v2 lean entry on the arm's shelf side) when given
+            gkey = inside_goal_key(self, arm) or self.grasp_key
+            spec = TT.BandSpec(object=f"{c.category}/{c.model}", grasp_key=gkey, scale=list(c.scale) if c.scale else None, arm=arm)
+            try:
+                rb = TT.interior_map_bands(self, spec, self.place["top"], arm, joints=joints, police=False)
+            except Reject as e:
+                if e.reason != "missing_map" or os.environ.get("ISPATIALGYM_INSIDE_NO_BAND_FALLBACK", "") != "1":
+                    raise
+                # OWNER DECISION (default off): the band-less C search of the legacy path under v2 only - measured, reported, never default
+                TT._count(self, "inside_no_band_fallback.used")
+                log.info("%s: INSIDE_NO_BAND_FALLBACK (%s arm): no goal-side interior map (%s) - the band-less C stance search", self.gp.variant, arm, str(e)[:300])
+                self.template_facts.setdefault("inside_bands", {})[arm] = {"no_band_fallback": str(e)[:300]}
+                memo[arm] = None
+                return None
+            log.info("%s: inside goal-side interior map (%s arm, board %.4f%s): %s", self.gp.variant, arm, float(self.place["z"]),
+                     f", support joints {joints}" if joints else "", rb.meta.get("map_path"))
+            self.template_facts.setdefault("inside_bands", {})[arm] = {**(TT.band_facts(rb) or {}), "interior": rb.meta.get("interior")}
+            memo[arm] = rb
+            return rb
         rb, why = None, ""
         try:
             rb = RB.ReachBands.load(self.world.scene_model, self.partner.name, f"{c.category}/{c.model}", self.grasp_key, scale=c.scale, arm=arm, surface_z=z,
@@ -803,6 +868,10 @@ class InsideMode:
         self.template_facts.setdefault("inside_bands", {})[arm] = None if rb is None else {**(TT.band_facts(rb) or {}), "n_cells": int(rb.meta.get("n_reachable_total", 0) or 0)}
         memo[arm] = rb
         return rb
+
+    def inside_goal_key(self, arm: str) -> Optional[str]:
+        """:func:`inside_goal_key` of this sampler."""
+        return inside_goal_key(self, arm)
 
     # ------------------------------------------------------------------ stance C
 
@@ -837,7 +906,12 @@ class InsideMode:
                                  "goal_in_band": 0}
         shelf = _shelf_spec(self, checked=True)
         cands: List[Stance] = []
+        cap = self.gp.gen("inside_stand_off_max_m")
         for so in [float(v) for v in (self.gp.gen("inside_stand_offs_m") or STAND_OFFS)]:
+            if cap is not None and so > float(cap) + 1e-9:
+                # i7-overhang 2026-11-07 (owner: keep the place positions nearer for this goal): the stand-off is beyond the cap
+                stats["stand_off_capped"] = stats.get("stand_off_capped", 0) + len(laterals) * len(trunks)
+                continue
             for lat in laterals:
                 xy = edge.base_xy(so, lat)
                 stats["lattice"] += len(trunks)

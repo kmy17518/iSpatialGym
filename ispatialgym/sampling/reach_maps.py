@@ -37,9 +37,34 @@ seeds with the slab, 8 / 8 without it; the lower finger's 7 mm sphere 5.2 mm int
 fingers are judged by the policy's floor allowance on their hulls alone; every other link but the ground-contact ones is checked against the floor
 plane by its spheres at the pre-grasp, the grasp and the approach configurations (the slab maps' treatment of their slab).
 
+**Interior maps** (``kind="interior"``, i7-lean 2026-11-07, owner decision; prompt I item 7): the library grasps of an object at a LEAN
+rest (``grasping.lean``) inside a compartment (:mod:`ispatialgym.sampling.interiors`: the support board at the interior surface height -
+the one policed support -, the board above, the side walls and the back panel as NORMAL obstacles, the open sides) - the compartment's
+front plane at ``d_e``, the object at the cell leaning on the side wall of its lean side (the wall's inner face at the cell's y + the lean
+rest's ``board_face_y_m``: the compartment follows the cell laterally), one object yaw (0: the rest is measured against the board, spine
+toward the robot), cells on the board (``board_x_range``). Every hand / sphere check of a problem runs in its compartment's frame; the
+IK never sees the interior (as a slab map's slab). Meta ``plane: "interior"``, ``interior`` (the spec, its digest), ``lean`` (the rest's
+lean identity + board face) - all in the key; ``ReachMap.find(kind="interior", interior=spec)`` checks them. Config:
+:func:`interior_config` (``n_yaws`` 1, ``x_max_m`` = max d_e + depth, ``interior`` = the spec digest). A STABLE rest in a compartment
+(i7-lean, the fridge jar of inside_large_scale_02): the compartment fixed in the map (lateral centre ``centre_y_m``), the footprint on
+the board and between the walls, the yaw axis kept, the spec's stand-offs (0.35-0.65) and its open-door box (an obstacle at the spec's
+joint values) - meta ``interior_placement`` "fixed" (a lean rest's: "lean_wall").
+
+**Overhang maps** (``kind="overhang"``, i7-overhang 2026-11-07, owner decision: hardback bqvvvx, inside_large_01): the library grasps of an
+object at an OVERHANG rest (``grasping.overhang``: one face ``distance_m`` beyond a slab edge, flush) on the synthetic slab - the slab's
+near edge at ``d_e`` UNDER the object: the rest's face toward the robot (one object yaw: the face normal turned to -x of the map frame),
+the object's root ``edge_along_m`` behind the edge (its x fixed per edge distance: cells ``(d_e + edge_along_m, y)`` - every edge distance
+has its own row of lateral cells, ``off_support`` at the others), the lateral lattice ``OVERHANG_LATTICE_M``, the edge distances
+``OVERHANG_EDGE_DISTANCES`` (the overhang pick's stance B stand-offs and its grasp stances backed off 0.10 / 0.20). The slab is the tabletop
+kind's (policed: beyond its near edge the space below its top is free - where the lower finger of a pinch across the thickness is).
+Meta ``plane: "slab_edge"`` and ``overhang`` (the rest's identity, the edge offset, the yaw) - in the key; ``ReachMap.find(kind="overhang")``
+checks them; an overhang rest is mapped and looked up in this kind only, a stable rest never in it. Config: :func:`overhang_config`.
+
     python -m ispatialgym.sampling.reach_maps bench
     python -m ispatialgym.sampling.reach_maps compute --jobs M.json --glib ROOT --anchors anchors.json [--heights 0.7351 ...] --out MAPS
     python -m ispatialgym.sampling.reach_maps compute --kind floor --jobs M.json --glib ROOT --out MAPS [--arm left]
+    python -m ispatialgym.sampling.reach_maps compute --kind interior --interior bookcase_kmuacd_0@0.8354 --jobs LEAN.json --glib ROOT --out MAPS [--arm left]
+    python -m ispatialgym.sampling.reach_maps compute --kind overhang --jobs OVERHANG.json --glib ROOT --anchors anchors.json --heights 0.7671 --out MAPS [--arm left]
     python -m ispatialgym.sampling.reach_maps info MAP.json
 """
 
@@ -113,11 +138,17 @@ class MapConfig:
     # i7-unblock 2026-11-07 (owner decision): "per_d_e" is the default of new builds; a floor map (one edge distance: both rules give the
     # same map) stays None (floor_config), so its key does not move
     trunk_eligibility: Optional[str] = "per_d_e"  # = TRUNK_ELIGIBILITY_DEFAULT
+    # i7-lean 2026-11-07: an interior map's compartment (``interiors.InteriorSpec.digest``); None for every other kind (left out of key():
+    # their keys stay)
+    interior: Optional[str] = None
+    # i7-overhang 2026-11-07: an overhang map's rest identity (``grasping.overhang.OverhangSpec.digest``); None for every other kind (left out
+    # of key(): their keys stay)
+    overhang: Optional[str] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang"):
             if d.get(k) is None:
                 d.pop(k)
         return d
@@ -216,9 +247,21 @@ def mark_partial(rec: Dict[str, Any], groups: Sequence[Tuple[str, Sequence[int]]
 
 #: the map kinds (``--kind``): ``tabletop`` (library grasps of an object on a slab edge), ``brace`` (contact classes on a slab edge),
 #: ``floor`` (i7-floor 2026-11-07: library grasps of an object on the floor plane the robot stands on - h = 0, no edge)
-KINDS = ("tabletop", "brace", "floor")
+KINDS = ("tabletop", "brace", "floor", "interior", "overhang")
 #: the support plane a map's cells stand on (meta ``plane``; a map without the field is a slab map)
-PLANE_OF_KIND = {"tabletop": "slab", "brace": "slab", "floor": "floor"}
+PLANE_OF_KIND = {"tabletop": "slab", "brace": "slab", "floor": "floor", "interior": "interior", "overhang": "slab_edge"}
+#: i7-lean 2026-11-07: the rest kinds each map kind is computed at (a lean rest in interior maps only; an interior map also at a stable rest:
+#: the fridge shelf's jar, inside_large_scale_02); i7-overhang: an overhang rest in overhang maps only
+REST_KINDS_OF_KIND = {"tabletop": ("stable",), "brace": ("stable",), "floor": ("stable",), "interior": ("stable", "lean"), "overhang": ("overhang",)}
+#: i7-overhang 2026-11-07: an overhang map's edge distances (base to the slab's near edge under the object): the overhang pick's stance B
+#: stand-offs (0.35 / 0.45 / 0.55) and its grasp stances B backed off 0.10 / 0.20 (``pick_overhang_push.grasp_back_offs_m``)
+OVERHANG_EDGE_DISTANCES: Tuple[float, ...] = (0.35, 0.45, 0.55, 0.65, 0.75)
+#: ... and its lateral lattice (one row of cells per edge distance: finer than the 2-D lattices at the same cost)
+OVERHANG_LATTICE_M = 0.04
+
+
+def rest_kind_ok(kind: str, rest_kind: str) -> bool:
+    return rest_kind in REST_KINDS_OF_KIND.get(kind, ("stable",))
 #: the floor kind (the legacy floor band's raster, ``reach_bands`` floor mode: cells 0.2 m ahead of the base, lateral +-STRIP_HALF_WIDTH):
 #: one "edge distance" 0.0 (no edge: the floor is everywhere), the lattice from FLOOR_X_MIN_M, laterals +-FLOOR_Y_HALF_M, height 0
 FLOOR_EDGE_DISTANCES: Tuple[float, ...] = (0.0,)
@@ -242,6 +285,49 @@ def floor_config(**kw) -> MapConfig:
     return MapConfig(**kw)
 
 
+def interior_config(spec, rest_kind: str = "lean", **kw) -> MapConfig:
+    """i7-lean 2026-11-07: the :class:`MapConfig` of an interior map of compartment ``spec`` (``interiors.InteriorSpec``) at a ``rest_kind``
+    rest: the spec's stand-offs (``edge_distances``), one object yaw at a LEAN rest (measured against its board; a stable rest keeps the
+    yaw axis), the lattice from the nearest front plane to the farthest board back, the spec's digest; ``kw`` sets the other fields (arm,
+    lattice, seeds, edge distances, ...)."""
+    kw = dict(kw)
+    d_es = tuple(kw.pop("edge_distances", tuple(spec.edge_distances)))
+    cfg = {"n_yaws": 1 if rest_kind == "lean" else MapConfig.n_yaws, "edge_distances": d_es, "x_max_m": round(max(d_es) + float(spec.depth_m), 4),
+           "interior": spec.digest(), **kw}
+    return MapConfig(**cfg)
+
+
+def overhang_geometry(rest) -> Dict[str, Any]:
+    """i7-overhang 2026-11-07: the map geometry of an overhang rest (``schema.Rest`` of kind "overhang"): its identity (digest, tag, side,
+    distance), the edge's offset ahead of the root along the face normal (``edge_along_m``: the root lies that far behind the edge, on the
+    slab), the normal in the support frame and the map yaw ``yaw_rad`` that turns it to -x of the map frame (the face toward the robot)."""
+    ov = getattr(rest, "overhang", None) or {}
+    if ov.get("edge_along_m") is None or not ov.get("normal_xy"):
+        raise ValueError(f"rest {getattr(rest, 'rest_id', '?')!r}: an overhang rest record without its edge / normal")
+    n = np.asarray(ov["normal_xy"], dtype=float)
+    yaw = math.atan2(0.0, -1.0) - math.atan2(float(n[1]), float(n[0]))
+    yaw = math.atan2(math.sin(yaw), math.cos(yaw))
+    return {"digest": ov.get("digest"), "tag": ov.get("tag"), "side": ov.get("side"), "distance_m": ov.get("distance_m"),
+            "measured_distance_m": ov.get("measured_distance_m"), "com_inside_m": ov.get("com_inside_m"), "edge_along_m": float(ov["edge_along_m"]),
+            "normal_xy": [float(v) for v in n], "yaw_rad": round(yaw, 6)}
+
+
+def overhang_config(rest, **kw) -> MapConfig:
+    """i7-overhang 2026-11-07: the :class:`MapConfig` of an overhang map of ``rest`` (an overhang ``schema.Rest``): one object yaw, the
+    edge distances :data:`OVERHANG_EDGE_DISTANCES`, the lateral lattice :data:`OVERHANG_LATTICE_M`, the rest's overhang digest; ``kw`` sets
+    the other fields (arm, seeds, edge distances, lattice, ...)."""
+    ov = getattr(rest, "overhang", None) or {}
+    cfg = {"n_yaws": 1, "edge_distances": OVERHANG_EDGE_DISTANCES, "lattice_m": OVERHANG_LATTICE_M, "overhang": ov.get("digest"), **kw}
+    return MapConfig(**cfg)
+
+
+def overhang_cells(cfg: MapConfig, edge_along_m: float) -> np.ndarray:
+    """(C, 2) cells of an overhang map: per edge distance ``d_e`` the root at ``x = d_e + edge_along_m`` (behind the near edge), laterals
+    ``-y_half_m .. y_half_m`` every ``lattice_m``; ordered by edge distance."""
+    ys = np.arange(-cfg.y_half_m, cfg.y_half_m + 1e-9, cfg.lattice_m)
+    return np.concatenate([np.stack([np.full(len(ys), float(d_e) + float(edge_along_m)), ys], 1) for d_e in cfg.edge_distances])
+
+
 def config_value(meta: Dict[str, Any], name: str) -> Any:
     cfg = meta.get("config") or {}
     return cfg[name] if name in cfg else CONFIG_LEGACY_DEFAULTS.get(name)
@@ -260,12 +346,29 @@ def lattice(cfg: MapConfig) -> np.ndarray:
     return np.stack([X.ravel(), Y.ravel()], 1)
 
 
-def support_mask(cells: np.ndarray, reach_back: np.ndarray, edge_distance: float, kind: str = "tabletop") -> np.ndarray:
+def support_mask(cells: np.ndarray, reach_back: np.ndarray, edge_distance: float, kind: str = "tabletop", reach_front: Optional[np.ndarray] = None,
+                 interior=None, lateral: Optional[Tuple[np.ndarray, np.ndarray, float]] = None) -> np.ndarray:
     """(C, Y) bool: the object (root at each cell, footprint reaching ``reach_back`` (Y,) toward the robot at each yaw) stands on the
     support. A slab map: the footprint behind the near edge ``edge_distance`` (cell + reach_back >= d_e). A floor map: everywhere (the
-    floor has no edge; the lattice starts FLOOR_X_MIN_M ahead of the base)."""
+    floor has no edge; the lattice starts FLOOR_X_MIN_M ahead of the base). An interior map (i7-lean): the footprint (``reach_back`` ..
+    ``reach_front``) on the compartment's board (``interior.board_x_range(d_e)``); ``lateral`` = (footprint y min (Y,), y max (Y,), the
+    compartment's lateral centre) - a compartment fixed in the map (a stable rest): the footprint also between its walls."""
     if kind == "floor":
         return np.ones((len(cells), len(reach_back)), dtype=bool)
+    if kind == "overhang":
+        # i7-overhang: the cells of this edge distance's row (the root ``edge_along_m`` behind the near edge: ``lateral`` carries that offset);
+        # the rest is the measured overhang - nothing else to fit
+        off = float(lateral) if lateral is not None else 0.0
+        m = np.abs(cells[:, 0] - (float(edge_distance) + off)) <= 1e-6
+        return np.repeat(m[:, None], len(reach_back), axis=1)
+    if kind == "interior":
+        x0, x1 = interior.board_x_range(edge_distance)
+        m = ((cells[:, None, 0] + reach_back[None, :]) >= x0) & ((cells[:, None, 0] + np.asarray(reach_front)[None, :]) <= x1)
+        if lateral is not None:
+            ylo, yhi, yc = lateral
+            w = 0.5 * float(interior.width_m)
+            m &= ((cells[:, None, 1] + np.asarray(ylo)[None, :]) >= yc - w) & ((cells[:, None, 1] + np.asarray(yhi)[None, :]) <= yc + w)
+        return m
     return (cells[:, None, 0] + reach_back[None, :]) >= edge_distance
 
 
@@ -563,9 +666,17 @@ def floor_plane() -> CP.Support:
     return CP.Support.plane(FLOOR_HEIGHT, name="floor")
 
 
-def map_support(kind: str, h: float, d_e: float, cfg: MapConfig) -> CP.Support:
-    """The support of a map kind at (height, edge distance): the floor plane (``floor``) or the synthetic slab."""
+def map_support(kind: str, h: float, d_e: float, cfg: MapConfig, interior=None) -> CP.Support:
+    """The support of a map kind at (height, edge distance): the floor plane (``floor``), an interior's support board (``interior``, in
+    its compartment frame: ``interiors.InteriorSpec.boxes``) or the synthetic slab."""
+    if kind == "interior":
+        return interior.policed(h, d_e)
     return floor_plane() if kind == "floor" else slab(h, d_e, cfg)
+
+
+def map_obstacles(kind: str, h: float, d_e: float, interior=None) -> Tuple[CP.Support, ...]:
+    """i7-lean 2026-11-07: the NORMAL obstacles of a map kind (an interior's board above, side walls, back panel; none otherwise)."""
+    return interior.obstacles(h, d_e) if kind == "interior" else ()
 
 
 @contextmanager
@@ -592,7 +703,7 @@ def _yaw_R(yaws: Sequence[float]) -> np.ndarray:
 
 
 def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: float, anchor: Dict[str, Any], geom=None,
-                cfg: Optional[MapConfig] = None, policy: CP.ContactPolicy = CP.DEFAULT, kind: str = "tabletop") -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
+                cfg: Optional[MapConfig] = None, policy: CP.ContactPolicy = CP.DEFAULT, kind: str = "tabletop", interior=None) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
     """One map: (meta, arrays). ``geom`` (the object's collision pieces, :mod:`object_geometry`) for the arm-vs-object check.
     ``kind="brace"``: the contact classes of :func:`brace_classes` instead of the library grasps (closed fingers, the pads on the
     object's faces; single-arm proposals only - simultaneous brace / manipulation and the arms' mutual collisions are checked later).
@@ -603,7 +714,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     (``cfg.floor_fingers``): "policy" - the pre-grasp and grasp IK without the cuRobo ground slab (:func:`ground_slab_off`; the fingers are
     then judged by their hulls' floor allowance only, every other link but the ground-contact ones by the sphere check against the floor
     plane at the pre-grasp, the grasp and the approach configurations; a problem's pre-grasp is its first IK seed that passes that check);
-    "spheres" - the former rule (the slab in the IK for every sphere: a padded finger sphere touching it failed the IK)."""
+    "spheres" - the former rule (the slab in the IK for every sphere: a padded finger sphere touching it failed the IK).
+    ``kind="interior"`` (i7-lean 2026-11-07, ``interior`` = an ``interiors.InteriorSpec``, ``cfg`` from :func:`interior_config`, ``height`` =
+    the spec's board height, ``rest_id`` a LEAN rest): the compartment of each problem follows its cell (the lean-side wall at the cell's y
+    + the rest's ``board_face_y_m``); the hand hulls and the whole-robot spheres are checked in that compartment's frame against the board
+    (policed, as a slab) and the other boxes (normal obstacles: every part, the fingers included); hull failures are ``hand_policy``,
+    sphere failures ``slab_spheres``, a footprint off the board ``off_support``."""
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.reach_bands import trunk_grid
 
@@ -622,6 +738,36 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         raise ValueError(f"a floor map's floor_fingers is one of {FLOOR_FINGER_RULES} (got {cfg.floor_fingers!r})")
     if not floor and cfg.floor_fingers is not None:
         raise ValueError(f"floor_fingers is a floor map's field (kind {kind!r}, got {cfg.floor_fingers!r})")
+    # i7-lean 2026-11-07: the rest kinds of the map kind (a lean rest in interior maps only; every other kind at a stable rest) - never crossed
+    r_kind = getattr(rest, "kind", "stable")
+    if not rest_kind_ok(kind, r_kind):
+        raise ValueError(f"a {kind} map is computed at a {' / '.join(REST_KINDS_OF_KIND[kind])} rest (rest {rest_id!r} of {lib.path} is a {r_kind} rest)")
+    interior_kind = kind == "interior"
+    lean_placed = interior_kind and r_kind == "lean"
+    lean_rec: Dict[str, Any] = {}
+    if interior_kind:
+        if interior is None:
+            raise ValueError("an interior map needs its compartment (interiors.InteriorSpec)")
+        if cfg.interior != interior.digest() or (lean_placed and int(cfg.n_yaws) != 1):
+            raise ValueError(f"an interior map is computed with interior_config(spec) (config interior {cfg.interior!r} / n_yaws {cfg.n_yaws}, spec {interior.digest()})")
+        if abs(float(height) - float(interior.height_m)) > 1e-9:
+            raise ValueError(f"an interior map is computed at its board height {interior.height_m} (got {height})")
+        if lean_placed:
+            lean_rec = getattr(rest, "lean", None) or {}
+            if lean_rec.get("board_face_y_m") is None or lean_rec.get("side") not in ("left", "right"):
+                raise ValueError(f"rest {rest_id!r}: a lean rest record without its side / board face")
+    elif interior is not None or cfg.interior is not None:
+        raise ValueError(f"interior is an interior map's field (kind {kind!r})")
+    # i7-overhang 2026-11-07: an overhang map - the rest's geometry fixes the yaw and the cells' x per edge distance
+    overhang_kind = kind == "overhang"
+    ov_geo: Dict[str, Any] = {}
+    if overhang_kind:
+        ov_geo = overhang_geometry(rest)
+        if cfg.overhang != ov_geo["digest"] or int(cfg.n_yaws) != 1:
+            raise ValueError(f"an overhang map is computed with overhang_config(rest) (config overhang {cfg.overhang!r} / n_yaws {cfg.n_yaws}, rest "
+                             f"{ov_geo['digest']})")
+    elif cfg.overhang is not None:
+        raise ValueError(f"overhang is an overhang map's field (kind {kind!r})")
     # i7-floorfix 2026-11-07: the support (the floor) out of the pre-grasp / grasp IK - the fingers then meet it only through the hull rule
     ik_without_ground = floor and cfg.floor_fingers == "policy"
     # the robot's ground-contact links (wheels, base body): they stand on the floor - not a grasp contact (rule 5; floor maps only)
@@ -629,8 +775,8 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     grasps = brace_classes() if kind == "brace" else grasp_set(lib, rest_id, cfg)
     if kind == "brace" and geom is None:
         raise ValueError("a brace map needs the object's collision geometry")
-    cells = lattice(cfg)
-    yaws = [2 * math.pi * k / cfg.n_yaws for k in range(cfg.n_yaws)]
+    cells = overhang_cells(cfg, ov_geo["edge_along_m"]) if overhang_kind else lattice(cfg)
+    yaws = [float(ov_geo["yaw_rad"])] if overhang_kind else [2 * math.pi * k / cfg.n_yaws for k in range(cfg.n_yaws)]
     nC, nY, nG = len(cells), len(yaws), len(grasps)
     trunks = trunk_grid(height)
     arrays: Dict[str, np.ndarray] = {"cells": cells.astype(np.float32), "yaws": np.array(yaws, dtype=np.float32)}
@@ -661,8 +807,33 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     if geom is not None:
         V = np.asarray(geom.union.vertices) @ Rr.T
         reach_back = np.array([float((V @ R.T)[:, 0].min()) for R in Ry])  # most negative x of the footprint at each yaw
+        reach_front = np.array([float((V @ R.T)[:, 0].max()) for R in Ry])
+        reach_ylo = np.array([float((V @ R.T)[:, 1].min()) for R in Ry])
+        reach_yhi = np.array([float((V @ R.T)[:, 1].max()) for R in Ry])
     else:
-        reach_back = np.zeros(nY)
+        V = None
+        reach_back = reach_front = reach_ylo = reach_yhi = np.zeros(nY)
+    # i7-lean 2026-11-07: the interior's compartment per problem (its lateral centre follows the cell: the lean-side wall's inner face at
+    # cell_y + board_face_y_m); every hand / sphere query of a problem is shifted by it into the compartment frame (the boxes at y = 0)
+    yc_dev = None
+    lateral_fit = None
+    if lean_placed:
+        from ispatialgym.sampling import interiors as IN
+
+        sg = 1.0 if lean_rec["side"] == "left" else -1.0
+        face = float(lean_rec["board_face_y_m"])
+        if V is not None:
+            far = float(V[:, 1].min()) if sg > 0 else float(V[:, 1].max())
+            if not IN.fits(interior.width_m, face, sg, far):
+                raise ValueError(f"{lib.path} rest {rest_id}: the object ({abs(face - far):.3f} m from its board to its far side) does not fit "
+                                 f"the {interior.width_m} m compartment {interior.name}")
+        yc_cell = IN.compartment_offsets(cells[:, 1].astype(float), face, sg, interior.width_m)
+        yc_dev = th.as_tensor(np.repeat(yc_cell, nY * nG), dtype=th.float32, device=dev)
+    elif interior_kind:
+        # i7-lean 2026-11-07 (the fridge): a stable rest's compartment is FIXED in the map - its lateral centre at the spec's centre_y_m (a stance
+        # square to the opening's centre), the footprint between its walls (support_mask)
+        yc_dev = th.full((N,), float(interior.centre_y_m), dtype=th.float32, device=dev)
+        lateral_fit = (reach_ylo, reach_yhi, float(interior.centre_y_m))
     tim["targets_s"] = round(time.time() - t0, 3)
     # -- the hand vs the slab per d_e (IK-independent): pre-grasp, approach, grasp, closing sweep
     t0 = time.time()
@@ -679,13 +850,23 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     pq_dev = th.as_tensor(pq_g, dtype=th.float32, device=dev)
     cq_dev = th.as_tensor(cq_g, dtype=th.float32, device=dev)
 
-    def hand_check_at(T, sb_, fq_t):
+    def _hc(T, sb_, fq, pid, obs_=()):
+        """``hc.check`` of poses ``T`` of problems ``pid`` (an index / mask / slice into the N problems); an interior map: in each problem's
+        compartment frame, the board policed and ``obs_`` normal obstacles (i7-lean)."""
+        if yc_dev is None:
+            return hc.check(T, sb_, fq, floor=floor)[0]
+        T = T.clone()
+        T[:, 1, 3] -= yc_dev[pid]
+        return hc.check_with_obstacles(T, sb_, obs_, fq, floor=floor)[0]
+
+    def hand_check_at(T, sb_, fq_t, pid=slice(None), obs_=()):
         """``hc.check`` with one finger opening per pose (grouped by value)."""
         vals = th.round(fq_t * 1e5) / 1e5
         out = th.ones(T.shape[0], dtype=th.bool, device=dev)
+        pid_t = th.arange(N, device=dev)[pid]
         for v in th.unique(vals).tolist():
             m = vals == v
-            out[m] = hc.check(T[m], sb_, (float(v), float(v)), floor=floor)[0]
+            out[m] = _hc(T[m], sb_, (float(v), float(v)), pid_t[m], obs_)
         return out
 
     def hand_check(T, q_of_grasp):
@@ -694,19 +875,36 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             groups.setdefault(round(v, 5), []).append(gi)
         if len(groups) == 1:
             v = next(iter(groups))
-            return hc.check(T, sb, (v, v), floor=floor)[0]
+            return _hc(T, sb, (v, v), slice(None), obs)
         o_all = th.ones(N, dtype=th.bool, device=dev)
         for v, gis in groups.items():
             sel = th.isin(g_of, th.as_tensor(gis, device=dev))
-            o_all[sel] = hc.check(T[sel], sb, (v, v), floor=floor)[0]
+            o_all[sel] = _hc(T[sel], sb, (v, v), sel, obs)
         return o_all
 
-    def spheres_ok(sph, ln, sb_):
-        """``contact_policy.sphere_support_ok`` against the map's support (floor: the ground-contact links scoped out)."""
-        return CP.sphere_support_ok(sph, ln, sb_, cfg.arm, policy, ground_contact_links=ground_links, floor_support=floor)
+    sphere_hits: Dict[str, int] = {}  # i7-lean: an interior map's post-IK sphere failures by link (board / obstacles), per map
+
+    def spheres_ok(sph, ln, sb_, pid=None, obs_=()):
+        """``contact_policy.sphere_support_ok`` against the map's support (floor: the ground-contact links scoped out); an interior map's
+        problems ``pid``: in their compartment frame, every sphere also clear of the normal obstacles ``obs_`` (i7-lean; the failing links
+        are counted in ``sphere_hits``)."""
+        if yc_dev is not None and pid is not None:
+            sph = sph.clone()
+            sph[..., 1] -= yc_dev[pid].to(sph.device)[:, None]
+        ok, worst = CP.sphere_support_ok(sph, ln, sb_, cfg.arm, policy, ground_contact_links=ground_links, floor_support=floor)
+        if obs_:
+            ok_o, worst_o = CP.spheres_clear(sph, ln, obs_)
+            if pid is not None:
+                for w, o, wo in zip(worst, ok_o.tolist(), worst_o):
+                    if w or not o:
+                        k = f"board:{w}" if w else f"obstacle:{wo}"
+                        sphere_hits[k] = sphere_hits.get(k, 0) + 1
+            ok = ok & ok_o.to(ok.device)
+        return ok, worst
 
     for d_e in cfg.edge_distances:
-        sb = map_support(kind, height, d_e, cfg)
+        sb = map_support(kind, height, d_e, cfg, interior)
+        obs = map_obstacles(kind, height, d_e, interior)
         ok = th.ones(N, dtype=th.bool, device=dev)
         for k in range(path.shape[0]):
             ok &= hand_check(path[k], pq_g)
@@ -720,7 +918,8 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     # off-support per (d_e, cell, yaw)
     onsup = {}
     for d_e in cfg.edge_distances:
-        m = support_mask(cells, reach_back, d_e, kind)  # (C, Y)
+        m = support_mask(cells, reach_back, d_e, kind, reach_front=reach_front, interior=interior,
+                         lateral=ov_geo["edge_along_m"] if overhang_kind else lateral_fit)  # (C, Y)
         onsup[d_e] = th.as_tensor(np.repeat(m[:, :, None], nG, axis=2).reshape(-1), device=dev)
     # -- arm-vs-object planes (object at each cell / yaw): world-frame planes per (cell, yaw) are built on the fly
     pieces = []
@@ -737,6 +936,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     obj_xy = th.as_tensor(cells, dtype=th.float32, device=dev).view(nC, 1, 1, 2).repeat(1, nY, nG, 1).reshape(-1, 2)
     t_ik = t_chk = 0.0
     n_ik = 0
+
     def solve_group(rec: Dict[str, Any], key: str, status: Dict[float, th.Tensor], q_lock: th.Tensor, des: Sequence[float], in_reach: th.Tensor) -> None:
         """The trunk's IK pass and per-d_e checks with the idle-arm posture ``q_lock`` for the edge distances ``des`` (i7-unblock 2026-11-07:
         a trunk whose postures are free of the slab at different d_e (``trunk_eligibility`` "per_d_e") runs one pass per posture group; a
@@ -814,13 +1014,14 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                         continue
                     ii = th.nonzero(cur).flatten()
                     good = th.ones(ii.numel(), dtype=th.bool, device=dev)
-                    sb = map_support(kind, height, d_e, cfg)
+                    sb = map_support(kind, height, d_e, cfg, interior)
+                    obs = map_obstacles(kind, height, d_e, interior)
                     for t in [0.0] + [k / (cfg.approach_configs + 1) for k in range(1, cfg.approach_configs + 1)] + [1.0]:
                         for c0 in range(0, ii.numel(), 8192):
                             iic = ii[c0:c0 + 8192]
                             qq = qp[iic] * (1 - t) + qg[iic] * t
                             sp = world.spheres(world.full_q(entry, qq, q_lock))
-                            o, _ = spheres_ok(sp, links, sb)
+                            o, _ = spheres_ok(sp, links, sb, order[sel[iic]], obs)
                             good[c0:c0 + 8192] &= o.to(dev)
                     w_slab = ~good
                     # the hand hulls at the FK eef of the grasp and the pre-grasp (IK tolerance: 5 mm / 0.05 rad)
@@ -828,7 +1029,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                     gq = g_of[order[sel[ii]]]
                     pq_t, cq_t = pq_dev[gq], cq_dev[gq]
                     for qq, fq_t in ((qg[ii], 0.5 * (pq_t + cq_t)), (qp[ii], pq_t)):
-                        good &= hand_check_at(world.eef(world.full_q(entry, qq, q_lock)), sb, fq_t)
+                        good &= hand_check_at(world.eef(world.full_q(entry, qq, q_lock)), sb, fq_t, order[sel[ii]], obs)
                     w_hand = ~good & ~w_slab
                     # the arm (not the hand) clear of the object at the cell
                     if pieces:
@@ -890,9 +1091,23 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 return None
             q_of[p] = q
             sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
-            return [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg))[0][0]) for d_e in cfg.edge_distances]
+            return [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg, interior))[0][0]) for d_e in cfg.edge_distances]
 
-        groups, collide = trunk_posture_groups(cfg.postures, len(cfg.edge_distances), free_of, trunk_rule(cfg))
+        if lateral_fit is not None:
+            # i7-lean 2026-11-07 (inside_large_scale_02, b4230177): a FIXED compartment (an interior map at a stable rest) also judges the
+            # posture against its obstacles (the open door, the walls, the board above) - among the postures free of the board at every d_e,
+            # the first free of the obstacles at the most d_e (the stance C order untucked / ready / tucked; the untucked idle arm stood in the
+            # fridge's open door); trunk_posture_groups applies it (the per_d_e fallback: per d_e the first slab-free posture also clear there)
+            def _obstacle_free(p: str, tr=tr, ti=ti) -> List[bool]:
+                sph, ln = world.backend.robot_spheres_world(world.q_config(tr, ti, p).unsqueeze(0))
+                sph_c = th.as_tensor(sph, dtype=th.float32).clone()
+                sph_c[..., 1] -= float(interior.centre_y_m)
+                o = [bool(CP.spheres_clear(sph_c, ln, map_obstacles(kind, height, d_e, interior))[0][0]) for d_e in cfg.edge_distances]
+                rec.setdefault("obstacle_free_by_posture", {})[p] = o
+                return o
+
+        obstacle_free_of = _obstacle_free if lateral_fit is not None else None
+        groups, collide = trunk_posture_groups(cfg.postures, len(cfg.edge_distances), free_of, trunk_rule(cfg), obstacle_free_of=obstacle_free_of)
         if collide:
             rec["slab_collide_by_posture"] = collide
         rec["posture"] = groups[0][0] if groups else None
@@ -938,6 +1153,32 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                        "note": "single-arm feasibility proposal; simultaneous brace + manipulation and inter-arm collisions are validated later"}
                       if kind == "brace" else None),
             "trunks": meta_trunks, "status_codes": STATUS, "robot": robot_digest(), "timing": tim, "created": S.now()}
+    if interior_kind:
+        # i7-lean 2026-11-07: the compartment and the lean rest are part of the identity (map_key, ReachMap.find)
+        meta["plane"] = PLANE_OF_KIND["interior"]
+        meta["interior_sphere_hits"] = dict(sorted(sphere_hits.items(), key=lambda kv: -kv[1])[:12])
+        meta["slab"] = None
+        meta["interior"] = interior.to_json()
+        if lean_placed:
+            meta["lean"] = {"digest": lean_rec.get("digest"), "tag": lean_rec.get("tag"), "deg": lean_rec.get("deg"), "side": lean_rec.get("side"),
+                            "measured_deg": lean_rec.get("measured_deg"), "board_face_y_m": float(lean_rec["board_face_y_m"]), "board": lean_rec.get("board")}
+            meta["interior_placement"] = "lean_wall"
+            meta["interior_note"] = ("one object yaw (0: the lean rest as measured against its board); the compartment follows the cell laterally "
+                                     "(its lean-side wall's inner face at cell_y + lean.board_face_y_m); the board policed, the other boxes normal "
+                                     "obstacles for every part; hull failures hand_policy, sphere failures slab_spheres, off the board off_support")
+        else:
+            meta["interior_placement"] = "fixed"
+            meta["interior_note"] = (f"a stable rest: the compartment fixed in the map, its lateral centre at y = {float(interior.centre_y_m)} (a stance "
+                                     "square to the opening's centre), the footprint on the board and between the walls; the board policed, the other "
+                                     "boxes (board above, walls, back, open doors) normal obstacles for every part; hull failures hand_policy, sphere "
+                                     "failures slab_spheres, off the board / walls off_support")
+    if overhang_kind:
+        # i7-overhang 2026-11-07: the support plane (the slab with its near edge under the object) and the overhang rest are in the identity
+        meta["plane"] = PLANE_OF_KIND["overhang"]
+        meta["overhang"] = dict(ov_geo)
+        meta["overhang_note"] = ("one object yaw (the rest's face normal turned to -x: toward the robot); per edge distance d_e the root at x = d_e + "
+                                 "edge_along_m (one row of lateral cells; the other rows off_support); the synthetic slab's near edge at d_e under the "
+                                 "object, policed as the tabletop kind's slab (beyond the edge the space below its top is free)")
     if floor:
         # i7-floor 2026-11-07: the support plane is part of the identity (map_key, ReachMap.find); slab maps carry no field (their keys stay)
         meta["plane"] = PLANE_OF_KIND["floor"]
@@ -967,6 +1208,11 @@ def map_key(meta: Dict[str, Any]) -> str:
     ident["height"] = meta["height"]["value"]
     if meta.get("plane") is not None:  # i7-floor 2026-11-07: a floor map's plane (slab maps keep their keys)
         ident["plane"] = meta["plane"]
+    if meta.get("interior") is not None:  # i7-lean 2026-11-07: an interior map's compartment and lean rest (other keys stay)
+        ident["interior"] = meta["interior"].get("digest")
+        ident["lean"] = (meta.get("lean") or {}).get("digest")
+    if meta.get("overhang") is not None:  # i7-overhang 2026-11-07: an overhang map's rest identity and its edge offset (other keys stay)
+        ident["overhang"] = {k: meta["overhang"].get(k) for k in ("digest", "edge_along_m", "yaw_rad")}
     return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -997,13 +1243,29 @@ class ReachMap:
 
     @staticmethod
     def find(maps_root: str, lib: S.ModelLibrary, height: float, *, rest_id: str, arm: str = "right", policy_key: Optional[str] = None,
-             anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None) -> Optional["ReachMap"]:
+             anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None,
+             interior=None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
         metadata (object identity, rest, policy, schema are all checked). ``kind="floor"`` (i7-floor 2026-11-07): ``height`` 0.0 and
         ``anchors=None`` (the anchor set has no floor height); the map's kind AND support plane (meta ``plane``: "floor"; a slab map's
-        is "slab") must be the kind's - a tabletop map at h 0 never serves a floor lookup, nor a floor map a tabletop one."""
+        is "slab") must be the kind's - a tabletop map at h 0 never serves a floor lookup, nor a floor map a tabletop one.
+        ``kind="interior"`` (i7-lean 2026-11-07): ``interior`` (an ``interiors.InteriorSpec`` or its digest) is required and must be the map's
+        compartment (meta ``interior.digest``), the rest a LEAN rest of the entry whose lean identity is the map's (meta ``lean.digest``);
+        no other kind serves a lean rest, and an interior map never serves another kind. ``kind="overhang"`` (i7-overhang 2026-11-07): the rest
+        an OVERHANG rest of the entry whose overhang identity is the map's (meta ``overhang.digest``); no other kind serves an overhang rest."""
         want_plane = PLANE_OF_KIND.get(kind, "slab")
+        want_interior = None
+        if kind == "interior":
+            if interior is None:
+                return None
+            want_interior = interior if isinstance(interior, str) else interior.digest()
+        r = (getattr(lib, "rests", None) or {}).get(rest_id)
+        r_kind = getattr(r, "kind", "stable") if r is not None else "stable"
+        if not rest_kind_ok(kind, r_kind):
+            return None  # i7-lean: a lean rest is looked up in interior maps only
+        want_lean = ((getattr(r, "lean", None) or {}).get("digest")) if r_kind == "lean" else None
+        want_overhang = ((getattr(r, "overhang", None) or {}).get("digest")) if r_kind == "overhang" else None
         target = height
         if anchors is not None:
             # of-v2maps 2026-11-06: the lookup's kind (exact / approx) used to overwrite the MAP kind argument ("tabletop"), so with an anchor
@@ -1026,6 +1288,12 @@ class ReachMap:
             if m.get("schema") != SCHEMA or m.get("kind", "tabletop") != kind or m.get("object_key") != want or m.get("rest_id") != rest_id or m.get("arm") != arm:
                 continue
             if map_plane(m) != want_plane:  # i7-floor 2026-11-07: the support plane the map's cells stand on
+                continue
+            if (m.get("interior") or {}).get("digest") != want_interior:  # i7-lean: the compartment (None for every other kind)
+                continue
+            if (m.get("lean") or {}).get("digest") != want_lean:  # i7-lean: the lean rest's identity (None for a stable rest)
+                continue
+            if (m.get("overhang") or {}).get("digest") != want_overhang:  # i7-overhang: the overhang rest's identity (None for any other)
                 continue
             if policy_key is not None and m.get("policy_key") != policy_key:
                 continue
@@ -1205,6 +1473,7 @@ def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any]
     links = world.link_of_sphere()
     t_ik = t_chk = 0.0
     n_ik = 0
+
     def solve_group(rec: Dict[str, Any], key: str, status: Dict[float, th.Tensor], q_lock: th.Tensor, des: Sequence[float], in_reach: th.Tensor) -> None:
         """:func:`compute_map`'s ``solve_group`` for the generic pose set: one IK pass with ``q_lock`` over the edge distances ``des``."""
         nonlocal t_ik, t_chk, n_ik
@@ -1591,7 +1860,8 @@ def _bench(args):
           f"sphere FK {n} in {time.time() - t1:.3f}s; setup {w.setup_s:.1f}s; peak {th.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
 
 
-def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT) -> bool:
+def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT,
+                      interior: Optional[str] = None, overhang: Optional[str] = None) -> bool:
     """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
     its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one), and its
     trunk eligibility rule (i7-unblock 2026-11-07: ``trunk_eligibility``, None = "all_d_e"; a map of the former rule does not stand in for
@@ -1604,6 +1874,10 @@ def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[st
     if kind == "floor" and floor_fingers is not None and config_value(m, "floor_fingers") != floor_fingers:
         return False
     if config_value(m, "trunk_eligibility") != (trunk_eligibility or "all_d_e"):
+        return False
+    if kind == "interior" and (m.get("interior") or {}).get("digest") != interior:  # i7-lean: another compartment does not count
+        return False
+    if kind == "overhang" and (m.get("overhang") or {}).get("digest") != overhang:  # i7-overhang: another overhang rest does not count
         return False
     return m.get("arm", "right") == arm and m.get("kind", "tabletop") == kind
 
@@ -1629,7 +1903,10 @@ def main(argv=None):
     c.add_argument("--seeds", type=int, default=8)
     c.add_argument("--batch", type=int, default=2048)
     c.add_argument("--kind", default="tabletop", choices=list(KINDS) + ["generic"],
-                   help="floor: the object on the floor plane (h 0, no edge, floor_config); generic: the manifest's generic pseudo-entries ({\"id\": \"_generic\", \"kind\": \"generic\"}) -> <out>/_generic/")
+                   help="floor: the object on the floor plane (h 0, no edge, floor_config); generic: the manifest's generic pseudo-entries ({\"id\": \"_generic\", \"kind\": \"generic\"}) -> <out>/_generic/; "
+                        "interior: the lean entries inside --interior's compartment (at its board height; no anchors); "
+                        "overhang: the overhang entries on a slab whose near edge lies under them (anchors / heights as tabletop)")
+    c.add_argument("--interior", default=None, help="--kind interior: an interiors.json name (ispatialgym/assets/interiors) or a spec json file")
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
@@ -1710,7 +1987,9 @@ def _compute_cli(a):
             cand = S.load_json(os.path.join(os.path.dirname(p), "candidates.json")) or {}
             parent = (S.load_json(os.path.join(os.path.dirname(p), "job.json")) or {}).get("derived_from")
             derived.append({"id": eid, "category": lib["category"], "model": lib["model"], "scale": lib.get("scale"), "constraint": lib.get("constraint") or "tabletop",
-                            "rest_hint_wxyz": cand.get("rest_hint_wxyz"), "derived": True, "derived_from": parent})
+                            "rest_hint_wxyz": cand.get("rest_hint_wxyz"), "derived": True, "derived_from": parent,
+                            **({"rest_kind": "lean", "lean": lib.get("lean")} if lib.get("rest_kind") == "lean" else {}),
+                            **({"rest_kind": "overhang", "overhang": lib.get("overhang")} if lib.get("rest_kind") == "overhang" else {})})
     if a.shard:
         # a derived entry goes to its parent job's shard - the shard whose glib stage made it, so it exists when this stage lists the
         # library; sharding the appended list by index instead raced the other shards' retries (each saw a different list). The parent
@@ -1726,8 +2005,22 @@ def _compute_cli(a):
     else:
         jobs += derived
     floor = a.kind == "floor"
+    interior_kind = a.kind == "interior"
+    spec = None
     kw = dict(mode=a.mode, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=a.kind != "brace", **_trunk_kw(a))
-    if floor:
+    if interior_kind:
+        # i7-lean 2026-11-07: one map per (lean entry, lean rest, arm) at the compartment's board height; no anchor file, no heights
+        from ispatialgym.sampling import interiors as IN
+
+        if not a.interior:
+            raise SystemExit("--kind interior needs --interior <name | spec.json>")
+        spec = IN.spec_named(a.interior)
+        if a.heights or a.heights_by_id:
+            print(f"GB_MAP_NOTE {json.dumps({'kind': 'interior', 'note': '--heights / --heights-by-id ignored: an interior map is at its board height'})}", flush=True)
+        aset, by_id = None, {}
+        anchors = [{"key": f"interior:{spec.name}", "height": float(spec.height_m), "surfaces": [f"{sc}/{nm}" for sc, nm in spec.supports]}]
+        cfg = interior_config(spec, **kw)  # the world's (arm, batch, seeds); each rest gets its own (one yaw at a lean rest)
+    elif floor:
         # i7-floor 2026-11-07: one map per (entry, stable rest, arm) at the floor (h 0, the synthetic FLOOR_ANCHOR); no anchor file, no heights
         if a.heights or a.heights_by_id:
             print(f"GB_MAP_NOTE {json.dumps({'kind': 'floor', 'note': '--heights / --heights-by-id ignored: a floor map is at h 0'})}", flush=True)
@@ -1746,7 +2039,9 @@ def _compute_cli(a):
     w = SynthWorld(cfg)
     for j in jobs:
         anchors_j = [x for x in aset.anchors if x["key"] in set(by_id[j["id"]])] if (aset is not None and j["id"] in by_id) else anchors
-        lib = S.load_model(j["category"], j["model"], j.get("scale"), a.glib, constraint=j.get("constraint") or "tabletop", rest_hint_wxyz=j.get("rest_hint_wxyz"))
+        lib = S.load_model(j["category"], j["model"], j.get("scale"), a.glib, constraint=j.get("constraint") or "tabletop", rest_hint_wxyz=j.get("rest_hint_wxyz"),
+                           lean=S.job_lean(j), overhang=S.job_overhang(j), validate_arm=S.job_validate_arm(j),
+                           access_region=S.job_access_region(j))  # i7-lean / i7-overhang: a lean / overhang job's own entry
         if lib is None or not lib.grasps():
             print(f"GB_MAP {json.dumps({'id': j['id'], 'ok': False, 'reason': 'no v2 library entry with validated grasps'})}", flush=True)
             continue
@@ -1754,14 +2049,22 @@ def _compute_cli(a):
         for rid, r in lib.rests.items():
             if not r.stable or not lib.grasps(rid):
                 continue
+            if not rest_kind_ok(a.kind, getattr(r, "kind", "stable")):  # i7-lean: lean rests in interior maps only (i7-overhang: overhang ones)
+                continue
+            if a.kind == "overhang":  # i7-overhang: the rest's own config (its digest, one yaw, the edge distances, the lateral lattice)
+                cfg_r = overhang_config(r, **{k: v for k, v in kw.items() if k != "lattice_m"})
+            else:
+                cfg_r = interior_config(spec, rest_kind=getattr(r, "kind", "stable"), **kw) if interior_kind else cfg
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
-                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind, cfg.floor_fingers, cfg.trunk_eligibility)
+                if a.skip_existing and any(_map_meta_matches(p, cfg_r.arm, a.kind, cfg_r.floor_fingers, cfg_r.trunk_eligibility, cfg_r.interior,
+                                                             cfg_r.overhang)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:
-                    meta, arrays = compute_map(w, lib, rid, float(anc["height"]), anc, geom=geom, cfg=cfg, kind=a.kind)
+                    meta, arrays = compute_map(w, lib, rid, float(anc["height"]), anc, geom=geom, cfg=cfg_r, kind=a.kind,
+                                               **({"interior": spec} if interior_kind else {}))
                     p = save(os.path.join(a.out, j["id"]), meta, arrays)
                     nf = {t["key"]: t.get("n_feasible") for t in meta["trunks"] if t.get("eligible")}
                     print(f"GB_MAP {json.dumps({'id': j['id'], 'ok': True, 'rest': rid, 'h': anc['key'], 'path': p, 'timing': meta['timing'], 'n_grasps': len(meta['grasps']), 'feasible': nf})}", flush=True)

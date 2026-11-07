@@ -16,6 +16,18 @@
 #     sbatch --array=0-$((N-1)) job_glib.sh
 # i7-unblock 2026-11-07: GB_TRUNK_ELIGIBILITY (all_d_e | per_d_e; unset = reach_maps.MapConfig's default) = the maps stage's
 # --trunk-eligibility (the trunk eligibility rule, part of the map identity).
+# i7-lean 2026-11-07: GB_STAGES token "lean" = the manifest's LEAN jobs end to end (grasping.pipeline lean: export, the settle against the
+# vertical board, candidates at the measured lean rest with the board as an obstacle, validation with the board present; manifest from
+# python -m ispatialgym.grasping.lean manifest), logs glib_lean_<shard>.log; GB_KIND=interior + GB_INTERIOR=<registry name or spec json>
+# (ispatialgym/assets/interiors/interiors.json) = the interior maps of the lean entries at the spec's board height (no anchors / heights):
+#   GB_STAGES="lean maps" GB_KIND=interior GB_INTERIOR=bookcase_kmuacd_0@0.8354 GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<lean jobs.json> ...
+# a STABLE rest in a compartment (the fridge jar, inside_large_scale_02): GB_INTERIOR=<registry.json>::<name> (the interiors measure CLI's file;
+# the spec carries its stand-offs, joints and open-door box), GB_MANIFEST = the stable entry's job
+# i7-overhang 2026-11-07: GB_STAGES token "overhang" = the manifest's OVERHANG jobs end to end (grasping.pipeline overhang: export, the settle
+# on a slab whose edge lies under the object, candidates at the measured overhang rest with the slab box as the support, validation on that
+# slab; manifest from python -m ispatialgym.grasping.overhang manifest), logs glib_overhang_<shard>.log; GB_KIND=overhang = the overhang maps
+# of the overhang entries (the slab's near edge under the object, one yaw, reach_maps.overhang_config) at GB_HEIGHTS (anchor keys, as tabletop):
+#   GB_STAGES="overhang maps" GB_KIND=overhang GB_HEIGHTS=0.7671 GB_ANCHORS=<anchors.json> GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<overhang jobs.json> ...
 #SBATCH --job-name=isggb
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -42,12 +54,33 @@ if [[ " $STAGES " == *" glib "* ]]; then
   grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_$I.log || KIT_RC=${KIT_RC/#0/1}
   echo "GB_STAGE glib rc=$KIT_RC s=$(( $(date +%s) - t0 ))"
 fi
+if [[ " $STAGES " == *" lean "* ]]; then
+  t0=$(date +%s)
+  # i7-overhang 2026-11-07: GB_VAL_ARM (default right) = the lean validation world's arm (left: the left-arm validator, the manifest's lean
+  # jobs with validate_arm left; logs glib_lean_<shard>_left.log)
+  VA=${GB_VAL_ARM:-right}; LSFX=$([ "$VA" = right ] && echo "" || echo "_$VA")
+  python -u -m ispatialgym.grasping.pipeline lean --arm $VA --jobs $M --root $OUT/glib --shard $I/$N --workers ${SLURM_CPUS_PER_TASK:-8} >> $OUT/logs/glib_lean_$I$LSFX.log 2>&1
+  rc=$?
+  grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_lean_$I$LSFX.log || rc=${rc/#0/1}
+  [ $KIT_RC = 0 ] && KIT_RC=$rc
+  echo "GB_STAGE lean rc=$rc s=$(( $(date +%s) - t0 ))"
+fi
+if [[ " $STAGES " == *" overhang "* ]]; then
+  t0=$(date +%s)
+  python -u -m ispatialgym.grasping.pipeline overhang --jobs $M --root $OUT/glib --shard $I/$N --workers ${SLURM_CPUS_PER_TASK:-8} >> $OUT/logs/glib_overhang_$I.log 2>&1
+  rc=$?
+  grep -q "GB_VALIDATE_DONE" $OUT/logs/glib_overhang_$I.log || rc=${rc/#0/1}
+  [ $KIT_RC = 0 ] && KIT_RC=$rc
+  echo "GB_STAGE overhang rc=$rc s=$(( $(date +%s) - t0 ))"
+fi
 if [[ " $STAGES " == *" maps "* ]]; then
   BYID=(); [ -n "${GB_HEIGHTS_BY_ID:-}" ] && BYID=(--heights-by-id $GB_HEIGHTS_BY_ID)
   DERIVED=--include-derived; [ "${GB_INCLUDE_DERIVED:-1}" = 0 ] && DERIVED=""   # 0: only the manifest's entries (a campaign library holds others)
   KIND=${GB_KIND:-tabletop}
   if [ "$KIND" = floor ]; then
     HEIGHTS=()   # the floor kind: h 0, no anchor axis
+  elif [ "$KIND" = interior ]; then
+    HEIGHTS=(--interior ${GB_INTERIOR:?GB_KIND=interior needs GB_INTERIOR})   # the interior kind: the spec's board height, no anchors
   else
     HEIGHTS=(--anchors ${GB_ANCHORS:-$GBH/anchors.json} --heights ${GB_HEIGHTS:-0.4230 0.8126 1.0505} "${BYID[@]}")
   fi

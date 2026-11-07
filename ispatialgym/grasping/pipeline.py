@@ -4,11 +4,32 @@
     python -m ispatialgym.grasping.pipeline candidates --jobs M.json [--workers 8]                  # CPU: candidates + families
     python -m ispatialgym.grasping.pipeline validate   --jobs M.json [--shard i/n]                  # GPU: rests + physics trials
     python -m ispatialgym.grasping.pipeline all        --jobs M.json [--only ID ...]                # the three, one process (pilots)
+    python -m ispatialgym.grasping.pipeline lean       --jobs M.json [--shard i/n] [--arm left]     # GPU: the lean jobs end to end
+    python -m ispatialgym.grasping.pipeline overhang   --jobs M.json [--shard i/n]                  # GPU: the overhang jobs end to end
     python -m ispatialgym.grasping.pipeline summary    --jobs M.json
 
 Floating jobs (``constraint`` "floating", i7-floating 2026-11-07; ``floating.floating_job``): export -> GraspGen in its own env
 (``scripts/grasp_bands/graspgen_floating.py``) -> candidates (``floating.generate``) -> validate (``validate_floating``: in hand, gravity,
 the held motions); ``scripts/grasp_bands/job_floating.sh`` runs the four. No settle survey, no rest retry.
+Lean rests (i7-lean 2026-11-07, :mod:`ispatialgym.grasping.lean`; jobs from ``python -m ispatialgym.grasping.lean manifest``): the
+``lean`` stage settles each lean job's object against the vertical board (``TabletopWorld.settle(lean=)``) and writes
+``<entry>/lean_settle.json``; the candidates are then generated at that MEASURED rest with the board as an obstacle and validated with the
+board present. ``all`` runs it between export and candidates for the manifest's lean jobs; ``lean`` runs export + lean settle +
+candidates + validate for the lean jobs only (``job_glib.sh`` ``GB_STAGES=lean``). Lean jobs skip the settle-first survey and the
+measured-rest retry (a lean rest that leans elsewhere keeps its ``<tag>_other`` record and serves nothing).
+
+Overhang rests (i7-overhang 2026-11-07, :mod:`ispatialgym.grasping.overhang`; jobs from ``python -m ispatialgym.grasping.overhang manifest``):
+the ``overhang`` stage settles each overhang job's object on the slab whose edge lies under it (``TabletopWorld.settle(overhang=)``) and writes
+``<entry>/overhang_settle.json``; the candidates are then generated at that MEASURED rest with the slab box as the support and validated on
+that slab. ``all`` runs it between export and candidates for the manifest's overhang jobs; ``overhang`` runs export + overhang settle +
+candidates + validate for the overhang jobs only (``job_glib.sh`` ``GB_STAGES=overhang``). Overhang jobs skip the settle-first survey and the
+measured-rest retry.
+
+Left-arm lean validation (i7-overhang 2026-11-07, owner decision; lean rests only): ``lean --arm left`` runs the validation world with the
+LEFT arm and the object mirrored to the robot's left (``validate_tabletop.mirrored_offsets``, as ``validate_artic motions --arm left``),
+generates the lean jobs' candidates for the left hand and validates only the manifest's lean jobs whose ``validate_arm`` is that arm
+(``lean manifest --validate-arm left``: their own entries ``...__valleft``, the arm in the library and its identity). Every other stage
+and job runs the right arm as before.
 
 ``--root`` (default ``ISPATIALGYM_GRASP_LIBRARY_V2`` or ``runlogs/grasp_library_v2``) holds ``models/<entry id>/``; finished stages are
 skipped per model (``--force`` redoes them). Every stage appends one json line per model to ``<root>/logs/<stage>_<shard>.jsonl``
@@ -105,10 +126,15 @@ def validate_overrides():
 
 
 def _cand_one(payload):
-    j, root, force = payload
+    j, root, force = payload[:3]
     from ispatialgym.grasping import candidates as CA
+    from ispatialgym.grasping import lean as LN
 
     d = S.job_dir(j, root)
+    j = LN.resolve_job(j, d)  # i7-lean: a lean job's measured rest from its lean_settle.json
+    from ispatialgym.grasping import overhang as OV
+
+    j = OV.resolve_job(j, d)  # i7-overhang: an overhang job's measured rest from its overhang_settle.json
     t0 = time.time()
     if not force and os.path.exists(os.path.join(d, "candidates.json")):
         return {"id": j["id"], "ok": True, "skipped": True}
@@ -116,7 +142,9 @@ def _cand_one(payload):
         return _cand_floating(j, d, t0)
     try:
         cfg, densify = candidate_overrides(j)
-        out = CA.generate(j, d, cfg=cfg, densify=densify)
+        # i7-overhang: a lean job validated with the left arm gets the left hand's candidates (every other job: the right hand as before)
+        arm = LN.job_arm(j) if LN.is_lean_job(j) else "right"
+        out = CA.generate(j, d, cfg=cfg, densify=densify, arm=arm)
         n_ok = sum(1 for c in out["candidates"] if c["geometry"]["ok"])
         fams = out["families"]
         pools = tuple(cfg.modes) + tuple(f for f in cfg.families if f not in CA.POSE_FAMILIES)
@@ -189,9 +217,16 @@ def stage_candidates(args, jobs):
 
 
 def _world(args):
+    from dataclasses import replace
+
     from ispatialgym.grasping import validate_tabletop as VT
 
-    return VT.TabletopWorld(validate_overrides())  # of-v2maps 2026-11-07: ISG_GLIB_VAL_OVERRIDES (default: ValidateConfig())
+    cfg = validate_overrides()  # of-v2maps 2026-11-07: ISG_GLIB_VAL_OVERRIDES (default: ValidateConfig())
+    arm = getattr(args, "arm", None) or "right"
+    if arm != "right":
+        # i7-overhang 2026-11-07 (owner: a left-arm validator for lean rests): the left arm, the object mirrored to the robot's left
+        cfg = replace(cfg, arm=arm, base_offsets=VT.mirrored_offsets(cfg.base_offsets))
+    return VT.TabletopWorld(cfg)
 
 
 def stage_validate(args, jobs, world=None):
@@ -203,8 +238,14 @@ def stage_validate(args, jobs, world=None):
         return world
     if world is None:
         world = _world(args)
+    from ispatialgym.grasping import lean as LN
+
     for j in todo:
         d = S.job_dir(j, args.root)
+        j = LN.resolve_job(j, d)  # i7-lean: a lean job's measured rest from its lean_settle.json
+        from ispatialgym.grasping import overhang as OV
+
+        j = OV.resolve_job(j, d)  # i7-overhang: an overhang job's measured rest from its overhang_settle.json
         try:
             if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: in hand, gravity, the held motions (validate_floating)
                 from ispatialgym.grasping import validate_floating as VF
@@ -244,12 +285,17 @@ def stage_settle(args, jobs, world=None):
     from ispatialgym.grasping import object_geometry as OG
     from ispatialgym.grasping import settle_first as SF
 
+    from ispatialgym.grasping import lean as LN
+
     if world is None:
         world = _world(args)
     cfg = world.cfg
     out: List[Dict[str, Any]] = []
+    from ispatialgym.grasping import overhang as OV
+
     for j in jobs:
-        if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: a floating object is never set down
+        # i7-floating: a floating object is never set down; i7-lean / i7-overhang: settled by their own stage, never surveyed on the bare slab
+        if (j.get("constraint") or "tabletop") == S.FLOATING or LN.is_lean_job(j) or OV.is_overhang_job(j):
             out.append(j)
             continue
         d = S.job_dir(j, args.root)
@@ -297,13 +343,114 @@ def stage_settle(args, jobs, world=None):
     return out, world
 
 
+def stage_lean(args, jobs, world=None):
+    """i7-lean 2026-11-07: per lean job, the object settled against the vertical board (``TabletopWorld.settle(lean=)`` from the job's
+    upright base leaned to its spec: ``lean.lean_quat``), the measured lean rest written to ``<entry>/lean_settle.json`` (schema
+    ``lean.SETTLE_SCHEMA``: the spec, the start, the rest record); returns the jobs (each lean job with its measured rest:
+    ``lean.job_at_rest``) and the world. Other jobs pass unchanged."""
+    import numpy as np
+
+    from ispatialgym.grasping import lean as LN
+    from ispatialgym.grasping import object_geometry as OG
+
+    out: List[Dict[str, Any]] = []
+    for j in jobs:
+        if not LN.is_lean_job(j):
+            out.append(j)
+            continue
+        d = S.job_dir(j, args.root)
+        path = os.path.join(d, LN.SETTLE_FILE)
+        t0 = time.time()
+        try:
+            doc = None if args.force else S.load_json(path)
+            if doc is None:
+                if world is None:
+                    world = _world(args)
+                spec = LN.spec_of(j)
+                quat0 = LN.lean_quat(LN.base_quat(j), spec)
+                obj = world.load(j, d)
+                try:
+                    rest, _ = world.settle(obj, OG.load(d), quat0, lean=spec)
+                finally:
+                    world.unload(obj)
+                ok = bool(rest["lean"]["lean_ok"]) and bool(rest["stable"])
+                rest["rest_id"] = spec.rest_id() if ok else spec.rest_id() + "_other"
+                doc = {"schema": LN.SETTLE_SCHEMA, "id": j["id"], "lean": spec.to_json(), "start_quat_xyzw": [round(float(v), 7) for v in np.asarray(quat0)],
+                       "lean_base_wxyz": j.get("lean_base_wxyz"), "lean_base": j.get("lean_base"), "rest": rest, "ok": ok,
+                       "wall_s": round(time.time() - t0, 2), "created": S.now()}
+                os.makedirs(d, exist_ok=True)
+                S.save_json(path, doc)
+            out.append(LN.job_at_rest(j, doc["rest"]))
+            r = doc["rest"]
+            _log(args, "lean", {"id": j["id"], "ok": True, "lean_ok": doc.get("ok"), "rest_id": r.get("rest_id"), "measured_deg": r["lean"].get("measured_deg"),
+                                "side": r["lean"].get("measured_side"), "h_root": r.get("h_root"), "board_face_y_m": r["lean"].get("board_face_y_m"),
+                                "board_load_ratio": r["lean"].get("board_load_ratio"), "why": r["lean"].get("lean_why"), "s": doc.get("wall_s")})
+        except Exception as e:  # noqa: BLE001
+            out.append(j)
+            _log(args, "lean", {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]})
+    print("GB_LEAN_DONE", flush=True)
+    return out, world
+
+
+def stage_overhang(args, jobs, world=None):
+    """i7-overhang 2026-11-07: per overhang job, the object settled on the slab whose edge lies under it (``TabletopWorld.settle(overhang=)``
+    from the job's designated rest at the reference yaw; ``overhang.slab_for``: the named face ``distance_m`` beyond the edge), the measured
+    overhang rest written to ``<entry>/overhang_settle.json`` (schema ``overhang.SETTLE_SCHEMA``: the spec, the start, the rest record);
+    returns the jobs (each overhang job with its measured rest: ``overhang.job_at_rest``) and the world. Other jobs pass unchanged."""
+    import numpy as np
+
+    from ispatialgym.grasping import object_geometry as OG
+    from ispatialgym.grasping import overhang as OV
+
+    out: List[Dict[str, Any]] = []
+    for j in jobs:
+        if not OV.is_overhang_job(j):
+            out.append(j)
+            continue
+        d = S.job_dir(j, args.root)
+        path = os.path.join(d, OV.SETTLE_FILE)
+        t0 = time.time()
+        try:
+            doc = None if args.force else S.load_json(path)
+            if doc is None:
+                if world is None:
+                    world = _world(args)
+                spec = OV.spec_of(j)
+                hint = j.get("rest_hint_wxyz")
+                q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
+                quat0 = S.quat_mul(S.quat_yaw(world.cfg.reference_yaw), q_rest)
+                obj = world.load(j, d)
+                try:
+                    rest, _ = world.settle(obj, OG.load(d), quat0, overhang=spec)
+                finally:
+                    world.unload(obj)
+                ok = bool(rest["overhang"]["overhang_ok"]) and bool(rest["stable"])
+                rest["rest_id"] = spec.rest_id() if ok else spec.rest_id() + "_other"
+                doc = {"schema": OV.SETTLE_SCHEMA, "id": j["id"], "overhang": spec.to_json(), "start_quat_xyzw": [round(float(v), 7) for v in np.asarray(quat0)],
+                       "overhang_base": j.get("overhang_base"), "rest": rest, "ok": ok, "wall_s": round(time.time() - t0, 2), "created": S.now()}
+                os.makedirs(d, exist_ok=True)
+                S.save_json(path, doc)
+            out.append(OV.job_at_rest(j, doc["rest"]))
+            r = doc["rest"]
+            _log(args, "overhang", {"id": j["id"], "ok": True, "overhang_ok": doc.get("ok"), "rest_id": r.get("rest_id"),
+                                    "measured_distance_m": r["overhang"].get("measured_distance_m"), "com_inside_m": r["overhang"].get("com_inside_m"),
+                                    "edge_along_m": r["overhang"].get("edge_along_m"), "flush_turn_deg": r["overhang"].get("flush_turn_deg"),
+                                    "h_root": r.get("h_root"), "stable": r.get("stable"), "why": r["overhang"].get("overhang_why"), "s": doc.get("wall_s")})
+        except Exception as e:  # noqa: BLE001
+            out.append(j)
+            _log(args, "overhang", {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]})
+    print("GB_OVERHANG_DONE", flush=True)
+    return out, world
+
+
 def rest_retry_jobs(args, jobs) -> List[Dict[str, Any]]:
     """Jobs whose object settled in a rest other than the designated one (``rests.json``: ``intended`` False) and got no valid grasp:
     derived jobs designated at that MEASURED rest (``rest_hint_wxyz`` = its quaternion, wxyz), candidates generated for it - a new model
     with an unstable canonical pose gets its grasps on the rest it really takes."""
     out = []
     for j in jobs:
-        if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: no support, no rest to retry at
+        # i7-floating: no support, no rest to retry at; i7-lean / i7-overhang: never retried as a stable rest
+        if (j.get("constraint") or "tabletop") == S.FLOATING or j.get("rest_kind") in ("lean", "overhang"):
             continue
         d = S.job_dir(j, args.root)
         lib = S.load_json(os.path.join(d, "library.json")) or {}
@@ -352,26 +499,49 @@ def summary(args, jobs):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("stage", choices=["export", "settle", "candidates", "validate", "retry", "all", "summary"])
+    ap.add_argument("stage", choices=["export", "settle", "lean", "overhang", "candidates", "validate", "retry", "all", "summary"])
     ap.add_argument("--jobs", required=True)
     ap.add_argument("--root", default=None)
     ap.add_argument("--shard", default=None, help="i/n")
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--arm", default="right", choices=["right", "left"],
+                    help="the validation world's arm (i7-overhang: left for the lean stage only - the lean jobs whose validate_arm is left)")
     args = ap.parse_args(argv)
+    if args.arm != "right" and args.stage not in ("lean", "summary"):
+        raise SystemExit(f"--arm {args.arm}: the left-arm validator is for the lean stage only (owner 2026-11-07: lean rests only)")
     jobs = _jobs(args)
     if args.stage == "summary":
         summary(args, jobs)
         return
     world = None
-    if args.stage in ("export", "all"):
+    if args.stage == "lean":
+        # i7-lean 2026-11-07: the manifest's lean jobs end to end (export, the settle against the board, candidates, validation)
+        from ispatialgym.grasping import lean as LN
+
+        jobs = [j for j in jobs if LN.is_lean_job(j)]
+        # i7-overhang: the lean jobs validated with this run's arm (``--arm``; a job's ``validate_arm``, right when absent)
+        skipped = [j["id"] for j in jobs if LN.job_arm(j) != args.arm]
+        jobs = [j for j in jobs if LN.job_arm(j) == args.arm]
+        print(f"GB_LEAN_JOBS {len(jobs)} (arm {args.arm}{f'; other arms skipped: {skipped}' if skipped else ''})", flush=True)
+    if args.stage == "overhang":
+        # i7-overhang 2026-11-07: the manifest's overhang jobs end to end (export, the settle at the slab edge, candidates, validation)
+        from ispatialgym.grasping import overhang as OV
+
+        jobs = [j for j in jobs if OV.is_overhang_job(j)]
+        print(f"GB_OVERHANG_JOBS {len(jobs)}", flush=True)
+    if args.stage in ("export", "all", "lean", "overhang"):
         world = stage_export(args, jobs, world)
     if args.stage == "settle" or (args.stage == "all" and settle_first_on()):
         jobs, world = stage_settle(args, jobs, world)  # of-v2maps 2026-11-07: GB_SETTLE_FIRST - the measured rests first
-    if args.stage in ("candidates", "all"):
+    if args.stage in ("all", "lean"):
+        jobs, world = stage_lean(args, jobs, world)  # i7-lean: the lean jobs' measured rests (other jobs pass unchanged)
+    if args.stage in ("all", "overhang"):
+        jobs, world = stage_overhang(args, jobs, world)  # i7-overhang: the overhang jobs' measured rests (other jobs pass unchanged)
+    if args.stage in ("candidates", "all", "lean", "overhang"):
         stage_candidates(args, jobs)
-    if args.stage in ("validate", "all"):
+    if args.stage in ("validate", "all", "lean", "overhang"):
         world = stage_validate(args, jobs, world)
     if args.stage in ("retry", "all"):
         derived = rest_retry_jobs(args, jobs)

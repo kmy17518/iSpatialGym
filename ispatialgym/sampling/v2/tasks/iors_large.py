@@ -114,6 +114,17 @@ and the grasp's finger sweep below the support top (the fingers ``finger_clearan
 ``com_margin_m`` inside), the grasp's exact IK at the pushed pose with the support present, the push chain (the open / closed hand behind
 the object's far side, pitched over it, fingertips ``tip_m`` above the support) and a physics settle of the pushed object. The pick
 records ``contacts.push_pick`` (``kind: "pick_overhang"``) and ``grasps[0].pick_overhang``; the program pushes, retreats and grasps.
+
+**The v2 overhang rest (i7-overhang 2026-11-07, owner decision: the overhang pick's PRIMARY path, hardback bqvvvx / inside_large_01).** With
+``pick_overhang_push`` mode ``only`` and a v2 library + maps root holding an OVERHANG rest of the target's key (``grasping.overhang``: the
+object settled with one face ``distance_m`` beyond a slab edge, grasps generated and validated there), the key becomes ``<key>@<overhang
+tag>`` (``tabletop.overhang_key``): the grasps and the rest are that entry's, the stance search reads the OVERHANG map (``tabletop.
+overhang_map_bands``: the init cells behind its feasible post-push cells), the pairs at B are the overhanging face flush with B's edge
+(``overhang.flush_yaw``) whose grasp the map holds feasible at the post-push cell from B or B backed off (:meth:`_v2_overhang_map_ok`, the
+map-hit step), and the push leaves the object exactly at the library rest (``overhang.v2_rest_push``: the face ``distance_m`` beyond the
+edge - one rung, inside the exact finger-clearance / centre-of-mass range). Every check after the map stays exact (the grasp IK at the
+pushed pose, the push chain, the settle, the program check). A map miss rejects ``missing_map`` with a MAP_REQUEST line; there is no
+legacy band and no legacy grasp.
 """
 
 from __future__ import annotations
@@ -139,6 +150,7 @@ from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang as OH
+from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
@@ -745,6 +757,7 @@ class IORSLarge(SamplerV2):
         self.partner_joints: Optional[Dict[str, float]] = None  # every partner joint once generation.partner_joint_init set them
         self.partner_moved: List[str] = []  # the partner links that request moved (the open door)
         self.finger_touch_error: Optional[str] = self.setup_finger_touch()  # a bad value: the spec rejection of bind_scene_roles
+        self.v2_overhang: Optional[Dict[str, Any]] = None  # i7-overhang: the v2 overhang rest of the grasp key (tabletop.overhang_rest_of_key)
 
     # ------------------------------------------------------------------ roles
 
@@ -1033,8 +1046,26 @@ class IORSLarge(SamplerV2):
             log.info("%s: relaxed rules (owner 2026-10-12 item 2): %s", self.gp.variant, relaxed)
         tgt = self.target
         self.hull = self.world.local_hull(tgt)
-        self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
+        # i7-overhang 2026-11-07: the overhang pick alone (mode only) takes the key's v2 OVERHANG rest when the library holds one (every other
+        # alias: the call as before)
+        gen = getattr(self.gp, "gen", None)
+        try:
+            ov0 = OH.options(gen("pick_overhang_push")) if callable(gen) else None
+        except ValueError as e:
+            raise Reject("spec", f"{self.gp.variant}: {e}")
+        if ov0 is not None and ov0["mode"] == "only":
+            self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target", overhang=True)
+        else:
+            self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
+        self.v2_overhang = TT.overhang_rest_of_key(self.grasp_key)
+        if self.v2_overhang is not None:
+            self.template_facts["v2_overhang"] = {k: self.v2_overhang.get(k) for k in ("tag", "side", "distance_m", "measured_distance_m", "edge_along_m",
+                                                                                      "com_inside_m", "normal_xy", "entry", "rest_id")}
         keep = self.gp.gen("grasp_rows")
+        if keep and self.v2_overhang is not None:
+            # the rows name the LEGACY library's pinches; the v2 overhang entry's grasps are its own (generated at the overhanging face)
+            log.info("%s: generation.grasp_rows %s not applied: the grasps are the v2 overhang entry's %s", self.gp.variant, keep, [g.name for g in self.grasps])
+            keep = None
         if keep:  # oracle-fix 2026-11-04 round 3 (hardback): opt-in generation.grasp_rows - only these library rows (the spine edge's pinches)
             kept = [g for g in self.grasps if getattr(g, "name", None) in set(keep)]
             if not kept:
@@ -3497,9 +3528,12 @@ class IORSLarge(SamplerV2):
                 fxy = focus_xy if focus_xy is not None else manip.focus[:2]
                 by_arm: Dict[str, Tuple[Stance, List[Any]]] = {}
                 for a, st in self._b_stances(manip, offered).items():
-                    F_a = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), st, a, self.grasp_ignore_objects()).get(0, [])
+                    if self.v2_overhang is not None and ov_opts is not None and ov_opts["mode"] == "only":
+                        F_a = []  # i7-overhang: the direct pairs are dropped in mode only - no batched screen of them
+                    else:
+                        F_a = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), st, a, self.grasp_ignore_objects()).get(0, [])
                     if ov_opts is not None and kind != "floor":
-                        F_a = self._overhang_pairs(manip, F_a, fxy, yaws, z_init, ov_opts)
+                        F_a = self._overhang_pairs(manip, F_a, fxy, yaws, z_init, ov_opts, arm=a, st=st)
                     by_arm[a] = (st, F_a)
                     if arm_bands.get(a) is not None and arm_bands[a].meta.get("mirrored_from"):
                         TT._count(self, "arm_band_mirrored.foci")
@@ -4017,25 +4051,52 @@ class IORSLarge(SamplerV2):
         ladder = OH.distance_ladder(d_min, d_max, opts["distance_step_m"], opts["max_distances"])
         pts = G.local_points_world(self.hull, (th.zeros(3), G.t(t_pose[1]).float()))
         back, front = OH.extent_along(pts[:, :2], u)
+        v2 = getattr(self, "v2_overhang", None)
+        v2_push = None
+        v2_sweep_beyond = None
+        if v2 is not None:
+            # i7-overhang 2026-11-07: the push that leaves the object at the library's overhang rest (the face measured_distance_m beyond the edge
+            # on the centre's line) - one rung. The library validated the grasp at exactly that rest (the exact finger hulls against the slab
+            # box within the policy's 2 mm, the physics trial with the edge there), so the finger-box sweep rule (finger_clearance_m on the
+            # conservative open-width box) is replaced by it unless v2_finger_clearance_m asks for it; the centre-of-mass margin and max_push_m
+            # stay (d_max), every exact check after it too
+            v2_push = OH.v2_rest_push(float(v2.get("measured_distance_m") or v2["distance_m"]), float(edges[0]), front)
+            v2_sweep_beyond = float(v2_push) + x_sweep - e_finger  # the box sweep's distance beyond the edge after the push (< 0: over the support)
+            fc = opts.get("v2_finger_clearance_m")
+            lo = max(0.01, (e_finger + float(fc) - x_sweep) if fc is not None else 0.01)
+            ladder = [round(v2_push, 4)] if lo - 1e-4 <= v2_push <= d_max + 1e-4 else []
         facts = {"direction": [round(float(u[0]), 4), round(float(u[1]), 4)], "edge_com_m": round(e_com, 4), "com_ahead_m": round(com_ahead, 4), "edge_finger_m": round(e_finger, 4),
                  "edge_lines_m": [None if e is None else round(e, 4) for e in edges], "finger_lateral_m": [round(l_lo, 4), round(l_hi, 4)],
                  "sweep_along_m": round(x_sweep, 4), "sweep_side": int(sweep[1]), "pinch_width_m": None if pinch is None else round(float(pinch), 4),
                  "push_min_m": round(d_min, 4), "push_max_m": round(d_max, 4), "ladder_m": ladder, "extent_front_m": round(front, 4), "extent_back_m": round(back, 4),
                  "com_xy": [round(float(v), 4) for v in com.tolist()]}
+        if v2 is not None:
+            facts["v2_rest"] = {"tag": v2.get("tag"), "distance_m": v2.get("measured_distance_m"), "push_m": round(float(v2_push), 4),
+                                "box_sweep_beyond_edge_m": round(float(v2_sweep_beyond), 4), "finger_rule": "library rest" if opts.get("v2_finger_clearance_m") is None
+                                else f"box sweep {float(opts['v2_finger_clearance_m']):.3f} m beyond the edge"}
+            if not ladder:
+                return None, (f"the v2 overhang rest's push {v2_push:.3f} m (face {v2.get('measured_distance_m')} m beyond the edge) is outside the range "
+                              f"[{lo:.3f}, {d_max:.3f}] m (centre of mass {opts['com_margin_m']:.3f} inside, push <= {opts['max_push_m']:.2f}"
+                              + (f", the finger box {float(opts['v2_finger_clearance_m']):.3f} beyond the edge" if opts.get("v2_finger_clearance_m") is not None else "") + ")")
         if not ladder:
             return None, (f"no push distance: the fingers need >= {d_min:.3f} m (edge {e_finger:.3f} m on their lines + clearance {opts['finger_clearance_m']:.3f} - sweep "
                           f"{x_sweep:.3f}), the centre of mass allows <= {d_max:.3f} m (edge {e_com:.3f} - margin {opts['com_margin_m']:.3f})")
         return facts, ""
 
     def _overhang_pairs(self, manip: Stance, F_direct: Sequence[Tuple[float, Any]], xy, yaws: Sequence[float], z_init: float,
-                        opts: Dict[str, Any]) -> List[Tuple[float, Any]]:
+                        opts: Dict[str, Any], arm: Optional[str] = None, st: Optional[Stance] = None) -> List[Tuple[float, Any]]:
         """F_init at B with the overhang pick on: the direct grasp's pairs (mode ``"only"``: none of them) and every (yaw, library row)
         whose overhang geometry has a push ladder (:meth:`_overhang_geometry`, no IK) - the pinch on the side the push brings past the
         edge, which the direct screen rarely admits (grasp_5 at B's direct yaws pinches the plate's side: no push distance). The geometry
-        is memoised per (focus, yaw, row) for the attempt (the arms share it)."""
+        is memoised per (focus, yaw, row) for the attempt (the arms share it). i7-overhang 2026-11-07: at the v2 overhang rest the one yaw
+        with the overhanging face flush with B's edge (``overhang.flush_yaw``) and only the rows whose grasp the overhang map holds feasible
+        at the post-push cell (:meth:`_v2_overhang_map_ok`, ``arm`` at its stance ``st``)."""
         if manip.edge is None or manip.focus is None:
             return list(F_direct)
         u = OH.unit_xy(-manip.edge.inward)
+        v2 = getattr(self, "v2_overhang", None)
+        if v2 is not None:
+            yaws = [OH.flush_yaw(v2["normal_xy"], u)]
         step = 2.0 * math.pi / max(1, len(yaws))
         only = opts["mode"] == "only"
         have = {pair_key(y, g, step) for y, g in F_direct}
@@ -4048,6 +4109,13 @@ class IORSLarge(SamplerV2):
                 key = (round(float(xy[0]), 4), round(float(xy[1]), 4), round(float(y), 4), getattr(g, "name", str(g)), round(float(u[0]), 4), round(float(u[1]), 4))
                 if key not in memo:
                     memo[key] = self._overhang_geometry(self.pose_on(xy, y, z_init), g, u, float(z_init), opts)[0] is not None
+                if memo[key] and v2 is not None:
+                    ok_m, why_m = self._v2_overhang_map_ok(st or manip, arm or TT.default_arm(self), g, self.pose_on(xy, y, z_init), u, float(z_init), opts)
+                    TT._count(self, f"pick_overhang.v2_map.{'hit' if ok_m else ('infeasible' if ok_m is False else 'miss')}")
+                    if not ok_m:
+                        log.info("%s: overhang pick pair %s yaw %.3f at B (%.2f, %.2f), %s arm: not in the overhang map (%s)", self.gp.variant, getattr(g, "name", g), y,
+                                 manip.translate, manip.tilt, arm, why_m)
+                        continue
                 if memo[key]:
                     extra.append((float(y), g))
         if extra:
@@ -4055,6 +4123,61 @@ class IORSLarge(SamplerV2):
         log.info("%s: overhang pick pairs at B (%.2f, %.2f) d %s: %d added to F_init's %d (yaws %s)%s", self.gp.variant, manip.translate, manip.tilt, manip.stand_off, len(extra),
                  len(F_direct), sorted({round(y, 2) for y, _ in extra}), " - mode only: the direct pairs dropped" if only else "")
         return ([] if only else list(F_direct)) + extra
+
+    def _v2_overhang_map_ok(self, st: Stance, arm: str, g, t_pose: G.Pose, u, z_init: float, opts: Dict[str, Any]) -> Tuple[Optional[bool], str]:
+        """i7-overhang 2026-11-07 (the map-hit step of the v2 overhang pick): whether ``arm``'s OVERHANG map (the band view of
+        ``surface["arm_bands"]``) holds the library row ``g`` (or its twin / a family member of it) feasible at the post-push cell - the
+        object at ``t_pose`` pushed to the library rest (:meth:`_overhang_geometry`'s one rung) - from ``st`` at its trunk, or from ``st``
+        backed off ``grasp_back_offs_m`` (the map's edge distance implied by the post-push root: its base-frame x minus the rest's
+        ``edge_along_m``, nearest map distance within 3 cm; the cell nearest in y within half the lattice). ``(True, "")``, ``(False, why)``
+        (the map's verdict), ``(None, why)`` (no overhang map view for the arm / the cell outside the map)."""
+        from ispatialgym.sampling import reach_maps as RMAP
+
+        rb = (self.surface.get("arm_bands") or {}).get(arm)
+        path = (rb.meta.get("map_path") if rb is not None else None) if getattr(rb, "meta", None) else None
+        if not path or rb.meta.get("map_kind") != "overhang":
+            return None, f"no overhang map view for the {arm} arm"
+        cache = self.__dict__.setdefault("_v2_overhang_maps", {})
+        if path not in cache:
+            cache[path] = RMAP.ReachMap(path)
+        rm = cache[path]
+        geo, why = self._overhang_geometry(t_pose, g, u, z_init, opts)
+        if geo is None:
+            return False, why
+        d3 = th.tensor([float(OH.unit_xy(u)[0]), float(OH.unit_xy(u)[1]), 0.0])
+        post = G.t(t_pose[0]).float() + d3 * float(geo["ladder_m"][0])
+        pb = st.world_to_base(post[:2])
+        ea = float(rm.meta["overhang"]["edge_along_m"])
+        lat = float(rm.meta["config"]["lattice_m"])
+        d_es = [float(d) for d in rm.meta["edge_distances"]]
+        trunks = [(float(t["translate"]), float(t["tilt"])) for t in rm.meta["trunks"] if t.get("eligible")]
+        same = [k for k in trunks if abs(k[0] - float(st.translate)) < 1e-6]
+        if not same:
+            return None, f"trunk translate {st.translate:.2f} not in the map ({sorted({k[0] for k in trunks})})"
+        tk = min(same, key=lambda k: abs(k[1] - float(st.tilt)))
+        base_name = C.split_twin(getattr(g, "name", str(g)))[0].split(GL_MEMBER_SEP)[0]
+        tried = []
+        for off in [0.0] + [float(o) for o in opts["grasp_back_offs_m"]]:
+            d_impl = float(pb[0]) + off - ea
+            d = min(d_es, key=lambda v: abs(v - d_impl))
+            if abs(d - d_impl) > 0.03:
+                tried.append(f"back-off {off:.2f}: edge distance {d_impl:.3f} m not in the map {d_es}")
+                continue
+            row = np.nonzero(np.abs(rm.cells[:, 0] - (d + ea)) <= 1e-4)[0]
+            if not len(row):
+                continue
+            k = row[int(np.argmin(np.abs(rm.cells[row, 1] - float(pb[1]))))]
+            if abs(float(rm.cells[k, 1]) - float(pb[1])) > 0.51 * lat + 1e-6:
+                tried.append(f"back-off {off:.2f}: lateral {float(pb[1]):.3f} m outside the map's cells")
+                continue
+            st_k = rm.status(d, *tk)[k, 0]
+            feas = [rm.meta["grasps"][i]["base"] for i in np.nonzero(st_k == RMAP.STATUS["feasible"])[0]]
+            if base_name in feas:
+                return True, ""
+            tried.append(f"back-off {off:.2f}: d_e {d:.2f} trunk {tk} cell y {float(rm.cells[k, 1]):+.2f}: {base_name} not feasible (feasible {sorted(set(feas))[:6]})")
+        if all("not in the map" in t or "outside" in t for t in tried) and tried:
+            return None, "; ".join(tried)[:400]
+        return False, "; ".join(tried)[:400]
 
     def _overhang_b_rank(self, entry, z_init: float, opts: Dict[str, Any]) -> Tuple[int, float, Optional[float]]:
         """How a pre-screened B candidate (``(n_F, stance, F_init, by_arm)``) suits the overhang pick, without an IK: ``(0, -reach margin,
@@ -4338,6 +4461,8 @@ class IORSLarge(SamplerV2):
                          "grasp_stance": None if grasp_st is st else {"name": grasp_st.name, "stand_off": grasp_st.stand_off, "trunk": [grasp_st.translate, round(grasp_st.tilt, 3)]},
                          "chain": {k: chain[k] for k in ("fingers", "opening", "pitch_deg", "wrist", "contact_along_m", "hand_travel_m", "tip_m", "support_touch_m")}}
                 TT._count(self, "pick_overhang.found")
+                if geo.get("v2_rest"):
+                    TT._count(self, "pick_overhang.v2_found")
                 log.info("%s: overhang pick at B (%.2f, %.2f), %s arm, grasp %s yaw %.2f: push %.3f m toward the edge (edge %.3f m, overhang %.3f m, centre of mass "
                          "%.3f m inside), %s hand pitch %.0f (%s), settle %s, grasp from %s", self.gp.variant, manip.translate, manip.tilt, arm, getattr(g, "name", g), yaw, push,
                          geo["edge_finger_m"], overhang, facts["com_inside_m"], chain["fingers"], chain["pitch_deg"], chain["wrist"], sfacts,
