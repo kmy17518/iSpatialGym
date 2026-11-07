@@ -14,6 +14,8 @@
 # on the floor plane at h 0 (reach_maps.floor_config); no anchors / GB_HEIGHTS / GB_HEIGHTS_BY_ID are passed (a floor map has no height axis):
 #   GB_STAGES=maps GB_KIND=floor GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<floor jobs.json> GB_NSHARD=N GB_TAG=<tag> GB_GLIB=<glib> \
 #     sbatch --array=0-$((N-1)) job_glib.sh
+# i7-unblock 2026-11-07: GB_TRUNK_ELIGIBILITY (all_d_e | per_d_e; unset = reach_maps.MapConfig's default) = the maps stage's
+# --trunk-eligibility (the trunk eligibility rule, part of the map identity).
 #SBATCH --job-name=isggb
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -50,10 +52,11 @@ if [[ " $STAGES " == *" maps "* ]]; then
     HEIGHTS=(--anchors ${GB_ANCHORS:-$GBH/anchors.json} --heights ${GB_HEIGHTS:-0.4230 0.8126 1.0505} "${BYID[@]}")
   fi
   LTAG=$([ "$KIND" = tabletop ] && echo "" || echo "_$KIND")   # the tabletop log names stay as they were
+  TRUNK=(); [ -n "${GB_TRUNK_ELIGIBILITY:-}" ] && TRUNK=(--trunk-eligibility $GB_TRUNK_ELIGIBILITY)   # i7-unblock: all_d_e | per_d_e (default: MapConfig's)
   for ARM in ${GB_ARMS:-right}; do
     t0=$(date +%s)
     python -u -m ispatialgym.sampling.reach_maps compute --kind $KIND --jobs $M --glib $GLIB "${HEIGHTS[@]}" \
-      --arm $ARM --shard $I/$N --out $OUT/maps --skip-existing $DERIVED >> $OUT/logs/maps_${I}_$ARM$LTAG.log 2>&1
+      --arm $ARM --shard $I/$N --out $OUT/maps --skip-existing $DERIVED "${TRUNK[@]}" >> $OUT/logs/maps_${I}_$ARM$LTAG.log 2>&1
     rc=$?; [ $KIT_RC = 0 ] && KIT_RC=$rc
     echo "GB_STAGE maps arm=$ARM rc=$rc s=$(( $(date +%s) - t0 )) kind=$KIND"
   done
