@@ -60,8 +60,14 @@ def main(argv=None):
             kw["scale"] = th.tensor(sc, dtype=th.float32)
         # as the validation world loads its objects (validate_tabletop.TabletopWorld.load): free base, then posed and kept still; every
         # pose below is read relative to the object's live root pose, so a settling step does not matter
+        # both parts "attachable", as the attachment task spawns them (sim_utils.spawn extra_abilities: AttachedTo follows the
+        # abilities, and the taxonomy does not give it to every model with attachment meta links - teapot mvrhya)
+        from ispatialgym.sampling import knowledge as K
+
+        abilities = K.abilities_of_category(spec["category"])
+        abilities.update({"attachable": {}})
         o = DatasetObject(name=name, category=spec["category"], model=spec["model"], dataset_name=spec.get("dataset") or "behavior-1k-assets",
-                          fixed_base=False, **kw)
+                          fixed_base=False, abilities=abilities, **kw)
         scene.add_object(o)
         o.set_position_orientation(th.tensor(pos, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
         o.keep_still()
