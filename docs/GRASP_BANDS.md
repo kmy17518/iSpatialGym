@@ -1382,6 +1382,10 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 5 | i7-floating (75b101db) | dafed151 |
 | 6 | i7-overhang (c53a3a3b; carries i7-lean da868175 .. a4a0fa1e) | 62a3f082 |
 | 7 | i7-fingertouch (f1af78aa; not i7-fingertouch-ab-us03) | 405d0c2f |
+| 8 | i7-unblock (145afcd8) | fcb6a54e |
+| 9 | i7-attach-swept (d711771f = i7-attachmap + i7-attachhover, swept default) | b03f1dca |
+| 10 | i7-plateqtf (0866bfc0; expanding tilt / yaw map default on - the owner's confirmation pending) | 386ab2b4 |
+| 11 | i7-memory (c49eacf6; outcome memory default on for train splits; $OFH/alias_memory not seeded, no thresholds.json) | a8baafe3 |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1391,6 +1395,10 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
   without duplication. i7-lean's fixed-compartment posture rule (b4230177) now runs through `trunk_posture_groups(obstacle_free_of=)`.
 - The overhang side retreat merged with i7-plate's families and the exact retreat; its blade lookup stays at CONTACT_Z (the overhang entry was
   counted with the merged defaults and does not move).
+
+- i7-unblock's own trunk-eligibility commits add nothing at merge 8: the cherry-picks are identical, and only i7-overhang's additions
+  differed, so HEAD was kept. i7-plateqtf's bases (i7-unblock, i7-padsweep) were each taken once.
+- Both attach defaults are kept: attach_axis "seat" (the candidate rule) and the swept hover (the oracle).
 
 **Checks per merge.** pyflakes (no new messages); the full suite with the trunk PYTHONPATH: 6 failed = the baseline set, 0 errors;
 test_glib_switches (golden key), test_attach_seats, test_glib_padsweep, test_grasp_ladder, test_floating_grasps, the lean / overhang /
@@ -1410,8 +1418,19 @@ Replaced entries are in `glib|maps/_superseded_<reason>`. Each staged entry was 
 The integration count (`int1_20261108/count`, `count2`) moved 5 attach entries and the gym shoe L2. Those were rebuilt: cabinet door 4 -> 5,
 webcam 5 -> 6, skateboard jljqtt 6 -> 6, acmbvb 2 -> 1, dip candle poexjo 0 -> 0, gym shoe 6 -> 6.
 
-`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_405d0c2f: 73 entries, 126 maps, 0 object_key mismatches,
-48 links resolving, anchor ranges by the midpoint rule, 0 errors.
+Later layers:
+- cap xxqyrt from stage_cap. It does not move under the merged defaults (count3). Its 0.8126 tabletop maps were rebuilt, because the staged
+  ones were keyed before the switch identity.
+- The 8 attach maps (box + swept: lids tnwisp / pbmsji, cork, cap), rebuilt against the int1 entries. Every attachmap_20261107 map carried
+  a pre-identity male key.
+- plate qtfzeq = the merged entry of v2maps_i7pq (27 valid; replaced entry in `_superseded_merged`).
+- 30 per_d_e merged maps of v2maps_i7unblock, only for entries int1 still holds unchanged (`_superseded_trunkelig`).
+
+**Open:** the per_d_e count and merge for the 46 former-rule maps of the 23 entries int1 replaced, plus the 8 interior / overhang maps
+i7-unblock deferred.
+
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_386ab2b4: 74 entries, 128 maps and 8 attach maps, 0 key mismatches, 50 links resolving,
+21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
 **Validation** (int1_1, `--grasps v2only` N 4 on the affected aliases only): see DECISIONS for the list, the skips and the results.
 
