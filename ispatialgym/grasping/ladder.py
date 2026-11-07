@@ -158,7 +158,7 @@ def history(src_dir: str, status: Dict[str, Optional[int]]) -> Dict[str, Any]:
         for r in (t.get("reasons") or (["valid"] if t.get("verdict") == "valid" else [])):
             reasons[str(r).split("@")[0]] += 1
     return {"rounds": status, "last_build": src_dir, "log": {k: v for k, v in (cand.get("log") or {}).items() if isinstance(v, dict)},
-            "geometry_reasons": dict(Counter((c.get("family") or c.get("mode"), c["geometry"]["reason"]) for c in cand.get("candidates") or []).most_common()) if cand else {},
+            "geometry_reasons": dict(Counter(f"{c.get('family') or c.get('mode')}/{c['geometry']['reason']}" for c in cand.get("candidates") or []).most_common()),
             "physics_reasons": dict(reasons)}
 
 

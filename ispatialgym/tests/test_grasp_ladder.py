@@ -338,3 +338,32 @@ def test_step4_list_and_owner_gate(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         LS.main(["submit", "--batch", str(batch), "--code", "/x", "--out", str(tmp_path / "out")])
     assert not os.path.exists(tmp_path / "out")
+
+
+def test_select_and_prepare_write_json_inputs_and_strips(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    import agent_step as AS
+
+    root = tmp_path / "L3"
+    d = root / "models" / "box__x__s1"
+    d.mkdir(parents=True)
+    m = trimesh.creation.box(extents=(0.03, 0.05, 0.04))
+    S.save_json(str(d / "geometry.json"), {"format": OG.FORMAT, "category": "box", "model": "x", "mass": 0.1, "meta_links": {},
+                                           "pieces": [{"name": "p0", "vertices": m.vertices.tolist(), "faces": m.faces.tolist()}]})
+    S.save_json(str(d / "candidates.json"), {"log": {"top": {"n_tilt": 3, "n_width_antipodal": 0}}, "candidates": [
+        {"name": "top_0", "mode": "top", "score": 1.0, "T_rest_eef": {"position": [0, 0, 0.03], "orientation_xyzw": [1.0, 0, 0, 0]}, "width_m": 0.03,
+         "features": {"shift_m": 0.0}, "geometry": {"ok": False, "reason": "finger_blade_in_object", "stage": "closing"}}]})
+    S.save_json(str(d / "library.json"), {"grasps": []})
+    S.save_json(str(d / "validation.json"), {"trials": [{"candidate": "top_0", "verdict": "invalid", "reasons": ["no_placement"]}]})
+    man = tmp_path / "m.json"
+    S.save_json(str(man), [{"id": "box__x__s1", "category": "box", "model": "x", "scale": [1, 1, 1], "constraint": "tabletop", "rest_hint_wxyz": None,
+                            "legacy_key": None, "alias_key": "alias_x"}, {"id": "other__y__s1", "category": "other", "model": "y"}])
+    batch = tmp_path / "batch"
+    AS.main(["select", "--manifest", str(man), "--roots", str(root), "--batch", str(batch)])
+    AS.main(["prepare", "--batch", str(batch)])
+    doc = json.load(open(batch / "inputs" / "box__x__s1.json"))
+    assert doc["contract"] == LD.CONTRACT and doc["geometry"]["extents_mm"] == [30.0, 50.0, 40.0] and doc["markers"][0]["marker"] == "A"
+    assert doc["history"]["geometry_reasons"] == {"top/finger_blade_in_object": 1} and doc["history"]["physics_reasons"] == {"no_placement": 1}
+    assert os.path.getsize(batch / doc["strip"]) > 10000 and (batch / "CONTRACT.md").exists() and (batch / "contract.schema.json").exists()
+    AS.main(["propose", "--batch", str(batch), "--runner", "manual"])
+    assert not (batch / "proposals" / "box__x__s1.json").exists()
