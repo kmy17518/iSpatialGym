@@ -143,7 +143,8 @@ def cluster_rests(outcomes: Sequence[Dict[str, Any]], V: np.ndarray, designated_
 def jobs_for_rests(job: Dict[str, Any], clusters: Sequence[Dict[str, Any]], min_outcomes: int = MIN_OUTCOMES) -> List[Dict[str, Any]]:
     """The jobs generated from a survey: the job itself designated at its most frequent stable rest (same id: the downstream maps /
     sampler keep their entry), and a derived job (its own id, ``derived_from``) per other stable rest seen at least ``min_outcomes``
-    times. Each carries ``rest_hint_wxyz`` (the measured rest) and ``settle_first`` (the cluster without its members)."""
+    times. The main job carries the measured rest as ``generation_rest_wxyz`` (its ``rest_hint_wxyz``, which names its directory, unchanged),
+    a derived job as its ``rest_hint_wxyz``; both carry ``settle_first`` (the cluster without its members)."""
     out: List[Dict[str, Any]] = []
     stable = [c for c in clusters if c["n_stable"] > 0]
     for k, c in enumerate(stable):
@@ -153,7 +154,9 @@ def jobs_for_rests(job: Dict[str, Any], clusters: Sequence[Dict[str, Any]], min_
         hint = [round(w, 6), round(x, 6), round(y, 6), round(z, 6)]
         meta = {kk: v for kk, v in c.items() if kk != "members"}
         if k == 0:
-            out.append(dict(job, rest_hint_wxyz=hint, rest_pose="settle_first", settle_first=meta, designated_rest_hint_wxyz=job.get("rest_hint_wxyz")))
+            # the job's own id AND directory (schema.job_dir derives both from rest_hint_wxyz): the designated hint stays, the measured rest is
+            # generation_rest_wxyz (candidates.generate / validate_tabletop.run_model read it first)
+            out.append(dict(job, generation_rest_wxyz=hint, rest_pose="settle_first", settle_first=meta, designated_rest_hint_wxyz=job.get("rest_hint_wxyz")))
         else:
             nj = dict(job, rest_hint_wxyz=hint, rest_pose="settle_first", settle_first=meta, derived_from=job["id"],
                       designated_rest_hint_wxyz=job.get("rest_hint_wxyz"))

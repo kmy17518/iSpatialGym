@@ -62,5 +62,6 @@ def test_jobs_keep_the_id_at_the_main_rest_and_derive_one_per_other_frequent_res
     jobs = SF.jobs_for_rests(job, cl)
     assert jobs[0]["id"] == job["id"] and jobs[0]["rest_pose"] == "settle_first" and jobs[0]["settle_first"]["rest_id"] == "s0"
     assert len(jobs) == 2 and jobs[1]["derived_from"] == job["id"] and jobs[1]["id"] != job["id"]  # the 1-outcome rest gets no job
-    w, x, y, z = jobs[0]["rest_hint_wxyz"]
+    assert jobs[0].get("rest_hint_wxyz") is None and S.job_dir(jobs[0]).endswith(job["id"])  # the designated directory is kept
+    w, x, y, z = jobs[0]["generation_rest_wxyz"]
     assert abs(S.tilt_distance([x, y, z, w], cl[0]["quat_xyzw"])) < 1e-5 and "members" not in jobs[0]["settle_first"]

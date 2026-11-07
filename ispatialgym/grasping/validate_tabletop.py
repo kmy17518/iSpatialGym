@@ -696,7 +696,7 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
     trials: List[Dict[str, Any]] = []
     timing = dict(world.timing)
     try:
-        hint = job.get("rest_hint_wxyz")
+        hint = job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz")  # of-v2maps 2026-11-07: the surveyed rest (GB_SETTLE_FIRST)
         q_rest = np.array([0, 0, 0, 1.0]) if hint is None else np.array([hint[1], hint[2], hint[3], hint[0]])
         quat0 = S.quat_mul(S.quat_yaw(cfg.reference_yaw), q_rest)
         rest, state = world.settle(obj, geom, quat0)

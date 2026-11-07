@@ -352,7 +352,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     if geom0 is None:
         raise FileNotFoundError(f"no geometry.json in {model_dir} (run the export stage)")
     constraint = job.get("constraint") or "tabletop"
-    R = rest_rotation(job.get("rest_hint_wxyz"))
+    # of-v2maps 2026-11-07 (GB_SETTLE_FIRST): a surveyed rest generates the candidates (generation_rest_wxyz), the designated hint names the entry
+    R = rest_rotation(job.get("generation_rest_wxyz") or job.get("rest_hint_wxyz"))
     geom = geom0.rotated(R)  # the rest frame: the tabletop is z = z_min
     union = geom.union
     lo, hi = union.vertices.min(0), union.vertices.max(0)
@@ -565,7 +566,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         by_name[f["representative"]]["family_relation"] = "representative"
     log["symmetry_s"] = round(time.time() - t_sym, 2)
     out = {"schema": S.CANDIDATES, "pipeline": PIPELINE, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
-           "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "legacy_key": job.get("legacy_key"),
+           "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "generation_rest_wxyz": job.get("generation_rest_wxyz"), "legacy_key": job.get("legacy_key"),
            "arm": arm, "policy": policy.meta(arm), "policy_key": policy.key(arm), "config": asdict(cfg), "symmetry_config": asdict(sym_cfg),
            "candidates": out_cands, "families": families, "representatives": rep_names, "log": log, "t_s": round(time.time() - t0, 2),
            "created": S.now(), "review_instructions": "docs/GRASP_REVIEW.md (symmetry annotations required)"}
