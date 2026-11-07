@@ -227,6 +227,11 @@ def main(argv=None):
 
     configure_logging(args.log_level)
     log_fast_switches()
+    # i7-memory (owner 2026-11-08 part C): the per-alias outcome memory ($ISPATIALGYM_ALIAS_MEMORY) steers TRAIN generation only - never an
+    # eval instance (alias_memory.enable_for_split: any other split leaves it off whatever the environment says)
+    from ispatialgym.sampling import alias_memory as AM
+
+    AM.enable_for_split(args.split)
     if train:
         return main_train(args)
     template_dir = os.path.abspath(args.template[0])

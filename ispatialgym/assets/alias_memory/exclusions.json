@@ -1,0 +1,12 @@
+{
+ "_comment": "Per-alias outcome memory (owner 2026-11-08 01:45 UTC, part C): demo rows that are NEVER counted against a configuration. First match wins. A rule's 'match' compares a memory row's fields (status, rc, reason, failure_type, stage, action, alias, tag, snapshot = ctx.snapshot, meta / sidecar = file present, wall_clock_exceeded): a scalar = equal, a list = one of, {\"not_in\": [...]}, {\"re\": regex}. 'kind' infrastructure = not the configuration's doing; known_bug = a documented defect of the code, counted again once fixed (scope it by snapshot). Add a rule with its why and its DECISIONS line; never remove one silently.",
+ "exclusions": [
+  {"id": "infra.status_error", "kind": "infrastructure", "match": {"status": "error"}, "why": "run_isg crashed (rc 4: an exception, not a verdict)"},
+  {"id": "infra.rc", "kind": "infrastructure", "match": {"rc": {"not_in": [0, 2]}}, "why": "the collector exited with neither success (0) nor an oracle verdict (2)"},
+  {"id": "infra.timeout", "kind": "infrastructure", "match": {"reason": ["timeout", "wallclock", "wall_clock"]}, "why": "the episode's wall clock / slurm deadline, not a planner or QA verdict"},
+  {"id": "infra.wall_clock", "kind": "infrastructure", "match": {"wall_clock_exceeded": true}, "why": "meta.wall_clock_exceeded: the episode was cut by time"},
+  {"id": "infra.oom", "kind": "infrastructure", "match": {"reason": {"re": "(?i)out of memory|\\boom\\b|cuda error|killed"}}, "why": "GPU / host memory"},
+  {"id": "infra.missing_meta", "kind": "infrastructure", "match": {"meta": false}, "why": "no demo meta.json: the outcome or its stage is unknown"},
+  {"id": "infra.missing_sidecar", "kind": "infrastructure", "match": {"sidecar": false}, "why": "no sidecar: the configuration is unknown"}
+ ]
+}

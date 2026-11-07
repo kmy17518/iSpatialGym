@@ -505,6 +505,10 @@ def main(argv=None, shutdown: bool = True):
                                                                  "scheduler groups variants with equal keys into one process")
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
+    # i7-memory (owner 2026-11-08 part C): sample_isg makes the eval templates / instances - the per-alias outcome memory never applies
+    from ispatialgym.sampling import alias_memory as _AM
+
+    _AM.enable_for_split(None)
     if args.room and not args.scene:
         parser.error("--room needs --scene")
     if args.scene_from_split and (args.scene or args.room or not args.seed_split):
