@@ -46,6 +46,7 @@ from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import pose_target
+from ispatialgym.sampling.v2 import contact_poses as CPZ
 from ispatialgym.sampling.v2 import orient as ORI
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
@@ -278,16 +279,8 @@ def fist_half_extents(depth: float, arm: str = "right") -> Tuple[float, float]:
     return float(np.abs(sel[:, 1]).max()), float(np.abs(sel[:, 0]).max())
 
 
-def wall_fist_axes(normal, closing, tilt: float = 0.0) -> Tuple[th.Tensor, th.Tensor]:
-    """(approach a, closing c) of a wall contact that acts in the wall plane: the fingers point into the wall (a = −n),
-    turned by ``tilt`` (rad) about c, and the pads close along ``closing`` (in the wall plane) — the outer side of a finger
-    (normal ±c) meets the target's edge, so the contact normal lies in the wall plane."""
-    n = C.unit(th.as_tensor(normal, dtype=th.float32))
-    c = th.as_tensor(closing, dtype=th.float32)
-    c = C.unit(c - n * float(th.dot(c, n)))
-    k = C.unit(th.cross(c, n, dim=0))
-    a = C.unit(-n * math.cos(tilt) + k * math.sin(tilt))
-    return a, c
+# i7-contact 2026-11-07: the wall contact's axes are the shared rule (contact_poses.wall_fist_axes)
+wall_fist_axes = CPZ.wall_fist_axes
 
 
 def wall_brace_turns(tilts: Sequence[float]) -> List[Tuple[float, str, float]]:
@@ -309,14 +302,8 @@ def _orient_extra(decision: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return {"orient": decision}
 
 
-def wall_contact_pose(point, normal, direction, face: float, gap: float = 0.0, tilt: float = 0.0, turn: float = 1.0) -> Tuple[th.Tensor, th.Tensor]:
-    """eef pose of a wall contact acting along ``direction`` (in the wall plane, toward the target): the outer side of a
-    finger (``face`` from the eef axis) stands ``gap`` before ``point``, the fingertips at ``point``'s depth (on the target's
-    mid-plane), the pads closing along ``turn`` · direction (either wrist turn puts a finger side on the point)."""
-    d = th.as_tensor(direction, dtype=th.float32)
-    a, c = wall_fist_axes(normal, d * (1.0 if turn >= 0 else -1.0), tilt)
-    tip = th.as_tensor(point, dtype=th.float32) - C.unit(d) * (float(face) + float(gap))
-    return tip - C.FINGERTIP_LENGTH * a, C.eef_quat(a, c)
+# i7-contact 2026-11-07: the wall push / brace pose is the shared rule (contact_poses.wall_contact_pose)
+wall_contact_pose = CPZ.wall_contact_pose
 
 
 def wall_screen_pose(pose, normal) -> Tuple[th.Tensor, th.Tensor]:

@@ -41,6 +41,7 @@ from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
+from ispatialgym.sampling.v2 import contact_poses as CPZ
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
@@ -56,7 +57,7 @@ AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-
 #: FINGER_PROFILE``: 8.4 mm over the fingertip section, 18 mm above it, no blade at the palm) over the height the face
 #: spans above the fingertips — the former 12 mm slab is gone (owner review of the axial demo, 2026-09-16)
 STOP_CLEARANCE = 0.005  # §5.5 style: the blade's outer face 5 mm outside the goal hull
-PUSH_TIP_CLEARANCE = 0.003  # the closed fingertips this far above the top for the thinnest targets (push / blade stop)
+PUSH_TIP_CLEARANCE = 0.003  # (= contact_poses.AXIAL_PUSH_TIP_CLEARANCE_M) the closed fingertips this far above the top for the thinnest targets (push / blade stop)
 THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down blade before the side contact classes
 #: the stop point may lie within one lattice cell of a left contact band cell (the blade stands beside the cell; the left band
 #: of a flat target starts at λ = 0.08 on the pilot support while the right band ends at 0.0 — the exact two-arm IK decides)
@@ -254,7 +255,7 @@ class AlignmentAxial(SamplerV2):
         0.6·h above the top) with the floor lowered from 3 cm to the fingertip length + 3 mm — at the 3 cm floor the
         closed fingers' tips (1.88 cm beyond the origin) hover 1.1 cm above the top and never touch a letter / magazine
         / catalog (h <= 1 cm); with the lower floor the blade spans the side face of every target."""
-        z = float(self.top.z) + max(0.6 * self.extents["height"], C.FINGERTIP_LENGTH + PUSH_TIP_CLEARANCE)
+        z = CPZ.axial_push_height(float(self.top.z), self.extents["height"], PUSH_TIP_CLEARANCE)  # i7-contact 2026-11-07: the shared rule
         # A/B knob generation.contact_height_extra_m (D2 core helper, 0 = no-op): the fingertip stays >= 1 cm below the target's top
         return lift_contact_height(self, z, "push", face_top_z=float(self.top.z) + float(self.extents["height"]))
 
@@ -401,11 +402,9 @@ class AlignmentAxial(SamplerV2):
                     push_half_p = geo[1]
                     props = []
                     for rank, c_sign in enumerate((1.0, -1.0)):
-                        quat = C.eef_quat(a_vec, c_sign * c_axis)
-                        p_init = (side_pt - d * push_half_p, quat)
-                        arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), z_axis, d_goal, n=2)
-                        props.append(O.Proposal(f"{pitch:.0f}{'' if c_sign > 0 else '-'}{'_side' if c_axis is side_c else ''}", rank, c_sign,
-                                                [C.pre_pose(p_init), p_init, arc[0], arc[1]]))
+                        # i7-contact 2026-11-07: the shared chain (contact_poses.axial_push_chain)
+                        chain = CPZ.axial_push_chain(side_pt, d, push_half_p, a_vec, c_axis, c_sign, th.tensor([float(com[0]), float(com[1]), z_push]), d_goal)
+                        props.append(O.Proposal(f"{pitch:.0f}{'' if c_sign > 0 else '-'}{'_side' if c_axis is side_c else ''}", rank, c_sign, chain))
 
                     def evaluate(p):
                         res = self.ikc.waypoints_ok(list(p.chain), manip, "right", ignore_all=[support, target], q_first=p.q_first)

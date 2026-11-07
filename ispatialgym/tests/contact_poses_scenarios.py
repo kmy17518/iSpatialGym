@@ -1,5 +1,5 @@
 """i7-contact 2026-11-07: the touching push / brace candidate scenarios of the contact-pose regression (``test_contact_poses``): each scenario
-builds an ``IORSSmall`` stand-in (``test_iors_small_lift._sampler``: the real class without a simulator), its hulls, the stance and the
+builds an ``IORSSmall`` stand-in (the large-scale / nextto / wall / axial builders: their tests' stand-ins) (``test_iors_small_lift._sampler``: the real class without a simulator), its hulls, the stance and the
 generation, and lists one record builder's candidates. ``ispatialgym/tests/data/contact_poses_golden.json`` holds the lists the builders
 produced at 63925048 (before the rules moved to ``sampling/v2/contact_poses.py``); ``python -m ispatialgym.tests.contact_poses_scenarios``
 rewrites it (only ever from a commit whose records are the reference)."""
@@ -152,17 +152,127 @@ def brace_scenarios():
     return out
 
 
+# ---------------------------------------------------------------------------------------------------------------- the other push / brace builders
+
+
+def _capture(IL, fn):
+    """Every ``orient.choose`` call's proposals during ``fn()`` (each call answered "none chosen", so every form / pitch / rung is visited):
+    ``[[stage, [[label, rank, payload, [pose...]], ...]], ...]``."""
+    calls = []
+    orig = IL.O.choose
+
+    def choose(ikc, arm, props, evaluate, q_start, camera_idx=None, stage="", downstream=None):
+        calls.append([stage, [[p.label, p.rank, _jsonable(p.payload) if not isinstance(p.payload, th.Tensor) else _jsonable(p.payload),
+                               [_pose(c) for c in p.chain]] for p in props]])
+        return None, {"options": []}
+
+    IL.O.choose = choose
+    try:
+        fn()
+    finally:
+        IL.O.choose = orig
+    return calls
+
+
+def large_scenarios():
+    """``(name, callable -> jsonable)`` of the floor push builders of ``iors_large`` (push height, the blade / flat / pitched-far chains)."""
+    from ispatialgym.sampling.v2.tasks import iors_large as IL
+    from ispatialgym.tests import test_iors_large_push_pitched as PP
+    from ispatialgym.tests import test_push_under_palm as PALM
+
+    out = []
+
+    def heights(name, height, gen):
+        def run():
+            s = PP._sampler(height=height, **gen)
+            return [list(s.push_height(p)) for p in (0.0, 30.0, 45.0, 60.0, 65.0, 70.0)]
+        out.append((name, run))
+
+    def chain(name, make, stance, drop, goal, d2, yaw=0.0):
+        def run():
+            s = make()
+            q = C.quat_from_yaw(math.radians(yaw))
+            return _capture(IL, lambda: s._push_under_chain(stance(), q, drop, goal, d2))
+        out.append((name, run))
+
+    heights("height_briefcase", 0.27, {})
+    heights("height_sandal_knobs", 0.072, {"push_tip_frac": 0.4, "push_tip_clearance_m": 0.02})
+    heights("height_flat_low", 0.02, {})
+    palm_place = lambda: PALM.PLACE  # noqa: E731
+    chain("blade_short_box", lambda: PALM._sampler(PALM._box(0.20, 0.12, 0.08)), palm_place, PALM.DROP, PALM.GOAL, (0.0, 1.0))
+    chain("blade_palm_contact", lambda: PALM._sampler(PALM._box(0.33, 0.12, 0.27), push_under_palm_contact=True), palm_place, PALM.DROP, PALM.GOAL, (0.0, 1.0))
+    chain("blade_yawed_offset", lambda: PALM._sampler(PALM._box(0.24, 0.09, 0.07), push_contact_offset_m=0.11, push_goal_extra_m=0.02), palm_place,
+          (0.05, -0.02), (0.05, 0.35), (0.0, 1.0), yaw=30.0)
+    from ispatialgym.tests import test_iors_large_push_flat as FL
+
+    chain("flat_briefcase", lambda: FL._sampler(push_under_hand="flat"), FL._stance, FL.DROP, FL.GOAL, (1.0, 0.0))
+    chain("flat_low_box", lambda: FL._sampler(height=0.10, com_z=0.04, push_under_hand="flat", push_flat_pre_dist_m=0.06), FL._stance, FL.DROP, FL.GOAL, (1.0, 0.0),
+          yaw=20.0)
+    chain("pitched_far_briefcase", lambda: PP._sampler(push_under_hand="pitched_far"), PP._stance, (1.0, 0.0), (1.40, 0.0), (1.0, 0.0))
+    chain("pitched_far_short", lambda: PP._sampler(height=0.12, com_z=0.05, push_under_hand="pitched_far", push_far_pre_m=[0.08, 0.04]), PP._stance,
+          (1.0, 0.1), (1.35, 0.1), (1.0, 0.0), yaw=15.0)
+    return out
+
+
+def nextto_wall_axial_scenarios():
+    """``(name, callable -> jsonable)``: the base push's hand poses (``iors_large_nextto.push_hand_poses``), the wall contacts
+    (``alignment_wall.wall_contact_pose``) and the axial push's eef height (``AlignmentAxial._push_height``)."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+    from ispatialgym.sampling.v2.tasks import iors_large_nextto as NT
+
+    out = []
+
+    def nextto():
+        rows = []
+        for point, d2, pitch, wrist, pre in (((1.2, 0.3, 0.25), (0.0, 1.0), 20.0, 1.0, 0.10), ((0.4, -0.2, 0.4), (0.6, -0.8), 35.0, -1.0, 0.08),
+                                             ((0.0, 0.0, 0.1), (-1.0, 0.0), 0.0, 1.0, 0.12)):
+            pre_p, contact = NT.push_hand_poses(th.tensor(point), d2, pitch, wrist, pre)
+            rows.append([_pose(pre_p), _pose(contact), _jsonable(NT.pitched_approach(d2, pitch))])
+        return rows
+
+    def wall():
+        rows = []
+        for point, n, d, face, gap, tilt, turn in (((0.5, 0.2, 0.9), (1.0, 0.0, 0.0), (0.0, 0.0, -1.0), 0.0084, 0.0, 0.0, 1.0),
+                                                   ((0.5, 0.2, 0.9), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), 0.007, 0.005, 0.3, -1.0),
+                                                   ((-0.3, 1.1, 1.2), (0.0, -1.0, 0.0), (0.6, 0.0, 0.8), 0.018, 0.002, -0.2, 1.0)):
+            rows.append(_pose(AW.wall_contact_pose(th.tensor(point), th.tensor(n), th.tensor(d), face, gap=gap, tilt=tilt, turn=turn)))
+            rows.append(_jsonable(list(AW.wall_fist_axes(th.tensor(n), th.tensor(d), tilt))))
+        return rows
+
+    def axial():
+        rows = []
+        for h, top, gen in ((0.012, 0.81, {}), (0.03, 0.7351, {}), (0.05, 0.6854, {}), (0.03, 0.8126, {"contact_height_extra_m": 0.01})):
+            s = SimpleNamespace(top=SimpleNamespace(z=top), extents={"height": h}, gen=lambda k, d=None, g=gen: g.get(k, d))
+            rows.append(round(float(AX.AlignmentAxial._push_height(s)), 6))
+        return rows
+
+    out += [("nextto_push_hand_poses", nextto), ("wall_contact_pose", wall), ("axial_push_height", axial)]
+    return out
+
+
 def run_all() -> Dict[str, Any]:
     out: Dict[str, Any] = {"push": {}, "brace": {}}
     for name, fn in push_scenarios():
         out["push"][name] = [[k, _pose(p), _jsonable(e)] for k, p, e in fn()]
     for name, fn in brace_scenarios():
         out["brace"][name] = [[k, _pose(pre), _pose(c), _jsonable(e)] for pre, c, k, e in fn()]
+    out["large"] = {name: fn() for name, fn in large_scenarios()}
+    out["other"] = {name: fn() for name, fn in nextto_wall_axial_scenarios()}
     return out
 
 
 if __name__ == "__main__":
+    import sys
+
     doc = run_all()
+    if "--sections" in sys.argv:  # only these sections are rewritten (the others keep the commit they were made at)
+        keep = sys.argv[sys.argv.index("--sections") + 1].split(",")
+        with open(GOLDEN) as f:
+            old = json.load(f)
+        doc = {k: (doc[k] if k in keep else old.get(k, doc[k])) for k in doc}
     with open(GOLDEN, "w") as f:
         json.dump(doc, f, indent=0, sort_keys=True)
     print({k: {n: len(v) for n, v in d.items()} for k, d in doc.items()})

@@ -68,6 +68,7 @@ from ispatialgym.sampling.eef_reach_volume import TRANSLATES
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
+from ispatialgym.sampling.v2 import contact_poses as CPZ
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import program_check as PC
 from ispatialgym.sampling.v2 import prompt0 as P0
@@ -391,24 +392,9 @@ def contact_local(face: str, coord: float, t0: float, z_local: float) -> th.Tens
     return th.tensor([nx * coord - ny * t0, ny * coord + nx * t0, z_local])
 
 
-def pitched_approach(direction_xy, pitch_deg: float) -> th.Tensor:
-    """Approach axis along the horizontal push ``direction`` tilted down by ``pitch_deg`` (fingertips forward-down onto the face)."""
-    d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1])], dtype=th.float32)
-    d = d / max(float(th.linalg.norm(d)), 1e-9)
-    p = math.radians(float(pitch_deg))
-    return th.tensor([math.cos(p) * float(d[0]), math.cos(p) * float(d[1]), -math.sin(p)])
-
-
-def push_hand_poses(point, direction_xy, pitch_deg: float, wrist: float, pre_m: float) -> Tuple[G.Pose, G.Pose]:
-    """``(pre, contact)`` eef poses of the closed hand: the fingertips on ``point`` with the approach of :func:`pitched_approach`, the pads
-    closing horizontally across the push (``wrist`` ±1 = the two wrist turns), the pre-contact ``pre_m`` back along the horizontal push."""
-    a = pitched_approach(direction_xy, pitch_deg)
-    d = th.tensor([float(direction_xy[0]), float(direction_xy[1]), 0.0])
-    d = d / max(float(th.linalg.norm(d)), 1e-9)
-    perp = th.tensor([-float(d[1]), float(d[0]), 0.0]) * float(wrist)
-    q = C.eef_quat(a, perp)
-    origin = th.as_tensor(point, dtype=th.float32) - C.FINGERTIP_LENGTH * a
-    return (origin - d * float(pre_m), q), (origin, q)
+# i7-contact 2026-11-07: the base push's hand poses are the shared rule (contact_poses.base_push_approach / base_push_hand_poses)
+pitched_approach = CPZ.base_push_approach
+push_hand_poses = CPZ.base_push_hand_poses
 
 
 def push_stance_pose(point_xy, direction_xy, stand_off: float, lateral: float) -> Tuple[float, float, float]:

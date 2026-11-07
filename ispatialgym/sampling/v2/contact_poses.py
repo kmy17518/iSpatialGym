@@ -923,51 +923,361 @@ def touching_brace_candidates(gs, manip: Stance, b_point: th.Tensor, face_z: Tup
         yield from gen()
 
 
-# ------------------------------------------------------------------------------------------------ what the oracle executes of a record
-
-#: ``execute.ExecuteConfig.push_pre_dist_m``: a straight push's pre-contact this far before the recorded init along the approach
-PUSH_EXEC_PRE_DIST_M = 0.04
-#: ``execute.push_lowered_pre``'s slack: a recorded pre-contact this much farther than ``PUSH_EXEC_PRE_DIST_M`` before the init is lowered
-PUSH_EXEC_PRE_SLACK_M = 0.005
-#: ``execute.ExecuteConfig.brace_touch_stop_m`` / ``brace_touch_backoff_m``: the brace's straight leg stops once the braced object moved
-#: this far and backs off along its approach
-BRACE_EXEC_TOUCH_STOP_M = 0.002
-BRACE_EXEC_BACKOFF_M = 0.004
+# ------------------------------------------------------------------------------------------------ the oracle's run-time transforms (called, not re-implemented)
 
 
-def pitched_push_class(kind: Optional[str]) -> bool:
-    """``execute._pitched_push_class`` of a record's ``pose_class``: a pitched blade ``push_blade_<deg>`` of 30 deg or steeper (the leaning /
-    raised blades' suffixes are not a number: not pitched)."""
-    try:
-        cls = str(kind or "")
-        return cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0
-    except (TypeError, ValueError):
-        return False
+def _oracle():
+    """``(execute, actions, sidecar)`` of the oracle, imported on first use (read-only: the transforms below CALL them)."""
+    from ispatialgym.oracle import actions as AC
+    from ispatialgym.oracle import execute as EX
+    from ispatialgym.oracle import sidecar as SC
+
+    return EX, AC, SC
+
+
+def oracle_config():
+    """The oracle's default ``ExecuteConfig`` (the run-time knobs the transforms read: ``push_pre_dist_m``, ``brace_touch_stop_m`` ...)."""
+    return _oracle()[0].ExecuteConfig()
+
+
+def _sc_pose(pose):
+    SC = _oracle()[2]
+    p, q = G.t(pose[0]).float(), G.t(pose[1]).float()
+    return SC.Pose([float(v) for v in p.tolist()], [float(v) for v in q.tolist()])
+
+
+def executed_push_pre(kind: Optional[str], init, pre, *, arc: bool = False, extras: Optional[Dict[str, Any]] = None, cfg=None):
+    """The pre-contact the oracle reaches a recorded push at: ``execute.push_lowered_pre`` on the record (``pose_class`` = ``kind``; an arc has a
+    ``mid``) - the recorded ``pre`` lowered to ``push_pre_dist_m`` (0.04 m) before ``init`` along the approach when it lies farther, else
+    ``pre`` itself. Returns ``(pos, quat)`` tensors."""
+    EX = _oracle()[0]
+    cfg = cfg or oracle_config()
+    contact = SimpleNamespace(mid=object() if arc else None, extra=dict(extras or {}, pose_class=kind))
+    low = EX.push_lowered_pre(contact, _sc_pose(pre), _sc_pose(init), cfg)
+    if low is None:
+        return G.t(pre[0]).float(), G.t(pre[1]).float()
+    return th.tensor(low.position, dtype=th.float32), th.tensor(low.orientation, dtype=th.float32)
 
 
 def recorded_pre_dist(extras: Optional[Dict[str, Any]]) -> float:
-    """The pre-contact distance of a push record (``IORSSmall._touching_push_choice``'s chain: ``pre_dist_m``, else ``IK.PRE_DIST``)."""
+    """The pre-contact distance of a touching push record (``IORSSmall._touching_push_choice``'s chain: ``pre_dist_m``, else ``IK.PRE_DIST``)."""
     return float((extras or {}).get("pre_dist_m") or IK.PRE_DIST)
 
 
-def executed_push_pre_dist(kind: Optional[str], extras: Optional[Dict[str, Any]], *, arc: bool = False,
-                           push_pre_dist_m: Optional[float] = PUSH_EXEC_PRE_DIST_M) -> float:
-    """How far before the init along the approach the oracle reaches a push's pre-contact (``execute.push_lowered_pre``): the recorded
-    distance, lowered to ``push_pre_dist_m`` when it lies more than ``PUSH_EXEC_PRE_SLACK_M`` beyond it - never for an arc (``mid``), a
-    pitched >= 30 deg blade class or ``push_pre_dist_m`` None."""
-    d = recorded_pre_dist(extras)
-    if arc or push_pre_dist_m is None or pitched_push_class(kind):
-        return d
-    return float(push_pre_dist_m) if d > float(push_pre_dist_m) + PUSH_EXEC_PRE_SLACK_M else d
+def executed_push_pre_dist(kind: Optional[str], extras: Optional[Dict[str, Any]], *, arc: bool = False, cfg=None) -> float:
+    """How far before the init along the approach the oracle reaches a touching push's pre-contact (:func:`executed_push_pre` of the record's
+    pre at :func:`recorded_pre_dist`)."""
+    init = (th.zeros(3), C.IDENTITY_QUAT.clone())
+    pre = IK.pre_pose(init, recorded_pre_dist(extras))
+    low = executed_push_pre(kind, init, pre, arc=arc, extras=extras, cfg=cfg)
+    return round(float(th.linalg.norm(low[0] - init[0])), 6)
 
 
-def contact_fingers(extras: Optional[Dict[str, Any]]) -> float:
-    """The finger joints (m per finger) the oracle holds a push / brace at: the record's ``fingers_opening_m`` (an open push, a wide stop),
-    else closed (``execute_push`` / ``execute_brace``)."""
-    v = (extras or {}).get("fingers_opening_m")
-    return IK.FINGER_CLOSED if v is None else float(v)
+#: the executors of a push record (``execute.EXECUTORS``): ``push`` = ``execute_push`` (a ``Push``: touching, axial, block design, the
+#: push-under, the wall push), ``base_push`` = ``execute_base_push`` (a ``BasePush``: ``kind: "base_push"``, nextto_large / touching_large_01)
+PUSH_EXECUTORS = ("push", "base_push")
+
+
+def pre_pose_rule(kind: Optional[str], extras: Optional[Dict[str, Any]] = None, *, arc: bool = False, executor: str = "push",
+                  recorded_m: Optional[float] = None, cfg=None) -> Dict[str, Any]:
+    """Owner decision 6 (2026-11-07): the pre-pose the oracle EXECUTES for a push record, as a schema field. ``execute_push`` puts a straight
+    push's ``init`` into its targets (no ``mid``) and calls ``push_lowered_pre``: the recorded pre-contact is replaced by one
+    ``push_pre_dist_m`` (0.04 m) before the init along the recorded approach unless the record has a ``mid`` (an arc: the axial push, the
+    push-under, the wall push), its ``pose_class`` is a pitched >= 30 deg blade, or the recorded pre lies within ``push_pre_dist_m`` + 5 mm of
+    the init; ``execute_base_push`` (a ``BasePush``) never lowers. ``rule`` = ``"lowered_to_push_pre_dist_m"`` | ``"recorded"``, with the
+    distance (m before the init along the approach) and the condition that decided it."""
+    cfg = cfg or oracle_config()
+    rec = float(recorded_pre_dist(extras) if recorded_m is None else recorded_m)
+    pdist = cfg.push_pre_dist_m
+    if executor == "base_push":
+        why, lowered = "BasePush: execute_base_push reaches the recorded pre-contact (no push_lowered_pre)", False
+    elif executor != "push":
+        raise ValueError(f"pre_pose_rule: executor {executor!r} (one of {PUSH_EXECUTORS})")
+    elif arc:
+        why, lowered = "the record has a mid (an arc / waypoint push): push_lowered_pre keeps the recorded pre", False
+    elif pdist is None:
+        why, lowered = "ExecuteConfig.push_pre_dist_m is None", False
+    elif pitched_push_class(kind):
+        why, lowered = f"pose_class {kind!r} is a pitched >= 30 deg blade: push_lowered_pre keeps the recorded pre", False
+    elif rec <= float(pdist) + PUSH_PRE_SLACK_M:
+        why, lowered = f"the recorded pre ({rec:.3f} m) is within push_pre_dist_m + {PUSH_PRE_SLACK_M} m of the init", False
+    else:
+        why, lowered = f"straight push (no mid), recorded pre {rec:.3f} m > push_pre_dist_m + {PUSH_PRE_SLACK_M} m: lowered", True
+    return {"rule": "lowered_to_push_pre_dist_m" if lowered else "recorded", "distance_m": round(float(pdist) if lowered else rec, 5),
+            "recorded_m": round(rec, 5), "condition": why, "executor": executor,
+            "source": "execute.push_lowered_pre (called by execute_push for a straight Push)" if executor == "push" else "execute.execute_base_push"}
+
+
+#: ``push_lowered_pre``'s slack (its ``<= push_pre_dist_m + 0.005`` test)
+PUSH_PRE_SLACK_M = 0.005
+
+
+def pitched_push_class(kind: Optional[str]) -> bool:
+    """``execute._pitched_push_class`` of a record's ``pose_class`` (a pitched blade of 30 deg or steeper keeps its recorded pre)."""
+    return bool(_oracle()[0]._pitched_push_class(SimpleNamespace(extra={"pose_class": kind})))
+
+
+def contact_fingers(extras: Optional[Dict[str, Any]], kind: str = "push") -> float:
+    """The finger joints (m per finger) the oracle holds a push / brace at: ``actions.push_is_open`` / ``brace_is_open`` of the record - its
+    ``fingers_opening_m`` - else closed (``execute_push`` / ``execute_brace``)."""
+    AC = _oracle()[1]
+    rec = SimpleNamespace(extra=dict(extras or {}))
+    is_open = AC.push_is_open(rec) if kind == "push" else AC.brace_is_open(rec)
+    return float(rec.extra["fingers_opening_m"]) if is_open else float(IK.FINGER_CLOSED)
+
+
+def brace_stop_rule(cfg=None) -> Dict[str, Any]:
+    """The oracle's brace leg (``execute_brace``): straight pre -> contact, stopped once the braced object moved ``brace_touch_stop_m``, then
+    backed off ``brace_touch_backoff_m`` along the approach."""
+    cfg = cfg or oracle_config()
+    return {"leg": "straight pre -> contact", "touch_stop_m": float(cfg.brace_touch_stop_m), "backoff_m": float(cfg.brace_touch_backoff_m)}
 
 
 def digest(obj: Any, n: int = 16) -> str:
-    """sha1 of the canonical JSON of ``obj`` (sorted keys), first ``n`` hex digits - the pose-set identities."""
+    """sha1 of the canonical JSON of ``obj`` (sorted keys), first ``n`` hex digits - the schema / pose-set identities."""
     return hashlib.sha1(json.dumps(obj, sort_keys=True, default=float).encode()).hexdigest()[:n]
+
+
+# ------------------------------------------------------------------------------------------------ the shared primitives (re-exported)
+
+#: the pose primitives every builder composes (``conventions`` / ``v2.ik`` / ``v2.tabletop``) - one vocabulary for the samplers and libraries
+fingertip_eef = C.fingertip_eef
+contact_eef = C.contact_eef
+default_closing_axis = C.default_closing_axis
+eef_quat = C.eef_quat
+pre_pose = IK.pre_pose
+blade_standoff = TT.blade_standoff
+pitched_approach = TT.pitched_approach
+
+
+# ------------------------------------------------------------------------------------------------ the floor pushes (iors_large: push-under / touching_large)
+
+
+def floor_blade_height(height: float, floor_z: float, pitch_deg: float, frac: float = 0.5, clear: float = 0.015, cap: float = 0.05) -> Tuple[float, float]:
+    """``(z_push, z_tip)`` of the floor blade (``IORSLarge.push_height``): the fingertips at ``frac`` (``push_tip_frac``) of the target's height
+    above the floor, at least ``clear`` (``push_tip_clearance_m``) and at most ``cap`` up; the eef origin ``FINGERTIP_LENGTH cos(pitch)`` above."""
+    z_tip = floor_z + max(clear, min(frac * height, cap))
+    drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
+    return z_tip + drop, z_tip
+
+
+def floor_push_chain(drop_xy, goal_xy, d2, z: float, offset: float, goal_extra: float, quat, *, pre: Tuple[Any, ...] = ("approach",),
+                     shift: Optional[th.Tensor] = None) -> List[Tuple[th.Tensor, th.Tensor]]:
+    """The straight floor push ``[pre, start, mid, goal]`` (``IORSLarge._push_under_chain`` / ``_push_under_flat_chain`` /
+    ``_push_under_pitched_chain``): the eef at height ``z``, ``offset`` behind the drop cell along the push ``d2`` (the contact offset + the
+    hand's stand-off), the goal ``offset - goal_extra`` behind the goal cell (``push_goal_extra_m``: the oracle's leg stops short of its last
+    waypoint), the mid-point; ``shift`` (the palm's stand-off) moves the three back; ``pre``: ``("approach",)`` = ``pre_pose`` (PRE_DIST back
+    along the approach), ``("back", d)`` = ``d`` behind the start along the push, ``("back_up", d, up)`` = ``d`` behind and ``up`` above it."""
+    d3 = th.tensor([float(d2[0]), float(d2[1]), 0.0])
+    start = th.tensor([float(drop_xy[0]), float(drop_xy[1]), z]) - d3 * offset
+    goal = th.tensor([float(goal_xy[0]), float(goal_xy[1]), z]) - d3 * (offset - goal_extra)
+    mid = 0.5 * (start + goal)
+    if shift is not None:
+        start, mid, goal = start - shift, mid - shift, goal - shift
+    if pre[0] == "approach":
+        p = C.pre_pose((start, quat))
+    elif pre[0] == "back":
+        p = (start - d3 * float(pre[1]), quat)
+    elif pre[0] == "back_up":
+        p = (start - d3 * float(pre[1]) + th.tensor([0.0, 0.0, float(pre[2])]), quat)
+    else:
+        raise ValueError(f"floor_push_chain: pre rule {pre!r}")
+    return [p, (start, quat), (mid, quat), (goal, quat)]
+
+
+# ------------------------------------------------------------------------------------------------ the base push (iors_large_nextto / touching_large)
+
+
+def base_push_approach(direction_xy, pitch_deg: float) -> th.Tensor:
+    """Approach axis along the horizontal push ``direction`` tilted down by ``pitch_deg`` (fingertips forward-down onto the face;
+    ``iors_large_nextto.pitched_approach``)."""
+    d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1])], dtype=th.float32)
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    p = math.radians(float(pitch_deg))
+    return th.tensor([math.cos(p) * float(d[0]), math.cos(p) * float(d[1]), -math.sin(p)])
+
+
+def base_push_hand_poses(point, direction_xy, pitch_deg: float, wrist: float, pre_m: float) -> Tuple[G.Pose, G.Pose]:
+    """``(pre, contact)`` eef poses of the closed hand of the base push (``iors_large_nextto.push_hand_poses``): the fingertips on ``point``
+    with the approach of :func:`base_push_approach`, the pads closing horizontally across the push (``wrist`` +-1 = the two wrist turns), the
+    pre-contact ``pre_m`` back along the horizontal push."""
+    a = base_push_approach(direction_xy, pitch_deg)
+    d = th.tensor([float(direction_xy[0]), float(direction_xy[1]), 0.0])
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    perp = th.tensor([-float(d[1]), float(d[0]), 0.0]) * float(wrist)
+    q = C.eef_quat(a, perp)
+    origin = th.as_tensor(point, dtype=th.float32) - C.FINGERTIP_LENGTH * a
+    return (origin - d * float(pre_m), q), (origin, q)
+
+
+# ------------------------------------------------------------------------------------------------ the wall contacts (alignment_wall: world_vertical)
+
+
+def wall_fist_axes(normal, closing, tilt: float = 0.0) -> Tuple[th.Tensor, th.Tensor]:
+    """(approach a, closing c) of a wall contact that acts in the wall plane (``alignment_wall.wall_fist_axes``): the fingers point into the
+    wall (a = -n), turned by ``tilt`` (rad) about c, and the pads close along ``closing`` (in the wall plane) - the outer side of a finger
+    (normal +-c) meets the target's edge, so the contact normal lies in the wall plane."""
+    n = C.unit(th.as_tensor(normal, dtype=th.float32))
+    c = th.as_tensor(closing, dtype=th.float32)
+    c = C.unit(c - n * float(th.dot(c, n)))
+    k = C.unit(th.cross(c, n, dim=0))
+    a = C.unit(-n * math.cos(tilt) + k * math.sin(tilt))
+    return a, c
+
+
+def wall_contact_pose(point, normal, direction, face: float, gap: float = 0.0, tilt: float = 0.0, turn: float = 1.0) -> Tuple[th.Tensor, th.Tensor]:
+    """eef pose of a wall contact (push or brace) acting along ``direction`` (in the wall plane, toward the target;
+    ``alignment_wall.wall_contact_pose``): the outer side of a finger (``face`` from the eef axis) stands ``gap`` before ``point``, the
+    fingertips at ``point``'s depth (on the target's mid-plane), the pads closing along ``turn`` x direction."""
+    d = th.as_tensor(direction, dtype=th.float32)
+    a, c = wall_fist_axes(normal, d * (1.0 if turn >= 0 else -1.0), tilt)
+    tip = th.as_tensor(point, dtype=th.float32) - C.unit(d) * (float(face) + float(gap))
+    return tip - C.FINGERTIP_LENGTH * a, C.eef_quat(a, c)
+
+
+# ------------------------------------------------------------------------------------------------ the axial push (alignment_axial)
+
+#: the closed fingertips this far above the axial target's top at the floor of the push height (``alignment_axial.PUSH_TIP_CLEARANCE``)
+AXIAL_PUSH_TIP_CLEARANCE_M = 0.003
+
+
+def axial_push_height(top_z: float, object_height: float, tip_clearance: float = AXIAL_PUSH_TIP_CLEARANCE_M) -> float:
+    """The axial push's eef origin height (``AlignmentAxial._push_height`` before its A/B knob): the generic pinch's ``0.6 h`` above the top
+    with the floor at the fingertip length + ``tip_clearance`` (0.0218 m: the closed tips 3 mm above the top of the thinnest targets)."""
+    return float(top_z) + max(0.6 * float(object_height), C.FINGERTIP_LENGTH + float(tip_clearance))
+
+
+def axial_push_chain(side_pt: th.Tensor, d: th.Tensor, half: float, approach: th.Tensor, closing: th.Tensor, c_sign: float, centre: th.Tensor,
+                     d_goal: float) -> List[Tuple[th.Tensor, th.Tensor]]:
+    """The axial push ``[pre, init, mid, goal]`` of one class / wrist turn (``AlignmentAxial._sample_with``): the closed blade ``half`` (its
+    half thickness at the pitch) before the face point ``side_pt`` along the push ``d``, approach ``approach``, closing ``c_sign x closing``,
+    the arc about ``centre`` (the centre of mass at the push height) through ``d_goal`` (``conventions.arc_waypoints``, 2 waypoints), the
+    pre-contact ``pre_pose`` of the init (an arc keeps it: ``execute.push_lowered_pre``)."""
+    quat = C.eef_quat(approach, c_sign * closing)
+    p_init = (side_pt - d * half, quat)
+    arc = C.arc_waypoints(p_init, centre, th.tensor([0.0, 0.0, 1.0]), d_goal, n=2)
+    return [C.pre_pose(p_init), p_init, arc[0], arc[1]]
+
+
+# ------------------------------------------------------------------------------------------------ the contact SCHEMA (push / brace library entries)
+
+CONTACT_SCHEMA = "isg-contact/1"
+CONTACT_KINDS = ("push", "brace")
+#: the arm roles of an entry: the working (pushing) arm, the bracing arm, or the base push's two hands
+ARM_ROLES = ("work", "brace", "both")
+
+
+def _mat(pose) -> np.ndarray:
+    if isinstance(pose, np.ndarray):
+        return pose.astype(float)
+    p, q = G.t(pose[0]).double().numpy(), G.t(pose[1]).double().numpy()
+    x, y, z, w = (float(v) for v in q)
+    R = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)], [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                  [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+    T = np.eye(4)
+    T[:3, :3], T[:3, 3] = R, p
+    return T
+
+
+def _pose_dict(T: np.ndarray) -> Dict[str, List[float]]:
+    from ispatialgym.grasping import schema as S
+
+    d = S.mat_pose(T)
+    q = d["orientation_xyzw"]
+    if q[3] < 0:
+        q = [-v for v in q]
+    return {"position": [round(float(v), 6) for v in d["position"]], "orientation_xyzw": [round(float(v), 7) for v in q]}
+
+
+def _pose_of(d: Dict[str, Any]) -> Tuple[th.Tensor, th.Tensor]:
+    return th.tensor(d["position"], dtype=th.float32), th.tensor(d["orientation_xyzw"], dtype=th.float32)
+
+
+def _jsonable(v):
+    if isinstance(v, th.Tensor):
+        v = v.tolist()
+    if isinstance(v, np.ndarray):
+        v = v.tolist()
+    if isinstance(v, dict):
+        return {str(k): _jsonable(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_jsonable(x) for x in v]
+    if isinstance(v, (np.floating, np.integer)):
+        v = v.item()
+    if isinstance(v, float):
+        return None if not math.isfinite(v) else round(v, 6)
+    return v
+
+
+def contact_entry(kind: str, cls: str, family: str, arm_role: str, T_world_obj, contact, pre, extras: Optional[Dict[str, Any]] = None, *,
+                  face_rule: str = "", direction=None, stroke_m: Optional[float] = None, arc: bool = False, support_z: Optional[float] = None,
+                  object_height: Optional[float] = None, pitch_deg: Optional[float] = None, wrist_turn: Optional[float] = None, executor: str = "push",
+                  cfg=None) -> Dict[str, Any]:
+    """One schema entry (``CONTACT_SCHEMA``) in the OBJECT frame from a record builder's world output (the object at ``T_world_obj``):
+    ``kind`` (push | brace) and ``cls`` (the builder's class label), ``family`` (the builder), ``arm_role``; the contact eef pose, its
+    approach (eef +z), closing axis (eef +y), pitch and wrist turn; the fingertip point; the finger state AS EXECUTED (:func:`contact_fingers`);
+    the height rule (the fingertip / eef height above the support, absolute and as a fraction of the object's height); the pre-contact as
+    recorded and AS EXECUTED (a push: :func:`executed_push_pre`, ``pre_pose_rule`` = :func:`pre_pose_rule` (owner decision 6); a base push /
+    a brace: the recorded one, and :func:`brace_stop_rule`); a push's direction
+    and stroke (``goal = contact + stroke x direction``); the record's extras."""
+    if kind not in CONTACT_KINDS or arm_role not in ARM_ROLES:
+        raise ValueError(f"contact_entry: kind {kind!r} / arm role {arm_role!r}")
+    extras = dict(extras or {})
+    To = _mat(T_world_obj)
+    Ti = np.linalg.inv(To)
+    Tc_w = _mat(contact)
+    Tc = Ti @ Tc_w
+    Tp = Ti @ _mat(pre)
+    if kind == "push" and executor == "push":
+        low = executed_push_pre(cls, contact, pre, arc=arc, extras=extras, cfg=cfg)
+        Tpe = Ti @ _mat(low)
+    else:
+        Tpe = Tp  # a brace, a base push: the recorded pre-contact
+    tip_w = Tc_w[:3, 3] + C.FINGERTIP_LENGTH * Tc_w[:3, 2]
+    height_rule: Dict[str, Any] = {"of": "fingertip plane centre above the support"}
+    if support_z is not None:
+        h_abs = float(tip_w[2]) - float(support_z)
+        height_rule.update(absolute_m=round(h_abs, 5), fraction=None if not object_height else round(h_abs / float(object_height), 4))
+    if extras.get("contact_height_m") is not None:
+        height_rule["rule_height_m"] = round(float(extras["contact_height_m"]), 5)
+    entry: Dict[str, Any] = {
+        "schema": CONTACT_SCHEMA, "kind": kind, "class": cls, "family": family, "arm_role": arm_role, "face_rule": face_rule,
+        "T_object_eef": _pose_dict(Tc), "contact_point": [round(float(v), 6) for v in (Ti[:3, :3] @ tip_w + Ti[:3, 3])],
+        "approach": [round(float(v), 6) for v in Tc[:3, 2]], "closing": [round(float(v), 6) for v in Tc[:3, 1]],
+        "pitch_deg": None if pitch_deg is None else float(pitch_deg), "wrist_turn": None if wrist_turn is None else float(wrist_turn),
+        "fingers": {"state": "open" if contact_fingers(extras, kind) > 0 else "closed", "opening_m": round(contact_fingers(extras, kind), 5)},
+        "height_rule": height_rule,
+        "pre": {"recorded": _pose_dict(Tp), "executed": _pose_dict(Tpe), "recorded_m": round(float(np.linalg.norm(Tp[:3, 3] - Tc[:3, 3])), 5),
+                "executed_m": round(float(np.linalg.norm(Tpe[:3, 3] - Tc[:3, 3])), 5),
+                "rule": "execute.push_lowered_pre" if kind == "push" else "recorded (execute_brace: straight pre -> contact)"},
+        "pre_pose_rule": (pre_pose_rule(cls, extras, arc=arc, executor=executor, recorded_m=float(np.linalg.norm(Tp[:3, 3] - Tc[:3, 3])), cfg=cfg) if kind == "push"
+                          else {"rule": "recorded", "distance_m": round(float(np.linalg.norm(Tp[:3, 3] - Tc[:3, 3])), 5), "executor": "brace",
+                                "condition": "execute_brace reaches the recorded pre-contact, then the straight leg to the contact", "source": "execute.execute_brace"}),
+        "push": None, "stop": brace_stop_rule(cfg) if kind == "brace" else None, "extras": _jsonable(extras)}
+    if kind == "push":
+        dv = np.asarray(_jsonable(direction if direction is not None else [0.0, 0.0, 0.0]), dtype=float)
+        dv = Ti[:3, :3] @ (dv / max(float(np.linalg.norm(dv)), 1e-12))
+        entry["push"] = {"direction": [round(float(v), 6) for v in dv], "stroke_m": None if stroke_m is None else round(float(stroke_m), 5), "arc": bool(arc)}
+    entry["digest"] = digest({k: v for k, v in entry.items() if k != "digest"})
+    return entry
+
+
+def entry_world(entry: Dict[str, Any], T_world_obj) -> Dict[str, Any]:
+    """A schema entry at an object pose: world ``{"contact", "pre", "pre_executed", "goal", "direction"}`` (``goal``/``direction`` for a push
+    with a stroke), poses as ``(pos, quat)`` tensors."""
+    To = _mat(T_world_obj)
+
+    def w(d):
+        from ispatialgym.grasping import schema as S
+
+        T = To @ S.pose_of(d)
+        return th.tensor(T[:3, 3], dtype=th.float32), th.tensor(S.mat_to_quat(T[:3, :3]), dtype=th.float32)
+
+    out = {"contact": w(entry["T_object_eef"]), "pre": w(entry["pre"]["recorded"]), "pre_executed": w(entry["pre"]["executed"]), "goal": None, "direction": None}
+    push = entry.get("push")
+    if push is not None:
+        dv = th.tensor(To[:3, :3] @ np.asarray(push["direction"], dtype=float), dtype=th.float32)
+        out["direction"] = dv
+        if push.get("stroke_m") is not None:
+            out["goal"] = (out["contact"][0] + dv * float(push["stroke_m"]), out["contact"][1])
+    return out
