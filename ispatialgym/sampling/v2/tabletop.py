@@ -4231,10 +4231,13 @@ def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str
     if isinstance(bands, NB.NeighborBands):
         bands = bands.member_for(st.focus[:2]) if st.focus is not None else None
     facts: Dict[str, Any] = {"from": [float(st.translate), float(st.tilt)]}
-    if bands is None or st.focus is None or not isinstance(getattr(bands, "meta", None), dict) or bands.meta.get("stand_offs"):
+    if bands is None or st.focus is None or not isinstance(getattr(bands, "meta", None), dict) or (bands.meta.get("stand_offs") and not is_map_view(bands)):
         facts["outcome"] = "no_band"
         return None, facts
-    k = bands.nearest_trunk(float(st.translate), float(st.tilt))
+    # i7-unblock 2026-11-07: a reach-map view (multi-distance) is read at the stance's stand-off (its d_e); a legacy multi-distance band
+    # stays "no_band" as before
+    skw = band_kw(bands, st) if is_map_view(bands) else {}
+    k = bands.nearest_trunk(float(st.translate), float(st.tilt), **skw)
     if k is None:
         facts["outcome"] = "no_band"
         return None, facts
@@ -4275,11 +4278,12 @@ def _tilt_snap(s, manip: Stance, st_of: Dict[str, Stance], offered: Sequence[str
                 outcome = "empty_at_grid"
     facts["first"] = outcome
     # the bracket: the band's grid tilts at this translate just below and above the stance's tilt must both hold the cell
-    tilts = sorted({float(t) for (tr, t) in bands.cells if abs(float(tr) - float(st.translate)) < 1e-6 and len(bands.cells[(tr, t)])})
+    cells_by_trunk = bands._maps(skw["stand_off"])[0] if skw else bands.cells
+    tilts = sorted({float(t) for (tr, t) in cells_by_trunk if abs(float(tr) - float(st.translate)) < 1e-6 and len(cells_by_trunk[(tr, t)])})
     lo = max((t for t in tilts if t <= float(st.tilt) + 1e-6), default=None)
     hi = min((t for t in tilts if t >= float(st.tilt) - 1e-6), default=None)
     cell_base = bands.to_base(np.asarray(st.focus[:2].tolist()), st.base_pose2d)[0]
-    both = lo is not None and hi is not None and all(bands.cell_index(float(st.translate), t, cell_base) is not None for t in {lo, hi})
+    both = lo is not None and hi is not None and all(bands.cell_index(float(st.translate), t, cell_base, **skw) is not None for t in {lo, hi})
     facts.update({"bracket": [lo, hi], "outcome": "in_bracket" if both else "out_of_bracket"})
     return None, facts
 
