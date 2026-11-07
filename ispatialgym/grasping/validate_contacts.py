@@ -38,7 +38,8 @@ saved BEFORE any contact). Per entry:
      ``brace_eef_drift_m`` of its contact pose, and no non-finger link loaded the slab.
 
 Trials: ``trials_per_entry`` (1: the physics is deterministic at one configuration; the yaw slots of a class are separate entries), at most
-``max_entries`` entries per model and kind in library order. Timing is recorded per model, rest and kind (``validation_timing``: setup, settle,
+``max_entries`` entries per model and kind in library order - or STRATIFIED (owner A6, ``--per-group-valid 3``: per (yaw x axial end x
+spin) group until 3 are valid or ``per_group_max`` were tried, :class:`GroupQuota`; the maps then read the VALID entries only). Timing is recorded per model, rest and kind (``validation_timing``: setup, settle,
 plan, trials, total). The thresholds are PROVISIONAL (the recorded measures are for calibrating them).
 
     python -m ispatialgym.grasping.validate_contacts --root ROOT --kind push|brace --glib GLIB [--jobs J.json] [--arm right|left] [--shard i/n] [--only ID ...]
