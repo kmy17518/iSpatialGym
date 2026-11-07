@@ -637,6 +637,29 @@ is unreachable). CR_FAST_ASTAR (i7-unblock 72d684a8) runs the same search withou
    switch, and a unit test checks for the same path on a fixed map.
 4. **CR_OBSTACLE_HEADROOM:** only how often it would skip goals is reported; its default is unchanged.
 
+### Owner decisions 2026-11-07: plate qtfzeq (under_small_03), the place stage, an expanding tilt / yaw map
+
+1. **Plate qtfzeq: one merged entry.** The plate families (lip_shallow + rim_straddle) are adopted for this entry and merged with the
+   switches-on rebuild into ONE entry: one build, all grasps validated together, one set of maps.
+   - The side grasp side_9 is physics-valid in the library but fails in the alias's sampling (empty F, grasp chains exhausted, 10 of them by
+     the support policy's "non-finger link touches the support"). It is diagnosed and fixed.
+   - Fallback: if a chosen side grasp then still fails for a reason the sampler cannot fix, the sampler may try the overhang approach (as
+     for luhkiz / bqvvvx). It is used only after the side grasp failed for that reason, and counted in kit.
+2. **The place stage** (gripper out of frame ~13, partner placement ~12): diagnosed first, no rule change.
+   - Which grasps, stances and place / pre-place poses are involved, and whether it is grasp choice, stance tilt or camera pitch; compared
+     with v2legacy1.
+   - The under relation (plate vs place mat) is checked against the task spec / BDDL, and the sampler and oracle must agree.
+   - The camera-frame rule is not relaxed.
+3. **An expanding, self-correcting reach map for tilts, then yaws** (instead of TILT_SNAP, which stays opt-in).
+   - A stance tilt not in the map gets a provisional column: the union of the two bracketing built tilts, marked "inherited".
+   - A cell is invalidated for that tilt only after a repeated REACHABILITY failure (IK / reach bound / joint limit; not a scene collision,
+     the support policy or the camera frame). A successful exact check marks it confirmed.
+   - Corrections live in an overlay file keyed by the map identity: never written into the frozen map, race-free for concurrent jobs, and
+     merged offline (the overlay version enters the identity once used).
+   - No extra GPU builds of true columns; building one is a separate decision.
+   - Kit counters: map_tilt.inherited_columns / .inherited_feasible / .cells_invalidated / .cells_confirmed / .empty_f_on_inherited.
+   - The same mechanism covers in-between yaws (the 8 x 45 deg slots).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
