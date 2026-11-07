@@ -461,6 +461,17 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     if cfg.preshape == "max":
         pq_g, cq_g = [max(pq_g)] * nG, [min(cq_g)] * nG
     g_of = th.arange(N, device=dev) % nG  # problems are (cell, yaw, grasp) row-major
+    pq_dev = th.as_tensor(pq_g, dtype=th.float32, device=dev)
+    cq_dev = th.as_tensor(cq_g, dtype=th.float32, device=dev)
+
+    def hand_check_at(T, sb_, fq_t):
+        """``hc.check`` with one finger opening per pose (grouped by value)."""
+        vals = th.round(fq_t * 1e5) / 1e5
+        out = th.ones(T.shape[0], dtype=th.bool, device=dev)
+        for v in th.unique(vals).tolist():
+            m = vals == v
+            out[m] = hc.check(T[m], sb_, (float(v), float(v)))[0]
+        return out
 
     def hand_check(T, q_of_grasp):
         groups: Dict[float, List[int]] = {}
@@ -603,9 +614,11 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                             good[c0:c0 + 8192] &= o.to(dev)
                     w_slab = ~good
                     # the hand hulls at the FK eef of the grasp and the pre-grasp (IK tolerance: 5 mm / 0.05 rad)
-                    for qq, fq in ((qg[ii], 0.5 * (pre_q + min(g["contact_q"] for g in grasps))), (qp[ii], pre_q)):
-                        o, _, _ = hc.check(world.eef(world.full_q(entry, qq, q_lock)), sb, (fq, fq))
-                        good &= o
+                    # ... each problem's fingers at ITS grasp's openings (cfg.preshape; "max": the batch values as before)
+                    gq = g_of[order[sel[ii]]]
+                    pq_t, cq_t = pq_dev[gq], cq_dev[gq]
+                    for qq, fq_t in ((qg[ii], 0.5 * (pq_t + cq_t)), (qp[ii], pq_t)):
+                        good &= hand_check_at(world.eef(world.full_q(entry, qq, q_lock)), sb, fq_t)
                     w_hand = ~good & ~w_slab
                     # the arm (not the hand) clear of the object at the cell
                     if pieces:
