@@ -569,6 +569,31 @@ per success). The bench's eroded top is one ~2 cm row, and the 8 cm map lattice 
 **Before adopting:** a report of where either trigger would fire, over the 20 map aliases and the 100 aliases (from the existing v2only
 sample logs / supports). Anywhere besides nextto_04 is the A/B scope.
 
+### Owner decision 2026-11-07: a goal-accessible grasp region for interior goals
+
+**Context.** inside_large_01's left-lean rest (hardback__bqvvvx__bu, 16.7 deg, bookcase_jaysra_0@0.9472) has no usable grasp, even with
+the left-arm validator (512e3139).
+- Its candidates pinch 3.3-4.8 cm from the book's centre, where the finger meets the board.
+- The only valid one pinches the page block deep in the bay, so its maps are empty.
+- The working right-lean grasp is a spine pinch, 6.4 cm from the centre.
+- The problem is where grasps are generated, not which arm validates.
+
+**The constraint**, in the grasp library, for entries used at an interior goal (a lean or stable rest in a compartment / shelf / basin;
+the interior kind):
+1. From the goal geometry the entry is built for (the interior spec: open sides, board / wall / headroom clearances), derive the object's
+   accessible region: the surface reachable from the open side with the fingers clearing the boards by the gates' margins. For a
+   leaning book this is the spine edge facing the open front.
+2. Candidate contacts are restricted to that region and ranked by board clearance. This is a candidate-generation constraint, not a
+   relaxed gate.
+3. The same v2 gates and physics apply, nothing relaxed. The region definition goes in the entry identity.
+4. Pick compatibility: the grasp is held from pick to place, so each entry reports whether its accessible-region grasps also exist at
+   the pick rest (for bqvvvx: the overhang pick's spine-edge pinches).
+5. Diagnose first: the pinch positions that clear the board are measured on lean_right vs lean_left, so the region comes from measured
+   clearances.
+
+**Apply now:** lean_left of hardback__bqvvvx__bu is rebuilt with the constraint (left-arm validator), then its interior maps (both arms).
+For touching_03's acbrnv lean entries, only whether they would change is reported.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
