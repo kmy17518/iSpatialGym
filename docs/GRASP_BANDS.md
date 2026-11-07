@@ -529,6 +529,35 @@ old one, which moves to `glib/_superseded_switches` / `maps/_superseded_switches
 branch's side-grasp retreat (i7-overhang, not merged) still looks the blade's pinched pieces up at CONTACT_Z, as the switch does for
 every side grasp. Whether the switch should cover that retreat is a question for the merge.
 
+### i7-switches 2026-11-07: gym shoe kmcbym ladder round 2 (switches on)
+
+Owner decision 20:20. Record: `$OFH/switches_20261107/gymshoe_r2`.
+
+**Where the old grasp went.** The old valid grasp (top_0, switches off) still passes every gate with the switches on (`gs_trace.py`).
+- Its recorded shift is now the real 10 mm, not 15 mm, and its width is re-measured at 20.8 mm, not 22.3 mm.
+- It reaches NMS ranked 2 of 2. A neighbour 4.8 mm / 30 deg away suppresses it: score 8.52 against 7.78. That neighbour passes object
+  clearance only with the exact retreat (its 15 mm try).
+- The neighbour becomes the only representative and fails object_pressed_into_table.
+- The old pose itself is still physics-valid under today's validator (`diag_old`: 1 of 1).
+- No round-2 candidate lies within 10 mm / 20 deg of the old pose; the denser pool samples other poses.
+
+**Round 2** (the retry levels of `v2_retry_20261107`, switches on, gate_dump on; candidates / geometry-ok / reps -> physics-valid):
+- L2: 15 / 12 / 12 -> 6 valid. L3: 24 / 23 / 23 -> 6 valid. Validation stops at max_valid 6.
+- Each level has one object_pressed_into_table, read during the close: object load 29.1x weight (L2) and 30.6x (L3) against the 2.0x
+  limit, sustained 11 / 13 steps, finger peak on the slab 0 N. The validator now records these per phase
+  (`forces.diagnostics`, f5182aa4).
+- The pad sweep is the largest late gate (all `touch`, none `width_lost`): top 97 -> 33 and side 4 -> 1 at L2; top 269 -> 110 and
+  side 29 -> 1 at L3; top 14 -> 2 at round 1. So the planned pre-shape sweep could change this entry's candidates. Its physics rejections
+  do not involve the sweep.
+
+**Replaced** with L2 (the first level that recovers).
+- Maps at 0.3471, right and left, built once under the per-d_e trunk-eligibility rule. i7-unblock 1527d9b8 / 58cd9939 / 722d687f were
+  cherry-picked onto i7-switches; snapshot trunk_0b6a7284.
+- Feasible cells right 91 -> 127 and left 92 -> 124 of 253, against the old per_d_e-merged maps; grasps 2 -> 12 (with twins).
+- Staged `$OFH/v2maps_i7ugs` = `cp -a v2maps_i7unblock` with the old entry and maps in `_superseded_switches_off`. Reader check:
+  38 entries, 88 maps, 0 key mismatches.
+- nextto_04 `--grasps v2only` N 4 with ISPATIALGYM_MAP_SUPPORT_FIRST=1, tag `i7_sw_gs_sf`: see DECISIONS.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
