@@ -31485,6 +31485,7 @@
    }
   },
   "generation": {
+   "map_support_first": true,
    "templates_max": 20,
    "instances_per_template": 5,
    "tremble_frames": 45,
