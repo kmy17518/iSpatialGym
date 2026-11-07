@@ -121,7 +121,7 @@ def _cand_one(payload):
             b["reasons"][c["geometry"]["reason"]] = b["reasons"].get(c["geometry"]["reason"], 0) + 1
         return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "n_candidates": len(out["candidates"]), "n_geometry_ok": n_ok,
                 "cand_config": {k: getattr(cfg, k) for k in ("n_candidates", "n_orientations", "cone_deg", "max_representatives", "topk", "families",
-                                                              "blade_contact_at_retreat")},
+                                                              "blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape")},
                 "densify": [list(x) for x in densify], "densified_from": (out["log"] or {}).get("densified_from") is not None,
                 "n_representatives": len(out["representatives"]), "n_families": len(fams),
                 "family_types": sorted({f.get("type") for f in fams.values()}), "log": {k: out["log"][k] for k in out["log"] if k in pools + ("n_sampled",)},
