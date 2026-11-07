@@ -2441,7 +2441,34 @@ class IORSSmall(SamplerV2):
             if not res_place.ok:
                 raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
                                                                     f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
+            if self.relation == "touching" and os.environ.get("ISPATIALGYM_TOUCHING_PUSH_SCREEN", "") == "1" and self.shelf_start is None:
+                # of-v2maps 2026-11-07 (owner prompt F, opt-in): the push screened at the draw too, from the goal check's push-stance laterals
+                # (touching_push_stance's order), so a candidate whose push no class reaches gives way to the next candidate instead of the attempt
+                # dying in the goal check (weak1_v2 touching_01: 11 / 16 goal checks 'no push class passes from any push stance lateral',
+                # touching_02 66 / 71; the map view's foci reach deeper than the legacy band's)
+                why = self.push_screen_why(manip, obj_at_place, p_pose)
+                self.counters["push_screen.checked"] = self.counters.get("push_screen.checked", 0) + 1
+                if why is not None:
+                    self.counters["push_screen.rejected"] = self.counters.get("push_screen.rejected", 0) + 1
+                    raise Reject("contact_unreachable", f"push screening at the draw (candidate {int(k)}, trunk {manip.translate}, {manip.tilt:.2f}): {why}")
         return p_pose
+
+    def push_screen_why(self, manip: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
+        """``ISPATIALGYM_TOUCHING_PUSH_SCREEN`` (of-v2maps 2026-11-07): None when a push class passes (:meth:`push_chain_feasible`, the chain +
+        retreat clear pose) from the manipulation stance or one of the goal check's push-stance laterals (``push_contact_laterals_m``, default
+        -0.12 / -0.16 / -0.20 / -0.08) with the box at its predicted place and the partner at its drawn pose; else the laterals' summary."""
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        tried = []
+        for lat in laterals:
+            cand = self.push_stance_for(manip, t_place_pose, lateral=lat)
+            probe = cand if cand is not None else manip
+            self._push_chain_fails = []
+            self._push_chain_height = None
+            kind = self.push_chain_feasible(probe, t_place_pose, p_pose)
+            if kind is not None:
+                return None
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: no class [{len(self._push_chain_fails)} cands]")
+        return "no push class from any push stance lateral (" + "; ".join(tried) + ")"
 
     def _pose_target(self, role: str, pose: G.Pose) -> Dict[str, Any]:
         tgt = full_pose_target(pose[0], pose[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
