@@ -1604,6 +1604,120 @@ What still fails is upstream of the attach map, or in the oracle's touchdown:
   - the grasp witness residual (`plan_failed`);
   - one lid joined "not aligned".
 
+### Per-alias outcome memory (i7-memory, 2026-11-08; owner decision 01:45 part C)
+
+Down-weights configurations that keep failing for an alias. It runs unattended, on top of the sampler's own order. Code:
+`ispatialgym/sampling/alias_memory.py`. Exclusions: `ispatialgym/assets/alias_memory/exclusions.json`. Tests:
+`tests/test_alias_memory.py`.
+
+- **Record:** `job_fast.sh` runs `alias_memory record <job dir>` after its collectors. It writes one row per demo into the job's own
+  shard, `alias_memory_shard.jsonl` (one writer per job, so no races). A row holds:
+  - the PLACE key: arm, place stance (`placement`, else the tabletop `manipulation` stance), stand-off bin (0.05 m), trunk
+    translate / tilt (0.01), goal yaw slot (the sampler's pi / 8 pair bucket);
+  - the PICK key: arm, `pick` / `manipulation` stance, stand-off, trunk, grasp family (the twin suffix `~r180` folded in), entry key;
+  - the outcome, failure type and STAGE;
+  - the context: trunk snapshot; alias customs version (the TRO's `task_spec_sha256`); entry / map key fingerprint (the v2 library
+    content and the content-hashed map file names of the alias's models, so a staged copy of the same data has the same keys);
+  - provenance: the pinned memory version and the placement stance's `alias_memory` extra.
+- **Attribute:** stages come from the verdict's action in the program.
+  - `pick`: up to and including the lift, with the push-to-pick.
+  - `carry`: between the lift and the first place.
+  - `place`: the place and everything after it.
+  - `outcome`: verdicts with no action (symbolic_only, not_reached, not_settled).
+  - `manipulation`: programs with no grasp-and-place.
+  - A pick or manipulation failure counts against the PICK key and leaves the place unobserved.
+  - A carry, place or outcome failure counts against the PLACE key and counts as a pick pass.
+  - A success is a pass for both.
+  - Excluded: infrastructure (status error, rc not 0 / 2, timeout / wall clock, OOM, a missing meta or sidecar) and documented
+    known bugs scoped by snapshot (attachment_01 / 04 recorded-IK `plan_failed`).
+- **Aggregate:** `alias_memory aggregate --root R` merges the shards and back-fills a finished job that has none. It writes a new
+  immutable `R/alias_memory/vNNNN` (`aliases/<alias>.json`, `meta.json`, `report.json` / `report.md`) and updates `LATEST`.
+  - `submit_fast.py submit` pins the version in job.env (`ISPATIALGYM_ALIAS_MEMORY`, `--alias-memory auto|off|<path>`; auto = LATEST,
+    off while none exists).
+  - It also queues `job_memory.sh`: a CPU job, `afterany` the GPU job. It builds a version only when no other job of the batch tag
+    is queued or running, so the batch's last job aggregates.
+- **Sample:** each (alias, bin) gets a Beta posterior with a flat prior.
+  - Levels: arm x trunk, then x stand-off, then x yaw (pick: x family). The finest level with >= `min_n` attributed demos decides;
+    sparser data backs off to the coarser level.
+  - A bin is DOWN-WEIGHTED when P(theta_bin < theta_rest of the alias) >= `p_worse` and its posterior mean <= `max_mean`. An alias
+    where everything fails down-weights nothing.
+  - The hook sits in `IORSLarge._couple` (stance C for every large-scale place mode). It keeps the prior order: today
+    travel / edge-rank, later i7-placeorder's order if adopted.
+  - Per coupling, a down-weighted bin keeps its place with probability max(`floor`, theta_bin / theta_rest), one Thompson draw per
+    bin. Otherwise its candidates move to the end and are still tried if everything before them fails.
+  - With nothing down-weighted the order is unchanged and no random number is drawn. The memory's own generator is derived from the
+    sampler's state without advancing it.
+  - Kit counters: `alias_memory.loaded`, `.place.no_down`, `.place.down_bins`, `.place.deferred`, `.place.kept_down`,
+    `.blocked_not_train`.
+  - Pick and yaw keys are recorded and reported only. A pick hook would be the same `reorder` call at the F draw.
+- **Forget:** evidence decays by 0.8 per newer trunk snapshot of the alias. It is RESET under another customs version or another
+  entry / map key fingerprint (`customs_change` / `keys_change` = 0).
+- **Guardrails** are in each version's report, per batch and alias:
+  - bins down-weighted and the share of the observed space (bins, demos) they hold;
+  - yield and GPU-h per success, batch vs before.
+  - Alerts only:
+    - space share > 50 %;
+    - yield drop > 0.25 (>= 4 demos on both sides);
+    - all failed (>= 4 demos: a bug, not a configuration).
+  - Shared-fix candidates: the same (arm, trunk) down-weighted in >= 3 aliases. The loop never changes a shared rule.
+- **Eval generation:** the memory is consulted only after `enable_for_split("train")`, which only `multiply_isg --split train` calls.
+  `sample_isg` (eval templates) switches it off whatever the environment says.
+- **Default: ON** with the proposed thresholds. The owner's text says "(unattended)" and "must run without the owner".
+  - The thresholds sit in each version's `meta.json`. A `<root>/alias_memory/thresholds.json` (the owner's) wins.
+  - Off per job: `--alias-memory off`.
+
+**Proposed thresholds** come from the replay over `$OFH/out`:
+- source: `$OFH/memory_20261108/replay`, 2375 demos, 88 batches (tags in finish order), snapshot `trunk_9f4302b1`;
+- check: for every demo, the memory of the batches before it, in its own context.
+
+| setting | inside_large_01 0.50 caught | 0.25 caught | later demos in flagged bins (ok) | (alias, context) findings |
+|---|---|---|---|---|
+| **proposed: min_n 3, p_worse 0.95, max_mean 0.35, decay 0.8, reset** | yes | no | 10 (1) | 4 |
+| min_n 2 / min_n 4 | yes / NO | no | 12 (4) / 12 (3) | 6 / 3 |
+| p_worse 0.90 / 0.99 | yes / NO | no | 14 (3) / 0 | 7 / 1 |
+| max_mean 0.25 / 0.50 | yes / yes | no | 9 (0) / 19 (5) | 3 / 12 |
+| snapshot decay 0.5 / 1.0 | yes / yes | no | 9 (1) / 16 (5) | 4 / 9 |
+| customs / keys change 0.5 instead of reset | yes | no | 10 (2) | 6 |
+| no forgetting at all | yes | no | 24 (14) | 24 |
+
+- `min_n` 3: the inside_large_01 case has exactly 3 place-stage failures (the 4th, i7_oh_m 300086, is `plan_failed` at the grasp:
+  pick stage).
+- The owner's example cutoff (95 % upper bound < 10 %) needs 28 straight failures under a flat prior. It catches nothing in
+  `$OFH/out`.
+- Floor 5 %: the owner's figure.
+- Forgetting is necessary. Without it, 14 of 24 later flagged demos succeeded: configurations healthy again after a fix.
+
+**Replay findings:** four (alias, context) pairs are down-weighted; no bin with a healthy rate is caught.
+
+- inside_large_01 place (right, 0.50, -0.60, 0.85 m): 0 / 3 (2 robot_wobble, 1 robot_touching_itself). P(worse) 0.987, mean 0.22,
+  vs the alias's rest 3.6 / 0.
+  - Context: i7_oh + i7_oh_m (customs 262df5, keys 22e3a0).
+  - (right, 0.25, -0.60, 0.85 m) 4 / 4 is NOT caught.
+  - In the i7_oh_R / int1_1 context (lean_left customs and libraries) the evidence is reset by rule.
+  - Back-off: in its context, 0.50 at an unseen stand-off falls back to the trunk level and is down-weighted too.
+- inside_large_03 place (left, 0.0, -0.60, 0.65 m): 17 demos, 9 collision + 3 plan_failed. Rest 25 / 0. Context: fix2 / ft*.
+- touching_04 place (right, 0.0, -0.61, 0.35 m): 0 / 4 (2 gripper_out_of_fov, 2 symbolic_only), rest 4.8 / 3.8. Small-scale task:
+  recorded, no hook.
+- inside_04 pick (left, 0.25, -0.53, 0.35 m, top_3): 0 / 5 (4 plan_failed, 1 collision). Pick: recorded only.
+- Later demos that fell in a flagged bin (all pick-level): 9 of 10 failed.
+  - ontop_small_02 pick (right, 0.25, -0.53): 5 later robot_wobble / pause. The placeorder scan found the same: 10 grasp-stage
+    wobbles at 0.25.
+  - close_small_02 pick: 4 object_tilt.
+  - The one success: inside_04 after i_fix13.
+- In the aliases' LATEST contexts, 2 of 99 aliases have a down-weighted place bin (inside_large_03, touching_04).
+- Alerts for the last batch, int1_1:
+  - disembedding_01 and _10: all failed;
+  - inside_large_01: yield 45 / 57 -> 1 / 4, 3 failed_grasp at the pick;
+  - nextto_01: yield 73 / 89 -> 2 / 4.
+- Shared-fix candidates: none.
+
+**Limits:**
+- Hook coverage: the place hook covers stance C of the large-scale tasks only. Tabletop (single-stance) and disembedding places are
+  recorded, not steered.
+- Key fingerprint: the keys cover the alias's model libraries and maps (its customs' grasp keys / representatives). They do not cover
+  partner-side maps (interiors, attach).
+- Snapshot order: snapshots are ordered by their first demo for the alias, not by git ancestry.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
