@@ -464,6 +464,10 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
 - Pick compatibility (rule 4, `access_region.pick_compatibility`): the region grasp is 8.7 mm / 34 deg from the overhang entry's
   side_2~r180 (the overhang pinches approach 30 / 60 deg off the spine normal, this one straight) - outside a 1.5 cm / 30 deg match;
   lean_right's side_3 3.9 cm / 180 deg. The held grasp at the goal stays the overhang entry's (F_goal is exact); the lean entry is the map.
+- Validation `i7_oh_R` (trunk_0adc84c9, v2-root `$OFH/v2maps_i7oh3` = v2maps_i7oh2 with the region lean_left, cap 0.70): stance C left 36
+  survivors, right none (lean_right's map is empty at <= 0.65); 14 attempts, 4 written, 4 demos, 2 successes, 0.451 GPU-h per success;
+  picks 31 / 31 and places 4 / 4 by the LEFT arm (all at stand-off 0.65); demo failures failed_grasp 1 (the push's differential IK stalled,
+  the grasp then missed), collision 1 (the carried book's base_link touched the bookcase in the navigate); 0 robot_wobble, 0 self-contact.
 - touching_03 acbrnv (report only): lean_left_11's 4 stored candidates are all outside the region (-1.0..-1.6 cm), a rebuild would
   re-select from the pre-NMS set; lean_left_20: 2 of 12 in the region (side_9, already the one valid grasp, and side_11 untested at
   +7.5 mm) - its two invalid representatives would not be tested.
