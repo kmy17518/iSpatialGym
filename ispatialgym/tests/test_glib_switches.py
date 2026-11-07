@@ -231,3 +231,17 @@ def test_blade_lookup_sits_at_the_recorded_retreat_with_both_switches(tmp_path, 
     assert (shifts > 0.005).any()  # a retreated grasp (the support retreat: the stub's lowest pose has its tips 19 mm into the table)
     assert np.allclose(calls_on[0], CA.CONTACT_Z + shifts, atol=1e-5)  # the pads' real contact = the recorded (exact) shift
     assert out_on["config"]["blade_contact_at_retreat"] is True and out_on["config"]["retreat_shift_exact"] is True
+
+
+def test_new_builds_record_both_switches_on(monkeypatch):
+    """i7-switches: after the count both switches are the default for new builds - a default config records them on (so a new entry's
+    identity carries them), an explicit False reproduces the build before the adoption."""
+    from dataclasses import asdict
+
+    from ispatialgym.grasping import candidates as CA
+    from ispatialgym.grasping import pipeline as PL
+
+    monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
+    assert S.candidate_switches(asdict(CA.CandidateConfig())) == {"blade_contact_at_retreat": True, "retreat_shift_exact": True}
+    cfg, _ = PL.candidate_overrides({"cand_overrides": {"blade_contact_at_retreat": False, "retreat_shift_exact": False}})
+    assert S.candidate_switches(asdict(cfg)) == {"blade_contact_at_retreat": False, "retreat_shift_exact": False}
