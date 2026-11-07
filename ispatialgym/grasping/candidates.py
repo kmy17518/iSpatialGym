@@ -100,12 +100,13 @@ class CandidateConfig:
     # grasp cleared at 10 mm records 15 mm and the closing sweep re-measures the width 5 mm off its contact (luhkiz: 57 of 62 top grasps
     # lose their width there; 59 of 62 pass the sweep at the real displacement).
     retreat_shift_exact: bool = True
-    # OWNER DECISION 2026-11-07 (i7-padsweep, a shared gate - approved; default False until the count on the campaign library): the closing
+    # OWNER DECISION, ADOPTED 2026-11-07 (i7-padsweep, a shared gate - approved; default True for new builds after the count on the campaign
+    # library, 44 entries / 6 move; False = the behaviour before, which every entry generated without the field reads as): the closing
     # sweep (pad_sweep) starts at each grasp's pre-shape as the oracle executes it (execute.execute_grasp: pinch width / 2 +
     # MotionsConfig.gripper_preshape_margin per finger, :func:`oracle_preshape_q`) instead of the fully open pads. From the fully open
     # pads a pinch across a wall next to a hole (tape kavsnx: the 35 mm core) starts its inner pad inside the opposite wall, which the
     # oracle never does. Part of the entry identity when on (schema.CANDIDATE_SWITCHES).
-    sweep_from_preshape: bool = False
+    sweep_from_preshape: bool = True
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -744,7 +745,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         cz = CONTACT_Z + (shift if mode == "top" else 0.0)  # the pads' contact height after the retreat
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
         c, width, antip, cov = contact_features(union, T, cz)
-        if cfg.sweep_from_preshape:  # OWNER DECISION (i7-padsweep): the pads start at the oracle's pre-shape of the recorded width
+        if cfg.sweep_from_preshape:  # OWNER DECISION (i7-padsweep, default on): the pads start at the oracle's pre-shape of the recorded width
             touch = pad_sweep(union, T, open_half=preshape_pad_half(width), pieces=piece_planes)
         else:
             touch = pad_sweep(union, T)

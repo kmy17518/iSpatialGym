@@ -46,7 +46,7 @@ def test_default_off_and_the_oracle_preshape_rule_is_reused():
 
     from ispatialgym.oracle.motions import MotionsConfig
 
-    assert CA.CandidateConfig().sweep_from_preshape is False
+    assert CA.CandidateConfig().sweep_from_preshape is True  # adopted (the default commit); False reproduces the build before
     m = MotionsConfig().gripper_preshape_margin
     w = np.array([0.0, 0.0135, 0.04, 0.09])
     # execute.execute_grasp: opening = 0.5 * grasp_pinch_width + motions.cfg.gripper_preshape_margin; the validator caps it at fully open
