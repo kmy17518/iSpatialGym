@@ -493,6 +493,12 @@ failures. All 3 place failures are inside_large_01 at translate 0.50 / tilt -0.6
   0.25 51/711, 0.50 16/520, 0.75 0/90, 0.95 0/94; pick-and-place 0.0 3/98, 0.25 3/134, 0.50 5/70, 0.75 0/11, 0.95 0/40. The place-time
   wobble / self-contact are inside_large_01's 3 at (0.50, -0.6) / 0.85; the campaign's other wobbles are grasp-stage.
 - Tests: `test_trunk_first_order.py` (the order, ties kept in the prior order, the set unchanged, the coupling's opt-in, the alias only).
+- Validation `i7_po` (trunk_032203c9, v2-root `$OFH/v2maps_i7oh3`, slurm 18372141, outcome memory OFF - i7-memory not merged; its evidence
+  resets on the customs change): 7 attempts, 4 written, 4 demos, 2 successes, 0.262 GPU-h per success (i7_oh_R 0.451, i7_oh_m 0.234);
+  rejections target_placement 2, approach_untrackable 1; 0 missing_map / MAP_REQUEST. Places 4 / 4 by the RIGHT arm, all at trunk (0.0, -0.6)
+  / stand-off 0.75 (C rank 0-1, `stance_c.extended_used` 0, `stance_c.trunk_first` 45 couplings); picks found 10 right / 2 left. No place
+  failure: both placements that ran succeeded; the 2 failed demos are plan_failed at the pick's grasp (the right arm's protected-object
+  re-plan from the lifted hand: no plan / still passing the book at 9 mm). 0 robot_wobble, 0 self-contact.
 
 ### Lean rests and interior maps (branch i7-lean, 2026-11-07)
 
