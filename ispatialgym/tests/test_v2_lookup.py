@@ -209,3 +209,26 @@ def test_left_contact_band_is_none_under_v2_only(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_V2_ONLY", "1")
     s = SimpleNamespace(bands_left={})
     assert TT.load_left_contact_band(s, 0.12) is None and list(s.bands_left.values()) == [None]
+
+
+def test_map_bands_miss_logs_the_map_to_build(v2root, tmp_path, monkeypatch, caplog):
+    # i7-floor 2026-11-07: the config requirement reused the name of the MAP_REQUEST fields - a miss raised TypeError (``** None``) without
+    # ISPATIALGYM_REACH_MAP_REQUIRE and logged the requirement instead of the map with it
+    import logging
+
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    _entry(v2root, "apple", "xyz", [1, 1, 1], legacy_key="apple__xyz__t", rests={"r0": ([0, 0, 0, 1], 0.04, True)}, grasps=[("g0", "r0")])
+    monkeypatch.setenv("ISPATIALGYM_REACH_MAPS", str(tmp_path / "maps"))
+    for k in ("ISPATIALGYM_REACH_MAP_ANCHORS", "ISPATIALGYM_REACH_MAP_REQUIRE", "ISPATIALGYM_V2_ONLY"):
+        monkeypatch.delenv(k, raising=False)
+    s = SimpleNamespace(world=SimpleNamespace(floor_z=0.0, scene_model="house"), ikc=SimpleNamespace())
+    top = SimpleNamespace(name="table_0", z=0.8126)
+    spec = TT.BandSpec(object="apple/xyz", grasp_key="apple__xyz__t")
+    with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+        assert TT.map_bands(s, spec, top, "right") is None
+        monkeypatch.setenv("ISPATIALGYM_REACH_MAP_REQUIRE", '{"preshape": "grasp"}')
+        assert TT.map_bands(s, spec, top, "left") is None
+    reqs = [json.loads(r.getMessage().split(" ", 1)[1]) for r in caplog.records if r.getMessage().startswith("MAP_REQUEST")]
+    assert [(r["kind"], r["arm"], r["h"], r["support"], r["rest_id"]) for r in reqs] == [("tabletop", "right", 0.8126, "table_0", "r0"),
+                                                                                         ("tabletop", "left", 0.8126, "table_0", "r0")]
