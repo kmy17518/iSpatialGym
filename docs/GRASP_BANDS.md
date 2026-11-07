@@ -440,6 +440,36 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - any oracle program change;
 - using legacy grasps (step 4).
 
+### Owner decisions 2026-11-07 (five: plate switches, the "top" label, goal side, articulation maps, optional contact steps)
+
+1. **The two plate switches** (`blade_contact_at_retreat`, `retreat_shift_exact`) are adopted the way the cork's attach-rule fix is
+   handled.
+   - First confirm the switch state is part of the entry identity (the digest / config the reader checks). If it is not, add it.
+   - Count on the campaign library only: the v2maps_i7 glib entries and the entries of the staged roots in use. Per entry, compare
+     candidates -> geometry-ok -> reps with the switches off and on, and note whether any recorded pose (retreat shift) changes. A
+     candidates-only run is enough.
+   - Report every entry whose counts or recorded poses move. The count can go both ways.
+   - Rebuild (validate + maps) only those entries, then make both switches the default for new builds.
+   - plate luhkiz keeps its current entry (9 physics-valid, switches off).
+2. **The 62-67 deg plate family keeps the label "top"**; the question is closed. The label is build-only (retreat rule, blade gate,
+   ranking bonus); no sampler, map or oracle code reads it, and relabelling would invalidate the 9 validated grasps. If tilt ever
+   matters, it is recorded in the grasp record, not by relabelling.
+3. **Goal side under v2only: no NO_BAND_TRUNKS fallback.** Interior maps are built instead with the interior kind
+   (interiors.measure -> spec -> GB_KIND=interior maps, as for the fridge):
+   - inside_large_03: the sink basin drop_in_sink_lkklqs_0 (surface ~0.77);
+   - inside_large_01: the bookcase board (~0.94 m).
+   - The consumer is iors_large_inside.inside_band. The fridge's "no stance C" issue lives in the same consumer, so a fix there
+     applies to all three.
+4. **Articulation maps.**
+   - open_02 maps only the 21 pinch variants the oracle executes; handle B is dropped. The yield per variant is checked from two
+     sources: validate_artic's physics trials, and a tally of the variant each past successful open_02 demo executed. Variants that
+     never succeed are reported.
+   - Left arm: right-arm segments are NOT reused. One left-arm physics validation per object where the task offers the left arm
+     (open_01, close_02), and the left-arm maps are built from those segments.
+5. **Contact maps under v2only.** A missing map for an OPTIONAL step skips that step and still logs the MAP_REQUEST (counted); for
+   example, a missing axial brace map means no brace, and the push runs by its own rule. A missing map for a REQUIRED step (e.g. the
+   touching brace gate) still rejects missing_map. Every i7-contact consumer is classified as optional or required.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
