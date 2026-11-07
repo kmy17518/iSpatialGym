@@ -379,7 +379,10 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
   - Old vs new are A/B'd first.
 - Carton push-close stop under `ISPATIALGYM_BRACE_FULL_OPEN`: 0.05 opening, corner inset 0.04 -> 0.06.
 - attachment touchdown: the hover is the swept first-touch height + 3 mm, behind `ISPATIALGYM_ATTACH_HOVER`, A/B'd before it becomes the default.
-- The support split is kept ON. A/B, N 4: 97 / 98 demos and 0.182 GPU-h per success, vs 79 / 94 and 0.220 with it off.
+- The support split is kept ON. It acts (`support_split.applied` > 0) only on the 10 disembedding aliases. There, A/B N 4: ON 36 / 36
+  demos and 0.173 GPU-h per success, vs OFF 33 / 36 and 0.184. On the other aliases it never acts, so ON and OFF ran the same
+  sampler; their gap (61 / 62 vs 46 / 58) is run-to-run variance at N 4. (Corrected 2026-11-07: the first summary, 97 / 98 at 0.182
+  vs 79 / 94 at 0.220, mixed the two groups.) An A/B claims an effect only where its switch's counter shows it acted.
 - The support policy polices only supports with a registered plane. world_vertical + articulation_large went from 0 to 36 written / 34 ok under v2only.
 - Floor maps: the fingers meet the floor only through the policy's floor allowance (`floor_fingers: "policy"`). The umbrella went from 0 to 71-73 cells per reaching trunk.
 
