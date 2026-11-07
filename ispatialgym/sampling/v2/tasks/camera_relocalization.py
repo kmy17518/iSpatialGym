@@ -297,6 +297,15 @@ def detour_failure(geo_blocked: Optional[float], geo_free: float, bucket_hi: flo
     return None
 
 
+def detour_headroom(geo_free: float, bucket_hi: float, min_detour_m: float, by_bucket: Optional[Dict[str, float]] = None) -> bool:
+    """Whether a goal whose free geodesic is ``geo_free`` leaves room for an admissible obstacle (i7-unblock 2026-11-07,
+    CR_OBSTACLE_HEADROOM): :func:`detour_failure` admits a blocked path ``g`` only when ``g - geo_free >= min detour`` and ``g <=
+    bucket_hi``, so with ``bucket_hi - geo_free`` below the bucket's minimum detour every obstacle cell fails (``short_detour`` below the
+    bucket's top, ``too_long`` above it; float subtraction is monotone, so the test is exact) - the teddy bear's 8 / 8 ``too_long`` cells at
+    a 4.86 m free path in the (3, 5] bucket (minimum detour 0.20)."""
+    return float(bucket_hi) - float(geo_free) >= bucket_min_detour(bucket_hi, min_detour_m, by_bucket)
+
+
 def nav_clearance_m(radius_m: float, resolution: float) -> float:
     """The clearance an OmniGibson navigation map keeps from a blocked cell: ``TraversableMap._erode_trav_map`` erodes with a
     square kernel of side ceil(radius / resolution) cells (radius = half the chassis diagonal + 0.2 m), half that side on each
@@ -443,6 +452,14 @@ class CameraRelocalizationV2(SamplerV2):
     def obstacle_params(self) -> Dict[str, Any]:
         return dict(self.g("obstacle"))
 
+    def geodesic(self, a_xy, b_xy):
+        """``RobotKit.geodesic`` (BEHAVIOR's ``get_shortest_path`` on the eroded map); i7-unblock 2026-11-07 (CR_FAST_ASTAR, default on): the
+        same path and geodesic through ``navigation.shortest_path_exact`` - BEHAVIOR's A* without its per-call score table of every map cell
+        (2.6 s a call on house_single_floor: 130 s of a goal search of 20 candidates, most of an obstacle attempt's 333-707 s)."""
+        if fast_on("CR_FAST_ASTAR"):
+            return NAV.shortest_path_exact(self.world.scene.trav_map, 0, G.t(a_xy)[:2], G.t(b_xy)[:2], robot=self.kit.robot)
+        return self.kit.geodesic(a_xy, b_xy)
+
     def buckets(self) -> List[Dict[str, Any]]:
         try:
             return normalise_buckets(self.g("path_buckets"))
@@ -582,6 +599,10 @@ class CameraRelocalizationV2(SamplerV2):
                 raise Reject("goal_sampling", f"no free cell of the task room at a geodesic in ({lo}, {hi}] m from the init (geodesic field)")
         prefilter = self.obstructed and fast_on("CR_OBSTACLE_PREFILTER")
         retry = self.obstructed and fast_on("CR_OBSTACLE_RETRY")
+        headroom = self.obstructed and bool(self.obstacle_names) and fast_on("CR_OBSTACLE_HEADROOM")
+        if headroom:
+            P_obs = self.obstacle_params()
+            min_detour, by_bucket = float(P_obs["min_detour_m"]), P_obs.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET)
         # goal candidates: analytic filters (bucket upper bound on the Euclidean distance, heading), collision later;
         # candidates whose Euclidean distance lies inside the bucket are tried first (a path is never shorter than it)
         cands = []
@@ -622,12 +643,17 @@ class CameraRelocalizationV2(SamplerV2):
             if not bool(self.kit.collision_free(q1, margin=margin)[0]):
                 fails["goal_collision"] = fails.get("goal_collision", 0) + 1
                 continue
-            path, geo = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
+            path, geo = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
             if geo is None or path is None or len(path) < 2:
                 fails["no_path"] = fails.get("no_path", 0) + 1
                 continue
             if bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
                 fails["bucket"] = fails.get("bucket", 0) + 1
+                continue
+            if headroom and not detour_headroom(float(geo), hi, min_detour, by_bucket):
+                # i7-unblock 2026-11-07 (CR_OBSTACLE_HEADROOM): no obstacle cell of this goal can pass detour_failure - skipped before the
+                # path record, the renders and the obstacle cells (it used to cost the attempt one of its CR_OBSTACLE_GOAL_TRIES)
+                fails["obstacle_headroom"] = fails.get("obstacle_headroom", 0) + 1
                 continue
             if prefilter and self.obstacle_names and not self.obstacle_cell_indices(path, self.obstacle_names[0], base0, base1):
                 fails["obstacle_prefilter"] = fails.get("obstacle_prefilter", 0) + 1  # no middle cell clears both bases: place_obstacles cannot succeed
@@ -1120,7 +1146,7 @@ class CameraRelocalizationV2(SamplerV2):
             out: Dict[str, Any] = {"footprints": self.footprints_of(poses, {**margins, name: m}, margin), "path": None, "geodesic_m": None,
                                    "path_record": None, "schedule": None, "view_indices": []}
             with self.blocked_map(out["footprints"]):
-                path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
+                path_b, geo_b = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
                 out.update(path=path_b, geodesic_m=geo_b)
                 why = detour_failure(geo_b, geo_before, bucket_hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
                 if why is None and max(corridor) < float(P["min_corridor_width_m"]):
@@ -1258,7 +1284,7 @@ class CameraRelocalizationV2(SamplerV2):
             base0 = draft.base_pose2d
             hi = draft.extras["bucket"]["hi_m"]
             with self.blocked_map(fps):
-                path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
+                path_b, geo_b = self.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
                 why = detour_failure(geo_b, float(draft.summary["geodesic_m"]), hi, float(P["min_detour_m"]), P.get("min_detour_m_by_bucket", MIN_DETOUR_M_BY_BUCKET))
                 if why:
                     raise Reject("obstacle", f"blocked-map path after the settle {why}")
