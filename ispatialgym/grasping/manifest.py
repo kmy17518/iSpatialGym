@@ -7,7 +7,9 @@ Sources:
   ``legacy_key`` (what the v2 entry replaces);
 * ``--candidates-csv`` - every sampleable target row of ``assets/icl/roles/candidates.csv`` (the ~1000-model universe): rows with a
   ``grasp_key`` as above, rows without one as NEW models (``tabletop``, canonical rest - no recorded physics settings);
-* ``--isg1020`` - the 16 tabletop / attachment targets of the isg-1020 aliases (the validation set).
+* ``--isg1020`` - the 16 tabletop / attachment targets of the isg-1020 aliases (the validation set);
+* ``--floating-keys K1 K2 ...`` - legacy floating (GraspGen) keys of the held-object tasks -> ``floating`` jobs (i7-floating 2026-11-07,
+  :func:`floating_job_of`): entry ``<category>__<model>__<scale tag>__floating``, ``legacy_key`` = the key.
 
     python -m ispatialgym.grasping.manifest --isg1020 --out runlogs/grasp_library_v2/manifests/isg1020.json
     python -m ispatialgym.grasping.manifest --candidates-csv ispatialgym/assets/icl/roles/candidates.csv --out .../all.json
@@ -57,6 +59,19 @@ def legacy_job(key: str, root: str = LEGACY_ROOT) -> Optional[Dict[str, Any]]:
             "kind": "attachment" if constraint == "attachment_free" else "tabletop", "source": "legacy_key"}
 
 
+def floating_job_of(key: str, root: str = LEGACY_ROOT, held_tasks: Optional[Sequence[str]] = None) -> Optional[Dict[str, Any]]:
+    """i7-floating 2026-11-07: the v2 ``floating`` job of a legacy floating (GraspGen) key - its model, spawn scale, dataset, legacy mode and
+    held task(s) read from ``results/<key>.json`` (metadata only: the legacy grasps are not used; ``floating.floating_job``). None for a
+    key of another pipeline."""
+    from ispatialgym.grasping import floating as FL
+
+    res = S.load_json(os.path.join(root, "results", f"{key}.json")) or {}
+    if res.get("pipeline") != "graspgen":
+        return None
+    tasks = list(held_tasks) if held_tasks else [t for t in [res.get("task")] if t in ("mental_rotation", "object_scaling")]
+    return FL.floating_job(key, res, tasks)
+
+
 def from_candidates_csv(path: str) -> List[Dict[str, Any]]:
     jobs = []
     with open(path) as f:
@@ -102,6 +117,7 @@ def main(argv=None):
     ap.add_argument("--legacy-keys", nargs="*", default=[])
     ap.add_argument("--candidates-csv", nargs="*", default=None)
     ap.add_argument("--isg1020", action="store_true")
+    ap.add_argument("--floating-keys", nargs="*", default=[], help="legacy floating (GraspGen) keys -> v2 floating jobs (i7-floating)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     jobs = []
@@ -113,6 +129,11 @@ def main(argv=None):
     for c in a.candidates_csv or []:
         jobs += from_candidates_csv(c)
     jobs = merge(jobs)
+    for k in a.floating_keys:  # i7-floating: ids are their own (floating.floating_job), never merged with a tabletop job of the model
+        j = floating_job_of(k)
+        if j is None:
+            raise SystemExit(f"{k}: not a legacy floating (graspgen) key")
+        jobs.append(j)
     S.save_json(a.out, jobs)
     n_new = sum(1 for j in jobs if j["source"] == "new_model")
     print(f"{len(jobs)} jobs ({n_new} new models without a library key) -> {a.out}")

@@ -52,6 +52,8 @@ LIBRARY = "isg-grasp-library/2"
 PROFILE = "isg-artic-profile/1"
 ARTIC_TRIAL = "isg-artic-trial/1"
 FAMILY = "isg-grasp-family/1"
+#: i7-floating 2026-11-07: the constraint of the held-object (floating) entries - part of the entry id (``__floating``), no rest
+FLOATING = "floating"
 
 DEFAULT_ROOT = os.path.join(REPO_ROOT, "runlogs", "grasp_library_v2")
 
@@ -99,7 +101,8 @@ def model_id(category: str, model: str, scale=None) -> str:
 
 def entry_id(category: str, model: str, scale=None, constraint: str = "tabletop", rest_hint_wxyz=None) -> str:
     """Library entry id: ``<category>__<model>__<scale tag>`` + ``__<constraint>`` (non-tabletop) + ``__r<digest>`` (a designated
-    non-canonical rest) - one directory per (model, scale, constraint, designated rest)."""
+    non-canonical rest) - one directory per (model, scale, constraint, designated rest). A floating entry (:data:`FLOATING`) is
+    ``<category>__<model>__<scale tag>__floating``: it never shares a directory with a tabletop / attachment entry of the model."""
     out = model_id(category, model, scale)
     if constraint and constraint != "tabletop":
         out += f"__{constraint}"
@@ -293,13 +296,22 @@ class ModelLibrary:
     def families(self) -> Dict[str, Dict[str, Any]]:
         return dict(self.data.get("families", {}))
 
+    @property
+    def floating(self) -> bool:
+        """i7-floating 2026-11-07: a ``floating`` entry (held-object grasps, no support, no rest: ``grasping.floating``)."""
+        return self.data.get("constraint") == FLOATING
+
     def identity(self) -> Dict[str, Any]:
-        """Every result-affecting factor of this library entry (for reach-map cache keys)."""
-        return {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
-                "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
-                "rests": {k: {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)} for k, r in self.rests.items()},
-                "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
-                "families": digest(self.data.get("families", {}))}
+        """Every result-affecting factor of this library entry (for reach-map cache keys). A floating entry adds its constraint (the
+        existing entries' identities are unchanged)."""
+        out = {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
+               "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
+               "rests": {k: {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)} for k, r in self.rests.items()},
+               "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
+               "families": digest(self.data.get("families", {}))}
+        if self.floating:
+            out["constraint"] = FLOATING
+        return out
 
     def identity_key(self) -> str:
         return digest(self.identity(), 16)
@@ -320,6 +332,14 @@ def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = 
             raise IncompatibleRecord(f"{lib.path}: rest {rest_id!r} is not a verified stable rest")
     if policy_key is not None and lib.policy_key != policy_key:
         raise IncompatibleRecord(f"{lib.path}: contact policy {lib.policy_key!r} != required {policy_key!r}")
+    if lib.data.get("constraint") == FLOATING:
+        # i7-floating 2026-11-07: a floating entry has no rest - its grasps carry rest_id None and it has no rest records
+        if lib.rests:
+            raise IncompatibleRecord(f"{lib.path}: a floating entry has rests {sorted(lib.rests)}")
+        for g in lib.data.get("grasps", []):
+            if g.get("rest_id") is not None:
+                raise IncompatibleRecord(f"{lib.path}: floating grasp {g.get('name')} refers to a rest {g.get('rest_id')!r}")
+        return
     for g in lib.data.get("grasps", []):
         if g.get("rest_id") not in lib.rests:
             raise IncompatibleRecord(f"{lib.path}: grasp {g.get('name')} refers to unknown rest {g.get('rest_id')!r}")
