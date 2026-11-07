@@ -60,17 +60,32 @@ def test_support_first_keep_is_off_by_default_and_ignores_scene_bands(monkeypatc
     assert out is keep  # a legacy scene band is untouched
 
 
-def test_v2_rest_h_root_placement_is_opt_in(monkeypatch):
-    # of-v2maps 2026-11-07 (the isg1020 spec: z = support + h_root, no 3 mm, no recomputed bottom offset)
-    s = SimpleNamespace(world=SimpleNamespace(bottom_offset=lambda hull, q: 0.02), _v2_rest_h={(0.0, 0.0, 0.0, 1.0): 0.0185, (-0.0, -0.0, -0.0, -1.0): 0.0185})
+def test_v2_rest_h_root_placement_by_entry_and_rest(monkeypatch):
+    # of-v2maps 2026-11-07 (the isg1020 spec: z = support + h_root, no 3 mm, no recomputed bottom offset); prompt I item 2: the default for v2
+    # rests, resolved by the object's entry + rest_id - two objects at the identity rest keep their own h_root (the former quaternion
+    # registry gave both the last one's), and a rolled rest keeps the bottom-offset rule
+    from ispatialgym.sampling import grasp_library as GL
+
+    rest = lambda h: SimpleNamespace(stable=True, h_root=h, quat_xyzw=[0.0, 0.0, 0.0, 1.0])
+    libs = {"cup__k": SimpleNamespace(path="/v2/models/cup__s1/library.json", rests={"r0": rest(0.0185)}),
+            "box__k": SimpleNamespace(path="/v2/models/box__s1/library.json", rests={"r0": rest(0.0610)})}
+    monkeypatch.setattr(GL, "v2_entry", lambda key: libs.get(key))
+    ht, hp = th.zeros(4, 3), th.ones(4, 3)
+    s = SimpleNamespace(world=SimpleNamespace(bottom_offset=lambda hull, q: 0.02), hull={"target": ht, "partner": hp}, grasp_key="cup__k",
+                        choice=SimpleNamespace(models={"partner": SimpleNamespace(grasp_key="box__k", category="box", model="m")}))
     q = th.tensor([0.0, 0.0, 0.0, 1.0])
     monkeypatch.delenv("ISPATIALGYM_V2_REST_H_ROOT", raising=False)
-    p, _ = TT.object_pose_on(s, th.zeros(4, 3), q, (0.1, 0.2), 0.3, 0.75)
+    p, _ = TT.object_pose_on(s, ht, q, (0.1, 0.2), 0.3, 0.75)
+    assert abs(float(p[2]) - (0.75 + 0.0185)) < 1e-6  # the default
+    p, _ = TT.object_pose_on(s, hp, -q, (0.1, 0.2), 0.3, 0.75)
+    assert abs(float(p[2]) - (0.75 + 0.0610)) < 1e-6  # the partner's own entry (and -q is the same rest)
+    assert TT.v2_rest_info(s, hp)["entry"] == "box__s1" and TT.v2_rest_info(s, hp)["rest_id"] == "r0"
+    p, _ = TT.object_pose_on(s, ht, th.tensor([0.0, 0.0, 0.7071, 0.7071]), (0.1, 0.2), 0.3, 0.75)  # not the measured rest
     assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
-    monkeypatch.setenv("ISPATIALGYM_V2_REST_H_ROOT", "1")
-    p, _ = TT.object_pose_on(s, th.zeros(4, 3), q, (0.1, 0.2), 0.3, 0.75)
-    assert abs(float(p[2]) - (0.75 + 0.0185)) < 1e-6
-    p, _ = TT.object_pose_on(s, th.zeros(4, 3), th.tensor([0.0, 0.0, 0.7071, 0.7071]), (0.1, 0.2), 0.3, 0.75)  # an unregistered rest
+    p, _ = TT.object_pose_on(s, th.full((4, 3), 2.0), q, (0.1, 0.2), 0.3, 0.75)  # a hull of no role (a distractor)
+    assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
+    monkeypatch.setenv("ISPATIALGYM_V2_REST_H_ROOT", "0")
+    p, _ = TT.object_pose_on(s, ht, q, (0.1, 0.2), 0.3, 0.75)
     assert abs(float(p[2]) - (0.75 + 0.02 + TT.Z_OFFSET)) < 1e-6
 
 
@@ -89,3 +104,23 @@ def test_v2_only_blocks_every_legacy_band(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_V2_ONLY")
     with pytest.raises(FileNotFoundError):  # off: the former behaviour (a cache miss)
         RB.ReachBands.load("no_such_scene", "no_such_support", "apple", "apple__x", dirs=[])
+
+
+def test_rest_z_applies_h_root_to_a_yawed_v2_rest_only(monkeypatch):
+    # prompt I item 2: the partner placements (place_partner / partner_pose_at / pose_centred_on) take the full orientation R_z(yaw) ∘ rest
+    import math
+
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import grasp_library as GL
+
+    tilt = [0.0, 0.7071068, 0.0, 0.7071068]  # a side rest
+    monkeypatch.setattr(GL, "v2_entry", lambda key: SimpleNamespace(path="/v2/models/m/library.json",
+                                                                    rests={"r0": SimpleNamespace(stable=True, h_root=0.033, quat_xyzw=tilt)}))
+    hp = th.ones(4, 3)
+    s = SimpleNamespace(world=SimpleNamespace(bottom_offset=lambda hull, q: 0.05), hull={"partner": hp},
+                        choice=SimpleNamespace(models={"partner": SimpleNamespace(grasp_key="m__k", category="m", model="m")}))
+    monkeypatch.delenv("ISPATIALGYM_V2_REST_H_ROOT", raising=False)
+    q = C.qmul(C.quat_from_yaw(1.3), th.tensor(tilt))
+    assert abs(TT.rest_z(s, hp, q, 0.7) - 0.733) < 1e-6
+    rolled = C.qmul(C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), math.radians(10.0)), th.tensor(tilt))
+    assert abs(TT.rest_z(s, hp, rolled, 0.7) - (0.7 + 0.05 + TT.Z_OFFSET)) < 1e-6  # a leaned / rolled rest: the bottom-offset rule

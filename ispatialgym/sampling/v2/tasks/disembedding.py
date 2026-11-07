@@ -594,7 +594,11 @@ class Disembedding(SamplerV2):
             # owner 2026-09-24: a lying prism-hulled object (the bottles) is placed rolled onto a facet of its hull, not on an edge
             # (``TT.prism_rest_quat``): bottle_of_milk/mrejrs at its canonical roll stood on two vertex lines 2 mm apart beside its
             # mass centre and tipped ~7 deg at every release, then kept rolling
-            self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
+            # of-v2maps 2026-11-07 (prompt I item 2): a v2 entry's rest is MEASURED (settled in physics, facet-down by construction) - the
+            # facet snap is for the legacy canonical guess and would move the object off the rest its grasps and h_root belong to
+            roll = 0.0
+            if TT.v2_rest_info(self, self.hull["target"], self.rest["target"]) is None:
+                self.rest["target"], roll = TT.prism_rest_quat(self.hull["target"], self.rest["target"])
             if roll:
                 log.info("%s: target rests on a hull facet at roll %+.2f deg from its library rest orientation", self.gp.variant, math.degrees(roll))
         for key in ("target", self.src_role, self.dst_role):

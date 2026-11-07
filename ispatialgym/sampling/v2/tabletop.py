@@ -773,21 +773,106 @@ def axial_init_yaw(rng, aligned_yaw: float, deviation_range_deg: Sequence[float]
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def v2_rest_h_root(s, rest_quat) -> Optional[float]:
-    """The measured h_root of the v2 rest whose quaternion is ``rest_quat`` (registered by :func:`map_bands`), else None."""
-    reg = getattr(s, "_v2_rest_h", None) or {}
-    return reg.get(tuple(round(float(v), 5) for v in _t(rest_quat).tolist()))
+def v2_rest_h_root_on() -> bool:
+    """of-v2maps 2026-11-07 (prompt I item 2): the measured-rest placement is the DEFAULT for v2 rests (``ISPATIALGYM_V2_REST_H_ROOT=0``
+    restores bottom offset + 3 mm). Without a v2 library root no rest is a v2 rest, so legacy runs are unchanged."""
+    return os.environ.get("ISPATIALGYM_V2_REST_H_ROOT", "1") != "0"
+
+
+def _role_of_hull(s, hull) -> Optional[str]:
+    hd = getattr(s, "hull", None)
+    if not isinstance(hd, dict):
+        return None
+    for role, h in hd.items():
+        if h is hull:
+            return role
+    for role, h in hd.items():
+        if isinstance(h, th.Tensor) and isinstance(hull, th.Tensor) and h.shape == hull.shape and bool(th.equal(h, hull)):
+            return role
+    return None
+
+
+def _grasp_key_of_role(s, role: str) -> Optional[str]:
+    if role == "target" and getattr(s, "grasp_key", None):
+        return s.grasp_key
+    models = getattr(getattr(s, "choice", None), "models", None) or {}
+    choice = models.get(role)
+    if choice is None:
+        return None
+    key = getattr(choice, "grasp_key", None)
+    if key:
+        return key
+    try:
+        return s.gp.roles[role].grasp_key_of(choice.category, choice.model)
+    except Exception:  # noqa: BLE001 - a role without a grasp key (a support, a tray) has no v2 rest
+        return None
+
+
+def v2_rest_info(s, hull, rest_quat=None) -> Optional[Dict[str, Any]]:
+    """The v2 rest the object of ``hull`` is placed at, keyed by entry + rest_id (of-v2maps 2026-11-07, prompt I item 2; was: a registry by
+    quaternion filled by map_bands, which two objects with the identity rest overwrote and which a map miss left empty): the role whose hull
+    this is, its grasp key, the key's v2 entry and stable rest (``grasp_library.v2_rest_id``). With ``rest_quat``: None unless the pose's rest
+    IS that measured rest (q or -q, 1e-4) - a rolled / leaned / layout rest is not the measured one and keeps the bottom-offset rule."""
+    role = _role_of_hull(s, hull)
+    if role is None:
+        return None
+    cache = s.__dict__.setdefault("_v2_rest_info", {}) if hasattr(s, "__dict__") else {}
+    if role not in cache:
+        info = None
+        key = _grasp_key_of_role(s, role)
+        if key:
+            from ispatialgym.sampling import grasp_library as GL
+
+            lib = GL.v2_entry(key)
+            rid = GL.v2_rest_id(lib) if lib is not None else None
+            if rid is not None and getattr(lib.rests[rid], "h_root", None) is not None:
+                info = {"role": role, "grasp_key": key, "entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid,
+                        "h_root": float(lib.rests[rid].h_root), "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
+        cache[role] = info
+    info = cache[role]
+    if info is None or rest_quat is None:
+        return info
+    q, r = _t(rest_quat).double(), th.tensor(info["quat_xyzw"], dtype=th.float64)
+    return info if min(float((q - r).abs().max()), float((q + r).abs().max())) <= 1e-4 else None
+
+
+def v2_rest_h_root(s, rest_quat, hull=None) -> Optional[float]:
+    """The measured h_root of the v2 rest the object of ``hull`` is placed at (:func:`v2_rest_info`), else None."""
+    info = v2_rest_info(s, hull, rest_quat) if hull is not None else None
+    return None if info is None else float(info["h_root"])
+
+
+def _yawed_from(quat, rest_quat) -> bool:
+    """``quat`` = R_z(·) ∘ ``rest_quat`` (q_full · q_rest⁻¹ is a pure yaw: no x / y part, 1e-4)."""
+    r = _t(rest_quat).double()
+    d = C.qmul(_t(quat).double(), th.tensor([-float(r[0]), -float(r[1]), -float(r[2]), float(r[3])], dtype=th.float64))
+    return abs(float(d[0])) <= 1e-4 and abs(float(d[1])) <= 1e-4
+
+
+def rest_z(s, hull: th.Tensor, quat, z_support: float, drop: float = Z_OFFSET) -> float:
+    """The root z of an object of ``hull`` at the full orientation ``quat`` standing on a support at ``z_support``: z_support + h_root when
+    ``quat`` is a yaw of its v2 entry's measured rest (:func:`v2_rest_info`; of-v2maps 2026-11-07, prompt I item 2 - the partner placements),
+    else z_support + bottom offset + ``drop`` (§3.2)."""
+    if v2_rest_h_root_on():
+        info = v2_rest_info(s, hull)
+        if info is not None and _yawed_from(quat, info["quat_xyzw"]):
+            _count(s, "v2_rest_h_root.used")
+            return float(z_support) + float(info["h_root"])
+    return float(z_support) + s.world.bottom_offset(hull, quat) + float(drop)
 
 
 def object_pose_on(s, hull: th.Tensor, rest_quat, xy, yaw: float, z_support: float, drop: float = Z_OFFSET) -> Pose:
     """§3.2: orientation ``R_z(yaw) ∘ rest``, z = support top + bottom offset + 3 mm. of-v2maps 2026-11-07 (the isg1020 spec, Prompt 1 §3a /
-    Prompt 2 §4; opt-in ``ISPATIALGYM_V2_REST_H_ROOT=1``): a v2 rest with a measured h_root (registered by map_bands) is placed at
-    z = support top + h_root - no 3 mm, no recomputed bottom offset."""
+    Prompt 2 §4): an object placed at its v2 entry's measured stable rest (:func:`v2_rest_info`, by entry + rest_id) goes to
+    z = support top + h_root - no 3 mm, no recomputed bottom offset. The default since prompt I (``ISPATIALGYM_V2_REST_H_ROOT=0``: off)."""
     quat = C.qmul(C.quat_from_yaw(yaw), _t(rest_quat))
-    if os.environ.get("ISPATIALGYM_V2_REST_H_ROOT", "") == "1":
-        h = v2_rest_h_root(s, rest_quat)
+    if v2_rest_h_root_on():
+        h = v2_rest_h_root(s, rest_quat, hull)
         if h is not None:
+            _count(s, "v2_rest_h_root.used")
             return th.tensor([float(xy[0]), float(xy[1]), float(z_support) + float(h)]), quat
+        if v2_rest_info(s, hull) is not None:
+            _count(s, "v2_rest_h_root.other_rest")  # a v2 object at a rolled / leaned / layout rest: the bottom-offset rule
     pos = th.tensor([float(xy[0]), float(xy[1]), float(z_support) + s.world.bottom_offset(hull, quat) + float(drop)])
     return pos, quat
 
@@ -1037,12 +1122,6 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
         ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
                                  "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
-    # of-v2maps 2026-11-07 (ISPATIALGYM_V2_REST_H_ROOT, object_pose_on): the measured h_root of every rest of the entry, by its quaternion
-    reg = s.__dict__.setdefault("_v2_rest_h", {})
-    for r in lib.rests.values():
-        if getattr(r, "h_root", None) is not None:
-            for sgn in (1.0, -1.0):  # q and -q are one rotation
-                reg[tuple(round(sgn * float(v), 5) for v in r.quat_xyzw)] = float(r.h_root)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -4414,7 +4493,7 @@ def partner_gap_masks(s, side: float, t_fp: th.Tensor, depth: float, p_hull: th.
     xy = partner_origin_xy(side, t_lat, p_lat, depth, stance, gs)
     out["top"] = polygons_supported(top, fp[None] + xy[:, None, :], margin).numpy()
     if cam is not None:
-        z = float(top.z) + s.world.bottom_offset(p_hull, p_quat) + Z_OFFSET
+        z = rest_z(s, p_hull, p_quat, float(top.z))
         corners = hull_corners_world(p_hull, (th.tensor([0.0, 0.0, z]), _t(p_quat)))
         pts = corners[None] + th.cat([xy, th.zeros(len(xy), 1)], dim=1)[:, None, :]
         out["frame"] = s.world.camera_model.inside(cam, pts.reshape(-1, 3), in_frame_margin).reshape(len(xy), -1).all(dim=1).numpy()
@@ -4436,7 +4515,7 @@ def partner_pose_at(s, side: float, t_fp: th.Tensor, depth: float, p_hull: th.Te
     t_lat = (_t(t_fp)[:, :2].float() - stance.base_xy) @ tangent
     p_lat = s.world.footprint(p_hull, (th.zeros(3), _t(p_quat))).float() @ tangent
     xy = partner_origin_xy(side, (float(t_lat.min()), float(t_lat.max())), (float(p_lat.min()), float(p_lat.max())), depth, stance, [g])[0]
-    return th.tensor([float(xy[0]), float(xy[1]), float(top.z) + s.world.bottom_offset(p_hull, p_quat) + Z_OFFSET]), _t(p_quat)
+    return th.tensor([float(xy[0]), float(xy[1]), rest_z(s, p_hull, p_quat, float(top.z))]), _t(p_quat)
 
 
 def partner_pose_why(s, t_fp: th.Tensor, p_hull: th.Tensor, p_pose: Pose, *, top=None, cam: Optional[Pose] = None, margin: float = SUPPORT_MARGIN,
@@ -4492,7 +4571,7 @@ def pose_centred_on(s, hull: th.Tensor, quat, xy, *, top=None) -> Pose:
     top = _top(s, top)
     fp = s.world.footprint(hull, (th.zeros(3), _t(quat))).float()
     c = 0.5 * (fp.max(dim=0).values + fp.min(dim=0).values)
-    return th.tensor([float(xy[0]) - float(c[0]), float(xy[1]) - float(c[1]), float(top.z) + s.world.bottom_offset(hull, quat) + Z_OFFSET]), _t(quat)
+    return th.tensor([float(xy[0]) - float(c[0]), float(xy[1]) - float(c[1]), rest_z(s, hull, quat, float(top.z))]), _t(quat)
 
 
 def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_rest, stance: Stance, side: Optional[float], gap_range: Sequence[float], *,
@@ -4518,7 +4597,7 @@ def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_
         p_lat = p_pts @ stance.tangent
         lat = (float(t_lat.max()) + g - float(p_lat.min())) if sd > 0 else (float(t_lat.min()) - g - float(p_lat.max()))
         xy = stance.world(depth_t, lat)
-        pos = th.tensor([float(xy[0]), float(xy[1]), z + s.world.bottom_offset(p_hull, p_quat) + Z_OFFSET])
+        pos = th.tensor([float(xy[0]), float(xy[1]), rest_z(s, p_hull, p_quat, z)])
         p_pose = (pos, p_quat)
         p_fp = s.world.footprint(p_hull, p_pose)
         if not top.polygon_supported(p_fp, margin=margin):

@@ -1199,10 +1199,18 @@ class IORSSmall(SamplerV2):
         out: List[Any] = []
         offsets: Dict[str, float] = {}
         facts: Dict[str, Dict[str, Any]] = {}
+        v2_keep = os.environ.get("ISPATIALGYM_V2_RECENTRE", "") != "1"
         for g in grasps:
             off = self.pinch_offset(g.pose)
             offsets[g.name] = off
             if abs(off) <= limit:
+                out.append(g)
+                continue
+            if v2_keep and (getattr(g, "meta", None) or {}).get("library") == "v2":
+                # of-v2maps 2026-11-07 (prompt I item 2; the isg1020 spec P1 §3: a grasp is used as physics-validated): a v2 grasp's
+                # T_object_eef passed the closure / lift / shake validation at THIS pinch centre - moving it makes an unvalidated grasp
+                # (abv2_base: 5 v2 grasps moved by 6.8-14.6 mm, steak / salt shaker / plate). ISPATIALGYM_V2_RECENTRE=1: as before
+                facts[g.name] = {"offset_m": round(off, 4), "applied": False, "reason": "v2 grasp: kept at its validated pose"}
                 out.append(g)
                 continue
             c = C.quat_to_mat(G.t(g.pose[1]))[:, 1]
