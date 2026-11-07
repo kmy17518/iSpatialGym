@@ -289,3 +289,64 @@ def test_inside_band_off_v2_only_keeps_the_legacy_path(jar, monkeypatch):
 
     monkeypatch.setattr(TT, "default_arm", lambda s: "right")
     assert _inside().inside_band("right") is None and calls == [(FRIDGE, "right", 0.70, DOOR)]
+
+
+def test_a_fixed_compartment_picks_the_idle_posture_clear_of_the_door(fake):
+    """i7_fridge (job 18367880): every map trunk kept the untucked idle arm, which stood in the open door - stance C's postures
+    (untucked / ready / tucked) are judged against the compartment's obstacles too; the map records the posture and the sphere hits."""
+    from ispatialgym.tests.test_interior_maps import _Backend
+
+    door_xy = (0.45 - 0.10, 0.20)  # the test door's centre in the map frame at d_e 0.45
+
+    class PostureBackend(_Backend):
+        def robot_spheres_world(self, q):
+            sph, links = super().robot_spheres_world(q)
+            if float(q[0, 0]) == 0.0:  # untucked: the idle left forearm in the door
+                sph = th.cat([sph, th.tensor([[[door_xy[0], door_xy[1], 1.0, 0.05]]])], dim=1)
+                links = links + ["left_arm_link5"]
+            return sph, links
+
+    class PostureWorld(FakeWorld):
+        def __init__(self, cfg):
+            super().__init__(cfg)
+            self.backend = PostureBackend()
+
+        def q_config(self, translate, tilt, posture="untucked", fingers=0.05):
+            q = th.zeros(28)
+            q[0] = {"untucked": 0.0, "ready": 1.0, "tucked": 2.0}[posture]
+            return q
+
+    sp = _fridge()
+    cfg = RM.interior_config(sp, rest_kind="stable", seeds=2, batch=64, edge_distances=(0.45,), postures=("untucked", "ready", "tucked"), lattice_m=0.12,
+                             y_half_m=0.36, n_yaws=2)
+    meta, _ = RM.compute_map(PostureWorld(cfg), _jar_lib(), "r0", sp.height_m, {"key": "x", "height": sp.height_m}, geom=fake.geom, cfg=cfg, kind="interior",
+                             interior=sp)
+    t = meta["trunks"][0]
+    assert t["eligible"] and t["posture"] == "ready" and t["obstacle_free_by_posture"] == {"untucked": [False], "ready": [True]}
+    assert isinstance(meta["interior_sphere_hits"], dict)
+    # a slab map keeps its rule (the board only): the untucked posture
+    cfg_t = RM.MapConfig(seeds=2, batch=64, edge_distances=(0.45,), lattice_m=0.24, y_half_m=0.24, n_yaws=1)
+    lib = _jar_lib()
+    mt, _ = RM.compute_map(PostureWorld(cfg_t), lib, "r0", 0.6789, {"key": "0.6789", "height": 0.6789}, geom=fake.geom, cfg=cfg_t, kind="tabletop")
+    assert mt["trunks"][0]["posture"] == "untucked" and "obstacle_free_by_posture" not in mt["trunks"][0]
+
+
+def test_registered_digests_stay_and_the_open_top_basin():
+    """The specs' digests are the maps' identity: the kmuacd cube (maps rebuilt on trunk_893d7e61) and the measured fridge (c623427d265d)
+    keep theirs; an open-top basin (inside_large_scale_03's drop-in sink) has no board above, walls to its rim and a near wall."""
+    reg = IN.load_registry(IN.REGISTRY)
+    assert reg["bookcase_kmuacd_0@0.8354"].digest() == "b58d4e5c790e"
+    fr = reg["fridge_petcxr_0@0.7064/j_left_door2.3"]
+    assert fr.digest() == "c623427d265d" and fr.joint_values == {"j_left_door": 2.3} and fr.extra_boxes[0][0] == "door_left_door"
+    sink = IN.InteriorSpec(name="sink", height_m=0.77, depth_m=0.40, width_m=0.45, headroom_m=1.505, rim_m=0.19, front_wall_x_m=0.06, open_top=True,
+                           back_thickness_m=0.02, board_setback_m=0.06, supports=(("house_double_floor_lower", "drop_in_sink_lkklqs_0"),))
+    assert sink.open_sides == ["top"] and sink.wall_height_m == 0.19
+    boxes = dict(sink.boxes(0.77, 0.45))
+    assert list(boxes) == ["board", "wall_left", "wall_right", "back", "front"]  # no board above
+    wl, fw = boxes["wall_left"], boxes["front"]
+    assert abs(wl.centre[2] + wl.half[2] - (0.77 + 0.19)) < 1e-9  # the walls end at the rim
+    assert abs(fw.centre[0] + fw.half[0] - (0.45 + 0.06)) < 1e-9 and abs(fw.centre[0] - fw.half[0] - 0.45) < 1e-9  # front plane .. inner face
+    assert abs(fw.centre[2] + fw.half[2] - 0.96) < 1e-9
+    g = sink.geometry()
+    assert g["open_top"] and g["rim_m"] == 0.19 and g["front_wall_x_m"] == 0.06 and "open_top" not in fr.geometry()
+    assert IN.InteriorSpec.from_json(sink.to_json()).digest() == sink.digest() != IN.InteriorSpec.from_json({**sink.to_json(), "rim_m": 0.25}).digest()
