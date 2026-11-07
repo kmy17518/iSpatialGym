@@ -171,6 +171,31 @@ def _v2_hint(path: str):
     return None
 
 
+#: a family member's grasp name: ``<row>@<param>`` (of-v2maps 2026-11-07, map-seeded F: ``v2/map_f.py``)
+MEMBER_SEP = "@"
+
+
+def family_member(g: "Grasp", family: Dict[str, Any], param: float) -> "Grasp":
+    """The member of ``g``'s v2 family at ``param`` (rad / m from the representative, ``schema.family_member_T``) as a grasp of its own,
+    named ``<row>@<param>`` - same key, pinch width and rest; ``meta`` adds ``family_param`` / ``family_base``. The oracle executes the
+    recorded ``eef_in_object``; :func:`conventions.grasp_entry` resolves the name."""
+    import copy
+
+    import numpy as np
+
+    from ispatialgym.grasping import schema as S
+
+    T = S.pose_mat(g.position.tolist(), g.quat.tolist())
+    Tm = S.family_member_T(family, T, float(param))
+    pose = S.mat_pose(Tm)
+    out = copy.copy(g)
+    out.name = f"{g.name}{MEMBER_SEP}{float(param):+.4f}"
+    out.position = th.tensor(np.asarray(pose["position"], dtype=float), dtype=th.float32)
+    out.quat = th.tensor(np.asarray(pose["orientation_xyzw"], dtype=float), dtype=th.float32)
+    out.meta = {**(g.meta or {}), "family_param": round(float(param), 6), "family_base": g.name}
+    return out
+
+
 def grasps_from_v2(lib, key: str, rest_id: Optional[str] = None) -> List["Grasp"]:
     out = []
     for g in lib.grasps(rest_id):

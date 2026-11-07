@@ -3211,6 +3211,12 @@ def _count(s, key: str) -> None:
         st[key] = st.get(key, 0) + 1
 
 
+def _countn(s, key: str, n: int = 1) -> None:
+    st = getattr(getattr(s, "kit", None), "stats", None)
+    if isinstance(st, dict):
+        st[key] = st.get(key, 0) + int(n)
+
+
 def _twin_side(d: Dict[str, Any]) -> str:
     src = f"{d['source']} " if d.get("source") else ""
     if d.get("margin_rad") is None:
@@ -3803,7 +3809,24 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
         return found
 
     screened: Dict[str, bool] = {}
+    from ispatialgym.sampling.v2 import map_f as MF
+
+    mf_mode = MF.mode() if fixed is None else ""
+    mf_cell: Dict[str, Any] = {}
     for a in offered:
+        if mf_mode and MF.is_view(band_of.get(a)):
+            mf_cell[a] = MF.focus_cell(band_of[a], st_of[a], fx.tolist())
+            if mf_cell[a] is None:
+                _count(s, "map_F.no_cell")
+        if mf_mode == "seed" and mf_cell.get(a) is not None:
+            # of-v2maps 2026-11-07 (prompt I item 4, ISPATIALGYM_MAP_F=seed): F = the map's pairs at the focus cell (v2/map_f.py)
+            F_of[a], w_a, mf_facts = MF.F_from_map(mf_cell[a], grasps, rng, MF.width_of(s).of(hash(mf_cell[a].key)))
+            s.__dict__.setdefault("_map_F_w", {}).update(w_a)
+            screened[a] = True
+            _count(s, "map_F.seeded" if F_of[a] else "map_F.seeded_empty")
+            if mf_facts.get("members"):
+                _count(s, "map_F.members")
+            continue
         if ev_on:
             ev_of[a] = evidence_cell(s, band_of.get(a), st_of[a])
             known = ev_F(a)
@@ -3847,6 +3870,10 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
             _count(s, "arm_band_mirrored.foci")
             if not F_of[a]:
                 _count(s, "arm_band_mirrored.empty_F")
+    if mf_mode == "diag":
+        for a in offered:
+            if mf_cell.get(a) is not None:
+                MF.diag_compare(s, _countn, mf_cell[a], F_of.get(a) or [], yaws)
     if refine and float(rng.random()) < BR.add_p():
         _refine_add(s, band_of.get(offered[0]), st_of[offered[0]], offered[0], fx, top, yaws, grasps, pose_at, ignore_for_grasp, eef_of, task_objs, rng)
 
@@ -3922,10 +3949,14 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
     exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
     tried: set = set()
     n_pairs = len(F)
+    mf_key = next((hash(c.key) for c in mf_cell.values() if c is not None), None) if mf_mode == "seed" else None
+    sc = MF.width_of(s).of(mf_key) if mf_key is not None else 1.0  # AdaptiveWidth of the focus's map cell (seed mode)
     while F:
-        out = _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
+        out = _phase3_draw(s, F, rng, jitter * sc, n_positions, focus_radius * sc, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins,
                            band_of, name, offered, arm, manip, fails, ev_of if ev_on else None, gname, tried, verify=task_objs if refine else None)
         if isinstance(out, tuple):
+            if mf_key is not None:
+                MF.width_of(s).update(mf_key, True)
             return out
         last_reason = out or last_reason
         if not (ev_on and not all(screened.get(a, True) for a in offered)):
@@ -3939,6 +3970,9 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
         _count(s, "band_evidence.rescreen_dry")
         F = pool_of(F_of, skip=tried)
         n_pairs += len(F)
+    if mf_key is not None:
+        MF.width_of(s).update(mf_key, False)
+        _count(s, "map_F.exhausted")
     _reject("grasp_unreachable", f"F ({n_pairs} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
 
 
@@ -4157,7 +4191,9 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
     IK failure reason. With ``ev_of`` (BAND_EVIDENCE) each tried pair's outcome is counted in its arm's evidence (a pair whose positions
     all left the support counts nothing); ``tried`` collects the pairs drawn."""
     last_reason = ""
-    for i in rng.permutation(len(F)):
+    from ispatialgym.sampling.v2 import map_f as MF
+
+    for i in MF.draw_order(rng, F, getattr(s, "_map_F_w", None)):
         yaw0, g, arms_i = F[int(i)]
         a0 = arms_i[0]
         tried.add((round(float(yaw0), 4), str(getattr(g, "name", id(g)))))

@@ -501,6 +501,10 @@ def grasp_entry(grasp_key: str, grasp_name: str):
     from ispatialgym.sampling import grasp_library as GL
 
     base, flipped = split_twin(grasp_name)
+    member = None
+    if GL.MEMBER_SEP in base:  # of-v2maps 2026-11-07: a v2 family member "<row>@<param>" (grasp_library.family_member)
+        base, p = base.split(GL.MEMBER_SEP, 1)
+        member = float(p)
     for clean in (True, False):
         try:
             grasps = GL.load_grasps(grasp_key, require_clean=clean)
@@ -508,6 +512,12 @@ def grasp_entry(grasp_key: str, grasp_name: str):
             continue
         for g in grasps:
             if g.name == base:
+                if member is not None:
+                    lib = GL.v2_entry(grasp_key)
+                    fam = (lib.families() if lib is not None else {}).get((g.meta or {}).get("family_id") or "")
+                    if fam is None:
+                        raise KeyError(f"grasp {grasp_name!r}: {base} has no v2 family in {grasp_key!r}")
+                    g = GL.family_member(g, fam, member)
                 return GL.twin(g) if flipped else g
     raise KeyError(f"grasp {grasp_name!r} not found in library entry {grasp_key!r}")
 
