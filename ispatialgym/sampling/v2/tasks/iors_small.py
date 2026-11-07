@@ -2382,6 +2382,9 @@ class IORSSmall(SamplerV2):
             def frame_score(pp, _cam=cam_m):
                 place_g = IK.grasp_pose(self.goal_pose(t_pose, pp), grasp.eef_in_object)
                 return min(self.ikc.eef_frame_margin(place_g, _cam), self.ikc.eef_frame_margin(self.pre_place_of(place_g), _cam))
+            # goal_pose reads the sidecar's manipulation stance (abv2_rank 2026-11-07: KeyError 'manipulation' in 21 / 21 iors_small runs): it is
+            # registered here, before the partner draw, instead of after it (the caller pops it again when this candidate is rejected)
+            self.sidecar.add_stance(manip)
         p_pose = self.place_partner(rng, t_pose, manip, cam_init, frame_score=frame_score)
         if frame_score is not None and isinstance(self.partner_draw, dict) and self.partner_draw.get("frame_rank"):
             d.summary.setdefault("frame_rank", []).append(self.partner_draw["frame_rank"])
