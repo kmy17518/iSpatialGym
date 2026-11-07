@@ -70,3 +70,11 @@ def test_the_eef_fixed_links_only_and_the_switches(monkeypatch):
     assert SM.categories() == list(SM.CATEGORIES)
     monkeypatch.setenv("ISPATIALGYM_MAP_SCENE_MASK_DIAG", "1")
     assert SM.active() and SM.diag_on() and not SM.mask_on()
+
+
+def test_band_anchor_z_reads_the_map_views_height():
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    assert TT.band_anchor_z(SimpleNamespace(meta={"height": {"value": 0.8126, "anchor_key": "0.8126"}})) == 0.8126
+    assert TT.band_anchor_z(SimpleNamespace(meta={"height": 0.75})) == 0.75
+    assert TT.band_anchor_z(SimpleNamespace(meta={})) is None and TT.band_anchor_z(None) is None

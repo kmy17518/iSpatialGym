@@ -3823,6 +3823,15 @@ def _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp
         log.info("DIAG_EMPTY_F failed: %r", e)
 
 
+def band_anchor_z(bands) -> Optional[float]:
+    """The height above the floor a band view was computed at: a map view's ``meta["height"]["value"]`` (``map_sampling.as_bands``), a
+    plain number, else None (maskdiag1 2026-11-07: the dict was read as a float, TypeError in 19 / 20 aliases)."""
+    h = bands.meta.get("height") if bands is not None and isinstance(getattr(bands, "meta", None), dict) else None
+    if isinstance(h, dict):
+        h = h.get("value")
+    return float(h) if isinstance(h, (int, float)) else None
+
+
 def scene_mask_F(s, F, st_of, offered, top, fx, yaws, grasps, pose_at, eef_of, hull, ignore_for_grasp, margin, scale_key, draw=None):
     """``scene_mask`` at the focus (of-v2maps 2026-11-07): every (yaw, grasp) per offered arm at its stance; MASK mode drops the masked
     (pair, arm) entries of F (a pair no arm keeps leaves F), DIAG mode keeps F and tests up to ``scene_mask.FN_CHECK_MAX`` masked pairs of F
@@ -3838,11 +3847,7 @@ def scene_mask_F(s, F, st_of, offered, top, fx, yaws, grasps, pose_at, eef_of, h
     except Exception:  # noqa: BLE001
         pass
     task_objs = list((getattr(getattr(s, "world", None), "spawned", None) or {}).values())
-    anchor_z = None
-    for a in offered:
-        b = getattr(s, "bands", None)
-        if b is not None and isinstance(getattr(b, "meta", None), dict) and b.meta.get("height") is not None:
-            anchor_z = float(b.meta["height"])
+    anchor_z = band_anchor_z(getattr(s, "bands", None))
     gi = {id(g): k for k, g in enumerate(grasps)}
     yi = {round(float(y), 4): j for j, y in enumerate(yaws)}
     cats_of: Dict[Tuple[float, str, str], List[str]] = {}
