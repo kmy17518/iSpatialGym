@@ -3351,7 +3351,8 @@ class IORSSmall(SamplerV2):
             for label, seed in (("the transit's start posture", q0[idx]), ("ready", th.tensor(M.ARM_READY_Q[arm], dtype=q0.dtype))):
                 q_seed = self.ikc.q_locked(manip, fingers=fingers).clone()
                 q_seed[idx] = seed.to(q_seed.dtype)
-                r2 = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, arm, q_seed=q_seed, cache=False, scale_key=self.choice.models["target"].scale, **kw)
+                with TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
+                    r2 = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, arm, q_seed=q_seed, cache=False, scale_key=self.choice.models["target"].scale, **kw)
                 q2 = self.ikc.solutions.get((arm, self.ikc._pose_key(grasp.pre_grasp))) if r2.ok else None
                 if q2 is None:
                     continue
@@ -4031,8 +4032,9 @@ class IORSSmall(SamplerV2):
             manip = self.sidecar.stance("manipulation")
             settled = self.settle_motion(draft, tname)
             draft.summary["target_settle"] = settled
-            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
-                                 scale_key=self.choice.models["target"].scale, cache=False, approached=[self.obj("target")])
+            with TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
+                res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
+                                     scale_key=self.choice.models["target"].scale, cache=False, approached=[self.obj("target")])
             ok = res.ok
             if not ok and settled.get("rotation_deg", 0.0) > float(self.gen("regrasp_after_roll_deg", REGRASP_AFTER_ROLL_DEG)):
                 # a round target rolled while settling: its library grasp now faces the wrong way; re-select among the
@@ -4169,9 +4171,10 @@ class IORSSmall(SamplerV2):
         tgt, manip = self.obj("target"), self.sidecar.stance("manipulation")
         scale = self.choice.models["target"].scale
         kw = {"ignore_for_last": self.support_objects(), "scale_key": scale, "cache": False, "approached": [tgt]}
-        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
-        if not res.ok and q_first is not None:
-            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
+        with TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
+            if not res.ok and q_first is not None:
+                res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
         if not res.ok:
             return f"pick: {res.reason}"
         if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, grasp.arm):

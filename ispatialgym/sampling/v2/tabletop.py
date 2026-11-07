@@ -2057,6 +2057,26 @@ def _policy_opening(s, g):
     return f(policy_opening_of(g)) if callable(f) else nullcontext()
 
 
+def record_policy_opening(s, rec):
+    """``_policy_opening`` for a recorded grasp (of-v2maps 2026-11-07, v2open1: the after-settle / held-turn re-checks of a GraspRecord
+    polices it at the fully open gripper again - nextto_03 36 / 36, ontop_small_04 59 / 59 settle_validate failures): the opening the oracle
+    pre-shapes to, from the record's ``pinch_width_m`` when the sampler measured it (execute.grasp_pinch_width's order), else the
+    library entry's width (``conventions.grasp_entry``); a no-op context when neither resolves."""
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    f = getattr(getattr(s, "ikc", None), "policy_opening", None)
+    if not callable(f) or rec is None:
+        return nullcontext()
+    w = (getattr(rec, "extras", None) or {}).get("pinch_width_m")
+    if w is None:
+        try:
+            w = (C.grasp_entry(rec.grasp_key, rec.grasp_name).meta or {}).get("width")
+        except Exception:  # noqa: BLE001  (a record without a library row: the configuration's opening)
+            w = None
+    return f(policy_opening_of(SimpleNamespace(meta={"width": w}))) if w is not None else nullcontext()
+
+
 def support_policy_fallback_mode() -> str:
     """Opt-in ``ISPATIALGYM_SUPPORT_POLICY_FALLBACK`` (of-v2maps 2026-11-06): ``""`` off (the rejection stands), ``raise`` (re-solve the
     grasp raised along -approach), ``raise+relax`` (... else accept the policy-rejected grasp and mark it)."""

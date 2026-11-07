@@ -1359,7 +1359,7 @@ class Disembedding(SamplerV2):
         manip, place_st = self.sidecar.stance("manipulation"), self.sidecar.stance("placement")
         scale = self.choice.models["target"].scale
         kw = {"ignore_for_last": self.grasp_ignore_list(), "scale_key": scale, "cache": False}
-        with self.pick_world():
+        with self.pick_world(), TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
             res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
             if not res.ok and q_first is not None:
                 res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)

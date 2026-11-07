@@ -1727,9 +1727,10 @@ class Attachment(SamplerV2):
         st = self.sidecar.stances.get(str(grasp.extras.get("attach_stance") or "manipulation")) or manip
         scale = self.choice.models[self.t_role].scale
         kw = {"ignore_for_last": [support], "scale_key": scale, "cache": False}
-        res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", q_first=q_first, **kw)
-        if not res.ok and q_first is not None:
-            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
+        with TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", q_first=q_first, **kw)
+            if not res.ok and q_first is not None:
+                res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
         if not res.ok:
             return f"pick: {res.reason}"
         if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, "right"):

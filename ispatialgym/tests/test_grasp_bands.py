@@ -441,6 +441,28 @@ def test_policy_opening_is_the_oracle_preshape(monkeypatch):
     assert ikc._policy_opening is None
 
 
+def test_record_policy_opening_resolves_the_recorded_grasp(monkeypatch):
+    # of-v2maps 2026-11-07 (v2open1): the after-settle re-check of a GraspRecord polices it at the oracle's pre-shape too
+    from types import SimpleNamespace
+
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import ik as IKm
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY_OPENING", raising=False)
+    monkeypatch.setattr(C, "grasp_entry", lambda key, name: SimpleNamespace(meta={"width": 0.01554}))  # carving knife top_3
+    ikc = SimpleNamespace(_policy_opening=None)
+    ikc.policy_opening = lambda m: IKm.IKChecker.policy_opening(ikc, m)
+    s = SimpleNamespace(ikc=ikc)
+    with TT.record_policy_opening(s, SimpleNamespace(grasp_key="k", grasp_name="top_3", extras={})):
+        assert abs(ikc._policy_opening - 0.01777) < 1e-6
+    with TT.record_policy_opening(s, SimpleNamespace(grasp_key="k", grasp_name="top_3", extras={"pinch_width_m": 0.02})):
+        assert abs(ikc._policy_opening - 0.02) < 1e-6  # the sampler's own pad width wins, as in the oracle
+    assert ikc._policy_opening is None
+    with TT.record_policy_opening(SimpleNamespace(ikc=SimpleNamespace()), SimpleNamespace(grasp_key="k", grasp_name="g", extras={})):
+        pass  # an IK checker without the switch (the tests' fakes): a no-op
+
+
 def test_support_policy_fallback_switch_and_pad_overlap(monkeypatch):
     # of-v2maps 2026-11-06: the opt-in fallback's switch and the overlap of the fingers with the object along the approach
     import torch as th
