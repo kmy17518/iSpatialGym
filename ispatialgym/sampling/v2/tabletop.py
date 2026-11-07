@@ -2327,6 +2327,32 @@ class BraceRecord(ContactRecord):
         return d
 
 
+#: owner decision 2026-11-07 (the BRACE OPENING rule): an OPEN brace (a wide stop, the record's ``fingers_opening_m``) opens FULLY -
+#: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
+#: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`)
+BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
+BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
+#: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
+#: the 8.4 mm finger then lies on the face (``wide_stop_positions``' fit rule for a stop moved onto the push line)
+BRACE_STOP_END_MARGIN_M = 0.01
+
+
+def brace_full_open() -> bool:
+    """Whether ``ISPATIALGYM_BRACE_FULL_OPEN`` is on (owner 2026-11-07: an open brace opens fully; default off = today's openings)."""
+    return os.environ.get(BRACE_FULL_OPEN_ENV, "0").strip().lower() in ("1", "true", "on", "yes")
+
+
+def brace_opening(today: float, room: Optional[float] = None) -> float:
+    """The per-finger opening (m) an OPEN brace records as ``fingers_opening_m`` - the opening ``execute_brace`` pre-shapes the gripper
+    to. Switch off (:func:`brace_full_open`): ``today``, the builder's own value. On (owner 2026-11-07): the full opening
+    (:data:`BRACE_FULL_OPENING_M`), narrower only to ``room`` - the widest per-finger opening the braced face takes (the caller's
+    geometry), never below 0."""
+    if not brace_full_open():
+        return float(today)
+    full = BRACE_FULL_OPENING_M
+    return full if room is None else max(0.0, min(full, float(room)))
+
+
 def brace_fingers(extras: Optional[Dict[str, Any]]) -> float:
     """The finger joints a brace record's checks use - the opening the oracle executes it at (``execute_brace``: the record's
     ``fingers_opening_m``, else the gripper closed) - for the brace's exact IK, its two-arm solve, its probes and its retreat."""
@@ -5141,7 +5167,7 @@ __all__ = [
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_bounds", "phase1c_lateral", "tilt_scan",
     "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "brace_fingers", "with_gripper",
-    "posed_in_hand",
+    "BRACE_FULL_OPEN_ENV", "BRACE_FULL_OPENING_M", "BRACE_STOP_END_MARGIN_M", "brace_full_open", "brace_opening", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
     "gap_masks_why", "partner_pose_at", "partner_pose_why", "meta_link_world_points", "meta_spot_gaps", "pose_centred_on",

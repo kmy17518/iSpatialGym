@@ -80,6 +80,25 @@ def wide_stop_positions(a_pos: float, s_line: float, opening: float, ends: Seque
     return out
 
 
+def wide_stop_layout(opening_today: float, corner_inset: float, ends: Sequence[float], near_i: int) -> Tuple[float, float]:
+    """``(per-finger opening, pad position along the face)`` (m) of an open face stop placed by the corner rule (the push-close brace
+    ``close_push_brace_*``, the carton-v4 wide stop ``v4_brace_*``): the face's robot-side end ``ends[near_i]`` + ``corner_inset`` inward.
+    ``ISPATIALGYM_BRACE_FULL_OPEN`` off: ``opening_today`` and that position 1 cm inside the ends - the values of before 2026-11-07. On
+    (owner 2026-11-07, :func:`tabletop.brace_opening`): the full opening, narrower only when the face is too short for it (each pad face
+    :data:`tabletop.BRACE_STOP_END_MARGIN_M` inside both ends with the stop centred), and the inset grown to at least the opening + that
+    margin so the near finger stays on the face (the 4 cm inset put a 4 cm stop's near pad face exactly at the corner; a 5 cm stop there
+    would brace beyond the corner)."""
+    lo, hi = float(ends[0]), float(ends[1])
+    if not TT.brace_full_open():
+        a_pos = ends[near_i] + (corner_inset if near_i == 0 else -corner_inset)
+        return float(opening_today), min(max(a_pos, ends[0] + 0.01), ends[1] - 0.01)
+    m = TT.BRACE_STOP_END_MARGIN_M
+    opening = TT.brace_opening(opening_today, room=0.5 * (hi - lo) - m)
+    inset = max(float(corner_inset), opening + m)
+    a_pos = ends[near_i] + (inset if near_i == 0 else -inset)
+    return opening, min(max(a_pos, lo + opening + m), hi - opening - m)
+
+
 def lever_detour_reaches(kit, arm: str, q_contact: th.Tensor, contact, retreat_m: float, pre_grasp, grasp) -> Tuple[bool, str]:
     """Owner 2026-09-30 (first-demo v3.0 F3, carton lever 0928-043925): whether the brace hand gets from its brace to its pinch the way the
     oracle moves it - the straight retreat ``retreat_m`` back along the brace's approach (the ``Retreat`` after a ``straight_retreat``
@@ -1696,9 +1715,9 @@ class ArticulationSmall(SamplerV2):
             end_pts = [centre + along * (e - c_along) for e in ends]
             near_i = 0 if float(th.linalg.norm((end_pts[0] - base_xy)[:2])) <= float(th.linalg.norm((end_pts[1] - base_xy)[:2])) else 1
             corner_inset = float(self.gen("close_push_brace_corner_inset_m", 0.04))
-            a_pos = ends[near_i] + (corner_inset if near_i == 0 else -corner_inset)
-            a_pos = min(max(a_pos, ends[0] + 0.01), ends[1] - 0.01)
-            opening = float(self.gen("close_push_brace_opening_m", 0.04))
+            # the stop's opening and place (owner 2026-11-07, ISPATIALGYM_BRACE_FULL_OPEN: fully open unless the face is too short, the
+            # near finger kept on the face; off = close_push_brace_opening_m at the corner inset, as before)
+            opening, a_pos = wide_stop_layout(float(self.gen("close_push_brace_opening_m", 0.04)), corner_inset, ends, near_i)
             kinds = [str(k) for k in (self.gen("close_push_brace_kinds", ["top_press", "opposite_face"]) or [])]
             # the push line's place along the face (the arc turns the contact about the hinge, which runs along the face)
             s_line = float(th.dot(wpf.contact.float(), along))
@@ -2341,10 +2360,15 @@ class ArticulationSmall(SamplerV2):
                 rp = self.ikc.exact([probe], st, main_arm, ignore_for_last=[support, target], q_seed=r.q, cache=False, fingers=C.FINGER_CLOSED)
                 return rec, (r.q.clone(), rp.q.clone() if rp.ok else None)
             else:
+                # the wide stop's opening and place (owner 2026-11-07, ISPATIALGYM_BRACE_FULL_OPEN; off = v4_brace_opening_m at the corner
+                # inset above, as before)
+                opening, a_w = wide_stop_layout(float(self.gen("v4_brace_opening_m", 0.04)), inset, ends, near_i)
+                if a_w != a_pos:
+                    p_face = centre + along * (a_w - c_along)
+                    p_face = p_face + n_face * (face_d - float(th.dot(p_face, n_face)))
                 p_face = th.tensor([float(p_face[0]), float(p_face[1]), z_b])
                 contact = C.contact_eef(p_face, -n_face, along)
                 pre = C.pre_pose(contact, float(self.gen("v4_brace_pre_m", 0.06)))
-                opening = float(self.gen("v4_brace_opening_m", 0.04))
                 extras = {"stop_clearance_m": 0.0, "pose_class": "wide_stop", "fingers_opening_m": opening, "stop_width_m": 2 * opening + 0.02,
                           "note": "two-flap v4: the pinching hand, open, holds the box against the lever's shove (owner 2026-09-20 21:20)"}
                 bk = "opposite_face"

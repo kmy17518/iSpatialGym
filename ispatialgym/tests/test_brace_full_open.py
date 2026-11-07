@@ -1,6 +1,10 @@
-"""The brace-opening mismatch fixes (i7-braceopen 2026-11-07) - no simulator.
+"""The BRACE OPENING rule (owner decision 2026-11-07) and the brace-opening mismatch fixes (i7-braceopen) - no simulator.
 
-* Default on: every check of a wide brace uses the record's ``fingers_opening_m`` - the opening the oracle
+* ``ISPATIALGYM_BRACE_FULL_OPEN`` ("0" default = the openings of before 2026-11-07, "1" = an open brace opens fully, narrower only
+  when the braced face cannot take the full spread): ``tabletop.brace_opening``, ``articulation_small.wide_stop_layout`` (the
+  push-close brace ``close_push_brace_opening_m`` and the carton-v4 wide stop ``v4_brace_opening_m``), ``block_design.pack_brace_opening``
+  (the packing tail's wide brace).
+* Default on, independent of the switch: every check of a wide brace uses the record's ``fingers_opening_m`` - the opening the oracle
   executes (``execute_brace``) - not closed fingers: ``tabletop.brace_second_arm(brace_fingers=...)`` (the two-arm solve), the pack's
   pushes with the brace locked, the program check's brace retreat and locked brace hand (``program_check.brace_open_fingers``,
   ``locked_seed``, ``_Tracker.locked_fingers``).
@@ -34,6 +38,32 @@ def _q_locked(stance=None, fingers=None, **kw):
     return q
 
 
+@pytest.fixture
+def switch(monkeypatch):
+    def _set(on: bool):
+        if on:
+            monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, "1")
+        else:
+            monkeypatch.delenv(TT.BRACE_FULL_OPEN_ENV, raising=False)
+    _set(False)
+    return _set
+
+
+# ---------------------------------------------------------------------------------------------------------- the rule and its switch
+
+def test_brace_opening_per_switch(switch, monkeypatch):
+    assert not TT.brace_full_open()  # the default: today's openings
+    assert TT.brace_opening(0.04) == 0.04 and TT.brace_opening(0.04, room=0.01) == 0.04
+    monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, "0")
+    assert TT.brace_opening(0.04) == 0.04
+    switch(True)
+    assert TT.brace_full_open() and TT.BRACE_FULL_OPENING_M == C.FINGER_OPEN == 0.05
+    assert TT.brace_opening(0.04) == 0.05  # fully open
+    assert TT.brace_opening(0.04, room=0.2) == 0.05  # the face takes the full spread
+    assert TT.brace_opening(0.04, room=0.03) == 0.03  # narrower only when the face cannot take it
+    assert TT.brace_opening(0.04, room=-0.01) == 0.0
+
+
 def test_brace_fingers_is_the_records_opening_else_closed():
     assert TT.brace_fingers({"fingers_opening_m": 0.04}) == 0.04
     assert TT.brace_fingers({"pose_class": "blade_down"}) == C.FINGER_CLOSED
@@ -49,6 +79,49 @@ def test_with_gripper_sets_one_hand():
 
 # ----------------------------------------------------------------------------- articulation_small: the push-close / v4 face stops
 
+def _layout():
+    from ispatialgym.sampling.v2.tasks.articulation_small import wide_stop_layout
+
+    return wide_stop_layout
+
+
+def _today(opening, inset, ends, near_i):
+    """The inline computation of before 2026-11-07 (close_push_brace_* / v4_brace_*)."""
+    a = ends[near_i] + (inset if near_i == 0 else -inset)
+    return opening, min(max(a, ends[0] + 0.01), ends[1] - 0.01)
+
+
+@pytest.mark.parametrize("ends", [[-0.12, 0.12], [0.31, 0.58], [-0.03, 0.03]])
+@pytest.mark.parametrize("near_i", [0, 1])
+@pytest.mark.parametrize("opening,inset", [(0.04, 0.04), (0.04, 0.05)])
+def test_wide_stop_layout_switch_off_is_today(switch, ends, near_i, opening, inset):
+    assert _layout()(opening, inset, ends, near_i) == _today(opening, inset, ends, near_i)
+
+
+def test_wide_stop_layout_full_open_keeps_both_fingers_on_the_face(switch):
+    switch(True)
+    m = TT.BRACE_STOP_END_MARGIN_M
+    # a carton face 24 cm long: fully open, the stop moved in so the near pad face is 1 cm inside the corner (inset 0.04 -> 0.06)
+    for near_i, sign in ((0, 1.0), (1, -1.0)):
+        q, a = _layout()(0.04, 0.04, [-0.12, 0.12], near_i)
+        assert q == 0.05
+        assert a == pytest.approx(sign * (-0.12 + 0.05 + m))
+        assert a - q >= -0.12 + m - 1e-9 and a + q <= 0.12 - m + 1e-9
+    # the v4 inset 0.05: moved to 0.06 as well
+    assert _layout()(0.04, 0.05, [0.0, 0.3], 0) == (0.05, pytest.approx(0.06))
+    # a larger configured inset is kept
+    assert _layout()(0.04, 0.09, [0.0, 0.3], 0) == (0.05, pytest.approx(0.09))
+    # a face 8 cm long cannot take the full spread: narrower, centred
+    q, a = _layout()(0.04, 0.04, [0.0, 0.08], 0)
+    assert q == pytest.approx(0.04 - m) and a == pytest.approx(0.04)
+    # the stop moved onto the push line keeps the face fit with the wider opening (wide_stop_positions' own rule)
+    from ispatialgym.sampling.v2.tasks.articulation_small import wide_stop_positions
+
+    q, a = _layout()(0.04, 0.04, [-0.12, 0.12], 0)
+    for s in wide_stop_positions(a, 0.05, q, [-0.12, 0.12]):
+        assert -0.12 + 0.01 + q <= s <= 0.12 - 0.01 - q
+
+
 def test_close_push_and_v4_stops_are_checked_at_their_opening():
     """The call sites: the push-close stop's two-arm solve passes the stop's opening for the brace hand (the fist closed), its lift-off and
     diagnostics use it; the v4 wide stop is solved / probed at the record's opening with the lever hand closed in the locked config."""
@@ -59,8 +132,9 @@ def test_close_push_and_v4_stops_are_checked_at_their_opening():
     assert "brace_fingers=opening" in stop and "fingers=C.FINGER_CLOSED, ignore_while_locked" in stop  # fist closed, brace hand open
     assert stop.count("cache=False, fingers=opening)") == 3  # lift-off, the two diagnostics
     assert "FINGER_CLOSED" not in stop.replace("fingers=C.FINGER_CLOSED, ignore_while_locked", "")
+    assert "wide_stop_layout(float(self.gen(\"close_push_brace_opening_m\", 0.04))" in src
     v4 = inspect.getsource(AS.ArticulationSmall._sample_with_v4)
-    wide = v4[v4.index("opening = float(self.gen(\"v4_brace_opening_m\""):v4.index("def brace_in_pinch_solution")]
+    wide = v4[v4.index("wide_stop_layout(float(self.gen(\"v4_brace_opening_m\""):v4.index("def brace_in_pinch_solution")]
     assert "fingers=b_fingers, q_seed=seed_b" in wide and "q_seed=q_b, cache=False, fingers=b_fingers" in wide
     assert "TT.with_gripper(self.kit, r.q, lever_arm, C.FINGER_CLOSED)" in wide and "return rec, (q_b.clone()" in wide
 
@@ -135,9 +209,45 @@ def _old_pack(spread):
     return max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * BD.FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
 
 
+@pytest.mark.parametrize("spread", [0.0, 0.026, 0.035, 0.12, 0.3])
+def test_pack_brace_opening_switch_off_is_today(switch, spread):
+    BD = _bd()
+    assert BD.pack_brace_opening(spread) == _old_pack(spread)
+    assert BD.pack_brace_opening(spread, face_half_m=0.2) == _old_pack(spread)  # the face is not consulted with the switch off
+
+
+def test_pack_brace_opening_full_open(switch):
+    BD = _bd()
+    switch(True)
+    m, half_t = BD.PACK_BRACE_END_MARGIN_M, BD.FINGER_HALF_THICKNESS
+    # two 2.5 cm dice 3.5 cm apart (the 10 mm place grid): the faces span +-3 cm - each finger's outer side 5 mm inside the outer edges
+    assert BD.pack_brace_opening(0.035, face_half_m=0.03) == pytest.approx(0.03 - half_t - m)
+    assert BD.pack_brace_opening(0.035, face_half_m=0.03) > _old_pack(0.035)
+    # a long braced line takes the full spread
+    assert BD.pack_brace_opening(0.12, face_half_m=0.0725) == 0.05
+    # never narrower than the fingers on the cubes' centres
+    assert BD.pack_brace_opening(0.035, face_half_m=0.02) == pytest.approx(_old_pack(0.035))
+    # one braced cube is a closed blade, not an open brace
+    assert BD.pack_brace_opening(0.0, face_half_m=0.0125) == 0.0
+    assert BD.pack_brace_opening(0.035) == pytest.approx(_old_pack(0.035))  # no face known: today's
+
+
 def _cube_hull(e=0.025):
     h = 0.5 * e
     return th.tensor([[x, y, z] for x in (-h, h) for y in (-h, h) for z in (-h, h)])
+
+
+def test_pack_face_half_is_the_braced_cubes_extent_along_the_closing_axis():
+    BD = _bd()
+    s = object.__new__(BD.BlockDesign)
+    s.hull = _cube_hull()
+    world = {"a": (th.tensor([0.5, 0.0175, 0.8]), Q_ID), "b": (th.tensor([0.5, -0.0175, 0.8]), Q_ID)}
+    mid = th.tensor([0.5, 0.0, 0.8])
+    # braced on their -x faces (brace direction +x): the closing axis runs along y, the faces span -0.03 .. 0.03
+    assert s._pack_face_half(world, ["a", "b"], mid, th.tensor([1.0, 0.0, 0.0])) == pytest.approx(0.03)
+    assert s._pack_face_half(world, ["a", "b"], mid + th.tensor([0.0, 0.005, 0.0]), th.tensor([-1.0, 0.0, 0.0])) == pytest.approx(0.025)
+    s.hull = None
+    assert s._pack_face_half(world, ["a", "b"], mid, th.tensor([1.0, 0.0, 0.0])) is None
 
 
 def _pack_sampler(monkeypatch, captured):
@@ -175,14 +285,21 @@ def _pack_sampler(monkeypatch, captured):
     return s, ikc, world
 
 
-def test_pack_pushes_are_checked_with_the_brace_hand_at_its_opening(monkeypatch):
+@pytest.mark.parametrize("on", [False, True])
+def test_pack_pushes_are_checked_with_the_brace_hand_at_its_opening(switch, monkeypatch, on):
+    BD = _bd()
+    switch(on)
     captured = {}
     s, ikc, world = _pack_sampler(monkeypatch, captured)
     stage, why = s._pack_stage("columns", world, ["a", "b"], [("c", 0.009)], th.tensor([-1.0, 0.0, 0.0]), th.tensor([1.0, 0.0, 0.0]),
                                Stance_("manipulation"), object())
     assert stage is not None, why
-    q_open = _old_pack(0.035)
-    assert stage["brace"]["fingers_opening_m"] == round(q_open, 4)  # the record is unchanged
+    q_open = BD.pack_brace_opening(0.035, 0.03 if on else None)
+    assert stage["brace"]["fingers_opening_m"] == round(q_open, 4)
+    if not on:
+        assert stage["brace"]["fingers_opening_m"] == round(_old_pack(0.035), 4)  # the record is today's with the switch off
+    else:
+        assert q_open == pytest.approx(0.03 - BD.FINGER_HALF_THICKNESS - BD.PACK_BRACE_END_MARGIN_M)
     # the brace chain at its opening (as before), the pushes with the brace hand held there and the push hand closed (the fix)
     assert ikc.calls[0]["arm"] == "left" and ikc.calls[0]["grip"]["left"] == pytest.approx([q_open] * 2)
     q_seed = captured["q_seed"]
