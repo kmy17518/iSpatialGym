@@ -60,6 +60,25 @@ CONTACT_TILT_DEG = 30.0
 #: closed fingers beside a cube face: the measured profile's fingertip section (``tabletop.FINGER_PROFILE``; the region
 #: spacing and the brace-point band test use it, the blade poses take the profile over the face height)
 FINGER_HALF_THICKNESS = TT.FINGER_PROFILE[0][1]
+#: a FULL-open pack brace (``ISPATIALGYM_BRACE_FULL_OPEN``): the braced cubes' face kept beyond each open finger's outer side (m; the
+#: toy dice's rounded edges)
+PACK_BRACE_END_MARGIN_M = 0.005
+
+
+def pack_brace_opening(spread: float, face_half_m: Optional[float] = None) -> float:
+    """The per-finger opening of the packing tail's wide brace (``fingers_opening_m``). Switch off: each finger's centre line (pad face +
+    half the 8.4 mm finger) on a braced cube's centre - ``spread / 2 - FINGER_HALF_THICKNESS / 2`` for the end cubes' centres ``spread``
+    apart, capped at full open; 0 (a closed blade, not an open brace) for one braced cube. On (owner 2026-11-07,
+    :func:`tabletop.brace_opening`): an open brace opens fully unless the braced faces cannot take it - each finger's outer side
+    (``FINGER_HALF_THICKNESS`` beyond its pad face) :data:`PACK_BRACE_END_MARGIN_M` inside ``face_half_m``, the braced cubes' half extent
+    along the closing axis about their mid point - never narrower than the off value (the fingers on the cubes' centres)."""
+    q_today = max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
+    if q_today <= 0.0 or face_half_m is None:
+        return q_today
+    room = float(face_half_m) - FINGER_HALF_THICKNESS - PACK_BRACE_END_MARGIN_M
+    return TT.brace_opening(q_today, room=max(q_today, room))
+
+
 #: the place puts the block this far right and toward the robot of its slot; the pushes close the margin (§6.2 "small safety margin")
 PLACE_MARGIN = 0.003  # was 5 mm: with a 1 cm slot tolerance the 7 mm diagonal release offset left 3 mm for everything else (0919-183037: 1.20 cm)
 #: the oracle's retreat after a release: the ``Place`` action's own 10 cm leg (actions.RETREAT_DIST) followed by the program's
@@ -2859,6 +2878,16 @@ class BlockDesign(SamplerV2):
                 out.append(st2)
         return out
 
+    def _pack_face_half(self, world: Dict[str, TT.Pose], braced: List[str], mid: th.Tensor, b_dxy: th.Tensor) -> Optional[float]:
+        """Half the extent (m) the braced cubes' faces offer the pack brace's fingers along its closing axis (horizontal, across the brace
+        direction ``b_dxy``) about the brace's ``mid`` point - the nearer of the two outer ends; None without the cube hull."""
+        if self.hull is None or not braced:
+            return None
+        u = th.cross(th.tensor([0.0, 0.0, 1.0]), b_dxy.float(), dim=0)
+        u = u / th.linalg.norm(u)
+        proj = th.cat([(C.transform_points(world[nm], self.hull) - TT._t(mid).float()) @ u for nm in braced])
+        return float(min(proj.max(), -proj.min()))
+
     def _pack_stage(self, tag: str, world: Dict[str, TT.Pose], braced: List[str], pushes: List[Tuple[str, float]], push_dir: th.Tensor, brace_dir: th.Tensor,
                     manip: Stance, support, brace_arm: Optional[str] = None, push_arm: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], str]:
         """One packing stage: the wide brace (left arm; the fingers opened so a finger SIDE rests on the face of each braced cube,
@@ -2877,10 +2906,11 @@ class BlockDesign(SamplerV2):
         centres = [self._centre(world[nm])[0] for nm in braced]
         mid = th.stack(centres).mean(dim=0)
         spread = float(th.linalg.norm(centres[0][:2] - centres[-1][:2])) if len(centres) > 1 else 0.0
-        # per-finger opening: the finger centre line (pad face + half the 8.4 mm finger) on each cube's centre
-        q_open = max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
         b_dxy = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])
         b_dxy = b_dxy / th.linalg.norm(b_dxy)
+        # per-finger opening (:func:`pack_brace_opening`): the finger centre line (pad face + half the 8.4 mm finger) on each cube's centre;
+        # ISPATIALGYM_BRACE_FULL_OPEN (owner 2026-11-07): fully open unless the braced cubes' faces along the closing axis cannot take it
+        q_open = pack_brace_opening(spread, self._pack_face_half(world, braced, mid, b_dxy) if TT.brace_full_open() else None)
         braced_objs = [self.objects[nm] for nm in braced]
         brace_fails: List[str] = []
         push_fails: List[str] = []
@@ -2894,8 +2924,9 @@ class BlockDesign(SamplerV2):
             return bool(r_b.ok), r_b, None, str(r_b.reason)
 
         def pushes_with(sc):
-            # the pushes, one per cube, each checked with the brace arm locked at its contact
-            q_seed = self.ikc.q_locked(manip, fingers=0.0).clone()
+            # the pushes, one per cube, each checked with the brace arm locked at its contact - its fingers at the brace's opening, as the
+            # oracle holds them (i7-braceopen 2026-11-07: the seed's 0.0 closed the braced hand for every push check), the push hand closed
+            q_seed = TT.with_gripper(self.kit, self.ikc.q_locked(manip, fingers=0.0), brace_arm, q_open)
             q_seed[idx_b] = sc.result.q[idx_b]
             push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, sc.proposal.label)
             if push_recs is None:

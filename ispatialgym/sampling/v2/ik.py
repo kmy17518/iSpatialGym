@@ -33,6 +33,7 @@ from ispatialgym.fastflags import fast_on, fast_value  # train-fast 2026-10-31: 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
+from ispatialgym.sampling.v2 import support_split as SS
 from ispatialgym.sampling.v2.stances import Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -158,14 +159,20 @@ def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_ar
 class _Ignoring:
     """Switch the collision meshes of ``objs`` off in the cuRobo world for the block; meshes disabled for another
     reason (attached objects, removed objects) are left alone. Falls back to ``RobotKit.ignoring`` (two world syncs)
-    when the backend has no per-mesh switch."""
+    when the backend has no per-mesh switch.
 
-    def __init__(self, kit, objs: List[Any], ground: bool = True, ground_meshes: bool = True):
+    ``split`` (i7-split 2026-11-07, :mod:`ispatialgym.sampling.v2.support_split`): ``split(obj)`` -> the support split's ``Plan`` of a
+    registered support (only its pieces within the tolerance of its plane go off - the rims / walls / rails above stay obstacles -, a
+    straddling piece's upper part is switched on as its own mesh), None = every piece of ``obj`` off (the former behaviour)."""
+
+    def __init__(self, kit, objs: List[Any], ground: bool = True, ground_meshes: bool = True, split: Optional[Callable[[Any], Any]] = None):
         self.kit = kit
         self.objs = objs
         self.ground = ground  # False: the cuRobo ground slab (``R1ProCuRobo.GROUND_SLAB_NAME``) is switched off too (floor-level pushes)
         self.ground_meshes = ground_meshes  # False (opt-in, owner 2026-09-25): the ground-like scene meshes (floors, lawn, carpets) off as well
+        self.split = split
         self.names: List[str] = []
+        self._clips: List[str] = []
         self._fallback = None
         self._slab_off = False
 
@@ -197,9 +204,13 @@ class _Ignoring:
         disabled = getattr(backend, "_disabled_obstacles", set())
         active = _ACTIVE_IGNORES.setdefault(id(backend), {})
         for o in self.objs:
+            plan = self.split(o) if self.split is not None else None
+            off = getattr(plan, "off", None)
             for link in getattr(o, "links", {}).values():
                 for cm in getattr(link, "collision_meshes", {}).values():
                     name = cm.prim_path
+                    if off is not None and name not in off:
+                        continue  # the support split: a piece above the support's plane + tol stays an obstacle
                     if name in backend._world_mesh_names and name not in disabled:
                         # nested contexts may ignore the same mesh: it is switched off once and back on when the last
                         # context that asked for it exits (refcount); the backend's ``_held_off`` set keeps its own ground
@@ -212,6 +223,8 @@ class _Ignoring:
                             held = backend._held_off = set()
                         held.add(name)
                         self.names.append(name)
+            if plan is not None and getattr(plan, "clips", None):
+                self._clips += SS.enable_clips(backend, plan)
         return self
 
     def _ground_meshes(self, enabled: bool) -> None:
@@ -252,6 +265,9 @@ class _Ignoring:
         if self._fallback is not None:
             self._fallback.__exit__(*exc)
             return False
+        if self._clips:
+            SS.disable_clips(self.kit.backend, self._clips)
+            self._clips = []
         active = _ACTIVE_IGNORES.setdefault(id(self.kit.backend), {})
         held = getattr(self.kit.backend, "_held_off", None)
         for name in self.names:
@@ -665,14 +681,38 @@ class IKChecker:
         sup = list(ft.supports() or [])
         return [o for o in ignore_last if any(o is s for s in sup)]
 
-    def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True):
+    def _floor_chain_supports(self, ignore_for_last: Sequence[Any], approached: Optional[Sequence[Any]], last_pose: Pose, arm: str) -> List[Any]:
+        """i7-floorfix 2026-11-07: the registered FLOOR supports (:func:`floor_support_names`, set by ``tabletop.floor_map_bands``) among a
+        chain's last-pose ignore set that the support policy polices (on, in scope, the arm holding nothing; not an approached object). The
+        floor reach maps (``reach_maps`` ``floor_fingers`` "policy") meet the floor with the fingers only through the policy's floor allowance
+        at the pre-grasp, along the approach and at the grasp - :meth:`exact` leaves these supports out of the world for the whole chain and
+        polices every configuration of it (:meth:`support_policy_eval`, :meth:`_policy_tail`; every other link but the ground-contact ones by
+        its spheres against the floor). [] otherwise: the chain as before (the pre-grasp and the approach against the full world)."""
+        if not ignore_for_last or not support_policy_on() or (support_policy_scope() == "grasp" and self._holding(arm)):
+            return []
+        floors = floor_support_names(self)
+        if not floors or not any(getattr(o, "name", None) in floors for o in ignore_for_last):
+            return []
+        appr = approached if approached is not None else self.approached_objects(last_pose)
+        sup = policed_supports(list(ignore_for_last), appr, planes=dict(getattr(self, "support_plane_z", None) or {}))
+        return [o for o in sup if getattr(o, "name", None) in floors]
+
+    def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True, split: bool = True):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
         grasp pose only"). Their collision meshes are switched off by name (``R1ProCuRobo._mesh_enable``, what
         ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each).
         ``ground=False`` also switches the cuRobo ground slab off (a floor-level push whose fingertips run < 4 cm above the
         floor: the padded fingertip spheres penetrate the slab while the real fingers do not; the oracle tracks the push
-        legs without a collision veto)."""
-        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes)
+        legs without a collision veto).
+
+        ``split`` (i7-split 2026-11-07, the owner's rule; ``ISPATIALGYM_SUPPORT_SPLIT``, default on): a REGISTERED support among ``objs``
+        (:mod:`~ispatialgym.sampling.v2.support_split`: a plane and a tolerance next to ``support_plane_z``) loses only its pieces within
+        the tolerance of its plane - every piece above (tray rims and walls, bookcase walls / the board above, bed rails / headboards)
+        stays a normal collision obstacle; an object without a registered plane (a wall, a handle object, a grasped target) goes whole.
+        Wherever the sampler ignores a support - grasp chains, the approach tail, places, lifts, releases, the program check - whether or
+        not the contact policy is on. ``split=False``: every object whole (diagnostics that ask "with these objects out of the world")."""
+        resolver = (lambda o: SS.plan_for(self, o)) if (split and SS.split_on()) else None
+        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -929,6 +969,9 @@ class IKChecker:
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
+        # i7-floorfix 2026-11-07: a floor grasp's chain leaves the registered floor out of the world for every pose and the approach, every
+        # configuration policed (the fingers by the policy's floor allowance) - the rule of the floor reach maps (floor_fingers "policy")
+        fl = self._floor_chain_supports(ignore_for_last, approached, poses[-1], arm) if len(poses) > 1 else []
         if q_first is not None and cache:
             cache = False  # a chain pinned to a given start is never a cached verdict of the poses alone
         key = None
@@ -936,6 +979,7 @@ class IKChecker:
             key = cache_key("exact_ik_v3", {**self.exact_cache_scope(), "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
+                                            **SS.cache_identity(self, list(ignore_for_last) + list(approached or [])),
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
                                             "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
             hit = cache_get(key)
@@ -960,9 +1004,12 @@ class IKChecker:
                             break
                         q_v = q0.clone()
                         q_v[idx] = th.tensor(q_i)[idx]
-                        with self.ignoring(list(ignore_for_last) if i == len(poses) - 1 else []):
+                        with self.ignoring(list(ignore_for_last) if i == len(poses) - 1 else list(fl)):
                             if not self._witness_ok(q_v, p, arm):
                                 break
+                        if fl and i < len(poses) - 1 and not bool(self.support_policy_eval(q_v, arm, fl, list(approached) if approached is not None
+                                                                                                          else self.approached_objects(p))["ok"]):
+                            break  # i7-floorfix: a floor chain's non-last witness is policed against the floor it was verified without
                         verified.append(q_v)
                     if len(verified) == len(poses) and bool(hit.get("ok", True)) and ignore_for_last and support_policy_on() \
                             and not (support_policy_scope() == "grasp" and self._holding(arm)):
@@ -988,14 +1035,14 @@ class IKChecker:
         touch = self._touch_objects(ignore_for_last)
         tkw = {"touch": touch} if touch else {}
         for i, p in enumerate(poses):
-            ign = list(ignore_for_last) if i == n - 1 else []
+            ign = list(ignore_for_last) if i == n - 1 else list(fl)
             if i > 0 and q is not None and is_approach(poses[i - 1], p):
                 # a straight same-orientation segment from the previous pose (pre-grasp -> grasp, pre-place -> place,
                 # pre-contact -> contact): the end pose is *tracked* from the previous solution so both witnesses lie in
                 # one IK branch and the oracle's straight approach is executable (oracle finding: the french-fries pre_grasp
                 # / grasp witnesses 3.16 rad apart -> plan_failed); an untrackable approach fails the chain
                 near = list(approached) if approached is not None else self.approached_objects(p)
-                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0, **tkw)
+                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near + list(fl), q_hint=q0, **tkw)
                 if q is None:
                     break
                 m_lim, jn = self.joint_limit_margin(q, arm)
@@ -1007,7 +1054,7 @@ class IKChecker:
                         q_alt, why_lim = self.away_from_limits(q, p, arm, q0)
                     q_pre2 = None
                     if q_alt is not None and not th.equal(q_alt, q):
-                        q_pre2, why_b = self.track_segment(q_alt, p, poses[i - 1], arm, ignore_mid=near, ignore_end=(), ignore_start=ign, **tkw)
+                        q_pre2, why_b = self.track_segment(q_alt, p, poses[i - 1], arm, ignore_mid=near + list(fl), ignore_end=(), ignore_start=ign, **tkw)
                     if q_pre2 is None:
                         q, why = None, why_lim or f"ik_joint_limit: {jn} within {m_lim * 1000:.0f} mrad of its limit at the end of the tracked approach"
                         break
@@ -1064,6 +1111,13 @@ class IKChecker:
                         q, why_lim = self.away_from_limits(q, p, arm, q0)
                     if q is None:
                         why = why_lim
+                        break
+                if fl and i < n - 1:
+                    # i7-floorfix: a floor chain's pose before the last (the pre-grasp) was solved without the floor - policed against it
+                    ev_i = self.support_policy_eval(q, arm, fl, list(approached) if approached is not None else self.approached_objects(p))
+                    if not bool(ev_i["ok"]):
+                        self._count("support_policy_floor_chain_rejected")
+                        q, why = None, f"support_policy at pose {i + 1} of {n}: {ev_i['reason']}"
                         break
             qs.append(q)
             self.solutions[(arm, self._pose_key(p))] = q.clone()
@@ -1418,7 +1472,12 @@ class IKChecker:
         """Spawned objects an approach ending at ``end_pose`` closes in on: those whose AABB (hull at the PhysX pose when
         the world caches it, else ``obj.aabb``) grown by ``APPROACHED_AABB_PAD`` contains the pad centre or the fingertip
         point of the end pose. A grasp straddles the target, a place hovers 1 cm over the partner, a contact sits 5 mm
-        off the touched face: all three land inside. Objects attached to the planner are already out of the world."""
+        off the touched face: all three land inside. Objects attached to the planner are already out of the world.
+
+        i7-split 2026-11-07: a REGISTERED support (``support_split.registered_names``: a split plane or the policy's ``support_plane_z``) is
+        never 'approached' - the source tray under a grasped object held the pad within its AABB + 3 cm, so the tray left the world along
+        the whole approach (``exact``'s ``ignore_mid``) and the support policy exempted it (``policed_supports``); it stays a support of
+        the chain's last pose (its split there). ``ISPATIALGYM_SUPPORT_SPLIT=0``: as before."""
         world = getattr(self.kit, "world", None)
         spawned = list(getattr(world, "spawned", {}).values()) if world is not None else []
         if not spawned:
@@ -1435,7 +1494,10 @@ class IKChecker:
             lo, hi = G.t(lo) - self.APPROACHED_AABB_PAD, G.t(hi) + self.APPROACHED_AABB_PAD
             if bool(((pts >= lo) & (pts <= hi)).all(dim=1).any()):
                 out.append(o)
-        return out
+        kept = SS.drop_registered(self, out)
+        if len(kept) != len(out):
+            self._count("support_split.approached_excluded")
+        return kept
 
     def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
                       ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = (), touch: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
@@ -1500,7 +1562,7 @@ class IKChecker:
             if not bool(free.all()):
                 bad = [idxs[j] for j, f in enumerate(free.tolist()) if not f]
                 return None, f"approach_untrackable: {what} ({len(bad)}/{len(idxs)}, {[round(dist * i / m, 3) for i in bad[:3]]} m from the start; {self._collision_blame(traj[bad[0]], ign)})"
-        why_tail = self._policy_tail(traj, m, dist, arm, pose_from, pose_to, near_end, near_start, both, ignore_end, ignore_start)
+        why_tail = self._policy_tail(traj, m, dist, arm, pose_from, pose_to, near_end, near_start, both, ignore_end, ignore_start, ignore_mid=ignore_mid)
         if why_tail:
             return None, why_tail
         ign = list(ignore_mid) + list(ignore_end)
@@ -1525,34 +1587,45 @@ class IKChecker:
         return traj[-1].clone(), "ok"
 
     def _policy_tail(self, traj, m: int, dist: float, arm: str, pose_from: Pose, pose_to: Pose, near_end, near_start, both,
-                     ignore_end: Sequence[Any], ignore_start: Sequence[Any]) -> str:
+                     ignore_end: Sequence[Any], ignore_start: Sequence[Any], ignore_mid: Sequence[Any] = ()) -> str:
         """of-v2maps 2026-11-07 (prompt I item 3; the isg1020 spec P2 §5: the policy applies wherever the support is ignored): the segment's
         configurations within ``APPROACH_WAYPOINT_M`` (3.3 cm) of a pose whose ignore set holds the support were collision-checked with
         the whole support removed and never policed (only the end pose was, in :meth:`exact`) - they are policed here like the end pose:
         the same switch / scope / holding rule, at the same policy opening. ``ISPATIALGYM_SUPPORT_POLICY_TAIL=0``: off. Returns the
-        rejection reason, '' when the tail passes."""
-        if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_TAIL", "1") == "0" or not support_policy_on():
-            return ""
-        if support_policy_scope() == "grasp" and self._holding(arm):
-            return ""
+        rejection reason, '' when the tail passes. i7-floorfix 2026-11-07: a registered floor in ``ignore_mid`` (a floor grasp's chain,
+        :meth:`_floor_chain_supports`: out of the world along the whole segment) polices EVERY configuration after the segment's start against
+        it, with the segment's other mid ignores (the approached object) left out as the collision check left them - independent of the tail
+        switch (without it the segment would meet the floor nowhere)."""
+        floors = floor_support_names(self) if ignore_mid else set()
+        mid_floor = [o for o in ignore_mid if getattr(o, "name", None) in floors]
+        planes = dict(getattr(self, "support_plane_z", None) or {})
         jobs = []
-        if ignore_end:
-            jobs.append((sorted(set(near_end) | set(both)), list(ignore_end), pose_to))
-        if ignore_start:
-            jobs.append((sorted(set(near_start) | set(both)), list(ignore_start), pose_from))
-        for idxs, sup, pose in jobs:
-            if not idxs:
+        if mid_floor and support_policy_on():
+            jobs.append((list(range(1, m + 1)), mid_floor, pose_to, [o for o in ignore_mid if all(o is not f for f in mid_floor)], "floor_chain"))
+        tail_on = os.environ.get("ISPATIALGYM_SUPPORT_POLICY_TAIL", "1") != "0" and support_policy_on() \
+            and not (support_policy_scope() == "grasp" and self._holding(arm))
+        if tail_on:
+            # the floor a floor-chain job polices along the whole segment is not policed twice on its tail
+            if ignore_end:
+                jobs.append((sorted(set(near_end) | set(both)), [o for o in ignore_end if all(o is not f for f in mid_floor)], pose_to, None, "tail"))
+            if ignore_start:
+                jobs.append((sorted(set(near_start) | set(both)), [o for o in ignore_start if all(o is not f for f in mid_floor)], pose_from, None, "tail"))
+        for idxs, sup, pose, appr_j, what in jobs:
+            if not idxs or not sup:
                 continue
-            appr = self.approached_objects(pose)
-            if not policed_supports(sup, appr, planes=dict(getattr(self, "support_plane_z", None) or {})):
+            appr = appr_j if appr_j is not None else self.approached_objects(pose)
+            if not policed_supports(sup, appr, planes=planes):
                 continue
             for i in idxs:
                 ev = self.support_policy_eval(traj[i], arm, sup, appr)
                 if not bool(ev["ok"]):
-                    self._count("support_policy_tail_rejected")
+                    self._count(f"support_policy_{what}_rejected")
+                    if what == "floor_chain":
+                        return (f"approach_untrackable: support policy along the floor grasp's approach ({ev.get('reason')}, "
+                                f"{round(dist * i / max(m, 1), 3)} m from the segment's start)")
                     return (f"approach_untrackable: support policy on the approach tail ({ev.get('reason')}, "
                             f"{round(dist * min(i, m - i) / max(m, 1), 3)} m from the policed pose)")
-            self._count("support_policy_tail_checked")
+            self._count(f"support_policy_{what}_checked")
         return ""
 
     def _finger_touch_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
@@ -1822,11 +1895,14 @@ class IKChecker:
             if bool(self.kit.collision_free(q, margin=float(margin))[0]):
                 return f"free at margin {float(margin):.2f} (the failing check used another margin or world)"
         for o in spawned:
-            if any(o is x for x in ignored):
-                continue
-            with self.ignoring(list(ignored) + [o]):
+            inside = any(o is x for x in ignored)
+            if inside and not getattr(SS.plan_for(self, o, count=False), "kept", 0):
+                continue  # ignored whole already
+            # i7-split: the removed object goes WHOLE - an ignored support whose split kept its rims / walls in the world is tried too
+            with self.ignoring(list(ignored)), self.ignoring([o], split=False):
                 if bool(self.kit.collision_free(q, margin=float(margin))[0]):
-                    return f"collides with {getattr(o, 'name', o)}" + (f" (within {float(margin):.2f} m)" if margin > 0 else "")
+                    return (f"collides with {getattr(o, 'name', o)}" + (" (a piece above its support plane: the support split keeps it)" if inside else "")
+                            + (f" (within {float(margin):.2f} m)" if margin > 0 else ""))
         try:  # world-only check: passing here means the robot (or its attached object) collides with itself
             self.kit._ensure_synced()
             with self.ignoring(list(ignored)):
@@ -1865,9 +1941,11 @@ class IKChecker:
                     o = by_name.get(n)
                     if o is None or o is getattr(self.kit, "robot", None) or "robot" in n:
                         continue
-                    with self.ignoring(list(ignored) + [o]):
+                    with self.ignoring(list(ignored)), self.ignoring([o], split=False):
                         if bool(self.kit.collision_free(q, margin=float(margin))[0]):
-                            return f"collides with the scene object {n} ({d:.2f} m from the base)"
+                            split_kept = any(o is x for x in ignored) and getattr(SS.plan_for(self, o, count=False), "kept", 0)
+                            return f"collides with the scene object {n} ({d:.2f} m from the base)" + (
+                                " (a piece above its support plane: the support split keeps it)" if split_kept else "")
                 # which of the robot's (or the attached object's) links touch the world: the sphere owners at this configuration
                 link_hits = []
                 try:
@@ -2116,6 +2194,7 @@ class IKChecker:
                                                  "grasps": [(getattr(g, "key", None), getattr(g, "name", None), list(G.t(eef_of(g)[0]).tolist()), list(G.t(eef_of(g)[1]).tolist())) for g in grasps],
                                                  "poses0": poses0,
                                                  "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS,
+                                                 **SS.cache_identity(self, ignore_for_grasp),
                                                  **({"pose_per_grasp": True} if pose_per_grasp else {}), **({"pre": pre_tag or "custom"} if pre_of is not None else {})})
             hit = cache_get(key)
             if hit is not None:

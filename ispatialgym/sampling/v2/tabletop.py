@@ -48,6 +48,7 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.fastflags import fast_on  # train-fast 2026-10-31: BAND_FEASIBLE_REUSE
 from ispatialgym.sampling.v2 import neighbors as NB
+from ispatialgym.sampling.v2 import support_split as SS  # i7-split 2026-11-07
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -191,6 +192,7 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
             tf["support_surface"] = fact
         if top is None:
             _reject("support_small", f"{support.name}: no support top ({top_err})")
+        SS.register_top(s, support, top, what="top")  # i7-split: the support split's plane (the policy registers its own at a map hit)
         return NB.union_top(s, support, top, spec, ignore=ignore)
     z_req = float(spec["top_z"])
     try:
@@ -210,6 +212,9 @@ def support_surface(s, support, ignore: Sequence[Any] = (), height: Optional[flo
     tf = getattr(s, "template_facts", None)
     if isinstance(tf, dict):
         tf["support_surface"] = fact
+    # i7-split 2026-11-07: the interior board is the support's split plane - its walls, back panel and the board above stay obstacles
+    # wherever the support is ignored (no policy plane: interiors have no map kind yet)
+    SS.register_top(s, support, itop, what="interior")
     return NB.union_top(s, support, itop, spec, ignore=ignore)
 
 
@@ -1173,6 +1178,7 @@ def generic_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Opti
         if not isinstance(getattr(ikc, "support_plane_z", None), dict):
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
+        SS.register_top(s, None, top, plane=float(top.z))  # i7-split: the support split's plane + tolerance next to it
     view = MS.as_bands(rm, overhang=0.0)
     view.meta["anchor_lookup"] = dict(getattr(rm, "lookup", None) or {})
     log.info("generic reach map hit at h %.4f (%s, map h %.4f), %s arm: %s", h, view.meta["anchor_lookup"].get("how"), float(rm.meta["height"]["value"]), arm, rm.path)
@@ -1279,6 +1285,12 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: O
         # computed at (the tray's inner floor), not their AABB top (the rim)
         planes.update({str(o.name): z_plane for o in list(spec.ignore or []) if getattr(o, "name", None)})
     _register_map_policy(s, lib, rid, planes)
+    # i7-split 2026-11-07: the support split's plane + tolerance next to each registered plane - the top from its raster; an extra
+    # ignored object at the tray floor keeps a split the task registered from its own raster (disembedding's TrayFloor), else none (whole)
+    SS.register_top(s, None, top, plane=float(top.z))
+    for o in list(spec.ignore or []) if z_support is not None else []:
+        if getattr(o, "name", None) and getattr(s, "ikc", None) is not None and SS.registration(s.ikc, o.name) is None:
+            SS.register(s.ikc, o, z_plane, SS.Tolerance.none("no_raster"), what=plane)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -1330,13 +1342,21 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
         map_request(s, **req)
         return None
     root = os.path.join(map_sampling_root(), entry)
+    # i7-floorfix 2026-11-07: only a floor map of the finger rule the exact IK applies at a floor grasp (reach_maps.FLOOR_FINGERS "policy": the
+    # floor out of the IK, the fingers by the policy's floor allowance) serves - a map of the former rule ("spheres": the IK's ground slab
+    # failed every grasp whose padded finger spheres touched the floor) does not
+    cfg_req = {**(_map_config_require() or {}), "floor_fingers": RMAP.FLOOR_FINGERS}
     rm = RMAP.ReachMap.find(root, lib, RMAP.FLOOR_HEIGHT, rest_id=rid, arm=arm, anchors=None, kind="floor", policy_key=CP.DEFAULT.key(arm),
-                            robot=RMAP.robot_digest(), config_require=_map_config_require())
+                            robot=RMAP.robot_digest(), config_require=cfg_req)
     if rm is None:
         log.info("reach map miss for %s (%s) on the floor, %s arm (%s)", spec.object, spec.grasp_key, arm, root)
         map_request(s, **req)
         return None
     _register_map_policy(s, lib, rid, {fname: z_plane} if floor is not None else {}, floors=[fname] if floor is not None else [])
+    if floor is not None and getattr(s, "ikc", None) is not None:
+        # i7-split 2026-11-07: the floor's split plane - no raster under a house-sized floor: the minimum tolerance (a floor piece above the
+        # datum + 3 mm stays an obstacle; at the floor's AABB-top datum every piece is support)
+        SS.register(s.ikc, floor, z_plane, SS.Tolerance.fixed(SS.MIN_TOL_M, "floor: no raster, the minimum tolerance"), what="floor")
     log.info("reach map hit for %s on the floor (datum %+.4f m), %s arm: %s", spec.object, datum, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -2423,6 +2443,48 @@ class BraceRecord(ContactRecord):
         d = super().to_sidecar()
         d.update({k: v for k, v in self.extras.items() if v is not None})
         return d
+
+
+#: owner decision 2026-11-07 (the BRACE OPENING rule): an OPEN brace (a wide stop, the record's ``fingers_opening_m``) opens FULLY -
+#: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
+#: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`)
+BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
+BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
+#: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
+#: the 8.4 mm finger then lies on the face (``wide_stop_positions``' fit rule for a stop moved onto the push line)
+BRACE_STOP_END_MARGIN_M = 0.01
+
+
+def brace_full_open() -> bool:
+    """Whether ``ISPATIALGYM_BRACE_FULL_OPEN`` is on (owner 2026-11-07: an open brace opens fully; default off = today's openings)."""
+    return os.environ.get(BRACE_FULL_OPEN_ENV, "0").strip().lower() in ("1", "true", "on", "yes")
+
+
+def brace_opening(today: float, room: Optional[float] = None) -> float:
+    """The per-finger opening (m) an OPEN brace records as ``fingers_opening_m`` - the opening ``execute_brace`` pre-shapes the gripper
+    to. Switch off (:func:`brace_full_open`): ``today``, the builder's own value. On (owner 2026-11-07): the full opening
+    (:data:`BRACE_FULL_OPENING_M`), narrower only to ``room`` - the widest per-finger opening the braced face takes (the caller's
+    geometry), never below 0."""
+    if not brace_full_open():
+        return float(today)
+    full = BRACE_FULL_OPENING_M
+    return full if room is None else max(0.0, min(full, float(room)))
+
+
+def brace_fingers(extras: Optional[Dict[str, Any]]) -> float:
+    """The finger joints a brace record's checks use - the opening the oracle executes it at (``execute_brace``: the record's
+    ``fingers_opening_m``, else the gripper closed) - for the brace's exact IK, its two-arm solve, its probes and its retreat."""
+    v = (extras or {}).get("fingers_opening_m")
+    return float(C.FINGER_CLOSED) if v is None else float(v)
+
+
+def with_gripper(kit, q: th.Tensor, arm: str, opening: Optional[float]) -> th.Tensor:
+    """A clone of the 28-D configuration ``q`` with ``arm``'s finger joints at ``opening`` (``q`` itself cloned when ``opening`` is None):
+    the IK of one arm keeps the other arm's fingers from its seed (``kit.q_config`` puts ONE opening on both grippers)."""
+    out = _t(q).clone()
+    if opening is not None:
+        out[kit.robot.gripper_control_idx[arm]] = float(opening)
+    return out
 
 
 def union_extent(*bands: Optional[RB.ReachBands]) -> Optional[Tuple[float, float]]:
@@ -4552,6 +4614,9 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             pose, z_here = (pose, z) if support_z is not None else NB.rest_on(top, pose, fp, NB.z_at(top, xy))
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
+            # i7-split 2026-11-07 (a measurement, nothing rejected): pre-shaped fingers inside a kept protrusion of the support (a rim / wall
+            # the flat-slab map cannot see) - ``support_split.protrusion_hits``
+            SS.count_protrusion_hit(s, eef, exact_kw.get("ignore_for_last") or (), policy_opening_of(g))
             if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
                 s.ikc._diag_object = (pose, hull, getattr(g, "name", None))  # of-v2maps: the candidate object pose the policy diagnostic reports
             sp_note = None
@@ -4620,7 +4685,7 @@ def verified_exact_failure(s, pre: Pose, eef: Pose, stance: Stance, arm: str, ex
     task-spawned objects ``objs`` out of the collision world (the static scene stays). The exact IK's own rules count when they persist
     that way - ``exact IK failed``, ``ik_joint_limit`` (joint-limit margin), ``ik_reach`` (witness residual), ``approach_untrackable``:
     properties of the arm at that stance and pose; a pass means the failure was a collision with a task object."""
-    with s.ikc.ignoring(list(objs)):
+    with SS.whole_ignoring(s.ikc, list(objs)):  # i7-split: out of the world WHOLE (a tray's rims too)
         again = s.ikc.exact([pre, eef], stance, arm, **exact_kw)
     return not again.ok
 
@@ -5094,7 +5159,7 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
                      brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None,
-                     q_first_brace: Optional[th.Tensor] = None):
+                     q_first_brace: Optional[th.Tensor] = None, brace_fingers: Optional[float] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -5104,12 +5169,17 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
     a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
     touches the target, is not in the picture. ``q_first_brace``: the brace chain starts from this arm configuration (``exact``'s
-    ``q_first``; a wrist-flipped solution, ``orient``). Returns the ``IKResult``."""
+    ``q_first``; a wrist-flipped solution, ``orient``). ``brace_fingers`` (i7-braceopen 2026-11-07): the brace arm's finger joints when
+    they differ from ``fingers`` - a wide stop's ``fingers_opening_m`` (:func:`brace_fingers`), the opening the oracle braces at - for the
+    brace chain, the combined check and ``brace_only_check``; the working arm keeps ``fingers``. None = ``fingers`` for both hands, as
+    before. Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
     if not r1.ok:
         return IK.IKResult(False, None, f"{work_arm}: {r1.reason}")
+    # the brace chain is seeded from the working arm's solution: its fingers are the seed's (``exact`` ignores ``fingers`` with a seed)
+    q_b0 = with_gripper(s.kit, r1.q, brace_arm, brace_fingers)
     # owner 2026-09-20 21:20: the working arm is locked at its CONTACT (touching the target) while the brace chain is solved - with
     # the target in the world every configuration of the brace chain read "in collision" through the locked arm's own contact
     # before the brace arm was even evaluated (carton close 0920-191145 / 204807: 'the arms are in each other's way'). The objects
@@ -5118,12 +5188,12 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
     q_f = None
     if q_first_brace is not None:
-        q_f = r1.q.clone()
+        q_f = q_b0.clone()
         idx_b = s.kit.robot.arm_control_idx[brace_arm]
         q_f[idx_b] = _t(q_first_brace)[idx_b]
     with ikc.ignoring(locked_ign):
-        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers,
-                       q_first=q_f)
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=q_b0, cache=False,
+                       fingers=fingers if brace_fingers is None else brace_fingers, q_first=q_f)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]
@@ -5133,7 +5203,7 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
         return IK.IKResult(False, None, "combined configuration collides")
     if brace_only_check is not None:
         ignored, margin = brace_only_check
-        q_b = ikc.q_locked(stance, fingers=fingers).clone()
+        q_b = with_gripper(s.kit, ikc.q_locked(stance, fingers=fingers), brace_arm, brace_fingers)
         idx = s.kit.robot.arm_control_idx[brace_arm]
         q_b[idx] = r2.q[idx]
         with ikc.ignoring(list(ignored)):
@@ -5214,7 +5284,8 @@ __all__ = [
     "BandSpec", "ensure_bands", "compute_bands", "band_cells_world", "band_union_cells", "workspace", "store_feasible_set",
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_bounds", "phase1c_lateral", "tilt_scan",
-    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
+    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "brace_fingers", "with_gripper",
+    "BRACE_FULL_OPEN_ENV", "BRACE_FULL_OPENING_M", "BRACE_STOP_END_MARGIN_M", "brace_full_open", "brace_opening", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
     "gap_masks_why", "partner_pose_at", "partner_pose_why", "meta_link_world_points", "meta_spot_gaps", "pose_centred_on",

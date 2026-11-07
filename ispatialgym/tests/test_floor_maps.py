@@ -431,6 +431,326 @@ def test_compute_cli_floor_kind_builds_one_h0_map_per_stable_rest(tmp_path, monk
     (d / "map__apple__x__h0.0000__bbb.json").write_text(json.dumps({"kind": "floor", "arm": "left"}))
     got.clear()
     RM._compute_cli(_cli_args(tmp_path))
+    assert len(got) == 1  # i7-floorfix: a floor map of the former finger rule (no floor_fingers: "spheres") does not stand in for the new one
+    (d / "map__apple__x__h0.0000__ccc.json").write_text(json.dumps({"kind": "floor", "arm": "left", "config": {"floor_fingers": "policy"}}))
+    got.clear()
+    RM._compute_cli(_cli_args(tmp_path))
     assert got == []
     with pytest.raises(SystemExit):
         RM._compute_cli(_cli_args(tmp_path, kind="tabletop"))  # a slab kind still needs its anchors
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# i7-floorfix 2026-11-07: the floor kind's finger rule (floor_fingers "policy": the IK without the ground slab, the fingers by the
+# policy's floor allowance) - the map's config / identity / lookup, compute_map's IK, the sampler's exact IK at a floor grasp
+# ------------------------------------------------------------------------------------------------------------------
+
+
+def test_floor_fingers_enters_the_floor_key_only_and_old_floor_maps_read_spheres():
+    k = RM.floor_config().key()
+    assert RM.floor_config().floor_fingers == RM.FLOOR_FINGERS == "policy" and k["floor_fingers"] == "policy"
+    assert "floor_fingers" not in RM.MapConfig().key() and "floor_fingers" not in RM.MapConfig(preshape="max").key()  # slab keys stay
+    assert RM.floor_config(floor_fingers="spheres").key()["floor_fingers"] == "spheres"
+    old = {kk: v for kk, v in k.items() if kk != "floor_fingers"}
+    assert RM.config_value({"config": old}, "floor_fingers") == "spheres" and RM.config_value({"config": k}, "floor_fingers") == "policy"
+    assert RM.map_key(_meta(config=old)) != RM.map_key(_meta())  # a new rule = a new map identity
+
+
+def test_find_and_floor_map_bands_never_serve_a_floor_map_of_the_former_finger_rule(v2, caplog):
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    old_cfg = {kk: v for kk, v in RM.floor_config().key().items() if kk != "floor_fingers"}
+    ident = dict(object_key=v2.lib.identity_key(), policy_key=CP.DEFAULT.key("right"), robot=RM.robot_digest())
+    old_path, _ = _write_map(v2.maps, _meta(config=old_cfg, **ident))
+    lib = SimpleNamespace(identity_key=v2.lib.identity_key)
+    ok = dict(rest_id="r0", arm="right", anchors=None, policy_key=ident["policy_key"], robot=ident["robot"])
+    assert RM.ReachMap.find(v2.maps, lib, 0.0, kind="floor", **ok).path == old_path  # without the requirement it would serve
+    assert RM.ReachMap.find(v2.maps, lib, 0.0, kind="floor", config_require={"floor_fingers": "policy"}, **ok) is None
+    s, _ = _floor_sampler()
+    spec = TT.BandSpec(object="apple/x", grasp_key="apple__x__t", scale=[1, 1, 1])
+    with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+        assert TT.floor_map_bands(s, spec, "right") is None  # the old floor map does not serve the floor grasp's rule
+    assert [r["kind"] for r in _requests(caplog)] == ["floor"]
+    new_path, _ = _write_map(v2.maps, _meta(**ident))
+    view = TT.floor_map_bands(s, spec, "right")
+    assert view is not None and view.meta["map_path"] == new_path
+
+
+class _FloorWorld:
+    """The SynthWorld surface compute_map uses (floor kind), on CPU: a configuration is a pose (flattened 4x4) + one value, the IK seed's
+    'elbow' (>= 0.5: the elbow high, else 0.5 m into the floor); the ground slab is a switchable cuboid; the fingers' spheres always 1 cm
+    into the floor and a wheel on it (the policy exempts both)."""
+
+    LINKS = ["right_arm_link4", "right_gripper_finger_link1", "wheel_motor_link1"]
+
+    def __init__(self, cfg):
+        self.cfg, self.dev = cfg, th.device("cpu")
+        self.slab = {"__ground__": True}
+        self.eligibility = []
+        cub = SimpleNamespace(names=[["__ground__"]], set_enabled=lambda n, on: self.slab.__setitem__(n, bool(on)))
+
+        def check_collision(q, emb_name, margin):
+            self.eligibility.append(self.slab["__ground__"])
+            return th.tensor([False])
+
+        self.backend = SimpleNamespace(check_collision=check_collision, checker=SimpleNamespace(data=SimpleNamespace(cuboids=cub)), GROUND_SLAB_NAME="__ground__",
+                                       robot_spheres_world=lambda q: (self._spheres(th.ones(1)), list(self.LINKS)),
+                                       ground_contact_links={"wheel_motor_link1"}, position_tolerance=0.005, orientation_tolerance=0.05)
+
+    def _spheres(self, elbow):
+        n = elbow.shape[0]
+        out = th.zeros(n, 3, 4)
+        out[:, 0] = th.stack([th.zeros(n), th.zeros(n), th.where(elbow >= 0.5, th.full((n,), 1.0), th.full((n,), -0.5)), th.full((n,), 0.05)], 1)
+        out[:, 1] = th.tensor([0.5, 0.0, -0.01, 0.005])
+        out[:, 2] = th.tensor([0.0, 0.2, 0.0, 0.05])
+        return out
+
+    def q_config(self, translate, tilt, posture="untucked", fingers=0.05):
+        return th.tensor([translate, tilt, fingers])
+
+    def shoulder(self, translate, tilt):
+        return np.array([0.0, 0.0, 0.6]), 1.5
+
+    def entry(self):
+        return None
+
+    def link_of_sphere(self):
+        return list(self.LINKS)
+
+    def full_q(self, entry, q_active, q_lock):
+        return q_active
+
+    def spheres(self, q_full):
+        return self._spheres(q_full[:, 16])
+
+    def eef(self, q_full):
+        return q_full[:, :16].reshape(-1, 4, 4)
+
+
+def _floor_solve(calls):
+    """Every pre-grasp seed solves (seed 0 with the elbow through the floor, the others high); the grasp has no IK while the slab is in
+    (the lower finger's padded spheres in it) and solves without it."""
+
+    def solve(world, entry, T, q_lock, seed_active=None):
+        n, S_ = T.shape[0], world.cfg.seeds
+        on = world.slab["__ground__"]
+        calls.append(("grasp" if seed_active is not None else "pre", on))
+        q = th.cat([T.reshape(n, 1, 16).repeat(1, S_, 1), th.arange(S_, dtype=th.float32).view(1, S_, 1).repeat(n, 1, 1)], dim=2)
+        if seed_active is None:
+            return th.ones(n, S_, dtype=th.bool), q
+        q[..., 16] = 1.0
+        return th.full((n, S_), not on, dtype=th.bool), q
+
+    return solve
+
+
+def _floor_lib(tmp_path):
+    d = S.model_dir("apple", "x", [1, 1, 1], str(tmp_path / "glib"))
+    os.makedirs(d)
+    S.save_json(os.path.join(d, "library.json"), {
+        "schema": S.LIBRARY, "category": "apple", "model": "x", "scale": [1, 1, 1], "arm": "right", "legacy_key": "apple__x__t",
+        "policy_key": CP.DEFAULT.key("right"), "rests": {"r0": {"schema": S.REST, "rest_id": "r0", "quat_xyzw": [0, 0, 0, 1], "h_root": 0.04, "stable": True}},
+        "grasps": [{"name": "g0", "rest_id": "r0", "T_object_eef": {"position": [0, 0, 0.1], "orientation_xyzw": [1, 0, 0, 0]}, "width_m": 0.03}]})
+    return S.load_model("apple", "x", [1, 1, 1], str(tmp_path / "glib"))
+
+
+@pytest.mark.parametrize("rule", ["policy", "spheres"])
+def test_compute_map_floor_policy_runs_the_ik_without_the_ground_slab(tmp_path, monkeypatch, rule):
+    calls = []
+    monkeypatch.setattr(RM, "_solve", _floor_solve(calls))
+    monkeypatch.setattr(RB, "trunk_grid", lambda h: [FLOOR_TRUNK])
+    cfg = RM.floor_config(seeds=2, twins=False, lattice_m=0.4, floor_fingers=rule)
+    w = _FloorWorld(cfg)
+    meta, arrays = RM.compute_map(w, _floor_lib(tmp_path), "r0", 0.0, RM.FLOOR_ANCHOR, cfg=cfg, kind="floor")
+    st = arrays[f"s0.00_{RB.trunk_key(*FLOOR_TRUNK)}"]
+    assert w.slab["__ground__"] and w.eligibility and all(w.eligibility)  # restored; the trunk eligibility kept the slab
+    assert meta["config"]["floor_fingers"] == rule and meta["floor"]["fingers"] == rule and meta["key"] == RM.map_key(meta)
+    if rule == "policy":
+        # both IKs without the slab; the pre-grasp is seed 1 (seed 0's elbow is through the floor), the fingers / wheel exempt: feasible
+        assert {c for c, _ in calls} == {"pre", "grasp"} and not any(on for _, on in calls)
+        assert int((st == RM.STATUS["feasible"]).sum()) > 0 and not (st == RM.STATUS["ik_grasp"]).any()
+        assert not (st == RM.STATUS["slab_spheres"]).any() and "self-collision only" in meta["ik"]["collision_world"]
+    else:
+        # the former rule: the slab in both IKs - the grasp has no IK anywhere
+        assert all(on for _, on in calls) and not (st == RM.STATUS["feasible"]).any() and (st == RM.STATUS["ik_grasp"]).any()
+
+
+def test_compute_map_policy_pre_grasp_seed_falls_back_and_floor_fingers_is_floor_only(tmp_path, monkeypatch):
+    calls = []
+    solve = _floor_solve(calls)
+
+    def low_elbow_pre(world, entry, T, q_lock, seed_active=None):
+        ok, q = solve(world, entry, T, q_lock, seed_active)
+        if seed_active is None:
+            q[..., 16] = 0.0  # every pre-grasp seed with the elbow through the floor
+        return ok, q
+
+    monkeypatch.setattr(RM, "_solve", low_elbow_pre)
+    monkeypatch.setattr(RB, "trunk_grid", lambda h: [FLOOR_TRUNK])
+    lib = _floor_lib(tmp_path)
+    cfg = RM.floor_config(seeds=2, twins=False, lattice_m=0.4)
+    meta, arrays = RM.compute_map(_FloorWorld(cfg), lib, "r0", 0.0, RM.FLOOR_ANCHOR, cfg=cfg, kind="floor")
+    st = arrays[f"s0.00_{RB.trunk_key(*FLOOR_TRUNK)}"]
+    assert not (st == RM.STATUS["feasible"]).any() and (st == RM.STATUS["slab_spheres"]).any()  # the non-finger links still meet the floor
+    with pytest.raises(ValueError):
+        RM.compute_map(_FloorWorld(cfg), lib, "r0", 0.0, RM.FLOOR_ANCHOR, cfg=RM.floor_config(floor_fingers="none"), kind="floor")
+    with pytest.raises(ValueError):
+        RM.compute_map(_FloorWorld(cfg), lib, "r0", 0.8, {"key": "0.8"}, cfg=RM.MapConfig(floor_fingers="policy"), kind="tabletop")
+
+
+class _FloorKit:
+    """eef position = right arm joints 0..2 (identity orientation), the fingers' opening = the gripper joints. Obstacles are horizontal
+    half-spaces (their top); at a horizontal approach 4 cm above the floor the fully open lower finger's spheres are 1.6 cm into it, the
+    palm 1.5 cm and the arm 13 cm above it."""
+
+    RIGHT, GRIP = th.arange(7, 14), th.tensor([21, 22])
+    BOTTOMS = {"right_gripper_finger_link1": -0.0564, "right_gripper_finger_link2": 0.03, "right_gripper_link": -0.0249, "right_arm_link6": 0.09}
+
+    def __init__(self, obstacles, attached=None):
+        self.robot = SimpleNamespace(arm_control_idx={"right": self.RIGHT, "left": th.arange(14, 21)}, gripper_control_idx={"right": self.GRIP},
+                                     joint_lower_limits=th.full((28,), -3.0), joint_upper_limits=th.full((28,), 3.0))
+        self.obstacles, self.disabled, self.stats = list(obstacles), set(), {}
+        kit = self
+
+        class _Backend:
+            _attached = attached or {}
+
+            def solve_ik_path(self, name, targets, q_start, **kw):
+                traj = [q_start.clone()]
+                for t in targets:
+                    q = traj[-1].clone()
+                    q[kit.RIGHT[:3]] = list(t.values())[0][0]
+                    traj.append(q)
+                return SimpleNamespace(success=True, q_traj=th.stack(traj), status="ok", diagnostics={})
+
+            def kin_entry(self, name):
+                return name
+
+            def _collision_costs(self, entry):
+                return {"link_of_sphere": list(kit.BOTTOMS) + [""]}
+
+        self.backend = _Backend()
+
+    def _ensure_synced(self):
+        pass
+
+    def links_clear(self, qs, links, margin):
+        qs = qs.unsqueeze(0) if qs.dim() == 1 else qs
+        return th.tensor([all(float(q[self.RIGHT[2]]) + self.BOTTOMS[l] - o.top >= float(margin) - 1e-12 for l in links for o in self.obstacles
+                              if o not in self.disabled) for q in qs], dtype=th.bool)
+
+    def collision_free(self, qs, margin=0.0):
+        return self.links_clear(qs, list(self.BOTTOMS), margin)
+
+    def fk(self, links, q):
+        return {links[0]: (q[self.RIGHT[:3]].clone(), th.tensor([0.0, 0.0, 0.0, 1.0]))}
+
+    def ik(self, pose, q_seed, arm="right"):
+        q = q_seed.clone()
+        q[self.robot.arm_control_idx[arm][:3]] = pose[0]
+        return q
+
+
+def _floor_checker(kit, registered=True):
+    from ispatialgym.sampling.v2 import ik as IK
+
+    ikc = IK.IKChecker(kit)
+    ikc.ignoring = lambda objs, ground=True, ground_meshes=True: _disabling(kit, objs)
+    if registered:
+        ikc.support_plane_z = {"floors_0": 0.0}
+        ikc.support_floor_names = {"floors_0"}
+    evals = []
+
+    def eval_(q, arm, sup, appr, finger_links=False):
+        evals.append((round(float(q[kit.RIGHT[0]]), 3), [o.name for o in sup], [o.name for o in appr]))
+        return {"ok": True, "reason": "", "stage": "hulls"}
+
+    ikc.support_policy_eval = eval_
+    return ikc, evals
+
+
+@__import__("contextlib").contextmanager
+def _disabling(kit, objs):
+    added = [o for o in objs if o not in kit.disabled]
+    kit.disabled.update(added)
+    try:
+        yield
+    finally:
+        kit.disabled.difference_update(added)
+
+
+class _Half:
+    """A horizontal half-space obstacle (hashable by identity, as the kit's ignore set needs)."""
+
+    def __init__(self, name, top):
+        self.name, self.top = name, float(top)
+
+
+def _hpose(s):
+    """A horizontal approach along +x, the eef 4 cm above the floor, ``s`` m before the grasp."""
+    return th.tensor([0.5 - s, 0.0, 0.04]), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+
+def test_exact_floor_grasp_chain_meets_the_floor_only_through_the_policy(monkeypatch):
+    floor, target = _Half("floors_0", 0.0), _Half("mouse_0", -10.0)
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    q0 = th.zeros(28)
+    q0[_FloorKit.GRIP] = 0.05
+    chain = [_hpose(0.10), _hpose(0.0)]
+    # the floor not registered (a table chain's rule): the pre-grasp and the approach against the whole world - the fully open lower
+    # finger's padded spheres are in the floor along the horizontal approach
+    kit = _FloorKit([floor, target])
+    ikc, evals = _floor_checker(kit, registered=False)
+    res = ikc.exact(chain, None, "right", ignore_for_last=[floor], q_seed=q0, cache=False, approached=[target])
+    assert not res.ok and "approach_untrackable" in res.reason and not evals
+    # a registered floor (tabletop.floor_map_bands): out of the world for the whole chain, every configuration policed against it -
+    # the pre-grasp once, the approach's configurations after its start (10), the grasp once; nothing policed twice on the tail
+    ikc, evals = _floor_checker(kit)
+    res = ikc.exact(chain, None, "right", ignore_for_last=[floor], q_seed=q0, cache=False, approached=[target])
+    assert res.ok, res.reason
+    assert all(sup == ["floors_0"] for _, sup, _ in evals) and len(evals) == 12
+    assert evals[0][0] == 0.4 and evals[-1][0] == 0.5 and sorted({x for x, _, _ in evals[1:-1]}) == [round(0.41 + 0.01 * k, 3) for k in range(10)]
+    assert all(appr == ["mouse_0"] for _, _, appr in evals[1:11])  # the approach: the approached target left out, as its collision check did
+    assert not kit.disabled  # every ignore context exited
+
+    # a pre-grasp the policy rejects fails the chain at pose 1
+    def reject_pre(q, arm, sup, appr, finger_links=False):
+        return {"ok": float(q[kit.RIGHT[0]]) > 0.45, "reason": "finger_penetration on floors_0", "stage": "hulls"}
+
+    ikc.support_policy_eval = reject_pre
+    res = ikc.exact(chain, None, "right", ignore_for_last=[floor], q_seed=q0, cache=False, approached=[target])
+    assert not res.ok and res.reason.startswith("support_policy at pose 1 of 2") and kit.stats["support_policy_floor_chain_rejected"] == 1
+    # an arm that holds something (a place onto the floor, scope "grasp"): the chain as before
+    kit2 = _FloorKit([floor, target], attached={"right": {"obj": "cup"}})
+    ikc2, evals2 = _floor_checker(kit2)
+    assert not ikc2.exact(chain, None, "right", ignore_for_last=[floor], q_seed=q0, cache=False, approached=[target]).ok and not evals2
+    # the policy off: as before
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY")
+    ikc3, evals3 = _floor_checker(_FloorKit([floor, target]))
+    assert not ikc3.exact(chain, None, "right", ignore_for_last=[floor], q_seed=q0, cache=False, approached=[target]).ok and not evals3
+
+
+def test_policy_tail_polices_a_floor_chain_segment_whole_and_independent_of_the_tail_switch(monkeypatch):
+    from ispatialgym.sampling.v2 import ik as IK
+
+    floor, target = SimpleNamespace(name="floors_0"), SimpleNamespace(name="mouse_0")
+    chk = IK.IKChecker.__new__(IK.IKChecker)
+    chk.kit = SimpleNamespace(backend=SimpleNamespace(), stats={})
+    chk.support_plane_z, chk.support_floor_names = {"floors_0": 0.0}, {"floors_0"}
+    chk.approached_objects = lambda pose: []
+    evals = []
+    chk.support_policy_eval = lambda q, arm, sup, appr: evals.append((int(q), [o.name for o in sup], [o.name for o in appr])) or {"ok": True}
+    traj = list(range(11))
+    args = (traj, 10, 0.1, "right", None, None, [8, 9], [1, 2], [])
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    assert chk._policy_tail(*args, ignore_end=[floor], ignore_start=(), ignore_mid=[target, floor]) == ""
+    assert [e[0] for e in evals] == list(range(1, 11)) and all(e[1] == ["floors_0"] and e[2] == ["mouse_0"] for e in evals)
+    evals.clear()
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY_TAIL", "0")
+    assert chk._policy_tail(*args, ignore_end=[floor], ignore_start=(), ignore_mid=[target, floor]) == "" and len(evals) == 10
+    evals.clear()
+    chk.support_policy_eval = lambda q, arm, sup, appr: {"ok": int(q) != 5, "reason": "palm_contact on floors_0"}
+    why = chk._policy_tail(*args, ignore_end=[floor], ignore_start=(), ignore_mid=[target, floor])
+    assert "along the floor grasp's approach (palm_contact on floors_0, 0.05 m" in why and chk.kit.stats["support_policy_floor_chain_rejected"] == 1
+    # an unregistered support in ignore_mid (the approached target): no floor-chain job
+    assert chk._policy_tail(*args, ignore_end=(), ignore_start=(), ignore_mid=[target]) == ""

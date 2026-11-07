@@ -56,6 +56,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import support_split as SS  # i7-split 2026-11-07
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.navigation import attached
@@ -201,10 +202,15 @@ class TrayFloor:
     """Inner floor of a tray measured once in the tray's root frame (cells = local xy of the floor raster, ``z_local`` =
     floor height above the root origin); ``at(pose)`` gives the world view used for placements."""
 
-    def __init__(self, cells_local: th.Tensor, z_local: float, res: float, rim_local: float, erode: int = FLOOR_ERODE_CELLS):
+    def __init__(self, cells_local: th.Tensor, z_local: float, res: float, rim_local: float, erode: int = FLOOR_ERODE_CELLS,
+                 heights: Optional[th.Tensor] = None):
         self.z_local = float(z_local)
         self.res = float(res)
         self.rim_local = float(rim_local)  # top of the tray walls above the root origin
+        # i7-split 2026-11-07: the floor raster before the erosion (root-frame xy) and each cell's hit height relative to the floor
+        # plane (m) - the support split's straddler test and tolerance (``register_split``)
+        self.raw_cells_local = cells_local.clone()
+        self.heights = heights
         lo = cells_local.min(dim=0).values
         hi = cells_local.max(dim=0).values
         self.origin = lo.clone()
@@ -246,6 +252,14 @@ class TrayFloor:
 
     def at(self, pose: TT.Pose) -> "TrayFloorWorld":
         return TrayFloorWorld(self, pose)
+
+    def register_split(self, ikc, tray, plane_world: float):
+        """i7-split 2026-11-07: register the tray's inner floor as its support-split plane (``support_split.register``) in the tray's root
+        frame (``z_local``: the tray moves with the focus) - the tolerance from the floor raster's heights, the raw floor cells for the
+        straddler test; ``plane_world`` = the floor's world height with the tray on the table (reported). Its rims and walls then stay
+        obstacles wherever the tray is ignored (the grasp, the lift, the place into it, the program check)."""
+        tol = SS.tolerance_from_heights(self.heights, 0.0) if self.heights is not None else SS.Tolerance.none("no_raster")
+        return SS.register(ikc, tray, float(plane_world), tol, dz=self.z_local, cells_local=self.raw_cells_local, what="tray_floor")
 
     @staticmethod
     def floor_cells(zs: th.Tensor, band: float = FLOOR_BAND, quantile: float = FLOOR_QUANTILE):
@@ -356,7 +370,7 @@ class TrayFloor:
             rim = float(hi[2]) - float(rp[2])
             log.info("%s: inner floor %d cells at %.3f m (%.4f m2), floor %.3f m above the root, rim %.3f m", tray.name, len(world_xy), res, len(world_xy) * res * res,
                      float(local[:, 2].mean()), rim)
-            return TrayFloor(local[:, :2].clone(), float(local[:, 2].mean()), res, rim)
+            return TrayFloor(local[:, :2].clone(), float(local[:, 2].mean()), res, rim, heights=(zs[keep] - float(floor_z)).clone())
         finally:
             s.world.park(tray, list(s.world.spawned).index(tray.name))
 
@@ -631,6 +645,11 @@ class Disembedding(SamplerV2):
         res = float(self.g("tray_raster_m"))
         self.src_floor = TrayFloor.measure(self, src, self.top, res)
         self.dst_floor = TrayFloor.measure(self, dst, self.top, res)
+        # i7-split 2026-11-07: the support split's planes - the table top (a map hit registers it again for the policy) and both trays' inner
+        # floors (split only: the policy does not police the trays) - so the trays' rims / walls stay obstacles wherever they are ignored
+        SS.register_top(self, support, self.top, what="top")
+        for tray, role, fl in ((src, self.src_role, self.src_floor), (dst, self.dst_role, self.dst_floor)):
+            fl.register_split(self.ikc, tray, float(self.top.z) + self.world.bottom_offset(self.hull[role], C.IDENTITY_QUAT) + fl.z_local)
         self.kit.sync_world()
         if self.layout is not None:
             # owner 2026-10-12 (the puzzle): the layout's yaws, and those at which the source tray turns with it
@@ -892,7 +911,7 @@ class Disembedding(SamplerV2):
                "yaws_reachable_deg": [deg(v) for v in kept], "pairs_per_yaw": {str(deg(v)): pairs[v] for v in options}}
         log.info("%s: layout yaws with a reachable grasp: %d of %d %s", self.gp.variant, len(kept), len(options), rec["yaws_reachable_deg"])
         if not kept:
-            with self.pick_world(), self.ikc.ignoring(self.support_objects()):
+            with self.pick_world(), SS.whole_ignoring(self.ikc, self.support_objects()):  # i7-split: the supports out WHOLE (reach alone)
                 reach = self._layout_yaw_screen(manip, arms_here, targets)
             raise Reject("grasp_unreachable", f"no layout yaw keeps a reachable grasp at the focus {[round(float(v), 3) for v in manip.focus[:2].tolist()]} "
                                               f"(0 of {len(options)} yaws x {len(self.grasps)} grasps, arms {arms_here}; with every object ignored "
@@ -1362,7 +1381,10 @@ class Disembedding(SamplerV2):
         tgt, support, dst = self.obj("target"), self.obj("support"), self.obj(self.dst_role)
         manip, place_st = self.sidecar.stance("manipulation"), self.sidecar.stance("placement")
         scale = self.choice.models["target"].scale
-        kw = {"ignore_for_last": self.grasp_ignore_list(), "scale_key": scale, "cache": False}
+        # i7-split 2026-11-07: the approached objects as the program check's grasp names them (``_approached_for``: the target and its
+        # ``may_touch`` distractors) - inferred, the source tray's AABB held the pad and the tray left the world along the whole approach
+        appr = [tgt] + [self.objects[b.name] for b in self.bindings.many("distractors")]
+        kw = {"ignore_for_last": self.grasp_ignore_list(), "scale_key": scale, "cache": False, "approached": appr}
         with self.pick_world(), TT.record_policy_opening(self, grasp):  # of-v2maps 2026-11-07: the policy at the grasp's pre-shape
             res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, q_first=q_first, **kw)
             if not res.ok and q_first is not None:

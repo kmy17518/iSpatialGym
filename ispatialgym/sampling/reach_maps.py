@@ -30,7 +30,12 @@ height 0, the support the floor plane (no edge: one edge distance 0.0, cells fro
 +-``FLOOR_Y_HALF_M`` = 0.80 m: :func:`floor_config`), the trunks of ``reach_bands.trunk_grid(0)`` (incl. the low-top tilt and the ground
 trunks), the contact policy's floor mode (rule 5: the fingers' floor allowance, the robot's ground-contact links scoped out of the sphere
 check); meta ``plane: "floor"`` (in the key; slab maps have no such field). Looked up with ``ReachMap.find(kind="floor", height=0.0,
-anchors=None)`` (``tabletop.floor_map_bands``).
+anchors=None)`` (``tabletop.floor_map_bands``). i7-floorfix 2026-11-07 (config ``floor_fingers``, :data:`FLOOR_FINGERS` "policy"): the
+floor IS the support there, so the pre-grasp / grasp IK run without the cuRobo ground slab - a padded finger sphere touching the floor
+failed the IK before the 2 mm finger rule was read (probe 2026-11-07, umbrella top_2 at fix1's configuration, left arm, t2.00/k0: 0 / 8 grasp
+seeds with the slab, 8 / 8 without it; the lower finger's 7 mm sphere 5.2 mm into the slab, its hull 3.5 mm above the floor) - and the
+fingers are judged by the policy's floor allowance on their hulls alone; every other link but the ground-contact ones is checked against the floor
+plane by its spheres at the pre-grasp, the grasp and the approach configurations (the slab maps' treatment of their slab).
 
     python -m ispatialgym.sampling.reach_maps bench
     python -m ispatialgym.sampling.reach_maps compute --jobs M.json --glib ROOT --anchors anchors.json [--heights 0.7351 ...] --out MAPS
@@ -49,6 +54,7 @@ import math
 import os
 import re
 import time
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -94,17 +100,24 @@ class MapConfig:
     # A floor map has no edge (edge_distances (0.0,)) and starts at FLOOR_X_MIN_M. Left out of key() while None (the keys of the maps
     # computed before the field existed stay as they were)
     x_min_m: Optional[float] = None
+    # i7-floorfix 2026-11-07: a floor map's finger rule against the floor it stands on (FLOOR_FINGER_RULES): "policy" = the pre-grasp / grasp
+    # IK without the cuRobo ground slab (the support itself), the fingers judged only by the contact policy's floor allowance on their hulls,
+    # every other link but the ground-contact ones by its spheres against the floor plane; "spheres" = the former rule (the padded finger
+    # spheres in the IK against the slab). None for a slab map (left out of key(): their keys stay); a floor map without the field
+    # was computed with "spheres" (CONFIG_LEGACY_DEFAULTS)
+    floor_fingers: Optional[str] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        if d.get("x_min_m") is None:
-            d.pop("x_min_m")
+        for k in ("x_min_m", "floor_fingers"):
+            if d.get(k) is None:
+                d.pop(k)
         return d
 
 
 #: the value a config field had before it existed (maps written earlier carry no such field)
-CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None}
+CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None, "floor_fingers": "spheres"}
 
 #: the map kinds (``--kind``): ``tabletop`` (library grasps of an object on a slab edge), ``brace`` (contact classes on a slab edge),
 #: ``floor`` (i7-floor 2026-11-07: library grasps of an object on the floor plane the robot stands on - h = 0, no edge)
@@ -119,12 +132,17 @@ FLOOR_Y_HALF_M = 0.80
 FLOOR_HEIGHT = 0.0
 #: the synthetic anchor of a floor map (the anchor set has no h = 0: a floor lookup passes ``anchors=None`` and height 0.0)
 FLOOR_ANCHOR: Dict[str, Any] = {"key": "floor", "height": FLOOR_HEIGHT, "surfaces": ["floor"]}
+#: i7-floorfix 2026-11-07: a floor map's finger rules (``MapConfig.floor_fingers``) and the one the sampler's exact IK applies at a floor grasp
+#: (``ik.IKChecker.exact``: the registered floor out of the world for the whole grasp chain, the fingers by the policy's floor allowance) -
+#: ``tabletop.floor_map_bands`` requires it, so a floor map of the former rule ("spheres") never serves
+FLOOR_FINGER_RULES: Tuple[str, ...] = ("policy", "spheres")
+FLOOR_FINGERS = "policy"
 
 
 def floor_config(**kw) -> MapConfig:
     """The :class:`MapConfig` of a floor map (``kind="floor"``): no edge (one distance 0.0), cells from FLOOR_X_MIN_M, laterals
-    +-FLOOR_Y_HALF_M; ``kw`` sets the other fields (arm, lattice, seeds, ...)."""
-    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, **kw}
+    +-FLOOR_Y_HALF_M, the finger rule :data:`FLOOR_FINGERS`; ``kw`` sets the other fields (arm, lattice, seeds, ...)."""
+    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, "floor_fingers": FLOOR_FINGERS, **kw}
     return MapConfig(**kw)
 
 
@@ -454,6 +472,25 @@ def map_support(kind: str, h: float, d_e: float, cfg: MapConfig) -> CP.Support:
     return floor_plane() if kind == "floor" else slab(h, d_e, cfg)
 
 
+@contextmanager
+def ground_slab_off(world):
+    """i7-floorfix 2026-11-07: the cuRobo ground slab (``R1ProCuRobo.GROUND_SLAB_NAME``) out of the collision world for the block - the IK of a
+    floor map under ``floor_fingers`` "policy" (the slab is the support there; the backend has no per-pair tolerance, so the support leaves the
+    IK and its contacts are checked explicitly, as a slab map's slab never enters it). Yields whether a slab was switched off."""
+    be = world.backend
+    cub = getattr(getattr(getattr(be, "checker", None), "data", None), "cuboids", None)
+    name = getattr(be, "GROUND_SLAB_NAME", "__ground__")
+    off = False
+    try:
+        if cub is not None and name in cub.names[0]:
+            cub.set_enabled(name, False)
+            off = True
+        yield off
+    finally:
+        if off:
+            cub.set_enabled(name, True)
+
+
 def _yaw_R(yaws: Sequence[float]) -> np.ndarray:
     return np.stack([np.array([[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1.0]]) for a in yaws])
 
@@ -466,8 +503,11 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     ``kind="floor"`` (i7-floor 2026-11-07): the library grasps of the object on the FLOOR the robot stands on - ``height`` 0, the support
     the floor plane (:func:`floor_plane`, no edge: ``cfg`` from :func:`floor_config`, one edge distance 0.0, cells from FLOOR_X_MIN_M),
     the trunks of ``trunk_grid(0)`` (the low-top tilt and the ground trunks), the policy's floor mode (contact_policy rule 5): the fingers'
-    floor allowance and the robot's ground-contact links (wheels, base) scoped out of the sphere check; the IK keeps the cuRobo ground
-    cuboid as the legacy floor band and the sampler's exact IK do."""
+    floor allowance and the robot's ground-contact links (wheels, base) scoped out of the sphere check. i7-floorfix 2026-11-07
+    (``cfg.floor_fingers``): "policy" - the pre-grasp and grasp IK without the cuRobo ground slab (:func:`ground_slab_off`; the fingers are
+    then judged by their hulls' floor allowance only, every other link but the ground-contact ones by the sphere check against the floor
+    plane at the pre-grasp, the grasp and the approach configurations; a problem's pre-grasp is its first IK seed that passes that check);
+    "spheres" - the former rule (the slab in the IK for every sphere: a padded finger sphere touching it failed the IK)."""
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.reach_bands import trunk_grid
 
@@ -482,6 +522,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     if floor and (abs(float(height) - FLOOR_HEIGHT) > 1e-9 or tuple(float(d) for d in cfg.edge_distances) != FLOOR_EDGE_DISTANCES or cfg.x_min_m is None):
         raise ValueError(f"a floor map is computed at height {FLOOR_HEIGHT} with floor_config() (got height {height}, edge distances "
                          f"{cfg.edge_distances}, x_min_m {cfg.x_min_m})")
+    if floor and cfg.floor_fingers not in FLOOR_FINGER_RULES:
+        raise ValueError(f"a floor map's floor_fingers is one of {FLOOR_FINGER_RULES} (got {cfg.floor_fingers!r})")
+    if not floor and cfg.floor_fingers is not None:
+        raise ValueError(f"floor_fingers is a floor map's field (kind {kind!r}, got {cfg.floor_fingers!r})")
+    # i7-floorfix 2026-11-07: the support (the floor) out of the pre-grasp / grasp IK - the fingers then meet it only through the hull rule
+    ik_without_ground = floor and cfg.floor_fingers == "policy"
     # the robot's ground-contact links (wheels, base body): they stand on the floor - not a grasp contact (rule 5; floor maps only)
     ground_links = sorted(getattr(world.backend, "ground_contact_links", ()) or ()) if floor else []
     grasps = brace_classes() if kind == "brace" else grasp_set(lib, rest_id, cfg)
@@ -641,7 +687,8 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         else:
             order = idx
         ta = time.time()
-        succ_pre, q_pre = _solve(world, entry, TP_flat[order], q_lock)
+        with (ground_slab_off(world) if ik_without_ground else nullcontext()):
+            succ_pre, q_pre = _solve(world, entry, TP_flat[order], q_lock)
         n_ik += int(order.numel())
         t_ik += time.time() - ta
         pre_any = succ_pre.any(dim=1)
@@ -655,10 +702,27 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             skip = th.zeros(order.numel(), dtype=th.bool, device=dev)
         # the grasp IK seeded from the first successful pre-grasp seed of each problem
         first_seed = th.argmax(succ_pre.int(), dim=1)
+        if ik_without_ground and order.numel() > 0:
+            # i7-floorfix: the IK never saw the floor - the pre-grasp seed of a problem is its first successful one whose spheres (every
+            # link but the fingers and the ground-contact ones) clear the floor plane; the first successful one when none does (it then
+            # fails the sphere check below as slab_spheres)
+            tb = time.time()
+            sb0 = map_support(kind, height, cfg.edge_distances[0], cfg)
+            clear = th.zeros_like(succ_pre)
+            for s in range(succ_pre.shape[1]):
+                rows = th.nonzero(succ_pre[:, s]).flatten()
+                for c0 in range(0, rows.numel(), 8192):
+                    rc = rows[c0:c0 + 8192]
+                    o, _ = spheres_ok(world.spheres(world.full_q(entry, q_pre[rc, s], q_lock)), links, sb0)
+                    clear[rc, s] = o.to(dev)
+            good_pre = succ_pre & clear
+            first_seed = th.where(good_pre.any(dim=1), th.argmax(good_pre.int(), dim=1), first_seed)
+            t_chk += time.time() - tb
         q_pre1 = q_pre[th.arange(order.numel(), device=dev), first_seed]
         sel = th.nonzero(pre_any & ~skip).flatten()
         ta = time.time()
-        succ_g, q_g = _solve(world, entry, TE_flat[order[sel]], q_lock, seed_active=q_pre1[sel]) if sel.numel() else (th.zeros(0, cfg.seeds, dtype=th.bool, device=dev), None)
+        with (ground_slab_off(world) if ik_without_ground else nullcontext()):
+            succ_g, q_g = _solve(world, entry, TE_flat[order[sel]], q_lock, seed_active=q_pre1[sel]) if sel.numel() else (th.zeros(0, cfg.seeds, dtype=th.bool, device=dev), None)
         n_ik += int(sel.numel())
         t_ik += time.time() - ta
         tb = time.time()
@@ -748,8 +812,11 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "policy": policy.meta(cfg.arm),
             "slab": None if floor else {"depth_m": cfg.slab_depth_m, "long_m": cfg.slab_long_m, "thickness_m": cfg.slab_thickness_m},
             "ik": {"seeds": cfg.seeds, "position_tolerance": world.backend.position_tolerance, "orientation_tolerance": world.backend.orientation_tolerance,
-                   "collision_world": ("floor cuboid (the support itself: kept for the IK, as the legacy floor band and the sampler's exact IK keep the "
-                                       "ground slab) + self-collision (the floor plane's contact policy and the object checked explicitly)" if floor else
+                   "collision_world": ("self-collision only: the floor cuboid (the support itself) out of the pre-grasp / grasp IK (floor_fingers "
+                                       "'policy': the fingers judged by the floor allowance on their hulls, every other link but the ground-contact ones "
+                                       "by its spheres against the floor plane; the object checked explicitly)" if ik_without_ground else
+                                       "floor cuboid (the support itself: kept for the IK, floor_fingers 'spheres') + self-collision (the floor plane's "
+                                       "contact policy and the object checked explicitly)" if floor else
                                        "floor cuboid + self-collision (slab and object checked explicitly)"), "pre_dist": C.PRE_DIST},
             "approach_check": f"hand hulls at the pre-grasp, every {policy.approach_step_m * 2:.3f} m of the straight approach and 2 sweep openings; "
                               f"whole-robot spheres at {cfg.approach_configs} joint-interpolated configurations",
@@ -767,7 +834,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         meta["plane"] = PLANE_OF_KIND["floor"]
         meta["floor"] = {"support": "the floor plane the robot stands on (z = 0 of the map frame, unbounded: no edge)", "edge_distance": 0.0,
                          "x_min_m": cfg.x_min_m, "y_half_m": cfg.y_half_m, "x_max_m": cfg.x_max_m, "ground_contact_links": ground_links,
-                         "finger_allowance_m": policy.floor_finger_max_penetration_m,
+                         "finger_allowance_m": policy.floor_finger_max_penetration_m, "fingers": cfg.floor_fingers,
                          "trunks": "reach_bands.trunk_grid(0.0): TRANSLATES x (TILTS + LOW_TOP_TILT) + GROUND_TRUNKS"}
     meta["key"] = map_key(meta)
     return meta, arrays
@@ -1388,12 +1455,15 @@ def _bench(args):
           f"sphere FK {n} in {time.time() - t1:.3f}s; setup {w.setup_s:.1f}s; peak {th.cuda.max_memory_allocated() / 1e9:.1f} GB", flush=True)
 
 
-def _map_meta_matches(path: str, arm: str, kind: str) -> bool:
-    """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count)."""
+def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None) -> bool:
+    """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
+    its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one)."""
     try:
         with open(path) as f:
             m = json.load(f)
     except (OSError, ValueError):
+        return False
+    if kind == "floor" and floor_fingers is not None and config_value(m, "floor_fingers") != floor_fingers:
         return False
     return m.get("arm", "right") == arm and m.get("kind", "tabletop") == kind
 
@@ -1535,7 +1605,7 @@ def _compute_cli(a):
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
-                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind)
+                if a.skip_existing and any(_map_meta_matches(p, cfg.arm, a.kind, cfg.floor_fingers)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:
