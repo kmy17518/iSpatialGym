@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import functools
 import hashlib
 import json
 import math
@@ -643,6 +644,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     return meta, arrays
 
 
+@functools.lru_cache(maxsize=1)
 def robot_digest() -> str:
     from ispatialgym.oracle import r1pro_model as M
 
@@ -688,7 +690,7 @@ class ReachMap:
 
     @staticmethod
     def find(maps_root: str, lib: S.ModelLibrary, height: float, *, rest_id: str, arm: str = "right", policy_key: Optional[str] = None,
-             anchors=None, kind: str = "tabletop") -> Optional["ReachMap"]:
+             anchors=None, kind: str = "tabletop", robot: Optional[str] = None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
         metadata (object identity, rest, policy, schema are all checked)."""
@@ -713,6 +715,8 @@ class ReachMap:
             if m.get("schema") != SCHEMA or m.get("kind", "tabletop") != kind or m.get("object_key") != want or m.get("rest_id") != rest_id or m.get("arm") != arm:
                 continue
             if policy_key is not None and m.get("policy_key") != policy_key:
+                continue
+            if robot is not None and m.get("robot") != robot:  # of-v2maps 2026-11-07 (P2 §11): a map of another robot model does not serve
                 continue
             if abs(float(m["height"]["value"]) - target) > 1e-6:
                 continue

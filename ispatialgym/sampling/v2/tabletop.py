@@ -1000,7 +1000,17 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
     lib = GL.v2_entry(spec.grasp_key) if spec.grasp_key else None
     if lib is None or not lib.rests:
         return None
-    rid = sorted(lib.rests, key=lambda r: (not lib.rests[r].stable, r))[0]
+    rid = GL.v2_rest_id(lib)  # of-v2maps 2026-11-07: the stable rest, deterministic (the grasps / rest quat of the same rest)
+    if rid is None:
+        return None
+    from ispatialgym.grasping import schema as GS
+
+    if spec.scale is not None and GS.canonical_scale(spec.scale) != lib.scale:
+        # of-v2maps 2026-11-07 (P2 §11: the lookup enforces scale): the entry was generated / mapped at another scale than the spawned object
+        log.info("V2_SCALE_MISMATCH %s (%s): spawned %s, entry %s", spec.object, spec.grasp_key, GS.canonical_scale(spec.scale), lib.scale)
+        if RB.v2_only():
+            _reject("v2_scale_mismatch", f"{spec.grasp_key}: spawned at {GS.canonical_scale(spec.scale)}, v2 entry at {lib.scale}")
+        return None
     h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
     anchors = None
     ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
@@ -1009,7 +1019,10 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
             an = json.load(f)
         anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
     root = os.path.join(map_sampling_root(), os.path.basename(os.path.dirname(lib.path)))
-    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors)
+    from ispatialgym.grasping import contact_policy as CP
+
+    # of-v2maps 2026-11-07 (P2 §11): a map computed under another contact policy does not serve
+    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest())
     if rm is None:
         log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
         return None

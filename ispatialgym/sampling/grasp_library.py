@@ -20,7 +20,7 @@ import math
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch as th
 import yaml
@@ -103,16 +103,24 @@ def v2_root() -> Optional[str]:
 
 @lru_cache(maxsize=4)
 def _v2_index(root: str) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    for p in glob.glob(os.path.join(root, "models", "*", "library.json")):
+    """legacy key -> library.json path. of-v2maps 2026-11-07 (the isg1020 spec's lookup rule, P2 §11): deterministic when several entries
+    share a legacy key (a retry / scale variant copied into the same root) - the entry with a stable rest and valid grasps wins, then the
+    shortest id, then the path (was: the last file of the glob)."""
+    cand: Dict[str, List[Tuple[Tuple[Any, ...], str]]] = {}
+    for p in sorted(glob.glob(os.path.join(root, "models", "*", "library.json"))):
         try:
             with open(p) as f:
                 d = json.load(f)
         except Exception:
             continue
-        if d.get("legacy_key"):
-            out[d["legacy_key"]] = p
-    return out
+        if not d.get("legacy_key"):
+            continue
+        rests = d.get("rests") or {}
+        stable = any(bool((r or {}).get("stable")) for r in rests.values())
+        eid = os.path.basename(os.path.dirname(p))
+        rank = (not stable, not bool(d.get("grasps")), len(eid), p)
+        cand.setdefault(d["legacy_key"], []).append((rank, p))
+    return {k: sorted(v)[0][1] for k, v in cand.items()}
 
 
 def v2_entry(key: str):
@@ -127,8 +135,32 @@ def v2_entry(key: str):
 
     with open(p) as f:
         d = json.load(f)
-    return S.load_model(d["category"], d["model"], d.get("scale"), root, constraint=d.get("constraint") or "tabletop",
-                        rest_hint_wxyz=d.get("rest_hint_wxyz") if "rest_hint_wxyz" in d else _v2_hint(p))
+    lib = S.load_model(d["category"], d["model"], d.get("scale"), root, constraint=d.get("constraint") or "tabletop",
+                       rest_hint_wxyz=d.get("rest_hint_wxyz") if "rest_hint_wxyz" in d else _v2_hint(p))
+    _check_v2_policy(lib, d)
+    return lib
+
+
+def _check_v2_policy(lib, d: Dict[str, Any]) -> None:
+    """of-v2maps 2026-11-07 (P1 §2 / P2 §11): an entry validated under another contact policy than the shared one does not serve
+    (``ValueError``); an entry without a policy key (older schema) is accepted as before."""
+    pk = d.get("policy_key")
+    if not pk:
+        return
+    from ispatialgym.grasping import contact_policy as CP
+
+    want = CP.DEFAULT.key(d.get("arm") or "right")
+    if pk != want:
+        raise ValueError(f"v2 entry {getattr(lib, 'path', '?')}: policy {pk} != the shared {want}")
+
+
+def v2_rest_id(lib) -> Optional[str]:
+    """The rest a v2 entry is used at (of-v2maps 2026-11-07): its stable rests first, then the id - deterministic; None without a stable rest
+    (the spec: a measured, stable rest is required)."""
+    if lib is None or not lib.rests:
+        return None
+    stable = [r for r in lib.rests if lib.rests[r].stable]
+    return sorted(stable)[0] if stable else None
 
 
 def _v2_hint(path: str):
@@ -155,7 +187,9 @@ def rest_quat_xyzw(key: str) -> Optional[th.Tensor]:
     (``ISPATIALGYM_GRASP_LIBRARY_V2``): its measured rest (xyzw, reference yaw included)."""
     lib = v2_entry(key)
     if lib is not None and lib.rests:
-        rid = sorted(lib.rests, key=lambda r: (not lib.rests[r].stable, r))[0]
+        rid = v2_rest_id(lib)
+        if rid is None:
+            raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} has no stable rest")
         return th.tensor([float(v) for v in lib.rests[rid].quat_xyzw], dtype=th.float32)
     d = _candidates(key)
     rq = (d.get("ispatialgym") or {}).get("rest_quat_wxyz")
@@ -168,7 +202,8 @@ def rest_quat_xyzw(key: str) -> Optional[th.Tensor]:
 def load_grasps(key: str, require_clean: bool = True) -> List[Grasp]:
     lib = v2_entry(key)
     if lib is not None:
-        out = grasps_from_v2(lib, key)
+        # of-v2maps 2026-11-07 (P1 §3a: each grasp belongs to its rest_id): only the grasps of the rest the object is placed at
+        out = grasps_from_v2(lib, key, rest_id=v2_rest_id(lib))
         if not out:
             raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} has no physics-validated grasps")
         return out

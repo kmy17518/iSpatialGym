@@ -1918,7 +1918,11 @@ class IORSSmall(SamplerV2):
         if bands is None:
             return None
         meta = getattr(bands, "meta", None) or {}
-        return {**(TT.band_facts(bands) or {}), "key": meta.get("key"), "lattice": meta.get("lattice"), "n_trunks": len(meta.get("trunks") or [])}
+        # of-v2maps 2026-11-07: a map view has no "key" / path - its map key and file name it (a rebuilt map must not reuse stale cells),
+        # and the support-first switch changes the cells Phase 2 keeps
+        return {**(TT.band_facts(bands) or {}), "key": meta.get("key") or meta.get("map_key"), "map_path": os.path.basename(str(meta.get("map_path") or "")) or None,
+                "lattice": meta.get("lattice"), "n_trunks": len(meta.get("trunks") or []),
+                "support_first": bool(TT.map_support_first_on() and TT.is_map_view(bands))}
 
     @staticmethod
     def _spa_cell_centre(lo: float, hi: float, cell_m: float, i: int) -> float:

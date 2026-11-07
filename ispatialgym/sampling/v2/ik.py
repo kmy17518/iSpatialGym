@@ -419,6 +419,17 @@ class IKResult:
         return ""
 
 
+
+def with_policy_scope(scope: Dict[str, Any]) -> Dict[str, Any]:
+    """of-v2maps 2026-11-07 (P2 §11: witnesses computed by ignoring the whole support must not satisfy the policy): with the support policy
+    on, its identity (shared policy key, scope) joins the exact-IK cache key - v2 runs no longer read witnesses written without it (the
+    re-policing of a cache hit stays as the guard); off: the key as before (legacy runs keep their entries)."""
+    if not support_policy_on():
+        return scope
+    from ispatialgym.grasping import contact_policy as CP
+
+    return {**scope, "support_policy": [CP.DEFAULT.key("right"), support_policy_scope()]}
+
 class IKChecker:
     """§3.6 / §3.9 IK checks over a ``RobotKit``. Stateless apart from the kit and the cache namespace."""
 
@@ -1060,8 +1071,10 @@ class IKChecker:
             out = {k: v for k, v in self.cache_scope.items() if k not in ("scene_crop", "full_rooms")}
             if self.cache_scope.get("full_rooms"):
                 out["rooms"] = list(self.cache_scope["full_rooms"])  # the full world's key (its scope's rooms are the rooms it loads)
-            return out
-        return {k: v for k, v in self.cache_scope.items() if k != "full_rooms"}
+        else:
+            out = {k: v for k, v in self.cache_scope.items() if k != "full_rooms"}
+        return with_policy_scope(out)
+
 
     # -- train-fast 2026-11-01: fresh solves and several witnesses per exact-IK cache entry ------------------------------------------
     #: share of exact-IK calls with a cache entry that solve afresh anyway (IK_FRESH_P); the new branch joins the entry

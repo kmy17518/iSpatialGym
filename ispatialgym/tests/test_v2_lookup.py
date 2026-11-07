@@ -1,0 +1,109 @@
+"""of-v2maps 2026-11-07 (prompt I item 1, the isg1020 spec P2 §11): the v2 lookup and the exact-IK cache enforce what a v2 record was made for -
+a deterministic entry per legacy key, its stable rest and that rest's grasps only, the shared contact policy, the robot model, and a cache key
+that keeps policed and unpoliced witnesses apart. Simulator-free."""
+
+import json
+import os
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
+
+from ispatialgym.grasping import contact_policy as CP
+from ispatialgym.grasping import schema as S
+from ispatialgym.sampling import grasp_library as GL
+
+
+def _entry(root, category, model, scale, *, legacy_key, rests, grasps, policy_key=None, dirname=None):
+    d = S.model_dir(category, model, scale, root) if dirname is None else os.path.join(root, "models", dirname)
+    os.makedirs(d, exist_ok=True)
+    S.save_json(os.path.join(d, "library.json"), {
+        "schema": S.LIBRARY, "category": category, "model": model, "scale": scale, "arm": "right", "legacy_key": legacy_key,
+        "policy_key": policy_key if policy_key is not None else CP.DEFAULT.key("right"),
+        "rests": {rid: {"schema": S.REST, "rest_id": rid, "quat_xyzw": q, "h_root": h, "stable": st} for rid, (q, h, st) in rests.items()},
+        "grasps": [{"name": n, "rest_id": rid, "T_object_eef": {"position": [0, 0, 0.1], "orientation_xyzw": [1, 0, 0, 0]}, "width_m": 0.02}
+                   for n, rid in grasps]})
+    return os.path.join(d, "library.json")
+
+
+@pytest.fixture
+def v2root(tmp_path, monkeypatch):
+    monkeypatch.setenv("ISPATIALGYM_GRASP_LIBRARY_V2", str(tmp_path))
+    GL._v2_index.cache_clear()
+    yield str(tmp_path)
+    GL._v2_index.cache_clear()
+
+
+def test_entry_choice_is_deterministic_and_prefers_a_stable_rest(v2root):
+    # two entries share a legacy key (a retry copied into the same root): the one with a stable rest wins, whatever the glob order
+    _entry(v2root, "knife", "aaa", [1, 1, 1], legacy_key="knife__aaa__st", rests={"r0": ([0, 0, 0, 1], 0.01, False)}, grasps=[("a", "r0")],
+           dirname="a_unstable")
+    good = _entry(v2root, "knife", "aaa", [1, 1, 1], legacy_key="knife__aaa__st", rests={"r0": ([0, 0, 0, 1], 0.01, True)}, grasps=[("b", "r0")],
+                  dirname="z_stable")
+    assert GL._v2_index(v2root)["knife__aaa__st"] == good
+
+
+def test_rest_choice_and_grasps_of_that_rest_only(v2root):
+    q1 = [0.7071068, 0, 0, 0.7071068]
+    _entry(v2root, "knife", "bbb", [1, 1, 1], legacy_key="knife__bbb",
+           rests={"r1": (q1, 0.02, True), "r0": ([0, 0, 0, 1], 0.01, True), "r2": ([0, 0, 1, 0], 0.03, False)},
+           grasps=[("g0", "r0"), ("g1", "r1"), ("g1b", "r1"), ("g2", "r2")])
+    lib = GL.v2_entry("knife__bbb")
+    assert GL.v2_rest_id(lib) == "r0"  # stable rests only, then the id
+    assert [g.name for g in GL.load_grasps("knife__bbb")] == ["g0"]  # was: every rest's grasps at r0's pose
+    assert np.allclose(GL.rest_quat_xyzw("knife__bbb").numpy(), [0, 0, 0, 1])
+    assert GL.v2_rest_id(SimpleNamespace(rests={"r0": SimpleNamespace(stable=False)})) is None
+
+
+def test_an_entry_of_another_contact_policy_does_not_serve(v2root):
+    _entry(v2root, "cup", "ccc", [1, 1, 1], legacy_key="cup__ccc", rests={"r0": ([0, 0, 0, 1], 0.05, True)}, grasps=[("g", "r0")],
+           policy_key="isg-support-contact-v0-old")
+    with pytest.raises(ValueError):
+        GL.v2_entry("cup__ccc")
+
+
+def _map(tmp_path, robot):
+    from ispatialgym.sampling import reach_maps as RM
+
+    base = tmp_path / f"map__cat__model__h0.8000__{robot}"
+    meta = {"schema": RM.SCHEMA, "kind": "tabletop", "object_key": "obj-key", "rest_id": "r0", "arm": "right", "height": {"value": 0.8},
+            "policy_key": "pk", "robot": robot}
+    (tmp_path / (base.name + ".json")).write_text(json.dumps(meta))
+    np.savez_compressed(str(base) + ".npz", cells=np.zeros((1, 2)), yaws=np.zeros(8))
+
+
+def test_map_lookup_checks_policy_and_robot(tmp_path):
+    from ispatialgym.sampling import reach_maps as RM
+
+    _map(tmp_path, "oldrobot")
+    lib = SimpleNamespace(identity_key=lambda: "obj-key")
+    kw = dict(rest_id="r0", arm="right")
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, **kw) is not None  # unchecked: as before
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, policy_key="pk", robot="oldrobot", **kw) is not None
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, policy_key="other", **kw) is None
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, robot=RM.robot_digest(), **kw) is None  # a map of another robot model
+
+
+def test_exact_cache_scope_carries_the_support_policy(monkeypatch):
+    from ispatialgym.sampling.v2 import ik as IK
+
+    chk = IK.IKChecker.__new__(IK.IKChecker)
+    chk.cache_scope = {"scene": "s", "rooms": ["a"], "full_rooms": ["a", "b"]}
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY", raising=False)
+    off = chk.exact_cache_scope()
+    assert "support_policy" not in off and "full_rooms" not in off  # legacy runs keep their key
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    on = chk.exact_cache_scope()
+    assert on["support_policy"] == [CP.DEFAULT.key("right"), "grasp"] and {k: v for k, v in on.items() if k != "support_policy"} == off
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", "1")
+    assert chk.exact_cache_scope()["support_policy"][1] == "all"
+
+
+def test_spa_signature_names_a_map_view():
+    from ispatialgym.sampling.v2.tasks.iors_small import IORSSmall
+
+    view = SimpleNamespace(path=None, meta={"map_key": "k123", "map_path": "/x/maps/e/map__a__b__h0.8__k123.json", "lattice": 0.08, "trunks": [1, 2]})
+    sig = IORSSmall._spa_band_signature(view)
+    assert sig["key"] == "k123" and sig["map_path"] == "map__a__b__h0.8__k123.json" and sig["n_trunks"] == 2
+    legacy = SimpleNamespace(path="/b/band.npz", meta={"key": "band-key", "lattice": 0.08, "trunks": []})
+    assert IORSSmall._spa_band_signature(legacy)["key"] == "band-key" and IORSSmall._spa_band_signature(legacy)["map_path"] is None
