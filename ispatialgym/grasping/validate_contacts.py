@@ -63,6 +63,9 @@ import torch as th
 from ispatialgym.grasping import schema as S
 
 TRIAL_SCHEMA = "isg-contact-trial/1"
+#: i7-contactfu 2026-11-08 (owner A2): the touching push's partner stand-in is KINEMATIC - OmniGibson honours ``kinematic_only`` only with a
+#: fixed base (``KitContactWorld._stop_obj``)
+STOP_STANDIN_KINEMATIC = {"fixed_base": True, "kinematic_only": True}
 
 
 #: the base placement of a trial per family (owner 2026-11-07, the second cluster run: "reproduce the stance the SAMPLER uses"): the CONTACT
@@ -1098,12 +1101,19 @@ class KitContactWorld:
     def _stop_obj(self):
         """The touching push's PARTNER stand-in: a kinematic box (``stop_size_m``) the target is pushed into - the stop at the place gap that
         ends a touching push in the demos (without it the target ran the whole push margin on and a tall narrow one tipped over: run D's
-        touching_02 replay, tilt 0.82 rad), parked below the floor between trials."""
+        touching_02 replay, tilt 0.82 rad), parked below the floor between trials.
+
+        i7-contactfu 2026-11-08 (owner A2): ``fixed_base=True`` with ``kinematic_only=True`` - OmniGibson makes an object kinematic only when it
+        has a fixed base (``usd_utils.compute_kinematic_only``: ``if not fixed_base: return False``), so until now the stand-in was a DYNAMIC
+        2.4 kg box 4 cm thick and 30 cm tall (scene probe $OFH/contactfu_20261108/a2: rigidBodyEnabled, kinematicEnabled 0, mass 2.4) that
+        fell below the floor while parked and gave way under the tilting target (touching_02 replay: the target leaned 0.46 rad on it). The
+        demo's partner is braced by the left gripper and stays put (fix2 300008: it moved 5 mm, tilted 8 deg, the target came back level);
+        the slab is built the same way (fixed_base, kinematic)."""
         if self._stop is None:
             from omnigibson.objects.primitive_object import PrimitiveObject
 
             sx, sy, sz = self.cfg.stop_size_m
-            self._stop = PrimitiveObject(name="isg_push_stop", primitive_type="Cube", size=1.0, kinematic_only=True, rgba=(0.9, 0.5, 0.2, 1.0),
+            self._stop = PrimitiveObject(name="isg_push_stop", primitive_type="Cube", size=1.0, **STOP_STANDIN_KINEMATIC, rgba=(0.9, 0.5, 0.2, 1.0),
                                          scale=self.tw.th.tensor([sx, sy, sz]))  # its x (thickness) along the push: stop_pose turns it so
             self.tw.scene.add_object(self._stop)
             self._park(self._stop, 1)
