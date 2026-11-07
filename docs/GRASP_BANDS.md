@@ -594,6 +594,33 @@ the interior kind):
 **Apply now:** lean_left of hardback__bqvvvx__bu is rebuilt with the constraint (left-arm validator), then its interior maps (both arms).
 For touching_03's acbrnv lean entries, only whether they would change is reported.
 
+### Owner decisions 2026-11-07: swept hover, the seat attach axis, the hand-overlap screen, floating grasps
+
+1. **Attach hover rule: SWEPT becomes the default** (an oracle program change, approved).
+   - Evidence, box vs swept at N 4: touched 5/9 vs 11/11; drop up to 22.2 mm vs <= 0.1 mm; protected_contact 4 -> 0; demos 4/14
+     (0.698 GPU-h per success) vs 5/15 (0.491).
+   - It lands together with the attach maps: i7-attachhover (the oracle rule) with i7-attachmap (the maps for both rules, plus the
+     consumer that reads the map of the rule the oracle runs). Never one without the other.
+   - If the integration takes long, the pair is merged first, the default flipped, and attachment_01-04 validated (v2only N 4).
+2. **attach_axis="seat" (the oracle's seat axis) becomes the default** for the attachment rule.
+   - Count: gains for the cork, dip candle, light bulb, webcam and trout; losses for the cabinet door and the wreath; the 24 lids /
+     caps are unchanged.
+   - The axis goes in the entry identity, the default flips in its own commit, and only the moving entries are rebuilt.
+   - Reported, not fixed: the oracle's 45 deg rule picks a doubtful centroid -> female axis for the skateboard deck and the wreath /
+     holly partners, and "seat" copies it.
+3. **The hand-overlap screen is not relaxed globally.** First, why it over-rejects on the napkins: 42/48 screened entries are
+   physically valid there, vs 2/9 for the cereal and 1/23 for the spray.
+   - If the screen's hand model is too conservative: fix the model, counted per object before / after.
+   - If the overlap is real but harmless in physics: the screen becomes a ranking hint for push entries, and physics decides.
+   - Either is a shared-gate change: the cause and counts are reported first.
+4. **Floating grasps.**
+   - Re-seed GraspGen for the mug, statue and teaspoon (low priority). The teaspoon's limit is physical, so a re-seed that does not
+     help is reported rather than forced.
+   - The statue: mental_rotation-statue at v2only N 4 first. If the stutter repeats, diagnose it and prefer a SAMPLER fix (a program
+     check that screens untrackable grasp / orientation pairs); an oracle change only with the owner's OK.
+   - The held-motion check matches the task, not stricter: it validates the motions each task's sampler draws, with the robot placed so
+     they are reachable, and drift thresholds calibrated on the collected demos. Entries are rebuilt only if their verdicts change.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
