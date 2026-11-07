@@ -83,6 +83,71 @@ def as_bands(rm: RM.ReachMap, overhang: float = 0.0):
     return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, dict(classes_so.get(ref, {})), cells_so, pairs_so, classes_so)
 
 
+def overhang_post_cells(rm: RM.ReachMap, edge_distance: float, translate: float, tilt: float) -> Tuple[np.ndarray, np.ndarray]:
+    """i7-overhang 2026-11-07: an overhang map's feasible POST-PUSH cells at (edge distance, trunk): ``(cells (N, 2) base frame, grasp mask
+    (N, G) bool)`` - the object at the overhang rest, its root ``edge_along_m`` behind the slab's near edge at ``edge_distance``."""
+    st = rm.status(edge_distance, translate, tilt) == RM.STATUS["feasible"]  # (C, 1, G)
+    ok = st.any(axis=1)
+    ci = np.nonzero(ok.any(axis=1))[0]
+    return rm.cells[ci].astype(np.float64), ok[ci]
+
+
+def as_overhang_init_bands(rm: RM.ReachMap, pushes: Sequence[float], back_offs: Sequence[float] = ()):
+    """i7-overhang 2026-11-07: an OVERHANG map as the multi-distance ``ReachBands`` view the overhang pick's stance search reads (Phase 2:
+    the INIT cells of the object on the support). Per stand-off ``so`` (the map's edge distances) and trunk: the map's feasible post-push
+    cells at ``so`` (the grasp from B) and at ``so + off`` for each ``off`` of ``back_offs`` moved ``off`` toward the edge into B's frame (the
+    grasp from B backed off along its axis at B's trunk: ``overhang.PICK_STANCE``), each then moved ``p`` back from the edge for every push
+    distance ``p`` of ``pushes`` (the object starts ``p`` behind its overhang rest and the push brings it there). Pairs: ``[cell, yaw index,
+    grasp]`` with the yaw index of the map's yaw on :data:`reach_bands.YAWS` (nearest); ``meta["overhang"]`` the rest geometry,
+    ``meta["overhang_view"]`` the pushes / back-offs."""
+    from ispatialgym.sampling import reach_bands as RB
+
+    meta = {"mode": "map_view", "map_kind": "overhang", "map_key": rm.meta["key"], "map_path": rm.path, "lattice": float(rm.meta["config"]["lattice_m"]),
+            "arm": rm.meta["arm"], "grasp_names": [g["name"] for g in rm.meta["grasps"]], "trunks": [], "stand_offs": [], "stand_off": None,
+            "overhang": dict(rm.meta.get("overhang") or {}), "height": rm.meta["height"],
+            "overhang_view": {"pushes_m": [round(float(p), 4) for p in pushes], "back_offs_m": [round(float(o), 4) for o in back_offs],
+                              "rule": "init cell = post-push cell (from B, or from B backed off moved into B's frame) + push along +x (away from the edge)"}}
+    yaw = float(rm.yaws[0]) if len(rm.yaws) else 0.0
+    yi = int(np.argmin([abs(math.atan2(math.sin(yaw - y), math.cos(yaw - y))) for y in RB.YAWS]))
+    d_es = [float(d) for d in rm.meta["edge_distances"]]
+    cells_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
+    pairs_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
+    for so in d_es:
+        so_k = round(so, 4)
+        meta["stand_offs"].append(so_k)
+        cells_so[so_k], pairs_so[so_k] = {}, {}
+        for t in rm.meta["trunks"]:
+            if not t.get("eligible"):
+                continue
+            key = (float(t["translate"]), float(t["tilt"]))
+            posts, masks = [], []
+            for off in [0.0] + [float(o) for o in back_offs]:
+                d = min(d_es, key=lambda v: abs(v - (so + off)))
+                if abs(d - (so + off)) > 1e-6:
+                    continue
+                c, m = overhang_post_cells(rm, d, *key)
+                if len(c):
+                    posts.append(c - np.array([off, 0.0]))
+                    masks.append(m)
+            if not posts:
+                cells_so[so_k][key] = np.zeros((0, 2))
+                pairs_so[so_k][key] = np.zeros((0, 3), dtype=np.int32)
+                continue
+            P, Mk = np.concatenate(posts), np.concatenate(masks)
+            cells, prs = [], []
+            for p in pushes:
+                for c, m in zip(P, Mk):
+                    k = len(cells)
+                    cells.append(c + np.array([float(p), 0.0]))
+                    prs.extend([[k, yi, int(g)] for g in np.nonzero(m)[0]])
+            cells_so[so_k][key] = np.asarray(cells, dtype=np.float64)
+            pairs_so[so_k][key] = np.asarray(prs, dtype=np.int32).reshape(-1, 3)
+            meta["trunks"].append({"translate": key[0], "tilt": key[1], "stand_off": so_k, "posture": t.get("posture")})
+    ref = meta["stand_offs"][len(meta["stand_offs"]) // 2]
+    meta["stand_off"] = ref
+    return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, {}, cells_so, pairs_so, {})
+
+
 @dataclass
 class Proposal:
     cell_base: Tuple[float, float]

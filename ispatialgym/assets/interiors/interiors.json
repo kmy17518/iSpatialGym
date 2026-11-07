@@ -13,12 +13,56 @@
    "wall_thickness_m": 0.042,
    "long_m": 1.2,
    "back_thickness_m": null,
-   "supports": [["house_double_floor_upper", "bookcase_kmuacd_0"]],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_kmuacd_0"
+    ]
+   ],
    "source": {
     "for": "touching_03 (inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside, row touching#03~T1): the hardback acbrnv leaning on a side wall of a kmuacd cube at the 0.8354 m board",
     "measured": "$OFH/probe_shelf/out_shelf_18312748.json (SimWorld.support_interior + PhysX rays + collision-piece AABBs in the bookcase's front-edge frame, house_double_floor_upper): board z median 0.8354 (861 cells over the row, 751 interior cells, open edges +u / -u, 5 board pieces), board piece __3 z 0.8001-0.8357 depth 0.0067-0.3056, board above __2 z 1.1865-1.2223 (underside 0.3511 above the board top; the raster's headroom median 0.3465 is measured 5 mm above the board), every bay's side-wall rays at mid depth 0.346-0.347 apart (centre bay +0.174 / -0.172), dividers 0.0-0.3056 deep, adjacent bays' inner faces 0.042 apart; the template $OFH/templates/inter_object_relation_satisfaction-touching_03 (support_surface z 0.8354, open +u -u, 751 cells; shelf_start wall rays +0.1661 / -0.1760 from the +u edge midpoint)",
     "asset": "behavior-1k-assets/objects/bookcase/kmuacd/misc/metadata.json bbox 0.300 x 1.201 x 1.225 m (collision 0.310 x 1.207 x 1.233)",
     "assumed": "long_m 1.2: the support board and the board above as one span centred on the compartment (the case is 1.207 wide, three cubes: exact for the centre cube, the side cubes' outer side is 0.05 m); the cubes below / above the boards and the adjacent cubes are not modelled; the walls span board to board above"
+   }
+  },
+  "bookcase_jaysra_0@0.9472": {
+   "height_m": 0.9472,
+   "depth_m": 0.3323,
+   "width_m": 0.3,
+   "headroom_m": 0.3635,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.34,
+   "board_setback_m": 0.0,
+   "back_thickness_m": null,
+   "centre_y_m": -0.0048,
+   "open_sides": [
+    "front",
+    "back"
+   ],
+   "edge_distances": [
+    0.55,
+    0.65,
+    0.75,
+    0.85
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_single_floor",
+     "bookcase_jaysra_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_single_floor/bookcase_jaysra_0 raster edge +u at 0.9472 (requested 0.940 +- 0.03), 671 board cells, open edges ['+u', '-u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.14523153007030487 / 0.15477414429187775, back ray None, moved links []",
+    "joints_settled": {},
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "inside_large_01 (inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk): the goal side of the hardback bqvvvx under v2 only - the book standing spine out in a bay of bookcase_jaysra_0 at the 0.94 m board, leaning on the bay's side board (the v2 lean entries of hardback__bqvvvx__bu at 16.7 deg)",
+    "job": "$OFH/overhang_20261107/measure.sh, slurm 18367772 (trunk_fd2941c0, interiors measure: house_single_floor childs_room_1)",
+    "template": "$OFH/templates/inter_object_relation_satisfaction-inside_large_scale_01: interior board z 0.9472, 671 board cells, open edges +u / -u, headroom median 0.3585 (+5 mm raster offset = 0.3635); bays L x 22.399..22.683 / M 22.746..23.041 at 0.949, R 23.104..23.388 at 0.974 (the customs' _inside_goal_region_note): the wall rays from the raster's lateral centre measured bay M (0.30 m); bay L is 0.284"
    }
   }
  }

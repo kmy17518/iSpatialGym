@@ -60,6 +60,14 @@ DEFAULTS: Dict[str, Any] = {
                                       # trunk (0, -0.92) the arm reaches a pre-grasp 0.24 m ahead, sim check 17838534)
     "grasp_back_offs_m": [0.10, 0.20],  # the grasp failing at B: tried from B backed off this far along its axis (stance "pick"; [] = B only)
     "grasp_trunks": [],               # ... at B's trunk, then these [translate, tilt]
+    # i7-overhang 2026-11-07 (the v2 OVERHANG rest: the grasp library's entry settled overhanging a slab edge, its overhang map): the object's
+    # INIT cells the overhang map's band view lays out behind each feasible post-push cell (the demos pushed 0.160 m; +-0.04) and the v2
+    # overhang rest's tag when the library holds several (None: the first)
+    "v2_init_push_m": [0.12, 0.16, 0.20],
+    "v2_rest": None,
+    # ... and the finger rule at the v2 rest: None = the library's (the grasp validated at that rest, its exact finger hulls against the slab
+    # box within the policy's 2 mm); a number = also the finger-box sweep rule (finger_clearance_m's) at this clearance
+    "v2_finger_clearance_m": None,
 }
 #: the grasp stance of the two-stance overhang pick (B backed off along its axis)
 PICK_STANCE = "pick"
@@ -119,7 +127,31 @@ def options(value: Any) -> Optional[Dict[str, Any]]:
         out["grasp_trunks"] = [(float(t[0]), float(t[1])) for t in (out["grasp_trunks"] or [])]
     except (TypeError, ValueError, IndexError):
         raise ValueError(f"pick_overhang_push.grasp_trunks {out['grasp_trunks']!r}: expected [[translate, tilt], ...]") from None
+    pushes = [out["v2_init_push_m"]] if isinstance(out["v2_init_push_m"], (int, float)) else list(out["v2_init_push_m"] or [])
+    if not pushes or any(not 0.0 < float(v) <= out["max_push_m"] + 1e-9 for v in pushes):
+        raise ValueError(f"pick_overhang_push.v2_init_push_m {out['v2_init_push_m']!r}: expected push distances in (0, max_push_m]")
+    out["v2_init_push_m"] = [float(v) for v in pushes]
+    if out["v2_finger_clearance_m"] is not None:
+        out["v2_finger_clearance_m"] = float(out["v2_finger_clearance_m"])
+        if not math.isfinite(out["v2_finger_clearance_m"]) or out["v2_finger_clearance_m"] < 0.0:
+            raise ValueError(f"pick_overhang_push.v2_finger_clearance_m {out['v2_finger_clearance_m']!r}: expected None or a number >= 0")
+    if out["v2_rest"] is not None and not str(out["v2_rest"]).startswith("overhang_"):
+        raise ValueError(f"pick_overhang_push.v2_rest {out['v2_rest']!r}: expected an overhang rest tag (overhang_...)")
     return out
+
+
+def v2_rest_push(rest_distance: float, edge_line: float, front: float) -> float:
+    """i7-overhang 2026-11-07: the push that leaves the object at its v2 OVERHANG rest - the face ``front`` ahead of the centre along the
+    push, the edge ``edge_line`` ahead of it on the face's line: the face ends ``rest_distance`` beyond the edge
+    (:func:`overhang_m` = ``rest_distance``)."""
+    return float(rest_distance) + float(edge_line) - float(front)
+
+
+def flush_yaw(normal_xy, d) -> float:
+    """i7-overhang 2026-11-07: the world yaw (about z, applied left of the rest orientation) that turns the rest-frame face normal
+    ``normal_xy`` (support frame at yaw 0) onto the push direction ``d``: the overhanging face flush with the edge, facing it."""
+    u = unit_xy(d)
+    return math.atan2(float(u[1]), float(u[0])) - math.atan2(float(normal_xy[1]), float(normal_xy[0]))
 
 
 def unit_xy(d) -> th.Tensor:

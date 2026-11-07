@@ -390,6 +390,54 @@ def shelf_lean_pose(s, hull: th.Tensor, rest_quat, top, edge: EdgeFrame, support
     return pose, facts
 
 
+def overhang_key(s, base_key: str) -> Optional[str]:
+    """i7-overhang 2026-11-07 (owner decision: the overhang pick's primary path - hardback bqvvvx, inside_large_01): the template's overhang
+    grasp key (``<base_key>@<overhang tag>``, ``grasping.overhang.overhang_key``) when the v2 library (``ISPATIALGYM_GRASP_LIBRARY_V2``) and the
+    maps root (``ISPATIALGYM_REACH_MAPS``) are set and the library holds overhang rests of ``base_key`` (``grasp_library.v2_overhang_tags``);
+    None otherwise (the key's path as before). Several rests: ``generation.pick_overhang_push.v2_rest`` (a tag) when given, else the first
+    (sorted by side, distance). Facts: ``template_facts["overhang_rest"]``."""
+    from ispatialgym.grasping import overhang as OVR
+    from ispatialgym.sampling import grasp_library as GL
+
+    if not base_key or not GL.v2_root() or not map_sampling_root():
+        return None
+    tags = GL.v2_overhang_tags(base_key)
+    if not tags:
+        return None
+    gen = getattr(getattr(s, "gp", None), "gen", None)
+    want = None
+    if callable(gen):
+        po = gen("pick_overhang_push")
+        want = po.get("v2_rest") if isinstance(po, dict) else None
+    pool = [(t, ov) for t, ov in tags if want is None or t == want]
+    if not pool:
+        _reject("missing_grasps:overhang", f"{base_key}: the v2 library's overhang rests {[t for t, _ in tags]} have no {want!r}")
+    tag, ov = pool[0]
+    tf = getattr(s, "template_facts", None)
+    if isinstance(tf, dict):
+        tf["overhang_rest"] = {"base_key": base_key, "key": OVR.overhang_key(base_key, tag), "tag": tag, "side": ov.get("side"),
+                               "distance_m": ov.get("distance_m"), "pool": [t for t, _ in tags]}
+    log.info("%s: the v2 overhang rest %s (face %s, %.4f m beyond the edge) of %s", getattr(getattr(s, "gp", None), "variant", "?"), tag, ov.get("side"),
+             float(ov.get("distance_m", 0.0)), base_key)
+    return OVR.overhang_key(base_key, tag)
+
+
+def overhang_rest_of_key(grasp_key: Optional[str]) -> Optional[Dict[str, Any]]:
+    """i7-overhang 2026-11-07: the MEASURED overhang record (``schema.Rest.overhang``: the face beyond the edge, the edge relative to the root,
+    the face normal in the support frame) of an overhang grasp key's v2 rest, with ``rest_id`` / ``entry``; None for any other key."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    if GL.overhang_key_parts(grasp_key)[1] is None:
+        return None
+    lib = GL.v2_entry(grasp_key)
+    rid = GL.v2_rest_id_for_key(lib, grasp_key) if lib is not None else None
+    if rid is None:
+        return None
+    ov = dict(lib.rests[rid].overhang or {})
+    ov.update(rest_id=rid, entry=os.path.basename(os.path.dirname(lib.path)))
+    return ov
+
+
 def upright_lean_quat(hull: th.Tensor, lean_side: float, lean_deg: float) -> th.Tensor:
     """A book's upright leaning rest orientation from its local hull (owner 2026-10-11, the touching#03 partner, which has no
     library key): the longest local axis vertical, the middle one along rest-frame +x (into the shelf) and the shortest across,
@@ -1049,11 +1097,13 @@ PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert"
                     "": "floating", "attachment": "attachment", "a": "attachment", "handle_half": "floating", "h": "floating"}
 
 
-def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False):
+def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False,
+                   overhang: bool = False):
     """``(grasps, key, rest_quat)`` of the role's model for the pipeline the customs entry requires (``roles.<role>.
     require.grasps``); ``Reject("missing_grasps:<pipeline>")`` when the library has no admissible row. ``lean`` (i7-lean 2026-11-07, the
     touching shelf layout): the key's v2 LEAN rest when the library holds one (:func:`shelf_lean_key`: the key becomes ``<key>@<lean tag>``,
-    its grasps and rest the lean entry's), else as before."""
+    its grasps and rest the lean entry's), else as before. ``overhang`` (i7-overhang 2026-11-07, the overhang pick's primary path): the key's
+    v2 OVERHANG rest when the library holds one (:func:`overhang_key`: ``<key>@<overhang tag>``, its grasps and rest the overhang entry's)."""
     from ispatialgym.sampling import grasp_library as GL
 
     choice = s.choice.models[role]
@@ -1063,6 +1113,8 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
         key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, kinds)
         if lean:
             key = shelf_lean_key(s, key) or key
+        if overhang:
+            key = overhang_key(s, key) or key
         grasps = GL.load_grasps(key)
     except (FileNotFoundError, ValueError) as e:
         _reject(f"missing_grasps:{pipeline}", f"{choice.category}/{choice.model}: {e}")
@@ -1145,7 +1197,7 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
     scene, support = s.world.scene_model, top.name
     gkey = "generic" if spec.generic_pinch else spec.grasp_key
     surface = surface_band_kwargs(s)
-    lean = is_lean_spec(spec)  # i7-lean 2026-11-07: a lean rest reads its interior map whatever the mode (a miss rejects missing_map)
+    lean = is_lean_spec(spec) or is_overhang_spec(spec)  # i7-lean / i7-overhang 2026-11-07: a lean / overhang rest reads its own map kind whatever the mode
     if map_sampling_root() and (RB.v2_only() or lean or (not spec.generic_pinch and not spec.placed and not surface)):
         # of-v2maps 2026-11-07 (prompt I item 7): v2only dispatches every spec kind to its map (v2_map_view); other modes as before
         mb = v2_map_view(s, spec, top) if (RB.v2_only() or lean) else map_bands(s, spec, top)
@@ -1155,6 +1207,9 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
         if os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
             kind = "generic" if spec.generic_pinch else ("placed" if spec.placed else ("interior" if surface else "tabletop"))
             _reject("missing_map", f"no {kind} reach map for {spec.object} ({gkey}) at {support}'s height")
+        if is_overhang_spec(spec):
+            # i7-overhang: an overhang rest has no legacy band (its key is a v2 key): a map miss rejects missing_map in every mode
+            _reject("missing_map", f"no overhang reach map for {spec.object} ({gkey}) at {support}'s height")
     try:
         bands = RB.ReachBands.load(scene, support, spec.object, gkey, placed=spec.placed, scale=spec.scale, **surface)
         log.info("reach band cache hit for %s / %s (%s%s): %s", support, spec.object, gkey, f", surface_z {surface['surface_z']:.2f}" if surface else "", bands.path)
@@ -1185,6 +1240,78 @@ def map_request(s, **fields) -> None:
     log.info("MAP_REQUEST %s", key)
 
 
+def is_overhang_spec(spec: Optional["BandSpec"]) -> bool:
+    """i7-overhang 2026-11-07: the band spec's object is at a v2 OVERHANG rest (its grasp key ``<base>@<overhang tag>``)."""
+    from ispatialgym.sampling import grasp_library as GL
+
+    return spec is not None and not spec.generic_pinch and GL.overhang_key_parts(spec.grasp_key)[1] is not None
+
+
+def overhang_view_opts(s) -> Dict[str, Any]:
+    """i7-overhang 2026-11-07: the push distances / grasp back-offs the overhang band view lays the INIT cells out with (``generation.
+    pick_overhang_push``'s ``v2_init_push_m`` / ``grasp_back_offs_m``, ``sampling.v2.overhang.DEFAULTS`` when off)."""
+    from ispatialgym.sampling.v2 import overhang as OH
+
+    try:
+        gen = getattr(getattr(s, "gp", None), "gen", None)
+        opts = OH.options(gen("pick_overhang_push")) if callable(gen) else None
+    except ValueError:
+        opts = None
+    opts = opts or OH.options(True)
+    return {"pushes": list(opts["v2_init_push_m"]), "back_offs": list(opts["grasp_back_offs_m"])}
+
+
+def overhang_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
+    """i7-overhang 2026-11-07 (owner decision: the overhang pick's primary path): the OVERHANG reach map (``reach_maps`` kind ``overhang``: the
+    object at its v2 overhang rest, the slab's near edge under it, one yaw - the overhanging face toward the robot) of the spec's overhang
+    entry at the support's actual height (the anchors of ``ISPATIALGYM_REACH_MAP_ANCHORS``, as :func:`map_bands`), as the band view the
+    overhang pick's stance search reads (``map_sampling.as_overhang_init_bands``: the INIT cells - the map's feasible post-push cells from B
+    and from B backed off, moved back from the edge by the push distances :func:`overhang_view_opts`). Identity: the entry and its
+    overhang rest (digest), the spawn scale, the contact policy key, the robot model, ``ISPATIALGYM_REACH_MAP_REQUIRE``. A hit turns the
+    grasp approach's support policy on at the measured top (:func:`map_bands`' registration). None on a miss (one MAP_REQUEST line with
+    ``kind: overhang``); never a legacy band, never a stable-rest map."""
+    arm = arm or spec.arm
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling import reach_maps as RMAP
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
+    req = dict(kind="overhang", plane=RMAP.PLANE_OF_KIND["overhang"], h=round(h, 4), arm=arm, support=str(getattr(top, "name", "")),
+               scene=str(getattr(s.world, "scene_model", "")), grasp_key=spec.grasp_key)
+    ent = _v2_map_entry(s, spec)
+    if ent is None:
+        log.info("overhang reach map miss for %s (%s) at h %.4f, %s arm: no v2 overhang entry / rest for the key", spec.object, spec.grasp_key, h, arm)
+        map_request(s, **req, why="no v2 overhang entry")
+        return None
+    lib, rid = ent
+    entry = os.path.basename(os.path.dirname(lib.path))
+    req.update(entry=entry, rest_id=rid)
+    anchors = None
+    ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
+    if ap and os.path.exists(ap):
+        with open(ap) as f:
+            an = json.load(f)
+        anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+    if not map_sampling_root():
+        map_request(s, **req, why="no maps root")
+        return None
+    root = os.path.join(map_sampling_root(), entry)
+    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors, kind="overhang", policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
+                            config_require=_map_config_require())
+    if rm is None:
+        log.info("overhang reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
+        map_request(s, **req)
+        return None
+    _register_map_policy(s, lib, rid, {str(top.name): float(top.z)})
+    SS.register_top(s, None, top, plane=float(top.z))
+    vo = overhang_view_opts(s)
+    view = MS.as_overhang_init_bands(rm, vo["pushes"], vo["back_offs"])
+    view.meta.update({"rest_id": rid, "entry": entry, "anchor_lookup": dict(getattr(rm, "lookup", None) or {})})
+    log.info("overhang reach map hit for %s at h %.4f, %s arm: %s (init cells: pushes %s, back-offs %s)", spec.object, h, arm, rm.path, vo["pushes"], vo["back_offs"])
+    return view
+
+
 def is_lean_spec(spec: Optional["BandSpec"]) -> bool:
     """i7-lean 2026-11-07: the band spec's object is at a v2 LEAN rest (its grasp key ``<base>@<lean tag>``)."""
     from ispatialgym.sampling import grasp_library as GL
@@ -1200,6 +1327,13 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
     stable rest. i7-lean 2026-11-07: a LEAN rest (:func:`is_lean_spec`) reads the INTERIOR map on an interior surface
     (:func:`interior_map_bands`) and rejects ``missing_map`` on any miss - also on a top surface (no lean map kind there). Every lookup
     enforces the item-11 identity (:func:`map_bands`, :func:`generic_map_bands`)."""
+    if is_overhang_spec(spec):
+        # i7-overhang 2026-11-07: an overhang rest reads its overhang map (the slab's near edge under it) on a top; an interior surface has no
+        # overhang kind
+        if surface_band_kwargs(s):
+            map_request(s, kind="overhang_interior", support=getattr(top, "name", None), object=spec.object, grasp_key=spec.grasp_key, arm=arm or spec.arm)
+            _reject("missing_map", f"no reach map kind for {spec.object} ({spec.grasp_key}) at an overhang rest on an interior surface")
+        return overhang_map_bands(s, spec, top, arm)
     if is_lean_spec(spec):
         if surface_band_kwargs(s):
             return interior_map_bands(s, spec, top, arm)
@@ -1765,10 +1899,13 @@ def map_view_arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None,
     arm's legacy band (cached, or computed in-process as :func:`ensure_bands` would) mirrored. One INFO line names the choice."""
     sp = spec or getattr(s, "band_spec", None) or BandSpec.from_sampler(s)
     t = _top(s, top)
-    own = v2_map_view(s, sp, t, arm=arm) if (RB.v2_only() or is_lean_spec(sp)) else map_bands(s, sp, t, arm=arm)  # i7-lean: a lean rest's own
+    own = v2_map_view(s, sp, t, arm=arm) if (RB.v2_only() or is_lean_spec(sp) or is_overhang_spec(sp)) else map_bands(s, sp, t, arm=arm)  # i7-lean / i7-overhang
     if own is not None:
         log.info("%s-arm reach band: the %s-arm reach map (%s)", arm, arm, own.meta.get("map_path"))
         return own
+    if is_overhang_spec(sp):
+        # i7-overhang: never a legacy band (nor a mirror) for an overhang rest
+        _reject("missing_map", f"no {arm}-arm overhang reach map for {sp.object} ({sp.grasp_key}) at {t.name}")
     if RB.v2_only() and os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
         _reject("missing_map", f"no {arm}-arm reach map for {sp.object} ({sp.grasp_key}) at {t.name}")
     scene, support = s.world.scene_model, t.name
