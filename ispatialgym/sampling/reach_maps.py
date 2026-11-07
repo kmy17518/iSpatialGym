@@ -25,8 +25,16 @@ what lets one IK pass serve every ``d_e`` (all seeds' solutions are kept and the
 Maps are proposal / filter data: the sampler transforms cells into a real stance on a real edge and re-checks everything exactly
 (scene geometry, clutter, legs, approach) - a map's feasible cell is not an executable trajectory.
 
+**Floor maps** (``kind="floor"``, i7-floor 2026-11-07; the legacy floor band's successor): the object on the floor the robot stands on -
+height 0, the support the floor plane (no edge: one edge distance 0.0, cells from ``FLOOR_X_MIN_M`` = 0.20 m ahead to ``x_max_m``, laterals
++-``FLOOR_Y_HALF_M`` = 0.80 m: :func:`floor_config`), the trunks of ``reach_bands.trunk_grid(0)`` (incl. the low-top tilt and the ground
+trunks), the contact policy's floor mode (rule 5: the fingers' floor allowance, the robot's ground-contact links scoped out of the sphere
+check); meta ``plane: "floor"`` (in the key; slab maps have no such field). Looked up with ``ReachMap.find(kind="floor", height=0.0,
+anchors=None)`` (``tabletop.floor_map_bands``).
+
     python -m ispatialgym.sampling.reach_maps bench
     python -m ispatialgym.sampling.reach_maps compute --jobs M.json --glib ROOT --anchors anchors.json [--heights 0.7351 ...] --out MAPS
+    python -m ispatialgym.sampling.reach_maps compute --kind floor --jobs M.json --glib ROOT --out MAPS [--arm left]
     python -m ispatialgym.sampling.reach_maps info MAP.json
 """
 
@@ -82,15 +90,42 @@ class MapConfig:
     # opening (the oracle's), "max": the batch rule of the maps before (max pre-shape, min contact for every grasp). A map without the
     # field was computed with "max" (CONFIG_LEGACY_DEFAULTS)
     preshape: str = "grasp"
+    # i7-floor 2026-11-07: the lattice's first x (m ahead of the base); None = min(edge_distances) (a slab map: no cell before the edge).
+    # A floor map has no edge (edge_distances (0.0,)) and starts at FLOOR_X_MIN_M. Left out of key() while None (the keys of the maps
+    # computed before the field existed stay as they were)
+    x_min_m: Optional[float] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
+        if d.get("x_min_m") is None:
+            d.pop("x_min_m")
         return d
 
 
 #: the value a config field had before it existed (maps written earlier carry no such field)
-CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max"}
+CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max", "x_min_m": None}
+
+#: the map kinds (``--kind``): ``tabletop`` (library grasps of an object on a slab edge), ``brace`` (contact classes on a slab edge),
+#: ``floor`` (i7-floor 2026-11-07: library grasps of an object on the floor plane the robot stands on - h = 0, no edge)
+KINDS = ("tabletop", "brace", "floor")
+#: the support plane a map's cells stand on (meta ``plane``; a map without the field is a slab map)
+PLANE_OF_KIND = {"tabletop": "slab", "brace": "slab", "floor": "floor"}
+#: the floor kind (the legacy floor band's raster, ``reach_bands`` floor mode: cells 0.2 m ahead of the base, lateral +-STRIP_HALF_WIDTH):
+#: one "edge distance" 0.0 (no edge: the floor is everywhere), the lattice from FLOOR_X_MIN_M, laterals +-FLOOR_Y_HALF_M, height 0
+FLOOR_EDGE_DISTANCES: Tuple[float, ...] = (0.0,)
+FLOOR_X_MIN_M = 0.20
+FLOOR_Y_HALF_M = 0.80
+FLOOR_HEIGHT = 0.0
+#: the synthetic anchor of a floor map (the anchor set has no h = 0: a floor lookup passes ``anchors=None`` and height 0.0)
+FLOOR_ANCHOR: Dict[str, Any] = {"key": "floor", "height": FLOOR_HEIGHT, "surfaces": ["floor"]}
+
+
+def floor_config(**kw) -> MapConfig:
+    """The :class:`MapConfig` of a floor map (``kind="floor"``): no edge (one distance 0.0), cells from FLOOR_X_MIN_M, laterals
+    +-FLOOR_Y_HALF_M; ``kw`` sets the other fields (arm, lattice, seeds, ...)."""
+    kw = {"edge_distances": FLOOR_EDGE_DISTANCES, "x_min_m": FLOOR_X_MIN_M, "y_half_m": FLOOR_Y_HALF_M, **kw}
+    return MapConfig(**kw)
 
 
 def config_value(meta: Dict[str, Any], name: str) -> Any:
@@ -98,11 +133,26 @@ def config_value(meta: Dict[str, Any], name: str) -> Any:
     return cfg[name] if name in cfg else CONFIG_LEGACY_DEFAULTS.get(name)
 
 
+def map_plane(meta: Dict[str, Any]) -> str:
+    """The support plane of a map (meta ``plane``; maps written before the floor kind are slab maps)."""
+    return str(meta.get("plane") or PLANE_OF_KIND.get(meta.get("kind", "tabletop"), "slab"))
+
+
 def lattice(cfg: MapConfig) -> np.ndarray:
-    xs = np.arange(min(cfg.edge_distances), cfg.x_max_m + 1e-9, cfg.lattice_m)
+    x0 = min(cfg.edge_distances) if cfg.x_min_m is None else float(cfg.x_min_m)
+    xs = np.arange(x0, cfg.x_max_m + 1e-9, cfg.lattice_m)
     ys = np.arange(-cfg.y_half_m, cfg.y_half_m + 1e-9, cfg.lattice_m)
     X, Y = np.meshgrid(xs, ys, indexing="ij")
     return np.stack([X.ravel(), Y.ravel()], 1)
+
+
+def support_mask(cells: np.ndarray, reach_back: np.ndarray, edge_distance: float, kind: str = "tabletop") -> np.ndarray:
+    """(C, Y) bool: the object (root at each cell, footprint reaching ``reach_back`` (Y,) toward the robot at each yaw) stands on the
+    support. A slab map: the footprint behind the near edge ``edge_distance`` (cell + reach_back >= d_e). A floor map: everywhere (the
+    floor has no edge; the lattice starts FLOOR_X_MIN_M ahead of the base)."""
+    if kind == "floor":
+        return np.ones((len(cells), len(reach_back)), dtype=bool)
+    return (cells[:, None, 0] + reach_back[None, :]) >= edge_distance
 
 
 # ------------------------------------------------------------------------------------------------ grasp set
@@ -394,6 +444,16 @@ def slab(h: float, d_e: float, cfg: MapConfig) -> CP.Support:
                           [cfg.slab_depth_m / 2, cfg.slab_long_m / 2, cfg.slab_thickness_m / 2], name="synthetic_slab")
 
 
+def floor_plane() -> CP.Support:
+    """The support of a floor map: the floor the robot stands on (solid below z = 0 of the map frame; no edge, unbounded)."""
+    return CP.Support.plane(FLOOR_HEIGHT, name="floor")
+
+
+def map_support(kind: str, h: float, d_e: float, cfg: MapConfig) -> CP.Support:
+    """The support of a map kind at (height, edge distance): the floor plane (``floor``) or the synthetic slab."""
+    return floor_plane() if kind == "floor" else slab(h, d_e, cfg)
+
+
 def _yaw_R(yaws: Sequence[float]) -> np.ndarray:
     return np.stack([np.array([[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1.0]]) for a in yaws])
 
@@ -402,7 +462,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 cfg: Optional[MapConfig] = None, policy: CP.ContactPolicy = CP.DEFAULT, kind: str = "tabletop") -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
     """One map: (meta, arrays). ``geom`` (the object's collision pieces, :mod:`object_geometry`) for the arm-vs-object check.
     ``kind="brace"``: the contact classes of :func:`brace_classes` instead of the library grasps (closed fingers, the pads on the
-    object's faces; single-arm proposals only - simultaneous brace / manipulation and the arms' mutual collisions are checked later)."""
+    object's faces; single-arm proposals only - simultaneous brace / manipulation and the arms' mutual collisions are checked later).
+    ``kind="floor"`` (i7-floor 2026-11-07): the library grasps of the object on the FLOOR the robot stands on - ``height`` 0, the support
+    the floor plane (:func:`floor_plane`, no edge: ``cfg`` from :func:`floor_config`, one edge distance 0.0, cells from FLOOR_X_MIN_M),
+    the trunks of ``trunk_grid(0)`` (the low-top tilt and the ground trunks), the policy's floor mode (contact_policy rule 5): the fingers'
+    floor allowance and the robot's ground-contact links (wheels, base) scoped out of the sphere check; the IK keeps the cuRobo ground
+    cuboid as the legacy floor band and the sampler's exact IK do."""
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.reach_bands import trunk_grid
 
@@ -411,7 +476,15 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     tim: Dict[str, float] = {}
     dev = world.dev
     rest = lib.rests[rest_id]
-    grasps = grasp_set(lib, rest_id, cfg) if kind == "tabletop" else brace_classes()
+    if kind not in KINDS:
+        raise ValueError(f"unknown map kind {kind!r} (one of {KINDS})")
+    floor = kind == "floor"
+    if floor and (abs(float(height) - FLOOR_HEIGHT) > 1e-9 or tuple(float(d) for d in cfg.edge_distances) != FLOOR_EDGE_DISTANCES or cfg.x_min_m is None):
+        raise ValueError(f"a floor map is computed at height {FLOOR_HEIGHT} with floor_config() (got height {height}, edge distances "
+                         f"{cfg.edge_distances}, x_min_m {cfg.x_min_m})")
+    # the robot's ground-contact links (wheels, base body): they stand on the floor - not a grasp contact (rule 5; floor maps only)
+    ground_links = sorted(getattr(world.backend, "ground_contact_links", ()) or ()) if floor else []
+    grasps = brace_classes() if kind == "brace" else grasp_set(lib, rest_id, cfg)
     if kind == "brace" and geom is None:
         raise ValueError("a brace map needs the object's collision geometry")
     cells = lattice(cfg)
@@ -470,7 +543,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         out = th.ones(T.shape[0], dtype=th.bool, device=dev)
         for v in th.unique(vals).tolist():
             m = vals == v
-            out[m] = hc.check(T[m], sb_, (float(v), float(v)))[0]
+            out[m] = hc.check(T[m], sb_, (float(v), float(v)), floor=floor)[0]
         return out
 
     def hand_check(T, q_of_grasp):
@@ -479,15 +552,19 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             groups.setdefault(round(v, 5), []).append(gi)
         if len(groups) == 1:
             v = next(iter(groups))
-            return hc.check(T, sb, (v, v))[0]
+            return hc.check(T, sb, (v, v), floor=floor)[0]
         o_all = th.ones(N, dtype=th.bool, device=dev)
         for v, gis in groups.items():
             sel = th.isin(g_of, th.as_tensor(gis, device=dev))
-            o_all[sel] = hc.check(T[sel], sb, (v, v))[0]
+            o_all[sel] = hc.check(T[sel], sb, (v, v), floor=floor)[0]
         return o_all
 
+    def spheres_ok(sph, ln, sb_):
+        """``contact_policy.sphere_support_ok`` against the map's support (floor: the ground-contact links scoped out)."""
+        return CP.sphere_support_ok(sph, ln, sb_, cfg.arm, policy, ground_contact_links=ground_links, floor_support=floor)
+
     for d_e in cfg.edge_distances:
-        sb = slab(height, d_e, cfg)
+        sb = map_support(kind, height, d_e, cfg)
         ok = th.ones(N, dtype=th.bool, device=dev)
         for k in range(path.shape[0]):
             ok &= hand_check(path[k], pq_g)
@@ -501,7 +578,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     # off-support per (d_e, cell, yaw)
     onsup = {}
     for d_e in cfg.edge_distances:
-        m = (cells[:, None, 0] + reach_back[None, :]) >= d_e  # (C, Y)
+        m = support_mask(cells, reach_back, d_e, kind)  # (C, Y)
         onsup[d_e] = th.as_tensor(np.repeat(m[:, :, None], nG, axis=2).reshape(-1), device=dev)
     # -- arm-vs-object planes (object at each cell / yaw): world-frame planes per (cell, yaw) are built on the fly
     pieces = []
@@ -530,7 +607,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             if not free:
                 continue
             sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
-            slab_free = [bool(CP.sphere_support_ok(sph, ln, slab(height, d_e, cfg), cfg.arm, policy)[0][0]) for d_e in cfg.edge_distances]
+            slab_free = [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg))[0][0]) for d_e in cfg.edge_distances]
             if all(slab_free):
                 posture, q_lock = p, q
                 break
@@ -604,13 +681,13 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                         continue
                     ii = th.nonzero(cur).flatten()
                     good = th.ones(ii.numel(), dtype=th.bool, device=dev)
-                    sb = slab(height, d_e, cfg)
+                    sb = map_support(kind, height, d_e, cfg)
                     for t in [0.0] + [k / (cfg.approach_configs + 1) for k in range(1, cfg.approach_configs + 1)] + [1.0]:
                         for c0 in range(0, ii.numel(), 8192):
                             iic = ii[c0:c0 + 8192]
                             qq = qp[iic] * (1 - t) + qg[iic] * t
                             sp = world.spheres(world.full_q(entry, qq, q_lock))
-                            o, _ = CP.sphere_support_ok(sp, links, sb, cfg.arm, policy)
+                            o, _ = spheres_ok(sp, links, sb)
                             good[c0:c0 + 8192] &= o.to(dev)
                     w_slab = ~good
                     # the hand hulls at the FK eef of the grasp and the pre-grasp (IK tolerance: 5 mm / 0.05 rad)
@@ -669,13 +746,15 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             "object": lib.identity(), "object_key": lib.identity_key(), "rest_id": rest_id,
             "height": {"value": height, "anchor_key": anchor.get("key"), "anchor_surfaces": anchor.get("surfaces", [])[:50]},
             "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "policy": policy.meta(cfg.arm),
-            "slab": {"depth_m": cfg.slab_depth_m, "long_m": cfg.slab_long_m, "thickness_m": cfg.slab_thickness_m},
+            "slab": None if floor else {"depth_m": cfg.slab_depth_m, "long_m": cfg.slab_long_m, "thickness_m": cfg.slab_thickness_m},
             "ik": {"seeds": cfg.seeds, "position_tolerance": world.backend.position_tolerance, "orientation_tolerance": world.backend.orientation_tolerance,
-                   "collision_world": "floor cuboid + self-collision (slab and object checked explicitly)", "pre_dist": C.PRE_DIST},
+                   "collision_world": ("floor cuboid (the support itself: kept for the IK, as the legacy floor band and the sampler's exact IK keep the "
+                                       "ground slab) + self-collision (the floor plane's contact policy and the object checked explicitly)" if floor else
+                                       "floor cuboid + self-collision (slab and object checked explicitly)"), "pre_dist": C.PRE_DIST},
             "approach_check": f"hand hulls at the pre-grasp, every {policy.approach_step_m * 2:.3f} m of the straight approach and 2 sweep openings; "
                               f"whole-robot spheres at {cfg.approach_configs} joint-interpolated configurations",
             "screening": cfg.mode, "exhaustive": cfg.mode == "full",
-            "grasps": ([{k: v for k, v in g.items() if k != "T"} | {"T_object_eef": S.mat_pose(g["T"])} for g in grasps] if kind == "tabletop" else
+            "grasps": ([{k: v for k, v in g.items() if k != "T"} | {"T_object_eef": S.mat_pose(g["T"])} for g in grasps] if kind != "brace" else
                        [dict(g, contact_point_world_yaw0=[round(float(v), 5) for v in contact_pts[0, i]],
                              contact_to_eef_yaw0=S.mat_pose(np.linalg.inv(S.pose_mat(contact_pts[0, i], [0, 0, 0, 1.0])) @ TE[0, i])) for i, g in enumerate(grasps)]),
             "brace": ({"fractions": list(BRACE_FRACTIONS), "pitches_deg": list(BRACE_PITCHES_DEG), "sides": list(BRACE_SIDES), "fingers": "closed",
@@ -683,6 +762,13 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                        "note": "single-arm feasibility proposal; simultaneous brace + manipulation and inter-arm collisions are validated later"}
                       if kind == "brace" else None),
             "trunks": meta_trunks, "status_codes": STATUS, "robot": robot_digest(), "timing": tim, "created": S.now()}
+    if floor:
+        # i7-floor 2026-11-07: the support plane is part of the identity (map_key, ReachMap.find); slab maps carry no field (their keys stay)
+        meta["plane"] = PLANE_OF_KIND["floor"]
+        meta["floor"] = {"support": "the floor plane the robot stands on (z = 0 of the map frame, unbounded: no edge)", "edge_distance": 0.0,
+                         "x_min_m": cfg.x_min_m, "y_half_m": cfg.y_half_m, "x_max_m": cfg.x_max_m, "ground_contact_links": ground_links,
+                         "finger_allowance_m": policy.floor_finger_max_penetration_m,
+                         "trunks": "reach_bands.trunk_grid(0.0): TRANSLATES x (TILTS + LOW_TOP_TILT) + GROUND_TRUNKS"}
     meta["key"] = map_key(meta)
     return meta, arrays
 
@@ -703,6 +789,8 @@ def map_key(meta: Dict[str, Any]) -> str:
     ident = {k: meta[k] for k in ("schema", "kind", "arm", "object_key", "rest_id", "edge_distances", "config", "policy_key", "robot")}
     ident["brace"] = meta.get("brace")
     ident["height"] = meta["height"]["value"]
+    if meta.get("plane") is not None:  # i7-floor 2026-11-07: a floor map's plane (slab maps keep their keys)
+        ident["plane"] = meta["plane"]
     return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -736,7 +824,10 @@ class ReachMap:
              anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
-        metadata (object identity, rest, policy, schema are all checked)."""
+        metadata (object identity, rest, policy, schema are all checked). ``kind="floor"`` (i7-floor 2026-11-07): ``height`` 0.0 and
+        ``anchors=None`` (the anchor set has no floor height); the map's kind AND support plane (meta ``plane``: "floor"; a slab map's
+        is "slab") must be the kind's - a tabletop map at h 0 never serves a floor lookup, nor a floor map a tabletop one."""
+        want_plane = PLANE_OF_KIND.get(kind, "slab")
         target = height
         if anchors is not None:
             # of-v2maps 2026-11-06: the lookup's kind (exact / approx) used to overwrite the MAP kind argument ("tabletop"), so with an anchor
@@ -756,6 +847,8 @@ class ReachMap:
             except Exception:  # noqa: BLE001
                 continue
             if m.get("schema") != SCHEMA or m.get("kind", "tabletop") != kind or m.get("object_key") != want or m.get("rest_id") != rest_id or m.get("arm") != arm:
+                continue
+            if map_plane(m) != want_plane:  # i7-floor 2026-11-07: the support plane the map's cells stand on
                 continue
             if policy_key is not None and m.get("policy_key") != policy_key:
                 continue
@@ -961,8 +1054,8 @@ def main(argv=None):
     c = sub.add_parser("compute")
     c.add_argument("--jobs", required=True)
     c.add_argument("--glib", default=None)
-    c.add_argument("--anchors", required=True)
-    c.add_argument("--heights", nargs="*", default=None, help="anchor keys (default: every anchor)")
+    c.add_argument("--anchors", default=None, help="the height anchors (required unless --kind floor)")
+    c.add_argument("--heights", nargs="*", default=None, help="anchor keys (default: every anchor; --kind floor: ignored, h 0)")
     c.add_argument("--heights-by-id", default=None, help="json {job id: [anchor keys]} (overrides --heights per job)")
     c.add_argument("--only", nargs="*", default=None)
     c.add_argument("--shard", default=None, help="i/n")
@@ -971,7 +1064,7 @@ def main(argv=None):
     c.add_argument("--lattice", type=float, default=0.08)
     c.add_argument("--seeds", type=int, default=8)
     c.add_argument("--batch", type=int, default=2048)
-    c.add_argument("--kind", default="tabletop", choices=["tabletop", "brace"])
+    c.add_argument("--kind", default="tabletop", choices=list(KINDS), help="floor: the object on the floor plane (h 0, no edge, floor_config)")
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
@@ -1053,16 +1146,27 @@ def _compute_cli(a):
         jobs = [j for k, j in enumerate(jobs) if k % n == i] + [d for d in derived if home(d) % n == i]
     else:
         jobs += derived
-    with open(a.anchors) as f:
-        an = json.load(f)
-    aset = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
-    want = set(a.heights) if a.heights else None
-    anchors = [x for x in aset.anchors if want is None or x["key"] in want]
-    cfg = MapConfig(mode=a.mode, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=a.kind == "tabletop")
-    by_id = json.load(open(a.heights_by_id)) if a.heights_by_id else {}
+    floor = a.kind == "floor"
+    kw = dict(mode=a.mode, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=a.kind != "brace")
+    if floor:
+        # i7-floor 2026-11-07: one map per (entry, stable rest, arm) at the floor (h 0, the synthetic FLOOR_ANCHOR); no anchor file, no heights
+        if a.heights or a.heights_by_id:
+            print(f"GB_MAP_NOTE {json.dumps({'kind': 'floor', 'note': '--heights / --heights-by-id ignored: a floor map is at h 0'})}", flush=True)
+        aset, anchors, by_id = None, [dict(FLOOR_ANCHOR)], {}
+        cfg = floor_config(**kw)
+    else:
+        if not a.anchors:
+            raise SystemExit(f"--anchors is required for --kind {a.kind}")
+        with open(a.anchors) as f:
+            an = json.load(f)
+        aset = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+        want = set(a.heights) if a.heights else None
+        anchors = [x for x in aset.anchors if want is None or x["key"] in want]
+        cfg = MapConfig(**kw)
+        by_id = json.load(open(a.heights_by_id)) if a.heights_by_id else {}
     w = SynthWorld(cfg)
     for j in jobs:
-        anchors_j = [x for x in aset.anchors if x["key"] in set(by_id[j["id"]])] if j["id"] in by_id else anchors
+        anchors_j = [x for x in aset.anchors if x["key"] in set(by_id[j["id"]])] if (aset is not None and j["id"] in by_id) else anchors
         lib = S.load_model(j["category"], j["model"], j.get("scale"), a.glib, constraint=j.get("constraint") or "tabletop", rest_hint_wxyz=j.get("rest_hint_wxyz"))
         if lib is None or not lib.grasps():
             print(f"GB_MAP {json.dumps({'id': j['id'], 'ok': False, 'reason': 'no v2 library entry with validated grasps'})}", flush=True)
