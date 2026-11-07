@@ -212,3 +212,20 @@ def test_reset_pair_records_unfilters_the_joined_pair_and_clears_the_pending(mon
     out = PRED.reset_pair_records(scene)
     assert calls == [("target_lid", "partner_teapot", False)] and out == {"unfiltered": 1, "pending_cleared": 1}
     assert not PRED._FILTERED and not PRED._PENDING_UNFILTER
+
+
+def test_the_alias_knob_lift_is_off_for_a_v2_library_grasp(monkeypatch):
+    """cap aliases (isg_customs grasp_height_extra_m 5 mm): a v2 grasp keeps its validated height (the floors still apply)."""
+    pytest.importorskip("omnigibson")
+    from ispatialgym.sampling import grasp_library as GL
+    from ispatialgym.sampling.v2.tasks import attachment as AT
+
+    monkeypatch.setattr(GL, "v2_entry", lambda key: object() if key == "cap__xxqyrt" else None)
+    assert AT.v2_library_lift_off("cap__xxqyrt") is True
+    assert AT.v2_library_lift_off("lid__legacy_only") is False and AT.v2_library_lift_off(None) is False
+
+    def boom(key):
+        raise FileNotFoundError(key)
+
+    monkeypatch.setattr(GL, "v2_entry", boom)
+    assert AT.v2_library_lift_off("cap__xxqyrt") is False
