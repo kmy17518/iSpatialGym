@@ -1,0 +1,609 @@
+{
+  "box__of__sanitary_napkin.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.326322078704834,
+        3.094874382019043,
+        0.8674161434173584
+      ],
+      "ori": [
+        0.00017776983440853655,
+        1.764769695000723e-05,
+        0.2637985944747925,
+        -0.964577853679657
+      ],
+      "lin_vel": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ang_vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          6.272017955780029,
+          3.0359389781951904,
+          0.8127919435501099,
+          6.380623817443848,
+          3.1538121700286865,
+          0.9220350980758667
+        ]
+      },
+      "HeatSourceOrSink": {
+        "heat_source_or_sink": false
+      },
+      "Temperature": {
+        "temperature": 23.0
+      },
+      "OnFire": {
+        "on_fire": false
+      }
+    }
+  },
+  "box__of__tissue.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.326971054077148,
+        3.34989333152771,
+        0.8500321507453918
+      ],
+      "ori": [
+        -0.0001839396427385509,
+        9.434708772459999e-06,
+        -0.001276947557926178,
+        0.9999991655349731
+      ],
+      "lin_vel": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ang_vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          6.273340702056885,
+          3.286461591720581,
+          0.8126920461654663,
+          6.380603313446045,
+          3.413325309753418,
+          0.8873729705810547
+        ]
+      },
+      "HeatSourceOrSink": {
+        "heat_source_or_sink": false
+      },
+      "Temperature": {
+        "temperature": 23.0
+      },
+      "OnFire": {
+        "on_fire": false
+      }
+    }
+  },
+  "breakfast_table.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        7.294824123382568,
+        3.5007479190826416,
+        0.7648558020591736
+      ],
+      "ori": [
+        -0.00012037080887239426,
+        0.00013860139006283134,
+        0.7062047123908997,
+        0.7080076932907104
+      ],
+      "lin_vel": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ang_vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          5.830531120300293,
+          2.9049391746520996,
+          -0.0004150271415710449,
+          8.76000690460205,
+          4.095602035522461,
+          0.8128686547279358
+        ]
+      }
+    }
+  },
+  "floor.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.781831741333008,
+        3.26104998588562,
+        -0.13887082040309906
+      ],
+      "ori": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          3.8204739093780518,
+          1.8885823488235474,
+          -0.2777208387851715,
+          9.36577320098877,
+          4.7315826416015625,
+          -2.0831823348999023e-05
+        ]
+      }
+    }
+  },
+  "robot_poses": {
+    "robot": [
+      {
+        "position": [
+          5.387904167175293,
+          2.997211456298828,
+          0.005267709493637085
+        ],
+        "orientation": [
+          -6.976863005547784e-06,
+          7.785573689034209e-05,
+          -0.0012755945790559053,
+          0.9999991655349731
+        ]
+      }
+    ]
+  },
+  "ispatialgym": {
+    "schema_version": "isg-tro-v1",
+    "activity": "inter_object_relation_satisfaction",
+    "activity_definition_id": 24,
+    "task_variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+    "instance_id": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table__house_single_floor__support-breakfast_table_rhjoby_0-T1__partner-box_of_tissues-ntbrtz__target-box_of_sanitary_~ff674d39__300068",
+    "generation_seed": 5248270997217525068,
+    "evaluation_profile": "isg-v1",
+    "bddl_sha256": "4da79e2c0635cf1b71a7cdbe98a77e279cfe439ecafbf234566f6236c8dd30ae",
+    "task_spec_sha256": "fafef54da492c5efdd18aa8be6d50588fcc2651a3bcadb24a565e69fd4c3bda3",
+    "layout_template_id": null,
+    "scene": {
+      "model": "house_single_floor",
+      "floor": 0,
+      "template_path": "../template.json",
+      "template_sha256": "e0166b3f68cd428d4375160043357632cad3e1365a8622911cf465fe2e0544b1",
+      "load_room_instances": [
+        "dining_room_0",
+        "entryway_0",
+        "garden_0",
+        "kitchen_0",
+        "living_room_0",
+        "living_room_1"
+      ],
+      "task_rooms": [
+        "dining_room_0"
+      ],
+      "sampled_with_rooms": [
+        "dining_room_0",
+        "entryway_0",
+        "garden_0",
+        "kitchen_0",
+        "living_room_0",
+        "living_room_1"
+      ],
+      "scene_variant": {
+        "scene_file": "../../scene_variants/house_single_floor__cc5e0dab4b.json",
+        "removed_objects": [
+          "straight_chair_jgoolz_0",
+          "straight_chair_jgoolz_1",
+          "straight_chair_jgoolz_2",
+          "straight_chair_jgoolz_3",
+          "straight_chair_jgoolz_4",
+          "straight_chair_jgoolz_5"
+        ],
+        "freed_footprints": {
+          "free": [
+            [
+              [
+                7.993353843688965,
+                3.1143271923065186
+              ],
+              [
+                8.363746643066406,
+                3.248072862625122
+              ],
+              [
+                8.546874046325684,
+                2.7409231662750244
+              ],
+              [
+                8.176481246948242,
+                2.607177495956421
+              ]
+            ],
+            [
+              [
+                8.428321838378906,
+                3.81669282913208
+              ],
+              [
+                8.04768180847168,
+                3.715738296508789
+              ],
+              [
+                7.909452438354492,
+                4.236918926239014
+              ],
+              [
+                8.290092468261719,
+                4.337873458862305
+              ]
+            ],
+            [
+              [
+                7.475783348083496,
+                3.7558629512786865
+              ],
+              [
+                7.083395957946777,
+                3.722538948059082
+              ],
+              [
+                7.037768363952637,
+                4.259805202484131
+              ],
+              [
+                7.4301557540893555,
+                4.293128967285156
+              ]
+            ],
+            [
+              [
+                6.607521057128906,
+                3.804436206817627
+              ],
+              [
+                6.21530818939209,
+                3.8397560119628906
+              ],
+              [
+                6.263669013977051,
+                4.3767828941345215
+              ],
+              [
+                6.655881881713867,
+                4.341463088989258
+              ]
+            ],
+            [
+              [
+                6.289393901824951,
+                3.2292425632476807
+              ],
+              [
+                6.669515132904053,
+                3.1263527870178223
+              ],
+              [
+                6.528636455535889,
+                2.605881929397583
+              ],
+              [
+                6.148515224456787,
+                2.7087717056274414
+              ]
+            ],
+            [
+              [
+                7.140786647796631,
+                3.0244858264923096
+              ],
+              [
+                7.520907878875732,
+                2.921595573425293
+              ],
+              [
+                7.380028247833252,
+                2.401125192642212
+              ],
+              [
+                6.99990701675415,
+                2.5040154457092285
+              ]
+            ]
+          ],
+          "block": [
+            [
+              [
+                5.848289966583252,
+                4.084524154663086
+              ],
+              [
+                8.743980407714844,
+                4.077131748199463
+              ],
+              [
+                8.741019248962402,
+                2.9172356128692627
+              ],
+              [
+                5.845329284667969,
+                2.9246277809143066
+              ]
+            ]
+          ]
+        },
+        "moved_objects": {
+          "straight_chair_jgoolz_0": {
+            "pos": [
+              8.276880264282227,
+              2.908885955810547,
+              0.32601872086524963
+            ],
+            "ori": [
+              1.6197562217712402e-05,
+              -1.215015072375536e-05,
+              0.8184217810630798,
+              0.5746181011199951
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -124.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          },
+          "straight_chair_jgoolz_1": {
+            "pos": [
+              8.163780212402344,
+              4.046063423156738,
+              0.32601845264434814
+            ],
+            "ori": [
+              -1.2665987014770508e-05,
+              -1.56183959916234e-05,
+              -0.6097702980041504,
+              0.7925782799720764
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -129.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          },
+          "straight_chair_jgoolz_2": {
+            "pos": [
+              7.255090236663818,
+              4.027685642242432,
+              0.32602065801620483
+            ],
+            "ori": [
+              -6.452202796936035e-06,
+              -7.124384865164757e-06,
+              -0.6765273213386536,
+              0.7364175915718079
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -134.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          },
+          "straight_chair_jgoolz_3": {
+            "pos": [
+              6.437382221221924,
+              4.110452651977539,
+              0.32601872086524963
+            ],
+            "ori": [
+              -1.7136335372924805e-05,
+              -1.3347831554710865e-05,
+              -0.7381362915039062,
+              0.6746516227722168
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -139.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          },
+          "straight_chair_jgoolz_4": {
+            "pos": [
+              6.403809547424316,
+              2.8983311653137207,
+              0.3260188698768616
+            ],
+            "ori": [
+              1.1816620826721191e-05,
+              -1.826148945838213e-05,
+              0.6077523231506348,
+              0.7941267490386963
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -144.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          },
+          "straight_chair_jgoolz_5": {
+            "pos": [
+              7.255201816558838,
+              2.6935744285583496,
+              0.3260185718536377
+            ],
+            "ori": [
+              1.1801719665527344e-05,
+              -1.615926157683134e-05,
+              0.6077519059181213,
+              0.7941270470619202
+            ],
+            "fixed_base": false,
+            "moved_to": [
+              -149.84286308288574,
+              -115.73151111602783,
+              -100.9590277671814
+            ]
+          }
+        }
+      },
+      "required_scene_objects": [
+        "breakfast_table_rhjoby_0",
+        "floors_qgmjvd_0"
+      ]
+    },
+    "object_bindings": {
+      "floor.n.01_1": {
+        "scene_object_name": "floors_qgmjvd_0",
+        "category": "floors",
+        "model": "qgmjvd"
+      },
+      "breakfast_table.n.01_1": {
+        "scene_object_name": "breakfast_table_rhjoby_0",
+        "category": "breakfast_table",
+        "model": "rhjoby"
+      },
+      "box__of__sanitary_napkin.n.01_1": {
+        "scene_object_name": "target_box_of_sanitary_napkins_humkqw_0",
+        "category": "box_of_sanitary_napkins",
+        "model": "humkqw"
+      },
+      "box__of__tissue.n.01_1": {
+        "scene_object_name": "partner_box_of_tissues_ntbrtz_0",
+        "category": "box_of_tissues",
+        "model": "ntbrtz"
+      }
+    },
+    "robot_state": {
+      "bddl_instance": "agent.n.01_1",
+      "model": "r1pro",
+      "joint_positions": {
+        "torso_joint1": 1.0506789684295654,
+        "torso_joint2": -1.4968596696853638,
+        "torso_joint3": -0.490983784198761,
+        "torso_joint4": -7.24313849786995e-07,
+        "left_arm_joint1": 8.968317160906736e-06,
+        "right_arm_joint1": 3.0247229005908594e-05,
+        "left_arm_joint2": 1.5700007677078247,
+        "right_arm_joint2": -1.5700002908706665,
+        "left_arm_joint3": -4.056651050632354e-06,
+        "right_arm_joint3": -1.1036308933398686e-07,
+        "left_arm_joint4": -1.5700019598007202,
+        "right_arm_joint4": -1.5699976682662964,
+        "left_arm_joint5": 1.5699917078018188,
+        "right_arm_joint5": -1.5700052976608276,
+        "left_arm_joint6": -9.856580618361477e-07,
+        "right_arm_joint6": -7.59174099584925e-07,
+        "left_arm_joint7": -2.315775418537669e-06,
+        "right_arm_joint7": -1.0178038110097987e-06,
+        "left_gripper_finger_joint1": 0.0499994195997715,
+        "left_gripper_finger_joint2": 0.04999987781047821,
+        "right_gripper_finger_joint1": 0.049999453127384186,
+        "right_gripper_finger_joint2": 0.049999963492155075
+      },
+      "joint_velocities": {
+        "torso_joint1": 0.0,
+        "torso_joint2": 0.0,
+        "torso_joint3": 0.0,
+        "torso_joint4": 0.0,
+        "left_arm_joint1": 0.0,
+        "right_arm_joint1": 0.0,
+        "left_arm_joint2": 0.0,
+        "right_arm_joint2": 0.0,
+        "left_arm_joint3": 0.0,
+        "right_arm_joint3": 0.0,
+        "left_arm_joint4": 0.0,
+        "right_arm_joint4": 0.0,
+        "left_arm_joint5": 0.0,
+        "right_arm_joint5": 0.0,
+        "left_arm_joint6": 0.0,
+        "right_arm_joint6": 0.0,
+        "left_arm_joint7": 0.0,
+        "right_arm_joint7": 0.0,
+        "left_gripper_finger_joint1": 0.0,
+        "left_gripper_finger_joint2": 0.0,
+        "right_gripper_finger_joint1": 0.0,
+        "right_gripper_finger_joint2": 0.0
+      },
+      "controller_targets": {}
+    },
+    "goal_observation": {
+      "sensor_key": "robot_r1:zed_link:Camera:0",
+      "rgb_path": null,
+      "rgb_sha256": null,
+      "resolution": [
+        1080,
+        1080
+      ],
+      "intrinsics": null,
+      "camera_pose_world": null
+    },
+    "pose_targets": {
+      "box__of__tissue.n.01_1": {
+        "link": null,
+        "frame": "world",
+        "position": [
+          6.32663631439209,
+          3.351928949356079,
+          0.8500314950942993
+        ],
+        "orientation": [
+          -0.000180640650796704,
+          1.338441052212147e-05,
+          0.009057898074388504,
+          0.9999589323997498
+        ],
+        "position_metric": "full",
+        "orientation_metric": "full",
+        "position_tolerance": 0.03,
+        "orientation_tolerance": 0.2,
+        "orientation_equivalences": []
+      },
+      "box__of__sanitary_napkin.n.01_1": {
+        "link": null,
+        "frame": "world",
+        "position": [
+          6.326173305511475,
+          3.2405176162719727,
+          0.8673581480979919
+        ],
+        "orientation": [
+          0.00017769170517567545,
+          -1.4022187315276824e-05,
+          -0.01214523520320654,
+          -0.9999262094497681
+        ],
+        "position_metric": "full",
+        "orientation_metric": "full",
+        "position_tolerance": 0.03,
+        "orientation_tolerance": 0.2,
+        "orientation_equivalences": []
+      }
+    },
+    "groups": {},
+    "articulation_targets": {}
+  }
+}

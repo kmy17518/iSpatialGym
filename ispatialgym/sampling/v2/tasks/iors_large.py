@@ -148,6 +148,7 @@ from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
+from ispatialgym.sampling.v2 import contact_poses as CPZ  # i7-contact 2026-11-07: the shared push / brace pose rules
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang as OH
@@ -1373,12 +1374,9 @@ class IORSLarge(SamplerV2):
         # executed; 1.1 cm had no IK solution at all, 0920-170805) - what the blade meets at that height is modelled per yaw by
         # ``contact_offset_along`` (pod probe 2026-09-20: the sandal's heel face reaches 12.8 cm back only up to z 3.5 cm, its toe
         # 11.4 cm forward up to z 4.5 cm, the strap 2.7 cm behind the root above - so the blade at 3.6 cm pushes it toe-first)
-        height = float(self.place["height"])
-        frac = float(self.num("push_tip_frac", 0.5))
-        clear = float(self.num("push_tip_clearance_m", 0.015))
-        z_tip = self.floor_z + max(clear, min(frac * height, 0.05))
-        drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
-        return z_tip + drop, z_tip
+        # i7-contact 2026-11-07: the shared rule (contact_poses.floor_blade_height)
+        return CPZ.floor_blade_height(float(self.place["height"]), self.floor_z, pitch_deg, frac=float(self.num("push_tip_frac", 0.5)),
+                                      clear=float(self.num("push_tip_clearance_m", 0.015)))
 
     def flat_turns(self, d2) -> List[Tuple[float, float, str, th.Tensor]]:
         """The flat hand's wrist turns pushing along ``d2`` (:func:`tabletop.flat_hand_quats`), lowest fingertips first: ``(fingertip height
@@ -1718,20 +1716,18 @@ class IORSLarge(SamplerV2):
                 continue
             half_d = off_m
             a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its arm's side for a side stance)
-            start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
             # the blade's goal runs ``push_goal_extra_m`` (3 cm) past the model's: the oracle's differential-IK leg stops 2-3 cm
             # short of its last waypoint (0920-143722 / 154503: eef 0.704-0.716 m ahead for a 0.736 m goal)
-            goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff - float(self.num("push_goal_extra_m", 0.03)))
-            mid = 0.5 * (start + goal)
+            extra = float(self.num("push_goal_extra_m", 0.03))
             low = (z_tip - self.floor_z) < self.SLAB_TIP_M
             props = []
             for rank, c_sign in enumerate((1.0, -1.0)):
                 q = C.eef_quat(a_vec, c_sign * closing)
-                poses = [(start, q), (mid, q), (goal, q)]
-                if palm:  # the wrist camera reaches 1.8 cm further toward the face than the knuckles: each turn has its stand-off
-                    back = d3 * (TT.palm_half_extent(q, d3) + PUSH_UNDER_CLEARANCE_M)
-                    poses = [(p - back, q) for p, _ in poses]
-                props.append(O.Proposal(f"{tag}pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, [C.pre_pose(poses[0])] + poses))
+                # the palm: the wrist camera reaches 1.8 cm further toward the face than the knuckles - each turn has its stand-off
+                back = d3 * (TT.palm_half_extent(q, d3) + PUSH_UNDER_CLEARANCE_M) if palm else None
+                # i7-contact 2026-11-07: the shared chain (contact_poses.floor_push_chain)
+                chain = CPZ.floor_push_chain(cd, gc, d2, z_push, half_d + standoff, extra, q, pre=("approach",), shift=back)
+                props.append(O.Proposal(f"{tag}pitch {pitch:.0f}{'' if c_sign > 0 else '-'}", rank, c_sign, chain))
 
             def evaluate(p, low=low, fingers=fingers):
                 with self.ikc.ignoring([floor, target], ground=not low):
@@ -1814,9 +1810,7 @@ class IORSLarge(SamplerV2):
                     skipped["nothing of the target within the fingertips' band"] = skipped.get("nothing of the target within the fingertips' band", 0) + 1
                     continue
                 z = self.floor_z + tip
-                start = th.tensor([float(cd[0]), float(cd[1]), z]) - d3 * (off + standoff)
-                goal = th.tensor([float(gc[0]), float(gc[1]), z]) - d3 * (off + standoff - extra)
-                chain = [(start - d3 * pre_d, q), (start, q), (0.5 * (start + goal), q), (goal, q)]
+                chain = CPZ.floor_push_chain(cd, gc, d2, z, off + standoff, extra, q, pre=("back", pre_d))  # i7-contact: the shared chain
                 clash = self.flat_chain_clash(place, chain, arm)
                 if clash is not None:
                     skipped[clash] = skipped.get(clash, 0) + 1
@@ -1894,9 +1888,7 @@ class IORSLarge(SamplerV2):
                     why.append(f"pitch {pitch:.0f} {label}: the face reaches the {part} ({gap:+.3f} m)")
                     continue
                 z = self.floor_z + tip + rise
-                start = th.tensor([float(cd[0]), float(cd[1]), z]) - d3 * (off + standoff)
-                goal = th.tensor([float(gc[0]), float(gc[1]), z]) - d3 * (off + standoff - extra)
-                chain = [(start - d3 * pre_back + th.tensor([0.0, 0.0, pre_up]), q), (start, q), (0.5 * (start + goal), q), (goal, q)]
+                chain = CPZ.floor_push_chain(cd, gc, d2, z, off + standoff, extra, q, pre=("back_up", pre_back, pre_up))  # i7-contact: the shared chain
                 facts = {"wrist_turn": label, "pitch_deg": float(pitch), "fingertip_z_m": float(tip), "push_height_m": float(tip + rise), "half_extent_m": float(off),
                          "standoff_m": float(standoff), "contact_height_m": float(band[1]), "fingertip_band_m": [float(band[0]), float(band[1])],
                          "palm_gap_m": float(gap) if math.isfinite(gap) else None, "palm_part": part or None, "hand_low_m": float(tip - drop)}

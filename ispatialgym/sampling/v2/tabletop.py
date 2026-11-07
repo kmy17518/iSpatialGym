@@ -1684,6 +1684,135 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
     return map_view_of(s, rm)
 
 
+# ---------------------------------------------------------------------------------------------------------------- contact maps
+# i7-contact 2026-11-07 (step 3): the contact maps of the PUSH / BRACE libraries (``sampling.contact_maps``: touch_push / touch_brace /
+# push_blade / axial_brace / floor_push) read by the touching brace gate and the axial joint placement under v2only. A map is a proposal
+# filter at (stance, object ROOT, object yaw); the exact chain IK of the samplers stays the decision.
+
+
+def contact_maps_on() -> bool:
+    """The samplers read their contact maps: ``ISPATIALGYM_V2_ONLY`` with a maps root (``ISPATIALGYM_REACH_MAPS``; the contact maps sit in its
+    ``<entry>/cmap__*`` files beside the grasp maps)."""
+    return bool(RB.v2_only() and map_sampling_root())
+
+
+def _map_anchors():
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
+    if not (ap and os.path.exists(ap)):
+        return None
+    with open(ap) as f:
+        an = json.load(f)
+    return AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+
+
+def contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
+    """The ``kind`` contact map (``contact_maps.ContactMap.find``) of the sampler's ``role`` object - its v2 library entry and stable rest
+    (:func:`_v2_map_entry`: the spawn scale enforced) - at the top's height above the floor (the anchors of ``ISPATIALGYM_REACH_MAP_ANCHORS``,
+    else the map's own height), the kind's arm, the shared contact policy's key, the robot digest, ``ISPATIALGYM_REACH_MAP_REQUIRE``; cached
+    per (kind, role, support, arm) on ``s._contact_maps``. None on a miss, with one ``MAP_REQUEST`` line (kind, entry, rest, h, arm, role,
+    support, scene)."""
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import contact_maps as CMAP
+    from ispatialgym.sampling import reach_maps as RMAP
+
+    arm = arm or CMAP.KINDS[kind]["arm"]
+    cache = s.__dict__.setdefault("_contact_maps", {}) if hasattr(s, "__dict__") else {}
+    ck = (kind, role, str(getattr(top, "name", "")), arm)
+    if ck in cache:
+        return cache[ck]
+    mc = s.choice.models[role]
+    spec = BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=mc.grasp_key, scale=list(mc.scale) if mc.scale else None)
+    h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
+    req = dict(kind=kind, role=role, object=spec.object, grasp_key=spec.grasp_key, h=round(h, 4), arm=arm, support=str(getattr(top, "name", "")),
+               scene=str(getattr(s.world, "scene_model", "")))
+    if contact_map_knobs(kind):
+        req["knobs"] = contact_map_knobs(kind)
+    from ispatialgym.grasping import schema as GS
+
+    cm = None
+    root = map_sampling_root()
+    # the map's object: the v2 grasp entry of the sampler's key (its stable rest checked) when the campaign library links one, else every
+    # contact-library entry of the model at the spawn scale (``<category>__<model>__<scale tag>[__...]``: a pushed / braced object needs no
+    # grasp entry - the touching partners, the axial targets)
+    ent = _v2_map_entry(s, spec)
+    cands: List[Tuple[str, Optional[str]]] = []
+    if ent is not None:
+        cands.append((os.path.basename(os.path.dirname(ent[0].path)), ent[1]))
+    mid = GS.model_id(mc.category, mc.model, list(mc.scale) if mc.scale else None)
+    if root and os.path.isdir(root):
+        cands += [(d, None) for d in sorted(os.listdir(root)) if (d == mid or d.startswith(mid + "__")) and d not in [c[0] for c in cands]]
+    req.update(entry=cands[0][0] if cands else mid, rest_id=cands[0][1] if cands else None)
+    if not root:
+        log.info("contact map miss (%s, %s %s): no maps root", kind, role, spec.object)
+    for entry, rid in cands:
+        cm = CMAP.ContactMap.find(root, kind, entry, h, rest_id=rid, arm=arm, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
+                                  anchors=_map_anchors(), config_require=_map_config_require(), knobs_require=contact_map_knobs(kind))
+        if cm is not None:
+            break
+    if cm is None:
+        map_request(s, **req)
+    else:
+        log.info("contact map hit (%s, %s %s) at h %.4f (%s): %s", kind, role, spec.object, h, (cm.lookup_how or {}).get("how"), cm.path)
+    cache[ck] = cm
+    return cm
+
+
+def contact_map_knobs(kind: str) -> Optional[Dict[str, Any]]:
+    """The library knobs a ``kind`` contact map must have been built under to propose what the oracle executes here
+    (``contact_maps.CONSUMER_KNOBS``): a touch_brace map's ``brace_full_open`` = this run's :func:`brace_full_open` (i7-contactbrace 2026-11-08:
+    the wide stop's opening is in its entries; a map of the other rule misses with a ``MAP_REQUEST`` line). None for the other kinds."""
+    if kind == "touch_brace":
+        return {"brace_full_open": brace_full_open()}
+    return None
+
+
+#: owner decision 2026-11-07 (item 5): what a missing contact map does under v2only. An OPTIONAL step is skipped (the action runs by its own
+#: rule; the MAP_REQUEST line is still logged and the skip counted in the kit counter ``contact_map_skipped.<kind>``); a REQUIRED step
+#: rejects ``missing_map``. kind -> why
+CONTACT_MAP_OPTIONAL: Dict[str, str] = {
+    "axial_brace": "the axial stop brace is optional (owner 2026-09-16: axial = push-only, the brace recorded only with a joint placement): "
+                   "no map -> no brace, the push runs by its own rule (push-only instance)"}
+CONTACT_MAP_REQUIRED: Dict[str, str] = {
+    "touch_push": "the touching brace gate (owner 2026-11-07 item 5: a required step) - its push side: the push is the task's action",
+    "touch_brace": "the touching brace gate (owner 2026-11-07 item 5: a required step) - its brace side",
+    "push_blade": "the axial push is the task's action: the joint placement's work side decides the target's placement",
+    "floor_push": "the push-under is the task's action (no consumer wired yet: no floor library)"}
+
+
+def need_contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
+    """:func:`contact_map` with the owner's rule for a miss (:data:`CONTACT_MAP_OPTIONAL` / :data:`CONTACT_MAP_REQUIRED`): an optional step's
+    miss returns None (the caller skips the step; the skip counted once per (kind, role, support, arm) in ``contact_map_skipped.<kind>``), a
+    required step's rejects ``missing_map``. Both log the MAP_REQUEST line (:func:`contact_map`)."""
+    cm = contact_map(s, kind, role, top, arm=arm)
+    if cm is not None:
+        return cm
+    if kind in CONTACT_MAP_OPTIONAL:
+        seen = s.__dict__.setdefault("_contact_map_skips", set()) if hasattr(s, "__dict__") else set()
+        ck = (kind, role, str(getattr(top, "name", "")), arm)
+        if ck not in seen:
+            seen.add(ck)
+            _count(s, f"contact_map_skipped.{kind}")
+        log.info("contact map %s of the %s missing: the optional step is skipped (%s)", kind, role, CONTACT_MAP_OPTIONAL[kind])
+        return None
+    _reject("missing_map", f"no {kind} contact map of the {role} at {getattr(top, 'name', '?')}'s height (MAP_REQUEST logged): {CONTACT_MAP_REQUIRED.get(kind, 'required')}")
+
+
+def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06) -> Dict[str, Any]:
+    """``ContactMap.lookup`` at ``stance`` for the object at ``pose`` (world): its ROOT xy in the base frame, its yaw from the stance (about z,
+    over the rest the map's entries stand on: ``meta["entry_rest_quat_xyzw"]``), the stance's stand-off and trunk; ``tol`` the in-band
+    distance of a point to a cell (``stances.BAND_CELL_TOL``)."""
+    from ispatialgym.sampling import contact_maps as CMAP
+
+    xy = stance.world_to_base(_t(pose[0])[:2])
+    rest = cm.meta.get("entry_rest_quat_xyzw") or [0.0, 0.0, 0.0, 1.0]
+    yaw = C.wrap_angle(CMAP.yaw_of([float(v) for v in _t(pose[1]).tolist()], rest) - float(stance.base_pose2d[2]))
+    so = getattr(stance, "stand_off", None)
+    return cm.lookup(float(so) if so is not None else min(cm.meta["edge_distances"]), float(stance.translate), float(stance.tilt),
+                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol)
+
+
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
                   trunks: Optional[Sequence[Tuple[float, float]]] = None) -> RB.ReachBands:
     """§4.1 steps 1–4 in-process (``reach_bands.BandComputer``) at the band stance (edge midpoint, s = 0.45 + overhang) of
@@ -2651,6 +2780,72 @@ class BraceRecord(ContactRecord):
         d = super().to_sidecar()
         d.update({k: v for k, v in self.extras.items() if v is not None})
         return d
+
+
+#: owner decision 2026-11-07 (the BRACE OPENING rule): an OPEN brace (a wide stop, the record's ``fingers_opening_m``) opens FULLY -
+#: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
+#: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`).
+#: i7-contactbrace 2026-11-08: the ONE definition of the switch - the touching wide stop (``contact_poses.brace_wide_spreads``: the full-open
+#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``), the pack brace (``block_design.pack_brace_opening``)
+#: and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
+BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
+BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
+#: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
+#: the 8.4 mm finger then lies on the face (``wide_stop_positions``' fit rule for a stop moved onto the push line)
+BRACE_STOP_END_MARGIN_M = 0.01
+
+
+#: the switch's default (i7-contactbrace 2026-11-08: ON after the owner's A/B - no alias regressed; "0" = the openings of before 2026-11-07)
+BRACE_FULL_OPEN_DEFAULT = "1"
+
+
+def brace_full_open() -> bool:
+    """Whether ``ISPATIALGYM_BRACE_FULL_OPEN`` is on (owner 2026-11-07: an open brace opens fully; default :data:`BRACE_FULL_OPEN_DEFAULT`,
+    ``0`` = the openings of before)."""
+    return os.environ.get(BRACE_FULL_OPEN_ENV, BRACE_FULL_OPEN_DEFAULT).strip().lower() in ("1", "true", "on", "yes")
+
+
+def brace_opening(today: float, room: Optional[float] = None) -> float:
+    """The per-finger opening (m) an OPEN brace records as ``fingers_opening_m`` - the opening ``execute_brace`` pre-shapes the gripper
+    to. Switch off (:func:`brace_full_open`): ``today``, the builder's own value. On (owner 2026-11-07): the full opening
+    (:data:`BRACE_FULL_OPENING_M`), narrower only to ``room`` - the widest per-finger opening the braced face takes (the caller's
+    geometry), never below 0."""
+    if not brace_full_open():
+        return float(today)
+    full = BRACE_FULL_OPENING_M
+    return full if room is None else max(0.0, min(full, float(room)))
+
+
+def brace_fingers(extras: Optional[Dict[str, Any]]) -> float:
+    """The finger joints a brace record's checks use - the opening the oracle executes it at (``execute_brace``: the record's
+    ``fingers_opening_m`` when ``actions.brace_is_open`` - a positive opening -, else the gripper closed) - for the brace's exact IK, its
+    two-arm solve, its probes and its retreat. i7-contactbrace 2026-11-08: the ONE rule of every sampler check of a brace (articulation_small,
+    block_design, the touching brace via ``contact_poses.contact_fingers``, the program check's ``brace_open_fingers``) - always on: a check at
+    another opening than the oracle's passes or refuses braces the program check and the demo then judge differently."""
+    from types import SimpleNamespace
+
+    from ispatialgym.oracle import actions as AC
+
+    rec = SimpleNamespace(extra=dict(extras or {}))
+    return float(rec.extra["fingers_opening_m"]) if AC.brace_is_open(rec) else float(C.FINGER_CLOSED)
+
+
+def count_brace_opening(s, extras: Optional[Dict[str, Any]], ok: Optional[bool] = None) -> None:
+    """i7-contactbrace 2026-11-08 (the BRACE OPENING A/B): kit counters of the openings a brace is checked / recorded at - per candidate
+    ``brace_opening.passed.<opening>`` / ``brace_opening.failed.<opening>`` (``ok``), per record ``brace_opening.recorded.<opening>`` (``ok`` None);
+    ``<opening>`` = :func:`brace_fingers` in m (``0.0500``) or ``closed``."""
+    q = brace_fingers(extras)
+    tag = "closed" if q <= 0.0 else f"{q:.4f}"
+    _count(s, f"brace_opening.{'recorded' if ok is None else ('passed' if ok else 'failed')}.{tag}")
+
+
+def with_gripper(kit, q: th.Tensor, arm: str, opening: Optional[float]) -> th.Tensor:
+    """A clone of the 28-D configuration ``q`` with ``arm``'s finger joints at ``opening`` (``q`` itself cloned when ``opening`` is None):
+    the IK of one arm keeps the other arm's fingers from its seed (``kit.q_config`` puts ONE opening on both grippers)."""
+    out = _t(q).clone()
+    if opening is not None:
+        out[kit.robot.gripper_control_idx[arm]] = float(opening)
+    return out
 
 
 def union_extent(*bands: Optional[RB.ReachBands]) -> Optional[Tuple[float, float]]:
@@ -5582,7 +5777,7 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
                      brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None,
-                     q_first_brace: Optional[th.Tensor] = None):
+                     q_first_brace: Optional[th.Tensor] = None, brace_fingers: Optional[float] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -5592,12 +5787,17 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
     a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
     touches the target, is not in the picture. ``q_first_brace``: the brace chain starts from this arm configuration (``exact``'s
-    ``q_first``; a wrist-flipped solution, ``orient``). Returns the ``IKResult``."""
+    ``q_first``; a wrist-flipped solution, ``orient``). ``brace_fingers`` (i7-braceopen 2026-11-07): the brace arm's finger joints when
+    they differ from ``fingers`` - a wide stop's ``fingers_opening_m`` (:func:`brace_fingers`), the opening the oracle braces at - for the
+    brace chain, the combined check and ``brace_only_check``; the working arm keeps ``fingers``. None = ``fingers`` for both hands, as
+    before. Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
     if not r1.ok:
         return IK.IKResult(False, None, f"{work_arm}: {r1.reason}")
+    # the brace chain is seeded from the working arm's solution: its fingers are the seed's (``exact`` ignores ``fingers`` with a seed)
+    q_b0 = with_gripper(s.kit, r1.q, brace_arm, brace_fingers)
     # owner 2026-09-20 21:20: the working arm is locked at its CONTACT (touching the target) while the brace chain is solved - with
     # the target in the world every configuration of the brace chain read "in collision" through the locked arm's own contact
     # before the brace arm was even evaluated (carton close 0920-191145 / 204807: 'the arms are in each other's way'). The objects
@@ -5606,12 +5806,12 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
     q_f = None
     if q_first_brace is not None:
-        q_f = r1.q.clone()
+        q_f = q_b0.clone()
         idx_b = s.kit.robot.arm_control_idx[brace_arm]
         q_f[idx_b] = _t(q_first_brace)[idx_b]
     with ikc.ignoring(locked_ign):
-        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers,
-                       q_first=q_f)
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=q_b0, cache=False,
+                       fingers=fingers if brace_fingers is None else brace_fingers, q_first=q_f)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]
@@ -5621,7 +5821,7 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
         return IK.IKResult(False, None, "combined configuration collides")
     if brace_only_check is not None:
         ignored, margin = brace_only_check
-        q_b = ikc.q_locked(stance, fingers=fingers).clone()
+        q_b = with_gripper(s.kit, ikc.q_locked(stance, fingers=fingers), brace_arm, brace_fingers)
         idx = s.kit.robot.arm_control_idx[brace_arm]
         q_b[idx] = r2.q[idx]
         with ikc.ignoring(list(ignored)):
@@ -5702,7 +5902,8 @@ __all__ = [
     "BandSpec", "ensure_bands", "compute_bands", "band_cells_world", "band_union_cells", "workspace", "store_feasible_set",
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_bounds", "phase1c_lateral", "tilt_scan",
-    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
+    "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "brace_fingers", "with_gripper", "count_brace_opening",
+    "BRACE_FULL_OPEN_ENV", "BRACE_FULL_OPENING_M", "BRACE_STOP_END_MARGIN_M", "brace_full_open", "brace_opening", "posed_in_hand",
     "placement_stance", "facade_v1_spec",
     "side_name", "in_start_region", "gap_grid", "longest_run", "lateral_gap_masks", "polygons_supported", "partner_origin_xy", "partner_gap_masks",
     "gap_masks_why", "partner_pose_at", "partner_pose_why", "meta_link_world_points", "meta_spot_gaps", "pose_centred_on",

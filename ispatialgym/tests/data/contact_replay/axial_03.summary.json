@@ -1,0 +1,902 @@
+{
+  "yaw_goal": -1.5707905610377735,
+  "yaw_init": -2.605218971588876,
+  "deviation_deg": -59.268382133004145,
+  "push_end": [
+    15.946221351623535,
+    -8.474172592163086,
+    0.7986804246902466
+  ],
+  "push_distance_m": 0.22288861445873687,
+  "manipulation_candidate": 0,
+  "spin": 1.0,
+  "push_pitch_deg": 0.0,
+  "brace_class": null,
+  "brace": "none",
+  "brace_reason": "no_joint_cell",
+  "joint_placement": {
+    "left_band": false,
+    "fails": {
+      "support": 0,
+      "frame": 0,
+      "work_off_band": 2,
+      "brace_off_band": 1,
+      "brace_class_failed": 0
+    }
+  },
+  "start_per_attempt": {
+    "draw_s": 0.0
+  },
+  "residual_velocity": null,
+  "tremble": {
+    "target_keyboard_injrgc_0": {
+      "step_mm": 0.0,
+      "step_deg": 0.0,
+      "first_move_frame": null,
+      "worst_frame": null,
+      "drift_mm": 0.0,
+      "drift_deg": 0.0,
+      "asleep": true,
+      "frames": 45,
+      "drift_xyz_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "z0": 0.7957
+    }
+  },
+  "bddl_at_init": {
+    "init_conditions_all_true": true,
+    "goal": [
+      {
+        "bddl": "['ontop', '?keyboard.n.01_1', '?desk.n.01_1']",
+        "satisfied": true
+      },
+      {
+        "bddl": "['pose_reached', '?keyboard.n.01_1']",
+        "satisfied": false
+      },
+      {
+        "bddl": "['not', ['grasped', '?agent.n.01_1', '?keyboard.n.01_1']]",
+        "satisfied": true
+      },
+      {
+        "bddl": "['pose_settled', '?keyboard.n.01_1']",
+        "satisfied": false
+      },
+      {
+        "bddl": "['pose_settled', '?agent.n.01_1']",
+        "satisfied": false
+      }
+    ]
+  },
+  "goal_tilt_deg": {
+    "keyboard.n.01_1": 0.0
+  },
+  "goal_check": {
+    "settled_poses": {
+      "target_keyboard_injrgc_0": [
+        [
+          15.832390785217285,
+          -8.293272972106934,
+          0.7957382202148438
+        ],
+        [
+          -6.774548069188313e-07,
+          -2.0447170356874267e-07,
+          -0.707098662853241,
+          0.7071149945259094
+        ]
+      ]
+    },
+    "goal": [
+      {
+        "bddl": "['ontop', '?keyboard.n.01_1', '?desk.n.01_1']",
+        "satisfied": true
+      },
+      {
+        "bddl": "['pose_reached', '?keyboard.n.01_1']",
+        "satisfied": true
+      },
+      {
+        "bddl": "['not', ['grasped', '?agent.n.01_1', '?keyboard.n.01_1']]",
+        "satisfied": true
+      },
+      {
+        "bddl": "['pose_settled', '?keyboard.n.01_1']",
+        "satisfied": false
+      },
+      {
+        "bddl": "['pose_settled', '?agent.n.01_1']",
+        "satisfied": false
+      }
+    ],
+    "robot_parked_at": [
+      17.100000381469727,
+      -9.90000057220459
+    ],
+    "binary_branch": {
+      "ontop(target_keyboard_injrgc_0, desk_mdhelw_1)": "omnigibson",
+      "pose_settled(target_keyboard_injrgc_0)": "none",
+      "pose_settled(robot_r1)": "none"
+    },
+    "binary_branch_log": [
+      {
+        "predicate": "ontop",
+        "entities": [
+          "target_keyboard_injrgc_0",
+          "desk_mdhelw_1"
+        ],
+        "branch": "omnigibson",
+        "ok": true,
+        "detail": {}
+      }
+    ]
+  },
+  "program_check": {
+    "mode": "expand",
+    "actions": [
+      {
+        "index": 0,
+        "name": "transition",
+        "arms": [],
+        "objects": [],
+        "stance": "manipulation",
+        "carried": null,
+        "n_poses": 2,
+        "witnesses": {}
+      },
+      {
+        "index": 1,
+        "name": "navigate",
+        "arms": [],
+        "objects": [],
+        "stance": "manipulation",
+        "carried": null,
+        "n_poses": 1,
+        "witnesses": {}
+      },
+      {
+        "index": 2,
+        "name": "transition",
+        "arms": [],
+        "objects": [],
+        "stance": "manipulation",
+        "carried": null,
+        "n_poses": 3,
+        "witnesses": {}
+      },
+      {
+        "index": 3,
+        "name": "push",
+        "arms": [
+          "right"
+        ],
+        "objects": [
+          "keyboard.n.01_1"
+        ],
+        "stance": "manipulation",
+        "carried": null,
+        "n_poses": 4,
+        "witnesses": {
+          "pre": {
+            "pose": {
+              "position": [
+                15.86622,
+                -8.52847,
+                0.90708
+              ],
+              "orientation": [
+                0.494458,
+                0.869202,
+                0.0,
+                -0.0
+              ]
+            },
+            "q": [
+              15.78949,
+              -9.28787,
+              0.00529,
+              0.0,
+              0.0,
+              1.5708,
+              0.7375,
+              -0.925,
+              -1.0338,
+              0.0,
+              0.0,
+              0.64129,
+              1.57,
+              -2.94626,
+              0.0,
+              -1.14835,
+              -1.57,
+              -1.70085,
+              1.57,
+              0.24972,
+              0.0,
+              -0.56647,
+              0.0,
+              1.07543,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",
+            "base_pose2d": [
+              15.789494514465332,
+              -9.287873268127441,
+              1.5708020925520199
+            ],
+            "floor_z": -0.0,
+            "fk_residual_m": 0.0,
+            "joint_limit_margin_rad": 0.1953,
+            "joint_limit_nearest": "right_arm_joint2",
+            "n_waypoints": 1,
+            "standoff": {
+              "clearance_m": 0.1218,
+              "branch": "skipped"
+            }
+          },
+          "waypoints": {
+            "pose": {
+              "position": [
+                16.05737,
+                -8.38547,
+                0.80708
+              ],
+              "orientation": [
+                -3e-06,
+                1.0,
+                0.0,
+                -0.0
+              ]
+            },
+            "q": [
+              15.78949,
+              -9.28787,
+              0.00529,
+              0.0,
+              0.0,
+              1.5708,
+              0.7375,
+              -0.925,
+              -1.0338,
+              0.0,
+              0.0,
+              0.71207,
+              1.57,
+              -2.86211,
+              0.0,
+              -0.55066,
+              -1.57,
+              -0.99144,
+              1.57,
+              2.12434,
+              0.0,
+              -0.27323,
+              0.0,
+              -0.74928,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",
+            "base_pose2d": [
+              15.789494514465332,
+              -9.287873268127441,
+              1.5708020925520199
+            ],
+            "floor_z": -0.0,
+            "fk_residual_m": 0.0,
+            "joint_limit_margin_rad": 0.2319,
+            "joint_limit_nearest": "right_arm_joint5",
+            "n_waypoints": 3,
+            "chain": "arc + retreat replayed"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "name": "retreat",
+        "arms": [
+          "right"
+        ],
+        "objects": [
+          "keyboard.n.01_1"
+        ],
+        "stance": "manipulation",
+        "carried": null,
+        "n_poses": 3,
+        "witnesses": {
+          "retreat": {
+            "pose": {
+              "position": [
+                16.05737,
+                -8.38547,
+                0.90708
+              ],
+              "orientation": [
+                -3e-06,
+                1.0,
+                0.0,
+                -0.0
+              ]
+            },
+            "q": [
+              15.78949,
+              -9.28787,
+              0.00529,
+              0.0,
+              0.0,
+              1.5708,
+              0.7375,
+              -0.925,
+              -1.0338,
+              0.0,
+              0.0,
+              0.44736,
+              1.57,
+              -2.81584,
+              0.0,
+              -0.54079,
+              -1.57,
+              -1.16782,
+              1.57,
+              2.10968,
+              0.0,
+              -0.32923,
+              0.0,
+              -0.86275,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",
+            "base_pose2d": [
+              15.789494514465332,
+              -9.287873268127441,
+              1.5708020925520199
+            ],
+            "floor_z": -0.0,
+            "fk_residual_m": 0.00085,
+            "joint_limit_margin_rad": 0.2465,
+            "joint_limit_nearest": "right_arm_joint5",
+            "n_waypoints": 3
+          }
+        }
+      }
+    ],
+    "stats": {
+      "program_check_s": 9.577,
+      "n_actions": 5,
+      "n_actions_checked": 5,
+      "n_poses": 13,
+      "n_ik_single": 1,
+      "n_chains": 2,
+      "n_sync": 0,
+      "sync_s": 0.0,
+      "n_attach": 0,
+      "early_gate_poses": 4,
+      "rejected": false
+    }
+  },
+  "wall_time_s": 51.94103169441223,
+  "phase_s": {
+    "sample": 30.52,
+    "apply": 0.18,
+    "settle_validate": 8.94,
+    "goal_check_program_check_write": 12.3,
+    "reset": 0.2,
+    "instance_filter": 0.0,
+    "goal_check": 2.57,
+    "program_check": 9.58
+  },
+  "kit": {
+    "ik_calls": 20,
+    "ik_s": 0.538,
+    "ik_batch_calls": 1,
+    "ik_batch_problems": 2,
+    "ik_batch_s": 6.378,
+    "collision_calls": 29,
+    "collision_configs": 62,
+    "collision_s": 0.207,
+    "ik_path_calls": 6,
+    "ik_path_s": 22.963,
+    "ik_path_waypoints": 22,
+    "sync_calls": 8,
+    "sync_s": 0.785,
+    "sync_full_calls": 5,
+    "attach_calls": 0,
+    "attach_s": 0.0,
+    "fit_cache_hits": 0,
+    "ik_all_calls": 0,
+    "limit_retry_poses": 3,
+    "limit_reject.right_arm_joint2": 0,
+    "limit_retry_seeded_rescued": 1,
+    "orient_choices": 1,
+    "limit_reject.right_arm_joint5": 0,
+    "limit_reject.right_arm_joint7": 0,
+    "limit_reject.right_arm_joint6": 0,
+    "limit_retry_random": 4,
+    "limit_retry_random_rescued": 2,
+    "support_policy_tail_checked": 1,
+    "orient_reason.only_feasible": 1
+  },
+  "kit_attempt": {
+    "by_stage": {
+      "reset": {
+        "sync_s": 0.054,
+        "sync_calls": 1.0
+      },
+      "sample": {
+        "ik_batch_s": 6.378,
+        "sync_s": 0.293,
+        "ik_batch_problems": 2.0,
+        "ik_path_calls": 1.0,
+        "sync_calls": 3.0,
+        "sync_full_calls": 2.0,
+        "orient_choices": 1.0,
+        "ik_path_s": 22.847,
+        "collision_configs": 28.0,
+        "limit_retry_random": 4.0,
+        "orient_reason.only_feasible": 1.0,
+        "support_policy_tail_checked": 1.0,
+        "ik_path_waypoints": 11.0,
+        "ik_calls": 14.0,
+        "ik_s": 0.43,
+        "ik_batch_calls": 1.0,
+        "limit_retry_random_rescued": 2.0,
+        "collision_calls": 8.0,
+        "collision_s": 0.063,
+        "limit_retry_poses": 2.0
+      },
+      "apply": {
+        "sync_s": 0.135,
+        "sync_calls": 1.0,
+        "sync_full_calls": 1.0
+      },
+      "settle_validate": {
+        "sync_s": 0.128,
+        "sync_calls": 1.0,
+        "sync_full_calls": 1.0,
+        "collision_configs": 13.0,
+        "collision_calls": 4.0,
+        "collision_s": 0.035
+      },
+      "goal_check": {
+        "sync_s": 0.176,
+        "sync_calls": 2.0,
+        "sync_full_calls": 1.0
+      },
+      "program_check": {
+        "limit_retry_seeded_rescued": 1.0,
+        "ik_path_calls": 5.0,
+        "ik_path_s": 0.116,
+        "collision_configs": 21.0,
+        "ik_path_waypoints": 11.0,
+        "ik_calls": 6.0,
+        "ik_s": 0.108,
+        "collision_calls": 17.0,
+        "collision_s": 0.11,
+        "limit_retry_poses": 1.0
+      }
+    },
+    "total": {
+      "ik_batch_s": 6.378,
+      "sync_s": 0.785,
+      "ik_batch_problems": 2.0,
+      "limit_retry_seeded_rescued": 1.0,
+      "ik_path_calls": 6.0,
+      "sync_calls": 8.0,
+      "sync_full_calls": 5.0,
+      "orient_choices": 1.0,
+      "ik_path_s": 22.963,
+      "collision_configs": 62.0,
+      "limit_retry_random": 4.0,
+      "orient_reason.only_feasible": 1.0,
+      "support_policy_tail_checked": 1.0,
+      "ik_path_waypoints": 22.0,
+      "ik_calls": 20.0,
+      "ik_s": 0.538,
+      "ik_batch_calls": 1.0,
+      "limit_retry_random_rescued": 2.0,
+      "collision_calls": 29.0,
+      "collision_s": 0.207,
+      "limit_retry_poses": 3.0
+    }
+  },
+  "attempt": 1,
+  "instance_id": "alignment-axial-keyboard-desk__office_cubicles_right__support-desk_mdhelw_1-T1__target-keyboard-injrgc__600000",
+  "seed": 8392122415414115552,
+  "base_pose2d": [
+    15.989494323730469,
+    -9.287872314453125,
+    1.5708020925520199
+  ],
+  "trunk": [
+    0.5977448505605351,
+    0.0
+  ],
+  "rejections_so_far": {
+    "target_placement": 1
+  },
+  "sidecar": "alignment-axial-keyboard-desk__office_cubicles_right__support-desk_mdhelw_1-T1__target-keyboard-injrgc__600000.oracle.json",
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        15.989494323730469,
+        -9.287872314453125,
+        1.5708020925520199
+      ],
+      "translate": 0.5977448509159555,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "stand_off": 0.45,
+      "edge": "-u",
+      "lateral": 0.18761255123379583,
+      "H_max": 0.020829200744628906,
+      "delta": 0.5596279833556047,
+      "delta_aim": 0.5596279833556047,
+      "delta_min": 0.308586573600769,
+      "delta_max": 0.7231464106321001,
+      "conflict": false,
+      "d_ws": 0.3451766624170191,
+      "d_near": 0.059999942779541016,
+      "d_far": 0.7000004053115845,
+      "lam_min": -0.800000011920929,
+      "lam_max": -0.0,
+      "x_c": 0.23549367343174876,
+      "z_c": 1.344918924951636,
+      "b": 0.7743894457817078,
+      "b_right": 0.7743900418281555,
+      "b_left": 0.7743894457817078,
+      "R_img": 0.7743894457817078,
+      "t_range": [
+        0.24523312682254159,
+        0.95
+      ],
+      "camera_pitch_deg": 22.580477940295808,
+      "hand_below": 0.18775737285614014,
+      "n_workspace_cells": 85,
+      "left_band": false,
+      "margins": {
+        "kind": "axial",
+        "lam_min": -0.800000011920929,
+        "lam_max": -0.0,
+        "b": 0.7743894457817078,
+        "R_img": 0.7743894457817078,
+        "safety": 0.02,
+        "w_diag": 0.26022309795315085,
+        "m_R": 1.0802231098740798,
+        "m_L": 0.28022309795315087
+      },
+      "lateral_bounds": [
+        -0.30977961763446515,
+        1.109779629555394
+      ],
+      "arms_q": {
+        "right": [
+          0.0,
+          -1.57,
+          0.0,
+          -1.57,
+          -1.57,
+          0.0,
+          0.0
+        ],
+        "left": [
+          0.0,
+          1.57,
+          0.0,
+          -1.57,
+          1.57,
+          0.0,
+          0.0
+        ]
+      },
+      "name": "init",
+      "edge_frame": {
+        "name": "-u",
+        "mid": [
+          16.177104949951172,
+          -8.837871551513672
+        ],
+        "inward": [
+          -5.765757123299409e-06,
+          1.0
+        ],
+        "tangent": [
+          -1.0,
+          -5.765757123299409e-06
+        ],
+        "length_m": 2.78000545501709,
+        "overhang_m": 0.0
+      },
+      "edge_depth": 0.44999969005584717,
+      "extras": {
+        "H_max": 0.020829200744628906,
+        "delta": 0.5596279833556047,
+        "delta_aim": 0.5596279833556047,
+        "delta_min": 0.308586573600769,
+        "delta_max": 0.7231464106321001,
+        "conflict": false,
+        "d_ws": 0.3451766624170191,
+        "d_near": 0.059999942779541016,
+        "d_far": 0.7000004053115845,
+        "lam_min": -0.800000011920929,
+        "lam_max": -0.0,
+        "x_c": 0.23549367343174876,
+        "z_c": 1.344918924951636,
+        "b": 0.7743894457817078,
+        "b_right": 0.7743900418281555,
+        "b_left": 0.7743894457817078,
+        "R_img": 0.7743894457817078,
+        "t_range": [
+          0.24523312682254159,
+          0.95
+        ],
+        "camera_pitch_deg": 22.580477940295808,
+        "hand_below": 0.18775737285614014,
+        "n_workspace_cells": 85,
+        "left_band": false,
+        "margins": {
+          "kind": "axial",
+          "lam_min": -0.800000011920929,
+          "lam_max": -0.0,
+          "b": 0.7743894457817078,
+          "R_img": 0.7743894457817078,
+          "safety": 0.02,
+          "w_diag": 0.26022309795315085,
+          "m_R": 1.0802231098740798,
+          "m_L": 0.28022309795315087
+        },
+        "lateral_bounds": [
+          -0.30977961763446515,
+          1.109779629555394
+        ],
+        "arms_q": {
+          "right": [
+            0.0,
+            -1.57,
+            0.0,
+            -1.57,
+            -1.57,
+            0.0,
+            0.0
+          ],
+          "left": [
+            0.0,
+            1.57,
+            0.0,
+            -1.57,
+            1.57,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "manipulation": {
+      "base_pose2d": [
+        15.789494514465332,
+        -9.287873268127441,
+        1.5708020925520199
+      ],
+      "translate": 0.25,
+      "tilt": -0.798799991607666,
+      "arms": [
+        "right"
+      ],
+      "stand_off": 0.45,
+      "edge": "-u",
+      "lateral": 0.38761255123379584,
+      "focus": [
+        15.789488792419434,
+        -8.297873497009277,
+        0.7956956624984741
+      ],
+      "contacts": [
+        "push"
+      ],
+      "idle_posture": "untucked",
+      "H_max": 0.020829200744628906,
+      "delta": 0.5596279833556047,
+      "delta_aim": 0.5596279833556047,
+      "delta_min": 0.308586573600769,
+      "delta_max": 0.7231464106321001,
+      "conflict": false,
+      "d_ws": 0.3451766624170191,
+      "d_near": 0.059999942779541016,
+      "d_far": 0.7000004053115845,
+      "lam_min": -0.800000011920929,
+      "lam_max": -0.0,
+      "x_c": 0.23549367343174876,
+      "z_c": 1.344918924951636,
+      "b": 0.7743894457817078,
+      "b_right": 0.7743900418281555,
+      "b_left": 0.7743894457817078,
+      "R_img": 0.7743894457817078,
+      "t_range": [
+        0.24523312682254159,
+        0.95
+      ],
+      "camera_pitch_deg": 22.580477940295808,
+      "hand_below": 0.18775737285614014,
+      "n_workspace_cells": 85,
+      "left_band": false,
+      "margins": {
+        "kind": "axial",
+        "lam_min": -0.800000011920929,
+        "lam_max": -0.0,
+        "b": 0.7743894457817078,
+        "R_img": 0.7743894457817078,
+        "safety": 0.02,
+        "w_diag": 0.26022309795315085,
+        "m_R": 1.0802231098740798,
+        "m_L": 0.28022309795315087
+      },
+      "lateral_bounds": [
+        -0.30977961763446515,
+        1.109779629555394
+      ],
+      "lateral_shift_m": 0.2,
+      "axis_angle": 0.3057559980830808,
+      "angle_class": 1,
+      "focus_info": null,
+      "init_view_angle": 0.3153966953369843,
+      "init_view_class": 0,
+      "init_travel": {
+        "lateral_m": 0.2,
+        "base_m": 0.2,
+        "path_m": 0.2236,
+        "departure_stand_off_m": 0.55,
+        "transition_stand_off_m": 0.45
+      },
+      "push_pitch_deg": 0.0,
+      "brace": "none",
+      "brace_class": null,
+      "brace_geometry": {
+        "reason": "no_joint_cell",
+        "brace_fails": [],
+        "blade_skips": {}
+      },
+      "arms_q": {
+        "right": [
+          0.0,
+          -1.57,
+          0.0,
+          -1.57,
+          -1.57,
+          0.0,
+          0.0
+        ],
+        "left": [
+          0.0,
+          1.57,
+          0.0,
+          -1.57,
+          1.57,
+          0.0,
+          0.0
+        ]
+      },
+      "name": "manipulation",
+      "edge_frame": {
+        "name": "-u",
+        "mid": [
+          16.177104949951172,
+          -8.837871551513672
+        ],
+        "inward": [
+          -5.765757123299409e-06,
+          1.0
+        ],
+        "tangent": [
+          -1.0,
+          -5.765757123299409e-06
+        ],
+        "length_m": 2.78000545501709,
+        "overhang_m": 0.0
+      },
+      "edge_depth": 0.44999948143959045,
+      "extras": {
+        "H_max": 0.020829200744628906,
+        "delta": 0.5596279833556047,
+        "delta_aim": 0.5596279833556047,
+        "delta_min": 0.308586573600769,
+        "delta_max": 0.7231464106321001,
+        "conflict": false,
+        "d_ws": 0.3451766624170191,
+        "d_near": 0.059999942779541016,
+        "d_far": 0.7000004053115845,
+        "lam_min": -0.800000011920929,
+        "lam_max": -0.0,
+        "x_c": 0.23549367343174876,
+        "z_c": 1.344918924951636,
+        "b": 0.7743894457817078,
+        "b_right": 0.7743900418281555,
+        "b_left": 0.7743894457817078,
+        "R_img": 0.7743894457817078,
+        "t_range": [
+          0.24523312682254159,
+          0.95
+        ],
+        "camera_pitch_deg": 22.580477940295808,
+        "hand_below": 0.18775737285614014,
+        "n_workspace_cells": 85,
+        "left_band": false,
+        "margins": {
+          "kind": "axial",
+          "lam_min": -0.800000011920929,
+          "lam_max": -0.0,
+          "b": 0.7743894457817078,
+          "R_img": 0.7743894457817078,
+          "safety": 0.02,
+          "w_diag": 0.26022309795315085,
+          "m_R": 1.0802231098740798,
+          "m_L": 0.28022309795315087
+        },
+        "lateral_bounds": [
+          -0.30977961763446515,
+          1.109779629555394
+        ],
+        "lateral_shift_m": 0.2,
+        "axis_angle": 0.3057559980830808,
+        "angle_class": 1,
+        "focus_info": null,
+        "init_view_angle": 0.3153966953369843,
+        "init_view_class": 0,
+        "_position": [
+          12,
+          2
+        ],
+        "init_travel": {
+          "lateral_m": 0.2,
+          "base_m": 0.2,
+          "path_m": 0.2236,
+          "departure_stand_off_m": 0.55,
+          "transition_stand_off_m": 0.45
+        },
+        "push_pitch_deg": 0.0,
+        "brace": "none",
+        "brace_class": null,
+        "brace_geometry": {
+          "reason": "no_joint_cell",
+          "brace_fails": [],
+          "blade_skips": {}
+        },
+        "arms_q": {
+          "right": [
+            0.0,
+            -1.57,
+            0.0,
+            -1.57,
+            -1.57,
+            0.0,
+            0.0
+          ],
+          "left": [
+            0.0,
+            1.57,
+            0.0,
+            -1.57,
+            1.57,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    }
+  },
+  "sampler_version": "2.0.0-dev",
+  "checks": {
+    "attached_object": true,
+    "program_check": "expand"
+  },
+  "visibility": "pending"
+}
