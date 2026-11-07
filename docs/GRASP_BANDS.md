@@ -528,6 +528,30 @@ selected, topk / reps 60):
 - No v2 map kind covers it, so nothing could be built. It is the same blocker as attachment_01 / 04. The partner's left contact band
   (`load_left_contact_band`) comes after it and is untested.
 
+**Owner decision 2026-11-07 item 2: `attach_axis = "seat"` is the default** (807a7314).
+- Identity (84fa3b9f, on top of the i7-switches identity 884279fd, cherry-picked as 33e72d92): `library.json` records `attach_axis`
+  for attach entries. An entry without the record reads its `candidates.json` config, else "meta_z". `ModelLibrary.identity()` adds it only
+  when it is not "meta_z", so every existing key is unchanged. `check_compatible(attach_axis=)` lets a reader require it.
+- Rebuilt with the default (`$OFH/attach_20261107/seat_rebuild`; glib + maps at the original heights / arms). Physics-valid old -> new:
+
+| entry | old | new | maps |
+|---|---|---|---|
+| cork ncxgpe (L3 config, 0.7853 both arms) | 2 (seat opt-in) | 2 | 2 |
+| dip_candle poexjo | 0 | 0 (measured-rest palm / finger, pressed) | - |
+| dip_candle poexjo `__rfecdee` | 0 | 5 | 3 |
+| light_bulb kfmkwd | 4 | 6 | 3 |
+| webcam fabztm | 2 | 5 | 3 |
+| trout kqpeke | 0 | 0 (1 rep, pressed) | - |
+| cabinet_door ertkre | 6 | 4 | 3 |
+| wreath rkrxno | 2 | 0 (no representative) | - |
+| skateboard_wheel jljqtt | 6 | 6 | 3 |
+| skateboard_wheel acmbvb | 6 | 2 | 3 |
+
+  The roles entries use round-1 config with maps at 0.4230 / 0.8126 / 1.0505 (right arm), as roles_all.
+- Staged: `stage_seat` (`cp -a v2maps_i7` + these entries and maps). The old versions are in `stage_seat/_superseded_meta_z/`.
+- Not changed (an oracle change): for the skateboard deck and the recreational_vehicle partner of wreath / holly, the oracle's 45-deg rule
+  picks the centroid->female direction, and "seat" copies it.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
