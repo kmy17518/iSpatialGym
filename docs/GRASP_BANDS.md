@@ -660,6 +660,28 @@ is unreachable). CR_FAST_ASTAR (i7-unblock 72d684a8) runs the same search withou
    - Kit counters: map_tilt.inherited_columns / .inherited_feasible / .cells_invalidated / .cells_confirmed / .empty_f_on_inherited.
    - The same mechanism covers in-between yaws (the 8 x 45 deg slots).
 
+### Owner direction 2026-11-07: finish the i7-braceopen and i7-fingertouch A/Bs before the integration
+
+**A. i7-braceopen** (cb164782: the sampler checks a wide brace at the record's fingers_opening_m; dc10d4d2: `ISPATIALGYM_BRACE_FULL_OPEN`,
+default off, with the full open 0.127 m spread first, the close_push / v4 stop openings at 0.05, and the pack brace capped at full open).
+- **The carton stop:** the decided corner inset of 0.06 at the 0.05 opening is implemented as inset = max(corner_inset, opening + 1 cm),
+  with `close_push_brace_corner_inset_m` still 0.04.
+- **Merge with i7-contact first.** It defines `ISPATIALGYM_BRACE_FULL_OPEN` again (contact_poses.py) and also has
+  `ISPATIALGYM_TOUCH_BRACE_AT_OPENING` (default on). These become ONE switch and ONE opening rule, and the contact libraries / maps use
+  the opening the oracle executes. Unit tests; existing keys unchanged with the switch off.
+- **The A/B:** off vs on for every alias whose brace opening changes (touching_01 / 02 / 04, articulation close_02, the carton variants,
+  block_4; listed from the code), run after the current i7-contact fixes land. Only the aliases where the executed opening changed are
+  judged.
+- **Adoption:** only where no alias regresses (a regression is reported first). The default flips in its own commit.
+
+**B. i7-fingertouch** (d7783b4b, af08d768: `ISPATIALGYM_FINGER_TOUCH_RULE` = spheres (default) | geometry).
+- **The A/B is re-run only where the rule acts:** aliases with approach_finger_support_touch (inside_large_03, the plate-in-sink variants,
+  under_small_03, and touching_03 once unblocked). It uses enough instances, or the same instances, to beat the ~15-point N 4 variance.
+- **Diagnosis:** the geometry arm's extra rejections (3 approach_untrackable on inside_large_03), checked against the spec's 2 mm rule.
+- **Adoption:** the default flips (own commit) only if geometry is no worse where it acts.
+
+**Merge order:** both land after i7-contact's current work; i7-braceopen together with i7-contact.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
