@@ -296,6 +296,34 @@ def support_policy_on() -> bool:
     return os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") not in ("", "0", "off", "false")
 
 
+#: i7-plateqtf2 2026-11-08 (owner decision 02:35 item 1, shared gate APPROVED): the support policy's sphere stage stays the fast conservative
+#: SCREEN; when it fails NARROWLY - only the hand's rigid links (palm / wrist camera / wrist: the links with exact hulls) touch, each sphere
+#: less than the model's sphere buffer (``contact_policy.MODEL_SPHERE_BUFFER_M``, 2 mm) deep, and only into the policed support (with the
+#: support out of the world they clear) - those links are judged by their EXACT hulls against the support plane instead, with at least
+#: :data:`HULL_FALLBACK_MIN_CLEARANCE_M` of real clearance. Non-finger links only: the fingers' 2 mm allowance (FingerTouch / rule 2) is
+#: unchanged. ``ISPATIALGYM_SUPPORT_HULL_FALLBACK`` = ``1`` on (the default) / ``shadow`` (judge and count, verdict unchanged) / ``0`` off.
+SUPPORT_HULL_FALLBACK_ENV = "ISPATIALGYM_SUPPORT_HULL_FALLBACK"
+SUPPORT_HULL_FALLBACK_DEFAULT = "1"  # i7-plateqtf2: the default after the count (owner item 1: "then make it the default in a separate commit")
+#: the real clearance the hull fallback requires (m): above the measured flatness of the supports it was diagnosed on (breakfast_table
+#: rhjoby: 8 pieces within 0.3 mm of the plane), below side_9's nominal 0.99 mm (``ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M``)
+HULL_FALLBACK_MIN_CLEARANCE_M = 0.0005  # == contact_policy.HULL_FALLBACK_MIN_CLEARANCE_M (the reusable check's default)
+
+
+def support_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`SUPPORT_HULL_FALLBACK_ENV`; unset = :data:`SUPPORT_HULL_FALLBACK_DEFAULT`)."""
+    v = (os.environ.get(SUPPORT_HULL_FALLBACK_ENV, "") or SUPPORT_HULL_FALLBACK_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    if v == "shadow":
+        return "shadow"
+    return "on"
+
+
+def support_hull_fallback_min_m() -> float:
+    v = os.environ.get("ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M", "").strip()
+    return float(v) if v else HULL_FALLBACK_MIN_CLEARANCE_M
+
+
 def registered_supports_only() -> bool:
     """of-v2maps 2026-11-07 (owner prompt "supports with protrusions": what counts as the support plane, the policy unchanged): the support
     policy polices only the supports whose plane the sampler REGISTERED (``IKChecker.support_plane_z``: a map hit's measured top, a tray floor,
@@ -719,8 +747,13 @@ class IKChecker:
         drop = [o for o in (approached or ()) if all(o is not sp for sp in supports)]
         with self.ignoring(drop):
             if not bool(self.kit.links_clear(q, others, CP.DEFAULT.sphere_support_margin_m)[0]):
-                out.update(ok=False, reason="non-finger link touches the support", stage="spheres")
-                return out
+                mode = support_hull_fallback_mode()
+                fb = self._hull_fallback(q, arm, others, supports, floors) if mode != "off" else None
+                if fb is not None:
+                    out["hull_fallback"] = fb
+                if fb is None or not fb["ok"] or mode == "shadow":
+                    out.update(ok=False, reason="non-finger link touches the support", stage="spheres")
+                    return out
         hc = getattr(self, "_hand_checker", None)
         if hc is None or hc.arm != arm:
             hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
@@ -756,6 +789,44 @@ class IKChecker:
             if not bool(ok[0]):
                 out.update(ok=False, reason=f"{reason[0]} on {name}")
                 return out
+        return out
+
+    def _hull_fallback(self, q: th.Tensor, arm: str, others: Sequence[str], supports: Sequence[Any], floors: set) -> Dict[str, Any]:
+        """The hull fallback of the sphere stage (:data:`SUPPORT_HULL_FALLBACK_ENV`, i7-plateqtf2 owner item 1), called inside the policy's
+        ignore context after the spheres of ``others`` failed: ``{"ok", "why", "hull_min_m", "links"}``. Narrow = every link but the hand's
+        rigid links clear at the policy's sphere margin, the hand's rigid links clear at that margin less the model's sphere buffer, and
+        clear at the full margin with the policed supports out of the world (the failure is the support's, not another obstacle's); then
+        their exact hulls (``contact_policy.HandChecker``: vertices + face samples) clear of every policed support's plane by
+        :func:`support_hull_fallback_min_m`. A floor support (rule 5) or a support without a plane never takes the fallback. Kit counters
+        ``support_policy.hull_fallback_passed`` / ``.hull_fallback_shadow_pass`` / ``.hull_fallback_failed.<why>``. The check itself is the
+        reusable ``contact_policy.hull_fallback`` (the links that failed, the geometry, the threshold)."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.oracle import r1pro_model as M
+
+        thr = support_hull_fallback_min_m()
+        if any(getattr(sp, "name", None) in floors for sp in supports):
+            out: Dict[str, Any] = {"ok": False, "why": "floor", "hull_min_m": None, "min_m": thr}
+        else:
+            planes = getattr(self, "support_plane_z", None)
+            tops = [support_plane_z(sp, planes) for sp in supports]
+            geometry = [CP.Support.plane(t, name=getattr(sp, "name", "support")) for sp, t in zip(supports, tops) if t is not None]
+            hc = getattr(self, "_hand_checker", None)
+            if hc is None or hc.arm != arm:
+                hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+            eef = self.kit.backend.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+            T = th.eye(4)
+            T[:3, :3] = _quat_mat(G.t(eef[1]).float())
+            T[:3, 3] = G.t(eef[0]).float()
+            fq = float(getattr(self, "_policy_opening", None) or float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean()))
+            out = CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(q, list(links), m)[0]), list(others), CP.DEFAULT.hand_rigid_links(arm), hc, T,
+                                   geometry if len(geometry) == len(tops) else [], threshold=thr, finger_q=(fq, fq),
+                                   margin=float(CP.DEFAULT.sphere_support_margin_m), geometry_out=lambda: self.ignoring(list(supports)))
+            if out["why"] == "no_geometry":
+                out["why"] = "no_plane"
+        if not out["ok"]:
+            self._count(f"support_policy.hull_fallback_failed.{out['why']}")
+            return out
+        self._count("support_policy.hull_fallback_shadow_pass" if support_hull_fallback_mode() == "shadow" else "support_policy.hull_fallback_passed")
         return out
 
     @contextmanager

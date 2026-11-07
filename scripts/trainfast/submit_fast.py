@@ -61,6 +61,20 @@ OFH = "/vision/u/minyeong/projects/isg_home/oracle_fix"
 V2_ROOT = os.path.join(OFH, "v2maps_20261106")  # glib/ (the library), maps/ (the reach maps), anchors.json, logs/
 GRASPS_V2 = {"ISPATIALGYM_GRASP_LIBRARY_V2": os.path.join(V2_ROOT, "glib"), "ISPATIALGYM_REACH_MAPS": os.path.join(V2_ROOT, "maps"),
              "ISPATIALGYM_REACH_MAP_ANCHORS": os.path.join(V2_ROOT, "anchors.json")}
+#: i7-plateqtf2 (owner decision 2026-11-08 02:35 item 5): the campaign's merged reach-map overlay (v2/map_tilt.py; <root>/<map key>/v<N>.json,
+#: releases <root>/releases/r<M>.json written by every offline merge). --map-overlay <root> pins the root's LATEST RELEASE into job.env
+#: (ISPATIALGYM_MAP_OVERLAY + ISPATIALGYM_MAP_OVERLAY_RELEASE): the job reads exactly those versions, whatever is merged meanwhile.
+MAP_OVERLAY_ROOT = os.path.join(OFH, "map_overlay")
+MAP_OVERLAY_DEFAULT = MAP_OVERLAY_ROOT  # i7-plateqtf2: ON by default (owner item 5, separate commit); --map-overlay off = none
+
+
+def overlay_release(root):
+    """The newest release number under an overlay root (0: none - the job then reads no overlay). Same rule as map_tilt.latest_release
+    (this script runs on the login node's python, without the package)."""
+    import glob as _glob
+
+    ns = [int(os.path.basename(p)[1:-5]) for p in _glob.glob(os.path.join(root, "releases", "r*.json")) if os.path.basename(p)[1:-5].isdigit()]
+    return max(ns) if ns else 0
 
 
 #: of-v2maps 2026-11-07 (owner: sampler jobs on shiyuc's GPUs too; shiyuc writes ONLY under this folder): submit --shiyuc - run as
@@ -244,12 +258,18 @@ def submit(a):
         # i7-memory (owner 2026-11-08 part C, unattended): the per-alias outcome memory version this job's sampler reads (train only)
         env["ISPATIALGYM_ALIAS_MEMORY"] = alias_memory_pin(a)
         env["ISPATIALGYM_ALIAS_MEMORY_ALIAS"] = a.key
+        ov_root = getattr(a, "map_overlay", None) or "off"
+        if a.grasps in ("v2", "v2only") and ov_root != "off":
+            # i7-plateqtf2 item 5: the reach maps' merged overlay, pinned to the root's latest release at submission (job.env is the record)
+            if not os.path.isdir(ov_root):
+                raise SystemExit(f"--map-overlay {ov_root}: no such directory (or --map-overlay off)")
+            env.update({"ISPATIALGYM_MAP_OVERLAY": os.path.abspath(ov_root), "ISPATIALGYM_MAP_OVERLAY_RELEASE": str(overlay_release(ov_root))})
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
         if getattr(a, "shiyuc", False):
             env.update(shiyuc_env(a))  # after --extra-env: no override moves a write out of SY
-            for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS", "ISPATIALGYM_REACH_MAP_ANCHORS", "TEMPLATE", "EVAL_INDEX"):
+            for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS", "ISPATIALGYM_REACH_MAP_ANCHORS", "TEMPLATE", "EVAL_INDEX", "ISPATIALGYM_MAP_OVERLAY"):
                 if env.get(k) and not os.access(env[k], os.R_OK):
                     raise SystemExit(f"--shiyuc: {k}={env[k]} is not readable by this account (stage a copy under {SY})")
             for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS"):  # every file of the v2 data (minyeong's are mode 600)
@@ -285,6 +305,7 @@ def submit(a):
         print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
               f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect} customs={customs} "
               f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root} alias_memory={env['ISPATIALGYM_ALIAS_MEMORY']}"
+              + (f" map_overlay={env['ISPATIALGYM_MAP_OVERLAY']}@r{env.get('ISPATIALGYM_MAP_OVERLAY_RELEASE', '?')}" if env.get("ISPATIALGYM_MAP_OVERLAY") else "")
               + (f" memory_job={mem_id}" if mem_id else ""))
     finally:
         unlock(lock)
@@ -398,6 +419,9 @@ def main():
     s.add_argument("--base-index", type=int, default=BASE_INDEX, help="first train index per alias in this ledger")
     s.add_argument("--v2-root", default=None, help="with --grasps v2 / v2only: the v2 data root (default V2_ROOT, v2maps_20261106)")
     s.add_argument("--shiyuc", action="store_true", help="run as shiyuc: every write under " + SY + " (shiyuc_env); --root / --base-index / --v2-root there")
+    s.add_argument("--map-overlay", default=MAP_OVERLAY_DEFAULT,
+                   help=f"with --grasps v2 / v2only: the merged reach-map overlay root, pinned to its latest release in job.env; 'off' = none "
+                        f"(default {MAP_OVERLAY_DEFAULT}; the campaign root is {MAP_OVERLAY_ROOT})")
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     s.add_argument("--alias-memory", default="auto",

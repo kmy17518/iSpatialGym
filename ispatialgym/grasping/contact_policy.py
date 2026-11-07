@@ -49,6 +49,11 @@ POLICY_NAME = "isg-support-contact"
 
 REASONS = ("ok", "finger_penetration", "palm_contact", "wrist_camera_contact", "wrist_contact", "link_sphere_contact", "obstacle_contact")
 ROLE_REASON = {"palm": "palm_contact", "wrist_camera": "wrist_camera_contact", "wrist": "wrist_contact"}
+#: the robot model's cuRobo sphere buffer (``r1pro_model.build_curobo_robot_dict(collision_sphere_buffer=0.002)``, the value of OmniGibson's
+#: shipped ``r1pro_description_curobo_default.yaml``): ONE global padding of every collision sphere of every link, used by every cuRobo
+#: query (planner, IK, the sampler's checks) - not a margin the contact policy chose for the non-finger links (its own sphere margin is
+#: ``sphere_support_margin_m`` = 0); i7-plateqtf2 2026-11-08 (owner item 1): the hull fallback's "narrow" bound
+MODEL_SPHERE_BUFFER_M = 0.002
 #: i7-lean 2026-11-07: the clearance every robot part keeps from a NORMAL obstacle box (the lean board, an interior's board above / side
 #: walls / back panel) - no allowance for any part, the fingers included (they touch only the policed support, rule 2)
 OBSTACLE_MARGIN_M = 0.0
@@ -274,6 +279,74 @@ def sphere_support_ok(spheres_world: th.Tensor, link_of_sphere: Sequence[str], s
     ok = worst.values >= policy.sphere_support_margin_m - 1e-9
     links = [None if bool(o) else link_of_sphere[int(i)] for o, i in zip(ok.tolist(), worst.indices.tolist())]
     return ok, links
+
+
+# ------------------------------------------------------------------------------------------------ the hull fallback (i7-plateqtf2)
+
+#: the hand roles with exact hulls the hull fallback judges (``HandChecker`` roles; the fingers keep rule 2)
+HULL_FALLBACK_ROLES = ("palm", "wrist_camera", "wrist")
+#: the real clearance the hull fallback requires by default (m; ``ik.HULL_FALLBACK_MIN_CLEARANCE_M`` is this value)
+HULL_FALLBACK_MIN_CLEARANCE_M = 0.0005
+
+
+def narrow_sphere_failure(links_clear, failed_links: Sequence[str], hand_links: Sequence[str], margin: float = 0.0,
+                          buffer: float = MODEL_SPHERE_BUFFER_M, geometry_out=None) -> Optional[str]:
+    """i7-plateqtf2 2026-11-08 (owner item 1; reused by i7-t03): whether a sphere-check failure of ``failed_links`` is NARROW - None when
+    it is, else why not. ``links_clear(links, margin) -> bool`` is the caller's sphere query (e.g. ``RobotKit.links_clear`` at one
+    configuration, against the world the failure was found in); ``hand_links`` the links with exact hulls (:meth:`ContactPolicy.
+    hand_rigid_links`). Narrow = (a) every failed link without an exact hull clear at ``margin`` (``non_hand_link``), (b) the hand links
+    clear at ``margin - buffer`` (each sphere less than the model's sphere buffer deep: ``deeper_than_buffer``), (c) with
+    ``geometry_out()`` (a context manager taking the judged support / obstacle out of the sphere world) the hand links clear at ``margin``
+    (the touch is that geometry's: ``other_obstacle``). ``no_hand_link`` when no failed link has a hull."""
+    hand = [l for l in failed_links if l in set(hand_links)]
+    rest = [l for l in failed_links if l not in set(hand)]
+    if not hand:
+        return "no_hand_link"
+    if rest and not bool(links_clear(rest, margin)):
+        return "non_hand_link"
+    if not bool(links_clear(hand, margin - buffer)):
+        return "deeper_than_buffer"
+    if geometry_out is not None:
+        with geometry_out():
+            if not bool(links_clear(hand, margin)):
+                return "other_obstacle"
+    return None
+
+
+def hull_clearance_min(checker: "HandChecker", T_eef, geometry: Sequence[Support], finger_q: Tuple[float, float] = (0.05, 0.05),
+                       roles: Sequence[str] = HULL_FALLBACK_ROLES) -> float:
+    """The smallest exact-hull clearance (m) of the hand ``roles`` at the eef pose ``T_eef`` (one 4x4) to any of ``geometry`` (support
+    planes or boxes: a split-off support piece is a box) - ``+inf`` without geometry."""
+    worst = float("inf")
+    for sp in geometry:
+        cl = checker.clearance(T_eef, sp, finger_q)
+        worst = min(worst, *(float(cl[r][0]) for r in roles))
+    return worst
+
+
+def hull_fallback(links_clear, failed_links: Sequence[str], hand_links: Sequence[str], checker: "HandChecker", T_eef, geometry: Sequence[Support],
+                  threshold: float = HULL_FALLBACK_MIN_CLEARANCE_M, finger_q: Tuple[float, float] = (0.05, 0.05), margin: float = 0.0,
+                  buffer: float = MODEL_SPHERE_BUFFER_M, geometry_out=None, roles: Sequence[str] = HULL_FALLBACK_ROLES) -> Dict[str, object]:
+    """i7-plateqtf2 2026-11-08 (owner decision item 1): the padded sphere check stays the screen; a NARROW failure
+    (:func:`narrow_sphere_failure`) is judged by the hand's exact hulls against ``geometry`` with at least ``threshold`` of real clearance
+    (:func:`hull_clearance_min`). Inputs: the sphere query and the links that failed, the hand links with hulls, the hull checker, the eef
+    pose, the support / obstacle geometry, the threshold. ``{"ok", "why" ("" | no_hand_link | non_hand_link | deeper_than_buffer |
+    other_obstacle | no_geometry | hull_clearance), "hull_min_m", "min_m"}``. The fingers are not judged here (rule 2 stays the caller's)."""
+    out: Dict[str, object] = {"ok": False, "why": "", "hull_min_m": None, "min_m": float(threshold)}
+    why = narrow_sphere_failure(links_clear, failed_links, hand_links, margin, buffer, geometry_out)
+    if why is not None:
+        out["why"] = why
+        return out
+    if not geometry:
+        out["why"] = "no_geometry"
+        return out
+    worst = hull_clearance_min(checker, T_eef, geometry, finger_q, roles)
+    out["hull_min_m"] = round(worst, 5)
+    if worst < float(threshold) - 1e-9:
+        out["why"] = "hull_clearance"
+        return out
+    out["ok"] = True
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ paths
