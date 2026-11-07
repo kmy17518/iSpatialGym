@@ -786,15 +786,23 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
             o_all[sel] = _hc(T[sel], sb, (v, v), sel, obs)
         return o_all
 
+    sphere_hits: Dict[str, int] = {}  # i7-lean: an interior map's post-IK sphere failures by link (board / obstacles), per map
+
     def spheres_ok(sph, ln, sb_, pid=None, obs_=()):
         """``contact_policy.sphere_support_ok`` against the map's support (floor: the ground-contact links scoped out); an interior map's
-        problems ``pid``: in their compartment frame, every sphere also clear of the normal obstacles ``obs_`` (i7-lean)."""
+        problems ``pid``: in their compartment frame, every sphere also clear of the normal obstacles ``obs_`` (i7-lean; the failing links
+        are counted in ``sphere_hits``)."""
         if yc_dev is not None and pid is not None:
             sph = sph.clone()
             sph[..., 1] -= yc_dev[pid].to(sph.device)[:, None]
         ok, worst = CP.sphere_support_ok(sph, ln, sb_, cfg.arm, policy, ground_contact_links=ground_links, floor_support=floor)
         if obs_:
-            ok_o, _ = CP.spheres_clear(sph, ln, obs_)
+            ok_o, worst_o = CP.spheres_clear(sph, ln, obs_)
+            if pid is not None:
+                for w, o, wo in zip(worst, ok_o.tolist(), worst_o):
+                    if w or not o:
+                        k = f"board:{w}" if w else f"obstacle:{wo}"
+                        sphere_hits[k] = sphere_hits.get(k, 0) + 1
             ok = ok & ok_o.to(ok.device)
         return ok, worst
 
@@ -836,8 +844,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         key = f"t{tr:.2f}_k{ti:+.1f}"
         rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
         status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
-        # eligibility: the first idle-arm posture free of self-collision and of the slab at every d_e (support factor, shared by objects)
+        # eligibility: the first idle-arm posture free of self-collision and of the slab at every d_e (support factor, shared by objects).
+        # i7-lean 2026-11-07 (inside_large_scale_02): a FIXED compartment (an interior map at a stable rest) also judges the posture against its
+        # obstacles (the open door, the walls, the board above) - among the postures free of the board at every d_e, the first free of the
+        # obstacles at the most d_e (the stance C order untucked / ready / tucked; the untucked idle arm stood in the fridge's open door)
         posture, q_lock = None, None
+        best_obs = -1
         for p in cfg.postures:
             q = world.q_config(tr, ti, p)
             free = not bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0])
@@ -845,10 +857,20 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 continue
             sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
             slab_free = [bool(spheres_ok(sph, ln, map_support(kind, height, d_e, cfg, interior))[0][0]) for d_e in cfg.edge_distances]
-            if all(slab_free):
+            if not all(slab_free):
+                rec.setdefault("slab_collide_by_posture", {})[p] = slab_free
+                continue
+            if lateral_fit is None:
                 posture, q_lock = p, q
                 break
-            rec.setdefault("slab_collide_by_posture", {})[p] = slab_free
+            sph_c = th.as_tensor(sph, dtype=th.float32).clone()
+            sph_c[..., 1] -= float(interior.centre_y_m)
+            obs_free = [bool(CP.spheres_clear(sph_c, ln, map_obstacles(kind, height, d_e, interior))[0][0]) for d_e in cfg.edge_distances]
+            rec.setdefault("obstacle_free_by_posture", {})[p] = obs_free
+            if sum(obs_free) > best_obs:
+                best_obs, posture, q_lock = sum(obs_free), p, q
+            if all(obs_free):
+                break
         rec["posture"] = posture
         if q_lock is None:
             rec["eligible"] = False
@@ -1024,6 +1046,7 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     if interior_kind:
         # i7-lean 2026-11-07: the compartment and the lean rest are part of the identity (map_key, ReachMap.find)
         meta["plane"] = PLANE_OF_KIND["interior"]
+        meta["interior_sphere_hits"] = dict(sorted(sphere_hits.items(), key=lambda kv: -kv[1])[:12])
         meta["slab"] = None
         meta["interior"] = interior.to_json()
         if lean_placed:

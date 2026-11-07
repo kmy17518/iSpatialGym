@@ -26,6 +26,61 @@
     "assumed": "long_m 1.2: the support board and the board above as one span centred on the compartment (the case is 1.207 wide, three cubes: exact for the centre cube, the side cubes' outer side is 0.05 m); the cubes below / above the boards and the adjacent cubes are not modelled; the walls span board to board above"
    }
   },
+  "fridge_petcxr_0@0.7064/j_left_door2.3": {
+   "height_m": 0.7064,
+   "depth_m": 0.577,
+   "width_m": 0.3423,
+   "headroom_m": 0.2434,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3823,
+   "board_setback_m": 0.2309,
+   "back_thickness_m": 0.02,
+   "centre_y_m": 0.0049,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "joints": {
+    "j_left_door": 2.3
+   },
+   "extra_boxes": [
+    {
+     "name": "door_left_door",
+     "centre": [
+      -0.0287,
+      0.3629,
+      0.3407
+     ],
+     "half": [
+      0.143,
+      0.2182,
+      0.9922
+     ],
+     "yaw": 0.8416
+    }
+   ],
+   "supports": [
+    [
+     "house_double_floor_lower",
+     "fridge_petcxr_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_lower/fridge_petcxr_0 raster edge +u at 0.7064 (requested 0.700 +- 0.03), 346 board cells, open edges ['+u'], front plane 0.2409 m out (static AABB overhang), wall rays 0.17600856721401215 / 0.16626763343811035, back ray 0.3260960578918457, moved links ['left_door', 'meta__left_door_lights_0_0_link', 'meta__left_door_lights_1_0_link']",
+    "joints_settled": {
+     "j_left_door": 2.3
+    },
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "run": "interiors measure on trunk_893d7e61 (coordinator, 2026-11-07): $OFH/fridge_maps_20261107/interiors.json"
+   }
+  },
   "bookcase_jaysra_0@0.9472": {
    "height_m": 0.9472,
    "depth_m": 0.3323,

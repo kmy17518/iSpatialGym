@@ -14,6 +14,9 @@ the floor, +x ahead, +y the robot's left, z up from the floor), the compartment'
 * ``extra_boxes`` (i7-lean 2026-11-07, the fridge) - further NORMAL obstacles as oriented boxes ``(name, centre, half, yaw)`` in the
   compartment frame (x from the front plane into the compartment, y from the compartment's lateral centre, z from the board top, yaw
   about z): an OPEN DOOR at the spec's ``joints`` (the support's joint values the spec was measured at, e.g. ``j_left_door`` 2.3);
+* an OPEN-TOP basin (i7-lean 2026-11-07, inside_large_scale_03's drop-in sink): ``open_top`` (no board above), ``rim_m`` (the walls' height
+  above the board; None = up to the board above), ``front_wall_x_m`` (a front wall whose inner face is that far behind the front plane;
+  None = an open front) - fields left out of the digest while unset, so the specs before them keep their digests;
 * ``edge_distances`` - the stand-offs (base to the front plane) its maps are computed at, ``centre_y_m`` - where a STABLE rest's map puts
   the compartment's lateral centre in the base frame (0: a stance square to the opening's centre; a LEAN rest's compartment follows
   the cell instead);
@@ -73,15 +76,26 @@ class InteriorSpec:
     edge_distances: Tuple[float, ...] = (0.35, 0.45, 0.55)
     joints: Tuple[Tuple[str, float], ...] = ()
     extra_boxes: Tuple[Tuple[str, Tuple[float, float, float], Tuple[float, float, float], float], ...] = ()
+    rim_m: Optional[float] = None
+    front_wall_x_m: Optional[float] = None
+    open_top: bool = False
     supports: Tuple[Tuple[str, str], ...] = ()
     source: Dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
 
     def geometry(self) -> Dict[str, Any]:
         g = {k: (None if getattr(self, k) is None else round(float(getattr(self, k)), 4)) for k in GEOMETRY_FIELDS}
-        return {"schema": SCHEMA, **g, "open_sides": self.open_sides, "edge_distances": [round(float(v), 4) for v in self.edge_distances],
-                "joints": {k: round(float(v), 4) for k, v in self.joints},
-                "extra_boxes": [{"name": n, "centre": [round(float(v), 4) for v in c], "half": [round(float(v), 4) for v in h], "yaw": round(float(y), 4)}
-                                for n, c, h, y in self.extra_boxes]}
+        out = {"schema": SCHEMA, **g, "open_sides": self.open_sides, "edge_distances": [round(float(v), 4) for v in self.edge_distances],
+               "joints": {k: round(float(v), 4) for k, v in self.joints},
+               "extra_boxes": [{"name": n, "centre": [round(float(v), 4) for v in c], "half": [round(float(v), 4) for v in h], "yaw": round(float(y), 4)}
+                               for n, c, h, y in self.extra_boxes]}
+        # i7-lean: the open-top fields only when set (the digests of the specs before them stay)
+        if self.rim_m is not None:
+            out["rim_m"] = round(float(self.rim_m), 4)
+        if self.front_wall_x_m is not None:
+            out["front_wall_x_m"] = round(float(self.front_wall_x_m), 4)
+        if self.open_top:
+            out["open_top"] = True
+        return out
 
     @property
     def joint_values(self) -> Dict[str, float]:
@@ -89,7 +103,14 @@ class InteriorSpec:
 
     @property
     def open_sides(self) -> List[str]:
+        if self.open_top:
+            return ["top"] + (["front"] if self.front_wall_x_m is None else []) + (["back"] if self.back_thickness_m is None else [])
         return ["front"] + (["back"] if self.back_thickness_m is None else [])
+
+    @property
+    def wall_height_m(self) -> float:
+        """The side / back / front walls' height above the board: the rim of an open-top basin, else the headroom (board to board above)."""
+        return float(self.rim_m) if self.rim_m is not None else float(self.headroom_m)
 
     def digest(self) -> str:
         from ispatialgym.grasping import schema as S
@@ -108,6 +129,10 @@ class InteriorSpec:
         kw["joints"] = tuple(sorted((str(k), float(v)) for k, v in (d.get("joints") or {}).items()))
         kw["extra_boxes"] = tuple((str(b["name"]), tuple(float(v) for v in b["centre"]), tuple(float(v) for v in b["half"]), float(b.get("yaw", 0.0)))
                                   for b in (d.get("extra_boxes") or []))
+        for k in ("rim_m", "front_wall_x_m"):
+            if d.get(k) is not None:
+                kw[k] = float(d[k])
+        kw["open_top"] = bool(d.get("open_top", False))
         return InteriorSpec(name=str(name or d.get("name") or "interior"), supports=tuple(tuple(s) for s in d.get("supports", [])),
                             source=dict(d.get("source") or {}), **kw)
 
@@ -123,14 +148,24 @@ class InteriorSpec:
         xb = float(d_e) + 0.5 * (float(self.board_setback_m) + float(self.depth_m))  # the boards start board_setback_m behind the front
         hb = 0.5 * (float(self.depth_m) - float(self.board_setback_m))
         hr = float(self.headroom_m)
-        out = [("board", CP.Support.box([xb, 0.0, h - 0.5 * self.board_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.board_thickness_m], name="interior_board")),
-               ("above", CP.Support.box([xb, 0.0, h + hr + 0.5 * self.top_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.top_thickness_m], name="interior_above"))]
+        hw = self.wall_height_m  # the walls: up to the board above, or to an open-top basin's rim
+        out = [("board", CP.Support.box([xb, 0.0, h - 0.5 * self.board_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.board_thickness_m], name="interior_board"))]
+        if not self.open_top:
+            out.append(("above", CP.Support.box([xb, 0.0, h + hr + 0.5 * self.top_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.top_thickness_m], name="interior_above")))
         for nm, sg in (("wall_left", 1.0), ("wall_right", -1.0)):
-            out.append((nm, CP.Support.box([x, sg * (0.5 * self.width_m + 0.5 * self.wall_thickness_m), h + 0.5 * hr],
-                                           [hd, 0.5 * self.wall_thickness_m, 0.5 * hr], name=f"interior_{nm}")))
+            out.append((nm, CP.Support.box([x, sg * (0.5 * self.width_m + 0.5 * self.wall_thickness_m), h + 0.5 * hw],
+                                           [hd, 0.5 * self.wall_thickness_m, 0.5 * hw], name=f"interior_{nm}")))
         if self.back_thickness_m is not None:
-            out.append(("back", CP.Support.box([float(d_e) + float(self.depth_m) + 0.5 * self.back_thickness_m, 0.0, h + 0.5 * hr],
-                                               [0.5 * self.back_thickness_m, 0.5 * self.width_m + self.wall_thickness_m, 0.5 * hr], name="interior_back")))
+            out.append(("back", CP.Support.box([float(d_e) + float(self.depth_m) + 0.5 * self.back_thickness_m, 0.0, h + 0.5 * hw],
+                                               [0.5 * self.back_thickness_m, 0.5 * self.width_m + self.wall_thickness_m, 0.5 * hw], name="interior_back")))
+        if self.front_wall_x_m is not None:
+            # an open-top basin's near wall: its inner face front_wall_x_m behind the front plane, from the front plane (at least wall_thickness_m
+            # thick), from the board's underside to the rim
+            fi = float(self.front_wall_x_m)
+            t = max(float(self.wall_thickness_m), fi)
+            zb, zt = h - float(self.board_thickness_m), h + hw
+            out.append(("front", CP.Support.box([float(d_e) + fi - 0.5 * t, 0.0, 0.5 * (zb + zt)], [0.5 * t, 0.5 * self.width_m + self.wall_thickness_m, 0.5 * (zt - zb)],
+                                                name="interior_front")))
         for nm, c, hf, yaw in self.extra_boxes:  # the open door(s): oriented, at the spec's joint values
             out.append((nm, CP.Support.box([float(d_e) + float(c[0]), float(c[1]), float(h) + float(c[2])], [float(v) for v in hf], yaw=float(yaw),
                                            name=f"interior_{nm}")))
@@ -266,6 +301,16 @@ def summary(specs: Sequence[InteriorSpec]) -> List[Dict[str, Any]]:
 
 #: the counted AABB overhang of a support beyond its raster edge (``iors_large_inside.overhang``): the front plane is that far out
 OVERHANG_MIN_M = 0.05
+#: a compartment is an OPEN-TOP basin when its walls stop at least this far below what sits above the board (the headroom): a sink under
+#: a cabinet has a 0.67 m headroom and a ~0.2 m rim (the headroom alone - at its cap only when nothing is above - misses it)
+OPEN_TOP_GAP_M = 0.10
+#: the rim search: 1 cm steps up to this height above the board (and 1 cm under the headroom), rays this long
+RIM_SEARCH_MAX_M = 0.80
+RIM_RAY_M = 0.60
+#: an object above an open-top basin is an obstacle box when its bottom is below this height above the floor (the arm's reach)
+OVERHEAD_MAX_Z_M = 1.90
+#: an overhead obstacle box is clipped to this margin around the compartment (a large cabinet / shelf over the sink)
+OVERHEAD_CLIP_M = 0.60
 
 
 def compartment_frame(mid, inward) -> Tuple[Any, Any, Any]:
@@ -308,7 +353,7 @@ def link_yaw_in(link_quat_xyzw, tangent) -> float:
 
 def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Optional[str] = None, joints: Optional[Dict[str, float]] = None,
             moved_links: Sequence[str] = (), edge_distances: Sequence[float] = (0.35, 0.45, 0.55), z_margin: float = 0.03, thickness_m: float = 0.02,
-            static_aabb=None) -> InteriorSpec:
+            static_aabb=None, side=None, open_top: Optional[bool] = None, door_boxes: str = "pieces") -> InteriorSpec:
     """The :class:`InteriorSpec` of ``support``'s compartment at ``z_surface`` (m above the floor) in the live ``world`` (``SimWorld``; the
     support's joints already set to ``joints``, e.g. by ``reach_bands.apply_support_joints``). Measured, in the compartment frame of the
     open raster edge ``edge`` (default the first open edge; origin = its midpoint moved out to the front plane, the support's static AABB
@@ -320,7 +365,16 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     open). Every OTHER link in ``moved_links`` (the open doors: the links ``partner_joint_init`` moved) is an extra NORMAL obstacle: its
     collision meshes' points (``mesh.points_in_parent_frame`` through ``link.scaled_transform``: the articulation at the joint values)
     in the compartment frame, boxed along the link's own x axis turned into that frame (a door hinged on a vertical axis stays an oriented
-    box). Thicknesses not measured (boards, walls, back) are ``thickness_m``."""
+    box). Thicknesses not measured (boards, walls, back) are ``thickness_m``. OPEN-TOP basins (i7-lean 2026-11-07): the walls' top is the
+    highest height (1 cm steps up to :data:`RIM_SEARCH_MAX_M` and 1 cm under the headroom) at which a horizontal ray (:data:`RIM_RAY_M`) from
+    the cells' centre still meets the support toward the left, the right or the robot; the compartment is open-top when that rim is at least
+    :data:`OPEN_TOP_GAP_M` under the headroom (``open_top`` True / False overrides) - then ``rim_m`` is it, the near wall's inner face
+    (``front_wall_x_m``) a ray toward the robot at half the rim, and the body the up rays meet above the board (a cabinet over the sink) an
+    extra obstacle box ``above_<object>`` (its AABB in the compartment frame, clipped :data:`OVERHEAD_CLIP_M` around the compartment) when its
+    bottom is under :data:`OVERHEAD_MAX_Z_M`. ``side`` (a world xy direction, the stance side) picks the raster edge whose outward normal
+    faces it when no raster edge is open. ``door_boxes`` "pieces" (default since 2026-11-07 15:5x: one box per collision piece of a moved
+    link - the fridge door's single box with its bins, 0.29 x 0.44 x 1.98 m, held the idle shoulder at every near stand-off) or "link" (one
+    box over the link's pieces: the registered fridge spec's)."""
     import math
 
     import torch as th
@@ -332,8 +386,11 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     edges = {n: (mid, normal, length) for n, mid, normal, length in itop.edges()}
     open_e = list(getattr(itop, "open_edges", []) or [])
     en = edge or (open_e[0] if open_e else None)
+    if en is None and side is not None:
+        sv = th.as_tensor(side, dtype=th.float32)[:2]
+        en = max(edges, key=lambda n: float(th.as_tensor(edges[n][1], dtype=th.float32)[:2] @ sv))  # the outward normal facing the side
     if en is None or en not in edges:
-        raise RuntimeError(f"{support.name}: no open raster edge at {float(itop.z):.3f} (open {open_e}, asked {edge!r})")
+        raise RuntimeError(f"{support.name}: no open raster edge at {float(itop.z):.3f} (open {open_e}, asked {edge!r}; pass side for an open-top basin)")
     mid0, outward, _length = edges[en]
     mid, inward, tangent = compartment_frame(mid0, -th.as_tensor(outward, dtype=th.float32)[:2])
     lo, hi = static_aabb if static_aabb is not None else support.aabb
@@ -347,7 +404,7 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     res = float(itop.resolution)
     hr = float(th.as_tensor(itop.headroom)[th.as_tensor(itop.mask)].median()) + RASTER_HEADROOM_OFFSET_M
     zb = float(itop.z)
-    z_mid = zb + 0.5 * hr
+    z_mid = zb + 0.5 * min(hr, 0.3)
     paths = tuple(str(lk.prim_path) for lk in support.links.values())
 
     def ray(p0_xy, dir_xy, reach: float, z: float) -> Optional[float]:
@@ -361,12 +418,33 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     d_mid = 0.5 * (float(d.min()) + float(d.max()))
     lc0 = 0.5 * (float(l.min()) + float(l.max()))
     p_c = origin + inward * d_mid + tangent * lc0
+    front_x = None
+    # the walls' top: the highest 1 cm step (under the headroom) at which a short ray from the cells' centre still meets the support toward the
+    # left, the right or the robot (not the back: a faucet behind a basin is no wall); open-top when it is well under the headroom
+    top = 0.0
+    for k in range(1, int(round(min(hr - 0.01, RIM_SEARCH_MAX_M) / 0.01)) + 1):
+        z = zb + 0.01 * k
+        if any(ray(p_c, dv, RIM_RAY_M, z) is not None for dv in (tangent, -tangent, -inward)):
+            top = 0.01 * k
+    rim_found = round(top, 4) if top > 0 else None
+    auto_open = rim_found is not None and rim_found < hr - OPEN_TOP_GAP_M
+    open_top = auto_open if open_top is None else bool(open_top)
+    rim = rim_found if open_top else None
+    if open_top:
+        z_mid = zb + 0.5 * (rim or 0.1)
     left, right = ray(p_c, tangent, 1.5, z_mid), ray(p_c, -tangent, 1.5, z_mid)
     if left is not None and right is not None:
         width, lc = left + right, lc0 + 0.5 * (left - right)
     else:
         width, lc = float(l.max() - l.min()) + res, lc0
-    back = ray(origin + tangent * lc + inward * (front + 0.01), inward, float(d.max()) + 0.10 + res, z_mid)
+    if open_top:
+        # a basin: the back from the cells' centre (the front plane may lie inside the basin's flange), the near wall toward the robot
+        b2 = ray(origin + inward * d_mid + tangent * lc, inward, 1.5, z_mid)
+        f2 = ray(origin + inward * d_mid + tangent * lc, -inward, 1.5, z_mid)
+        back = None if b2 is None else (d_mid + b2) - (front + 0.01)
+        front_x = None if f2 is None else round(d_mid - f2, 4)
+    else:
+        back = ray(origin + tangent * lc + inward * (front + 0.01), inward, float(d.max()) + 0.10 + res, z_mid)
     opposite = {"+u": "-u", "-u": "+u", "+v": "-v", "-v": "+v"}.get(en)
     closed = back is not None and opposite not in open_e
     depth = (front + 0.01 + back) if closed else float(d.max()) + 0.5 * res
@@ -389,16 +467,51 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
         if not pts:
             a, b = (th.as_tensor(v, dtype=th.float32) for v in link.aabb)
             pts = [th.tensor([[float(x), float(y), float(z)] for x in (a[0], b[0]) for y in (a[1], b[1]) for z in (a[2], b[2])])]
-        W = th.cat(pts)
-        Pc = th.stack([(W[:, :2] - origin) @ inward, (W[:, :2] - origin) @ tangent - lc, W[:, 2] - zb], dim=1).numpy()
         yaw = link_yaw_in(link.get_position_orientation()[1].numpy(), tangent.numpy())
-        ctr, half = oriented_box(Pc, yaw)
-        extra.append((f"door_{link_name}", ctr, half, yaw))
+        groups = pts if door_boxes == "pieces" else [th.cat(pts)]
+        for k, W in enumerate(groups):
+            Pc = th.stack([(W[:, :2] - origin) @ inward, (W[:, :2] - origin) @ tangent - lc, W[:, 2] - zb], dim=1).numpy()
+            ctr, half = oriented_box(Pc, yaw)
+            extra.append((f"door_{link_name}" + (f"_{k}" if len(groups) > 1 else ""), ctr, half, yaw))
+    overhead = None
+    if open_top:
+        # what the up rays meet above the board (a cabinet / shelf over the sink): its link's AABB, an obstacle when within the arm's reach
+        prim_link = {}
+        for o in world.scene.objects:
+            for lk in o.links.values():
+                prim_link[str(lk.prim_path)] = (o, lk)
+        robot_paths = tuple(str(lk.prim_path) for lk in getattr(getattr(world, "robot", None), "links", {}).values())
+        seen: Dict[str, int] = {}
+        for c in cells[:: max(1, len(cells) // 9)]:
+            s0 = [float(c[0]), float(c[1]), zb + 0.005]
+            h = world.raycast(th.tensor([s0]), th.tensor([[s0[0], s0[1], zb + 0.005 + 2.0]]))[0]
+            body = str(h.get("rigidBody", "")) if h.get("hit") else ""
+            if body and not body.startswith(robot_paths) and body in prim_link:
+                seen[body] = seen.get(body, 0) + 1
+        if seen:
+            body = max(seen, key=seen.get)
+            o, lk = prim_link[body]
+            a, b = (th.as_tensor(v, dtype=th.float32) for v in lk.aabb)
+            if float(a[2]) < OVERHEAD_MAX_Z_M + floor_z:
+                W = th.tensor([[float(x), float(y), float(z)] for x in (a[0], b[0]) for y in (a[1], b[1]) for z in (a[2], b[2])])
+                Pc = th.stack([(W[:, :2] - origin) @ inward, (W[:, :2] - origin) @ tangent - lc, W[:, 2] - zb], dim=1)
+                lo_c, hi_c = Pc.min(dim=0).values, Pc.max(dim=0).values
+                cl = OVERHEAD_CLIP_M
+                lo_c = th.stack([lo_c[0].clamp(min=-cl), lo_c[1].clamp(min=-(0.5 * width + cl)), lo_c[2]])
+                hi_c = th.stack([hi_c[0].clamp(max=depth + cl), hi_c[1].clamp(max=0.5 * width + cl), hi_c[2].clamp(max=float(lo_c[2]) + 1.0)])
+                ctr = tuple(round(float(v), 4) for v in 0.5 * (lo_c + hi_c))
+                half = tuple(round(float(v), 4) for v in 0.5 * (hi_c - lo_c))
+                if all(v > 0 for v in half):
+                    extra.append((f"above_{o.name}", ctr, half, 0.0))
+                    overhead = {"object": o.name, "link": getattr(lk, "name", None), "bottom_above_board_m": round(float(a[2]) - zb, 4),
+                                "bottom_above_floor_m": round(float(a[2]) - floor_z, 4), "rays": seen[body]}
     joints_set = OJ.joint_dict(support) if joints else {}
     src = {"measured": f"interiors.measure: {scene}/{support.name} raster edge {en} at {zb:.4f} (requested {float(z_surface):.3f} +- {z_margin}), "
                        f"{int(itop.mask.sum())} board cells, open edges {open_e}, front plane {front:.4f} m out (static AABB overhang), "
-                       f"wall rays {left} / {right}, back ray {back}, moved links {list(moved_links)}",
-           "joints_settled": {k: round(float(joints_set.get(k, v)), 4) for k, v in (joints or {}).items()},
+                       f"wall rays {left} / {right}, back ray {back}, moved links {list(moved_links)}, wall rim {rim_found} vs headroom {hr:.4f} "
+                       f"(open top {open_top}{'' if auto_open == open_top else ', overridden'})",
+           **({"overhead": overhead} if overhead else {}),
+           "joints_settled": {k: round(float(joints_set.get(k, v)), 4) for k, v in (joints or {}).items()}, "door_boxes": door_boxes,
            "assumed": f"board / board above / walls / back thickness {thickness_m} m; long_m = the walls' outer span"}
     return InteriorSpec(name=name, height_m=round(zb - floor_z, 4), depth_m=round(depth, 4), width_m=round(width, 4), headroom_m=round(hr, 4),
                         board_thickness_m=thickness_m, top_thickness_m=thickness_m, wall_thickness_m=thickness_m, long_m=round(width + 2 * thickness_m, 4),
@@ -406,6 +519,7 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
                         centre_y_m=round(lc - float((mid - origin) @ tangent), 4) if not math.isnan(lc) else 0.0,
                         edge_distances=tuple(float(v) for v in edge_distances),
                         joints=tuple(sorted((str(k), round(float(v), 4)) for k, v in (joints or {}).items())), extra_boxes=tuple(extra),
+                        rim_m=None if rim is None else round(rim, 4), front_wall_x_m=front_x, open_top=bool(open_top),
                         supports=((scene, support.name),), source=src)
 
 
@@ -438,6 +552,9 @@ def main(argv=None):
     m.add_argument("--joints", default=None, help="JSON {joint: value} (the task's partner_joint_init)")
     m.add_argument("--rooms", nargs="*", default=None)
     m.add_argument("--edge", default=None)
+    m.add_argument("--side", default=None, help="world direction the stance side faces (+x / -x / +y / -y; write --side=-x): picks the raster edge of an open-top basin")
+    m.add_argument("--open-top", default="auto", choices=["auto", "yes", "no"], help="override the open-top rule (the wall rim well under the headroom)")
+    m.add_argument("--door-boxes", default="pieces", choices=["pieces", "link"], help="a moved link (an open door) as one box per collision piece or one box")
     m.add_argument("--stand-offs", nargs="+", type=float, default=[0.35, 0.45, 0.55])
     m.add_argument("--thickness", type=float, default=0.02)
     m.add_argument("--name", required=True)
@@ -459,8 +576,12 @@ def main(argv=None):
         moved = OJ.moved_links(before, OJ.link_poses(support))
     root = getattr(support, "root_link_name", "base_link")
     static = OJ.static_aabb(support, moved) if moved else None
+    side = None
+    if a.side:
+        side = {"+x": (1.0, 0.0), "-x": (-1.0, 0.0), "+y": (0.0, 1.0), "-y": (0.0, -1.0)}[a.side]
     spec = measure(world, support, a.surface_z, name=a.name, scene=a.scene, edge=a.edge, joints=joints, moved_links=[n for n in moved if n != root],
-                   edge_distances=a.stand_offs, z_margin=a.surface_tol, thickness_m=a.thickness, static_aabb=static)
+                   edge_distances=a.stand_offs, z_margin=a.surface_tol, thickness_m=a.thickness, static_aabb=static, side=side,
+                   open_top={"auto": None, "yes": True, "no": False}[a.open_top], door_boxes=a.door_boxes)
     write_registry(a.out, [spec])
     print("INTERIOR_SPEC " + json.dumps(spec.to_json()), flush=True)
     import omnigibson as og
