@@ -608,6 +608,24 @@ def intersect_feasible(F_init: Sequence[Tuple[float, Any]], F_goal: Sequence[Tup
     return [yg for yg in F_init if key(yg) in goal_keys]
 
 
+def trunk_first_order(c_pool: Sequence[Any], order: Sequence[int]) -> List[int]:
+    """The stance C ORDER with the least extended trunk first (owner decision 2026-11-07, i7-placeorder, option 1 for inside_large_01;
+    opt-in ``generation.c_order_trunk_first``): the indices ``order`` into ``c_pool`` re-sorted by (trunk translate, stand-off) ascending -
+    the least trunk translate first, then the nearest stand-off; a STABLE sort, so the prior order (travel / edge rank / the seeded
+    permutation) decides among equal keys. It changes the order, never the set: no candidate is dropped (the per-coupling budget
+    ``c_candidates_max`` is the same); the exact IK and the QA gates judge every candidate as before, so a more extended trunk is coupled
+    only after the less extended candidates before it failed. The per-alias outcome memory (``alias_memory.reorder``, i7-memory) takes this
+    order as its prior and only defers the candidates of the bins it down-weighted.
+
+    Evidence (``$OFH/placeorder_20261107/demos.jsonl``, 2340 demos): no campaign-wide link between trunk extension and place failures; the 3
+    place-time robot_wobble / robot_touching_itself of the campaign are inside_large_01 at translate 0.50 / tilt -0.6 / stand-off 0.85, while
+    translate 0.25 at 0.85 went 4 / 4."""
+    def key(k: int) -> Tuple[float, float]:
+        c = c_pool[int(k)]
+        return round(float(c.translate), 4), round(float(c.stand_off or 0.0), 4)
+    return sorted((int(k) for k in order), key=key)
+
+
 def pair_key(yaw: float, grasp: Any, yaw_step: float = math.pi / 8) -> Tuple[int, Any]:
     """A (yaw, grasp) pair's key on the screening grid (:func:`intersect_feasible`'s): yaw bucket, grasp name."""
     return int(round(float(yaw) / yaw_step)), getattr(grasp, "name", grasp)
@@ -4751,6 +4769,13 @@ class IORSLarge(SamplerV2):
             order.sort(key=lambda k: (round(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) / 0.25), int(c_pool[k].extras.get("edge_rank", 0))))
         else:
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
+        trunk_first = bool(self.gp.gen("c_order_trunk_first", False))
+        if trunk_first:
+            # i7-placeorder (owner decision 2026-11-07, option 1 for inside_large_01): the least extended trunk first, then the nearest
+            # stand-off - the order only (:func:`trunk_first_order`); the outcome memory's reweighting (i7-memory) layers on this order
+            order = trunk_first_order(c_pool, order)
+            TT._count(self, "stance_c.trunk_first")
+        least_translate = min((float(c.translate) for c in c_pool), default=0.0)
         # i7-memory (owner 2026-11-08 01:45 part C): the per-alias outcome memory reweights the C order from outcomes. The order above is
         # the PRIOR and is kept; the candidates of an (arm, trunk[, stand-off]) bin the memory down-weighted move to the end unless the
         # bin keeps its place this coupling (Thompson draw, never below the exploration floor). No memory / nothing down-weighted = the
@@ -5374,6 +5399,14 @@ class IORSLarge(SamplerV2):
                 self.sidecar.describe(pname, partner.category.replace("_", " "), path_length_m=path_bc.length_m)
                 if push and floor_name:
                     self.sidecar.describe(floor_name, "floor", push_distance_cm=100.0 * float(chain["distance_m"]))
+                if trunk_first:
+                    extended = float(place.translate) > least_translate + 1e-6
+                    d.summary["c_order"] = {"mode": "trunk_first", "rank": i_c, "translate": float(place.translate), "stand_off": place.stand_off,
+                                            "least_translate": least_translate, "extended": extended}
+                    if extended:
+                        TT._count(self, "stance_c.extended_used")
+                        log.info("%s: stance C trunk-first order: trunk (%.2f, %.2f) d %.2f coupled at rank %d, after the less extended candidates (least "
+                                 "translate %.2f) failed", self.gp.variant, place.translate, place.tilt, place.stand_off or 0.0, i_c, least_translate)
                 return d
             errors.append(f"C (d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f})): no (yaw, grasp) of F ({len(F)}) passes the exact IK at B and C — {fails}")
             log.info("%s: C try exhausted (d %.2f λ %+.2f edge %s, push trunk %s): %s", self.gp.variant, place.stand_off or 0.0, place.lateral, place.extras.get("edge"),
