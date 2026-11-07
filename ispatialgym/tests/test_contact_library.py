@@ -563,7 +563,8 @@ def test_the_start_pose_avoids_a_hand_inside_the_object(glib):
 
 def test_touching_checks_the_wide_brace_at_its_opening(monkeypatch):
     """The touching sampler's two-arm solve, its diagnostic and the brace retreat use the brace record's opening (a wide stop's
-    ``fingers_opening_m``), as the oracle and the program check; ``ISPATIALGYM_TOUCH_BRACE_AT_OPENING=0`` = the checks of before."""
+    ``fingers_opening_m``), as the oracle and the program check - always (i7-contactbrace 2026-11-08: ``ISPATIALGYM_TOUCH_BRACE_AT_OPENING``
+    is gone, the one rule ``tabletop.brace_fingers``)."""
     from ispatialgym.sampling.v2.tasks import iors_small as IS
     from ispatialgym.tests import test_touching_brace_open_push_speed as BO
 
@@ -603,9 +604,9 @@ def test_touching_checks_the_wide_brace_at_its_opening(monkeypatch):
     assert opening == pytest.approx(0.0315)
     assert calls[0] == ("both", 0.0, pytest.approx(0.0315)) and calls[1] == ("exact", "left", pytest.approx(0.0315))  # the solve, the diagnostic
     calls.clear()
-    monkeypatch.setenv("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "0")
+    monkeypatch.setenv("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "0")  # the retired switch changes nothing
     s._touching_brace_choice(st, [], BO.T_PLACE, BO.P_POSE, b_point, face_z, BO.DIRECTION, 0.05, p_hull, p_init, [], [], push_fingers_q=0.0)
-    assert calls[0] == ("both", 0.0, "absent") and calls[1] == ("exact", "left", 0.0)  # before: the push's fingers, the diagnostic closed
+    assert calls[0] == ("both", 0.0, pytest.approx(0.0315)) and calls[1] == ("exact", "left", pytest.approx(0.0315))
 
 
 def test_exact_both_arms_puts_the_other_arms_fingers_on_its_own_gripper():

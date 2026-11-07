@@ -1872,15 +1872,21 @@ def push_open_fingers(action, name: str, after_name: Optional[str]) -> Optional[
 def brace_open_fingers(action, name: str, after_name: Optional[str]) -> Optional[float]:
     """The finger joints a WIDE brace (owner 2026-09-19 00:49) and the retreat after it are checked with: the brace record's
     ``fingers_opening_m`` - ``execute_brace`` pre-shapes the gripper to it, and ``execute_retreat`` leaves a brace's gripper as it is
-    (i7-braceopen 2026-11-07: the retreat was checked with the stance's open fingers); None for anything else (a closed brace)."""
+    (i7-braceopen 2026-11-07: the retreat was checked with the stance's open fingers); None for anything else (a brace record without the
+    key). The value is :func:`tabletop.brace_fingers`'s - the one rule the samplers check a brace with (the oracle's ``actions.brace_is_open``:
+    a non-positive opening is the closed gripper)."""
     if name == "brace":
         rec = getattr(action, "contact", None)
     elif name == "retreat" and after_name == "brace":
         rec = getattr(getattr(action, "after", None), "contact", None)
     else:
         return None
-    v = (getattr(rec, "extra", None) or {}).get("fingers_opening_m") if rec is not None else None
-    return None if v is None else float(v)
+    extras = (getattr(rec, "extra", None) or {}) if rec is not None else {}
+    if extras.get("fingers_opening_m") is None:
+        return None
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    return TT.brace_fingers(extras)
 
 
 def locked_seed(sampler, stance: Stance, fingers: Optional[float], locked: Dict[str, th.Tensor],

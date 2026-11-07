@@ -1749,6 +1749,7 @@ class ArticulationSmall(SamplerV2):
                 # to the record's ``fingers_opening_m`` = ``opening``; the retreat leaves it so) - the fist closed, the brace hand open
                 res = TT.brace_second_arm(self, st, arm, list(pair), brace_arm, [pre, contact], ignore_work_last=[support, target], ignore_brace_last=[target],
                                           fingers=C.FINGER_CLOSED, ignore_while_locked=[touched] if touched.links else [target], brace_fingers=opening)
+                TT.count_brace_opening(self, {"fingers_opening_m": opening}, ok=bool(res.ok))  # i7-contactbrace: the A/B's counters
                 if res.ok:
                     # the brace's lift-off (program check 0920-232450: left_arm_joint7 within 96 mrad of its limit at the retreat pose) - the
                     # clear pose 10 cm back along -a, solved with the fist locked at its contact, must keep the joint-limit margin
@@ -1777,6 +1778,7 @@ class ArticulationSmall(SamplerV2):
                           "note": "the box slides along the push; the other hand, open, holds it (owner 2026-09-20 16:24): a top press on the far rim or a stop on the far face"}
                 if kind == "opposite_face":
                     extras["push_line_offset_m"] = round(s_line - a_k, 4)
+                TT.count_brace_opening(self, extras)
                 return TT.BraceRecord("brace", brace_arm, pre, contact, direction=direction, brace_kind=kind, object=tname, stance=st.name, extras=extras), None
 
             for kind in kinds:

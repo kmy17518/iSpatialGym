@@ -772,15 +772,14 @@ def wide_stop_spread(partner_hull_w: th.Tensor, b_point: th.Tensor, outward: th.
 #: the touching wide stop's tip spreads (m, ``generation.brace_wide_spreads_m``), the widest that fits the braced face is used
 BRACE_WIDE_SPREADS_M: Tuple[float, ...] = (0.09, 0.07, 0.05)
 #: owner decision 2026-11-07 ("an open brace opens FULLY (0.05 per finger), narrower only when the braced face cannot take the full spread"):
-#: ``ISPATIALGYM_BRACE_FULL_OPEN=1`` prepends the full-open spread 2 x FINGER_OPEN + CLOSED_TIP_SPREAD_M = 0.127 m; "0" (default) = today's
-BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
-BRACE_FULL_OPEN_SPREAD_M = round(2.0 * C.FINGER_OPEN + CLOSED_TIP_SPREAD_M, 4)
-
-
-def brace_full_open_on() -> bool:
-    import os
-
-    return os.environ.get(BRACE_FULL_OPEN_ENV, "0").strip() == "1"
+#: the ONE switch ``ISPATIALGYM_BRACE_FULL_OPEN`` and its rule live in ``tabletop`` (:data:`tabletop.BRACE_FULL_OPEN_ENV`,
+#: :func:`tabletop.brace_full_open`, :data:`tabletop.BRACE_FULL_OPENING_M`; i7-contactbrace 2026-11-08 - this module defined its own copy).
+#: On, the touching wide stop's spreads start with the full-open spread 2 x 0.05 + CLOSED_TIP_SPREAD_M = 0.127 m, the narrower ones kept as
+#: the fallback where the face is too short for it
+BRACE_FULL_OPEN_ENV = TT.BRACE_FULL_OPEN_ENV
+BRACE_FULL_OPEN_SPREAD_M = round(2.0 * TT.BRACE_FULL_OPENING_M + CLOSED_TIP_SPREAD_M, 4)
+#: whether the switch is on (:func:`tabletop.brace_full_open`; the name the contact library's identity reads)
+brace_full_open_on = TT.brace_full_open
 
 
 def brace_wide_spreads(gs) -> List[float]:
@@ -1076,11 +1075,13 @@ def pitched_push_class(kind: Optional[str]) -> bool:
 
 def contact_fingers(extras: Optional[Dict[str, Any]], kind: str = "push") -> float:
     """The finger joints (m per finger) the oracle holds a push / brace at: ``actions.push_is_open`` / ``brace_is_open`` of the record - its
-    ``fingers_opening_m`` - else closed (``execute_push`` / ``execute_brace``)."""
+    ``fingers_opening_m`` - else closed (``execute_push`` / ``execute_brace``). A brace: :func:`tabletop.brace_fingers` (the one rule of the
+    brace checks, i7-contactbrace 2026-11-08)."""
+    if kind != "push":
+        return TT.brace_fingers(extras)
     AC = _oracle()[1]
     rec = SimpleNamespace(extra=dict(extras or {}))
-    is_open = AC.push_is_open(rec) if kind == "push" else AC.brace_is_open(rec)
-    return float(rec.extra["fingers_opening_m"]) if is_open else float(IK.FINGER_CLOSED)
+    return float(rec.extra["fingers_opening_m"]) if AC.push_is_open(rec) else float(IK.FINGER_CLOSED)
 
 
 def brace_stop_rule(cfg=None) -> Dict[str, Any]:

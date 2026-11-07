@@ -413,7 +413,10 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
             "entry_rest_quat_xyzw": entry_rest_quat(entries[0]),
             "library": {"digest": lib_k.get("digest"), "validate": lib_k.get("validate"), "families": sorted(lib_k.get("families") or {}),
                         # the builders' params (an axial library's long_axis: the side its +end classes push) - the consumer checks its own axis
-                        "params": {f: (v or {}).get("params") for f, v in (lib_k.get("families") or {}).items() if f in spec["families"]}},
+                        "params": {f: (v or {}).get("params") for f, v in (lib_k.get("families") or {}).items() if f in spec["families"]},
+                        # the pose rule's knobs as the library resolved them (i7-contactbrace 2026-11-08: a touch_brace map's brace_full_open -
+                        # the consumer keeps a map built under the opening rule it runs, :func:`library_knob`); not in the map key
+                        "knobs": {f: (v or {}).get("knobs") for f, v in (lib_k.get("families") or {}).items() if f in spec["families"]}},
             "height": {"value": float(height), "anchor_key": anchor.get("key"), "anchor_surfaces": list(anchor.get("surfaces", []))[:50]},
             "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "robot": RM.robot_digest(),
             "pose_set": pset, "classes": [class_row(grid[(y, g)]) if (y, g) in grid else None for y in range(nY) for g in range(nG)],
@@ -428,6 +431,22 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
 
 def object_key(obj: Dict[str, Any]) -> Dict[str, Any]:
     return {k: obj.get(k) for k in ("entry", "category", "model", "scale", "rest_id", "geometry")}
+
+
+def library_knob(meta: Dict[str, Any], key: str, default: Any = None) -> Any:
+    """A pose-rule knob of the library a map was built from (``meta["library"]["knobs"][family][key]``, the first of the map's families
+    that records it); ``default`` for a map built before the knobs were recorded (2026-11-08) - those libraries ran every rule's default."""
+    for fam in sorted(((meta.get("library") or {}).get("knobs") or {}).items()):
+        kn = fam[1] or {}
+        if key in kn:
+            return kn[key]
+    return default
+
+
+#: kind -> the library knobs a consumer requires to match the rule it runs, with the value a map that does not record them was built under
+#: (i7-contactbrace 2026-11-08: a touch_brace map's entries carry the wide stop's opening - ``ISPATIALGYM_BRACE_FULL_OPEN`` changes it, so a
+#: map built under the other rule proposes braces the oracle does not execute)
+CONSUMER_KNOBS: Dict[str, Dict[str, Any]] = {"touch_brace": {"brace_full_open": False}}
 
 
 def map_key(meta: Dict[str, Any]) -> str:
@@ -472,10 +491,11 @@ class ContactMap:
     @staticmethod
     def find(maps_root: str, kind: str, entry: str, height: float, *, rest_id: Optional[str] = None, arm: Optional[str] = None,
              policy_key: Optional[str] = None, robot: Optional[str] = None, anchors=None, config_require: Optional[Dict[str, Any]] = None,
-             pose_set_digest: Optional[str] = None) -> Optional["ContactMap"]:
+             pose_set_digest: Optional[str] = None, knobs_require: Optional[Dict[str, Any]] = None) -> Optional["ContactMap"]:
         """The ``kind`` map of the library entry ``entry`` (the v2 model directory id) at the anchor covering ``height`` (``anchors``: exact or
         within the anchor's range; None: the map's own height within 1 mm), the arm (default the kind's), the rest, the contact policy, the
-        robot model, the required config and pose set; None when none matches."""
+        robot model, the required config and pose set, and ``knobs_require`` (knob -> value: :func:`library_knob`, a map without the record
+        read at :data:`CONSUMER_KNOBS`' value of the kind); None when none matches."""
         arm = arm or KINDS[kind]["arm"]
         target, how = float(height), "height"
         if anchors is not None:
@@ -504,6 +524,8 @@ class ContactMap:
             if config_require and any(RM.config_value(m, k) != v for k, v in config_require.items()):
                 continue
             if pose_set_digest is not None and (m.get("pose_set") or {}).get("digest") != pose_set_digest:
+                continue
+            if knobs_require and any(library_knob(m, k, CONSUMER_KNOBS.get(kind, {}).get(k)) != v for k, v in knobs_require.items()):
                 continue
             if abs(float(m["height"]["value"]) - target) > (1e-6 if anchors is not None else 1e-3):
                 continue

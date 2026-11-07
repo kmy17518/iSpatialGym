@@ -217,13 +217,6 @@ SPA_CELL_REJECTS = ("no_workspace", "edge_too_short", "stance_collision", "shelf
 _SPA_CACHE_ANNOUNCED = False
 
 
-def brace_at_opening_on() -> bool:
-    """i7-contact 2026-11-07 (``ISPATIALGYM_TOUCH_BRACE_AT_OPENING``, default "1"): the touching brace's checks put the brace hand at its record's
-    opening (``contact_poses.contact_fingers``: a wide stop's ``fingers_opening_m``, else closed) - the opening ``execute_brace`` braces at and
-    the program check checks - instead of the push's fingers on both hands / closed; "0" = the checks of before (the records are the same)."""
-    return os.environ.get("ISPATIALGYM_TOUCH_BRACE_AT_OPENING", "1").strip() != "0"
-
-
 def hand_overlap_rank_on() -> bool:
     """i7-contact 2026-11-07, owner item 3 (``ISPATIALGYM_HAND_OVERLAP_RANK``, default "0" = OFF; the owner decides): the touching PUSH's hand-overlap
     screen (:meth:`IORSSmall.push_hand_overlap`: wrist camera / knuckles / gripper body within 5 mm of the target) is a RANKING hint instead of
@@ -4896,6 +4889,7 @@ class IORSSmall(SamplerV2):
             pre, contact, kind, extras = brace_chosen
             brace_rec = TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras)
             brace_rec.stance = manip.name
+            TT.count_brace_opening(self, extras)
             self.sidecar.add_contact(brace_rec)
             draft.summary["brace"] = {"present": True, "kind": kind, "gate": gate, **{k: v for k, v in extras.items() if v is not None}}
             manip.arms = ["right", "left"]
@@ -5004,37 +4998,41 @@ class IORSSmall(SamplerV2):
         import itertools
 
         pushed = (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))
-        at_opening = brace_at_opening_on()
 
         def evaluate(p):
             pre, contact = p.chain
-            # i7-contact 2026-11-07 (brace_at_opening_on, default on): the brace hand at the opening the oracle braces at (a wide stop's
-            # fingers_opening_m, else closed) in the two-arm solve, the diagnostic and the retreat - as the program check checks it
-            brace_q = CPZ.contact_fingers(p.payload[3], "brace") if at_opening else None
+            # the brace hand at the opening the oracle braces at (tabletop.brace_fingers: a wide stop's fingers_opening_m, else closed) in the
+            # two-arm solve, the diagnostic and the retreat - as the program check checks it (i7-contact 2026-11-07; i7-contactbrace 2026-11-08:
+            # always, the one rule of every brace check - ISPATIALGYM_TOUCH_BRACE_AT_OPENING is gone)
+            brace_q = TT.brace_fingers(p.payload[3])
             overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
             if overlap is not None:
                 return False, None, None, overlap
             with self.posed("target", pushed), self.ikc.ignoring([self.obj("target")]):
                 res = self.ikc.exact_both_arms(("right", list(push_chain)), ("left", [pre, contact]), st, ignore_push, ignore_brace, fingers=push_fingers_q,
-                                               q_first_other=p.q_first, **({"fingers_other": brace_q} if at_opening else {}))
+                                               q_first_other=p.q_first, fingers_other=brace_q)
             if not res.ok:
                 if not diagnose:
                     return False, res, None, str(res.reason)
                 # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass here names
                 # the two-arm combination (self-collision / the locked right arm) as the blocker
-                alone = self.ikc.exact([pre, contact], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED if brace_q is None else brace_q)
+                alone = self.ikc.exact([pre, contact], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=brace_q)
                 return False, res, None, f"{res.reason} [left alone: {'ok' if alone.ok else alone.reason}]"
             qs = O.chain_qs(self.ikc, "left", [pre, contact])
-            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False,
-                                   **({"fingers": brace_q} if at_opening else {}))
+            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False, fingers=brace_q)
             if not r_ret.ok:
                 return False, res, None, f"brace retreat clear pose: {r_ret.reason}"
             return True, res, qs, ""
 
+        def evaluate_counted(p):
+            out = evaluate(p)
+            TT.count_brace_opening(self, p.payload[3], ok=bool(out[0]))  # i7-contactbrace: the openings tried / passed (the A/B's counters)
+            return out
+
         stream = self.touching_brace_candidates(st, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init)
         if limit is not None:
             stream = itertools.islice(stream, int(limit))
-        return O.choose_first(self.ikc, "left", stream, key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=evaluate,
+        return O.choose_first(self.ikc, "left", stream, key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=evaluate_counted,
                               q_start=self.ikc.q_locked(st), stage="touching brace")
 
     def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,

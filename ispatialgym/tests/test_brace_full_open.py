@@ -386,3 +386,118 @@ def test_check_action_targets_receives_the_trackers_locked_fingers():
     body = inspect.getsource(PC.check_action_targets)
     assert "q_seed = locked_seed(sampler, stance, fingers, locked, locked_fingers)" in body
     assert "wide = brace_open_fingers(action, name, after_name)" in body
+
+
+# ---------------------------------------------------------------------------------------------------------- i7-contactbrace: one switch, one rule
+
+def test_one_switch_definition(switch, monkeypatch):
+    """i7-contactbrace 2026-11-08: ``ISPATIALGYM_BRACE_FULL_OPEN`` is defined once (tabletop); contact_poses (the touching wide stop) and the
+    contact library's identity read the same switch with the same parsing."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    assert CPZ.BRACE_FULL_OPEN_ENV is TT.BRACE_FULL_OPEN_ENV and CPZ.brace_full_open_on is TT.brace_full_open
+    assert CPZ.BRACE_FULL_OPEN_SPREAD_M == round(2 * TT.BRACE_FULL_OPENING_M + CPZ.CLOSED_TIP_SPREAD_M, 4) == 0.127
+    for v, on in (("1", True), ("true", True), ("on", True), ("0", False), ("", False), ("no", False)):
+        monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, v)
+        assert TT.brace_full_open() is on and CPZ.brace_full_open_on() is on
+        assert CPZ.brace_wide_spreads(CPZ.PoseGen({}))[0] == (0.127 if on else 0.09)
+
+
+@pytest.mark.parametrize("opening", [None, 0.0, -0.01, 0.0315, 0.04, 0.05, "x"])
+def test_brace_fingers_is_the_oracles_brace_is_open(opening):
+    """One rule of the brace checks: ``tabletop.brace_fingers`` = the opening ``execute_brace`` holds (``actions.brace_is_open``), and the
+    touching brace's ``contact_poses.contact_fingers(.., "brace")`` is the same function."""
+    from ispatialgym.oracle import actions as AC
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    extras = {} if opening is None else {"fingers_opening_m": opening}
+    want = float(opening) if AC.brace_is_open(SimpleNamespace(extra=extras)) else C.FINGER_CLOSED
+    assert TT.brace_fingers(extras) == want == CPZ.contact_fingers(extras, "brace")
+
+
+def test_program_check_brace_opening_is_the_one_rule():
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    assert PC.brace_open_fingers(_brace(opening=0.0), "brace", None) == C.FINGER_CLOSED  # a recorded 0 is the closed gripper (as before)
+    assert PC.brace_open_fingers(_brace(opening="x"), "brace", None) == C.FINGER_CLOSED  # the oracle: not open -> closed
+    assert PC.brace_open_fingers(_brace(opening=0.05), "brace", None) == 0.05
+
+
+def test_touching_brace_library_identity_unchanged_with_the_switch_off(switch):
+    """The touching_brace knobs of the libraries built 2026-11-07 (contact_libs_20261107e: ntbrtz / dkhgxn) resolve the same with the switch
+    off - the library digests and the map keys built from them do not move; on, the identity changes."""
+    from ispatialgym.grasping import contact_library as CL
+
+    sub = "inter_object_relation_satisfaction-touching_small_scale"
+    built = {"brace_wide_spreads_m": [0.09, 0.07, 0.05], "brace_full_open": False}
+    got = CL.resolved_knobs("touching_brace", {}, sub)
+    assert {k: got[k] for k in built} == built and got["brace_full_open"] is False
+    got_w = CL.resolved_knobs("touching_brace", {"brace_open_when_wide": True}, sub)
+    assert got_w["brace_open_when_wide"] is True and got_w["brace_wide_spreads_m"] == [0.09, 0.07, 0.05]
+    switch(True)
+    on = CL.resolved_knobs("touching_brace", {}, sub)
+    assert on["brace_full_open"] is True and on["brace_wide_spreads_m"] == [0.127, 0.09, 0.07, 0.05]
+
+
+def _map_files(root, entry, key, knobs):
+    import json
+    import os
+
+    import numpy as np
+
+    from ispatialgym.sampling import contact_maps as CMAP
+
+    d = os.path.join(root, entry)
+    os.makedirs(d, exist_ok=True)
+    meta = {"schema": CMAP.SCHEMA, "kind": "touch_brace", "arm": "left", "object": {"entry": entry}, "rest_id": "r0",
+            "height": {"value": 0.8126}, "pose_set": {"digest": key, "classes": []}, "library": {"families": ["touching_brace"]}}
+    if knobs is not None:
+        meta["library"]["knobs"] = {"touching_brace": knobs}
+    base = os.path.join(d, f"cmap__touch_brace__box__m__h0.8126__{key}")
+    with open(base + ".json", "w") as f:
+        json.dump(meta, f)
+    np.savez_compressed(base + ".npz", cells=np.zeros((1, 2)), yaws=np.zeros(1))
+
+
+def test_touch_brace_maps_are_read_only_under_the_opening_rule_they_were_built_with(switch, tmp_path):
+    """The contact libraries / maps use the opening the oracle executes: a touch_brace map records its library's knobs (not in its key);
+    the sampler keeps only a map built under the run's ``ISPATIALGYM_BRACE_FULL_OPEN`` (a map without the record = built before it, off)."""
+    from ispatialgym.sampling import contact_maps as CMAP
+
+    root = str(tmp_path)
+    _map_files(root, "old", "a" * 16, None)
+    _map_files(root, "on", "b" * 16, {"brace_full_open": True, "brace_wide_spreads_m": [0.127, 0.09, 0.07, 0.05]})
+    _map_files(root, "off", "c" * 16, {"brace_full_open": False})
+    assert TT.contact_map_knobs("touch_brace") == {"brace_full_open": False} and TT.contact_map_knobs("touch_push") is None
+
+    def found(entry):
+        cm = CMAP.ContactMap.find(root, "touch_brace", entry, 0.8126, knobs_require=TT.contact_map_knobs("touch_brace"))
+        return cm is not None
+
+    assert (found("old"), found("off"), found("on")) == (True, True, False)
+    switch(True)
+    assert TT.contact_map_knobs("touch_brace") == {"brace_full_open": True}
+    assert (found("old"), found("off"), found("on")) == (False, False, True)
+    assert CMAP.ContactMap.find(root, "touch_brace", "old", 0.8126) is not None  # no requirement: as before
+    assert CMAP.library_knob({"library": {"knobs": {"touching_brace": {"brace_full_open": True}}}}, "brace_full_open", False) is True
+    assert CMAP.library_knob({"library": {}}, "brace_full_open", False) is False
+
+
+def test_map_meta_records_the_library_knobs_outside_the_key():
+    from ispatialgym.sampling import contact_maps as CMAP
+
+    src = inspect.getsource(CMAP.compute_contact_map)
+    assert '"knobs": {f: (v or {}).get("knobs")' in src
+    meta = {"schema": CMAP.SCHEMA, "kind": "touch_brace", "arm": "left", "plane": "slab", "edge_distances": [0.45], "config": "c", "policy_key": "p",
+            "robot": "r", "object": {"entry": "e"}, "height": {"value": 0.8}, "pose_set": {"digest": "d"}, "library": {"digest": "L"}}
+    k0 = CMAP.map_key(meta)
+    meta["library"]["knobs"] = {"touching_brace": {"brace_full_open": True}}
+    assert CMAP.map_key(meta) == k0  # existing map keys unchanged
+
+
+def test_brace_opening_counters():
+    s = SimpleNamespace(kit=SimpleNamespace(stats={}))
+    TT.count_brace_opening(s, {"fingers_opening_m": 0.05}, ok=False)
+    TT.count_brace_opening(s, {"fingers_opening_m": 0.0315}, ok=True)
+    TT.count_brace_opening(s, {"pose_class": "brace_tip_h-"})
+    assert s.kit.stats == {"brace_opening.failed.0.0500": 1, "brace_opening.passed.0.0315": 1, "brace_opening.recorded.closed": 1}
