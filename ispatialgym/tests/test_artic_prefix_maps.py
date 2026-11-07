@@ -178,7 +178,7 @@ def _pmeta(**kw):
             "object": {"category": "carton", "model": "cdmmwy", "scale": [1.0, 1.0, 1.0], "rest": dict(REST)}, "object_key": "ok", "rest_id": "r0",
             "joint": "j_right_lid", "motion": "push_close", "q_start": 1.6493, "handle_sig": "sig", "face_yaw_offset": 0.0, "yaws": [0.0],
             "segments": [{"index": 0, "variant": "tip#0+"}, {"index": 1, "variant": "tip#0-"}], "segment_ids": ["a", "b"], "validated_travel_rad": 0.4,
-            "min_open_rad": 0.0, "step_max_rad": 0.5, "height": {"value": 0.8126, "anchor_key": "0.8126"}, "edge_distances": [0.35, 0.45, 0.55],
+            "min_open_rad": 0.0, "step_max_rad": 0.5, "arm_validated": ["right"], "height": {"value": 0.8126, "anchor_key": "0.8126"}, "edge_distances": [0.35, 0.45, 0.55],
             "config": RM.MapConfig(twins=False).key(), "policy_key": CP.DEFAULT.key("right"), "robot": RM.robot_digest(),
             "trunks": [{"translate": TRUNK[0], "tilt": TRUNK[1], "key": TKEY, "eligible": True, "posture": "untucked"},
                        {"translate": 0.5, "tilt": 0.0, "key": "t0.50_k+0.0", "eligible": False}]}
@@ -338,3 +338,34 @@ def test_consumer_off_v2_only_keeps_the_legacy_path(monkeypatch):
     with pytest.raises(AttributeError):  # the legacy body runs (this stand-in has no world / kit for it): the prefix map is not read
         AS._brace_band(s, SimpleNamespace(name="e0"), None)
     assert not s.handle_only_band and "artic_prefix_map" not in s.template_facts
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# owner 2026-11-07: an arm's map only from segments validated with that arm
+# ------------------------------------------------------------------------------------------------------------------
+
+
+def test_a_left_map_from_right_arm_segments_is_impossible(tmp_path, monkeypatch):
+    monkeypatch.setattr(RM, "_solve", _fake_solve)
+    monkeypatch.setattr(RB, "trunk_grid", lambda h: [(0.25, -0.3)])
+    left = RM.MapConfig(arm="left", seeds=2, twins=False, lattice_m=0.16)
+    with pytest.raises(ValueError, match="no left-arm validated segment"):
+        RM.compute_prefix_map(_FakeWorld(left), _alib(), 0.8126, {"key": "0.8126"}, cfg=left)  # both segments right-arm validated
+    mixed = _alib()
+    mixed["segments"][1] = dict(mixed["segments"][1], arm_validated="left", id="s1L")
+    meta, _ = RM.compute_prefix_map(_FakeWorld(left), mixed, 0.8126, {"key": "0.8126"}, cfg=left)
+    assert meta["arm"] == "left" and meta["arm_validated"] == ["left"] and meta["segment_ids"] == ["s1L"] and [s["variant"] for s in meta["segments"]] == ["v1"]
+    right = RM.MapConfig(seeds=2, twins=False, lattice_m=0.16)
+    meta_r, _ = RM.compute_prefix_map(_FakeWorld(right), mixed, 0.8126, {"key": "0.8126"}, cfg=right)
+    assert meta_r["arm_validated"] == ["right"] and meta_r["segment_ids"] == ["s0"]
+    # a map whose arm is not the arm its segments were validated with never serves, even with a self-consistent key
+    ok = dict(policy_key=CP.DEFAULT.key("left"), robot=RM.robot_digest())
+    d = str(tmp_path / "left_from_right")
+    _write_prefix(d, _pmeta(arm="left", policy_key=CP.DEFAULT.key("left"), arm_validated=["right"]))
+    assert RM.find_prefix(d, _spec(arm="left"), **ok) is None
+    d2 = str(tmp_path / "left")
+    _write_prefix(d2, _pmeta(arm="left", policy_key=CP.DEFAULT.key("left"), arm_validated=["left"]))
+    assert RM.find_prefix(d2, _spec(arm="left"), **ok) is not None
+    d3 = str(tmp_path / "old")
+    _write_prefix(d3, _pmeta(arm_validated=None))
+    assert RM.find_prefix(d3, _spec(), policy_key=CP.DEFAULT.key("right"), robot=RM.robot_digest()) is None

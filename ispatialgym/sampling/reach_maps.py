@@ -1388,6 +1388,12 @@ def compute_prefix_map(world: SynthWorld, alib: Dict[str, Any], height: float, a
     segs = [s for s in alib.get("segments") or [] if (segments is None or s.get("id") in set(segments)) and s.get("waypoints")]
     if not segs:
         raise ValueError(f"{alib.get('alias')}: no validated segment in the library")
+    # owner 2026-11-07: an arm's map reads ONLY segments validated in physics with that arm - a left map from right-arm segments is refused
+    other = sorted({str(s.get("arm_validated")) for s in segs if s.get("arm_validated") != cfg.arm})
+    segs = [s for s in segs if s.get("arm_validated") == cfg.arm]
+    if not segs:
+        raise ValueError(f"{alib.get('alias')}: no {cfg.arm}-arm validated segment (the library's segments were validated with {other}); a {cfg.arm}-arm "
+                         f"prefix map needs validate_artic motions --arm {cfg.arm}")
     rid = str(segs[0].get("rest_id") or "r0")
     if any(str(s.get("rest_id") or "r0") != rid for s in segs):
         raise ValueError(f"{alib.get('alias')}: the segments stand on different rests")
@@ -1608,7 +1614,7 @@ def find_prefix(maps_root: str, spec: Dict[str, Any], *, anchors=None, policy_ke
     sampler builds, ``sampling.v2.artic_prefix.prefix_spec``): ``category``, ``model``, ``scale``, ``rest_quat`` (the sampler's placement
     rest), ``joint``, ``motion``, ``q_start``, ``needed_travel``, ``arm``, ``face_yaw_offset``, ``handle_sig``, ``height``; optional
     ``step_max_rad`` (the map's must not be larger) and ``min_open_rad`` (equal). Identity enforced: schema, kind, prefix version, the map's own
-    key over its identity, arm, category / model / scale, a STABLE rest whose intended rest is ``rest_quat`` (q or -q, 1e-4), joint, motion,
+    key over its identity, arm, segments validated with that same arm (``arm_validated``), category / model / scale, a STABLE rest whose intended rest is ``rest_quat`` (q or -q, 1e-4), joint, motion,
     the start value within ``q_tol``, the handle signature, the face yaw within ``yaw_tol``, a validated travel >= the needed one, the policy
     key, the robot digest, the required config fields, the height. The hit carries ``lookup`` = ``{how, query_h, map_h}``."""
     target, how = float(spec["height"]), "height"
@@ -1638,6 +1644,8 @@ def find_prefix(maps_root: str, spec: Dict[str, Any], *, anchors=None, policy_ke
         r = o.get("rest") or {}
         if m.get("arm") != spec["arm"] or o.get("category") != spec["category"] or o.get("model") != spec["model"]:
             continue
+        if list(m.get("arm_validated") or []) != [spec["arm"]]:
+            continue  # owner 2026-11-07: only a map built from segments validated with ITS arm serves (never a left map of right segments)
         if S.canonical_scale(o.get("scale")) != S.canonical_scale(spec.get("scale")):
             continue
         iq = np.asarray(r.get("intended_quat_xyzw") or [9.0, 9.0, 9.0, 9.0], dtype=float)
@@ -1708,7 +1716,8 @@ def prefix_bands(pm: PrefixMap, needed_rad: float, *, overhang: float = 0.0, yaw
 
 
 def _prefix_cli(a) -> None:
-    """``prefix``: one map per (library, anchor) for ``--arm``; a library whose offered arms lack it is skipped (``--any-arm``: computed)."""
+    """``prefix``: one map per (library, anchor) for ``--arm``; a library whose offered arms lack it is skipped (``--any-arm``: computed); a library
+    without segments validated with ``--arm`` (``validate_artic motions --arm``) gives no map (compute_prefix_map refuses another arm's segments)."""
     from ispatialgym.grasping import object_geometry as OG
 
     an = json.load(open(a.anchors))
@@ -1730,8 +1739,8 @@ def _prefix_cli(a) -> None:
                 continue
             h = float(anchors[hk]["height"])
             o = os.path.join(a.out, f"prefix__{alib.get('category')}__{alib.get('model')}__{alib.get('motion')}__{a.arm}__h{h:.4f}__*.json")
-            if a.skip_existing and glob.glob(o):
-                continue
+            if a.skip_existing and any(list((S.load_json(x) or {}).get("arm_validated") or []) == [a.arm] for x in glob.glob(o)):
+                continue  # only a map of this arm's own validated segments counts as existing
             try:
                 if w is None:
                     w = SynthWorld(cfg)

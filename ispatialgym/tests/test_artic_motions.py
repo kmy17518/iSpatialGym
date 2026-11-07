@@ -165,3 +165,19 @@ def test_an_approach_that_does_not_track_is_rerun_from_the_contact():
     mw.mcfg = VA.MotionConfig(contact_retry=False)
     calls.clear()
     assert mw.trial(None, {}, {}, None, {}, None)["stop"] == "approach_failed" and calls == [True]
+
+
+
+def test_left_arm_validation_has_its_own_library_segment_ids_and_mirrored_stance():
+    assert VA.arm_suffix("right") == "" and VA.arm_suffix("left") == "__left"
+    assert VA.library_path("/m", "a-b", "right") == "/m/artic_library__a-b.json" and VA.library_path("/m", "a-b", "left") == "/m/artic_library__a-b__left.json"
+    assert VA.mirrored_offsets(((0.0, -0.15), (0.08, -0.22))) == ((0.0, 0.15), (0.08, 0.22))
+    m = {"alias": "a", "motion": "pull_open", "joint": "j", "face_yaw_offset": 3.14, "arms_offered": ["right", "left"], "handle_sig": "sig",
+         "variants": [{"name": "h#0+", "assignment": "+pinch", "preshape_q": 0.014, "contact_q": 0.005}]}
+    tr = _trial([0.0, 0.05, 0.1], until=4)
+    seg_r = VA.segment_from_trial(tr, m, {}, VA.MotionConfig(wp_step_m=1.0), {"validator": "v"})
+    seg_l = VA.segment_from_trial(dict(tr, arm_validated="left"), m, {}, VA.MotionConfig(wp_step_m=1.0), {"validator": "v"})
+    assert seg_r["arm_validated"] == "right" and seg_l["arm_validated"] == "left" and seg_r["id"] != seg_l["id"]
+    lib = VA.build_motion_library(dict(m, category="c", model="m", scale=[1, 1, 1], q_start=0.0, handle_arm="right"), {"rest_id": "r0"}, {},
+                                  [dict(tr, arm_validated="left")], VA.MotionConfig(wp_step_m=1.0), {"validator": "v"})
+    assert lib["arm_validated"] == "left" and lib["segments"][0]["arm_validated"] == "left"

@@ -441,6 +441,22 @@ def alias_slug(alias: str) -> str:
     return "".join(c if (c.isalnum() or c in "-_.") else "_" for c in alias)
 
 
+def arm_suffix(arm: str) -> str:
+    """The file suffix of an arm's validation outputs: none for the right arm (the files of the first runs), ``__left`` for the left."""
+    return "" if arm == "right" else f"__{arm}"
+
+
+def library_path(model_dir: str, alias: str, arm: str = "right") -> str:
+    """``<model dir>/artic_library__<alias>[__<arm>].json``: one library per (alias, validated arm) - the owner's 2026-11-07 rule: an arm's
+    prefix map reads only segments validated with that arm."""
+    return os.path.join(model_dir, f"artic_library__{alias_slug(alias)}{arm_suffix(arm)}.json")
+
+
+def mirrored_offsets(offsets: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:
+    """``ValidateConfig.base_offsets`` (the object to the robot's RIGHT, for the right arm) mirrored to the robot's left for the left arm."""
+    return tuple((float(x), -float(y)) for x, y in offsets)
+
+
 def load_annotation(hkey: str) -> Dict[str, Any]:
     """The sampler's handle annotation (``articulation_small._load_handle``: ``<grasp library>/artic/handles/<key>.json``)."""
     from ispatialgym.sampling.grasp_library import library_root
@@ -512,14 +528,15 @@ def segment_from_trial(tr: Dict[str, Any], motion: Dict[str, Any], rest: Dict[st
            "face_yaw_offset": motion["face_yaw_offset"], "arms_offered": list(motion["arms_offered"]), "handle_sig": motion["handle_sig"],
            "arm_validated": tr.get("arm_validated"), "stance": tr.get("stance"), "start": tr.get("start"),
            "source": dict(source, trial=tr.get("candidate"), validated_until_step=until, motion_segment=label)}
-    seg["id"] = S.digest({k: seg[k] for k in ("alias", "motion", "variant", "joint", "q_list", "handle_sig")} | {"src": source.get("validator")}, 12)
+    seg["id"] = S.digest({k: seg[k] for k in ("alias", "motion", "variant", "joint", "q_list", "handle_sig", "arm_validated")} | {"src": source.get("validator")}, 12)
     return seg
 
 
 def build_motion_library(motion: Dict[str, Any], rest: Dict[str, Any], profile: Dict[str, Any], trials: Sequence[Dict[str, Any]], mcfg: MotionConfig,
                          source: Dict[str, Any]) -> Dict[str, Any]:
     segs = [s for s in (segment_from_trial(t, motion, rest, mcfg, source) for t in trials) if s is not None]
-    return {"schema": LIBRARY_V2, "category": motion["category"], "model": motion["model"], "scale": motion["scale"], "alias": motion["alias"],
+    arms = sorted({str(s.get("arm_validated")) for s in segs} | {str(t.get("arm_validated")) for t in trials if t.get("arm_validated")})
+    return {"schema": LIBRARY_V2, "arm_validated": arms[0] if len(arms) == 1 else arms, "category": motion["category"], "model": motion["model"], "scale": motion["scale"], "alias": motion["alias"],
             "motion": motion["motion"], "joint": motion["joint"], "q_start": motion["q_start"], "handle_sig": motion["handle_sig"],
             "face_yaw_offset": motion["face_yaw_offset"], "arms_offered": list(motion["arms_offered"]), "handle_arm": motion["handle_arm"],
             "rests": {rest.get("rest_id", "r0"): rest}, "profile": profile, "segments": segs,
@@ -874,8 +891,11 @@ class MotionWorld:
 
 
 def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False, customs_path: Optional[str] = None) -> Dict[str, Any]:
-    """One alias: setup (motion, profile, rest), the trials (unless ``rest_only``), ``motions/<alias>.json`` and the library."""
+    """One alias: setup (motion, profile, rest), the trials (unless ``rest_only``), ``motions/<alias>[__<arm>].json`` and the library of the
+    validation world's arm (:func:`library_path`). An arm the task does not offer (``arms_offered``) runs no trial and writes no library."""
     t0 = time.time()
+    arm = mw.w.cfg.arm
+    sfx = arm_suffix(arm)
     ctx = mw.setup(alias, root, customs_path)
     d, obj, motion, rest = ctx["dir"], ctx["obj"], ctx["motion"], ctx["rest"]
     state, rest_sim = ctx["state"]
@@ -885,9 +905,13 @@ def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False
                            "motion": motion, "profile": ctx["profile"], "rest": rest, "config": {"artic": asdict(mw.aw.cfg), "motion": asdict(mw.mcfg)},
                            "validation_world": {"arm": mw.w.cfg.arm, "base_yaws": mw.w.cfg.base_yaws, "slab_top_z": mw.w.cfg.slab_top_z}, "trials": []}
     try:
-        S.save_json(os.path.join(mdir, f"{alias_slug(alias)}__rest.json"), {"schema": REST_SCHEMA, "alias": alias, "rest": rest, "profile": ctx["profile"],
+        S.save_json(os.path.join(mdir, f"{alias_slug(alias)}__rest{sfx}.json"), {"schema": REST_SCHEMA, "alias": alias, "arm": arm, "rest": rest, "profile": ctx["profile"],
                                                                            "motion": {k: motion[k] for k in ("motion", "joint", "q_start", "face_yaw_offset", "handle_sig")}})
         if rest_only:
+            out["wall_s"] = round(time.time() - t0, 2)
+            return out
+        if arm not in motion["arms_offered"]:
+            out["error"] = f"the task offers {motion['arms_offered']}, not the {arm} arm: no trial is run, no library is written"
             out["wall_s"] = round(time.time() - t0, 2)
             return out
         if not rest.get("stable"):
@@ -900,11 +924,11 @@ def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False
                     tr = {"candidate": f"{alias}:{v['name']}", "variant": v["name"], "stop": "error", "error": repr(e), "traceback": traceback.format_exc()[-1500:]}
                 out["trials"].append(tr)
         out["wall_s"] = round(time.time() - t0, 2)
-        vpath = os.path.join(mdir, f"{alias_slug(alias)}.json")
+        vpath = os.path.join(mdir, f"{alias_slug(alias)}{sfx}.json")
         S.save_json(vpath, out)
         lib = build_motion_library(motion, {k: v for k, v in rest.items() if k not in ("physics_profile",)}, ctx["profile"], out["trials"], mw.mcfg,
                                    {"validator": f"{VALIDATOR_VERSION}+{MOTIONS_VERSION}", "validation": os.path.relpath(vpath, d)})
-        lib_path = os.path.join(d, f"artic_library__{alias_slug(alias)}.json")
+        lib_path = library_path(d, alias, arm)
         S.save_json(lib_path, lib)
         out["library"] = lib_path
         out["n_segments"] = lib["n_segments"]
@@ -923,16 +947,19 @@ def _motions_main(argv) -> None:
     ap.add_argument("--customs", default=None, help="the customs file (default the code's isg_customs.json)")
     ap.add_argument("--max-trials", type=int, default=MotionConfig.max_trials)
     ap.add_argument("--any-yaw", action="store_true", help="the stance search over 8 base yaws (default: the task's face yaw only)")
+    ap.add_argument("--arm", default="right", choices=["right", "left"],
+                    help="the validation world's arm (owner 2026-11-07: a left-arm prefix map needs LEFT-arm validated segments); left: the object to the robot's left")
     a = ap.parse_args(argv)
     from ispatialgym.grasping import validate_tabletop as VT
 
-    world = VT.TabletopWorld(VT.ValidateConfig() if a.any_yaw else VT.ValidateConfig(base_yaws=1))
+    kw = {"arm": a.arm} if a.arm == "right" else {"arm": a.arm, "base_offsets": mirrored_offsets(VT.ValidateConfig().base_offsets)}
+    world = VT.TabletopWorld(VT.ValidateConfig(**kw) if a.any_yaw else VT.ValidateConfig(base_yaws=1, **kw))
     mw = MotionWorld(ArticWorld(world, ArticConfig(max_segments=1)), MotionConfig(max_trials=a.max_trials))
     for alias in a.aliases:
         try:
             r = run_alias(mw, alias, a.root, rest_only=a.cmd == "rest", customs_path=a.customs)
             m = r["motion"]
-            print("GB_ARTIC_MOTION " + json.dumps({"alias": alias, "cmd": a.cmd, "motion": m["motion"], "joint": m["joint"], "q_start": m["q_start"],
+            print("GB_ARTIC_MOTION " + json.dumps({"alias": alias, "cmd": a.cmd, "arm": a.arm, "motion": m["motion"], "joint": m["joint"], "q_start": m["q_start"],
                                                     "face_yaw_offset": m["face_yaw_offset"], "arms_offered": m["arms_offered"], "n_variants": len(m["variants"]),
                                                     "rest_stable": r["rest"].get("stable"), "rest_quat": r["rest"].get("quat_xyzw"), "h_root": r["rest"].get("h_root"),
                                                     "brake": r["profile"].get("brake_candidate"), "stable_set": r["profile"].get("stable_set"), "error": r.get("error"),
