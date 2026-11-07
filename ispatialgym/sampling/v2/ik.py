@@ -324,6 +324,44 @@ def support_hull_fallback_min_m() -> float:
     return float(v) if v else HULL_FALLBACK_MIN_CLEARANCE_M
 
 
+#: i7-t03 2026-11-08 (owner request item 2, shared gate APPROVED: switch -> count -> default after the owner sees the count): the pieces a
+#: support split keeps in the world (the side board a book leans on, the walls, the board above; ``support_split.Plan``) are FINGER-ONLY
+#: contact - the finger collision shapes (``hand_geometry.role_links(arm)["finger"]``) may TOUCH them (clearance >= 0 on the fingers' exact
+#: hulls, never judged on the padded spheres) but not penetrate; every other part keeps the obstacle rule (its spheres clear at margin 0);
+#: the policed plane keeps its 2 mm and FingerTouch is unchanged. ``1`` on / ``shadow`` (judge and count, verdict unchanged) / ``0`` off.
+SPLIT_FINGER_TOUCH_ENV = "ISPATIALGYM_SPLIT_FINGER_TOUCH"
+#: i7-t03 2026-11-08 (owner request item 3: the side_9 rule of i7-plateqtf2, ``_hull_fallback`` / :data:`HULL_FALLBACK_MIN_CLEARANCE_M`,
+#: extended to (a) the split-off pieces and (b) the exact-IK witness at the pre-grasp / grasp): when the padded spheres fail NARROWLY - only
+#: the hand's rigid links (palm, wrist camera, wrist), each less than the model's sphere buffer (``contact_policy.MODEL_SPHERE_BUFFER_M``)
+#: deep - those links are judged by their EXACT hulls against the obstacle's convex pieces with :func:`support_hull_fallback_min_m` of real
+#: clearance; arm / torso / base keep their spheres. ``1`` on / ``shadow`` / ``0`` off (default).
+WITNESS_HULL_FALLBACK_ENV = "ISPATIALGYM_WITNESS_HULL_FALLBACK"
+#: version of the two rules' measurement (the exact-IK cache scope while either is on)
+CONTACT_REJUDGE_VERSION = 1
+
+
+def _tri_mode(env: str) -> str:
+    v = os.environ.get(env, "").strip().lower()
+    if v in ("", "0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
+def split_finger_touch_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` of :data:`SPLIT_FINGER_TOUCH_ENV` (default off)."""
+    return _tri_mode(SPLIT_FINGER_TOUCH_ENV)
+
+
+def witness_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` of :data:`WITNESS_HULL_FALLBACK_ENV` (default off)."""
+    return _tri_mode(WITNESS_HULL_FALLBACK_ENV)
+
+
+def contact_rejudge_on() -> bool:
+    """Either i7-t03 contact rule (items 2 / 3) on or in shadow: :meth:`IKChecker.contact_rejudge` runs."""
+    return split_finger_touch_mode() != "off" or witness_hull_fallback_mode() != "off"
+
+
 def registered_supports_only() -> bool:
     """of-v2maps 2026-11-07 (owner prompt "supports with protrusions": what counts as the support plane, the policy unchanged): the support
     policy polices only the supports whose plane the sampler REGISTERED (``IKChecker.support_plane_z``: a map hit's measured top, a tray floor,
@@ -641,6 +679,9 @@ class IKChecker:
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
         self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
+        m2, m3 = split_finger_touch_mode(), witness_hull_fallback_mode()
+        if "on" in (m2, m3):  # i7-t03: another verdict - never shared with the rules off (shadow changes no verdict: the keys stay)
+            self.cache_scope["contact_rejudge"] = [m2, m3, round(support_hull_fallback_min_m(), 5), CONTACT_REJUDGE_VERSION]
 
     def _holding(self, arm: str) -> bool:
         """``arm`` has an object attached in the planner (``navigation.attached`` / ``R1ProCuRobo.attach_object``: a place, carry or release
@@ -821,9 +862,23 @@ class IKChecker:
             return fail("non_hand_link")  # an arm / torso / base link: no exact hull to judge it by
         if not bool(self.kit.links_clear(q, hand, margin - CP.MODEL_SPHERE_BUFFER_M)[0]):
             return fail("deeper_than_buffer")
+        split_geoms: List[Any] = []
         with self.ignoring(list(supports)):
             if not bool(self.kit.links_clear(q, hand, margin)[0]):
-                return fail("other_obstacle")
+                # i7-t03 2026-11-08 (owner item 3a, ISPATIALGYM_WITNESS_HULL_FALLBACK, default off): the hand may fail only on the pieces the
+                # support split keeps (the walls / side board of the policed support) - judged by the same exact hulls and threshold below
+                mode3 = witness_hull_fallback_mode()
+                kept = [(sp, SS.plan_for(self, sp, count=False)) for sp in supports] if mode3 != "off" and SS.split_on() else []
+                kept = [(sp, pl) for sp, pl in kept if pl is not None and pl.kept and not pl.clips]
+                ok_split = False
+                if kept:
+                    with self.ignoring([sp for sp, _ in kept], split=False):
+                        ok_split = bool(self.kit.links_clear(q, hand, margin)[0])
+                if not ok_split:
+                    return fail("other_obstacle")
+                split_geoms = [self._pieces_geometry(sp, frozenset(p for p, _ in SS._pieces(sp)) - pl.off) for sp, pl in kept]
+                if any(g is None for g in split_geoms):
+                    return fail("split_pieces_unmeasured")
         hc = getattr(self, "_hand_checker", None)
         if hc is None or hc.arm != arm:
             hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
@@ -832,6 +887,15 @@ class IKChecker:
         T[:3, :3] = _quat_mat(G.t(eef[1]).float())
         T[:3, 3] = G.t(eef[0]).float()
         fq = float(getattr(self, "_policy_opening", None) or float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean()))
+        if split_geoms:
+            smin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))[r]).reshape(-1)[0]) for g in split_geoms for r in ("palm", "wrist_camera", "wrist"))
+            out["split_pieces_hull_min_m"] = round(smin, 5)
+            if smin < thr - 1e-9:
+                return fail("split_pieces_hull_clearance")
+            if witness_hull_fallback_mode() == "shadow":
+                self._count("witness.hull_fallback_shadow_pass")
+                return fail("split_pieces_shadow")
+            self._count("witness.hull_fallback_passed")
         planes = getattr(self, "support_plane_z", None)
         worst = float("inf")
         for sp in supports:
@@ -913,7 +977,22 @@ class IKChecker:
         Wherever the sampler ignores a support - grasp chains, the approach tail, places, lifts, releases, the program check - whether or
         not the contact policy is on. ``split=False``: every object whole (diagnostics that ask "with these objects out of the world")."""
         resolver = (lambda o: SS.plan_for(self, o)) if (split and SS.split_on()) else None
-        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
+        ctx = _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
+        if not contact_rejudge_on():
+            return ctx
+        return self._tracked_ignoring(ctx, list(objs), resolver is not None)
+
+    @contextmanager
+    def _tracked_ignoring(self, ctx: Any, objs: List[Any], split: bool):
+        """i7-t03: :meth:`ignoring` that records its objects while active (``_ignore_stack``: what :meth:`contact_rejudge` reads when a
+        witness is judged inside the context). Used only while an i7-t03 contact rule is on."""
+        stack = self.__dict__.setdefault("_ignore_stack", [])
+        with ctx:
+            stack.append((objs, split))
+            try:
+                yield ctx
+            finally:
+                stack.pop()
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -939,7 +1018,11 @@ class IKChecker:
             return False
         if float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0]))) > self.WITNESS_POS_TOL or G.quat_angle(eef[1], G.t(pose[1])) > self.WITNESS_ANG_TOL:
             return False
-        return bool(self.kit.collision_free(q, margin=0.0)[0])
+        if bool(self.kit.collision_free(q, margin=0.0)[0]):
+            return True
+        # i7-t03 2026-11-08 (items 2 / 3, default off): a witness that collides only through the fingers touching a split-off piece or the
+        # hand's rigid links narrowly inside the sphere buffer is judged by the exact hulls
+        return bool(contact_rejudge_on() and bool(self.contact_rejudge(q, arm, None, where="witness")[0]))
 
     def collision_free_at(self, q: th.Tensor, pose: Pose, arm: str, ignore: Sequence[Any] = ()) -> bool:
         """``q`` (a configuration ``exact`` returned) reaches ``pose`` and is collision-free in the CURRENT world with
@@ -1304,6 +1387,8 @@ class IKChecker:
                             q = self._solve_exact(p, q_alt, arm)
                             if q is not None:
                                 break
+                    if q is None and contact_rejudge_on():
+                        q = self._solve_rejudged(p, q_near, arm)  # i7-t03 items 2 / 3 (default off)
                 if q is None:
                     why = f"exact IK failed at pose {i + 1} of {n}"
                     break
@@ -1751,6 +1836,12 @@ class IKChecker:
             ign = list(ignore_mid) + list(extra)
             with self.ignoring(ign):
                 free = self.kit.collision_free(traj[idxs], margin=0.0)
+            if not bool(free.all()) and contact_rejudge_on():  # i7-t03 items 2 / 3 (default off)
+                hit = [j for j, f in enumerate(free.tolist()) if not f]
+                rj = self.contact_rejudge(traj[[idxs[j] for j in hit]], arm, ign, where="track")
+                free = free.clone()
+                for j, ok_j in zip(hit, rj.tolist()):
+                    free[j] = bool(ok_j)
             present = [o for o in touch if all(o is not x for x in ign)]
             if not bool(free.all()) and present:
                 hit = [j for j, f in enumerate(free.tolist()) if not f]
@@ -1769,6 +1860,8 @@ class IKChecker:
         ign = list(ignore_mid) + list(ignore_end)
         with self.ignoring(ign):
             end_free = bool(self.kit.collision_free(traj[-1], margin=0.0)[0])
+        if not end_free and contact_rejudge_on():  # i7-t03 items 2 / 3 (default off)
+            end_free = bool(self.contact_rejudge(traj[-1:], arm, ign, where="track")[0])
         present = [o for o in touch if all(o is not x for x in ign)]
         if not end_free and present:
             # the program check's grasp approach is 3 segments: the first two end with the support in the world
@@ -2111,6 +2204,198 @@ class IKChecker:
         except Exception:  # noqa: BLE001 - a backend without the sphere-to-link map: the rule cannot separate the fingers
             return []
         return [l for l in links if l not in set(M.FINGER_LINKS[arm])]
+
+    # -- i7-t03 2026-11-08 (owner items 2 / 3): split-off pieces as finger-only contact, the hull fallback of the witness --------------
+
+    def _active_ignores(self) -> Tuple[List[Any], List[Any]]:
+        """``(split, whole)``: the objects of the active :meth:`ignoring` contexts that ignore with the support split (a registered support
+        keeps its pieces above the plane in the world) and those ignored whole (``split=False``)."""
+        sp, wh = [], []
+        for objs, split in self.__dict__.get("_ignore_stack", []):
+            (sp if split else wh).extend(objs)
+        return sp, wh
+
+    def _registered_objects(self) -> List[Any]:
+        """The scene / spawned objects the support split registered (``support_split.registered_names``) - the supports a hand can meet
+        whole at a pre-grasp."""
+        names = SS.registered_names(self)
+        if not names:
+            return []
+        world = getattr(self.kit, "world", None)
+        cands = list(getattr(world, "spawned", {}).values()) if world is not None else []
+        cands += list(getattr(getattr(world, "scene", None), "objects", []) or [])
+        out, seen = [], set()
+        for o in cands:
+            n = getattr(o, "name", None)
+            if n in names and n not in seen:
+                seen.add(n)
+                out.append(o)
+        return out
+
+    def _pieces_geometry(self, sp: Any, only: Optional[Any] = None) -> Optional[ConvexPieces]:
+        """:class:`ConvexPieces` of ``sp``'s collision pieces (``only``: those prim paths), cached per support, its pose and the piece set;
+        None when a piece cannot be read."""
+        try:
+            p, q = sp.get_position_orientation()
+            root = tuple(round(float(v), 4) for v in list(G.t(p).tolist()) + list(G.t(q).tolist()))
+        except Exception:  # noqa: BLE001
+            root = None
+        key = (getattr(sp, "name", id(sp)), root, None if only is None else tuple(sorted(only)))
+        cache = self.__dict__.setdefault("_contact_geometry_cache", {})
+        if key not in cache:
+            verts = self._support_pieces_world(sp, only)
+            geom = ConvexPieces.from_vertices(verts, name=str(getattr(sp, "name", "obstacle"))) if verts else None
+            cache[key] = geom if (geom is not None and geom.halfspaces) else None
+        return cache[key]
+
+    def contact_rejudge(self, qs: th.Tensor, arm: str, ignored: Optional[Sequence[Any]] = None, where: str = "witness") -> th.Tensor:
+        """i7-t03 2026-11-08 (owner items 2 / 3; :data:`SPLIT_FINGER_TOUCH_ENV`, :data:`WITNESS_HULL_FALLBACK_ENV`, both default off): ``(K,)``
+        bool - configurations ``qs`` that FAIL ``collision_free(margin=0)`` with ``ignored`` out of the world (None: the active
+        :meth:`ignoring` contexts, a witness judged inside one) re-judged by the exact hulls against the obstacles the two rules cover - the
+        pieces a support split keeps (the ignored registered supports' ``Plan`` with kept pieces; a plan with clipped straddlers is not
+        judged) and the registered supports in the world whole (item 3b: the pre-grasp's bookcase):
+
+        (a) the whole body collision-free at margin 0 with those obstacles out of the world (the failure is theirs alone);
+        (b) every link but the hand (the fingers and the rigid hand links) clear at margin 0 - today's obstacle rule;
+        (c) the hand's rigid links (palm, wrist camera, wrist): clear at margin 0, else (item 3) clear at margin 0 less the model's sphere
+            buffer (NARROW) and their exact hulls at least :func:`support_hull_fallback_min_m` from every obstacle's convex pieces;
+        (d) the fingers: clear at margin 0, else (item 2) clear of everything but the split-off pieces at margin 0 and their exact hulls at
+            clearance >= 0 from those pieces (touch, no penetration) - never judged on the spheres.
+
+        A rule in ``shadow`` judges and counts but its passes stay failures. Counters ``support_split.finger_touch_allowed`` /
+        ``.finger_touch_shadow_pass`` / ``.finger_touch_failed.<why>``, ``witness.hull_fallback_passed`` / ``.hull_fallback_shadow_pass`` /
+        ``.hull_fallback_failed.<why>``, ``contact_rejudge.<where>.checked`` / ``.passed`` / ``.rejected.<why>``."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.oracle import r1pro_model as M
+
+        qs = G.t(qs)
+        if qs.dim() == 1:
+            qs = qs.unsqueeze(0)
+        n = int(qs.shape[0])
+        out = th.zeros(n, dtype=th.bool)
+        m2, m3 = split_finger_touch_mode(), witness_hull_fallback_mode()
+        if n == 0 or (m2 == "off" and m3 == "off"):
+            return out
+        self._count(f"contact_rejudge.{where}.checked", n)
+        if ignored is None:
+            ign_split, ign_whole = self._active_ignores()
+            base_ign: List[Any] = []
+        else:
+            ign_split, ign_whole, base_ign = list(ignored), [], list(ignored)
+
+        def is_in(o, xs):
+            return any(o is x for x in xs)
+
+        kept: List[Tuple[Any, Any]] = []
+        for o in ign_split:
+            if is_in(o, ign_whole) or is_in(o, [k for k, _ in kept]):
+                continue
+            plan = SS.plan_for(self, o, count=False) if SS.split_on() else None
+            if plan is not None and plan.kept:
+                kept.append((o, plan))
+        whole = [o for o in self._registered_objects() if not is_in(o, ign_split) and not is_in(o, ign_whole)]
+
+        def reject(why: str) -> th.Tensor:
+            self._count(f"contact_rejudge.{where}.rejected.{why}", n)
+            return out
+
+        if not kept and not whole:
+            return reject("no_obstacle")
+        if any(plan.clips for _, plan in kept):
+            return reject("clipped_straddler")
+        g_kept = [self._pieces_geometry(o, frozenset(p for p, _ in SS._pieces(o)) - plan.off) for o, plan in kept]
+        g_whole = [self._pieces_geometry(o) for o in whole]
+        if any(g is None for g in g_kept + g_whole):
+            return reject("unmeasured")
+        objs = [o for o, _ in kept] + whole
+        fingers = list(M.FINGER_LINKS[arm])
+        rigid = list(CP.DEFAULT.hand_rigid_links(arm))
+        rest = [l for l in self._non_finger_links(arm) if l not in set(rigid)]
+        if not rest:
+            return reject("no_link_map")
+        buf = float(CP.MODEL_SPHERE_BUFFER_M)
+        thr = float(support_hull_fallback_min_m())
+        with self.ignoring(base_ign), self.ignoring(objs, split=False):
+            body = self.kit.collision_free(qs, margin=0.0).clone()
+        with self.ignoring(base_ign):
+            rest_ok = self.kit.links_clear(qs, rest, 0.0)
+            rig0 = self.kit.links_clear(qs, rigid, 0.0)
+            rig_narrow = self.kit.links_clear(qs, rigid, -buf)
+            fin0 = self.kit.links_clear(qs, fingers, 0.0)
+        with self.ignoring(base_ign), self.ignoring([o for o, _ in kept], split=False):
+            fin_rest = self.kit.links_clear(qs, fingers, 0.0)
+        grip = self.kit.robot.gripper_control_idx[arm]
+        hc = self._touch_hand_checker(arm)
+        for i in range(n):
+            if not bool(body[i]):
+                self._count(f"contact_rejudge.{where}.rejected.other_collision")
+                continue
+            if not bool(rest_ok[i]):
+                self._count(f"contact_rejudge.{where}.rejected.non_hand_link")
+                continue
+            T = self._eef_matrix(qs[i], arm)
+            fq = float(qs[i, grip].float().mean())
+            hand_fb, finger_fb, verdict = False, False, True
+            if not bool(rig0[i]):
+                if m3 == "off":
+                    self._count(f"contact_rejudge.{where}.rejected.hand_link")
+                    continue
+                why = None
+                if not bool(rig_narrow[i]):
+                    why = "deeper_than_buffer"
+                else:
+                    hmin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))[r]).reshape(-1)[0]) for g in g_kept + g_whole for r in ("palm", "wrist_camera", "wrist"))
+                    if hmin < thr - 1e-9:
+                        why = "hull_clearance"
+                if why is not None:
+                    self._count(f"witness.hull_fallback_failed.{why}")
+                    continue
+                hand_fb = True
+                verdict = verdict and m3 == "on"
+            if not bool(fin0[i]):
+                why = None
+                if m2 == "off":
+                    why = "off"
+                elif not kept:
+                    why = "not_split_piece"
+                elif not bool(fin_rest[i]):
+                    why = "other_obstacle"
+                else:
+                    fmin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))["finger"]).reshape(-1)[0]) for g in g_kept)
+                    if fmin < -1e-9:
+                        why = "penetration"
+                if why is not None:
+                    self._count(f"support_split.finger_touch_failed.{why}")
+                    continue
+                finger_fb = True
+                verdict = verdict and m2 == "on"
+            if hand_fb:
+                self._count("witness.hull_fallback_passed" if m3 == "on" else "witness.hull_fallback_shadow_pass")
+            if finger_fb:
+                self._count("support_split.finger_touch_allowed" if m2 == "on" else "support_split.finger_touch_shadow_pass")
+            if verdict:
+                out[i] = True
+                self._count(f"contact_rejudge.{where}.passed")
+        return out
+
+    def _solve_rejudged(self, pose: Pose, q_seed: th.Tensor, arm: str) -> Optional[th.Tensor]:
+        """i7-t03 (items 2 / 3): the pose solved with the obstacles :meth:`contact_rejudge` covers out of the world (the split-off pieces of
+        the active ignore contexts, the registered supports present whole), the solution kept when it collides only as those rules allow -
+        how the support policy treats its plane (solved without it, then judged). None otherwise. Counter ``contact_rejudge.solve.tried``."""
+        ign_split, ign_whole = self._active_ignores()
+        objs = [o for o in ign_split if not any(o is w for w in ign_whole)
+                and getattr(SS.plan_for(self, o, count=False) if SS.split_on() else None, "kept", 0)]
+        objs += [o for o in self._registered_objects() if not any(o is x for x in ign_split + ign_whole)]
+        if not objs:
+            return None
+        self._count("contact_rejudge.solve.tried")
+        with self.ignoring(objs, split=False):
+            q = self._solve_exact(pose, q_seed, arm)
+        if q is None:
+            return None
+        if bool(self.kit.collision_free(q, margin=0.0)[0]) or bool(self.contact_rejudge(q, arm, None, where="solve")[0]):
+            return q
+        return None
 
     #: the oracle's ``Motions._densify`` resolution of a tracked eef chain (``MotionsConfig.cartesian_step`` / ``cartesian_rot_step``)
     TRACK_STEP_M = 0.01
