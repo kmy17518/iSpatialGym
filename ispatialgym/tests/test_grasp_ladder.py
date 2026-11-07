@@ -154,7 +154,7 @@ def test_generate_runs_proposals_through_the_same_gates(tmp_path, monkeypatch):
     # the report: per proposal pool the gate chain, the killing gate with its reasons
     rep = LD.entry_report(str(d))
     assert rep["pools"]["agent_p2"]["killed_by"]["gate"] == "width_antipodal" and rep["pools"]["agent_p0"]["geometry_ok"] == len(good)
-    assert "agent_p0" in LD.summarize(rep)
+    assert "agent_p0" in LD.summarize(rep) and "killed at width_antipodal" in LD.summarize(rep) and "antipodal " in LD.summarize(rep)
     # the pipeline's candidates log line keeps the given-pose pools
     rec_line = {k: v for k, v in out["log"].items() if k in ("n_sampled",) or (isinstance(v, dict) and "source" in v)}
     assert set(rec_line) == {"n_sampled", "agent_p0", "agent_p1_side", "agent_p2"}

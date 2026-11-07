@@ -497,6 +497,21 @@ def entry_report(model_dir: str) -> Dict[str, Any]:
     return out
 
 
+#: the measures each gate decides on (gate_dump stats): the report prints their min / median / max over the dropped poses
+GATE_MEASURES = {"width_antipodal": ("width_mm", "antipodal"), "support_retreat": ("deficit_mm", "retreat_mm"), "support_lift": ("lift_mm",),
+                 "object_clear": ("sphere_clear_mm", "shift_mm"), "sweep": ("touch_mm", "limit_mm"), "lever": ("com_perp_mm", "cap_mm")}
+
+
+def _measured(k: Dict[str, Any]) -> str:
+    out = []
+    for m in GATE_MEASURES.get(k.get("gate"), ()):
+        st = (k.get("stats") or {}).get(m) or {}
+        p = st.get("pct")
+        if p:
+            out.append(f"{m} {p[0]}/{p[2]}/{p[4]}")
+    return ", ".join(out)
+
+
 def summarize(rep: Dict[str, Any]) -> str:
     lines = [f"{os.path.basename(rep['dir'])}: physics-valid {rep['n_valid']}"]
     for pool, r in rep["pools"].items():
@@ -507,7 +522,7 @@ def summarize(rep: Dict[str, Any]) -> str:
             s += f" | error {r['error']}"
         if r.get("killed_by"):
             k = r["killed_by"]
-            s += f" | killed at {k['gate']} ({k['dropped_by']})"
+            s += f" | killed at {k['gate']} ({k['dropped_by'] or 'all'}; min/median/max {_measured(k) or '-'})"
         if r["physics_reasons"]:
             s += f" | physics {r['physics_reasons']}"
         lines.append(s)
