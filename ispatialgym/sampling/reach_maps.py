@@ -798,6 +798,360 @@ class ReachMap:
         return (st * w_g[None, None, :]).sum(axis=(1, 2)) / len(self.yaws)
 
 
+# ------------------------------------------------------------------------------------------------ generic pinch maps (prompt I item 7)
+#
+# i7-generic 2026-11-07: the GENERIC-PINCH kind - the scene-independent replacement of the legacy per-scene ``--generic-pinch`` bands
+# (``reach_bands.BandComputer`` with ``grasp_sets=None``: blocks, axial push targets; alignment-axial_01..05, block_design_01). The legacy
+# band's pose set does not depend on the object, so a generic map has no library entry: one map per (height, arm, pose set, policy, robot,
+# config), written under ``<maps root>/_generic/``. Kept apart from :func:`compute_map` (its own functions, its own key / save / find).
+
+
+GENERIC_KIND = "generic"
+#: the maps-root directory of the generic pseudo-entry (the maps of one root share it; the pose set is in each map's identity)
+GENERIC_DIR = "_generic"
+#: eef height above the support (m): the legacy ``max(0.6 h, 0.03)`` (``reach_bands`` generic pinch, ``tabletop.compute_bands``) at the
+#: objects of the six aliases (h <= 5 cm: the axial targets, the 2.5 cm blocks)
+GENERIC_DZ_M = 0.03
+#: the finger opening rule of a generic pinch (``fingers_q`` default): the support policy measures a grasp without a pinch width at the
+#: configuration's own opening (``tabletop.policy_opening_of`` -> None; ``RobotKit.q_config`` locks the fingers at ``FINGER_OPEN``), which
+#: is also the legacy band's locked opening (``BandComputer.fingers`` 0.05) - fully open, the widest (worst-case) hand against the slab
+GENERIC_FINGERS_RULE = "configuration's own opening (no pinch width: tabletop.policy_opening_of -> None; RobotKit.q_config FINGER_OPEN)"
+
+
+def generic_dz(object_height: float) -> float:
+    """The legacy eef height above the support of a generic pinch for an object ``object_height`` tall: ``max(0.6 h, 0.03)``."""
+    return round(max(0.6 * float(object_height), GENERIC_DZ_M), 4)
+
+
+def generic_pose_set(dz_m: float = GENERIC_DZ_M, fingers_q: Optional[float] = None) -> Dict[str, Any]:
+    """The pose set of a generic map (part of its identity): the legacy generic classes (``reach_bands.GENERIC_CLASSES``: approach pitched
+    ``TILTS_GENERIC`` deg from straight down toward the robot's forward = +x of the map frame, wrist yaw ``YAWS_GENERIC_DEG`` in the base
+    frame; tilt-major, yaw-minor = ``RobotKit.grasp_candidates_at``'s order = the bit order of the class mask), the eef at the cell, ``dz_m``
+    above the slab top, the pre-grasp ``pre_dist_m`` back along the approach (eef +z), the fingers at ``fingers_q`` per finger (default
+    :data:`GENERIC_FINGERS_RULE`) through the whole approach - no closing sweep (no pinch width: the exact check closes on the real
+    object). The support is NOT ignored at the grasp (the legacy band ignored it): the contact policy applies against the slab."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import reach_bands as RB
+
+    fq = float(C.FINGER_OPEN if fingers_q is None else fingers_q)
+    return {"name": "generic_pinch", "classes": list(RB.GENERIC_CLASSES), "tilts_deg": [float(t) for t in RB.TILTS_GENERIC],
+            "wrist_yaws_deg": [float(y) for y in RB.YAWS_GENERIC_DEG], "order": "tilt-major, wrist-yaw-minor (RobotKit.grasp_candidates_at)",
+            "toward": [1.0, 0.0], "dz_m": round(float(dz_m), 4), "fingers_q": round(fq, 4),
+            "fingers_rule": GENERIC_FINGERS_RULE if fingers_q is None else "explicit", "pre_dist_m": float(C.PRE_DIST),
+            "closing_sweep": False, "support_at_grasp": "contact policy (not ignored)", "on_support": "cell x >= d_e (the eef point over the slab)"}
+
+
+def generic_rotations(pose_set: Dict[str, Any]) -> np.ndarray:
+    """(G, 3, 3) eef orientations of the pose set's classes in the map frame, by the legacy band's own pose function
+    (``RobotKit.top_down_quat``: base yaw 0, forward +x)."""
+    from ispatialgym.sampling.robot_utils import RobotKit
+
+    out = [S.quat_to_mat([float(v) for v in RobotKit.top_down_quat(math.radians(float(y)), float(t), pose_set["toward"])])
+           for t in pose_set["tilts_deg"] for y in pose_set["wrist_yaws_deg"]]
+    if len(out) != len(pose_set["classes"]):
+        raise ValueError(f"generic pose set: {len(out)} poses for {len(pose_set['classes'])} classes")
+    return np.stack(out)
+
+
+def generic_class_rows(pose_set: Dict[str, Any], R: np.ndarray) -> List[Dict[str, Any]]:
+    """The map's class axis (``meta["grasps"]``, the rows ``ReachMap.cell_weights`` / ``pairs`` index): one row per class, each its own
+    measure (``base`` = the class, no twins / families), the eef pose relative to the cell at the slab top (``T_cell_eef``)."""
+    rows = []
+    names = iter(pose_set["classes"])
+    for t in pose_set["tilts_deg"]:
+        for y in pose_set["wrist_yaws_deg"]:
+            T = np.eye(4)
+            T[:3, :3] = R[len(rows)]
+            T[2, 3] = float(pose_set["dz_m"])
+            n = next(names)
+            rows.append({"name": n, "base": n, "twin": False, "family_id": None, "param": None, "tilt_deg": float(t), "wrist_yaw_deg": float(y),
+                         "preshape_q": float(pose_set["fingers_q"]), "contact_q": float(pose_set["fingers_q"]), "physics": "generic_pinch",
+                         "yaw_equivalent": False, "T_cell_eef": S.mat_pose(T)})
+    return rows
+
+
+def generic_map_key(meta: Dict[str, Any]) -> str:
+    """The identity of a generic map: schema, kind, arm, edge distances, config, policy key, robot, height and the pose set."""
+    ident = {k: meta.get(k) for k in ("schema", "kind", "arm", "edge_distances", "config", "policy_key", "robot", "pose_set")}
+    ident["height"] = meta["height"]["value"]
+    return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def compute_generic_map(world: SynthWorld, height: float, anchor: Dict[str, Any], cfg: Optional[MapConfig] = None,
+                        policy: CP.ContactPolicy = CP.DEFAULT, pose_set: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
+    """One generic map: (meta, arrays), status per (edge distance, trunk, cell, class) as ``(cells, 1, classes)`` arrays (one "yaw": the
+    classes carry the orientation). The checks of :func:`compute_map` without an object: the hand hulls against the slab at the pose set's
+    fixed opening at the pre-grasp and along the straight approach to the grasp (per ``d_e``), the reach bound, batched IK of the pre-grasp
+    and of the grasp seeded from it (branch jump), then per ``d_e`` every non-finger sphere at the pre-grasp, the grasp and the
+    joint-interpolated configurations clear of the slab and the hand hulls at the FK eef poses. Exhaustive (``cfg.mode`` is not used)."""
+    from ispatialgym.sampling.reach_bands import trunk_grid
+
+    cfg = cfg or world.cfg
+    ps = dict(pose_set or generic_pose_set())
+    t_all = time.time()
+    tim: Dict[str, float] = {}
+    dev = world.dev
+    cells = lattice(cfg)
+    R = generic_rotations(ps)
+    rows = generic_class_rows(ps, R)
+    nC, nG = len(cells), len(rows)
+    fq = float(ps["fingers_q"])
+    trunks = trunk_grid(height)
+    arrays: Dict[str, np.ndarray] = {"cells": cells.astype(np.float32), "yaws": np.zeros(1, dtype=np.float32)}
+    meta_trunks: List[Dict[str, Any]] = []
+    # -- eef targets (cells x classes, row-major), world = map frame
+    t0 = time.time()
+    TE_t = th.eye(4, device=dev).repeat(nC, nG, 1, 1)
+    TE_t[:, :, :3, :3] = th.as_tensor(R, dtype=th.float32, device=dev).unsqueeze(0)
+    TE_t[:, :, 0, 3] = th.as_tensor(cells[:, 0], dtype=th.float32, device=dev).view(nC, 1)
+    TE_t[:, :, 1, 3] = th.as_tensor(cells[:, 1], dtype=th.float32, device=dev).view(nC, 1)
+    TE_t[:, :, 2, 3] = float(height) + float(ps["dz_m"])
+    TE_flat = TE_t.reshape(-1, 4, 4)
+    TP_flat = TE_flat.clone()
+    TP_flat[:, :3, 3] -= float(ps["pre_dist_m"]) * TP_flat[:, :3, 2]
+    N = TE_flat.shape[0]
+    tim["targets_s"] = round(time.time() - t0, 3)
+    # -- the hand vs the slab per d_e (IK-independent): the fixed opening from the pre-grasp along the approach to the grasp (path ends incl.)
+    t0 = time.time()
+    hc = CP.HandChecker(cfg.arm, policy, device=str(dev), spacing=cfg.hand_spacing_m)
+    path = CP.approach_path(TP_flat, TE_flat, policy.approach_step_m * 2)
+    hand_ok: Dict[float, th.Tensor] = {}
+    for d_e in cfg.edge_distances:
+        sb = slab(height, d_e, cfg)
+        ok = th.ones(N, dtype=th.bool, device=dev)
+        for k in range(path.shape[0]):
+            ok &= hc.check(path[k], sb, (fq, fq))[0]
+        hand_ok[d_e] = ok
+    del path
+    tim["hand_policy_s"] = round(time.time() - t0, 3)
+    # the eef point over the slab (object-independent: the sampler's erosion keeps the object's footprint on the real top)
+    onsup = {d_e: th.as_tensor(np.repeat((cells[:, 0] >= d_e - 1e-9)[:, None], nG, axis=1).reshape(-1), device=dev) for d_e in cfg.edge_distances}
+    entry = world.entry()
+    links = world.link_of_sphere()
+    t_ik = t_chk = 0.0
+    n_ik = 0
+    for tr, ti in trunks:
+        key = f"t{tr:.2f}_k{ti:+.1f}"
+        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
+        status = {d_e: th.zeros(N, dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        posture, q_lock = None, None
+        for p in cfg.postures:
+            q = world.q_config(tr, ti, p, fingers=fq)
+            if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
+                continue
+            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
+            slab_free = [bool(CP.sphere_support_ok(sph, ln, slab(height, d_e, cfg), cfg.arm, policy)[0][0]) for d_e in cfg.edge_distances]
+            if all(slab_free):
+                posture, q_lock = p, q
+                break
+            rec.setdefault("slab_collide_by_posture", {})[p] = slab_free
+        rec["posture"] = posture
+        if q_lock is None:
+            rec.update(eligible=False, reason="every idle-arm posture collides (self or the slab at some d_e)")
+            for d_e in cfg.edge_distances:
+                arrays[f"s{d_e:.2f}_{key}"] = np.full((nC, 1, nG), STATUS["trunk_ineligible"], dtype=np.uint8)
+            meta_trunks.append(rec)
+            continue
+        rec["eligible"] = True
+        sh, L = world.shoulder(tr, ti)
+        sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
+        reach = L + cfg.reach_margin_m
+        in_reach = (th.linalg.norm(TE_flat[:, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(TP_flat[:, :3, 3] - sh_t, dim=1) <= reach)
+        rec.update({"shoulder": [round(float(v), 4) for v in sh], "arm_len": round(L, 4)})
+        any_hand = th.zeros(N, dtype=th.bool, device=dev)
+        for d_e in cfg.edge_distances:
+            any_hand |= hand_ok[d_e] & onsup[d_e]
+        order = th.nonzero(in_reach & any_hand).flatten()
+        rec["n_problems"] = int(order.numel())
+        ta = time.time()
+        succ_pre, q_pre = _solve(world, entry, TP_flat[order], q_lock)
+        n_ik += int(order.numel())
+        t_ik += time.time() - ta
+        pre_any = succ_pre.any(dim=1)
+        first_seed = th.argmax(succ_pre.int(), dim=1)
+        q_pre1 = q_pre[th.arange(order.numel(), device=dev), first_seed]
+        sel = th.nonzero(pre_any).flatten()
+        ta = time.time()
+        succ_g, q_g = _solve(world, entry, TE_flat[order[sel]], q_lock, seed_active=q_pre1[sel]) if sel.numel() else (None, None)
+        n_ik += int(sel.numel())
+        t_ik += time.time() - ta
+        tb = time.time()
+        feas = {d_e: th.zeros(sel.numel(), dtype=th.bool, device=dev) for d_e in cfg.edge_distances}
+        why = {d_e: th.full((sel.numel(),), STATUS["ik_grasp"], dtype=th.uint8, device=dev) for d_e in cfg.edge_distances}
+        if sel.numel():
+            qp = q_pre1[sel]
+            for s in range(cfg.seeds):
+                ok_s = succ_g[:, s]
+                if not bool(ok_s.any()):
+                    continue
+                qg = q_g[:, s]
+                jump = (qg - qp).abs().max(dim=1).values > cfg.branch_max_rad
+                cand_s = ok_s & ~jump
+                for d_e in cfg.edge_distances:
+                    cur = cand_s & ~feas[d_e]
+                    why[d_e] = th.where(ok_s & jump & ~feas[d_e], th.full_like(why[d_e], STATUS["branch_jump"]), why[d_e])
+                    if not bool(cur.any()):
+                        continue
+                    ii = th.nonzero(cur).flatten()
+                    good = th.ones(ii.numel(), dtype=th.bool, device=dev)
+                    sb = slab(height, d_e, cfg)
+                    for t in [0.0] + [k / (cfg.approach_configs + 1) for k in range(1, cfg.approach_configs + 1)] + [1.0]:
+                        for c0 in range(0, ii.numel(), 8192):
+                            iic = ii[c0:c0 + 8192]
+                            sp = world.spheres(world.full_q(entry, qp[iic] * (1 - t) + qg[iic] * t, q_lock))
+                            o, _ = CP.sphere_support_ok(sp, links, sb, cfg.arm, policy)
+                            good[c0:c0 + 8192] &= o.to(dev)
+                    w_slab = ~good
+                    # the hand hulls at the FK eef of the grasp and the pre-grasp (IK tolerance), the pose set's opening
+                    for qq in (qg[ii], qp[ii]):
+                        good &= hc.check(world.eef(world.full_q(entry, qq, q_lock)), sb, (fq, fq))[0]
+                    w_hand = ~good & ~w_slab
+                    feas[d_e][ii] |= good
+                    w = why[d_e][ii]
+                    w = th.where(w_slab, th.full_like(w, STATUS["slab_spheres"]), w)
+                    w = th.where(w_hand, th.full_like(w, STATUS["hand_policy"]), w)
+                    why[d_e][ii] = w
+        t_chk += time.time() - tb
+        for d_e in cfg.edge_distances:
+            st = status[d_e]
+            st.fill_(STATUS["unevaluated"])
+            st[~in_reach] = STATUS["reach_bound"]
+            st[in_reach & ~hand_ok[d_e]] = STATUS["hand_policy"]
+            st[~onsup[d_e]] = STATUS["off_support"]
+            vals = th.full((order.numel(),), STATUS["ik_pre"], dtype=th.uint8, device=dev)
+            if sel.numel():
+                vals[sel] = th.where(feas[d_e], th.full_like(why[d_e], STATUS["feasible"]), why[d_e])
+            ok_here = hand_ok[d_e][order] & onsup[d_e][order]
+            st[order] = th.where(ok_here, vals, st[order])
+            a = st.view(nC, 1, nG).cpu().numpy()
+            arrays[f"s{d_e:.2f}_{key}"] = a
+            rec.setdefault("n_feasible", {})[f"{d_e:.2f}"] = int((a == STATUS["feasible"]).sum())
+            rec.setdefault("class_counts", {})[f"{d_e:.2f}"] = {r["name"]: int((a[:, 0, g] == STATUS["feasible"]).sum()) for g, r in enumerate(rows)}
+        meta_trunks.append(rec)
+    tim.update({"ik_s": round(t_ik, 2), "checks_s": round(t_chk, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)})
+    meta = {"schema": SCHEMA, "kind": GENERIC_KIND, "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
+            "object": None, "object_key": GENERIC_KIND, "rest_id": None,
+            "height": {"value": height, "anchor_key": anchor.get("key"), "anchor_surfaces": anchor.get("surfaces", [])[:50]},
+            "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "policy": policy.meta(cfg.arm),
+            "slab": {"depth_m": cfg.slab_depth_m, "long_m": cfg.slab_long_m, "thickness_m": cfg.slab_thickness_m},
+            "ik": {"seeds": cfg.seeds, "position_tolerance": world.backend.position_tolerance, "orientation_tolerance": world.backend.orientation_tolerance,
+                   "collision_world": "floor cuboid + self-collision (slab checked explicitly)", "pre_dist": float(ps["pre_dist_m"])},
+            "approach_check": f"hand hulls at {fq:.4f} m per finger at the pre-grasp and every {policy.approach_step_m * 2:.3f} m of the straight approach "
+                              f"to the grasp (no closing sweep); whole-robot spheres at {cfg.approach_configs} joint-interpolated configurations",
+            "screening": "full", "exhaustive": True, "pose_set": ps, "classes": list(ps["classes"]), "grasps": rows,
+            "trunks": meta_trunks, "status_codes": STATUS, "robot": robot_digest(), "timing": tim, "created": S.now()}
+    meta["key"] = generic_map_key(meta)
+    return meta, arrays
+
+
+def save_generic(out_dir: str, meta: Dict[str, Any], arrays: Dict[str, np.ndarray]) -> str:
+    """``<out_dir>/map__generic__h<h>__<key>.{json,npz}`` (``out_dir`` = ``<maps root>/_generic``)."""
+    os.makedirs(out_dir, exist_ok=True)
+    base = os.path.join(out_dir, f"map__{GENERIC_KIND}__h{float(meta['height']['value']):.4f}__{meta['key']}")
+    np.savez_compressed(base + ".npz", **arrays)
+    S.save_json(base + ".json", meta)
+    return base + ".json"
+
+
+def find_generic(maps_root: str, height: float, *, arm: str = "right", pose_set: Optional[Dict[str, Any]] = None, policy_key: Optional[str] = None,
+                 robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None, anchors=None) -> Optional[ReachMap]:
+    """The generic map at the anchor covering ``height`` (``AnchorSet.lookup``: exact, or within the anchor's clipped range; without
+    ``anchors`` the height itself) in ``maps_root`` (the ``_generic`` directory), or None. Identity enforced: schema, kind ``generic``, arm,
+    the pose set (dz, fingers, classes, ...: equal as recorded), the policy key, the robot digest, the required config fields, the height,
+    and the map's own key over those (a hand-edited identity does not serve). The hit carries ``rm.lookup`` = ``{how, query_h, map_h}``."""
+    target, how = float(height), "height"
+    if anchors is not None:
+        a, how = anchors.lookup(height)
+        if a is None:
+            return None
+        target = float(a["height"])
+    want_ps = json.dumps(pose_set, sort_keys=True) if pose_set is not None else None
+    for fn in sorted(os.listdir(maps_root)) if os.path.isdir(maps_root) else []:
+        if not fn.endswith(".json") or not fn.startswith("map__"):
+            continue
+        p = os.path.join(maps_root, fn)
+        try:
+            with open(p) as f:
+                m = json.load(f)
+        except Exception:  # noqa: BLE001
+            continue
+        if m.get("schema") != SCHEMA or m.get("kind") != GENERIC_KIND or m.get("arm") != arm:
+            continue
+        if policy_key is not None and m.get("policy_key") != policy_key:
+            continue
+        if robot is not None and m.get("robot") != robot:
+            continue
+        if config_require and any(config_value(m, k) != v for k, v in config_require.items()):
+            continue
+        if want_ps is not None and json.dumps(m.get("pose_set"), sort_keys=True) != want_ps:
+            continue
+        if abs(float(m["height"]["value"]) - target) > 1e-6 or m.get("key") != generic_map_key(m):
+            continue
+        rm = ReachMap(p)
+        rm.lookup = {"how": how, "query_h": round(float(height), 4), "map_h": float(m["height"]["value"])}
+        return rm
+    return None
+
+
+def _generic_meta_matches(path: str, arm: str, pose_set: Dict[str, Any]) -> bool:
+    """``--skip-existing`` of a generic job: the map ``path`` is this run's arm, the generic kind and the job's pose set."""
+    try:
+        with open(path) as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return m.get("arm") == arm and m.get("kind") == GENERIC_KIND and json.dumps(m.get("pose_set"), sort_keys=True) == json.dumps(pose_set, sort_keys=True)
+
+
+def _compute_generic_cli(a) -> None:
+    """``compute --kind generic``: the manifest's generic pseudo-entries (``{"id": "_generic", "kind": "generic"}``, optional ``dz_m``,
+    ``fingers_q``, ``dir`` (default ``_generic``)) at the anchors (``--heights`` / ``--heights-by-id`` by the entry's id) for ``--arm``,
+    written to ``<--out>/<dir>/``; every other manifest entry (and ``--include-derived`` / ``--glib``) is ignored. Sharded by the index of
+    the generic entries (``i/n``): several entries with distinct ids and ``--heights-by-id`` split the heights over the shards."""
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    with open(a.jobs) as f:
+        jobs = [j for j in json.load(f) if j.get("kind") == GENERIC_KIND]
+    if a.only:
+        jobs = [j for j in jobs if j["id"] in set(a.only)]
+    if a.shard:
+        i, n = (int(v) for v in a.shard.split("/"))
+        jobs = [j for k, j in enumerate(jobs) if k % n == i]
+    with open(a.anchors) as f:
+        an = json.load(f)
+    aset = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+    want = set(a.heights) if a.heights else None
+    anchors = [x for x in aset.anchors if want is None or x["key"] in want]
+    by_id = json.load(open(a.heights_by_id)) if a.heights_by_id else {}
+    if not jobs:
+        print(f"GB_MAP {json.dumps({'kind': GENERIC_KIND, 'ok': True, 'reason': 'no generic entry in this shard'})}", flush=True)
+        print("GB_MAP_DONE", flush=True)
+        raise SystemExit(0)  # no synthetic world was started: nothing to shut down
+    cfg = MapConfig(mode="full", lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, arm=a.arm, twins=False)
+    w = SynthWorld(cfg)
+    known = {x["key"] for x in aset.anchors}
+    for j in jobs:
+        anchors_j = [x for x in aset.anchors if x["key"] in set(by_id[j["id"]])] if j["id"] in by_id else anchors
+        for k in sorted(set(by_id.get(j["id"], a.heights or [])) - known):  # a height the anchor file lacks is said, not skipped silently
+            print(f"GB_MAP {json.dumps({'id': j['id'], 'kind': GENERIC_KIND, 'ok': False, 'h': k, 'arm': cfg.arm, 'reason': 'not an anchor key of --anchors'})}", flush=True)
+        ps = generic_pose_set(float(j.get("dz_m", GENERIC_DZ_M)), j.get("fingers_q"))
+        out = os.path.join(a.out, j.get("dir") or GENERIC_DIR)
+        for anc in anchors_j:
+            h = float(anc["height"])
+            if a.skip_existing and any(_generic_meta_matches(p, cfg.arm, ps) for p in glob.glob(os.path.join(out, f"map__{GENERIC_KIND}__h{h:.4f}__*.json"))):
+                continue
+            try:
+                meta, arrays = compute_generic_map(w, h, anc, cfg=cfg, pose_set=ps)
+                p = save_generic(out, meta, arrays)
+                nf = {t["key"]: t.get("n_feasible") for t in meta["trunks"] if t.get("eligible")}
+                print(f"GB_MAP {json.dumps({'id': j['id'], 'kind': GENERIC_KIND, 'ok': True, 'h': anc['key'], 'arm': cfg.arm, 'path': p, 'timing': meta['timing'], 'n_classes': len(meta['grasps']), 'dz_m': ps['dz_m'], 'fingers_q': ps['fingers_q'], 'feasible': nf})}", flush=True)
+            except Exception as e:  # noqa: BLE001
+                import traceback
+
+                print(f"GB_MAP {json.dumps({'id': j['id'], 'kind': GENERIC_KIND, 'ok': False, 'h': anc['key'], 'arm': cfg.arm, 'error': repr(e), 'tb': traceback.format_exc()[-1200:]})}", flush=True)
+    print("GB_MAP_DONE", flush=True)
+
+
 # ------------------------------------------------------------------------------------------------ articulation opening prefixes (prompt 2 §7)
 
 
@@ -971,7 +1325,8 @@ def main(argv=None):
     c.add_argument("--lattice", type=float, default=0.08)
     c.add_argument("--seeds", type=int, default=8)
     c.add_argument("--batch", type=int, default=2048)
-    c.add_argument("--kind", default="tabletop", choices=["tabletop", "brace"])
+    c.add_argument("--kind", default="tabletop", choices=["tabletop", "brace", "generic"],
+                   help="generic: the manifest's generic pseudo-entries ({\"id\": \"_generic\", \"kind\": \"generic\"}) -> <out>/_generic/")
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
@@ -1011,6 +1366,8 @@ def main(argv=None):
         print(json.dumps({k: m.meta[k] for k in ("key", "rest_id", "height", "edge_distances", "screening", "timing")}, indent=1))
         for t in m.meta["trunks"]:
             print(t["key"], t.get("eligible"), t.get("posture"), t.get("n_problems"), t.get("n_feasible"), t.get("n_skipped"))
+    elif a.kind == GENERIC_KIND:
+        _compute_generic_cli(a)
     else:
         _compute_cli(a)
     import omnigibson as og

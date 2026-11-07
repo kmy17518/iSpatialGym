@@ -7,6 +7,9 @@
 # job dirs), ISG_GB_ROOT (the code root: a frozen snapshot), GB_OUT (default $GBH/out/$GB_TAG), GB_GLIB (the library the maps read,
 # default $GB_OUT/glib), GB_HEIGHTS_BY_ID (json {entry id: [anchor keys]}), GB_INCLUDE_DERIVED (default 1), GB_ARMS (default "right": one maps pass per arm). Pass
 # -o <log> on the sbatch line to keep the .out under the campaign (the #SBATCH --output below is grasp-bands').
+# i7-generic 2026-11-07: GB_KIND (default tabletop; brace | generic) = the maps stage's reach_maps --kind. generic: the manifest's generic
+# pseudo-entries ([{"id": "_generic", "kind": "generic"}], optional dz_m / fingers_q / dir) at GB_HEIGHTS (or GB_HEIGHTS_BY_ID by entry id),
+# no library (GB_STAGES=maps; GB_GLIB unused), written to $GB_OUT/maps/_generic/, logs maps_<shard>_<arm>_generic.log.
 #SBATCH --job-name=isggb
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -36,12 +39,13 @@ fi
 if [[ " $STAGES " == *" maps "* ]]; then
   BYID=(); [ -n "${GB_HEIGHTS_BY_ID:-}" ] && BYID=(--heights-by-id $GB_HEIGHTS_BY_ID)
   DERIVED=--include-derived; [ "${GB_INCLUDE_DERIVED:-1}" = 0 ] && DERIVED=""   # 0: only the manifest's entries (a campaign library holds others)
+  KIND=${GB_KIND:-tabletop}; LOGK=""; [ "$KIND" != tabletop ] && LOGK="_$KIND"
   for ARM in ${GB_ARMS:-right}; do
     t0=$(date +%s)
     python -u -m ispatialgym.sampling.reach_maps compute --jobs $M --glib $GLIB --anchors ${GB_ANCHORS:-$GBH/anchors.json} --heights ${GB_HEIGHTS:-0.4230 0.8126 1.0505} \
-      "${BYID[@]}" --arm $ARM --shard $I/$N --out $OUT/maps --skip-existing $DERIVED >> $OUT/logs/maps_${I}_$ARM.log 2>&1
+      "${BYID[@]}" --arm $ARM --kind $KIND --shard $I/$N --out $OUT/maps --skip-existing $DERIVED >> $OUT/logs/maps_${I}_${ARM}${LOGK}.log 2>&1
     rc=$?; [ $KIT_RC = 0 ] && KIT_RC=$rc
-    echo "GB_STAGE maps arm=$ARM rc=$rc s=$(( $(date +%s) - t0 ))"
+    echo "GB_STAGE maps kind=$KIND arm=$ARM rc=$rc s=$(( $(date +%s) - t0 ))"
   done
 fi
 echo "GB_JOB_DONE shard $I rc=$KIT_RC end $(date +%s)"
