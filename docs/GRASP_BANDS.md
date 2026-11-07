@@ -1416,6 +1416,8 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 11 | i7-memory (c49eacf6; outcome memory default on for train splits; $OFH/alias_memory not seeded, no thresholds.json) | a8baafe3 |
 | 12 | i7-placeorder (3d8492fc; trunk-first order before the memory hook) | f313237f |
 | 13 | i7-contactbrace (3d5cd9bb = i7-contact + i7-braceopen; one switch ISPATIALGYM_BRACE_FULL_OPEN, default on) | 0f8e95c0 |
+| 14 | i7-attachfix (9681dac8; collector attach restore, witness FK check, opt-in outer_pinch / attach_face_retreat) | 6e5c6cba |
+| 15 | i7-plateqtf2 (93072af3; hull fallback on, IORSSmall overhang fallback, pre-place framing, pinned map overlay on) | 543d6d1a |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1468,7 +1470,22 @@ i7-unblock deferred.
 `jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_0f8e95c0: 75 entries, 128 maps, 8 attach maps and 16 contact maps, 0 key mismatches, 50 links resolving,
 21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
-**Validation** (int1_1, `--grasps v2only` N 4 on the affected aliases only): see DECISIONS for the list, the skips and the results.
+**Validation** (`--grasps v2only` N 4, affected aliases only; `tab_i.py -a int1_1 .. int1_5`; DECISIONS "integration RESULTS").
+- **int1_1** (merges 1-7, 33 aliases): 658 attempts, 126 written, 105 ok; 0.164 GPU-h per success.
+- **Two regressions with a cause.** disembedding_01 and _10 went 0 / 4. Their earlier runs with the v2maps_i7 entries were 4 / 4 + 4 / 4 each.
+  The sampler now draws new grasps of the rebuilt entries (jigsaw: switches + pad sweep; tablefork: switches). Those grasps are
+  physics-valid in the library but fail in the tray execution. This goes to the owner.
+- **Later batches.**
+  - Attachment (after i7-attachfix): 01 4 / 4, 02 2 / 4, 04 4 / 4.
+  - inside_large_01: 4 / 4 (trunk-first order).
+  - axial_01 / 03 / 04: 3 / 4, 4 / 4, 4 / 4.
+  - touching_01 3 / 4; touching_02 2 / 2 (its place-depth limit).
+  - inside_01 3 / 4.
+- **Pre-existing gaps.**
+  - axial_02: repeats_eval.
+  - axial_05: no push_blade map of tablespoon tqqwys.
+  - ontop_large_01: no goal map at h 0.9158.
+
 
 ### i7-unblock (2026-11-07): nextto_04, under_small_03, camera_relocalization teddy_bear
 
