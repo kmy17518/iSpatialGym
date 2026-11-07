@@ -369,3 +369,24 @@ def test_select_and_prepare_write_json_inputs_and_strips(tmp_path, monkeypatch):
     assert os.path.getsize(batch / doc["strip"]) > 10000 and (batch / "CONTRACT.md").exists() and (batch / "contract.schema.json").exists()
     AS.main(["propose", "--batch", str(batch), "--runner", "manual"])
     assert not (batch / "proposals" / "box__x__s1.json").exists()
+
+
+def test_step3_and_step4_take_the_last_rounds_gates(tmp_path, monkeypatch):
+    monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
+    d = tmp_path / "m"
+    d.mkdir()
+    from dataclasses import asdict
+
+    rc = asdict(_cfg(cone_deg=60.0, blade_contact_at_retreat=False, n_candidates=48000, topk=36))
+    S.save_json(str(d / "candidates.json"), {"config": rc})
+    g = LD.round_gates(str(d))
+    assert set(g) == set(LD.GATE_FIELDS) and g["cone_deg"] == 60.0 and "n_candidates" not in g and "topk" not in g
+    assert LD.round_gates(str(tmp_path / "none")) == {}
+    job = {"category": "c", "model": "m", "scale": [1, 1, 1], "constraint": "tabletop", "rest_hint_wxyz": None, "id": "c__m__s1"}
+    j = LD.agent_job(job, _doc([_prop()]), "/p.json", g)
+    cfg, _ = PL.candidate_overrides(j)
+    assert cfg.cone_deg == 60.0 and list(cfg.families) == ["agent"] and j["ladder"]["gates_from"] == "last round"
+    for k in LD.GATE_FIELDS:  # every gate of the step-3 build equals the round's
+        assert json.loads(json.dumps(getattr(cfg, k))) == json.loads(json.dumps(rc[k])), k
+    lj = LD.legacy_job(job, [], "c__m", g)
+    assert PL.candidate_overrides(lj)[0].cone_deg == 60.0

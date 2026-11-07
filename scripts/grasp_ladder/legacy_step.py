@@ -77,7 +77,7 @@ def cmd_submit(a):
         if j["id"] not in rows or (a.only and j["id"] not in a.only):
             continue
         key = j["legacy_key"]
-        jobs.append(LD.legacy_job(j, LD.legacy_grasps(key), key))
+        jobs.append(LD.legacy_job(j, LD.legacy_grasps(key), key, LD.round_gates(e["src_dir"])))
         d = os.path.join(a.out, "glib", "models", j["id"])
         os.makedirs(d, exist_ok=True)
         if not os.path.exists(os.path.join(d, "geometry.json")):

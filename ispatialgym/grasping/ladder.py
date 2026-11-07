@@ -281,20 +281,18 @@ def render_strip(geom_rest, markers: Sequence[Dict[str, Any]], header: str, path
         setter(ctr[k] - span, ctr[k] + span)
     ax.view_init(elev=30, azim=-60)
     ax.set_title("oblique (elev 30, azim -60)", fontsize=9)
-    ax = fig.add_subplot(2, 4, 7)
-    ax.axis("off")
     lines = []
     for i, m in enumerate(markers):
         ms = m.get("measures") or {}
-        keep = {k: ms[k] for k in list(ms)[:6]}
-        lines.append(f"{m.get('marker')}: {m['pool']} / {m['gate']} ({m.get('why')}) c={m['contact_mm']} w={m.get('width_mm')} {json.dumps(keep)[:110]}")
-    ax.text(0, 1, "\n".join(lines) or "no markers (no near miss recorded)", va="top", fontsize=7, family="monospace", wrap=True)
-    ax = fig.add_subplot(2, 4, 8)
-    ax.axis("off")
-    ax.text(0, 1, "markers: coloured dot = pinch centre (contact), segment = closing axis (+-width/2),\narrow = approach (from 30 mm behind the "
-            "contact toward it).\nBrown line = the support plane. Axes in mm, rest frame.", va="top", fontsize=8)
+        keep = {k: ms[k] for k in ("tilt_deg", "touch_mm", "limit_mm", "lift_mm", "part", "deficit_mm", "sphere_clear_mm", "stage",
+                                   "blade_object_depth_m", "antipodal") if ms.get(k) not in (None, "")}
+        lines.append(f"{m.get('marker')}: {m['pool']}/{m['gate']} ({m.get('why')}) c={m['contact_mm']} w={m.get('width_mm')}")
+        lines.append("     " + json.dumps(keep)[:90])
+    fig.text(0.51, 0.47, "\n".join(lines) or "no markers (no near miss recorded)", va="top", ha="left", fontsize=7.5, family="monospace")
+    fig.text(0.76, 0.47, "markers: dot = pinch centre (contact)\nsegment = closing axis (+-width / 2)\narrow = approach (30 mm behind\n"
+             "  the contact toward it)\nbrown line = the support plane\naxes in mm, rest frame", va="top", ha="left", fontsize=8)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.subplots_adjust(left=0.04, right=0.99, top=0.92, bottom=0.06, wspace=0.25, hspace=0.3)
     fig.savefig(path, dpi=80)
     plt.close(fig)
     return path
@@ -388,8 +386,21 @@ def check_proposals(doc: Dict[str, Any], entry_id: Optional[str] = None) -> List
     return err
 
 
-def agent_overrides(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """The cand_overrides of an entry's step-3 build: only the proposals (no mode, no sampled family), the gate dump on."""
+#: the CandidateConfig fields that are gates (thresholds and the owner-decision switches): a step-3 / step-4 build takes them from the
+#: last round's recorded config, so the given poses meet exactly the gates that round applied (e.g. the retry ladder's cone 60)
+GATE_FIELDS = ("aperture_m", "min_width_m", "cone_deg", "top_max_tilt_deg", "side_tilt_deg", "obj_margin_m", "tip_max_m", "retreats_m",
+               "side_lift_max_m", "sweep_margin_m", "lever_cap", "approach_obj_check", "blade_contact_at_retreat", "retreat_shift_exact")
+
+
+def round_gates(src_dir: str) -> Dict[str, Any]:
+    """The gate fields of the last round's candidate config (``candidates.json`` "config"); {} when it recorded none."""
+    cfg = (S.load_json(os.path.join(src_dir, "candidates.json")) or {}).get("config") or {}
+    return {k: cfg[k] for k in GATE_FIELDS if k in cfg}
+
+
+def agent_overrides(doc: Dict[str, Any], gates: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The cand_overrides of an entry's step-3 build: only the proposals (no mode, no sampled family), the gate dump on, and the last
+    round's gates (``gates``, :func:`round_gates`) - the same gates, nothing relaxed."""
     props = []
     for p in doc["proposals"]:
         q = {k: p[k] for k in ("contact_mm", "closing_axis", "approach", "pad_offset_mm")}
@@ -397,14 +408,16 @@ def agent_overrides(doc: Dict[str, Any]) -> Dict[str, Any]:
             q["expand"] = p["expand"]
         q["from_marker"] = p.get("from_marker")
         props.append(q)
-    return {"modes": [], "families": ["agent"], "agent_proposals": props, "gate_dump": True}
+    return {**(gates or {}), "modes": [], "families": ["agent"], "agent_proposals": props, "gate_dump": True}
 
 
-def agent_job(job: Dict[str, Any], doc: Dict[str, Any], proposals_path: str) -> Dict[str, Any]:
-    """The step-3 manifest entry of ``job`` (same id, category, model, scale, constraint, rest: the same entry identity)."""
+def agent_job(job: Dict[str, Any], doc: Dict[str, Any], proposals_path: str, gates: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The step-3 manifest entry of ``job`` (same id, category, model, scale, constraint, rest: the same entry identity), judged by
+    ``gates`` (the last round's, :func:`round_gates`)."""
     j = {k: v for k, v in copy.deepcopy(job).items() if k not in ("cand_overrides", "ladder", "retry_status")}
-    j["cand_overrides"] = agent_overrides(doc)
-    j["ladder"] = {"step": 3, "source": "agent", "contract": CONTRACT, "proposals": proposals_path, "n_proposals": len(doc["proposals"])}
+    j["cand_overrides"] = agent_overrides(doc, gates)
+    j["ladder"] = {"step": 3, "source": "agent", "contract": CONTRACT, "proposals": proposals_path, "n_proposals": len(doc["proposals"]),
+                   "gates_from": "last round" if gates else "defaults", "gates": dict(gates or {})}
     return j
 
 
@@ -433,13 +446,14 @@ def legacy_grasps(key: str, root: str = LEGACY_ROOT) -> List[Dict[str, Any]]:
     return out
 
 
-def legacy_job(job: Dict[str, Any], grasps: Sequence[Dict[str, Any]], key: str) -> Dict[str, Any]:
-    """The step-4 manifest entry: the legacy grasps as given poses through the same gates and physics (owner approval required to run
-    and to use - scripts/grasp_ladder/legacy_step.py refuses without it)."""
+def legacy_job(job: Dict[str, Any], grasps: Sequence[Dict[str, Any]], key: str, gates: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The step-4 manifest entry: the legacy grasps as given poses through the same gates (``gates``: the last round's) and physics
+    (owner approval required to run and to use - scripts/grasp_ladder/legacy_step.py refuses without it)."""
     j = {k: v for k, v in copy.deepcopy(job).items() if k not in ("cand_overrides", "ladder", "retry_status")}
-    j["cand_overrides"] = {"modes": [], "families": ["legacy"], "gate_dump": True,
+    j["cand_overrides"] = {**(gates or {}), "modes": [], "families": ["legacy"], "gate_dump": True,
                            "legacy_grasps": [{k: g[k] for k in ("name", "position", "quat_xyzw")} for g in grasps]}
-    j["ladder"] = {"step": 4, "source": "legacy", "legacy_key": key, "legacy_root": os.path.relpath(LEGACY_ROOT, REPO_ROOT), "n_grasps": len(grasps)}
+    j["ladder"] = {"step": 4, "source": "legacy", "legacy_key": key, "legacy_root": os.path.relpath(LEGACY_ROOT, REPO_ROOT), "n_grasps": len(grasps),
+                   "gates_from": "last round" if gates else "defaults", "gates": dict(gates or {})}
     return j
 
 

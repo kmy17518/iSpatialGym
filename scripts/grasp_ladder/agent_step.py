@@ -185,7 +185,7 @@ def cmd_submit(a):
         if not doc["feasible"] or not doc["proposals"]:
             rec.append((j["id"], "infeasible (proposer)"))
             continue
-        jobs.append(LD.agent_job(j, doc, os.path.abspath(p)))
+        jobs.append(LD.agent_job(j, doc, os.path.abspath(p), LD.round_gates(e["src_dir"])))  # the last round's gates (no relaxing)
         d = os.path.join(a.out, "glib", "models", j["id"])
         os.makedirs(d, exist_ok=True)
         if not os.path.exists(os.path.join(d, "geometry.json")):  # the pipeline's own export, reused (no re-export)
