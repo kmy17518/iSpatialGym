@@ -262,3 +262,37 @@ def test_the_pre_pose_rule_per_push_class_is_what_the_oracle_executes(row):
     e = CPZ.contact_entry("push", cls or "push", "x", "work", (th.zeros(3), C.IDENTITY_QUAT.clone()), (th.tensor([0.5, 0.0, 0.1]), C.IDENTITY_QUAT.clone()),
                           C.pre_pose((th.tensor([0.5, 0.0, 0.1]), C.IDENTITY_QUAT.clone()), rec), {}, direction=[1.0, 0.0, 0.0], arc=arc, executor=executor)
     assert e["pre_pose_rule"]["rule"] == rule and e["pre"]["executed_m"] == pytest.approx(dist, abs=1e-5)
+
+
+def test_the_axial_blade_geometry_and_extreme_point_are_the_samplers_former_bodies():
+    """``AlignmentAxial._blade_geometry`` / ``_extreme_point`` now call ``axial_blade_geometry`` / ``extreme_point``: the former bodies, inline."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import tabletop as TT
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+
+    hull = th.tensor([[sx * 0.11, sy * 0.03, z] for sx in (-1, 1) for sy in (-1, 1) for z in (0.0, 0.012)] + [[0.05, 0.031, 0.006]], dtype=th.float32)
+    s = SimpleNamespace(top=SimpleNamespace(z=0.7351), extents={"height": 0.012}, gen=lambda k, d=None: d, hull=hull, long_axis=th.tensor([1.0, 0.0, 0.0]))
+    s._push_height = lambda: AX.AlignmentAxial._push_height(s)
+    s._face_z_range = lambda: AX.AlignmentAxial._face_z_range(s)
+    for pitch in (0.0, 30.0, 45.0, 60.0):
+        for side in (False, True):
+            z_push = s._push_height()
+            z_tip = z_push - C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))
+            so = TT.blade_standoff(s._face_z_range(), z_tip, pitch, 0.0, side=side)
+            old = None if so is None else (so[0], so[1], z_tip)
+            assert AX.AlignmentAxial._blade_geometry(s, pitch, 0.0, side=side) == old
+    pose = (th.tensor([0.6, -0.1, 0.7351]), C.quat_from_yaw(0.4))
+    for direction, near in (((0.0, 1.0), None), ((0.3, -0.9), th.tensor([0.68, -0.06, 0.74])), ((-1.0, 0.0), th.tensor([0.5, -0.14, 0.74]))):
+        pts = C.transform_points(pose, hull)
+        dxy = th.tensor([float(direction[0]), float(direction[1])])
+        dxy = dxy / th.linalg.norm(dxy)
+        sel_pts = pts
+        if near is not None:
+            long_w = C.quat_rotate(pose[1], s.long_axis)[:2]
+            along = (pts[:, :2] - near[:2]) @ long_w
+            sel = along.abs() <= 0.04
+            if int(sel.sum()) >= 3:
+                sel_pts = pts[sel]
+        old = sel_pts[int(th.argmax(sel_pts[:, :2] @ dxy))]
+        assert th.equal(AX.AlignmentAxial._extreme_point(s, pose, th.tensor(direction), near=near), old)

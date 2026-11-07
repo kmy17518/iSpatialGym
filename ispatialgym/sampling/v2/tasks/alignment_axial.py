@@ -565,12 +565,7 @@ class AlignmentAxial(SamplerV2):
         height for the approach ``pitch`` (deg): the fingertips sit ``FINGERTIP_LENGTH·cos(pitch)`` below the eef
         origin; the half thickness is the finger profile's maximum over the face height above the tips (``tabletop.
         blade_standoff``). None when the face reaches the palm section."""
-        z_push = self._push_height()
-        z_tip = z_push - C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch)))
-        so = TT.blade_standoff(self._face_z_range(), z_tip, pitch, clearance, side=side)
-        if so is None:
-            return None
-        return so[0], so[1], z_tip
+        return CPZ.axial_blade_geometry(self._push_height(), self._face_z_range(), pitch, clearance, side=side)  # i7-contact: the shared rule
 
     def _brace_candidates(self, manip: Stance, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init: TT.Pose, com: th.Tensor, d_goal: float):
         """Brace poses of the closed left gripper at the stop face (``stop_pts`` on the goal hull, the pushed end's
@@ -636,18 +631,8 @@ class AlignmentAxial(SamplerV2):
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
         that end along the long axis are considered (the face at the pushed end)."""
-        pts = C.transform_points(pose, self.hull)
-        dxy = th.tensor([float(direction[0]), float(direction[1])])
-        dxy = dxy / th.linalg.norm(dxy)
-        if near is not None:
-            long_w = C.quat_rotate(TT._t(pose[1]), self.long_axis)[:2]
-            along = (pts[:, :2] - TT._t(near)[:2]) @ long_w
-            sel = along.abs() <= 0.04
-            if int(sel.sum()) >= 3:
-                pts = pts[sel]
-        proj = pts[:, :2] @ dxy
-        i = int(th.argmax(proj))
-        return pts[i]
+        long_w = C.quat_rotate(TT._t(pose[1]), self.long_axis)[:2] if near is not None else None
+        return CPZ.extreme_point(C.transform_points(pose, self.hull), direction, near=near, long_w=long_w)  # i7-contact: the shared rule
 
     # ------------------------------------------------------------------ program check (push-only sidecars)
 

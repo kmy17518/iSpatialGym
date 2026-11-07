@@ -1,0 +1,88 @@
+[
+ {
+  "id": "box_of_sanitary_napkins__humkqw__s1",
+  "category": "box_of_sanitary_napkins",
+  "model": "humkqw",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/oracle_fix/v2maps_20261107/glib/models/box_of_sanitary_napkins__humkqw__s1",
+  "families": [
+   "touching_push"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {},
+  "alias": "touching_01 target"
+ },
+ {
+  "id": "box_of_tissues__ntbrtz__s1__r1b93c2",
+  "category": "box_of_tissues",
+  "model": "ntbrtz",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/box_of_tissues__ntbrtz__s1__r1b93c2",
+  "families": [
+   "touching_brace"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {},
+  "alias": "touching_01 partner"
+ },
+ {
+  "id": "box_of_cereal__iucshm__s0.8",
+  "category": "box_of_cereal",
+  "model": "iucshm",
+  "scale": 0.8,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/oracle_fix/v2maps_20261107/glib/models/box_of_cereal__iucshm__s0.8",
+  "families": [
+   "touching_push"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {
+   "push_height_sweep": false,
+   "push_gripper_open": false,
+   "push_speed_m_s": 0.02
+  },
+  "alias": "touching_02 target (the bar variant's knobs)"
+ },
+ {
+  "id": "box_of_cereal__dkhgxn__s1",
+  "category": "box_of_cereal",
+  "model": "dkhgxn",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/grasp_bands/out/roles_all_20261102/glib/models/box_of_cereal__dkhgxn__s1",
+  "families": [
+   "touching_brace"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {
+   "brace_open_when_wide": true
+  },
+  "alias": "touching_02 partner"
+ },
+ {
+  "id": "spray_bottle__miqtui__s1",
+  "category": "spray_bottle",
+  "model": "miqtui",
+  "scale": 1,
+  "model_dir": "/vision/u/minyeong/projects/isg_home/oracle_fix/v2maps_20261107/glib/models/spray_bottle__miqtui__s1",
+  "families": [
+   "touching_push"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {
+   "push_height_sweep": true,
+   "push_raised_max_aspect": 1.5
+  },
+  "alias": "touching_04 target"
+ },
+ {
+  "id": "bottle_of_detergent__gkpmii__s1",
+  "category": "bottle_of_detergent",
+  "model": "gkpmii",
+  "scale": 1,
+  "families": [
+   "touching_brace"
+  ],
+  "subtask": "inter_object_relation_satisfaction-touching_small_scale",
+  "generation": {},
+  "alias": "touching_04 partner - NO v2 entry yet: glib stage first"
+ }
+]

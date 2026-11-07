@@ -1147,6 +1147,32 @@ def axial_push_height(top_z: float, object_height: float, tip_clearance: float =
     return float(top_z) + max(0.6 * float(object_height), C.FINGERTIP_LENGTH + float(tip_clearance))
 
 
+def axial_blade_geometry(z_push: float, face_z: Tuple[float, float], pitch: float, clearance: float, side: bool = False) -> Optional[Tuple[float, float, float]]:
+    """``(stand-off, finger half thickness, tip z)`` of the axial push's top-down blade beside the target's face at the push height
+    ``z_push`` (``AlignmentAxial._blade_geometry``): the fingertips ``FINGERTIP_LENGTH cos(pitch)`` below the eef origin, the half thickness
+    the finger profile's maximum over the face height above the tips (``tabletop.blade_standoff``); None when the face reaches the palm."""
+    z_tip = z_push - C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch)))
+    so = TT.blade_standoff(face_z, z_tip, pitch, clearance, side=side)
+    if so is None:
+        return None
+    return so[0], so[1], z_tip
+
+
+def extreme_point(pts_w: th.Tensor, direction, near=None, long_w=None, window: float = 0.04) -> th.Tensor:
+    """The hull point (world) with the largest projection on ``direction`` (xy) - with ``near`` / ``long_w`` (the long axis, world xy) only
+    the points within ``window`` of that end along the long axis when at least 3 are (``AlignmentAxial._extreme_point``)."""
+    pts = pts_w
+    dxy = th.tensor([float(direction[0]), float(direction[1])])
+    dxy = dxy / th.linalg.norm(dxy)
+    if near is not None and long_w is not None:
+        along = (pts[:, :2] - TT._t(near)[:2]) @ long_w
+        sel = along.abs() <= window
+        if int(sel.sum()) >= 3:
+            pts = pts[sel]
+    proj = pts[:, :2] @ dxy
+    return pts[int(th.argmax(proj))]
+
+
 def axial_push_chain(side_pt: th.Tensor, d: th.Tensor, half: float, approach: th.Tensor, closing: th.Tensor, c_sign: float, centre: th.Tensor,
                      d_goal: float) -> List[Tuple[th.Tensor, th.Tensor]]:
     """The axial push ``[pre, init, mid, goal]`` of one class / wrist turn (``AlignmentAxial._sample_with``): the closed blade ``half`` (its
