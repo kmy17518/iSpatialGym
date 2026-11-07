@@ -1044,6 +1044,32 @@ class R1ProCuRobo:
             near = ((dm > 0.0) & mask).any(dim=1)
         return near.cpu()
 
+    def world_sphere_hits(self, spheres_world: th.Tensor, margin: float = 0.0) -> th.Tensor:
+        """of-v2maps 2026-11-07 (the band-view scene mask): ``(N, S)`` bool - which of arbitrary WORLD-frame spheres ``(N, S, 4)`` (x y z r)
+        lie within ``margin`` of a world obstacle (the ignored / attached obstacles excluded, as :meth:`link_proximity`); no robot, no IK -
+        the spheres of eef-fixed links placed at a candidate eef pose. The checker works in the robot root frame (:meth:`root_pose`)."""
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+
+        sw = as_tensor(spheres_world).float().cpu()
+        if sw.ndim == 2:
+            sw = sw.unsqueeze(0)
+        n, k = int(sw.shape[0]), int(sw.shape[1])
+        if n == 0 or k == 0:
+            return th.zeros(n, k, dtype=th.bool)
+        rp, rq = self.root_pose()
+        R = T.quat2mat(rq.float().cpu()).float()
+        loc = sw.clone()
+        loc[..., :3] = (sw[..., :3] - rp.float().cpu().reshape(1, 1, 3)) @ R
+        dev = self.device_cfg.device
+        sp = loc.to(dev).reshape(n, 1, k, 4).contiguous()
+        buf = CollisionBuffer.from_shape(sp.shape, self.device_cfg)
+        mask = th.ones(1, k, dtype=th.bool, device=dev)
+        sp, act = shrink_link_spheres(sp, mask, float(margin))
+        with th.no_grad():
+            dm = self.checker.get_sphere_collision(KinematicsState(robot_spheres=sp), buf, th.ones(1, device=dev), th.full((1,), act, device=dev)).reshape(n, -1)
+        return (dm > 0.0).cpu()
+
     def robot_spheres_world(self, q_batch: th.Tensor, emb_name: str = "whole_body") -> Tuple[th.Tensor, List[str]]:
         """``(N, S, 4)`` world-frame collision spheres (x y z r; r <= 0 = a disabled sphere) of the full configurations
         ``q_batch`` (N, 28) in the embodiment ``emb_name`` - an attached object's spheres included - and the link of every

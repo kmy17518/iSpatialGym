@@ -217,6 +217,12 @@ class RobotKit:
         self._ensure_synced()
         return ~self.backend.link_proximity(qs, list(links), float(margin), emb_name="whole_body", sync_world=False)
 
+    def world_sphere_hits(self, spheres_world: th.Tensor, margin: float = 0.0) -> th.Tensor:
+        """``(N, S)`` bool: which world-frame spheres ``(N, S, 4)`` lie within ``margin`` of a world obstacle (ignored objects excluded) -
+        no robot configuration (of-v2maps 2026-11-07, ``scene_mask``)."""
+        self._ensure_synced()
+        return self.backend.world_sphere_hits(spheres_world, float(margin))
+
     def collision_free(self, qs: th.Tensor, margin: float = 0.01, sync: bool = False) -> th.Tensor:
         qs = G.t(qs)
         if qs.ndim == 1:

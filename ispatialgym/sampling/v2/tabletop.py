@@ -3682,6 +3682,12 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                     e = ev_of.get(a)
                     if e is not None:
                         e[0].mark_unreachable(e[1], e[2])
+    from ispatialgym.sampling.v2 import scene_mask as SM
+
+    if F and fixed is None and SM.active():
+        # of-v2maps 2026-11-07 (owner prompt D, opt-in ISPATIALGYM_MAP_SCENE_MASK / _DIAG): the pairs the real scene certainly rules out
+        F = scene_mask_F(s, F, st_of, offered, top, fx, yaws, grasps, pose_at, eef_of, hull, ignore_for_grasp, margin, scale_key,
+                         draw=(rng, float(focus_radius), float(jitter), int(n_positions)))
     if not F and fast_on("DIAG_EMPTY_F", default=False):
         _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp, eef_of)
     if not F:
@@ -3817,6 +3823,106 @@ def _diag_empty_f(s, fx, yaws, grasps, pose_at, st_of, offered, ignore_for_grasp
         log.info("DIAG_EMPTY_F failed: %r", e)
 
 
+def scene_mask_F(s, F, st_of, offered, top, fx, yaws, grasps, pose_at, eef_of, hull, ignore_for_grasp, margin, scale_key, draw=None):
+    """``scene_mask`` at the focus (of-v2maps 2026-11-07): every (yaw, grasp) per offered arm at its stance; MASK mode drops the masked
+    (pair, arm) entries of F (a pair no arm keeps leaves F), DIAG mode keeps F and tests up to ``scene_mask.FN_CHECK_MAX`` masked pairs of F
+    per process with the exact IK as the draw would (the support check at margin, then [pre, grasp] with the grasp's pre-shape) - a
+    pass is a FALSE NEGATIVE of the categories that masked it. ``s._scene_mask_of`` keeps the categories per (yaw, grasp, arm) for the
+    draw's outcome lines (``SCENE_MASK_DRAW``)."""
+    from ispatialgym.sampling.v2 import scene_mask as SM
+
+    IK = _ik()
+    support_obj = None
+    try:
+        support_obj = s.world.obj(NB.own_top(top).name)
+    except Exception:  # noqa: BLE001
+        pass
+    task_objs = list((getattr(getattr(s, "world", None), "spawned", None) or {}).values())
+    anchor_z = None
+    for a in offered:
+        b = getattr(s, "bands", None)
+        if b is not None and isinstance(getattr(b, "meta", None), dict) and b.meta.get("height") is not None:
+            anchor_z = float(b.meta["height"])
+    gi = {id(g): k for k, g in enumerate(grasps)}
+    yi = {round(float(y), 4): j for j, y in enumerate(yaws)}
+    cats_of: Dict[Tuple[float, str, str], List[str]] = {}
+    for a in offered:
+        ev = SM.evaluate(s, st_of[a], top, a, fx[None, :], list(yaws), list(grasps), pose_at, eef_of, support_obj, hull=hull,
+                         ignore=[o for o in task_objs if o is not support_obj], anchor_z=anchor_z, opening_of=policy_opening_of,
+                         frame_at_grasp=SM.frame_rule_at_grasp(s))
+        in_F = 0
+        for yaw0, g, arms_i in F:
+            if a not in arms_i or id(g) not in gi or round(float(yaw0), 4) not in yi:
+                continue
+            in_F += 1
+            j, k = yi[round(float(yaw0), 4)], gi[id(g)]
+            cs = [c for c, m in ev["masks"].items() if bool(m[0, j, k])]
+            if cs:
+                cats_of[(round(float(yaw0), 4), str(getattr(g, "name", "")), a)] = cs
+        SM.log_record(s, "phase3_focus", ev, {"arm": a, "focus": [round(float(v), 3) for v in fx.tolist()], "F_pairs": in_F,
+                                               "F_masked": sum(1 for kk in cats_of if kk[2] == a),
+                                               "F_masked_by": {c: sum(1 for kk, v in cats_of.items() if kk[2] == a and c in v) for c in ev["masks"]},
+                                               "trunk": [round(float(st_of[a].translate), 3), round(float(st_of[a].tilt), 3)]})
+    s._scene_mask_of = cats_of
+    if SM.diag_on():
+        n = s.__dict__.setdefault("_scene_mask_fn_n", [0])
+        exact_kw = {"ignore_for_last": list(ignore_for_grasp), "scale_key": scale_key}
+        for (yaw0, gname_, a), cs in list(cats_of.items()):
+            if n[0] >= SM.FN_CHECK_MAX:
+                break
+            g = next((gg for _, gg, _ in F if str(getattr(gg, "name", "")) == gname_), None)
+            if g is None:
+                continue
+            n[0] += 1
+            # as the draw would: n_positions positions within the focus radius, the yaw jittered, the support check at margin, the exact IK
+            rng_d, fr, jit, npos = draw if draw is not None else (None, 0.0, 0.0, 1)
+            ok, why, n_sup = False, "", 0
+            for _ in range(max(1, npos)):
+                if rng_d is not None:
+                    r_, a_ = float(rng_d.uniform(0.0, fr)), float(rng_d.uniform(0.0, 2 * math.pi))
+                    xy = th.tensor([float(fx[0]) + r_ * math.cos(a_), float(fx[1]) + r_ * math.sin(a_)])
+                    yaw = float(yaw0) + float(rng_d.uniform(-jit, jit))
+                else:
+                    xy, yaw = fx, float(yaw0)
+                pose = pose_at(xy, yaw)
+                if not bool(top.polygon_supported(s.world.footprint(hull, pose), margin=margin)):
+                    why = "support"
+                    continue
+                n_sup += 1
+                eef = IK.grasp_pose(pose, eef_of(g))
+                with _policy_opening(s, g):
+                    r = s.ikc.exact([IK.pre_pose(eef), eef], st_of[a], a, **exact_kw)
+                if r.ok:
+                    ok, why = True, ""
+                    break
+                why = str(r.reason)[:120]
+            log.info("SCENE_MASK_FN %s", json.dumps({"yaw": yaw0, "grasp": gname_, "arm": a, "cats": cs, "exact_ok": ok, "why": why, "supported_tries": n_sup}))
+            _count(s, "scene_mask.fn_checked")
+            if ok:
+                _count(s, "scene_mask.false_negative")
+                for c in cs:
+                    _count(s, f"scene_mask.false_negative.{c}")
+        return F
+    out = []
+    for yaw0, g, arms_i in F:
+        keep = [a for a in arms_i if (round(float(yaw0), 4), str(getattr(g, "name", "")), a) not in cats_of]
+        if keep:
+            out.append((yaw0, g, keep))
+    _count(s, "scene_mask.F_removed", len(F) - len(out))
+    return out
+
+
+def _scene_mask_draw_note(s, yaw0, g, arm, fails_at, fails, outcome: str) -> None:
+    """``SCENE_MASK_DRAW {json}`` (scene mask DIAG / MASK): a drawn F pair's outcome (``ok``, ``support`` = every position off the support,
+    else the last exact-IK reason) with the categories that masked it (``s._scene_mask_of``) - the overlap with the draw-time failures."""
+    mo = getattr(s, "_scene_mask_of", None)
+    if mo is None:
+        return
+    cs = mo.get((round(float(yaw0), 4), str(getattr(g, "name", "")), arm), [])
+    log.info("SCENE_MASK_DRAW %s", json.dumps({"yaw": round(float(yaw0), 4), "grasp": str(getattr(g, "name", "")), "arm": arm, "cats": cs, "outcome": outcome,
+                                               "support_fails": int(fails["support"] - fails_at["support"]), "ik_fails": int(fails["ik"] - fails_at["ik"])}))
+
+
 def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull, top, margin, support_z, z, eef_of, IK, st_of, exact_kw, twins, band_of,
                  name, offered, arm, manip, fails, ev_of, gname, tried, verify=None):
     """:func:`phase3_target`'s draw over F (without replacement): ``(pose, GraspRecord)`` on the first exact-IK confirmation, else the last
@@ -3830,6 +3936,7 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
         yaw = float(yaw0) + float(rng.uniform(-jitter, jitter))
         n_ik = 0
         last_fail = None
+        fails_at = dict(fails)  # of-v2maps 2026-11-07: this pair's outcome for SCENE_MASK_DRAW
         for _ in range(int(n_positions)):
             r, a = float(rng.uniform(0.0, focus_radius)), float(rng.uniform(0.0, 2 * math.pi))
             xy = th.tensor([float(fx[0]) + r * math.cos(a), float(fx[1]) + r * math.sin(a)])
@@ -3883,7 +3990,9 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             if st_of[arm_c] is not manip:
                 adopt_arm(manip, st_of[arm_c])
             rec.stance = manip.name
+            _scene_mask_draw_note(s, yaw0, g, a0, fails_at, fails, "ok")
             return pose, rec
+        _scene_mask_draw_note(s, yaw0, g, a0, fails_at, fails, str(last_reason)[:100] if n_ik else "support")
         if n_ik and ev_of is not None and ev_of.get(a0) is not None:
             e = ev_of[a0]
             if verify is None:
