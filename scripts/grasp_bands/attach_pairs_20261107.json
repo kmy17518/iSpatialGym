@@ -1,0 +1,6 @@
+[
+ {"id": "lid_tnwisp__teapot_mvrhya", "male_entry": "lid__tnwisp__s1__attachment_free", "partner": {"category": "teapot", "model": "mvrhya", "scale": [1.0, 1.0, 1.0]},
+  "heights": ["1.0505"], "aliases": ["configuration_matching-attachment_01 (bar_udatjt_0, house_single_floor)"]},
+ {"id": "lid_pbmsji_s065__stockpot_oshwps_s065", "male_entry": "lid__pbmsji__s0.65__attachment_free", "partner": {"category": "stockpot", "model": "oshwps", "scale": [0.65, 0.65, 0.65]},
+  "heights": ["0.7853"], "aliases": ["configuration_matching-attachment_04 (desk_mdhelw_1, office_cubicles_right)"]}
+]
