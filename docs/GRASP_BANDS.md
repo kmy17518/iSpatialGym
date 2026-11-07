@@ -366,6 +366,21 @@ Not linked on purpose: held-object floating keys (mental_rotation / object_scali
 (§2.2), and the v2 library has no floating constraint. Map types without a consumer (brace, floor, interior, tray, articulation prefix)
 keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I) and `tmp/outputs/round4_reports.md` (I).
 
+## Contact libraries and contact maps (branch `i7-contact`, 2026-11-07)
+
+The PUSH / BRACE contacts the oracle executes get the grasp library's treatment: one shared pose rule module
+(`ispatialgym/sampling/v2/contact_poses.py`, the samplers' record builders as pure functions, golden-tested against 63925048), per-object
+libraries in the object frame (`ispatialgym/grasping/contact_library.py`, schema `isg-contact/1`: the contact, the EXECUTED pre - a straight
+push's lowered 0.04 m pre, owner decision 6 -, the fingers, the stroke / arc / partner gap / task goal, the brace stop), physics validation
+on the oracle's own `execute_push` / `execute_brace` (`ispatialgym/grasping/validate_contacts.py`: the task's goal check, a kinematic partner
+stand-in at the place gap, the object's TRO pose target, the variant's customs `generation`), and reach maps of the entries
+(`ispatialgym/sampling/contact_maps.py`: kinds touch_push / touch_brace / push_blade / axial_brace / floor_push; cell = the object ROOT, an axial
+brace's at its GOAL pose; identity incl. the pose set digest). Consumers under v2only (`tabletop.need_contact_map`): the touching brace gate
+(required: a miss rejects `missing_map`), the axial joint placement (push_blade required; axial_brace OPTIONAL - a miss skips the brace,
+counted `contact_map_skipped.axial_brace`). Pipeline: `scripts/grasp_bands/job_contacts.sh` (GC_STAGES build / validate / replay / maps), roots
+under `$OFH` only. Run E (2026-11-07): the touching_02 push replay tips (validator friction / mass, not the criterion), the axial replays
+need the task's COM hinge in the validator world (not yet); see `$OFH/DECISIONS.md` 2026-11-07 (i7-contact).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
