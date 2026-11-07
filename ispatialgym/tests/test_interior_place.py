@@ -39,6 +39,22 @@ def test_the_rule_is_canonical_and_covers_only_its_own_place():
     assert IP.covers(None, None) is None and IP.covers(level, None) is not None and IP.covers(None, level) is not None
 
 
+def test_a_place_map_boxes_the_side_walls_along_the_board_only():
+    """The fridge probe (2026-11-07): its cabinet walls start ~0.13 m behind the front plane; a place map boxes the walls where measure
+    measured them (along the board), the former boxes and every spec digest unchanged."""
+    sp = _fridge(board_setback_m=0.2309)
+    front, board = dict(sp.boxes(sp.height_m, 0.45)), dict(sp.boxes(sp.height_m, 0.45, walls="board"))
+    for nm in ("wall_left", "wall_right"):
+        assert abs(front[nm].centre[0] - front[nm].half[0] - 0.45) < 1e-9  # from the front plane (as before)
+        assert abs(board[nm].centre[0] - board[nm].half[0] - (0.45 + 0.2309)) < 1e-9 and abs(board[nm].centre[0] + board[nm].half[0] - (0.45 + 0.55)) < 1e-9
+    assert [n for n, _ in sp.boxes(sp.height_m, 0.45)] == [n for n, _ in sp.boxes(sp.height_m, 0.45, walls="board")]
+    assert front["door_left_door"] == board["door_left_door"] and front["above"] == board["above"] and front["back"] == board["back"]
+    assert len(sp.obstacles(sp.height_m, 0.45, "board")) == len(sp.obstacles(sp.height_m, 0.45))
+    assert IP.place_rule()["walls"] == "board" and IP.covers(IP.place_rule(walls="front"), IP.place_rule()) is not None
+    with pytest.raises(ValueError):
+        sp.boxes(sp.height_m, 0.45, walls="none")
+
+
 def test_the_keys_of_every_other_map_stay():
     sp = _fridge()
     for cfg in (RM.MapConfig(), RM.floor_config(), RM.interior_config(sp), RM.interior_config(sp, rest_kind="stable")):

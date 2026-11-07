@@ -138,9 +138,14 @@ class InteriorSpec:
 
     # -------------------------------------------------------------------------------------------- boxes (compartment frame)
 
-    def boxes(self, h: float, d_e: float) -> List[Tuple[str, Any]]:
+    def boxes(self, h: float, d_e: float, walls: str = "front") -> List[Tuple[str, Any]]:
         """``[(name, contact_policy.Support box)]`` with the compartment centred at y = 0, its front edge at x = ``d_e`` and the board top
-        at z = ``h``; the board first (the policed support)."""
+        at z = ``h``; the board first (the policed support). ``walls`` (i7-interior 2026-11-07): "front" = the side walls from the front plane
+        to the back (as before); "board" = only along the board's depth (``board_setback_m`` .. ``depth_m``: where ``measure`` takes its wall
+        rays - the fridge's cabinet walls start ~0.13-0.15 m behind its front plane, the 0.23 m setback in front of the board holds the doors,
+        probe 2026-11-07); identical without a setback."""
+        if walls not in ("front", "board"):
+            raise ValueError(f"walls {walls!r} (front | board)")
         from ispatialgym.grasping import contact_policy as CP
 
         x = float(d_e) + 0.5 * float(self.depth_m)
@@ -152,9 +157,10 @@ class InteriorSpec:
         out = [("board", CP.Support.box([xb, 0.0, h - 0.5 * self.board_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.board_thickness_m], name="interior_board"))]
         if not self.open_top:
             out.append(("above", CP.Support.box([xb, 0.0, h + hr + 0.5 * self.top_thickness_m], [hb, 0.5 * self.long_m, 0.5 * self.top_thickness_m], name="interior_above")))
+        wx, whd = (xb, hb) if walls == "board" else (x, hd)
         for nm, sg in (("wall_left", 1.0), ("wall_right", -1.0)):
-            out.append((nm, CP.Support.box([x, sg * (0.5 * self.width_m + 0.5 * self.wall_thickness_m), h + 0.5 * hw],
-                                           [hd, 0.5 * self.wall_thickness_m, 0.5 * hw], name=f"interior_{nm}")))
+            out.append((nm, CP.Support.box([wx, sg * (0.5 * self.width_m + 0.5 * self.wall_thickness_m), h + 0.5 * hw],
+                                           [whd, 0.5 * self.wall_thickness_m, 0.5 * hw], name=f"interior_{nm}")))
         if self.back_thickness_m is not None:
             out.append(("back", CP.Support.box([float(d_e) + float(self.depth_m) + 0.5 * self.back_thickness_m, 0.0, h + 0.5 * hw],
                                                [0.5 * self.back_thickness_m, 0.5 * self.width_m + self.wall_thickness_m, 0.5 * hw], name="interior_back")))
@@ -178,8 +184,8 @@ class InteriorSpec:
         """The x span of the support board (where an object can stand): ``[d_e + board_setback_m, d_e + depth_m]``."""
         return float(d_e) + float(self.board_setback_m), float(d_e) + float(self.depth_m)
 
-    def obstacles(self, h: float, d_e: float) -> Tuple[Any, ...]:
-        return tuple(b for _, b in self.boxes(h, d_e)[1:])
+    def obstacles(self, h: float, d_e: float, walls: str = "front") -> Tuple[Any, ...]:
+        return tuple(b for _, b in self.boxes(h, d_e, walls)[1:])
 
 
 def compartment_offsets(cell_y, board_face_y_m: float, side_sign: float, width_m: float):

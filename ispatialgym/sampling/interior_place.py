@@ -24,6 +24,10 @@ sink: 1 cell per arm at d_e 0.35):
 * the compartment at every lateral offset ``laterals_m`` of the base along the opening (stance C's laterals: ``lattice_values(-half_run,
   half_run, 0.10)`` - inside_large_02's single lateral is -0.035, not 0): its centre at ``centre_y_m - lateral`` in the base frame; a cell
   is feasible when it is at any of them (the consumer snaps the real goal cells, which lie in the real compartment, to the map's cells);
+* the side walls only along the board's depth (``walls`` "board"), where ``interiors.measure`` takes its wall rays: the former map boxed
+  them from the front plane, but the fridge's cabinet walls start ~0.13-0.15 m behind it (probe 2026-11-07, rays from the compartment's
+  centre line: the open left door at 0.20-0.30 m and the closed RIGHT door at 0.222-0.245 m to the sides for x < 0.13, the cabinet at
+  0.172-0.179 m from 0.15 m on) - the phantom 0.02 m wall boxes held the working forearm (right_arm_link4 / 5) at every lateral 0 stance;
 * a finer lattice (``lattice_m`` 0.04) restricted to the compartment's span: the consumer admits goal cells within 0.51 lattice of a
   feasible cell (the 0.08 lattice's first row at d_e 0.55 sat 0.041 m in front of the fridge's first eroded goal cell - just outside).
 
@@ -50,6 +54,9 @@ DEFAULT_LATTICE_M = 0.04
 PRE_RULES = ("approach", "outward")
 BODY_RULES = ("arm", "robot")
 RELEASE_RULES = ("lift", "rest")
+#: the side walls' extent (``InteriorSpec.boxes(walls=)``): "board" = along the board's depth, where they were measured; "front" = from the
+#: front plane (the former interior map: the fridge's walls 0.23 m in front of its board, where the doors are - probe 2026-11-07)
+WALL_RULES = ("board", "front")
 #: stance C's own defaults (``iors_large_inside``: DROP_HEIGHT_M, RELEASE_CLEARANCE_M; ``ik.PRE_DIST``)
 DROP_M = 0.005
 CLEARANCE_M = 0.02
@@ -58,15 +65,17 @@ PRE_M = 0.10
 
 def place_rule(pre: str = "approach", pre_m: float = PRE_M, drop_m: float = DROP_M, clearance_m: float = CLEARANCE_M, tilts_deg: Sequence[float] = (),
                lift_per_grasp: bool = False, laterals_m: Sequence[float] = DEFAULT_LATERALS_M, lattice_m: float = DEFAULT_LATTICE_M, body: str = "arm",
-               release: str = "lift") -> Dict[str, Any]:
-    """The canonical place rule (the map identity's ``interior_place``). ``body`` "robot" and ``release`` "rest" are the former interior
-    map's assumptions, kept for measurements (a lookup never asks for them)."""
+               release: str = "lift", walls: str = "board") -> Dict[str, Any]:
+    """The canonical place rule (the map identity's ``interior_place``). ``body`` "robot", ``release`` "rest" and ``walls`` "front" are the
+    former interior map's assumptions, kept for measurements (a lookup never asks for them)."""
     if pre not in PRE_RULES:
         raise ValueError(f"interior place: pre {pre!r} (one of {PRE_RULES})")
     if body not in BODY_RULES:
         raise ValueError(f"interior place: body {body!r} (one of {BODY_RULES})")
     if release not in RELEASE_RULES:
         raise ValueError(f"interior place: release {release!r} (one of {RELEASE_RULES})")
+    if walls not in WALL_RULES:
+        raise ValueError(f"interior place: walls {walls!r} (one of {WALL_RULES})")
     tilts = sorted({round(float(t), 2) for t in tilts_deg if float(t) != 0.0})
     if any(not 0.0 < t < 90.0 for t in tilts):
         raise ValueError(f"interior place: tilts_deg {list(tilts_deg)} (0 < tilt < 90)")
@@ -75,7 +84,7 @@ def place_rule(pre: str = "approach", pre_m: float = PRE_M, drop_m: float = DROP
         raise ValueError(f"interior place: lattice_m {lattice_m}")
     return {"rule": RULE, "pre": pre, "pre_m": round(float(pre_m), 4), "drop_m": round(float(drop_m), 4), "clearance_m": round(float(clearance_m), 4),
             "tilts_deg": tilts, "lift_per_grasp": bool(lift_per_grasp), "laterals_m": lats, "lattice_m": round(float(lattice_m), 4), "body": body,
-            "release": release}
+            "release": release, "walls": walls}
 
 
 def parse_rule(value: Any) -> Optional[Dict[str, Any]]:
@@ -89,7 +98,7 @@ def parse_rule(value: Any) -> Optional[Dict[str, Any]]:
 
 
 #: the fields a map's rule must equal a lookup's (the tilts must contain the lookup's; laterals / lattice are the builder's resolution)
-_EQUAL_FIELDS = ("rule", "pre", "pre_m", "drop_m", "clearance_m", "lift_per_grasp", "body", "release")
+_EQUAL_FIELDS = ("rule", "pre", "pre_m", "drop_m", "clearance_m", "lift_per_grasp", "body", "release", "walls")
 
 
 def covers(have: Optional[Dict[str, Any]], want: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -212,6 +221,7 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
     from ispatialgym.sampling.reach_bands import trunk_grid
 
     rule = dict(cfg.interior_place)
+    walls = rule.get("walls", "front")  # a rule without the field (built before it) had the walls from the front plane
     t_all = time.time()
     tim: Dict[str, float] = {}
     dev = world.dev
@@ -299,7 +309,7 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
     step = policy.approach_step_m * 2
     for d_e in d_es:
         sb = interior.policed(height, d_e)
-        obs = interior.obstacles(height, d_e)
+        obs = interior.obstacles(height, d_e, walls)
         for li, yc in enumerate(centres):
             ok = th.zeros(N, dtype=th.bool, device=dev)
             idx = th.nonzero(onsup[(d_e, li)]).flatten()
@@ -338,7 +348,7 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
         s = sph[:, work_t].clone()
         s[..., 1] -= centres[li]
         ok, worst = CP.sphere_support_ok(s, work_links, interior.policed(height, d_e), cfg.arm, policy)
-        ok_o, worst_o = CP.spheres_clear(s, work_links, interior.obstacles(height, d_e))
+        ok_o, worst_o = CP.spheres_clear(s, work_links, interior.obstacles(height, d_e, walls))
         if li == li_ref:
             for k in [f"board:{w}" if w else f"obstacle:{wo}" for w, o, wo in zip(worst, ok_o.tolist(), worst_o) if w or not o]:
                 sphere_hits[k] = sphere_hits.get(k, 0) + 1
@@ -452,7 +462,7 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
                 E_p = world.eef(world.full_q(entry, qp[ii], q_lock))
                 obj_ok = object_clear(world.full_q(entry, qg[ii], q_lock), pid)
                 for d_e in d_es:
-                    sb, obs = interior.policed(height, d_e), interior.obstacles(height, d_e)
+                    sb, obs = interior.policed(height, d_e), interior.obstacles(height, d_e, walls)
                     hit = th.zeros(ii.numel(), dtype=th.bool, device=dev)
                     w_sph = th.ones(ii.numel(), dtype=th.bool, device=dev)
                     w_hand = th.ones(ii.numel(), dtype=th.bool, device=dev)
