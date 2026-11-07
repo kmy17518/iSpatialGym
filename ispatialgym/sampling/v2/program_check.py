@@ -1256,8 +1256,14 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                     q_prev = th.as_tensor(action.contact.extra["q_hint"], dtype=th.float32)
                 # owner 2026-09-24: where the previous arm action left THIS arm (every family) - the leg that starts there is tracked from it
                 q_end_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0])
-                n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj, q_seed_prev=q_prev,
-                                                    q_end_prev=q_end_prev, held_since_init=tracker.carried is not None and tracker.carried_arm is None)
+                from ispatialgym.sampling.v2 import tabletop as TT
+
+                # of-v2maps 2026-11-07 (v2open2: 'approach: support_policy: finger_penetration' 21 / 20 / 6 program-check rejections): a grasp
+                # action's approach and grasp are policed at the oracle's pre-shape of its recorded grasp (tabletop.record_policy_opening)
+                with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None):
+                    n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj,
+                                                        q_seed_prev=q_prev, q_end_prev=q_end_prev,
+                                                        held_since_init=tracker.carried is not None and tracker.carried_arm is None)
                 end_q = witnesses.pop("__arm_end_q__", None)
                 partial_leg = witnesses.pop("__partial__", None)
                 repose_note = witnesses.pop("__repose__", None)
