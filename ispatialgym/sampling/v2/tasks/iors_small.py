@@ -2399,6 +2399,9 @@ class IORSSmall(SamplerV2):
             place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
             for what, pose in (("place", place_guess), ("pre-place", self.pre_place_of(place_guess))):
                 if not self.ikc.eef_in_frame(pose, cam_manip):
+                    # of-v2maps 2026-11-06: opt-in ISPATIALGYM_FRAME_DIAG (the projected box / fingers, a rendered image for the first few)
+                    TT.frame_diag(self, manip, grasp.arm, pose, what, obj=self.obj("target"), obj_pose=goal_guess, cam_pose=cam_manip,
+                                  tag=f"candidate {int(k)} grasp {getattr(grasp, 'grasp_name', '')}")
                     raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
                                                          f"(trunk {manip.translate}, {manip.tilt:.2f})")
         # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the

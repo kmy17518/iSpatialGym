@@ -2020,6 +2020,103 @@ def in_frame(s, cam_pose: Pose, points: th.Tensor, margin: float = IN_FRAME_MARG
     return bool(s.world.camera_model.all_inside(cam_pose, points, margin))
 
 
+#: images ``frame_diag`` renders per process (the JSON line is written for every rejection)
+FRAME_DIAG_IMAGES = 6
+
+
+def frame_diag(s, stance: Stance, arm: str, eef_pose: Pose, what: str, obj: Any = None, obj_pose: Optional[Pose] = None,
+               cam_pose: Optional[Pose] = None, tag: str = "") -> Optional[Dict[str, Any]]:
+    """Opt-in ``ISPATIALGYM_FRAME_DIAG=<dir>`` (of-v2maps 2026-11-06, the plate's gripper_not_in_frame): at a frame rejection of the eef
+    pose ``eef_pose`` from ``stance``, one ``FRAME_DIAG {json}`` line - the image coordinates (u, v), depth and in-image / in-margin
+    flags of the 8 corners ``IKChecker.eef_in_frame`` tests (a 12 x 12 x 8 cm box around the eef: +-6 cm across, -2..+6 cm along the
+    approach) and of the two finger links (by FK of the IK solution at the pose, else the stance posture), whether the IK found one,
+    and per point the distance (px) past the 5 % border. For the first :data:`FRAME_DIAG_IMAGES` rejections of a process whose world
+    has the head camera (``ISPATIALGYM_FAST_SAMPLER_CAMERAS=0``), the robot is posed at the stance with that configuration and ``obj``
+    at ``obj_pose``, the head camera rendered, the points and the border drawn, ``<dir>/<variant>_<n>_<what>.png`` saved, and the
+    robot / object put back (no physics step between). Never fails the caller."""
+    out_dir = os.environ.get("ISPATIALGYM_FRAME_DIAG")
+    if not out_dir:
+        return None
+    try:
+        from ispatialgym.sampling import geometry as G
+
+        cam = cam_pose if cam_pose is not None else s.camera_pose_at(stance)
+        cm = s.world.camera_model
+        p, q = _t(eef_pose[0]).float(), _t(eef_pose[1]).float()
+        names, pts = [], []
+        for dx in (-0.06, 0.06):
+            for dy in (-0.06, 0.06):
+                for dz in (-0.02, 0.06):
+                    names.append(f"box{'+' if dx > 0 else '-'}{'+' if dy > 0 else '-'}{'a' if dz > 0 else 'b'}")
+                    pts.append(p + G.rotate(q, th.tensor([dx, dy, dz])))
+        r = s.ikc.exact([eef_pose], stance, arm, cache=False)
+        q_full = r.q if (r.ok and r.q is not None) else s.ikc.q_locked(stance)
+        for ln in (f"{arm}_gripper_finger_link1", f"{arm}_gripper_finger_link2"):
+            try:
+                fk = s.kit.backend.fk([ln], q_full)[ln]
+                names.append(ln.rsplit("_", 1)[-1])
+                pts.append(_t(fk[0]).float())
+            except Exception:  # noqa: BLE001
+                pass
+        P = th.stack(pts)
+        uv, depth = cm.project(cam, P)
+        W, H = float(cm.width), float(cm.height)
+        mu, mv = IN_FRAME_MARGIN * W, IN_FRAME_MARGIN * H
+        rows = []
+        for i, nm in enumerate(names):
+            u, v, d = float(uv[i, 0]), float(uv[i, 1]), float(depth[i])
+            past = max(mu - u, u - (W - mu), mv - v, v - (H - mv), 0.0)
+            rows.append({"pt": nm, "u": round(u, 1), "v": round(v, 1), "depth": round(d, 3), "in_image": bool(d > 0.05 and 0 <= u <= W and 0 <= v <= H),
+                         "in_margin": bool(d > 0.05 and mu <= u <= W - mu and mv <= v <= H - mv), "past_border_px": round(past, 1)})
+        n = s.__dict__.get("_frame_diag_n", 0)
+        s._frame_diag_n = n + 1
+        rec = {"what": what, "tag": tag, "n": n, "arm": arm, "stance": [round(float(v), 3) for v in stance.base_pose2d], "trunk": [stance.translate, round(stance.tilt, 3)],
+               "ik_ok": bool(r.ok), "image": [int(W), int(H)], "box_in_margin": sum(x["in_margin"] for x in rows[:8]), "box_in_image": sum(x["in_image"] for x in rows[:8]),
+               "fingers_in_margin": sum(x["in_margin"] for x in rows[8:]), "max_past_border_px": max(x["past_border_px"] for x in rows), "points": rows}
+        if n < FRAME_DIAG_IMAGES and getattr(s.world, "cam", None) is not None:
+            rec["png"] = _frame_diag_image(s, stance, q_full, obj, obj_pose, uv, rows, mu, mv, W, H, out_dir, n, what)
+        log.info("FRAME_DIAG %s", json.dumps(rec))
+        return rec
+    except Exception as e:  # noqa: BLE001 - a diagnostic never fails an attempt
+        log.info("FRAME_DIAG failed: %r", e)
+        return None
+
+
+def _frame_diag_image(s, stance: Stance, q_full: th.Tensor, obj: Any, obj_pose: Optional[Pose], uv: th.Tensor, rows: List[Dict[str, Any]],
+                      mu: float, mv: float, W: float, H: float, out_dir: str, n: int, what: str) -> Optional[str]:
+    """:func:`frame_diag`'s render: the robot at ``stance`` with ``q_full``, ``obj`` at ``obj_pose``, the head camera's rgb with the projected
+    points (green inside the 5 % border, red outside) and the border; the robot and the object restored afterwards."""
+    from PIL import Image, ImageDraw
+
+    robot = s.world.robot
+    q0 = robot.get_joint_positions().clone()
+    o0 = obj.get_position_orientation() if obj is not None else None
+    try:
+        x, y, yaw = (float(v) for v in stance.base_pose2d)
+        robot.set_joint_positions(_t(s.kit.q_at_base_pose(_t(q_full).float(), x, y, yaw)))
+        if obj is not None and obj_pose is not None:
+            obj.set_position_orientation(_t(obj_pose[0]).float(), _t(obj_pose[1]).float())
+        img = s.world.rgb(n_renders=3).numpy().astype("uint8")
+    finally:
+        robot.set_joint_positions(q0)
+        if o0 is not None:
+            obj.set_position_orientation(*o0)
+    im = Image.fromarray(img)
+    dr = ImageDraw.Draw(im)
+    dr.rectangle([mu, mv, W - mu, H - mv], outline=(255, 255, 0), width=2)
+    for i, row in enumerate(rows):
+        u, v = float(uv[i, 0]), float(uv[i, 1])
+        col = (0, 220, 0) if row["in_margin"] else (255, 0, 0)
+        if row["pt"] in ("link1", "link2"):
+            col = (0, 120, 255) if row["in_margin"] else (255, 0, 255)
+        dr.ellipse([u - 5, v - 5, u + 5, v + 5], outline=col, width=3)
+        dr.text((u + 6, v - 6), row["pt"], fill=col)
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{getattr(getattr(s, 'gp', None), 'variant', 'x')}_{os.getpid()}_{n}_{what}.png")
+    im.save(path)
+    return path
+
+
 def all_in_frame(s, cam_pose: Pose, items: Sequence[Tuple[str, th.Tensor, Pose]], margin: float = IN_FRAME_MARGIN, skip: Sequence[str] = ()) -> List[str]:
     """§4.6 step 4: names of the ``(name, hull, pose)`` items whose AABB corners are not fully inside the image (``margin``);
     ``skip`` names are exempt (the disembedding destination tray)."""

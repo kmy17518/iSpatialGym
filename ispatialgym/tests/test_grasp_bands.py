@@ -417,3 +417,29 @@ def test_finger_link_clearance_per_hull():
     d = IK.finger_link_clearance(hc, T, CP.Support.plane(0.801), (0.02, 0.02))
     assert set(d) == {"right_gripper_finger_link1", "right_gripper_finger_link2"}
     assert abs(d["right_gripper_finger_link1"] - (-0.001)) < 1e-6 and abs(d["right_gripper_finger_link2"] - (-0.004)) < 1e-6
+
+
+def test_frame_diag_projects_the_eef_box_and_flags_the_border(monkeypatch, tmp_path):
+    # of-v2maps 2026-11-06 (the plate's gripper_not_in_frame): the 8 box corners eef_in_frame tests, in / out of the 5 % border
+    from types import SimpleNamespace
+
+    import torch as th
+
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.v2 import ik as IKm
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    monkeypatch.setenv("ISPATIALGYM_FRAME_DIAG", str(tmp_path))
+    cm = G.CameraModel(640, 480, 400.0, 400.0, 320.0, 240.0)
+    cam = (th.tensor([0.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))  # looking along -z (camera convention of CameraModel.project)
+    def fk(names, q):
+        raise RuntimeError("no fk")
+    s = SimpleNamespace(world=SimpleNamespace(camera_model=cm, cam=None), ikc=SimpleNamespace(exact=lambda *a, **k: IKm.IKResult(False, None, "x", 1),
+                        q_locked=lambda st: th.zeros(28)), kit=SimpleNamespace(backend=SimpleNamespace(fk=fk)), gp=SimpleNamespace(variant="v"))
+    st = SimpleNamespace(base_pose2d=(0.0, 0.0, 0.0), translate=0.0, tilt=0.0)
+    centre = (th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    rec = TT.frame_diag(s, st, "right", centre, "place", cam_pose=cam)
+    assert rec["box_in_margin"] == 8 and rec["max_past_border_px"] == 0.0 and not rec["ik_ok"] and len(rec["points"]) == 8
+    side = (th.tensor([1.0, 0.0, -1.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))  # 1 m to the side at 1 m depth: u ~ 720 px > 640
+    rec = TT.frame_diag(s, st, "right", side, "place", cam_pose=cam)
+    assert rec["box_in_image"] == 0 and rec["max_past_border_px"] > 100
