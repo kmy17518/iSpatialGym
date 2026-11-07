@@ -279,6 +279,26 @@ def support_policy_on() -> bool:
     return os.environ.get("ISPATIALGYM_SUPPORT_POLICY", "") not in ("", "0", "off", "false")
 
 
+def policed_supports(supports: Sequence[Any], approached: Optional[Sequence[Any]]) -> List[Any]:
+    """of-v2maps 2026-11-06: the ignored objects the support policy polices - those the chain does NOT approach (the support under a grasped
+    object); an object the hand is meant to touch (``approached``: the grasped target, a pushed box) is not a support of the approach."""
+    return [sp for sp in supports if all(sp is not a for a in (approached or ()))]
+
+
+def support_plane_z(sp: Any, planes: Optional[Dict[str, float]]) -> Optional[float]:
+    """of-v2maps 2026-11-06: the support policy's top plane of ``sp`` - the MEASURED top the sampler registered for it
+    (``IKChecker.support_plane_z``, set by ``tabletop.map_bands``: the height the reach map was computed at), else its AABB top (the
+    2026-11-02 rule: a table whose box rises above its working surface - a lip, a back panel - read as finger penetration for a flat
+    object's grasp: v2scope1 inside_03 / nextto_03 / ontop_small_04 lost 499-772 grasps each to 'finger_penetration'); None without either."""
+    name = getattr(sp, "name", None)
+    if planes and name in planes:
+        return float(planes[name])
+    try:
+        return float(sp.aabb[1][2])
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def support_policy_scope() -> str:
     """of-v2maps 2026-11-06: which exact-IK chains the support policy polices - ``"grasp"`` (``ISPATIALGYM_SUPPORT_POLICY=grasp``, what
     ``tabletop.map_bands`` turns on): only chains whose arm holds nothing (the empty hand closing on an object at rest on its support - the
@@ -403,6 +423,12 @@ class IKChecker:
         others = self._non_finger_links(arm)
         if not others:
             return True, ""
+        # of-v2maps 2026-11-06: only the SUPPORTS under the approach are policed - an ignored object the hand is meant to touch (a pushed box,
+        # approached by the chain) is not (v2scope1: touching_01 / 02 'touching push: no push class passes', 'finger_penetration on
+        # target_box_of_sanitary_napkins'); a chain with no such support is not a grasp on a support
+        supports = policed_supports(supports, approached)
+        if not supports:
+            return True, ""
         drop = [o for o in (approached or ()) if all(o is not sp for sp in supports)]
         with self.ignoring(drop):
             if not bool(self.kit.links_clear(q, others, CP.DEFAULT.sphere_support_margin_m)[0]):
@@ -416,9 +442,8 @@ class IKChecker:
         T[:3, 3] = G.t(eef[0]).float()
         fq = float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean())
         for sp in supports:
-            try:
-                top = float(sp.aabb[1][2])
-            except Exception:  # noqa: BLE001 - a support without an AABB (a wall): the sphere rule above only
+            top = support_plane_z(sp, getattr(self, "support_plane_z", None))
+            if top is None:  # a support without an AABB (a wall): the sphere rule above only
                 continue
             ok, reason, _ = hc.check(T, CP.Support.plane(top, name=getattr(sp, "name", "support")), (fq, fq))
             if not bool(ok[0]):
@@ -850,7 +875,9 @@ class IKChecker:
                 qs[-1] = q
                 self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
         if q is not None and ignore_for_last and support_policy_on() and not (support_policy_scope() == "grasp" and self._holding(arm)):
-            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, approached)
+            # of-v2maps 2026-11-06: the objects the last pose closes in on (as the IK's own last-pose ignore infers them) - a push that
+            # passes no ``approached`` has its pushed box exempted as the grasp's target is, the support under it stays policed
+            ok_p, why_p = self.support_policy_ok(q, arm, ignore_for_last, approached if approached is not None else self.approached_objects(poses[-1]))
             if not ok_p:
                 q, why = None, f"support_policy: {why_p}"
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))

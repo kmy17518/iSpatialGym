@@ -1002,6 +1002,12 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         return None
     # of-v2maps 2026-11-06: the grasp approach only (ik.support_policy_scope) - "1" also policed places / carries / releases
     os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    # ... against the support's MEASURED top (the height the map was computed at), not its AABB top (ik.support_plane_z)
+    ikc = getattr(s, "ikc", None)
+    if ikc is not None:
+        if not isinstance(getattr(ikc, "support_plane_z", None), dict):
+            ikc.support_plane_z = {}
+        ikc.support_plane_z[str(top.name)] = float(top.z)
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 

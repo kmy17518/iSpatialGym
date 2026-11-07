@@ -377,3 +377,22 @@ def test_support_policy_scope_and_the_holding_arm(monkeypatch):
     assert chk._holding("left") and not chk._holding("right")
     chk.kit = SimpleNamespace(backend=SimpleNamespace())  # a backend without attachments: never holding
     assert not chk._holding("left")
+
+
+def test_policed_supports_and_the_measured_top_plane():
+    # of-v2maps 2026-11-06 (v2scope1): a pushed box the chain approaches is not a support of the approach (touching_01 'finger_penetration
+    # on target_box...'); the plane is the measured top map_bands registered, not the AABB top (inside_03 / nextto_03 / ontop_small_04
+    # 'finger_penetration' on tables whose box rises above the working surface)
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2 import ik as IK
+
+    table = SimpleNamespace(name="table_0", aabb=([0, 0, 0], [1, 1, 0.83]))
+    box = SimpleNamespace(name="box_0", aabb=([0, 0, 0.81], [0.1, 0.1, 0.95]))
+    assert IK.policed_supports([table], [box]) == [table]  # a grasp of the box: the table is policed
+    assert IK.policed_supports([table, box], [box]) == [table]  # a push of the box: the box is not
+    assert IK.policed_supports([box], [box]) == []  # a handle / contact chain on the object itself: nothing to police
+    assert IK.policed_supports([table], None) == [table]
+    assert IK.support_plane_z(table, {"table_0": 0.8126}) == 0.8126  # the measured top wins over the AABB's 0.83
+    assert IK.support_plane_z(table, {}) == 0.83 and IK.support_plane_z(table, None) == 0.83
+    assert IK.support_plane_z(SimpleNamespace(name="wall"), None) is None
