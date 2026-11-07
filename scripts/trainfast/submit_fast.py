@@ -87,7 +87,7 @@ def shiyuc_env(a):
     env = {"ISGF_SAMPLING_CACHE": os.path.join(SY, "cache", "sampling"), "ISGF_ASSET_CACHE": os.path.join(SY, "asset_cache"),
            "ISGF_JB_NFS": os.path.join(SY, "jobs"), "KIT_TPL_NFS_ROOT": os.path.join(SY, "kit_templates"),
            "KIT_TEX_STORE": os.path.join(SY, "kit_textures"), "ISGF_EXP_PATH": os.path.join(SY, "isaacsim_overlay", "apps"),
-           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISGF_PREDEMO_ROOT": root}
+           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISGF_PREDEMO_ROOT": root, "ISGF_GIT_SAFE_ALL": "1"}
     for k in ("ISGF_SAMPLING_CACHE", "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_PREDEMO_ROOT"):
         assert env[k].startswith(SY + "/"), k
     if not os.path.isdir(env["ISGF_EXP_PATH"]):

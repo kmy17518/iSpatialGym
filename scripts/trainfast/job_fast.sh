@@ -16,6 +16,9 @@ source $JOBDIR/job.env
 # of-v2maps 2026-11-07 (shiyuc mode, submit_fast.py --shiyuc): OmniGibson copies its .kit into $EXP_PATH on every launch - the account's own
 # overlay (job.env ISGF_EXP_PATH); the kit stores come through KIT_TPL_NFS_ROOT / KIT_TEX_STORE in job.env (kit_appdata.sh reads them)
 [ -n "${ISGF_EXP_PATH:-}" ] && export EXP_PATH=$ISGF_EXP_PATH
+# ... and git reads the snapshot's Behavior-1K commit for the kit template key (kit_appdata.sh: `git rev-parse`; another account's checkout
+# is "dubious ownership" -> key ..._nob1k -> a cold Kit start, sytest_sy 2026-11-07): safe.directory by environment, no config file written
+if [ "${ISGF_GIT_SAFE_ALL:-0}" = 1 ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; fi
 [ -n "${KIT_TPL_NFS_ROOT:-}" ] && export KIT_TPL_NFS_ROOT
 [ -n "${KIT_TEX_STORE:-}" ] && export KIT_TEX_STORE
 # one trunk (owner 2026-11-05): the scripts come from the job's frozen code snapshot (submit_fast.py writes ISGF_SCRIPTS=<snapshot>/scripts/trainfast;
