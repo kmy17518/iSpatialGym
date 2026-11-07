@@ -81,13 +81,13 @@ def shiyuc_env(a):
         raise SystemExit(f"--shiyuc: --base-index {a.base_index} < {SHIYUC_BASE_INDEX} (minyeong's ranges)")
     if a.ledger and not os.path.abspath(a.ledger).startswith(SY + "/"):
         raise SystemExit(f"--shiyuc: --ledger {a.ledger} is not under {SY}")
-    st_ = os.path.join(SY, "stores")
+    # the read stores (lab band store, eval85 bands, train85 bands, reach_volume) are world-readable (probe 2026-11-07): read in place, as
+    # minyeong's jobs do; env_fast.sh / job_fast.sh take ISGF_LAB_BAND_STORE / ISGF_EVAL_BANDS / ISGF_REACH_VOLUME_SRC / ISGF_T85_BANDS
+    # (--extra-env) for a staged copy should one become unreadable
     env = {"ISGF_SAMPLING_CACHE": os.path.join(SY, "cache", "sampling"), "ISGF_ASSET_CACHE": os.path.join(SY, "asset_cache"),
            "ISGF_JB_NFS": os.path.join(SY, "jobs"), "KIT_TPL_NFS_ROOT": os.path.join(SY, "kit_templates"),
            "KIT_TEX_STORE": os.path.join(SY, "kit_textures"), "ISGF_EXP_PATH": os.path.join(SY, "isaacsim_overlay", "apps"),
-           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISGF_PREDEMO_ROOT": root,
-           "ISGF_LAB_BAND_STORE": os.path.join(st_, "lab_reach_bands"), "ISGF_EVAL_BANDS": os.path.join(st_, "bands_eval"),
-           "ISGF_REACH_VOLUME_SRC": os.path.join(st_, "reach_volume"), "ISGF_T85_BANDS": os.path.join(st_, "bands_train")}
+           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISGF_PREDEMO_ROOT": root}
     for k in ("ISGF_SAMPLING_CACHE", "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_PREDEMO_ROOT"):
         assert env[k].startswith(SY + "/"), k
     if not os.path.isdir(env["ISGF_EXP_PATH"]):
@@ -219,6 +219,10 @@ def submit(a):
             for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS", "ISPATIALGYM_REACH_MAP_ANCHORS", "TEMPLATE", "EVAL_INDEX"):
                 if env.get(k) and not os.access(env[k], os.R_OK):
                     raise SystemExit(f"--shiyuc: {k}={env[k]} is not readable by this account (stage a copy under {SY})")
+            for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS"):  # every file of the v2 data (minyeong's are mode 600)
+                bad = [os.path.join(d, f) for d, _, fs in os.walk(env.get(k) or "/nonexistent") for f in fs if not os.access(os.path.join(d, f), os.R_OK)]
+                if bad:
+                    raise SystemExit(f"--shiyuc: {len(bad)} unreadable files under {env[k]} (e.g. {bad[0]}): pass --v2-root <the staged copy under {SY}>")
         script = os.path.join(env["ISGF_SCRIPTS"], f"job_{a.flow}.sh")
         cmd, gres = sbatch(a, f"{a.job_prefix}{st.short_of(a.key)}", p["TIME_LIMIT_S"], script, job_dir)
         if a.dry_run:
