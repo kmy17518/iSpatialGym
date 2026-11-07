@@ -1,0 +1,5 @@
+[
+ {"id": "cork_ncxgpe__wine_bottle_inkqch", "male_entry": "cork__ncxgpe__s1__attachment_free", "partner": {"category": "wine_bottle", "model": "inkqch", "scale": [1.0, 1.0, 1.0]},
+  "heights": ["0.7853"], "aliases": ["configuration_matching-attachment_03 (desk_mdhelw_1, office_cubicles_right)"],
+  "glib": "$OFH/attach_20261107/stage_cork/glib (i7-attach round 2: 2 physics-valid grasps via cand_overrides attach_axis seat - OWNER DECISION pending)"}
+]

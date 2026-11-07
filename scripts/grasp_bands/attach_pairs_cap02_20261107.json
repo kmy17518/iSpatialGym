@@ -1,0 +1,5 @@
+[
+ {"id": "cap_xxqyrt__lemonade_bottle_yprkek", "male_entry": "cap__xxqyrt__s1__attachment_free", "partner": {"category": "lemonade_bottle", "model": "yprkek", "scale": [1.0, 1.0, 1.0]},
+  "heights": ["0.8126"], "aliases": ["configuration_matching-attachment_02 (breakfast_table_rhjoby_0, house_single_floor)"],
+  "glib": "$OFH/attach_20261107/stage_cap/glib (i7-attach round 2: 1 physics-valid grasp top_0 via blade_contact_at_retreat)"}
+]

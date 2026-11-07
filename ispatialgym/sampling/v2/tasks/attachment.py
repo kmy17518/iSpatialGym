@@ -235,6 +235,50 @@ REST_STABILITY_STEPS = 300
 REST_TIP_MAX_DEG = 3.0
 
 
+def attachment_links(male, female):
+    """``(male child link, female parent link)`` of the pair - the first parent candidate ``AttachedTo`` offers for ``female`` - or None
+    (i7-attachmap 2026-11-07: a module function, so the attach map's pair measurement (``attach_maps.measure_pair``) resolves the pair
+    exactly as the template does)."""
+    cands = male.states[AttachedTo]._get_parent_candidates(female)
+    if not cands:
+        return None
+    for child_name, parent_names in cands.items():
+        for parent_name in parent_names:
+            return male.states[AttachedTo].links[child_name], female.states[AttachedTo].links[parent_name]
+    return None
+
+
+#: the insertion-axis rule's defaults (``generation.insertion_axis_min_offset_m`` / ``insertion_axis_max_deviation_deg``)
+INSERTION_AXIS_MIN_OFFSET_M = 0.02
+INSERTION_AXIS_MAX_DEVIATION_DEG = 45.0
+
+
+def insertion_axis_rule(parent_link_in_female, partner_hull: th.Tensor, min_offset_m: float = INSERTION_AXIS_MIN_OFFSET_M,
+                        max_deviation_deg: float = INSERTION_AXIS_MAX_DEVIATION_DEG) -> Tuple[th.Tensor, Dict[str, Any]]:
+    """The pair's insertion axis in the female root frame and its template facts (i7-attachmap 2026-11-07: the rule of
+    :meth:`Attachment.sample_template`, moved here unchanged so the attach map measures it by the same code): the direction from the
+    partner's hull centroid to the female meta link (the side from which the male can approach without passing through the partner: up
+    for a bottle neck / socket / pot top, away from the wall for a nail, the underside for a deck) when it is well-defined (offset >
+    ``min_offset_m``) and deviates more than ``max_deviation_deg`` from the meta link's +z; the meta link's +z otherwise. BEHAVIOR's
+    attachment frames need only match between male and female, not point along the insertion (cork/ncxgpe -> wine_bottle/inkqch: both
+    frames (0.5, -0.5, 0.5, 0.5), +z along the bottle's -y, so the +z rule put the pre-attach 10 cm beside the neck and slid the cork in
+    sideways)."""
+    axis_geo = TT._t(parent_link_in_female[0]) - TT._t(partner_hull).mean(dim=0)  # both in the female root frame
+    axis_z = C.unit(C.quat_rotate(parent_link_in_female[1], th.tensor([0.0, 0.0, 1.0])))
+    facts: Dict[str, Any] = {"source": "meta link +z", "axis": [round(float(v), 4) for v in axis_z]}
+    axis = axis_z
+    if float(th.linalg.norm(axis_geo)) > float(min_offset_m):
+        geo = C.unit(axis_geo)
+        angle = math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(geo, axis_z))))))
+        facts.update({"centroid_to_female": [round(float(v), 4) for v in geo], "angle_deg": round(angle, 1)})
+        if angle > float(max_deviation_deg):
+            # the annotation's +z is not the approach direction (a teapot's +z is within 8 deg of it and stays exact)
+            axis = geo
+            facts["source"] = "centroid->female"
+            facts["axis"] = facts["centroid_to_female"]
+    return axis, facts
+
+
 @dataclass
 class HoldingTransition(Transition):
     """A recorded stance transition driven with an object in hand (§6.8 second base pose): ``holding`` = the carried bddl
@@ -376,25 +420,10 @@ class Attachment(SamplerV2):
         fp, fq = female.get_position_orientation()
         pp, pq = parent_link.get_position_orientation()
         self.parent_link_in_female = C.relative((pp.float(), pq.float()), (fp.float(), fq.float()))
-        # insertion axis in the female root frame: the direction from the partner's hull centroid to the female meta link (the
-        # side from which the male can approach without passing through the partner: up for a bottle neck / socket / pot
-        # top, away from the wall for a nail, the underside for a deck) when it is well-defined; the meta link's +z only as
-        # the fallback — BEHAVIOR's attachment frames need only match between male and female, not point along the
-        # insertion (cork/ncxgpe -> wine_bottle/inkqch: both frames (0.5, -0.5, 0.5, 0.5), +z along the bottle's -y, so the
-        # +z rule put the pre-attach 10 cm beside the neck and slid the cork in sideways)
-        axis_geo = TT._t(self.parent_link_in_female[0]) - TT._t(self.hull[self.p_role]).mean(dim=0)  # both in the female root frame
-        axis_z = C.unit(C.quat_rotate(self.parent_link_in_female[1], th.tensor([0.0, 0.0, 1.0])))
-        facts: Dict[str, Any] = {"source": "meta link +z", "axis": [round(float(v), 4) for v in axis_z]}
-        self.insertion_axis_local = axis_z
-        if float(th.linalg.norm(axis_geo)) > float(self.gen("insertion_axis_min_offset_m", 0.02)):
-            geo = C.unit(axis_geo)
-            angle = math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(geo, axis_z))))))
-            facts.update({"centroid_to_female": [round(float(v), 4) for v in geo], "angle_deg": round(angle, 1)})
-            if angle > float(self.gen("insertion_axis_max_deviation_deg", 45.0)):
-                # the annotation's +z is not the approach direction (a teapot's +z is within 8 deg of it and stays exact)
-                self.insertion_axis_local = geo
-                facts["source"] = "centroid->female"
-                facts["axis"] = facts["centroid_to_female"]
+        # insertion axis in the female root frame (:func:`insertion_axis_rule`: centroid -> female link when the link's +z deviates)
+        self.insertion_axis_local, facts = insertion_axis_rule(self.parent_link_in_female, self.hull[self.p_role],
+                                                               float(self.gen("insertion_axis_min_offset_m", INSERTION_AXIS_MIN_OFFSET_M)),
+                                                               float(self.gen("insertion_axis_max_deviation_deg", INSERTION_AXIS_MAX_DEVIATION_DEG)))
         self.template_facts["insertion_axis"] = facts
         log.info("%s: insertion axis %s", self.gp.variant, json.dumps(facts))
         self.symmetry = self._symmetry_equivalences(male, child_link)
@@ -416,13 +445,14 @@ class Attachment(SamplerV2):
                    "safety": 0.02, "H_max": H_max}
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        # i7-attachmap 2026-11-07: under v2 only the attach-reach band is the pair's ATTACH map (attach_maps: the held male at its seat on the
+        # partner, pre-attach -> hover -> touchdown -> seat by chained IK, the oracle's hover rule); a miss rejects missing_map (+ MAP_REQUEST).
+        # Every other mode loads / computes the legacy band per edge as before.
+        attach_view = self._attach_map_view() if TT.RB.v2_only() else None
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
-                try:
-                    self.attach_bands = TT.RB.ReachBands.load(self.world.scene_model, self.top.name, attach_spec.object, attach_spec.grasp_key, placed=attach_spec.placed, scale=attach_spec.scale)
-                except FileNotFoundError:
-                    self.attach_bands = TT.compute_bands(self, attach_spec, self.top, edge)
+                self.attach_bands = self._attach_band(attach_spec, edge, attach_view)
                 # A1: the left contact band of the partner's height class (partner brace face); §4.4 margins over the union
                 self.left_bands = TT.load_left_contact_band(self, self.height[self.p_role], top=self.top, edge=edge, compute=TT.left_band_compute())
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top, left_bands=self.left_bands)
@@ -451,13 +481,35 @@ class Attachment(SamplerV2):
                                     "band": getattr(self.bands, "path", None), "attach_band": getattr(self.attach_bands, "path", None)})
 
     def _attachment_links(self, male, female):
-        cands = male.states[AttachedTo]._get_parent_candidates(female)
-        if not cands:
-            return None
-        for child_name, parent_names in cands.items():
-            for parent_name in parent_names:
-                return male.states[AttachedTo].links[child_name], female.states[AttachedTo].links[parent_name]
-        return None
+        return attachment_links(male, female)
+
+    def _attach_band(self, attach_spec: TT.BandSpec, edge: EdgeFrame, view=None):
+        """The attach-reach band at ``edge``: the attach map's ``view`` (v2 only, :meth:`_attach_map_view`) when given, else the legacy
+        band - loaded from the band caches, computed in-process on a miss (unchanged)."""
+        if view is not None:
+            return view
+        try:
+            return TT.RB.ReachBands.load(self.world.scene_model, self.top.name, attach_spec.object, attach_spec.grasp_key, placed=attach_spec.placed, scale=attach_spec.scale)
+        except FileNotFoundError:
+            return TT.compute_bands(self, attach_spec, self.top, edge)
+
+    def _attach_map_view(self):
+        """i7-attachmap 2026-11-07 (v2 only): the attach map of the pair (``attach_maps.sampler_view``: the male's v2 entry + stable rest,
+        the partner model / scale, the top's height (anchors), the right arm, the oracle's hover rule, ``pre_attach_back_m``, the contact
+        policy, the robot; the map's pair spec checked against the live one) as the attach-reach band view; a miss logs MAP_REQUEST and
+        rejects ``missing_map`` - no legacy band under v2 only."""
+        from ispatialgym.sampling import attach_maps as AM
+
+        pc = self.choice.models[self.p_role]
+        live = {"T_partner_male": C.compose(self.parent_link_in_female, self.root_in_child_link), "insertion_axis": self.insertion_axis_local,
+                "partner_bottom_offset_m": float(self.world.bottom_offset(self.hull[self.p_role], C.IDENTITY_QUAT))}
+        view, req, why = AM.sampler_view(self, grasp_key=self.grasp_key, partner=(pc.category, pc.model, list(pc.scale) if pc.scale else None),
+                                         top=self.top, live=live, pre_back_m=float(self.g("pre_attach_back_m")), arm="right")
+        self.template_facts["attach_map"] = {"hit": view is not None, "why": why, "path": None if view is None else view.meta.get("map_path")}
+        if view is None:
+            TT.map_request(self, **req)
+            raise Reject("missing_map", f"no attach map for {req.get('entry') or self.grasp_key} on {pc.category}/{pc.model} at h {req.get('h')}: {why}")
+        return view
 
     def _symmetry_equivalences(self, male, child_link) -> List[List[float]]:
         """§6.8 mating-axis symmetry test: rotate the male hull about the female axis (the child link's z) in 15° steps; a

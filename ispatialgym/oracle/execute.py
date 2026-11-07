@@ -109,6 +109,10 @@ class PrivilegedState(Protocol):
     def init_pose(self, name: str) -> Optional[Tuple[th.Tensor, th.Tensor]]: ...  # the object's pose at the program start
 
 
+#: the attach hover rule the oracle runs unless ``ISPATIALGYM_ATTACH_HOVER`` says otherwise (OWNER DECISION 2026-11-07: swept)
+ATTACH_HOVER_DEFAULT = "swept"
+
+
 @dataclass
 class ExecuteConfig:
     #: base at the last path waypoint / drive-in pose (m, rad)
@@ -314,6 +318,15 @@ class ExecuteConfig:
     #: (the partner's collision convexes whose footprint meets theirs, widened by ``attach_hover_footprint_margin_m``) ...
     attach_hover_clear_m: float = 0.003
     attach_hover_footprint_margin_m: float = 0.01
+    #: (owner 2026-11-07, configuration_matching-attachment_04 option B) where the hover's height comes from: ``"box"`` (today, the
+    #: rule above) or ``"swept"`` - the part's FIRST TOUCH along the seat axis (its collision pieces swept down the axis onto the
+    #: partner's, ``convex_sweep.first_touch``; the fingertips' pieces too, whichever touches first) + ``attach_hover_clear_m``,
+    #: so the touchdown's ``attach_hover_clear_m + attach_touchdown_extra_m`` reaches the first touch with the extra to spare (the
+    #: box rule took the stockpot's loop handles, outside the lid, for its top: the hover 29 mm above the first touch, the 7 mm
+    #: touchdown never touched in 37 / 37 and the lid dropped 22 mm). A swept miss (no pair meets) falls back to the box rule.
+    #: Env ``ISPATIALGYM_ATTACH_HOVER``; the default is ``swept`` (OWNER DECISION 2026-11-07, after the A/B on attachment_01-04: box i7_ah
+    #: vs swept i7_ahs, touched 5 / 9 vs 11 / 11, drop <= 22.2 vs <= 0.1 mm, protected_contact 4 -> 0); ``box`` = the former rule.
+    attach_hover_rule: str = field(default_factory=lambda: os.environ.get("ISPATIALGYM_ATTACH_HOVER", ATTACH_HOVER_DEFAULT))
     #: ... aligns the male link there with the female one - laterally (across the seat axis) and in yaw about it modulo the part's
     #: symmetry, the height and the tilt kept - in the closed-loop passes of the task's correction regime (``AttachCorrection``),
     #: then TOUCHES DOWN (owner 2026-10-10: released at the hover, the contact hold's squeeze let go at once kicked the cap 8 mm
@@ -3344,6 +3357,24 @@ def _collision_points(links: Sequence[Any]) -> Optional[th.Tensor]:
     return th.cat(pts, dim=0) if pts else None
 
 
+def _collision_pieces(links: Sequence[Any]) -> List[th.Tensor]:
+    """World points of every collision mesh of every link in ``links``, one tensor per mesh - the convex pieces PhysX collides
+    (``convexHull``-approximated collision meshes, ``points_in_world_frame`` through the render-side scaled transform); a link
+    without collision meshes contributes its collision hull (``collision_boundary_points_world``) as one piece."""
+    out: List[th.Tensor] = []
+    for link in links:
+        n0 = len(out)
+        for mesh in (getattr(link, "collision_meshes", None) or {}).values():
+            pts = getattr(mesh, "points_in_world_frame", None)
+            if pts is not None and len(pts):
+                out.append(th.as_tensor(pts).float())
+        if len(out) == n0:
+            pts = getattr(link, "collision_boundary_points_world", None)
+            if pts is not None and len(pts):
+                out.append(th.as_tensor(pts).float())
+    return out
+
+
 def _seat_axis(state, action: Place) -> Optional[th.Tensor]:
     """The pair's insertion axis in the world, pointing out of the seat (``predicates.seat_axis``, the attach rule's own)."""
     from ispatialgym.sampling import predicates as PRED
@@ -3354,13 +3385,109 @@ def _seat_axis(state, action: Place) -> Optional[th.Tensor]:
     return PRED.seat_axis(state.object(action.object), state.object(action.on), links[1].body_name).float()
 
 
+#: ``ExecuteConfig.attach_hover_rule`` / ``ISPATIALGYM_ATTACH_HOVER``: the hover from the partner's top under the part (``box``, the
+#: former rule) or from the part's swept first touch (``swept``, owner 2026-11-07 option B; the default since the owner's decision)
+ATTACH_HOVER_RULES = ("box", "swept")
+
+
+def attach_hover_rule(cfg: ExecuteConfig) -> str:
+    """The configured hover rule (``ATTACH_HOVER_RULES``); anything else is the default (:data:`ATTACH_HOVER_DEFAULT`), with a warning."""
+    rule = str(getattr(cfg, "attach_hover_rule", None) or ATTACH_HOVER_DEFAULT).strip().lower()
+    if rule not in ATTACH_HOVER_RULES:
+        log.warning("ISPATIALGYM_ATTACH_HOVER=%r is not one of %s - the default %s rule", rule, "/".join(ATTACH_HOVER_RULES), ATTACH_HOVER_DEFAULT)
+        return ATTACH_HOVER_DEFAULT
+    return rule
+
+
+#: swept first touches (``swept_first_touch``), least recently used first, by the pair's names, the axis and every piece's points in
+#: the partner's root frame rounded to ``SWEEP_CACHE_QUANT_M`` (the axis to ``SWEEP_CACHE_QUANT_RAD``): the same part in the same
+#: hand pose over the same partner to ~1 mm / 0.5 deg - a retried place, a vectorized world's clones - is swept once
+_SWEEP_CACHE: Dict[str, Dict[str, Any]] = {}
+SWEEP_CACHE_SIZE = 64
+SWEEP_CACHE_QUANT_M = 0.001
+SWEEP_CACHE_QUANT_RAD = math.radians(0.5)
+
+
+def _sweep_key(names: Sequence[str], ref: Optional[Tuple[Any, Any]], axis: th.Tensor, groups: Sequence[Sequence[th.Tensor]]) -> str:
+    import hashlib
+
+    import numpy as np
+
+    if ref is not None:
+        p = C.as_tensor(ref[0]).double().reshape(3).numpy()
+        R = C.quat_to_mat(C.as_tensor(ref[1]).double().reshape(4)).double().numpy()
+    else:
+        p, R = np.zeros(3), np.eye(3)
+    h = hashlib.blake2b(digest_size=16)
+    h.update(repr(tuple(str(n) for n in names)).encode())
+    h.update(np.round(C.as_tensor(axis).double().reshape(3).numpy() @ R / SWEEP_CACHE_QUANT_RAD).astype(np.int64).tobytes())
+    for g in groups:
+        h.update(b"|%d|" % len(g))
+        for pts in g:
+            local = (C.as_tensor(pts).double().reshape(-1, 3).numpy() - p) @ R
+            h.update(np.round(local / SWEEP_CACHE_QUANT_M).astype(np.int64).tobytes())
+    return h.hexdigest()
+
+
+def swept_first_touch(part: Sequence[th.Tensor], fingers: Sequence[th.Tensor], partner: Sequence[th.Tensor], axis: th.Tensor,
+                      ref: Optional[Tuple[Any, Any]] = None, names: Sequence[str] = ()) -> Dict[str, Any]:
+    """The part's and the fingertips' first touch on the partner along ``axis`` (owner 2026-11-07, option B): every collision piece
+    of ``part`` / ``fingers`` (world points, at the pose the sweep starts from) swept along ``axis`` onto every piece of ``partner``
+    (``convex_sweep.first_touch``: the largest ``t`` at which a piece moved by ``t * axis`` meets a partner piece - the height above
+    that pose, along the axis, at which the part coming down it first touches; None when no pair ever meets). ``part_m`` /
+    ``fingers_m``, the pairs that set them and the pair counts; cached by the pair, the axis and the pieces in ``ref``'s frame (the
+    partner's root pose) to 1 mm (``cached`` in the result, ``ms`` the time)."""
+    import time
+
+    from ispatialgym.oracle import convex_sweep as CS
+
+    t0 = time.perf_counter()
+    try:
+        key: Optional[str] = _sweep_key(names, ref, axis, (part, fingers, partner))
+    except Exception as e:  # noqa: BLE001 - an unhashable input: swept without the cache
+        log.debug("swept first touch: no cache key (%r)", e)
+        key = None
+    if key is not None and key in _SWEEP_CACHE:
+        hit = _SWEEP_CACHE.pop(key)
+        _SWEEP_CACHE[key] = hit
+        return {**hit, "cached": True, "ms": round((time.perf_counter() - t0) * 1000, 2)}
+    u = C.as_tensor(axis).double().reshape(3).numpy()
+    fixed = [CS.convex_piece(p) for p in partner]
+    res_p = CS.first_touch([CS.convex_piece(p) for p in part], fixed, u)
+    res_f = CS.first_touch([CS.convex_piece(p) for p in fingers], fixed, u) if fingers else None
+    out = {"part_m": res_p["t"], "fingers_m": None if res_f is None else res_f["t"], "part_pair": res_p["pair"], "fingers_pair": None if res_f is None else res_f["pair"],
+           "pieces": {"part": res_p["pieces_moving"], "fingers": 0 if res_f is None else res_f["pieces_moving"], "partner": res_p["pieces_fixed"]},
+           "pairs": {k: res_p[k] + (0 if res_f is None else res_f[k]) for k in ("pairs_total", "pairs_overlapping", "pairs_tested")},
+           "partner_pieces_unbuilt": int(sum(1 for f in fixed if f is None))}
+    if key is not None:
+        _SWEEP_CACHE[key] = dict(out)
+        while len(_SWEEP_CACHE) > SWEEP_CACHE_SIZE:
+            _SWEEP_CACHE.pop(next(iter(_SWEEP_CACHE)))
+    return {**out, "cached": False, "ms": round((time.perf_counter() - t0) * 1000, 2)}
+
+
+def _r(v: Optional[float], n: int = 5) -> Optional[float]:
+    return None if v is None else round(float(v), n)
+
+
 def attach_hover_targets(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
     """The attach place's hover pose (owner 2026-10-10): ``place`` - the hand pose that seats the part, re-aimed for its live in-hand
-    pose - raised along the seat axis until the lowest point of both the part and the fingertips is ``attach_hover_clear_m`` above
-    the partner's top under them (the highest vertex of the partner's collision convexes whose footprint meets theirs, widened by
-    ``attach_hover_footprint_margin_m``). ``place`` and ``descent`` end there and the retreat is raised with it. The part and the
-    closed fingers are rigid with the hand, so their collision points are carried from where they are now to the seated hand pose.
-    ``ctx["attach"]["hover"]`` records the height above the seat, the clearances and the partner's top."""
+    pose - raised along the seat axis. ``place`` and ``descent`` end there and the retreat is raised with it. The part and the
+    closed fingers are rigid with the hand, so their collision geometry is carried from where it is now to the seated hand pose.
+    The height (``attach_hover_rule``, ``ISPATIALGYM_ATTACH_HOVER``):
+
+    * ``box`` (default): until the lowest point of both the part and the fingertips is ``attach_hover_clear_m`` above the
+      partner's top under them (the highest vertex of the partner's collision convexes whose footprint meets theirs, widened by
+      ``attach_hover_footprint_margin_m``) - the vertical clearance, converted along the axis;
+    * ``swept`` (owner 2026-11-07, option B): ``attach_hover_clear_m`` above the FIRST TOUCH - the part's collision pieces (and
+      the fingertips', whichever touches first) swept down the seat axis onto the partner's (``swept_first_touch``), so the
+      touchdown's ``attach_hover_clear_m + attach_touchdown_extra_m`` reaches it with the extra to spare. No pair meeting: the box
+      rule, logged (``swept_fallback``).
+
+    The sweep runs under both rules: ``ctx["attach"]["hover"]`` records the rule and the source used, the height above the seat
+    (and the box rule's), the first touch above the seat (``first_touch_m``, the fingertips' ``first_touch_fingers_m``), the gap
+    from the hover down to it (``gap_to_first_touch_m``, what the touchdown has to travel), the clearances, the partner's top and
+    the sweep's pair counts / time."""
     rec: Dict[str, Any] = {"applied": False}
     ctx.setdefault("attach", {})["hover"] = rec
     if targets.get("place") is None:
@@ -3373,8 +3500,9 @@ def attach_hover_targets(action: Place, motions: Motions, state, targets: Dict[s
     except Exception:  # noqa: BLE001
         pass
     child, partner = state.object(action.object), state.object(action.on)
+    finger_links = list((getattr(motions.robot, "finger_links", None) or {}).get(action.arm, []))
     part = _collision_points(list(child.links.values()))
-    fingers = _collision_points(list((getattr(motions.robot, "finger_links", None) or {}).get(action.arm, [])))
+    fingers = _collision_points(finger_links)
     meshes = []
     for link in partner.links.values():
         for mesh in (getattr(link, "collision_meshes", None) or {}).values():
@@ -3398,7 +3526,25 @@ def attach_hover_targets(action: Place, motions: Motions, state, targets: Dict[s
     top = max(float(m[:, 2].max()) for m in (under or meshes))
     low_part = float(part_s[:, 2].min())
     low_fingers = float(fing_s[:, 2].min()) if fing_s is not None else float("inf")
-    h = max(0.0, top + cfg.attach_hover_clear_m - min(low_part, low_fingers)) / max(float(axis[2]), 0.5)
+    h_box = max(0.0, top + cfg.attach_hover_clear_m - min(low_part, low_fingers)) / max(float(axis[2]), 0.5)
+    rule = attach_hover_rule(cfg)
+    try:
+        ref = partner.get_position_orientation() if callable(getattr(partner, "get_position_orientation", None)) else None
+        sw = swept_first_touch([C.transform_points(carry, p) for p in _collision_pieces(list(child.links.values()))],
+                               [C.transform_points(carry, p) for p in _collision_pieces(finger_links)], meshes, axis, ref=ref,
+                               names=(str(getattr(child, "name", action.object)), str(getattr(partner, "name", action.on))))
+    except Exception as e:  # noqa: BLE001 - the sweep never breaks the place: the box rule
+        sw = {"part_m": None, "fingers_m": None, "error": repr(e)[:200]}
+        (log.warning if rule == "swept" else log.debug)("place(%s): the swept first touch failed (%s)", action.object, sw["error"])
+    t_part, t_fing = sw.get("part_m"), sw.get("fingers_m")
+    h, source = h_box, "box"
+    if rule == "swept":
+        if t_part is not None:
+            first = t_part if t_fing is None else max(t_part, t_fing)
+            h, source = max(0.0, first + cfg.attach_hover_clear_m), "swept"
+        else:
+            rec["swept_fallback"] = sw.get("error") or "no piece of the part meets a piece of the partner along the seat axis"
+            log.warning("place(%s): swept hover: %s - the box rule, %.1f mm above the seat", action.object, rec["swept_fallback"], h_box * 1000)
     shift = axis * h
     hover = Pose(position=[float(v) for v in (p_seat + shift).tolist()], orientation=[float(v) for v in q_seat.tolist()])
     out = dict(targets)
@@ -3407,12 +3553,23 @@ def attach_hover_targets(action: Place, motions: Motions, state, targets: Dict[s
         out["retreat"] = [Pose(position=[float(v) for v in (as_world_pose(w)[0].float() + shift).tolist()], orientation=[float(v) for v in as_world_pose(w)[1].float().tolist()])
                           for w in out["retreat"]]
     dz = float(shift[2])
-    rec.update({"applied": True, "height_above_seat_m": round(h, 4), "part_clearance_m": round(low_part + dz - top, 4),
-                "finger_clearance_m": None if fing_s is None else round(low_fingers + dz - top, 4), "partner_top_z": round(top, 4),
+    if source == "swept":
+        # along the seat axis: what the touchdown travels to the part's (the fingertips') first touch
+        part_clearance, finger_clearance = h - t_part, (None if t_fing is None else h - t_fing)
+        lowest = "fingertips" if t_fing is not None and t_fing > t_part else "part"
+    else:
+        part_clearance, finger_clearance = low_part + dz - top, (None if fing_s is None else low_fingers + dz - top)
+        lowest = "fingertips" if low_fingers < low_part else "part"
+    rec.update({"applied": True, "height_above_seat_m": round(h, 4), "part_clearance_m": round(part_clearance, 4),
+                "finger_clearance_m": None if finger_clearance is None else round(finger_clearance, 4), "partner_top_z": round(top, 4),
                 "partner_convexes_under": len(under), "partner_convexes": len(meshes), "seat_axis": [round(float(v), 4) for v in axis.tolist()],
-                "lowest": "fingertips" if low_fingers < low_part else "part"})
-    log.info("place(%s): hover %.1f mm above the seat - the part %.1f mm and the fingertips %s mm above the top of %s", action.object, h * 1000,
-             rec["part_clearance_m"] * 1000, "n/a" if rec["finger_clearance_m"] is None else f"{rec['finger_clearance_m'] * 1000:.1f}", action.on)
+                "lowest": lowest, "rule": rule, "source": source, "box_height_above_seat_m": round(h_box, 4), "first_touch_m": _r(t_part),
+                "first_touch_fingers_m": _r(t_fing), "gap_to_first_touch_m": None if t_part is None else _r(h - t_part),
+                "sweep": {k: sw.get(k) for k in ("pieces", "pairs", "part_pair", "fingers_pair", "partner_pieces_unbuilt", "cached", "ms", "error") if k in sw}})
+    log.info("place(%s): hover %.1f mm above the seat (%s rule%s) - the part %.1f mm and the fingertips %s mm above %s; first touch %s mm above the seat, "
+             "%s mm below the hover", action.object, h * 1000, source, "" if source == rule else f", {rule} requested", rec["part_clearance_m"] * 1000,
+             "n/a" if rec["finger_clearance_m"] is None else f"{rec['finger_clearance_m'] * 1000:.1f}", action.on,
+             "n/a" if t_part is None else f"{t_part * 1000:.1f}", "n/a" if t_part is None else f"{(h - t_part) * 1000:.1f}")
     return out
 
 
@@ -3515,6 +3672,9 @@ def _touch_down(action: Place, motions: Motions, state, ctx: Dict[str, Any], cfg
     depth = float(hover.get("part_clearance_m") or cfg.attach_hover_clear_m) + float(cfg.attach_touchdown_extra_m)
     p0, q0 = (x.float() for x in state.eef_pose(arm))
     rec["depth_max_m"] = round(depth, 4)
+    # the A/B of the hover rules (owner 2026-11-07): where the hover came from and how far below it the swept first touch lies
+    rec["hover_source"] = hover.get("source", "box")
+    rec["gap_to_first_touch_m"] = hover.get("gap_to_first_touch_m")
     if touching():
         rec["touched"] = True
     elif axis is None:
@@ -3561,6 +3721,10 @@ def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, An
     n0 = len(PRED.JOINS)
     PRED.LAST_RELEASE_ATTACH.clear()
     obs: Dict[str, Any] = {"k": 0, "contact": None, "joined": None, "trace": []}
+    try:
+        h0 = _hover_offset(state, action)  # the part's height above the seat when the fingers open
+    except Exception:  # noqa: BLE001 - no attachment pair (the test stubs)
+        h0 = None
 
     def watch():
         obs["k"] += 1
@@ -3592,10 +3756,29 @@ def _release_into_join(action: Place, motions: Motions, state, ctx: Dict[str, An
     joins = PRED.JOINS[n0:]
     hook = {k: v for k, v in PRED.LAST_RELEASE_ATTACH.items() if k in ("attached", "reason", "trigger", "contact", "lateral_m", "vertical_m", "rot_rad")} or None
     after = [t for t in obs["trace"] if obs["contact"] is not None and t[0] >= obs["contact"]]
+    # the drop at the release (owner 2026-11-07, the hover A/B): the part's fall along the seat axis from the open to its first contact -
+    # the height at that step's trace, or the join's own (pre-snap) height when it joined in that step (the trace stops at the join)
+    v0 = None if h0 is None else float(h0["vertical_m"])
+    v_contact = None
+    if obs["contact"] is not None:
+        at = [t[1] for t in obs["trace"] if t[0] == obs["contact"]]
+        if at:
+            v_contact = at[0]
+        elif joins and obs["joined"] == obs["contact"]:
+            v_contact = joins[0].get("vertical_m")
+    elif joins:
+        v_contact = joins[0].get("vertical_m")
     rec.update({"steps_to_first_contact": obs["contact"], "steps_to_join": obs["joined"], "join": joins[0] if joins else None, "release_hook": hook,
                 "bounce_m": round(max(t[1] for t in after) - after[0][1], 5) if after else None,
                 "max_rot_rad_before_join": round(max(t[3] for t in obs["trace"]), 5) if obs["trace"] else None,
+                "vertical_at_release_m": _r(v0), "drop_m": None if v0 is None or v_contact is None else _r(v0 - float(v_contact)),
                 "attached": bool(state.attached(action.object, action.on))})
+    hv, td = ctx["attach"].get("hover") or {}, ctx["attach"].get("touchdown") or {}
+    summary = {"hover_rule": hv.get("rule"), "hover_source": hv.get("source"), "first_touch_m": hv.get("first_touch_m"), "hover_m": hv.get("height_above_seat_m"),
+               "gap_to_first_touch_m": hv.get("gap_to_first_touch_m"), "touched": td.get("touched"), "lowered_m": td.get("lowered_m"), "drop_m": rec["drop_m"],
+               "attached": rec["attached"]}
+    ctx["attach"]["summary"] = summary
+    log.info("place(%s): attach summary %s", action.object, " ".join(f"{k}={v}" for k, v in summary.items()))
     if rec["attached"]:
         j = rec["join"] or {}
         log.info("place(%s): released at hover, first contact after %s steps, joined to %s after %s steps (%s, %s)", action.object, obs["contact"], action.on,
