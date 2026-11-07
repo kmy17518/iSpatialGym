@@ -1443,7 +1443,9 @@ def contact_entry(kind: str, cls: str, family: str, arm_role: str, T_world_obj, 
         "pre_pose_rule": (pre_pose_rule(cls, extras, arc=arc, executor=executor, recorded_m=float(np.linalg.norm(Tp[:3, 3] - Tc[:3, 3])), cfg=cfg) if kind == "push"
                           else {"rule": "recorded", "distance_m": round(float(np.linalg.norm(Tp[:3, 3] - Tc[:3, 3])), 5), "executor": "brace",
                                 "condition": "execute_brace reaches the recorded pre-contact, then the straight leg to the contact", "source": "execute.execute_brace"}),
-        "push": None, "stop": brace_stop_rule(cfg) if kind == "brace" else None, "extras": _jsonable(extras)}
+        "push": None, "stop": brace_stop_rule(cfg) if kind == "brace" else None, "extras": _jsonable(extras),
+        # the object's pose in the frame the record builder ran in: the extras' world values (fingertip_z, contact_z, contact_point) are in it
+        "T_rule_object": _pose_dict(To)}
     if kind == "push":
         dv = np.asarray(_jsonable(direction if direction is not None else [0.0, 0.0, 0.0]), dtype=float)
         dv = Ti[:3, :3] @ (dv / max(float(np.linalg.norm(dv)), 1e-12))

@@ -3,7 +3,7 @@
 # libraries of the manifest's objects (ispatialgym/grasping/contact_library.py, validate_contacts.py). Everything goes under $OFH - never the
 # grasp-bands home: GBH (the env's asset cache / job dirs) defaults to $OFH/contact_home here.
 #   GC_MANIFEST=<jobs.json> GC_GLIB=<v2 glib root: the objects' model dirs> GC_ROOT=$OFH/contact_libs_<tag> GC_NSHARD=N \
-#     [GC_STAGES="build validate"] [GC_KINDS="push brace"] ISG_GB_ROOT=<frozen code snapshot> \
+#     [GC_STAGES="build validate"] [GC_KINDS="push brace"] [GC_REPLAY_SPECS=<file>: GC_STAGES=replay] ISG_GB_ROOT=<frozen code snapshot> \
 #     sbatch --array=0-$((N-1)) -o $GC_ROOT/logs/%x_%A_%a.out scripts/grasp_bands/job_contacts.sh
 # build: python -m ispatialgym.grasping.contact_library build (no simulator); validate: one Isaac Sim world per kind and arm (push: right,
 # brace: left), the shard's manifest ids (the build's partition). Logs: $GC_ROOT/logs/{build,validate}_<i>of<N>.jsonl + <stage>_<i>.log.
@@ -31,6 +31,15 @@ if [[ " $STAGES " == *" build "* ]]; then
   python -u -m ispatialgym.grasping.contact_library build --jobs $M --glib $GLIB --root $ROOT --shard $I/$N >> $ROOT/logs/build_$I.log 2>&1
   rc=$?; grep -q "GB_CONTACT_BUILD_DONE" $ROOT/logs/build_$I.log || rc=${rc/#0/1}; RC=$rc
   echo "GC_STAGE build rc=$rc s=$(( $(date +%s) - t0 ))"
+fi
+if [[ " $STAGES " == *" replay "* ]]; then
+  # one recorded demo replay per array task: line I+1 of GC_REPLAY_SPECS = "<push|brace> <v2 model dir of the contacted object> <instance .oracle.json> [...]"
+  t0=$(date +%s)
+  SPEC=$(sed -n "$((I + 1))p" ${GC_REPLAY_SPECS:?})
+  read -r RK RM RI <<< "$SPEC"
+  python -u -m ispatialgym.grasping.validate_contacts replay --kind $RK --model-dir $RM --instance $RI >> $ROOT/logs/replay_$I.log 2>&1
+  rc=$?; grep -q "GB_CONTACT_REPLAY" $ROOT/logs/replay_$I.log || rc=${rc/#0/1}; RC=$rc
+  echo "GC_STAGE replay rc=$rc s=$(( $(date +%s) - t0 ))"
 fi
 if [[ " $STAGES " == *" validate "* ]]; then
   for KIND in ${GC_KINDS:-push brace}; do

@@ -593,3 +593,98 @@ def test_the_verdict_table(tmp_path, glib):
     r = next(iter(rows.values()))
     assert sum(r["verdicts"].values()) >= 1 and all(set(m) <= {"valid", "invalid"} for m in (x["measures"] for x in rows.values()))
     assert any("valid" in x["measures"] and x["measures"]["valid"]["moved_along_m"]["median"] == 0.07 for x in rows.values())
+
+
+# ---------------------------------------------------------------------------------------------------------------- run C: replays of recorded demos
+
+REPLAY = os.path.join(os.path.dirname(__file__), "data", "contact_replay")
+
+
+def _replay(inst, kind):
+    o = json.load(open(os.path.join(REPLAY, f"{inst}.oracle.json")))
+    t = json.load(open(os.path.join(REPLAY, f"{inst}.tro_state.json")))
+    return VC.replay_situation(o, kind, t)
+
+
+def _recorded_model(root, eid):
+    o = json.load(open(os.path.join(REPLAY, "objects.json")))[eid]
+    d = os.path.join(root, "models", eid)
+    os.makedirs(d, exist_ok=True)
+    rest = {"schema": S.REST, "rest_id": "r0", "quat_xyzw": o["rest"]["quat_xyzw"], "h_root": o["rest"]["h_root"], "stable": True}
+    S.save_json(os.path.join(d, "library.json"), {"schema": S.LIBRARY, "category": o["category"], "model": o["model"], "scale": o["scale"], "rests": {"r0": rest}, "grasps": []})
+    S.save_json(os.path.join(d, "geometry.json"), {"format": "isg-object-geometry/1", "pieces": [{"name": "p", "vertices": o["vertices"], "faces": o["faces"]}]})
+    return d, o["rest"]["quat_xyzw"]
+
+
+#: (recorded demo, kind, the contacted object's v2 entry (geometry + rest copied in data/contact_replay/objects.json), family, the alias's knobs,
+#:  the class the sampler executed): touching_02 (fix2 g300008: push_tip_h- + the wide brace), touching_01 (abv2_aim2 g300068: the leaning blade),
+#:  axial_01 (fix2 g300006: the arc push)
+CASES = [("touching_02", "push", "box_of_cereal__iucshm__s0.8", "touching_push", {"push_height_sweep": False, "push_gripper_open": False}, "push_tip_h-"),
+         ("touching_02", "brace", "box_of_cereal__dkhgxn__s1", "touching_brace", {"brace_open_when_wide": True}, "brace_wide_h-"),
+         ("touching_01", "push", "box_of_sanitary_napkins__humkqw__s1", "touching_push", {}, "push_blade_lean20@3.5cm"),
+         ("axial_01", "push", "board_game__qgvsnb__s1", "axial_push", {}, None)]
+
+
+@pytest.mark.parametrize("case", CASES, ids=[f"{c[0]}-{c[1]}" for c in CASES])
+def test_the_library_reproduces_the_recorded_demo_records(case, tmp_path):
+    """Run C's replay finding 1: the library is NOT what diverges - built at the recorded object's exact yaw in the record's stance frame, the
+    entry of the executed class (axial: the best of the rule's classes) lands on the recorded contact within 1.5 mm / 1 deg and its pre-contact
+    within 2 mm (the recorded objects' v2 geometry and rest; the stance frame from the sidecar)."""
+    inst, kind, eid, fam, gen, cls = case
+    sit = _replay(inst, kind)
+    d, rest_q = _recorded_model(str(tmp_path), eid)
+    R = sit["T_base_object"][:3, :3] @ S.quat_to_mat(np.asarray(rest_q, dtype=float)).T
+    params = {"yaws_deg": [math.degrees(math.atan2(R[1, 0], R[0, 0]))], **({"long_axis": [0.0, 1.0, 0.0]} if fam == "axial_push" else {})}
+    sub = "alignment-axial" if fam == "axial_push" else TOUCHING
+    lib = CL.build_job({"id": eid, "model_dir": d, "families": [fam], "generation": gen, "subtask": sub, "params": {fam: params}}, None)[kind]
+    cands = [e for e in lib["entries"] if cls is None or e["class"] == cls]
+    best = min((VC.replay_entry_check(sit, e) for e in cands), key=lambda c: c["contact_err_m"])
+    assert best["contact_err_m"] < 0.0015 and best["pre_err_m"] < 0.0025
+    assert cls is None or best["contact_angle_deg"] < 1.0  # (axial: the class's twin turn shares the position: 0 or 180 deg)
+
+
+def test_the_replayed_situations_are_the_samplers_stance_relation():
+    """Run C's replay finding 2: in the record's stance frame the touching push runs along +y, its contact 0.73-0.84 m ahead and 0.10-0.13 m
+    right, the brace 0.08 m left; the axial push 0.72 m ahead; the witness configuration of the pre-contact is the oracle's own (its base moved
+    to the origin); the support heights are the real ones."""
+    rel = VC.STANCE_RELATIONS
+    for inst, kind, fam in (("touching_02", "push", "touching_push"), ("touching_02", "brace", "touching_brace"), ("touching_01", "push", "touching_push"),
+                            ("axial_01", "push", "axial_push"), ("axial_03", "push", "axial_push")):
+        sit = _replay(inst, kind)
+        a, l_ = sit["relation"]["contact_ahead_m"], sit["relation"]["contact_lateral_m"]
+        assert min(rel[fam]["ahead_m"]) - 0.12 <= a <= max(rel[fam]["ahead_m"]) + 0.25, (inst, a)
+        assert min(rel[fam]["lateral_m"]) - 0.15 <= l_ <= max(rel[fam]["lateral_m"]) + 0.05, (inst, l_)
+        assert sit["witness_q"] is not None and sit["witness_q"][0] == 0.0 and sit["witness_q"][1] == 0.0 and sit["witness_q"][5] == 0.0
+        if fam != "axial_push":
+            assert np.allclose(sit["record"]["direction"], [0.0, 1.0 if kind == "push" else -1.0, 0.0], atol=0.01)
+    assert _replay("touching_02", "push")["support_z"] == pytest.approx(1.0505, abs=1e-3) and _replay("touching_01", "push")["support_z"] == pytest.approx(0.8126, abs=2e-3)
+    assert _replay("touching_02", "push")["object_from"] == "place" and _replay("touching_02", "brace")["object_from"] == "program start"
+    e = VC.record_entry(_replay("axial_01", "push"))
+    assert e["push"]["arc"] and e["arc"]["turn_rad"] != 0.0 and e["pre_pose_rule"]["rule"] == "recorded"
+
+
+def test_world_extras_and_the_axial_records_extras(glib):
+    """Run C's replay findings 3-4: (a) the library's world-valued extras (fingertip_z, contact_z, contact_point) are in the rule frame
+    (support z 0) - the oracle reads them as world values, so they move to the trial's object pose; (b) the axial push entries carry the
+    sampler's record's extras (none): their blade fingertip_z made the oracle's palm lift raise every axial push ~0.8 m (plan_failed)."""
+    lib = CL.build_job(_job("magazine__flat__s1", ["axial_push"], params={"axial_push": {"yaws": 1}}), glib)["push"]
+    assert all(e["extras"] == {} and "fingertip_z_rule" in e["axial"] for e in lib["entries"])
+    e = {"extras": {"fingertip_z": 0.005, "contact_z": 0.06, "contact_point": [0.0, -0.05, 0.005], "stop_clearance_m": 0.005},
+         "T_rule_object": {"position": [0.0, 0.0, 0.1], "orientation_xyzw": [0.0, 0.0, 0.0, 1.0]}}
+    T = np.eye(4)
+    T[:3, 3] = [0.7, -0.1, 0.9126]  # the object on a 0.8126 support
+    w = VC.world_extras(e, T)
+    assert w["fingertip_z"] == pytest.approx(0.8176) and w["contact_z"] == pytest.approx(0.8726) and w["contact_point"] == pytest.approx([0.7, -0.15, 0.8176])
+    assert w["stop_clearance_m"] == 0.005 and VC.world_extras({"extras": {"fingertip_z": 1.0}}, T)["fingertip_z"] == 1.0  # no rule frame: as recorded
+
+
+def test_the_validator_ik_runs_in_a_clean_world():
+    """Run C's replay finding 5 (the cause of '1 valid, then 47 no_placement / chain_unreachable'): the oracle's planning syncs the cuRobo
+    world WITH the slab and the object; the validator's own IK (placement, chain check) then saw them at the contact. Every plan_entry first
+    resets it to the robot and the ground (the support and the contacted object ignored, as the sampler's exact IK at a contact)."""
+    calls = []
+    kw = VC.KitContactWorld.__new__(VC.KitContactWorld)
+    kw._pusher = "pusher"
+    kw.tw = SimpleNamespace(slab="slab", backend=SimpleNamespace(update_world=lambda ignore_objects=(): calls.append(list(ignore_objects))))
+    kw.clean_world("obj")
+    assert calls == [["slab", "obj", "pusher"]]

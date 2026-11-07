@@ -67,6 +67,13 @@ def yaw_slots(n: int = DEFAULT_YAWS) -> List[float]:
     return [2 * math.pi * k / n for k in range(int(n))]
 
 
+def _yaws(params: Dict[str, Any]) -> List[float]:
+    """The object yaws a family builds at: ``params["yaws_deg"]`` (an explicit list: a replayed demo's exact yaw), else ``params["yaws"]`` slots."""
+    if params.get("yaws_deg") is not None:
+        return [math.radians(float(v)) for v in params["yaws_deg"]]
+    return yaw_slots(int(params.get("yaws", DEFAULT_YAWS)))
+
+
 def object_frame(rest_quat_xyzw, h_root: float, yaw: float, support_z: float = 0.0) -> np.ndarray:
     """T_world_object of the object at its rest turned ``yaw`` about z, its root at the origin xy, standing on a support at ``support_z``
     (``schema.place_object``)."""
@@ -110,7 +117,7 @@ def build_touching_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params
     D = th.tensor(TOUCH_DIRECTION)
     stroke = float(params.get("stroke_m", TOUCH_PUSH_STROKE_M))
     out = []
-    for yaw in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
+    for yaw in _yaws(params):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
         hull_w = _world_points(pts_obj, T)
         face_z = (float(hull_w[:, 2].min()), float(hull_w[:, 2].max()))
@@ -147,7 +154,7 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
     gs = CPZ.PoseGen(knobs, subtask=params.get("subtask") or TOUCHING_SUBTASK)
     D = th.tensor(TOUCH_DIRECTION)
     out = []
-    for yaw in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
+    for yaw in _yaws(params):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
         hull_w = _world_points(pts_obj, T)
         face_z = (float(hull_w[:, 2].min()), float(hull_w[:, 2].max()))
@@ -211,7 +218,7 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     h = float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
     z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
     out = []
-    for yaw_goal in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
+    for yaw_goal in _yaws(params):
         for end_sign in (1.0, -1.0):
             half_len = float(proj.max() if end_sign > 0 else -proj.min()) - AXIAL_END_INSET_M
             for spin in (1.0, -1.0):
@@ -264,7 +271,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     long_local = params.get("long_axis")
     rest = axial_rest(rest)  # the axial program's upright identity placement
     out = []
-    for yaw in yaw_slots(int(params.get("yaws", DEFAULT_YAWS))):
+    for yaw in _yaws(params):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
         pts_w = _world_points(pts_obj, T)
         h = float(pts_w[:, 2].max() - pts_w[:, 2].min())
@@ -298,13 +305,16 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
                                                                        spin * turn)
                             cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{pitch:.0f}{'' if c_sign > 0 else '-'}{cname}"
                             stroke = abs(turn) * float(th.linalg.norm(r_xy))
-                            e = CPZ.contact_entry("push", cls, "axial_push", "work", T, init, pre, {"blade_half_thickness_m": geo[1], "fingertip_z": geo[2]},
+                            # the extras are the sampler's axial push record's (none: AlignmentAxial records no blade fields, so the oracle's palm
+                            # lift - which reads fingertip_z / blade_half_thickness_m - never applies to it); the blade's geometry as facts
+                            e = CPZ.contact_entry("push", cls, "axial_push", "work", T, init, pre, {},
                                                   face_rule="the face a long-axis end moves away from, at the push height", direction=d, stroke_m=stroke,
                                                   arc=True, support_z=0.0, object_height=h, pitch_deg=pitch, wrist_turn=c_sign, executor="push")
                             Ti = np.linalg.inv(T)
                             e["arc"] = {"centre_object": [round(float(v), 6) for v in (Ti[:3, :3] @ np.array([float(com[0]), float(com[1]), z_push]) + Ti[:3, 3])],
                                         "turn_rad": round(spin * turn, 6), "mid_object": _obj_pose(Ti, mid), "goal_object": _obj_pose(Ti, goal)}
                             e["yaw_deg"] = round(math.degrees(yaw), 4)
+                            e["axial"] = {"blade_half_thickness_m": round(float(geo[1]), 5), "fingertip_z_rule": round(float(geo[2]), 5)}
                             out.append(e)
     return out
 
@@ -433,7 +443,7 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})
         lib_k["families"][fam] = {"arm_role": spec["arm_role"], "scope": spec["scope"], "knobs": resolved_knobs(fam, knobs, job.get("subtask") or TOUCHING_SUBTASK),
                                   "params": {k: v for k, v in params.items() if k != "subtask"}, "frame": "rule frame: +x the robot's forward, +y its left; support z 0",
-                                  "yaws_deg": [round(math.degrees(y), 4) for y in yaw_slots(int(params.get("yaws", DEFAULT_YAWS)))], "n_entries": len(entries),
+                                  "yaws_deg": [round(math.degrees(y), 4) for y in _yaws(params)], "n_entries": len(entries),
                                   "build_s": round(time.time() - t0, 3)}
         lib_k["entries"].extend(entries)
     for k, lib_k in out.items():

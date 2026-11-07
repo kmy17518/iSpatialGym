@@ -1,0 +1,339 @@
+{
+  "box__of__cereal.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.200399875640869,
+        0.08473379909992218,
+        1.159638524055481
+      ],
+      "ori": [
+        -3.2226151233771816e-05,
+        -9.23758761928184e-06,
+        -0.0012492589885368943,
+        0.9999992251396179
+      ],
+      "lin_vel": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ang_vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          6.178828716278076,
+          0.006339997053146362,
+          1.0505454540252686,
+          6.221972465515137,
+          0.1631275862455368,
+          1.2687315940856934
+        ]
+      },
+      "HeatSourceOrSink": {
+        "heat_source_or_sink": false
+      },
+      "Temperature": {
+        "temperature": 23.0
+      },
+      "OnFire": {
+        "on_fire": false
+      }
+    }
+  },
+  "box__of__cereal.n.01_2": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.032048225402832,
+        0.08698997646570206,
+        1.1717898845672607
+      ],
+      "ori": [
+        -6.80102311889641e-05,
+        7.71482809795998e-05,
+        0.999834418296814,
+        0.018199719488620758
+      ],
+      "lin_vel": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ang_vel": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          5.993827819824219,
+          0.007852070033550262,
+          1.0502461194992065,
+          6.0709967613220215,
+          0.16255971789360046,
+          1.2919901609420776
+        ]
+      },
+      "HeatSourceOrSink": {
+        "heat_source_or_sink": false
+      },
+      "Temperature": {
+        "temperature": 23.0
+      },
+      "OnFire": {
+        "on_fire": false
+      }
+    }
+  },
+  "countertop.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        7.287360668182373,
+        0.2122894823551178,
+        0.660920262336731
+      ],
+      "ori": [
+        2.301114676583893e-07,
+        -2.3069738119829708e-07,
+        0.7080053091049194,
+        -0.7062070965766907
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          5.788505554199219,
+          -0.3045467436313629,
+          0.0013813972473144531,
+          8.785634994506836,
+          0.8482627868652344,
+          1.0523836612701416
+        ]
+      }
+    }
+  },
+  "floor.n.01_1": {
+    "is_asleep": false,
+    "root_link": {
+      "pos": [
+        6.593125820159912,
+        -0.258637011051178,
+        -0.13868464529514313
+      ],
+      "ori": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "non_kin": {
+      "AABB": {
+        "aabb": [
+          3.8204736709594727,
+          -2.4058876037597656,
+          -0.2773846387863159,
+          9.365774154663086,
+          1.8886120319366455,
+          1.531839370727539e-05
+        ]
+      }
+    }
+  },
+  "robot_poses": {
+    "robot": [
+      {
+        "position": [
+          6.052343845367432,
+          -0.7451934814453125,
+          0.005301475524902344
+        ],
+        "orientation": [
+          -6.0711055994033813e-05,
+          5.0391485274303705e-05,
+          0.7062072157859802,
+          0.7080051302909851
+        ]
+      }
+    ]
+  },
+  "ispatialgym": {
+    "schema_version": "isg-tro-v1",
+    "activity": "inter_object_relation_satisfaction",
+    "activity_definition_id": 107,
+    "task_variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar",
+    "instance_id": "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar__house_single_floor__support-bar_udatjt_0-B3__partner-box_of_cereal-dkhgxn__target-box_of_cereal-iucshm-s0.8__300008",
+    "generation_seed": 4189510809028428770,
+    "evaluation_profile": "isg-v1",
+    "bddl_sha256": "01c832ca9043a43ca787521319e6feeaa1c52811c1bc18a4daac417c55acc4e3",
+    "task_spec_sha256": "2df48929b59431a5e8d18305df2ddc6dc035d25cca61072bfdf1c56c962e5c22",
+    "layout_template_id": null,
+    "scene": {
+      "model": "house_single_floor",
+      "floor": 0,
+      "template_path": "../template.json",
+      "template_sha256": "e7c4174d9ee3da3f4f885924320e0b1f035101619b8bce169c118ce272c2160a",
+      "load_room_instances": [
+        "kitchen_0",
+        "dining_room_0",
+        "entryway_0",
+        "garden_0",
+        "living_room_0"
+      ],
+      "task_rooms": [
+        "kitchen_0"
+      ],
+      "sampled_with_rooms": [
+        "kitchen_0",
+        "dining_room_0",
+        "entryway_0",
+        "garden_0",
+        "living_room_0"
+      ],
+      "scene_variant": null,
+      "required_scene_objects": [
+        "bar_udatjt_0",
+        "floors_kxcpgy_0"
+      ]
+    },
+    "object_bindings": {
+      "floor.n.01_1": {
+        "scene_object_name": "floors_kxcpgy_0",
+        "category": "floors",
+        "model": "kxcpgy"
+      },
+      "countertop.n.01_1": {
+        "scene_object_name": "bar_udatjt_0",
+        "category": "bar",
+        "model": "udatjt"
+      },
+      "box__of__cereal.n.01_1": {
+        "scene_object_name": "target_box_of_cereal_iucshm_0",
+        "category": "box_of_cereal",
+        "model": "iucshm"
+      },
+      "box__of__cereal.n.01_2": {
+        "scene_object_name": "partner_box_of_cereal_dkhgxn_0",
+        "category": "box_of_cereal",
+        "model": "dkhgxn"
+      }
+    },
+    "robot_state": {
+      "bddl_instance": "agent.n.01_1",
+      "model": "r1pro",
+      "joint_positions": {
+        "torso_joint1": 0.44999629259109497,
+        "torso_joint2": -0.4000056982040405,
+        "torso_joint3": 1.0049011507362593e-06,
+        "torso_joint4": -6.498086122519453e-07,
+        "left_arm_joint1": 2.9248862119857222e-05,
+        "right_arm_joint1": 5.130428689881228e-05,
+        "left_arm_joint2": 1.5700008869171143,
+        "right_arm_joint2": -1.5700007677078247,
+        "left_arm_joint3": -4.354662905825535e-06,
+        "right_arm_joint3": 1.0541175470279995e-06,
+        "left_arm_joint4": -1.570002794265747,
+        "right_arm_joint4": -1.5699971914291382,
+        "left_arm_joint5": 1.5699894428253174,
+        "right_arm_joint5": -1.5700091123580933,
+        "left_arm_joint6": -1.1351310149620986e-06,
+        "right_arm_joint6": -1.1149414831379545e-06,
+        "left_arm_joint7": -2.2724541395291453e-06,
+        "right_arm_joint7": -1.3333745982890832e-06,
+        "left_gripper_finger_joint1": 0.049999333918094635,
+        "left_gripper_finger_joint2": 0.04999980702996254,
+        "right_gripper_finger_joint1": 0.049999333918094635,
+        "right_gripper_finger_joint2": 0.04999987408518791
+      },
+      "joint_velocities": {
+        "torso_joint1": 0.0,
+        "torso_joint2": 0.0,
+        "torso_joint3": 0.0,
+        "torso_joint4": 0.0,
+        "left_arm_joint1": 0.0,
+        "right_arm_joint1": 0.0,
+        "left_arm_joint2": 0.0,
+        "right_arm_joint2": 0.0,
+        "left_arm_joint3": 0.0,
+        "right_arm_joint3": 0.0,
+        "left_arm_joint4": 0.0,
+        "right_arm_joint4": 0.0,
+        "left_arm_joint5": 0.0,
+        "right_arm_joint5": 0.0,
+        "left_arm_joint6": 0.0,
+        "right_arm_joint6": 0.0,
+        "left_arm_joint7": 0.0,
+        "right_arm_joint7": 0.0,
+        "left_gripper_finger_joint1": 0.0,
+        "left_gripper_finger_joint2": 0.0,
+        "right_gripper_finger_joint1": 0.0,
+        "right_gripper_finger_joint2": 0.0
+      },
+      "controller_targets": {}
+    },
+    "goal_observation": {
+      "sensor_key": "robot_r1:zed_link:Camera:0",
+      "rgb_path": null,
+      "rgb_sha256": null,
+      "resolution": [
+        1080,
+        1080
+      ],
+      "intrinsics": null,
+      "camera_pose_world": null
+    },
+    "pose_targets": {
+      "box__of__cereal.n.01_2": {
+        "link": null,
+        "frame": "world",
+        "position": [
+          6.036947250366211,
+          0.08730252087116241,
+          1.171790361404419
+        ],
+        "orientation": [
+          -0.00012963985500391573,
+          5.0586098950589076e-05,
+          0.9998156428337097,
+          0.019205542281270027
+        ],
+        "position_metric": "full",
+        "orientation_metric": "full",
+        "position_tolerance": 0.03,
+        "orientation_tolerance": 0.2,
+        "orientation_equivalences": []
+      },
+      "box__of__cereal.n.01_1": {
+        "link": null,
+        "frame": "world",
+        "position": [
+          6.097224712371826,
+          0.08537759631872177,
+          1.1596599817276
+        ],
+        "orientation": [
+          -3.2466425182064995e-05,
+          0.000500313937664032,
+          0.000469375605462119,
+          0.9999997615814209
+        ],
+        "position_metric": "full",
+        "orientation_metric": "full",
+        "position_tolerance": 0.03,
+        "orientation_tolerance": 0.2,
+        "orientation_equivalences": []
+      }
+    },
+    "groups": {},
+    "articulation_targets": {}
+  }
+}

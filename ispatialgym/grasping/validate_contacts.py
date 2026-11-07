@@ -34,6 +34,7 @@ Trials: ``trials_per_entry`` (1: the physics is deterministic at one configurati
 plan, trials, total). The thresholds are PROVISIONAL (the recorded measures are for calibrating them).
 
     python -m ispatialgym.grasping.validate_contacts --root ROOT --kind push|brace --glib GLIB [--jobs J.json] [--arm right|left] [--shard i/n] [--only ID ...]
+    python -m ispatialgym.grasping.validate_contacts replay --instance <...oracle.json ...> --kind push|brace --model-dir <v2 model dir>
 """
 
 from __future__ import annotations
@@ -68,7 +69,7 @@ STANCE_RELATIONS: Dict[str, Dict[str, Any]] = {
                        "trunks": ((0.0, -0.61), (0.25, -0.53), (0.25, -0.27), (0.5, -0.45), (0.5, -0.23), (0.0, -0.31), (0.25, -0.8), (0.0, -0.92)),
                        "source": "the touching demos' braces: 0.69-0.84 m ahead, 0.02-0.18 m left of the push stance"},
     # 207 axial_01-05 demos: the push init 0.49-1.10 m ahead, 0.41 m right to 0.03 m left of the manipulation stance
-    "axial_push": {"ahead_m": (0.70, 0.80, 0.62, 0.90), "lateral_m": (-0.10, -0.18, -0.03, -0.28),
+    "axial_push": {"ahead_m": (0.70, 0.80, 0.62, 0.90), "lateral_m": (-0.10, -0.18, 0.0, -0.28),
                    "trunks": ((0.0, -0.92), (0.0, -0.61), (0.25, -0.8), (0.25, -0.53), (0.5, -0.45), (0.5, -0.68), (0.75, -0.38), (0.75, -0.19), (0.95, -0.16),
                               (0.95, -0.31)),
                    "source": "207 axial_01-05 demos: push init 0.49-1.10 m ahead, -0.41..+0.03 m lateral of the manipulation stance"},
@@ -133,7 +134,7 @@ def entry_action(entry: Dict[str, Any], T_world_obj, obj_name: str, arm: str, *,
     from ispatialgym.sampling.v2 import contact_poses as CPZ
 
     w = CPZ.entry_world(entry, T_world_obj)
-    extras = dict(entry.get("extras") or {})
+    extras = world_extras(entry, T_world_obj)
     if entry["kind"] == "push":
         extras.setdefault("pose_class", extras.get("pose_class") or entry["class"])
         mid = goal = None
@@ -158,6 +159,29 @@ def entry_action(entry: Dict[str, Any], T_world_obj, obj_name: str, arm: str, *,
     c = BraceContact(arm=arm, object=obj_name, kind=str(extras.get("pose_class") or entry["class"]), pre=_sc_pose(w["pre"]), contact=_sc_pose(w["contact"]),
                      direction=[float(v) for v in a.tolist()], extra=extras)
     return Brace(contact=c, base_yaw=base_yaw)
+
+
+#: record extras holding WORLD values (the sampler's records): the library's are in the rule frame the builder ran in (``T_rule_object``)
+WORLD_Z_KEYS = ("fingertip_z", "contact_z")
+WORLD_POINT_KEYS = ("contact_point",)
+
+
+def world_extras(entry: Dict[str, Any], T_world_obj) -> Dict[str, Any]:
+    """The entry's record extras with their WORLD values (``fingertip_z``, ``contact_z``, ``contact_point``) moved from the rule frame the
+    builder ran in (``T_rule_object``: the object on a support at z 0) to the trial's object pose - the oracle reads them as world values
+    (``execute_push``'s palm lift compares ``fingertip_z`` with the object's top: a rule-frame 2 cm raised every such push ~0.8 m)."""
+    extras = dict(entry.get("extras") or {})
+    if entry.get("T_rule_object") is None:
+        return extras
+    M = _T(T_world_obj) @ np.linalg.inv(S.pose_of(entry["T_rule_object"]))
+    for k in WORLD_Z_KEYS:
+        if isinstance(extras.get(k), (int, float)):
+            extras[k] = round(float(extras[k]) + float(M[2, 3]), 6)  # a yaw + translation: z moves by the translation alone
+    for k in WORLD_POINT_KEYS:
+        v = extras.get(k)
+        if isinstance(v, (list, tuple)) and len(v) == 3:
+            extras[k] = [round(float(x), 6) for x in (M[:3, :3] @ np.asarray(v, dtype=float) + M[:3, 3])]
+    return extras
 
 
 def run_oracle(action, motions, state, step, max_steps: int) -> Dict[str, Any]:
@@ -553,6 +577,14 @@ class KitContactWorld:
         rest = dict(rest, world_position=[float(v) for v in p.tolist()], world_quat_xyzw=[float(v) for v in q.tolist()])  # the restore keys stay
         return rest, state
 
+    def clean_world(self, obj) -> None:
+        """The cuRobo collision world of the validator's own IK (the placement, the chain check): the robot and the ground only, as the
+        sampler's exact IK at a contact (the support and the pushed / braced object ignored at the contact pose; the contact policy and the
+        arm-object check are explicit). The oracle's planning syncs the world with the slab and the object in it (Motions.arm_to), and the
+        stale meshes made every IK after a model's first trial fail (run C: 1 valid, then 47 no_placement / chain_unreachable)."""
+        ignore = [self.tw.slab, obj] + ([self._pusher] if self._pusher is not None else [])
+        self.tw.backend.update_world(ignore_objects=ignore)
+
     def set_support_height(self, z: Optional[float]) -> None:
         """The slab top of the next library (the alias family's support height: its reach and the arm's posture depend on it); None = the
         world's default (``ValidateConfig.slab_top_z``)."""
@@ -574,6 +606,7 @@ class KitContactWorld:
 
         if T_obj is None:
             T_obj = CPZ._mat(obj.get_position_orientation())
+        self.clean_world(obj)
         start = start_pose_of(entry, hull_points(geom), T_obj)
         if start is None:
             return {"q": None, "fail": "start_in_object: the hand meets the object at both pre-contacts (the robot is set there)"}
@@ -722,6 +755,49 @@ class KitContactWorld:
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
                     wall_s=round(time.time() - t0, 3))
 
+    def replay(self, sit: Dict[str, Any], obj, geom) -> Dict[str, Any]:
+        """A recorded demo's situation (:func:`replay_situation`) rebuilt: the slab at the recorded support height, the object settled at
+        its recorded stance-frame pose, the robot at the oracle's own witness configuration of the pre-contact (base at the origin), then the
+        validator's chain IK of the record's poses from there (the clean world) and the ORACLE's action of the record itself, judged as
+        the library entries are. ``divergence`` names what differs from the real run."""
+        from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+        self.set_support_height(sit["support_z"])
+        T_o = sit["T_base_object"]
+        rest, state = self.tw.settle(obj, geom, S.mat_to_quat(T_o[:3, :3]), obj_xy=(float(T_o[0, 3]), float(T_o[1, 3])))
+        p, q = (x.clone() for x in obj.get_position_orientation())
+        rest = dict(rest, world_position=[float(v) for v in p.tolist()], world_quat_xyzw=[float(v) for v in q.tolist()])
+        T_settled = CPZ._mat((p, q))
+        entry = record_entry(dict(sit, T_base_object=T_settled))
+        out: Dict[str, Any] = {"situation": {k: sit[k] for k in ("kind", "pose_class", "support_z", "stance", "relation", "object_from")},
+                               "settle_shift_m": round(float(np.linalg.norm(T_settled[:3, 3] - T_o[:3, 3])), 5)}
+        self.clean_world(obj)
+        if sit.get("witness_q") is None:
+            return dict(out, error="no witness configuration in the record's ik_witnesses")
+        qw = th.tensor(sit["witness_q"], dtype=th.float32)
+        plan = {"q": qw, "base": [0.0, 0.0, 0.0], "trunk": [sit["stance"]["translate"], sit["stance"]["tilt"]]}
+        w = CPZ.entry_world(entry, T_settled)
+        poses = {"contact": w["contact"]}
+        if entry.get("arc") is not None:
+            for k in ("mid", "goal"):
+                Tk = T_settled @ S.pose_of(entry["arc"][f"{k}_object"])
+                poses[k] = (th.tensor(Tk[:3, 3], dtype=th.float32), th.tensor(S.mat_to_quat(Tk[:3, :3]), dtype=th.float32))
+        elif w["goal"] is not None:
+            poses["goal"] = w["goal"]
+        succ, _qs = self.tw.backend.solve_ik_batch(f"{self.arm}_arm", self.tw.M.EEF_LINK[self.arm], list(poses.values()), qw, batch_size=8, seeds=self.vcfg.ik_seeds)
+        out["chain_reach"] = {k: bool(v) for k, v in zip(poses, succ.tolist())}
+        trial = self.trial_push(obj, entry, plan, state, rest, self.arm) if sit["kind"] == "push" else self.trial_brace(obj, entry, plan, state, rest, self.arm)
+        out["trial"] = trial
+        div = []
+        if not all(out["chain_reach"].values()):
+            div.append(f"chain IK from the oracle's own configuration fails for {[k for k, v in out['chain_reach'].items() if not v]}")
+        if trial.get("verdict") != "valid":
+            div.append(f"the oracle's action of the record is {trial.get('verdict')} here: {trial.get('reasons')}")
+        if out["settle_shift_m"] > 0.005:
+            div.append(f"the object settles {out['settle_shift_m']:.3f} m from its recorded pose (the slab vs the real support)")
+        out["divergence"] = div or ["none: the replay passes as the demo did"]
+        return out
+
     def _geom_of(self, obj):
         return getattr(obj, "_isg_geom")
 
@@ -742,6 +818,107 @@ class KitContactWorld:
             self._park_pusher()
             self.tw.og.sim.step()
         return self._pusher
+
+
+# ------------------------------------------------------------------------------------------------ replay of a recorded demo situation
+
+
+def _mat2d(base_pose2d) -> np.ndarray:
+    x, y, yaw = (float(v) for v in base_pose2d)
+    T = np.eye(4)
+    T[:3, :3] = np.array([[math.cos(yaw), -math.sin(yaw), 0.0], [math.sin(yaw), math.cos(yaw), 0.0], [0.0, 0.0, 1.0]])
+    T[:2, 3] = [x, y]
+    return T
+
+
+def _pose_T(d: Dict[str, Any]) -> np.ndarray:
+    return S.pose_mat(d["position"], d["orientation"])
+
+
+def _pose_dict(T: np.ndarray) -> Dict[str, List[float]]:
+    return {"position": [float(v) for v in T[:3, 3]], "orientation": [float(v) for v in S.mat_to_quat(T[:3, :3])]}
+
+
+def replay_situation(oracle: Dict[str, Any], kind: str, tro: Dict[str, Any]) -> Dict[str, Any]:
+    """The exact situation of a recorded demo's push / brace (``oracle`` = the instance's ``*.oracle.json`` sidecar, ``tro`` = its
+    ``-tro_state.json``) in the record's STANCE frame (the base at the origin facing +x, z kept): the base pose and trunk of the record's
+    stance, the arm configuration of the oracle's witness at the pre-contact (``ik_witnesses``), the object's pose at the action (a pushed
+    target the program placed first: its place = ``grasps[].place`` o inv(``eef_in_object``); else its program-start pose), the support height
+    (the object's start AABB bottom), the record moved into the stance frame (poses, direction, world extras), its stance relation (the
+    contact ahead / lateral of the base)."""
+    rec = dict((oracle.get("contacts") or {})[kind])
+    st = (oracle.get("stances") or {})[rec.get("stance") or "manipulation"]
+    Tb = _mat2d(st["base_pose2d"])
+    Tbi = np.linalg.inv(Tb)
+    obj = rec["object"]
+    g = next((g for g in oracle.get("grasps") or [] if g.get("object") == obj and g.get("place") and g.get("eef_in_object")), None)
+    if g is not None and kind == "push":
+        T_obj = _pose_T(g["place"]) @ np.linalg.inv(_pose_T(g["eef_in_object"]))
+        obj_from = "place"
+    else:
+        rl = tro[obj]["root_link"]
+        T_obj = S.pose_mat(rl["pos"], rl["ori"])
+        obj_from = "program start"
+    support_z = float(tro[obj]["non_kin"]["AABB"]["aabb"][2])
+    keys = [k for k in ("pre", "init", "mid", "goal", "contact") if isinstance(rec.get(k), dict)]
+    rec_b = dict(rec)
+    for k in keys:
+        rec_b[k] = _pose_dict(Tbi @ _pose_T(rec[k]))
+    if rec.get("direction") is not None:
+        rec_b["direction"] = [float(v) for v in (Tbi[:3, :3] @ np.asarray(rec["direction"], dtype=float))]
+    for k in WORLD_POINT_KEYS:
+        if isinstance(rec.get(k), list) and len(rec[k]) == 3:
+            rec_b[k] = [float(v) for v in (Tbi[:3, :3] @ np.asarray(rec[k], dtype=float) + Tbi[:3, 3])]
+    wit = next((w for w in oracle.get("ik_witnesses") or [] if w.get("name") == kind and w.get("arm") == rec.get("arm") and "pre" in (w.get("targets") or {})), None)
+    q = None if wit is None else [float(v) for v in wit["targets"]["pre"]["q"]]
+    if q is not None:  # the base joints (x, y, z, rx, ry, yaw) into the stance frame: the base at the origin
+        q[0], q[1], q[5] = 0.0, 0.0, 0.0
+    contact = rec_b.get("init") or rec_b.get("contact")
+    return {"kind": kind, "arm": rec.get("arm"), "object": obj, "object_from": obj_from, "T_base_object": Tbi @ T_obj, "support_z": support_z,
+            "stance": {"name": rec.get("stance"), "base_pose2d": list(st["base_pose2d"]), "translate": st.get("translate"), "tilt": st.get("tilt"),
+                       "stand_off": st.get("stand_off")}, "witness_q": q, "record": rec_b, "record_world": rec,
+            "relation": {"contact_ahead_m": round(float(contact["position"][0]), 4), "contact_lateral_m": round(float(contact["position"][1]), 4)},
+            "pose_class": rec.get("pose_class") or rec.get("kind")}
+
+
+def replay_entry_check(sit: Dict[str, Any], entry: Dict[str, Any]) -> Dict[str, Any]:
+    """The library entry of the replayed record's class at the replayed object pose vs the record: the contact eef's position / angle error
+    and the pre-contact's (the library frame against what the sampler recorded)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    w = CPZ.entry_world(entry, sit["T_base_object"])
+    rec = sit["record"]
+    c_rec = _pose_T(rec.get("init") or rec["contact"])
+    c_lib = _T(w["contact"])
+    p_rec, p_lib = _pose_T(rec["pre"]), _T(w["pre"])
+    ang = math.degrees(math.acos(max(-1.0, min(1.0, (float(np.trace(c_rec[:3, :3].T @ c_lib[:3, :3])) - 1.0) / 2.0))))
+    return {"class": entry["class"], "contact_err_m": round(float(np.linalg.norm(c_rec[:3, 3] - c_lib[:3, 3])), 5), "contact_angle_deg": round(ang, 3),
+            "pre_err_m": round(float(np.linalg.norm(p_rec[:3, 3] - p_lib[:3, 3])), 5)}
+
+
+def record_entry(sit: Dict[str, Any]) -> Dict[str, Any]:
+    """The replayed record as a schema entry at its object pose (the oracle action of the replay is the RECORD itself; the entry form feeds
+    the validator's judge and chain check)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    rec = sit["record"]
+    T_obj = sit["T_base_object"]
+    extras = {k: v for k, v in rec.items() if k not in ("arm", "object", "pre", "init", "mid", "goal", "contact", "direction", "distance_m", "stance", "kind", "orient")}
+    if sit["kind"] == "push":
+        e = CPZ.contact_entry("push", sit["pose_class"] or "push", "replay", "work", T_obj, _poseq(rec["init"]), _poseq(rec["pre"]), extras,
+                              direction=rec["direction"], stroke_m=rec.get("distance_m"), arc=rec.get("mid") is not None)
+        if rec.get("mid") is not None:
+            Ti = np.linalg.inv(T_obj)
+            turn = math.atan2(*(lambda Rm: (Rm[1, 0], Rm[0, 0]))(_pose_T(rec["goal"])[:3, :3] @ _pose_T(rec["init"])[:3, :3].T))
+            e["arc"] = {"mid_object": CPZ._pose_dict(Ti @ _pose_T(rec["mid"])), "goal_object": CPZ._pose_dict(Ti @ _pose_T(rec["goal"])), "turn_rad": round(turn, 6)}
+    else:
+        e = CPZ.contact_entry("brace", sit["pose_class"] or "brace", "replay", "brace", T_obj, _poseq(rec["contact"]), _poseq(rec["pre"]), extras)
+    e["T_rule_object"] = CPZ._pose_dict(T_obj)  # the record's world extras are the stance frame's once the object stands there
+    return e
+
+
+def _poseq(d: Dict[str, Any]):
+    return th.tensor(d["position"], dtype=th.float32), th.tensor(d["orientation"], dtype=th.float32)
 
 
 # ------------------------------------------------------------------------------------------------ CLI
@@ -807,7 +984,52 @@ def validate_cli(a) -> None:
     og.shutdown()
 
 
+def replay_cli(argv) -> None:
+    """``validate_contacts replay --instance <instances/...oracle.json> --kind push|brace --model-dir <v2 model dir of the contacted object>``:
+    one recorded demo's situation rebuilt and run (:meth:`KitContactWorld.replay`); one ``GB_CONTACT_REPLAY {json}`` line."""
+    import json as _json
+
+    from ispatialgym.grasping import contact_library as CL
+
+    ap = argparse.ArgumentParser(prog="validate_contacts replay")
+    ap.add_argument("--instance", nargs="+", required=True, help="the instances' *.oracle.json (their -tro_state.json beside them)")
+    ap.add_argument("--kind", required=True, choices=["push", "brace"])
+    ap.add_argument("--model-dir", required=True)
+    a = ap.parse_args(argv)
+    cfg = ContactValidateConfig()
+    world = None
+    for path in a.instance:
+        oracle = _json.load(open(path))
+        tro = _json.load(open(path[: -len(".oracle.json")] + "-tro_state.json"))
+        sit = replay_situation(oracle, a.kind, tro)
+        if world is None:
+            world = KitContactWorld(cfg, sit["arm"])
+        job = {"id": os.path.basename(a.model_dir), "model_dir": a.model_dir}
+        mlib, _rid, geom = CL.load_object(None, job)
+        obj = world.load({"id": job["id"], "category": mlib.data.get("category"), "model": mlib.data.get("model"), "scale": mlib.data.get("scale"),
+                          "rest_hint_wxyz": None}, a.model_dir)
+        obj._isg_geom = geom
+        try:
+            res = world.replay(sit, obj, geom)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+
+            res = {"error": repr(e), "tb": traceback.format_exc()[-1500:]}
+        finally:
+            world.unload(obj)
+        print("GB_CONTACT_REPLAY " + _json.dumps({"instance": os.path.basename(path), **res}, default=str), flush=True)
+    import omnigibson as og
+
+    og.shutdown()
+
+
 def main(argv=None):
+    import sys
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "replay":
+        replay_cli(argv[1:])
+        return
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", required=True)
     ap.add_argument("--kind", required=True, choices=["push", "brace"])
