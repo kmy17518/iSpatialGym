@@ -146,6 +146,51 @@ class LoadError(RuntimeError):
         self.message = message
 
 
+#: i7-attachfix: a TRO object further than this from its TRO root pose after the restore is a load error (the settle under keep_still
+#: moves an object < 0.1 mm; the reuse bug moved them 40-549 mm)
+TRO_POSE_TOL_M = 0.005
+TRO_POSE_TOL_RAD = 0.05
+
+
+def _quat_angle_xyzw(a, b) -> float:
+    d = abs(sum(float(x) * float(y) for x, y in zip(a, b)))
+    return 2.0 * math.acos(min(1.0, d))
+
+
+def tro_pose_mismatches(expected: Dict[str, Any], live: Dict[str, Any], pos_tol: float = TRO_POSE_TOL_M,
+                        rot_tol: float = TRO_POSE_TOL_RAD) -> List[Dict[str, Any]]:
+    """i7-attachfix: the instances whose live root pose (``live[inst] = (pos, quat xyzw)``) is off the TRO's (``expected``, same form)
+    by more than ``pos_tol`` (m) or ``rot_tol`` (rad): ``[{"instance", "pos_m", "rot_rad"}]`` (sorted by instance)."""
+    out = []
+    for inst in sorted(expected):
+        if inst not in live:
+            continue
+        (pe, qe), (pl, ql) = expected[inst], live[inst]
+        dp = math.dist([float(x) for x in pe], [float(x) for x in pl])
+        da = _quat_angle_xyzw(qe, ql)
+        if dp > pos_tol or da > rot_tol:
+            out.append({"instance": inst, "pos_m": round(dp, 4), "rot_rad": round(da, 4)})
+    return out
+
+
+def detach_scene_attachments(scene) -> List[Dict[str, str]]:
+    """i7-attachfix: remove every BEHAVIOR attachment joint of ``scene`` (each object whose ``AttachedTo`` has a parent):
+    ``set_value(parent, False)``, outside any state load. Returns ``[{"child", "parent"}]``."""
+    try:
+        from omnigibson.object_states import AttachedTo
+    except Exception:  # noqa: BLE001 - no simulator (the test stubs)
+        return []
+    out = []
+    for obj in list(getattr(scene, "objects", []) or []):
+        st = (getattr(obj, "states", None) or {}).get(AttachedTo) if hasattr(getattr(obj, "states", None), "get") else None
+        if st is None or getattr(st, "parent", None) is None:
+            continue
+        parent = st.parent
+        st.set_value(parent, False)
+        out.append({"child": obj.name, "parent": parent.name})
+    return out
+
+
 # ==========================================================================================
 # instance resolution / env config (from the v1 driver)
 # ==========================================================================================
@@ -558,6 +603,12 @@ class InstanceLoader:
         backend = shared.get("backend")
         for arm in list(getattr(backend, "_attached", {}) or {}):
             backend.detach_object(arm)
+        # i7-attachfix 2026-11-08: the previous episode's BEHAVIOR attachment joints (a lid / cork the attach rule joined to its partner)
+        # are removed HERE, before the state load. Left in place, the scene state load below detaches them itself (AttachedTo._load_state
+        # -> _detach -> og.sim.update_handles() in the middle of the load) and the instance started with the pair off its TRO
+        # (i7_attswept: attachment_01 300114 lid 103.8 mm / teapot 81.6 mm, 300115 lid 76.6 mm, attachment_04 300116 lid 549 mm,
+        # attachment_03 300020 bottle 40 mm - each the instance after a joined episode on the same collector world)
+        self.report["attachments_detached_before_reuse"] = detach_scene_attachments(self.env.scene)
         # every scene object (poses, velocities, joints of doors / drawers, object states) back to the template's, so that
         # only the TRO decides where this instance starts - as in a fresh process
         self.env.scene.load_state(copy.deepcopy(shared["scene_state0"]), serialized=False)
@@ -574,6 +625,12 @@ class InstanceLoader:
     def restore(self, settle_physics_steps: int = 25):
         """TRO → simulator, then the §3.14 restores, a settle with the task entities held, the snapshot, one reset."""
         env, task, robot = self.env, self.task, self.robot
+        try:  # i7-attachfix: the attach rule's join list is per process - this episode's joins start here
+            from ispatialgym.sampling import predicates as PRED
+
+            self.report["attach_joins_start"] = len(PRED.JOINS)
+        except Exception:  # noqa: BLE001
+            pass
         self.report["floor_collision_filter"] = self._apply_floor_filters()
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
@@ -615,9 +672,52 @@ class InstanceLoader:
         else:
             obs, info = SE.reset(env)  # returns to the snapshot, activates pose_settled tracking, renders
         self.report["after_reset"] = self.restore_after_reset()
+        # i7-attachfix: every TRO object starts where the TRO puts it (the plan, its grasps and its IK witnesses assume it); a world
+        # reused after a joined episode left the pair off its TRO pose and nothing compared them (meta.start_state was only recorded)
+        self.report["tro_pose_check"] = self._check_tro_poses()
         if self.report["controller_targets_restored"]:
             robot.apply_action(self.hold.action())  # the recorded targets also hold after the reset, until the first action
         return obs, info
+
+    def _tro_pose_pairs(self) -> Dict[str, Tuple[Any, Any]]:
+        """``{instance: (TRO root pose, live root pose)}`` of the TRO's physical objects (position, quaternion xyzw)."""
+        out = {}
+        for inst, st in (self.tro.object_states or {}).items():
+            ent = self.physical.get(inst)
+            rl = (st or {}).get("root_link") if isinstance(st, dict) else None
+            if ent is None or not rl or rl.get("pos") is None or rl.get("ori") is None:
+                continue
+            pos, quat = ent.get_position_orientation()
+            out[inst] = ((rl["pos"], rl["ori"]), (pos.tolist(), quat.tolist()))
+        return out
+
+    def _check_tro_poses(self) -> Dict[str, Any]:
+        """i7-attachfix: compare every TRO object's live root pose with the TRO (:func:`tro_pose_mismatches`). A mismatch is re-applied
+        once (the TRO states of those objects, held still, the initial file and the reset again); one that persists is a LoadError -
+        the episode must not start from a world the plan does not describe."""
+        pairs = self._tro_pose_pairs()
+        bad = tro_pose_mismatches({k: v[0] for k, v in pairs.items()}, {k: v[1] for k, v in pairs.items()})
+        rec: Dict[str, Any] = {"n_objects": len(pairs), "mismatch": bad, "reapplied": False}
+        if not bad:
+            return rec
+        log.warning("TRO_POSE_CHECK: %d object(s) off their TRO pose after the restore: %s - re-applying the TRO states", len(bad), bad)
+        from omnigibson.utils.python_utils import recursively_convert_to_torch
+
+        for m in bad:
+            self.physical[m["instance"]].load_state(recursively_convert_to_torch(copy.deepcopy(self.tro.object_states[m["instance"]])), serialized=False)
+        for _ in range(2):
+            og.sim.step_physics()
+            self._hold_entities()
+        og.sim.step()
+        self.env.scene.update_initial_file()
+        self.env.scene.reset()
+        self.restore_after_reset()
+        pairs = self._tro_pose_pairs()
+        still = tro_pose_mismatches({k: v[0] for k, v in pairs.items()}, {k: v[1] for k, v in pairs.items()})
+        rec.update({"reapplied": True, "after_reapply": still})
+        if still:
+            raise LoadError("error", f"TRO objects off their TRO pose after the restore and a re-apply: {still}")
+        return rec
 
     def _held_articulations(self, physical: Dict[str, Any]) -> Dict[str, th.Tensor]:
         """The joint vectors the settle holds and every reset restores: the ``articulation_targets`` instances' (the target's initial
@@ -1828,7 +1928,7 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
             from ispatialgym.sampling import predicates as PRED
 
             # the attach rule's joins in this episode (owner 2026-10-10): trigger, alignment, contact, snap size
-            meta["attach_joins"] = list(PRED.JOINS)
+            meta["attach_joins"] = list(PRED.JOINS[int(loader.report.get("attach_joins_start") or 0):])  # this episode's only (i7-attachfix: the list is per process)
             meta["attach_join_mode"] = PRED.join_mode()
         exit_code = EXIT_SUCCESS if success else EXIT_ORACLE_FAILED
         result.update({
