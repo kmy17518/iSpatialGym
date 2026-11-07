@@ -268,6 +268,84 @@ bands, so the campaign library holds only the entries meant to change.
 - **The map views are optimistic.** They are wider than the scene's legacy bands: the salt shaker at trunk (0.25, −0.9), stand-off
   0.45, has 103 map cells against 31 band cells. Map proposals therefore meet more exact-check rejections.
 
+## Round 4 (2026-11-07): thin objects, the plate, settle-first, the scene mask, frame ranking, the weak aliases
+
+The full numbers are in `$OFH/DECISIONS.md`, from "2026-11-07 ... ROUND 4" on.
+
+### Thin flat objects (the support policy's finger opening)
+- **Diagnosis** (opt-in `ISPATIALGYM_SUPPORT_POLICY_DIAG`; v2diag1 / v2diag2). Every rejection was `finger_penetration` on the table:
+  - sunflower: median −13.4 mm;
+  - tablespoon: −2.5 / −4.3 mm;
+  - carving knife: −4.4 mm.
+
+  The plane, the object pose (plane + h_root + the 3 mm lift) and the IK residual (1–2 mm) were all right. The policy measured the
+  fingers fully open, at 0.05 m per finger. The oracle descends pre-shaped at width / 2 + 10 mm, which is the library's `preshape_q`.
+  The offline HandChecker reproduces the scene's depths at 0.05 m, and gives +3.5 mm of clearance at the pre-shape.
+- **Fix.** The policy now measures a library grasp at its pre-shape (`tabletop.policy_opening_of`, `IKChecker.policy_opening`) at:
+  - the draw (a1117046);
+  - the recorded-grasp re-checks: after-settle, held turn, disembedding, attachment (dd25a979, `record_policy_opening`);
+  - the program check's grasp approach (29c77f60).
+
+  The opt-in raise / relax fallback (`ISPATIALGYM_SUPPORT_POLICY_FALLBACK`) never fired once the opening was right.
+- **v2open3** (N 4):
+
+  | Alias | Attempts / written / demos ok | Legacy |
+  |---|---|---|
+  | nextto_03 | 9 / 4 / 4 | 9 / 4 / 4 |
+  | inside_03 | 52 / 3 / 3 | 44 / 4 / 4 |
+  | ontop_small_04 | 6 / 4 / 4 | 24 / 2 / 0 |
+
+  The shared contact-policy defaults are unchanged.
+
+### The plate (under_small_03)
+- **Family.** side_9's family was marked rotational and yaw-equivalent in the campaign library copy only. The collision AABB is ±0.1229 m square; the detector missed it because the hull rim is 0.113–0.128 m.
+- **Maps.** The recompute is identical in feasibility: 242880 / 242880 entries feasible, 0 flipped.
+- **Empty F is kinematic.** 0 pairs pass even with all 38 scene objects removed. side_9 is a side pinch at rim height; the v2 top grasps were all rejected for object clearance (0 object-clear).
+- **gripper_not_in_frame at the place** (`ISPATIALGYM_FRAME_DIAG`): the box is truly out of view at the image's left edge, not a margin case (1 of 16 was margin-only). In 14 of 16 cases the place IK fails too.
+
+### Settle first, then generate (`GB_SETTLE_FIRST=1`, adeac28d / fb868b32)
+- **Mechanism.**
+  - A survey drops the object 12 times (4 yaws × 3 drops), and the outcomes are clustered into rests by up vector + height.
+  - Rests that differ by a roll about a near-round principal axis are merged, using the support-function roundness.
+  - The job keeps its directory, and the surveyed rest becomes `generation_rest_wxyz`. Other stable rests seen at least 2 times get derived entries.
+  - Validation's settle stays as the guard.
+- **Survey.** 24 of 26 objects have one rest (12 / 12).
+  - The carving knife lands bimodally: 7 / 12 at the designated rest, 5 / 12 at 0.609 rad.
+  - The cork lands upright 8 / 12 and on its side (1.467 rad) 4 / 12.
+  - Sprouts, spatula and spray bottle each have one rest, 0.338 / 0.188 / 0.063 rad off the designated one.
+- **Library.** Valid grasps: current 80, control 80, settle 87.
+  - spatula 4 → 6 (measured-rest finger rejections 5 → 0);
+  - sprouts 4 → 5;
+  - umbrella 1 → 2;
+  - the knife's second-rest entry: 6.
+
+  Guard firings 18 → 15. The 5 excluded entries are still at 0: their failures aren't rest mismatches (cap / tape geometry, cork meta-link frame, candy, pillow load). The survey costs 25–47 s per object.
+- **A/B.** Campaign copy `$OFH/v2maps_settle_20261107/campaign`, with the 3 changed entries' maps recomputed. Arm `absettle` vs abv2_base on inside_01 / under_small_04 / touching_04.
+
+### The scene mask (`ISPATIALGYM_MAP_SCENE_MASK` / `_DIAG`, scene_mask.py, 9735c17f / 87fbb8fd)
+- **What it is.** Categories evaluated per (cell, yaw, grasp) at the phase-3 focus, with no IK: support, height, trav, static, hand (eef-fixed link spheres via `kit.world_sphere_hits`), features, frame.
+- **maskdiag2** (212 foci, 5479 pairs, 1067 in F).
+  - Only trav (1526) and hand (20, all outside F) fire. Within F, only trav fires.
+  - trav is wrong for manipulation stances: 225 / 305 masked F pairs pass the exact IK. So it is dropped.
+- **Conclusion.** The map's surplus is reach (80 % of the focus pairs fail the IK screen), not scene geometry. The lever is the map view's reach at the actual stance: map views are never refined and are read at the nearest grid tilt.
+
+### Frame ranking (trunk 20fd38da / 0e2a7632 / b13a368f; merged)
+- **E1.** Frame rejections are almost all place / pre-place at the iors_small draw (pre-place 913, place 743). Oracle FOV failures: 0 in 498 demos.
+- **Consistency.** The sampler's 8-corner eef box is stricter than the oracle's single fingertip point. Aligning them is the owner's decision.
+- **Opt-in switches.**
+  - `ISPATIALGYM_FRAME_RANK` keeps the partner pose (of up to 4 valid ones) whose place / pre-place box sits deepest in frame.
+  - `ISPATIALGYM_STANCE_FRAME_AIM` tries the manipulation candidates in order of the expected place's frame margin.
+- **A/B.** The first arms crashed (a stance-order bug) and were rerun as `*_rank2` / `*_aim2`.
+
+### The weak aliases (prompt F)
+- **First divergence on all six: the band source.**
+  - The map view's phase-2 pool is 2–9× the scene band's, with deeper foci.
+  - It uses a fixed lattice, all-or-nothing trunk eligibility, and no refinement.
+- **touching_01 / 02.** The push is out of reach from the map's deep foci. The goal check finds no push class (11 / 16, 66 / 71). Opt-in `ISPATIALGYM_TOUCHING_PUSH_SCREEN` screens the push at the draw (745863d2).
+- **nextto_04.** The map lattice rows can't hit the 1.2 cm strip of the eroded 0.36 m bench, so there is no phase-2 survivor. It stays on legacy, an owner decision.
+- **under_small_04.** The program-check policy is fixed by 29c77f60. The goal settle is unstable at the v2 rest (r0_other).
+- **inside_04 / touching_04.** Weak under legacy too (frame / contact).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
