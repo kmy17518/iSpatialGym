@@ -75,6 +75,29 @@ class CandidateConfig:
     modes: Tuple[str, ...] = ("top", "side")
     max_representatives: int = 10
     weights: Dict[str, float] = field(default_factory=lambda: {"com": 5.0, "antipodal": 1.0, "coverage": 1.0, "width": 0.5, "clearance": 1.0, "vertical": 3.0})
+    # i7-plate 2026-11-07 (owner: recover plate luhkiz): opt-in structured candidate FAMILIES (:data:`FAMILIES`), each its own pool after
+    # the modes, through the same gates as a top grasp (retreat along the approach). Default () = off; enable per object with the
+    # manifest's ``cand_overrides`` ({"families": ["lip_shallow", "rim_straddle"]}) or per run with ISG_GLIB_CAND_OVERRIDES.
+    families: Tuple[str, ...] = ()
+    lip_band_m: float = 0.012  # lip_shallow: the pad contact within this of the largest radius about the plate axis
+    lip_tilt_deg: Tuple[float, float] = (0.0, 70.0)  # lip_shallow: the tilt window (the top mode stops at 40, the side mode starts at 70)
+    lip_pad_offsets_m: Tuple[float, ...] = (0.0, 0.008, 0.016, 0.024)  # lip_shallow: eef raised back along the approach (contact -> tips)
+    straddle_n_azimuth: int = 72
+    straddle_n_heights: int = 10
+    straddle_tilts_deg: Tuple[float, ...] = (0.0, 10.0, -10.0, 20.0, -20.0)  # rim_straddle: approach tilt in the radial plane (+ leans outward)
+    straddle_pad_offsets_m: Tuple[float, ...] = (0.0, 0.007, 0.014, 0.021, 0.028)  # rim_straddle: the contact this far toward the tips
+    family_max_pool: int = 40000  # a family pool larger than this is subsampled (seeded)
+    # ISG_GLIB_GATE_DUMP=1: per pool and gate, the counts and the measures of the dropped candidates -> gate_dump.json (diagnostics only)
+    gate_dump: bool = field(default_factory=lambda: os.environ.get("ISG_GLIB_GATE_DUMP", "") == "1")
+    # OWNER DECISION (default False = the shared behaviour): finger_blades_clear's pinched pieces looked up at the retreated contact
+    # (CONTACT_Z + shift) instead of CONTACT_Z. The call site passes no contact_z, so a retreated top grasp's real pinched piece is not left
+    # out and the pad's own lip contact counts as a blade in the object (luhkiz L3: 4 of its 5 lip pinches pass at the real contact).
+    blade_contact_at_retreat: bool = False
+    # OWNER DECISION (default False = the shared behaviour): the top mode's object-clearance retreats keep the shift equal to the eef's
+    # real displacement. As written, a failed try (absolute retreats 5, 10, ... mm from the unmoved pose) still adds to the shift, so a
+    # grasp cleared at 10 mm records 15 mm and the closing sweep re-measures the width 5 mm off its contact (luhkiz: 57 of 62 top grasps
+    # lose their width there; 59 of 62 pass the sweep at the real displacement).
+    retreat_shift_exact: bool = False
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -303,6 +326,187 @@ def stem_axis(union, lo, hi):
     return head_pt, axis_dir, float(ext[ax])
 
 
+# ------------------------------------------------------------------------------------------------ opt-in candidate families (i7-plate)
+#
+# Owner decision 2026-11-07 (plate luhkiz: 7 sloped rim sectors + a foot disk as convex hulls, no grasp passed): structured pools that go
+# through EVERY gate of a top grasp unchanged (width / antipodal cone, support retreat, sphere clearance, closing sweep, lever, NMS, policy
+# geometry, finger blades). A family only proposes poses; it never relaxes a gate. Default off (``CandidateConfig.families`` = ()).
+
+
+def plate_axis(union) -> Tuple[float, float, float]:
+    """The rest-frame vertical axis of a plate-like object: ``(cx, cy, r_max)`` - the xy centre of its collision bbox and the largest
+    vertex radius about it."""
+    v = np.asarray(union.vertices)
+    lo, hi = v.min(0), v.max(0)
+    cx, cy = 0.5 * (lo[0] + hi[0]), 0.5 * (lo[1] + hi[1])
+    return float(cx), float(cy), float(np.hypot(v[:, 0] - cx, v[:, 1] - cy).max())
+
+
+def _inside_any(P: np.ndarray, planes) -> np.ndarray:
+    """Points inside (or on) any convex piece given by its face planes ``[(normals (F, 3), offsets (F,))]``."""
+    inside = np.zeros(len(P), dtype=bool)
+    for n, off in planes:
+        inside |= ((P @ n.T - off[None]) <= 1e-9).all(axis=1)
+    return inside
+
+
+def _frames(x: np.ndarray, y: np.ndarray, z: np.ndarray, p: np.ndarray) -> np.ndarray:
+    T = np.tile(np.eye(4), (len(p), 1, 1))
+    T[:, :3, 0], T[:, :3, 1], T[:, :3, 2], T[:, :3, 3] = x, y, z, p
+    return T
+
+
+def lip_family_poses(T_all: np.ndarray, geom: OG.ObjectGeometry, cfg: CandidateConfig) -> Tuple[np.ndarray, np.ndarray]:
+    """``lip_shallow`` (owner option 2): the sampled antipodal pinches whose pad contact lies on the OUTER LIP - within ``lip_band_m`` of the
+    largest radius about the plate axis (:func:`plate_axis`) - at tilts in ``lip_tilt_deg`` (the top mode ends at ``top_max_tilt_deg``,
+    the side mode starts at ``side_tilt_deg[0]``; the window between them is proposed here too), each at every ``lip_pad_offsets_m``: the
+    eef raised back along its approach by the offset with the contact point kept (a higher eef - the contact nearer the fingertips, so
+    less blade reaches past the lip). An offset-0 pose inside the top mode's own window is left out (the top mode makes it).
+    Returns ``(T (N, 4, 4), initial shift (N,))``: the contact sits at ``CONTACT_Z + shift`` along the approach."""
+    empty = (np.zeros((0, 4, 4)), np.zeros(0))
+    if len(T_all) == 0:
+        return empty
+    cx, cy, r_max = plate_axis(geom.union)
+    c = T_all[:, :3, 3] + T_all[:, :3, 2] * CONTACT_Z
+    tl = tilt_deg(T_all)
+    m = (np.hypot(c[:, 0] - cx, c[:, 1] - cy) >= r_max - cfg.lip_band_m) & (tl >= cfg.lip_tilt_deg[0]) & (tl <= cfg.lip_tilt_deg[1])
+    T, tl = T_all[m], tl[m]
+    offs = [float(s) for s in cfg.lip_pad_offsets_m if CONTACT_Z + float(s) <= cfg.tip_max_m + 1e-9]
+    cap = max(1, int(cfg.family_max_pool) // max(1, len(offs)))
+    if len(T) > cap:
+        pick = np.sort(np.random.default_rng(cfg.seed).choice(len(T), cap, replace=False))
+        T, tl = T[pick], tl[pick]
+    Ts, ss = [], []
+    for s0 in offs:
+        k = (tl > cfg.top_max_tilt_deg) if (s0 <= 0.0 and "top" in cfg.modes) else np.ones(len(T), dtype=bool)
+        Tk = T[k].copy()
+        Tk[:, :3, 3] -= Tk[:, :3, 2] * s0
+        Ts.append(Tk)
+        ss.append(np.full(len(Tk), s0))
+    return (np.concatenate(Ts), np.concatenate(ss)) if Ts else empty
+
+
+def rim_profile(geom: OG.ObjectGeometry, theta: np.ndarray, z: np.ndarray) -> Dict[str, np.ndarray]:
+    """The rim's inner and outer faces about the plate axis at azimuths ``theta`` and heights ``z`` (paired arrays): a ray from the axis
+    outward meets the inner face (``r_in``; only where the axis point is free - inside no piece, an open centre), a ray from outside inward
+    the outer face (``r_out``). ``{"r_in", "r_out", "free", "radial" (N, 3), "axis" (N, 3)}``; NaN where a ray misses."""
+    union = geom.union
+    cx, cy, r_max = plate_axis(union)
+    planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces]
+    rad = np.stack([np.cos(theta), np.sin(theta), np.zeros_like(theta)], axis=1)
+    axis = np.stack([np.full_like(theta, cx), np.full_like(theta, cy), np.asarray(z, dtype=float)], axis=1)
+    free = ~_inside_any(axis, planes)
+    far = r_max + 0.05
+    d_in, _ = hits(union, axis, rad)
+    d_out, _ = hits(union, axis + rad * far, -rad)
+    r_in = np.where(free & np.isfinite(d_in), d_in, np.nan)
+    r_out = np.where(np.isfinite(d_out), far - d_out, np.nan)
+    return {"r_in": r_in, "r_out": r_out, "free": free, "radial": rad, "axis": axis}
+
+
+def straddle_family_poses(T_all: np.ndarray, geom: OG.ObjectGeometry, cfg: CandidateConfig) -> Tuple[np.ndarray, np.ndarray]:
+    """``rim_straddle`` (owner option 3): approach about vertical (``straddle_tilts_deg`` in the radial plane, + leaning outward), the
+    closing axis radial - one finger in the open centre, one outside the rim, the pads across the rim wall. Per azimuth
+    (``straddle_n_azimuth``) and height (``straddle_n_heights`` over the object's z range) the pad contact centre is midway between the
+    rim's inner and outer faces (:func:`rim_profile`), at every ``straddle_pad_offsets_m`` toward the fingertips (the tips stay above the
+    support / the centre's floor while the pads meet the rim low on the pad). ``T_all`` is unused (the family is constructed).
+    Returns ``(T (N, 4, 4), initial shift (N,))``."""
+    union = geom.union
+    lo, hi = union.vertices.min(0), union.vertices.max(0)
+    th_ = np.linspace(0.0, 2.0 * np.pi, int(cfg.straddle_n_azimuth), endpoint=False)
+    zs = np.linspace(lo[2] + 0.001, hi[2] - 0.001, int(cfg.straddle_n_heights))
+    TH, ZZ = (a.ravel() for a in np.meshgrid(th_, zs, indexing="ij"))
+    pr = rim_profile(geom, TH, ZZ)
+    ok = np.isfinite(pr["r_in"]) & np.isfinite(pr["r_out"]) & (pr["r_out"] - pr["r_in"] >= cfg.min_width_m)
+    rad, axis = pr["radial"][ok], pr["axis"][ok]
+    c = axis + rad * (0.5 * (pr["r_in"][ok] + pr["r_out"][ok]))[:, None]
+    up = np.array([0.0, 0.0, 1.0])
+    Ts, ss = [], []
+    for a_deg in cfg.straddle_tilts_deg:
+        a = math.radians(float(a_deg))
+        z = -math.cos(a) * up[None] + math.sin(a) * rad  # the approach: down, leaning outward for a > 0
+        y = math.cos(a) * rad + math.sin(a) * up[None]   # the closing axis: radial, perpendicular to the approach
+        x = np.cross(y, z)
+        for s0 in cfg.straddle_pad_offsets_m:
+            s0 = float(s0)
+            if CONTACT_Z + s0 > cfg.tip_max_m + 1e-9:
+                continue
+            Ts.append(_frames(x, y, z, c - z * (CONTACT_Z + s0)))
+            ss.append(np.full(len(c), s0))
+    if not Ts:
+        return np.zeros((0, 4, 4)), np.zeros(0)
+    T, s = np.concatenate(Ts), np.concatenate(ss)
+    if len(T) > cfg.family_max_pool:
+        pick = np.sort(np.random.default_rng(cfg.seed).choice(len(T), int(cfg.family_max_pool), replace=False))
+        T, s = T[pick], s[pick]
+    return T, s
+
+
+FAMILIES = {"lip_shallow": lip_family_poses, "rim_straddle": straddle_family_poses}
+
+
+# ------------------------------------------------------------------------------------------------ gate dump (ISG_GLIB_GATE_DUMP=1)
+
+GATE_DUMP_FILE = "gate_dump.json"
+GATE_DUMP_SCHEMA = "isg-glib-gate-dump/1"
+GATE_DUMP_NOTES = ("Per generation pass (the last one wrote candidates.json), per pool (a mode or a family) and gate: n_in / n_out, dropped_by "
+                   "(why the dropped ones failed), stats (percentiles 0/10/50/90/100 of every numeric measure over the dropped ones) and up to "
+                   "max_records dropped candidates with the measures the gate decided on. 'sweep' holds two tests: width_lost (the pinch line "
+                   "meets no object after the support move, e.g. a side lift above the object) and touch (the pad sweep: a pad meets the object "
+                   "further out than width / 2 + sweep_margin_m). 'geometry' lists every selected candidate with its final reason; "
+                   "blade_depth_at_real_contact_mm is diagnostic (finger_blades_clear with the pinched pieces looked up at the real contact, "
+                   "CONTACT_Z + the eef's real retreat; the call as written uses CONTACT_Z); shift_minus_real_mm > 0 = failed object-clearance "
+                   "retreat tries counted in the shift (the sweep then re-measures the width that far off the contact). "
+                   "Lengths in mm, contact_offset_mm = the contact's offset toward the fingertips (the retreat).")
+SUPPORT_PARTS = ("finger", "palm", "wrist_camera", "wrist")
+
+
+def _js(v):
+    if isinstance(v, (np.ndarray, list, tuple)):
+        return [_js(x) for x in v]
+    if isinstance(v, (np.bool_, bool)):
+        return bool(v)
+    if isinstance(v, (np.integer, int)):
+        return int(v)
+    if isinstance(v, (np.floating, float)):
+        return round(float(v), 2) if math.isfinite(float(v)) else None
+    return str(v)
+
+
+class _GateDump:
+    """Diagnostics only (no gate reads it): what each gate dropped and the measures it decided on (:data:`GATE_DUMP_NOTES`)."""
+
+    def __init__(self, on: bool, max_records: int = 400):
+        self.on, self.max_records = bool(on), int(max_records)
+        self.pools: Dict[str, List[Dict[str, Any]]] = {}
+
+    def gate(self, pool: str, gate: str, n_in: int, n_out: int, drop_idx=None, measures: Optional[Dict[str, np.ndarray]] = None, why=None,
+             summary=None, records=None) -> None:
+        if not self.on:
+            return
+        from collections import Counter
+
+        st: Dict[str, Any] = {"gate": gate, "n_in": int(n_in), "n_out": int(n_out)}
+        if why is not None:
+            st["dropped_by"] = dict(Counter(str(w) for w in why).most_common())
+        if summary is not None:
+            st["summary"] = dict(Counter(str(w) for w in summary).most_common())
+        if drop_idx is not None and measures:
+            idx = np.asarray(drop_idx, dtype=int)
+            stats = {}
+            for k, v in measures.items():
+                v = np.asarray(v)
+                if v.ndim == 1 and v.dtype.kind in "fi" and len(idx):
+                    x = v[idx].astype(float)
+                    x = x[np.isfinite(x)]
+                    stats[k] = {"n_finite": int(len(x)), "pct": _js(np.percentile(x, [0, 10, 50, 90, 100])) if len(x) else None}
+            st["stats"] = stats
+            st["dropped"] = [{k: _js(np.asarray(v)[i]) for k, v in measures.items()} for i in idx[: self.max_records]]
+        if records is not None:
+            st["records"] = records
+        self.pools.setdefault(pool, []).append(st)
+
+
 # ------------------------------------------------------------------------------------------------ generation
 
 
@@ -333,18 +537,24 @@ def generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig = Candida
     """Candidates of one model (``job``: category, model, scale, constraint, rest_hint_wxyz) -> ``candidates.json``. A model whose
     representatives come out empty is sampled again denser (``densify``: candidate x orientation multipliers; small features such as
     a lid's knob draw few of the uniform surface samples - the legacy lid__pbmsji__s065 run used 48000 x 48)."""
-    out = _generate(job, model_dir, cfg, policy, sym_cfg, arm)
+    dumps: List[Dict[str, Any]] = []
+    out = _generate(job, model_dir, cfg, policy, sym_cfg, arm, dumps)
     for mc, mo in densify:
         if out["representatives"]:
             break
         dense = CandidateConfig(**{**asdict(cfg), "n_candidates": cfg.n_candidates * mc, "n_orientations": cfg.n_orientations * mo})
         prev = out["log"]
-        out = _generate(job, model_dir, dense, policy, sym_cfg, arm)
+        out = _generate(job, model_dir, dense, policy, sym_cfg, arm, dumps)
         out["log"]["densified_from"] = prev
+    if cfg.gate_dump:
+        S.save_json(os.path.join(model_dir, GATE_DUMP_FILE), {"schema": GATE_DUMP_SCHEMA, "id": job.get("id"), "category": job.get("category"),
+                                                           "model": job.get("model"), "families": list(cfg.families), "passes": dumps,
+                                                           "final_pass": len(dumps) - 1, "notes": GATE_DUMP_NOTES, "created": S.now()})
     return out
 
 
-def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy: CP.ContactPolicy, sym_cfg: SY.SymmetryConfig, arm: str) -> Dict[str, Any]:
+def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy: CP.ContactPolicy, sym_cfg: SY.SymmetryConfig, arm: str,
+              dumps: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     import torch as th
 
     t0 = time.time()
@@ -379,29 +589,63 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     hc = CP.HandChecker(arm, policy, spacing=0.004)
     clear_fn = SphereClearance(geom, arm)
     out_cands: List[Dict[str, Any]] = []
+    dump = _GateDump(cfg.gate_dump)
+    # the pools: the modes first (as before: their names, order and numbers are unchanged), then the opt-in families (top-type)
+    pools: List[Tuple[str, str, Optional[np.ndarray], Optional[np.ndarray]]] = []
     for mode in cfg.modes:
-        L: Dict[str, Any] = {}
         if len(T_all) == 0:
-            log[mode] = L
+            pools.append((mode, mode, None, None))
             continue
         tl = tilt_deg(T_all)
         m = tl <= cfg.top_max_tilt_deg if mode == "top" else (tl >= cfg.side_tilt_deg[0]) & (tl <= cfg.side_tilt_deg[1])
-        T = T_all[m].copy()
-        L["n_tilt"] = int(len(T))
-        if len(T) == 0:
-            log[mode] = L
+        pools.append((mode, mode, T_all[m].copy(), None))
+    for fam in cfg.families:
+        if fam not in FAMILIES:
+            raise ValueError(f"unknown candidate family {fam!r} (known: {sorted(FAMILIES)})")
+        Tf, sf = FAMILIES[fam](T_all, geom, cfg)
+        pools.append((fam, "top", Tf, sf))
+    n_named: Dict[str, int] = {}
+    top_z = float(hi[2])
+    ax_x, ax_y, _ = plate_axis(union)
+
+    def _where(Tm, czm):  # dump: where a candidate pinches (rest frame, about the plate axis), its tilt and its contact offset toward the tips
+        czm = np.broadcast_to(np.asarray(czm, dtype=float), (len(Tm),))
+        cm = Tm[:, :3, 3] + Tm[:, :3, 2] * czm[:, None]
+        return {"contact_mm": cm * 1000, "contact_r_mm": np.hypot(cm[:, 0] - ax_x, cm[:, 1] - ax_y) * 1000,
+                "contact_azimuth_deg": np.degrees(np.arctan2(cm[:, 1] - ax_y, cm[:, 0] - ax_x)), "tilt_deg": tilt_deg(Tm),
+                "contact_offset_mm": (czm - CONTACT_Z) * 1000}
+
+    for pool, mode, T, shift0 in pools:
+        L: Dict[str, Any] = {}
+        if T is None:
+            log[pool] = L
             continue
-        _, width, antip, cov = contact_features(union, T, CONTACT_Z)
+        is_family = shift0 is not None
+        L["n_pool" if is_family else "n_tilt"] = int(len(T))
+        dump.gate(pool, "pool", len(T) if is_family else len(T_all), len(T))  # a family pool is proposed, not filtered from the samples
+        if len(T) == 0:
+            log[pool] = L
+            continue
+        cz0 = CONTACT_Z + shift0 if is_family else CONTACT_Z  # a family pose may start with its contact toward the tips
+        if not is_family:
+            shift0 = np.zeros(len(T))
+        _, width, antip, cov = contact_features(union, T, cz0)
         keep = np.isfinite(width) & (width >= cfg.min_width_m) & (width <= cfg.aperture_m) & (antip >= math.cos(math.radians(cfg.cone_deg)))
-        T, width = T[keep], width[keep]
+        if dump.on:
+            ok_w = np.isfinite(width) & (width >= cfg.min_width_m) & (width <= cfg.aperture_m)
+            why = np.where(~np.isfinite(width), "no_width", np.where(~ok_w, "width_range", "antipodal"))
+            dump.gate(pool, "width_antipodal", len(T), int(keep.sum()), np.where(~keep)[0],
+                      {**_where(T, cz0), "width_mm": width * 1000, "antipodal": antip, "why": why}, why[~keep])
+        T, width, shift0 = T[keep], width[keep], shift0[keep]
         L["n_width_antipodal"] = int(len(T))
         if len(T) == 0:
-            log[mode] = L
+            log[pool] = L
             continue
         # 3) the support under the hand: policy measurement on the exact hulls at the pre-shaped opening
         shift = np.zeros(len(T))
         pre_q = np.clip(0.5 * width + PRESHAPE_MARGIN, 0.0, FINGER_OPEN)
         deficit = np.zeros(len(T))
+        part = np.zeros(len(T), dtype=int)  # dump: the hand part furthest below its allowance (index into SUPPORT_PARTS)
         margin = 0.001  # aim 1 mm inside every allowance: the measured rest sits a fraction of a mm off the canonical one
         for q in np.unique(np.round(pre_q, 3)):
             idx = np.where(np.round(pre_q, 3) == q)[0]
@@ -413,60 +657,79 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             need = np.where((cl["finger"].numpy() < -policy.finger_support_max_penetration_m) | (hand < policy.hand_support_margin_m),
                             np.maximum(need_f, need_h), 0.0)
             deficit[idx] = np.maximum(0.0, need)
+            if dump.on:
+                part[idx] = np.argmin(np.stack([cl["finger"].numpy() + policy.finger_support_max_penetration_m] +
+                                               [cl[r].numpy() - policy.hand_support_margin_m for r in SUPPORT_PARTS[1:]]), axis=0)
         a = T[:, :3, 2]
         if mode == "top":  # retreat along the approach (as before; the support's normal component of the retreat lifts the hand)
             s = deficit / np.maximum(-a[:, 2], 1e-3)
-            ok = (CONTACT_Z + s) <= cfg.tip_max_m + 1e-9  # the contact no further out than the tip surface (gen_candidates TIP_MAX)
-            T, s, width, pre_q = T[ok], s[ok], width[ok], pre_q[ok]
+            ok = (CONTACT_Z + shift0 + s) <= cfg.tip_max_m + 1e-9  # the contact no further out than the tip surface (gen_candidates TIP_MAX)
+            if dump.on:
+                dump.gate(pool, "support_retreat", len(T), int(ok.sum()), np.where(~ok)[0],
+                          {**_where(T, CONTACT_Z + shift0), "deficit_mm": deficit * 1000, "retreat_mm": s * 1000, "part": np.array(SUPPORT_PARTS)[part]},
+                          np.array(SUPPORT_PARTS)[part][~ok])
+            T, s, width, pre_q, shift0 = T[ok], s[ok], width[ok], pre_q[ok], shift0[ok]
             T[:, :3, 3] -= T[:, :3, 2] * s[:, None]
-            shift = s
+            shift = shift0 + s
         else:  # lift along the support normal (lift_grasp_off_support's move); the pads must still close on the object (sweep below)
             ok = deficit <= cfg.side_lift_max_m
-            T, width, pre_q, deficit = T[ok], width[ok], pre_q[ok], deficit[ok]
+            if dump.on:
+                dump.gate(pool, "support_lift", len(T), int(ok.sum()), np.where(~ok)[0],
+                          {**_where(T, CONTACT_Z), "lift_mm": deficit * 1000, "part": np.array(SUPPORT_PARTS)[part]}, np.array(SUPPORT_PARTS)[part][~ok])
+            lift_part = np.array(SUPPORT_PARTS)[part][ok]
+            T, width, pre_q, deficit, shift0 = T[ok], width[ok], pre_q[ok], deficit[ok], shift0[ok]
             T[:, 2, 3] += deficit
             shift = deficit
         L["n_support"] = int(len(T))
         if len(T) == 0:
-            log[mode] = L
+            log[pool] = L
             continue
         # 4) object clearance (spheres) with the object-aware retreat of top grasps
         clear = _clear_grouped(clear_fn, T, pre_q)
         ok = clear >= cfg.obj_margin_m
-        if mode == "top":
-            for ds in cfg.retreats_m:
-                bad = np.where(~ok & ((CONTACT_Z + shift + ds) <= cfg.tip_max_m))[0]
-                if len(bad) == 0:
-                    break
-                Tb = T[bad].copy()
-                Tb[:, :3, 3] -= Tb[:, :3, 2] * ds
-                cb = _clear_grouped(clear_fn, Tb, pre_q[bad])
-                good = cb >= cfg.obj_margin_m
-                idx = bad[good]
-                T[idx] = Tb[good]
-                clear[idx] = cb[good]
-                shift[idx] += ds
-                ok[idx] = True
-                shift[bad[~good]] += ds
-        T, clear, shift, width, pre_q = T[ok], clear[ok], shift[ok], width[ok], pre_q[ok]
+        # the eef's real displacement along the approach (the shift as written may count failed retreat tries)
+        real = _object_retreats(clear_fn, T, pre_q, shift, clear, ok, cfg) if mode == "top" else shift.copy()
+        if dump.on:
+            dump.gate(pool, "object_clear", len(T), int(ok.sum()), np.where(~ok)[0],
+                      {**_where(T, CONTACT_Z + (shift if mode == "top" else 0.0)), "sphere_clear_mm": clear * 1000, "shift_mm": shift * 1000})
+        T, clear, shift, width, pre_q, shift0, real = T[ok], clear[ok], shift[ok], width[ok], pre_q[ok], shift0[ok], real[ok]
+        if mode != "top":
+            lift_part = lift_part[ok]
         L["n_object_clear"] = int(len(T))
         if len(T) == 0:
-            log[mode] = L
+            log[pool] = L
             continue
         cz = CONTACT_Z + (shift if mode == "top" else 0.0)  # the pads' contact height after the retreat
         cz = np.broadcast_to(np.asarray(cz, dtype=float), (len(T),)).copy()
         c, width, antip, cov = contact_features(union, T, cz)
         touch = pad_sweep(union, T)
         keep = np.isfinite(width) & (width >= cfg.min_width_m) & (touch <= width / 2 + cfg.sweep_margin_m)
-        T, clear, shift, cz, width, antip, cov, pre_q = T[keep], clear[keep], shift[keep], cz[keep], width[keep], antip[keep], cov[keep], pre_q[keep]
+        if dump.on:
+            # the stage holds two tests: the pinch line still meets the object after the support move (width_lost: e.g. a side lift
+            # above the object), and the pad sweep proper (touch: the pads meet the object no further out than width / 2 + margin)
+            lost = ~(np.isfinite(width) & (width >= cfg.min_width_m))
+            why = np.where(lost, "width_lost", "touch")
+            ms = {**_where(T, cz), "why": why, "width_mm": width * 1000, "touch_mm": touch * 1000, "limit_mm": (width / 2 + cfg.sweep_margin_m) * 1000,
+                  "contact_above_object_top_mm": (c[:, 2] - top_z) * 1000, "shift_mm": shift * 1000, "shift_minus_real_mm": (shift - real) * 1000}
+            if mode != "top":
+                ms["lift_part"] = lift_part
+            dump.gate(pool, "sweep", len(T), int(keep.sum()), np.where(~keep)[0], ms, why[~keep])
+        T, clear, shift, cz, width, antip, cov, pre_q, shift0, real = (T[keep], clear[keep], shift[keep], cz[keep], width[keep], antip[keep],
+                                                                       cov[keep], pre_q[keep], shift0[keep], real[keep])
         L["n_sweep"] = int(len(T))
         if len(T) == 0:
-            log[mode] = L
+            log[pool] = L
             continue
         score, perp = _score(T, com, width, antip, cov, clear, size, cz, mode, cfg.weights)
         feats = {"com_perp": perp, "width": width, "antipodal": antip, "coverage": cov, "clearance": clear, "tilt_deg": tilt_deg(T), "shift_m": shift}
+        if is_family:
+            feats["pad_offset_m"] = shift0
         if constraint != "flower_stem_top":
             keep = perp <= cfg.lever_cap * size
-            T, score, cz, pre_q = T[keep], score[keep], cz[keep], pre_q[keep]
+            if dump.on:
+                dump.gate(pool, "lever", len(T), int(keep.sum()), np.where(~keep)[0], {**_where(T, cz), "com_perp_mm": perp * 1000,
+                                                                                      "cap_mm": np.full(len(T), cfg.lever_cap * size * 1000)})
+            T, score, cz, pre_q, real = T[keep], score[keep], cz[keep], pre_q[keep], real[keep]
             feats = {k: v[keep] for k, v in feats.items()}
             L["n_lever"] = int(len(T))
         if constraint == "attachment_free" and len(T):
@@ -491,11 +754,12 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                     Pw = P @ T[i, :3, :3].T + T[i, :3, 3]
                     face_gap[i] = min(face_gap[i], Vm_max[k] - float((Pw @ m).max()))
             keep &= face_gap >= 0.002
-            T, score, cz, pre_q, side_m, face_gap = T[keep], score[keep], cz[keep], pre_q[keep], side_m[keep], face_gap[keep]
+            T, score, cz, pre_q, side_m, face_gap, real = T[keep], score[keep], cz[keep], pre_q[keep], side_m[keep], face_gap[keep], real[keep]
             feats = {k: v[keep] for k, v in feats.items()}
             feats["attach_side_m"], feats["attach_face_gap_m"] = side_m, face_gap
             score = score + 2.0 * np.clip(side_m / 0.03, 0, 1)
             L["n_attachment_free"] = int(len(T))
+            dump.gate(pool, "attachment_free", L.get("n_lever", L["n_sweep"]), len(T))
         elif constraint == "flower_stem_top" and len(T):
             head_pt, axis_dir, Ls = stem_axis(union, lo, hi)
             cc = T[:, :3, 3] + T[:, :3, 2] * cz.reshape(-1, 1)
@@ -503,36 +767,56 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             across = np.abs(T[:, :3, 1] @ axis_dir)
             w_lo, w_hi, w_c = FLOWER_WINDOW.get(job["category"], FLOWER_WINDOW_DEFAULT)
             keep = (t >= w_lo) & (t <= w_hi) & (across <= 0.5) & (feats["width"] <= STEM_MAX_WIDTH)
-            T, score, cz, pre_q, t, across = T[keep], score[keep], cz[keep], pre_q[keep], t[keep], across[keep]
+            T, score, cz, pre_q, t, across, real = T[keep], score[keep], cz[keep], pre_q[keep], t[keep], across[keep], real[keep]
             feats = {k: v[keep] for k, v in feats.items()}
             score = score + 5.0 * np.exp(-((t - w_c) / 0.15) ** 2) - 1.0 * across
             feats["stem_t"], feats["pinch_across"] = t, across
             L["n_flower"] = int(len(T))
+            dump.gate(pool, "flower_stem_top", L["n_sweep"], len(T))
         if len(T) == 0:
-            log[mode] = L
+            log[pool] = L
             continue
         sel = nms(T, score, cfg.topk, cfg.nms_pos_m, cfg.nms_rot_deg)
         L["n_selected"] = int(len(sel))
+        dump.gate(pool, "nms", len(T), len(sel))
         # 7) the full policy geometry: pre-grasp, approach, closing sweep (fingers from the pre-shape to the contact opening)
         Ts = T[sel]
         contact_q = np.clip(0.5 * feats["width"][sel] + pad_face_offset(arm), 0.0, FINGER_OPEN)  # joint value at the pads' first touch
         geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])))
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
-        blades, deep = finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q)
+        cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
+        blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default off)
+        blades, deep = finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, **blade_kw)
+        if dump.on:  # diagnostics: the blade depth with the pinched pieces looked up at the real contact (what the switch would do)
+            deep_at = deep if blade_kw else finger_blades_clear(geom, hc, Ts, pre_q[sel], contact_q, contact_z=cz_real[sel].reshape(-1, 1))[1]
+        recs = []
         for r, i in enumerate(sel):
             T_obj = np.linalg.inv(R) @ Ts[r]  # back to the canonical object frame
             ok_geo = bool(geo["ok"][r]) and bool(appr[r]) and bool(blades[r])
             reason = (geo["reason"][r] if not bool(geo["ok"][r]) else ("approach_hits_object" if not appr[r] else
                       ("finger_blade_in_object" if not blades[r] else "ok")))
-            out_cands.append({
-                "name": f"{mode}_{len([c for c in out_cands if c['mode'] == mode])}", "mode": mode, "score": round(float(score[i]), 4),
+            name = f"{pool}_{n_named.get(pool, 0)}"
+            n_named[pool] = n_named.get(pool, 0) + 1
+            cand = {
+                "name": name, "mode": mode, "score": round(float(score[i]), 4),
                 "T_object_eef": S.mat_pose(T_obj), "T_rest_eef": S.mat_pose(Ts[r]), "width_m": round(float(feats["width"][i]), 5),
                 "preshape_q": round(float(pre_q[i]), 5), "contact_q": round(float(contact_q[r]), 5),
                 "features": {k: round(float(v[i]), 5) for k, v in feats.items()},
                 "geometry": {"ok": ok_geo, "reason": reason, "stage": geo["stage"][r], "finger_min_m": round(float(geo["finger_min"][r]), 5),
                              "hand_min_m": round(float(geo["hand_min"][r]), 5), "blade_object_depth_m": round(float(deep[r]), 5)},
-            })
-        log[mode] = L
+            }
+            if is_family:
+                cand["family"] = pool
+            out_cands.append(cand)
+            if dump.on:
+                recs.append({"name": name, "reason": reason, "stage": geo["stage"][r], "approach_object_clear": bool(appr[r]),
+                             "blade_depth_mm": round(float(deep[r]) * 1000, 2), "blade_depth_at_real_contact_mm": round(float(deep_at[r]) * 1000, 2),
+                             "shift_minus_real_mm": round(float(feats["shift_m"][i] - real[i]) * 1000, 2) if mode == "top" else 0.0,
+                             "finger_min_mm": round(float(geo["finger_min"][r]) * 1000, 2), "hand_min_mm": round(float(geo["hand_min"][r]) * 1000, 2),
+                             **{k: _js(v[0]) for k, v in _where(Ts[r:r + 1], cz[sel][r:r + 1]).items()}, "width_mm": round(float(feats["width"][i]) * 1000, 2)})
+        if dump.on:
+            dump.gate(pool, "geometry", len(sel), sum(1 for x in recs if x["reason"] == "ok"), summary=[x["reason"] for x in recs], records=recs)
+        log[pool] = L
     # 8) symmetry families of the geometric survivors, deduplicated (one candidate per family)
     t_sym = time.time()
     good = sorted([c for c in out_cands if c["geometry"]["ok"]], key=lambda c: -c["score"])
@@ -565,6 +849,10 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         by_name[f["representative"]]["family_id"] = fid
         by_name[f["representative"]]["family_relation"] = "representative"
     log["symmetry_s"] = round(time.time() - t_sym, 2)
+    if dumps is not None and dump.on:
+        dumps.append({"n_candidates": cfg.n_candidates, "n_orientations": cfg.n_orientations, "cone_deg": cfg.cone_deg, "n_sampled": int(len(T_all)),
+                      "object_top_z_mm": round(top_z * 1000, 2), "support_z_mm": round(z_min * 1000, 2), "plate_axis_xy_mm": [round(ax_x * 1000, 2), round(ax_y * 1000, 2)],
+                      "log": {k: v for k, v in log.items() if isinstance(v, dict)}, "pools": dump.pools})
     out = {"schema": S.CANDIDATES, "pipeline": PIPELINE, "category": job["category"], "model": job["model"], "scale": list(S.canonical_scale(job.get("scale"))),
            "dataset": job.get("dataset"), "constraint": constraint, "rest_hint_wxyz": job.get("rest_hint_wxyz"), "generation_rest_wxyz": job.get("generation_rest_wxyz"), "legacy_key": job.get("legacy_key"),
            "arm": arm, "policy": policy.meta(arm), "policy_key": policy.key(arm), "config": asdict(cfg), "symmetry_config": asdict(sym_cfg),
@@ -580,6 +868,31 @@ def _clear_grouped(clear_fn, T, pre_q):
         idx = np.where(np.round(pre_q, 3) == q)[0]
         out[idx] = clear_fn(T[idx], float(q))
     return out
+
+
+def _object_retreats(clear_fn, T, pre_q, shift, clear, ok, cfg: CandidateConfig) -> np.ndarray:
+    """The object-aware retreat of top grasps, in place on ``T`` / ``shift`` / ``clear`` / ``ok``: a pose whose hand spheres are not clear
+    of the object tries ``cfg.retreats_m`` (absolute retreats from its pose) while its contact stays within ``tip_max_m``. Returns the
+    eef's real displacement along the approach (``shift`` on entry + the retreat that cleared). As written (shared behaviour) a failed
+    try still adds to ``shift`` - with ``cfg.retreat_shift_exact`` (owner decision, default off) the shift is the real displacement."""
+    real = shift.copy()
+    for ds in cfg.retreats_m:
+        bad = np.where(~ok & ((CONTACT_Z + shift + ds) <= cfg.tip_max_m))[0]
+        if len(bad) == 0:
+            break
+        Tb = T[bad].copy()
+        Tb[:, :3, 3] -= Tb[:, :3, 2] * ds
+        cb = _clear_grouped(clear_fn, Tb, pre_q[bad])
+        good = cb >= cfg.obj_margin_m
+        idx = bad[good]
+        T[idx] = Tb[good]
+        clear[idx] = cb[good]
+        shift[idx] += ds
+        real[idx] += ds
+        ok[idx] = True
+        if not cfg.retreat_shift_exact:
+            shift[bad[~good]] += ds
+    return real
 
 
 def _approach_object_clear(clear_fn, T, pre_q, cfg) -> np.ndarray:

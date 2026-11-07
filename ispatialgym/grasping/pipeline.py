@@ -69,17 +69,22 @@ def stage_export(args, jobs, world=None):
     return world
 
 
-def candidate_overrides():
+def candidate_overrides(job: Optional[Dict[str, Any]] = None):
     """of-v2maps 2026-11-07 (owner: retry the objects without feasible grasps with more candidates + time, recorded): opt-in
     ``ISG_GLIB_CAND_OVERRIDES`` (JSON of ``candidates.CandidateConfig`` fields, e.g. n_candidates / n_orientations / max_representatives /
     topk) and ``ISG_GLIB_DENSIFY`` ("4x2,8x4,16x8": the densify passes, candidate x orientation multipliers; default (4, 2), (8, 4)).
-    Returns ``(CandidateConfig, densify)``."""
+    i7-plate 2026-11-07: a manifest entry's own ``cand_overrides`` (same fields, e.g. ``{"families": ["lip_shallow", "rim_straddle"]}``)
+    applies to that entry only, over the run's. Returns ``(CandidateConfig, densify)``."""
     from dataclasses import asdict
 
     from ispatialgym.grasping import candidates as CA
 
     base = CA.CandidateConfig()
     ov = json.loads(os.environ.get("ISG_GLIB_CAND_OVERRIDES") or "{}")
+    ov = {**ov, **((job or {}).get("cand_overrides") or {})}
+    unknown = sorted(set(ov) - set(asdict(base)))
+    if unknown:
+        raise ValueError(f"unknown CandidateConfig fields in the candidate overrides: {unknown}")
     cfg = CA.CandidateConfig(**{**asdict(base), **ov}) if ov else base
     dz = os.environ.get("ISG_GLIB_DENSIFY", "").strip()
     densify = tuple(tuple(int(v) for v in p.lower().split("x")) for p in dz.split(",") if p) if dz else ((4, 2), (8, 4))
@@ -103,15 +108,24 @@ def _cand_one(payload):
     if not force and os.path.exists(os.path.join(d, "candidates.json")):
         return {"id": j["id"], "ok": True, "skipped": True}
     try:
-        cfg, densify = candidate_overrides()
+        cfg, densify = candidate_overrides(j)
         out = CA.generate(j, d, cfg=cfg, densify=densify)
         n_ok = sum(1 for c in out["candidates"] if c["geometry"]["ok"])
         fams = out["families"]
+        pools = tuple(cfg.modes) + tuple(cfg.families)
+        by_pool: Dict[str, Dict[str, Any]] = {p: {"n": 0, "geometry_ok": 0, "reasons": {}} for p in pools}
+        for c in out["candidates"]:  # i7-plate: per pool (mode / family) the selected candidates and the gate each one failed
+            b = by_pool.setdefault(c.get("family") or c["mode"], {"n": 0, "geometry_ok": 0, "reasons": {}})
+            b["n"] += 1
+            b["geometry_ok"] += int(bool(c["geometry"]["ok"]))
+            b["reasons"][c["geometry"]["reason"]] = b["reasons"].get(c["geometry"]["reason"], 0) + 1
         return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "n_candidates": len(out["candidates"]), "n_geometry_ok": n_ok,
-                "cand_config": {k: getattr(cfg, k) for k in ("n_candidates", "n_orientations", "cone_deg", "max_representatives", "topk")},
+                "cand_config": {k: getattr(cfg, k) for k in ("n_candidates", "n_orientations", "cone_deg", "max_representatives", "topk", "families",
+                                                              "blade_contact_at_retreat")},
                 "densify": [list(x) for x in densify], "densified_from": (out["log"] or {}).get("densified_from") is not None,
                 "n_representatives": len(out["representatives"]), "n_families": len(fams),
-                "family_types": sorted({f.get("type") for f in fams.values()}), "log": {k: out["log"][k] for k in out["log"] if k in ("top", "side", "n_sampled")},
+                "family_types": sorted({f.get("type") for f in fams.values()}), "log": {k: out["log"][k] for k in out["log"] if k in pools + ("n_sampled",)},
+                "by_pool": by_pool, "gate_dump": CA.GATE_DUMP_FILE if cfg.gate_dump else None,
                 "reasons": sorted({c["geometry"]["reason"] for c in out["candidates"] if not c["geometry"]["ok"]})}
     except Exception as e:  # noqa: BLE001
         return {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]}
