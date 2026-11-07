@@ -490,6 +490,29 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 
 **Validation:** the count table; `--grasps v2only` N 4 on nextto_04. Aliases with rebuilt maps ride along in the next scheduled run.
 
+### Owner decisions 2026-11-07: inside_large_01 (hardback bqvvvx, the v2 overhang path)
+
+1. **Overhang pick, finger clearance: keep the new rule.**
+   - On the v2 overhang path the pick goes to the library's physics-validated rest (spine 0.0294 m past the edge, COM 0.0555 m inside),
+     not the old 1 cm finger-box clearance. The box rule plus the 5 cm COM margin leaves no flush push.
+   - `v2_finger_clearance_m` stays as the off-by-default fallback that restores the box rule.
+   - Unit test: the default on this path is the library rest, and the switch restores the box rule.
+   - Scope: this path only; not a gate shared by all objects.
+2. **Left-arm goal side: a left-arm validator for lean rests** (no mirroring of the right-lean entry).
+   - Today the lean validator runs physics with the right arm only, and the left board blocks it. So lean_left of
+     hardback__bqvvvx__bu (16.7 deg, bookcase_jaysra_0@0.9472) has no valid spine pinch and an empty interior map.
+   - A left-arm physics validation for lean entries, like the articulation left-arm validation: the arm that validates is recorded in
+     the entry and its identity.
+   - Rebuild lean_left with it, then its interior maps (both arms).
+   - Lean rests only; ordinary tabletop validation is unchanged.
+   - Whether touching_03's acbrnv lean entries would gain from it is reported only (not rebuilt).
+3. **Far place: keep the place positions nearer.** The shared QA gates stay unchanged.
+   - All 3 place failures (robot_wobble 1.01 / 1.03 deg vs the 1.00 gate; right_arm_link5 vs torso_link4) were at the right arm's far
+     place, stand-off 0.75-0.85 m.
+   - The place stand-off for this goal is preferred, or capped, at about 0.7 m: a task / generation option of inside_large_01, not a
+     change to the shared stance or QA rules.
+   - If the cap leaves an arm no stance, that is reported, not widened.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
