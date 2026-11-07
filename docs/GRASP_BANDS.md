@@ -409,6 +409,57 @@ need the task's COM hinge in the validator world (not yet); see `$OFH/DECISIONS.
   with 143 N median (live 4 N). Default-off switches: `ISPATIALGYM_HAND_OVERLAP_RANK=1` (sampler: the overlap ranks, not rejects) and
   `validate_contacts --screen-as-rank`.
 
+## Brace opening: one switch, one rule (branch `i7-contactbrace`, 2026-11-08)
+
+The owner's BRACE OPENING rule (2026-11-07): an open brace opens fully (0.05 per finger), narrower only when the braced face requires it.
+`i7-contactbrace` = i7-contact 521dc344 + i7-braceopen dc10d4d2 (merge 51786e00) + the reconciliation f14f8a20.
+
+- **One switch**: `ISPATIALGYM_BRACE_FULL_OPEN` is defined once, in `tabletop` (`BRACE_FULL_OPEN_ENV`, `brace_full_open()`,
+  `BRACE_FULL_OPENING_M`, `brace_opening(today, room)`); `contact_poses.BRACE_FULL_OPEN_ENV` / `brace_full_open_on` are those names (the
+  copy i7-contact had is gone). Its sites: the touching wide stop (`contact_poses.brace_wide_spreads`: the full-open spread 0.127 m =
+  2 x 0.05 + 0.027 first, then 0.09 / 0.07 / 0.05 where the face is too short), the push-close and carton-v4 stops
+  (`articulation_small.wide_stop_layout`: min(0.05, face room), inset max(corner inset, opening + 1 cm)), the pack brace
+  (`block_design.pack_brace_opening`), and the touching_brace library identity (`resolved_knobs`: `brace_full_open`, the spreads).
+- **One opening rule for the checks**: every sampler check of a brace puts the brace hand at `tabletop.brace_fingers` = the opening
+  `execute_brace` holds (`actions.brace_is_open`: the record's positive `fingers_opening_m`, else closed) - the two-arm solves
+  (`brace_second_arm(brace_fingers=)`, `IKChecker.exact_both_arms(fingers_other=)`), the probes, the retreat, the program check
+  (`brace_open_fingers`, the locked brace hand). cb164782's unconditional rule kept; `ISPATIALGYM_TOUCH_BRACE_AT_OPENING` retired (its
+  default was already the rule; "0" checked another opening than the oracle).
+- **Maps at the executed opening**: a contact map's meta records its library's knobs (`library.knobs`, not in the map key); the
+  touch_brace consumer (`tabletop.contact_map_knobs`, `ContactMap.find(knobs_require=)`) reads a map only when its library's
+  `brace_full_open` = the run's switch (a map without the record = built off).
+- Switch off: library identities, map keys and grasp keys unchanged (tests; the ntbrtz / dkhgxn libraries rebuilt off on trunk_f14f8a20
+  are byte-identical to the parent i7-contact 8e798b51 build).
+- Kit counters `brace_opening.{passed,failed,recorded}.<opening>` (touching brace, push-close stop).
+- Where the opening can change (from the code): touching_01 / 02 / 04 (the touching wide stop), close_02 (carton push-close stop). Not:
+  block_design_01 (= block_4 board: `block_pack_tail` false, the pack brace never runs; the pack-tail block_4 variants have no alias),
+  open_02 (carton v4 brace `blade_down`, closed), touching_03 (shelf layout, no brace), the axial stop brace (closed). The other carton close
+  customs variants have no alias. Libraries (partner-centred push line): dkhgxn's wide stops 0.0315 -> 0.05 (validated 6 valid / 2
+  unreachable, as off); ntbrtz has no wide entry; gkpmii's face takes at most 0.09 (unchanged). gkpmii (touching_04's partner) got its v2
+  export (`$OFH/contactbrace_20261108/glib_gkpmii`) - touching_04 rejected `missing_map touch_brace` before.
+- A/B (`$OFH/contactbrace_20261108`: `sub_ab.sh`, `stage_ab.sh`, `ab_tab.py`): roots `v2maps_icb_off` / `v2maps_icb_on`, a ledger per arm at
+  the same base index, a cold sampling cache per job, `--grasps v2only`, tags `icb_off` / `icb_on`.
+  close_02 under v2only is blocked on this branch (`legacy_band_blocked`: its articulation band needs i7-artic's maps), so close_02 ran
+  with `--grasps v2` (v2 grasps, the legacy band where no v2 map; no legacy grasps). Results (N 4 x 2 at 310000-310007 /
+  close_02 310008-310015; off -> on):
+
+  | alias | executed opening | attempts | written | demos ok | GPU-h / success | brace candidates passed / failed |
+  |---|---|---|---|---|---|---|
+  | touching_01 | unchanged (wide stop tried at 0.0315 / 0.0215 only; records closed / blade) | 47 / 47 | 8 / 8 | 7 / 8 | 0.166 / 0.142 | identical |
+  | touching_02 | 0.0315 -> 0.05 (spread 0.09 -> 0.127, every candidate and record) | 141 / 141 | 2 / 2 | 2 / 2 | 0.696 / 0.769 | 14 / 48 both |
+  | touching_04 | unchanged (gkpmii's face takes <= 0.09) | see DECISIONS | 0 / 0 (place stage) | - | - | identical |
+  | close_02 [v2] | 0.04 -> 0.05 (every candidate and record) | 10 / 11 | 8 / 8 | 1 / 8 | 0.94 / - | 77 / 446 vs 119 / 760 |
+
+  touching_01 / 04 sample identically in both arms (same rejections, same counters): the switch does not act there. touching_02 (blocked
+  by place depth, not judged) changed only the opening: the same attempts, rejections and brace pass / fail counts - the wider hand
+  collided nowhere new - and 2 / 2 demos in both arms. close_02: every failure in both arms is the same hard QA during the push (the
+  carton displaced 1.0-1.2 cm, tilt 0.003 rad, ~step 550) - present before (i7_artic3 3 / 4 object_tilt at 0.04); 1 / 8 vs 0 / 8 is
+  within N 4 noise and has no cause in the opening; on's 2 program_check_failed are the push arm's tip_push waypoint, not the brace hand.
+- **Default ON** (separate commit): `tabletop.BRACE_FULL_OPEN_DEFAULT = "1"`; `ISPATIALGYM_BRACE_FULL_OPEN=0` = the openings of before.
+  With it on, the touch_brace consumer reads only maps built on: a root needs the on maps of ntbrtz / dkhgxn / gkpmii
+  (`$OFH/contactbrace_20261108/libs_on/maps`, staged in `$OFH/v2maps_icb_on`). Not exercised by any alias: the pack brace (no block_4
+  pack-tail alias) and the carton-v4 wide stop (every alias `blade_down`).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
