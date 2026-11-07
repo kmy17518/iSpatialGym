@@ -1414,6 +1414,8 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 9 | i7-attach-swept (d711771f = i7-attachmap + i7-attachhover, swept default) | b03f1dca |
 | 10 | i7-plateqtf (0866bfc0; expanding tilt / yaw map default on - the owner's confirmation pending) | 386ab2b4 |
 | 11 | i7-memory (c49eacf6; outcome memory default on for train splits; $OFH/alias_memory not seeded, no thresholds.json) | a8baafe3 |
+| 12 | i7-placeorder (3d8492fc; trunk-first order before the memory hook) | f313237f |
+| 13 | i7-contactbrace (3d5cd9bb = i7-contact + i7-braceopen; one switch ISPATIALGYM_BRACE_FULL_OPEN, default on) | 0f8e95c0 |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1453,11 +1455,17 @@ Later layers:
   a pre-identity male key.
 - plate qtfzeq = the merged entry of v2maps_i7pq (27 valid; replaced entry in `_superseded_merged`).
 - 30 per_d_e merged maps of v2maps_i7unblock, only for entries int1 still holds unchanged (`_superseded_trunkelig`).
+- Contact maps (16), from three roots:
+  - v2maps_icb_on: the touch_brace maps built with full-open on (ntbrtz, dkhgxn, gkpmii), plus the touch_push maps;
+  - v2maps_i7contact2: the axial h maps (qgvsnb, injrgc, tfovwy), with the pushed-end / spin fix;
+  - v2maps_i7contact3: the paperback s1x1x2.5 maps.
+
+  The gkpmii v2 export is added to glib. The check also reads the contact maps, including the touch_brace knob at the run's default.
 
 **Open:** the per_d_e count and merge for the 46 former-rule maps of the 23 entries int1 replaced, plus the 8 interior / overhang maps
 i7-unblock deferred.
 
-`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_386ab2b4: 74 entries, 128 maps and 8 attach maps, 0 key mismatches, 50 links resolving,
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_0f8e95c0: 75 entries, 128 maps, 8 attach maps and 16 contact maps, 0 key mismatches, 50 links resolving,
 21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
 **Validation** (int1_1, `--grasps v2only` N 4 on the affected aliases only): see DECISIONS for the list, the skips and the results.
