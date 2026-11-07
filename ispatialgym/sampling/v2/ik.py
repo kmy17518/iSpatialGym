@@ -1456,6 +1456,9 @@ class IKChecker:
             if not bool(free.all()):
                 bad = [idxs[j] for j, f in enumerate(free.tolist()) if not f]
                 return None, f"approach_untrackable: {what} ({len(bad)}/{len(idxs)}, {[round(dist * i / m, 3) for i in bad[:3]]} m from the start; {self._collision_blame(traj[bad[0]], ign)})"
+        why_tail = self._policy_tail(traj, m, dist, arm, pose_from, pose_to, near_end, near_start, both, ignore_end, ignore_start)
+        if why_tail:
+            return None, why_tail
         ign = list(ignore_mid) + list(ignore_end)
         with self.ignoring(ign):
             end_free = bool(self.kit.collision_free(traj[-1], margin=0.0)[0])
@@ -1476,6 +1479,37 @@ class IKChecker:
                      max(touched), ft.max_penetration_m * 1000, ft.margin_m * 1000, arm, [getattr(o, "name", str(o)) for o in touch],
                      "configuration's own" if opening is None else f"{opening:.4f} m (pre-shaped)", dist)
         return traj[-1].clone(), "ok"
+
+    def _policy_tail(self, traj, m: int, dist: float, arm: str, pose_from: Pose, pose_to: Pose, near_end, near_start, both,
+                     ignore_end: Sequence[Any], ignore_start: Sequence[Any]) -> str:
+        """of-v2maps 2026-11-07 (prompt I item 3; the isg1020 spec P2 §5: the policy applies wherever the support is ignored): the segment's
+        configurations within ``APPROACH_WAYPOINT_M`` (3.3 cm) of a pose whose ignore set holds the support were collision-checked with
+        the whole support removed and never policed (only the end pose was, in :meth:`exact`) - they are policed here like the end pose:
+        the same switch / scope / holding rule, at the same policy opening. ``ISPATIALGYM_SUPPORT_POLICY_TAIL=0``: off. Returns the
+        rejection reason, '' when the tail passes."""
+        if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_TAIL", "1") == "0" or not support_policy_on():
+            return ""
+        if support_policy_scope() == "grasp" and self._holding(arm):
+            return ""
+        jobs = []
+        if ignore_end:
+            jobs.append((sorted(set(near_end) | set(both)), list(ignore_end), pose_to))
+        if ignore_start:
+            jobs.append((sorted(set(near_start) | set(both)), list(ignore_start), pose_from))
+        for idxs, sup, pose in jobs:
+            if not idxs:
+                continue
+            appr = self.approached_objects(pose)
+            if not policed_supports(sup, appr):
+                continue
+            for i in idxs:
+                ev = self.support_policy_eval(traj[i], arm, sup, appr)
+                if not bool(ev["ok"]):
+                    self._count("support_policy_tail_rejected")
+                    return (f"approach_untrackable: support policy on the approach tail ({ev.get('reason')}, "
+                            f"{round(dist * min(i, m - i) / max(m, 1), 3)} m from the policed pose)")
+            self._count("support_policy_tail_checked")
+        return ""
 
     def _finger_touch_ok(self, qs: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any]) -> Tuple[th.Tensor, float]:
         """``(ok (K,) bool, max penetration in mm over the passing ones)`` of approach configurations that collide with ``touch`` (the grasp's

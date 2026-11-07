@@ -31,7 +31,7 @@ import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch as th
@@ -242,7 +242,7 @@ def sweep_openings(open_q: float, contact_q: float, steps: int) -> List[Tuple[fl
     return [(float(q), float(q)) for q in qs]
 
 
-def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contact_q: Sequence[float], open_q: float = 0.05,
+def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contact_q: Sequence[float], open_q: Union[float, Sequence[float]] = 0.05,
                          floor: bool = False) -> Dict[str, object]:
     """Rules 2, 3 and 6 for grasp poses (N, 4, 4): the pre-grasp and every approach waypoint at the pre-shape opening, then the closing
     sweep at the grasp pose down to each pose's contact opening. ``{"ok": (N,), "reason": [...], "stage": [...], "finger_min": (N,),
@@ -264,9 +264,35 @@ def check_grasp_geometry(checker: HandChecker, T_grasp, support: Support, contac
         fmin.copy_(th.minimum(fmin, cl["finger"].cpu()))
         hmin.copy_(th.minimum(hmin, th.minimum(th.minimum(cl["palm"], cl["wrist_camera"]), cl["wrist"]).cpu()))
 
+    # of-v2maps 2026-11-07 (prompt I item 3; the isg1020 spec P1 §2: one policy at the oracle's opening): ``open_q`` may be one opening per
+    # pose (each grasp's own pre-shape) - was one scalar, the validator passed the batch's MAX pre-shape (a thin grasp was checked wider open)
+    oq = th.as_tensor(open_q, dtype=th.float32).reshape(-1)
+    if oq.numel() == 1:
+        oq = oq.repeat(n)
+    o_groups: Dict[float, List[int]] = {}
+    for i, v in enumerate(oq.tolist()):
+        o_groups.setdefault(round(v, 5), []).append(i)
+
+    def check_at_openings(T_k):
+        if len(o_groups) == 1:
+            v = next(iter(o_groups))
+            return checker.check(T_k, support, (v, v), floor=floor)
+        o_all = th.ones(n, dtype=th.bool)
+        r_all = ["ok"] * n
+        cl_all = {r: th.full((n,), float("inf")) for r in H.ROLES}
+        for v, idx in o_groups.items():
+            o, r, cl = checker.check(T_k[idx], support, (v, v), floor=floor)
+            for a, i in enumerate(idx):
+                o_all[i] = o[a]
+                r_all[i] = r[a]
+                for role in H.ROLES:
+                    cl_all[role][i] = cl[role][a]
+        return o_all, r_all, cl_all
+
     for k in range(path.shape[0]):
-        o, r, cl = checker.check(path[k], support, (open_q, open_q), floor=floor)
+        o, r, cl = check_at_openings(path[k])
         fold(o, r, cl, "pre_grasp" if k == 0 else ("grasp_open" if k == path.shape[0] - 1 else f"approach_{k}"))
+    open_q = oq
     cq = th.as_tensor(contact_q, dtype=th.float32).reshape(-1)
     if cq.numel() == 1:
         cq = cq.repeat(n)

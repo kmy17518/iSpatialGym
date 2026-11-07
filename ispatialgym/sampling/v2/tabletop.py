@@ -1107,7 +1107,10 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
     from ispatialgym.grasping import contact_policy as CP
 
     # of-v2maps 2026-11-07 (P2 §11): a map computed under another contact policy does not serve
-    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest())
+    # ... and (ISPATIALGYM_REACH_MAP_REQUIRE, a JSON dict of MapConfig fields, e.g. {"preshape": "grasp"}) of the required configuration
+    req = json.loads(os.environ.get("ISPATIALGYM_REACH_MAP_REQUIRE") or "{}") or None
+    rm = RMAP.ReachMap.find(root, lib, h, rest_id=rid, arm=arm, anchors=anchors, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
+                            config_require=req)
     if rm is None:
         log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
         return None

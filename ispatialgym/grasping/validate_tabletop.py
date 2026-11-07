@@ -450,10 +450,16 @@ class TabletopWorld:
         lifts = {}
         if targets:
             names0 = list(targets)
-            cl = self.hand.clearance(th.as_tensor(np.stack([targets[n] for n in names0]), dtype=th.float32), self.support,
-                                     (max(c["preshape_q"] for c in cands),) * 2)
-            for i, n in enumerate(names0):
-                lift = max(0.0, -float(cl["finger"][i]) + 0.0005) if float(cl["finger"][i]) < 0.0 else 0.0
+            # of-v2maps 2026-11-07 (prompt I item 3): each candidate's fingers at ITS pre-shape (was the batch's max: a thin pinch was
+            # lifted for fingers opened as wide as the widest candidate's)
+            pre_of = {c["name"]: float(c["preshape_q"]) for c in cands}
+            fmin = {}
+            for v in sorted({round(pre_of[n], 5) for n in names0}):
+                grp = [n for n in names0 if round(pre_of[n], 5) == v]
+                cl = self.hand.clearance(th.as_tensor(np.stack([targets[n] for n in grp]), dtype=th.float32), self.support, (v, v))
+                fmin.update({n: float(cl["finger"][i]) for i, n in enumerate(grp)})
+            for n in names0:
+                lift = max(0.0, -fmin[n] + 0.0005) if fmin[n] < 0.0 else 0.0
                 if lift > 0.0:
                     targets[n] = targets[n].copy()
                     targets[n][2, 3] += lift
@@ -718,7 +724,7 @@ def run_model(world: TabletopWorld, job: Dict[str, Any], model_dir: str) -> Dict
 
         T_wo = S.pose_mat(*obj_pose)
         Tw = th.as_tensor(np.stack([T_wo @ S.pose_of(c["T_object_eef"]) for c in reps]), dtype=th.float32) if reps else None
-        geo = CP.check_grasp_geometry(world.hand, Tw, world.support, [c["contact_q"] for c in reps], open_q=max([c["preshape_q"] for c in reps] + [0.0])) if reps else None
+        geo = CP.check_grasp_geometry(world.hand, Tw, world.support, [c["contact_q"] for c in reps], open_q=[c["preshape_q"] for c in reps]) if reps else None
         # a candidate whose fingers end up just past the allowance at the MEASURED rest (it settles a fraction of a mm off the canonical
         # rest the generator used) is lifted along the support normal by the deficit (<= max_rest_lift_m) and re-checked; the lifted
         # transform is the one tested and recorded

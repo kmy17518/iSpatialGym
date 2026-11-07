@@ -107,3 +107,62 @@ def test_spa_signature_names_a_map_view():
     assert sig["key"] == "k123" and sig["map_path"] == "map__a__b__h0.8__k123.json" and sig["n_trunks"] == 2
     legacy = SimpleNamespace(path="/b/band.npz", meta={"key": "band-key", "lattice": 0.08, "trunks": []})
     assert IORSSmall._spa_band_signature(legacy)["key"] == "band-key" and IORSSmall._spa_band_signature(legacy)["map_path"] is None
+
+
+def test_map_lookup_config_require_and_the_legacy_default(tmp_path):
+    from ispatialgym.sampling import reach_maps as RM
+
+    _map(tmp_path, "r")  # written without config.preshape: the former batch rule
+    lib = SimpleNamespace(identity_key=lambda: "obj-key")
+    kw = dict(rest_id="r0", arm="right")
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, config_require={"preshape": "max"}, **kw) is not None
+    assert RM.ReachMap.find(str(tmp_path), lib, 0.8, config_require={"preshape": "grasp"}, **kw) is None
+    assert RM.MapConfig().preshape == "grasp" and RM.MapConfig().key()["preshape"] == "grasp"
+
+
+def test_grasp_geometry_takes_one_opening_per_pose():
+    import torch as th
+
+    from ispatialgym.grasping import contact_policy as CP
+
+    seen = []
+
+    class _Checker:
+        policy = SimpleNamespace(approach_step_m=0.05, sweep_steps=2)
+
+        def check(self, T, support, q, floor=False):
+            seen.append((round(q[0], 4), int(T.shape[0])))
+            n = int(T.shape[0])
+            return th.ones(n, dtype=th.bool), ["ok"] * n, {r: th.full((n,), 1.0) for r in CP.H.ROLES}
+
+    T = th.eye(4).repeat(3, 1, 1)
+    out = CP.check_grasp_geometry(_Checker(), T, None, [0.01, 0.01, 0.02], open_q=[0.02, 0.03, 0.02])
+    assert bool(out["ok"].all())
+    approach = [x for x in seen[:-6]]
+    assert {q for q, _ in approach} == {0.02, 0.03} and all(n in (1, 2) for _, n in approach)  # grouped per opening, never the max for all
+
+
+def test_the_approach_tail_is_policed_where_the_support_is_ignored(monkeypatch):
+    from ispatialgym.sampling.v2 import ik as IK
+
+    table = SimpleNamespace(name="table", aabb=([0, 0, 0], [1, 1, 0.8]))
+    chk = IK.IKChecker.__new__(IK.IKChecker)
+    chk.kit = SimpleNamespace(backend=SimpleNamespace(), stats={})
+    chk.approached_objects = lambda pose: []
+    evals = []
+    chk.support_policy_eval = lambda q, arm, sup, appr: evals.append(int(q)) or {"ok": int(q) != 9, "reason": "finger_penetration"}
+    traj = list(range(11))  # configuration i = i
+    args = (traj, 10, 0.1, "right", None, None, [8, 9], [1, 2], [])
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    why = chk._policy_tail(*args, ignore_end=[table], ignore_start=())
+    assert "support policy on the approach tail" in why and evals == [8, 9] and chk.kit.stats["support_policy_tail_rejected"] == 1
+    evals.clear()
+    assert chk._policy_tail(*args, ignore_end=(), ignore_start=[table]) == "" and evals == [1, 2]  # backward tracking: the start's tail
+    evals.clear()
+    monkeypatch.setenv("ISPATIALGYM_SUPPORT_POLICY_TAIL", "0")
+    assert chk._policy_tail(*args, ignore_end=[table], ignore_start=()) == "" and evals == []
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY_TAIL")
+    chk.kit = SimpleNamespace(backend=SimpleNamespace(_attached={"right": {"obj": "cup"}}), stats={})
+    assert chk._policy_tail(*args, ignore_end=[table], ignore_start=()) == ""  # scope "grasp": a holding arm is not policed
+    monkeypatch.delenv("ISPATIALGYM_SUPPORT_POLICY")
+    assert chk._policy_tail(*args, ignore_end=[table], ignore_start=()) == ""  # policy off: as before

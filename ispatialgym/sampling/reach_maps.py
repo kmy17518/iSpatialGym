@@ -78,11 +78,24 @@ class MapConfig:
     hand_spacing_m: float = 0.006
     reach_margin_m: float = 0.03
     postures: Tuple[str, ...] = ("untucked", "ready", "tucked")
+    # of-v2maps 2026-11-07 (prompt I item 3): the fingers' opening of the hand-vs-slab check - "grasp": each grasp's own pre-shape / contact
+    # opening (the oracle's), "max": the batch rule of the maps before (max pre-shape, min contact for every grasp). A map without the
+    # field was computed with "max" (CONFIG_LEGACY_DEFAULTS)
+    preshape: str = "grasp"
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
         return d
+
+
+#: the value a config field had before it existed (maps written earlier carry no such field)
+CONFIG_LEGACY_DEFAULTS: Dict[str, Any] = {"preshape": "max"}
+
+
+def config_value(meta: Dict[str, Any], name: str) -> Any:
+    cfg = meta.get("config") or {}
+    return cfg[name] if name in cfg else CONFIG_LEGACY_DEFAULTS.get(name)
 
 
 def lattice(cfg: MapConfig) -> np.ndarray:
@@ -440,18 +453,35 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     t0 = time.time()
     hc = CP.HandChecker(cfg.arm, policy, device=str(dev), spacing=cfg.hand_spacing_m)
     hand_ok: Dict[float, th.Tensor] = {}
-    pre_q = float(max(g["preshape_q"] for g in grasps))
     path = CP.approach_path(TP_flat, TE_flat, policy.approach_step_m * 2)
+    # of-v2maps 2026-11-07 (prompt I item 3; the isg1020 spec P1 §2): each grasp's fingers at ITS pre-shape on the approach and swept to
+    # ITS contact opening (cfg.preshape "grasp"); "max" = the former batch rule (max pre-shape, min contact) for every grasp of the entry
+    pq_g = [float(g["preshape_q"]) for g in grasps]
+    cq_g = [float(g["contact_q"]) for g in grasps]
+    if cfg.preshape == "max":
+        pq_g, cq_g = [max(pq_g)] * nG, [min(cq_g)] * nG
+    g_of = th.arange(N, device=dev) % nG  # problems are (cell, yaw, grasp) row-major
+
+    def hand_check(T, q_of_grasp):
+        groups: Dict[float, List[int]] = {}
+        for gi, v in enumerate(q_of_grasp):
+            groups.setdefault(round(v, 5), []).append(gi)
+        if len(groups) == 1:
+            v = next(iter(groups))
+            return hc.check(T, sb, (v, v))[0]
+        o_all = th.ones(N, dtype=th.bool, device=dev)
+        for v, gis in groups.items():
+            sel = th.isin(g_of, th.as_tensor(gis, device=dev))
+            o_all[sel] = hc.check(T[sel], sb, (v, v))[0]
+        return o_all
+
     for d_e in cfg.edge_distances:
         sb = slab(height, d_e, cfg)
         ok = th.ones(N, dtype=th.bool, device=dev)
         for k in range(path.shape[0]):
-            o, _, _ = hc.check(path[k], sb, (pre_q, pre_q))
-            ok &= o
+            ok &= hand_check(path[k], pq_g)
         for j in range(1, 3):
-            q = pre_q + (min(g["contact_q"] for g in grasps) - pre_q) * j / 2
-            o, _, _ = hc.check(TE_flat, sb, (q, q))
-            ok &= o
+            ok &= hand_check(TE_flat, [p + (c - p) * j / 2 for p, c in zip(pq_g, cq_g)])
         hand_ok[d_e] = ok
     del path
     if th.cuda.is_available():
@@ -690,7 +720,7 @@ class ReachMap:
 
     @staticmethod
     def find(maps_root: str, lib: S.ModelLibrary, height: float, *, rest_id: str, arm: str = "right", policy_key: Optional[str] = None,
-             anchors=None, kind: str = "tabletop", robot: Optional[str] = None) -> Optional["ReachMap"]:
+             anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
         metadata (object identity, rest, policy, schema are all checked)."""
@@ -718,6 +748,8 @@ class ReachMap:
                 continue
             if robot is not None and m.get("robot") != robot:  # of-v2maps 2026-11-07 (P2 §11): a map of another robot model does not serve
                 continue
+            if config_require and any(config_value(m, k) != v for k, v in config_require.items()):
+                continue  # ... nor one computed under another configuration (e.g. preshape "max")
             if abs(float(m["height"]["value"]) - target) > 1e-6:
                 continue
             return ReachMap(p)
