@@ -33,6 +33,7 @@ from ispatialgym.fastflags import fast_on, fast_value  # train-fast 2026-10-31: 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
+from ispatialgym.sampling.v2 import support_split as SS
 from ispatialgym.sampling.v2.stances import Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -158,14 +159,20 @@ def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_ar
 class _Ignoring:
     """Switch the collision meshes of ``objs`` off in the cuRobo world for the block; meshes disabled for another
     reason (attached objects, removed objects) are left alone. Falls back to ``RobotKit.ignoring`` (two world syncs)
-    when the backend has no per-mesh switch."""
+    when the backend has no per-mesh switch.
 
-    def __init__(self, kit, objs: List[Any], ground: bool = True, ground_meshes: bool = True):
+    ``split`` (i7-split 2026-11-07, :mod:`ispatialgym.sampling.v2.support_split`): ``split(obj)`` -> the support split's ``Plan`` of a
+    registered support (only its pieces within the tolerance of its plane go off - the rims / walls / rails above stay obstacles -, a
+    straddling piece's upper part is switched on as its own mesh), None = every piece of ``obj`` off (the former behaviour)."""
+
+    def __init__(self, kit, objs: List[Any], ground: bool = True, ground_meshes: bool = True, split: Optional[Callable[[Any], Any]] = None):
         self.kit = kit
         self.objs = objs
         self.ground = ground  # False: the cuRobo ground slab (``R1ProCuRobo.GROUND_SLAB_NAME``) is switched off too (floor-level pushes)
         self.ground_meshes = ground_meshes  # False (opt-in, owner 2026-09-25): the ground-like scene meshes (floors, lawn, carpets) off as well
+        self.split = split
         self.names: List[str] = []
+        self._clips: List[str] = []
         self._fallback = None
         self._slab_off = False
 
@@ -197,9 +204,13 @@ class _Ignoring:
         disabled = getattr(backend, "_disabled_obstacles", set())
         active = _ACTIVE_IGNORES.setdefault(id(backend), {})
         for o in self.objs:
+            plan = self.split(o) if self.split is not None else None
+            off = getattr(plan, "off", None)
             for link in getattr(o, "links", {}).values():
                 for cm in getattr(link, "collision_meshes", {}).values():
                     name = cm.prim_path
+                    if off is not None and name not in off:
+                        continue  # the support split: a piece above the support's plane + tol stays an obstacle
                     if name in backend._world_mesh_names and name not in disabled:
                         # nested contexts may ignore the same mesh: it is switched off once and back on when the last
                         # context that asked for it exits (refcount); the backend's ``_held_off`` set keeps its own ground
@@ -212,6 +223,8 @@ class _Ignoring:
                             held = backend._held_off = set()
                         held.add(name)
                         self.names.append(name)
+            if plan is not None and getattr(plan, "clips", None):
+                self._clips += SS.enable_clips(backend, plan)
         return self
 
     def _ground_meshes(self, enabled: bool) -> None:
@@ -252,6 +265,9 @@ class _Ignoring:
         if self._fallback is not None:
             self._fallback.__exit__(*exc)
             return False
+        if self._clips:
+            SS.disable_clips(self.kit.backend, self._clips)
+            self._clips = []
         active = _ACTIVE_IGNORES.setdefault(id(self.kit.backend), {})
         held = getattr(self.kit.backend, "_held_off", None)
         for name in self.names:
@@ -665,14 +681,22 @@ class IKChecker:
         sup = list(ft.supports() or [])
         return [o for o in ignore_last if any(o is s for s in sup)]
 
-    def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True):
+    def ignoring(self, objs: Sequence[Any], ground: bool = True, ground_meshes: bool = True, split: bool = True):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
         grasp pose only"). Their collision meshes are switched off by name (``R1ProCuRobo._mesh_enable``, what
         ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each).
         ``ground=False`` also switches the cuRobo ground slab off (a floor-level push whose fingertips run < 4 cm above the
         floor: the padded fingertip spheres penetrate the slab while the real fingers do not; the oracle tracks the push
-        legs without a collision veto)."""
-        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes)
+        legs without a collision veto).
+
+        ``split`` (i7-split 2026-11-07, the owner's rule; ``ISPATIALGYM_SUPPORT_SPLIT``, default on): a REGISTERED support among ``objs``
+        (:mod:`~ispatialgym.sampling.v2.support_split`: a plane and a tolerance next to ``support_plane_z``) loses only its pieces within
+        the tolerance of its plane - every piece above (tray rims and walls, bookcase walls / the board above, bed rails / headboards)
+        stays a normal collision obstacle; an object without a registered plane (a wall, a handle object, a grasped target) goes whole.
+        Wherever the sampler ignores a support - grasp chains, the approach tail, places, lifts, releases, the program check - whether or
+        not the contact policy is on. ``split=False``: every object whole (diagnostics that ask "with these objects out of the world")."""
+        resolver = (lambda o: SS.plan_for(self, o)) if (split and SS.split_on()) else None
+        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -936,6 +960,7 @@ class IKChecker:
             key = cache_key("exact_ik_v3", {**self.exact_cache_scope(), "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
+                                            **SS.cache_identity(self, list(ignore_for_last) + list(approached or [])),
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
                                             "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
             hit = cache_get(key)
@@ -1418,7 +1443,12 @@ class IKChecker:
         """Spawned objects an approach ending at ``end_pose`` closes in on: those whose AABB (hull at the PhysX pose when
         the world caches it, else ``obj.aabb``) grown by ``APPROACHED_AABB_PAD`` contains the pad centre or the fingertip
         point of the end pose. A grasp straddles the target, a place hovers 1 cm over the partner, a contact sits 5 mm
-        off the touched face: all three land inside. Objects attached to the planner are already out of the world."""
+        off the touched face: all three land inside. Objects attached to the planner are already out of the world.
+
+        i7-split 2026-11-07: a REGISTERED support (``support_split.registered_names``: a split plane or the policy's ``support_plane_z``) is
+        never 'approached' - the source tray under a grasped object held the pad within its AABB + 3 cm, so the tray left the world along
+        the whole approach (``exact``'s ``ignore_mid``) and the support policy exempted it (``policed_supports``); it stays a support of
+        the chain's last pose (its split there). ``ISPATIALGYM_SUPPORT_SPLIT=0``: as before."""
         world = getattr(self.kit, "world", None)
         spawned = list(getattr(world, "spawned", {}).values()) if world is not None else []
         if not spawned:
@@ -1435,7 +1465,10 @@ class IKChecker:
             lo, hi = G.t(lo) - self.APPROACHED_AABB_PAD, G.t(hi) + self.APPROACHED_AABB_PAD
             if bool(((pts >= lo) & (pts <= hi)).all(dim=1).any()):
                 out.append(o)
-        return out
+        kept = SS.drop_registered(self, out)
+        if len(kept) != len(out):
+            self._count("support_split.approached_excluded")
+        return kept
 
     def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
                       ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = (), touch: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
@@ -1822,11 +1855,14 @@ class IKChecker:
             if bool(self.kit.collision_free(q, margin=float(margin))[0]):
                 return f"free at margin {float(margin):.2f} (the failing check used another margin or world)"
         for o in spawned:
-            if any(o is x for x in ignored):
-                continue
-            with self.ignoring(list(ignored) + [o]):
+            inside = any(o is x for x in ignored)
+            if inside and not getattr(SS.plan_for(self, o, count=False), "kept", 0):
+                continue  # ignored whole already
+            # i7-split: the removed object goes WHOLE - an ignored support whose split kept its rims / walls in the world is tried too
+            with self.ignoring(list(ignored)), self.ignoring([o], split=False):
                 if bool(self.kit.collision_free(q, margin=float(margin))[0]):
-                    return f"collides with {getattr(o, 'name', o)}" + (f" (within {float(margin):.2f} m)" if margin > 0 else "")
+                    return (f"collides with {getattr(o, 'name', o)}" + (" (a piece above its support plane: the support split keeps it)" if inside else "")
+                            + (f" (within {float(margin):.2f} m)" if margin > 0 else ""))
         try:  # world-only check: passing here means the robot (or its attached object) collides with itself
             self.kit._ensure_synced()
             with self.ignoring(list(ignored)):
@@ -1865,9 +1901,11 @@ class IKChecker:
                     o = by_name.get(n)
                     if o is None or o is getattr(self.kit, "robot", None) or "robot" in n:
                         continue
-                    with self.ignoring(list(ignored) + [o]):
+                    with self.ignoring(list(ignored)), self.ignoring([o], split=False):
                         if bool(self.kit.collision_free(q, margin=float(margin))[0]):
-                            return f"collides with the scene object {n} ({d:.2f} m from the base)"
+                            split_kept = any(o is x for x in ignored) and getattr(SS.plan_for(self, o, count=False), "kept", 0)
+                            return f"collides with the scene object {n} ({d:.2f} m from the base)" + (
+                                " (a piece above its support plane: the support split keeps it)" if split_kept else "")
                 # which of the robot's (or the attached object's) links touch the world: the sphere owners at this configuration
                 link_hits = []
                 try:
@@ -2108,6 +2146,7 @@ class IKChecker:
                                                  "grasps": [(getattr(g, "key", None), getattr(g, "name", None), list(G.t(eef_of(g)[0]).tolist()), list(G.t(eef_of(g)[1]).tolist())) for g in grasps],
                                                  "poses0": poses0,
                                                  "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS,
+                                                 **SS.cache_identity(self, ignore_for_grasp),
                                                  **({"pose_per_grasp": True} if pose_per_grasp else {}), **({"pre": pre_tag or "custom"} if pre_of is not None else {})})
             hit = cache_get(key)
             if hit is not None:

@@ -977,7 +977,9 @@ class SimWorld:
                 occupied[i, j] = True
                 occupants.add(o.name)
         yaw = G.yaw_of(support.get_position_orientation()[1])
-        return SupportTop(support.name, xs, ys, mask, occupied, z_top, yaw, sorted(occupants), resolution)
+        # i7-split 2026-11-07: the per-cell hit heights of the top cells are kept (``SupportTop.zs``) - the support split derives its
+        # tolerance from their spread about the plane (``v2.support_split.tolerance_from_top``)
+        return SupportTop(support.name, xs, ys, mask, occupied, z_top, yaw, sorted(occupants), resolution, zs=zs)
 
     def support_interior(self, support, z_surface: float, resolution: float = 0.02, z_margin: float = 0.03, ignore: Iterable = (),
                          probe: float = 0.04, headroom_cap: float = 1.5, board_max_thickness: float = 0.12) -> "SupportInterior":
@@ -1049,7 +1051,7 @@ class SimWorld:
                 board.append(str(cm.prim_path))
         yaw = G.yaw_of(support.get_position_orientation()[1])
         out = SupportInterior(support.name, xs, ys, mask, occupied, z_meas, yaw, sorted(occupants), resolution, headroom=headroom, z_requested=z0,
-                              board_pieces=board, headroom_cap=headroom_cap)
+                              board_pieces=board, headroom_cap=headroom_cap, zs=zs)
         z_probe = z_meas + min(0.5 * float(headroom[mask].median()), 0.15)
         corners = G.aabb_corners(lo, hi)[:, :2]
         for name, mid, normal, length in out.edges():
@@ -1429,6 +1431,9 @@ class SupportTop:
     yaw: float  # support root yaw (its local x axis direction)
     occupants: List[str] = field(default_factory=list)
     resolution: float = 0.02
+    #: i7-split 2026-11-07: (nx, ny) hit height of each top cell (``nan`` off the top; :meth:`SimWorld.support_top` / ``support_interior``),
+    #: None for a raster built without them
+    zs: Optional[th.Tensor] = None
 
     @property
     def free(self) -> th.Tensor:
