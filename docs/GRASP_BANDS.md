@@ -440,6 +440,119 @@ keep their aliases v2-blocked. The numbers are in `$OFH/DECISIONS.md` (PROMPT I)
 - any oracle program change;
 - using legacy grasps (step 4).
 
+### The attach map kind (i7-attachmap, 2026-11-07)
+
+Owner: "No v2 attach map" (attachment_01 / 04 made 0 attempts in every `v2only` arm). Their lids (tnwisp / pbmsji) have v2 grasps
+and their PICK maps hit (`lid__tnwisp__s1__attachment_free` h1.0505, `lid__pbmsji__s0.65__attachment_free` h0.7853). What blocked
+them is the second band the attachment task reads: the attach-reach band, which is legacy (`LEGACY_BAND_BLOCKED
+ReachBands.load(... grasp_key=attach:lid__tnwisp, placed=['attach:lid/tnwisp'])` on every edge, then `setup rejected: [no_stance]`).
+
+**What the legacy attach band models.** It is a per-scene band of the PARTNER (the pot), not of the lid.
+- Its "grasps" are the pseudo-grasps `T_partner_male ∘ T_object_eef`: the eef poses that seat the held lid on the partner.
+- A cell (the partner root on the top) is in it when one (partner yaw, lid grasp) pair passes two IK checks: the seat eef pose, and a
+  pre-grasp 10 cm back along the GRIPPER's approach. The support is ignored at the seat; the partner is not in the scene.
+- The task reads only cells from it, at a stance:
+  - `band_cells_world` gives the partner cells that `_partner_room` / `_attach_and_brace` try;
+  - `joint_placement` gives the work cell (`classes` is None for library grasps).
+- Everything after that is exact: partner support / gap / frame, the hand vs the partner, the `[pre-attach, seat]` exact IK with the
+  lid in hand, the fingers in the partner, the carry, the brace.
+
+**The attach map** (`sampling/attach_maps.py`, schema `isg-attach-map/1`) is its scene-independent replacement: the held male at its
+SEAT on the partner, in the synthetic world of the reach maps.
+- **Cell**: the partner ROOT xy (base frame), the partner upright (rest identity, as the task places it). 8 yaw slots. The root is at
+  `h + bottom offset + 3 mm` (`object_pose_on`).
+- **Grasp axis**: the pick map's (`reach_maps.grasp_set`: the v2 grasps of the stable rest, twins, family members). Each grasp carries
+  the fingers' measured hold opening (`finger_q`, reversed for a twin).
+- **The pair** (`AttachSpec`, measured in Isaac Sim by the task's own code: `attachment_links`, `insertion_axis_rule`,
+  `predicates.seat_axis`): `T_partner_male`, the insertion axis, the seat axis, the partner's collision pieces and its bottom offset.
+- **The chain the oracle runs after the carry**, one eef orientation:
+  1. `pre`: the recorded pre-attach, `pre_attach_back_m` (0.10) along the insertion axis;
+  2. `hover`: the seat raised along the seat axis by the HOVER RULE;
+  3. `touchdown`: the end of `_touch_down`'s leg, i.e. the hover lowered by the part's clearance + 4 mm;
+  4. `seat`: the pose the sampler's exact check reaches.
+- **Checks per (d_e, trunk, cell, yaw, grasp)**:
+  - batched IK of the pre, each next pose seeded from the previous one (the smallest joint step <= 1 rad, else `branch_jump`);
+  - the hand hulls (fingers closed at the hold) vs the slab at every chain pose;
+  - per d_e, every non-finger sphere vs the slab at the chain + 3 interpolated pre -> hover configurations;
+  - the arm (not the hand) vs the partner's pieces at all but the seat (the exact check ignores the partner there too).
+- **Statuses**: the reach-map codes plus `ik_hover` / `ik_touchdown` / `ik_seat` / `partner_arm`.
+- **Hover rules** (part of the identity): `box`, today's `execute.attach_hover_targets` (unit test: same height / clearance / top as
+  the oracle's function on the same pieces); and `swept`, i7-attachhover's option B (the first touch by an exact Minkowski-difference
+  ray cast; it equals `convex_sweep.first_touch` to 8e-17 m on 300 random cases; no touch -> box). The sampler reads the rule the
+  oracle executes (`ExecuteConfig.attach_hover_rule` where the oracle has it, else `box`: this trunk).
+- **Identity** (`map_key`): kind, arm, the male (v2 entry, identity key, rest, grasp-set digest), the partner (category / model /
+  scale / geometry digest), the pair spec digest (T_partner_male, both axes, bottom offset, drop, both geometry digests), the hover rule
+  + clear / footprint margin / touchdown extra / axis-z clamp, `pre_attach_back_m`, the height, the edge distances, the config, the
+  contact-policy key, the robot digest. `AttachMap.find` checks every field and the stored key; files `amap__attach__*` (never read by
+  `ReachMap.find`).
+- **Consumer** (`Attachment._attach_map_view`, v2 only): `attach_maps.sampler_view` (the male's v2 entry, the top's height through
+  the anchors, the right arm), then the map's pair spec against the live template's (`live_mismatch`: T_partner_male 1 mm / 0.01 rad,
+  insertion axis 0.01 rad, bottom offset 2 mm) -> the band view (`map_sampling.as_bands`). A miss logs `MAP_REQUEST {"kind":
+  "attach", ...}` and rejects `missing_map`. Off v2 only the legacy band is loaded / computed as before (`_attach_band`). The exact
+  checks are unchanged.
+- **Build**: `scripts/grasp_bands/job_attach.sh` (`python -m ispatialgym.sampling.attach_maps build --pairs ...`: spec, then one map
+  per height x rule x arm); pairs `scripts/grasp_bands/attach_pairs_20261107.json`.
+
+**Built (2026-11-07, job 18368282, trunk_1c3b2b28, `$OFH/attachmap_20261107`, right arm, ~30 s per map).**
+- **Specs**:
+  - tnwisp / teapot mvrhya: `T_partner_male` (-0.00185, 0, 0.0533), yaw 0, both axes +z;
+  - pbmsji / stockpot oshwps at 0.65: (0, 0.0009, 0.0797), yaw 90 deg, both axes +z.
+  - Against the joined lid of the 8 i7_ah demos: <= 0.07 mm / 0.04 deg.
+- **Hover table** (map vs the oracle's own logs, i7_ah box arm + swept recollects):
+
+  | pair | box hover | box touchdown end | first touch | swept hover |
+  |---|---|---|---|---|
+  | pbmsji / oshwps (map) | 41.56 mm | 34.56 mm | 13.27 mm | 16.27 mm |
+  | pbmsji / oshwps (oracle) | 41.6 mm | 34.6 mm | 12.9-14.1 mm | 15.9-17.1 mm |
+  | tnwisp / mvrhya (map) | 7.95 mm | 0.95 mm | 4.90 mm | 7.90 mm |
+  | tnwisp / mvrhya (oracle) | 9.5-9.7 mm | - | 5.0-5.1 mm | 8.1 mm |
+
+  tnwisp's box hover is 1.6-1.8 mm lower in the map: the executed in-hand pose sits lower on the knob than the library row the map
+  uses.
+- **Feasible partner cells per trunk** (d_e 0.35 / 0.45 / 0.55; box = swept within 1 cell):
+  - tnwisp at h 1.0505 (a bar): 6 trunks reach (t0.00 k-0.6: 50 / 42 / 32; t0.50 k0: 28 / 11 / 3); t0.75 / t0.95 none;
+  - pbmsji at h 0.7853: 16 trunks, 7-88 cells.
+
+**All four attachment aliases** (scope addition, 2026-11-07). Cap xxqyrt (attachment_02) and cork ncxgpe (attachment_03) got v2 grasps
+in i7-attach round 2; under v2only they stopped at the same legacy attach band. The consumer serves them unchanged.
+- **Inputs**: the attach agent's staged roots `$OFH/attach_20261107/stage_{cap,cork}` (read-only; the anchors are v2maps_i7's).
+- **Builds** (jobs 18368635 / 18368636, about 4 min each):
+  - cap / lemonade_bottle yprkek at h 0.8126:
+    - `T_partner_male` z 0.140, axes +z;
+    - hover box 13.2 mm, first touch 10.2 mm;
+    - 15 trunks with 3-84 cells at d_e 0.45.
+  - cork / wine_bottle inkqch at h 0.7853:
+    - the insertion axis is the centroid->female rule (the link +z is 90.4 deg off), and the seat axis is identical;
+    - hover box 21.3 mm, first touch 18.1 mm;
+    - 16 trunks with 36-104 cells.
+- **The cork result depends on the owner's `attach_axis` "seat" decision.** Its two grasps exist only under that opt-in candidates
+  switch.
+- **The partner's left contact band** (the brace of attachment_03, `brace_search` on) is not a legacy band under v2only.
+  `load_left_contact_band` returns None, so the brace is decided by `joint_placement`'s reach proxy and the exact two-arm IK.
+  No brace map is built: the brace has no map consumer yet.
+
+**Validation** (`--grasps v2only` N 4, tag `i7_attmap`, trunk_1c3b2b28). Every alias hits its BOX attach map: the live pair spec matched,
+and there are 0 `LEGACY_BAND_BLOCKED` / `MAP_REQUEST` / `missing_map`. In total: 40 attempts, 16 written, 7 / 16 demos ok,
+0.34 GPU-h per success.
+
+| alias | attempts | written | demos ok | GPU-h | per success | before (i7_ah: `--grasps v2` + legacy band) |
+|---|---|---|---|---|---|---|
+| attachment_01 lid / teapot | 5 | 4 | 3 | 0.36 | 0.12 | 5 / 4 / 2, 0.53 |
+| attachment_04 lid / stockpot | 8 | 4 | 2 | 0.42 | 0.21 | 16 / 4 / 2, 0.82 |
+| attachment_02 cap / lemonade bottle | 6 | 4 | 0 | 0.47 | - | legacy grasps |
+| attachment_03 cork / wine bottle (depends on `attach_axis` "seat") | 21 | 4 | 2 | 1.10 | 0.55 | legacy grasps |
+
+What still fails is upstream of the attach map, or in the oracle's touchdown:
+- **attachment_02**: the cap's one grasp, top_0, does not hold (`failed_grasp` at the pick, 4 / 4). The attach never runs.
+- **attachment_04**:
+  - one carry reorient is `plan_failed` (a 3.27 rad joint swing);
+  - in one pick, the wrist camera touches the stockpot.
+- **attachment_01**: one `failed_grasp`.
+- **attachment_03**:
+  - the cork's rest is unstable (7 attempts);
+  - the pick's feasible set F is empty (8 attempts);
+  - in 2 of 4 demos the touchdown found no contact within 7 mm, so the cork was released but not attached.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
