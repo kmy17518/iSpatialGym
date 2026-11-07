@@ -1009,7 +1009,8 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
         # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
-        ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root)}
+        ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
+                                 "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
     log.info("reach map hit for %s at h %.4f, %s arm: %s", spec.object, h, arm, rm.path)
     return MS.as_bands(rm, overhang=0.0)
 
@@ -3694,6 +3695,8 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
             pose, z_here = (pose, z) if support_z is not None else NB.rest_on(top, pose, fp, NB.z_at(top, xy))
             eef = IK.grasp_pose(pose, eef_of(g))
             pre = IK.pre_pose(eef)
+            if os.environ.get("ISPATIALGYM_SUPPORT_POLICY_DIAG"):
+                s.ikc._diag_object = (pose, hull, getattr(g, "name", None))  # of-v2maps: the candidate object pose the policy diagnostic reports
             res = s.ikc.exact([pre, eef], st_of[a0], a0, **exact_kw)
             g_rec, eef_in_object, pick, arm_c = g, eef_of(g), None, a0
             if (twins or len(arms_i) > 1) and getattr(g, "name", None):

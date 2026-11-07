@@ -477,6 +477,24 @@ class IKChecker:
             except Exception as e:  # noqa: BLE001
                 objs.append({"err": repr(e)[:80]})
         rec["objects"], rec["rest"] = objs, {k: rest.get(k) for k in ("entry", "rest_id", "h_root")}
+        # the CANDIDATE object pose the grasp was solved at (tabletop._phase3_draw sets it: during sampling no object stands there)
+        cand = getattr(self, "_diag_object", None)
+        if cand is not None and ev["plane_z"] is not None:
+            try:
+                pose, hull, gname = cand
+                pz = float(G.t(pose[0])[2])
+                lowest = float(G.local_points_world(hull, pose)[:, 2].min()) if hull is not None else None
+                c = {"grasp": gname, "z": round(pz, 4), "lowest_above_plane_mm": None if lowest is None else round(1000 * (lowest - float(ev["plane_z"])), 2)}
+                if rest.get("h_root") is not None:
+                    c["expected_z"] = round(float(ev["plane_z"]) + float(rest["h_root"]), 4)
+                    c["dz_mm"] = round(1000 * (pz - c["expected_z"]), 2)
+                if rest.get("quat_xyzw") is not None:
+                    up = G.rotate(G.t(pose[1]).float(), th.tensor([0.0, 0.0, 1.0]))
+                    up_r = G.rotate(th.tensor([float(v) for v in rest["quat_xyzw"]]), th.tensor([0.0, 0.0, 1.0]))
+                    c["tilt_vs_rest_mrad"] = round(1000 * float(th.acos(th.clamp(th.dot(up, up_r), -1.0, 1.0))), 2)
+                rec["candidate"] = c
+            except Exception as e:  # noqa: BLE001
+                rec["candidate"] = {"err": repr(e)[:80]}
         log.info("SUPPORT_POLICY_DIAG %s", json.dumps(rec))
         return rec
 
