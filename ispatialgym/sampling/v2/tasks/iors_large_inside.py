@@ -64,6 +64,11 @@ standing spine out in the bay, settled leaning on the side board as the shelf pl
 of the target's own key (whose v2 rest is the pick's). A missing lean entry or map rejects ``missing_map`` with a MAP_REQUEST line.
 ``ISPATIALGYM_INSIDE_NO_BAND_FALLBACK=1`` (default off; OWNER DECISION): under v2 only a goal-side map miss keeps the band-less C stance
 search (the :data:`NO_BAND_TRUNKS` trunks per base pose by reach margin) instead of rejecting - measured, never on by default.
+
+Nearer places (i7-overhang 2026-11-07, owner decision for inside_large_01: the far place stand-offs 0.75 / 0.85 m bent the torso past the
+shared robot_wobble gate / put the forearm against the torso; the QA gates stay): ``generation.inside_stand_off_max_m`` (default none =
+every ``inside_stand_offs_m``) drops stance C's stand-offs beyond it; ``placement_stats["stand_off_capped"]`` counts the lattice
+candidates it removed. An arm left without a stance by it is reported, not widened.
 """
 
 from __future__ import annotations
@@ -901,7 +906,12 @@ class InsideMode:
                                  "goal_in_band": 0}
         shelf = _shelf_spec(self, checked=True)
         cands: List[Stance] = []
+        cap = self.gp.gen("inside_stand_off_max_m")
         for so in [float(v) for v in (self.gp.gen("inside_stand_offs_m") or STAND_OFFS)]:
+            if cap is not None and so > float(cap) + 1e-9:
+                # i7-overhang 2026-11-07 (owner: keep the place positions nearer for this goal): the stand-off is beyond the cap
+                stats["stand_off_capped"] = stats.get("stand_off_capped", 0) + len(laterals) * len(trunks)
+                continue
             for lat in laterals:
                 xy = edge.base_xy(so, lat)
                 stats["lattice"] += len(trunks)
