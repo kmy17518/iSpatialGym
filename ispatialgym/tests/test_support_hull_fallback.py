@@ -106,6 +106,11 @@ def test_not_narrow_or_not_the_support_keeps_the_rejection(on, sphere, other, wh
     assert not ev["ok"] and ev["hull_fallback"]["why"] == why and st["hull_calls"] == 0
 
 
+def test_on_by_default(monkeypatch):
+    monkeypatch.delenv(IK.SUPPORT_HULL_FALLBACK_ENV, raising=False)
+    assert IK.support_hull_fallback_mode() == "on" and IK.support_hull_fallback_min_m() == 0.0005
+
+
 def test_switch_off_and_shadow(monkeypatch):
     monkeypatch.setenv(IK.SUPPORT_HULL_FALLBACK_ENV, "0")
     chk, _ = _checker({PALM: -0.0009}, {"palm": 0.00099})

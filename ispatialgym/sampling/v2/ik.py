@@ -301,9 +301,9 @@ def support_policy_on() -> bool:
 #: less than the model's sphere buffer (``contact_policy.MODEL_SPHERE_BUFFER_M``, 2 mm) deep, and only into the policed support (with the
 #: support out of the world they clear) - those links are judged by their EXACT hulls against the support plane instead, with at least
 #: :data:`HULL_FALLBACK_MIN_CLEARANCE_M` of real clearance. Non-finger links only: the fingers' 2 mm allowance (FingerTouch / rule 2) is
-#: unchanged. ``ISPATIALGYM_SUPPORT_HULL_FALLBACK`` = ``1`` on / ``shadow`` (judge and count, verdict unchanged) / ``0`` off.
+#: unchanged. ``ISPATIALGYM_SUPPORT_HULL_FALLBACK`` = ``1`` on (the default) / ``shadow`` (judge and count, verdict unchanged) / ``0`` off.
 SUPPORT_HULL_FALLBACK_ENV = "ISPATIALGYM_SUPPORT_HULL_FALLBACK"
-SUPPORT_HULL_FALLBACK_DEFAULT = "0"
+SUPPORT_HULL_FALLBACK_DEFAULT = "1"  # i7-plateqtf2: the default after the count (owner item 1: "then make it the default in a separate commit")
 #: the real clearance the hull fallback requires (m): above the measured flatness of the supports it was diagnosed on (breakfast_table
 #: rhjoby: 8 pieces within 0.3 mm of the plane), below side_9's nominal 0.99 mm (``ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M``)
 HULL_FALLBACK_MIN_CLEARANCE_M = 0.0005
