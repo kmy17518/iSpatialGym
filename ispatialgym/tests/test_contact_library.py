@@ -189,7 +189,8 @@ def _carry(robot, box, face_y, slip=0.0, tip=0.0):
 
 
 def test_the_oracle_runs_a_push_entry_and_the_acceptance_judges_it(glib):
-    e = _tip_entry(glib)
+    e = dict(_tip_entry(glib), goal_target=None)  # the stroke rules (a push without a task goal)
+    e["push"] = {k: v for k, v in e["push"].items() if k != "stop_gap_m"}
     T = CL.object_frame([0, 0, 0, 1.0], 0.0, 0.0, support_z=0.81)
     T[:2, 3] = [0.7, -0.1]
     pts = CL.hull_points(SimpleNamespace(union=SimpleNamespace(vertices=np.array(_box_geometry(*CEREAL)["vertices"]))))
@@ -212,6 +213,135 @@ def test_the_oracle_runs_a_push_entry_and_the_acceptance_judges_it(glib):
             assert verdict["measures"]["moved_along_m"] >= verdict["measures"]["needed_m"] and verdict["measures"]["tip_gap_m"] <= 0.001
         else:
             assert "slip" in verdict["reasons"]
+
+
+def test_a_touching_push_entry_carries_its_partner_and_goal_and_the_axial_its_turns(glib):
+    """Run D (1): a touching push's target moves the GAP (the push distance less the task's 0.035 margin) and ends touching its partner -
+    the entry carries the partner's place (``push.stop_gap_m``) and the task goal (``goal_target``: translate, tolerances 0.03 / 0.2); the
+    axial push entries turn through the task's goal deviations 25 / 45 / 65 deg (``AXIAL_PUSH_TURNS_DEG``), each its own class, goal = turn."""
+    e = _tip_entry(glib)
+    assert e["push"]["stop_gap_m"] == pytest.approx(e["push"]["stroke_m"] - CL.TOUCH_PUSH_MARGIN_M) == pytest.approx(0.045)
+    assert e["goal_target"] == {"kind": "translate", "along_push_m": e["push"]["stop_gap_m"], "position_tolerance": 0.03, "orientation_tolerance": 0.2,
+                                "source": e["goal_target"]["source"]}
+    lib = CL.build_job(_job("magazine__flat__s1", ["axial_push"], params={"axial_push": {"yaws": 1}}), glib)["push"]["entries"]
+    by_turn = {}
+    for x in lib:
+        t = x["class"].rsplit("@t", 1)[1]
+        by_turn.setdefault(t, []).append(x)
+        assert x["goal_target"]["kind"] == "turn" and x["goal_target"]["turn_rad"] == x["arc"]["turn_rad"] and x["goal_target"]["orientation_tolerance"] == 0.1
+        assert abs(x["arc"]["turn_rad"]) == pytest.approx(math.radians(float(t)), abs=1e-5)
+    assert sorted(by_turn) == ["25", "45", "65"] and len({len(v) for v in by_turn.values()}) == 1
+
+
+def test_a_push_with_a_task_goal_is_judged_by_the_tasks_goal_check():
+    """Run D (1): calibrated on the replays - a push with a task goal passes when the TASK's check passes: the goal pose within its tolerances
+    (touching 0.03 m / 0.2 rad full rotation: a topple / slip fails it; axial orientation 0.1, no position), a touching target touching its
+    partner (the stop's face <= 3 mm + 1 mm slack: the touching predicate's geometric branch), the oracle clean. The stroke measures (a touching
+    target moves the gap, not the stroke) stay diagnostics."""
+    from ispatialgym.sampling import predicates as P
+
+    cfg = VC.ContactValidateConfig()
+    assert cfg.touching_gap_max_m == P.TOUCHING_GAP_MAX_M == 0.003
+    pts = np.array(_box_geometry(*CEREAL)["vertices"])
+    e = {"push": {"direction": [0.0, 1.0, 0.0], "stroke_m": 0.08, "stop_gap_m": 0.045}, "extras": {"stop_clearance_m": 0.005},
+         "goal_target": {"kind": "translate", "along_push_m": 0.045, "position_tolerance": 0.03, "orientation_tolerance": 0.2}}
+    T0 = np.eye(4)
+    T0[:3, 3] = [0.7, -0.1, 0.81]
+
+    def after(dy, dx=0.0, tilt=0.0, yaw=0.0):
+        T = T0.copy()
+        ct, st, cy, sy = math.cos(tilt), math.sin(tilt), math.cos(yaw), math.sin(yaw)
+        T[:3, :3] = np.array([[cy, -sy, 0], [sy, cy, 0], [0, 0, 1.0]]) @ np.array([[1, 0, 0], [0, ct, -st], [0, st, ct]])
+        T[:3, 3] = T0[:3, 3] + [dx, dy, 0.0]
+        return T
+
+    stop = VC.stop_pose(e, T0, pts, cfg)
+    lead = T0[1, 3] + CEREAL[1] / 2
+    assert stop["face_along_m"] == pytest.approx(lead + 0.045 + cfg.stop_slack_m)
+    assert stop["centre"][1] == pytest.approx(stop["face_along_m"] + cfg.stop_size_m[0] / 2) and stop["centre"][0] == pytest.approx(0.7)
+    assert stop["centre"][2] - cfg.stop_size_m[2] / 2 == pytest.approx(0.81 + 0.001)  # its bottom just above the support
+    assert VC.stop_pose(dict(e, push={"direction": [0.0, 1.0, 0.0]}), T0, pts, cfg) is None
+    run = {"completed": True, "postcondition": None}
+    eef = np.eye(4)
+
+    def judge(T1, **kw):
+        return VC.judge_push(e, T0, T1, eef, pts, cfg, run, touch_gap_m=VC.touch_gap(stop, T1, pts), **kw)
+
+    ok = judge(after(0.045))
+    assert ok["verdict"] == "valid" and ok["measures"]["touch_gap_m"] == pytest.approx(0.001) and ok["measures"]["goal_position_err_m"] == pytest.approx(0.0)
+    assert "short" in ok["measures"]["diagnostic_reasons"]  # the stroke rule would have called it short: the target moves the gap
+    assert judge(after(0.035))["reasons"] == ["not_touching"]  # 1 cm short of the partner (within the 0.03 position tolerance)
+    assert judge(after(0.08))["reasons"] == ["goal_position"]  # run D's world: no partner, the target ran the push margin on
+    assert "goal_orientation" in judge(after(0.045, tilt=0.3))["reasons"]  # a topple
+    assert judge(after(0.045, tilt=0.15))["verdict"] == "valid"  # within the task's 0.2 rad
+    assert judge(after(0.045, yaw=0.25))["reasons"] == ["goal_orientation"]
+    assert VC.judge_push(e, T0, after(0.045), eef, pts, cfg, run)["reasons"] == ["not_touching"]  # no stop measured: not shown touching
+    assert judge(after(0.045), other_slab_N=3.0)["reasons"] == ["non_finger_contact"]
+    # an axial push: orientation only (no position, no drift), the task's 0.1 rad
+    a = {"push": {"direction": [0.0, 1.0, 0.0], "stroke_m": 0.1, "arc": True}, "arc": {"turn_rad": 0.9}, "extras": {},
+         "goal_target": {"kind": "turn", "turn_rad": 0.95, "orientation_tolerance": 0.1}}
+    g = VC.goal_pose(a, T0)
+    assert g["position_tolerance"] is None and VC._quat_angle(g["T"][:3, :3], after(0.0, yaw=0.95)[:3, :3]) == pytest.approx(0.0, abs=1e-9)
+    assert VC.judge_push(a, T0, after(0.0, dx=0.08, yaw=0.88), eef, pts, cfg, run)["verdict"] == "valid"  # 0.07 rad short, 8 cm drift: the task's check
+    assert VC.judge_push(a, T0, after(0.0, yaw=0.80), eef, pts, cfg, run)["reasons"] == ["goal_orientation"]
+    assert VC.judge_push(a, T0, after(0.0, yaw=-0.95), eef, pts, cfg, run)["reasons"] == ["goal_orientation"]  # the wrong sense
+    pt = VC.goal_pose_target("box.n.01_1", g)
+    assert pt.position is None and pt.orientation_tolerance == 0.1 and pt.orientation_metric == "full"
+    pt = VC.goal_pose_target("box.n.01_1", VC.goal_pose(e, T0))
+    assert np.allclose(pt.position, [0.7, -0.055, 0.81]) and pt.position_tolerance == 0.03 and pt.orientation_tolerance == 0.2
+
+
+def test_the_oracle_stops_a_touching_push_at_its_goal_in_the_fake_world(glib):
+    """Run D (2): touching_02's 'topple' was the WORLD - no partner and no goal: the oracle ran the push margin on (0.084 m) and the tall narrow
+    target (4.3 cm deep, 21.8 cm tall) tipped. With the task's goal as the object's pose target the oracle's own closed loop stops the push
+    when the target reaches it (``push_stopped``), the target touches the partner's place; without it the push runs the whole stroke (in
+    Isaac Sim the partner stand-in stops the target)."""
+    e = _tip_entry(glib)
+    T = CL.object_frame([0, 0, 0, 1.0], 0.0, 0.0, support_z=0.81)
+    T[:2, 3] = [0.7, -0.1]
+    pts = CL.hull_points(SimpleNamespace(union=SimpleNamespace(vertices=np.array(_box_geometry(*CEREAL)["vertices"]))))
+    cfg = VC.ContactValidateConfig()
+    goal = VC.goal_pose(e, T)
+    stop = VC.stop_pose(e, T, pts, cfg)
+    out = {}
+    for with_goal in (True, False):
+        env, robot, box, motions, state = _fake_push_world(e, T, lambda r, b: _carry(r, b, 0.0))
+        if with_goal:
+            env.task._tro = SimpleNamespace(meta=SimpleNamespace(pose_targets={"box.n.01_1": VC.goal_pose_target("box.n.01_1", goal)}))
+        act = VC.entry_action(e, T, "box.n.01_1", "right")
+        run = VC.run_oracle(act, motions, state, env.step, cfg.max_steps)
+        T1 = VC._T((box.pos, th.as_tensor(box.quat).float()))
+        out[with_goal] = (run, VC.judge_push(e, T, T1, VC._T(robot.eef_pose("right")), pts, cfg, dict(run, postcondition=None), goal=goal,
+                                             touch_gap_m=VC.touch_gap(stop, T1, pts)))
+    run, v = out[True]
+    assert run["ctx"].get("push_stopped") and v["verdict"] == "valid", v
+    assert v["measures"]["goal_position_err_m"] < 0.01 and -0.01 < v["measures"]["touch_gap_m"] <= cfg.touching_gap_max_m + cfg.stop_slack_m
+    run, v = out[False]  # the fake world has no partner physics: the target runs the stroke on, 3 cm through the partner's place
+    assert not run["ctx"].get("push_stopped") and v["measures"]["moved_along_m"] > 0.07 and v["measures"]["touch_gap_m"] < -0.025
+
+
+def test_the_replays_take_the_demos_goal_partner_and_variant():
+    """Run D (1)-(2): a replay's goal is the demo's - a touching push stops at the partner's place (the record's push distance less the 0.035
+    margin: touching_02 0.0493, touching_01 0.0217), the TRO's goal from the replay start kept beside it; an axial push's turn is the TRO's
+    orientation target (axial_01 0.953 rad, axial_03 1.026: the record's arc 0.967 / 1.034); the variant reaches the oracle's ctx (the
+    board game's push_arc_stall_ends_arc, which run D's axial_01 replay ran without)."""
+    from ispatialgym.oracle import execute as EX
+
+    want = {"touching_02": (0.0493, 0.0445), "touching_01": (0.0217, 0.0235)}
+    for inst, (gap, tro) in want.items():
+        sit = _replay(inst, "push")
+        assert sit["pose_target"]["position_tolerance"] == 0.03 and "touching" in sit["variant"]
+        e = VC.record_entry(sit)
+        assert e["push"]["stop_gap_m"] == pytest.approx(gap, abs=2e-4) and e["goal_target"]["along_push_m"] == e["push"]["stop_gap_m"]
+        assert e["goal_target"]["tro_along_push_m"] == pytest.approx(tro, abs=5e-4) and e["goal_target"]["orientation_tolerance"] == 0.2
+    for inst, turn, arc in (("axial_01", 0.9527, 0.9666), ("axial_03", 1.026, 1.0344)):
+        e = VC.record_entry(_replay(inst, "push"))
+        g = e["goal_target"]
+        assert g["kind"] == "turn" and g["turn_rad"] == pytest.approx(turn, abs=1e-3) and g["arc_turn_rad"] == pytest.approx(arc, abs=1e-3)
+        assert g["orientation_tolerance"] == 0.1 and "stop_gap_m" not in e["push"]
+    assert VC.record_goal(_replay("touching_02", "brace"), {}) is None
+    sit = _replay("axial_01", "push")
+    assert EX.variant_generation(VC.oracle_ctx(sit["variant"]))["push_arc_stall_ends_arc"] is True and VC.oracle_ctx(None) == {}
 
 
 def test_the_push_and_brace_acceptance_rules():
@@ -590,6 +720,7 @@ def test_the_verdict_table(tmp_path, glib):
     CL.save_library(root, lib, "box_of_cereal__iucshm__s0.8")
     rows = {r["class"]: r for r in CL.verdict_table(root)}
     assert CL.class_family("push_tip_h-@5.0cm") == "push_tip_h-" and CL.class_family("+end-spin_blade_0@f2#") == "+end-spin_blade_0"
+    assert CL.class_family("+end-spin_blade_0@t65") == "+end-spin_blade_0@t65" == CL.class_family("+end-spin_blade_0@t65@f1")
     r = next(iter(rows.values()))
     assert sum(r["verdicts"].values()) >= 1 and all(set(m) <= {"valid", "invalid"} for m in (x["measures"] for x in rows.values()))
     assert any("valid" in x["measures"] and x["measures"]["valid"]["moved_along_m"]["median"] == 0.07 for x in rows.values())
@@ -684,7 +815,7 @@ def test_the_validator_ik_runs_in_a_clean_world():
     resets it to the robot and the ground (the support and the contacted object ignored, as the sampler's exact IK at a contact)."""
     calls = []
     kw = VC.KitContactWorld.__new__(VC.KitContactWorld)
-    kw._pusher = "pusher"
+    kw._pusher, kw._stop = "pusher", "stop"
     kw.tw = SimpleNamespace(slab="slab", backend=SimpleNamespace(update_world=lambda ignore_objects=(): calls.append(list(ignore_objects))))
     kw.clean_world("obj")
-    assert calls == [["slab", "obj", "pusher"]]
+    assert calls == [["slab", "obj", "pusher", "stop"]]

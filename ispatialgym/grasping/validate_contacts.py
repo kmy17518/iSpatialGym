@@ -20,8 +20,16 @@ saved BEFORE any contact). Per entry:
    push) at ``brace_pusher_speed_m_s`` until ``brace_press_m`` past first contact, and holds ``brace_hold_steps``;
 3. **acceptance** (:func:`judge_push` / :func:`judge_brace`; force series from ``validate_tabletop.ForceProbe``):
 
-   * a PUSH passes when the object moved along the push direction by >= ``stroke - stop clearance - push_short_tol_m`` (the stroke minus the
-     fingertips' start gap), it did not topple (tilt change <= ``topple_tilt_rad``), the hand did not slip off (sideways drift <=
+   * a PUSH WITH A TASK GOAL (``goal_target``: every touching / axial push entry and replay since run D, calibrated on the replays of the
+     demos) passes when the TASK's goal check passes (:func:`judge_goal`): the object within the goal's position tolerance (touching 0.03 m;
+     axial none) and orientation tolerance (touching 0.2, axial 0.1 rad: the full rotation, so a topple or a slip fails it), a touching
+     push's target touching its partner (the stop's face <= ``touching_gap_max_m`` + ``stop_slack_m`` away: the BDDL ``touching``), the
+     oracle's action ran to its end with a clean postcondition, no non-finger link loaded the slab. The world carries what the demos have:
+     the goal is the object's TRO pose target (``SimState.pose_target``: the oracle's closed-loop push stops at it / re-pushes toward it),
+     and a touching push meets a kinematic partner stand-in (``stop_size_m``) at the place gap (``push.stop_gap_m``). The stroke measures
+     below stay in the record as diagnostics (``diagnostic_reasons``);
+   * any other PUSH passes when the object moved along the push direction by >= ``stroke - stop clearance - push_short_tol_m`` (the stroke
+     minus the fingertips' start gap), it did not topple (tilt change <= ``topple_tilt_rad``), the hand did not slip off (sideways drift <=
      ``push_lateral_max_m``, yaw change <= ``push_yaw_max_rad``, the fingertips within ``contact_lost_m`` of the object's face at the goal),
      no non-finger robot link loaded the slab beyond ``non_finger_contact_N``, the oracle's postcondition is clean and the action ran to its
      end (``max_steps``);
@@ -102,6 +110,13 @@ class ContactValidateConfig:
     non_finger_contact_N: float = 0.5
     # brace load / acceptance
     brace_pusher_size_m: Tuple[float, float, float] = (0.03, 0.08, 0.05)
+    #: the touching push's partner stand-in (thickness along the push, width, height): a partner-sized face the target is pushed into
+    stop_size_m: Tuple[float, float, float] = (0.04, 0.20, 0.30)
+    #: the stop's near face this far past the goal (the push's stop-at-goal ends the push first; the stop catches an overshoot)
+    stop_slack_m: float = 0.001
+    #: a touching push's target touches its partner: the gap to the stop's face at the end <= this (the touching predicate's geometric
+    #: branch, ``sampling.predicates.TOUCHING_GAP_MAX_M``) plus ``stop_slack_m``
+    touching_gap_max_m: float = 0.003
     brace_pusher_gap_m: float = 0.01
     brace_press_m: float = 0.01
     brace_pusher_speed_m_s: float = 0.02
@@ -184,13 +199,21 @@ def world_extras(entry: Dict[str, Any], T_world_obj) -> Dict[str, Any]:
     return extras
 
 
-def run_oracle(action, motions, state, step, max_steps: int) -> Dict[str, Any]:
+def oracle_ctx(variant: Optional[str] = None) -> Dict[str, Any]:
+    """The oracle action's ``ctx`` at its start: the variant as the sidecar's (``execute.variant_generation`` reads its customs
+    ``generation``; the oracle's other sidecar reads are ``getattr(..., None)``), else empty."""
+    return {} if not variant else {"sidecar": SimpleNamespace(variant=str(variant))}
+
+
+def run_oracle(action, motions, state, step, max_steps: int, variant: Optional[str] = None) -> Dict[str, Any]:
     """``execute.run_action`` of ``action`` stepping the world with ``step(a)`` (at most ``max_steps``), then ``execute.check_postcondition``:
-    ``{"steps", "completed", "postcondition", "ctx"}``."""
+    ``{"steps", "completed", "postcondition", "ctx"}``. ``variant``: the customs variant whose ``generation`` the oracle reads
+    (``execute.variant_generation`` via ``ctx["sidecar"].variant``: e.g. ``push_arc_stall_ends_arc`` of alignment-axial-board_game-
+    breakfast_table, which the demos ran with - run D's axial_01 replay ran without it)."""
     from ispatialgym.oracle import execute as EX
 
     targets = action.targets(None, state)
-    ctx: Dict[str, Any] = {}
+    ctx = oracle_ctx(variant)
     n, completed = 0, True
     gen = EX.run_action(action, motions, state, targets, ctx)
     for a in gen:
@@ -231,9 +254,17 @@ def tip_gap(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj: np.ndarray, T_eef:
 
 
 def judge_push(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef1: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig,
-               run: Dict[str, Any], other_slab_N: float = 0.0, tip_gap_m: float = None) -> Dict[str, Any]:
+               run: Dict[str, Any], other_slab_N: float = 0.0, tip_gap_m: float = None, goal: Optional[Dict[str, Any]] = None,
+               touch_gap_m: Optional[float] = None) -> Dict[str, Any]:
     """The push acceptance (module docstring): ``{"verdict", "reasons", "measures"}``. ``tip_gap_m``: the fingertips' gap to the face at the
-    push's farthest object position (the trial's per-step :func:`tip_gap`; the oracle backs the hand off after the push), else at the end."""
+    push's farthest object position (the trial's per-step :func:`tip_gap`; the oracle backs the hand off after the push), else at the end.
+    An entry with a task goal (``goal_target``) is judged by :func:`judge_goal` (``goal``: the trial's, else :func:`goal_pose` at ``T_obj0``;
+    ``touch_gap_m``: a touching push's end gap to the stop); the stroke / arc measures stay as diagnostics."""
+    if entry.get("goal_target"):
+        diag = (judge_arc_push(entry, T_obj0, T_obj1, cfg, run, other_slab_N) if entry.get("arc") is not None else
+                judge_push(dict(entry, goal_target=None), T_obj0, T_obj1, T_eef1, pts_obj, cfg, run, other_slab_N, tip_gap_m))
+        return judge_goal(entry, T_obj0, T_obj1, cfg, run, other_slab_N, extra_measures=dict(diag["measures"], diagnostic_reasons=diag["reasons"]),
+                          goal=goal, touch_gap_m=touch_gap_m)
     if entry.get("arc") is not None:
         return judge_arc_push(entry, T_obj0, T_obj1, cfg, run, other_slab_N)
     d = T_obj0[:3, :3] @ np.asarray(entry["push"]["direction"], dtype=float)
@@ -283,6 +314,73 @@ class PeakTracker:
         along = float((T_obj[:3, 3] - self.T0[:3, 3]) @ self.d)
         if self.gap is None or along > self.best + 1e-5:  # the first step at the farthest position (the back-off after it does not count)
             self.best, self.gap = along, tip_gap(self.entry, self.T0, T_obj, T_eef, self.pts)
+
+
+def goal_pose(entry: Dict[str, Any], T_obj0: np.ndarray) -> Optional[Dict[str, Any]]:
+    """The task goal an entry's push serves (``entry["goal_target"]``), at the object's start pose ``T_obj0``: ``{"T": the goal pose (4x4),
+    "position_tolerance" (None: orientation only), "orientation_tolerance"}`` - a touching push leaves the target touching its partner (the
+    start pose moved ``along_push_m`` along the push), an axial push turns it ``turn_rad`` about the vertical (orientation only)."""
+    g = entry.get("goal_target")
+    if not g:
+        return None
+    T = np.array(T_obj0, dtype=float)
+    if g["kind"] == "translate":
+        d = T_obj0[:3, :3] @ np.asarray(entry["push"]["direction"], dtype=float)
+        d[2] = 0.0
+        d = d / max(float(np.linalg.norm(d)), 1e-12)
+        T[:3, 3] = T_obj0[:3, 3] + d * float(g["along_push_m"])
+    elif g["kind"] == "turn":
+        a = float(g["turn_rad"])
+        T[:3, :3] = np.array([[math.cos(a), -math.sin(a), 0.0], [math.sin(a), math.cos(a), 0.0], [0.0, 0.0, 1.0]]) @ T_obj0[:3, :3]
+    else:
+        raise ValueError(f"goal_target kind {g['kind']!r}")
+    return {"T": T, "position_tolerance": g.get("position_tolerance"), "orientation_tolerance": float(g["orientation_tolerance"]), "kind": g["kind"]}
+
+
+def goal_pose_target(name: str, goal: Dict[str, Any]):
+    """The goal as the oracle's ``eval.targets.PoseTarget`` (what ``SimState.pose_target`` hands its closed-loop pushes: the re-push, the
+    goal follow, the arc's residual), from ``tro_writer.pose_target``'s record."""
+    from ispatialgym.eval.targets import PoseTarget
+    from ispatialgym.sampling.tro_writer import pose_target
+
+    T = goal["T"]
+    pos = None if goal["position_tolerance"] is None else [float(v) for v in T[:3, 3]]
+    return PoseTarget.from_dict(name, pose_target(position=pos, orientation=[float(v) for v in S.mat_to_quat(T[:3, :3])],
+                                                  position_tolerance=goal["position_tolerance"], orientation_tolerance=goal["orientation_tolerance"]))
+
+
+def _quat_angle(Ra: np.ndarray, Rb: np.ndarray) -> float:
+    return float(math.acos(max(-1.0, min(1.0, (float(np.trace(Ra.T @ Rb)) - 1.0) / 2.0))))
+
+
+def judge_goal(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, cfg: ContactValidateConfig, run: Dict[str, Any], other_slab_N: float = 0.0,
+               extra_measures: Optional[Dict[str, Any]] = None, goal: Optional[Dict[str, Any]] = None, touch_gap_m: Optional[float] = None) -> Dict[str, Any]:
+    """A push with a task goal (``goal_target``) passes when the TASK's goal check passes - the object within the goal's position tolerance
+    (when it has one) and orientation tolerance (the full rotation: a topple or a slip fails it; the TRO pose target the oracle aims at),
+    a touching push's target touching its partner (``touch_gap_m`` <= ``touching_gap_max_m`` + ``stop_slack_m``: the task's BDDL goal) - the
+    oracle's action ran to its end with a clean postcondition, and no non-finger link loaded the slab: the validator is no stricter than
+    what makes a demo succeed. The straight / arc measures stay as diagnostics (``extra_measures``)."""
+    goal = goal if goal is not None else goal_pose(entry, T_obj0)
+    pos_err = float(np.linalg.norm(T_obj1[:3, 3] - goal["T"][:3, 3]))
+    ori_err = _quat_angle(T_obj1[:3, :3], goal["T"][:3, :3])
+    reasons = []
+    if not run.get("completed", True):
+        reasons.append("incomplete")
+    if run.get("postcondition"):
+        reasons.append(f"oracle:{run['postcondition']}")
+    if goal["position_tolerance"] is not None and pos_err > float(goal["position_tolerance"]):
+        reasons.append("goal_position")
+    if ori_err > goal["orientation_tolerance"]:
+        reasons.append("goal_orientation")
+    touching = (entry.get("push") or {}).get("stop_gap_m") is not None and goal["kind"] == "translate"
+    if touching and (touch_gap_m is None or float(touch_gap_m) > cfg.touching_gap_max_m + cfg.stop_slack_m):
+        reasons.append("not_touching")
+    if other_slab_N > cfg.non_finger_contact_N:
+        reasons.append("non_finger_contact")
+    meas = {"touch_gap_m": None if touch_gap_m is None else round(float(touch_gap_m), 5),"goal_position_err_m": round(pos_err, 5), "goal_orientation_err_rad": round(ori_err, 5), "position_tolerance": goal["position_tolerance"],
+            "orientation_tolerance": goal["orientation_tolerance"], "tilt_change_rad": round(_tilt(T_obj0[:3, :3], T_obj1[:3, :3]), 5),
+            "other_slab_N": round(float(other_slab_N), 4), **(extra_measures or {})}
+    return {"verdict": "invalid" if reasons else "valid", "reasons": reasons, "measures": meas}
 
 
 def judge_arc_push(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, cfg: ContactValidateConfig, run: Dict[str, Any],
@@ -338,6 +436,35 @@ def judge_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T
         reasons.append("non_finger_contact")
     return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
             "measures": {"moved_along_load_m": round(moved, 5), "tilt_change_rad": round(tilt, 5), "eef_drift_m": round(drift, 5), "other_slab_N": round(float(other_slab_N), 4)}}
+
+
+def stop_pose(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig) -> Optional[Dict[str, Any]]:
+    """Where the touching push's partner stand-in stands (``push.stop_gap_m`` set): its near face ``stop_gap_m`` beyond the object's leading
+    face along the push, on the object's centre line, its bottom 1 mm above the support, turned square to the push. None without a gap."""
+    gap = (entry.get("push") or {}).get("stop_gap_m")
+    if gap is None:
+        return None
+    d = T_obj[:3, :3] @ np.asarray(entry["push"]["direction"], dtype=float)
+    d[2] = 0.0
+    d = d / max(float(np.linalg.norm(d)), 1e-12)
+    pts = pts_obj @ T_obj[:3, :3].T + T_obj[:3, 3]
+    lead = float((pts[:, :2] @ d[:2]).max())
+    c = pts.mean(axis=0)
+    sx, _sy, sz = cfg.stop_size_m
+    face = lead + float(gap) + float(cfg.stop_slack_m)
+    centre = np.array([c[0], c[1], float(pts[:, 2].min()) + 0.5 * float(sz) + 0.001]) + d * (face - float(c[:2] @ d[:2]) + 0.5 * float(sx))
+    yaw = math.atan2(d[1], d[0])
+    R = np.array([[math.cos(yaw), -math.sin(yaw), 0.0], [math.sin(yaw), math.cos(yaw), 0.0], [0.0, 0.0, 1.0]])  # its x (thickness) along the push
+    return {"centre": centre, "R": R, "gap_m": round(float(gap), 5), "d": d, "face_along_m": face}
+
+
+def touch_gap(stop: Optional[Dict[str, Any]], T_obj: np.ndarray, pts_obj: np.ndarray) -> Optional[float]:
+    """The gap between the object's leading face (``T_obj``) and the stop's near face (:func:`stop_pose`) along the push (<= 0: touching or
+    pressed into it); None without a stop."""
+    if stop is None:
+        return None
+    pts = pts_obj @ T_obj[:3, :3].T + T_obj[:3, 3]
+    return float(stop["face_along_m"] - (pts[:, :2] @ np.asarray(stop["d"])[:2]).max())
 
 
 def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig, dt: float) -> List[np.ndarray]:
@@ -562,8 +689,11 @@ class KitContactWorld:
         self.vcfg = VT.ValidateConfig(arm=arm, base_yaws=1, base_offsets=offs)
         self.tw = VT.TabletopWorld(self.vcfg)
         self.cfg, self.arm, self.VT = cfg, arm, VT
+        self.variant: Optional[str] = None
         self._pusher = None
         self._pusher_obj()  # before any object: no prim is added while an object's probe view is live
+        self._stop = None
+        self._stop_obj()
 
     def load(self, job: Dict[str, Any], model_dir: str):
         return self.tw.load(job, model_dir)
@@ -582,7 +712,7 @@ class KitContactWorld:
         sampler's exact IK at a contact (the support and the pushed / braced object ignored at the contact pose; the contact policy and the
         arm-object check are explicit). The oracle's planning syncs the world with the slab and the object in it (Motions.arm_to), and the
         stale meshes made every IK after a model's first trial fail (run C: 1 valid, then 47 no_placement / chain_unreachable)."""
-        ignore = [self.tw.slab, obj] + ([self._pusher] if self._pusher is not None else [])
+        ignore = [self.tw.slab, obj] + [o for o in (self._pusher, getattr(self, "_stop", None)) if o is not None]
         self.tw.backend.update_world(ignore_objects=ignore)
 
     def set_support_height(self, z: Optional[float]) -> None:
@@ -591,6 +721,10 @@ class KitContactWorld:
         import dataclasses
 
         self.tw.cfg = dataclasses.replace(self.vcfg, slab_top_z=float(z) if z is not None else self.vcfg.slab_top_z)
+
+    def set_variant(self, variant: Optional[str]) -> None:
+        """The customs variant of the next library / replay (its ``generation`` knobs reach the oracle: :func:`run_oracle`); None = none."""
+        self.variant = str(variant) if variant else None
 
     def plan_entry(self, obj, geom, entry, T_obj, arm):
         """The configuration at the trial's start pose (:func:`start_pose_of`) against the SETTLED rest pose ``T_obj`` (not the live object, which
@@ -646,13 +780,18 @@ class KitContactWorld:
         b["chain_unreachable"] = [k for k, v in reach.items() if v is False]
         return b
 
-    def _motions_state(self, obj):
+    def _motions_state(self, obj, goal: Optional[Dict[str, Any]] = None):
+        """The oracle's ``Motions`` (the cuRobo backend as its planner) and ``SimState`` over a task stub: the object and the slab in scope, and
+        the push's task goal as the object's TRO pose target (``SimState.pose_target``: the oracle's closed-loop push - the re-push, the goal
+        follow, an arc's residual - aims at it, as in the demos; without it run D's axial replays stopped short: 'skipped: beyond the
+        recorded arc')."""
         from ispatialgym.oracle.executor import SimState
         from ispatialgym.oracle.motions import Motions, MotionsConfig
 
         motions = Motions(self.tw.env, self.tw.backend, cfg=MotionsConfig(), robot=self.tw.robot)
         motions.state.hold_current()
-        task = SimpleNamespace(object_scope={obj.name: obj, self.tw.slab.name: self.tw.slab}, _tro=None)
+        tro = None if goal is None else SimpleNamespace(meta=SimpleNamespace(pose_targets={obj.name: goal_pose_target(obj.name, goal)}))
+        task = SimpleNamespace(object_scope={obj.name: obj, self.tw.slab.name: self.tw.slab}, _tro=tro)
         return motions, SimState(self.tw.env, task, self.tw.robot)
 
     def _start(self, obj, entry, plan, state, rest):
@@ -691,12 +830,18 @@ class KitContactWorld:
         from ispatialgym.grasping.contact_library import hull_points
 
         pts = hull_points(self._geom_of(obj))
-        motions, sim = self._motions_state(obj)
         T_start = _T(obj.get_position_orientation())
+        # the task's goal (the oracle's pose target, the judge's goal) and the touching push's partner stand-in, at the settled start
+        goal = goal_pose(entry, T_start)
+        motions, sim = self._motions_state(obj, goal)
+        stop = self._place_stop(entry, T_start, pts)
         w = _entry_world(entry, T_start)
         trace = TrialTrace(T_start, _T(w["contact"]))
         trace.rec.update(obj_rest=[round(float(v), 4) for v in rest.get("world_position", [])] + [round(float(v), 4) for v in rest.get("world_quat_xyzw", [])],
-                         eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec)
+                         eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec,
+                         stop=None if stop is None else {"centre": [round(float(v), 4) for v in stop["centre"]], "gap_m": stop["gap_m"]},
+                         goal=None if goal is None else {"pose": _pose7(goal["T"]), "position_tolerance": goal["position_tolerance"],
+                                                         "orientation_tolerance": goal["orientation_tolerance"]})
         step = self._stepper(obj, sim, arm, sa, series, trace)
         self._hold(motions, step, self.vcfg.init_hold_steps)
         T0 = _T(obj.get_position_orientation())
@@ -708,13 +853,16 @@ class KitContactWorld:
             track(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm)))
 
         try:
-            run = run_oracle(act, motions, sim, step_track, self.cfg.max_steps)
+            run = run_oracle(act, motions, sim, step_track, self.cfg.max_steps, variant=self.variant)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
+            self._park(self._stop, 1)
             out = _error_trial(ex)
             return dict(out, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), debug=trace.end(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm))),
                         wall_s=round(time.time() - t0, 3))
         T1, Te = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
-        out = judge_push(entry, T0, T1, Te, pts, self.cfg, run, max(series) if series else 0.0, tip_gap_m=track.gap)
+        self._park(self._stop, 1)  # after the end pose is read (a target leaning on it is judged where it stands)
+        out = judge_push(entry, T0, T1, Te, pts, self.cfg, run, max(series) if series else 0.0, tip_gap_m=track.gap, goal=goal,
+                         touch_gap_m=touch_gap(stop, T1, pts))
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te),
                     wall_s=round(time.time() - t0, 3))
 
@@ -735,7 +883,7 @@ class KitContactWorld:
         self._hold(motions, step, self.vcfg.init_hold_steps)
         act = entry_action(entry, _T(obj.get_position_orientation()), obj.name, arm)
         try:
-            run = run_oracle(act, motions, sim, step, self.cfg.max_steps)
+            run = run_oracle(act, motions, sim, step, self.cfg.max_steps, variant=self.variant)
             T0, Te0 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
             trace.rec["braced"] = {"obj": _pose7(T0), "eef": _pose7(Te0)}
             pusher = self._pusher_obj()
@@ -763,6 +911,7 @@ class KitContactWorld:
         from ispatialgym.sampling.v2 import contact_poses as CPZ
 
         self.set_support_height(sit["support_z"])
+        self.set_variant(sit.get("variant"))
         T_o = sit["T_base_object"]
         rest, state = self.tw.settle(obj, geom, S.mat_to_quat(T_o[:3, :3]), obj_xy=(float(T_o[0, 3]), float(T_o[1, 3])))
         p, q = (x.clone() for x in obj.get_position_orientation())
@@ -800,6 +949,33 @@ class KitContactWorld:
 
     def _geom_of(self, obj):
         return getattr(obj, "_isg_geom")
+
+    def _stop_obj(self):
+        """The touching push's PARTNER stand-in: a kinematic box (``stop_size_m``) the target is pushed into - the stop at the place gap that
+        ends a touching push in the demos (without it the target ran the whole push margin on and a tall narrow one tipped over: run D's
+        touching_02 replay, tilt 0.82 rad), parked below the floor between trials."""
+        if self._stop is None:
+            from omnigibson.objects.primitive_object import PrimitiveObject
+
+            sx, sy, sz = self.cfg.stop_size_m
+            self._stop = PrimitiveObject(name="isg_push_stop", primitive_type="Cube", size=1.0, kinematic_only=True, rgba=(0.9, 0.5, 0.2, 1.0),
+                                         scale=self.tw.th.tensor([sx, sy, sz]))  # its x (thickness) along the push: stop_pose turns it so
+            self.tw.scene.add_object(self._stop)
+            self._park(self._stop, 1)
+            self.tw.og.sim.step()
+        return self._stop
+
+    def _park(self, o, k: int = 0):
+        o.set_position_orientation(self.tw.th.tensor([5.0 + 0.5 * k, 5.0, -1.0]), self.tw.th.tensor([0.0, 0.0, 0.0, 1.0]))
+
+    def _place_stop(self, entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray) -> Optional[Dict[str, Any]]:
+        """The stop at :func:`stop_pose` (None: the entry has no ``push.stop_gap_m``, the stop stays parked)."""
+        c = stop_pose(entry, T_obj, pts_obj, self.cfg)
+        if c is None:
+            return None
+        th_ = self.tw.th
+        self._stop.set_position_orientation(th_.tensor(c["centre"], dtype=th_.float32), th_.tensor(S.mat_to_quat(c["R"]), dtype=th_.float32))
+        return c
 
     def _park_pusher(self):
         if self._pusher is not None:
@@ -874,7 +1050,15 @@ def replay_situation(oracle: Dict[str, Any], kind: str, tro: Dict[str, Any]) -> 
     if q is not None:  # the base joints (x, y, z, rx, ry, yaw) into the stance frame: the base at the origin
         q[0], q[1], q[5] = 0.0, 0.0, 0.0
     contact = rec_b.get("init") or rec_b.get("contact")
-    return {"kind": kind, "arm": rec.get("arm"), "object": obj, "object_from": obj_from, "T_base_object": Tbi @ T_obj, "support_z": support_z,
+    # the object's TRO pose target (the task's goal, what the demo's oracle closed its push on), into the stance frame
+    pt = dict(((tro.get("ispatialgym") or {}).get("pose_targets") or {}).get(obj) or {}) or None
+    if pt is not None:
+        if pt.get("position") is not None:
+            pt["position"] = [float(v) for v in (Tbi[:3, :3] @ np.asarray(pt["position"], dtype=float) + Tbi[:3, 3])]
+        if pt.get("orientation") is not None:
+            pt["orientation"] = [float(v) for v in S.mat_to_quat(Tbi[:3, :3] @ S.pose_mat([0.0, 0.0, 0.0], pt["orientation"])[:3, :3])]
+    return {"kind": kind, "arm": rec.get("arm"), "object": obj, "object_from": obj_from, "variant": oracle.get("variant") or "", "T_base_object": Tbi @ T_obj, "support_z": support_z,
+            "pose_target": pt,
             "stance": {"name": rec.get("stance"), "base_pose2d": list(st["base_pose2d"]), "translate": st.get("translate"), "tilt": st.get("tilt"),
                        "stand_off": st.get("stand_off")}, "witness_q": q, "record": rec_b, "record_world": rec,
             "relation": {"contact_ahead_m": round(float(contact["position"][0]), 4), "contact_lateral_m": round(float(contact["position"][1]), 4)},
@@ -914,7 +1098,54 @@ def record_entry(sit: Dict[str, Any]) -> Dict[str, Any]:
     else:
         e = CPZ.contact_entry("brace", sit["pose_class"] or "brace", "replay", "brace", T_obj, _poseq(rec["contact"]), _poseq(rec["pre"]), extras)
     e["T_rule_object"] = CPZ._pose_dict(T_obj)  # the record's world extras are the stance frame's once the object stands there
+    goal = record_goal(sit, e)
+    if goal is not None:
+        stop = goal.pop("stop_gap_m", None)
+        if stop is not None:
+            e["push"]["stop_gap_m"] = stop
+        e["goal_target"] = goal
     return e
+
+
+def record_goal(sit: Dict[str, Any], entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The replayed push's task goal (``goal_target``, :func:`goal_pose`), at the replay's object start pose:
+
+    - a touching push (the variant's ``touching``, a straight push): the partner's face where the demo had it - the record's push distance
+      less the task's ``push_margin_m`` (``iors_small``: push distance = the gap at the place + 0.035) - is the stop (``stop_gap_m``), the
+      goal the target touching it (``along_push_m`` = that gap; the TRO's tolerances 0.03 / 0.2). The TRO's own goal position, measured from
+      the replay's start (the place pose before its settle), is kept as ``tro_along_push_m`` (touching_01: 0.0235 vs gap 0.0217; touching_02:
+      0.0445 vs 0.0493 - the goal was drafted against the partner before the target's 3 mm settle);
+    - an arc (axial) push: the turn of the TRO's orientation target from the start (``turn_rad``; tolerance the TRO's, 0.1), else the
+      record's arc (init -> goal eef turn).
+
+    None for any other push / a brace."""
+    from ispatialgym.grasping.contact_library import AXIAL_GOAL_TOL, TOUCH_GOAL_TOL, TOUCH_PUSH_MARGIN_M
+
+    rec = sit["record"]
+    if sit["kind"] != "push":
+        return None
+    T0 = sit["T_base_object"]
+    pt = sit.get("pose_target") or {}
+    if "touching" in str(sit.get("variant") or "") and rec.get("mid") is None and rec.get("distance_m") is not None:
+        gap = max(0.0, float(rec["distance_m"]) - TOUCH_PUSH_MARGIN_M)
+        tol = dict(TOUCH_GOAL_TOL)
+        if pt.get("position_tolerance") is not None:
+            tol = {"position_tolerance": float(pt["position_tolerance"]), "orientation_tolerance": float(pt.get("orientation_tolerance") or tol["orientation_tolerance"])}
+        g = {"kind": "translate", "along_push_m": round(gap, 5), **tol, "stop_gap_m": round(gap, 5), "source": "the record's push distance - push_margin"}
+        if pt.get("position") is not None:
+            d = np.asarray(rec["direction"], dtype=float)
+            d[2] = 0.0
+            d = d / max(float(np.linalg.norm(d)), 1e-12)
+            g["tro_along_push_m"] = round(float((np.asarray(pt["position"]) - T0[:3, 3]) @ d), 5)
+        return g
+    if entry.get("arc") is not None:
+        tol = float(pt["orientation_tolerance"]) if pt.get("orientation_tolerance") is not None else AXIAL_GOAL_TOL["orientation_tolerance"]
+        if pt.get("orientation") is not None:
+            Rg = S.pose_mat([0.0, 0.0, 0.0], pt["orientation"])[:3, :3] @ T0[:3, :3].T
+            return {"kind": "turn", "turn_rad": round(math.atan2(Rg[1, 0], Rg[0, 0]), 6), "orientation_tolerance": tol, "source": "the TRO's orientation target",
+                    "arc_turn_rad": entry["arc"]["turn_rad"]}
+        return {"kind": "turn", "turn_rad": entry["arc"]["turn_rad"], "orientation_tolerance": tol, "source": "the record's arc: init -> goal eef turn"}
+    return None
 
 
 def _poseq(d: Dict[str, Any]):
@@ -965,6 +1196,7 @@ def validate_cli(a) -> None:
             job = library_job(lib_k, eid)
             mlib, _rid, geom = CL.load_object(a.glib, job)
             world.set_support_height((lib_k.get("validate") or {}).get("support_z"))
+            world.set_variant((lib_k.get("validate") or {}).get("variant"))
             obj = world.load(dict(job, rest_hint_wxyz=None), os.path.dirname(mlib.path))
             obj._isg_geom = geom
             try:

@@ -13,7 +13,8 @@
   "alias": "touching_01 target",
   "validate": {
    "support_z": 0.8126,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table"
   }
  },
  {
@@ -30,7 +31,8 @@
   "alias": "touching_01 partner",
   "validate": {
    "support_z": 0.8126,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_sanitary_napkins-box_of_tissues-breakfast_table"
   }
  },
  {
@@ -51,7 +53,8 @@
   "alias": "touching_02 target (the bar variant's knobs)",
   "validate": {
    "support_z": 1.0505,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar"
   }
  },
  {
@@ -70,7 +73,8 @@
   "alias": "touching_02 partner",
   "validate": {
    "support_z": 1.0505,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-box_of_cereal_s080-box_of_cereal-bar"
   }
  },
  {
@@ -90,7 +94,8 @@
   "alias": "touching_04 target",
   "validate": {
    "support_z": 0.8668,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-commercial_kitchen_table"
   }
  },
  {
@@ -106,7 +111,8 @@
   "alias": "touching_04 partner - NO v2 entry yet: glib stage first",
   "validate": {
    "support_z": 0.8668,
-   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)"
+   "note": "the alias family's support height (touching_01 breakfast_table 0.8126, touching_02 bar 1.0505, touching_04 commercial kitchen table 0.8668)",
+   "variant": "inter_object_relation_satisfaction-touching_small_scale-spray_bottle-bottle_of_detergent-commercial_kitchen_table"
   }
  }
 ]

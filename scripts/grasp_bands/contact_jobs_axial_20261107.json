@@ -30,7 +30,8 @@
   "alias": "alignment-axial_01 (support 0.8126)",
   "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
   "validate": {
-   "support_z": 0.8126
+   "support_z": 0.8126,
+   "variant": "alignment-axial-board_game-breakfast_table"
   }
  },
  {
@@ -64,7 +65,8 @@
   "alias": "alignment-axial_02 (support 0.6854; the alias spawns s1x1x2.5 - this entry is s1)",
   "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
   "validate": {
-   "support_z": 0.6854
+   "support_z": 0.6854,
+   "variant": "alignment-axial-paperback_book-desk"
   }
  },
  {
@@ -98,7 +100,8 @@
   "alias": "alignment-axial_03 (support 0.7853)",
   "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
   "validate": {
-   "support_z": 0.7853
+   "support_z": 0.7853,
+   "variant": "alignment-axial-keyboard-desk"
   }
  },
  {
@@ -132,7 +135,8 @@
   "alias": "alignment-axial_04 (support 0.7351)",
   "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
   "validate": {
-   "support_z": 0.7351
+   "support_z": 0.7351,
+   "variant": "alignment-axial-magazine-desk"
   }
  },
  {
@@ -166,7 +170,8 @@
   "alias": "alignment-axial_05 (support 0.8126; stable rest r0_other, 2.5 deg tilt)",
   "note": "long_axis = the icl frame record (roles/candidates.csv frame_long); com_local defaults to the hull centroid (the sampler reads PhysX's)",
   "validate": {
-   "support_z": 0.8126
+   "support_z": 0.8126,
+   "variant": "alignment-axial-tablespoon-breakfast_table"
   }
  }
 ]

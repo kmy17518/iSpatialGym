@@ -37,6 +37,7 @@ import argparse
 import json
 import math
 import os
+import re
 import time
 import traceback
 from typing import Any, Dict, List, Optional, Sequence
@@ -53,8 +54,16 @@ TOUCHING_SUBTASK = "inter_object_relation_satisfaction-touching_small_scale"
 TOUCH_DIRECTION = (0.0, 1.0, 0.0)
 #: the default push stroke of a touching push entry (m past the init along the push): within the measured 0.056-0.085 m
 TOUCH_PUSH_STROKE_M = 0.08
-#: the default turn of an axial push entry (rad of the end's arc; the axial deviation range is 20-70 deg)
+#: the default turn of an axial BRACE entry (rad of the end's arc; the axial deviation range is 20-70 deg)
 AXIAL_TURN_DEG = 45.0
+#: the axial PUSH entries' turns (deg): the task's goal distribution (``generation.deviation_range_deg`` [20, 70]: its low end, middle, high end)
+AXIAL_PUSH_TURNS_DEG = (25.0, 45.0, 65.0)
+#: the task goal tolerances the validation's goal check uses (the customs ``tolerances``: touching 0.03 m / 0.2 rad, axial orientation 0.1 rad)
+TOUCH_GOAL_TOL = {"position_tolerance": 0.03, "orientation_tolerance": 0.2}
+AXIAL_GOAL_TOL = {"orientation_tolerance": 0.1}
+#: ``IORSSmall.push_margin``: the touching push runs this far past the place gap (the place tolerance 0.03 + 5 mm of pressing) - the target
+#: itself moves the GAP, then stands touching its partner
+TOUCH_PUSH_MARGIN_M = 0.035
 #: alignment_axial's END_INSET: the pushed end lies this far inside the long-axis extremity
 AXIAL_END_INSET_M = 0.03
 DEFAULT_YAWS = 8
@@ -142,6 +151,10 @@ def build_touching_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params
                                   direction=D, stroke_m=stroke, support_z=0.0, object_height=face_z[1] - face_z[0], executor="push")
             e["yaw_deg"] = round(math.degrees(yaw), 4)
             e["sampler_screen"] = {"hand_overlap": overlap, "against": against}
+            gap = max(0.0, stroke - TOUCH_PUSH_MARGIN_M)
+            e["push"]["stop_gap_m"] = round(gap, 5)  # the partner stands this far ahead of the target's leading face (the trial's stop)
+            e["goal_target"] = {"kind": "translate", "along_push_m": round(gap, 5), **TOUCH_GOAL_TOL,
+                                "source": "touching: the target ends touching its partner - the place gap along the push (IORSSmall.push_distance - push_margin)"}
             out.append(e)
     return out
 
@@ -258,7 +271,8 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     """The axial push entries (``AlignmentAxial._sample_with``'s classes on the shared rules: ``axial_push_height``, ``axial_blade_geometry``,
     ``extreme_point``, ``axial_push_chain``) of the target at each yaw slot: per long-axis end (``AXIAL_END_INSET_M`` inside it) and turn sense,
     the closed blade beside the face the end moves away from, pitched 0 / 30 / 45 / 60 deg toward the robot's forward (+x), the closing axis
-    along the push or across it, both wrist turns, along the end's arc through ``params["turn_deg"]`` about the centre of mass
+    along the push or across it, both wrist turns, along the end's arc through each of ``params["turns_deg"]`` (default
+    :data:`AXIAL_PUSH_TURNS_DEG`: the task's goal deviations) about the centre of mass
     (``params["com_local"]``, default the hull centroid). The long axis: ``params["long_axis"]`` (object frame), default the footprint's
     longer side at the rest."""
     from ispatialgym.robot import conventions as C
@@ -266,7 +280,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     from ispatialgym.sampling.v2 import tabletop as TT
 
     z_axis = th.tensor([0.0, 0.0, 1.0])
-    turn = math.radians(float(params.get("turn_deg", AXIAL_TURN_DEG)))
+    turns = [math.radians(float(v)) for v in (params.get("turns_deg") or ([params["turn_deg"]] if params.get("turn_deg") is not None else AXIAL_PUSH_TURNS_DEG))]
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = params.get("long_axis")
     rest = axial_rest(rest)  # the axial program's upright identity placement
@@ -300,10 +314,11 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
                         geo = CPZ.axial_blade_geometry(z_push, (0.0, h), pitch, 0.0, side=c_axis is side_c)
                         if geo is None:
                             continue
-                        for c_sign in (1.0, -1.0):
+                        for c_sign, turn in ((c, t) for c in (1.0, -1.0) for t in turns):
                             pre, init, mid, goal = CPZ.axial_push_chain(side_pt, d, geo[1], a_vec, c_axis, c_sign, th.tensor([float(com[0]), float(com[1]), z_push]),
                                                                        spin * turn)
-                            cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{pitch:.0f}{'' if c_sign > 0 else '-'}{cname}"
+                            cls = (f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{pitch:.0f}{'' if c_sign > 0 else '-'}{cname}"
+                                   + (f"@t{math.degrees(turn):.0f}" if len(turns) > 1 else ""))
                             stroke = abs(turn) * float(th.linalg.norm(r_xy))
                             # the extras are the sampler's axial push record's (none: AlignmentAxial records no blade fields, so the oracle's palm
                             # lift - which reads fingertip_z / blade_half_thickness_m - never applies to it); the blade's geometry as facts
@@ -315,6 +330,8 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
                                         "turn_rad": round(spin * turn, 6), "mid_object": _obj_pose(Ti, mid), "goal_object": _obj_pose(Ti, goal)}
                             e["yaw_deg"] = round(math.degrees(yaw), 4)
                             e["axial"] = {"blade_half_thickness_m": round(float(geo[1]), 5), "fingertip_z_rule": round(float(geo[2]), 5)}
+                            e["goal_target"] = {"kind": "turn", "turn_rad": round(spin * turn, 6), **AXIAL_GOAL_TOL,
+                                                "source": "alignment-axial: the goal yaw (orientation only, the customs tolerance 0.1 rad)"}
                             out.append(e)
     return out
 
@@ -531,8 +548,11 @@ def summary(root: str) -> List[Dict[str, Any]]:
 
 def class_family(cls: str) -> str:
     """A class label without its height / face-point / duplicate suffix (``push_tip_h-@5.0cm`` -> ``push_tip_h-``, ``+end-spin_blade_0@f2`` ->
-    ``+end-spin_blade_0``): the rows of the verdict table."""
-    return str(cls).split("@")[0].rstrip("#")
+    ``+end-spin_blade_0``), an axial push's goal turn kept (``+end-spin_blade_0@t65`` -> ``+end-spin_blade_0@t65``): the rows of the verdict
+    table."""
+    parts = str(cls).split("@")
+    turn = next((p for p in parts[1:] if re.fullmatch(r"t\d+#?", p)), None)
+    return parts[0].rstrip("#") + (f"@{turn.rstrip('#')}" if turn else "")
 
 
 def verdict_table(root: str) -> List[Dict[str, Any]]:
