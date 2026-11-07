@@ -215,6 +215,9 @@ def rest_quat_xyzw(key: str) -> Optional[th.Tensor]:
     """Orientation the object had to be placed in (side rest pose) for the tabletop grasps, or None (canonical). With a v2 entry
     (``ISPATIALGYM_GRASP_LIBRARY_V2``): its measured rest (xyzw, reference yaw included)."""
     lib = v2_entry(key)
+    if lib is not None and getattr(lib, "floating", False):
+        # i7-floating 2026-11-07: a floating entry (held-object grasps) has no rest - it never serves a placement on a support
+        raise ValueError(f"grasp key {key!r}: its v2 entry {lib.path} is a floating entry (no rest)")
     if lib is not None and lib.rests:
         rid = v2_rest_id(lib)
         if rid is None:

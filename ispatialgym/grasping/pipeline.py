@@ -6,6 +6,10 @@
     python -m ispatialgym.grasping.pipeline all        --jobs M.json [--only ID ...]                # the three, one process (pilots)
     python -m ispatialgym.grasping.pipeline summary    --jobs M.json
 
+Floating jobs (``constraint`` "floating", i7-floating 2026-11-07; ``floating.floating_job``): export -> GraspGen in its own env
+(``scripts/grasp_bands/graspgen_floating.py``) -> candidates (``floating.generate``) -> validate (``validate_floating``: in hand, gravity,
+the held motions); ``scripts/grasp_bands/job_floating.sh`` runs the four. No settle survey, no rest retry.
+
 ``--root`` (default ``ISPATIALGYM_GRASP_LIBRARY_V2`` or ``runlogs/grasp_library_v2``) holds ``models/<entry id>/``; finished stages are
 skipped per model (``--force`` redoes them). Every stage appends one json line per model to ``<root>/logs/<stage>_<shard>.jsonl``
 (timings, counts, errors) and prints ``GB_<STAGE>_DONE``.
@@ -50,6 +54,7 @@ def stage_export(args, jobs, world=None):
 
     todo = [j for j in jobs if args.force or OG.load(S.job_dir(j, args.root)) is None]
     if not todo:
+        print("GB_EXPORT_DONE (nothing to do)", flush=True)
         return world
     if world is None:
         world = _world(args)
@@ -107,6 +112,8 @@ def _cand_one(payload):
     t0 = time.time()
     if not force and os.path.exists(os.path.join(d, "candidates.json")):
         return {"id": j["id"], "ok": True, "skipped": True}
+    if (j.get("constraint") or "tabletop") == S.FLOATING:
+        return _cand_floating(j, d, t0)
     try:
         cfg, densify = candidate_overrides(j)
         out = CA.generate(j, d, cfg=cfg, densify=densify)
@@ -131,6 +138,40 @@ def _cand_one(payload):
                 "reasons": sorted({c["geometry"]["reason"] for c in out["candidates"] if not c["geometry"]["ok"]})}
     except Exception as e:  # noqa: BLE001
         return {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-800:]}
+
+
+def floating_overrides(job: Optional[Dict[str, Any]] = None):
+    """i7-floating 2026-11-07: the floating candidates' config (``floating.FloatingConfig``), opt-in ``ISG_GLIB_FLOAT_OVERRIDES`` (JSON of its
+    fields) and a manifest entry's own ``cand_overrides`` over it."""
+    from dataclasses import asdict
+
+    from ispatialgym.grasping import floating as FL
+
+    base = FL.FloatingConfig()
+    ov = json.loads(os.environ.get("ISG_GLIB_FLOAT_OVERRIDES") or "{}")
+    ov = {**ov, **((job or {}).get("cand_overrides") or {})}
+    unknown = sorted(set(ov) - set(asdict(base)))
+    if unknown:
+        raise ValueError(f"unknown FloatingConfig fields in the floating overrides: {unknown}")
+    return FL.FloatingConfig(**{**asdict(base), **ov}) if ov else base
+
+
+def _cand_floating(j, d, t0):
+    """i7-floating 2026-11-07: a ``floating`` job's candidates from its GraspGen output (``floating.generate``)."""
+    from ispatialgym.grasping import floating as FL
+
+    try:
+        cfg = floating_overrides(j)
+        out = FL.generate(j, d, cfg=cfg)
+        lg = out["log"]["graspgen"]
+        return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "constraint": S.FLOATING, "floating_mode": out["floating_mode"],
+                "n_candidates": len(out["candidates"]), "n_geometry_ok": len(out["candidates"]), "n_representatives": len(out["representatives"]),
+                "gates": {k: v for k, v in lg.items() if k.startswith("n_")}, "gate_dump": CA_GATE_DUMP if cfg.gate_dump else None}
+    except Exception as e:  # noqa: BLE001
+        return {"id": j["id"], "ok": False, "constraint": S.FLOATING, "error": repr(e), "tb": traceback.format_exc()[-800:]}
+
+
+CA_GATE_DUMP = "gate_dump.json"
 
 
 def stage_candidates(args, jobs):
@@ -165,13 +206,26 @@ def stage_validate(args, jobs, world=None):
     for j in todo:
         d = S.job_dir(j, args.root)
         try:
-            rec = VT.run_model(world, j, d)
+            if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: in hand, gravity, the held motions (validate_floating)
+                from ispatialgym.grasping import validate_floating as VF
+
+                rec = VF.run_model(world, j, d, cfg=floating_validate_overrides())
+            else:
+                rec = VT.run_model(world, j, d)
             rec["ok"] = True
         except Exception as e:  # noqa: BLE001
             rec = {"id": j["id"], "ok": False, "error": repr(e), "tb": traceback.format_exc()[-1500:]}
         _log(args, "validate", rec)
     print("GB_VALIDATE_DONE", flush=True)
     return world
+
+
+def floating_validate_overrides():
+    """i7-floating 2026-11-07: opt-in ``ISG_GLIB_FLOAT_VAL_OVERRIDES`` (JSON of ``validate_floating.FloatingValidateConfig`` fields)."""
+    from ispatialgym.grasping import validate_floating as VF
+
+    ov = json.loads(os.environ.get("ISG_GLIB_FLOAT_VAL_OVERRIDES") or "{}")
+    return VF.FloatingValidateConfig(**ov)
 
 
 def settle_first_on() -> bool:
@@ -195,6 +249,9 @@ def stage_settle(args, jobs, world=None):
     cfg = world.cfg
     out: List[Dict[str, Any]] = []
     for j in jobs:
+        if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: a floating object is never set down
+            out.append(j)
+            continue
         d = S.job_dir(j, args.root)
         t0 = time.time()
         path = os.path.join(d, "settle_first.json")
@@ -246,6 +303,8 @@ def rest_retry_jobs(args, jobs) -> List[Dict[str, Any]]:
     with an unstable canonical pose gets its grasps on the rest it really takes."""
     out = []
     for j in jobs:
+        if (j.get("constraint") or "tabletop") == S.FLOATING:  # i7-floating: no support, no rest to retry at
+            continue
         d = S.job_dir(j, args.root)
         lib = S.load_json(os.path.join(d, "library.json")) or {}
         if lib.get("grasps"):

@@ -22,7 +22,8 @@ joint limit; neither safe: more clearance), easier to reach (the largest arm-joi
 ``against_default``. The right hold keeps its cache key and entry, constraint record, B7 prior and record fields; a left hold
 has its own cache key (arm + approach), ``left_arm_q`` fields and no B7 prior (the survey was rendered with the right hand).
 
-Grasp: a library grasp of the ``floating`` pipeline (§2.2), realised as v1 §5.2 (fingers advanced 1 mm/step until both
+Grasp: a library grasp of the ``floating`` pipeline (§2.2; with a v2 library, a ``floating`` v2 entry linked to the key -
+``grasping.floating``, i7-floating 2026-11-07 - and no other constraint's entry, :func:`check_v2_floating`), realised as v1 §5.2 (fingers advanced 1 mm/step until both
 pads touch, 4 mm press through the assisted-grasp window, gravity re-enabled, still held); a row whose attach fails is
 ``Reject("grasp_failed")`` — never an AABB heuristic. The realised grasp (finger joints, object pose in the eef frame,
 key / name) is what the TRO ``grasps[0]`` stores (loader contract §3.14). Which row (owner 2026-10-11: diverse grasps
@@ -490,6 +491,30 @@ def floating_key(category: str, model: str, preferred: Optional[str]) -> str:
     return key
 
 
+class V2ScaleMismatch(Exception):
+    """The v2 entry serving a floating key was built at another scale than the object is spawned at (P2 §11: the lookup enforces scale)."""
+
+
+def check_v2_floating(key: str, spawn_scale=None) -> None:
+    """i7-floating 2026-11-07 (§2.2 "no fallback to another pipeline", in the v2 library): a v2 entry serving the floating key ``key`` must
+    be a ``floating`` entry (``grasping.floating``: GraspGen proposals validated in hand, no support) - a tabletop / attachment entry of the
+    same model linked to it is refused (``ValueError`` -> ``missing_grasps:floating``); a spawn scale (None = 1) other than the entry's is
+    logged ``V2_SCALE_MISMATCH`` and, under v2 only, raises :class:`V2ScaleMismatch`. No v2 entry (the legacy library serves): nothing
+    to check - the legacy path is unchanged."""
+    lib = GL.v2_entry(key)
+    if lib is None:
+        return
+    cons = lib.data.get("constraint") or "tabletop"
+    if cons != PIPELINE:
+        raise ValueError(f"v2 entry {os.path.basename(os.path.dirname(lib.path))} of {key!r} is a {cons!r} entry, not floating (held_object §2.2)")
+    from ispatialgym.grasping import schema as GS
+
+    if GS.canonical_scale(spawn_scale) != lib.scale:
+        log.info("V2_SCALE_MISMATCH %s: spawned %s, entry %s", key, GS.canonical_scale(spawn_scale), lib.scale)
+        if GL.v2_only():
+            raise V2ScaleMismatch(f"{key}: spawned at {GS.canonical_scale(spawn_scale)}, v2 entry at {lib.scale}")
+
+
 def start_controller_targets(robot, state, arm: str) -> Dict[str, float]:
     """``robot_state.controller_targets`` of a settled start (joint name -> drive target of ``state``): the trunk, the idle arm
     and the holding ``arm``, each group complete - the loader applies complete groups only
@@ -833,9 +858,12 @@ class HeldObjectV2(SamplerV2):
             raise Reject("spec", f"{target.name} has no collision geometry")
         try:
             self.grasp_key = floating_key(choice.category, choice.model, choice.grasp_key)
+            check_v2_floating(self.grasp_key, choice.scale)
             self.grasps = GL.load_grasps(self.grasp_key)
         except (FileNotFoundError, ValueError) as e:
             raise Reject(f"missing_grasps:{PIPELINE}", f"{choice.category}/{choice.model}: {e}")
+        except V2ScaleMismatch as e:
+            raise Reject("v2_scale_mismatch", f"{choice.category}/{choice.model}: {e}")
         self.equivalences = self.gp.orientation_equivalences("target", choice.category, choice.model)
         self.check_symmetry()
         self.choose_hold()
