@@ -308,11 +308,11 @@ def test_the_axial_stop_brace_produces_the_golden_candidates(name):
 
 def test_the_full_open_brace_switch(monkeypatch):
     """Owner decision 2026-11-07: ``ISPATIALGYM_BRACE_FULL_OPEN=1`` puts the full-open spread (2 x 0.05 + 0.027 = 0.127 m, 0.05 per finger)
-    first; "0" (default) keeps today's spreads and records (the golden lists above run with it off)."""
+    first (the default since i7-contactbrace 2026-11-08); "0" keeps today's spreads and records."""
     from ispatialgym.tests import test_iors_small_lift as LIFT
     from ispatialgym.tests import test_touching_brace_open_push_speed as BO
 
-    monkeypatch.delenv(CPZ.BRACE_FULL_OPEN_ENV, raising=False)
+    monkeypatch.setenv(CPZ.BRACE_FULL_OPEN_ENV, "0")
     gs = CPZ.PoseGen({})
     assert CPZ.BRACE_FULL_OPEN_SPREAD_M == 0.127 and CPZ.brace_wide_spreads(gs) == [0.09, 0.07, 0.05] and not CPZ.brace_full_open_on()
 

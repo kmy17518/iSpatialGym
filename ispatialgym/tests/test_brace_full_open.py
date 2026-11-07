@@ -41,18 +41,22 @@ def _q_locked(stance=None, fingers=None, **kw):
 @pytest.fixture
 def switch(monkeypatch):
     def _set(on: bool):
-        if on:
-            monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, "1")
-        else:
-            monkeypatch.delenv(TT.BRACE_FULL_OPEN_ENV, raising=False)
+        monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, "1" if on else "0")
     _set(False)
     return _set
 
 
 # ---------------------------------------------------------------------------------------------------------- the rule and its switch
 
+def test_the_default_is_full_open(monkeypatch):
+    """i7-contactbrace 2026-11-08: the owner's rule adopted after the A/B - unset = on; ``0`` = the openings of before."""
+    monkeypatch.delenv(TT.BRACE_FULL_OPEN_ENV, raising=False)
+    assert TT.BRACE_FULL_OPEN_DEFAULT == "1" and TT.brace_full_open() and TT.brace_opening(0.04) == 0.05
+    assert TT.contact_map_knobs("touch_brace") == {"brace_full_open": True}
+
+
 def test_brace_opening_per_switch(switch, monkeypatch):
-    assert not TT.brace_full_open()  # the default: today's openings
+    assert not TT.brace_full_open()  # switched off: today's openings
     assert TT.brace_opening(0.04) == 0.04 and TT.brace_opening(0.04, room=0.01) == 0.04
     monkeypatch.setenv(TT.BRACE_FULL_OPEN_ENV, "0")
     assert TT.brace_opening(0.04) == 0.04

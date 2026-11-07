@@ -2469,9 +2469,14 @@ BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
 BRACE_STOP_END_MARGIN_M = 0.01
 
 
+#: the switch's default (i7-contactbrace 2026-11-08: ON after the owner's A/B - no alias regressed; "0" = the openings of before 2026-11-07)
+BRACE_FULL_OPEN_DEFAULT = "1"
+
+
 def brace_full_open() -> bool:
-    """Whether ``ISPATIALGYM_BRACE_FULL_OPEN`` is on (owner 2026-11-07: an open brace opens fully; default off = today's openings)."""
-    return os.environ.get(BRACE_FULL_OPEN_ENV, "0").strip().lower() in ("1", "true", "on", "yes")
+    """Whether ``ISPATIALGYM_BRACE_FULL_OPEN`` is on (owner 2026-11-07: an open brace opens fully; default :data:`BRACE_FULL_OPEN_DEFAULT`,
+    ``0`` = the openings of before)."""
+    return os.environ.get(BRACE_FULL_OPEN_ENV, BRACE_FULL_OPEN_DEFAULT).strip().lower() in ("1", "true", "on", "yes")
 
 
 def brace_opening(today: float, room: Optional[float] = None) -> float:
