@@ -72,6 +72,15 @@ DEFAULT_YAWS = 8
 # ------------------------------------------------------------------------------------------------ helpers
 
 
+def _redigest(e: Dict[str, Any]) -> Dict[str, Any]:
+    """The entry's digest over its fields as built (``contact_entry``'s, plus what the family adds after it: the partner gap, the task goal,
+    the yaw slot, the axial facts) - the identity a contact map's pose set reads."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    e["digest"] = CPZ.digest({k: v for k, v in e.items() if k not in ("digest", "validation", "sampler_screen")})
+    return e
+
+
 def yaw_slots(n: int = DEFAULT_YAWS) -> List[float]:
     return [2 * math.pi * k / n for k in range(int(n))]
 
@@ -155,7 +164,7 @@ def build_touching_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params
             e["push"]["stop_gap_m"] = round(gap, 5)  # the partner stands this far ahead of the target's leading face (the trial's stop)
             e["goal_target"] = {"kind": "translate", "along_push_m": round(gap, 5), **TOUCH_GOAL_TOL,
                                 "source": "touching: the target ends touching its partner - the place gap along the push (IORSSmall.push_distance - push_margin)"}
-            out.append(e)
+            out.append(_redigest(e))
     return out
 
 
@@ -186,7 +195,7 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
             # the sampler's screen (IORSSmall._touching_brace_choice: hand_overlap against the partner's box)
             e["sampler_screen"] = {"hand_overlap": CPZ.hand_overlap(contact, th.as_tensor(pts_obj, dtype=th.float32), _tpose(T), against="box"), "against": "box"}
             e["load"] = {"direction": [float(v) for v in TOUCH_DIRECTION], "what": "the touching push drives the target into the partner along +y"}
-            out.append(e)
+            out.append(_redigest(e))
     return out
 
 
@@ -263,7 +272,7 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
                     e["load"] = {"frame": "rule", "direction": [round(float(v), 6) for v in d_stop.tolist()],
                                  "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ end_goal.double().numpy() + Ti[:3, 3])],
                                  "what": "the right arm's axial push brings the end into the stop at the goal"}
-                    out.append(e)
+                    out.append(_redigest(e))
     return out
 
 
@@ -332,7 +341,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
                             e["axial"] = {"blade_half_thickness_m": round(float(geo[1]), 5), "fingertip_z_rule": round(float(geo[2]), 5)}
                             e["goal_target"] = {"kind": "turn", "turn_rad": round(spin * turn, 6), **AXIAL_GOAL_TOL,
                                                 "source": "alignment-axial: the goal yaw (orientation only, the customs tolerance 0.1 rad)"}
-                            out.append(e)
+                            out.append(_redigest(e))
     return out
 
 

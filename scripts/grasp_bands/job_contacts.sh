@@ -8,6 +8,12 @@
 # build: python -m ispatialgym.grasping.contact_library build (no simulator); validate: one Isaac Sim world per kind and arm (push: right,
 # brace: left), the shard's manifest ids (the build's partition). Logs: $GC_ROOT/logs/{build,validate}_<i>of<N>.jsonl + <stage>_<i>.log.
 # A failure inside python can still exit 0: the stages count only with their done lines (GB_CONTACT_BUILD_DONE / GB_CONTACT_VALIDATE_DONE).
+# maps (i7-contact 2026-11-07, step 3): the contact maps of the root's libraries (python -m ispatialgym.sampling.contact_maps compute) per
+# GC_MAP_KINDS (default "touch_push touch_brace push_blade axial_brace"; a kind whose libraries the root does not hold is a no-op), the
+# library entries with a verdict in GC_MAP_VERDICTS (default "valid"; "all" = unvalidated too), at GC_MAP_HEIGHTS (default each library's
+# validate.support_z), written to GC_MAPS_OUT (default $GC_ROOT/maps: <entry>/cmap__<kind>__*; the sampler reads them from the maps root
+# ISPATIALGYM_REACH_MAPS beside the grasp maps). Logs $GC_ROOT/logs/maps_<i>_<kind>.log + $GC_MAPS_OUT/logs/maps_<kind>_<i>of<N>.jsonl:
+#   GC_STAGES=maps GC_MANIFEST=none GC_GLIB=none GC_ROOT=<library root> GC_NSHARD=N ISG_GB_ROOT=<snapshot> sbatch --array=0-$((N-1)) job_contacts.sh
 #SBATCH --job-name=isgcontact
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -47,6 +53,16 @@ if [[ " $STAGES " == *" validate "* ]]; then
     python -u -m ispatialgym.grasping.validate_contacts --root $ROOT --kind $KIND --glib $GLIB --jobs $M --shard $I/$N >> $ROOT/logs/validate_${I}_$KIND.log 2>&1
     rc=$?; grep -q "GB_CONTACT_VALIDATE_DONE" $ROOT/logs/validate_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
     echo "GC_STAGE validate kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
+  done
+fi
+if [[ " $STAGES " == *" maps "* ]]; then
+  MOUT=${GC_MAPS_OUT:-$ROOT/maps}; mkdir -p $MOUT
+  for KIND in ${GC_MAP_KINDS:-touch_push touch_brace push_blade axial_brace}; do
+    t0=$(date +%s)
+    python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT --shard $I/$N --verdicts ${GC_MAP_VERDICTS:-valid} \
+      ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} >> $ROOT/logs/maps_${I}_$KIND.log 2>&1
+    rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $ROOT/logs/maps_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
+    echo "GC_STAGE maps kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
   done
 fi
 echo "GC_JOB_DONE shard $I rc=$RC end $(date +%s)"

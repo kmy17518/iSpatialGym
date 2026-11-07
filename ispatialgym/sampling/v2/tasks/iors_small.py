@@ -2487,9 +2487,15 @@ class IORSSmall(SamplerV2):
         # target's right face at the *place* position) lies in the right band and whose brace point (partner's far / left
         # face) lies in the left contact band of the same trunk is preferred and enables the brace; otherwise the last
         # drawn position is kept and the instance becomes push-only (``self._brace_gate`` tells ``touching_contacts``)
-        right_cells = self.bands.band(manip.translate, manip.tilt, **TT.band_kw(self.bands, manip)) if getattr(self, "bands", None) is not None else None
-        left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
-        self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
+        maps = TT.contact_maps_on() and self.shelf_start is None  # i7-contact: the touch_push / touch_brace maps under v2only
+        if maps:
+            right_cells = left_cells = None
+            self.contact_maps_of_pair()  # a miss rejects missing_map (MAP_REQUEST logged)
+            self.template_facts["left_contact_band"] = "touch_brace map"
+        else:
+            right_cells = self.bands.band(manip.translate, manip.tilt, **TT.band_kw(self.bands, manip)) if getattr(self, "bands", None) is not None else None
+            left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=manip)
+            self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         faces_yaws = self.widest_faces_partner_yaws(t_pose, manip) if self.widest_faces() else None  # the two turns parallel to the target
         if self.pair_goal_align() is not None:
             faces_yaws = [self.pair_partner_yaw(t_pose)]  # the front at the required turn from the target's
@@ -2508,6 +2514,13 @@ class IORSSmall(SamplerV2):
                 misses.append(f"yaw {math.degrees(yaw):+.0f}: {why}")
                 continue
             p_pose = pose
+            if maps:
+                g = self.contact_map_gate(manip, self.place_pose_for(t_pose, p_pose, manip), p_pose)
+                if g["ok"]:
+                    self._brace_gate = g
+                    return p_pose
+                errors.append(g["why"])
+                continue
             if left_cells is None or right_cells is None:
                 self._brace_gate = {"ok": None, "why": "left contact band unavailable"}  # unknown: the two-arm IK decides
                 return p_pose
@@ -2521,6 +2534,10 @@ class IORSSmall(SamplerV2):
                           f"{[round(float(v), 2) for v in b_b]} {'in' if in_band(b_b, left_cells) else 'OFF'} left band")
         if p_pose is None:
             raise Reject("partner_placement", f"no partner yaw of 8 admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
+        if maps:
+            self._brace_gate = {"ok": False, "maps": True, "why": f"none of 8 partner positions has the push (touch_push map) and the brace (touch_brace map) "
+                                                                  f"feasible at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
+            return p_pose
         self._brace_gate = {"ok": False, "why": f"none of 8 partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace point "
                                                 f"in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
         return p_pose
@@ -4361,12 +4378,38 @@ class IORSSmall(SamplerV2):
             obj.keep_still()
             TT.sync_moved(self.kit, [obj])
 
+    def contact_maps_of_pair(self):
+        """i7-contact 2026-11-07 (step 3, under v2only): the target's ``touch_push`` map (right arm) and the partner's ``touch_brace`` map
+        (left arm) at the top (``tabletop.contact_map``); a miss rejects ``missing_map`` (the ``MAP_REQUEST`` line names it)."""
+        pm = TT.contact_map(self, "touch_push", "target", self.top)
+        bm = TT.contact_map(self, "touch_brace", "partner", self.top)
+        missing = [k for k, m in (("touch_push", pm), ("touch_brace", bm)) if m is None]
+        if missing:
+            raise Reject("missing_map", f"no {' / '.join(missing)} contact map at {self.top.name}'s height (MAP_REQUEST logged)")
+        return pm, bm
+
+    def contact_map_gate(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
+        """The A1 joint gate on the contact maps (i7-contact, under v2only): the TARGET's root at its place pose in the ``touch_push`` map
+        (a feasible push class at its yaw slot) and the PARTNER's root in the ``touch_brace`` map, at stance ``st`` - the maps are keyed by
+        the object ROOT and its yaw from the stance (the band gate tested face points against grasp cells); the exact chain IK decides."""
+        pm, bm = self.contact_maps_of_pair()
+        w = TT.contact_map_check(pm, st, t_place_pose)
+        b = TT.contact_map_check(bm, st, p_pose)
+        ok = bool(w["ok"] and b["ok"])
+        out = {"ok": ok, "maps": True, "stance": st.name, "work": {k: w.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")},
+               "brace": {k: b.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}}
+        if not ok:
+            out["why"] = f"push {'ok' if w['ok'] else 'OFF: ' + str(w['why'])} / brace {'ok' if b['ok'] else 'OFF: ' + str(b['why'])} at {st.name}"
+        return out
+
     def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
         brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``). The shelf
         layout has no brace at any stance."""
         if self.shelf_start is not None:
             return {"ok": False, "stance": st.name, "why": "shelf layout: the side board holds the partner, no brace"}
+        if TT.contact_maps_on():
+            return self.contact_map_gate(st, t_place_pose, p_pose)
         right_cells = self.bands.band(st.translate, st.tilt, **TT.band_kw(self.bands, st)) if getattr(self, "bands", None) is not None else None
         left_cells = left_contact_band_cells(self, (st.translate, st.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]), stance=st)
         if left_cells is None or right_cells is None:

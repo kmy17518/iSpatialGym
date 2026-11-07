@@ -1341,6 +1341,83 @@ def floor_map_bands(s, spec: BandSpec, arm: Optional[str] = None, *, floor=None,
     return MS.as_bands(rm, overhang=0.0)
 
 
+# ---------------------------------------------------------------------------------------------------------------- contact maps
+# i7-contact 2026-11-07 (step 3): the contact maps of the PUSH / BRACE libraries (``sampling.contact_maps``: touch_push / touch_brace /
+# push_blade / axial_brace / floor_push) read by the touching brace gate and the axial joint placement under v2only. A map is a proposal
+# filter at (stance, object ROOT, object yaw); the exact chain IK of the samplers stays the decision.
+
+
+def contact_maps_on() -> bool:
+    """The samplers read their contact maps: ``ISPATIALGYM_V2_ONLY`` with a maps root (``ISPATIALGYM_REACH_MAPS``; the contact maps sit in its
+    ``<entry>/cmap__*`` files beside the grasp maps)."""
+    return bool(RB.v2_only() and map_sampling_root())
+
+
+def _map_anchors():
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
+    if not (ap and os.path.exists(ap)):
+        return None
+    with open(ap) as f:
+        an = json.load(f)
+    return AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+
+
+def contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None):
+    """The ``kind`` contact map (``contact_maps.ContactMap.find``) of the sampler's ``role`` object - its v2 library entry and stable rest
+    (:func:`_v2_map_entry`: the spawn scale enforced) - at the top's height above the floor (the anchors of ``ISPATIALGYM_REACH_MAP_ANCHORS``,
+    else the map's own height), the kind's arm, the shared contact policy's key, the robot digest, ``ISPATIALGYM_REACH_MAP_REQUIRE``; cached
+    per (kind, role, support, arm) on ``s._contact_maps``. None on a miss, with one ``MAP_REQUEST`` line (kind, entry, rest, h, arm, role,
+    support, scene)."""
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import contact_maps as CMAP
+    from ispatialgym.sampling import reach_maps as RMAP
+
+    arm = arm or CMAP.KINDS[kind]["arm"]
+    cache = s.__dict__.setdefault("_contact_maps", {}) if hasattr(s, "__dict__") else {}
+    ck = (kind, role, str(getattr(top, "name", "")), arm)
+    if ck in cache:
+        return cache[ck]
+    mc = s.choice.models[role]
+    spec = BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=mc.grasp_key, scale=list(mc.scale) if mc.scale else None)
+    h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
+    req = dict(kind=kind, role=role, object=spec.object, grasp_key=spec.grasp_key, h=round(h, 4), arm=arm, support=str(getattr(top, "name", "")),
+               scene=str(getattr(s.world, "scene_model", "")))
+    ent = _v2_map_entry(s, spec)
+    cm = None
+    if ent is None:
+        log.info("contact map miss (%s, %s %s): no v2 library entry / stable rest", kind, role, spec.object)
+    elif not map_sampling_root():
+        log.info("contact map miss (%s, %s %s): no maps root", kind, role, spec.object)
+    else:
+        lib, rid = ent
+        entry = os.path.basename(os.path.dirname(lib.path))
+        req.update(entry=entry, rest_id=rid)
+        cm = CMAP.ContactMap.find(map_sampling_root(), kind, entry, h, rest_id=rid, arm=arm, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(),
+                                  anchors=_map_anchors(), config_require=_map_config_require())
+    if cm is None:
+        map_request(s, **req)
+    else:
+        log.info("contact map hit (%s, %s %s) at h %.4f (%s): %s", kind, role, spec.object, h, (cm.lookup_how or {}).get("how"), cm.path)
+    cache[ck] = cm
+    return cm
+
+
+def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06) -> Dict[str, Any]:
+    """``ContactMap.lookup`` at ``stance`` for the object at ``pose`` (world): its ROOT xy in the base frame, its yaw from the stance (about z,
+    over the rest the map's entries stand on: ``meta["entry_rest_quat_xyzw"]``), the stance's stand-off and trunk; ``tol`` the in-band
+    distance of a point to a cell (``stances.BAND_CELL_TOL``)."""
+    from ispatialgym.sampling import contact_maps as CMAP
+
+    xy = stance.world_to_base(_t(pose[0])[:2])
+    rest = cm.meta.get("entry_rest_quat_xyzw") or [0.0, 0.0, 0.0, 1.0]
+    yaw = C.wrap_angle(CMAP.yaw_of([float(v) for v in _t(pose[1]).tolist()], rest) - float(stance.base_pose2d[2]))
+    so = getattr(stance, "stand_off", None)
+    return cm.lookup(float(so) if so is not None else min(cm.meta["edge_distances"]), float(stance.translate), float(stance.tilt),
+                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol)
+
+
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
                   trunks: Optional[Sequence[Tuple[float, float]]] = None) -> RB.ReachBands:
     """§4.1 steps 1–4 in-process (``reach_bands.BandComputer``) at the band stance (edge midpoint, s = 0.45 + overhang) of

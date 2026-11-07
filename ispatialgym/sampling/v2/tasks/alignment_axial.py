@@ -173,7 +173,13 @@ class AlignmentAxial(SamplerV2):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 # A1: the left contact band of the target's height class (stop-edge brace); §4.4 margins over the union
-                self.left_bands = TT.load_left_contact_band(self, ez, top=self.top, edge=edge, compute=TT.left_band_compute())
+                if TT.contact_maps_on():
+                    # i7-contact 2026-11-07 (step 3, under v2only): the push_blade / axial_brace contact maps replace the generic band
+                    # (work) and the left contact band / reach proxy box (brace) in the joint placement; a miss rejects missing_map
+                    self.left_bands = None
+                    self.axial_maps()
+                else:
+                    self.left_bands = TT.load_left_contact_band(self, ez, top=self.top, edge=edge, compute=TT.left_band_compute())
                 init0 = TT.phase1b_init_trunk(self, st, ez, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = None
                 for _ in range(8):  # §6.10: retry the next lateral position before the next edge (8 draws: the rule is sensitive to the lateral)
@@ -338,6 +344,9 @@ class AlignmentAxial(SamplerV2):
                 contact_xy = side_pt[:2] - d[:2] * push_half
                 goal_pose, stop_pts, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
                 stop_pt = stop_pts[0]  # the band test uses the corner-side point (the brace candidates run along the face)
+                if TT.contact_maps_on():
+                    pairs.append((e, self.map_joint_placement(manip, pose, goal_pose, spin0, abs(d_goal0)), goal_pose, stop_pts, d_stop))
+                    continue
                 jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, z_axis), tol_brace=BRACE_CELL_TOL)
                 if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
                     jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)), tol_brace=BRACE_CELL_TOL)
@@ -514,6 +523,37 @@ class AlignmentAxial(SamplerV2):
         self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
         self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
         return draft
+
+    def axial_maps(self):
+        """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm) and ``axial_brace`` map (left arm) at the
+        top (``tabletop.contact_map``); a miss rejects ``missing_map`` (the ``MAP_REQUEST`` line names it)."""
+        pm = TT.contact_map(self, "push_blade", "target", self.top)
+        bm = TT.contact_map(self, "axial_brace", "target", self.top)
+        missing = [k for k, m in (("push_blade", pm), ("axial_brace", bm)) if m is None]
+        if missing:
+            raise Reject("missing_map", f"no {' / '.join(missing)} contact map at {self.top.name}'s height (MAP_REQUEST logged)")
+        return pm, bm
+
+    def map_joint_placement(self, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float) -> Dict[str, Any]:
+        """The A1 joint placement on the contact maps (``TT.joint_placement``'s dict): the WORK side = the target's root at its init pose in
+        the ``push_blade`` map (a feasible arc class of the push's spin at the entry turn nearest ``turn``: the map's chain holds the
+        executed pre, the init AND the arc to the goal), the BRACE side = the target's root at its GOAL pose in the ``axial_brace`` map (a
+        feasible stop-brace class of the spin) - instead of the generic band's work cell and the left contact band / reach proxy box."""
+        pm, bm = self.axial_maps()
+        turns = sorted({abs(float(r["arc_turn_rad"])) for r in pm.meta["classes"] if r and r.get("arc_turn_rad") is not None})
+        t_near = min(turns, key=lambda t: abs(t - turn)) if turns else None
+
+        def keep_push(r):
+            a = r.get("arc_turn_rad")
+            return a is not None and math.copysign(1.0, float(a)) == spin and (t_near is None or abs(abs(float(a)) - t_near) < 1e-4)
+
+        w = TT.contact_map_check(pm, manip, pose, keep=keep_push)
+        b = TT.contact_map_check(bm, manip, goal_pose, keep=lambda r: float((r.get("goal") or {}).get("spin", spin)) == spin)
+        return {"ok": bool(w["ok"] and b["ok"]), "work_ok": bool(w["ok"]), "brace_ok": bool(b["ok"]), "brace_class_ok": True, "left_band": False,
+                "maps": {"push_blade": {k: w.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}, "turn_class_rad": t_near,
+                         "axial_brace": {k: b.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}},
+                # the map's class labels are the library's (no band class names: the pitch order and the brace's passing classes keep their defaults)
+                "work_cell": w.get("cell"), "brace_cell": b.get("cell"), "classes": None, "brace_classes": None, "brace_class": None}
 
     def _stop_geometry(self, pose: TT.Pose, end: th.Tensor, com: th.Tensor, spin: float, yaw_goal: float, z_brace: float):
         """§6.10 stop edge of the pushed ``end``: ``(goal_pose, stop_pts, d_stop)`` (``contact_poses.axial_stop_geometry``, the rule the brace
