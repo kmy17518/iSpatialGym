@@ -1,7 +1,9 @@
 """Sampling from scene-independent reach maps (:mod:`reach_maps`): the sampler-facing view and the weighted, continuous proposals.
 
-* :func:`as_bands` - a map at a real support (its actual top height, the edge's overhang) as a :class:`reach_bands.ReachBands`-shaped
-  view (multi-distance: one stand-off per map edge distance, ``stand_off = d_e - overhang``) so the tabletop sampler's stance search
+* :func:`as_bands` - a map at a real support (its actual top height) as a :class:`reach_bands.ReachBands`-shaped view (multi-distance:
+  one stand-off per map edge distance, ``stand_off = d_e - overhang``; the sampler passes ``overhang = 0`` - its stance stands
+  ``stand_off + overhang`` outside the raster edge, i.e. ``stand_off`` from the physical edge the map's ``d_e`` measures; of-v2maps
+  2026-11-07, prompt I item 8) so the tabletop sampler's stance search
   (``band_cells_world``, ``workspace``, ``phase2_manipulation_stance``) runs on it unchanged. The view is tagged
   ``meta["mode"] = "map_view"`` and has no file path (band refinement and job-local band copies never touch it); a legacy band is
   never built from a map and a map is never read as a band.
