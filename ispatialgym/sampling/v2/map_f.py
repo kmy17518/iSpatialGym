@@ -42,7 +42,9 @@ def family_on() -> bool:
 
 
 def is_view(b) -> bool:
-    return isinstance(getattr(b, "meta", None), dict) and b.meta.get("mode") == "map_view" and bool(b.meta.get("map_path"))
+    # i7-generic 2026-11-07: a generic map view has classes, not library grasps - never F's source
+    return (isinstance(getattr(b, "meta", None), dict) and b.meta.get("mode") == "map_view" and bool(b.meta.get("map_path"))
+            and b.meta.get("map_kind") != RM.GENERIC_KIND)
 
 
 def reach_map_of(view) -> RM.ReachMap:

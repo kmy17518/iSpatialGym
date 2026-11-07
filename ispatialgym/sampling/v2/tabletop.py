@@ -1099,11 +1099,11 @@ def map_request(s, **fields) -> None:
 def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
     """of-v2maps 2026-11-07 (prompt I item 7, the shared dispatch of :func:`ensure_bands` and :func:`map_view_arm_band`): the v2 map view of
     a band spec by its kind - a placed TRAY (disembedding: ``placed`` tray tokens and ``z_support`` = the tray's inner floor) reads the
-    tabletop map at the tray-floor height (an EXACT anchor only), a plain spec the tabletop map at the top; generic pinch / attach / interior
-    specs have no map kind yet (None + MAP_REQUEST). Every lookup enforces the item-11 identity (:func:`map_bands`)."""
+    tabletop map at the tray-floor height (an EXACT anchor only), a plain spec the tabletop map at the top, a generic pinch the generic map
+    at the top (:func:`generic_map_bands`, i7-generic); attach / interior specs have no map kind yet (None + MAP_REQUEST). Every lookup
+    enforces the item-11 identity (:func:`map_bands`, :func:`generic_map_bands`)."""
     if spec.generic_pinch:
-        map_request(s, kind="generic", support=getattr(top, "name", None), h=round(float(top.z) - float(getattr(s.world, "floor_z", 0.0)), 4), arm=arm or spec.arm)
-        return None
+        return generic_map_bands(s, spec, top, arm)
     if spec.placed:
         if spec.z_support is not None and all(str(p).startswith("tray/") for p in spec.placed):
             return map_bands(s, spec, top, arm, z_support=float(spec.z_support), exact_anchor=True, plane="tray_floor")
@@ -1115,6 +1115,68 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
                     grasp_key=spec.grasp_key, arm=arm or spec.arm)
         return None
     return map_bands(s, spec, top, arm)
+
+
+def generic_map_pose_set(spec: BandSpec) -> Dict[str, Any]:
+    """i7-generic 2026-11-07: the generic map pose set a generic-pinch spec needs (``reach_maps.generic_pose_set``): the legacy eef height
+    ``max(0.6 h, 0.03)`` of the spec's object height (``reach_maps.generic_dz``: 0.03 for the six aliases), the default finger opening;
+    ``ISPATIALGYM_GENERIC_MAP_FINGERS`` (m per finger) asks for the maps of another opening (e.g. 0 = a closed-blade build)."""
+    from ispatialgym.sampling import reach_maps as RMAP
+
+    f = os.environ.get("ISPATIALGYM_GENERIC_MAP_FINGERS")
+    return RMAP.generic_pose_set(RMAP.generic_dz(spec.height), float(f) if f not in (None, "") else None)
+
+
+def generic_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
+    """i7-generic 2026-11-07 (prompt I item 7, the generic kind): the generic-pinch map (``reach_maps.find_generic`` in
+    ``<ISPATIALGYM_REACH_MAPS>/_generic``) at the support's actual height above the floor as a multi-distance band view whose per-cell
+    class bitmask is the legacy generic band's (``map_sampling.as_bands``), or None + one MAP_REQUEST line (kind, plane, h, arm, dz, fingers,
+    support, scene). The anchor rule is :func:`map_bands`': the top's height exact or within its anchor's clipped range (``view.meta
+    ["anchor_lookup"]`` records which: ``exact`` / ``approx`` / ``height`` = no anchor file, the map's own height only); a ``z_support``
+    plane (none of the generic tasks has one) takes an EXACT anchor only, as the tray floor does. Identity: arm, pose set, the shared
+    contact policy's key, the robot digest, ``ISPATIALGYM_REACH_MAP_REQUIRE``. A hit turns the grasp-approach support policy on and
+    registers the support's measured top (``ikc.support_plane_z``) as :func:`map_bands` does; the push, the picks and every IK stay exact."""
+    arm = arm or spec.arm
+    from ispatialgym.grasping import contact_policy as CP
+    from ispatialgym.sampling import map_sampling as MS
+    from ispatialgym.sampling import reach_maps as RMAP
+    from ispatialgym.sampling.height_anchors import AnchorSet
+
+    z_plane = float(spec.z_support) if spec.z_support is not None else float(top.z)
+    h = z_plane - float(getattr(s.world, "floor_z", 0.0))
+    plane = "top" if spec.z_support is None else "z_support"
+    pose_set = generic_map_pose_set(spec)
+    req = dict(kind=RMAP.GENERIC_KIND, plane=plane, h=round(h, 4), arm=arm, dz_m=pose_set["dz_m"], fingers_q=pose_set["fingers_q"],
+               support=str(getattr(top, "name", "")), scene=str(getattr(s.world, "scene_model", "")))
+    root = map_sampling_root()
+    anchors = None
+    ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
+    if ap and os.path.exists(ap):
+        with open(ap) as f:
+            an = json.load(f)
+        anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+    if root is None or (spec.z_support is not None and (anchors is None or anchors.lookup(h)[1] != "exact")):
+        log.info("generic reach map miss at h %.4f, %s arm (%s): %s", h, arm, plane, "no maps root" if root is None else f"no EXACT anchor for the {plane}")
+        map_request(s, **req)
+        return None
+    cfg_req = json.loads(os.environ.get("ISPATIALGYM_REACH_MAP_REQUIRE") or "{}") or None
+    gdir = os.path.join(root, RMAP.GENERIC_DIR)
+    rm = RMAP.find_generic(gdir, h, arm=arm, pose_set=pose_set, policy_key=CP.DEFAULT.key(arm), robot=RMAP.robot_digest(), config_require=cfg_req,
+                           anchors=anchors)
+    if rm is None:
+        log.info("generic reach map miss at h %.4f, %s arm, dz %.3f, fingers %.3f (%s)", h, arm, pose_set["dz_m"], pose_set["fingers_q"], gdir)
+        map_request(s, **req)
+        return None
+    os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
+    ikc = getattr(s, "ikc", None)
+    if ikc is not None:
+        if not isinstance(getattr(ikc, "support_plane_z", None), dict):
+            ikc.support_plane_z = {}
+        ikc.support_plane_z[str(top.name)] = float(top.z)
+    view = MS.as_bands(rm, overhang=0.0)
+    view.meta["anchor_lookup"] = dict(getattr(rm, "lookup", None) or {})
+    log.info("generic reach map hit at h %.4f (%s, map h %.4f), %s arm: %s", h, view.meta["anchor_lookup"].get("how"), float(rm.meta["height"]["value"]), arm, rm.path)
+    return view
 
 
 def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: Optional[float] = None, exact_anchor: bool = False,

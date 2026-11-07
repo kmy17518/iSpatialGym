@@ -44,11 +44,19 @@ def as_bands(rm: RM.ReachMap, overhang: float = 0.0):
     """The map as a multi-distance ``ReachBands`` view (cells / pairs per trunk per stand-off) at a support with ``overhang``."""
     from ispatialgym.sampling import reach_bands as RB
 
+    # i7-generic 2026-11-07: a generic map (reach_maps.compute_generic_map) reads like the legacy --generic-pinch band - no grasp names,
+    # pairs [cell, -1, class] (ReachBands.feasible -> ("generic", class)), the class names in meta["classes"] and per cell the bitmask of
+    # the classes feasible there (bit k = class k; ReachBands.classes_at / tabletop.cell_classes / joint_placement read it unchanged)
+    generic = rm.meta.get("kind") == RM.GENERIC_KIND
     meta = {"mode": "map_view", "map_key": rm.meta["key"], "map_path": rm.path, "lattice": float(rm.meta["config"]["lattice_m"]),
-            "arm": rm.meta["arm"], "grasp_names": [g["name"] for g in rm.meta["grasps"]], "trunks": [],
+            "arm": rm.meta["arm"], "grasp_names": [] if generic else [g["name"] for g in rm.meta["grasps"]], "trunks": [],
             "stand_offs": [], "stand_off": None, "overhang": float(overhang), "height": rm.meta["height"]}
+    if generic:
+        meta.update({"map_kind": RM.GENERIC_KIND, "generic_pinch": True, "classes": [g["name"] for g in rm.meta["grasps"]],
+                     "pose_set": rm.meta.get("pose_set")})
     cells_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
     pairs_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
+    classes_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
     for d_e in rm.meta["edge_distances"]:
         so = round(float(d_e) - float(overhang), 4)
         meta["stand_offs"].append(so)
@@ -63,11 +71,16 @@ def as_bands(rm: RM.ReachMap, overhang: float = 0.0):
             cells_so[so][key] = rm.cells[ci].astype(np.float64)
             remap = {int(c): i for i, c in enumerate(ci)}
             p = np.argwhere(ok)
-            pairs_so[so][key] = np.array([[remap[int(c)], int(y), int(g)] for c, y, g in p], dtype=np.int32).reshape(-1, 3)
+            if generic:
+                pairs_so[so][key] = np.array([[remap[int(c)], -1, int(g)] for c, _, g in p], dtype=np.int32).reshape(-1, 3)
+                bits = (ok.any(axis=1).astype(np.int64) << np.arange(ok.shape[2], dtype=np.int64)[None, :]).sum(axis=1)
+                classes_so.setdefault(so, {})[key] = bits[ci]
+            else:
+                pairs_so[so][key] = np.array([[remap[int(c)], int(y), int(g)] for c, y, g in p], dtype=np.int32).reshape(-1, 3)
             meta["trunks"].append({"translate": key[0], "tilt": key[1], "stand_off": so, "posture": t.get("posture")})
     ref = meta["stand_offs"][len(meta["stand_offs"]) // 2]
     meta["stand_off"] = ref
-    return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, {}, cells_so, pairs_so, {})
+    return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, dict(classes_so.get(ref, {})), cells_so, pairs_so, classes_so)
 
 
 @dataclass
