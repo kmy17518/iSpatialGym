@@ -28,6 +28,13 @@ Placement contract (reach bands, sampling; :func:`place_object`)::
 Compatibility: a consumer passes what it requires (scale, rest_id, policy key, schema versions); :func:`check_compatible` raises
 :class:`IncompatibleRecord` on any mismatch. A legacy library entry (``runlogs/grasp_library_20260905``) has no measured rest and
 is never substituted for a v2 record (:func:`load_model` returns None; ``grasp_library.load_grasps`` keeps serving legacy keys).
+
+Candidate switches (i7-switches 2026-11-07, owner decision: the plate switches adopted after a count): the ``candidates.CandidateConfig``
+switches that change which candidates an entry holds and their recorded poses (:data:`CANDIDATE_SWITCHES`). ``library.json`` records their
+state (``candidate_switches``, from its candidates' ``config``); an entry written before that record reads its ``candidates.json`` config,
+and a config without the fields (every entry before 6e418172) reads all off. The state enters :meth:`ModelLibrary.identity` (the reach maps'
+``object_key``) only when a switch is on - every existing key is unchanged, and an entry built with a switch on never matches a map of one
+built without; ``check_compatible(candidate_switches=)`` lets a reader require a state.
 """
 
 from __future__ import annotations
@@ -58,6 +65,15 @@ DEFAULT_ROOT = os.path.join(REPO_ROOT, "runlogs", "grasp_library_v2")
 
 class IncompatibleRecord(ValueError):
     """A stored record does not match what the consumer requires (scale / rest / policy / schema)."""
+
+
+#: i7-switches 2026-11-07: the candidate-generation switches that are part of an entry's identity (module docstring)
+CANDIDATE_SWITCHES = ("blade_contact_at_retreat", "retreat_shift_exact")
+
+
+def candidate_switches(config: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+    """The switch state of a candidates config (``candidates.json`` ``config`` or a ``library.json`` record); a missing field is off."""
+    return {k: bool((config or {}).get(k, False)) for k in CANDIDATE_SWITCHES}
 
 
 def library_root(root: Optional[str] = None) -> str:
@@ -269,6 +285,7 @@ class ModelLibrary:
     path: str
     data: Dict[str, Any]
     rests: Dict[str, Rest] = field(default_factory=dict)
+    _switches: Optional[Dict[str, bool]] = field(default=None, repr=False, compare=False)
 
     @property
     def category(self) -> str:
@@ -293,21 +310,45 @@ class ModelLibrary:
     def families(self) -> Dict[str, Dict[str, Any]]:
         return dict(self.data.get("families", {}))
 
+    def candidate_switches(self) -> Dict[str, bool]:
+        """i7-switches: the candidate switches this entry was generated with - the ``library.json`` record, else its ``candidates.json``
+        config (an entry validated before the record), else all off."""
+        rec = self.data.get("candidate_switches")
+        if isinstance(rec, dict):
+            return candidate_switches(rec)
+        if self._switches is None:
+            doc = None
+            if self.path and os.path.exists(self.path):
+                doc = load_json(os.path.join(os.path.dirname(self.path), "candidates.json"))
+            self._switches = candidate_switches((doc or {}).get("config"))
+        return dict(self._switches)
+
     def identity(self) -> Dict[str, Any]:
-        """Every result-affecting factor of this library entry (for reach-map cache keys)."""
-        return {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
-                "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
-                "rests": {k: {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)} for k, r in self.rests.items()},
-                "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
-                "families": digest(self.data.get("families", {}))}
+        """Every result-affecting factor of this library entry (for reach-map cache keys). i7-switches: the candidate switches only when
+        one is on (an entry generated without them keeps its key)."""
+        out = {"schema": self.data.get("schema"), "category": self.category, "model": self.model, "scale": list(self.scale),
+               "dataset": self.data.get("dataset"), "policy_key": self.policy_key,
+               "rests": {k: {"quat_xyzw": [round(float(v), 6) for v in r.quat_xyzw], "h_root": round(r.h_root, 6)} for k, r in self.rests.items()},
+               "grasps": digest([{k: g.get(k) for k in ("name", "rest_id", "family_id", "T_object_eef", "finger_q", "width_m")} for g in self.data.get("grasps", [])]),
+               "families": digest(self.data.get("families", {}))}
+        sw = self.candidate_switches()
+        if any(sw.values()):
+            out["candidate_switches"] = sw
+        return out
 
     def identity_key(self) -> str:
         return digest(self.identity(), 16)
 
 
 def check_compatible(lib: ModelLibrary, *, scale=None, rest_id: Optional[str] = None, policy_key: Optional[str] = None,
-                     schema: str = LIBRARY) -> None:
-    """Raise :class:`IncompatibleRecord` when ``lib`` does not satisfy the consumer's requirements."""
+                     schema: str = LIBRARY, candidate_switches: Optional[Dict[str, bool]] = None) -> None:
+    """Raise :class:`IncompatibleRecord` when ``lib`` does not satisfy the consumer's requirements (``candidate_switches``: the state
+    of each named switch, i7-switches)."""
+    if candidate_switches is not None:
+        have = lib.candidate_switches()
+        bad = {k: have.get(k) for k, v in candidate_switches.items() if have.get(k) is not bool(v)}
+        if bad:
+            raise IncompatibleRecord(f"{lib.path}: candidate switches {bad} != required {dict(candidate_switches)}")
     if lib.data.get("schema") != schema:
         raise IncompatibleRecord(f"{lib.path}: schema {lib.data.get('schema')!r}, expected {schema}")
     if scale is not None and canonical_scale(scale) != lib.scale:
