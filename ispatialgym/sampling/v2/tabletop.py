@@ -1376,7 +1376,8 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
     return map_bands(s, spec, top, arm)
 
 
-def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joints: Optional[Dict[str, float]] = None, police: bool = True) -> RB.ReachBands:
+def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joints: Optional[Dict[str, float]] = None, police: bool = True,
+                       place: Optional[Dict[str, Any]] = None) -> RB.ReachBands:
     """i7-lean 2026-11-07 (owner decision; prompt I item 7, the INTERIOR kind): the interior reach map of the spec's LEAN rest
     (``reach_maps`` kind ``interior``) inside the compartment the sampler works on, as a band view (``map_sampling.as_bands``, overhang 0:
     the stand-offs = the map's edge distances to the compartment's front plane). The compartment is the registry's spec of the support at
@@ -1388,7 +1389,10 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     ``missing_map`` - there is no legacy fallback for a lean rest. ``joints`` (the fridge, inside_large_scale_02): the support's joint values
     (``generation.partner_joint_init`` applied) - the spec must have been measured at them (the door's open box is in its identity).
     ``police`` False: no support-policy registration (a PLACE band - the goal side of iors_large_inside: the grasp scope never polices it).
-    The entry's rest is the key's (a lean key: its lean rest; a plain key: the stable rest)."""
+    The entry's rest is the key's (a lean key: its lean rest; a plain key: the stable rest). i7-interior 2026-11-07: ``place`` (an
+    ``interior_place.place_rule``: the goal side of iors_large_inside at a stable rest) - only an interior PLACE map whose rule covers it
+    serves (the former interior maps judged the whole robot at the rest pose: stricter than stance C's exact place); the rule goes into the
+    MAP_REQUEST."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
     from ispatialgym.sampling import interiors as IN
@@ -1401,6 +1405,8 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     req = dict(kind="interior", plane="interior", h=round(h, 4), arm=arm, support=support, scene=scene, grasp_key=spec.grasp_key)
     if joints:
         req["joints"] = {str(k): round(float(v), 4) for k, v in joints.items()}
+    if place is not None:
+        req["interior_place"] = place
 
     def miss(why: str):
         log.info("interior reach map miss for %s (%s) in %s at h %.4f, %s arm: %s", spec.object, spec.grasp_key, support, h, arm, why)
@@ -1424,13 +1430,14 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
         miss("no maps root (ISPATIALGYM_REACH_MAPS)")
     root = os.path.join(map_sampling_root(), entry)
     rm = RMAP.ReachMap.find(root, lib, float(ispec.height_m), rest_id=rid, arm=arm, anchors=None, kind="interior", policy_key=CP.DEFAULT.key(arm),
-                            robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec)
+                            robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec, interior_place=place)
     if rm is None:
-        miss(f"no map of {ispec.name} ({ispec.digest()}) in {root}")
+        miss(f"no map of {ispec.name} ({ispec.digest()}){' under the place rule' if place is not None else ''} in {root}")
     if police:
         _register_map_policy(s, lib, rid, {support: float(top.z)})
     view = MS.as_bands(rm, overhang=0.0)
-    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid, "rest_id": rid})
+    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid, "rest_id": rid,
+                      "interior_place": (rm.meta.get("config") or {}).get("interior_place")})
     log.info("interior reach map hit for %s in %s (%s) at h %.4f, %s arm: %s", spec.object, support, ispec.name, h, arm, rm.path)
     return view
 
