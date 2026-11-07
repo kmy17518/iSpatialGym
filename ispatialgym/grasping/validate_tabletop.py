@@ -788,6 +788,8 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
                        "T_object_eef": t.get("eef_in_object_used", c["T_object_eef"]), "T_object_eef_at_attach": t["achieved"]["T_object_eef_at_attach"],
                        "width_m": c["width_m"], "preshape_q": c["preshape_q"], "finger_q": t["closure"]["fingers_final_m"],
                        "physics": "tested", "trial_forces": {k: t["forces"][k]["max"] for k in ("finger_slab", "obj_slab_ratio")}})
+        if c.get("source"):  # i7-ladder: a given pose's source ("agent" / "legacy"), its pool and proposal / legacy grasp
+            grasps[-1].update({k: c[k] for k in ("source", "family", "proposal", "legacy_grasp") if k in c})
     fams = {fid: f for fid, f in (cand_doc.get("families") or {}).items() if any(g["family_id"] == fid for g in grasps)}
     for f in fams.values():
         f["physics"] = "representative_only"
@@ -797,7 +799,10 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
             "policy_key": policy.key(policy_arm(cand_doc)), "policy": policy.meta(policy_arm(cand_doc)), "physics_profile": physics_profile,
             "rests": {k: v for k, v in rests.items()}, "families": fams, "grasps": grasps,
             "twins": "finger-swapped twins (eef turned pi about +z) are NOT stored: reach maps evaluate them with their own IK / policy checks",
-            "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "created": S.now()}}
+            "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "created": S.now()},
+            # i7-ladder 2026-11-07: the ladder step that built this entry (scripts/grasp_ladder), only when the job names one
+            **({"ladder": job["ladder"]} if job.get("ladder") else {}),
+            **({"source": sorted({g["source"] for g in grasps if g.get("source")})} if any(g.get("source") for g in grasps) else {})}
 
 
 def policy_arm(cand_doc) -> str:
