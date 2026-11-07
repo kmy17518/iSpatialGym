@@ -181,3 +181,31 @@ def test_v2_only_refuses_legacy_grasps_and_campaign_links_serve(v2root, monkeypa
     assert [g.name for g in GL.load_grasps("mug__ppp__t")] == ["g"]
     with pytest.raises(ValueError, match="v2 only"):
         GL.load_grasps("apple__omzprq")  # no v2 entry: the legacy library is not served
+
+
+def test_v2_map_view_routes_by_kind_and_logs_requests(monkeypatch, caplog):
+    import logging
+
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    calls = []
+    monkeypatch.setattr(TT, "map_bands", lambda s, spec, top, arm=None, **kw: calls.append(kw) or "VIEW")
+    monkeypatch.setattr(TT, "surface_band_kwargs", lambda s: {})
+    s = SimpleNamespace(world=SimpleNamespace(floor_z=0.0, scene_model="house"))
+    top = SimpleNamespace(name="table_0", z=0.8126)
+    assert TT.v2_map_view(s, TT.BandSpec(object="a/b", grasp_key="k"), top) == "VIEW" and calls[-1] == {}
+    tray = TT.BandSpec(object="a/b", grasp_key="k", placed=["tray/uekqey@focus_centred_edge_aligned"], z_support=0.8187)
+    assert TT.v2_map_view(s, tray, top) == "VIEW" and calls[-1] == {"z_support": 0.8187, "exact_anchor": True, "plane": "tray_floor"}
+    with caplog.at_level(logging.INFO, logger="ispatialgym.sampling.v2"):
+        assert TT.v2_map_view(s, TT.BandSpec(object="a/b", generic_pinch=True), top) is None
+        assert TT.v2_map_view(s, TT.BandSpec(object="t/m", grasp_key="attach:lid__x", placed=["attach:lid/x"]), top) is None
+    reqs = [r.getMessage() for r in caplog.records if r.getMessage().startswith("MAP_REQUEST")]
+    assert len(reqs) == 2 and '"kind": "generic"' in reqs[0] and '"h": 0.8126' in reqs[0] and '"kind": "attach"' in reqs[1]
+
+
+def test_left_contact_band_is_none_under_v2_only(monkeypatch):
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    monkeypatch.setenv("ISPATIALGYM_V2_ONLY", "1")
+    s = SimpleNamespace(bands_left={})
+    assert TT.load_left_contact_band(s, 0.12) is None and list(s.bands_left.values()) == [None]

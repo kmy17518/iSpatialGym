@@ -1057,13 +1057,15 @@ def ensure_bands(s, spec: Optional[BandSpec] = None, top=None, edge: Optional[Ed
     scene, support = s.world.scene_model, top.name
     gkey = "generic" if spec.generic_pinch else spec.grasp_key
     surface = surface_band_kwargs(s)
-    if map_sampling_root() and not spec.generic_pinch and not spec.placed and not surface:
-        mb = map_bands(s, spec, top)
+    if map_sampling_root() and (RB.v2_only() or (not spec.generic_pinch and not spec.placed and not surface)):
+        # of-v2maps 2026-11-07 (prompt I item 7): v2only dispatches every spec kind to its map (v2_map_view); other modes as before
+        mb = v2_map_view(s, spec, top) if RB.v2_only() else map_bands(s, spec, top)
         if mb is not None:
             s.bands = mb
             return s.bands
         if os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
-            _reject("missing_map", f"no reach map for {spec.object} ({gkey}) at {support}'s height")
+            kind = "generic" if spec.generic_pinch else ("placed" if spec.placed else ("interior" if surface else "tabletop"))
+            _reject("missing_map", f"no {kind} reach map for {spec.object} ({gkey}) at {support}'s height")
     try:
         bands = RB.ReachBands.load(scene, support, spec.object, gkey, placed=spec.placed, scale=spec.scale, **surface)
         log.info("reach band cache hit for %s / %s (%s%s): %s", support, spec.object, gkey, f", surface_z {surface['surface_z']:.2f}" if surface else "", bands.path)
@@ -1083,7 +1085,40 @@ def map_sampling_root() -> Optional[str]:
     return os.environ.get("ISPATIALGYM_REACH_MAPS") or None
 
 
-def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
+def map_request(s, **fields) -> None:
+    """of-v2maps 2026-11-07 (prompt I item 7): one ``MAP_REQUEST {json}`` line per missing map (kind, entry, rest, exact height, arm, support,
+    scene) - a probe pass of the held aliases collects the maps to build from these lines (heights measured live, not from inventories)."""
+    key = json.dumps(fields, sort_keys=True)
+    seen = s.__dict__.setdefault("_map_requests", set()) if hasattr(s, "__dict__") else set()
+    if key in seen:
+        return
+    seen.add(key)
+    log.info("MAP_REQUEST %s", key)
+
+
+def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.ReachBands]:
+    """of-v2maps 2026-11-07 (prompt I item 7, the shared dispatch of :func:`ensure_bands` and :func:`map_view_arm_band`): the v2 map view of
+    a band spec by its kind - a placed TRAY (disembedding: ``placed`` tray tokens and ``z_support`` = the tray's inner floor) reads the
+    tabletop map at the tray-floor height (an EXACT anchor only), a plain spec the tabletop map at the top; generic pinch / attach / interior
+    specs have no map kind yet (None + MAP_REQUEST). Every lookup enforces the item-11 identity (:func:`map_bands`)."""
+    if spec.generic_pinch:
+        map_request(s, kind="generic", support=getattr(top, "name", None), h=round(float(top.z) - float(getattr(s.world, "floor_z", 0.0)), 4), arm=arm or spec.arm)
+        return None
+    if spec.placed:
+        if spec.z_support is not None and all(str(p).startswith("tray/") for p in spec.placed):
+            return map_bands(s, spec, top, arm, z_support=float(spec.z_support), exact_anchor=True, plane="tray_floor")
+        map_request(s, kind="attach" if any(str(p).startswith("attach:") for p in spec.placed) else "placed", support=getattr(top, "name", None),
+                    placed=list(map(str, spec.placed)), object=spec.object, grasp_key=spec.grasp_key, arm=arm or spec.arm)
+        return None
+    if surface_band_kwargs(s):
+        map_request(s, kind="interior", support=getattr(top, "name", None), surface_z=surface_band_kwargs(s).get("surface_z"), object=spec.object,
+                    grasp_key=spec.grasp_key, arm=arm or spec.arm)
+        return None
+    return map_bands(s, spec, top, arm)
+
+
+def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, z_support: Optional[float] = None, exact_anchor: bool = False,
+              plane: str = "top") -> Optional[RB.ReachBands]:
     """The scene-independent reach map of the sampler's object at the support's actual height above the floor, as a multi-distance band
     view (``map_sampling.as_bands``); None when the object has no v2 library entry or no compatible map covers the height (the anchors of
     ``ISPATIALGYM_REACH_MAP_ANCHORS``: exact or within 1 cm, else uncovered). Turns the grasp pose's support policy on
@@ -1109,13 +1144,21 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         if RB.v2_only():
             _reject("v2_scale_mismatch", f"{spec.grasp_key}: spawned at {GS.canonical_scale(spec.scale)}, v2 entry at {lib.scale}")
         return None
-    h = float(top.z) - float(getattr(s.world, "floor_z", 0.0))
+    z_plane = float(z_support) if z_support is not None else float(top.z)
+    h = z_plane - float(getattr(s.world, "floor_z", 0.0))
     anchors = None
     ap = os.environ.get("ISPATIALGYM_REACH_MAP_ANCHORS")
     if ap and os.path.exists(ap):
         with open(ap) as f:
             an = json.load(f)
         anchors = AnchorSet(an["anchors"], an.get("max_approx_m", 0.01))
+    req = dict(kind="tabletop", plane=plane, entry=os.path.basename(os.path.dirname(lib.path)), rest_id=rid, h=round(h, 4), arm=arm,
+               support=str(getattr(top, "name", "")), scene=str(getattr(s.world, "scene_model", "")))
+    if exact_anchor and (anchors is None or anchors.lookup(h)[1] != "exact"):
+        # a tray floor 6 mm above its table must not be served by the table top's map through the +-1 cm anchor range
+        log.info("reach map miss for %s (%s) at h %.4f, %s arm: no EXACT anchor for the %s", spec.object, spec.grasp_key, h, arm, plane)
+        map_request(s, **req)
+        return None
     root = os.path.join(map_sampling_root(), os.path.basename(os.path.dirname(lib.path)))
     from ispatialgym.grasping import contact_policy as CP
 
@@ -1126,6 +1169,7 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
                             config_require=req)
     if rm is None:
         log.info("reach map miss for %s (%s) at h %.4f, %s arm (%s)", spec.object, spec.grasp_key, h, arm, root)
+        map_request(s, **req)
         return None
     # of-v2maps 2026-11-06: the grasp approach only (ik.support_policy_scope) - "1" also policed places / carries / releases
     os.environ.setdefault("ISPATIALGYM_SUPPORT_POLICY", "grasp")
@@ -1135,6 +1179,12 @@ def map_bands(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[RB.
         if not isinstance(getattr(ikc, "support_plane_z", None), dict):
             ikc.support_plane_z = {}
         ikc.support_plane_z[str(top.name)] = float(top.z)
+        if z_support is not None:
+            # of-v2maps 2026-11-07: the objects the grasp ignores besides the support (the source tray) are policed at the plane the map was
+            # computed at (the tray's inner floor), not their AABB top (the rim)
+            for o in list(spec.ignore or []):
+                if getattr(o, "name", None):
+                    ikc.support_plane_z[str(o.name)] = z_plane
         # the support-policy diagnostic's expected object z (ik._support_policy_diag): the plane + the v2 rest's root height
         ikc.support_policy_rest = {"entry": os.path.basename(os.path.dirname(lib.path)), "rest_id": rid, "h_root": float(lib.rests[rid].h_root),
                                  "quat_xyzw": [float(v) for v in lib.rests[rid].quat_xyzw]}
@@ -1387,10 +1437,12 @@ def map_view_arm_band(s, arm: str, *, spec: Optional[BandSpec] = None, top=None,
     arm's legacy band (cached, or computed in-process as :func:`ensure_bands` would) mirrored. One INFO line names the choice."""
     sp = spec or getattr(s, "band_spec", None) or BandSpec.from_sampler(s)
     t = _top(s, top)
-    own = map_bands(s, sp, t, arm=arm)
+    own = v2_map_view(s, sp, t, arm=arm) if RB.v2_only() else map_bands(s, sp, t, arm=arm)
     if own is not None:
         log.info("%s-arm reach band: the %s-arm reach map (%s)", arm, arm, own.meta.get("map_path"))
         return own
+    if RB.v2_only() and os.environ.get("ISPATIALGYM_REACH_MAPS_STRICT"):
+        _reject("missing_map", f"no {arm}-arm reach map for {sp.object} ({sp.grasp_key}) at {t.name}")
     scene, support = s.world.scene_model, t.name
     gkey = "generic" if sp.generic_pinch else sp.grasp_key
     try:
@@ -1719,6 +1771,12 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
             pass
     if cls in cache:
         return cache[cls]
+    if RB.v2_only():
+        # of-v2maps 2026-11-07 (prompt I item 7): no brace-map consumer yet - under v2only the left contact band is None (every caller
+        # tolerates it: the brace is decided by the exact two-arm IK alone) instead of a blocked legacy load per draw (touching_02: 47 lines)
+        cache[cls] = None
+        log.info("left contact band (height class %.2f): none under v2only (no brace map consumer; the exact brace IK decides)", cls)
+        return None
     top = _top(s, top)
     scene, support = s.world.scene_model, top.name
     surface = surface_band_kwargs(s)
