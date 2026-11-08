@@ -121,14 +121,16 @@ INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
 #: a point :data:`INSIDE_ARM_SIDE_AIM_M` to the arm's side of the base (``inside_goal_lateral_m``'s rule) unless the alias sets that key.
 #: The place's arm joint 2 (shoulder adduction: right upper limit +0.1745 rad, left lower -0.1745) stood at its limit (median 3 mrad with
 #: collisions off) in 268 place IKs of the fridge runs - the goal ~0.025 m from the base's centre line, the right arm reaching inward.
-#: Switch ``ISPATIALGYM_INSIDE_ARM_SIDE`` (default off); kit counters ``inside_arm_side.lateral_added`` / ``.aimed``.
+#: Switch ``ISPATIALGYM_INSIDE_ARM_SIDE`` (default on since the owner's 5t, 2026-11-08: A/B 4 / 4 ok at 0.31 GPU-h / success vs 3 / 4 at 0.45;
+#: "0" off); kit counters ``inside_arm_side.lateral_added`` / ``.aimed``.
 #: Relation "inside" only (owner 5t, 2026-11-08): SurfaceTouchingMode (touching_large_02) inherits this stance C and is unchanged by it.
 INSIDE_ARM_SIDE_ENV = "ISPATIALGYM_INSIDE_ARM_SIDE"
 INSIDE_ARM_SIDE_AIM_M = 0.17
+INSIDE_ARM_SIDE_DEFAULT = "1"  # default on for relation "inside" (owner 5t, 2026-11-08); "0" off
 
 
 def inside_arm_side_on() -> bool:
-    return os.environ.get(INSIDE_ARM_SIDE_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+    return os.environ.get(INSIDE_ARM_SIDE_ENV, INSIDE_ARM_SIDE_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
 
 
 def inside_map_cap_on() -> bool:
