@@ -291,8 +291,18 @@ class PreshapeOuter:
 
     EPS = 2e-4
 
-    def __init__(self, pieces_planes):
-        self.planes = pieces_planes
+    def __init__(self, pieces):
+        """``pieces``: the collision pieces (trimesh). A convex piece is tested by its face planes; a non-convex one (a whole-object hull,
+        e.g. hardback bqvvvx's single piece) by ``Trimesh.contains`` (the face planes of a non-convex mesh do not bound its inside)."""
+        self.planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in pieces if pc.is_convex]
+        self.solids = [pc for pc in pieces if not pc.is_convex]
+
+    def inside(self, P: np.ndarray) -> np.ndarray:
+        out = _inside_any(P, self.planes) if self.planes else np.zeros(len(P), dtype=bool)
+        for pc in self.solids:
+            if len(P):
+                out |= pc.contains(P)
+        return out
 
     def hits(self, union, c, y):
         """``(width, cos_plus, cos_minus, d_plus, d_minus)`` as :func:`outer_hits`."""
@@ -312,8 +322,8 @@ class PreshapeOuter:
         side = np.sign(t)
         side[side == 0] = 1.0
         out_dir = y[ridx] * side[:, None]  # away from the pad centre on that side
-        inner = _inside_any(loc - out_dir * self.EPS, self.planes)
-        outer = ~_inside_any(loc + out_dir * self.EPS, self.planes)
+        inner = self.inside(loc - out_dir * self.EPS)
+        outer = ~self.inside(loc + out_dir * self.EPS)
         is_outer = inner & outer
         cos = np.abs(np.einsum("ij,ij->i", union.face_normals[tri], y[ridx]))
         d = np.abs(t)
@@ -1044,7 +1054,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     piece_planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces] if cfg.sweep_from_preshape else None
     oh = 0.5 * cfg.aperture_m if cfg.outer_pinch else None  # i7-attachfix: the pinch measured from outside (CandidateConfig.outer_pinch)
     if cfg.outer_pinch and cfg.outer_pinch_preshape:  # i7-attachdef (owner 5.1): ... judged at the oracle's pre-shape opening
-        oh = PreshapeOuter([(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces])
+        oh = PreshapeOuter(geom.pieces)
     # i7-attachfix (attach_face_retreat): the attachment rule's mating frames, known before the support step so a top grasp's retreat
     # also clears the rule's face gap where the mating face rests on the support
     face_mates: List[Tuple[np.ndarray, float]] = []

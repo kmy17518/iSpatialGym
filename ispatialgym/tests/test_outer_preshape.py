@@ -42,7 +42,7 @@ def test_the_cap_keeps_its_diameter_pinch():
     pieces, u = _cup()
     T = _pinch([0, 0, 0.004], [1.0, 0, 0])  # pad centre in the cavity
     _, w_full, _, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=0.0889 / 2)
-    _, w_pre, ant, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(_planes(pieces)))
+    _, w_pre, ant, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(pieces))
     assert abs(w_pre[0] - 0.052) < 0.0015 and abs(w_pre[0] - w_full[0]) < 1e-6 and ant[0] > 0.9
 
 
@@ -56,7 +56,7 @@ def test_a_wall_pinch_next_to_a_far_wall_comes_back():
     closing = [math.cos(math.pi / 24), math.sin(math.pi / 24), 0.0]
     T = _pinch(c, closing, approach=(0, 0, -1.0))
     _, w_full, _, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=0.0889 / 2)
-    _, w_pre, ant, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(_planes(pieces)))
+    _, w_pre, ant, _ = CA.contact_features(u, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(pieces))
     _, w_in, _, _ = CA.contact_features(u, T, CA.CONTACT_Z)
     assert w_full[0] > 0.02  # the fully-open measure spans the cavity (the thin pinch lost)
     assert abs(w_pre[0] - 0.003) < 0.0005 and abs(w_pre[0] - w_in[0]) < 1e-4 and ant[0] > 0.9  # the wall, as the pad-centre measure
@@ -73,10 +73,28 @@ def test_a_convex_solid_is_unchanged_and_a_pinch_too_wide_for_the_preshape_is_dr
     box = trimesh.creation.box(extents=[0.03, 0.05, 0.02])
     T = _pinch([0, 0, 0], [1.0, 0, 0])
     w0 = CA.contact_features(box, T, CA.CONTACT_Z)[1][0]
-    w1 = CA.contact_features(box, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(_planes([box])))[1][0]
+    w1 = CA.contact_features(box, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter([box]))[1][0]
     assert abs(w0 - 0.03) < 1e-6 and abs(w1 - w0) < 1e-6
     wide = trimesh.creation.box(extents=[0.12, 0.05, 0.02])  # wider than any pre-shape: no pinch holds
-    assert not np.isfinite(CA.contact_features(wide, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter(_planes([wide])))[1][0])
+    assert not np.isfinite(CA.contact_features(wide, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter([wide]))[1][0])
+
+
+def test_a_non_convex_single_piece_is_judged_by_containment():
+    """hardback bqvvvx: one non-convex piece (a whole-book hull) - its face planes do not bound its inside; the pinch across the book is
+    found by containment (before: no outer boundary, every candidate dropped)."""
+    import trimesh
+
+    from ispatialgym.grasping import candidates as CA
+
+    from shapely.geometry import Polygon
+
+    notch = trimesh.creation.extrude_polygon(Polygon(
+        [(-0.03, -0.02), (0.05, -0.02), (0.05, 0.02), (0.03, 0.02), (0.03, 0.0), (-0.03, 0.0)]), 0.03)
+    notch.apply_translation([0, 0, -0.015])
+    assert not notch.is_convex and notch.is_watertight
+    T = _pinch([0.0, -0.01, 0.0], [0, 0, 1.0], approach=(1.0, 0, 0))
+    w = CA.contact_features(notch, T, CA.CONTACT_Z, outer_half=CA.PreshapeOuter([notch]))[1][0]
+    assert abs(w - 0.03) < 1e-4
 
 
 def test_the_switch_is_off_by_default_and_enters_the_identity_only_when_on():
