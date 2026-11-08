@@ -20,7 +20,7 @@ B=$VJ/bundle
 $S5 ls "$JOB_S3/bundle/cache/*_base_*" 2>/dev/null | awk -v p="$JOB_S3/bundle/cache/" '{print p $NF, "/"}' > $B/boot_list1b.txt || true
 {
   echo "$JOB_S3/bundle/env_delta.tar.zst /"
-  $S5 ls "$JOB_S3/bundle/cache/*_delta_*" 2>/dev/null | awk -v p="$JOB_S3/bundle/cache/" '{print p $NF, "/"}' | sort
+  $S5 ls "$JOB_S3/bundle/cache/*_delta_*" 2>/dev/null | awk -v p="$JOB_S3/bundle/cache/" '{print p $NF, "/"}' | sort  || true
 } > $B/boot_list2.txt
 $S5 cp $B/boot_list.txt $JOB_S3/bundle/boot_list.txt > /dev/null
 $S5 cp $B/boot_list1b.txt $JOB_S3/bundle/boot_list1b.txt > /dev/null
