@@ -38,6 +38,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.sim_utils import Reject
@@ -675,6 +676,9 @@ class BlockDesign(SamplerV2):
                 so = float(c.stand_off if c.stand_off is not None else 0.35)
                 log.info("%s: candidate %d region cells (base depth|lateral; edge depth = base depth - %.2f): %s", self.gp.variant, k, so,
                          " ".join(f"({float(c.world_to_base(xy)[0]):.2f}|{float(c.world_to_base(xy)[1]):+.2f})" for xy in c.extras.get("focus_info", {}).get("cells", [])))
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
         for k in order[: int(self.gen("manipulation_candidates_tried", 6))]:
             cand = self.manip_candidates[k]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")

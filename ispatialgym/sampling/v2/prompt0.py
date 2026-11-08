@@ -784,7 +784,8 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
                       extra_visibility: Optional[Callable[[Pose], bool]] = None, arms_excluded: Optional[bool] = None,
                       in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3,
                       posture: Optional[str] = None, fingers: Optional[float] = None,
-                      clearance_ignore: Optional[Sequence[Any]] = None, stats: Optional[Dict[str, int]] = None) -> Tuple[int, Optional[Stance]]:
+                      clearance_ignore: Optional[Sequence[Any]] = None, stats: Optional[Dict[str, int]] = None,
+                      memory_arm: Optional[str] = None) -> Tuple[int, Optional[Stance]]:
     """§5.2 step 4: one survivor drawn uniformly (its index is returned so the caller can drop it) with the tilt drawn
     continuously inside its band; the drawn stance is re-checked (collision, focus in frame, extra visibility, optical
     axis within its class). The tilt is redrawn up to ``tilt_draws`` times inside the band (the grid tilt itself, which
@@ -792,7 +793,10 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
     caller takes the next survivor. ``posture`` (A6): the stance is checked in that named arm posture and records it
     (``q`` = the configuration the checks locked, ``fingers`` its gripper opening, ``extras["arm_posture"]``).
     ``clearance_ignore`` (the target): the draw is uniform among the survivors of the best base-clearance tier
-    (:func:`clearance_tier_indices`; the tier is cached on the survivors' ``extras["clearance_tier"]``)."""
+    (:func:`clearance_tier_indices`; the tier is cached on the survivors' ``extras["clearance_tier"]``).
+    ``memory_arm`` (i7-memory2, owner 2026-11-08 2.3): the outcome memory's PICK hook - the survivors of a flagged (arm x trunk[, stand-off])
+    pick bin (the grid trunk; the drawn tilt is recorded with its ``grid_tilt``) leave the draw's pool unless a Thompson draw keeps them;
+    when only flagged survivors remain they are drawn as before (never a block). Memory off / nothing flagged: the same draw, bit for bit."""
     if not survivors:
         return -1, None
     if clearance_ignore is not None:
@@ -801,9 +805,13 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
             for j, st in enumerate(survivors):
                 st.extras["clearance_tier"] = 0 if j in keep else 1
         top = [j for j, st in enumerate(survivors) if st.extras.get("clearance_tier") == 0] or list(range(len(survivors)))
-        i = int(top[int(rng.integers(len(top)))])
     else:
-        i = int(rng.integers(len(survivors)))
+        top = list(range(len(survivors)))
+    if memory_arm is not None:
+        from ispatialgym.sampling import alias_memory as AM
+
+        top = AM.pick_draw_pool(s, top, survivors, memory_arm, rng)
+    i = int(top[int(rng.integers(len(top)))])
     grid = survivors[i]
     lo, hi = grid.extras.get("band", tilt_band(grid.tilt, grid.translate))
     excl = (len(set(arms)) > 1) if arms_excluded is None else arms_excluded
@@ -817,7 +825,7 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         st = grid.with_trunk(grid.translate, tilt, name)
         st.focus = grid.focus if focus is None else _t(focus)
         st.arms = list(arms)
-        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier", "bar_offset_m")}
+        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier", "bar_offset_m", "alias_memory_pick")}
         st.extras["grid_tilt"] = grid.tilt
         if not bool(body_free(s, [st], arms_excluded=excl, posture=posture, fingers=fingers)[0]):
             fail("collision")

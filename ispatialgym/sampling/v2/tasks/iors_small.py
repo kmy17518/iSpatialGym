@@ -39,6 +39,7 @@ import torch as th
 from ispatialgym.fastflags import fast_on, fast_value  # train-fast 2026-10-31: SPA_CACHE
 from ispatialgym.oracle.programs import TOUCHING_SHELF_LAYOUT
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put, cache_root  # train-fast 2026-10-31: the SPA lateral-cell memo on disk
 from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
@@ -2080,6 +2081,10 @@ class IORSSmall(SamplerV2):
             order = sorted(order, key=lambda i: float(th.linalg.norm(cands[int(i)].focus[:2] - sx)) if cands[int(i)].focus is not None else 1e9)
         errors = []
         default = self.segment_arms[0]
+        # i7-memory2 (owner 2026-11-08 2.3): the per-alias outcome memory's PICK hook - the candidates of a flagged (arm x trunk[, stand-off])
+        # pick bin move to the end of the order above (a Thompson draw keeps them in place, never below the floor; never removed). Memory off
+        # / nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*)
+        order = AM.reorder_pick(self, order, cands, lambda st: default, rng)
         for k in order[:6]:
             cand = cands[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")

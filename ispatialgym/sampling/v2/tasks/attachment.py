@@ -38,6 +38,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.sim_utils import Reject
@@ -746,6 +747,9 @@ class Attachment(SamplerV2):
         if rejects is None:
             rejects = self._candidate_rejects = {}
         order = self._candidate_order(rng, rejects)
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
         for k in order[:6]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")

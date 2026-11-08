@@ -3646,6 +3646,11 @@ class IORSLarge(SamplerV2):
             self.template_facts.setdefault("F_init_prescreen_arms", []).append([{a: len(F) for a, (_, F) in t[3].items()} for t in pre])
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.variant, len(pre), len(yaws), [t[0] for t in pre],
                  "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on stance B - the B candidates of a flagged (arm x trunk[, stand-off])
+        # pick bin move to the end of the order above (a Thompson draw keeps them in place, never below the floor; never removed). Memory off /
+        # nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*; provenance in B's extras)
+        k_pick = AM.reorder_pick(self, range(len(pre)), [t[1] for t in pre], lambda st: (list(getattr(st, "arms", None) or []) or [offered[0]])[0], rng)
+        pre = [pre[k] for k in k_pick]
         n_couple = int(self.num("b_candidates_max", 6))
         for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
             self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")

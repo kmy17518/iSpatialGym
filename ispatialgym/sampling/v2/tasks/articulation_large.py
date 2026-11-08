@@ -1348,7 +1348,10 @@ class ArticulationLarge(SamplerV2):
         # on the retreat from a near stand-off, door 0921-030920) - every survivor gets its draw there instead of 8 of them
         sequential = str((self.gp.gen("hybrid_follow") or {}).get("policy", "hybrid")) == "sequential"
         for _ in range(len(pool) if sequential else min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=None, extra_visibility=None, clearance_ignore=[self.target], stats=draw_stats)
+            # i7-memory2 (owner 2.3): memory_arm = the outcome memory's pick hook on the draw (prompt0.draw_manipulation; the hybrid follow
+            # plans from the stance drawn here - articulation_hybrid has no stance choice of its own)
+            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=None, extra_visibility=None, clearance_ignore=[self.target], stats=draw_stats,
+                                            memory_arm=self.arm)
             pool.pop(i)
             if manip is None:
                 errors.append(f"drawn tilt fails the re-check ({dict(draw_stats)})")

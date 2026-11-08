@@ -109,22 +109,48 @@ def shiyuc_env(a):
     return env
 
 
+#: i7-memory2 (owner 2026-11-08 2.2 / 2.4): the store of each memory mode under --root (alias_memory.STORE_DIRS) - separate stores
+#: (<root>/alias_memory stays the legacy store the pre-mode snapshots aggregate every demo into: never pinned by a mode)
+MEMORY_STORES = {"production": "alias_memory_production", "validation": "alias_memory_validation"}
+
+
+def _version_mode(path):
+    try:
+        meta = json.load(open(os.path.join(path, "meta.json")))
+    except (OSError, ValueError):
+        return "production"
+    return str(meta.get("mode") or "legacy")
+
+
 def alias_memory_pin(a):
     """i7-memory (owner 2026-11-08 part C): the outcome-memory VERSION the job reads, pinned in job.env (ISPATIALGYM_ALIAS_MEMORY):
-    --alias-memory auto (default) = <root>/alias_memory/LATEST when one exists, else off; off; or a version dir / a memory root (its LATEST)."""
+    --alias-memory auto (default) = the mode's store's LATEST when one exists, else off; off; or a version dir / a memory root (its LATEST).
+    i7-memory2: --memory-mode production (default; store <root>/alias_memory_production, starts empty) | validation (store <root>/alias_memory_validation,
+    seeded from the replay; it must exist - its first version is built by `alias_memory aggregate --root R --mode validation`); a pinned
+    version of the other mode's store is refused."""
+    mode = getattr(a, "memory_mode", "production") or "production"
     v = getattr(a, "alias_memory", "auto") or "auto"
     if v == "off":
         return "off"
-    root = os.path.join(os.path.abspath(a.root), "alias_memory") if v == "auto" else os.path.abspath(v)
+    root = os.path.join(os.path.abspath(a.root), MEMORY_STORES[mode]) if v == "auto" else os.path.abspath(v)
     if os.path.exists(os.path.join(root, "meta.json")):
-        return root
-    try:
-        ver = open(os.path.join(root, "LATEST")).read().strip()
-    except OSError:
-        if v != "auto":
-            raise SystemExit(f"--alias-memory {v}: neither a version (meta.json) nor a memory root (LATEST)")
-        return "off"
-    return os.path.join(root, ver) if ver and os.path.isdir(os.path.join(root, ver)) else "off"
+        ver_dir = root
+    else:
+        try:
+            ver = open(os.path.join(root, "LATEST")).read().strip()
+        except OSError:
+            if v != "auto":
+                raise SystemExit(f"--alias-memory {v}: neither a version (meta.json) nor a memory root (LATEST)")
+            if mode == "validation":
+                raise SystemExit(f"--memory-mode validation: no seeded store at {root} - build it first (CPU): PYTHONPATH=<code> python -m "
+                                 f"ispatialgym.sampling.alias_memory aggregate --root {os.path.abspath(a.root)} --mode validation --no-gpu")
+            return "off"
+        ver_dir = os.path.join(root, ver) if ver and os.path.isdir(os.path.join(root, ver)) else None
+        if ver_dir is None:
+            return "off"
+    if _version_mode(ver_dir) != mode:
+        raise SystemExit(f"--memory-mode {mode}: {ver_dir} is a {_version_mode(ver_dir)} memory version (the stores are separate)")
+    return ver_dir
 
 
 def memory_job(a, gpu_jobid, code):
@@ -134,7 +160,7 @@ def memory_job(a, gpu_jobid, code):
         return None
     cmd = ["sbatch", "--parsable", "-J", f"{a.job_prefix}mem", "-A", a.acct, "-p", a.part, "--time=1:00:00", f"--exclude={EXCLUDE}", "-c", "2",
            "--mem=8G", f"--dependency=afterany:{gpu_jobid}", "-o", os.path.join(a.root, "slurm", "%x_%j.log"), script, os.path.abspath(a.root),
-           a.tag or a.flow, os.path.abspath(code)]
+           a.tag or a.flow, os.path.abspath(code), getattr(a, "memory_mode", "production") or "production"]
     res = subprocess.run(cmd, capture_output=True, text=True)
     return res.stdout.strip().split(";")[0] if res.returncode == 0 else f"failed ({res.stderr.strip()[:80]})"
 
@@ -258,6 +284,8 @@ def submit(a):
         # i7-memory (owner 2026-11-08 part C, unattended): the per-alias outcome memory version this job's sampler reads (train only)
         env["ISPATIALGYM_ALIAS_MEMORY"] = alias_memory_pin(a)
         env["ISPATIALGYM_ALIAS_MEMORY_ALIAS"] = a.key
+        # i7-memory2 (owner 2.2 / 2.4): the job's memory mode - the store it reads (pinned above) and the one its demos are aggregated into
+        env["ISPATIALGYM_ALIAS_MEMORY_MODE"] = getattr(a, "memory_mode", "production") or "production"
         ov_root = getattr(a, "map_overlay", None) or "off"
         if a.grasps in ("v2", "v2only") and ov_root != "off":
             # i7-plateqtf2 item 5: the reach maps' merged overlay, pinned to the root's latest release at submission (job.env is the record)
@@ -304,7 +332,7 @@ def submit(a):
         mem_id = memory_job(a, jobid, a.code) if getattr(a, "memory_aggregate", True) else None
         print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
               f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect} customs={customs} "
-              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root} alias_memory={env['ISPATIALGYM_ALIAS_MEMORY']}"
+              f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root} alias_memory={env['ISPATIALGYM_ALIAS_MEMORY']} memory_mode={env['ISPATIALGYM_ALIAS_MEMORY_MODE']}"
               + (f" map_overlay={env['ISPATIALGYM_MAP_OVERLAY']}@r{env.get('ISPATIALGYM_MAP_OVERLAY_RELEASE', '?')}" if env.get("ISPATIALGYM_MAP_OVERLAY") else "")
               + (f" memory_job={mem_id}" if mem_id else ""))
     finally:
@@ -425,8 +453,11 @@ def main():
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     s.add_argument("--alias-memory", default="auto",
-                   help="i7-memory: the per-alias outcome memory the sampler reads, pinned in job.env - auto (default: <root>/alias_memory/LATEST "
+                   help="i7-memory: the per-alias outcome memory the sampler reads, pinned in job.env - auto (default: the --memory-mode store's LATEST "
                         "if any, else off), off, or a version dir / memory root")
+    s.add_argument("--memory-mode", default="production", choices=sorted(MEMORY_STORES),
+                   help="i7-memory2 (owner 2026-11-08 2.2 / 2.4): production (default: <root>/alias_memory_production, starts empty, resets on a customs / "
+                        "keys change) or validation (<root>/alias_memory_validation: seeded from the replay, carried over at the reduced weight)")
     s.add_argument("--no-memory-aggregate", dest="memory_aggregate", action="store_false",
                    help="i7-memory: do not queue the batch's aggregation job (job_memory.sh, CPU, afterany this job)")
     r = sub.add_parser("recollect")
