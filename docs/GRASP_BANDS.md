@@ -2516,6 +2516,38 @@ None), and this board has a back and an open SIDE. It runs before the map lookup
 map built. Options: (a) the open-sides rule tells an open side from an open back (a rule every interior lookup shares), (b) register the
 board without its back panel (misstates the geometry).
 
+### Owner decisions 2026-11-08 (5c.1 / 5c.2, `owner_20261108e_goal_framing.md` items 1 and 2)
+
+**1. The floor datum: fixed (ce7b75d4, on by default as the rule's bug fix).** A partner's `under_clearance.floor_z` is a floor level
+only when the partner stands on it (within `FLOOR_STAND_TOL_M` 0.05 m of its AABB bottom); countertop_kelzer_0's 0.4977 (its AABB
+bottom 0.8514: the raycast stopped on the cabinet inside the counter) is no longer one - the only floor level dropped in the
+inventory (the office levels 0.0045 / -0.0032 stay: their partners stand on them). `real_floors=False` = the former rule. Change list
+(repo tables, before anything was rebuilt): 15 house_single_floor tops get their true heights - countertop_fjkase_0 0.4180 -> 0.9157,
+ikwqer / sjxber 0.4298 -> 0.9275, kelker / kelzer 0.3898 -> 0.8875, shelf_amyper_2 / 7 0.3149 -> 0.8126, amyper_3 / 8 0.7248 ->
+1.2225, amyper_4 / 9 1.1346 -> 1.6323, amyper_5 / 10 1.5445 -> 2.0422, shelf_fjozhc_0 0.5657 -> 1.0634, shelf_pfusrd_0 1.3314 ->
+1.8291; the 7 customs interior bindings of those supports (0.81 / 0.89 / 0.92 / 0.93 / 1.22) now lie within 3 cm of their true top and
+name it (no interior surface left in candidates.csv: `test_grasp_bands` updated); every other surface height unchanged. Anchors 108 ->
+102 (dropped 0.3149 0.3898 0.4180 0.4298 0.5657 0.7248 0.81 0.89 0.92 0.93 1.1346 1.22 1.3314 1.5445; new 0.8875 0.9157 0.9275 1.0634
+1.2225 1.6323 1.8291 2.0422). Who reads them: no staged or integrated root - none of the 43 `$OFH/v2maps_*` / 11 shiyuc roots' anchors.json
+holds a dropped key, and no map anywhere (`$OFH/v2maps_*/maps`, `$GBH/out/*/maps`) is keyed at one; only `$GBH/anchors.json` (the
+read-only grasp-bands record, no map at those keys) lists them. So nothing was rebuilt; the campaign anchors are live heights (the
+staged 0.9158 agrees with the rule's 0.9157 within 1e-4, served exactly / within the window). Tests (test_goal_anchors.py): kelzer's
+cabinet top is not a floor level, a real raised floor still is; exactly the 15 tops change, to their inventory top above floor 0;
+every other height unchanged.
+
+**2. The hall tree: "front + side" as its own open-sides case (a083123a, `ISPATIALGYM_INTERIOR_FRONT_SIDE`, default off).**
+`interiors.open_sides_case`: one open raster edge = "front" (a back panel); with the switch two ADJACENT open edges (+u / -v) =
+"front_side" (the back closed), any OPPOSITE pair = "front_back"; off = any two edges are front + back (today). `live_mismatch` uses
+it; kit counter `interior_open_sides.front_side` at the lookup it served. A lookup-side switch: no digest / map key / map changes.
+Digest check (switch off and on, identical): fridge 0b539d8a83ab, sink lkklqs bdb7f8c6f92e, kmuacd b58d4e5c790e, jaysra 9d713ac87564,
+hall tree d6947c534b88, and the other branches' specs from their registries: awvzkn (i7-ft2) 4571693d44c4, opryhp_0@0.3722 (i7-t03specs)
+b8577f909128, otwukr_1@0.3888 41a3fa72d143, otwukr_1@0.7204 71e59f596aa4. Of the measured rasters only the hall tree's is two
+adjacent edges (fridge / t03 bookcases one edge, jaysra +u/-u, lkklqs four, awvzkn none): the switch changes no other verdict (kmuacd
+is hand-authored, no measured edges). test_interior_registry.py: the digests on / off, the case table, the hall tree served only
+with the switch. Maps: umbrella__ziqzqo__s1 interior PLACE maps in hall_tree_upkvgr_0@0.5809 (the variant's rule: pre approach, drop
+0.005, no tilts; trunk_a083123a, 18381078 / 18381079), staged in v2maps_goalmaps; touching_large_02 N 4 v2only switch on / off
+(chain_t02.sh 18381085).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
