@@ -451,3 +451,10 @@ def test_spine_guard_rejects_a_plus_y_entry_or_a_grasp_off_the_spine():
     IL.overhang_spine_grasp(none, SimpleNamespace(name="side_4", pose=(th.tensor([0.04, 0.0729, 0.0]), None)))
     assert off.kit.stats == {} and none.kit.stats == {}
 
+
+def test_spine_guard_is_on_for_inside_large_01_only():
+    d = json.load(open(CUSTOMS))
+    g = d[ALIAS_VARIANT]["generation"]
+    assert g.get("overhang_required_side") == "-y" and g.get("overhang_pinch_edge_max_m") == 0.03
+    others = [k for k, v in d.items() if isinstance(v, dict) and k != ALIAS_VARIANT and (v.get("generation") or {}).get("overhang_required_side") is not None]
+    assert others == []
