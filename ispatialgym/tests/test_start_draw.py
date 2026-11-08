@@ -349,29 +349,42 @@ def test_iors_large_support(fake_tt, monkeypatch):
 
 
 def test_iors_large_floor_and_reject(fake_tt, monkeypatch):
+    """Floor init: only the robot's stance A is redrawn (around the template's anchor c_t - the target's start cell - and its stance-B
+    pool), with the A -> B leg checked; a failed draw keeps the last good surface."""
+    import contextlib
+
     s = _iors_large("floor")
-    keep = s.surface
+    c_t = th.tensor([0.5, 2.0])
+    b = Stance("manipulation", (0.5, 1.6, math.pi / 2), 0.5, 0.0)
+    s.surface.update({"c_t": c_t, "manip": [b], "z": 0.0, "edge": None})
+    legs = []
+    s.ikc.ignoring = lambda objs: contextlib.nullcontext()
+    s.obj = lambda role: "floor"
+    s.sidecar = SimpleNamespace(transitions=[1], paths=[2])
 
-    def floor(rng):
-        c_t = th.tensor([float(rng.uniform(-2, 2)), 2.0])
-        init = Stance("init", (float(c_t[0]), 1.0, 0.0), 0.5, 0.0)
-        s.surface.update({"c_t": c_t, "init": init, "manip": [init], "init_xy": c_t, "z": 0.0, "edge": None})
+    def stance_a(ct, rng, height, like=None):
+        assert ct is c_t and like is b
+        ang = float(rng.uniform(-math.pi, math.pi))
+        return Stance("init", (float(ct[0]) + math.cos(ang), float(ct[1]) + math.sin(ang), ang + math.pi), 0.5, 0.0)
 
-    s.try_floor_surface = floor
+    s.floor_stance_a = stance_a
+    s.record_leg_a_b = lambda a, m: legs.append((a, m))
     monkeypatch.setenv("ISPATIALGYM_START_DRAW", "1")
-    xs = {s.spa_draw(np.random.default_rng(i)) or s.surface["init"].base_pose2d[0] for i in range(6)}
-    assert len(xs) == 6 and s._spa_facts["kind"] == "floor" and "c_t" in s._spa_facts
+    xs = set()
+    for i in range(6):
+        s.spa_draw(np.random.default_rng(i))
+        xs.add(s.surface["init"].base_pose2d[0])
+        assert s.surface["c_t"] is c_t and s.surface["manip"] == [b] and legs[-1] == (s.surface["init"], b)
+    assert len(xs) == 6 and s._spa_facts["kind"] == "floor" and "c_t" in s._spa_facts and s.sidecar.paths == []
 
-    def fail(rng):
-        raise Reject("no_floor_cell", "none")
+    def fail(ct, rng, height, like=None):
+        raise Reject("no_stance", "no stance A")
 
-    s.try_floor_surface = fail
+    s.floor_stance_a = fail
     before = s.surface
     with pytest.raises(Reject):
         s.spa_draw(np.random.default_rng(0))
-    assert s.surface["init"] is before["init"] and s.surface["c_t"] is before["c_t"]  # the last good surface kept
-    assert s.kit.stats["start_draw.rejected.no_floor_cell"] == 1
-    assert keep["kind"] == "floor"
+    assert s.surface["init"] is before["init"] and s.kit.stats["start_draw.rejected.no_stance"] == 1  # the last good surface kept
 
 
 def test_iors_small_sample_draws_under_the_switch(monkeypatch):

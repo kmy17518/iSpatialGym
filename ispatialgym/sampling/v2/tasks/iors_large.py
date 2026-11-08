@@ -2329,9 +2329,11 @@ class IORSLarge(SamplerV2):
         raise Reject("no_free_edge", f"{support.name}: " + ("; ".join(errors) or "no edge with a free, collision-free stance"))
 
     def spa_redraw_start(self, rng: np.random.Generator) -> None:
-        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own stances A and B on the template's init surface
-        (bound in the BDDL, so it stays) from the attempt's ``rng`` - the template's own draw: on the floor :meth:`try_floor_surface` (the anchor
-        cell c_t, stance B facing it, stance A with the target and the partner in frame and the A -> B leg), on a support
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own robot start on the template's init surface
+        (bound in the BDDL, so it stays) from the attempt's ``rng`` - the template's own draw: on the floor the robot's stance A only
+        (:meth:`floor_stance_a`: the eroded map 0.6-1.5 m from c_t, target and partner region in frame, collision-free; then the A -> B leg,
+        as :meth:`try_floor_surface` does) around the template's anchor cell c_t and stance-B pool - c_t is the TARGET's start cell, not the
+        robot's (A/B 2026-11-08: redrawing c_t too gave no_floor_cell / 1500 s time_budget attempts at C) -; on a support
         :meth:`try_support_surface` (edges in random order, Phase 1b / 1c with the goal region in frame - or ``free_start`` -, Phase 2) on the
         template's top. The template's stance-C existence test is not repeated: the attempt draws its stance-C pool itself (``sample_instance``).
         A draw that finds none keeps the template's surface for the next attempt. The nextto / base-push modes (no init surface) draw their
@@ -2345,7 +2347,13 @@ class IORSLarge(SamplerV2):
         self.surface = {"kind": kind, "obj": keep.get("obj"), **({"n_c": keep["n_c"]} if "n_c" in keep else {})}
         try:
             if kind == "floor":
-                self.try_floor_surface(rng)
+                manip = keep["manip"]
+                init = self.floor_stance_a(keep["c_t"], rng, self.target_dims()[1], like=manip[0])
+                with self.ikc.ignoring([self.obj("floor")]):
+                    self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (try_floor_surface's check)
+                self.sidecar.transitions.clear()
+                self.sidecar.paths.clear()
+                self.surface = {**keep, "init": init}
             else:
                 self.try_support_surface(keep["obj"], rng, top=keep.get("top"))
         except Reject:
