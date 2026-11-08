@@ -2773,6 +2773,44 @@ an arm x trunk bin of the decided outcome-memory pick hook (i7-memory2), so no s
 writes 7 / 8 and 6 / 8 here (ad_int1 4 / 4): nothing for i7-attachdef from inside_04. Suite: 23 failed + 3 errors, the base
 93229922's set (3104 vs 3100 passed: the 4 new tests).
 
+## Integration round 2 (2026-11-08, of-v2maps)
+
+The owner's decisions of 2026-11-08 (`owner_answers_20261108f.md`, "Integration"): a new integration round on of-v2maps from 93229922, the
+process of round 1. Each finished branch is folded at its last reported commit; a branch whose agent is still running is folded only after
+its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$OFH/DECISIONS.md` ("integration-2" lines).
+
+**Merges** (one merge commit each; snapshots `$OFH/code/trunk_<sha>`):
+
+| # | branch (commit merged) | merge | notes |
+|---|---|---|---|
+| 1 | i7-memory2 (01ac6958) | bc8adc96 | outcome memory 2.1-2.4, production / validation stores, the pick hook in every family; clean |
+| 2 | i7-vast (135c0cd4) | d1b3e9bc | scripts/vast_fast/ only; clean |
+| 3 | i7-diag (d1f06313) | c9a6e88c | diagnosis scripts + docs; docs conflict (sections unioned) |
+| 4 | i7-t03specs (3cc6a30f) | 04ee0673 | opryhp_0 / otwukr_1 interior specs in the registry, `interiors measure --lateral`; owner 5k.2; docs conflict |
+| 5 | i7-inside04 (1a4d0604), docs only | 24dde33b, 1b5e5525 | CHERRY-PICKS of the two docs commits a0e41b4b / 1a4d0604; 6d9445a9 (ISPATIALGYM_IORS_FAR_ARM, owner 5h: dropped) is NOT in of-v2maps |
+
+i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
+that contains 6d9445a9 would show it as new.
+
+**Checks per merge.** pyflakes on the changed files (no new messages). The full suite runs on a CPU node (`int2_20261108/job_suite.sh`:
+the frozen snapshot copied node-local, trunk PYTHONPATH, 8 shards by test file): lambda's load (~170) could not finish it. Baseline
+trunk_93229922 = 15 failed + 6 errors on the node (lambda's run of the same tree: 23 failed + 3 errors; the sets differ by environment,
+so each merge is compared with the node baseline); merges 1 (bc8adc96) and 4 (04ee0673): the SAME 21 ids. Merges 2, 3, 5 change scripts / docs
+only (covered by merge 4's run).
+
+**The consolidated root `$OFH/v2maps_int2`** (`jobs/v2build/build_int2.py`, log `v2maps_int2/INT2.txt`; v2maps_int1 untouched): `init` =
+cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatever a layer replaces moves to
+`glib|maps/_superseded_<reason>_before_int2/`. Layers:
+- t03specs: the touching_03 lean entry `hardback__acbrnv__s1__lean_left_20_c5c708` (v2maps_int1 never held it) with its 8 interior maps:
+  kmuacd 0.8354 r / l, and opryhp_0@0.3722 / otwukr_1@0.3888 / @0.7204 r / l (staged root `t03specs_20261108/v2maps_t03specs`).
+
+check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 contact, 12 prefix, 20 interior maps (0 spec mismatches),
+51 links, ERRORS 0. v2maps_int1 on the same snapshot: 76 / 138, ERRORS 0.
+
+**Validation** (`--grasps v2only` N 4 on v2maps_int2, overlay default, memory off as the branches ran; `tab_i.py -a <tag>`):
+- int2_1 (trunk_1b5e5525): touching_03, the only alias whose v2only behaviour merges 1-5 change (the lean entry is now in the root).
+  Memory2's defaults change nothing in a memory-off run (production store empty, the pick hook inert).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
