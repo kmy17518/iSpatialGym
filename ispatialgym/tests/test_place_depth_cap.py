@@ -292,8 +292,10 @@ def test_a1_screen_rejects_when_no_a1_push_stance_places(monkeypatch):
     me.shelf_tip = lambda: True
     screen(me, manip, None, "t", "p", 2)
     assert stats == {} and not probes
-    # the switch defaults off
+    # the switch defaults on (lead decision 7, 2026-11-08); "0" off
     _a1_me(monkeypatch, None, [], place_ok=lambda st: False)
+    assert IS.touch_a1_screen_mode() == "on" and IS.TOUCH_A1_SCREEN_DEFAULT == "1"
+    _a1_me(monkeypatch, "0", [], place_ok=lambda st: False)
     assert IS.touch_a1_screen_mode() == "off"
 
 

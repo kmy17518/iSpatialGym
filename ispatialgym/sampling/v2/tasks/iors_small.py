@@ -246,9 +246,12 @@ TOUCH_LIFT_SCREEN_DEFAULT = "1"
 #: owner 5r.1 touching_04 follow-up (2026-11-08): the goal check's contact_unreachable screened at the draw against the push map - the goal
 #: check's own A1 push stances (:meth:`IORSSmall.push_stance_candidates`: touch_push map + whole-body collision, the same call and inputs) must
 #: hold one stance from which the carried box's place passes (:meth:`IORSSmall.place_infeasible_why`, the goal check's own "place:" verdict);
-#: when none does, the goal check rejects contact_unreachable ~130 s later, after the draft. "0" off (default), "shadow" (counted, nothing
-#: rejected), "1" on. Only where the goal check is certain to use those stances (A1 non-empty; not the shelf layout / tip release)
+#: when none does, the goal check rejects contact_unreachable ~130 s later, after the draft. "0" off, "shadow" (counted, nothing rejected),
+#: "1" on. Only where the goal check is certain to use those stances (A1 non-empty; not the shelf layout / tip release). Default "1" since
+#: the lead's decision 7 (2026-11-08, owner away; A/B c3_r1: shadow 3 / 3 would-be rejections failed at the goal check, on: goal-check
+#: contact_unreachable 8 -> 5, touching_04 1.33 -> 0.99 GPU-h per success)
 TOUCH_A1_SCREEN_ENV = "ISPATIALGYM_TOUCH_A1_SCREEN"
+TOUCH_A1_SCREEN_DEFAULT = "1"
 #: owner 5r.1 touching_04 follow-up (2026-11-08): "1" = the touching Phase 2 scans the trunk tilts the touch_push map is built at (its
 #: eligible trunks at each translate, within the torso limit) instead of ``tabletop.tilt_scan``'s continuous samples, so the manipulation
 #: and push stances (same trunk) read built map columns, not the nearest / inherited ones (c2's place-screen and A1 failures sat at
@@ -293,7 +296,7 @@ def touch_lift_screen_mode() -> str:
 
 
 def touch_a1_screen_mode() -> str:
-    v = (os.environ.get(TOUCH_A1_SCREEN_ENV) or "0").strip().lower()
+    v = (os.environ.get(TOUCH_A1_SCREEN_ENV) or TOUCH_A1_SCREEN_DEFAULT).strip().lower()
     return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
 
 
