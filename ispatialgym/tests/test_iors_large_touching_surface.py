@@ -404,3 +404,35 @@ def test_stance_c_frame_test_at_the_release_yaw(monkeypatch):
     gen = {"inside_stand_offs_m": [0.20], "inside_trunks": [[0.5, -0.3]]}
     assert _Framed(**gen)._placement_candidates_at(edge, (0.2, 4.7), "right") == []  # at the rest yaw: across the board, out of frame
     assert len(_Framed(quat=q, **gen)._placement_candidates_at(edge, (0.2, 4.7), "right")) == len(P0_laterals(edge, 0.409))
+
+
+def test_inside_only_switches_leave_the_surface_stance_c_unchanged(monkeypatch):
+    """Owner 5t (2026-11-08): ISPATIALGYM_INSIDE_ARM_SIDE and the stance-C map cap (ISPATIALGYM_INSIDE_MAP_CAP) act for the relation "inside"
+    only. SurfaceTouchingMode (touching_large_02, relation "touching") inherits InsideMode's stance C: with both switches on its candidates,
+    goal cells and placement_stats are exactly those with both off; the same stance C with relation "inside" is changed by them."""
+    monkeypatch.setattr(IN.P0, "base_ok", lambda s_, xy: True)
+    monkeypatch.setattr(IN.P0, "body_free", lambda s_, cands, **kw: th.ones(len(cands), dtype=th.bool))
+    monkeypatch.setattr(IN.P0, "camera_poses", lambda s_, cands: list(cands))
+    monkeypatch.setattr(IN.P0, "in_frame", lambda s_, cam, pts: True)
+    monkeypatch.setattr(IN.P0, "axis_angle", lambda s_, cam, point: 0.3)
+    edge = EdgeFrame.from_edge("+u", th.tensor([-0.792, 3.604]), th.tensor([1.0, 0.0]), 1.28, 0.285)
+    cells = th.tensor([[-0.892, 3.30 + 0.04 * i] for i in range(16)])
+    band = SimpleNamespace(trunks=lambda: [(t, k) for t in (0.25, 0.5, 0.75) for k in (0.0, -0.3)], meta={"lattice": 0.08, "mode": "map_view"})
+
+    def run(relation, on):
+        monkeypatch.setenv(IN.INSIDE_ARM_SIDE_ENV, "1" if on else "0")
+        monkeypatch.setenv(IN.INSIDE_MAP_CAP_ENV, "1" if on else "0")
+        s = _StanceC(band=band, inside_stand_offs_m=[0.20, 0.30])
+        s.relation, s.kit = relation, SimpleNamespace(stats={})
+        s.place["cells"] = cells
+        out = s._placement_candidates_at(edge, (0.2, 4.7), "right")
+        return ([(tuple(round(float(v), 6) for v in c.base_pose2d), c.translate, c.tilt, c.stand_off, c.lateral, c.extras["goal_cell"]) for c in out],
+                s.template_facts["placement_stats"], s.kit.stats)
+
+    off, on = run("touching", False), run("touching", True)
+    assert on[0] == off[0] and on[1] == off[1] and off[0]
+    assert not any(k.startswith(("inside_arm_side.", "inside_map_cap.")) for k in on[2])
+    assert "map_cap" not in on[1]
+    i_off, i_on = run("inside", False), run("inside", True)
+    assert i_off[0] == off[0]  # the switches off: the inside and the surface stance C alike
+    assert i_on[0] != i_off[0] and i_on[2].get("inside_arm_side.aimed", 0) > 0 and i_on[2].get("inside_map_cap.dropped", 0) > 0 and "map_cap" in i_on[1]

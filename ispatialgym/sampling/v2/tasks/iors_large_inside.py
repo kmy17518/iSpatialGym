@@ -111,6 +111,7 @@ SIDE_MAX_DEG = 45.0
 #: ``generation.inside_map_trunks`` trunks with the most reach margin, default :data:`NO_BAND_TRUNKS`; every base pose keeps at least one) -
 #: the interior place maps admitted 17-26 survivors and each attempt ran ~3x longer (690 s vs 234 s legacy). Switch
 #: ``ISPATIALGYM_INSIDE_MAP_CAP`` (default on since the owner's 6.2; "0" off); kit counters ``inside_map_cap.kept`` / ``.dropped``, placement_stats ``map_cap``.
+#: Relation "inside" only (owner 5t, 2026-11-08): SurfaceTouchingMode (touching_large_02) inherits this stance C and is not capped.
 INSIDE_MAP_CAP_ENV = "ISPATIALGYM_INSIDE_MAP_CAP"
 INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
 
@@ -121,6 +122,7 @@ INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
 #: The place's arm joint 2 (shoulder adduction: right upper limit +0.1745 rad, left lower -0.1745) stood at its limit (median 3 mrad with
 #: collisions off) in 268 place IKs of the fridge runs - the goal ~0.025 m from the base's centre line, the right arm reaching inward.
 #: Switch ``ISPATIALGYM_INSIDE_ARM_SIDE`` (default off); kit counters ``inside_arm_side.lateral_added`` / ``.aimed``.
+#: Relation "inside" only (owner 5t, 2026-11-08): SurfaceTouchingMode (touching_large_02) inherits this stance C and is unchanged by it.
 INSIDE_ARM_SIDE_ENV = "ISPATIALGYM_INSIDE_ARM_SIDE"
 INSIDE_ARM_SIDE_AIM_M = 0.17
 
@@ -938,7 +940,7 @@ class InsideMode:
             trunks = [(float(t), float(k)) for t, k in self.gp.gen("inside_trunks")]
         half_run = edge.length / 2 - (half + 0.10)
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
-        arm_side = inside_arm_side_on()
+        arm_side = inside_arm_side_on() and getattr(self, "relation", None) == "inside"  # 5t: not the touching surface place (SurfaceTouchingMode)
         if arm_side and half_run > 0:
             # i7-interior2 (owner item 2): the run's other end too (INSIDE_ARM_SIDE_ENV)
             side_l = round(half_run if arm == "right" else -half_run, 6)  # the base to the arm's far side: the goal toward the arm's shoulder
@@ -1048,7 +1050,7 @@ class InsideMode:
             kept = {id(st) for st in best_per_base([st for st, _ in classed], int(self.num("inside_no_band_trunks", NO_BAND_TRUNKS)))}
             classed = [(st, k) for st, k in classed if id(st) in kept]
             stats["no_band_kept"] = len(classed)
-        elif inside_map_cap_on() and classed and (getattr(rb, "meta", None) or {}).get("mode") == "map_view":
+        elif inside_map_cap_on() and getattr(self, "relation", None) == "inside" and classed and (getattr(rb, "meta", None) or {}).get("mode") == "map_view":  # 5t: inside only
             # i7-interior2 2026-11-08 (owner 6.2): the band / map survivors capped per base pose by reach margin, as without a band
             for st, _ in classed:
                 if "reach_margin_m" not in st.extras:
