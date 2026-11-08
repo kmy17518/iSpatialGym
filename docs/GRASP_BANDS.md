@@ -3119,6 +3119,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 18 | i7-interior2 (3749f69b) | 02ccd615 | INSIDE_ARM_SIDE + stance-C map cap for relation inside only, INSIDE_ARM_SIDE DEFAULT for inside (owner 5i.1 / 5t), opt-in joint_margin_rad; the margin maps not folded (lead #22) |
 | 19 | i7-tray up to dae908a3 | 4054c3d7 | DEFAULTS LAYOUT_PAD_CHECK=all for fixed layouts (48fe31cc), GRASP_TURN_FILTER (owner 5u.1); NOT the release-sweep gate (686c1dcd / 3115595e, lead #23) nor its root |
 | 20 | i7-axialrest final (2f25683f; code b4bcb3d0) | 1083d1f6 | AXIAL_BRACE_MAP_JOINT_MARGIN / AXIAL_BRACE_TILT_INTERSECT both off (lead #24); the margin maps not folded |
+| 21 | i7-brace (be096dd7) | 68c6ffc2 | DEFAULTS axial TURN_COVER + OPPOSITE (owner 4), WALL_BRACE_MAP (owner 5w.2); load diagnostics off; contact_library / contact_maps conflicts kept both sides |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3146,6 +3147,8 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 - ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
   (`int2_20261108/rebuild_ft2b.sh`, same inputs) before the layer.
+- brace33_touch / brace34w (with merge 21): the touch_brace maps of gkpmii / dkhgxn / ntbrtz re-validated under the pusher fix, and the 8
+  world_vertical wall_brace maps.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
 
