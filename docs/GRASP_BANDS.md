@@ -2537,6 +2537,136 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 7.1, 7.2 | FingerTouch: sphere screen then exact hull for palm / camera / wrist; rerun the bar / countertop sink templates with interior maps | i7-ft2 |
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
+| 2026-11-08c item 3 | block_design_01: diagnose each board_placement sub-reason, fix behind a default-off switch with an N 4 A/B, reject infeasible board draws early | i7-blockdesign |
+
+### i7-blockdesign (owner decision 2026-11-08 item 3): block_design_01 diagnosed, fixed, faster
+
+Branch `i7-blockdesign` from of-v2maps 93229922, i7-contact3's 5aeb9da4 (pack tail removed) cherry-picked first (e1b901aa: the fix
+touches block_design.py). Record `$OFH/blockdesign_20261108`, DECISIONS "i7-blockdesign" lines. Baseline c3_bd_base / c3_bd_new (and
+bd_off on this branch, switches off): 60 attempts / 0 written, every candidate board_placement, 21.6 s and 74 exact IK per rejected
+attempt, 0.45 GPU-h.
+
+Diagnosis (ISPATIALGYM_BD_DIAG, logging only: bd_diag2 = the board positions / probes of the 6 candidates tried, bd_diag3 = every
+candidate swept on a 8 x 12 grid of board positions with the probe re-run from FLIP_TRUNKS):
+
+* The template never changes between attempts: the start is not drawn (`start drawn: None`), the init is the template seed's +v edge,
+  lateral 0.35 moved by the flip-room rule to 0.07 (any drawn lateral >= 0.07 lands there: i7-startdraw's per-attempt start would give
+  the same init and candidates), so all 60 attempts repeat the same 6 candidates and the same 18 verdicts.
+* Maps: under the v2 generic reach map (h 0.8126) every one of the 27 Phase 2 survivors stands at trunk translate 0.95 (tilt 0 / -0.16);
+  the legacy band's pool (eval85 a2_k4, the written instance) also had 0.75 / 0.25 / 0.00. The 6 tried (score order: the shift
+  penalty puts the shift-0.25 candidates last) are all stand-off 0.45 at shifts 0.35 / 0.45; the stand-off 0.35 ones are ranks 7-13.
+* "Off the top" (0.46, -0.02) / (0.44, -0.10) / (0.48, +0.04): the plate is 0.0908 m (half 0.0454) and the test wants 1 cm margin, so
+  the board centre must be >= 0.055 m in from the edge; at stand-off 0.45 those depths are +0.010 / -0.010 / +0.030 m from the edge
+  (both near corners off). The list was set for stand-off 0.35 (eval85 a1_seed0 wrote with (0.46, -0.02) at stand-off 0.35). (0.60,
+  +0.05) is off the edge's END at shift 0.45 (manipulation lateral 0.52 + 0.05 + half > 0.58).
+* "No pitched place reaches the pockets": reach, not collision - the far-left pocket's pre-place has no IK (`exact IK failed at pose 1
+  of 2`) with the board and the board + support removed from the world as well. From the 0.95 trunk at stand-off 0.45 the probe passes
+  only right of the base near the edge (board lateral <= -0.10, depth <= 0.54); trunk 0.75 / -0.30 at the same base reaches (0.52,
+  -0.06) / (0.52, -0.02) (bd_diag3).
+* "No cell set lets every repeated-colour block flip": rbbr needs 2 flips, each from a flip-eligible cell (base lateral <= -0.10, >= 0.10
+  m in from the edge, >= 0.07 m left of the init camera) with no other block within 0.20 m to its right and 0.12 m in depth. The
+  region lattice is diagonal (8 cm offsets), so two eligible cells are usually diagonal neighbours and block each other; the board
+  (footprint + 6 cm cell margin = 0.118 m half) removes the same-column partner (candidate 10 at (0.52, -0.06): 4 kept, 2 eligible,
+  diagonal). On the sweep candidates 10 / 13 / 14 / 16 have no board position with a flip set at all; 11 / 12 / 15 have 10-28; the
+  stand-off 0.35 candidates 17-22 have 38-48, and the probe passes from their own trunk at depth 0.44.
+* Not involved: the place / grasp maps (the probe and the layout are geometric + exact IK), the pack brace (block_design_01 is the
+  board variant), alias memory (off in every arm).
+
+Switches (default off, sampler-side; no oracle / shared gate change):
+
+* `ISPATIALGYM_BD_BOARD_EARLY=1` (speed, same verdicts): `_board_precheck` runs the board's CPU tests (on the top, cells kept, flip
+  set) on the candidate's region before the init -> manipulation travel and before the exact probe; inside `_place_board` the flip-set
+  test runs before the probe; a failed probe is kept per (base pose, trunk, board xy, yaw) for the process. Counters
+  `bd_board.precheck_pass / precheck_reject / layout_before_probe / probe_run / probe_memo_hit`.
+* `ISPATIALGYM_BD_BOARD_SEARCH=1` (the fix): (1) the candidates whose region has a board position passing the CPU tests (list + grid,
+  any configured pattern) are tried first, in score order (`_board_feasible`; here 10 of 27, tried 12, 15, 11, 17, 19, 18); (2) after
+  the list, a grid of positions (depth 0.45-0.66 x lateral -0.22..+0.06, nearest first to the list's first position on the top, ties
+  right first), the CPU tests before each probe, at most `generation.board_grid_max_probes` (12) probes per candidate. Counters
+  `bd_board.feasible_candidates / order_changed / grid_searched / grid_placed / grid_failed`.
+
+A/B (cluster svl titanrtx, N 4 v2only, 320100-320103, alias memory off, snapshot trunk_788907d5; `$OFH/blockdesign_20261108/submit_ab.sh`):
+
+| arm | switches | att / written / ok | s per rejected attempt | exact IK / attempt | job wall | GPU-h |
+|---|---|---|---|---|---|---|
+| bd_off (= c3_bd_base / new) | - | 60 / 0 / 0 | 21.4 | 74.1 | 1618 s | 0.45 |
+| bd_early | BD_BOARD_EARLY | 60 / 0 / 0 | 2.5 (attempt 0 16.9, then 2.2) | 0.3 | 496 s | 0.14 |
+| bd_fix | BD_BOARD_EARLY + BD_BOARD_SEARCH | 4 / 4 / 0 | - (no rejection; 1.0 attempt per written) | 522 | 2944 s | 0.82 |
+
+bd_fix wrote the first fast-flow block_design_01 instances (attempt 0 each; 10 of 27 candidates board-feasible, tried 12, 15, 11, 17,
+19, 18; the board at the grid's (0.51, -0.10) after 3 probes); written attempts 826 / 383 / 441 / 413 s (the first incl. 531 s of
+cuRobo attach sphere fitting). Every demo ended `oracle_failed:timeout` at action 33 (the 4th block's place) when the program reached
+the oracle's 3000-action-step budget (`eval/instances.DEFAULT_MAX_STEPS`: no demo length, no --max-steps); 320100 / 320102 had three
+blocks seated within 1 mm, 320101 / 320103 three blocks 4.0-4.5 cm off their slots (not diagnosed). The eval85 block_design_01
+successes took 3520 / 4149 steps. The step budget is a shared gate: the owner decides (measurement: recollect with
+`ISGF_COLLECT_EXTRA="--max-steps 6000"`, slurm 18381777: 4 / 4 SUCCESS at 3267 / 3382 / 3457 / 3512 action steps, every block <= 1 mm -
+the 4 cm of 320101 / 320103 were mid-program - demo walls 635-904 s, 0.46 GPU-h). GPU-h per success: off / early - (0 ok); fix +
+recollect (0.82 + 0.46) / 4 = 0.32, one job with the larger budget ~0.21-0.23 (estimate).
+
+Needs the owner: (a) the demo step budget for block design (`DEFAULT_MAX_STEPS` 3000 without a demo length is a shared gate; e.g.
+`--max-steps 6000` for the block_design collectors via `ISGF_COLLECT_EXTRA`, or a per-family budget); (b) the defaults of
+`BD_BOARD_EARLY` / `BD_BOARD_SEARCH` (both off; they act only on board variants).
+
+### i7-blockdesign 5m (owner decisions 2026-11-08c): the step budget, the defaults, table-relative board positions
+
+The owner's 5m.1 / 5m.2 / "Board positions" (verbatim in the 2026-11-08c decisions; the early-reject audit of 5m is i7-diag's):
+
+* **5m.1 (de5779b0) a 6000-step oracle budget for block-design collectors only.** Mechanism: `scripts/trainfast/submit_fast.py`
+  `COLLECTOR_MAX_STEPS = {"configuration_matching-block_design": 6000}` (alias-key prefix) - `with_collector_max_steps` appends
+  `--max-steps 6000` to `ISGF_COLLECT_EXTRA` in the job's `job.env` (fast_env.sh -> `COLLECT_EXTRA` -> every `run_isg --mode oracle`
+  collector of the job), on `submit` and on `recollect` (a recollect of an older job without it gets it too); a job that passes its own
+  `--max-steps` in `ISGF_COLLECT_EXTRA` (--extra-env) keeps it. The shared `eval/instances.DEFAULT_MAX_STEPS` 3000 is unchanged; the
+  SUBMITTED line prints `collect_extra=...`. Not a customs field: the collectors take the budget from the command line, and job.env
+  is the job's record.
+* **5m.2 (73d54d48) `ISPATIALGYM_BD_BOARD_EARLY` and `ISPATIALGYM_BD_BOARD_SEARCH` default ON** (own commit; `0` restores each; board
+  variants only). The tests pin the off arms explicitly.
+* **Board positions (f1fc4ac1) `ISPATIALGYM_BD_BOARD_TABLE=1`, default off.** The hand-set `board_base_xy_candidates` are base-relative
+  (base depth, lateral) and were tuned at stand-off 0.35 (`BOARD_LIST_STAND_OFF`), so at 0.45 the near ones are off the top. With the
+  switch a board position is (inset of the board centre from the working edge, lateral from the stance's centre line): the depth is
+  the TABLE's, so it holds at every stand-off; the lateral stays the robot's, because the right arm's reach and the flip approaches are
+  set by the centre line (`_board_position_note`: right of the grid it blocks the flips, left of the centre line the arm misses the
+  slots). The listed positions are `generation.board_table_xy_candidates`, else the base list at its own stand-off (inset = depth -
+  0.35; the same table's edge overhang cancels); with BD_BOARD_SEARCH the table lattice follows (insets 0.06-0.30 step 0.03 x laterals
+  -0.22..+0.06 step 0.04, nearest first to the first kept listed position, ties right first). Per candidate stance a position is kept
+  only when the plate lies on the top (1 cm margin) and the board centre's base depth is in `generation.board_table_depth_window_m`
+  (default 0.40-0.66: the list's nearest at its stand-off .. the grid's farthest). The lattice positions get the grid's treatment (CPU
+  tests before each probe, `board_grid_max_probes`). One function, `_board_plan(manip)`, is the position plan of `_place_board`,
+  `_board_precheck` (hence BD_BOARD_SEARCH's candidate order); the init's flip-room move (`_board_fit`) keeps the base list either
+  way (2774e392, see the first run below): i7-startdraw's 5o.1 flip-room range can call `_board_fit` / `_board_plan` unchanged.
+  Example (unit test, rhjoby-like top, stand-off 0.45): the list becomes (0.56, -0.02), (0.54, -0.10), (0.58, +0.04), (0.62, -0.06),
+  and (0.70, +0.05) is out of the window; at 0.35 it is the base list. Counters `bd_board.table_plans / table_listed /
+  table_listed_off_top / table_listed_out_of_window / table_lattice / table_lattice_off_top / table_lattice_out_of_window /
+  table_listed_placed / table_lattice_placed / table_failed`.
+
+Runs (cluster svl titanrtx, N 4 v2only, alias memory off, two replicates per arm at 320100-103 / 320200-203; every job with
+`ISGF_COLLECT_EXTRA='--max-steps 6000'` from 5m.1, the collector logs `max_steps: 6000`; `$OFH/blockdesign_20261108/submit_5m.sh`):
+
+| arm | snapshot | att / written / ok | rejections | written attempt (s) | GPU-h | GPU-h / success |
+|---|---|---|---|---|---|---|
+| bdv_grid (defaults: list + SEARCH grid; = 5m validation) | trunk_f1fc4ac1 | 8 / 8 / 6 | none | 345-878 | 1.93 | 0.32 |
+| bdv_table (TABLE=1, flip-room move on the table positions) | trunk_f1fc4ac1 | 120 / 0 / 0 | 120 board_placement | - | 0.48 | - |
+| bdv_tableb (TABLE=1, flip-room move on the base list) | trunk_2774e392 | 16 / 5 / 5 (cancelled at 2 h 37) | 8 approach_untrackable + 3 gripper_not_in_frame (program_check, 0.87-1.29 ks each) | 818-1808 | 5.23 | 1.05 |
+
+* **5m validation (bdv_grid, the defaults after 5m.1 / 5m.2):** every instance written on attempt 0 (candidate 12, stand-off 0.45, the
+  board at the grid's (0.51, -0.10) after 3 grid probes; 5 probes per attempt); 6 / 8 demos succeed at 3314-3539 action steps (all
+  past the old 3000 budget). Failures: 320101 symbolic_only (one die 4.0 cm off slot_2, rotated pi: the same instance was 4.0-4.5 cm
+  off at the 3000-step timeout in bd_fix and succeeded in the 6000-step recollect, so it varies between runs), 320201 not_reached
+  (layout error 3.9 mm at the closest approach). Neither diagnosed further.
+* **bdv_table (first table run):** the table positions also drove the init's flip-room fit; the minimum move (init 0.35 -> 0.20
+  instead of 0.07) then "fit" every stand-off, the manipulation stances stood at the lateral range's end, 3 of 24 candidates were
+  board-feasible and all 120 attempts ended board_placement (precheck: no flip set, grid none). Fixed in 2774e392 (the flip-room
+  move keeps the base list); the result is evidence for i7-startdraw's 5o.1: the move to 0.07 is what gives the workable candidates.
+* **bdv_tableb (the A/B arm):** the same 27 candidates and the same order as the grid (12, 15, 11, 17, 19, 18). Candidate 12 (stand-off
+  0.45, trunk 0.95) fails board_placement: its listed table positions (0.56, -0.02) / (0.54, -0.10) / (0.58, +0.04) / (0.62, -0.06) are
+  0.10 m deeper than the base list and all out of the tall trunk's reach (the probe passes only at depth <= 0.54 and lateral <= -0.10,
+  bd_diag2), and the lattice, ordered nearest to the first listed position, spends the 12-probe cap before (0.51, -0.10) - the
+  position the grid finds on its 3rd probe because its order starts near the edge. Candidate 15 gets (0.51, -0.10) from the lattice and
+  fails path_collision; candidate 11 board_placement; candidate 17 (stand-off 0.35, the list's own stand-off, the board at (0.46,
+  -0.02)) writes, but its program check rejects 11 of 16 attempts (approach_untrackable, gripper_not_in_frame at the place descent).
+  31 probes per attempt vs 5. Its 5 written demos all succeed (3004-3525 steps).
+* **Verdict: the table-relative positions are worse than BD_BOARD_SEARCH's grid** (5 written / 16 attempts and 1.05 GPU-h per success
+  vs 8 / 8 and 0.32). Holding the board's inset from the edge constant moves it away from the base as the stand-off grows, while the
+  reach that limits the board is base-relative; the hand-set list worked at 0.35 because there inset and reach coincide. The switch
+  stays default off (no default change asked); the owner decides whether to keep it.
 
 ## i7-diag (2026-11-08): the IORS large floor aliases and touching_04 (diagnosis only)
 

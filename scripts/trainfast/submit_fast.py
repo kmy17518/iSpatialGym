@@ -43,6 +43,10 @@ BASE_INDEX = 100000
 #: the families whose sampler screens goal occlusion (owner 2026-11-05: they keep a camera under SAMPLER_CAMERAS; train85 measured
 #: 2.0-2.1 s per instance and 6.1-6.3 % rejected); every other family is screened in the replay stage
 SAMPLER_OCCLUSION_FAMILIES = ("mental_rotation", "disembedding")
+#: i7-blockdesign 2026-11-08 (owner 5m.1): the oracle's action-step budget per alias-key prefix, for the COLLECTORS only (run_isg --max-steps
+#: through ISGF_COLLECT_EXTRA in job.env; the shared eval/instances DEFAULT_MAX_STEPS 3000 stays). Block design: every success so far took
+#: 3267-4149 steps (the bd_fix 6000-step recollect 4 / 4 at 3267-3512; eval85 3520 / 4149), so at 3000 the alias writes demos that never succeed
+COLLECTOR_MAX_STEPS = {"configuration_matching-block_design": 6000}
 EXCLUDE = "visionlab-dgx1,viscam7,viscam11,viscam12,viscam-hgx-1,viscam-hgx-2,viscam14,viscam15,viscam16,svl9"
 
 spec = importlib.util.spec_from_file_location("submit_train", os.path.join(T85, "scripts", "submit_train.py"))
@@ -170,6 +174,23 @@ def eval_index_of(key):
     return p if os.path.exists(p) else os.path.join(st.EVAL_INDEX_DIR, key + ".json")
 
 
+def collector_max_steps(key):
+    """The collector step budget of alias ``key`` (``COLLECTOR_MAX_STEPS``, the longest matching prefix), else None (run_isg's default)."""
+    hits = [p for p in COLLECTOR_MAX_STEPS if key.startswith(p)]
+    return COLLECTOR_MAX_STEPS[max(hits, key=len)] if hits else None
+
+
+def with_collector_max_steps(env, key):
+    """5m.1: ``--max-steps N`` appended to ``env["ISGF_COLLECT_EXTRA"]`` for an alias with a collector budget, unless the job already
+    passes its own ``--max-steps`` (an --extra-env ISGF_COLLECT_EXTRA wins). Returns the budget applied, else None."""
+    n = collector_max_steps(key)
+    extra = str(env.get("ISGF_COLLECT_EXTRA", "") or "")
+    if n is None or "--max-steps" in extra.split():
+        return None
+    env["ISGF_COLLECT_EXTRA"] = (extra + " " if extra else "") + f"--max-steps {int(n)}"
+    return n
+
+
 def registry_path(a):
     if getattr(a, "registry", None):
         return a.registry
@@ -295,6 +316,7 @@ def submit(a):
         for kv in a.extra_env or []:
             k, v = kv.split("=", 1)
             env[k] = v
+        with_collector_max_steps(env, a.key)  # 5m.1: block design's collectors at 6000 steps (job.env is the record)
         if getattr(a, "shiyuc", False):
             env.update(shiyuc_env(a))  # after --extra-env: no override moves a write out of SY
             for k in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS", "ISPATIALGYM_REACH_MAP_ANCHORS", "TEMPLATE", "EVAL_INDEX", "ISPATIALGYM_MAP_OVERLAY"):
@@ -333,6 +355,7 @@ def submit(a):
         print(f"SUBMITTED {jobid} {a.flow} {a.key} {tag} {a.acct}/{a.part} {gres} time={st.hms(p['TIME_LIMIT_S'])} sample_limit={p['SAMPLE_LIMIT_S']} "
               f"max_attempts={p['MAX_ATTEMPTS']} demo_limit={p['DEMO_LIMIT_S']} spa={env['START_PER_ATTEMPT']} k={a.kcollect} customs={customs} "
               f"occl={env.get('ISGF_GOAL_OCCLUSION', 'off')} grasps={a.grasps} root={a.root} alias_memory={env['ISPATIALGYM_ALIAS_MEMORY']} memory_mode={env['ISPATIALGYM_ALIAS_MEMORY_MODE']}"
+              + (f" collect_extra=\"{env['ISGF_COLLECT_EXTRA']}\"" if env.get("ISGF_COLLECT_EXTRA") else "")
               + (f" map_overlay={env['ISPATIALGYM_MAP_OVERLAY']}@r{env.get('ISPATIALGYM_MAP_OVERLAY_RELEASE', '?')}" if env.get("ISPATIALGYM_MAP_OVERLAY") else "")
               + (f" memory_job={mem_id}" if mem_id else ""))
     finally:
@@ -361,6 +384,11 @@ def recollect(a):
     for kv in a.extra_env or []:
         k, v = kv.split("=", 1)
         over[k] = v
+    # 5m.1: a recollect of a job submitted before the collector budget (its job.env has no --max-steps) gets it too
+    if "ISGF_COLLECT_EXTRA" not in over:
+        cur = {"ISGF_COLLECT_EXTRA": " ".join(shlex.split(env0.get("ISGF_COLLECT_EXTRA", "''")))}
+        if with_collector_max_steps(cur, key) is not None:
+            over["ISGF_COLLECT_EXTRA"] = cur["ISGF_COLLECT_EXTRA"]
     with open(os.path.join(job_dir, "job.env"), "a") as fh:
         for k, v in over.items():
             fh.write(f"{k}={shlex.quote(str(v))}\n")

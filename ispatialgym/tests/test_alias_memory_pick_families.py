@@ -99,7 +99,8 @@ def test_attachment(monkeypatch):
 def test_block_design(monkeypatch):
     from ispatialgym.sampling.v2.tasks.block_design import BlockDesign
 
-    check_family(monkeypatch, BlockDesign.sample_instance, lambda: stub(_flips_expected=lambda: False))
+    # integration-2 (merge of i7-blockdesign: BD_BOARD_SEARCH default on, board variants only): the stub is not a board variant
+    check_family(monkeypatch, BlockDesign.sample_instance, lambda: stub(_flips_expected=lambda: False, _has_board=lambda: False))
 
 
 def test_alignment_axial(monkeypatch):
