@@ -108,6 +108,12 @@ SHELF_LIFT_STRAIGHTEN_ENV = "ISPATIALGYM_SHELF_LIFT_STRAIGHTEN"
 LEANED_BOARD_MAX_GAP_M = 0.005
 #: the upright book's top keeps this below the board above along the lift (m)
 LIFT_HEADROOM_MARGIN_M = 0.005
+#: (d) touch-rule fix 2026-11-08 (LEAD DECISION, owner away; same switch): at lift pose 0 ONLY (the grasp pose = the book's resting lean on the
+#: board) the book's hull may read down to this below the leaned-on board (m) - the resting contact, measured < 0.05 mm in every one of the 53
+#: i7t03r4_v / r5_diag refusals; every later lift pose keeps clearance >= 0 (:data:`LIFT_TOUCH_CLEARANCE_TOL_M`) and every robot link today's rule
+LIFT_START_CONTACT_TOL_M = 1e-4
+#: the clearance tolerance of the leaned-board touch rule (m; numerical zero)
+LIFT_TOUCH_CLEARANCE_TOL_M = 1e-9
 #: (d) fix 2026-11-08: the book's standing axis (:meth:`IORSSmall.shelf_standing_axis`) is used only while it stands within this of vertical at
 #: the attempt's start (deg; the drawn leans are 11-20 deg) - past it the lean cannot be told from another axis and the lift stays today's
 SHELF_LIFT_AXIS_MAX_TILT_DEG = 40.0
@@ -188,6 +194,19 @@ def lift_object_poses(grasp_pose: G.Pose, lift_end: G.Pose, eef_in_object: G.Pos
 def lift_headroom_m(hull_local: th.Tensor, poses: Sequence[G.Pose], ceiling_z: float) -> float:
     """The smallest distance (m) from the held object's top to ``ceiling_z`` over ``poses`` (negative: above it)."""
     return min(float(ceiling_z) - float(G.local_points_world(hull_local, (G.t(p[0]).float(), G.t(p[1]).float()))[:, 2].max()) for p in poses)
+
+
+def lift_touch_clearance_why(cls: Sequence[float]) -> Optional[str]:
+    """(d): the leaned-board touch rule on the attached book's hull clearances (m) to that board at each lift pose (index 0 = the grasp pose).
+    None = allowed: pose 0 (the resting lean contact) >= -:data:`LIFT_START_CONTACT_TOL_M`, every later pose >= -:data:`LIFT_TOUCH_CLEARANCE_TOL_M`.
+    Else ``"penetration_start"`` (pose 0 deeper than the resting tolerance) or ``"penetration"`` (a later pose below 0)."""
+    if not cls:
+        return "penetration"
+    if any(c < -LIFT_TOUCH_CLEARANCE_TOL_M for c in cls[1:]):
+        return "penetration"
+    if cls[0] < -LIFT_START_CONTACT_TOL_M:
+        return "penetration_start"
+    return None
 
 
 class _PieceShim:
@@ -3808,8 +3827,10 @@ class IORSSmall(SamplerV2):
 
     def lift_with_touch(self, grasp: GraspRecord, check) -> Any:
         """(d): ``check()`` (the lift test, object attached) as today; when it fails and the switch is on, once more with the leaned-on board out of
-        the world, kept only when the attached book's hull stays at clearance >= 0 from that board along the lift and every robot link is clear
-        of it at margin 0 at the lift's end configuration. Kit ``shelf_lift.leaned_board_touch_allowed`` / ``.leaned_board_touch_refused.<why>``."""
+        the world, kept only when the attached book's hull stays at clearance >= 0 from that board along the lift (pose 0, the resting lean, down
+        to -:data:`LIFT_START_CONTACT_TOL_M`: :func:`lift_touch_clearance_why`) and every robot link is clear of it at margin 0 at the lift's end
+        configuration. Kit ``shelf_lift.leaned_board_touch_allowed`` / ``.leaned_board_start_contact_allowed`` (pose 0 < 0, within the tolerance) /
+        ``.leaned_board_touch_refused.<why>`` (ik / penetration / penetration_start / robot_link)."""
         r = check()
         shim = self.lift_touch_ignores(grasp)
         if getattr(r, "ok", False) or not shim:
@@ -3821,9 +3842,11 @@ class IORSSmall(SamplerV2):
             return r
         geom = self.ikc._pieces_geometry(self.support, frozenset([grasp.extras["lift_leaned_piece"]]))
         poses = lift_object_poses(grasp.grasp, PC.lift_end_pose(grasp), grasp.eef_in_object)
-        cl = min(float(geom.sdf(G.local_points_world(self.hull["target"], (G.t(p[0]).float(), G.t(p[1]).float()))).min()) for p in poses) if geom else -1.0
-        if cl < -1e-9:
-            TT._count(self, "shelf_lift.leaned_board_touch_refused.penetration")
+        cls = [float(geom.sdf(G.local_points_world(self.hull["target"], (G.t(p[0]).float(), G.t(p[1]).float()))).min()) for p in poses] if geom else []
+        why = lift_touch_clearance_why(cls)
+        if why is not None:
+            TT._count(self, f"shelf_lift.leaned_board_touch_refused.{why}")
+            log.info("SHELF_LIFT_TOUCH refused %s cl0 %s cl_rest %s", why, round(cls[0], 6) if cls else None, round(min(cls[1:]), 6) if len(cls) > 1 else None)
             return r
         links = [ln for ln in self.ikc._non_finger_links(grasp.arm) if "attached" not in ln]
         from ispatialgym.oracle import r1pro_model as M
@@ -3835,6 +3858,8 @@ class IORSSmall(SamplerV2):
             TT._count(self, "shelf_lift.leaned_board_touch_refused.robot_link")
             return r
         TT._count(self, "shelf_lift.leaned_board_touch_allowed")
+        if cls[0] < -LIFT_TOUCH_CLEARANCE_TOL_M:  # allowed with the resting contact at pose 0 (within LIFT_START_CONTACT_TOL_M)
+            TT._count(self, "shelf_lift.leaned_board_start_contact_allowed")
         return r2
 
     def lifted_book_gap(self, manip: Stance, grasp: GraspRecord) -> float:
