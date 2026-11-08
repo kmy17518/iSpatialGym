@@ -709,6 +709,20 @@ CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
 CARRY_SIDEWAYS_ENV = "ISPATIALGYM_CARRY_SIDEWAYS"
 
 
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_WIDE_PATH=1`` (default off) - after the carried B -> C path
+#: collides at every variant of today, the GLOBAL path is planned again on the eroded traversability map eroded further by each of
+#: :data:`CARRY_WIDE_PATH_EROSIONS_M` (``NAV.plan_path`` global_extra_erosion_m, a square kernel like the map's own erosion): the shortest path
+#: no longer hugs the obstacles, so an object held across the heading (the umbrella reaches ~0.4 m beyond the base's sides) passes them -
+#: the centred umbrella carries of gm_t02_cc_on collided 20-30 % along the path, base at (-0.6..-0.8, 1.4..1.5) heading north past
+#: standing_mirror_wwkuuf_0. The same swept check judges the path. Kit carry_path.wide_tried / wide_used.
+CARRY_WIDE_PATH_ENV = "ISPATIALGYM_CARRY_WIDE_PATH"
+CARRY_WIDE_PATH_EROSIONS_M: Tuple[float, ...] = (0.15, 0.30)
+
+
+def carry_wide_path_on() -> bool:
+    return os.environ.get(CARRY_WIDE_PATH_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
 def carry_sideways_on() -> bool:
     return os.environ.get(CARRY_SIDEWAYS_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
 
@@ -3338,19 +3352,28 @@ class IORSLarge(SamplerV2):
         k_plain = len(variants) - 1
         if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
             variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
+        if carry_wide_path_on():  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
+            variants += [{"global_extra_erosion_m": w} for w in CARRY_WIDE_PATH_EROSIONS_M]
         chosen: Dict[str, Any] = {}
 
         def carried_path(redo=None, **kw):
             """The carried path B -> C: per variant (straight arrival first) the local path, then the eroded global one on a path_collision (the
             local shortest path hugs the partner's corner with the object out front, 0920-100543); a straight arrival that finds no path at all
-            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition)."""
-            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)]
+            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition). i7-goalmaps: the opt-in EXTRA
+            variants after the plain one (CARRY_SIDEWAYS_ENV, CARRY_WIDE_PATH_ENV) are tried after the plain one's path_collision; whatever they
+            fail with, the plain one's error is what the leg raises."""
+            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)
+                     if not (force is False and "global_extra_erosion_m" in v)]  # a wide-path variant is global only
             i = 0
+            plain_err: Optional[Reject] = None
             while True:
                 k, v, force = tries[i]
                 plain = k >= k_plain
+                extra = k > k_plain
                 if "heading_offset" in v:
                     TT._count(self, "carry_path.sideways_tried")
+                if "global_extra_erosion_m" in v:
+                    TT._count(self, "carry_path.wide_tried")
                 try:
                     p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
                     chosen.clear()
@@ -3359,17 +3382,29 @@ class IORSLarge(SamplerV2):
                         TT._count(self, "carry_path.sideways_used")
                         log.info("%s: B -> C carry: SIDEWAYS path (heading offset %+.2f rad, %s) %.2f m", self.gp.variant, float(v["heading_offset"]),
                                  "global" if force else "local", p.length_m)
+                    if "global_extra_erosion_m" in v:
+                        TT._count(self, "carry_path.wide_used")
+                        log.info("%s: B -> C carry: WIDE path (the global map eroded %.2f m more) %.2f m", self.gp.variant, float(v["global_extra_erosion_m"]),
+                                 p.length_m)
                     return p
                 except Reject as e:
-                    if plain and e.reason != "path_collision":
-                        raise
-                    if not plain:
-                        log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
-                                 str(e)[:600])
-                    # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
-                    i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
-                    if i >= len(tries):
-                        raise
+                    if extra:
+                        log.info("%s: B -> C carry: extra variant %s %s: %s: %s", self.gp.variant, v, "global" if force else "local", e.reason, str(e)[:300])
+                        i += 1
+                        if i >= len(tries):
+                            raise plain_err if plain_err is not None else e
+                    else:
+                        if plain and e.reason != "path_collision":
+                            raise
+                        if plain:
+                            plain_err = e
+                        if not plain:
+                            log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
+                                     str(e)[:600])
+                        # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
+                        i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
+                        if i >= len(tries):
+                            raise
                     self._drop_leg_records(place.name)
                     if redo is not None:
                         redo()

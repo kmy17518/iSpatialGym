@@ -73,3 +73,23 @@ def test_the_sideways_offset_nearer_the_place_yaw_comes_first():
     # driving north (heading +pi/2) to a stance facing -x (yaw pi): +pi/2 gives yaw pi (no turn at the end), -pi/2 gives 0
     assert IL.sideways_offsets((0.0, 0.0), (0.0, 2.0), math.pi) == [math.pi / 2, -math.pi / 2]
     assert IL.sideways_offsets((0.0, 0.0), (0.0, 2.0), 0.0) == [-math.pi / 2, math.pi / 2]
+
+
+# ---------------------------------------------------------------------------------------------- the wide global path (CARRY_WIDE_PATH)
+
+
+def test_the_wide_path_switch_is_off_by_default(monkeypatch):
+    monkeypatch.delenv(IL.CARRY_WIDE_PATH_ENV, raising=False)
+    assert not IL.carry_wide_path_on()
+    monkeypatch.setenv(IL.CARRY_WIDE_PATH_ENV, "1")
+    assert IL.carry_wide_path_on()
+
+
+def test_erode_more_grows_the_obstacles_by_a_square_kernel():
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    free = th.ones(11, 11, dtype=th.bool)
+    free[5, 5] = False
+    out = NAV.erode_more(free, 2)
+    assert not out[3:8, 3:8].any() and out[2, 5] and out[5, 8] and out[0, 0]
+    assert th.equal(NAV.erode_more(free, 0), free)
