@@ -1207,13 +1207,16 @@ AXIAL_UPRIGHT_TILT_RAD = 0.05
 
 
 def axial_settled_rest_on() -> bool:
-    """i7-axialrest (owner 2026-11-08, decision 2: the axial program at the target's settled rest; default OFF): the alignment-axial program
-    places its target at ``R_z(yaw) * q_rest`` (the v2 entry's measured stable rest, with its measured root height) instead of upright at
-    the identity, composes the goal yaw with that rest (``q_goal = R_z(yaw_goal) * q_rest``), reads its geometry at the rest, and the axial
-    contact library is built at the same rest (``contact_library.axial_rest``). ``ISPATIALGYM_AXIAL_SETTLED_REST=1``."""
+    """i7-axialrest (owner 2026-11-08, decision 2: the axial program at the target's settled rest; DEFAULT ON since the owner's 2026-11-08
+    item 3, ``ISPATIALGYM_AXIAL_SETTLED_REST=0`` turns it off): the alignment-axial program places a TILTED target (tilt >
+    ``AXIAL_UPRIGHT_TILT_RAD``) at ``R_z(yaw) * q_rest`` (the v2 entry's measured stable rest, with its measured root height) instead of
+    upright at the identity, composes the goal yaw with that rest (``q_goal = R_z(yaw_goal) * q_rest``), reads its geometry at the rest, and
+    the axial contact library is built at the same rest (``contact_library.axial_rest``); an upright rest stays today's identity rest. It
+    goes with the settled-rest push_blade / axial_brace maps of the tilted targets in the root (tablespoon tqqwys: cba67061 / 8753ec81) -
+    with the switch off those maps are a rest mismatch (``missing_map``)."""
     import os
 
-    return os.environ.get("ISPATIALGYM_AXIAL_SETTLED_REST", "0") == "1"
+    return os.environ.get("ISPATIALGYM_AXIAL_SETTLED_REST", "1") != "0"
 
 
 def axial_rest_tilt(rest_quat) -> float:

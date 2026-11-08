@@ -201,7 +201,9 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
 
 def axial_settled(params: Optional[Dict[str, Any]]) -> bool:
     """i7-axialrest (owner 2026-11-08, decision 2): whether an axial family builds at the target's SETTLED v2 rest - the family param
-    ``settled_rest`` (``build_job`` sets it when ``ISPATIALGYM_AXIAL_SETTLED_REST=1``, so it enters the library identity only when on)."""
+    ``settled_rest`` (``build_job`` sets it under the switch - the default since the owner's 2026-11-08 item 3 - for a TILTED rest only: the
+    one case the switch changes the build, refused without it, so the flip changed no library identity: upright libraries carry no param,
+    tqqwys's settled-rest maps keep theirs)."""
     return bool((params or {}).get("settled_rest"))
 
 

@@ -1,5 +1,5 @@
 """i7-axialrest (owner 2026-11-08, decision 2): the alignment-axial program at the target's SETTLED v2 rest behind
-``ISPATIALGYM_AXIAL_SETTLED_REST`` (default off) - simulator-free: switch off = today, an upright rest gives today's placement / goal /
+``ISPATIALGYM_AXIAL_SETTLED_REST`` (default on since the owner's 2026-11-08 item 3; "0" = off) - simulator-free: switch off = today, an upright rest gives today's placement / goal /
 contacts, a tilted rest keeps its tilt at the spawn and the goal, the goal check measures the turn alone."""
 
 from __future__ import annotations
@@ -61,8 +61,10 @@ def _full_err(q, g):
 # ---------------------------------------------------------------------------------------------------- switch off = today
 
 
-def test_the_switch_is_off_by_default(monkeypatch):
+def test_the_switch_is_on_by_default(monkeypatch):
     monkeypatch.delenv(ENV, raising=False)
+    assert CPZ.axial_settled_rest_on()  # owner 2026-11-08 item 3: the default
+    monkeypatch.setenv(ENV, "0")
     assert not CPZ.axial_settled_rest_on()
     monkeypatch.setenv(ENV, "1")
     assert CPZ.axial_settled_rest_on()
@@ -76,7 +78,7 @@ def test_off_the_placement_is_object_pose_on_at_the_identity(monkeypatch):
 
 
 def test_off_the_stop_geometry_and_the_library_are_unchanged(tmp_path, monkeypatch):
-    monkeypatch.delenv(ENV, raising=False)
+    monkeypatch.setenv(ENV, "0")
     hull, com_l = _hull(), th.tensor([0.0, 0.0, 0.013])
     pose = (th.tensor([0.6, 0.0, 0.82]), C.quat_from_yaw(0.5))
     end = C.quat_rotate(pose[1], th.tensor([0.06, 0.0, 0.0])) + pose[0]
@@ -117,7 +119,7 @@ def test_an_upright_rest_gives_the_same_contacts(tmp_path, monkeypatch):
     _model_dir(root, "magazine__tfovwy__s1", (0.20, 0.28, 0.012), rest_q=UPRIGHT_REST, h_root=0.0047)
     jm = _job("magazine__tfovwy__s1", ["axial_push", "axial_brace"], subtask="alignment-axial",
               params={"axial_push": {"yaws": 2, "long_axis": [1, 0, 0]}, "axial_brace": {"yaws": 2, "long_axis": [1, 0, 0], "clear_turns": True}})
-    monkeypatch.delenv(ENV, raising=False)
+    monkeypatch.setenv(ENV, "0")
     off = CL.build_job(jm, root)
     monkeypatch.setenv(ENV, "1")
     on = CL.build_job(jm, root)
