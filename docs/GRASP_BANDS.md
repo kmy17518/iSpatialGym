@@ -2674,6 +2674,12 @@ today collides the global path is planned again on the eroded map eroded 0.15 / 
 
 The table is appended to DECISIONS by `umbrella_r2/final_cc.sh` (job 18385122).
 
+Interim (runs still going): attempts / successful B -> C carries / carry legs failed per attempt - OFF 23 / 5 / 14.6, CENTRED 3 / 1 / 14.3
+(the cancelled first centred run 3 / 12 / 12.7), CENTRED + WIDE 4 / 24 / 2.5 (21 of the 24 on a WIDE path, mostly at 0.30 m; 20 at a centred
+pose). 0 written in every arm so far: after a carry the C tries end at B's exact pick IK, `C: pre-place branch off the tracked carry` and C's
+attached place IK - the next blockers, outside the carry. umb2 vs umb2s: 23 att / 5 carries vs 30 / 15, both 0 written - umb2 stays primary
+until the final numbers.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
