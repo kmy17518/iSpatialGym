@@ -1108,7 +1108,10 @@ class Attachment(SamplerV2):
                 try:
                     for g_l, H_l, gap in holds:
                         pre_l = IK.pre_pose(H_l)
-                        r_l = self.ikc.exact([pre_l, H_l], manip, "left", ignore_for_last=[male], q_seed=r_c.q, cache=False, scale_key=scale)
+                        # the male is touched by both hands here: it leaves the world for both hands' chains (the locked right hand's fingers
+                        # stand on it); the two hands' distance is the exact-hull check above, the left approach the entry's validated one
+                        with self.ikc.ignoring([male]):
+                            r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_c.q, cache=False, scale_key=scale)
                         if not r_l.ok:
                             fails["left_ik"] += 1
                             continue
@@ -1118,7 +1121,8 @@ class Attachment(SamplerV2):
                             fails["combined"] += 1
                             continue
                         retreat_r = IK.pre_pose(H_r, RETREAT_DIST)
-                        r_x = self.ikc.exact([retreat_r], manip, "right", q_seed=r_l.q, cache=False)
+                        with self.ikc.ignoring([male]):
+                            r_x = self.ikc.exact([retreat_r], manip, "right", q_seed=r_l.q, cache=False)
                         if not r_x.ok:
                             fails["retreat"] += 1
                             continue
