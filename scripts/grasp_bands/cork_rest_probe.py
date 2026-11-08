@@ -13,7 +13,10 @@ Per trial: the drop + settle of the validator (``TabletopWorld.settle``, varied 
 the world y axis (each from the settled snapshot): the up-axis tilt (the sampler's metric: the object's local +z), the full rotation and
 the translation after 300 steps. One ``CORK_REST {json}`` line per trial (also ``<out>/rest_probe.jsonl``).
 
-    python -u scripts/grasp_bands/cork_rest_probe.py --out OUT [--trials 12] [--model-dir DIR]
+    python -u scripts/grasp_bands/cork_rest_probe.py --out OUT [--trials 12] [--model-dir DIR] [--support desk/mdhelw]
+
+``--support <category>/<model>``: the cork settles on that B1K object (fixed, its top found by a drop) instead of the validator's slab, at a
+random xy over the inner 80 % of the top (attachment_03's desk mdhelw: is the instability the desk's surface?). Same nudge.
 """
 
 from __future__ import annotations
@@ -67,12 +70,46 @@ def rests(rng, trials):
     return out
 
 
+def settle_on(world, obj, geom, q0, xy, top_z, drop=0.003):
+    """The validator's drop + settle (``TabletopWorld.settle``'s rule: still over 30 steps, 1 mm / 3 mrad, slow) on a B1K support whose top is
+    at ``top_z`` (the AABB's: a drop from 3 mm above it; a lower surface under the xy is reached by the fall). ``(record, state)``."""
+    import torch as th
+
+    cfg = world.cfg
+    V = geom.union.vertices
+    R0 = np.array([rot(q0, e) for e in np.eye(3)]).T
+    bottom = -float((V @ R0.T)[:, 2].min())
+    world.park()
+    obj.set_position_orientation(th.tensor([xy[0], xy[1], top_z + bottom + drop], dtype=th.float32), th.tensor(q0, dtype=th.float32))
+    obj.keep_still()
+    a = world.hold_action()
+    hist, stable, steps = [], False, 0
+    for steps in range(1, cfg.settle_max_steps + 1):
+        world.env.step(a)
+        p, q = obj.get_position_orientation()
+        hist.append((p.numpy().astype(float).copy(), q.numpy().astype(float).copy()))
+        if steps >= cfg.settle_window:
+            ps = np.array([h[0] for h in hist[-cfg.settle_window:]])
+            qs = [h[1] for h in hist[-cfg.settle_window:]]
+            dp = float(np.linalg.norm(ps - ps[-1], axis=1).max())
+            dr = max(qang(qq, qs[-1]) for qq in qs)
+            if dp <= cfg.settle_pos_m and dr <= cfg.settle_rot_rad and float(th.linalg.norm(obj.get_linear_velocity())) <= cfg.settle_speed_m_s \
+                    and float(th.linalg.norm(obj.get_angular_velocity())) <= cfg.settle_ang_rad_s:
+                stable = True
+                break
+    p, q = obj.get_position_orientation()
+    up_dev = math.acos(float(np.clip(np.dot(rot(q.numpy().astype(float), [0, 0, 1]), rot(q0, [0, 0, 1])), -1, 1)))
+    rec = {"stable": stable, "settle_steps": steps, "tilt_from_intended_rad": up_dev, "h_root": round(float(p[2]) - top_z, 6)}
+    return rec, world.scene.dump_state(serialized=False)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--trials", type=int, default=12)
     ap.add_argument("--model-dir", default=None, help="a geometry export dir (default <out>/model)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--support", default=None, help="category/model of a B1K support (default: the validator's slab)")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     out_path = os.path.join(a.out, "rest_probe.jsonl")
@@ -89,18 +126,41 @@ def main(argv=None):
     obj = world.load(job, mdir)
     geom = OG.load(mdir)
     rng = np.random.default_rng(a.seed)
+    desk = None
+    if a.support:
+        from omnigibson.objects.dataset_object import DatasetObject
+
+        cat, mod = a.support.split("/")
+        desk = DatasetObject(name="probe_support", category=cat, model=mod, dataset_name="behavior-1k-assets", fixed_base=True, include_default_states=False)
+        world.scene.add_object(desk)
+        desk.set_position_orientation(th.tensor([2.0, 2.0, 0.6]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        for _ in range(3):
+            og.sim.step()
+        lo, hi = (v.numpy().astype(float) for v in desk.aabb)
+        desk.set_position_orientation(th.tensor([2.0, 2.0, 0.6 - float(lo[2])]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        for _ in range(3):
+            og.sim.step()
+        lo, hi = (v.numpy().astype(float) for v in desk.aabb)
+        world.slab.set_position_orientation(th.tensor([3.0, 3.0, -5.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))  # the slab out of the way
+        print("CORK_REST_SUPPORT " + json.dumps({"support": a.support, "aabb_lo": lo.round(4).tolist(), "aabb_hi": hi.round(4).tolist()}), flush=True)
     for k, (fam, q0) in enumerate(rests(rng, a.trials)):
         xy = (float(rng.uniform(-0.05, 0.05)), float(rng.uniform(-0.05, 0.05)))
         t0 = time.time()
-        rec, state = world.settle(obj, geom, q0, obj_xy=xy)
+        if desk is not None:
+            xy = (float(rng.uniform(lo[0] + 0.1 * (hi[0] - lo[0]), hi[0] - 0.1 * (hi[0] - lo[0]))),
+                  float(rng.uniform(lo[1] + 0.1 * (hi[1] - lo[1]), hi[1] - 0.1 * (hi[1] - lo[1]))))
+            rec, state = settle_on(world, obj, geom, q0, xy, float(hi[2]))
+        else:
+            rec, state = world.settle(obj, geom, q0, obj_xy=xy)
         p_s, q_s = obj.get_position_orientation()
         p_s, q_s = p_s.numpy().astype(float), q_s.numpy().astype(float)
-        row = {"trial": k, "family": fam, "start_quat_xyzw": [round(float(v), 5) for v in q0], "settled_quat_xyzw": [round(float(v), 5) for v in q_s],
+        row = {"trial": k, "family": fam, "xy": [round(v, 4) for v in xy], "support": a.support or "slab", "start_quat_xyzw": [round(float(v), 5) for v in q0], "settled_quat_xyzw": [round(float(v), 5) for v in q_s],
                "stable": rec["stable"], "settle_steps": rec["settle_steps"], "tilt_from_start_deg": round(math.degrees(rec["tilt_from_intended_rad"]), 2),
                "axis_world": [round(float(v), 3) for v in rot(q_s, [0, 0, 1])], "h_root_m": rec["h_root"], "nudge": {}}
         for nm, ax in (("x", [1, 0, 0]), ("y", [0, 1, 0])):
             world.scene.load_state(state, serialized=False)
-            world.place_slab(rec["slab"]["centre"], rec["slab"]["dims"])
+            if desk is None:
+                world.place_slab(rec["slab"]["centre"], rec["slab"]["dims"])
             qn = qmul(qaxis(ax, math.radians(NUDGE_DEG)), q_s)
             obj.set_position_orientation(th.tensor(p_s + np.array([0, 0, 0.001]), dtype=th.float32), th.tensor(qn, dtype=th.float32))
             obj.keep_still()
