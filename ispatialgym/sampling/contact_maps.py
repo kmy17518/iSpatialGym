@@ -751,7 +751,9 @@ def _compute_cli(a) -> None:
             f.write(json.dumps(dict(rec, t=round(time.time(), 1))) + "\n")
 
     todo = []
-    arms = [None] if spec["arm"] is not None else ["left", "right"]  # i7-brace: a per-entry-arm kind maps each arm's entries
+    # i7-brace: a per-entry-arm kind maps each arm's entries - one arm per process with --arm (the second arm's cuRobo IK in the same
+    # process ran out of GPU memory on a 24 GB titanrtx: 20.6 GB held after the first, run 7)
+    arms = [None] if spec["arm"] is not None else ([a.arm] if getattr(a, "arm", None) else ["left", "right"])
     for eid in ids:
         lib_k = CL.load_library(CL.library_path(a.root, spec["lib_kind"], eid))
         if not any(select_entries(lib_k, a.kind, verdicts, arm=arm) for arm in arms):
@@ -811,6 +813,8 @@ def main(argv=None):
     c.add_argument("--overlay-root", default=None, help="owner A6: the merged contact overlay root (<root>/<lineage key>/v<N>.json): the entries a "
                    "real oracle success confirmed join the validated ones; the version enters the map identity")
     c.add_argument("--overlay-version", type=int, default=None, help="the overlay version (default the latest)")
+    c.add_argument("--arm", default=None, choices=["left", "right"], help="i7-brace: a per-entry-arm kind (wall_brace): this arm's map only "
+                   "(default both, in one process)")
     i = sub.add_parser("info", help="a contact map's summary")
     i.add_argument("map")
     a = ap.parse_args(argv)

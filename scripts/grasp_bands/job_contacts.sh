@@ -86,12 +86,16 @@ if '--only' in a:
 print(' '.join(j['id'] for j in CL._jobs(sys.argv[1], only or None, sys.argv[2])))" $M $I/$N "${GC_VALIDATE_ARGS:-}")
     MSEL="--only ${MIDS:-__none__}"
   fi
+  # i7-brace: GC_MAP_ARMS="left right" = one process per arm (a wall_brace map per brace arm; log maps_<i>_<kind>_<arm>.log)
   for KIND in ${GC_MAP_KINDS:-touch_push touch_brace push_blade axial_brace}; do
-    t0=$(date +%s)
-    python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT $MSEL --verdicts ${GC_MAP_VERDICTS:-valid} \
-      ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} ${GC_MAP_OVERLAY:+--overlay-root $GC_MAP_OVERLAY} >> $ROOT/logs/maps_${I}_$KIND.log 2>&1
-    rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $ROOT/logs/maps_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
-    echo "GC_STAGE maps kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
+    for MARM in ${GC_MAP_ARMS:-default}; do
+      t0=$(date +%s)
+      if [ "$MARM" = default ]; then MAARG=""; MLOG=$ROOT/logs/maps_${I}_$KIND.log; else MAARG="--arm $MARM"; MLOG=$ROOT/logs/maps_${I}_${KIND}_$MARM.log; fi
+      python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT $MSEL --verdicts ${GC_MAP_VERDICTS:-valid} $MAARG \
+        ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} ${GC_MAP_OVERLAY:+--overlay-root $GC_MAP_OVERLAY} >> $MLOG 2>&1
+      rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $MLOG || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
+      echo "GC_STAGE maps kind=$KIND arm=$MARM rc=$rc s=$(( $(date +%s) - t0 ))"
+    done
   done
 fi
 echo "GC_JOB_DONE shard $I rc=$RC end $(date +%s)"
