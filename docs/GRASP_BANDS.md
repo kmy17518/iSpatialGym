@@ -2424,7 +2424,22 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   non_finger_link side grasps, 0 found); map cap fridge 17 -> 10, sink 26 -> 9 survivors, base poses 4 -> 4 / 3 -> 3. Where 6.3 acted: the
   leaning grasp-trunk drives 1 / 4 ok over the v2 runs (each failure navigate[4], the idle right gripper on the fridge), straight carries
   15 / 16 (one robot_wobble); B rejected the leaning drive (`inside_carry_straight.rejected` 224 / 47) and wrote straight carries only.
-  Open: the default of `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` (owner).
+  Default: `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` ON since b165883c (owner 2026-11-08b item 1; "0" off). It is read only by
+  `IORSLarge.record_carry_leg` with relation "inside" - the 15 inside_large_scale variants (fridge jar, sink plate, bookcase hardback;
+  counted inside_large_01 / 02 / 03); no other alias or family. Validation on trunk_b165883c: i7i2_fridge_def 19 att / 4 written /
+  3 of 4 ok (0.35 GPU-h per success), every carry straightened; the failure was the pick (right_arm_link6 vs the breakfast table).
+- **Owner item 2 (2026-11-08d), the fridge's place joint 2.** 268 of 349 C place-IK diagnostics (i7_fridge4 + i7i2_fridgeA/A2/B/B2) were
+  arm joint 2 at its limit (right 201 / left 67), median 3 mrad from the limit WITH COLLISIONS OFF: shoulder adduction (URDF right upper
+  +0.1745 rad) - the goal ~0.025 m from the base's centre line (stance C's single lateral -0.035, the nearest goal cell); the place map's
+  IK has no 50 mrad joint margin. Legacy successes (5 / 5): right arm, so 0.55, trunk (0.95, -0.3), goal 0.871 ahead / -0.025, no tilt.
+  f288f376 `ISPATIALGYM_INSIDE_ARM_SIDE` (default off): the side's other lateral and the goal cell 0.17 m toward the working arm's
+  shoulder (counters `inside_arm_side.*`). A/B: A i7i2_j2A 31 / 4 / 3 ok (0.45 GPU-h per success, joint-2 rejections 5.7 per attempt), B
+  i7i2_j2B 13 / 4 / 4 ok (0.31, 5.0 per attempt); every B demo's goal 0.117 m toward its arm.
+- **Owner item 3, the sink pick.** i7i2_sink: 41 B-failure lines, 123 reasons - the wrist camera within 5 mm of the world 63, exact IK
+  34, joint limit 25. Opt-in `ISPATIALGYM_CAMERA_BLAME` (f288f376 / 19c00c0f, `orient.camera_blame`, no verdict change): 73 / 73 blamed
+  cases are the camera vs bar_egwapq_0 (the init support; nothing else frees it), clear at 3 mm (66) / 4 (6) / 2 (1): the buffered spheres'
+  narrow gap, not a collision. The sink is not blocked (i7i2_sink + i7i2_sinkdiag2: 11 att, 8 written, 8 / 8 ok); the fix (the hull fallback
+  extended to the wrist camera at the policed support) is a shared gate - asked, not implemented.
 
 ## Limitations / not done
 
