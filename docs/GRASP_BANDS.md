@@ -2461,8 +2461,40 @@ i7-brace 9d2ce7e3 (6ab54ba7) supplies the clear-turn axial_brace builder.
 - both maps are at h0.8126;
 - staged in `$OFH/v2maps_int1_axialrest` (= brace34b + the two maps).
 
-**A/B:** tags `i7ar_off` / `i7ar_on`, trunk_4d22896d, the same indices 310000-310003. Both arms run with TURN_COVER=1 and OPPOSITE=1; the
-results are in DECISIONS ("i7-axialrest" lines).
+**A/B:** tags `i7ar_off` / `i7ar_on`, trunk_4d22896d, svl titanrtx, v2only N 4, the same indices 310000-310003, root
+`$OFH/v2maps_int1_axialrest`. Both arms run with TURN_COVER=1 and OPPOSITE=1; the switch is the only difference. Full record: DECISIONS
+"i7-axialrest RESULTS" (2026-11-08).
+
+| alias | off att / wr / ok | off GPU-h per success | on att / wr / ok | on GPU-h per success | brace present (off / on) |
+|---|---|---|---|---|---|
+| axial_05 (tqqwys, tilt 0.0866) | 0 / 0 / 0 (missing_map) | - (0.09 GPU-h) | 30 / 4 / 2 | 0.17 | - / 0 of 4 |
+| axial_01 | 11 / 4 / 2 | 0.17 | 12 / 4 / 3 | 0.090 | 2 / 1 of 4 |
+| axial_03 | 6 / 4 / 4 | 0.048 | 10 / 4 / 4 | 0.050 | 2 / 3 of 4 |
+| axial_04 | 21 / 4 / 4 | 0.055 | 14 / 4 / 2 | 0.090 | 0 / 0 of 4 |
+| all | 38 / 12 / 10 | 0.083 | 66 / 16 / 11 | 0.090 | |
+
+- **axial_05 off:** 0 attempts, as expected. The setup is rejected `no_stance` because both edges are `missing_map`: the settled-rest map
+  is not the identity program's rest (`axial_rest.map_rest_mismatch.push_blade` 1). tab_i's missing_map column shows 0, because the
+  reject happens at setup.
+- **axial_05 on:** `axial_rest.settled_used` 32.
+  - Rejections: target_placement 19 (mostly no push-feasible placement on the push_blade map), program_check_failed 4, approach_untrackable 3.
+  - The brace never landed: brace_ik_failed in all 4 written demos (kit paired 21, push_only 11, opposite_used 0).
+- **Turn vs tilt on axial_05 on.** In every demo the goal tilt equals the settled tilt (0.086-0.087); the full error equals the heading
+  error within 0.0002 rad.
+  - 310002 and 310003 succeeded: turns 1.21 / 1.22 rad, errors 0.016 / 0.020 (tolerance 0.12).
+  - 310000 not_settled: turn 0.425, short by 0.088 (tolerance 0.05).
+  - 310001 robot_wobble: lost by 1.21.
+  - No demo here was decided by the goal frame. The frame matters for turns below ~0.87 rad.
+- **Regression on axial_01 / 03 / 04.** The rests are the identity within 5e-6 rad.
+  - The only program difference: the pre-settle drop is 3.0 mm lower (top + h_root instead of `object_pose_on`'s + Z_OFFSET 3 mm). The
+    settled pose is identical within 0.1 mm.
+  - The same draws (6 instances) give identical attempt, yaw, push end, brace and status in both arms.
+  - The other draws diverge on the 3 mm. axial_04 on's 2 failures are spin +1 draws the off arm never drew: within N 4 noise, not
+    attributed to the switch.
+- **For the owner (default unchanged):** the switch works as approved and is inert on upright rests except the 3 mm drop.
+  - Recommend default on, together with tqqwys's settled-rest maps in the consolidated root. The switch off with those maps gives
+    missing_map.
+  - Option: keep the 3 mm drop under the switch, so upright rests stay draw-identical.
 
 ## Limitations / not done
 
