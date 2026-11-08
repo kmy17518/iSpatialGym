@@ -4753,6 +4753,124 @@ memory OFF, TURN_COVER=1 + OPPOSITE=1, map overlay r3; `i7ar_5yf_off` root v2map
 - **Defaults: neither flipped.** Both act, but the result is not "no worse" for what they are for: the brace present drops (4 -> 3 -> 1) and
   the map's live precision stays 0. Both stay default OFF; the margin maps are staged in v2maps_int2_axialmargin, not in int2.
 
+### i7-brace (owner 2026-11-08 3.3 / 3.4; branch `i7-brace` from of-v2maps cf1f5d2d)
+
+- **3.3 the brace-load pusher** (a1ef1c8d): built `kinematic_only` without a fixed base (dynamic in OmniGibson, the touching stand-in's
+  bug of 021aa89c) - now `PUSHER_KINEMATIC` (fixed_base + kinematic). `validate_contacts --revalidate` re-runs exactly the entries an
+  earlier run validated (old record -> `validation_prev`, uncapped). Every brace library the consolidated root reads was re-validated
+  (`$OFH/brace_20261108/libs_touch` / `libs_axial` / `libs_axial_sj` / `libs_axial_e`, per-entry changes: `verdict_changes.py`), maps
+  valid-only (owner A6), staged in `$OFH/v2maps_int1_brace33` (cp -a v2maps_int1; old maps in `_superseded_brace33/`).
+- **3.4 axial** (63da6197; default off): library param `clear_turns` builds the axial_brace entries once at the goal, keyed by pushed end x
+  spin, each with `goal.clear_turn_max_deg` (the contiguous range over 5..90 deg of the sampler's own `blade_sweep_clear`), plus the
+  OPPOSITE-END candidates (`axial_opposite_brace_candidates`: the far end's face the far end arrives at, resisting the same turn; classes
+  `<end><spin>spin_opp_*`, tried after the current ones; no `side_high` analog). Sampler switches `ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1`
+  (the map keeps the entries clear for the drawn turn) and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1` (the opposite candidates after the current
+  ones, the record's direction from the candidate); kit `axial_brace.opposite_tried` / `.opposite_used`. The exact two-arm check unchanged.
+- **3.4 the 12 braceless axial instances** (i7_contactfu): 9 `no_joint_cell` (turns 21-64 deg: the axial_brace map has no class of the
+  pushed end / spin at the goal root - reach, not the sweep), 3 `brace_ik_failed` (axial_04 magazine, 21.7-21.9 deg: the blades fail the
+  left arm's IK at the pre or meet the goal-posed target within 3 mm; all side pads sweep-skipped). The sweep test is monotone in the turn
+  on synthetic boxes (a pad clear at 45 deg is clear below it), so the failures at <= 45 deg are reach / goal-pose collisions.
+- **3.4 world_vertical `wall_brace`**: `alignment_wall.WallGeometry` = the task's hang / contact geometry moved verbatim out of
+  `AlignmentWall` (which inherits it: the live brace choice unchanged, test).
+  - *Library* (`contact_library.build_wall_brace`, family `wall_brace`): the task's own braces on the level (goal) pose at the synthetic
+    spot `WALL_RULE_SPOT` (wall plane x = 0 facing -x, the HINGE at z 0: a map / the validator add the hinge height), keyed by the tilt
+    sign; the hinge at the collision pieces' volume centroid (`pieces_com`); per entry the task's brace arm / push arm (`wall.brace_arm`:
+    + tilt and - tilt brace with opposite arms), the oracle record's extras (`pose_class` = the kind, `placed_at: goal`, `contact_face`);
+    `goal.clear_delta_min_deg .. clear_delta_max_deg` = the longest contiguous run of grid tilts (5..45 deg) where the task's `brace_clear`
+    holds (148f9fb5: the stop at the goal edge clears the tilted hull more the farther the target is tilted - a small target's brace is
+    clear from 10-20 deg on; the run from 5 deg dropped every license_plate entry); `load` = the leveling push carried on past level (the
+    pushed corner of the 20 deg tilt, its tangent about the COM hinge, 3-D in the wall plane) with the braced point's own direction.
+  - *Validator* (`validate_contacts`): `KitContactWorld`'s wall = a KINEMATIC box (`PUSHER_KINEMATIC`, as the pusher fix; category `walls`
+    so the oracle's `SimState.contact_supports` gives it to the planner as the target's support, as a scene wall); `hang()` replaces the
+    settle: the slab out of reach, the target at its level pose with the hinge at `validate.support_z` (1.45 m), on the task's hinge
+    (`create_hinge` at the PhysX COM about the wall normal, parented to the wall, `AlignmentWall.hinge_resistance` of the variant); the
+    probe and the whole-robot contact policy against the wall. Each entry is validated by ITS brace arm (`wall_arm_entries`; job_contacts
+    `GC_VALIDATE_ARMS="left right"`); the stance relation `wall_brace` from 26 braced demos (contact 0.73-0.86 m ahead, 0.05-0.30 m to the
+    brace arm's side, mirrored for the right arm). The oracle's own Brace runs (closed fist, touch stop, back-off), then the LOAD (the
+    leveling push carried on past level): the pusher's 3 cm face meets the pushed corner square to its tangent and is carried along the
+    corner's ARC about the hinge; the sweep is stopped `brace_press_m` (at the braced point) after the target first turns 2 mrad past level
+    (`wall_load_stop`, the contact measured on the SIGNED turn) - the touching / axial calibration (the object driven 1 cm past first
+    contact); the target is woken every step (the sleep assist sleeps it while the brace stands). `judge_wall_standing` = valid BEFORE the
+    load (the oracle reached its stop, no non-finger wall load); `judge_wall_brace` = after it: clean oracle run, the braced point along its
+    load direction <= `brace_hold_max_m` (`not_held`) and >= 1 mm (`not_loaded`), the brace fingers pressed the target >= 1 N
+    (`not_braced`), it travelled at most the stop's gap + the hand's own displacement + 4 mm (`slipped_past`), the hinge axis not twisted
+    (`topple`), the hand within `brace_eef_drift_m` (`hand_pushed`), no non-finger link loading the wall. The load took seven runs to make
+    exact (DECISIONS "WALL VALIDATION RUN 1..7"): the material by distance to the corner line missed thick targets (vacuous passes), the
+    8 cm face pushed the edge, the sleeping target ignored the pusher, a straight path and the contact offsets over-turned it, an unsigned
+    turn mistook a backward settle for the contact.
+  - *Validation* (run 7, `$OFH/brace_20261108/wall/libs`, trunk_45612c00; valid BEFORE the load / AFTER it): painting dacihj 34 / 31 of
+    36, signpost vvjtkv 23 / 15 of 24 (the s+25/+ and s-25/- fists let the target slide past), license_plate naclac 34 / 10 of 36,
+    paper_towel_dispenser jacqxv 36 / 5 of 36 (its braced point goes past the fist: not_braced / slipped_past), wall_clock 0 entries
+    (push-only) - 132 entries, 127 / 61. The maps (01154b97, one arm per process: the second arm in one process ran out of GPU memory)
+    from the 61 valid entries: 8 maps (4 objects x 2 arms), staged in `$OFH/v2maps_int1_brace34w` (= v2maps_int1_brace34b + the
+    wall_brace maps; found by the model-id directory, no glib entry / legacy key needed).
+  - *Maps* (`contact_maps` kind `wall_brace`): per stand-off d_e 0.35-0.90 (prompt0's Phase-2 d lattice) the wall box at x = d_e and the
+    hung root's row in front of it (`cell_de`), laterals every 0.05 m over +-0.60, the tucked idle arm, trunk eligibility per d_e, one map
+    per brace arm, valid entries only; `ContactMap.find_near` (the hinge height, no support anchor); the lookup stays in the stand-off's row.
+  - *Sampler* (`ISPATIALGYM_WALL_BRACE_MAP=1`, default OFF): at each stance with push reach the map (brace arm of the drawn tilt sign, at
+    the hinge height) gives the feasible classes (tilt sign + kind + wrist) whose clear range covers |delta| - they replace the reach
+    volume's brace candidates; the stand-off of the row is read from the hung root's position (the patch protrusion and the COM included);
+    the exact two-arm check is unchanged; a missing map keeps the reach-volume rule. Kit `wall_brace_map.hit / miss / stances /
+    stance_feasible / stance_none / reach_volume_kept / reach_volume_none / map_only / reach_only / cover_dropped / written_brace /
+    written_push_only`.
+  - *Runs* (v2only N 4, trunk_01154b97, `v2maps_int1_brace34w`, base index 310000 both arms, svl titanrtx): `i7_wall_off` 97 att /
+    18 wr / 18 ok, 0.106 GPU-h per success, 115.5 exact IK per attempt; `i7_wall_on` (`ISPATIALGYM_WALL_BRACE_MAP=1`) 104 / 18 / 18, 0.107,
+    62.6. Per alias off vs on: 01 6/4/4 vs 6/4/4; 02 (wall clock, push-only) identical; 03 7/4/4 vs 8/4/4 (the dispenser's braces become
+    side_high: its below_high entries fail the load); 04 51/2/2 vs 51/2/2 (too_few_visible, not the brace); 05 27/4/4 vs 33/4/4. Brace
+    present 14 / 14 in both; where it acted, the map's feasible stances vs the reach volume's: 01 1047 vs 485, 03 137 vs 211, 04 7450 vs
+    7155, 05 2953 vs 2709 (of 1886 / 873 / 17420 / 8904 screened). The switch stays default OFF (owner).
+- **Owner 2026-11-08 (decisions 20261108h 5w.1): the wall load test APPROVED** for the `wall_brace` family only: the corner's arc load
+  stopped `brace_press_m` at the braced point after the measured (signed-turn) contact, and its rejection reasons `not_loaded` /
+  `not_braced` / `slipped_past` (4 mm). It already is the code of run 7 (45612c00, `validate_contacts.judge_wall_brace` /
+  `wall_load_stop`, read only for a `wall_brace` library); no shared gate or contact policy changed, no code change.
+- **Owner 2026-11-08 (5w.2): `ISPATIALGYM_WALL_BRACE_MAP` DEFAULT ON** (separate commit; `=0` turns it off), with the wall maps staged in
+  **`$OFH/v2maps_int1_brace34w`** (= v2maps_int1_brace34b + the 8 run-7 wall_brace maps: the root to fold into the integration).
+  Confirmation run: world_vertical 01-05, N 4 v2only on that snapshot and root, no switch in the environment: `i7_wall_def`
+  (trunk_b1a07ba6) 104 att / 18 wr / 18 ok, 0.105 GPU-h per success, 62.6 exact IK per attempt - per alias identical to `i7_wall_on`.
+- **Owner 2026-11-08 (5w.3): the touching / axial brace validator, DIAGNOSIS AND COUNT ONLY** (no rebuild, no default; the switches below
+  are diagnostic, default off, unset = today's load bit-identical): `ISPATIALGYM_GC_BRACE_LOAD_DIAG=1` records the load
+  (`debug.load_diag`: asleep at the load, the assist's sleeps / wakes, the LOAD POINT's travel along the load - the arriving end on the
+  axial COM hinge, whose root never translates -, the measured first contact vs the computed face); `_WAKE=1` wakes the braced object at
+  every pusher step (the wall's 220ff7db); `_MEASURED=1` stops the pusher `brace_press_m` after the measured contact (the wall's
+  fae1e4d8). Re-validation arms D / W / WM of the live libraries (libs_touch, libs_axial_ct2, libs_axial_e jhaltj s1, libs_axial_sj) under
+  `$OFH/brace_20261108/w53/<arm>`; counts in DECISIONS ("i7-brace 5w.3"). `validate_contacts probe` (5w.3(b)): the real arm pressed into
+  a sleeping partner at 0.1-3.3 mm/step under each sleep condition (`KitContactWorld.probe_wake`).
+  - *The sleeping object*: the restored partner falls asleep by PhysX's OWN sleep (threshold 0.005) ~12 steps after the trial's wake,
+    before the assist's 30-step window (the assist slept none of them), and the teleported kinematic pusher never wakes it: in the record
+    414 of the 462 valid touching / axial brace verdicts were judged with the load never reaching the object (touch 110 / 110, magazine
+    96 / 96, keyboard 79 / 94, jhaltj 44 / 44 and 85 / 90; board_game 0 / 28 - its blades press it awake). Woken at every pusher step
+    (W) 84 verdicts change (83 hand_pushed, 1 not_held): touch 1 / 110, keyboard 12 / 94, magazine 18 / 96, jhaltj s1x1x2.5 53 / 90.
+  - *The load start*: the measured contact is at the computed face on the touch partners but 1.1-2.8 cm EARLY (medians) on the axial
+    keyboard / jhaltj s1x1x2.5 / board_game, so the computed load over-presses them; stopped 1 cm after the measured contact (WM) 104
+    verdicts change both ways (60 invalid -> valid, 44 valid -> invalid at the 1 cm hand_pushed threshold). Valid D -> W -> WM: 462 -> 378 ->
+    394. Still vacuous with both (awake, the load point < 1 mm): magazine 48 / 96, jhaltj s1 34 / 44 trials - the axial load path misses or
+    pushes through the COM hinge, and `not_held` cannot fire on a hinged target (the judge reads its pinned root). Owner: rebuild / fix.
+  - *Collection / replay / eval* (the same `SleepAssist` in run_isg and run_isg_vec; 3246 written demos mined, the probe): a hand slower
+    than 0.3 mm/step is not "moving" for the assist - it neither wakes the body proactively nor keeps it awake; PhysX itself wakes a
+    sleeping body when the hand is 1.8-2.2 cm from its box, at every speed (21 / 21); but under the assist a 0.1-0.2 mm/step approach is
+    RE-SLEPT at once (the window is already full of still poses) and stays asleep while pressed (12 / 12 probes, 73-124 steps, up to 15 N)
+    - it still moves as far as an awake body and no kick was measured (object speeds within the awake control's range). In the demos 2325 first motions after an assist
+    sleep came without the assist's wake (1514 with a slow hand); kicks 2.2 % vs 1.7 % after a wake. Teleports (`set_position_orientation`,
+    the scene state load) wake the teleported body; Executor.restore wakes every tracked object.
+- **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
+  validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
+- **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
+  axial_01 / 03 / 04 56 / 12 / 12 (brace 0 / 12); i7_brace34 (clear-turn maps, opposite not validated) 42 / 12 / 11, brace 0 / 12;
+  i7_brace34b (+ the validated opposite entries, `v2maps_int1_brace34b`, TURN_COVER=1 OPPOSITE=1) 53 / 11 / 10, 0.070 GPU-h per success,
+  BRACE PRESENT 4 / 11 (axial_03 3 / 4, axial_01 1 / 4, axial_04 0 / 3), every brace an opposite-end blade (`opp_blade_30`), braced demos
+  3 / 4 ok; kit axial_brace.paired 25 / opposite_tried 19 / opposite_used 10.
+- **Owner 2026-11-08 (answers 20261108b item 4): the axial brace switches DEFAULT ON** (separate commit): `ISPATIALGYM_AXIAL_BRACE_TURN_COVER`
+  and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE` read `1` when unset (`=0` turns either off). The axial brace maps the integration root reads are
+  the brace34b maps - the clear-turn library plus the opposite-end entries validated as their own group, staged in
+  **`$OFH/v2maps_int1_brace34b`: the root to fold into the integration**. Confirmation run: axial_01 / 03 / 04, N 4 v2only on that
+  snapshot and root, no switch in the environment: `i7_brace_def` (trunk_59f7967b) 40 att / 12 wr / 10 ok, 0.067 GPU-h per
+  success, brace present 4 / 12 (i7_brace34b with the env switches: 53 / 11 / 10, 4 / 11).
+- **Owner 2026-11-08 (item 5): board_game qgvsnb** - the 14 of 104 blade braces that hold the real load are accepted; board_game mostly
+  runs push-only; no other brace type is searched. Coverage from the staged map (`brace_20261108/bgcov.py`; % of (cell, yaw slot, d_e,
+  trunk) problems with a feasible covering class): the 14 current-end entries 3-4 classes / 5.0 % (spin +) and 3.7 % (spin -) for turns
+  20-45 deg, 1-2 classes / 1.5-2.8 % for 50-70 deg (only the yaw 0 / 180 slots' entries clear past 45); with the 14 opposite-end ones
+  7.7 / 6.2 % and 4.4 / 3.1 %.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
