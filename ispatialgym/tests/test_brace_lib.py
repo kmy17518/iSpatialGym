@@ -343,7 +343,12 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     r = float(np.linalg.norm((E - H0) - n_w0 * float((E - H0) @ n_w0)))
     assert all(abs(float(np.linalg.norm((f - H0) - n_w0 * float((f - H0) @ n_w0))) - r) < 2e-3 for f in face)  # on the corner's arc
     phi0, phi1 = facts["arc_rad"]
-    assert abs(phi0 * facts["r_face_m"] + cfg.brace_pusher_gap_m) < 1e-4 and abs(phi1 * e["load"]["r_brace_m"] - cfg.brace_press_m) < 1e-4
+    assert abs(phi0 * facts["r_face_m"] + cfg.brace_pusher_gap_m) < 1e-4 and abs(facts["phi_press_rad"] * e["load"]["r_brace_m"] - cfg.brace_press_m) < 1e-6
+    assert len(facts["phis"]) == len(path) and abs(facts["phis"][-1] - phi1) < 1e-5
+    # the stop: phi_press after the target first moved (measured), wherever the contact happened
+    ph = [0.01 * i for i in range(20)]
+    assert VC.wall_load_stop(ph, [0.0] * 5, 0.05, 0.002) is None  # no motion yet
+    assert VC.wall_load_stop(ph, [0, 0, 0, 0.001, 0.003, 0.01], 0.05, 0.002) == 9  # contact at step 4 (0.04) -> stop at 0.09
     assert float((face[1] - face[0]) @ d) > 0  # it moves along the corner's tangent first
     # the judge: the target turned past level by an angle about the hinge -> the braced point moved along its load direction
     n_w = T0[:3, :3] @ np.asarray(e["wall"]["normal_object"])

@@ -172,6 +172,8 @@ class ContactValidateConfig:
     wall_braced_min_N: float = 1.0
     #: the braced point may travel at most the stop's gap (``wall.brace_offset_m``) + the hand's own displacement + this (``slipped_past``)
     wall_slip_m: float = 0.004
+    #: the wall load's contact: the target turned this far (rad) under the sweep
+    wall_contact_turn_rad: float = 0.002
     wall_pusher_travel_max_m: float = 0.06
 
 
@@ -615,8 +617,10 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres, xyzw quaternions - one per control step -, facts)``. The leveling push
     carried on past level: the pusher's face meets the PUSHED corner (``load.point_object``) square to its tangent (``load.direction``, in the
     wall plane) and is carried along the corner's ARC about the hinge (``wall.hinge_object``, the wall normal), from ``brace_pusher_gap_m``
-    before the material to the turn that carries the braced point (``load.brace_point_object``) ``brace_press_m`` past level - the touching
-    / axial calibration (their object travels ``brace_press_m`` past first contact). A straight path along the tangent over-turned the target
+    before the material to the end of the sweep (``wall_pusher_travel_max_m``); the trial (:func:`wall_load_stop`) stops it ``phi_press`` = ``brace_press_m`` / r_brace
+    after the target first moves - the braced point (``load.brace_point_object``) driven ``brace_press_m`` past level unbraced, the touching
+    / axial calibration (their object travels ``brace_press_m`` past first contact); the contact is MEASURED (run 5: the target turned from
+    ~7 mm before the computed face - the physics' contact offsets - 0.09 rad for 0.056). A straight path along the tangent over-turned the target
     (2026-11-08 run 3: the contact slid inward along the flat face, every trial 1.59 cm at the braced point for 1 cm meant), so the arc makes
     the travel exact whatever the brace does. The material it meets: the hull points within the box's half-width ACROSS the line in the wall
     plane (any offset along the normal: the corner is on the mid-plane, the hull's vertices off it); none raises (no load placed: the trial
@@ -646,18 +650,33 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     axis = n if float(np.cross(n, rF) @ d) >= 0 else -n  # turning about +axis carries the corner along d
     r_B = float(load.get("r_brace_m") or r_F)
     phi0 = -cfg.brace_pusher_gap_m / r_F
-    phi1 = min(cfg.brace_press_m / max(r_B, 0.05), cfg.wall_pusher_travel_max_m / r_F)
+    phi_press = cfg.brace_press_m / max(r_B, 0.05)
+    phi1 = (cfg.brace_pusher_gap_m + cfg.wall_pusher_travel_max_m) / r_F + phi0  # the sweep's end; the trial stops it phi_press after contact
     k = max(1, int(math.ceil((phi1 - phi0) * r_F / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
     R0 = np.stack([np.cross(y, d), y, d], axis=1)
-    centres, quats = [], []
+    centres, quats, phis = [], [], []
     for i in range(k + 1):
-        Rp = _rot(axis, phi0 + (phi1 - phi0) * i / k)
+        phi = phi0 + (phi1 - phi0) * i / k
+        Rp = _rot(axis, phi)
         Fi = H + Rp @ (F0 - H)
         centres.append(Fi - (Rp @ d) * half)
         quats.append(np.asarray(S.mat_to_quat(Rp @ R0), dtype=float))
+        phis.append(phi)
     facts = {"start": [round(float(v), 4) for v in centres[0]], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
-             "arc_rad": [round(phi0, 5), round(phi1, 5)], "r_face_m": round(r_F, 5), "steps": k, "n_line_points": int(near.sum())}
+             "arc_rad": [round(phi0, 5), round(phi1, 5)], "phi_press_rad": round(phi_press, 6), "phis": phis, "r_face_m": round(r_F, 5), "steps": k,
+             "n_line_points": int(near.sum())}
     return centres, quats, facts
+
+
+def wall_load_stop(phis: Sequence[float], turns: Sequence[float], phi_press: float, contact_rad: float) -> Optional[int]:
+    """i7-brace: the step of the wall load's sweep at which the pusher stops - the first step whose angle reaches the contact angle (the
+    pusher's angle at the first step the target had turned >= ``contact_rad``) + ``phi_press``; None while that is not reached (``phis`` /
+    ``turns`` per step so far)."""
+    c = next((i for i, t in enumerate(turns) if t >= contact_rad), None)
+    if c is None:
+        return None
+    stop = next((i for i in range(c, len(phis)) if phis[i] >= phis[c] + phi_press - 1e-12), None)
+    return stop
 
 
 def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, cfg: ContactValidateConfig,
@@ -1311,19 +1330,33 @@ class KitContactWorld:
                 pre_load = judge_wall_standing(run, self.cfg, max(series) if series else 0.0)
                 n_pre = len(series)
                 path, q_push, push_facts = wall_pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0)
-                trace.rec["pusher"] = push_facts
+                trace.rec["pusher"] = {k: v for k, v in push_facts.items() if k != "phis"}
             else:
                 path = pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0)
                 q_push = [np.array([0.0, 0.0, 0.0, 1.0])] * len(path)
-            wake = wall_entry(entry)
-            for i, c in enumerate(path + [None] * self.cfg.brace_hold_steps):
-                if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
+            if wall_entry(entry):
+                # i7-brace: the arc sweep, stopped phi_press after the target first moved (wall_load_stop); the sleep assist sleeps the still
+                # hung target while the brace stands and a teleported kinematic pusher does not wake it (run 2: 6 / 12 signpost trials did not
+                # move) - the push hand it stands in for would: woken every step
+                turns: List[float] = []
+                stop = None
+                for i, c in enumerate(path):
                     pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(q_push[i], dtype=th_.float32))
-                    if wake:
-                        # i7-brace: the sleep assist sleeps the still hung target while the brace stands, and a teleported kinematic pusher
-                        # does not wake it (2026-11-08 run 2: 6 / 12 signpost trials did not move at all) - the push hand it stands in for does
-                        obj.wake()
-                self._hold(motions, step, 1)
+                    obj.wake()
+                    self._hold(motions, step, 1)
+                    turns.append(_tilt(T0[:3, :3], _T(obj.get_position_orientation())[:3, :3]))
+                    stop = wall_load_stop(push_facts["phis"], turns, push_facts["phi_press_rad"], self.cfg.wall_contact_turn_rad)
+                    if stop is not None and i >= stop:
+                        break
+                trace.rec["pusher"] = dict({k: v for k, v in push_facts.items() if k != "phis"}, stop_step=stop, swept_steps=len(turns),
+                                           contact_step=next((j for j, t in enumerate(turns) if t >= self.cfg.wall_contact_turn_rad), None))
+                for _ in range(self.cfg.brace_hold_steps):
+                    self._hold(motions, step, 1)
+            else:
+                for i, c in enumerate(path + [None] * self.cfg.brace_hold_steps):
+                    if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
+                        pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(q_push[i], dtype=th_.float32))
+                    self._hold(motions, step, 1)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
             self._park_pusher()
             self._hinge_off(hinge, obj)
