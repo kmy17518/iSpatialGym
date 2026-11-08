@@ -2043,7 +2043,19 @@ no random number drawn). It runs over the pick (manipulation) stance candidates 
 - Not covered: the other tabletop families (attachment, block design, alignment, disembedding, articulation large / hybrid) keep
   their order.
 
-**Replay outputs:** `$OFH/memory2_20261108` (`replay_production`, `replay_validation`; CPU job, snapshot below).
+**Replay outputs:** `$OFH/memory2_20261108` (`replay_production`, `replay_validation`), from CPU job 18377645 on trunk_52621543.
+
+**Stores on `$OFH` (2026-11-08):**
+- `alias_memory_validation/v0001`: the seed v0003 (2,383 demos) plus 235 pre-mode demos, all weighted as seeded, 99 aliases.
+- `alias_memory_validation/v0002`: the batch aggregation after the GPU check.
+- `alias_memory_production`: `thresholds.json` only. It is empty, so `--alias-memory auto` pins off until the first production batch.
+
+**GPU check `i7_mem2_val`** (inside_large_01, v2only, `v2maps_int1`, `--memory-mode validation`, trunk_52621543, slurm 18377666):
+- 7 attempts, 4 written, 2 ok (1 failed_grasp, 1 robot_wobble), 0.284 GPU-h per success.
+- Kit over the 7 attempts:
+  - place: consulted 51, down_bins 28, flagged 56 candidates (the seeded trunk 0.50 bins), reordered 38, explored 18;
+  - pick: consulted 7, no_down 7. The seed holds no pick finding for this alias.
+- All four placements are at (right, 0.0, -0.6, 0.75 m). The shards carry `mode: validation` and `sampled_with_pick`.
 
 ## Contact libraries and contact maps (branch `i7-contact`, 2026-11-07)
 
