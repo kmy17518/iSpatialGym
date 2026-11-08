@@ -54,16 +54,18 @@ from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
-def board_grid_on() -> bool:
-    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_GRID=1`` (default off): when no position of
-    ``generation.board_base_xy_candidates`` works, the board is searched on a grid of (base depth, lateral) positions of the manipulation
-    stance (:meth:`BlockDesign._board_grid`), nearest to the list's first position at the stand-off it was set for (0.35) first; the
-    same tests, the CPU ones (on the top, cells kept, the repeated-colour flip set) before the exact place probe, at most
-    ``generation.board_grid_max_probes`` probes per candidate. Off: the list alone."""
-    return os.environ.get("ISPATIALGYM_BD_BOARD_GRID", "0") == "1"
+def board_search_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_SEARCH=1`` (default off), the board variant only:
+    (1) the manipulation candidates on whose region some board position passes the CPU tests (on the top, cells kept, the repeated-colour
+    flip set; the list, then the grid) are tried first, in score order, the others after (:meth:`BlockDesign._board_feasible`) - today
+    the 6 tried were all at stand-off 0.45 where the list's near positions are off the top, the stand-off 0.35 ones ranked 7+;
+    (2) when no position of ``generation.board_base_xy_candidates`` works, a grid of (base depth, lateral) positions
+    (:meth:`BlockDesign._board_grid`), the CPU tests before each exact place probe, at most ``generation.board_grid_max_probes`` probes
+    per candidate. Off: the score order and the list alone."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_SEARCH", "0") == "1"
 
 
-#: BD_BOARD_GRID: base depths / laterals (m) of the board grid, and the stand-off the customs positions were set for
+#: BD_BOARD_SEARCH: base depths / laterals (m) of the board grid, and the stand-off the customs positions were set for
 BOARD_GRID_DEPTHS = tuple(round(0.45 + 0.03 * i, 2) for i in range(8))  # 0.45 .. 0.66
 BOARD_GRID_LATERALS = tuple(round(-0.22 + 0.04 * i, 2) for i in range(8))  # -0.22 .. +0.06
 BOARD_LIST_STAND_OFF = 0.35
@@ -531,7 +533,7 @@ class BlockDesign(SamplerV2):
         return [(float(d), float(l)) for d, l in (self.gen("board_base_xy_candidates", None) or BOARD_BASE_XY)]
 
     def _board_grid(self, manip: Stance) -> List[Tuple[float, float]]:
-        """BD_BOARD_GRID: the grid positions not in the list, nearest first to the list's first position on the top at ``manip`` (else to
+        """BD_BOARD_SEARCH: the grid positions not in the list, nearest first to the list's first position on the top at ``manip`` (else to
         the list's first position moved by the stance's stand-off beyond ``BOARD_LIST_STAND_OFF``: the same distance from the edge); ties
         to the robot's right first (bd_diag2: from the tall 0.95 trunk the place probe passes only right of the base, near the edge)."""
         positions = self._board_positions()
@@ -690,6 +692,14 @@ class BlockDesign(SamplerV2):
             return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * abs(lat - GRID_LATERAL_PREFERRED) + 0.5 * trunk_pen + shift_pen + elig_pen
 
         order.sort(key=score)
+        if board_search_on() and self._has_board():
+            feasible = [k for k in order if self._board_feasible(k, init)]
+            if feasible and feasible != order[:len(feasible)]:
+                self._kc("bd_board.order_changed")
+            self._kc("bd_board.feasible_candidates", len(feasible))
+            order = feasible + [k for k in order if k not in set(feasible)]
+            log.info("%s: BD_BOARD_SEARCH: %d of %d manipulation candidates have a board position passing the CPU tests; tried first: %s", self.gp.variant,
+                     len(feasible), len(order), feasible[: int(self.gen("manipulation_candidates_tried", 6))])
         BDD.candidates(self, order, {k: score(k) for k in order} if BDD.level() else None)
         if self._flips_expected():
             log.info("%s: %d manipulation candidates; flip cells per candidate (first 12 by score): %s", self.gp.variant, len(order),
@@ -2620,7 +2630,7 @@ class BlockDesign(SamplerV2):
         k_diag = getattr(self, "_bd_k", -1)
         BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
         positions = [(d, l, False) for d, l in self._board_positions()]
-        if board_grid_on():
+        if board_search_on():
             positions += [(d, l, True) for d, l in self._board_grid(manip)]
         grid_why: Dict[str, int] = {}
         grid_probes, grid_max = 0, int(self.gen("board_grid_max_probes", 12))
@@ -2687,7 +2697,7 @@ class BlockDesign(SamplerV2):
                 continue
             if on_grid:
                 self._kc("bd_board.grid_placed")
-                log.info("%s: BD_BOARD_GRID: the board at a grid position (%.2f, %+.2f) of the stance at stand-off %s (%d grid probes; list: %s)", self.gp.variant,
+                log.info("%s: BD_BOARD_SEARCH: the board at a grid position (%.2f, %+.2f) of the stance at stand-off %s (%d grid probes; list: %s)", self.gp.variant,
                          float(depth), float(lateral), manip.stand_off, grid_probes, "; ".join(why))
             log.info("%s: puzzle board %s at base (%.2f, %+.2f): pitch %.1f mm, seat %.1f mm, rim %.0f mm over the floor, release bias %.1f mm; %d cells clear (%s)",
                      self.gp.variant, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,
@@ -2705,9 +2715,11 @@ class BlockDesign(SamplerV2):
         if isinstance(st, dict):
             st[key] = st.get(key, 0) + n
 
-    def _board_precheck(self, init: Stance, manip: Stance, slot_faces: List[str]) -> None:
+    def _board_precheck(self, init: Stance, manip: Stance, slot_faces: List[str], count: bool = True) -> None:
         """BD_BOARD_EARLY: :meth:`_place_board`'s CPU checks (on the top, cells kept, the repeated-colour flip set) on the candidate's region
-        before the travel and the exact probe; Reject ``board_placement`` (the same reasons) when no position passes them."""
+        before the travel and the exact probe; Reject ``board_placement`` (the same reasons) when no position passes them. ``count``
+        False: no kit counter (the candidate order of BD_BOARD_SEARCH)."""
+        kc = self._kc if count else (lambda key, n=1: None)
         right, toward, _ = self._table_axes(manip)
         far = -toward
         geo = self._board_geometry()
@@ -2726,7 +2738,7 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         why: List[str] = []
-        positions = list(self._board_positions()) + (self._board_grid(manip) if board_grid_on() else [])
+        positions = list(self._board_positions()) + (self._board_grid(manip) if board_search_on() else [])
         n_list = len(self._board_positions())
         for i, (depth, lateral) in enumerate(positions):
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
@@ -2735,7 +2747,7 @@ class BlockDesign(SamplerV2):
             if i >= n_list:
                 if (self._board_on_top(manip, depth, lateral, half, right, far) and self._board_cpu_ok(manip, init, depth, lateral, cells, half_b, n, n_flip,
                                                                                                        flip_mode, primary_dir, img_score, slot_faces)):
-                    self._kc("bd_board.precheck_pass")
+                    kc("bd_board.precheck_pass")
                     return
                 continue
             if not self._board_on_top(manip, depth, lateral, half, right, far):
@@ -2750,13 +2762,35 @@ class BlockDesign(SamplerV2):
             if flip_mode and not self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True):
                 why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
                 continue
-            self._kc("bd_board.precheck_pass")
+            kc("bd_board.precheck_pass")
             return
-        self._kc("bd_board.precheck_reject")
+        kc("bd_board.precheck_reject")
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works (precheck): " + "; ".join(why))
 
+    def _board_feasible(self, k: int, init: Stance) -> bool:
+        """BD_BOARD_SEARCH (1): whether candidate ``k``'s region has a board position passing the CPU tests for some configured pattern
+        (:meth:`_board_precheck`), kept per (candidate, base pose) for the process."""
+        cand = self.manip_candidates[k]
+        memo = self.__dict__.setdefault("_bd_feasible_memo", {})
+        key = (k, tuple(round(float(v), 3) for v in cand.base_pose2d), round(float(cand.translate), 3), round(float(cand.tilt), 3),
+               tuple(round(float(v), 3) for v in init.base_pose2d))
+        if key not in memo:
+            c2f = self.color_to_face()
+            ok = False
+            for pat in (self.g("patterns") or {}).values():
+                if any(c not in c2f for c in pat):
+                    continue
+                try:
+                    self._board_precheck(init, cand, [c2f[c] for c in pat], count=False)
+                    ok = True
+                    break
+                except Reject:
+                    continue
+            memo[key] = ok
+        return memo[key]
+
     def _board_cpu_ok(self, manip, init, depth, lateral, cells, half_b, n, n_flip, flip_mode, primary_dir, img_score, slot_faces) -> bool:
-        """The precheck's cells-kept + flip-set test of one board position (the grid positions of BD_BOARD_GRID)."""
+        """The precheck's cells-kept + flip-set test of one board position (the grid positions of BD_BOARD_SEARCH)."""
         right, toward, _ = self._table_axes(manip)
         xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
         kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]

@@ -296,7 +296,7 @@ REGION_12 = [(0.67, -0.16), (0.75, -0.08), (0.75, -0.24), (0.59, -0.08), (0.59, 
 
 
 def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
-    """ISPATIALGYM_BD_BOARD_GRID=1: at stand-off 0.45 the list's first three positions are off the top and its last two leave candidate
+    """ISPATIALGYM_BD_BOARD_SEARCH=1: at stand-off 0.45 the list's first three positions are off the top and its last two leave candidate
     12's cells no flip set; the grid (nearest to the first position at the same distance from the edge first) is searched with the CPU
     tests before each probe, the probes capped by board_grid_max_probes. Off: the list's verdict."""
     s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
@@ -308,12 +308,12 @@ def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
 
     s.ikc = SimpleNamespace(exact=reach)
     cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
-    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_GRID", raising=False)
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_SEARCH", raising=False)
     monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY", raising=False)
     with pytest.raises(Reject) as off:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
     assert "(0.46, -0.02): off the top" in str(off.value) and "grid" not in str(off.value)
-    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_GRID", "1")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "1")
     probes.clear()
     _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
     b = manip.world_to_base(pose[0][:2])
@@ -331,3 +331,25 @@ def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
     with pytest.raises(Reject) as capped:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
     assert "grid" in str(capped.value) and "probe cap" in str(capped.value)
+
+
+def test_board_search_puts_the_board_feasible_candidates_first(monkeypatch):
+    """BD_BOARD_SEARCH (1): a candidate counts as board-feasible when some position passes the CPU tests on its region (candidate 10's
+    cells at stand-off 0.45: none; candidate 11's at stand-off 0.35: (0.44, -0.10)); the verdict is kept per candidate."""
+    s, init, manip, faces, probes, _axes, _e, _l = _early_scene(monkeypatch, stand_off=0.45)
+    cam = C.camera_pose(C.torso_q(init.translate, init.tilt), base_pose=tuple(float(v) for v in init.base_pose2d))
+    calls = []
+    s.camera_pose_at = lambda st: calls.append(st) or cam
+    s.world = SimpleNamespace(camera_model=CameraModel(1080, 1080, 459.0, 459.0, 540.0, 540.0), park=lambda obj, i: None)
+    s.names = lambda: ["b0", "b1", "b2", "b3"]
+    s.faces = dict(BD.DEFAULT_FACES)
+    bad = manip
+    bad.extras["focus_info"] = {"cells": th.stack([bad.base_to_world(th.tensor(c)) for c in REGION_10])}
+    good = _layout_scene(stand_off=0.35)[2]
+    good.extras["focus_info"] = {"cells": th.stack([good.base_to_world(th.tensor(c)) for c in REGION_11])}
+    s.manip_candidates = [bad, good]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    assert [s._board_feasible(k, init) for k in (0, 1)] == [False, True]
+    n = len(calls)
+    assert [s._board_feasible(k, init) for k in (0, 1)] == [False, True] and len(calls) == n  # kept
+    assert probes == [] and "bd_board.precheck_reject" not in s.kit.stats
