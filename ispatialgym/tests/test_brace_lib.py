@@ -349,6 +349,10 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     ph = [0.01 * i for i in range(20)]
     assert VC.wall_load_stop(ph, [0.0] * 5, 0.05, 0.002) is None  # no motion yet
     assert VC.wall_load_stop(ph, [0, 0, 0, 0.001, 0.003, 0.01], 0.05, 0.002) == 9  # contact at step 4 (0.04) -> stop at 0.09
+    assert VC.wall_load_stop(ph, [-0.008, -0.008, 0.0], 0.05, 0.002) is None  # a backward settle is not the contact
+    ax = np.array(facts["axis"])
+    assert abs(VC.signed_turn(np.eye(3), _turn_about(ax, 0.03, np.zeros(3))[:3, :3], ax) - 0.03) < 1e-9
+    assert abs(VC.signed_turn(np.eye(3), _turn_about(ax, -0.02, np.zeros(3))[:3, :3], ax) + 0.02) < 1e-9
     assert float((face[1] - face[0]) @ d) > 0  # it moves along the corner's tangent first
     # the judge: the target turned past level by an angle about the hinge -> the braced point moved along its load direction
     n_w = T0[:3, :3] @ np.asarray(e["wall"]["normal_object"])

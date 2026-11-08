@@ -664,14 +664,29 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
         phis.append(phi)
     facts = {"start": [round(float(v), 4) for v in centres[0]], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
              "arc_rad": [round(phi0, 5), round(phi1, 5)], "phi_press_rad": round(phi_press, 6), "phis": phis, "r_face_m": round(r_F, 5), "steps": k,
+             "axis": [float(v) for v in axis],
              "n_line_points": int(near.sum())}
     return centres, quats, facts
 
 
+def signed_turn(R0: np.ndarray, R1: np.ndarray, axis) -> float:
+    """The rotation from ``R0`` to ``R1`` about ``axis`` (rad, signed: + = the sense ``axis`` turns; the rotation vector's component)."""
+    Rr = np.asarray(R1, dtype=float) @ np.asarray(R0, dtype=float).T
+    c = max(-1.0, min(1.0, (float(np.trace(Rr)) - 1.0) / 2.0))
+    ang = math.acos(c)
+    if ang < 1e-9:
+        return 0.0
+    w = np.array([Rr[2, 1] - Rr[1, 2], Rr[0, 2] - Rr[2, 0], Rr[1, 0] - Rr[0, 1]])
+    nw = float(np.linalg.norm(w))
+    if nw < 1e-12:  # a half turn: the axis from the symmetric part
+        return ang
+    return ang * float((w / nw) @ _unit(axis))
+
+
 def wall_load_stop(phis: Sequence[float], turns: Sequence[float], phi_press: float, contact_rad: float) -> Optional[int]:
     """i7-brace: the step of the wall load's sweep at which the pusher stops - the first step whose angle reaches the contact angle (the
-    pusher's angle at the first step the target had turned >= ``contact_rad``) + ``phi_press``; None while that is not reached (``phis`` /
-    ``turns`` per step so far)."""
+    pusher's angle at the first step the target had turned >= ``contact_rad`` PAST LEVEL - ``turns`` signed, :func:`signed_turn`) +
+    ``phi_press``; None while that is not reached (``phis`` / ``turns`` per step so far)."""
     c = next((i for i, t in enumerate(turns) if t >= contact_rad), None)
     if c is None:
         return None
@@ -1344,7 +1359,9 @@ class KitContactWorld:
                     pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(q_push[i], dtype=th_.float32))
                     obj.wake()
                     self._hold(motions, step, 1)
-                    turns.append(_tilt(T0[:3, :3], _T(obj.get_position_orientation())[:3, :3]))
+                    # SIGNED (past level +): an unsigned turn read the target's small backward settle after the brace as the contact (run 6:
+                    # 10 / 17 painting trials stopped at the sweep's first step, the load never reached them)
+                    turns.append(signed_turn(T0[:3, :3], _T(obj.get_position_orientation())[:3, :3], push_facts["axis"]))
                     stop = wall_load_stop(push_facts["phis"], turns, push_facts["phi_press_rad"], self.cfg.wall_contact_turn_rad)
                     if stop is not None and i >= stop:
                         break
