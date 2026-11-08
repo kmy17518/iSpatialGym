@@ -226,11 +226,15 @@ def attach_fallback_on() -> bool:
 #: i7-cork 2026-11-08 (owner decision 5n.3, the lying route's carry check): the carry turns the male from its lifted grasp to the pre-attach;
 #: the goal's turn about the (vertical) insertion axis follows the PARTNER'S yaw, which the partner placement draws uniformly, so the
 #: recorded lying turns were 125-179 deg (8 instances, i7cork_ly / _r2) where the route's own turn is the 90 deg tilt, and the tracked SLERP
-#: of the large turns is what fails. ``ISG_LYING90_MIN_TURN=1`` (default off): on the lying route only, the partner's yaw at each cell is
-#: drawn within +-:data:`LYING90_YAW_JITTER_DEG` of the yaw whose attach makes the carry's turn smallest (:func:`min_turn_yaw`, closed
-#: form: the 90 deg tilt). Kit ``attach_route.lying90.min_turn_yaw``.
+#: of the large turns is what fails. ``ISG_LYING90_MIN_TURN=1`` (default off): on the lying route only, each partner cell is offered the
+#: yaw whose attach makes the carry's turn smallest (:func:`min_turn_yaw`, closed form: the 90 deg tilt; jittered +-:data:`LYING90_YAW_JITTER_DEG`)
+#: and the :data:`LYING90_YAW_LADDER_DEG` offsets around it; the batched screen keeps per cell the smallest-turn yaw it reaches and the
+#: exact checks take the cells in the order of that turn (30 deg classes), then the focus distance. Kit ``attach_route.lying90.min_turn_yaw``.
 LYING90_MIN_TURN_SWITCH = "ISG_LYING90_MIN_TURN"
-LYING90_YAW_JITTER_DEG = 30.0
+LYING90_YAW_JITTER_DEG = 15.0
+#: the partner yaws tried per cell around the min-turn yaw (deg, in this order; the screen keeps the smallest turn it reaches): the
+#: min-turn attach alone was out of the stance's reach at most cells (i7cork2_lymt: 0 written / 23 attempts, the pairs failing the screen)
+LYING90_YAW_LADDER_DEG = (0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0)
 #: the carry diagnostics (every route, no decision): the turn buckets (deg) of kit ``carry_turn.<route>.<ok|failed>.<bucket>`` and the arm
 #: joint gap (rad) between the carry's tracked end and the attach witness above which kit ``attach_branch_gap.<route>.gt`` counts (the
 #: oracle's finishing bound: a witness farther than 0.6 rad is "in another IK branch")
@@ -2195,49 +2199,55 @@ class Attachment(SamplerV2):
         perm = [int(i) for i in rng.permutation(len(cells))]
         perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
         geo: List[Tuple[Any, ...]] = []
+        geo_rank: List[Tuple[int, float]] = []  # (cell order, carry turn deg) per geo entry
+        geo_cells: List[int] = []
         for i in perm[:PARTNER_CELLS_TRIED]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
                 continue
             yaw = float(rng.uniform(-math.pi, math.pi))
-            if yaw_c is not None:
-                yaw = yaw_c + math.radians(LYING90_YAW_JITTER_DEG) * yaw / math.pi  # the same draw, mapped onto +-LYING90_YAW_JITTER_DEG
-            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
-            fp = self.world.footprint(self.hull[self.p_role], pose)
-            if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
-                fails["support"] += 1
-                continue
-            if TT._polygons_overlap(m_fp, fp, float(self.g("partner_gap_min_m"))):
-                fails["gap"] += 1
-                continue
-            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
-                fails["frame"] += 1
-                continue
-            hand_hit = self._hand_clear_of_partner(grasp, pose)
-            if hand_hit is not None:
-                fails["hand"] = fails.get("hand", 0) + 1
-                fails.setdefault("hand_example", hand_hit)
-                continue
-            # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
-            jp = None
-            for point, b_dir in self._partner_brace_points(pose, st):
-                jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
-                if not jp_["ok"] and jp_["brace_ok"] and not jp_["brace_class_ok"]:
-                    jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
-                if jp is None or (jp_["ok"] and not jp["ok"]) or (jp_["brace_ok"] and not jp["brace_ok"] and not jp["ok"]):
-                    jp, point_best, b_dir_best = jp_, point, b_dir
-                if jp["ok"]:
-                    break
-            point, b_dir = point_best, b_dir_best
-            if require_joint and not jp["ok"]:
-                fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
-                continue
-            goal = self._attached_pose(pose)
-            eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
-            axis = self._insertion_axis_world(pose)
-            eef_pre = (eef_attach[0] + axis * float(self.g("pre_attach_back_m")), eef_attach[1])
-            geo.append((pose, eef_pre, eef_attach, point, b_dir, jp.get("brace_classes"), bool(jp["ok"])))
+            # i7-cork 5n.3 (ISG_LYING90_MIN_TURN): the ladder of partner yaws in the order of the carry's turn - the min-turn yaw first (one
+            # jittered draw), then the LYING90_YAW_LADDER_DEG offsets around it; the screen below keeps per cell the smallest-turn yaw it reaches
+            yaws = [yaw] if yaw_c is None else [yaw_c + math.radians(LYING90_YAW_JITTER_DEG) * yaw / math.pi + math.radians(o) for o in LYING90_YAW_LADDER_DEG]
+            geo_cells.append(i)
+            for yaw in yaws:
+                pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
+                fp = self.world.footprint(self.hull[self.p_role], pose)
+                if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
+                    fails["support"] += 1
+                    continue
+                if TT._polygons_overlap(m_fp, fp, float(self.g("partner_gap_min_m"))):
+                    fails["gap"] += 1
+                    continue
+                if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
+                    fails["frame"] += 1
+                    continue
+                hand_hit = self._hand_clear_of_partner(grasp, pose)
+                if hand_hit is not None:
+                    fails["hand"] = fails.get("hand", 0) + 1
+                    fails.setdefault("hand_example", hand_hit)
+                    continue
+                # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
+                jp = None
+                for point, b_dir in self._partner_brace_points(pose, st):
+                    jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
+                    if not jp_["ok"] and jp_["brace_ok"] and not jp_["brace_class_ok"]:
+                        jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
+                    if jp is None or (jp_["ok"] and not jp["ok"]) or (jp_["brace_ok"] and not jp["brace_ok"] and not jp["ok"]):
+                        jp, point_best, b_dir_best = jp_, point, b_dir
+                    if jp["ok"]:
+                        break
+                point, b_dir = point_best, b_dir_best
+                if require_joint and not jp["ok"]:
+                    fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
+                    continue
+                goal = self._attached_pose(pose)
+                eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
+                axis = self._insertion_axis_world(pose)
+                eef_pre = (eef_attach[0] + axis * float(self.g("pre_attach_back_m")), eef_attach[1])
+                geo.append((pose, eef_pre, eef_attach, point, b_dir, jp.get("brace_classes"), bool(jp["ok"])))
+                geo_rank.append((len(geo_cells), math.degrees(C.quat_angle(TT._t(grasp.grasp[1]), TT._t(eef_pre[1])))))
         if not geo:
             return None
         with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
@@ -2245,6 +2255,15 @@ class Attachment(SamplerV2):
                 ok = self.ikc.screen_pairs([[g_[1], g_[2]] for g_ in geo], st, "right", ignore_for_last=[support])
         screened = [g_ for g_, o in zip(geo, ok.tolist()) if o]
         fails["screen"] = len(geo) - len(screened)
+        if yaw_c is not None:
+            # per cell its smallest-turn screened yaw; the cells by that turn (30 deg classes), then by their focus distance
+            best: Dict[int, Tuple[float, Tuple[Any, ...]]] = {}
+            for g_, o, (cell, turn) in zip(geo, ok.tolist(), geo_rank):
+                if o and (cell not in best or turn < best[cell][0]):
+                    best[cell] = (turn, g_)
+            order_c = sorted(best, key=lambda c: (int(best[c][0] // 30.0), c))
+            screened = [best[c][1] for c in order_c]
+            fails["min_turn_screened_deg"] = [round(best[c][0], 1) for c in order_c[:PARTNER_EXACT_CAP]]
         shift = th.tensor([float(st.base_xy[0] - manip.base_xy[0]), float(st.base_xy[1] - manip.base_xy[1]), 0.0])
         for pose, eef_pre, eef_attach, point, b_dir, brace_classes, joint_ok in screened[:PARTNER_EXACT_CAP]:
             self._check_deadline()
@@ -2509,6 +2528,8 @@ class Attachment(SamplerV2):
         bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
         self._route_count("rest_unstable" if bad else "rest_stable")
         self._early_vs_late(draft, tilts, bad)
+        if early_rest_mode() == "shadow" and self.obj(self.t_role) is not None:
+            self._late_repeat(draft, tilts)
         if bad:
             self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
             male = self.obj(self.t_role)
@@ -2596,6 +2617,21 @@ class Attachment(SamplerV2):
             raise EarlyRestUnstable("rest_unstable", f"early ({rec['route']} route): the drawn rest's up axis {tilt:.1f} deg off {REST_STABILITY_STEPS} steps after a "
                                                      f"{REST_NUDGE_DEG:.0f} deg nudge (> {REST_TIP_MAX_DEG:.0f})", route=rec["route"])
         return rec
+
+    def _late_repeat(self, draft: Draft, tilts: Dict[str, float]) -> None:
+        """Shadow only (:data:`EARLY_REST_SWITCH`): the late nudge test of the male repeated on the very same settled state (the world was
+        restored after the first) - the test's own repeatability, against which the early-vs-late disagreements are read. Kit / counters
+        ``early_rest.late_repeat.{agree, disagree}``, ``draft.summary.rest_late_repeat_deg``, log ``REST_LATE_REPEAT``."""
+        male = self.obj(self.t_role)
+        again = self._nudge_tilts([self.t_role]).get(male.name)
+        first = tilts.get(male.name)
+        if again is None or first is None:
+            return
+        key = "early_rest.late_repeat." + ("agree" if (again > REST_TIP_MAX_DEG) == (first > REST_TIP_MAX_DEG) else "disagree")
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+        draft.summary["rest_late_repeat_deg"] = again
+        log.info("%s: REST_LATE_REPEAT %s first %.2f deg repeat %.2f deg", self.gp.variant, key.rsplit(".", 1)[-1], float(first), float(again))
 
     def _early_vs_late(self, draft: Draft, tilts: Dict[str, float], bad: Dict[str, float]) -> None:
         """Shadow bookkeeping of :data:`EARLY_REST_SWITCH`: the early verdict on the drafted male vs this (late) test - kit / counters
