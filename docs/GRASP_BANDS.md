@@ -2813,7 +2813,8 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - attachdef (with merge 8): the 25 entries of `attachdef_20261108/v2maps_ad2` that differ from int2 (owner 4.1 and 5.1 rebuilds), whole entry
   directories; the int1 teacup / lid builds stay (owner 5.2). The qtfzeq overlay follows the new keys in `$OFH/map_overlay` r3.
 - i7-cork's staged root is not folded. Its extra cork entries serve only the default-off routes. They share the cork's model, so the sampler's
-  entry lookup would see four candidates instead of one.
+  entry lookup would see four candidates instead of one (lead: agreed, not folded). If the owner turns a route on, the entries are staged
+  in `$SY/v2/v2maps_int1_cork`.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
 
