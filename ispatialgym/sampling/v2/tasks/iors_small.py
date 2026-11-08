@@ -225,6 +225,10 @@ PLACE_DEPTH_CAP_DEFAULT = "1"
 #: instead of an attempt that loses every candidate. Default "0" (the owner decides after the A/B).
 PLACE_DEPTH_CAP_REDRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_REDRAW"
 PLACE_DEPTH_CAP_REDRAWS = 8
+#: follow-up (c), the draw itself: "1" = Phase 2's (stance, position) pairs are cut to the cap (``keep_pairs``: the start / place positions
+#: the attempt draws from lie within the push's reach; an empty class falls back as Phase 2 does) - the redraw above re-draws whole starts,
+#: this draws the position within the cap. Enters the start-per-attempt cell cache key when on. Default "0".
+PLACE_DEPTH_CAP_DRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_DRAW"
 #: follow-up (b): the cap's basis - "map" (default: the deepest feasible map cell at any yaw / lateral from the base stand-offs that are
 #: collision-free at the candidate's own lateral) or "a1" (A1's own push stance test, :meth:`IORSSmall.push_stance_candidates` with the
 #: collision check, for the target at the candidate's focus at each map yaw slot: the same basis as the partner-draw gate)
@@ -256,6 +260,10 @@ _SPA_CACHE_ANNOUNCED = False
 
 def place_depth_cap_redraw_on() -> bool:
     return (os.environ.get(PLACE_DEPTH_CAP_REDRAW_ENV) or "0").strip() == "1"
+
+
+def place_depth_cap_draw_on() -> bool:
+    return (os.environ.get(PLACE_DEPTH_CAP_DRAW_ENV) or "0").strip() == "1"
 
 
 def place_depth_cap_basis() -> str:
@@ -925,7 +933,7 @@ class IORSSmall(SamplerV2):
                 self.init_stance.name = "init"
             cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                   target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                                   **phase2_band)
             phase2_any = phase2_any or bool(cands)
             self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
@@ -1858,6 +1866,8 @@ class IORSSmall(SamplerV2):
                 "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
         if shelf_draw_on(self):
             payload["shelf_poses"] = "per_attempt"
+        if self._pdc_keep_pairs() is not None:  # follow-up (c): the cell's Phase 2 is cut to the cap (only when on: keys unchanged off)
+            payload["place_depth_cap_draw"] = {"basis": place_depth_cap_basis(), "stand_offs": self.push_stance_stand_offs(init_trunk)}
         return payload
 
     def _spa_cell_compute(self, edge: EdgeFrame, init_trunk: Stance, lateral: float, margins: Dict[str, Any], H_max: float, nb_top) -> Dict[str, Any]:
@@ -1895,7 +1905,7 @@ class IORSSmall(SamplerV2):
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
         cands = TT.phase2_manipulation_stance(self, init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                               **phase2_band)
         kept = cands if self.shelf_start is not None else self.start_region(cands)
         if not kept:
@@ -2091,7 +2101,7 @@ class IORSSmall(SamplerV2):
                 self.init_stance.name = "init"
             cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                   target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                                   **phase2_band)
             phase2_any = phase2_any or bool(cands)
             self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
@@ -4947,6 +4957,22 @@ class IORSSmall(SamplerV2):
             if rows:
                 return True, round(math.degrees(y), 1)
         return False, None
+
+    def _pdc_keep_pairs(self):
+        """Follow-up (c) (:data:`PLACE_DEPTH_CAP_DRAW_ENV`, with the cap on): Phase 2's ``keep_pairs`` - the (stance, position) pairs whose
+        focus lies within the cap (:meth:`place_depth_caps`); None when off or the cap does not apply (no map: every pair kept)."""
+        if not (place_depth_cap_draw_on() and place_depth_cap_mode() == "on" and self.place_depth_cap_applies()):
+            return None
+
+        def keep(cands: List[Stance]) -> List[Stance]:
+            facts = self.place_depth_caps(cands)
+            if not facts:
+                return cands
+            kept = [c for c in cands if not (facts.get(id(c)) or {}).get("remove")]
+            TT._countn(self, "place_depth_cap.phase2_removed", len(cands) - len(kept))
+            log.info("%s: place depth cap in Phase 2: %d of %d (stance, position) pairs within the cap", self.gp.variant, len(kept), len(cands))
+            return kept
+        return keep
 
     def place_depth_cap_filter(self, cands: List[Stance]) -> Tuple[List[Stance], Dict[int, Dict[str, Any]]]:
         """:meth:`place_depth_caps` applied to the attempt's candidates: on - the ``remove`` ones leave the draws; shadow - all kept, the would-be
