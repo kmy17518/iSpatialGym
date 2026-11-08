@@ -579,51 +579,60 @@ def _unit(v) -> np.ndarray:
     return v / max(float(np.linalg.norm(v)), 1e-12)
 
 
+def _rot(axis: np.ndarray, ang: float) -> np.ndarray:
+    k = _unit(axis)
+    K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+    return np.eye(3) + math.sin(ang) * K + (1.0 - math.cos(ang)) * (K @ K)
+
+
 def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig, dt: float
-                     ) -> Tuple[List[np.ndarray], np.ndarray, Dict[str, Any]]:
-    """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres per control step, the pusher's xyzw quaternion, facts)``. The leveling
-    push carried on past level: the pusher meets the PUSHED corner (``load.point_object``) on the line along the corner's tangent
-    (``load.direction``, 3-D in the wall plane - not flattened as :func:`pusher_path`), starting ``brace_pusher_gap_m`` before the hull points
-    it meets, and drives on so far that the braced point (``load.brace_point_object``) would travel
-    ``brace_press_m`` with no brace (the touching / axial calibration; the lever ratio r_push / r_brace about the hinge; at most
-    ``wall_pusher_travel_max_m`` past the gap), at ``brace_pusher_speed_m_s``. The material it meets: the hull points within the box's half-width
-    ACROSS the line in the wall plane (any offset along the normal: the corner is on the mid-plane, the hull's vertices off it); none raises
-    (no load placed: the trial errors, never a vacuous pass). The box travels along its
-    local z, its 3 cm side across the line in the wall plane (the push fist's width), its 8 cm side along the wall normal."""
+                     ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict[str, Any]]:
+    """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres, xyzw quaternions - one per control step -, facts)``. The leveling push
+    carried on past level: the pusher's face meets the PUSHED corner (``load.point_object``) square to its tangent (``load.direction``, in the
+    wall plane) and is carried along the corner's ARC about the hinge (``wall.hinge_object``, the wall normal), from ``brace_pusher_gap_m``
+    before the material to the turn that carries the braced point (``load.brace_point_object``) ``brace_press_m`` past level - the touching
+    / axial calibration (their object travels ``brace_press_m`` past first contact). A straight path along the tangent over-turned the target
+    (2026-11-08 run 3: the contact slid inward along the flat face, every trial 1.59 cm at the braced point for 1 cm meant), so the arc makes
+    the travel exact whatever the brace does. The material it meets: the hull points within the box's half-width ACROSS the line in the wall
+    plane (any offset along the normal: the corner is on the mid-plane, the hull's vertices off it); none raises (no load placed: the trial
+    errors, never a vacuous pass). The box: local z along the travel (5 cm), y across it in the wall plane (3 cm: the push fist's width),
+    x along the wall normal (8 cm)."""
     load = entry.get("load") or {}
+    wall = entry.get("wall") or {}
     R, t = T_obj[:3, :3], T_obj[:3, 3]
     d = _unit(R @ np.asarray(load["direction"], dtype=float))
     P = R @ np.asarray(load["point_object"], dtype=float) + t
-    n = _unit(R @ np.asarray((entry.get("wall") or {}).get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
+    n = _unit(R @ np.asarray(wall.get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
+    H = R @ np.asarray(wall.get("hinge_object") or [0.0, 0.0, 0.0], dtype=float) + t
     pts = pts_obj @ R.T + t
     rel = pts - P
     along = rel @ d
     y = _unit(np.cross(d, n))
-    # the box's face sweeps along d with its 3 cm side across the line (y) and its 8 cm side along the wall normal: it meets the hull edges that
-    # run along the normal (the corner lies on the mid-thickness plane, the hull's VERTICES half the thickness off it) - the points within its
-    # half-width across the line count, whatever their offset along the normal (2026-11-08 run: a distance-to-the-line test found no vertex
-    # within 2 cm of a 4.1 cm signpost's / a 14.5 cm dispenser's corner line, the fallback took points 5-16 cm away and the pusher never
-    # touched them - vacuous "valid" verdicts)
     r_line = 0.5 * float(cfg.brace_pusher_size_m[0]) + 0.005
     near = np.abs(rel @ y) <= r_line
     if not near.any():
         raise ValueError(f"wall load: no hull point within {r_line:.3f} m across the pushed corner's line (no load can be placed)")
     face = float(along[near].min())
-    # the box travels along its local z (``brace_pusher_size_m`` = (y, x, z) scale (0.08, 0.03, 0.05): 5 cm along the travel, 3 cm across it in
-    # the wall plane - the push fist's width, so it acts at the corner, not along the edge - and 8 cm along the wall normal)
     half = 0.5 * float(cfg.brace_pusher_size_m[2])
-    start = P + d * (face - cfg.brace_pusher_gap_m - half)
-    r_E, r_B = float(load.get("r_push_m") or 0.0), float(load.get("r_brace_m") or 0.0)
-    # the touching / axial calibration: the loaded object travels brace_press_m past its first contact (the brace's gap - the stop offset /
-    # the touch stop's back-off - taken out of it, the hand pressed by the rest): here the BRACED point's unbraced travel = brace_press_m
-    # (2026-11-08 run 2 drove it the 5 mm offset + 1 cm: the hand yields as far as it is driven - 1.9 cm drift, hand_pushed)
-    past = min(cfg.brace_press_m * (r_E / max(r_B, 0.05) if r_E > 0 else 1.0), cfg.wall_pusher_travel_max_m)
-    travel = cfg.brace_pusher_gap_m + past
-    k = max(1, int(math.ceil(travel / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
-    q = S.mat_to_quat(np.stack([np.cross(y, d), y, d], axis=1))  # local x = the wall normal, y = across the travel in the plane, z = the travel
-    facts = {"start": [round(float(v), 4) for v in start], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
-             "travel_m": round(travel, 5), "past_contact_m": round(past, 5), "n_line_points": int(near.sum()), "line_r_m": round(r_line, 4)}
-    return [start + d * travel * i / k for i in range(k + 1)], np.asarray(q, dtype=float), facts
+    F0 = P + d * face  # the material's face point on the corner's line
+    rF = F0 - H
+    rF = rF - n * float(rF @ n)
+    r_F = max(float(np.linalg.norm(rF)), 1e-3)
+    axis = n if float(np.cross(n, rF) @ d) >= 0 else -n  # turning about +axis carries the corner along d
+    r_B = float(load.get("r_brace_m") or r_F)
+    phi0 = -cfg.brace_pusher_gap_m / r_F
+    phi1 = min(cfg.brace_press_m / max(r_B, 0.05), cfg.wall_pusher_travel_max_m / r_F)
+    k = max(1, int(math.ceil((phi1 - phi0) * r_F / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
+    R0 = np.stack([np.cross(y, d), y, d], axis=1)
+    centres, quats = [], []
+    for i in range(k + 1):
+        Rp = _rot(axis, phi0 + (phi1 - phi0) * i / k)
+        Fi = H + Rp @ (F0 - H)
+        centres.append(Fi - (Rp @ d) * half)
+        quats.append(np.asarray(S.mat_to_quat(Rp @ R0), dtype=float))
+    facts = {"start": [round(float(v), 4) for v in centres[0]], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
+             "arc_rad": [round(phi0, 5), round(phi1, 5)], "r_face_m": round(r_F, 5), "steps": k, "n_line_points": int(near.sum())}
+    return centres, quats, facts
 
 
 def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, cfg: ContactValidateConfig,
@@ -1266,13 +1275,13 @@ class KitContactWorld:
                 n_pre = len(series)
                 path, q_push, push_facts = wall_pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0)
                 trace.rec["pusher"] = push_facts
-                q_t = th_.tensor(q_push, dtype=th_.float32)
             else:
-                path, q_t = pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0), th_.tensor([0.0, 0.0, 0.0, 1.0])
+                path = pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0)
+                q_push = [np.array([0.0, 0.0, 0.0, 1.0])] * len(path)
             wake = wall_entry(entry)
-            for c in path + [None] * self.cfg.brace_hold_steps:
+            for i, c in enumerate(path + [None] * self.cfg.brace_hold_steps):
                 if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
-                    pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), q_t)
+                    pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(q_push[i], dtype=th_.float32))
                     if wake:
                         # i7-brace: the sleep assist sleeps the still hung target while the brace stands, and a teleported kinematic pusher
                         # does not wake it (2026-11-08 run 2: 6 / 12 signpost trials did not move at all) - the push hand it stands in for does
