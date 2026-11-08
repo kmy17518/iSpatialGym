@@ -17857,6 +17857,7 @@
  "configuration_matching-block_design-block_4-breakfast_table": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 32,
+  "superseded_by": "configuration_matching-block_design-block_4-breakfast_table_board",
   "roles": {
    "targets": {
     "category": "toy_dice",
@@ -17961,8 +17962,7 @@
    "flip_tilt_deg": 45.0,
    "orientation_equivalences": null,
    "block_pack_tail": true,
-   "place_gap_m": 0.01,
-   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "_pack_removed_note": "owner 2026-11-08 3.7 (i7-contact3): the packing tail (the wide pack brace + its pushes) is removed and this pack-tail variant superseded by the board variant (configuration_matching-block_design-block_4-breakfast_table_board); block_pack_tail stays true so the sampler refuses the entry (Reject spec) instead of running it without its packing",
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
@@ -18085,7 +18085,6 @@
     ]
    },
    "block_gap_m": 0.006,
-   "block_pack_tail": false,
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
@@ -18266,7 +18265,6 @@
     ]
    },
    "block_gap_m": 0.006,
-   "block_pack_tail": false,
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
@@ -18351,6 +18349,7 @@
  "configuration_matching-block_design-block_4-coffee_table": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 7,
+  "superseded_by": "configuration_matching-block_design-block_4-breakfast_table_board",
   "roles": {
    "targets": {
     "category": "toy_dice",
@@ -18455,8 +18454,7 @@
    "flip_tilt_deg": 45.0,
    "orientation_equivalences": null,
    "block_pack_tail": true,
-   "place_gap_m": 0.01,
-   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "_pack_removed_note": "owner 2026-11-08 3.7 (i7-contact3): the packing tail (the wide pack brace + its pushes) is removed and this pack-tail variant superseded by the board variant (configuration_matching-block_design-block_4-breakfast_table_board); block_pack_tail stays true so the sampler refuses the entry (Reject spec) instead of running it without its packing",
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
@@ -18485,6 +18483,7 @@
  "configuration_matching-block_design-block_4-conference_table": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 76,
+  "superseded_by": "configuration_matching-block_design-block_4-breakfast_table_board",
   "roles": {
    "targets": {
     "category": "toy_dice",
@@ -18589,8 +18588,7 @@
    "flip_tilt_deg": 45.0,
    "orientation_equivalences": null,
    "block_pack_tail": true,
-   "place_gap_m": 0.01,
-   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "_pack_removed_note": "owner 2026-11-08 3.7 (i7-contact3): the packing tail (the wide pack brace + its pushes) is removed and this pack-tail variant superseded by the board variant (configuration_matching-block_design-block_4-breakfast_table_board); block_pack_tail stays true so the sampler refuses the entry (Reject spec) instead of running it without its packing",
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",
@@ -18619,6 +18617,7 @@
  "configuration_matching-block_design-block_4-desk": {
   "iddl": "configuration_matching/block_design.iddl",
   "definition_id": 6,
+  "superseded_by": "configuration_matching-block_design-block_4-breakfast_table_board",
   "roles": {
    "targets": {
     "category": "toy_dice",
@@ -18758,8 +18757,7 @@
    "flip_tilt_deg": 45.0,
    "orientation_equivalences": null,
    "block_pack_tail": true,
-   "place_gap_m": 0.01,
-   "_pack_note": "owner 2026-09-19 21:47 experiment: the blocks are placed on a 10 mm grid (place_gap_m, room for the fingers beside the placed neighbours) and then PACKED to 1 mm gaps (block_gap_m = the goal grid): stage 1 = the left column wide-braced (left gripper opened so a finger side sits on each left cube's left face) while the right hand pushes the right column's cubes against it; stage 2 = the far row braced on its far faces, the near row pushed away from the robot (fallback: near row braced, far row pulled)",
+   "_pack_removed_note": "owner 2026-11-08 3.7 (i7-contact3): the packing tail (the wide pack brace + its pushes) is removed and this pack-tail variant superseded by the board variant (configuration_matching-block_design-block_4-breakfast_table_board); block_pack_tail stays true so the sampler refuses the entry (Reject spec) instead of running it without its packing",
    "block_brace_push": false,
    "_block_brace_push_note": "owner 2026-09-19 first demo: no brace / push tail - a push against the row-left / column-top neighbour closes the 10 mm layout gap and moves the block off its slot (pod run 0919-144520: the first two-arm stance also broke program_block_design's single working arm)",
    "_block_gap_note_2": "owner 2026-09-19 (demo 0919-121912 / 132059): the release beside a placed neighbour opens the pads; with the cube's staged release (cube_release_margin_m 4.5 mm past the face) the 8.4 mm fingertip needs gap + place margin (3 mm) >= 12.9 mm, so 10 mm gaps",

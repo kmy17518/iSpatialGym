@@ -1428,68 +1428,6 @@ class _Tracker:
         obj.keep_still()
         _sync(sampler.kit, [obj])  # train-fast 2026-10-31: the advanced block alone
 
-    def advance_push(self, action, sampler) -> None:
-        """Block design packing tail (owner 2026-09-19 21:47): a push of ``sidecar.pack`` moves its cube (and, for a wall push, the
-        cube it drives ahead of it) by the recorded travel minus the blade's stand-off, so the next push's blade is checked
-        against the cubes where the program leaves them (a pack push of 18 mm otherwise overlaps the un-moved neighbour in this
-        static world). Restored by :meth:`restore_moved`."""
-        contact = getattr(action, "contact", None)
-        name = getattr(action, "object", None) or getattr(contact, "object", None)
-        # the tracker holds the sampler's SidecarDraft (``pack`` attribute); the F6 Sidecar keeps it under ``extra``
-        pack = getattr(self.sidecar, "pack", None)
-        if not isinstance(pack, dict):
-            pack = (self.sidecar.extra or {}).get("pack") if isinstance(getattr(self.sidecar, "extra", None), dict) else None
-        if not isinstance(pack, dict) or sampler is None or name not in getattr(sampler, "objects", {}) or contact is None:
-            if isinstance(pack, dict):
-                log.warning("program check: pack push of %s not advanced (object unknown or no contact)", name)
-            return
-        rec, best = None, 1e9
-        try:
-            p_init = th.tensor([float(v) for v in contact.init.position])
-        except Exception:  # noqa: BLE001
-            return
-        for stage in pack.get("stages") or []:
-            for p_ in stage.get("pushes") or []:
-                if p_.get("object") != name or not isinstance(p_.get("init"), dict):
-                    continue
-                d_ = float(th.linalg.norm(th.tensor([float(v) for v in p_["init"].get("position", [0, 0, 0])]) - p_init))
-                if d_ < best:
-                    rec, best = p_, d_
-        if rec is None or best > 1e-3:
-            log.warning("program check: no pack push record matches push of %s (nearest %.4f m) - the world is not advanced", name, best)
-            return
-        travel = float(rec.get("distance_m", 0.0)) - float(rec.get("standoff_m", 0.0))
-        d = th.tensor([float(v) for v in rec.get("direction", [0, 0, 0])])
-        if travel <= 0.0 or float(th.linalg.norm(d)) < 1e-6:
-            return
-        d = d / th.linalg.norm(d)
-        d2 = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
-        # the cubes ahead of the pushed one along the direction (the wall pushes drive the neighbour column / row along) - in the
-        # table plane: a turned cube's ROOT sits an edge higher than an unturned one's (0920-173048: the driven right column was
-        # missed on the 25 mm root-z difference and stayed 9 mm short of the sampler's world)
-        pushed = sampler.objects[name]
-        p_c, _ = pushed.get_position_orientation()
-        edge = float(getattr(sampler, "edge", 0.0254))
-        shifted: List[Any] = []  # train-fast 2026-10-31: the cubes this push moves (the partial sync re-poses these alone)
-        for other, obj in sampler.objects.items():
-            if other == name or not any(other == b.get("instance") for b in (getattr(self.sidecar, "blocks", None) or [])):
-                continue
-            p_o, _ = obj.get_position_orientation()
-            rel = (p_o - p_c)[:2]
-            along = float(th.dot(rel, d2))
-            across = float(th.linalg.norm(rel - along * d2))
-            if 0.0 < along < travel + edge and across < 0.6 * edge:
-                # it moves by what the pushed cube's travel leaves after closing the gap between them down to the sampler's packed
-                # gap (its world model keeps ``block_gap_m`` between packed cubes; 0920-093727: 1 mm off put a hand 2.7 mm from
-                # the neighbour where the sampler had 3.7)
-                g_pack = float(sampler.g("block_gap_m")) if hasattr(sampler, "g") else 0.0
-                gap = max(0.0, along - edge - g_pack)
-                move = max(0.0, travel - gap)
-                if move > 1e-4:
-                    shifted.append(self._shift(other, obj, d * move, sampler))
-        shifted.append(self._shift(name, pushed, d * travel, sampler))
-        _sync(sampler.kit, shifted)
-
     def advance_pick_push(self, action, sampler) -> None:
         """The overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``; owner 2026-10-13 ~03:15 item 4): the pushed object is
         moved to the record's ``post_push_pose`` (where the sampler settled it), so the grasp is checked at the overhang as the oracle
@@ -1662,8 +1600,6 @@ class _Tracker:
         elif name == "push":
             if str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang":
                 self.advance_pick_push(action, sampler)
-            else:
-                self.advance_push(action, sampler)
         arms = list(getattr(action, "arms", ()) or [])
         if name == "brace" and arms and witnesses and sampler is not None:
             # the brace hand stays at its contact until its own retreat: its solved contact configuration locks the arm for
@@ -1915,19 +1851,6 @@ def _two_point_fingers(action, name: str, after_name: Optional[str]) -> Optional
         return None
     ex = getattr(rec, "extra", None) or {}
     return float(ex["fingers_opening_m"]) if ex.get("push_contact_form") == "two_point" and ex.get("fingers_opening_m") is not None else None
-
-
-def _is_pack_push(sidecar, action) -> bool:
-    """A push of the block-design packing tail (``sidecar.pack`` stages; the draft's attribute or the F6 ``extra``)."""
-    if getattr(action, "name", "") != "push":
-        return False
-    pack = getattr(sidecar, "pack", None)
-    if not isinstance(pack, dict):
-        pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
-    if not isinstance(pack, dict):
-        return False
-    obj = getattr(getattr(action, "contact", None), "object", None)
-    return any(p_.get("object") == obj for st_ in (pack.get("stages") or []) for p_ in (st_.get("pushes") or []))
 
 
 def _approached_for(action, sampler) -> Optional[List[Any]]:
@@ -2391,8 +2314,7 @@ def _pick_overhang_push(action) -> bool:
 
 def _world_advances(sidecar, action) -> bool:
     """Whether the check's world changes AFTER ``action`` (``_Tracker.after`` / ``run._carry_joint_state``), so later actions' targets
-    are not the static ones: a place while block records exist (``advance_block``), a push while a packing tail exists (``advance_push``),
-    a pick-overhang push (``advance_pick_push``), a push - or the retreat after one - with an articulation record (its joint), a base
+    are not the static ones: a place while block records exist (``advance_block``), a pick-overhang push (``advance_pick_push``), a push - or the retreat after one - with an articulation record (its joint), a base
     push (the object and the stance), a base follow (its joint; a hybrid end stance)."""
     name = getattr(action, "name", "")
     if name in ("base_push", "base_follow"):
@@ -2401,10 +2323,7 @@ def _world_advances(sidecar, action) -> bool:
         return bool(getattr(sidecar, "blocks", None))
     if name == "push":
         extra = getattr(getattr(action, "contact", None), "extra", None) or {}
-        pack = getattr(sidecar, "pack", None)
-        if not isinstance(pack, dict):
-            pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
-        return bool(extra.get("articulation")) or str(extra.get("kind") or "") == "pick_overhang" or isinstance(pack, dict)
+        return bool(extra.get("articulation")) or str(extra.get("kind") or "") == "pick_overhang"
     if name == "retreat":
         after = getattr(action, "after", None)
         if getattr(after, "name", "") == "push":
@@ -2414,15 +2333,9 @@ def _world_advances(sidecar, action) -> bool:
 
 def _gate_pose_targets(sidecar, sampler, action, name: str, arm: str, targets: Any) -> List[Tuple[str, List[Any]]]:
     """The ``(key, poses)`` list the frame gate of :func:`check_action_targets` sees for an action whose chains leave from no earlier
-    configuration: ``iter_pose_targets``, a pack push's ``pre`` merged into its chain, ``_place_order`` / ``_chain_order``, the skipped
+    configuration: ``iter_pose_targets``, ``_place_order`` / ``_chain_order``, the skipped
     keys out - the same keys, indices and order, so the early gate's message is the per-action gate's."""
     pose_targets = list(iter_pose_targets(targets))
-    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
-        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
-        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
-        if pre_l and wps_l:
-            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
-            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
     pose_targets = _place_order(pose_targets, None, sampler, arm) if name == "place" else _chain_order(pose_targets)
     skip = _skipped_target_keys(name, action, targets)
     return [(k_, p_) for k_, p_ in pose_targets if k_.split(".")[0] not in skip]
@@ -2650,17 +2563,6 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             return 1, witnesses
     where = _where_of(action, name, stance_name, arm, carried, locked)
     pose_targets = list(iter_pose_targets(targets))
-    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
-        # a packing push (block design, owner 2026-09-19 21:47) is verified as the oracle executes it: ``arm_to(pre)`` then
-        # ``arm_along(init -> goal)`` from the pre's configuration - ONE chain pre -> init -> ... -> goal tracked from the pre's
-        # branch (the sampler's ``_pack_pushes`` checks this very chain). Checked as "pre" alone + "waypoints" from a fresh IK at
-        # init, the init pose landed in a branch that collides with the neighbour cube 2-4 mm from the blade (0920-101139: 7/8
-        # attempts 'waypoints: exact IK failed at pose 1 of 3 ... collides with <neighbour>')
-        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
-        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
-        if pre_l and wps_l:
-            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
-            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
     slab_off = _slab_off(action)
     # owner 2026-09-24 (block design 0921-050358 action 15: 'the sidecar's pre-pose and end-pose witnesses are in different IK
     # branches', finish rejected 3.2 rad away): the legs are checked as ONE chain the way the oracle runs them -
@@ -2819,8 +2721,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             and not (getattr(getattr(action, "contact", None), "extra", None) or {}).get("articulation")):
                         # owner 2026-09-26 (axial 0926-043254 / 051919): a free-object push whose pre-contact witness sits in another branch
                         # than the stance posture's IK is followed densely, as the oracle runs it (arm_to the pre-contact, then the legs
-                        # from there) - only in that situation. The pre-contact is its own single target ("pre", solved before the chain;
-                        # a pack push merges it into the chain and has q_first): the chain checked is pre + the waypoints from its witness
+                        # from there) - only in that situation. The pre-contact is its own single target ("pre", solved before the
+                        # chain): the chain checked is pre + the waypoints from its witness
                         q_ref, chain_ref = q_first, list(chain)
                         if q_ref is None and "pre" in single_q:
                             pre_poses = next((p_ for k_, p_ in pose_targets if k_ == "pre"), None)
@@ -2828,7 +2730,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                                 q_ref, chain_ref = single_q["pre"], list(pre_poses) + list(chain)
                         chk = None
                         replay = None  # the arc replay from a given pre-contact configuration (set when the replay runs)
-                        if (q_ref is not None and len(chain_ref) >= 4 and not _is_pack_push(sidecar, action)
+                        if (q_ref is not None and len(chain_ref) >= 4
                                 and os.environ.get("ISG_PUSH_REPLAY", "on").lower() not in ("off", "0", "false")):
                             # owner 2026-09-27 (A8): a free-object arc push is replayed as the oracle runs it - the straight leg, the true
                             # arc of the closed loop, the contact retreat's escape leg - and rejected when the replay cannot follow it
