@@ -132,8 +132,10 @@ class CandidateConfig:
     # legacy_grasps: the step-4 legacy grasps ({"name", "position", "quat_xyzw"}: the eef in the canonical object frame).
     agent_proposals: Tuple[Dict[str, Any], ...] = ()
     legacy_grasps: Tuple[Dict[str, Any], ...] = ()
-    # i7-attachfix 2026-11-08 (owner direction item 1, cap xxqyrt): OPT-IN candidate switches (default off = the behaviour before; part
-    # of the entry identity when on - schema.CANDIDATE_SWITCHES). Measured on the cap (a 52.3 mm x 11.2 mm cup resting open side down,
+    # i7-attachfix 2026-11-08 (owner direction item 1, cap xxqyrt): candidate switches, part of the entry identity when on
+    # (schema.CANDIDATE_SWITCHES). OWNER DECISION 4.1, ADOPTED 2026-11-08 (i7-attachdef: default True for new builds after the count on
+    # the campaign library, attachdef_20261108/count; False = the behaviour before, which every entry generated without the fields reads
+    # as - schema.candidate_switches). Measured on the cap (a 52.3 mm x 11.2 mm cup resting open side down,
     # walls 3 mm): the Isaac sampler asks ``multiple_hits=True`` and takes the furthest hit within the aperture, but the embree
     # intersector returns ONLY the first hit, so every antipodal pair spans one wall / disc / piece-cut thickness (4000 samples: 100 %
     # of the pad centres inside a collision piece, widths 0.1-18 mm) and no pinch across the diameter was ever proposed; the width /
@@ -141,12 +143,12 @@ class CandidateConfig:
     # outer_pinch: the sampler gets every hit along its ray (repeated first-hit casts), and the pinch width / antipodal cone / the
     # blade check's pinched points are measured from OUTSIDE along the closing axis (rays from +-aperture/2 toward the pad centre: the
     # surfaces the closing pads meet). Identical for a convex single-piece object.
-    outer_pinch: bool = False
+    outer_pinch: bool = True
     # attach_face_retreat: an attachment_free top grasp's support retreat also clears the attachment rule's face gap (the fingers
     # ``ATTACH_FACE_GAP_M`` inside the male's mating face) when that face rests on the support - before, the retreat stopped the fingers
     # 1 mm below the support (the support policy's allowance) and the rule then dropped every retreated grasp at face_gap -1.0 mm (cap
     # xxqyrt: 27 of 27 rule drops). The rule itself is unchanged.
-    attach_face_retreat: bool = False
+    attach_face_retreat: bool = True
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}

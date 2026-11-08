@@ -246,8 +246,9 @@ def test_new_builds_record_both_switches_on(monkeypatch):
     from ispatialgym.grasping import pipeline as PL
 
     monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
-    assert S.candidate_switches(asdict(CA.CandidateConfig())) == dict(OFF3, blade_contact_at_retreat=True, retreat_shift_exact=True, sweep_from_preshape=True)
-    cfg, _ = PL.candidate_overrides({"cand_overrides": {"blade_contact_at_retreat": False, "retreat_shift_exact": False, "sweep_from_preshape": False}})
+    # i7-attachdef 2026-11-08: outer_pinch / attach_face_retreat default on too (owner 4.1)
+    assert S.candidate_switches(asdict(CA.CandidateConfig())) == {k: True for k in OFF3}
+    cfg, _ = PL.candidate_overrides({"cand_overrides": {k: False for k in OFF3}})
     assert S.candidate_switches(asdict(cfg)) == OFF3
 
 
