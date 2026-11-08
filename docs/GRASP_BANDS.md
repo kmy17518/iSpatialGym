@@ -2553,6 +2553,11 @@ added the -v end with no rejection growth; the dormant row-note mechanism would 
 (acts; small spread with the base-relative board list, the full flip-room range with BD_BOARD_TABLE, whose own default i7-blockdesign's
 A/B decides). (3) axial_02's repeats: options (a) / (b) / (c) below.
 
+**Lead decisions while the owner is away (2026-11-08, tmp/outputs/lead_decisions_while_away.md 12-14):** `ISPATIALGYM_ALL_EDGES` DEFAULT ON
+(b77691af, own commit; `=0` restores both restrictions; the restriction tests pin it to 0; suite = bd47a6d4's ids, snapshot
+trunk_b77691af); `ISPATIALGYM_BD_FLIP_ROOM_DRAW` stays off until i7-blockdesign's BD_BOARD_TABLE A/B is in; axial_02's repeat-aware
+draw is left to the owner (not built).
+
 5o.2 (axial_02, re-measured with the switch on): repeats unchanged, 11 of 25 (`repeats_eval`), because nothing pinned the edge. The
 diagnosis (`ISPATIALGYM_STANCE_BLAME=1` in se_on, logging only): every draw offers all four edges; -u's stance collides with the scene
 object `fixed_window_ucejof_0` (0.07 m from the base: the desk stands against the window wall) 10 / 10, -v's with `armchair_ybcnmu_0`
