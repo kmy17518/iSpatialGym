@@ -445,6 +445,79 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     return out
 
 
+#: i7-brace (owner 3.4): the world_vertical tilt grid (deg) a wall_brace entry's clear range is tested over (the task draws |delta| U(15, 45))
+WALL_CLEAR_DELTAS_DEG = tuple(float(v) for v in range(5, 50, 5))
+#: the synthetic wall spot of the wall_brace rule frame: the wall plane x = 0 facing -x (the robot stands at x < 0 facing +x), the hinge height
+WALL_RULE_SPOT = {"point": (0.0, 0.0, 0.0), "normal": (-1.0, 0.0, 0.0), "hang_z": 1.2, "wall_protrusion_m": 0.0}
+
+
+def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any], pieces: Optional[Sequence[np.ndarray]] = None) -> List[Dict[str, Any]]:
+    """i7-brace (owner 3.4): the world_vertical BRACE entries - AlignmentWall's own candidates (``WallGeometry.contacts_for``: the
+    ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns`` braces on the LEVEL (goal) pose, the stop at the
+    goal edge) at the synthetic wall spot :data:`WALL_RULE_SPOT`, keyed by the TILT SIGN (which end is high: the brace side), each recording
+    the start range it stays clear for - ``goal.clear_delta_max_deg``, the largest |delta| of :data:`WALL_CLEAR_DELTAS_DEG` up to which the
+    task's ``brace_clear`` (2 cm from the tilted hull) holds at every grid tilt. The entry is in the object frame at the level pose; ``load``
+    = the direction the leveling push would carry the braced point past level (about the wall normal through the COM hinge). Needs the
+    reviewed frame ``params["front_axis"]`` / ``["up_axis"]`` (as the task: no default); ``params["com_local"]`` (default the hull centroid);
+    the task's generation knobs (``wall_contact_tilt_deg``, ``brace_kinds``, ``brace_offset_m``, ``brace_clearance_m``, ...) from ``knobs``."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    if not params.get("front_axis") or not params.get("up_axis"):
+        raise ValueError("wall_brace: the reviewed frame (params front_axis / up_axis) is required (AlignmentWall: missing_frame)")
+    front, side, up = AW.frame_axes(params["front_axis"], params["up_axis"])
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    g = AW.WallGeometry.standalone(hull, front, side, up, com_local, [th.as_tensor(P, dtype=th.float32) for P in (pieces or [])], params=knobs)
+    spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in WALL_RULE_SPOT.items()}
+    deltas = sorted(float(v) for v in (params.get("clear_deltas_deg") or WALL_CLEAR_DELTAS_DEG))
+    _, _, h = g.dims()
+    out = []
+    for sign in (1.0, -1.0):
+        geos = [g.contacts_for(spot, sign * math.radians(d)) for d in deltas]
+        ref = geos[0]
+        if ref.get("no_corner"):
+            continue  # the task pushes the middle of the end: no brace (push-only)
+        T_l = CPZ._mat(ref["pose_level"])
+        Ti = np.linalg.inv(T_l)
+        n = ref["normal"]
+        C_ = ref["C"]
+        seen = set()
+        for i, b in enumerate(ref["braces"]):
+            # the brace poses live on the level pose: the same at every tilt of this sign (checked)
+            same = all(bool(th.allclose(G_["braces"][i]["pose"][0], b["pose"][0], atol=1e-5)) for G_ in geos if len(G_["braces"]) > i)
+            t_max = 0.0
+            for d, G_ in zip(deltas, geos):
+                if not g.brace_clear(G_, b):
+                    break
+                t_max = d
+            if t_max <= 0.0 or not same:
+                continue
+            cls = f"{'+' if sign > 0 else '-'}tilt_{b['kind']}_{b['wrist']}"
+            while cls in seen:
+                cls += "#"
+            seen.add(cls)
+            e = CPZ.contact_entry("brace", cls, "wall_brace", "brace", T_l, b["pose"], b["pre"],
+                                  {"kind": b["kind"], "wrist": b["wrist"], "tilt_deg": b["tilt_deg"], "face_m": b["face_m"]},
+                                  face_rule="AlignmentWall.contacts_for's brace on the level pose (the stop at the goal edge), in the wall plane",
+                                  object_height=h)
+            Bo = Ti[:3, :3] @ b["B"].double().numpy() + Ti[:3, 3]
+            ao = Ti[:3, :3] @ b["a"].double().numpy()
+            # the leveling push turns the target by -delta about n: past level it carries B on along -sign x n x (B - C)
+            v = -sign * th.cross(n, b["B"] - C_, dim=0)
+            v = v / max(float(th.linalg.norm(v)), 1e-9)
+            e["yaw_deg"] = 0.0
+            e["goal"] = {"tilt_sign": sign, "clear_delta_max_deg": t_max, "deltas_deg": deltas}
+            e["wall"] = {"B_object": [round(float(x), 6) for x in Bo], "approach_object": [round(float(x), 6) for x in ao],
+                         "normal_object": [round(float(x), 6) for x in (Ti[:3, :3] @ n.double().numpy())],
+                         "hinge_object": [round(float(x), 6) for x in com_local.tolist()]}
+            e["load"] = {"frame": "object", "direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v.double().numpy())],
+                         "point_object": [round(float(x), 6) for x in Bo],
+                         "what": "the leveling push carries the braced point past level about the wall normal through the COM hinge"}
+            out.append(_redigest(e))
+    return out
+
+
 def _obj_pose(Ti: np.ndarray, pose) -> Dict[str, List[float]]:
     from ispatialgym.sampling.v2 import contact_poses as CPZ
 
@@ -471,7 +544,8 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
                   "missing": "iors_large_nextto's face points (the push lanes) are sampler logic; the hand poses are shared (base_push_hand_poses)"},
     "wall_push": {"kind": "push", "arm_role": "work", "builder": None, "scope": "world_vertical (library only)",
                   "missing": "the wall layout (hinge corner, E_low, the arc) is alignment_wall sampler logic; the pose is shared (wall_contact_pose)"},
-    "wall_brace": {"kind": "brace", "arm_role": "brace", "builder": None, "scope": "world_vertical (library only)", "missing": "as wall_push"},
+    "wall_brace": {"kind": "brace", "arm_role": "brace", "builder": build_wall_brace, "needs_pieces": True,
+                   "scope": "alignment-world_vertical 01-05: the brace holding the hung target at its level goal (i7-brace, owner 3.4)"},
 }
 
 
@@ -565,7 +639,7 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
         knobs = dict(job.get("generation") or {})
         params = dict((job.get("params") or {}).get(fam) or {}, subtask=job.get("subtask"))
         t0 = time.time()
-        entries = spec["builder"](pts, rest, knobs, params)
+        entries = (spec["builder"](pts, rest, knobs, params, pieces=_pieces(geom)) if spec.get("needs_pieces") else spec["builder"](pts, rest, knobs, params))
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})
         lib_k["families"][fam] = {"arm_role": spec["arm_role"], "scope": spec["scope"], "knobs": resolved_knobs(fam, knobs, job.get("subtask") or TOUCHING_SUBTASK),
                                   "params": {k: v for k, v in params.items() if k != "subtask"}, "frame": "rule frame: +x the robot's forward, +y its left; support z 0",
@@ -576,6 +650,15 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
         # the validation setup of the alias family (the support height the trials stand the object at; not part of the library's identity)
         lib_k["validate"] = dict(job.get("validate") or {})
         lib_k["digest"] = _library_digest(lib_k)
+    return out
+
+
+def _pieces(geom) -> List[np.ndarray]:
+    """The object's collision pieces' vertices (root frame) when the geometry carries them (the wall contacts' material cut)."""
+    out = []
+    for p in getattr(geom, "pieces", None) or []:
+        v = getattr(p, "vertices", p)
+        out.append(np.asarray(v, dtype=float).reshape(-1, 3))
     return out
 
 

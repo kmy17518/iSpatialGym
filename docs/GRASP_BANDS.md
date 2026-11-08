@@ -2385,6 +2385,33 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+### i7-brace (owner 2026-11-08 3.3 / 3.4; branch `i7-brace` from of-v2maps cf1f5d2d)
+
+- **3.3 the brace-load pusher** (a1ef1c8d): built `kinematic_only` without a fixed base (dynamic in OmniGibson, the touching stand-in's
+  bug of 021aa89c) - now `PUSHER_KINEMATIC` (fixed_base + kinematic). `validate_contacts --revalidate` re-runs exactly the entries an
+  earlier run validated (old record -> `validation_prev`, uncapped). Every brace library the consolidated root reads was re-validated
+  (`$OFH/brace_20261108/libs_touch` / `libs_axial` / `libs_axial_sj` / `libs_axial_e`, per-entry changes: `verdict_changes.py`), maps
+  valid-only (owner A6), staged in `$OFH/v2maps_int1_brace33` (cp -a v2maps_int1; old maps in `_superseded_brace33/`).
+- **3.4 axial** (63da6197; default off): library param `clear_turns` builds the axial_brace entries once at the goal, keyed by pushed end x
+  spin, each with `goal.clear_turn_max_deg` (the contiguous range over 5..90 deg of the sampler's own `blade_sweep_clear`), plus the
+  OPPOSITE-END candidates (`axial_opposite_brace_candidates`: the far end's face the far end arrives at, resisting the same turn; classes
+  `<end><spin>spin_opp_*`, tried after the current ones; no `side_high` analog). Sampler switches `ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1`
+  (the map keeps the entries clear for the drawn turn) and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1` (the opposite candidates after the current
+  ones, the record's direction from the candidate); kit `axial_brace.opposite_tried` / `.opposite_used`. The exact two-arm check unchanged.
+- **3.4 the 12 braceless axial instances** (i7_contactfu): 9 `no_joint_cell` (turns 21-64 deg: the axial_brace map has no class of the
+  pushed end / spin at the goal root - reach, not the sweep), 3 `brace_ik_failed` (axial_04 magazine, 21.7-21.9 deg: the blades fail the
+  left arm's IK at the pre or meet the goal-posed target within 3 mm; all side pads sweep-skipped). The sweep test is monotone in the turn
+  on synthetic boxes (a pad clear at 45 deg is clear below it), so the failures at <= 45 deg are reach / goal-pose collisions.
+- **3.4 world_vertical `wall_brace`** (library done, validator / map / sampler not yet): `alignment_wall.WallGeometry` = the task's hang /
+  contact geometry moved verbatim out of `AlignmentWall` (which inherits it: the live brace choice unchanged, test); `contact_library.
+  build_wall_brace` (family `wall_brace`) builds the task's own braces on the level pose at the synthetic spot `WALL_RULE_SPOT`, keyed by
+  the tilt sign, with `goal.clear_delta_max_deg` (the task's `brace_clear` at every grid tilt 5..45 deg up to it) and `load` (the leveling
+  turn past level about the wall normal through the COM hinge). Still to do: a wall world in the validator (a fixed kinematic wall slab,
+  the object on the COM hinge), the wall-frame map kind (base relative to the hinge point and the wall normal), the default-off sampler
+  switch, N 4 on world_vertical 01-05.
+- **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
+  validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`, 18378110).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

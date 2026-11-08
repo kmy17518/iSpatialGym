@@ -339,131 +339,22 @@ def half_turn_equivalence(front) -> List[float]:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-@register(*SUBTASKS)
-class AlignmentWall(SamplerV2):
-    """World vertical: the wall-hung target is pushed back to its upright goal."""
+class WallGeometry:
+    """i7-brace 2026-11-08 (owner 3.4): the world_vertical target's hang / contact geometry - moved VERBATIM out of :class:`AlignmentWall`
+    (which inherits it) so the ``wall_brace`` contact library builds its entries with the task's ONE implementation
+    (:meth:`contacts_for`: the push and the ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns``
+    brace candidates; :meth:`brace_clear`). Needs ``hull``, ``pieces``, ``front`` / ``side`` / ``up``, ``com_local`` and ``param(key,
+    default)``; :meth:`standalone` makes one without a scene (the library builder)."""
 
-    #: the target's collision pieces in its root frame (``SimWorld.local_collision_pieces``); None: unknown, the contacts keep
-    #: the hull's projected extremes
-    pieces: Optional[List[th.Tensor]] = None
-
-    def __init__(self, ctx):
-        super().__init__(ctx)
-        if self.gp.bddl is None:
-            self.definition_id = V1_DEFINITION_ID[self.subtask]
-        self.wall_role = "support" if "support" in self.gp.roles else ("wall" if "wall" in self.gp.roles else "support")
-        self.hinge: Optional[Hinge] = None
-        self.hull: Optional[th.Tensor] = None
-        self.com_local = th.zeros(3)
-        self.front = self.side = self.up = None
-        self.frame: Dict[str, Optional[str]] = {}
-        self.spots: List[Dict[str, Any]] = []
-        self.spot: Optional[Dict[str, Any]] = None
-        self.step1: Dict[int, List[Stance]] = {}
-
-    # ------------------------------------------------------------------ parameters
-
-    def v1_role_variants(self) -> Dict[str, str]:
-        return {"wall": "support"} if self.wall_role == "support" else {}
-
-    def param(self, key: str, default=None, v1_key: Optional[str] = None):
-        v = self.gp.gen(key)
-        if v is None and v1_key is not None:
-            v = self.gp.gen(v1_key)
-        return default if v is None else v
-
-    def target_param(self, key: str, default=None):
-        """``generation.<key>`` per target: a value, or a dict keyed ``<category>/<model>`` / ``<category>`` / ``default``."""
-        v = self.param(key, default)
-        if isinstance(v, dict):
-            c = self.choice.models["target"]
-            v = v.get(f"{c.category}/{c.model}", v.get(c.category, v.get("default", default)))
-        return v
-
-    def hang_height(self) -> float:
-        return float(self.param("hang_height_m", 1.45, "height"))
-
-    def deviation_range(self) -> Tuple[float, float]:
-        """§5.5 δ = sign·U(lo, hi). Owner decision A8 (2026‑09‑16): |δ| ≤ ``max_deviation_deg`` (25°) until the two-stroke
-        push for larger tilts exists (TODO, D list) — a wider customs range is capped here and the applied range is
-        recorded in ``template_facts.deviation_range_applied_deg``."""
-        lo, hi = (float(v) for v in self.param("deviation_range_deg", [15.0, 25.0]))
-        cap = float(self.param("max_deviation_deg", MAX_DEVIATION_DEG))
-        hi_applied = min(hi, cap)
-        lo_applied = min(lo, hi_applied)
-        self.template_facts["deviation_range_applied_deg"] = [lo_applied, hi_applied]
-        if hi_applied < hi:
-            self.template_facts["deviation_range_customs_deg"] = [lo, hi]
-        return math.radians(lo_applied), math.radians(hi_applied)
-
-    def stance_posture(self) -> Tuple[str, float]:
-        """A6: the arm posture the two-arm manipulation stance records and drives in with (``generation.
-        stance_arm_posture``, default ``tucked`` — hanging arms clear a wall 0.5 m ahead where untucked / ready hands do
-        not) and its gripper opening (closed pads: the oracle closes the grippers before a push / brace)."""
-        return str(self.param("stance_arm_posture", "tucked")), float(C.FINGER_CLOSED)
-
-    def symmetric_180(self) -> bool:
-        return bool(self.target_param("symmetric_180", False))
-
-    def reviewed_frame(self) -> Dict[str, str]:
-        """§5.5 frame of the target from the variant: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
-        ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
-        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — a variant without the keys
-        for the spawned model is ``Reject("missing_frame")`` (re-ground the variant)."""
-        c = self.choice.models["target"]
-        front, up = self.target_param("front_axis"), self.target_param("up_axis")
-        missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
-        if missing:
-            raise Reject("missing_frame", f"{self.gp.variant}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
-                                          f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
-        return {"front_axis": str(front), "up_axis": str(up)}
-
-    # ------------------------------------------------------------------ roles
-
-    def bind_scene_roles(self):
-        self.bind_floor_v2()  # the wall is bound in prepare_bindings (it needs the spawned target's extents)
-
-    @property
-    def target(self):
-        return self.obj("target")
-
-    @property
-    def tname(self) -> str:
-        return self.bindings.one("target").name
-
-    @property
-    def wall(self):
-        return self.obj(self.wall_role)
-
-    def support_objects(self) -> List[Any]:
-        return [self.wall] if self.bindings.has(self.wall_role) else []
-
-    # ------------------------------------------------------------------ target geometry
-
-    def com_world(self, obj=None, pose: Optional[G.Pose] = None) -> th.Tensor:
-        if pose is None:
-            p, q = (obj or self.target).get_position_orientation()
-            pose = (p.float(), q.float())
-        return pose[0] + G.rotate(pose[1], self.com_local)
-
-    def _com_local(self, obj) -> th.Tensor:
-        try:
-            total, acc = 0.0, th.zeros(3)
-            rp, rq = obj.get_position_orientation()
-            for link in obj.links.values():
-                m = float(link.mass)
-                if m <= 0:
-                    continue
-                lp, lq = link.get_position_orientation()
-                acc += m * (lp.float() + G.rotate(lq.float(), G.t(link.center_of_mass)))
-                total += m
-            if total > 0:
-                return G.rotate(G.qinv(rq.float()), acc / total - rp.float())
-        except Exception:  # noqa: BLE001
-            pass
-        lo, hi = obj.aabb
-        rp, rq = obj.get_position_orientation()
-        return G.rotate(G.qinv(rq.float()), (lo + hi) / 2 - rp.float())
+    @classmethod
+    def standalone(cls, hull: th.Tensor, front: th.Tensor, side: th.Tensor, up: th.Tensor, com_local: th.Tensor, pieces: Optional[Sequence[th.Tensor]] = None,
+                   params: Optional[Dict[str, Any]] = None) -> "WallGeometry":
+        g = cls.__new__(cls)
+        g.hull, g.front, g.side, g.up, g.com_local = th.as_tensor(hull, dtype=th.float32), front, side, up, th.as_tensor(com_local, dtype=th.float32)
+        g.pieces = list(pieces or [])
+        prm = dict(params or {})
+        g.param = lambda key, default=None, v1_key=None: prm.get(key, default)
+        return g
 
     def dims(self, hull: Optional[th.Tensor] = None) -> Tuple[float, float, float]:
         """(thickness along front, width along the wall, height along up) of the canonical hull."""
@@ -642,6 +533,133 @@ class AlignmentWall(SamplerV2):
             if float(th.linalg.norm(pts - p, dim=1).min()) < clear:
                 return False
         return True
+
+
+@register(*SUBTASKS)
+class AlignmentWall(SamplerV2, WallGeometry):
+    """World vertical: the wall-hung target is pushed back to its upright goal."""
+
+    #: the target's collision pieces in its root frame (``SimWorld.local_collision_pieces``); None: unknown, the contacts keep
+    #: the hull's projected extremes
+    pieces: Optional[List[th.Tensor]] = None
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        if self.gp.bddl is None:
+            self.definition_id = V1_DEFINITION_ID[self.subtask]
+        self.wall_role = "support" if "support" in self.gp.roles else ("wall" if "wall" in self.gp.roles else "support")
+        self.hinge: Optional[Hinge] = None
+        self.hull: Optional[th.Tensor] = None
+        self.com_local = th.zeros(3)
+        self.front = self.side = self.up = None
+        self.frame: Dict[str, Optional[str]] = {}
+        self.spots: List[Dict[str, Any]] = []
+        self.spot: Optional[Dict[str, Any]] = None
+        self.step1: Dict[int, List[Stance]] = {}
+
+    # ------------------------------------------------------------------ parameters
+
+    def v1_role_variants(self) -> Dict[str, str]:
+        return {"wall": "support"} if self.wall_role == "support" else {}
+
+    def param(self, key: str, default=None, v1_key: Optional[str] = None):
+        v = self.gp.gen(key)
+        if v is None and v1_key is not None:
+            v = self.gp.gen(v1_key)
+        return default if v is None else v
+
+    def target_param(self, key: str, default=None):
+        """``generation.<key>`` per target: a value, or a dict keyed ``<category>/<model>`` / ``<category>`` / ``default``."""
+        v = self.param(key, default)
+        if isinstance(v, dict):
+            c = self.choice.models["target"]
+            v = v.get(f"{c.category}/{c.model}", v.get(c.category, v.get("default", default)))
+        return v
+
+    def hang_height(self) -> float:
+        return float(self.param("hang_height_m", 1.45, "height"))
+
+    def deviation_range(self) -> Tuple[float, float]:
+        """§5.5 δ = sign·U(lo, hi). Owner decision A8 (2026‑09‑16): |δ| ≤ ``max_deviation_deg`` (25°) until the two-stroke
+        push for larger tilts exists (TODO, D list) — a wider customs range is capped here and the applied range is
+        recorded in ``template_facts.deviation_range_applied_deg``."""
+        lo, hi = (float(v) for v in self.param("deviation_range_deg", [15.0, 25.0]))
+        cap = float(self.param("max_deviation_deg", MAX_DEVIATION_DEG))
+        hi_applied = min(hi, cap)
+        lo_applied = min(lo, hi_applied)
+        self.template_facts["deviation_range_applied_deg"] = [lo_applied, hi_applied]
+        if hi_applied < hi:
+            self.template_facts["deviation_range_customs_deg"] = [lo, hi]
+        return math.radians(lo_applied), math.radians(hi_applied)
+
+    def stance_posture(self) -> Tuple[str, float]:
+        """A6: the arm posture the two-arm manipulation stance records and drives in with (``generation.
+        stance_arm_posture``, default ``tucked`` — hanging arms clear a wall 0.5 m ahead where untucked / ready hands do
+        not) and its gripper opening (closed pads: the oracle closes the grippers before a push / brace)."""
+        return str(self.param("stance_arm_posture", "tucked")), float(C.FINGER_CLOSED)
+
+    def symmetric_180(self) -> bool:
+        return bool(self.target_param("symmetric_180", False))
+
+    def reviewed_frame(self) -> Dict[str, str]:
+        """§5.5 frame of the target from the variant: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
+        ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
+        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — a variant without the keys
+        for the spawned model is ``Reject("missing_frame")`` (re-ground the variant)."""
+        c = self.choice.models["target"]
+        front, up = self.target_param("front_axis"), self.target_param("up_axis")
+        missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
+        if missing:
+            raise Reject("missing_frame", f"{self.gp.variant}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
+                                          f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
+        return {"front_axis": str(front), "up_axis": str(up)}
+
+    # ------------------------------------------------------------------ roles
+
+    def bind_scene_roles(self):
+        self.bind_floor_v2()  # the wall is bound in prepare_bindings (it needs the spawned target's extents)
+
+    @property
+    def target(self):
+        return self.obj("target")
+
+    @property
+    def tname(self) -> str:
+        return self.bindings.one("target").name
+
+    @property
+    def wall(self):
+        return self.obj(self.wall_role)
+
+    def support_objects(self) -> List[Any]:
+        return [self.wall] if self.bindings.has(self.wall_role) else []
+
+    # ------------------------------------------------------------------ target geometry
+
+    def com_world(self, obj=None, pose: Optional[G.Pose] = None) -> th.Tensor:
+        if pose is None:
+            p, q = (obj or self.target).get_position_orientation()
+            pose = (p.float(), q.float())
+        return pose[0] + G.rotate(pose[1], self.com_local)
+
+    def _com_local(self, obj) -> th.Tensor:
+        try:
+            total, acc = 0.0, th.zeros(3)
+            rp, rq = obj.get_position_orientation()
+            for link in obj.links.values():
+                m = float(link.mass)
+                if m <= 0:
+                    continue
+                lp, lq = link.get_position_orientation()
+                acc += m * (lp.float() + G.rotate(lq.float(), G.t(link.center_of_mass)))
+                total += m
+            if total > 0:
+                return G.rotate(G.qinv(rq.float()), acc / total - rp.float())
+        except Exception:  # noqa: BLE001
+            pass
+        lo, hi = obj.aabb
+        rp, rq = obj.get_position_orientation()
+        return G.rotate(G.qinv(rq.float()), (lo + hi) / 2 - rp.float())
 
     def contact_specs(self, geo: Dict[str, Any]) -> Tuple[P0.ContactSpec, List[Tuple[Dict[str, Any], P0.ContactSpec]]]:
         push = geo["push"]

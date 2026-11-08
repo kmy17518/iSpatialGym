@@ -158,3 +158,61 @@ def test_the_opposite_end_entries_are_their_own_stratification_group():
     assert VC.axial_group({"class": "+end-spin_v@f0"}) == "+end-spin"
     assert VC.axial_group({"class": "+end-spin_opp_v@f0"}) == "+end-spin_opp"
     assert VC.axial_group({"class": "push_tip_h"}) == ""
+
+
+# ------------------------------------------------------------------------------------------------ 3.4 world_vertical: wall_brace
+
+
+def _painting():
+    L, W, T = 0.40, 0.60, 0.03  # height (z, up), width (y, side), thickness (x, front)
+    hull = th.tensor([[sx * T / 2, sy * W / 2, sz * L / 2] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)], dtype=th.float32)
+    return hull
+
+
+def test_alignment_wall_keeps_its_geometry_methods_as_one_implementation():
+    """i7-brace: AlignmentWall's contact geometry moved verbatim into WallGeometry - the task resolves to the same functions (live behaviour
+    unchanged), and a scene-free WallGeometry gives the same braces as an AlignmentWall with the same attributes."""
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    for m in ("dims", "depth_extents", "wall_offset", "mid_plane_point", "hang_pose", "hull_at", "contact_section", "contacts_for", "brace_clear"):
+        assert getattr(AW.AlignmentWall, m) is getattr(AW.WallGeometry, m)
+    f, s_, u = AW.frame_axes("+x", "+z")
+    hull = _painting()
+    g = AW.WallGeometry.standalone(hull, f, s_, u, th.zeros(3))
+    task = AW.AlignmentWall.__new__(AW.AlignmentWall)
+    task.hull, task.front, task.side, task.up, task.com_local, task.pieces = hull, f, s_, u, th.zeros(3), []
+    task.ctx = SimpleNamespace()
+    task.param = lambda key, default=None, v1_key=None: default
+    spot = {"point": th.tensor([2.0, 1.0, 0.0]), "normal": th.tensor([0.0, -1.0, 0.0]), "hang_z": 1.4, "wall_protrusion_m": 0.0}
+    a, b = task.contacts_for(spot, math.radians(25.0)), g.contacts_for(spot, math.radians(25.0))
+    assert [x["kind"] for x in a["braces"]] == [x["kind"] for x in b["braces"]] and a["braces"]
+    assert all(bool(th.allclose(x["pose"][0], y["pose"][0])) for x, y in zip(a["braces"], b["braces"]))
+
+
+def test_the_wall_brace_library_keys_by_tilt_sign_and_records_the_clear_range(monkeypatch):
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    hull = _painting()
+    es = CL.build_wall_brace(hull.numpy(), None, {}, {"front_axis": "+x", "up_axis": "+z"})
+    assert es and {e["goal"]["tilt_sign"] for e in es} == {1.0, -1.0}
+    assert all(e["family"] == "wall_brace" and 0.0 < e["goal"]["clear_delta_max_deg"] <= 45.0 for e in es)
+    assert all(e["class"].startswith(("+tilt_", "-tilt_")) for e in es)
+    kinds = {e["class"].split("_", 1)[1].rsplit("_", 1)[0] for e in es}
+    assert kinds <= {"below_high", "above_low", "side_high"}
+    # the recorded range is the task's own brace_clear at every grid tilt up to it (and fails just past it, below the grid's end)
+    f, s_, u = AW.frame_axes("+x", "+z")
+    g = AW.WallGeometry.standalone(hull, f, s_, u, th.zeros(3))
+    spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in CL.WALL_RULE_SPOT.items()}
+    e = es[0]
+    sign, t_max = e["goal"]["tilt_sign"], e["goal"]["clear_delta_max_deg"]
+    geo = g.contacts_for(spot, sign * math.radians(t_max))
+    b = next(x for x in geo["braces"] if f"{'+' if sign > 0 else '-'}tilt_{x['kind']}_{x['wrist']}" == e["class"])
+    assert g.brace_clear(geo, b)
+    if t_max < 45.0:
+        assert not g.brace_clear(g.contacts_for(spot, sign * math.radians(t_max + 5.0)), b)
+    # the load turns the braced point on past level: tangential to the hinge, in the wall plane
+    d, B = np.asarray(e["load"]["direction"]), np.asarray(e["load"]["point_object"])
+    n = np.asarray(e["wall"]["normal_object"])
+    assert abs(float(d @ n)) < 1e-5 and abs(float(d @ (B - np.asarray(e["wall"]["hinge_object"])))) < 1e-5
+    with pytest.raises(ValueError):
+        CL.build_wall_brace(hull.numpy(), None, {}, {})  # no reviewed frame: no default
