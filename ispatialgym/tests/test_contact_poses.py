@@ -328,3 +328,69 @@ def test_the_full_open_brace_switch(monkeypatch):
     assert CPZ.brace_wide_spreads(gs) == [0.127, 0.09, 0.07, 0.05] and CPZ.brace_wide_spreads(CPZ.PoseGen({"brace_wide_spreads_m": [0.127, 0.05]})) == [0.127, 0.05]
     assert first_wide(wide) == ("brace_wide_h-", 0.127, 0.05)  # the 20 cm face takes the full spread
     assert first_wide(narrow) == ("brace_wide_h-", 0.09, 0.0315) and first_wide(None) == ("brace_wide_h-", 0.09, 0.0315)  # narrower faces: the widest that fits
+
+
+def test_push_line_through_the_mass_centre_shifts_the_contact_across_the_push():
+    """Lead decision 9 (2026-11-08, ISPATIALGYM_PUSH_LINE_COM): with ``line_xy`` (the target's mass centre) the swept / open push classes'
+    contact line runs through that point instead of the footprint centre - the same heights and classes, every contact shifted across the
+    push by the point's offset, the offset recorded (``push_line``); without it the records are unchanged (no ``push_line``)."""
+    from ispatialgym.tests import test_iors_small_lift as LIFT
+
+    cereal = LIFT._box(0.1567, 0.0427, 0.2182)
+    pose = CS._yawed(CS.PLACE, 0.0)
+    hull_w = G.local_points_world(cereal, pose)
+    face_z = (float(hull_w[:, 2].min()), float(hull_w[:, 2].max()))
+    gs = CPZ.PoseGen({"push_height_sweep": True}, subtask=CS.TOUCHING)
+    fp = CPZ.push_face_point(hull_w, CS.D)
+    d2 = CS.D[:2] / th.linalg.norm(CS.D[:2])
+    side2 = th.tensor([-float(d2[1]), float(d2[0])])
+    sec = CPZ.HullSections(hull_w)
+    t_fp, facts = CPZ.push_line_t0(sec, hull_w, face_z[0], side2)
+    assert facts == {}
+    off = 0.006  # the mass centre 6 mm off the footprint centre across the push
+    centre_xy = G.t(pose[0])[:2].float()
+    line_xy = centre_xy + off * side2 + 0.01 * d2  # a shift along the push changes nothing
+    t0, facts = CPZ.push_line_t0(sec, hull_w, face_z[0], side2, line_xy)
+    assert t0 - t_fp == pytest.approx(off + float((centre_xy @ side2)) - t_fp, abs=1e-6)
+    assert facts["push_line"]["through"] == "com"
+    base = list(CPZ.touching_push_candidates(gs, CPZ.MAP_FRAME, fp, face_z, CS.D, t_hull_w=hull_w))
+    com = list(CPZ.touching_push_candidates(gs, CPZ.MAP_FRAME, fp, face_z, CS.D, t_hull_w=hull_w, line_xy=line_xy))
+    assert base and [k for k, _p, _e in com][:len(base)] == [k for k, _p, _e in base][:len(com)]
+    shift = float(facts["push_line"]["offset_from_footprint_m"])
+    n = 0
+    for (kb, pb, eb), (kc, pc, ec) in zip(base, com):
+        assert kb == kc and "push_line" not in eb
+        if "contact_point" in eb and eb.get("push_height_sweep") is True:
+            n += 1
+            assert ec["push_line"]["offset_from_footprint_m"] == pytest.approx(shift, abs=1e-6)
+            dcp = th.tensor(ec["contact_point"][:2]) - th.tensor(eb["contact_point"][:2])
+            assert float(dcp @ side2) == pytest.approx(shift, abs=2e-4) and abs(float(dcp @ d2)) < 2e-3
+            assert ec["contact_height_m"] == eb["contact_height_m"]
+    assert n > 0
+    # the open-gripper classes take the same line
+    ob = list(CPZ.open_push_candidates(gs, CPZ.MAP_FRAME, hull_w, face_z, CS.D))
+    oc = list(CPZ.open_push_candidates(gs, CPZ.MAP_FRAME, hull_w, face_z, CS.D, line_xy=line_xy))
+    if ob and oc:
+        assert "push_line" not in ob[0][2] and oc[0][2]["push_line"]["offset_from_footprint_m"] == pytest.approx(shift, abs=1e-6)
+
+
+def test_push_line_com_switch_and_the_samplers_line_point(monkeypatch):
+    """The sampler's line point: None with the switch off (default); on, the target's mass centre (root frame, cached) at the place pose."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    monkeypatch.delenv(IS.PUSH_LINE_COM_ENV, raising=False)
+    assert not IS.push_line_com_on()
+    stats, calls = {}, []
+    me = SimpleNamespace(obj=lambda role: SimpleNamespace(name="target_x"), kit=SimpleNamespace(stats=stats), gp=SimpleNamespace(variant="t"))
+    me.push_line_xy = IS.IORSSmall.push_line_xy.__get__(me)
+    t_pose = (th.tensor([1.0, 2.0, 0.9]), C.quat_from_yaw(math.pi / 2))
+    assert me.push_line_xy(t_pose) is None
+    monkeypatch.setattr(AX, "_com_local", lambda obj: calls.append(obj.name) or th.tensor([0.01, 0.0, 0.05]))
+    monkeypatch.setenv(IS.PUSH_LINE_COM_ENV, "1")
+    xy = me.push_line_xy(t_pose)
+    assert th.allclose(xy, th.tensor([1.0, 2.01]), atol=1e-5)  # +1 cm along the root x, the root turned 90 deg
+    me.push_line_xy(t_pose)
+    assert calls == ["target_x"] and stats["push_line_com.used"] == 2

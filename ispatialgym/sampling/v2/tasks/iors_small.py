@@ -257,6 +257,12 @@ TOUCH_A1_SCREEN_DEFAULT = "1"
 #: and push stances (same trunk) read built map columns, not the nearest / inherited ones (c2's place-screen and A1 failures sat at
 #: (0.25, -0.53) and (0.0, -0.61)). Only with a touch_push map; enters the start-per-attempt cell cache key when on. Default "0"
 TOUCH_BUILT_TILTS_ENV = "ISPATIALGYM_TOUCH_BUILT_TILTS"
+#: lead decision 9 (2026-11-08, owner away; i7-contact3's symbolic_only diagnosis: the touching_04 spray bottle turns during the push, the
+#: push line ~4 mm off its root, the turn's sign that of an off-centre push in 37 / 46): "1" = the touching push's contact line (the swept
+#: and the open-gripper classes) runs through the target's MASS CENTRE (PhysX link COMs, mass-weighted; the AABB centre without masses) at
+#: its place instead of its footprint centre (contact_poses.push_line_t0). An oracle push change (the recorded push poses); the touch_push
+#: maps / library keep the footprint line. Default "0"
+PUSH_LINE_COM_ENV = "ISPATIALGYM_PUSH_LINE_COM"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -298,6 +304,10 @@ def touch_lift_screen_mode() -> str:
 def touch_a1_screen_mode() -> str:
     v = (os.environ.get(TOUCH_A1_SCREEN_ENV) or TOUCH_A1_SCREEN_DEFAULT).strip().lower()
     return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
+
+
+def push_line_com_on() -> bool:
+    return (os.environ.get(PUSH_LINE_COM_ENV) or "0").strip() == "1"
 
 
 def touch_built_tilts_on() -> bool:
@@ -5523,12 +5533,13 @@ class IORSSmall(SamplerV2):
         sweep = t_pose is not None and self.push_height_sweep_on()
         open_push = t_pose is not None and open_classes and self.push_gripper_open_on()
         hull_w = self.world.hull_at(self.hull["target"], t_pose) if (sweep or open_push) else None
-        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=hull_w if sweep else None)
+        line_xy = self.push_line_xy(t_pose) if (sweep or open_push) else None
+        cands = self.touching_push_candidates(st, p_init, t_face_z, direction, t_hull_w=hull_w if sweep else None, line_xy=line_xy)
         if open_push:
             import itertools
 
             # oracle-fix 2026-11-06 (owner on touching#02's cereal box): the open gripper low on the face first, today's classes after it
-            cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction), cands)
+            cands = itertools.chain(self.open_push_candidates(st, hull_w, t_face_z, direction, line_xy=line_xy), cands)
         pair = self.pair_goal_align()
         if pair is not None and pair["push_max_height_m"] is not None:
             h_max = float(pair["push_max_height_m"])
@@ -5631,12 +5642,29 @@ class IORSSmall(SamplerV2):
         return O.choose_first(self.ikc, "left", stream, key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=evaluate_counted,
                               q_start=self.ikc.q_locked(st), stage="touching brace")
 
+    def push_line_xy(self, t_pose: G.Pose) -> Optional[th.Tensor]:
+        """:data:`PUSH_LINE_COM_ENV`: the world xy of the target's mass centre at ``t_pose`` (the push line's point), None when off (the
+        footprint centre line). The centre in the root frame is cached per target object; kit ``push_line_com.used``."""
+        if not push_line_com_on() or t_pose is None:
+            return None
+        from ispatialgym.sampling.v2.tasks.alignment_axial import _com_local
+
+        obj = self.obj("target")
+        memo = self.__dict__.setdefault("_push_line_com", {})
+        key = getattr(obj, "name", id(obj))
+        if key not in memo:
+            memo[key] = G.t(_com_local(obj)).float()
+            log.info("%s: push line through the mass centre (ISPATIALGYM_PUSH_LINE_COM): %s in the root frame %s", self.gp.variant, key,
+                     [round(float(v), 4) for v in memo[key]])
+        TT._count(self, "push_line_com.used")
+        return (G.t(t_pose[0]).float() + C.quat_rotate(G.t(t_pose[1]).float(), memo[key]))[:2]
+
     def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
-                                 t_hull_w: Optional[th.Tensor] = None):
+                                 t_hull_w: Optional[th.Tensor] = None, line_xy: Optional[th.Tensor] = None):
         """The push record builder (``contact_poses.touching_push_candidates``, the rule the ``touch_push`` maps share): the closed right gripper's
         push poses at the target's right face (``face_point``, mid height) along ``direction``, in the order to try; ``t_hull_w`` (the target's
         hull at the place, given under :meth:`push_height_sweep_on`): :meth:`swept_push_candidates` instead. Yields ``(kind, eef pose, extras)``."""
-        yield from CPZ.touching_push_candidates(self, manip, face_point, face_z, direction, t_hull_w=t_hull_w)
+        yield from CPZ.touching_push_candidates(self, manip, face_point, face_z, direction, t_hull_w=t_hull_w, line_xy=line_xy)
 
     def _leaning_blade(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], d: th.Tensor, outward: th.Tensor, clearance: float,
                        z_tip: float, lean_deg: float):
@@ -5676,11 +5704,12 @@ class IORSSmall(SamplerV2):
         layout's book leans on a side board and is pushed by the hand that carried it)."""
         return self.relation == "touching" and self.shelf_start is None and bool(TT.phase2_gen(self, "push_gripper_open", False))
 
-    def open_push_candidates(self, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+    def open_push_candidates(self, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
+                             line_xy: Optional[th.Tensor] = None):
         """``generation.push_gripper_open``: ``contact_poses.open_push_candidates`` - the right gripper open ``push_open_opening_m`` per finger,
         both fingertips ``stop_clearance_m`` before the face on the footprint centre line (``push_open_v-``, ``push_open_h-`` / ``push_open_h``),
         by the lower fingertip's height. Yields ``(kind, eef pose, extras)``; the extras carry ``fingers_opening_m``."""
-        yield from CPZ.open_push_candidates(self, manip, t_hull_w, face_z, direction)
+        yield from CPZ.open_push_candidates(self, manip, t_hull_w, face_z, direction, line_xy=line_xy)
 
     def wide_stop_spread(self, partner_hull_w: th.Tensor, b_point: th.Tensor, outward: th.Tensor, side_h: th.Tensor, s_push: float,
                          spreads: Sequence[float] = (0.09, 0.07, 0.05), end_margin: float = 0.01, face_depth_tol: float = 0.01, band: float = 0.03) -> Optional[float]:
