@@ -318,3 +318,124 @@ def test_release_drives_stay_inside_the_free_gap(gap, n):
     for d, st in plan:
         move = float((st.base_xy - manip.base_xy) @ manip.tangent)
         assert move == pytest.approx(-d, abs=1e-5) and 0.0 < d <= gap - 0.01 + 1e-9 and st.stand_off == manip.stand_off and st.name == "push"
+
+
+# -- (d) fix 2026-11-08: the straightening lift on touching_03 (IORSSmall.up_axis is inside-only; i7t03r3_d / _v crashed on it) ------------
+
+# acbrnv at the touching_03 start (BOOK): the model -x is its standing axis (height 22.3 cm), +-y its width into the shelf, +-z its 3.1 cm
+BOOK_HULL = th.tensor([[x, y, z] for x in (-0.1115, 0.1115) for y in (-0.075, 0.075) for z in (-0.0155, 0.0155)])
+
+
+class _Board:
+    """A kept piece as the lift plan reads it: AABB boxes + a signed distance (a horizontal board above at ``z0``)."""
+
+    def __init__(self, lo, hi):
+        self.boxes = [(th.tensor(lo), th.tensor(hi))]
+
+    def sdf(self, p):
+        lo, hi = self.boxes[0]
+        p = th.as_tensor(p, dtype=th.float32)
+        return th.maximum(lo - p, p - hi).max(dim=-1).values
+
+
+def _lift_sampler(monkeypatch, ceiling_gap=0.10, rest=BOOK[1], key="hardback__acbrnv__bu", switch="1"):
+    from ispatialgym.sampling import geometry as G
+
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, switch)
+    s = _sampler()
+    s.relation = "touching"
+    s.hull = {"target": BOOK_HULL}
+    s.rest = {"target": rest}
+    s.grasp_key = key
+    s.world = SimpleNamespace(hull_at=lambda h, pose: G.local_points_world(h, (G.t(pose[0]).float(), G.t(pose[1]).float())))
+    hull_w = G.local_points_world(BOOK_HULL, BOOK)
+    top = float(hull_w[:, 2].max())
+    lo, hi = hull_w.min(dim=0).values, hull_w.max(dim=0).values
+    above = _Board([float(lo[0]) - 0.1, float(lo[1]) - 0.1, top + ceiling_gap], [float(hi[0]) + 0.1, float(hi[1]) + 0.1, top + ceiling_gap + 0.02])
+    s._kept_pieces = lambda: [("/World/bookcase/board_above", None, above)]
+    eio = (th.tensor([0.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    gr = SimpleNamespace(arm="left", grasp=G.compose(BOOK, eio), carry_height=0.04, eef_in_object=eio, extras={"lift_away": [0.03, 0.0, 0.0]})
+    return s, gr
+
+
+def test_lift_plan_on_touching_03_does_not_raise_and_straightens(monkeypatch):
+    """The i7t03r3_d crash: shelf_lift_plan on touching (up_axis() None) - now the book's standing axis from its rest (-x)."""
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    s, gr = _lift_sampler(monkeypatch)
+    assert s.up_axis() is None  # unchanged: inside-only
+    facts = s.shelf_lift_plan(gr)
+    assert facts["axis"] == [-1, 0, 0] and facts["axis_source"] == "rest" and facts["start_tilt_deg"] == pytest.approx(19.6, abs=0.2)
+    assert s.kit.stats == {"shelf_lift.straightened": 1} and "lift_turn" in gr.extras and facts["turn_deg"] == pytest.approx(19.6, abs=0.2)
+    end = PC.lift_end_pose(gr)
+    poses = IS.lift_object_poses(gr.grasp, end, gr.eef_in_object)
+    up_end = G.rotate(G.t(poses[-1][1]).float(), th.tensor([-1.0, 0.0, 0.0]))
+    assert float(up_end[2]) == pytest.approx(1.0, abs=1e-4)  # standing upright at the lift's end
+
+
+def test_lift_plan_reads_the_v2_lean_base(monkeypatch):
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling import grasp_library as GL
+
+    upright = IS.shortest_arc(G.rotate(BOOK[1], th.tensor([-1.0, 0.0, 0.0])), th.tensor([0.0, 0.0, 1.0]))
+    q = G.qmul(upright, BOOK[1])  # xyzw, -x vertical
+    monkeypatch.setattr(GL, "v2_entry", lambda key: SimpleNamespace(data={"lean_base_wxyz": [float(q[3]), float(q[0]), float(q[1]), float(q[2])]}))
+    s, gr = _lift_sampler(monkeypatch, rest=None, key="hardback__acbrnv__bu@lean_left_20")
+    facts = s.shelf_lift_plan(gr)
+    assert facts["axis"] == [-1, 0, 0] and facts["axis_source"] == "v2_lean_base" and s.kit.stats == {"shelf_lift.straightened": 1}
+
+
+@pytest.mark.parametrize("gap", [0.10, 0.03, 0.0])
+def test_straightened_touching_03_lift_stays_inside_the_headroom(monkeypatch, gap):
+    """The turn is kept only when the upright book's top stays >= LIFT_HEADROOM_MARGIN_M under the board above along the whole lift."""
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    s, gr = _lift_sampler(monkeypatch, ceiling_gap=gap)
+    facts = s.shelf_lift_plan(gr)
+    if "lift_turn" in gr.extras:
+        poses = IS.lift_object_poses(gr.grasp, PC.lift_end_pose(gr), gr.eef_in_object)
+        top = max(float(G.local_points_world(BOOK_HULL, (G.t(p[0]).float(), G.t(p[1]).float()))[:, 2].max()) for p in poses)
+        assert facts["ceiling_z"] - top >= IS.LIFT_HEADROOM_MARGIN_M - 1e-4 and s.kit.stats == {"shelf_lift.straightened": 1}
+    else:
+        assert facts["headroom_m"] < IS.LIFT_HEADROOM_MARGIN_M and s.kit.stats == {"shelf_lift.no_headroom": 1}
+    assert ("lift_turn" in gr.extras) is (gap >= 0.10)  # 0.04 lift + ~2.4 cm the upright book gains: 3 cm is too little
+
+
+@pytest.mark.parametrize("rest,key,why", [(None, None, "no_rest"), (th.tensor([0.0, 0.0, 0.0, 1.0]), "k", "tilted")])
+def test_lift_plan_without_an_axis_is_todays_lift(monkeypatch, rest, key, why):
+    """No standing axis (no rest / one lying at the start): no turn, no leaned-board touch (today's lift), counted, never raises."""
+    s, gr = _lift_sampler(monkeypatch, rest=rest, key=key)
+    gr.extras.update(lift_turn=[0.0, 0.0, 0.0, 1.0], lift_leaned_piece="/stale")  # a stale record is cleared too
+    facts = s.shelf_lift_plan(gr)
+    assert facts["fallback"] == "no_axis" and facts["why"] == why
+    assert "lift_turn" not in gr.extras and "lift_leaned_piece" not in gr.extras and s.kit.stats == {f"shelf_lift.fallback_no_axis.{why}": 1}
+    assert s.lift_touch_ignores(gr) == []
+
+
+def test_lift_plan_error_is_todays_lift(monkeypatch):
+    s, gr = _lift_sampler(monkeypatch)
+
+    def boom():
+        raise RuntimeError("no geometry")
+
+    s._kept_pieces = boom
+    facts = s.shelf_lift_plan(gr)
+    assert facts["fallback"] == "error" and "lift_turn" not in gr.extras and s.kit.stats == {"shelf_lift.fallback_error": 1}
+
+
+def test_lift_straighten_off_is_today(monkeypatch):
+    """Switch off: after_goal_check never plans (the call sits under shelf_lift_straighten_on), the lift end is today's, no leaned piece."""
+    import inspect
+
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    s, gr = _lift_sampler(monkeypatch, switch="0")
+    assert not IS.shelf_lift_straighten_on()
+    src = inspect.getsource(IS.IORSSmall.after_goal_check)
+    assert "if shelf_lift_straighten_on():" in src and src.index("if shelf_lift_straighten_on():") < src.index("self.shelf_lift_plan(grasp)")
+    p, q = PC.lift_end_pose(gr)
+    assert list(q) == pytest.approx(list(gr.grasp[1]), abs=1e-7)
+    gr.extras["lift_leaned_piece"] = "/World/bookcase/board"
+    assert s.lift_touch_ignores(gr) == []

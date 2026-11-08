@@ -107,6 +107,9 @@ SHELF_LIFT_STRAIGHTEN_ENV = "ISPATIALGYM_SHELF_LIFT_STRAIGHTEN"
 LEANED_BOARD_MAX_GAP_M = 0.005
 #: the upright book's top keeps this below the board above along the lift (m)
 LIFT_HEADROOM_MARGIN_M = 0.005
+#: (d) fix 2026-11-08: the book's standing axis (:meth:`IORSSmall.shelf_standing_axis`) is used only while it stands within this of vertical at
+#: the attempt's start (deg; the drawn leans are 11-20 deg) - past it the lean cannot be told from another axis and the lift stays today's
+SHELF_LIFT_AXIS_MAX_TILT_DEG = 40.0
 
 
 def shelf_lift_straighten_on() -> bool:
@@ -3360,11 +3363,67 @@ class IORSSmall(SamplerV2):
                 out.append((prim, cm, g))
         return out
 
+    def shelf_standing_axis(self) -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
+        """(d) fix 2026-11-08 (touching has no ``generation.target_up_axis``: :meth:`up_axis` is inside-only and stays so): the book's
+        standing (bottom -> top) axis as a signed model axis (+-e_i), the rule ``tabletop.upright_shelf_facts`` reads the shelf start's lean
+        from (the local axis most aligned with world +z, ``grasping.lean.up_axis_local``) applied to the v2 lean entry's upright base
+        (``lean_base_wxyz``, source ``v2_lean_base``) when the key is a lean key that has one, else to the template's rest (the upright-shelf
+        key's rest or the measured lean rest; source ``rest``). ``(None, facts with why)`` when it cannot be read or stands more than
+        :data:`SHELF_LIFT_AXIS_MAX_TILT_DEG` from vertical at the attempt's start pose. Never raises."""
+        from ispatialgym.grasping import lean as LN
+        from ispatialgym.sampling import grasp_library as GL
+
+        facts: Dict[str, Any] = {}
+        try:
+            ax, src = None, None
+            key = getattr(self, "grasp_key", None)
+            if key and GL.lean_key_parts(key)[1] is not None:
+                lib = GL.v2_entry(key)
+                base = None if lib is None else lib.data.get("lean_base_wxyz")
+                if base is not None:
+                    ax, src = LN.up_axis_local(LN.xyzw(base)), "v2_lean_base"
+            if ax is None:
+                rest = (self.__dict__.get("_shelf_rest0") or getattr(self, "rest", None) or {}).get("target")
+                if rest is not None:
+                    ax, src = LN.up_axis_local(np.asarray(G.t(rest).detach().cpu().double().numpy())), "rest"
+            if ax is None:
+                return None, {"why": "no_rest"}
+            v = th.as_tensor(np.asarray(ax, dtype=np.float64), dtype=th.float32)
+            up_w = G.rotate(G.t(self.shelf_pose[1]).float(), v)
+            tilt = math.degrees(math.acos(max(-1.0, min(1.0, float(up_w[2])))))
+            facts.update(axis=[int(round(float(x))) for x in v], axis_source=src, start_tilt_deg=round(tilt, 2))
+            if not math.isfinite(tilt) or tilt > SHELF_LIFT_AXIS_MAX_TILT_DEG:
+                facts["why"] = "tilted"
+                return None, facts
+            return v, facts
+        except Exception as e:  # noqa: BLE001 - (d) must fall back to today's lift, never fail the attempt
+            log.warning("shelf_standing_axis: %s: %r", getattr(getattr(self, "gp", None), "variant", "?"), e)
+            facts.update(why="error", error=repr(e)[:200])
+            return None, facts
+
     def shelf_lift_plan(self, grasp: GraspRecord) -> Dict[str, Any]:
         """(d): ``grasps.lift_turn`` (the upright turn of the leaning book) when the upright book stays under the board above along the lift
         (:func:`lift_headroom_m` >= :data:`LIFT_HEADROOM_MARGIN_M`), and ``grasps.lift_leaned_piece`` = the split-kept piece the book leans on
-        (within :data:`LEANED_BOARD_MAX_GAP_M` of its start hull). Kit ``shelf_lift.straightened`` / ``.no_headroom``. The facts."""
-        facts: Dict[str, Any] = {}
+        (within :data:`LEANED_BOARD_MAX_GAP_M` of its start hull). Kit ``shelf_lift.straightened`` / ``.no_headroom``. The facts.
+        (d) fix 2026-11-08: the up direction is the book's standing axis (:meth:`shelf_standing_axis`); without one, or on any error here,
+        the lift is today's (no turn, no leaned-board touch; kit ``shelf_lift.fallback_no_axis.<why>`` / ``.fallback_error``) - never raises."""
+        for k in ("lift_turn", "lift_leaned_piece"):  # only this attempt's plan sets them
+            grasp.extras.pop(k, None)
+        axis, afacts = self.shelf_standing_axis()
+        if axis is None:
+            TT._count(self, f"shelf_lift.fallback_no_axis.{afacts.get('why', 'unknown')}")
+            return {"fallback": "no_axis", **afacts}
+        try:
+            return self._shelf_lift_plan(grasp, axis, afacts)
+        except Exception as e:  # noqa: BLE001 - as above: the attempt keeps today's lift
+            log.warning("shelf_lift_plan: %s: %r (today's lift)", getattr(getattr(self, "gp", None), "variant", "?"), e, exc_info=True)
+            grasp.extras.pop("lift_turn", None)
+            grasp.extras.pop("lift_leaned_piece", None)
+            TT._count(self, "shelf_lift.fallback_error")
+            return {"fallback": "error", "error": repr(e)[:200], **afacts}
+
+    def _shelf_lift_plan(self, grasp: GraspRecord, axis: th.Tensor, afacts: Dict[str, Any]) -> Dict[str, Any]:
+        facts: Dict[str, Any] = dict(afacts)
         pieces = self._kept_pieces()
         t0 = (G.t(self.shelf_pose[0]).float(), G.t(self.shelf_pose[1]).float())
         hull_w = self.world.hull_at(self.hull["target"], t0)
@@ -3378,7 +3437,7 @@ class IORSSmall(SamplerV2):
             d = float(geom.sdf(hull_w).min())
             if d <= LEANED_BOARD_MAX_GAP_M and (leaned is None or d < leaned[1]):
                 leaned = (prim, d)
-        up = G.rotate(t0[1], self.up_vector())
+        up = G.rotate(t0[1], axis)
         turn = shortest_arc(up, th.tensor([0.0, 0.0, 1.0]))
         g2 = type("G2", (), {})()
         g2.grasp, g2.carry_height = grasp.grasp, grasp.carry_height
