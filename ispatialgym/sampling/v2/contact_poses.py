@@ -1197,6 +1197,38 @@ def wall_contact_pose(point, normal, direction, face: float, gap: float = 0.0, t
 
 #: the closed fingertips this far above the axial target's top at the floor of the push height (``alignment_axial.PUSH_TIP_CLEARANCE``)
 AXIAL_PUSH_TIP_CLEARANCE_M = 0.003
+#: i7-axialrest (owner 2026-11-08, decision 2): a library / map rest and the axial program's rest are the same rest when their up axes agree
+#: within this (rad) - the upright identity-built maps (tilt ~1e-5) vs a tilted v2 rest (tablespoon tqqwys 0.0866)
+AXIAL_REST_MATCH_RAD = 0.02
+
+
+def axial_settled_rest_on() -> bool:
+    """i7-axialrest (owner 2026-11-08, decision 2: the axial program at the target's settled rest; default OFF): the alignment-axial program
+    places its target at ``R_z(yaw) * q_rest`` (the v2 entry's measured stable rest, with its measured root height) instead of upright at
+    the identity, composes the goal yaw with that rest (``q_goal = R_z(yaw_goal) * q_rest``), reads its geometry at the rest, and the axial
+    contact library is built at the same rest (``contact_library.axial_rest``). ``ISPATIALGYM_AXIAL_SETTLED_REST=1``."""
+    import os
+
+    return os.environ.get("ISPATIALGYM_AXIAL_SETTLED_REST", "0") == "1"
+
+
+def axial_rest_tilt(rest_quat) -> float:
+    """The tilt (rad) of a rest: the angle between its up axis and the world vertical (0 for the identity)."""
+    u = C.quat_rotate(TT._t(rest_quat).float(), th.tensor([0.0, 0.0, 1.0]))
+    return math.acos(max(-1.0, min(1.0, float(u[2]))))
+
+
+def axial_rest_match(rest_a, rest_b, tol: float = AXIAL_REST_MATCH_RAD) -> bool:
+    """Whether two rests stand the same way up (their up axes within ``tol``; a yaw between them does not count)."""
+    ua = C.quat_rotate(TT._t(rest_a).float(), th.tensor([0.0, 0.0, 1.0]))
+    ub = C.quat_rotate(TT._t(rest_b).float(), th.tensor([0.0, 0.0, 1.0]))
+    return math.acos(max(-1.0, min(1.0, float(th.dot(ua, ub))))) <= float(tol)
+
+
+def axial_rest_pose(rest_quat, yaw: float) -> th.Tensor:
+    """``R_z(yaw) * q_rest`` (xyzw); ``rest_quat`` None: ``R_z(yaw)`` (the upright identity rest, as before i7-axialrest)."""
+    q = C.quat_from_yaw(float(yaw))
+    return q if rest_quat is None else C.qmul(q, TT._t(rest_quat).float())
 
 
 def axial_push_height(top_z: float, object_height: float, tip_clearance: float = AXIAL_PUSH_TIP_CLEARANCE_M) -> float:
@@ -1239,10 +1271,13 @@ AXIAL_THIN_TARGET_HEIGHT_M = 0.04
 AXIAL_STOP_FACE_FRACTIONS = (0.08, 0.2, 0.35, 0.5, 0.65, 0.8)
 
 
-def axial_stop_face_points(hull: th.Tensor, goal_pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=AXIAL_STOP_FACE_FRACTIONS) -> List[th.Tensor]:
+def axial_stop_face_points(hull: th.Tensor, goal_pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=AXIAL_STOP_FACE_FRACTIONS,
+                           flush: bool = False) -> List[th.Tensor]:
     """Points of the goal hull's face extreme along ``d_stop`` (projection within 3 mm of the maximum) at the given fractions of the face's
     span from the end nearest ``near`` (the pushed end's arrival) to the far end, at height ``z``; a face shorter than 6 cm yields its midpoint
-    only (``AlignmentAxial._stop_face_points``)."""
+    only (``AlignmentAxial._stop_face_points``). ``flush`` (i7-axialrest, a target at a tilted settled rest): every point moved along ``d_stop``
+    onto the face's outermost projection - a tilted face's top edge stands up to its height x sin(tilt) beyond its bottom corners, and the
+    brace's 5 mm stop clearance is measured from the outermost point."""
     pts = C.transform_points(goal_pose, hull)
     dxy = th.tensor([float(d_stop[0]), float(d_stop[1])])
     dxy = dxy / th.linalg.norm(dxy)
@@ -1252,27 +1287,29 @@ def axial_stop_face_points(hull: th.Tensor, goal_pose, d_stop: th.Tensor, near: 
     dist = th.linalg.norm(face[:, :2] - f, dim=1)
     p_near, p_far = face[int(th.argmin(dist))], face[int(th.argmax(dist))]
     span = float(th.linalg.norm(p_far[:2] - p_near[:2]))
+    pmax = float(proj.max())
+
+    def at(p):
+        xy = p[:2] + dxy * (pmax - float(p[:2] @ dxy)) if flush else p[:2]
+        return th.tensor([float(xy[0]), float(xy[1]), float(z)])
     if span < 0.06:
-        mid = 0.5 * (p_near + p_far)
-        return [th.tensor([float(mid[0]), float(mid[1]), float(z)])]
-    out = []
-    for t in fractions:
-        p = p_near + (p_far - p_near) * t
-        out.append(th.tensor([float(p[0]), float(p[1]), float(z)]))
-    return out
+        return [at(0.5 * (p_near + p_far))]
+    return [at(p_near + (p_far - p_near) * t) for t in fractions]
 
 
-def axial_stop_geometry(hull: th.Tensor, com_local: th.Tensor, pose, end: th.Tensor, com: th.Tensor, spin: float, yaw_goal: float, z_brace: float):
+def axial_stop_geometry(hull: th.Tensor, com_local: th.Tensor, pose, end: th.Tensor, com: th.Tensor, spin: float, yaw_goal: float, z_brace: float,
+                        rest_quat=None):
     """§6.10 stop edge of the pushed ``end`` (``AlignmentAxial._stop_geometry``): the goal pose (the centre of mass fixed, yaw = aligned), the
     direction the end moves in at the goal (``d_stop``) and the stop points on the goal hull's face along it at the brace height
-    (:func:`axial_stop_face_points`, nearest the pushed end first). Returns ``(goal_pose, stop_pts, d_stop)``."""
+    (:func:`axial_stop_face_points`, nearest the pushed end first). Returns ``(goal_pose, stop_pts, d_stop)``. ``rest_quat`` (i7-axialrest,
+    :func:`axial_settled_rest_on`): the goal orientation is ``R_z(yaw_goal) * rest_quat`` (None: ``R_z(yaw_goal)``, the upright identity)."""
     z_axis = th.tensor([0.0, 0.0, 1.0])
-    q_goal = C.quat_from_yaw(yaw_goal)
+    q_goal = C.quat_from_yaw(yaw_goal) if rest_quat is None else axial_rest_pose(rest_quat, yaw_goal)
     goal_pose = (com - C.quat_rotate(q_goal, com_local), q_goal)
     r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
     d_stop = spin * th.cross(z_axis, th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
     d_stop = d_stop / th.linalg.norm(d_stop)
-    stop_pts = axial_stop_face_points(hull, goal_pose, d_stop, near=com + r_goal, z=z_brace)
+    stop_pts = axial_stop_face_points(hull, goal_pose, d_stop, near=com + r_goal, z=z_brace, flush=rest_quat is not None)
     return goal_pose, stop_pts, d_stop
 
 
@@ -1349,12 +1386,12 @@ def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_
 
 def axial_opposite_brace_candidates(manip, hull: th.Tensor, com_local: th.Tensor, pose_init, opp_end: th.Tensor, com: th.Tensor, spin: float,
                                     yaw_goal: float, z_brace: float, d_goal: float, *, z_push: float, face_z: Tuple[float, float], height: float,
-                                    skips: Optional[Dict[str, int]] = None, sweep_check: bool = True):
+                                    skips: Optional[Dict[str, int]] = None, sweep_check: bool = True, rest_quat=None):
     """i7-brace (owner 3.4): the OPPOSITE-END stop brace - the analog of world_vertical's ``above_low``: the pads / blade on the FAR end's face
     the far end arrives at (:func:`axial_stop_geometry` of ``opp_end``, the same spin: its ``d_stop`` points opposite the pushed end's), resisting
     the same turn. The candidates of :func:`axial_brace_candidates` there, kinds prefixed ``opp_``, extras ``opposite_end`` and
     ``brace_direction`` (= -its d_stop: the brace record's direction) and ``opp_d_stop``. Tried after the current candidates."""
-    _goal, stop_pts, d_stop = axial_stop_geometry(hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace)
+    _goal, stop_pts, d_stop = axial_stop_geometry(hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace, rest_quat=rest_quat)
     for pre, contact, kind, extras in axial_brace_candidates(manip, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push, face_z=face_z,
                                                              height=height, skips=skips, sweep_check=sweep_check):
         yield pre, contact, f"opp_{kind}", dict(extras, opposite_end=True, brace_direction=[round(float(v), 6) for v in (-d_stop).tolist()],

@@ -96,6 +96,11 @@ class AlignmentAxial(SamplerV2):
         self.hinge: Optional[Hinge] = None
         self.front_axis = th.tensor([1.0, 0.0, 0.0])
         self.long_axis = th.tensor([0.0, 1.0, 0.0])
+        #: i7-axialrest (owner 2026-11-08, decision 2; ``contact_poses.axial_settled_rest_on``): the target's settled v2 rest (xyzw) and its
+        #: measured root height the program places / turns the target at - None: the upright identity rest (the program before the switch)
+        self.rest_quat: Optional[th.Tensor] = None
+        self.rest_h_root: Optional[float] = None
+        self.rest_info: Dict[str, Any] = {}
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -161,8 +166,15 @@ class AlignmentAxial(SamplerV2):
         self.top = self.support_top(support)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
+        self.rest_quat, self.rest_h_root, self.rest_info = None, None, {}
+        if CPZ.axial_settled_rest_on():
+            # i7-axialrest: the program's geometry at the settled rest - the extents of the hull standing at it (height = its world z extent)
+            self._settled_rest()
+            if self.rest_quat is not None:
+                long_len, short_len, ez = rest_extents(self.hull, self.rest_quat, self.long_axis)
         mc = self.choice.models["target"]
-        self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=None, grasps=None, hull=self.hull, rest_quat=C.IDENTITY_QUAT.clone(),
+        self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=None, grasps=None, hull=self.hull,
+                                     rest_quat=C.IDENTITY_QUAT.clone() if self.rest_quat is None else self.rest_quat.clone(),
                                      scale=list(mc.scale) if mc.scale else None, generic_pinch=True, height=ez)
         w_diag = 0.5 * math.hypot(long_len, short_len)
         margins = {"kind": "axial", "w_diag": w_diag, "safety": 0.02, "H_max": ez}
@@ -249,10 +261,82 @@ class AlignmentAxial(SamplerV2):
     # ------------------------------------------------------------------ geometry
 
     def _aligned_yaw(self, stance: Stance) -> float:
-        """Long axis parallel to the front edge, front toward the robot: the object's front axis maps onto −inward."""
+        """Long axis parallel to the front edge, front toward the robot: the object's front axis maps onto −inward. i7-axialrest: the yaw of
+        ``R_z(yaw) * q_rest`` - the front axis as it stands at the settled rest (its heading about the support normal)."""
         target_dir = -stance.inward
-        f = self.front_axis[:2]
+        f = self.front_axis[:2] if getattr(self, "rest_quat", None) is None else C.quat_rotate(getattr(self, "rest_quat", None), self.front_axis.float())[:2]
         return C.wrap_angle(math.atan2(float(target_dir[1]), float(target_dir[0])) - math.atan2(float(f[1]), float(f[0])))
+
+    # ------------------------------------------------------------------ i7-axialrest: the settled rest
+
+    def _settled_rest(self) -> None:
+        """i7-axialrest (owner 2026-11-08, decision 2): ``self.rest_quat`` / ``self.rest_h_root`` = the target's v2 stable rest as the axial
+        contact library was built at it (the push_blade map's ``object.rest``: the v2 entry's measured quat and root height - the same rest
+        the library's validation settles the object at), else the v2 rest of the target's grasp key (``tabletop.v2_rest_info``); without
+        either the identity rest stays (counter ``axial_rest.no_v2_rest``)."""
+        q = h = None
+        src = None
+        if TT.contact_maps_on():
+            pm = TT.contact_map(self, "push_blade", "target", self.top)
+            r = ((pm.meta.get("object") or {}).get("rest") or {}) if pm is not None else {}
+            if r.get("quat_xyzw") is not None:
+                q, h, src = r["quat_xyzw"], r.get("h_root"), f"push_blade map {os.path.basename(pm.path)}"
+        if q is None:
+            info = TT.v2_rest_info(self, self.hull)
+            if info is not None:
+                q, h, src = info["quat_xyzw"], info.get("h_root"), f"v2 entry {info.get('entry')} rest {info.get('rest_id')}"
+        if q is None:
+            TT._count(self, "axial_rest.no_v2_rest")
+            self.rest_info = {"settled": False, "why": "no v2 rest (no push_blade map, no grasp key entry): the identity rest"}
+            return
+        self.rest_quat = th.tensor([float(v) for v in q], dtype=th.float32)
+        self.rest_h_root = None if h is None else float(h)
+        self.rest_info = {"settled": True, "quat_xyzw": [round(float(v), 7) for v in q], "h_root": self.rest_h_root,
+                          "tilt_rad": round(CPZ.axial_rest_tilt(self.rest_quat), 5), "source": src}
+        log.info("%s: AXIAL_SETTLED_REST %s", self.gp.variant, self.rest_info)
+
+    def _place(self, xy, yaw: float) -> TT.Pose:
+        """The target's pose with its root at ``xy`` turned ``yaw``: upright at the identity (``object_pose_on``, as before the switch), or
+        (i7-axialrest) ``R_z(yaw) * q_rest`` with the root at the support top + the rest's measured root height."""
+        if getattr(self, "rest_quat", None) is None:
+            return TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw, self.top.z)
+        quat = CPZ.axial_rest_pose(self.rest_quat, yaw)
+        if self.rest_h_root is not None:
+            return th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + float(self.rest_h_root)]), quat
+        return th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + self.world.bottom_offset(self.hull, quat) + float(TT.Z_OFFSET)]), quat
+
+    def _heading(self, quat) -> float:
+        """The front axis's heading about the support normal (rad) of the target at ``quat``."""
+        f = C.quat_rotate(TT._t(quat).float(), self.front_axis.float())
+        return math.atan2(float(f[1]), float(f[0]))
+
+    def settled_goal_quat(self, q_now, yaw_goal: float) -> th.Tensor:
+        """i7-axialrest: the goal orientation of the target standing at ``q_now`` - ``q_now`` turned about the support normal until its
+        front axis has the heading of ``R_z(yaw_goal) * q_rest``: the rest's tilt (as it settled) kept, only the turn compared."""
+        rest = self.rest_quat
+        h_goal = self._heading(CPZ.axial_rest_pose(rest, yaw_goal))
+        return C.qmul(C.quat_from_yaw(C.wrap_angle(h_goal - self._heading(q_now))), TT._t(q_now).float())
+
+    def _map_rest_ok(self, cm, kind: str) -> bool:
+        """i7-axialrest: a contact map serves the program only when its entries stand on the program's rest (``entry_rest_quat_xyzw`` vs
+        ``self.rest_quat`` / the identity, up axes within ``contact_poses.AXIAL_REST_MATCH_RAD``): a settled-rest map is not the upright
+        program's, nor the reverse (counter ``axial_rest.map_rest_mismatch.<kind>``, a ``MAP_REQUEST`` line)."""
+        if cm is None:
+            return True
+        rest_map = cm.meta.get("entry_rest_quat_xyzw") or [0.0, 0.0, 0.0, 1.0]
+        rest = getattr(self, "rest_quat", None)
+        mine = rest if rest is not None else C.IDENTITY_QUAT
+        if CPZ.axial_rest_match(rest_map, mine):
+            return True
+        seen = self.__dict__.setdefault("_axial_rest_mismatch", set())
+        if kind not in seen:
+            seen.add(kind)
+            TT._count(self, f"axial_rest.map_rest_mismatch.{kind}")
+            mc = self.choice.models["target"]
+            TT.map_request(self, kind=kind, role="target", object=f"{mc.category}/{mc.model}", h=round(float(self.top.z) - float(getattr(self.world, "floor_z", 0.0)), 4),
+                           support=str(getattr(self.top, "name", "")), rest_quat_xyzw=[round(float(v), 6) for v in mine.tolist()],
+                           map_rest_quat_xyzw=[round(float(v), 6) for v in rest_map], why="the map stands on another rest than the axial program")
+        return False
 
     def _com_world(self, pose: TT.Pose) -> th.Tensor:
         return TT._t(pose[0]) + C.quat_rotate(TT._t(pose[1]), self.com_local)
@@ -335,6 +419,8 @@ class AlignmentAxial(SamplerV2):
         if chosen is None:
             raise Reject("target_placement", f"no (yaw, position) with a long-axis end whose push point lies in the right band at this trunk ({fails})")
         pose, yaw0, delta, com, pairs = chosen
+        if getattr(self, "rest_quat", None) is not None:
+            TT._count(self, "axial_rest.settled_used")  # i7-axialrest: this attempt placed the target at its settled rest
         # target in the world for the checks below
         target.set_position_orientation(*pose)
         target.keep_still()
@@ -553,7 +639,7 @@ class AlignmentAxial(SamplerV2):
             yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
             r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
             xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
-            pose = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw0, self.top.z)
+            pose = self._place(xy, yaw0)  # i7-axialrest: R_z(yaw0) * q_rest under the switch (upright identity otherwise)
             if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
                 continue
@@ -635,7 +721,14 @@ class AlignmentAxial(SamplerV2):
         """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm: REQUIRED, a miss rejects ``missing_map``)
         and ``axial_brace`` map (left arm: OPTIONAL, owner 2026-11-07 item 5 - a miss returns None, the brace step is skipped and the push
         runs by its own rule) at the top (``tabletop.need_contact_map``; both log the ``MAP_REQUEST`` line)."""
-        return TT.need_contact_map(self, "push_blade", "target", self.top), TT.need_contact_map(self, "axial_brace", "target", self.top)
+        pm = TT.need_contact_map(self, "push_blade", "target", self.top)
+        bm = TT.need_contact_map(self, "axial_brace", "target", self.top)
+        # i7-axialrest: a map built at another rest than the program's is a miss (the push: missing_map, the optional brace: skipped)
+        if not AlignmentAxial._map_rest_ok(self, pm, "push_blade"):
+            TT._reject("missing_map", f"the push_blade map of the target stands on another rest than the axial program's ({self.rest_info or 'identity'})")
+        if not AlignmentAxial._map_rest_ok(self, bm, "axial_brace"):
+            bm = None
+        return pm, bm
 
     def map_joint_placement(self, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float, end_sign: Optional[float] = None) -> Dict[str, Any]:
         """The A1 joint placement on the contact maps (``TT.joint_placement``'s dict) for the long-axis END ``end_sign`` (+1: the end along
@@ -703,7 +796,7 @@ class AlignmentAxial(SamplerV2):
         library shares): the goal pose (COM fixed, yaw = aligned), the direction the end moves in at the goal and the points of the goal hull's
         face along it at the brace height - only the part of that face near the pushed end's arrival is free of the object before the goal,
         so the candidates run from that corner toward the far end."""
-        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace)
+        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace, rest_quat=getattr(self, "rest_quat", None))
 
     def _stop_face_points(self, goal_pose: TT.Pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=(0.08, 0.2, 0.35, 0.5, 0.65, 0.8)) -> List[th.Tensor]:
         """``contact_poses.axial_stop_face_points``: the goal hull's stop face points at ``fractions`` of its span from the end nearest ``near``."""
@@ -738,7 +831,8 @@ class AlignmentAxial(SamplerV2):
             TT._count(self, "axial_brace.opposite_tried")
             yield from CPZ.axial_opposite_brace_candidates(manip, self.hull, self.com_local, pose_init, opp_end, com, spin, yaw_goal,
                                                            TT.contact_height(self.top.z, self.extents["height"]), d_goal, z_push=self._push_height(),
-                                                           face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips)
+                                                           face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips,
+                                                           rest_quat=getattr(self, "rest_quat", None))
 
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
@@ -830,6 +924,17 @@ class AlignmentAxial(SamplerV2):
         draft.object_poses[tname] = (p1.clone(), q1.clone())
         yaw_goal = draft.summary["yaw_goal"]
         q_goal = C.quat_from_yaw(yaw_goal)
+        if getattr(self, "rest_quat", None) is not None:
+            # i7-axialrest (owner 2026-11-08, decision 2): q_goal = R_z(yaw_goal) * q_rest, in the frame of the rest as it settled - the settled
+            # orientation turned about the support normal to the aligned heading; the TRO target with it (the full-quaternion check then
+            # measures the turn alone: the hinge keeps the tilt)
+            q_goal = self.settled_goal_quat(q1.float(), yaw_goal)
+            tgt = draft.pose_targets.get(tname)
+            if tgt is not None:
+                tgt["orientation"] = [float(v) for v in q_goal.tolist()]
+            draft.summary["axial_rest"] = dict(self.rest_info, settled_tilt_rad=round(CPZ.axial_rest_tilt(q1.float()), 5),
+                                               goal_tilt_rad=round(CPZ.axial_rest_tilt(q_goal), 5),
+                                               turn_rad=round(C.wrap_angle(self._heading(q_goal) - self._heading(q1.float())), 5))
         com = self._com_world((p1.float(), q1.float()))
         draft.goal_poses[tname] = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
 
@@ -854,6 +959,17 @@ class AlignmentAxial(SamplerV2):
         return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
                  "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
                  "brace": "stop_edge", "hard": False}]
+
+
+def rest_extents(hull: th.Tensor, rest_quat, long_axis: th.Tensor) -> Tuple[float, float, float]:
+    """i7-axialrest: ``(long, short, height)`` of the hull standing at ``rest_quat`` - along the long axis's heading at the rest, across it
+    (both horizontal), and its world z extent."""
+    pts = C.transform_points((th.zeros(3), TT._t(rest_quat).float()), hull.float())
+    lw = C.quat_rotate(TT._t(rest_quat).float(), long_axis.float())[:2]
+    lw = lw / th.linalg.norm(lw)
+    sw = th.tensor([-float(lw[1]), float(lw[0])])
+    a, b = pts[:, :2] @ lw, pts[:, :2] @ sw
+    return float(a.max() - a.min()), float(b.max() - b.min()), float(pts[:, 2].max() - pts[:, 2].min())
 
 
 def axial_brace_turn_cover_on() -> bool:
