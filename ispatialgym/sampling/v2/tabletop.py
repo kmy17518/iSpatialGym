@@ -3196,8 +3196,10 @@ def all_edges_on() -> bool:
     ``generation.init_edges`` (:func:`gen_edges`) - so every edge of the top is offered and the existing checks decide (free floor,
     whole-body collision, Phase 1b / 1c, the family's frame rules, the eval-repeat check). An interior surface's open sides
     (``top.open_edges``) are geometry, not a template pin, and still apply. Kit counters (only when a restriction was ignored):
-    ``start_edges.row_ignored`` / ``start_edges.gen_ignored``. Default off (the owner decides the default after the A/B)."""
-    return os.environ.get("ISPATIALGYM_ALL_EDGES", "0") not in ("", "0")
+    ``start_edges.row_ignored`` / ``start_edges.gen_ignored``. DEFAULT ON since 2026-11-08 (lead decision 12 while the owner was away,
+    tmp/outputs/lead_decisions_while_away.md; the A/B in $OFH/startdraw_20261108: it acts only on block design's init_edges, adding the -v
+    end with no rejection growth): unset = on; ``ISPATIALGYM_ALL_EDGES=0`` restores both restrictions."""
+    return os.environ.get("ISPATIALGYM_ALL_EDGES", "1") != "0"
 
 
 def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[EdgeFrame, Stance]]:
