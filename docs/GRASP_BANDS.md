@@ -2385,6 +2385,56 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+### i7-ft2 (2026-11-08): owner decisions 7.1 (FingerTouch hand hulls) and 7.2 (the bar / countertop plate-in-sink templates)
+
+**7.1, the decision:** apply the two-step to the FingerTouch path. Before this, the geometry rule judged the palm, wrist camera + mount
+and wrist (the hand's rigid links) by their padded spheres only. That is more lenient than the spec's P1 §3, which asks for hulls AND
+spheres.
+
+**7.1, the implementation:** `ISPATIALGYM_FINGER_TOUCH_HAND_HULLS` (6cc62a73; default on since e9efae38; `0` restores the former stage,
+`shadow` only counts). It lives in `IKChecker._finger_touch_geometry_ok`'s non-finger stage, against the touched support's geometry
+(its registered plane, else its convex pieces):
+- A narrow sphere failure is judged by i7-plateqtf2's reusable `contact_policy.hull_fallback`, with the same 0.5 mm threshold (side_9's).
+  Narrow means only hand links touch, each sphere less than the 2 mm buffer deep, and only into the touched support.
+- A sphere pass also needs the hulls clear by `hand_support_margin_m` (`contact_policy.hull_clearance_min`).
+- Counters: `finger_touch.hand_hulls.*` (`fallback_*`, `spec_*`, `verdict_to_pass` / `verdict_to_fail`, `decision_to_*`).
+
+**7.1, the A/B:** `ft2hh_sh` (shadow: today's verdicts plus the count) vs `ft2hh_on`, run on the same indices with a cold cache per job
+and the alias memory off.
+
+| alias (grasps) | written / attempts | demos ok | GPU-h per success (sh / on) | fallback judged -> passed | spec hull rejected |
+|---|---|---|---|---|---|
+| under_small_03 (v2only) | 4 / 22 both | 4 / 4 both | 0.217 / 0.218 | 30 -> 6 (hull 0.53-1.44 mm) | 0 of 327 / 333 |
+| inside_large_03 (legacy A/B arm) | 4 / 9 both | 4 / 4 both | 0.080 / 0.077 | 38 -> 13 / 12 | 0 of 131 / 143 |
+| plate-in-sink lkklqs_0-breakfast_table (legacy) | 4 / 4 both | 4 / 4 both | 0.051 / 0.051 | 4 -> 2 | 0 of 51 |
+
+- The refused narrow candidates were non_hand_link 23, deeper_than_buffer 27-28 and hull_clearance 1.
+- Groups flipped to pass: 6, 1 and 0. None flipped to fail.
+- Attempt outcomes were identical in 33 of 35 attempts. In the other two (inside_large_03 300702), both arms rejected the attempt, for
+  different reasons after the trajectories diverged.
+- touching_03 is still blocked.
+
+**7.2, the sink spec and maps:**
+- `drop_in_sink_awvzkn_0@basin` was measured (`interiors.measure`, house_single_floor) and committed to the code registry (3030ddfd).
+  It is an open-top basin at 0.7316 m: width 0.2466, depth 0.4063, rim 0.16, digest 4571693d44c4.
+- v2only template probes asked for the interior map of that sink and for a plate luhkiz tabletop map at bar_udatjt_0 h 1.0505. The
+  countertop pick reads the existing 0.8874 maps.
+- Built in `$OFH/ft2_20261108`:
+  - the bar maps (right / left), about 600-1900 cells per trunk and d_e;
+  - the interior PLACE maps, with the lkklqs sink's rule (pre approach, drop 0.02, tilts 30 / 45).
+- The first sink build was EMPTY. The plate's level footprint (0.241 m) must lie between the 0.2466 m walls, a 2.8 mm margin. The
+  default laterals put the compartment centre 6.6 mm off every 0.04 lattice row, so every problem was off_support.
+- Rebuilt with the laterals shifted by the spec's centre_y (-0.0866 .. 0.0734; the builder's resolution, not an identity-equal field):
+  36,985 feasible cells over both arms. Staged as `$OFH/v2maps_ft2b` (a copy of v2maps_int1 plus these maps).
+
+**7.2, the templates:** at eval:0, v2only on v2maps_ft2b, both variants now pass setup (stance C at the sink). The first attempt then
+spent its 3000 s budget at "F draw at C (exact IK at B / C)", and the job hit its 4500 s limit with no instance:
+- bar: 70 of 108 B tries failed "support policy on the approach tail (finger_penetration on bar_udatjt_0)";
+- countertop: 65 of 95 on countertop_kelzer_0.
+
+This is the IORS-large pick's missing pre-shape (owner item 6.1, assigned to i7-interior2), the same symptom as i7_sink2 on lkklqs. No
+template exists yet. Rerun once 6.1 lands: `$OFH/ft2_20261108/chain72b.sh`'s template step on v2maps_ft2b.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
