@@ -695,7 +695,7 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
 #: (CARRY_POSES, the hand 0.35-0.45 m to the arm's side) hold a long object held across the heading (the umbrella, 0.82 m, released along
 #: the hall tree's board) out to ~0.85 m on that side: gm_t02_umb2 / umb2s + PATH_BLAME, every carry with the hand >= 0.3 m to the side
 #: failed its B -> C path (~800 of 800; the umbrella or the gripper against standing_mirror_wwkuuf_0 / the walls), the hand within 0.1 m of
-#: the centre line passed 8 of 11. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
+#: the centre line passed 8 of 15. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
 #: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
 #: / carry_pose.centred_used.
 CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"

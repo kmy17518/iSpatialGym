@@ -2621,6 +2621,31 @@ C's (umb2) and 432 / 474 (umb2s), against 521 / 3392 in gm_t02_on. 0 written so 
 are the carried umbrella against standing_mirror_wwkuuf_0 (removing the mirror alone frees them), 7 walls_oqrbxo_0, 5 walls_owxeej_0, around
 (-0.87, 1.15..1.26) beside the hall tree - the next blocker, outside 5q.2.
 
+**Lead decisions (owner away), 2026-11-08.** (1) L2v's per-entry `slab_half_m` 0.05 is accepted provisionally for umbrella__ziqzqo__s1 only;
+umb2 stays the primary root unless umb2s does as well. (2) The carry past the mirror is this branch's.
+
+**The carry past standing_mirror_wwkuuf_0 (diagnosis).** Per C the planner tries lifts 0.12 / 0.25 m (0.25: no IK from B in ~100 tries),
+per lift the CARRY_POSES that pass B's camera frame and IK (the hand 0.30-0.50 m to the holding arm's side), then the lift configuration;
+per option the travel trunks (0.5, 0) and (2.0, 0) with the local then the eroded global path, then the drive at B's trunk. PATH_BLAME
+(34 blamed): the global path just north of B, base at (-0.82..-0.94, 1.10..1.26) heading 1.0-1.2 rad and (-0.67..-0.70, 1.50..1.54);
+the mirror 25 (the umbrella 11, the holding gripper 13, 1 right), walls_oqrbxo_0 8 (the umbrella), walls_owxeej_0 2 (init -> B leg). The
+release needs the shaft along the board, i.e. ACROSS the robot's heading at C, and the carried yaw is fixed relative to the base: the 0.82
+m umbrella is carried across the heading, and with the hand 0.3-0.5 m to the left it reaches ~0.85 m left of the base.
+
+| hand lateral at the carry pose (umb2 + umb2s + pathblame) | carries ok | failed |
+|---|---|---|
+| >= 0.3 m (CARRY_POSES beside the body) | 0 | ~730 (path_collision) |
+| 0.2 m | 0 | 6 |
+| lift configuration | 10 | 126 |
+| within 0.1 m of the centre line | 8 | 7 |
+
+**The fix (6ac7931a, `ISPATIALGYM_CARRY_CENTRED`, default off; sampler-side, no oracle or gate change).** `carry_poses_at_b` first tries
+`CARRY_CENTRED_POSES` (0.45-0.55 m ahead, raise 0.05-0.20 m) with the hand's lateral chosen so that the carried object's hull centre lies
+on the base's centre line (`centred_hand_lateral`); the existing checks judge them (B's camera frame, exact IK attached, the in-hand line,
+the carried path). Kit counters `carry_pose.centred_offered` / `centred_used`; test_carry_centred.py. A/B on touching_large_02 N 4 v2only,
+root v2maps_goalmaps_umb2, trunk_6ac7931a, svl titanrtx: gm_t02_cc_on (18384743) / gm_t02_cc_off (18384745); final numbers appended to
+DECISIONS by `umbrella_r2/final_cc.sh`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
