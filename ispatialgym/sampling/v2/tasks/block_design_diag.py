@@ -45,7 +45,8 @@ def candidates(s, order: List[int], scores: Optional[dict] = None) -> None:
     for rank, k in enumerate(order):
         c = s.manip_candidates[k]
         fi = c.extras.get("focus_info", {}) or {}
-        cells = fi.get("cells", []) or []
+        cells = fi.get("cells")
+        cells = [] if cells is None else list(cells)
         cb = " ".join(f"({float(c.world_to_base(xy)[0]):.2f}|{float(c.world_to_base(xy)[1]):+.2f})" for xy in cells)
         log.info("BD_DIAG cand rank %d k %d %s focus depth %.2f score %s cells %d flip %d: %s", rank, k, _st(c), float(fi.get("depth", float("nan"))),
                  f"{scores[k]:.3f}" if scores and k in scores else "-", len(cells), s._n_flip_cells(c, init), cb)
