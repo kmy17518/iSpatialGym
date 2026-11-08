@@ -2411,6 +2411,75 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
 
+## Goal-surface reach maps for the IORS large predicates (branch i7-goalmaps, 2026-11-08)
+
+**Owner decision** (2026-11-08, verbatim prompt `tmp/outputs/prompt_goalmaps_axialrest_overpath.md` section 1; `$OFH/DECISIONS.md`
+"OWNER DECISIONS (verbatim prompt ...)"): change the height-anchor rule so the reach maps cover every goal surface an IORS large predicate
+needs - the partner (goal-surface) rows become surfaces of their target model with the same measurement rules (inventory top, floor datum,
+canonical key, 10 mm window); the existing anchors and keys stay; only new anchors; build the missing goal maps, stage them in a COPY of
+`$OFH/v2maps_int1`, validate N 4 v2only. No height union (a map at one height serving another).
+
+### Audit (before the code change)
+
+**What the goal side reads, per predicate** (the sampler, `--grasps v2only`; `iors_large*.py`):
+
+| predicate (large) | goal side | map kind it reads | surface (height) | role row |
+|---|---|---|---|---|
+| ontop | carry + place on the partner's top (stance C, `IORSLarge._placement_candidates_at`: `band("tabletop", partner)` -> `v2_band` -> `tabletop.map_bands` at `band_top(partner)` = the live place top) | **tabletop** (anchor height) | the partner's top, live `top.z - world.floor_z` (1e-4) | `partner` rows (candidates.csv ontop_large_scale; representatives.csv ontop_large_scale#NN) |
+| inside | carry + place into the partner's compartment (`InsideMode.inside_band` -> `tabletop.interior_map_bands`; PLACE rule `inside_place_rule`, or a lean goal rest) | **interior** (registry spec, no anchor axis) | the registry spec's board / basin (`assets/interiors/interiors.json`, measured 1e-4) | `partner` rows (representatives.csv inside_large_scale#NN) |
+| touching, `touching_place` "surface" | as inside, on the partner's board (`SurfaceTouchingMode` = InsideMode) | **interior** | the spec at the variant's `inside_surface_z_m` | `partner` rows (representatives.csv touching_large_scale#NN) |
+| touching (floor push, default) | drop on the floor + floor push to the face (`TouchingMode`, push-under machinery: exact IK from C) | none (exact) | the floor | - |
+| under (push-under, `under_mode` "push") | drop beside the partner + floor push under it (`push_under_candidates`: exact IK from C; no `band()` call) | none (exact) | the floor under the partner | - |
+| nextto | the base pushes the target (no grasp) | none (exact) | the floor | - |
+
+The init side (stances A / B) reads the init support's tabletop map or the floor map (h 0) - not part of this decision.
+
+**Per alias** (the 15 IORS large aliases; MAP_REQUEST lines over `$OFH/out/*/inter_object_relation_satisfaction-*large*/*/sample.log`
++ the dry pass below; "int1" = `$OFH/v2maps_int1`):
+
+| alias | goal kind | goal surface (height) | role row | int1 today |
+|---|---|---|---|---|
+| ontop_large_01 | tabletop | house_single_floor/countertop_fjkase_0 top, live 0.9158 (inventory top.z 0.9157) | candidates.csv:2719 partner; representatives ontop#01 partner representative | **MISSING** (soap_dispenser__zwudcz__s1 has floor maps only; anchors 0.8874 [0.8801, 0.8974] / 0.9275 [0.9175, 0.93055]; MAP_REQUEST tabletop h 0.9158 in i7_floor, i7_floorfix, int1_1) |
+| ontop_large_02 | tabletop | house_double_floor_upper/desk_iotfzl_0 top 0.7351 | candidates.csv:2735 / 2765; reps ontop#02 representative | covered (mouse__pljjtu__s1 h0.7351 r / l) |
+| ontop_large_03 | tabletop | hotel_suite_large/bed_kddswt_0 top, live 0.5145 (inventory 0.5083) | candidates.csv:2742 / 2770; reps ontop#03 representative | covered (pillow__mltefs__s1__tabletop_level_pinch h0.5145 r / l; the anchor came from the init bed kddswt_1) |
+| inside_large_01 | interior (lean goal rest) | bookcase_jaysra_0@0.9472 | reps inside#01 representative | covered (hand-built lean maps, both arms) |
+| inside_large_02 | interior (PLACE) | fridge_petcxr_0@0.7064/j_left_door2.3 | reps inside#02 representative | covered (hand-built, `interior_place.py`) |
+| inside_large_03 | interior (PLACE) | drop_in_sink_lkklqs_0@basin 0.7751 | reps inside#03 heldout | covered (hand-built) |
+| inside_large_03 sinkcounter / sinkbar (template variants) | interior + tabletop | drop_in_sink_awvzkn_0@basin 0.7316; bar_udatjt_0 top 1.0505 (plate luhkiz) | reps inside#03 representative / support | in progress (i7-ft2) |
+| touching_large_02 | interior (PLACE, `touching_place` surface) | house_double_floor_lower/hall_tree_upkvgr_0 board 0.5809 (customs `inside_surface_z_m` 0.58: collision hull c13 top 0.581) | reps touching#02 heldout | **MISSING** - no interior spec (MAP_REQUEST interior h 0.5809 "no interior spec ... in assets/interiors/interiors.json", i7diag_floor) |
+| touching_large_01 / 03 | none (floor push) | floor | - | n/a |
+| under_large_01 / 02 / 03 | none (push-under) | floor under bed_rrcvaq_0 / desk_mdhelw_0 / desk_mdhelw_1 | - | n/a |
+| nextto_large_01 / 02 / 03 | none (base push) | floor | - | n/a |
+
+**Facts from the forked session, checked:**
+
+- `height_anchors.py:105` reads only `role == "support"` rows, `model_surfaces` (:240) the surfaces of the target's subtasks - correct.
+- "Its height never became an anchor for the target" - not for the reason given. In `candidates.csv` ontop_large_scale lists 149 support
+  rows, countertop_fjkase_0 among them, so the rule already puts that top among soap_dispenser zwudcz's surfaces - but at **0.4180**, not
+  0.9157: the floor datum takes countertop_kelzer_0's `under_clearance.floor_z` 0.4977 (the cabinet top under the counter, not a floor)
+  as a floor level of house_single_floor, and every support top there whose AABB bottom lies above 0.4777 (15 tops: the 5 countertops and
+  10 shelves) is measured from it (`$GBH/anchors.json` has 0.4180 / 0.4298 / 0.3898 for the countertops). Changing the datum changes those 15 existing
+  surface heights (owner question, not done).
+- The campaign's anchors are not the rule's output: `v2maps_int1/anchors.json` holds 22 `measured_live` anchors (the sampler's live
+  `top.z - world.floor_z`: `jobs/v2build/build_anchors.py`, `anchors_i7.py`, then one anchor per MAP_REQUEST via `build_int1.py anchor` /
+  `stage_plate.py`). They list the INIT supports of the aliases (and the hand-added goal heights 0.7671, 0.8874); the goal tops were
+  never listed - the actual blind spot for ontop_large_01.
+- `representatives.csv` (the per-alias table) names the instance in `name`, the model id in `model`: the rule reads `model` as the
+  instance, so all 270 of its support rows are "missing inventory" and its partner rows were never readable.
+- The 10 mm window: 0.9158 is 11.7 mm below 0.9275 and outside its range [0.9175, 0.93055] - uncovered by design (correct).
+- The expanding map (map_tilt) fills tilts / yaws inside a map at one height only - correct (`reach_maps` / `map_tilt` have no height axis).
+
+**Dry pass over the role tables** (every ontop_large_scale partner row of both tables, inventory `top.z` with a floor 0, looked up in the
+int1 anchors): 35 partner surfaces; covered exactly / approx: the beds rrcvaq / gxfipj / ivdnny / kddswt, desks bhkhxo / iotfzl / mdhelw /
+xhjsub / aduafr / pfsjbc, countertops ikwqer / sjxber / kelker / kelzer / zkhelh; uncovered: countertop_fjkase_0 0.9157 (ontop_large_01),
+and the heldout / candidate-only partners of no alias (desk_nbpuns 0.5494, desk_uqcmzf 0.7168, the sofas 0.3991-0.7079, beds klcjcy /
+siuxgz / tjfzsb 0.448-0.473, bed_zrumze 0.6156, countertop_tpuwys 1.0792 (Rs_int) / 1.3830). Interior goals have no inventory: their
+heights come from the registry (the hall tree has none).
+
+**Missing goal maps of the aliases:** (1) ontop_large_01 - soap_dispenser__zwudcz__s1, countertop_fjkase_0 top, h 0.9158, tabletop, r + l;
+(2) touching_large_02 - umbrella__ziqzqo__s1, hall_tree_upkvgr_0 board, h 0.5809, interior PLACE (rule drop 0.005, pre approach) - needs
+an interior spec first (no inventory / registry measurement). In progress elsewhere: inside_large_03's awvzkn / bar variants (i7-ft2).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
