@@ -115,6 +115,9 @@ def _bind(s, *names):
 
 
 def _r7_sampler(monkeypatch, clear_ok=True, end_ok=True, backoff="0"):
+    for env in (IS.SHELF_RELEASE_TRACKED_ENV, PM.PAIR_MESH_ENV):  # r8: the shelf tip family's defaults pinned off unless the test set them
+        if not os.environ.get(env):
+            monkeypatch.setenv(env, "0")
     s, st, place, calls = _clear_sampler(monkeypatch, clear_ok=clear_ok, end_ok=end_ok, switch=backoff)
     _bind(s, "release_tracked", "pair_mesh_why")
     tracked = []
@@ -134,6 +137,8 @@ def test_round7_switches_off_are_today(monkeypatch):
     for env in (PM.PAIR_MESH_ENV, IS.SHELF_RELEASE_TRACKED_ENV, IS.SHELF_PREGRASP_FRAME_ENV, IK.TRACKED_END_BLAME_ENV):
         monkeypatch.delenv(env, raising=False)
     assert not (PM.pair_mesh_on() or IS.shelf_release_tracked_on() or IS.shelf_pregrasp_frame_on() or IK.tracked_end_blame_on())
+    for env in (PM.PAIR_MESH_ENV, IS.SHELF_RELEASE_TRACKED_ENV):  # explicit "0": the shelf tip family's defaults (r8) do not apply
+        monkeypatch.setenv(env, "0")
     s, st, place, calls, tracked = _r7_sampler(monkeypatch)
     monkeypatch.setattr(PM, "pair_touch_why", lambda *a, **k: pytest.fail("pair mesh judged with the switch off"))
     assert s.release_clear_why(st, place, "left", q_place=th.zeros(28)) == (None, None)
