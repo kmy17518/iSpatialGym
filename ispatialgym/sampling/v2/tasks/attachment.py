@@ -351,6 +351,11 @@ class HoldingTransition(Transition):
 
 @register(SUBTASK)
 class Attachment(SamplerV2):
+    #: i7-cork: class defaults of the route state (instances made without __init__, the tests' stubs, keep the current route)
+    attach_route: Optional[str] = None
+    hold_key: Optional[str] = None
+    hold_grasps: Sequence[Any] = ()
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
