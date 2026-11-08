@@ -4758,8 +4758,8 @@ class IORSSmall(SamplerV2):
     def place_depth_cap_applies(self) -> bool:
         """:func:`place_depth_cap_mode` is not off and the attempt's place is followed by a mapped push: touching, not the shelf layout (its
         place is the board compartment, not a drawn depth), the push stance on, the contact maps read (v2only + a maps root)."""
-        return (place_depth_cap_mode() != "off" and self.relation == "touching" and self.shelf_start is None and self.shelf_pose is None
-                and bool(self.gen("push_stance", True)) and TT.contact_maps_on())
+        return (place_depth_cap_mode() != "off" and TT.contact_maps_on() and getattr(self, "relation", None) == "touching"
+                and getattr(self, "shelf_start", None) is None and getattr(self, "shelf_pose", None) is None and bool(self.gen("push_stance", True)))
 
     def push_reach_x(self, pm, translate: float, tilt: float) -> Dict[float, Optional[float]]:
         """Per edge distance of the ``touch_push`` map ``pm`` at the trunk nearest (``translate``, ``tilt``) (``ContactMap.nearest_trunk``, as

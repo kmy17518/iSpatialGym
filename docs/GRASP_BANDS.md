@@ -2412,6 +2412,18 @@ the candidate draw in `sample_instance`): on - candidates whose focus depth exce
 removals' outcomes counted per candidate / attempt. Affected aliases: touching_01, touching_02, touching_04 (iors_small touching, mapped
 push after the place). Not affected: touching_03 (shelf layout: no drawn depth), touching_large_01-03 and the under_large push-under (floor
 pushes: no floor_push map), axial (no place: the start placement is already map-driven), close / open push (no place).
+A/B (trunk_5aeb9da4, v2only N 4, indices 320100-320103, memory off; record `$OFH/contact3_20261108`): shadow (= off sampling) - the cap
+would remove 196 / 508 candidate draws on touching_02 and 214 / 369 on touching_04; of the would-be removals tried, every one that
+reached a push test was unreachable (touching_02 85 / 85: 83 A1 partner-draw contact_unreachable + 2 drafted, both contact_unreachable in
+goal_check; touching_04 58 / 58), the rest died earlier (grasp_unreachable 60 / 77, 4 other), none was written. On: removed 108 / 297 and
+188 / 315 (all_removed attempts 30 / 27, rejected in ~1 s). Results shadow -> on: touching_02 118 att / 2 wr / 2 ok, 0.40 GPU-h per success
+-> 78 / 3 / 3, 0.18; touching_04 61 / 4 / 2, 0.66 -> 53 / 4 / 2, 0.56; total 0.53 -> 0.33. DEFAULT ON (the owner decided the rule) in a
+separate commit; "0" restores the draw of before. (The attempt-level shadow counters are counted after the attempt's kit line; the drafted
+attempts' outcomes were read from the rejection lines.)
+block_design_01 base (trunk_fcddc495) vs pack removed (trunk_5aeb9da4), v2only N 4 at 320100-320103: identical - 60 / 60 attempts, the same
+rejection sequence, 0 written in both: every attempt target_placement / board_placement ("off the top" at board positions (0.46, -0.02),
+(0.44, -0.10), (0.48, 0.04); "no pitched place reaches the pockets' release aims" at (0.52, -0.06), (0.60, 0.05)) - a pre-existing blocker
+of block_design_01 under v2only on the integration trunk, unrelated to the pack removal.
 
 **3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
 _pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
