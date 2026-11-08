@@ -67,6 +67,8 @@ TRIAL_SCHEMA = "isg-contact-trial/1"
 #: i7-contactfu 2026-11-08 (owner A2): the touching push's partner stand-in is KINEMATIC - OmniGibson honours ``kinematic_only`` only with a
 #: fixed base (``KitContactWorld._stop_obj``)
 STOP_STANDIN_KINEMATIC = {"fixed_base": True, "kinematic_only": True}
+#: i7-brace 2026-11-08 (owner 3.3): the brace load's pusher is built the same way (it was ``kinematic_only`` without a fixed base: dynamic)
+PUSHER_KINEMATIC = STOP_STANDIN_KINEMATIC
 
 
 #: the base placement of a trial per family (owner 2026-11-07, the second cluster run: "reproduce the stance the SAMPLER uses"): the CONTACT
@@ -115,6 +117,9 @@ class ContactValidateConfig:
     #: Without ``skip_validated`` the run is FRESH: an entry it does not run loses an earlier verdict (kept as ``validation_prev``), so a map
     #: built from the library reads only this run's verdicts
     per_group_valid: int = 0
+    #: i7-brace 2026-11-08 (owner 3.3): RE-validate exactly the entries an earlier run validated (verdict valid / invalid / unreachable; the
+    #: earlier record kept as ``validation_prev``), no cap - the per-entry verdict changes of a validator fix; other entries untouched
+    revalidate: bool = False
     per_group_min: int = 2
     per_group_max: int = 8
     #: the object in the base frame (ahead of the slab edge, to the arm's side): the right arm's; the left arm's lateral is mirrored
@@ -735,6 +740,16 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
                     e["validation_prev"] = e.pop("validation")
                     tim["n_cleared"] = tim.get("n_cleared", 0) + 1
         lib_k["validation_groups"] = quota.summary(cfg.per_group_min)
+    elif cfg.revalidate:
+        for e in entry_order(lib_k["entries"]):
+            prev = e.get("validation") or {}
+            if prev.get("verdict") not in ("valid", "invalid", "unreachable"):
+                continue
+            e["validation_prev"] = e.pop("validation")
+            run_entry(e, screen_of(e))
+            tim["n_revalidated"] = tim.get("n_revalidated", 0) + 1
+            if e["validation"]["verdict"] != prev.get("verdict"):
+                tim["n_changed"] = tim.get("n_changed", 0) + 1
     else:
         for e in entry_order(lib_k["entries"]):
             screen = screen_of(e)
@@ -1246,13 +1261,15 @@ class KitContactWorld:
             self._pusher.set_position_orientation(self.tw.th.tensor([5.0, 5.0, -1.0]), self.tw.th.tensor([0.0, 0.0, 0.0, 1.0]))
 
     def _pusher_obj(self):
-        """The brace load's pusher: a kinematic box (``kinematic_only``: set_position drives it into the partner, PhysX pushes it out), parked
-        below the floor 5 m away between loads."""
+        """The brace load's pusher: a kinematic box (set_position drives it into the partner, PhysX pushes the partner out), parked below the
+        floor 5 m away between loads. i7-brace 2026-11-08 (owner 3.3): built with ``PUSHER_KINEMATIC`` (fixed_base + kinematic_only) -
+        OmniGibson honours ``kinematic_only`` only with a fixed base, so until now the pusher was a DYNAMIC box (as the touching stand-in
+        was, 021aa89c): gravity and the partner's contact moved it during the load."""
         if self._pusher is None:
             from omnigibson.objects.primitive_object import PrimitiveObject
 
             sx, sy, sz = self.cfg.brace_pusher_size_m
-            self._pusher = PrimitiveObject(name="isg_brace_pusher", primitive_type="Cube", size=1.0, kinematic_only=True, rgba=(0.2, 0.6, 0.9, 1.0),
+            self._pusher = PrimitiveObject(name="isg_brace_pusher", primitive_type="Cube", size=1.0, **PUSHER_KINEMATIC, rgba=(0.2, 0.6, 0.9, 1.0),
                                            scale=self.tw.th.tensor([sy, sx, sz]))
             self.tw.scene.add_object(self._pusher)
             self._park_pusher()
@@ -1434,7 +1451,8 @@ def validate_cli(a) -> None:
 
     cfg = ContactValidateConfig(diagnose_screened=bool(getattr(a, "diagnose_screened", False)), skip_validated=bool(getattr(a, "skip_validated", False)),
                                  screen_as_rank=bool(getattr(a, "screen_as_rank", False)), per_group_valid=int(getattr(a, "per_group_valid", 0) or 0),
-                                 per_group_min=int(getattr(a, "per_group_min", 2) or 2), per_group_max=int(getattr(a, "per_group_max", 8) or 8))
+                                 per_group_min=int(getattr(a, "per_group_min", 2) or 2), per_group_max=int(getattr(a, "per_group_max", 8) or 8),
+                                 revalidate=bool(getattr(a, "revalidate", False)))
     arm = a.arm or (cfg.work_arm if a.kind == "push" else cfg.brace_arm)
     base = os.path.join(a.root, a.kind, "models")
     if getattr(a, "jobs", None):
@@ -1548,6 +1566,8 @@ def main(argv=None):
     ap.add_argument("--skip-validated", action="store_true", help="keep the entries an earlier run validated (not re-run, not counted against max_entries)")
     ap.add_argument("--per-group-valid", type=int, default=0, help="owner A6: STRATIFIED - validate per (yaw x end x spin) group until this many "
                     "are valid (0: off, the max_entries cap); without --skip-validated the run is fresh (unreached entries lose old verdicts)")
+    ap.add_argument("--revalidate", action="store_true", help="owner 3.3: re-run exactly the entries an earlier run validated (old record -> "
+                    "validation_prev), uncapped: the per-entry verdict changes of a validator fix")
     ap.add_argument("--per-group-min", type=int, default=2, help="a group with fewer valid entries is reported short")
     ap.add_argument("--per-group-max", type=int, default=8, help="at most this many entries tried per group (kept verdicts count)")
     ap.add_argument("--jobs", default=None, help="the build manifest: validate the shard's job ids (the build's partition)")
