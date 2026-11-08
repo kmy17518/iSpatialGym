@@ -169,6 +169,8 @@ print("torch", torch.__version__, "cuda", torch.cuda.device_count(), torch.cuda.
 x = torch.randn(1024, 1024, device="cuda"); print("matmul", float((x @ x).sum()) == float((x @ x).sum()))
 EOF
 python /work/selftest.py > $LOG/selftest.log 2>&1 || { cat $LOG/selftest.log; self_destroy "env self-test failed"; }
+for t in rsync taskset timeout git python3 awk find xargs hostname md5sum; do command -v $t > /dev/null || self_destroy "missing tool $t"; done
+rsync --version | head -1 >> $LOG/selftest.log
 cat $LOG/selftest.log
 log "self-test ok"
 kill $HB_PID $WD_PID 2>/dev/null

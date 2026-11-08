@@ -279,7 +279,8 @@ def stage(s3, rec, state):
         raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
     code = os.path.abspath(env["ISGE_CODE"])
     b1k = os.path.dirname(os.path.realpath(os.path.join(code, "Behavior-1K", "OmniGibson")))
-    code_keys = [ensure_code(s3, code, state)]
+    # tools the job scripts call that the image lacks (rsync: kit_appdata.sh, job_fast.sh's collector app-data copies and prebuild dir)
+    code_keys = ["bundle/tools/rsync.tar.zst", ensure_code(s3, code, state)]
     if not under(b1k, [code]):
         code_keys.append(ensure_code(s3, b1k, state))
     shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)

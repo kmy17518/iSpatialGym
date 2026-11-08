@@ -16,6 +16,7 @@ B=$VJ/bundle
   echo "$REPLAY_S3/bundle/assets/robot.tar.zst /work/data"
   echo "$REPLAY_S3/bundle/assets/task_instances.tar.zst /work/data"
   echo "$JOB_S3/bundle/stores.tar.zst /"
+  echo "$JOB_S3/bundle/tools/rsync.tar.zst /"   # rsync 3.2.7 (Ubuntu 24.04 debs, files only): the image has none
 } > $B/boot_list.txt
 $S5 ls "$JOB_S3/bundle/cache/*_base_*" 2>/dev/null | awk -v p="$JOB_S3/bundle/cache/" '{print p $NF, "/"}' > $B/boot_list1b.txt || true
 {
