@@ -94,3 +94,75 @@ def test_min_turn_yaw_of_a_lying_male_is_its_tilt():
         worst = max(C.quat_angle(ql, C.qmul(C.quat_from_yaw(y), qp)) for y in np.linspace(-math.pi, math.pi, 721))
         assert math.degrees(worst) > 170.0
     assert AT.carry_turn_bucket(95.0) == "lt100" and AT.carry_turn_bucket(120.0) == "lt140" and AT.carry_turn_bucket(150.0) == "ge140"
+
+
+def test_fallback_switch(monkeypatch):
+    for env in list(AT.ATTACH_ROUTE_SWITCHES.values()) + [AT.ATTACH_FALLBACK_SWITCH]:
+        monkeypatch.delenv(env, raising=False)
+    assert not AT.attach_fallback_on()
+    monkeypatch.setenv(AT.ATTACH_FALLBACK_SWITCH, "1")
+    assert AT.attach_fallback_on()
+    monkeypatch.setenv("ISG_ATTACH_LYING90", "1")
+    with pytest.raises(ValueError):
+        AT.attach_fallback_on()
+
+
+def _fb_stub(outcomes, routes=(None, "lying90", "handover")):
+    """``outcomes``: route -> an exception to raise or a Draft to return from the route's draw."""
+    s = _stub(None)
+    s._route_states = {r: {} for r in routes}
+    s.attach_route = None
+    switched = []
+
+    def switch(route, rng):
+        switched.append(route)
+        s.attach_route = route
+
+    def draw(rng):
+        out = outcomes[s.attach_route]
+        if isinstance(out, Exception):
+            s._early_rest_last = {"tilt_deg": 9.0} if isinstance(out, AT.EarlyRestUnstable) else None
+            raise out
+        return out
+
+    s._switch_route = switch
+    s._sample_instance_route = draw
+    return s, switched
+
+
+def test_fallback_after_the_current_rest_fails():
+    d = Draft()
+    s, switched = _fb_stub({None: AT.EarlyRestUnstable("rest_unstable", "early"), "lying90": d})
+    assert s.sample_instance(None) is d and switched == ["lying90"]
+    assert d.summary["attach_fallback"]["route"] == "lying90"
+    assert d.summary["attach_fallback"]["tried"] == [{"route": "current", "reject": "rest_unstable", "early_rest": True, "tilt_deg": 9.0}]
+    assert s.counters == {"attach_fallback.current.rest_unstable": 1, "attach_fallback.used.lying90": 1}
+
+
+def test_fallback_chain_to_handover_and_exhausted():
+    d = Draft()
+    s, switched = _fb_stub({None: AT.EarlyRestUnstable("rest_unstable", "early"), "lying90": AT.Reject("target_placement", "carry"), "handover": d})
+    assert s.sample_instance(None) is d and switched == ["lying90", "handover"]
+    assert s.counters["attach_fallback.lying90.rejected.target_placement"] == 1 and s.counters["attach_fallback.used.handover"] == 1
+    s, _ = _fb_stub({None: AT.EarlyRestUnstable("rest_unstable", "a"), "lying90": AT.EarlyRestUnstable("rest_unstable", "b"),
+                     "handover": AT.EarlyRestUnstable("rest_unstable", "c")})
+    with pytest.raises(AT.EarlyRestUnstable):
+        s.sample_instance(None)
+    assert s.counters["attach_fallback.exhausted"] == 1 and s.counters["attach_fallback.handover.rest_unstable"] == 1
+
+
+def test_fallback_keeps_the_current_routes_other_rejections():
+    s, switched = _fb_stub({None: AT.Reject("partner_placement", "x"), "lying90": Draft()})
+    with pytest.raises(AT.Reject) as e:
+        s.sample_instance(None)
+    assert e.value.reason == "partner_placement" and switched == [] and s.counters == {}
+    d = Draft()
+    s, switched = _fb_stub({None: AT.EarlyRestUnstable("rest_unstable", "early"), "handover": d}, routes=(None, "handover"))
+    assert s.sample_instance(None) is d and switched == ["handover"]
+
+
+def test_no_fallback_states_is_the_route_draw():
+    s = _stub(None)
+    d = Draft()
+    s._sample_instance_route = lambda rng: d
+    assert s.sample_instance(None) is d and "attach_fallback" not in d.summary

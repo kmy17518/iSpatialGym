@@ -199,6 +199,30 @@ def _env_on(env: str) -> bool:
     return os.environ.get(env, "").strip().lower() in ("1", "on", "true", "yes")
 
 
+#: i7-cork 2026-11-08 (owner decision 5n.1): per-attempt FALLBACK routes behind ``ISG_ATTACH_FALLBACK=1`` (default off). The current route
+#: (the template's library rest, no route switch) stays primary. When the current route's drawn rest fails the nudge test - the early test
+#: (:meth:`Attachment._early_rest`), run on every drawn rest as the route decision whatever ``ISG_ATTACH_EARLY_REST`` says - the SAME
+#: attempt goes on with ``lying90``, and when that route's draw is rejected too (its rest, or any rejection of its sampling stage) with
+#: ``handover`` (:data:`ATTACH_FALLBACK_ORDER`); each route gets the attempt budget afresh. The current route's other rejections end the
+#: attempt as before, and so does any rejection after the sampling stage (the late rest test included). Each route's template state
+#: (grasps, rest, bands / maps, init and manipulation stances) is built once by ``sample_template``; a route whose v2 entries are missing or
+#: whose template fails is left out (``template_facts.attach_fallback``). Kit / counters ``attach_fallback.used.<route>``,
+#: ``attach_fallback.<route>.rest_unstable``, ``attach_fallback.<route>.rejected.<reason>``, ``attach_fallback.exhausted``;
+#: ``draft.summary.attach_fallback`` (the route used, the routes tried). Exclusive with the single-route switches.
+ATTACH_FALLBACK_SWITCH = "ISG_ATTACH_FALLBACK"
+ATTACH_FALLBACK_ORDER = ("lying90", "handover")
+#: the sampler state a route's template sets (``Attachment._capture_route_state``; plus the male's rest / height entries)
+ROUTE_STATE_KEYS = ("attach_route", "hold_grasps", "hold_key", "grasps", "grasp_key", "band_spec", "bands", "attach_bands", "left_bands", "edge_frame",
+                    "init_stance", "manip_candidates")
+
+
+def attach_fallback_on() -> bool:
+    on = _env_on(ATTACH_FALLBACK_SWITCH)
+    if on and attach_route_requested() is not None:
+        raise ValueError(f"{ATTACH_FALLBACK_SWITCH} is exclusive with {sorted(ATTACH_ROUTE_SWITCHES.values())}")
+    return on
+
+
 #: i7-cork 2026-11-08 (owner decision 5n.3, the lying route's carry check): the carry turns the male from its lifted grasp to the pre-attach;
 #: the goal's turn about the (vertical) insertion axis follows the PARTNER'S yaw, which the partner placement draws uniformly, so the
 #: recorded lying turns were 125-179 deg (8 instances, i7cork_ly / _r2) where the route's own turn is the 90 deg tilt, and the tracked SLERP
@@ -421,6 +445,11 @@ class Attachment(SamplerV2):
     hold_grasps: Sequence[Any] = ()
     #: i7-cork 5n.2: the early nudge verdict of the attempt's last drawn rest (:meth:`_early_rest`), None when not run
     _early_rest_last: Optional[Dict[str, Any]] = None
+    #: i7-cork 5n.1 (ISG_ATTACH_FALLBACK): every available route's template state (None = off), the primary's live state while an attempt
+    #: runs on a fallback route, the early nudge test as the route decision
+    _route_states: Optional[Dict[Optional[str], Dict[str, Any]]] = None
+    _primary_live: Optional[Dict[str, Any]] = None
+    _early_force: bool = False
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -497,6 +526,94 @@ class Attachment(SamplerV2):
     # ------------------------------------------------------------------ template
 
     def sample_template(self):
+        """The template of the current route, or of the route a switch asks for; with :data:`ATTACH_FALLBACK_SWITCH` also each fallback
+        route's (:meth:`_sample_template_fallback`)."""
+        if attach_fallback_on():
+            return self._sample_template_fallback()
+        return self._sample_template_route(attach_route_requested())
+
+    def _sample_template_fallback(self) -> None:
+        """i7-cork 5n.1: the current route's template (the primary; its failure is the template's), then each of :data:`ATTACH_FALLBACK_ORDER`
+        in turn from a cleared band / stance state - a route that is not served or whose template rejects is left out; the template facts
+        stay the primary's plus ``attach_fallback`` (per route: available, why not, grasps, candidates, seconds). The sampler is left in the
+        primary's state; ``self._route_states`` holds every available route's."""
+        import copy
+
+        self._route_states, self._primary_live, self._early_force = None, None, False
+        self._sample_template_route(None)
+        primary_facts = copy.deepcopy(self.template_facts)
+        primary = self._capture_route_state()
+        states: Dict[Optional[str], Dict[str, Any]] = {None: primary}
+        facts: Dict[str, Any] = {"order": ["current"] + list(ATTACH_FALLBACK_ORDER), "routes": {}}
+        for route in ATTACH_FALLBACK_ORDER:
+            for k in ("bands", "attach_bands", "left_bands", "band_spec", "edge_frame", "init_stance"):
+                setattr(self, k, None)
+            self.manip_candidates = []
+            t0 = time.time()
+            try:
+                self._sample_template_route(route)
+            except Reject as e:
+                facts["routes"][route] = {"available": False, "why": f"[{e.reason}] {str(e)[:300]}"}
+                log.info("%s: ATTACH_FALLBACK route %s unavailable: %s", self.gp.variant, route, facts["routes"][route]["why"])
+                continue
+            if self.attach_route != route:
+                facts["routes"][route] = {"available": False, "why": (self.template_facts.get("attach_route") or {}).get("why")}
+                log.info("%s: ATTACH_FALLBACK route %s unavailable: %s", self.gp.variant, route, facts["routes"][route]["why"])
+                continue
+            states[route] = self._capture_route_state()
+            facts["routes"][route] = {"available": True, "grasp_key": self.grasp_key, "n_grasps": len(self.grasps), "hold_key": self.hold_key,
+                                      "n_manipulation_candidates": len(self.manip_candidates), "s": round(time.time() - t0, 1)}
+            log.info("%s: ATTACH_FALLBACK route %s ready: %s", self.gp.variant, route, json.dumps(facts["routes"][route], default=str))
+        self.template_facts.clear()
+        self.template_facts.update(primary_facts)
+        self.template_facts["attach_fallback"] = facts
+        self._apply_route_state(primary)
+        self._route_states, self._early_force = states, True
+
+    def _capture_route_state(self) -> Dict[str, Any]:
+        st = {k: getattr(self, k, None) for k in ROUTE_STATE_KEYS}
+        st["manip_candidates"] = list(self.manip_candidates or [])
+        st["rest_t"], st["height_t"] = self.rest.get(self.t_role), self.height.get(self.t_role)
+        st["_rejects"] = {}
+        return st
+
+    def _apply_route_state(self, st: Dict[str, Any]) -> None:
+        for k in ROUTE_STATE_KEYS:
+            setattr(self, k, st[k])
+        self.manip_candidates = list(st["manip_candidates"])
+        self.rest[self.t_role], self.height[self.t_role] = st["rest_t"], st["height_t"]
+
+    def _switch_route(self, route: str, rng: np.random.Generator) -> None:
+        """i7-cork 5n.1: this attempt goes on with ``route``'s template state (the primary's live state kept for :meth:`sample`), its own
+        reject memory, its manipulation candidates narrowed by the split cone as ``SamplerV2.sample`` narrows the primary's."""
+        if self._primary_live is None:
+            self._primary_live = {**self._capture_route_state(), "_split_cone_cands": getattr(self, "_split_cone_cands", None),
+                                  "_split_cone_pools": getattr(self, "_split_cone_pools", None), "_candidate_rejects": getattr(self, "_candidate_rejects", None)}
+        st = self._route_states[route]
+        self._apply_route_state(st)
+        self._candidate_rejects = st["_rejects"]
+        self._split_cone_cands = self._split_cone_pools = None
+        TT.split_cone_draw(self, rng)
+
+    def _restore_primary_route(self) -> None:
+        live = getattr(self, "_primary_live", None)
+        if live is None:
+            return
+        self._apply_route_state(live)
+        self._split_cone_cands, self._split_cone_pools, self._candidate_rejects = live["_split_cone_cands"], live["_split_cone_pools"], live["_candidate_rejects"]
+        self._primary_live = None
+
+    def _fb_count(self, step: str) -> None:
+        key = f"attach_fallback.{step}"
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+
+    def sample(self, rng: np.random.Generator) -> Draft:
+        """i7-cork 5n.1: every attempt starts on the primary route (a fallback the previous attempt switched to is undone first)."""
+        self._restore_primary_route()
+        return super().sample(rng)
+
+    def _sample_template_route(self, want: Optional[str]):
         male, female = self.obj(self.t_role), self.obj(self.p_role)
         if AttachedTo not in male.states:
             raise Reject("spec", f"{male.name} has no AttachedTo state (no attachment meta links?)")
@@ -505,7 +622,7 @@ class Attachment(SamplerV2):
             raise Reject("spec", f"{male.name} has no male attachment link matching a female link of {female.name}")
         child_link, parent_link = self.pair
         self.grasps, self.grasp_key, self.rest[self.t_role] = TT.library_grasps(self, self.t_role, "attachment", kinds=["attachment", "tabletop"])
-        self._select_attach_route()
+        self._select_attach_route(want)
         self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
@@ -622,7 +739,7 @@ class Attachment(SamplerV2):
         if self.attach_route is not None:
             TT._countn(self, f"attach_route.{self.attach_route}.{step}", n)
 
-    def _select_attach_route(self) -> None:
+    def _select_attach_route(self, want: Optional[str] = None) -> None:
         """i7-cork (owner decision 4.2): the route a switch asks for (:func:`attach_route_requested`) when the v2 library serves its keys
         (:func:`attach_route_keys`): the male's grasps, key and rest become the route's pick entry's (``lying90``: the lying entry;
         ``handover``: the wide-end-down entry of the right hand's narrow-end pinch, ``self.hold_grasps`` / ``self.hold_key`` the left
@@ -630,7 +747,6 @@ class Attachment(SamplerV2):
         from ispatialgym.sampling import grasp_library as GL
 
         self.attach_route, self.hold_grasps, self.hold_key = None, [], None
-        want = attach_route_requested()
         if want is None:
             return
         keys = attach_route_keys(self.grasp_key, want)
@@ -904,6 +1020,39 @@ class Attachment(SamplerV2):
         return (focus, round(float(c.stand_off or 0.0), 3), round(float(c.lateral), 3), round(float(c.translate), 3), round(float(c.tilt), 4))
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        """The attempt's draw on the template's route; with :data:`ATTACH_FALLBACK_SWITCH` the current route first and, after its drawn
+        rest failed the nudge test, each available fallback route in turn (:data:`ATTACH_FALLBACK_ORDER`)."""
+        states = getattr(self, "_route_states", None)
+        if not states:
+            return self._sample_instance_route(rng)
+        routes = [None] + [r for r in ATTACH_FALLBACK_ORDER if r in states]
+        tried: List[Dict[str, Any]] = []
+        for i, route in enumerate(routes):
+            label = route or "current"
+            if i > 0:
+                self._switch_route(route, rng)
+                log.info("%s: ATTACH_FALLBACK attempt goes on with route %s (after %s)", self.gp.variant, route, json.dumps(tried, default=str))
+            try:
+                d = self._sample_instance_route(rng)
+            except Reject as e:
+                early = isinstance(e, EarlyRestUnstable)
+                if route is None and not early:
+                    raise  # the current route's other rejections end the attempt as before
+                rec = {"route": label, "reject": e.reason, "early_rest": early}
+                if early and self._early_rest_last is not None:
+                    rec["tilt_deg"] = self._early_rest_last.get("tilt_deg")
+                tried.append(rec)
+                self._fb_count(f"{label}.rest_unstable" if early else f"{label}.rejected.{e.reason}")
+                if i + 1 < len(routes):
+                    continue
+                self._fb_count("exhausted")
+                raise
+            self._fb_count(f"used.{label}")
+            d.summary["attach_fallback"] = {"route": label, "tried": tried}
+            return d
+        raise Reject("target_placement", "attach fallback: no route")  # not reached
+
+    def _sample_instance_route(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
         self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))
@@ -2409,6 +2558,7 @@ class Attachment(SamplerV2):
         whatever the switch says (the fallback routes' decision). Records ``self._early_rest_last`` (compared with the late test) and kit
         ``early_rest.<route>.{stable, unstable}``; raises :class:`EarlyRestUnstable` for an unstable male in mode ``on`` / with ``force``."""
         mode = early_rest_mode()
+        force = force or bool(getattr(self, "_early_force", False))
         if mode == "off" and not force:
             return None
         male, W = self.obj(self.t_role), self.world
