@@ -1,5 +1,5 @@
 """i7-interior2 2026-11-08 (owner 6.1-6.3): IORS large's pick measures the support policy at the grasp's pre-shape (as
-tabletop.grasp_at_pose), the large overhang fallback / the stance-C map cap (default on: owner 6.1 / 6.2) and the straightened inside carry (default off) switches.
+tabletop.grasp_at_pose), the large overhang fallback / the stance-C map cap (default on: owner 6.1 / 6.2) and the straightened inside carry (default on: owner 2026-11-08b) switches.
 Simulator-free."""
 
 from contextlib import contextmanager
@@ -67,11 +67,11 @@ def test_the_switch_defaults(monkeypatch):
 
     for env in (L.LARGE_OVERHANG_FALLBACK_ENV, L.INSIDE_CARRY_STRAIGHT_ENV, LI.INSIDE_MAP_CAP_ENV):
         monkeypatch.delenv(env, raising=False)
-    # the owner decided 6.1 (overhang fallback) and 6.2 (map cap): default on; 6.3 (straightened carry) stays an A/B switch
-    assert L.large_overhang_fallback_on() and not L.inside_carry_straight_on() and LI.inside_map_cap_on()
-    for env in (L.LARGE_OVERHANG_FALLBACK_ENV, LI.INSIDE_MAP_CAP_ENV):
+    # the owner decided 6.1 (overhang fallback), 6.2 (map cap) and 2026-11-08b item 1 (the straightened inside carry): default on
+    assert L.large_overhang_fallback_on() and L.inside_carry_straight_on() and LI.inside_map_cap_on()
+    for env in (L.LARGE_OVERHANG_FALLBACK_ENV, L.INSIDE_CARRY_STRAIGHT_ENV, LI.INSIDE_MAP_CAP_ENV):
         monkeypatch.setenv(env, "0")
-    assert not L.large_overhang_fallback_on() and not LI.inside_map_cap_on()
+    assert not L.large_overhang_fallback_on() and not L.inside_carry_straight_on() and not LI.inside_map_cap_on()
     for env in (L.LARGE_OVERHANG_FALLBACK_ENV, L.INSIDE_CARRY_STRAIGHT_ENV, LI.INSIDE_MAP_CAP_ENV):
         monkeypatch.setenv(env, "1")
     assert L.large_overhang_fallback_on() and L.inside_carry_straight_on() and LI.inside_map_cap_on()

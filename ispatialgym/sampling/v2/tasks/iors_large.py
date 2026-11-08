@@ -171,13 +171,15 @@ LARGE_OVERHANG_FALLBACK_ENV = "ISPATIALGYM_LARGE_OVERHANG_FALLBACK"
 #: i7-interior2 2026-11-08 (owner 6.3, inside_large_02): the inside mode's B -> C carry only with the torso STRAIGHTENED (the departure
 #: transition to a travel trunk of tilt 0) - no fallback drive at B's leaning grasp trunk. Every successful fridge demo before (fix1 / fix2
 #: 5 / 5, i7_fridge4 300023) carried straightened; the i7_fridge4 demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) succeeded 1 / 3,
-#: both failures the idle gripper against fridge_petcxr_0 in the carry drive (navigate[4]). Default off ("1" on); kit counters
+#: both failures the idle gripper against fridge_petcxr_0 in the carry drive (navigate[4]). Default on since the owner's 2026-11-08b item 1
+#: (A/B: 8 / 8 ok vs 6 / 8; "0" off); kit counters
 #: ``inside_carry_straight.rejected`` / ``.straight``.
 INSIDE_CARRY_STRAIGHT_ENV = "ISPATIALGYM_INSIDE_CARRY_STRAIGHT"
 
 
 def inside_carry_straight_on() -> bool:
-    return os.environ.get(INSIDE_CARRY_STRAIGHT_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+    # default ON (owner 2026-11-08, owner_answers_20261108b item 1); "0" off
+    return os.environ.get(INSIDE_CARRY_STRAIGHT_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
 
 
 def large_overhang_fallback_on() -> bool:
