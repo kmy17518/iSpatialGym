@@ -1813,10 +1813,10 @@ def need_contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None)
     _reject("missing_map", f"no {kind} contact map of the {role} at {getattr(top, 'name', '?')}'s height (MAP_REQUEST logged): {CONTACT_MAP_REQUIRED.get(kind, 'required')}")
 
 
-def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06) -> Dict[str, Any]:
+def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06, tilt_read: str = "nearest") -> Dict[str, Any]:
     """``ContactMap.lookup`` at ``stance`` for the object at ``pose`` (world): its ROOT xy in the base frame, its yaw from the stance (about z,
     over the rest the map's entries stand on: ``meta["entry_rest_quat_xyzw"]``), the stance's stand-off and trunk; ``tol`` the in-band
-    distance of a point to a cell (``stances.BAND_CELL_TOL``)."""
+    distance of a point to a cell (``stances.BAND_CELL_TOL``); ``tilt_read``: ``ContactMap.lookup``'s (i7-axialrest 5y fix: "intersection")."""
     from ispatialgym.sampling import contact_maps as CMAP
 
     xy = stance.world_to_base(_t(pose[0])[:2])
@@ -1824,7 +1824,7 @@ def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float =
     yaw = C.wrap_angle(CMAP.yaw_of([float(v) for v in _t(pose[1]).tolist()], rest) - float(stance.base_pose2d[2]))
     so = getattr(stance, "stand_off", None)
     return cm.lookup(float(so) if so is not None else min(cm.meta["edge_distances"]), float(stance.translate), float(stance.tilt),
-                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol)
+                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol, **({"tilt_read": tilt_read} if tilt_read != "nearest" else {}))
 
 
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
