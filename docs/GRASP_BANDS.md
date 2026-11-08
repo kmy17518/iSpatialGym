@@ -2385,6 +2385,51 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+### i7-cork (2026-11-08): the cork's two routes (owner decisions 4.2 / 4.3 / 4.5)
+
+Branch i7-cork from of-v2maps cf1f5d2d. Records: `$OFH/cork_20261108` (probes, first builds), shiyuc `$SY/isg/cork_20261108` (builds,
+ledgers), staged root `$SY/v2/v2maps_int1_cork` (`cp` of v2maps_int1 + the three entries below, `CORK_STAGE.txt`).
+
+**Owner decisions implemented.** 4.3: attachment_03's customs `brace_search: false` (22a13e67). 4.5: the overhang fallback is not wired
+for the cork. 4.2: two routes, each behind its own default-off switch; the program reads the route the sampler recorded
+(`grasps[0].attach_route`).
+
+**Diagnosis.**
+- Rest survey (`scripts/grasp_bands/cork_rest_probe.py`, the sampler's nudge: 2 deg about world x / y, +1 mm, 300 steps, 3 deg):
+
+  | rest | validator slab | desk mdhelw (B1K, random xy) |
+  |---|---|---|
+  | male end down (r0, today) | 12 / 12 | 1 / 16 (median 15.7 deg, max 109) |
+  | wide end down | 12 / 12 | 16 / 16 (max 0.35 deg) |
+  | lying | 11 / 12 | 16 / 16 on x (the sampler's axis), 13 / 16 on y (an 11 deg roll) |
+
+  The tapered end's 6.5 mm ring is stable on a flat box, not on the desk's collision surface.
+- No hand-over primitive existed; the attachment program's tracked SLERP carry is route ii's 90 deg turn as it is; route i is built
+  from Grasp / Lift / Reorient / Retreat(release) per arm.
+- Hand-over geometry (`cork_handover_geom.py`, both hands' exact hulls on the 34.5 mm cork): axial fingertip pinches from both ends
+  3.8-17.2 mm apart; a side pinch of either hand meets the other hand.
+
+**Route ii, lying + 90 deg turn (`ISG_ATTACH_LYING90=1`).** The male's grasps / rest come from the v2 entry serving `<key>__lying90`
+(`cork__ncxgpe__s1__attachment_free__raf10b6`: designated at the measured lying rest, attachment_free / seat axis, L3 config, 3 of 7
+physics-valid; tabletop maps r / l at 0.7853, attach maps box + swept, right arm). Everything else is the attachment sampler and program
+as they are. Kit `attach_route.lying90.{pick, attach_found, carry_checked, carry_failed, rest_stable, rest_unstable, drafted}`.
+
+**Route i, hand-over (`ISG_ATTACH_HANDOVER=1`).** Two new entries (opt-in `CandidateConfig.finger_axis_window_m`: every finger vertex
+within a window along the object's +z, a top grasp backed off along its approach into it; recorded in the library and the identity):
+`cork__ncxgpe__s1__rd4d4f5` (`<key>__handover_pick`: wide end down, tabletop, fingers z <= -3 mm = the narrow end, 6 valid, right map) and
+`cork__ncxgpe__s1__attachment_free__r428115` (`<key>__handover_hold`: r0, attachment_free, fingers z >= +3 mm = the wide end, 6 valid,
+left-arm attach maps). Sampler (`_sample_with_handover`): the right pick; the hand-over search (male centre 0.52-0.60 m ahead, +-6 cm,
+22-30 cm above the top, its axis along the robot's left, 8 turns; both eef poses in the stance image, the two hands' exact hulls >= 3 mm
+apart, the right carry tracked with the male attached, the left [pre-grasp, grasp] with the right locked, the combined whole-body check,
+the right's release retreat with the left locked); place stances = the grasp stance, then lateral / stand-off shifts (heading and trunk
+kept, the path recorded as an axis leg); the left attach from the hold entry's left attach map, its carry tracked from the hold
+configuration. Program `program_attachment_handover`: pick -> lift -> carry to the hand-over -> the left grasps -> the right releases
+and backs off -> [axis-leg drive] -> the left carries to the pre-attach -> attach -> retreat. Program check: the hand-over phases (the
+male posed at its recorded hand-over pose, both hands' chains with it ignored, the other hand locked); `grasp_of(obj, arm=)` picks the
+carrying hand's record. Executor: the planner attachment moves to the taking hand; the hand-over grasp is not lifted off a support.
+Kit `attach_route.handover.{pick, handover_carry_checked, handover_found, handover_unreachable, carry_checked, carry_failed,
+attach_found, place_unreachable, rest_stable, rest_unstable, drafted}`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

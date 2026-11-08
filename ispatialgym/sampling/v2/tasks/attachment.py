@@ -146,11 +146,13 @@ ATTACH_ROUTE_KEYS = {"lying90": ("__lying90",), "handover": ("__handover_pick", 
 #: the hand-over (route i): the male's centre in the grasp stance's base frame (forward, left) and above the support top (m), its turns
 #: about its own axis, the candidates an attempt evaluates with the exact IK, the two hands' smallest hull distance, the place stances'
 #: stand-off shifts (the lateral ones are SECOND_BASE_LATERALS)
-HANDOVER_FORWARD_M = (0.52, 0.60)
-HANDOVER_LEFT_M = (0.0, 0.06, -0.06)
-HANDOVER_RISE_M = (0.22, 0.30)
+HANDOVER_FORWARD_M = (0.42, 0.50, 0.58)
+HANDOVER_LEFT_M = (0.0, -0.06, 0.06)
+HANDOVER_RISE_M = (0.12, 0.18, 0.24)
+#: the male's axis tilted from the robot's left toward the world's up (+) / down (-) at the hand-over (deg)
+HANDOVER_TILTS_DEG = (0.0, -25.0, 25.0)
 HANDOVER_ROLLS = 8
-HANDOVER_TRIES = 24
+HANDOVER_TRIES = 40
 HANDOVER_HANDS_MIN_M = 0.003
 HANDOVER_STANDOFF_SHIFTS_M = (-0.10, 0.10)
 
@@ -1042,16 +1044,20 @@ class Attachment(SamplerV2):
         f = th.tensor([float(st.forward[0]), float(st.forward[1]), 0.0])
         lft = th.tensor([float(st.left[0]), float(st.left[1]), 0.0])
         up = th.tensor([0.0, 0.0, 1.0])
-        R0 = th.stack([f, -up, lft], dim=1)  # columns: object x -> forward, y -> down, z -> left
+        frames = []
+        for t in HANDOVER_TILTS_DEG:
+            z = math.cos(math.radians(t)) * lft + math.sin(math.radians(t)) * up
+            frames.append(th.stack([f, th.linalg.cross(z, f), z], dim=1))  # columns: object x -> forward, z -> left (tilted), y = z x x
         out = []
         for fx in HANDOVER_FORWARD_M:
             for ly in HANDOVER_LEFT_M:
                 for dz in HANDOVER_RISE_M:
                     xy = st.base_to_world([fx, ly])
                     p = th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + dz])
-                    for k in range(HANDOVER_ROLLS):
-                        Rz = C.quat_to_mat(C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), 2.0 * math.pi * k / HANDOVER_ROLLS))
-                        out.append((p, C.mat_to_quat(R0 @ Rz)))
+                    for R0 in frames:
+                        for k in range(HANDOVER_ROLLS):
+                            Rz = C.quat_to_mat(C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), 2.0 * math.pi * k / HANDOVER_ROLLS))
+                            out.append((p, C.mat_to_quat(R0 @ Rz)))
         return [out[int(i)] for i in rng.permutation(len(out))]
 
     def _handover_search(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_manip) -> Dict[str, Any]:
@@ -1067,75 +1073,120 @@ class Attachment(SamplerV2):
         male, support = self.obj(self.t_role), self.obj("support")
         scale = self.choice.models[self.t_role].scale
         q_fr = self._finger_q_of(grasp)
-        fails = {"frame": 0, "hands": 0, "carry": 0, "left_ik": 0, "combined": 0, "retreat": 0}
+        fails: Dict[str, int] = {"frame": 0, "right_ik": 0, "hands": 0, "left_ik": 0, "combined": 0, "carry": 0, "retreat": 0}
+        why: Dict[str, int] = {}
+
+        def note(kind, reason):
+            k = f"{kind}:{str(reason).split(':')[0].split(' (')[0][:40]}"
+            why[k] = why.get(k, 0) + 1
+
         n = int(self.g("reorientation_waypoints")) + 1
         tried = 0
-        for carry in CARRY_HEIGHTS:
-            lift = (TT._t(grasp.grasp[0]) + th.tensor([0.0, 0.0, carry]), TT._t(grasp.grasp[1]))
-            for M in self._handover_object_poses(manip, rng):
-                if tried >= HANDOVER_TRIES:
-                    break
-                self._check_deadline()
-                H_r = IK.grasp_pose(M, grasp.eef_in_object)
-                if not self.ikc.eef_in_frame(H_r, cam_manip):
+        for M in self._handover_object_poses(manip, rng):
+            if tried >= HANDOVER_TRIES:
+                break
+            self._check_deadline()
+            H_r = IK.grasp_pose(M, grasp.eef_in_object)
+            if not self.ikc.eef_in_frame(H_r, cam_manip):
+                fails["frame"] += 1
+                continue
+            tried += 1
+            # the right hand at the hand-over, the male attached (a cheap exact IK before the tracked carry)
+            with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+                with attached(self.kit, "right", male):
+                    r_h = self.ikc.exact([H_r], manip, "right", ignore_for_last=[support], cache=False, scale_key=scale)
+            if not r_h.ok:
+                fails["right_ik"] += 1
+                note("right_ik", r_h.reason)
+                continue
+            holds = []
+            for g_l in self.hold_grasps:
+                H_l = IK.grasp_pose(M, (TT._t(g_l.pose[0]), TT._t(g_l.pose[1])))
+                if not self.ikc.eef_in_frame(H_l, cam_manip):
                     fails["frame"] += 1
                     continue
-                holds = []
-                for g_l in self.hold_grasps:
-                    H_l = IK.grasp_pose(M, (TT._t(g_l.pose[0]), TT._t(g_l.pose[1])))
-                    if not self.ikc.eef_in_frame(H_l, cam_manip):
-                        fails["frame"] += 1
-                        continue
-                    gap = self._hands_apart_m(H_r, q_fr, H_l, self._finger_q_of(g_l))
-                    if gap < HANDOVER_HANDS_MIN_M:
-                        fails["hands"] += 1
-                        continue
-                    holds.append((g_l, H_l, gap))
-                if not holds:
+                gap = self._hands_apart_m(H_r, q_fr, H_l, self._finger_q_of(g_l))
+                if gap < HANDOVER_HANDS_MIN_M:
+                    fails["hands"] += 1
                     continue
-                tried += 1
+                holds.append((g_l, H_l, gap))
+            if not holds:
+                continue
+            # the male where the right hand holds it at the hand-over, in the world for the left hand's chain
+            male.set_position_orientation(TT._t(M[0]), TT._t(M[1]))
+            male.keep_still()
+            self.kit.sync_world()
+            try:
+                found_l = None
+                for g_l, H_l, gap in holds:
+                    pre_l = IK.pre_pose(H_l)
+                    # the male is touched by both hands here: it leaves the world for both hands' chains (the locked right hand's fingers
+                    # stand on it); the two hands' distance is the exact-hull check above, the left approach the entry's validated one
+                    with self.ikc.ignoring([male]):
+                        r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_h.q, cache=False, scale_key=scale)
+                    if not r_l.ok:
+                        fails["left_ik"] += 1
+                        note("left_ik", r_l.reason)
+                        continue
+                    with self.ikc.ignoring([male]):
+                        free = bool(self.kit.collision_free(r_l.q, margin=0.005)[0])
+                    if not free:
+                        fails["combined"] += 1
+                        continue
+                    found_l = (g_l, H_l, gap, pre_l, r_l)
+                    break
+            finally:
+                male.set_position_orientation(TT._t(m_pose[0]), TT._t(m_pose[1]))
+                male.keep_still()
+                self.kit.sync_world()
+            if found_l is None:
+                continue
+            g_l, H_l, gap, pre_l, r_l = found_l
+            # the right hand's carry lift -> hand-over, tracked (the lift ladder)
+            r_c, lift, wps, carry = None, None, None, None
+            for carry in CARRY_HEIGHTS:
+                lift = (TT._t(grasp.grasp[0]) + th.tensor([0.0, 0.0, carry]), TT._t(grasp.grasp[1]))
                 wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, H_r, n)]
                 with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
                     with attached(self.kit, "right", male):
                         r_c = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
                 self._route_count("handover_carry_checked")
-                if not r_c.ok or r_c.q is None:
-                    fails["carry"] += 1
+                if r_c.ok and r_c.q is not None:
+                    break
+                note("carry", r_c.reason)
+            if r_c is None or not r_c.ok or r_c.q is None:
+                fails["carry"] += 1
+                continue
+            # the left hand again from the tracked right configuration, then the right hand's release retreat with the left locked
+            male.set_position_orientation(TT._t(M[0]), TT._t(M[1]))
+            male.keep_still()
+            self.kit.sync_world()
+            try:
+                with self.ikc.ignoring([male]):
+                    r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_c.q, cache=False, scale_key=scale)
+                    free = bool(r_l.ok) and bool(self.kit.collision_free(r_l.q, margin=0.005)[0])
+                if not free:
+                    fails["combined"] += 1
                     continue
-                # the male where the right hand holds it at the hand-over, in the world for the left hand's chain (ignored at its grasp)
-                male.set_position_orientation(TT._t(M[0]), TT._t(M[1]))
+                retreat_r = IK.pre_pose(H_r, RETREAT_DIST)
+                with self.ikc.ignoring([male]):
+                    r_x = self.ikc.exact([retreat_r], manip, "right", q_seed=r_l.q, cache=False)
+            finally:
+                male.set_position_orientation(TT._t(m_pose[0]), TT._t(m_pose[1]))
                 male.keep_still()
                 self.kit.sync_world()
-                try:
-                    for g_l, H_l, gap in holds:
-                        pre_l = IK.pre_pose(H_l)
-                        # the male is touched by both hands here: it leaves the world for both hands' chains (the locked right hand's fingers
-                        # stand on it); the two hands' distance is the exact-hull check above, the left approach the entry's validated one
-                        with self.ikc.ignoring([male]):
-                            r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_c.q, cache=False, scale_key=scale)
-                        if not r_l.ok:
-                            fails["left_ik"] += 1
-                            continue
-                        with self.ikc.ignoring([male]):
-                            free = bool(self.kit.collision_free(r_l.q, margin=0.005)[0])
-                        if not free:
-                            fails["combined"] += 1
-                            continue
-                        retreat_r = IK.pre_pose(H_r, RETREAT_DIST)
-                        with self.ikc.ignoring([male]):
-                            r_x = self.ikc.exact([retreat_r], manip, "right", q_seed=r_l.q, cache=False)
-                        if not r_x.ok:
-                            fails["retreat"] += 1
-                            continue
-                        self._route_count("handover_found")
-                        return {"M": M, "H_r": H_r, "lift": lift, "carry": carry, "wps_r": wps, "q_r": r_c.q, "g_l": g_l, "H_l": H_l, "pre_l": pre_l,
-                                "q_l": r_l.q, "retreat_r": retreat_r, "q_x": r_x.q, "hands_apart_m": gap, "tried": tried, "fails": fails}
-                finally:
-                    male.set_position_orientation(TT._t(m_pose[0]), TT._t(m_pose[1]))
-                    male.keep_still()
-                    self.kit.sync_world()
+            if not r_x.ok:
+                fails["retreat"] += 1
+                note("retreat", r_x.reason)
+                continue
+            self._route_count("handover_found")
+            return {"M": M, "H_r": H_r, "lift": lift, "carry": carry, "wps_r": wps, "q_r": r_c.q, "g_l": g_l, "H_l": H_l, "pre_l": pre_l,
+                    "q_l": r_l.q, "retreat_r": retreat_r, "q_x": r_x.q, "hands_apart_m": gap, "tried": tried, "fails": fails}
+        for k_, v_ in fails.items():
+            if v_:
+                self._route_count(f"handover_fail.{k_}", v_)
         self._route_count("handover_unreachable")
-        raise Reject("handover_unreachable", f"no hand-over pose passes ({tried} evaluated): {fails}")
+        raise Reject("handover_unreachable", f"no hand-over pose passes ({tried} evaluated): {fails}; reasons {dict(sorted(why.items(), key=lambda kv: -kv[1])[:6])}")
 
     @staticmethod
     def _carried_pose(frm: Stance, to: Stance, pose: TT.Pose) -> TT.Pose:
