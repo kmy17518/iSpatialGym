@@ -75,6 +75,47 @@ def start_per_attempt() -> bool:
     return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1"
 
 
+#: i7-attachdef 2026-11-08 (lead decision: a sampler-only bug fix, default OFF until the owner decides): the collector's queue
+#: (``run_isg.queue_ready``) takes an instance as ready once its TRO, its summary and the template meta exist, and the summary was written
+#: BEFORE the post-write screens (``check_instance_filter``, ``check_goal_occlusion``) - a collector polling in that window claimed an attempt
+#: the screen then rejected (campaign: disembedding_04 / 09 ran a goal-occluded layout and wrote its goal override into the TRO the sampler
+#: re-sampled over it; 2 mental_rotation episodes hit FileNotFoundError). With ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=1`` the summary is
+#: written as ``<iid>.summary.json.pending`` and renamed (atomic) to ``<iid>.summary.json`` only after every post-write screen passed; a
+#: rejected attempt's files are removed with it, so it is never claimable. Counters (SAMPLING_REPORT) ``publish_after_screens.{published,withheld}``.
+SUMMARY_SUFFIX = ".summary.json"
+PENDING_SUFFIX = ".pending"
+
+
+def publish_after_screens() -> bool:
+    return fast_on("PUBLISH_AFTER_SCREENS", default=False)
+
+
+def instance_summary_path(tro_path: str, pending: Optional[bool] = None) -> str:
+    """The summary file of the instance whose TRO is ``tro_path``: the pending name while the switch holds it back."""
+    base = tro_path[: -len("-tro_state.json")] + SUMMARY_SUFFIX if tro_path.endswith("-tro_state.json") else tro_path + SUMMARY_SUFFIX
+    return base + PENDING_SUFFIX if (publish_after_screens() if pending is None else pending) else base
+
+
+def remove_instance_files(tro_path: str) -> List[str]:
+    """A rejected attempt's files: the TRO, the sidecar, the summary (published or pending). Returns the removed paths."""
+    out = []
+    for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), instance_summary_path(tro_path, False), instance_summary_path(tro_path, True)):
+        if os.path.exists(p):
+            os.remove(p)
+            out.append(p)
+    return out
+
+
+def publish_instance(tro_path: str) -> bool:
+    """After the post-write screens: the pending summary -> the summary the queue reads (``os.replace``: atomic on one filesystem).
+    False when there was nothing pending (the switch off: the summary was written in place)."""
+    pend = instance_summary_path(tro_path, True)
+    if not os.path.exists(pend):
+        return False
+    os.replace(pend, instance_summary_path(tro_path, False))
+    return True
+
+
 class TemplateExhausted(Reject):
     """A rejection after which no attempt of the template can succeed (IORS small once every start-region candidate failed its
     init -> manipulation travel deterministically): ``run_instances`` counts it like any rejection and ends the template's attempts
@@ -1276,7 +1317,7 @@ class SamplerV2(TaskSampler):
         if not getattr(self.world, "cameras", True):
             # train-fast SAMPLER_CAMERAS (2026-10-31): this world has no head camera; the pixel screens of this instance are still to run
             summary["visibility"] = "pending"
-        with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
+        with open(instance_summary_path(path), "w") as f:  # i7-attachdef: pending until the post-write screens pass (switch)
             json.dump(_jsonable(summary), f, indent=2)
         if start_per_attempt():
             self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
@@ -1368,12 +1409,16 @@ class SamplerV2(TaskSampler):
         why = self.instance_filter(tro_path)
         if not why:
             return
-        for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), tro_path.replace("-tro_state.json", ".summary.json")):
-            if os.path.exists(p):
-                os.remove(p)
+        remove_instance_files(tro_path)
+        self._count_withheld()
         if not self.instance_seeds:
             self.template_meta.pop("stances", None)
         raise Reject("repeats_eval", str(why))
+
+    def _count_withheld(self) -> None:
+        """i7-attachdef: a post-write rejection the switch kept from the queue (its summary was still pending)."""
+        if publish_after_screens():
+            self.counters["publish_after_screens.withheld"] = self.counters.get("publish_after_screens.withheld", 0) + 1
 
     def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
         """Pre-generation goal-image occlusion (``ispatialgym.eval.goal_occlusion``): the goal state as the goal check
@@ -1440,12 +1485,10 @@ class SamplerV2(TaskSampler):
             self.kit.sync_world()
             self.configure_targets(draft)
         draft.summary["goal_occlusion"] = rep
-        summary_path = tro_path.replace("-tro_state.json", ".summary.json")
-        sidecar_path = tro_path.replace("-tro_state.json", ".oracle.json")
+        summary_path = instance_summary_path(tro_path)
         if rep["occluded"]:
-            for p in (tro_path, sidecar_path, summary_path):
-                if os.path.exists(p):
-                    os.remove(p)
+            remove_instance_files(tro_path)
+            self._count_withheld()
             if not self.instance_seeds:
                 self.template_meta.pop("stances", None)
             self.counters["goal_occluded"] = self.counters.get("goal_occluded", 0) + 1
@@ -1630,6 +1673,8 @@ class SamplerV2(TaskSampler):
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
                     clock.mark("goal_occlusion")
+                    if publish_instance(path):  # i7-attachdef: only now can a collector claim it (ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS)
+                        self.counters["publish_after_screens.published"] = self.counters.get("publish_after_screens.published", 0) + 1
                     self.instance_seeds.append(seed)
                     written.append(path)
                     # run_isg loads an instance through the template meta; demos replay instances while the rest of the
