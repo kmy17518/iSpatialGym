@@ -170,6 +170,31 @@ def attach_route_keys(base_key: str, route: str) -> Tuple[str, ...]:
     return tuple(f"{base_key}{sfx}" for sfx in ATTACH_ROUTE_KEYS[route])
 
 
+#: i7-cork 2026-11-08 (owner decision 5n.2): the rest-nudge test of :meth:`Attachment.check_rest_stability` run on the MALE right after its
+#: rest is drawn (``phase3_target``: the male at the focus, its grasp confirmed), before the partner / attach / carry search (~180 s), in
+#: the sampler's own world: the male put there with gravity on, settled as ``settle_and_validate`` settles it (``settle_steps`` + the
+#: tremble window), nudged the same 2 deg / 300 steps / 3 deg (:meth:`Attachment._nudge_tilts`); the world restored and the male back at its
+#: drawn pose afterwards. ``0`` (default): not run. ``shadow``: run and recorded (``draft.summary.early_rest``, kit
+#: ``early_rest.<route>.{stable, unstable}``) and compared with the late test after the settle (kit / counters
+#: ``early_rest.vs_late.<agreement>``, log ``EARLY_REST_VS_LATE``); nothing is rejected early. ``1``: an unstable male ends the attempt
+#: there (``Reject("rest_unstable", "early: ...")``, counter ``rest_unstable_early``). The late test runs as before in every mode (it also
+#: tests the partner).
+EARLY_REST_SWITCH = "ISG_ATTACH_EARLY_REST"
+
+
+def early_rest_mode() -> str:
+    """``off`` | ``shadow`` | ``on`` (:data:`EARLY_REST_SWITCH`)."""
+    v = os.environ.get(EARLY_REST_SWITCH, "").strip().lower()
+    if v == "shadow":
+        return "shadow"
+    return "on" if v in ("1", "on", "true", "yes") else "off"
+
+
+class EarlyRestUnstable(Reject):
+    """The male's drawn rest failed the early nudge test; the reason stays ``rest_unstable``. It leaves
+    :meth:`Attachment.sample_instance`'s candidate loop (the late test ends the attempt too)."""
+
+
 @dataclass
 class CarryPlan:
     """The carry from the lifted grasp to the pre-attach that :meth:`Attachment._carry_to_pre_attach` settled on (or tried last):
@@ -355,6 +380,8 @@ class Attachment(SamplerV2):
     attach_route: Optional[str] = None
     hold_key: Optional[str] = None
     hold_grasps: Sequence[Any] = ()
+    #: i7-cork 5n.2: the early nudge verdict of the attempt's last drawn rest (:meth:`_early_rest`), None when not run
+    _early_rest_last: Optional[Dict[str, Any]] = None
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -848,6 +875,7 @@ class Attachment(SamplerV2):
         if rejects is None:
             rejects = self._candidate_rejects = {}
         order = self._candidate_order(rng, rejects)
+        self._early_rest_last = None
         for k in order[:6]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
@@ -864,6 +892,8 @@ class Attachment(SamplerV2):
                 if self.attach_route == "handover":
                     return self._sample_with_handover(rng, init, manip, int(k))
                 return self._sample_with(rng, init, manip, int(k))
+            except EarlyRestUnstable:
+                raise  # i7-cork 5n.2: the drawn rest fails the nudge test - the attempt ends there, as the late test ends it
             except Reject as e:
                 key = self._candidate_key(cand)
                 rejects[key] = rejects.get(key, 0) + 1
@@ -899,6 +929,7 @@ class Attachment(SamplerV2):
         male.set_position_orientation(*m_pose)
         male.keep_still()
         self.kit.sync_world()
+        self._early_rest(m_pose)  # i7-cork 5n.2 (ISG_ATTACH_EARLY_REST): the nudge test on the drawn rest before the partner / attach / carry search
         self._apply_grasp_height_extra(grasp, m_pose, manip)  # generation.grasp_height_extra_m (owner 2026-09-19 16:49; 0 = no-op)
         self._record_pinch_width(grasp, m_pose)  # the pre-shape width from the male's own geometry at the pinch (pwgbsb 0919-210926)
         # step 2 (+ §6.8 owner 2026-09-16 17:10): the partner on an attach-reach cell with the attach pose and the left brace
@@ -1357,6 +1388,7 @@ class Attachment(SamplerV2):
         male.set_position_orientation(*m_pose)
         male.keep_still()
         self.kit.sync_world()
+        self._early_rest(m_pose)  # i7-cork 5n.2 (ISG_ATTACH_EARLY_REST): before the hand-over search
         self._record_pinch_width(grasp, m_pose)
         ho = self._handover_search(rng, manip, m_pose, grasp, cam_manip)
         ho["grasp"] = grasp
@@ -2248,6 +2280,27 @@ class Attachment(SamplerV2):
         95 deg over the 130 steps of the transition - the demo then aimed at a cork lying 26 mm away (the "IK 235 mm off").
         The world is restored afterwards (the recorded poses are the settled ones)."""
         roles = [r for r in (self.t_role, self.p_role) if self.obj(r) is not None]
+        tilts = self._nudge_tilts(roles)
+        draft.summary["rest_tilt_after_nudge_deg"] = tilts
+        bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
+        self._route_count("rest_unstable" if bad else "rest_stable")
+        self._early_vs_late(draft, tilts, bad)
+        if bad:
+            self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
+            male = self.obj(self.t_role)
+            if male is not None and male.name in bad and not self._rest_flip_forced and not (self.template_facts.get("male_rest_orientation") or {}).get("flipped"):
+                # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
+                # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
+                self._rest_flip_forced = True
+                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.variant, male.name, bad[male.name])
+            raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
+                                          f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
+        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.variant, REST_NUDGE_DEG, tilts)
+
+    def _nudge_tilts(self, roles: Sequence[str]) -> Dict[str, float]:
+        """The nudge of :meth:`check_rest_stability` on ``roles`` as they lie now: each tilted REST_NUDGE_DEG about world x and lifted 1 mm,
+        REST_STABILITY_STEPS physics steps with the robot held, the up axis's angle (deg) to the pose before the nudge per object name.
+        The world is restored afterwards."""
         up = th.tensor([0.0, 0.0, 1.0])
         state = self.world.snapshot()
         tilts: Dict[str, float] = {}
@@ -2269,20 +2322,74 @@ class Attachment(SamplerV2):
         finally:
             self.world.restore(state)
             self.world.keep_still(self.objects.values())
-        draft.summary["rest_tilt_after_nudge_deg"] = tilts
-        bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
-        self._route_count("rest_unstable" if bad else "rest_stable")
-        if bad:
-            self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
-            male = self.obj(self.t_role)
-            if male is not None and male.name in bad and not self._rest_flip_forced and not (self.template_facts.get("male_rest_orientation") or {}).get("flipped"):
-                # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
-                # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
-                self._rest_flip_forced = True
-                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.variant, male.name, bad[male.name])
-            raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
-                                          f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
-        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.variant, REST_NUDGE_DEG, tilts)
+        return tilts
+
+    def _route_label(self) -> str:
+        return self.attach_route or "current"
+
+    def _early_rest(self, m_pose: TT.Pose, force: bool = False) -> Optional[Dict[str, Any]]:
+        """i7-cork (owner decision 5n.2, :data:`EARLY_REST_SWITCH`): the nudge test on the male at its drawn rest ``m_pose`` right after the
+        draw - the male placed with gravity on, settled as ``settle_and_validate`` settles it (``settle_steps``, then the tremble window),
+        then :meth:`_nudge_tilts`; the world restored, the male back at ``m_pose`` without gravity (as the draw left it). ``force``: run
+        whatever the switch says (the fallback routes' decision). Records ``self._early_rest_last`` (compared with the late test) and kit
+        ``early_rest.<route>.{stable, unstable}``; raises :class:`EarlyRestUnstable` for an unstable male in mode ``on`` / with ``force``."""
+        mode = early_rest_mode()
+        if mode == "off" and not force:
+            return None
+        male, W = self.obj(self.t_role), self.world
+        t0 = time.time()
+        state = W.snapshot()
+        settle_err = tremble_err = None
+        try:
+            male.set_position_orientation(*m_pose)
+            W.activate(male)
+            still = self.settle_still_entities(Draft())
+            settle_err = W.settle([male], steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)), still=still)
+            tremble_err = W.tremble_after([male], frames=int(self.gen("tremble_frames", W.TREMBLE_FRAMES)),
+                                          pos_tol=float(self.gen("tremble_pos_tol_m", W.TREMBLE_POS_TOL)), ang_tol=float(self.gen("tremble_ang_tol_rad", W.TREMBLE_ANG_TOL)),
+                                          drift_pos_tol=float(self.gen("tremble_drift_pos_tol_m", W.TREMBLE_DRIFT_POS_TOL)),
+                                          drift_ang_tol=float(self.gen("tremble_drift_ang_tol_rad", W.TREMBLE_DRIFT_ANG_TOL)), still=still)
+            tilts = self._nudge_tilts([self.t_role])
+        finally:
+            W.restore(state)
+            W.set_gravity(male, False)
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+        tilt = float(tilts.get(male.name, 0.0))
+        unstable = tilt > REST_TIP_MAX_DEG
+        rec = {"route": self._route_label(), "mode": mode if not force else f"{mode}+route_decision", "tilt_deg": round(tilt, 2), "unstable": unstable,
+               "settle": settle_err, "tremble": tremble_err, "s": round(time.time() - t0, 2)}
+        self._early_rest_last = rec
+        key = f"early_rest.{rec['route']}.{'unstable' if unstable else 'stable'}"
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+        log.info("%s: EARLY_REST %s", self.gp.variant, json.dumps(rec, default=str))
+        if unstable and (mode == "on" or force):
+            if mode == "on":
+                self.counters["rest_unstable_early"] = self.counters.get("rest_unstable_early", 0) + 1
+            raise EarlyRestUnstable("rest_unstable", f"early ({rec['route']} route): the drawn rest's up axis {tilt:.1f} deg off {REST_STABILITY_STEPS} steps after a "
+                                                     f"{REST_NUDGE_DEG:.0f} deg nudge (> {REST_TIP_MAX_DEG:.0f})", route=rec["route"])
+        return rec
+
+    def _early_vs_late(self, draft: Draft, tilts: Dict[str, float], bad: Dict[str, float]) -> None:
+        """Shadow bookkeeping of :data:`EARLY_REST_SWITCH`: the early verdict on the drafted male vs this (late) test - kit / counters
+        ``early_rest.vs_late.{agree_stable, agree_unstable, early_unstable_late_stable, early_stable_late_unstable}`` (the male) and
+        ``late_partner_only`` (the late test failed on the partner alone), ``draft.summary.early_rest``, log ``EARLY_REST_VS_LATE``."""
+        rec = getattr(self, "_early_rest_last", None)
+        if rec is None:
+            return
+        male = self.obj(self.t_role)
+        late_bad = male is not None and male.name in bad
+        early_bad = bool(rec.get("unstable"))
+        agree = {(False, False): "agree_stable", (True, True): "agree_unstable", (True, False): "early_unstable_late_stable",
+                 (False, True): "early_stable_late_unstable"}[(early_bad, late_bad)]
+        keys = [f"early_rest.vs_late.{agree}"] + (["early_rest.vs_late.late_partner_only"] if bad and not late_bad else [])
+        for key in keys:
+            TT._countn(self, key)
+            self.counters[key] = self.counters.get(key, 0) + 1
+        draft.summary["early_rest"] = {**rec, "late_tilt_deg": tilts.get(male.name) if male is not None else None, "vs_late": agree}
+        log.info("%s: EARLY_REST_VS_LATE %s early %.2f deg late %s deg (route %s)", self.gp.variant, agree, float(rec.get("tilt_deg") or 0.0), tilts, rec.get("route"))
 
     def after_settle(self, draft: Draft):
         tname, pname = self.tname, self.pname
