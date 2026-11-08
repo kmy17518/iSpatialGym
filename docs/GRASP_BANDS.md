@@ -1880,7 +1880,7 @@ Down-weights configurations that keep failing for an alias. It runs unattended, 
     sampler's state without advancing it.
   - Kit counters: `alias_memory.loaded`, `.place.no_down`, `.place.down_bins`, `.place.deferred`, `.place.kept_down`,
     `.blocked_not_train`.
-  - Pick and yaw keys are recorded and reported only. A pick hook would be the same `reorder` call at the F draw.
+  - The yaw key is recorded and reported only. Since i7-memory2 the pick key also steers: the pick hook (below).
 - **Forget:** evidence decays by 0.8 per newer trunk snapshot of the alias. It is RESET under another customs version or another
   entry / map key fingerprint (`customs_change` / `keys_change` = 0).
 - **Guardrails** are in each version's report, per batch and alias:
@@ -1950,6 +1950,94 @@ Down-weights configurations that keep failing for an alias. It runs unattended, 
 - Key fingerprint: the keys cover the alias's model libraries and maps (its customs' grasp keys / representatives). They do not cover
   partner-side maps (interiors, attach).
 - Snapshot order: snapshots are ordered by their first demo for the alias, not by git ancestry.
+
+### Outcome memory: owner decisions 2.1-2.4, modes and the pick hook (i7-memory2, 2026-11-08)
+
+The owner's answers to `tmp/outputs/open_decisions_20261108.md` section 2 (verbatim in `tmp/outputs/owner_answers_20261108.md`):
+- 2.1 "adopt the proposed values";
+- 2.2 "reset (safe: a fix starts clean) in actual production - but for the validation runs carry over at reduced weight to maximize
+  speed";
+- 2.3 "add a pick hook";
+- 2.4 "start empty at production. but for validation runs seed from the replay ($OFH/memory_20261108/alias_memory). and at reduced
+  weight to maximize speed".
+
+**Thresholds (2.1).** min_n 3, p_worse 0.95, max_mean 0.35, floor 0.05, snapshot decay 0.8 are the `Thresholds` defaults in code and
+the content of each store's `thresholds.json`. The aggregator reads that file (it wins over the code) and writes it with the mode's
+defaults when it is missing. Every version's `meta.json` carries the thresholds it was built with; the sampler reads them from there.
+
+**Two modes, one switch, two stores (2.2 / 2.4).** `submit_fast.py submit ... --memory-mode production|validation` writes
+`ISPATIALGYM_ALIAS_MEMORY_MODE` into job.env. That one switch picks:
+- the store the job's sampler reads (pinned, as before, by `--alias-memory auto` = the mode store's LATEST);
+- the store its demos are aggregated into (`job_memory.sh <root> <tag> <code> <mode>` -> `alias_memory aggregate --mode <mode>`).
+
+| | production (default) | validation (opt-in) |
+|---|---|---|
+| store | `<root>/alias_memory` | `<root>/alias_memory_validation` |
+| demos aggregated | production-mode jobs only: starts EMPTY | the seed + jobs from before the modes (both marked `seed`) + validation-mode jobs |
+| customs / keys change | RESET (weight 0) | carried over at w = 1/3, flat |
+| seeded demo | (none) | w = 1/3, flat |
+| own context, older snapshot | 0.8 per newer snapshot | 0.8 per newer snapshot, never below w |
+| bootstrap | the first production job's batch aggregation | `alias_memory aggregate --root R --mode validation --no-gpu` (pins the seed in `seed.json`) |
+
+- Separation is enforced three times:
+  - each mode aggregates only its own demos;
+  - a store's `thresholds.json` carries its mode, and aggregating the other mode into it is refused;
+  - `submit_fast` refuses to pin a version of the other mode, and the sampler ignores one (`alias_memory.mode_mismatch`, memory off).
+- `--memory-mode validation` with no seeded store stops the submit and prints the bootstrap command.
+- Seed: `$OFH/memory_20261108/alias_memory`, LATEST at seeding = v0003 (2,383 demos of 99 aliases, the replay plus the i7_mem_smoke batch).
+
+**The weight (w = 1/3: three carried demos count as one fresh one).** Measured on the 2,375-demo replay and the v0003 seed:
+- inside_large_01's (right, 0.50, -0.60, 0.85 m) bin is 0 / 3. To be flagged, its mean 1 / (2 + 3w) must be <= 0.35, so w >= 0.286.
+  - At w = 1/3 it is flagged from the seed at a new snapshot under today's customs / keys: mean 0.333, P(worse) 0.991.
+  - At w = 0.25 it is not flagged (mean 0.36).
+- Carried-over evidence is discounted once, flat, not also by its age. Compounded with the 0.8-per-snapshot decay (the i7-memory
+  rule `customs_change x 0.8^k`), the bin is 4-5 snapshots old, and no weight below ~0.9 flags it (w 0.8: mean 0.373).
+- Seeded at w = 1/3, a validation store's first attempt defers exactly two bins, both with a failing record:
+  - inside_large_01 place above (0 / 3);
+  - inside_large_03 place (left, 0.0, -0.60, 0.65 m): 5 / 17, against a rest of 25 / 0.
+  - No pick bin is flagged from the seed.
+- Chronological replay (every demo judged by the memory of the batches before it, at the hooks' levels):
+
+| | later demos in flagged bins | failed | flagged bins (alias x bin) |
+|---|---|---|---|
+| production (reset) | 10 (place 0, pick 10) | 9 | 4 |
+| **validation w = 1/3** | **10 (place 1, pick 9)** | **8** | 5 |
+| validation w = 0.35 / 0.5 / 0.75 / 1.0 | 11 / 14 / 18 / 24 | 8 / 8 / 9 / 10 | |
+
+- At w = 1/3, every bin flagged had a failing record when it was flagged: at most 3 ok of 7 (the carried successes included), mean
+  <= 0.32. The rest of its alias stood at 0.65-0.80 (articulation_close_small_02: 0 / 8 vs 0.47).
+  - The one place demo flagged and then succeeding: ontop_small_01 (left, 0.25, -0.80, 0.35 m), 0 / 3 when flagged. It is a tabletop
+    place, which no hook steers.
+  - The pick demo flagged and then succeeding: inside_04 after i_fix13 (1 / 6 when flagged); also flagged in production.
+- From w = 0.5 on, bins healthy again after a fix are flagged: 6 of 14 later flagged demos succeeded.
+
+**Pick hook (2.3).** `alias_memory.reorder_pick` is the same `reorder` as the place hook (prior order kept; a flagged bin's candidates
+move to the end unless a Thompson draw keeps them, never below the 5 % floor; never removed; off or nothing flagged = the order unchanged,
+no random number drawn). It runs over the pick (manipulation) stance candidates at three sites:
+- `IORSLarge.sample_instance`: stance B, after the pre-screen order; the arm is the lead stance's.
+- `IORSSmall.sample_instance`: the manipulation stance, after the frame-aim / shelf orders; the default segment arm.
+- `ArticulationSmall.sample_instance`: the manipulation stance, after the depth preferences; the handle arm.
+
+- Key: arm x trunk (translate, tilt), then x stand-off (`PICK_HOOK_LEVELS` 2; back-off as the place hook).
+- Why not the grasp family: on the replay the stance-level findings were followed by failure in 9 of 10 later demos, the
+  family-level keys in fewer:
+  - (arm, entry, family): 6 of 10;
+  - (entry, family): 10 of 15;
+  - stance x stand-off x family: 10 of 12.
+- The family stays recorded and reported. ontop_small_02's top_11 family (10 ok / 10 failed with the right arm vs top_6 18 / 1) is
+  the one family finding; it overlaps the flagged trunk 0.25 bin.
+- Provenance: `extras["alias_memory_pick"]` on the candidate stance, so on the written pick / manipulation stance. Rows record it
+  as `sampled_with_pick`, and the job's `mode`.
+- Kit counters, per hook (`place` and `pick`):
+  - `alias_memory.<kind>.consulted`;
+  - `.flagged`: candidates in flagged bins;
+  - `.reordered`: moved to the end;
+  - `.explored`: kept in place by the draw / floor;
+  - besides `.no_down`, `.down_bins`, `.deferred`, `.kept_down`, `alias_memory.mode.<mode>` and `alias_memory.mode_mismatch`.
+- Not covered: the other tabletop families (attachment, block design, alignment, disembedding, articulation large / hybrid) keep
+  their order.
+
+**Replay outputs:** `$OFH/memory2_20261108` (`replay_production`, `replay_validation`; CPU job, snapshot below).
 
 ## Contact libraries and contact maps (branch `i7-contact`, 2026-11-07)
 
