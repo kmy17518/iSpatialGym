@@ -21,6 +21,7 @@ import omnigibson.utils.transform_utils as T  # noqa: E402
 
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
 from ispatialgym.robot.conventions import CONTACT_CENTER_Z, FINGER_OPEN, NOMINAL_BASE_Z, camera_offset_in_zed, q_with_base_pose, torso_q, torso_q_to_translate_tilt  # noqa: E402,F401  (moved to robot/conventions, F5)
+from ispatialgym.sampling import attempt_cap as AC  # noqa: E402  (i7-stancememo 5x.3: the per-attempt cap, checked at the expensive queries)
 from ispatialgym.sampling import geometry as G  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling")
@@ -224,6 +225,7 @@ class RobotKit:
         return self.backend.world_sphere_hits(spheres_world, float(margin))
 
     def collision_free(self, qs: th.Tensor, margin: float = 0.01, sync: bool = False) -> th.Tensor:
+        AC.check("kit.collision_free")
         qs = G.t(qs)
         if qs.ndim == 1:
             qs = qs.unsqueeze(0)
@@ -239,6 +241,7 @@ class RobotKit:
     # ------------------------------------------------------------------ IK
 
     def ik(self, eef_pose: G.Pose, q_seed: th.Tensor, arm: str = "right", torso: bool = False) -> Optional[th.Tensor]:
+        AC.check("kit.ik")
         emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
         self._ensure_synced()
         t0 = time.time()
@@ -252,6 +255,7 @@ class RobotKit:
         :meth:`ik` (``backend.solve_ik(return_all=True)``), which keeps only the solution nearest to the seed; the caller picks
         (``IKChecker`` prefers the one clear of the joint limits). Timed like :meth:`ik` (``ik_calls`` / ``ik_s``) plus ``ik_all_calls``.
         Train-fast 2026-10-31 (LIMIT_RETRY_RETURN_ALL)."""
+        AC.check("kit.ik_all")
         emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
         self._ensure_synced()
         t0 = time.time()
@@ -268,6 +272,7 @@ class RobotKit:
         chain tracking and the witness polish of ``IKChecker``), timed into ``ik_path_calls`` / ``ik_path_s`` / ``ik_path_waypoints``
         (train-fast 2026-10-31: the largest formerly uninstrumented cost). The world is NOT re-synced here (the callers hold their
         ignore contexts); pass ``sync_world`` explicitly to change that."""
+        AC.check("kit.ik_path")
         t0 = time.time()
         try:
             return self.backend.solve_ik_path(emb, waypoints, q_start=q_start, **kw)
@@ -369,6 +374,7 @@ class RobotKit:
         (embodiment, batch size, seeds), so a small anchor batch may ask for 32 seeds without touching the screening solver."""
         if len(poses) == 0:
             return th.zeros(0, dtype=th.bool), th.zeros(0, 28)
+        AC.check("kit.ik_batch")
         self._ensure_synced()
         t0 = time.time()
         emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"

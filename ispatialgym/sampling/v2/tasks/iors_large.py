@@ -142,6 +142,7 @@ import torch as th
 
 from ispatialgym import REPO_ROOT
 from ispatialgym.sampling import alias_memory as AM
+from ispatialgym.sampling import attempt_cap as AC
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling import reach_bands as RB
@@ -3248,7 +3249,8 @@ class IORSLarge(SamplerV2):
         old = [round(float(v), 3) for v in keep["c_t"].tolist()]
         t0 = time.time()
         try:
-            self.try_surface("floor", None, np.random.default_rng([int(self.ctx.base_seed), int(index), int(attempt), 5]))
+            with AC.suspended():  # a start draw: never cut inside (5x.3)
+                self.try_surface("floor", None, np.random.default_rng([int(self.ctx.base_seed), int(index), int(attempt), 5]))
         except Reject as e:
             self.surface = keep
             m.search_fails = 0
@@ -3657,6 +3659,7 @@ class IORSLarge(SamplerV2):
     def _check_deadline(self, stage: str) -> None:
         """Per-attempt time budget (``ATTEMPT_BUDGET_S``): the attempt stops with ``Reject("time_budget")`` naming the stage
         it reached once the budget is spent (a > 2 h attempt is a bug, not a search)."""
+        AC.check(f"iors_large: {stage}")  # i7-stancememo 5x.3: the adaptive cap (ISPATIALGYM_ATTEMPT_CAP) names the stage it cut
         deadline = getattr(self, "_deadline", math.inf)
         if time.time() > deadline:
             spent = time.time() - getattr(self, "_attempt_t0", deadline)

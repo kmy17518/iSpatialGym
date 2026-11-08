@@ -38,6 +38,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import attempt_cap as AC
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.sim_utils import Reject
@@ -794,6 +795,7 @@ class Attachment(SamplerV2):
     def _check_deadline(self):
         """Per-attempt time budget (owner 2026-09-16 10:47 item 3: an attempt stays under ~5 min): the current candidate
         stops with ``Reject("time_budget")`` once it is spent."""
+        AC.check("attachment: the search")  # i7-stancememo 5x.3: the adaptive cap (ISPATIALGYM_ATTEMPT_CAP)
         if time.time() > getattr(self, "_deadline", math.inf):
             raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
 

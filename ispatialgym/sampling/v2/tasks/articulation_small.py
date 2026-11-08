@@ -40,6 +40,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import attempt_cap as AC
 from ispatialgym.sampling import constraints as CN
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import reach_bands as RB
@@ -1124,6 +1125,7 @@ class ArticulationSmall(SamplerV2):
     SECOND_STANCE_MAX = 10
 
     def _check_deadline(self):
+        AC.check("articulation_small: the search")  # i7-stancememo 5x.3: the adaptive cap (ISPATIALGYM_ATTEMPT_CAP)
         if time.time() > getattr(self, "_deadline", math.inf):
             raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
 
