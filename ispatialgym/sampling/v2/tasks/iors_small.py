@@ -227,8 +227,11 @@ PLACE_DEPTH_CAP_REDRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_REDRAW"
 PLACE_DEPTH_CAP_REDRAWS = 8
 #: follow-up (c), the draw itself: "1" = Phase 2's (stance, position) pairs are cut to the cap (``keep_pairs``: the start / place positions
 #: the attempt draws from lie within the push's reach; an empty class falls back as Phase 2 does) - the redraw above re-draws whole starts,
-#: this draws the position within the cap. Enters the start-per-attempt cell cache key when on. Default "0".
+#: this draws the position within the cap. Enters the start-per-attempt cell cache key when on. Default "1" since the owner's 5r.1
+#: (2026-11-08; A/B c3_fu_c2: attempts losing every candidate 47 -> 0, written per attempt touching_04 0.044 -> 0.11, touching_02 0.045 ->
+#: 0.16); "0" = the draw of before
 PLACE_DEPTH_CAP_DRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_DRAW"
+PLACE_DEPTH_CAP_DRAW_DEFAULT = "1"
 #: follow-up (b): the cap's basis - "map" (default: the deepest feasible map cell at any yaw / lateral from the base stand-offs that are
 #: collision-free at the candidate's own lateral) or "a1" (A1's own push stance test, :meth:`IORSSmall.push_stance_candidates` with the
 #: collision check, for the target at the candidate's focus at each map yaw slot: the same basis as the partner-draw gate)
@@ -263,7 +266,7 @@ def place_depth_cap_redraw_on() -> bool:
 
 
 def place_depth_cap_draw_on() -> bool:
-    return (os.environ.get(PLACE_DEPTH_CAP_DRAW_ENV) or "0").strip() == "1"
+    return (os.environ.get(PLACE_DEPTH_CAP_DRAW_ENV) or PLACE_DEPTH_CAP_DRAW_DEFAULT).strip() == "1"
 
 
 def place_depth_cap_basis() -> str:

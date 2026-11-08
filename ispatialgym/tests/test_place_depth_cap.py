@@ -232,9 +232,10 @@ def test_phase2_keep_pairs_draws_within_the_cap(monkeypatch):
     """(c): with the draw switch on (and the cap on) Phase 2's keep_pairs keeps the (stance, position) pairs within the cap."""
     me, stats = _me(monkeypatch, _Map(0.75), free=lambda st: float(st.stand_off) >= 0.35 - 1e-9)
     me._pdc_keep_pairs = IS.IORSSmall._pdc_keep_pairs.__get__(me)
-    monkeypatch.delenv(IS.PLACE_DEPTH_CAP_DRAW_ENV, raising=False)
+    monkeypatch.setenv(IS.PLACE_DEPTH_CAP_DRAW_ENV, "0")
     assert me._pdc_keep_pairs() is None
-    monkeypatch.setenv(IS.PLACE_DEPTH_CAP_DRAW_ENV, "1")
+    monkeypatch.delenv(IS.PLACE_DEPTH_CAP_DRAW_ENV, raising=False)
+    assert IS.place_depth_cap_draw_on() and IS.PLACE_DEPTH_CAP_DRAW_DEFAULT == "1"  # the default since the owner's 5r.1 (2026-11-08)
     keep = me._pdc_keep_pairs()
     cands = [_cand(0.50), _cand(0.40), _cand(0.30)]
     assert keep(cands) == cands[1:] and stats["place_depth_cap.phase2_removed"] == 1
