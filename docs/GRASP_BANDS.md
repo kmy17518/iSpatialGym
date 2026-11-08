@@ -2450,6 +2450,33 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+### touching_03 round 2 (owner 2026-11-08, `prompt_t03_round2.md`; branch `i7-t03`, all switches DEFAULT OFF)
+
+Merged of-v2maps cf1f5d2d first (98c2e9b4; the integration's support hull fallback default kept; i7-t03's round-1 switches stay off).
+
+**Diagnostic 0** (copies of trunk_98c2e9b4 with `t03_20261108/patch_drive_diag.py`, log only): the failing carried drives to the release
+stance drove 0.14-0.25 m while the free gap between the lifted book and the partner was 0.11-0.12 m; every drive first collided at
+s = 0.12-0.14 m, the ATTACHED BOOK + left finger 2 against the PARTNER book. The release's clear pose (15 cm back along the horizontal
+approach: 0.38 m in front of the base) fails the IK with the support and the partner removed - a reach limit, not a collision bug.
+
+- **(a) `ISPATIALGYM_SHELF_FREE_START`** (d510403d, 832fad79, fix 67a1ab4a): `IORSSmall.shelf_free_start` - the edge init stance when it
+  frames the target AND the partner, else `iors_large.free_floor_stance` (factored out of `IORSLarge.free_start_stance`, behaviour unchanged)
+  with that test; the drive to the edge stance = `prompt0.connect` + the shelf back-off arrival (`core.record_stance_travel`). A travel
+  failure from a free start no longer drops the candidate (67a1ab4a). Called once at the top of `sample_instance`; `_spa_redraw_start_cached`
+  is untouched (i7-startdraw). Kit `free_start.edge_ok / .used / .failed.*`.
+- **(b) `ISPATIALGYM_SHELF_JOINT_STANCE`**: `shelf_fixed_start` / `shelf_stance_shift` judge each stance on the fixed-start grasp AND the tip
+  release at the drafted goal (`shelf_release_why`: `place_infeasible_why` at `goal_pose` of the start poses); both first, grasp-only the
+  fallback. Kit `stance_shift.both_passed / .grasp_only / .rejected.release`.
+- **(c) `ISPATIALGYM_SHELF_RELEASE_IN_GAP`** (2f815f1b): the release stances = the manipulation stance, then drives toward the partner of
+  0.25-1.0 x (free gap - `carry_path_margin_m`). Kit `shelf_release.drive_in_gap / .no_stance / .no_room`.
+- **(d) `ISPATIALGYM_SHELF_LIFT_STRAIGHTEN`** (approved oracle + contact-rule change): `grasps.lift_turn` (the upright turn, refused when the
+  upright book would reach the board above: `shelf_lift.straightened / .no_headroom`), oracle `Lift.turn`, `program_check.lift_end_pose`;
+  `grasps.lift_leaned_piece`: at the lift only, the attached book may touch the board it leaned on (hull >= 0), every robot link clear of it
+  (`lift_with_touch`; the program check's lift ignores that piece). Kit `shelf_lift.leaned_board_touch_allowed / _refused.*`.
+
+A/B (legacy, N 4, 300100-103, kmuacd template only): a (trunk_2f815f1b) 320 att / 0 written, 1.79 GPU-h; b / c / d rerun on
+trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d's switches - numbers in DECISIONS "i7-t03 ROUND 2".
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
