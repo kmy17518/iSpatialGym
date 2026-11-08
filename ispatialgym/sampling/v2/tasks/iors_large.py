@@ -155,7 +155,7 @@ from ispatialgym.sampling.v2 import overhang as OH
 from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, register, start_draw_active, start_facts
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import neighbors as NB
@@ -757,6 +757,8 @@ class SegmentArms:
 
 @register(*RELATION_OF_SUBTASK)
 class IORSLarge(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     relation_mode: Optional[type] = None  # the relation's mode class once adopted (inside / touching / nextto)
 
     def __init__(self, ctx):
@@ -2261,15 +2263,17 @@ class IORSLarge(SamplerV2):
         self.surface["n_c"] = len(c_survivors)
         self.template_facts["stances"] = {"init": self.surface["init"].to_meta(), "n_manipulation_candidates": len(self.surface["manip"]), "n_placement_candidates": len(c_survivors)}
 
-    def try_support_surface(self, support, rng: np.random.Generator):
+    def try_support_surface(self, support, rng: np.random.Generator, top: Optional[SupportTop] = None):
         """Stances A and B on a support (tabletop Phases 1a / 1b / 1c / 2 of ``tabletop.py``): per edge (random order)
         the init trunk, the lateral draw redrawn (≤ 6) until the partner is visible (≥ 4 / 8 corners + centre), the
         Phase-2 survivors with the band of (support, target) - with every offered arm's band (owner 2026-09-27, first-demo v2.2:
-        ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``)."""
+        ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``). ``top``
+        (i7-startdraw, the per-attempt draw): the template's top of this support instead of measuring it again."""
         self.kit.sync_world()
         offered = TT.offered_arms(self)
         half, height = self.target_dims()
-        top = TT.support_surface(self, support, ignore=[self.target], height=height)
+        if top is None:
+            top = TT.support_surface(self, support, ignore=[self.target], height=height)
         if int(top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
         self.surface["top"] = top
@@ -2323,6 +2327,34 @@ class IORSLarge(SamplerV2):
                                  "arm_bands": dict(arm_bands or {offered[0]: getattr(self, "bands", None)})})
             return
         raise Reject("no_free_edge", f"{support.name}: " + ("; ".join(errors) or "no edge with a free, collision-free stance"))
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own stances A and B on the template's init surface
+        (bound in the BDDL, so it stays) from the attempt's ``rng`` - the template's own draw: on the floor :meth:`try_floor_surface` (the anchor
+        cell c_t, stance B facing it, stance A with the target and the partner in frame and the A -> B leg), on a support
+        :meth:`try_support_surface` (edges in random order, Phase 1b / 1c with the goal region in frame - or ``free_start`` -, Phase 2) on the
+        template's top. The template's stance-C existence test is not repeated: the attempt draws its stance-C pool itself (``sample_instance``).
+        A draw that finds none keeps the template's surface for the next attempt. The nextto / base-push modes (no init surface) draw their
+        stance A per attempt already. Off: the template's start."""
+        if not start_draw_active(self):
+            return
+        keep = dict(self.surface or {})
+        kind = keep.get("kind")
+        if kind is None or keep.get("init") is None:
+            return
+        self.surface = {"kind": kind, "obj": keep.get("obj"), **({"n_c": keep["n_c"]} if "n_c" in keep else {})}
+        try:
+            if kind == "floor":
+                self.try_floor_surface(rng)
+            else:
+                self.try_support_surface(keep["obj"], rng, top=keep.get("top"))
+        except Reject:
+            self.surface = keep
+            raise
+        init = self.surface["init"]
+        edge = self.surface.get("edge")
+        self._spa_facts = start_facts("floor" if kind == "floor" else edge, init, self.surface["manip"], kind=kind,
+                                      **({"c_t": [round(float(v), 4) for v in self.surface["c_t"].tolist()]} if kind == "floor" else {}))
 
     def goal_region_points(self, from_xy) -> th.Tensor:
         """Owner decision 2026‑09‑16 (a)/(d): the **relevant region** of the partner stance A must see — ontop: the top-face

@@ -1355,6 +1355,10 @@ class NextToMode:
     the goal, the settle and the goal check are the base push's (module docstring). No grasp: no library grasps, no bands, no init
     surface, no placement constraint records."""
 
+    #: i7-startdraw: stance A is drawn per attempt already (``_stance_a`` per goal candidate of the attempt's draw) - the START_DRAW switch
+    #: leaves the mode as it is
+    START_DRAW_FAMILY = False
+
     def prepare_bindings(self):
         try:
             prepare(self)

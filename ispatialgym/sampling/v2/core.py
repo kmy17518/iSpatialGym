@@ -68,11 +68,42 @@ from ispatialgym.sampling.v2.stances import PathRecord, SidecarDraft, Stance, Tr
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
-def start_per_attempt() -> bool:
+def start_per_attempt(s: Any = None) -> bool:
     """train85 (owner 2026-10-14 ~20:45): ``ISPATIALGYM_START_PER_ATTEMPT=1``, set only by the train jobs, makes every attempt draw
     its own start (:meth:`SamplerV2.spa_redraw_start`) instead of the start ``sample_template`` drew once per template from the
-    template seed; each instance's start is in its own TRO / sidecar. Unset: nothing changes."""
-    return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1"
+    template seed; each instance's start is in its own TRO / sidecar. Unset: nothing changes. i7-startdraw (owner 2026-11-08 3.5):
+    also True for a sampler ``s`` of a start-draw family while ``ISPATIALGYM_START_DRAW=1`` (:func:`start_draw_active`)."""
+    return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1" or (s is not None and start_draw_active(s))
+
+
+def start_draw_on() -> bool:
+    """i7-startdraw (owner 2026-11-08 3.5, "templates should never fix the robot's start base"): ``ISPATIALGYM_START_DRAW=1`` makes the
+    start-draw families (``SamplerV2.START_DRAW_FAMILY``: alignment-axial, articulation open / close small, attachment, block_design,
+    disembedding, IORS large inside / ontop / under / touching - nextto and the touching base push draw their stance A per attempt
+    already - and IORS small) draw the robot's start base per ATTEMPT from the attempt's rng: the template's own start search (edges in
+    random order, Phase 1b / 1c with every check it makes, the family's frame rule, Phase 2 from the drawn start) rerun per attempt
+    (:meth:`SamplerV2.spa_redraw_start`); implies :func:`start_per_attempt` for those samplers. Unset / 0: nothing changes."""
+    return os.environ.get("ISPATIALGYM_START_DRAW") == "1"
+
+
+def start_draw_active(s: Any) -> bool:
+    """:func:`start_draw_on` and ``s`` is a sampler of a start-draw family (``START_DRAW_FAMILY``)."""
+    return start_draw_on() and bool(getattr(s, "START_DRAW_FAMILY", False))
+
+
+def start_facts(edge: Any, init: Any, cands: Sequence[Any], **extra: Any) -> Dict[str, Any]:
+    """i7-startdraw: the drawn start's facts (``_spa_facts``: the attempt log line, ``summary.start_per_attempt``) - the edge, the lateral, the
+    trunk, the base pose and the size of the Phase-2 pool drawn from it."""
+    return {"edge": getattr(edge, "name", edge), "lateral_m": None if getattr(init, "lateral", None) is None else round(float(init.lateral), 4),
+            "trunk": [round(float(init.translate), 3), round(float(init.tilt), 3)], "base_pose2d": [round(float(v), 4) for v in init.base_pose2d],
+            "n_manipulation_candidates": len(cands), **extra}
+
+
+def _kit_count(s: Any, key: str) -> None:
+    """``tabletop._count`` (a kit counter in ``kit.stats``) without the import cycle."""
+    st = getattr(getattr(s, "kit", None), "stats", None)
+    if isinstance(st, dict):
+        st[key] = st.get(key, 0) + 1
 
 
 class TemplateExhausted(Reject):
@@ -244,6 +275,9 @@ class SamplerV2(TaskSampler):
     """Base of every v2 task module (README "How a task module plugs in")."""
 
     subtasks: Tuple[str, ...] = ()
+    #: i7-startdraw (owner 2026-11-08 3.5): the module's ``sample_template`` fixes the start base, and its ``spa_redraw_start`` draws it per
+    #: attempt under ``ISPATIALGYM_START_DRAW=1`` (:func:`start_draw_active`)
+    START_DRAW_FAMILY: bool = False
     #: settle steps of §3.5 (90 + 10 in ``SimWorld.settle``); goal check 120
     DEFAULT_SETTLE_STEPS = 90
     GOAL_SETTLE_STEPS = 120
@@ -316,6 +350,26 @@ class SamplerV2(TaskSampler):
         """This attempt's own start drawn from the attempt's ``rng`` (:func:`start_per_attempt`): the task modules whose
         ``sample_template`` fixes the start for the template override it; the others draw the start per attempt already."""
 
+    def spa_draw(self, rng: np.random.Generator) -> None:
+        """The attempt's start (:meth:`spa_redraw_start`) timed (``_spa_draw_s``); with ``ISPATIALGYM_START_DRAW`` (i7-startdraw) the kit
+        counters ``start_draw.drawn`` / ``start_draw.edge.<edge>`` / ``start_draw.rejected.<reason>`` and one log line with the drawn start
+        (``template_meta.template_facts`` is the snapshot ``run_template`` took: an attempt's search does not reach it)."""
+        active = start_draw_active(self)
+        t_spa = time.time()
+        try:
+            self.spa_redraw_start(rng)
+        except Reject as e:
+            if active:
+                _kit_count(self, f"start_draw.rejected.{e.reason}")
+            raise
+        self._spa_draw_s = time.time() - t_spa
+        if active:
+            facts = getattr(self, "_spa_facts", None) or {}
+            _kit_count(self, "start_draw.drawn")
+            if facts.get("edge"):
+                _kit_count(self, f"start_draw.edge.{facts['edge']}")
+            log.info("%s: START_DRAW: start drawn %s", self.gp.variant, facts)
+
     def spa_template_start(self, errors: List[str], draws: int = 8) -> None:
         """start_per_attempt: the template's own start draw found no start with the template seed's draw; up to ``draws`` more draws
         from derived streams (every attempt draws its own start anyway: the template's start only shows that one exists, and one
@@ -382,7 +436,7 @@ class SamplerV2(TaskSampler):
         from ispatialgym.sampling.v2 import tabletop as TT
 
         self.sidecar.reset_instance()
-        if start_per_attempt():
+        if start_per_attempt(self):
             full = getattr(self, "_split_cone_cands", None)
             # oracle-fix 2026-11-06 (zero-yield survey, ontop_small_04 / inside_04): a task that drew this attempt's start before calling here
             # (``_spa_drawn``: iors_small.sample, whose spa_redraw_start rebuilds manip_candidates for the new start) keeps that list - the
@@ -395,15 +449,13 @@ class SamplerV2(TaskSampler):
                 # position (only iors_small's spa_redraw_start rebuilds the list): the template's full list goes back first
                 self.manip_candidates = list(full)
             if not getattr(self, "_spa_drawn", False):
-                t_spa = time.time()
-                self.spa_redraw_start(rng)
-                self._spa_draw_s = time.time() - t_spa
+                self.spa_draw(rng)
             self._spa_drawn = False
             self._split_cone_cands = self._split_cone_pools = None
             log.info("%s: start_per_attempt: start drawn in %.1fs: %s", self.gp.variant, getattr(self, "_spa_draw_s", 0.0), getattr(self, "_spa_facts", None))
         TT.split_cone_draw(self, rng)
         draft = self.sample_instance(rng)
-        if start_per_attempt():
+        if start_per_attempt(self):
             draft.summary["start_per_attempt"] = {**(getattr(self, "_spa_facts", None) or {}), "draw_s": round(float(getattr(self, "_spa_draw_s", 0.0)), 2)}
         if draft.robot_q is None and "init" in self.sidecar.stances:
             st = self.sidecar.stance("init")
@@ -1278,7 +1330,7 @@ class SamplerV2(TaskSampler):
             summary["visibility"] = "pending"
         with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
             json.dump(_jsonable(summary), f, indent=2)
-        if start_per_attempt():
+        if start_per_attempt(self):
             self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
         elif "stances" not in self.template_meta:
             self.template_meta["stances"] = {k: v.to_meta() for k, v in self.sidecar.stances.items()}
@@ -1357,6 +1409,8 @@ class SamplerV2(TaskSampler):
         why = check_record(rec)
         if why:
             self.counters["repeats_eval_early"] = self.counters.get("repeats_eval_early", 0) + 1
+            if start_draw_active(self):
+                _kit_count(self, "start_draw.repeat_rejected")
             raise Reject("repeats_eval", f"early: {why}")
 
     def check_instance_filter(self, tro_path: str) -> None:
@@ -1366,6 +1420,8 @@ class SamplerV2(TaskSampler):
         if self.instance_filter is None:
             return
         why = self.instance_filter(tro_path)
+        if start_draw_active(self):
+            _kit_count(self, "start_draw.repeat_rejected" if why else "start_draw.repeat_passed")
         if not why:
             return
         for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), tro_path.replace("-tro_state.json", ".summary.json")):
@@ -1647,7 +1703,7 @@ class SamplerV2(TaskSampler):
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
-                    if isinstance(e, TemplateExhausted) and not start_per_attempt():
+                    if isinstance(e, TemplateExhausted) and not start_per_attempt(self):
                         exhausted = True
                         self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1
                         log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.variant, index, attempt)

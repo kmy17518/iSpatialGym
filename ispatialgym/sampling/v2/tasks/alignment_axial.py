@@ -45,7 +45,7 @@ from ispatialgym.sampling.tro_writer import pose_target
 from ispatialgym.sampling.v2 import contact_poses as CPZ
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
 
 import omnigibson as og  # noqa: E402
@@ -78,6 +78,8 @@ def _axis(name: str) -> th.Tensor:
 
 @register(SUBTASK)
 class AlignmentAxial(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
@@ -167,9 +169,25 @@ class AlignmentAxial(SamplerV2):
         w_diag = 0.5 * math.hypot(long_len, short_len)
         margins = {"kind": "axial", "w_diag": w_diag, "safety": 0.02, "H_max": ez}
         self.extents = {"long": long_len, "short": short_len, "height": ez, "w_diag": w_diag}
-        ev = self.g("edge_visibility") or {}
+        self._start_margins = margins
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
+                                    "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
+                                    "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2 survivors:
+        free floor, whole-body collision-free), the init trunk (Phase 1b), <= 8 lateral draws (Phase 1c: floor, collision, trunk sweep) with
+        the reference edge in frame from the init camera (the translate moved within its range first), the Phase-2 survivors that see the
+        front edge. Sets ``edge_frame`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes; the
+        edges' failures go to ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
+        ez, w_diag = float(margins["H_max"]), float(margins["w_diag"])
+        ev = self.g("edge_visibility") or {}
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
@@ -213,16 +231,21 @@ class AlignmentAxial(SamplerV2):
                 if not cands:
                     raise Reject("edge_not_visible", "no Phase-2 survivor sees the front edge")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
-                                    "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
-                                    "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge, init stance and Phase-2 pool from the
+        attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it makes; off: the template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        if not self._start_search(rng, self._start_margins, errors):
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates)
 
     def _edge_visible_points(self, stance: Stance, cam, target_lat: float, target_pose: Optional[TT.Pose], with_in_frame: bool = False):
         """§6.10 reference edge: of 9 points along the front edge over [λ − 0.30, λ + 0.30], how many are in frame (5 %) and
