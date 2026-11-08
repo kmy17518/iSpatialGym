@@ -2232,6 +2232,63 @@ over the kit blocks by `$OFH/plateqtf2_20261108/tab_pq2.py`, the same script on 
 - Overlay merged after the batch: `$OFH/map_overlay` release r2 (ce1af987a8df9d69 v2 212 entries / 29 invalidated / 179 confirmed,
   b2f36adb26c194ad v2 92 / 15 / 71, + 3 new map keys of attachment_03 / inside_01).
 
+### i7-contactfu (owner decisions 2026-11-08 01:45, part A; branch `i7-contactfu` from 521dc344)
+
+- **A1 touching_02 push stance** (`iors_small.push_stance_candidates`, sampler-only): the push stance moves along the edge AND toward /
+  away from it - stand-offs `PUSH_STANCE_STAND_OFFS_M` (0.15-0.55) plus the manipulation stance's, chosen from the target's `touch_push`
+  map at its place pose (brace-map fits first, then the stand-off nearest the manipulation stance's), limited by the whole-body collision
+  check (the base's distance to the table); at most 8 get the exact push chain. The partner draw (`place_partner`, v2only) tests the maps
+  over those push stances; a partner whose push fails the map from every push stance at all 8 positions rejects `contact_unreachable` at
+  the draw (kit `touch_push.partner_rejected`) instead of ~30 s later. Kit `touch_push.stand_off_moved` / `.gate_at_push_stance`.
+- **A2 touching_02 tipping**: a scene load of the demo (fix2 300008) found NO physics material on the bar, the boxes or the grippers and
+  no scene default (PhysX default 0.5 / 0.5 / 0, average) - the same as the validator; both boxes 0.5 kg (iucshm s0.8 density 342 kg/m3),
+  same COM, solver iterations, sleep settings. The difference was the validator's partner stand-in: built `kinematic_only=True` without a
+  fixed base, which OmniGibson ignores (`compute_kinematic_only`: no fixed base -> dynamic) - a 2.4 kg dynamic box that gave way under the
+  tilting target (the demo's partner is held by the left brace: it moved 5 mm). Fix: `STOP_STANDIN_KINEMATIC` (fixed_base + kinematic).
+  Replay at the default friction 0.5: VALID (tilt 0.000, orientation err 0.0025, touch gap 2.0 mm; was 0.463 rad). The brace-load pusher is
+  built the same way (dynamic) - not changed (it would move brace verdicts; owner question).
+- **A3 hand-overlap screen**: enforced; `ISPATIALGYM_HAND_OVERLAP_RANK` and `validate_contacts --screen-as-rank` stay default off; the
+  stratified validation marks screened entries `screened` and never counts them.
+- **A4 axial_02 repeats** (analysis, `$OFH/contactfu_20261108/a4/`): `instance_separation.measured_repeat` (base <= 0.25 m / 15 deg + the
+  task tolerances: goal and start orientation within 0.1 rad) against 2 eval instances (start yaw delta +24.3 / +34.4 deg, the same pinned
+  init base) -> a draft repeats iff delta in [18.6, 40.1] deg. The jhaltj s1x1x2.5 `push_blade` map admits at the drawn cells (x 0.79-0.91)
+  only `+end-spin_0@t25` (delta 22-34 deg: inside the window) - the map gate narrows the start onto the eval instances (6 classes, turns 25 /
+  45 only, 30 / 48 valid). Proposals: widen the library (turns 35 / 55 / 65, the -end 45 class, 16 yaw slots), order candidate stances by
+  map coverage; drawing delta outside the eval windows touches the repeat path (owner).
+- **A5 axial brace pairing** (`alignment_axial._scan_candidates`, v2only, map lookups only): per candidate stance (the first 6), the placement
+  draws until one has a PAIR - one pushed end whose `push_blade` class (init root) and `axial_brace` class (goal root) both fit, the same
+  end and spin in both maps; the paired stances first, else the first push-feasible draw (push-only); the paired end is tried first. Kit
+  `axial_brace.paired` / `.push_only`. axial_01-04 have no orientation equivalences: one goal yaw per stance.
+- **A6 stratified validation + learned maps**: `validate_contacts --per-group-valid 3 --per-group-max 8` (`GroupQuota`: per (yaw x end x
+  spin) group, library order, round-robin; kept verdicts with `--skip-validated`; a fresh run moves unreached old verdicts to
+  `validation_prev`); maps from VALID entries only. Learning (`sampling/contact_overlay.py`, the ONE overlay mechanism of
+  `v2/map_tilt.py`): the sampler notes the executed library entry per instance (`summary.contact_entries`: lineage key, class, yaw slot),
+  `python -m ispatialgym.sampling.contact_overlay harvest <job dirs>` turns each SUCCESSFUL demo into `ok` events
+  (`<job>/map_overlay/<lineage>/harvest__<instance>.jsonl`, immutable), `python -m ispatialgym.sampling.v2.map_tilt merge --root R` folds
+  them into `R/<lineage>/v<N>.json`, `contact_maps compute --overlay-root R` (job_contacts.sh `GC_MAP_OVERLAY`) rebuilds with the
+  confirmed entries joined; the map identity carries `{lineage, version}`; frozen maps are never edited.
+- **A6 run** (trunk_1da26c1c; `$OFH/contactfu_20261108/submit_gpu.sh`): touching push FRESH (the stand-in changed) on
+  `contact_libs_20261108s`: valid cereal iucshm 12 (groups short 4 / 8: 4 yaw slots with no valid entry), napkins 14 (short 4), spray 22
+  (short 1), 43-44 entries tried each, 578-883 s per library; touching brace kept (dkhgxn 40, ntbrtz 32 valid, 3 / group everywhere, 0 s);
+  axial (`contact_libs_axial_20261108s`, kept + stratified) push qgvsnb 101 (short 0), injrgc 62 (short 14), tfovwy 86 (short 8), brace
+  104 / 97 (short 3) / 120; jhaltj s1x1x2.5 (`_20261108sj`) push 80 (short 6), brace 96. GPU: touching ~0.6 h, axial ~4.8 h (tfovwy push
+  6725 s, jhaltj push 5381 s - the slow re-contact pushes); today's capped run: 48 entries / library, 470-3330 s. Maps (valid only) staged
+  in `v2maps_i7contactfu_t` (touching) / `_a` (axial). job_contacts.sh: the maps stage now maps the validate stage's partition (the
+  library-id partition let shard 1 map the napkins / cereal push libraries before their validation ended; rebuilt).
+- **A1 runs** (touching_02 v2only N 4, v2maps_i7contactfu_t; i7_contact2 before: 150 att / 1 written / 1 ok, 107 contact_unreachable,
+  1.21 GPU-h): i7_contactfu (trunk_1da26c1c, map-only partner test) 112 att / 3 wr / 3 ok, 53 contact_unreachable, 0.32 GPU-h per
+  success; the A1 log showed the map fits at 14-18 of 28 (lateral x stand-off) candidates but only 2-6 pass the collision check (the base
+  cannot go closer than ~0.30-0.35 m at the bar), so the partner test now includes it (89dd63aa): i7_contactfu2 82 att / 3 wr / 3 ok
+  (brace present 3 / 3), contact_unreachable 11, 45 partner draws rejected at ~1-6 s, 0.20 GPU-h per success; the recorded push stances
+  moved 0.10 / 0.25 / 0.10 m toward the bar (stand-offs 0.45 / 0.30 / 0.35).
+- **Overlay trial**: `contact_overlay harvest` over the i7_contactfu jobs: 13 successes -> 16 ok events in 5 lineages (1 entry not in its
+  map: it would join), merged to `$OFH/contactfu_20261108/overlay_trial/<lineage>/v1.json`; no map rebuilt.
+- **A5 run** (i7_contactfu, v2maps_i7contactfu_a): axial_01 11 att / 4 wr / 4 ok, axial_03 6 / 4 / 3, axial_04 17 / 4 / 3 (12 written,
+  10 / 12 demos, 0.125 GPU-h per success); kit `axial_brace.paired` 5 / `.push_only` 35 (scan per attempt); brace present 0 / 12 - axial_04
+  3 instances had a map pair but the exact two-arm brace failed (side contacts all sweep-skipped, blades IK at the pre / target at goal):
+  the brace library is built at one turn (45 deg, `AXIAL_TURN_DEG`) while the sampler's sweep test uses the drawn turn; axial_01 now draws
+  both spins (2 / 2; i7_contact2 all +1).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

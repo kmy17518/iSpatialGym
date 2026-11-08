@@ -399,6 +399,38 @@ def test_the_brace_pusher_drives_the_partner_into_the_brace():
     assert path[0][2] == pytest.approx(0.81 + 0.121) and len(path) - 1 == math.ceil((cfg.brace_pusher_gap_m + cfg.brace_press_m) / (cfg.brace_pusher_speed_m_s / 30.0))
 
 
+def test_the_touching_partner_stand_in_is_kinematic(monkeypatch):
+    """i7-contactfu (owner A2): OmniGibson honours kinematic_only only with a fixed base - the stand-in is built with both (the scene probe
+    found it dynamic, 2.4 kg, before)."""
+    import sys
+    import types
+
+    made = []
+
+    class _Prim:
+        def __init__(self, **kw):
+            made.append(kw)
+
+        def set_position_orientation(self, *a):
+            pass
+
+    mod = types.ModuleType("omnigibson.objects.primitive_object")
+    mod.PrimitiveObject = _Prim
+    monkeypatch.setitem(sys.modules, "omnigibson.objects.primitive_object", mod)
+    w = VC.KitContactWorld.__new__(VC.KitContactWorld)
+    w.cfg, w._stop = VC.ContactValidateConfig(), None
+    w.tw = SimpleNamespace(th=th, scene=SimpleNamespace(add_object=lambda o: None), og=SimpleNamespace(sim=SimpleNamespace(step=lambda: None)))
+    w._stop_obj()
+    assert made and made[0]["fixed_base"] is True and made[0]["kinematic_only"] is True
+    try:
+        from omnigibson.utils.usd_utils import compute_kinematic_only
+    except Exception:  # noqa: BLE001 - no OmniGibson here: the kwargs above are the contract
+        return
+    sc = th.tensor(VC.ContactValidateConfig().stop_size_m)
+    assert compute_kinematic_only(made[0]["fixed_base"], sc, 0, 0, made[0]["kinematic_only"], False)
+    assert not compute_kinematic_only(False, sc, 0, 0, True, False)  # the old construction was dynamic
+
+
 def test_validate_library_writes_each_entrys_verdict_and_the_timing(glib):
     lib = CL.build_job(_job("box_of_cereal__iucshm__s0.8", ["touching_push"], params={"touching_push": {"yaws": 2}}), glib)["push"]
     calls = []
