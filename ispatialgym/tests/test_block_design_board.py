@@ -231,3 +231,39 @@ def test_board_placement_keeps_a_flip_set():
     with pytest.raises(Reject) as e:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=lambda kept: False)
     assert e.value.reason == "board_placement" and "no cell set of them lets every repeated-colour block flip" in str(e.value)
+
+
+def test_flip_room_draw_spreads_the_init_over_the_range_that_keeps_the_flip_room(monkeypatch):
+    """i7-startdraw 5o.1 (``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1``): every init the move would put at the one point 0.1274 is drawn instead
+    from the whole range that keeps the +0.35 m flip room and the board on the top at every stand-off ([0.044, < 0.1374] here - 0.1374
+    is bare at 0.55; without a board [0.044, 0.1974]); off (or no rng) = the move, unchanged."""
+    import numpy as np
+
+    top, edge = _top_and_edge()
+    monkeypatch.delenv("ISPATIALGYM_BD_FLIP_ROOM_DRAW", raising=False)
+    s = _sampler(top)
+    assert s._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(0)).lateral == pytest.approx(0.1274, abs=1e-6)
+    monkeypatch.setenv("ISPATIALGYM_BD_FLIP_ROOM_DRAW", "1")
+    assert s._init_with_room_for_flips(_init(edge, 0.38)).lateral == pytest.approx(0.1274, abs=1e-6)  # no rng: the move
+    s.kit.stats = {}
+    lats = []
+    for seed in range(12):
+        init = _init(edge, (0.24, 0.38, 0.48, 0.07)[seed % 4])
+        st = s._init_with_room_for_flips(init, np.random.default_rng(seed))
+        assert BOUNDS[0] - 1e-6 <= st.lateral < 0.1374 and st.lateral + 0.35 <= BOUNDS[1] + 1e-6
+        assert all(s._board_fit(st, 0.35, _half(s)).values())
+        assert st.translate == init.translate and st.stand_off == init.stand_off and st.extras["lateral_bounds"] == BOUNDS
+        rec = s._flip_room
+        span = rec["draw"]["admissible_span"]
+        assert span[0] == pytest.approx(BOUNDS[0]) and 0.1274 - 1e-6 <= span[1] < 0.1374 and rec["draw"]["board_stand_offs"] == 3
+        assert rec["lateral"] == pytest.approx(st.lateral, abs=1e-4) and rec["lateral_drawn"] == init.lateral
+        lats.append(round(st.lateral, 3))
+    assert len(set(lats)) >= 6 and max(lats) - min(lats) >= 0.05 and s.kit.stats == {"bd_flip_room_draw.drawn": 12}
+    bare = _sampler(top, board=False)
+    bare_lats = {round(bare._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(k)).lateral, 3) for k in range(12)}
+    assert min(bare_lats) >= BOUNDS[0] - 1e-6 and max(bare_lats) <= BOUNDS[1] - 0.35 + 1e-6 and max(bare_lats) > 0.13
+    # no lateral of the range on the floor: the move as before (here: none either -> the drawn init)
+    off = _sampler(top)
+    off.kit = SimpleNamespace(trav_free=lambda xy: False, stats={})
+    init = _init(edge, 0.38)
+    assert off._init_with_room_for_flips(init, np.random.default_rng(0)) is init and off.kit.stats == {"bd_flip_room_draw.no_floor": 1}
