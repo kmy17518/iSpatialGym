@@ -3315,6 +3315,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 19 | i7-tray up to dae908a3 | 4054c3d7 | DEFAULTS LAYOUT_PAD_CHECK=all for fixed layouts (48fe31cc), GRASP_TURN_FILTER (owner 5u.1); NOT the release-sweep gate (686c1dcd / 3115595e, lead #23) nor its root |
 | 20 | i7-axialrest final (2f25683f; code b4bcb3d0) | 1083d1f6 | AXIAL_BRACE_MAP_JOINT_MARGIN / AXIAL_BRACE_TILT_INTERSECT both off (lead #24); the margin maps not folded |
 | 21 | i7-brace (be096dd7) | 68c6ffc2 | DEFAULTS axial TURN_COVER + OPPOSITE (owner 4), WALL_BRACE_MAP (owner 5w.2); load diagnostics off; contact_library / contact_maps conflicts kept both sides |
+| 22 | i7-t03 (7ac9945a) | 2f157bbf | touching_03 rounds 1 / 2 / 5, every t03 switch off (verified); ik.py: camhull's camera rule + t03's contact rules both kept |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
