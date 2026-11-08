@@ -60,7 +60,7 @@ def _me(monkeypatch, pm, free=lambda st: True, mode="1"):
     monkeypatch.setattr(TT, "contact_map", lambda s, kind, role, top, **kw: pm)
     monkeypatch.setattr(TT, "contact_maps_on", lambda: True)
     stats = {}
-    me = SimpleNamespace(relation="touching", shelf_start=None, shelf_pose=None, top=None, gen=lambda k, d=None: d,
+    me = SimpleNamespace(relation="touching", shelf_start=None, shelf_pose=None, top=None, gen=lambda k, d=None: d, gp=SimpleNamespace(variant="t"),
                          kit=SimpleNamespace(stats=stats), ikc=SimpleNamespace(stances_collision_free=lambda sts: th.tensor([bool(free(s)) for s in sts])))
     for name in ("push_stance_stand_offs", "place_depth_cap_applies", "push_reach_x", "place_depth_caps", "place_depth_cap_filter"):
         setattr(me, name, getattr(IS.IORSSmall, name).__get__(me))

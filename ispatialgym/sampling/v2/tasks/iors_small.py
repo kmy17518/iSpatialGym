@@ -4847,6 +4847,8 @@ class IORSSmall(SamplerV2):
             return cands, {}
         n_rm = sum(1 for f in facts.values() if f["remove"])
         TT._countn(self, "place_depth_cap.candidates", len(facts))
+        log.info("%s: place depth cap (%s): %d of %d candidates beyond it: %s", self.gp.variant, place_depth_cap_mode(), n_rm, len(facts),
+                 [(f["depth_m"], f["cap_m"], f["s_min"], f["trunk"]) for f in facts.values()][:12])
         if place_depth_cap_mode() == "shadow":
             TT._countn(self, "place_depth_cap.shadow_would_remove", n_rm)
             return cands, facts
