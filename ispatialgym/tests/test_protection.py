@@ -209,10 +209,11 @@ def _brace_mon(monkeypatch, switch):
 def test_brace_allowed_pair_is_allowed_in_the_protected_check_during_the_other_arms_move(monkeypatch):
     """Owner 5r.2: the brace finger coming into contact with the braced carton after the span opened (300006: step 409 of the right
     push's pre_contact) is allowed with the switch on - the pair brace_allowed lists, during the other arm's move."""
-    mon, pairs, robot, carton, events = _brace_mon(monkeypatch, "1")
-    pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link")}
-    mon.episode_steps = 1
-    assert mon._check_protected() is None and events == ["protect_brace_allowed"]
+    for switch in ("1", None):  # on, and the default
+        mon, pairs, robot, carton, events = _brace_mon(monkeypatch, switch)
+        pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link")}
+        mon.episode_steps = 1
+        assert mon._check_protected() is None and events == ["protect_brace_allowed"]
     mon.episode_steps = 2
     assert mon._check_protected() is None and events == ["protect_brace_allowed"]  # counted once per pair and span
 
@@ -249,8 +250,11 @@ def test_brace_allowed_rule_leaves_unlisted_pairs_failing(monkeypatch):
 
 
 def test_brace_allowed_rule_changes_nothing_without_an_active_brace_or_with_the_switch_off(monkeypatch):
-    """No active brace (begin_action's allowed empty) or the switch off (unset / "0"): the brace finger's new contact is a verdict, as before."""
-    for switch, allowed in (("1", []), (None, None), ("0", None)):
+    """No active brace (begin_action's allowed empty) or the switch off ("0"): the brace finger's new contact is a verdict, as before."""
+    from ispatialgym.oracle import qa as Q
+
+    assert Q.BRACE_PROTECT_DEFAULT == "1"  # default on since the lead's decision 8 (2026-11-08)
+    for switch, allowed in (("1", []), (None, []), ("0", None)):
         mon, pairs, robot, carton, events = _brace_mon(monkeypatch, switch)
         if allowed is not None:
             mon.allowed = allowed

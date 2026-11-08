@@ -695,8 +695,8 @@ class Monitors:
         ``Executor.brace_allowed_pairs``, the active braces' finger / gripper links on the object each braces, set by ``begin_action`` only while
         a brace's span contains the action - count as allowed in the protected-contact run-check, limited to the pairs of a brace arm that is not
         moving in this action (the other arm's move). Nothing else changes: no active brace = no pairs; every other pair keeps its rule; the
-        movement check is unchanged. Off: ``[]``."""
-        if os.environ.get(BRACE_PROTECT_SWITCH, "") != "1":
+        movement check is unchanged. Off (``=0``): ``[]``; default on (:data:`BRACE_PROTECT_DEFAULT`)."""
+        if (os.environ.get(BRACE_PROTECT_SWITCH) or BRACE_PROTECT_DEFAULT).strip() != "1":
             return []
         allowed = getattr(self, "allowed", None) or []
         if not allowed:
@@ -1162,8 +1162,11 @@ class RootWatch:
 ELBOW_GRAZE_PAIRS: Tuple[Tuple[str, str], ...] = tuple(tuple(sorted((f"{arm}_arm_link3", f"{arm}_arm_link5"))) for arm in ("left", "right"))
 SELF_EXCLUDE_SWITCH = "ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW"
 #: owner 5r.2 (2026-11-08, i7-contact3; close_02 300006): "1" = while a brace is active, the finger / object pairs its ``brace_allowed`` lists
-#: count as allowed in the protected-contact run-check during the other arm's move (:meth:`Monitors._brace_protect_allowed`); default off
+#: count as allowed in the protected-contact run-check during the other arm's move (:meth:`Monitors._brace_protect_allowed`). Default "1"
+#: since the lead's decision 8 (2026-11-08, owner away; it acted once, on the diagnosed pair: 300006 succeeds, close_02 N 4 4 / 4 ok vs
+#: 3 / 4); "0" = the check of before
 BRACE_PROTECT_SWITCH = "ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED"
+BRACE_PROTECT_DEFAULT = "1"
 
 
 def self_excluded_pairs() -> List[Tuple[str, str]]:
