@@ -2445,6 +2445,12 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
     the exact two-arm check is unchanged; a missing map keeps the reach-volume rule. Kit `wall_brace_map.hit / miss / stances /
     stance_feasible / stance_none / reach_volume_kept / reach_volume_none / map_only / reach_only / cover_dropped / written_brace /
     written_push_only`.
+  - *Runs* (v2only N 4, trunk_01154b97, `v2maps_int1_brace34w`, base index 310000 both arms, svl titanrtx): `i7_wall_off` 97 att /
+    18 wr / 18 ok, 0.106 GPU-h per success, 115.5 exact IK per attempt; `i7_wall_on` (`ISPATIALGYM_WALL_BRACE_MAP=1`) 104 / 18 / 18, 0.107,
+    62.6. Per alias off vs on: 01 6/4/4 vs 6/4/4; 02 (wall clock, push-only) identical; 03 7/4/4 vs 8/4/4 (the dispenser's braces become
+    side_high: its below_high entries fail the load); 04 51/2/2 vs 51/2/2 (too_few_visible, not the brace); 05 27/4/4 vs 33/4/4. Brace
+    present 14 / 14 in both; where it acted, the map's feasible stances vs the reach volume's: 01 1047 vs 485, 03 137 vs 211, 04 7450 vs
+    7155, 05 2953 vs 2709 (of 1886 / 873 / 17420 / 8904 screened). The switch stays default OFF (owner).
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
