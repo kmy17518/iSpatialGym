@@ -2922,6 +2922,10 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 7 | i7-axialrest (64efe96b; carries i7-brace 9d2ce7e3) | 691086c4 | DEFAULT AXIAL_SETTLED_REST (dee19fcb, owner 5g); BRACE_PROBE / BRACE_PRE_POLICY off; i7-brace's TURN_COVER / OPPOSITE default (59f7967b) comes with i7-brace |
 | 8 | i7-attachdef (5f81fc86) | ab50b82b | DEFAULTS outer_pinch + attach_face_retreat (044715ef, owner 4.1), outer_pinch_preshape (7ac55021 after 71b4d1fc / 599fdad9 / dbd8f4bd / d1ad9cb4, owner 5.1), PUBLISH_AFTER_SCREENS (917f7232, owner 5j) |
 | 9 | i7-cork (1d92b089) | e1b91b94 | customs attachment_03 brace_search false (22a13e67, owner 4.3); the lying90 / hand-over / fallback / early-rest / min-turn routes all off; conflicts in candidates.py (attachdef's defaults + cork's finger_axis_window_m) and attachment.py (memory2's pick hook kept in cork's route draw) |
+| 10 | i7-contact3 (015b815a) | 2698480b | DEFAULTS place-depth cap, pack brace removed, close_02 TOP_PRESS_ACCEPT, PLACE_DEPTH_CAP_DRAW, TOUCH_LIFT_SCREEN, TOUCH_A1_SCREEN, QA_BRACE_PROTECT_ALLOWED (the last two lead decisions while the owner is away); TOUCH_BUILT_TILTS off; not the push-line commit 4822246b |
+| 11 | i7-axialrest (7d21c982; code 2de8f35d) | 0973a5f7 | brace pre call refuses on any failure; AXIAL_BRACE_PRE_POLICY DEFAULT (owner 5y.1) |
+| 12 | i7-goalmaps (c54620d5) | fb031c15 | DEFAULTS goal-surface anchors, floor-datum fix, INTERIOR_FRONT_SIDE; hall tree spec; carry switches off; interiors.json = union of every spec, registry test knows every digest |
+| 13 | i7-blockdesign (a2f89901) | cd38c3d1 | 6000 collector steps for block design, BD_BOARD_EARLY + BD_BOARD_SEARCH DEFAULT; BD_BOARD_TABLE off; submit_fast summary line keeps memory_mode + collect_extra |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -2945,6 +2949,8 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - i7-cork's staged root is not folded. Its extra cork entries serve only the default-off routes. They share the cork's model, so the sampler's
   entry lookup would see four candidates instead of one (lead: agreed, not folded). If the owner turns a route on, the entries are staged
   in `$SY/v2/v2maps_int1_cork`.
+- goalmaps (with merge 12): ontop_large_01's countertop maps (soap dispenser h0.9158 r / l) with the anchor 0.9158, and the umbrella's hall-tree
+  interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
 
@@ -2964,6 +2970,8 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
 - int2_4 (trunk_e1b91b94, own ledger = the branches' indices): under_small_03 / inside_04 / touching_02 (framing: ifr3 21/3/3 0.215, 32/4/4 0.192,
   ifr_t02_B 25/4/4 0.126), nextto_03 / 04, inside_01 / 02, disembedding_07, attachment_03 (ad_v51 + i7cork2_cur_r 25/4/4 0.164), disembedding_09
   (ad_race 11/4/4).
+- int2_5 (trunk_cd38c3d1, after the goalmaps check): touching_02 / 04 and close_02 at i7-contact3's indices, axial_05 / 01 / 03 / 04 (i7ar_pd
+  49/16/12, 0.075), block_design_01 at 6000 steps (bdv_grid 8/8/6), ontop_large_01 (gm_after 14/4/3), touching_large_02 (known 0 written).
 
 ### i7-framing (owner decisions 2026-11-08 5.1 / 5.2): the lifted carry, pre-grasp / pre-contact by the fingertip rule
 
