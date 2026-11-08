@@ -956,6 +956,24 @@ def _carried_lift_pose(sc: Sidecar, g: GraspRecord, frm: str, to: str) -> Pose:
     return Pose(pos, quat)
 
 
+#: i7-cork: the attachment routes a sidecar may record (``grasps[0].attach_route``; absent = the current route)
+ATTACH_ROUTES = ("lying90", "handover")
+
+
+def attach_route_of(sc: Sidecar) -> Optional[str]:
+    """``grasps[0].attach_route`` (None when absent); an unknown route is a :class:`SidecarError`."""
+    g = sc.grasps[0] if sc.grasps else None
+    route = g.extra.get("attach_route") if g is not None and isinstance(g.extra, dict) else None
+    if route is not None and route not in ATTACH_ROUTES:
+        raise SidecarError(f"grasps[0].attach_route {route!r}: unknown route ({' | '.join(ATTACH_ROUTES)})")
+    return route
+
+
+def program_attachment_handover(sc: Sidecar) -> List[Action]:
+    """The hand-over route (i7-cork, owner decision 2026-11-08 4.2 (i)); see :func:`program_attachment`."""
+    raise SidecarError("grasps[0].attach_route 'handover': the hand-over program is not built yet")
+
+
 def program_attachment(sc: Sidecar) -> List[Action]:
     """init → manipulation stance → grasp the target → lift → [the recorded second base pose: navigate / transition to the
     ``attach`` stance with the male part in hand] → reorient_in_hand toward the attach orientation while moving to the
@@ -970,7 +988,13 @@ def program_attachment(sc: Sidecar) -> List[Action]:
     waypoints from the carried lift ``grasps[0].lift``); the oracle drives the recorded move with the held object in
     the collision world and the arms frozen at their joints (no re-planning of the stance) and reorients / braces /
     attaches from there. Only when the joint placement has no cell after that is the instance brace-less
-    (``summary.brace: none``): one-arm attach, no brace leg."""
+    (``summary.brace: none``): one-arm attach, no brace leg.
+
+    i7-cork (owner decision 2026-11-08 4.2): ``grasps[0].attach_route`` = the route the sampler planned (absent: this sequence).
+    ``lying90``: the male rested on its side - the same sequence, the recorded SLERP carry is its 90 deg in-hand turn."""
+    route = attach_route_of(sc)
+    if route == "handover":
+        return program_attachment_handover(sc)
     g = _single_grasp(sc, "pre_grasp", "carry_height", "waypoints", "pre_place", "place", "place_on")
     brace = sc.contacts.brace if sc.contacts is not None else None
     if brace is not None:

@@ -131,6 +131,31 @@ def v2_library_lift_off(grasp_key: Optional[str]) -> bool:
         return False
 
 
+#: i7-cork 2026-11-08 (owner decision 4.2, attachment_03's cork): the male's alternative ROUTES, each behind its own DEFAULT-OFF switch.
+#: ``lying90`` (``ISG_ATTACH_LYING90=1``): the male rests on its side (the v2 entry served by ``<key>__lying90``: its stable lying rest and
+#: its grasps), the grasp, the lift and the recorded SLERP carry turn it 90 deg so the male end points along the insertion axis - the
+#: attachment program as it is (``grasps[0].attach_route``). ``handover`` (``ISG_ATTACH_HANDOVER=1``): the male rests wide end down
+#: (``<key>__handover_pick``), the right hand grasps its narrow (mating) end, brings it to a hand-over pose in front of the robot with the wide
+#: end toward the left hand, the left hand grasps the wide end (``<key>__handover_hold``: fingers off the mating side), the right hand lets
+#: go, the base moves to the place pose (heading kept, axis legs) and the left hand attaches. A route whose entry is not in the v2 library
+#: is not taken (counter ``attach_route.<route>.no_entry``): the alias keeps the current route.
+ATTACH_ROUTE_SWITCHES = {"lying90": "ISG_ATTACH_LYING90", "handover": "ISG_ATTACH_HANDOVER"}
+ATTACH_ROUTE_KEYS = {"lying90": ("__lying90",), "handover": ("__handover_pick", "__handover_hold")}
+
+
+def attach_route_requested() -> Optional[str]:
+    """The route a switch asks for (None: the current route). Both switches on is a configuration error."""
+    on = [r for r, env in ATTACH_ROUTE_SWITCHES.items() if os.environ.get(env, "").strip().lower() in ("1", "on", "true", "yes")]
+    if len(on) > 1:
+        raise ValueError(f"attachment routes {on}: at most one of {sorted(ATTACH_ROUTE_SWITCHES.values())} may be on")
+    return on[0] if on else None
+
+
+def attach_route_keys(base_key: str, route: str) -> Tuple[str, ...]:
+    """The grasp keys a route reads (``<base key><suffix>``, served by the v2 entries whose ``legacy_keys`` list them)."""
+    return tuple(f"{base_key}{sfx}" for sfx in ATTACH_ROUTE_KEYS[route])
+
+
 @dataclass
 class CarryPlan:
     """The carry from the lifted grasp to the pre-attach that :meth:`Attachment._carry_to_pre_attach` settled on (or tried last):
@@ -341,6 +366,10 @@ class Attachment(SamplerV2):
         self.left_bands = None  # A1: the left arm's contact band (partner brace), None until B3's bands exist
         self._att_fails: Dict[str, Any] = {}
         self.brace_missing = False  # the last instance has no partner brace (owner 17:10: optional only without a joint cell)
+        #: i7-cork: the route taken (None = the current route; :meth:`_select_attach_route`), the left hand's hold grasps (hand-over)
+        self.attach_route: Optional[str] = None
+        self.hold_grasps: List[Any] = []
+        self.hold_key: Optional[str] = None
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -391,6 +420,7 @@ class Attachment(SamplerV2):
             raise Reject("spec", f"{male.name} has no male attachment link matching a female link of {female.name}")
         child_link, parent_link = self.pair
         self.grasps, self.grasp_key, self.rest[self.t_role] = TT.library_grasps(self, self.t_role, "attachment", kinds=["attachment", "tabletop"])
+        self._select_attach_route()
         self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
@@ -398,7 +428,10 @@ class Attachment(SamplerV2):
         # horizontal axis when that end carries the mass centre with a clearly larger tipping margin (cork/ncxgpe stood on its
         # tapered end: 5-6.5 mm contact radius under a mass centre 1.7 cm up, the 2 deg rest nudge toppled 8/8 draws, 0925-093339;
         # the carry turns the male in hand toward the attach orientation anyway, so the rest end is free). Facts on the template.
-        if bool(self.gen("male_rest_by_stability", True)):
+        if self.attach_route is not None:
+            # i7-cork: a route's rest is its entry's measured rest (lying / wide end down) - never flipped
+            flip = {"flipped": False, "route": self.attach_route, "reason": f"route {self.attach_route}: the rest of {self.grasp_key}"}
+        elif bool(self.gen("male_rest_by_stability", True)):
             com = None
             try:
                 com = male.root_link.center_of_mass  # PhysX's, in the link frame (the cork's is at its origin: the vertex mean sat 5 mm lower)
@@ -492,6 +525,50 @@ class Attachment(SamplerV2):
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "attachment_links": [child_link.body_name, parent_link.body_name], "n_symmetry_equivalences": len(self.symmetry),
                                     "band": getattr(self.bands, "path", None), "attach_band": getattr(self.attach_bands, "path", None)})
+
+    def _route_count(self, step: str, n: int = 1) -> None:
+        """Kit counter ``attach_route.<route>.<step>`` (per instance in ``summary.json["kit"]``); nothing off the routes."""
+        if self.attach_route is not None:
+            TT._countn(self, f"attach_route.{self.attach_route}.{step}", n)
+
+    def _select_attach_route(self) -> None:
+        """i7-cork (owner decision 4.2): the route a switch asks for (:func:`attach_route_requested`) when the v2 library serves its keys
+        (:func:`attach_route_keys`): the male's grasps, key and rest become the route's pick entry's (``lying90``: the lying entry;
+        ``handover``: the wide-end-down entry of the right hand's narrow-end pinch, ``self.hold_grasps`` / ``self.hold_key`` the left
+        hand's wide-end grasps). Otherwise ``self.attach_route`` stays None and nothing changes (``template_facts.attach_route``)."""
+        from ispatialgym.sampling import grasp_library as GL
+
+        self.attach_route, self.hold_grasps, self.hold_key = None, [], None
+        want = attach_route_requested()
+        if want is None:
+            return
+        keys = attach_route_keys(self.grasp_key, want)
+        facts: Dict[str, Any] = {"requested": want, "keys": list(keys), "base_key": self.grasp_key}
+        try:
+            libs = [GL.v2_entry(k) for k in keys]
+        except ValueError as e:  # an entry under another contact policy: not served
+            libs, facts["error"] = [None], str(e)[:300]
+        if any(lib is None for lib in libs):
+            facts["taken"] = False
+            facts["why"] = "no v2 entry serves " + ", ".join(k for k, lib in zip(keys, libs) if lib is None) if "error" not in facts else facts["error"]
+            self.template_facts["attach_route"] = facts
+            self.counters[f"attach_route.{want}.no_entry"] = self.counters.get(f"attach_route.{want}.no_entry", 0) + 1
+            log.info("%s: ATTACH_ROUTE %s not taken: %s", self.gp.variant, want, facts["why"])
+            return
+        grasps = GL.load_grasps(keys[0])
+        rest = C.rest_quat(keys[0])
+        self.grasps, self.grasp_key, self.rest[self.t_role] = grasps, keys[0], rest
+        if want == "handover":
+            self.hold_key = keys[1]
+            self.hold_grasps = GL.load_grasps(keys[1])
+        self.attach_route = want
+        facts.update(taken=True, pick_entry=os.path.basename(os.path.dirname(libs[0].path)), n_pick_grasps=len(grasps),
+                     rest_quat_xyzw=[round(float(v), 5) for v in rest])
+        if want == "handover":
+            facts.update(hold_entry=os.path.basename(os.path.dirname(libs[1].path)), n_hold_grasps=len(self.hold_grasps))
+        self.template_facts["attach_route"] = facts
+        self.counters[f"attach_route.{want}.template"] = self.counters.get(f"attach_route.{want}.template", 0) + 1
+        log.info("%s: ATTACH_ROUTE %s %s", self.gp.variant, want, json.dumps(facts, default=str))
 
     def _attachment_links(self, male, female):
         return attachment_links(male, female)
@@ -791,6 +868,7 @@ class Attachment(SamplerV2):
                     raise
                 log.info("%s: no %s grasp confirmed at the focus (%s); every library grasp is screened next", self.gp.variant, label, e)
         grasp.place_on = pname
+        self._route_count("pick")
         male.set_position_orientation(*m_pose)
         male.keep_still()
         self.kit.sync_world()
@@ -822,6 +900,7 @@ class Attachment(SamplerV2):
                 raise Reject("partner_placement", f"no partner cell with a reachable attach pose from the grasp stance or a second base pose ({self._att_fails})")
             if att.get("brace") is not None:
                 brace_state = "present"
+        self._route_count("attach_found")
         f_pose, attach, pre_attach, wps, carry, lift = att["f_pose"], att["attach"], att["pre_attach"], att["wps"], att["carry"], att["lift"]
         goal = self._attached_pose(f_pose)
         brace_pre, brace, brace_kind = att["brace"] if att.get("brace") is not None else (None, None, None)
@@ -855,6 +934,11 @@ class Attachment(SamplerV2):
                              "slerp_policy": att.get("slerp_policy")})
         if att.get("carry_over") is not None:
             grasp.extras["carry_over"] = att["carry_over"]
+        if self.attach_route is not None:
+            # i7-cork: the route the oracle program reads (programs.program_attachment); lying90 = the program as it is, the recorded SLERP
+            # carry being the 90 deg in-hand turn
+            grasp.extras["attach_route"] = self.attach_route
+            grasp.extras["attach_route_turn_deg"] = round(math.degrees(C.quat_angle(TT._t(lift[1]) if lift is not None else TT._t(grasp.grasp[1]), TT._t(pre_attach[1]))), 1)
         self._record_approach_standoff(grasp, f_pose, manip)  # over-the-top pre-grasp approach when the partner stands near the male
         # owner item 3 (release height): the attach pose is fixed by the mating links (no release above a surface), but the
         # surface under the male's footprint centre at the goal (the female's mating face) is recorded for the audit
@@ -892,6 +976,9 @@ class Attachment(SamplerV2):
                           "brace": brace_state, "brace_class": brace_kind, "attach_stance": work_st.name, "second_base_pose": work_st is not manip,
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
+        if self.attach_route is not None:
+            d.summary["attach_route"] = {"route": self.attach_route, "grasp_key": self.grasp_key, "turn_deg": grasp.extras.get("attach_route_turn_deg")}
+            self._route_count("drafted")
         return d
 
     # ------------------------------------------------------------------ asymmetric library grasps re-centred (cap/xxqyrt)
@@ -1468,8 +1555,10 @@ class Attachment(SamplerV2):
                     # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
                     plan = self._carry_to_pre_attach(grasp, eef_pre, pose, st, shift)
                     r_w, lift, wps, carry = plan.result, plan.lift, plan.waypoints, plan.carry
+                    self._route_count("carry_checked")
                     if not r_w.ok:
                         fails["slerp"] += 1
+                        self._route_count("carry_failed")
                         seq = [lift] + wps
                         log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.variant, st.name, plan.ladder, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
@@ -1707,6 +1796,7 @@ class Attachment(SamplerV2):
             self.world.keep_still(self.objects.values())
         draft.summary["rest_tilt_after_nudge_deg"] = tilts
         bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
+        self._route_count("rest_unstable" if bad else "rest_stable")
         if bad:
             self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
             male = self.obj(self.t_role)
