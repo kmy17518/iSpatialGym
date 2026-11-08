@@ -2528,6 +2528,52 @@ trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d
     of place -> the 5 cm arm retreat.
   - Kit `shelf_retreat.backoff_passed` / `.backoff_failed.<place_end|drive|no_edge>` / `.recorded`.
 
+#### Round 5 results (2026-11-08; DECISIONS "i7-t03 r5 ..." lines, "i7-t03 r5 RESULTS")
+
+Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 3165 passed), N 4, memory off. `$OFH/t03_20261108`:
+`sub_r5.sh` (+ a slot gate and an `otw` case), `loop_r5.sh`, `after_T7.sh`, `mk_registry.py`, `parse_lift_diag.py`.
+
+| arm (tag) | grasps / support | switches | att / wr / ok | GPU-h |
+|---|---|---|---|---|
+| c (i7t03r3_c) | legacy, kmuacd | FREE_START + JOINT_STANCE + RELEASE_IN_GAP + STANCE_SHIFT | 320 / 0 / 0 | 2.69 |
+| d (i7t03r4_d) | legacy, kmuacd | c + LIFT_STRAIGHTEN | 320 / 0 / 0 | 2.88 |
+| v (i7t03r4_v) | v2only lean root, kmuacd | d | 320 / 0 / 0 | 1.19 |
+| e (i7t03r5_e) | legacy, kmuacd | d + SPAN_RULE + RETREAT_BACKOFF | 320 / 0 / 0 | 3.41 |
+| T6 off (i7t03r5_T6off) | v2only, opryhp_0 T6 | none | 320 / 0 / 0 | 1.92 |
+| T6 on (i7t03r5_T6on) | v2only, opryhp_0 T6 | LIFT_STRAIGHTEN | 320 / 0 / 0 | 1.96 |
+| T7 (i7t03r5_T7) | v2only, otwukr_1 T7 | e's | 36 / 4 / **2** | 0.26 (0.128 per success) |
+| T8 (i7t03r5_T8) | v2only, otwukr_1 T8 | e's | 28 / 4 / 0 | 0.30 |
+
+- **d.** The rejections are c's exactly. (d) acts 4 times, and all 4 are refused as penetration: the lift is reached 4 times in 320.
+  The blockers come earlier: no_free_edge 137, the fixed-start grasp 123, init -> manipulation 40.
+- **e.** The rejections are c's / d's: target_placement 169 (fixed-start grasp 123, init -> manipulation 40, transit 6), no_free_edge
+  137, approach_untrackable 10, lift 3, place 1.
+  - The new switches act but clear nothing. shelf_span.passed 183 (0 rejected on kmuacd). The 5p.1 back-off was tried 7 times and
+    failed at place_end all 7 (never recorded). 5p.2 tried other trunks 234 times with 0 passing. (d) straightened 4, refused 3.
+  - On legacy kmuacd, the blockers sit before the lift.
+- **T6 (d) off / on.** With (d) on, lift_unreachable goes 152 -> 0 and ik_joint_limit 26 -> 0 (straightened 222, touch allowed
+  181, refused 0).
+  - But repeats_eval rises 32 -> 158. Every one repeats the template's single eval instance `__0000`: opryhp T6 draws one
+    layout, so a goal-passing attempt is the eval instance again.
+  - gripper_not_in_frame rises 1 -> 53.
+- **T7 / T8 templates.** With SPAN_RULE + (d), both otwukr templates pass the shelf_width setup that stopped i7-t03specs (drawn free
+  spans 0.110-0.125 m). T7 wrote 4 in 9 attempts, T8 4 in 5. Registered in `reg_T7` / `reg_T8` + `registry_T7` / `_T8.tsv`, which
+  are the trunk touching_03 row with the template fields swapped.
+- **T7 / T8 N 4.** The first touching_03 successes are T7 300401 and 300402: grasp, lift + straighten, place, retreat.
+  - 5 of the 6 demo failures are the same self-contact, "left_arm_link5 touches torso_link2": T8 x4 at the 5 cm arm retreat after the
+    place, and T7 300400 at the place itself (the instance that recorded the 5p.1 back-off).
+  - T7 300403 failed on arm_stutter during the grasp.
+  - The sampler checks the 15 cm clear pose by exact IK. It is not yet diagnosed whether that check misses this pair or the executed
+    path leaves the checked one.
+- **Lift refusal diagnosis** (i7t03r5_diag = the v settings on a log-only copy of trunk_b6da685d; it reproduces v exactly, 53 refusals).
+  - All 53 are identical. The piece is `kmuacd__base_link__collision__6`, the leaned-on side board. It is convex: hull volume =
+    mesh volume = 0.005155 m3 (11 vertices, 18 faces, watertight), so its hull does not swallow the book.
+  - One book hull vertex is involved, (-0.1108, -0.0826, -0.0156) in the book frame: the top-end cover corner. It is less than 0.05 mm
+    deep, at mesh distance 0, at lift pose 0 only (the grasp pose = the book's resting lean). The mid and last lift poses are 0.01 m clear.
+  - So the refusal is the book's own resting contact at the start pose, refused by the rule's `cl < -1e-9`; the lift does not
+    enter the board.
+  - Exempting the start pose, or a tolerance, is a contact-rule change for the owner (not made).
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
