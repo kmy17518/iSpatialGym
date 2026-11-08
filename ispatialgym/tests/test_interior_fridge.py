@@ -361,12 +361,15 @@ def test_a_fixed_compartment_picks_the_idle_posture_clear_of_the_door(fake):
 
 
 def test_registered_digests_stay_and_the_open_top_basin():
-    """The specs' digests are the maps' identity: the kmuacd cube (maps rebuilt on trunk_893d7e61) and the measured fridge (c623427d265d)
-    keep theirs; an open-top basin (inside_large_scale_03's drop-in sink) has no board above, walls to its rim and a near wall."""
+    """The specs' digests are the maps' identity: the kmuacd cube (maps rebuilt on trunk_893d7e61) and the measured fridge (door per piece,
+    0b539d8a83ab since 2026-11-08) keep theirs; an open-top basin (inside_large_scale_03's drop-in sink) has no board above, walls to its rim and a near wall."""
     reg = IN.load_registry(IN.REGISTRY)
     assert reg["bookcase_kmuacd_0@0.8354"].digest() == "b58d4e5c790e"
     fr = reg["fridge_petcxr_0@0.7064/j_left_door2.3"]
-    assert fr.digest() == "c623427d265d" and fr.joint_values == {"j_left_door": 2.3} and fr.extra_boxes[0][0] == "door_left_door"
+    # integration 2026-11-08 (lead decision: the registry carries the specs the campaign maps were built with): the fridge spec is i7-lean's
+    # door-per-piece measurement (a4a0fa1e --door-boxes pieces, staged in v2maps_i7fridge4) under the same name - digest 0b539d8a83ab (was the
+    # single-box c623427d265d, whose maps are superseded)
+    assert fr.digest() == "0b539d8a83ab" and fr.joint_values == {"j_left_door": 2.3} and fr.extra_boxes[0][0] == "door_left_door_0"
     sink = IN.InteriorSpec(name="sink", height_m=0.77, depth_m=0.40, width_m=0.45, headroom_m=1.505, rim_m=0.19, front_wall_x_m=0.06, open_top=True,
                            back_thickness_m=0.02, board_setback_m=0.06, supports=(("house_double_floor_lower", "drop_in_sink_lkklqs_0"),))
     assert sink.open_sides == ["top"] and sink.wall_height_m == 0.19

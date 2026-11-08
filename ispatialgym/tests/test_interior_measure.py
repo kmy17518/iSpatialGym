@@ -135,7 +135,8 @@ def test_a_basin_with_nothing_above_and_a_closed_compartment():
 
 def test_the_registered_digests_do_not_move():
     reg = IN.load_registry(IN.REGISTRY)
-    assert reg["bookcase_kmuacd_0@0.8354"].digest() == "b58d4e5c790e" and reg["fridge_petcxr_0@0.7064/j_left_door2.3"].digest() == "c623427d265d"
+    # the fridge entry: the door-per-piece spec since 2026-11-08 (integration, lead decision; was c623427d265d, one door box)
+    assert reg["bookcase_kmuacd_0@0.8354"].digest() == "b58d4e5c790e" and reg["fridge_petcxr_0@0.7064/j_left_door2.3"].digest() == "0b539d8a83ab"
 
 
 def test_an_open_door_is_boxed_per_collision_piece(monkeypatch):

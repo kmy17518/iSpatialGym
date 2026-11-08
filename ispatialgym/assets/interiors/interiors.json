@@ -52,16 +52,478 @@
    },
    "extra_boxes": [
     {
-     "name": "door_left_door",
+     "name": "door_left_door_0",
      "centre": [
-      -0.0287,
-      0.3629,
-      0.3407
+      -0.1323,
+      0.5067,
+      0.4735
      ],
      "half": [
-      0.143,
-      0.2182,
-      0.9922
+      0.0325,
+      0.0452,
+      0.2195
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_1",
+     "centre": [
+      0.1267,
+      0.2754,
+      0.4749
+     ],
+     "half": [
+      0.0325,
+      0.0432,
+      0.2206
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_2",
+     "centre": [
+      -0.0367,
+      0.3545,
+      -0.2507
+     ],
+     "half": [
+      0.0149,
+      0.1855,
+      0.3675
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_3",
+     "centre": [
+      -0.049,
+      0.3408,
+      -0.3284
+     ],
+     "half": [
+      0.0303,
+      0.1547,
+      0.0674
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_4",
+     "centre": [
+      -0.049,
+      0.3408,
+      -0.5168
+     ],
+     "half": [
+      0.0303,
+      0.1547,
+      0.0674
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_5",
+     "centre": [
+      -0.049,
+      0.3408,
+      -0.1552
+     ],
+     "half": [
+      0.0303,
+      0.1547,
+      0.0674
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_6",
+     "centre": [
+      -0.0733,
+      0.3136,
+      1.0169
+     ],
+     "half": [
+      0.0766,
+      0.1856,
+      0.2474
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_7",
+     "centre": [
+      -0.06,
+      0.3261,
+      0.5532
+     ],
+     "half": [
+      0.0186,
+      0.0388,
+      0.0261
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_8",
+     "centre": [
+      -0.0035,
+      0.3918,
+      -0.1876
+     ],
+     "half": [
+      0.0325,
+      0.2178,
+      0.4639
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_9",
+     "centre": [
+      -0.0035,
+      0.3917,
+      1.0045
+     ],
+     "half": [
+      0.0325,
+      0.2178,
+      0.3284
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_10",
+     "centre": [
+      -0.0283,
+      0.361,
+      0.6362
+     ],
+     "half": [
+      0.0715,
+      0.1386,
+      0.049
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_11",
+     "centre": [
+      -0.0278,
+      0.3616,
+      0.2815
+     ],
+     "half": [
+      0.0697,
+      0.1386,
+      0.0145
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_12",
+     "centre": [
+      -0.0253,
+      0.3647,
+      0.5773
+     ],
+     "half": [
+      0.073,
+      0.0494,
+      0.0103
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_13",
+     "centre": [
+      -0.0824,
+      0.3059,
+      0.4698
+     ],
+     "half": [
+      0.0114,
+      0.1438,
+      0.2206
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_14",
+     "centre": [
+      -0.0638,
+      0.3243,
+      0.1889
+     ],
+     "half": [
+      0.0472,
+      0.1828,
+      0.0893
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_15",
+     "centre": [
+      -0.0844,
+      0.3012,
+      0.4675
+     ],
+     "half": [
+      0.0163,
+      0.1567,
+      0.2066
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_16",
+     "centre": [
+      -0.1004,
+      0.2832,
+      0.6514
+     ],
+     "half": [
+      0.0251,
+      0.1567,
+      0.1193
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_17",
+     "centre": [
+      -0.1885,
+      0.4177,
+      0.7216
+     ],
+     "half": [
+      0.0682,
+      0.0294,
+      0.1236
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_18",
+     "centre": [
+      -0.1813,
+      0.4346,
+      0.4199
+     ],
+     "half": [
+      0.0508,
+      0.0235,
+      0.1782
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_19",
+     "centre": [
+      -0.1813,
+      0.4346,
+      0.1769
+     ],
+     "half": [
+      0.0508,
+      0.0235,
+      0.0648
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_20",
+     "centre": [
+      0.0425,
+      0.2113,
+      0.7216
+     ],
+     "half": [
+      0.0682,
+      0.0293,
+      0.1236
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_21",
+     "centre": [
+      0.0585,
+      0.2204,
+      0.4198
+     ],
+     "half": [
+      0.0508,
+      0.0235,
+      0.1782
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_22",
+     "centre": [
+      0.0585,
+      0.2204,
+      0.1769
+     ],
+     "half": [
+      0.0508,
+      0.0235,
+      0.0648
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_23",
+     "centre": [
+      -0.1421,
+      0.4319,
+      0.4386
+     ],
+     "half": [
+      0.0469,
+      0.0036,
+      0.2031
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_24",
+     "centre": [
+      0.0543,
+      0.2565,
+      0.4386
+     ],
+     "half": [
+      0.0469,
+      0.0036,
+      0.2031
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_25",
+     "centre": [
+      -0.0258,
+      0.3655,
+      -0.1811
+     ],
+     "half": [
+      0.0045,
+      0.2169,
+      0.4684
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_26",
+     "centre": [
+      -0.0258,
+      0.3654,
+      0.9431
+     ],
+     "half": [
+      0.0044,
+      0.2169,
+      0.3523
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_27",
+     "centre": [
+      -0.1739,
+      0.4978,
+      0.4435
+     ],
+     "half": [
+      0.0044,
+      0.0182,
+      0.1641
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_28",
+     "centre": [
+      0.123,
+      0.2326,
+      0.4435
+     ],
+     "half": [
+      0.0044,
+      0.0182,
+      0.1641
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_29",
+     "centre": [
+      -0.105,
+      0.5534,
+      0.9011
+     ],
+     "half": [
+      0.0308,
+      0.0157,
+      0.0859
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_30",
+     "centre": [
+      -0.0906,
+      0.5695,
+      0.724
+     ],
+     "half": [
+      0.027,
+      0.0157,
+      0.0957
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_31",
+     "centre": [
+      -0.0837,
+      0.5773,
+      0.531
+     ],
+     "half": [
+      0.0198,
+      0.0157,
+      0.0994
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_32",
+     "centre": [
+      -0.086,
+      0.5746,
+      0.3367
+     ],
+     "half": [
+      0.0233,
+      0.0157,
+      0.0956
+     ],
+     "yaw": 0.8416
+    },
+    {
+     "name": "door_left_door_33",
+     "centre": [
+      -0.1012,
+      0.5577,
+      0.123
+     ],
+     "half": [
+      0.0356,
+      0.0157,
+      0.1218
      ],
      "yaw": 0.8416
     }
@@ -73,12 +535,12 @@
     ]
    ],
    "source": {
-    "measured": "interiors.measure: house_double_floor_lower/fridge_petcxr_0 raster edge +u at 0.7064 (requested 0.700 +- 0.03), 346 board cells, open edges ['+u'], front plane 0.2409 m out (static AABB overhang), wall rays 0.17600856721401215 / 0.16626763343811035, back ray 0.3260960578918457, moved links ['left_door', 'meta__left_door_lights_0_0_link', 'meta__left_door_lights_1_0_link']",
+    "measured": "interiors.measure: house_double_floor_lower/fridge_petcxr_0 raster edge +u at 0.7064 (requested 0.700 +- 0.03), 346 board cells, open edges ['+u'], front plane 0.2409 m out (static AABB overhang), wall rays 0.17600856721401215 / 0.16626763343811035, back ray 0.3260960578918457, moved links ['left_door', 'meta__left_door_lights_0_0_link', 'meta__left_door_lights_1_0_link'], wall rim 0.23 vs headroom 0.2434 (open top False)",
     "joints_settled": {
      "j_left_door": 2.3
     },
-    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
-    "run": "interiors measure on trunk_893d7e61 (coordinator, 2026-11-07): $OFH/fridge_maps_20261107/interiors.json"
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
    }
   },
   "bookcase_jaysra_0@0.9472": {
@@ -118,6 +580,45 @@
     "for": "inside_large_01 (inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk): the goal side of the hardback bqvvvx under v2 only - the book standing spine out in a bay of bookcase_jaysra_0 at the 0.94 m board, leaning on the bay's side board (the v2 lean entries of hardback__bqvvvx__bu at 16.7 deg)",
     "job": "$OFH/overhang_20261107/measure.sh, slurm 18367772 (trunk_fd2941c0, interiors measure: house_single_floor childs_room_1)",
     "template": "$OFH/templates/inter_object_relation_satisfaction-inside_large_scale_01: interior board z 0.9472, 671 board cells, open edges +u / -u, headroom median 0.3585 (+5 mm raster offset = 0.3635); bays L x 22.399..22.683 / M 22.746..23.041 at 0.949, R 23.104..23.388 at 0.974 (the customs' _inside_goal_region_note): the wall rays from the raster's lateral centre measured bay M (0.30 m); bay L is 0.284"
+   }
+  },
+  "drop_in_sink_lkklqs_0@basin": {
+   "height_m": 0.7751,
+   "depth_m": 0.43,
+   "width_m": 0.3311,
+   "headroom_m": 0.6714,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3711,
+   "board_setback_m": 0.0,
+   "back_thickness_m": null,
+   "centre_y_m": 0.0049,
+   "open_sides": [
+    "top",
+    "back"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "rim_m": 0.11,
+   "front_wall_x_m": -0.0121,
+   "open_top": true,
+   "supports": [
+    [
+     "house_double_floor_lower",
+     "drop_in_sink_lkklqs_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_lower/drop_in_sink_lkklqs_0 raster edge +u at 0.7751 (requested 0.770 +- 0.25), 374 board cells, open edges ['+u', '-u', '+v', '-v'], front plane 0.0000 m out (static AABB overhang), wall rays 0.17047742009162903 / 0.16064459085464478, back ray 0.41808047874793686, moved links [], wall rim 0.11 vs headroom 0.6714 (open top True)",
+    "joints_settled": {},
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
    }
   }
  }
