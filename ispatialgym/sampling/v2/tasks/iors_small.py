@@ -2269,7 +2269,9 @@ class IORSSmall(SamplerV2):
                 try:
                     self.record_stance_travel(init, manip)
                 except Reject as e:
-                    if travel_failure_deterministic(e, self.world):
+                    if travel_failure_deterministic(e, self.world) and not init.extras.get("free_start"):
+                        # i7-t03 round 2 (a): a travel from a FREE-FLOOR start (drawn per attempt) says nothing about the candidate - it is not
+                        # dropped (round-2 A/B b: 8 no_path drives from free starts dropped the cell's candidates -> no_manipulation_stance x34)
                         self.drop_candidate(cand, e)
                     raise
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation); the upright shelf start is
