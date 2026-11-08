@@ -551,8 +551,10 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
 def axial_group(entry: Dict[str, Any]) -> str:
     """An axial entry's (pushed end, turn sense) group - the class label's ``+end+spin`` / ``+end-spin`` / ``-end+spin`` / ``-end-spin``
     prefix (``contact_library.build_axial_push`` / ``build_axial_brace``); ``""`` for every other family."""
-    m = re.match(r"^([+-]end[+-]spin)", str(entry.get("class", "")))
-    return m.group(1) if m else ""
+    m = re.match(r"^([+-]end[+-]spin)(_opp_)?", str(entry.get("class", "")))
+    # i7-brace (owner 3.4): an opposite-end entry of the clear-turn build is its own group (the stratified quota of the current-end
+    # candidates, first in library order, otherwise never reaches it)
+    return (m.group(1) + ("_opp" if m.group(2) else "")) if m else ""
 
 
 def entry_group(entry: Dict[str, Any]) -> Tuple[float, str]:

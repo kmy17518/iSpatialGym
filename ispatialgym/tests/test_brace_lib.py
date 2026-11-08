@@ -152,3 +152,9 @@ def test_the_turn_cover_switch_filters_the_brace_classes(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "1")
     AX.AlignmentAxial.map_joint_placement(ax, None, pose, pose, 1.0, math.radians(30.0), end_sign=1.0)
     assert seen[-1] == ("axial_brace", ["+end+spin_opp_v@f0"])  # the 20 deg entry does not cover a 30 deg turn
+
+
+def test_the_opposite_end_entries_are_their_own_stratification_group():
+    assert VC.axial_group({"class": "+end-spin_v@f0"}) == "+end-spin"
+    assert VC.axial_group({"class": "+end-spin_opp_v@f0"}) == "+end-spin_opp"
+    assert VC.axial_group({"class": "push_tip_h"}) == ""
