@@ -11,8 +11,12 @@ program check replays it (``program_check.check_overpath``). The path, in the pu
 "pick" back-off when there is one):
 
 1. from where the escape leaves the hand, rise to the book's top + a clearance (:data:`CLEARANCES_M`, the first that passes);
-2. move across at that height to above the pre-grasp (the hand turns to the pre-grasp's orientation on the way);
+2. move across at that height to above the pre-grasp;
 3. descend to the pre-grasp in front of the overhanging edge.
+
+The hand turns from the push's orientation to the pre-grasp's in place above the pre-grasp (the first schedule of
+:data:`ORIENT_SCHEDULES`; i7op2_b showed the turn spread over the across leg unreachable mid-way), else where the escape ends, else
+spread over the across leg.
 
 The sampler tracks those Cartesian legs by differential IK from the start (no branch flip: ``track_chain``'s 0.2 rad step bound),
 subsamples the tracked configurations every :data:`WAYPOINT_SPACING_RAD` and checks the path the oracle runs - the piecewise-linear joint
@@ -52,6 +56,18 @@ IK_STEP_RAD = 0.1
 IK_JUMP_MAX_RAD = 0.3
 #: a rise shorter than this is skipped (the start is already above the across height)
 MIN_LEG_M = 0.01
+#: the version of the transit in the sampler's failed-pick memo key (``IORSLarge._overhang_memo_key``; persisted between the jobs of an
+#: alias): a failure of an earlier path design never applies to this one (i7op2_b skipped 28 picks remembered from the buggy i7op_b)
+MEMO_VERSION = "overpath/2"
+#: where the hand turns from the push's orientation to the pre-grasp's (:func:`leg_plan`), tried in this order:
+#: ``over_pre`` - across in the start's orientation, the turn in place above the pre-grasp, the descent in the pre-grasp's orientation;
+#: ``at_start`` - the turn in place where the escape ends, then rise / across / descend in the pre-grasp's orientation;
+#: ``slerp`` - the first design (the turn spread over the across leg; i7op2_b: no plan, the seeded IK lost the hand mid-across).
+ORIENT_SCHEDULES = ("over_pre", "at_start", "slerp")
+#: diagnostics / tuning of the switch-on path only: a comma list overriding :data:`ORIENT_SCHEDULES` (enters the memo key when set)
+ORIENT_ENV = "ISPATIALGYM_OVERPATH_ORIENT"
+#: diagnostic: every schedule is planned (each at its first passing clearance) and logged before the first in order is returned
+TRY_ALL_ENV = "ISPATIALGYM_OVERPATH_TRY_ALL"
 
 
 def on() -> bool:
@@ -59,24 +75,68 @@ def on() -> bool:
     return os.environ.get(ENV, "0").strip().lower() in ("1", "on", "true", "yes")
 
 
-def leg_poses(start_pos, start_quat, pre_pos, pre_quat, z_across: float) -> List[Tuple[th.Tensor, th.Tensor]]:
-    """The eef poses of the transit: the start, the rise to ``z_across`` above the start (skipped when the start is within
-    :data:`MIN_LEG_M` of it or higher), the point above the pre-grasp at ``z_across`` (the pre-grasp's orientation), the pre-grasp.
-    Positions (3,) / quaternions xyzw (4,) as float tensors."""
+def orient_schedules() -> Tuple[str, ...]:
+    """The turn schedules tried in order: :data:`ORIENT_ENV` when set (unknown names dropped), else :data:`ORIENT_SCHEDULES`."""
+    raw = os.environ.get(ORIENT_ENV, "").strip()
+    if not raw:
+        return ORIENT_SCHEDULES
+    out = tuple(x.strip() for x in raw.split(",") if x.strip() in ORIENT_SCHEDULES)
+    return out or ORIENT_SCHEDULES
+
+
+def try_all() -> bool:
+    return os.environ.get(TRY_ALL_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def memo_tag() -> Tuple[str, ...]:
+    """The transit's part of the failed-pick memo key: :data:`MEMO_VERSION` (+ the schedule override when set)."""
+    raw = os.environ.get(ORIENT_ENV, "").strip()
+    return (MEMO_VERSION,) + ((f"orient={','.join(orient_schedules())}",) if raw else ())
+
+
+def leg_plan(start_pos, start_quat, pre_pos, pre_quat, z_across: float, orient: str = "slerp") -> List[Tuple[th.Tensor, th.Tensor, str]]:
+    """The labelled eef poses of the transit ``(position (3,), quaternion xyzw (4,), label)``: the start; the rise to ``z_across`` above
+    the start (skipped when the start is within :data:`MIN_LEG_M` of it or higher); the point above the pre-grasp at the across height;
+    the pre-grasp. ``orient`` (:data:`ORIENT_SCHEDULES`) places the turn from the start's orientation to the pre-grasp's: ``slerp`` over
+    the across leg, ``at_start`` in place before the rise, ``over_pre`` in place above the pre-grasp before the descent. A label names
+    the leg that ENDS at its pose: ``start``, ``turn``, ``rise``, ``across``, ``down``."""
+    if orient not in ORIENT_SCHEDULES:
+        raise ValueError(f"unknown turn schedule {orient!r} (one of {ORIENT_SCHEDULES})")
     p0 = th.as_tensor(start_pos, dtype=th.float32).reshape(3)
     q0 = th.as_tensor(start_quat, dtype=th.float32).reshape(4)
     p1 = th.as_tensor(pre_pos, dtype=th.float32).reshape(3)
     q1 = th.as_tensor(pre_quat, dtype=th.float32).reshape(4)
     z = max(float(z_across), float(p1[2]))
-    out = [(p0, q0)]
+    out = [(p0, q0, "start")]
+    if orient == "at_start":
+        out.append((p0.clone(), q1, "turn"))
+    q_move = q0 if orient == "over_pre" else q1
     if z - float(p0[2]) > MIN_LEG_M:
-        out.append((th.tensor([float(p0[0]), float(p0[1]), z]), q0))
+        out.append((th.tensor([float(p0[0]), float(p0[1]), z]), q0 if orient == "slerp" else out[-1][1], "rise"))
     over = th.tensor([float(p1[0]), float(p1[1]), max(z, float(p0[2]))])
     if float(th.linalg.norm(over - out[-1][0])) > MIN_LEG_M:
-        out.append((over, q1))
+        out.append((over, q_move, "across"))
+    if orient == "over_pre":
+        out.append((out[-1][0].clone(), q1, "turn"))
     if float(th.linalg.norm(p1 - out[-1][0])) > 1e-4:
-        out.append((p1, q1))
+        out.append((p1, q1, "down"))
     return out
+
+
+def leg_poses(start_pos, start_quat, pre_pos, pre_quat, z_across: float, orient: str = "slerp") -> List[Tuple[th.Tensor, th.Tensor]]:
+    """:func:`leg_plan` without the labels."""
+    return [(p, q) for p, q, _ in leg_plan(start_pos, start_quat, pre_pos, pre_quat, z_across, orient)]
+
+
+def leg_of(counts: Sequence[int], labels: Sequence[str], k: int) -> Tuple[str, float]:
+    """The leg of dense waypoint ``k`` (1-based; ``counts[i]`` dense waypoints in the leg ending at pose ``i + 1``, labelled
+    ``labels[i + 1]``) and the fraction of that leg done there."""
+    c0 = 0
+    for i, n in enumerate(counts):
+        if k <= c0 + n:
+            return str(labels[i + 1]), round((k - c0) / max(1, n), 2)
+        c0 += n
+    return str(labels[-1]), 1.0
 
 
 def subsample(traj: th.Tensor, spacing: float = WAYPOINT_SPACING_RAD) -> List[int]:

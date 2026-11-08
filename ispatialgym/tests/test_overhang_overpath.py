@@ -168,9 +168,15 @@ def _toy_sampler(shortcut=False):
     return s
 
 
+def _bind(s):
+    for name in ("_overpath_configs", "_overpath_plan_one", "_overpath_where", "_overpath_where_track", "_overpath_limit"):
+        if not hasattr(s, name):
+            setattr(s, name, getattr(IL.IORSLarge, name).__get__(s))
+
+
 def _plan(s, q_start, book_pose, pre_pos):
     s._overpath_start = lambda st, gst, arm, chain, settled: (q_start, "escape", "")
-    s._overpath_configs = lambda *a: IL.IORSLarge._overpath_configs(s, *a)
+    _bind(s)
     pre = (th.tensor(pre_pos), th.tensor([0.0, 0.0, 0.0, 1.0]))
     st = SimpleNamespace(name="manipulation")
     return IL.IORSLarge._overpath_plan(s, st, st, "right", {}, book_pose, pre, pre)
@@ -229,7 +235,7 @@ def test_overpath_rejects_a_path_through_the_book():
     s = _toy_sampler()
     s.kit.collide = lambda qs: qs[:, 2] > 0.86
     rec, key, why = _plan(s, q0, book, [0.0, -0.16, 0.79])
-    assert rec is None and key == "collision" and len(s.ikc.calls) == len(OP.CLEARANCES_M)
+    assert rec is None and key == "collision" and len(s.ikc.calls) == len(OP.CLEARANCES_M) * len(OP.ORIENT_SCHEDULES)
 
 
 def test_switch_off_is_today(monkeypatch):
@@ -247,7 +253,7 @@ def test_switch_off_is_today(monkeypatch):
     k_off = IL.IORSLarge._overhang_memo_key(sm, *args)
     assert k_off[-1] is False
     monkeypatch.setenv(OP.ENV, "1")
-    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_off + ("overpath",)
+    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_off + ("overpath", OP.MEMO_VERSION)
     # the source: the plan runs only behind the switch, in the pick and in the record
     import inspect
 
@@ -489,3 +495,100 @@ def test_spine_guard_is_on_for_inside_large_01_only():
     assert g.get("overhang_required_side") == "-y" and g.get("overhang_pinch_edge_max_m") == 0.03
     others = [k for k, v in d.items() if isinstance(v, dict) and k != ALIAS_VARIANT and (v.get("generation") or {}).get("overhang_required_side") is not None]
     assert others == []
+
+
+# ------------------------------------------------------------------------------------------------ CORRECTION 2026-11-08: the turn schedules
+
+
+def test_memo_key_carries_the_transit_version(monkeypatch):
+    """i7op2_b skipped 28 picks remembered from the buggy i7op_b under the same key: the transit's version is in the key now (and a
+    schedule override, when set); off, the key is unchanged."""
+    from ispatialgym.tests.test_iors_large_overhang import _GP, _manip, Z_TOP
+
+    m = _manip()
+    args = (m, {"right": m}, ["right"], SimpleNamespace(name="side_0"), 4.32, th.tensor([1.0, 0.0]), Z_TOP, False)
+    sm = SimpleNamespace(gp=_GP(overhang_fail_memo=True))
+    monkeypatch.delenv(OP.ENV, raising=False)
+    monkeypatch.delenv(OP.ORIENT_ENV, raising=False)
+    k_off = IL.IORSLarge._overhang_memo_key(sm, *args)
+    monkeypatch.setenv(OP.ENV, "1")
+    k_on = IL.IORSLarge._overhang_memo_key(sm, *args)
+    assert k_on == k_off + ("overpath", "overpath/2") and k_on != k_off + ("overpath",)  # the first design's key never matches
+    monkeypatch.setenv(OP.ORIENT_ENV, "slerp")
+    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_on + ("orient=slerp",)
+    assert OP.orient_schedules() == ("slerp",)
+    monkeypatch.setenv(OP.ORIENT_ENV, "nonsense")
+    assert OP.orient_schedules() == OP.ORIENT_SCHEDULES
+
+
+def test_leg_plan_turn_schedules():
+    q0, q1 = th.tensor([0.0, 0.0, 0.0, 1.0]), th.tensor([0.0, 0.7071, 0.0, 0.7071])
+    p0, p1 = th.tensor([1.0, 0.0, 0.90]), th.tensor([1.3, 0.1, 0.80])
+    over = OP.leg_plan(p0, q0, p1, q1, 0.95, "over_pre")
+    assert [lb for _, _, lb in over] == ["start", "rise", "across", "turn", "down"]
+    assert th.allclose(over[2][1], q0) and th.allclose(over[3][1], q1) and th.allclose(over[3][0], over[2][0])  # across unturned, turn in place
+    assert over[3][0].tolist() == pytest.approx([1.3, 0.1, 0.95]) and th.allclose(over[4][1], q1)  # the descent in the pre-grasp's orientation
+    start = OP.leg_plan(p0, q0, p1, q1, 0.95, "at_start")
+    assert [lb for _, _, lb in start] == ["start", "turn", "rise", "across", "down"]
+    assert th.allclose(start[1][0], p0) and all(th.allclose(q, q1) for _, q, _ in start[1:])
+    sl = OP.leg_plan(p0, q0, p1, q1, 0.95, "slerp")
+    assert [lb for _, _, lb in sl] == ["start", "rise", "across", "down"]
+    assert all(th.allclose(a[0], b[0]) and th.allclose(a[1], b[1]) for a, b in zip(OP.leg_poses(p0, q0, p1, q1, 0.95), sl))
+    # no rise when the start is above the across height
+    assert [lb for _, _, lb in OP.leg_plan(th.tensor([1.0, 0.0, 1.0]), q0, p1, q1, 0.95, "over_pre")] == ["start", "across", "turn", "down"]
+    with pytest.raises(ValueError):
+        OP.leg_plan(p0, q0, p1, q1, 0.95, "sideways")
+    assert OP.leg_of([3, 5, 2], ["start", "rise", "across", "down"], 4) == ("across", 0.2)
+    assert OP.leg_of([3, 5, 2], ["start", "rise", "across", "down"], 10) == ("down", 1.0)
+
+
+def test_plan_tries_the_turn_schedules_in_order_and_names_where_the_ik_fails(monkeypatch):
+    """The first schedule (turn over the pre-grasp) fails where the seeded IK finds no solution mid-across: the reason names the leg, the
+    waypoint, the height and whether any IK branch reaches it; the next schedule plans and the record says which one."""
+    monkeypatch.delenv(OP.ORIENT_ENV, raising=False)
+    monkeypatch.delenv(OP.TRY_ALL_ENV, raising=False)
+    book = (th.tensor([0.0, 0.0, 0.7671 + 0.0153]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    q0 = th.zeros(28)
+    q0[0:3] = th.tensor([0.0, 0.20, 0.93])
+    s = _toy_sampler()
+    s.ikc.stall = True
+    calls = {"n": 0}
+
+    def plan_one(*a):
+        calls["n"] += 1
+        orient = a[11]
+        if orient == "over_pre":
+            # a seeded IK with no solution on the across leg below y 0.05
+            s.kit.ik = lambda pose, q_seed, arm="right": None if float(pose[0][1]) < 0.05 and float(pose[0][2]) > 0.9 else _ToyKit.ik(s.kit, pose, q_seed, arm)
+            s.kit.ik_all = lambda pose, q_seed, arm="right": None
+        else:
+            s.kit.ik = lambda pose, q_seed, arm="right": _ToyKit.ik(s.kit, pose, q_seed, arm)
+        return IL.IORSLarge._overpath_plan_one(s, *a)
+
+    s._overpath_plan_one = plan_one
+    rec, key, why = _plan(s, q0, book, [0.0, -0.16, 0.79])
+    assert rec is not None and rec["orient"] == "at_start" and calls["n"] == 2
+    assert rec["orients_failed"] and rec["orients_failed"][0].startswith("over_pre: track")
+    assert s.kit.stats.get("overpath.orient.over_pre.rejected") == 1 and s.kit.stats.get("overpath.orient.at_start.planned") == 1
+    # every schedule failing: one rejection naming each schedule's failing leg / waypoint
+    s2 = _toy_sampler()
+    s2.ikc.stall = True
+    s2.kit.ik = lambda pose, q_seed, arm="right": None if float(pose[0][1]) < 0.05 and float(pose[0][2]) > 0.9 else _ToyKit.ik(s2.kit, pose, q_seed, arm)
+    s2.kit.ik_all = lambda pose, q_seed, arm="right": th.zeros(2, 28)
+    rec, key, why = _plan(s2, q0, book, [0.0, -0.16, 0.79])
+    assert rec is None and key == "track"
+    for orient in OP.ORIENT_SCHEDULES:
+        assert f"{orient}: track:" in why
+    assert "seeded IK: no solution at waypoint" in why and "across leg at" in why and "z 0.930" in why and "2 IK branches reach it" in why
+
+
+def test_try_all_plans_every_schedule(monkeypatch):
+    monkeypatch.delenv(OP.ORIENT_ENV, raising=False)
+    monkeypatch.setenv(OP.TRY_ALL_ENV, "1")
+    book = (th.tensor([0.0, 0.0, 0.7671 + 0.0153]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    q0 = th.zeros(28)
+    q0[0:3] = th.tensor([0.0, 0.20, 0.93])
+    s = _toy_sampler()
+    rec, key, why = _plan(s, q0, book, [0.0, -0.16, 0.79])
+    assert rec is not None and rec["orient"] == OP.ORIENT_SCHEDULES[0]
+    assert all(s.kit.stats.get(f"overpath.orient.{o}.planned") == 1 for o in OP.ORIENT_SCHEDULES)
