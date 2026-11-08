@@ -2654,6 +2654,58 @@ def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry
     return "legs", chosen["legs"]
 
 
+#: i7-framing (owner decision 2026-11-08 5.1, the owner's torso suggestion; default off): ``1`` = the place's protective via-above of the carry
+#: is made by the TORSO when the sampler recorded ``grasps[].carry_torso`` (``IORSSmall.carry_torso_lift``, the same switch name)
+CARRY_TORSO_LIFT_ENV = "ISPATIALGYM_CARRY_TORSO_LIFT"
+
+
+def _carry_torso_record(action: Place, ctx: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    """``(translate, tilt)`` of the held object's ``grasps[].carry_torso`` when ``ISPATIALGYM_CARRY_TORSO_LIFT=1``, else None."""
+    if (os.environ.get(CARRY_TORSO_LIFT_ENV, "") or "0").strip().lower() not in ("1", "on", "true", "yes"):
+        return None
+    sc = ctx.get("sidecar")
+    g = next((g for g in (getattr(sc, "grasps", None) or []) if g.object == action.object and getattr(g, "arm", None) in (None, action.arm)), None)
+    rec = (getattr(g, "extra", None) or {}).get("carry_torso") if g is not None else None
+    if not isinstance(rec, dict) or rec.get("translate") is None or rec.get("tilt") is None:
+        return None
+    return float(rec["translate"]), float(rec["tilt"])
+
+
+def _carry_torso_lift(action: Place, motions: Motions, state, targets, ctx: Dict[str, Any], cfg: "ExecuteConfig", arm: str, on, carry, torso: Tuple[float, float],
+                      err: SkillError) -> Iterator[th.Tensor]:
+    """i7-framing (owner 2026-11-08 5.1): the protective via-above of the carry made by the torso. (1) ``trunk_to(carry_torso)`` with the
+    arm joints held - the hand (and the object) rise with ``torso_link4``, the head camera with them, so the fingertips keep their image
+    position; (2) the recorded straight carry ``carry`` moved rigidly with the torso (``Mt`` = torso_link4 after ∘ before⁻¹), tracked
+    as usual (finish: ``arm_to`` its end with the pre-place witness's arm joints at the carry trunk); (3) ``trunk_to`` back to the
+    stance's trunk with the arm held - the hand lands on the pre-place. The sampler checked the leg (tracked exact IK, framing) and
+    the two trunk sweeps (whole body, the object attached)."""
+    link = motions.robot.links["torso_link4"]
+    t0, k0 = float(motions.trunk.translate), float(motions.trunk.tilt)
+    pa, qa = link.get_position_orientation()
+    A = (pa.float(), qa.float())
+    yield from motions.trunk_to(translate=torso[0], tilt=torso[1])
+    pb, qb = link.get_position_orientation()
+    Mt = C.compose((pb.float(), qb.float()), C.invert(A))
+    legs = [tuple(C.compose(Mt, as_world_pose(w))) for w in carry]
+    P = getattr(motions, "_protect", None)
+    if P is not None:
+        P["along"] = "log"  # as the via-above: the displaced leg is executed, a remaining near pass is logged, the run-time check stays
+    wq = _witness(ctx, "pre_place")
+    if wq is not None:
+        wq = C.as_tensor(wq).clone().float().reshape(-1)
+        wq[[C.JOINT_INDEX[n] for n in M.TORSO_JOINTS]] = C.torso_q(torso[0], torso[1], C.TORSO_JOINT_LIMITS)
+    finish = _free_leg_finish(state, legs[-1], wq, on, cfg)
+    yield from motions.arm_along(arm, legs, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    yield from motions.trunk_to(translate=t0, tilt=k0)
+    here = as_world_pose(state.eef_pose(arm))
+    miss = float(th.linalg.norm(here[0].float() - as_world_pose(targets["pre_place"])[0].float()))
+    ctx["carry_leg"] = {"kind": "straight via torso lift", "carry_torso": [round(torso[0], 4), round(torso[1], 4)], "from": [round(t0, 4), round(k0, 4)],
+                        "rise_m": round(float(pb[2] - pa[2]), 3), "waypoints": len(legs), "pre_place_miss_m": round(miss, 4),
+                        "finish": finish.info if finish.used else None, "protected": err.details.get("protected")}
+    log.info("place(%s): the protective carry by the torso: trunk (%.2f, %.2f) -> (%.2f, %.2f), torso_link4 +%.3f m, back; %.1f mm from the pre-place",
+             action.object, t0, k0, torso[0], torso[1], float(pb[2] - pa[2]), 1000 * miss)
+
+
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -2725,17 +2777,23 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             except SkillError as e:
                 if e.details.get("stage") != "protected":
                     raise
-                here = as_world_pose(state.eef_pose(arm))
-                pre_p, pre_q = as_world_pose(targets["pre_place"])
-                z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
-                legs = [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q), (pre_p, pre_q)]
-                P = getattr(motions, "_protect", None)
-                if P is not None:
-                    P["along"] = "log"  # the via-above leg is executed; a remaining near pass is logged, the run-time check stays
-                finish2 = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
-                yield from motions.arm_along(arm, legs, finish=finish2, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-                ctx["carry_leg"] = {"kind": "straight via above", "lift_m": round(z_top - max(float(here[0][2]), float(pre_p[2])), 3), "finish": finish2.info if finish2.used else None,
-                                    "protected": e.details.get("protected")}
+                torso = _carry_torso_record(action, ctx)
+                if torso is not None:
+                    # i7-framing (owner 2026-11-08 5.1; ISPATIALGYM_CARRY_TORSO_LIFT=1 and the sampler's grasps[].carry_torso): the protective
+                    # rise made by the TORSO, arm joints held (the arm's rise took the fingertips out of the head camera's frame)
+                    yield from _carry_torso_lift(action, motions, state, targets, ctx, cfg, arm, on, carry, torso, e)
+                else:
+                    here = as_world_pose(state.eef_pose(arm))
+                    pre_p, pre_q = as_world_pose(targets["pre_place"])
+                    z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
+                    legs = [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q), (pre_p, pre_q)]
+                    P = getattr(motions, "_protect", None)
+                    if P is not None:
+                        P["along"] = "log"  # the via-above leg is executed; a remaining near pass is logged, the run-time check stays
+                    finish2 = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
+                    yield from motions.arm_along(arm, legs, finish=finish2, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                    ctx["carry_leg"] = {"kind": "straight via above", "lift_m": round(z_top - max(float(here[0][2]), float(pre_p[2])), 3), "finish": finish2.info if finish2.used else None,
+                                        "protected": e.details.get("protected")}
     else:
         with _transit(ctx, motions, state, action, "carry"):
             yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)

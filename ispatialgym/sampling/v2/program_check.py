@@ -2175,6 +2175,127 @@ def fingertips_in_frame(sampler, stance: Stance, name: str, pose_targets: Sequen
     return None
 
 
+# ------------------------------------------------------------------ i7-framing (owner decision 2026-11-08 5.1): the lifted carry
+
+#: the oracle's protective via-above of the CARRY (``oracle/execute.py``, the place's straight carry leg when its tracked path passes a
+#: protected object too closely): the hand rises straight to ``z_top = max(lift end z, pre-place z) + protect_above_m``, crosses at
+#: ``z_top`` to above the pre-place and descends onto it. ``MotionsConfig.protect_above_m`` (0.12; a test keeps them equal).
+ORACLE_PROTECT_ABOVE_M = 0.12
+#: waypoints per leg of the via-above the frame check projects (the oracle tracks the legs straight, orientation SLERPed)
+CARRY_FRAME_LEG_WAYPOINTS = 8
+#: ``1``: the IORS small sampler checks the lifted carry's fingertip framing (default off); kit ``framing.carry.checked`` / ``.failed``
+CARRY_FRAME_CHECK_ENV = "ISPATIALGYM_CARRY_FRAME_CHECK"
+#: ``1``: where only the via-above's arm lift leaves the frame, the sampler records a TORSO lift for the carry (``grasps[].carry_torso``)
+#: and the oracle executes it on the protective via-above (default off); kit ``framing.carry.torso_lift_used``
+CARRY_TORSO_LIFT_ENV = "ISPATIALGYM_CARRY_TORSO_LIFT"
+#: the torso lift: the hand rises at least this much at both carry ends (the via-above's rise), moves at most CARRY_TORSO_MAX_SHIFT_M
+#: sideways and turns at most CARRY_TORSO_MAX_ROT_RAD (torso_link4: the JoyLo translate keeps its orientation, the tilt turns it)
+CARRY_TORSO_MIN_RISE_M = ORACLE_PROTECT_ABOVE_M
+CARRY_TORSO_MAX_SHIFT_M = 0.04
+CARRY_TORSO_MAX_ROT_RAD = 0.1
+CARRY_TORSO_STEP = 0.05
+
+
+def _env_on(name: str) -> bool:
+    return (os.environ.get(name, "") or "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def carry_frame_check_on() -> bool:
+    return _env_on(CARRY_FRAME_CHECK_ENV)
+
+
+def carry_torso_lift_on() -> bool:
+    return _env_on(CARRY_TORSO_LIFT_ENV)
+
+
+def via_above_carry_poses(lift_end, pre_place, above_m: float = ORACLE_PROTECT_ABOVE_M, n: int = CARRY_FRAME_LEG_WAYPOINTS) -> Dict[str, List[Any]]:
+    """The oracle's protective via-above of the carry from the lift end to the pre-place (``oracle/execute.py``): ``{"rise": [...],
+    "cross": [...], "descend": [...]}`` - the lift end raised straight to ``z_top`` (its orientation), across at ``z_top`` to above the
+    pre-place (orientation SLERPed to the pre-place's), straight down onto the pre-place; ``n`` waypoints per leg, each leg's start
+    excluded (the lift end itself is checked by the caller's other checks)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    a = (G.t(lift_end[0]).float(), G.t(lift_end[1]).float())
+    b = (G.t(pre_place[0]).float(), G.t(pre_place[1]).float())
+    z_top = max(float(a[0][2]), float(b[0][2])) + float(above_m)
+    up = (th.tensor([float(a[0][0]), float(a[0][1]), z_top]), a[1])
+    over = (th.tensor([float(b[0][0]), float(b[0][1]), z_top]), b[1])
+    return {"rise": list(C.line_waypoints(a, up, n)), "cross": list(C.line_waypoints(up, over, n)), "descend": list(C.line_waypoints(over, b, n))}
+
+
+def first_out_of_frame(model, cam, legs: Dict[str, Sequence[Any]], margin: float = FINGERTIP_FRAME_MARGIN, slack_m: float = FINGERTIP_FRAME_SLACK_M) -> Optional[Dict[str, Any]]:
+    """The first pose of ``legs`` ({name: poses}) whose fingertip fails :func:`fingertip_frame_margin` (the pre-place's rule), as
+    ``{key, index, n, u, v, depth_m, margin_px}``; None when all pass."""
+    for key, poses in legs.items():
+        for i, p in enumerate(poses):
+            fm = fingertip_frame_margin(model, cam, p, margin, slack_m)
+            if not fm["inside"]:
+                return {"key": key, "index": i, "n": len(poses), "u": fm["u"], "v": fm["v"], "depth_m": fm["depth_m"], "margin_px": round(fm["margin_px"], 1)}
+    return None
+
+
+def torso_link4_world(base_pose2d, translate: float, tilt: float, floor_z: float = 0.0):
+    """World pose of ``torso_link4`` (the link the head camera and both arms hang from) at a base pose and JoyLo trunk."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    x, y, yaw = (float(v) for v in base_pose2d)
+    base = (th.tensor([x, y, float(floor_z) + C.NOMINAL_BASE_Z]), G.quat_from_yaw(yaw))
+    return C.compose(base, C.torso_fk(C.torso_q(translate, tilt, C.TORSO_JOINT_LIMITS))["torso_link4"])
+
+
+def torso_move(base_pose2d, trunk_from: Tuple[float, float], trunk_to: Tuple[float, float], floor_z: float = 0.0):
+    """The world transform ``Mt`` a trunk change applies to everything on ``torso_link4`` with the arm joints held (the hand, the head
+    camera): a world pose ``p`` at ``trunk_from`` is ``Mt ∘ p`` at ``trunk_to``. The hand's image position is unchanged by construction."""
+    from ispatialgym.sampling import geometry as G
+
+    A = torso_link4_world(base_pose2d, *trunk_from, floor_z=floor_z)
+    B = torso_link4_world(base_pose2d, *trunk_to, floor_z=floor_z)
+    return G.compose(B, G.invert(A))
+
+
+def carry_torso_choice(base_pose2d, trunk: Tuple[float, float], points: Sequence[Any], floor_z: float = 0.0, min_rise: float = CARRY_TORSO_MIN_RISE_M,
+                       max_shift: float = CARRY_TORSO_MAX_SHIFT_M, max_rot: float = CARRY_TORSO_MAX_ROT_RAD, step: float = CARRY_TORSO_STEP) -> Optional[Dict[str, Any]]:
+    """The smallest trunk change (the torso straightened along the JoyLo translate alone first - it keeps torso_link4's orientation -,
+    then with the tilt raised too) that lifts every one of ``points`` (world positions on the hand, arm joints held) by >= ``min_rise`` with <=
+    ``max_shift`` sideways and <= ``max_rot`` turn: ``{"translate", "tilt", "from": [translate, tilt], "rise_m": [...], "shift_m",
+    "rot_rad"}``, or None. Within each group in order of the change ``|d translate| + |d tilt|``, both within their ranges / joint limits."""
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    t0, k0 = float(trunk[0]), float(trunk[1])
+    lo_t = float(M.TRUNK_TRANSLATE_RANGE[0])
+    j = M.TRUNK_TILT_JOINT_INDEX
+    cands = []
+    for i in range(0, int(round((t0 - lo_t) / step)) + 1):
+        for k in range(0, int(round(max_rot / step)) + 1):
+            if i == 0 and k == 0:
+                continue
+            tr, kt = max(lo_t, t0 - i * step), k0 + k * step
+            q = C.translate_to_torso_q(tr)[j] + kt
+            if not (float(C.TORSO_JOINT_LIMITS[0][j]) <= float(q) <= float(C.TORSO_JOINT_LIMITS[1][j])):
+                continue
+            cands.append((k > 0, abs(t0 - tr) + abs(kt - k0), tr, kt))  # the translate alone first (no turn of the hand), then with the tilt
+    A_q = torso_link4_world(base_pose2d, t0, k0, floor_z)[1]
+    for _, _, tr, kt in sorted(cands):
+        Mt = torso_move(base_pose2d, (t0, k0), (tr, kt), floor_z)
+        rot = float(G.quat_angle(A_q, torso_link4_world(base_pose2d, tr, kt, floor_z)[1]))
+        if rot > max_rot + 1e-6:
+            continue
+        rises, shifts = [], []
+        for p in points:
+            p = G.t(p).float().reshape(3)
+            p2 = G.compose(Mt, (p, th.tensor([0.0, 0.0, 0.0, 1.0])))[0].float()
+            rises.append(float(p2[2] - p[2]))
+            shifts.append(float(th.linalg.norm(p2[:2] - p[:2])))
+        if min(rises) >= min_rise and max(shifts) <= max_shift:
+            return {"translate": round(tr, 4), "tilt": round(kt, 4), "from": [round(t0, 4), round(k0, 4)], "rise_m": [round(r, 4) for r in rises],
+                    "shift_m": round(max(shifts), 4), "rot_rad": round(rot, 4)}
+    return None
+
+
 def _carry_start_ignores(sampler) -> List[Any]:
     """What the carry leg may still touch where it starts (the lift end): the grasp's support objects (the floor class's floor
     included, ``grasp_ignore_objects``) - exempted for the first ``APPROACH_WAYPOINT_M`` of the leg only."""

@@ -118,6 +118,23 @@ def pre_place_frame_rule() -> str:
     return v
 
 
+#: i7-framing (owner decision 2026-11-08 5.2): the frame rule of the PRE-GRASP and the touching PRE-CONTACTS (push / brace) - ``box`` (the
+#: eef box, the rule before) or ``fingertip`` (the pre-place's rule: ``program_check.fingertip_frame_margin``, the fingertip point inside
+#: QA's 5 % plus 2 cm slack). Both rules are evaluated either way and the disagreements counted (``precontact_frame.<pose>.removed``: the
+#: box fails and the fingertip passes; ``.added``: the box passes and the fingertip fails; ``.removed_object_out``: a removed rejection
+#: whose object - the target at the pre-grasp / push, the partner at the brace - is not wholly in that image). The contact poses (grasp,
+#: push contact / goal, brace contact) keep the box, as the program check does (``CONTACT_POSE_KEYS``).
+PRECONTACT_FRAME_RULE_ENV = "ISPATIALGYM_PRECONTACT_FRAME_RULE"
+PRECONTACT_FRAME_POSES = ("pre-grasp", "push pre-contact", "brace pre-contact")
+
+
+def precontact_frame_rule() -> str:
+    v = (os.environ.get(PRECONTACT_FRAME_RULE_ENV, "") or "box").strip().lower()
+    if v not in ("fingertip", "box"):
+        raise ValueError(f"{PRECONTACT_FRAME_RULE_ENV}={v!r}: expected fingertip or box")
+    return v
+
+
 def left_contact_band_cells(s, trunk: Tuple[float, float], height: float, stance=None):
     """Base-frame cells of the left-arm generic CONTACT band (closed gripper, brace approach; one band per object height
     class — B3 A1) at ``trunk``, through ``tabletop.load_left_contact_band`` (B3's ``ReachBands.load(scene, support,
@@ -4433,8 +4450,12 @@ class IORSSmall(SamplerV2):
         cam = self.camera_pose_at(manip)
         cam_place = cam if work is None else self.camera_pose_at(work)
         # the pre-poses join the check (owner 2026-09-16 10:15 item 1b): the oracle's FOV monitor arms from the pre-pose
-        self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp})
+        t_now = self.obj("target").get_position_orientation()
+        self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp}, objects={"pre-grasp": ("target", (t_now[0].float(), t_now[1].float()))})
         self.require_in_frame(cam_place, {"pre-place": pre_place, "place": place})
+        if PC.carry_frame_check_on():
+            # i7-framing (owner 2026-11-08 5.1): the lifted carry (the oracle's protective via-above) framed by the fingertip rule
+            self.carry_frame_check(draft, grasp, manip, st_place, lift_end, pre_place, r_lift)
         if self.shelf_tip():
             grasp.extras["place_kind"] = SHELF_TIP_PLACE_KIND  # the program: pick, carry, place (the book tips onto the partner), retreat
             return
@@ -4444,16 +4465,28 @@ class IORSSmall(SamplerV2):
             self.touching_contacts(draft, st_place)
             c = self.sidecar.contacts
             poses = {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal}
+            # i7-framing 5.2: the objects of the pre-contacts' removed_object_out counter (the target placed, the partner where it stands)
+            p_now = self.obj("partner").get_position_orientation()
+            objs = {"brace pre-contact": ("partner", (p_now[0].float(), p_now[1].float()))}
+            if grasp.eef_in_object is not None:
+                eio = (G.t(grasp.eef_in_object[0]).float(), G.t(grasp.eef_in_object[1]).float())
+                objs["push pre-contact"] = ("target", G.compose((G.t(place[0]).float(), G.t(place[1]).float()), G.invert(eio)))
             if "brace" in c:
                 # a brace whose poses leave the frame is dropped (push-only) rather than rejecting the instance
                 brace_poses = {"brace pre-contact": c["brace"].pre, "brace contact": c["brace"].contact}
-                if all(self.ikc.eef_in_frame(p, cam) for p in brace_poses.values() if p is not None):
-                    poses.update(brace_poses)
+
+                def _brace_in(what, p):
+                    if what in PRECONTACT_FRAME_POSES:  # i7-framing 5.2: the pre-contact by precontact_frame_rule, counted
+                        box, tip = self.precontact_frame_ok(what, p, cam, objs.get(what))
+                        return tip if precontact_frame_rule() == "fingertip" else box
+                    return self.ikc.eef_in_frame(p, cam)
+                if all(_brace_in(w, p) for w, p in brace_poses.items() if p is not None):
+                    pass  # judged here (the require_in_frame below would only repeat it: the box passes => the fingertip-only rule passes)
                 else:
                     self.sidecar.contacts.pop("brace", None)
                     manip.arms, manip.contacts = ["right"], ["push"]
                     draft.summary["brace"] = {"present": False, "why": "brace poses outside the manipulation image (5 %)", "gate": (self._brace_gate or {})}
-            self.require_in_frame(cam, poses)
+            self.require_in_frame(cam, poses, objects=objs)
 
     @contextmanager
     def posed(self, role: str, pose: G.Pose):
@@ -4930,15 +4963,115 @@ class IORSSmall(SamplerV2):
             return float(self.ikc.eef_frame_margin(pose, cam))
         return float(PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)["margin_px"])
 
-    def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
+    def carry_frame_check(self, draft: Draft, grasp: GraspRecord, manip: Stance, st_place: Stance, lift_end: G.Pose, pre_place: G.Pose, r_lift) -> None:
+        """i7-framing (owner decision 2026-11-08 5.1, ``ISPATIALGYM_CARRY_FRAME_CHECK=1``): the fingertips must stay framed (the pre-place's
+        rule, ``program_check.fingertip_frame_margin``) along the oracle's protective via-above of the carry too (``PC.via_above_carry_poses``:
+        rise to max(lift end, pre-place) + 0.12 m, across, down) - the carry the oracle takes when the straight leg passes a protected object
+        (under_small_03 300150: gripper_out_of_fov there, the straight carry framed). When only that arm lift leaves the frame (the straight
+        carry passes) and ``ISPATIALGYM_CARRY_TORSO_LIFT=1``: :meth:`carry_torso_lift` (the torso makes the rise instead - the hand's image
+        position does not change with the trunk) is recorded as ``grasps[].carry_torso``; otherwise ``Reject("gripper_not_in_frame")``.
+        Kit ``framing.carry.checked`` / ``.failed`` / ``.torso_lift_used`` (+ ``.skipped_drive``, ``.torso_lift_failed.<why>``)."""
+        if st_place is not manip:
+            TT._count(self, "framing.carry.skipped_drive")  # the place is made from another base pose (a carried drive first): not modelled
+            return
+        TT._count(self, "framing.carry.checked")
+        model, cam = self.kit.world.camera_model, self.camera_pose_at(manip)
+        out = PC.first_out_of_frame(model, cam, PC.via_above_carry_poses(lift_end, pre_place))
+        if out is None:
+            return
+        TT._count(self, "framing.carry.failed")
+        straight = PC.first_out_of_frame(model, cam, {"straight": list(C.line_waypoints(lift_end, pre_place, PC.CARRY_FRAME_LEG_WAYPOINTS, endpoints=True))})
+        rec: Dict[str, Any] = {"via_above_out": out, "straight_out": straight, "torso_lift": None}
+        if straight is None and PC.carry_torso_lift_on():
+            ch, why = self.carry_torso_lift(grasp, manip, lift_end, pre_place, r_lift)
+            rec["torso_lift"] = ch if ch is not None else {"failed": why}
+            if ch is not None:
+                TT._count(self, "framing.carry.torso_lift_used")
+                grasp.extras["carry_torso"] = ch
+                draft.summary["carry_frame"] = rec
+                return
+            TT._count(self, f"framing.carry.torso_lift_failed.{why}")
+        draft.summary["carry_frame"] = rec
+        raise Reject("gripper_not_in_frame", f"lifted carry (the oracle's protective via-above, +{PC.ORACLE_PROTECT_ABOVE_M:.2f} m): fingertip (+2 cm slack) outside "
+                                             f"the manipulation image at {out['key']} {out['index'] + 1}/{out['n']} (u {out['u']}, v {out['v']}, depth {out['depth_m']} m)"
+                                             f"{'' if straight is None else '; the straight carry too'}")
+
+    def carry_torso_lift(self, grasp: GraspRecord, manip: Stance, lift_end: G.Pose, pre_place: G.Pose, r_lift) -> Tuple[Optional[Dict[str, Any]], str]:
+        """i7-framing (owner 2026-11-08 5.1, the owner's torso suggestion; ``ISPATIALGYM_CARRY_TORSO_LIFT=1``): the carry's protective rise made
+        by the TORSO, arm joints held - the oracle (``execute._carry_torso_lift``) sweeps the trunk to ``carry_torso`` (the hand and the head
+        camera move together: the image is unchanged), tracks the straight carry at that trunk (``Mt ∘`` the straight leg), sweeps the trunk
+        back (the hand lands on the pre-place). The trunk: :func:`program_check.carry_torso_choice` (>= 0.12 m rise at both ends, <= 4 cm
+        sideways, <= 0.1 rad turn). Checked here with the object attached: the straight leg at the carry trunk (tracked exact IK, framed),
+        the trunk sweeps with the arm at the lift-end / pre-place configuration (whole body, supports ignored, 4 steps each).
+        Returns (record, "") or (None, why)."""
+        import dataclasses
+
+        from ispatialgym.oracle import r1pro_model as M
+
+        t0, k0 = float(manip.translate), float(manip.tilt)
+        ch = PC.carry_torso_choice(manip.base_pose2d, (t0, k0), [lift_end[0], pre_place[0]], floor_z=float(self.kit.floor_z))
+        if ch is None:
+            return None, "no_trunk"
+        if r_lift is None or getattr(r_lift, "q", None) is None:
+            return None, "no_lift_q"
+        carry_st = dataclasses.replace(manip, translate=float(ch["translate"]), tilt=float(ch["tilt"]))
+        Mt = PC.torso_move(manip.base_pose2d, (t0, k0), (ch["translate"], ch["tilt"]), floor_z=float(self.kit.floor_z))
+        a2, b2 = G.compose(Mt, lift_end), G.compose(Mt, pre_place)
+        leg = [a2] + list(C.line_waypoints(a2, b2, PC.CARRY_FRAME_LEG_WAYPOINTS))
+        if PC.first_out_of_frame(self.kit.world.camera_model, self.camera_pose_at(carry_st), {"torso_leg": leg}) is not None:
+            return None, "frame"
+        idx = [C.JOINT_INDEX[n] for n in M.ARM_JOINTS[grasp.arm]]
+        supports = self.support_objects()
+        with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            r_leg = self.ikc.waypoints_ok(leg, carry_st, grasp.arm, ignore_all=supports, cache=False, approached=[])
+            if not r_leg.ok or r_leg.q is None:
+                return None, "leg_ik"
+            q_lift, q_pre = G.t(r_lift.q).reshape(-1)[idx], G.t(r_leg.q).reshape(-1)[idx]
+            sweep = []
+            for q_arm in (q_lift, q_pre):
+                for s in (0.25, 0.5, 0.75, 1.0):
+                    st_s = dataclasses.replace(manip, translate=t0 + s * (float(ch["translate"]) - t0), tilt=k0 + s * (float(ch["tilt"]) - k0))
+                    sweep.append(self.ikc.q_locked(st_s, **{f"{grasp.arm}_arm": q_arm}))
+            with self.ikc.ignoring(list(supports)):
+                free = self.kit.collision_free(th.stack(sweep), margin=0.005)
+        if not bool(th.all(free)):
+            return None, "sweep_collision"
+        return dict(ch, leg_waypoints=len(leg)), ""
+
+    def precontact_frame_ok(self, what: str, pose: G.Pose, cam: G.Pose, obj: Optional[Tuple[str, G.Pose]] = None) -> Tuple[bool, bool]:
+        """i7-framing (owner decision 2026-11-08 5.2): ``(box, fingertip)`` verdicts of a pre-grasp / touching pre-contact eef pose - the eef
+        box (``IKChecker.eef_in_frame``) and the pre-place's fingertip rule (``program_check.fingertip_frame_margin``: QA's 5 % + 2 cm slack).
+        Counts ``precontact_frame.<what>.checked`` / ``.removed`` (box fails, fingertip passes) / ``.added`` (box passes, fingertip fails) and,
+        for a removed one whose ``obj`` = (hull key, object pose) is not wholly in the image (``TT.in_frame`` of its hull corners, 5 %),
+        ``.removed_object_out``. The caller applies :func:`precontact_frame_rule`."""
+        box = bool(self.ikc.eef_in_frame(pose, cam))
+        tip = bool(PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)["inside"])
+        key = "precontact_frame." + what.replace(" ", "_").replace("-", "_")
+        TT._count(self, key + ".checked")
+        if box != tip:
+            TT._count(self, key + (".removed" if tip else ".added"))
+            if tip and obj is not None and not TT.in_frame(self, cam, TT.hull_corners_world(self.hull[obj[0]], obj[1])):
+                TT._count(self, key + ".removed_object_out")
+        return box, tip
+
+    def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]], objects: Optional[Dict[str, Tuple[str, G.Pose]]] = None):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
         with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not. Opt-in
         ``generation.grasp_frame_rule: "fingertip"`` (oracle-fix 2026-11-04 round 4, IORSLarge's rule): QA's own criterion instead - the fingertip
-        point (``conventions.fingertip``) inside the image with the 5 % margin (t03tip3 opryhp: the shelf pre-grasp's +-6 cm eef box left the image)."""
+        point (``conventions.fingertip``) inside the image with the 5 % margin (t03tip3 opryhp: the shelf pre-grasp's +-6 cm eef box left the image).
+        i7-framing (owner 2026-11-08 5.2): the pre-grasp and the touching pre-contacts (:data:`PRECONTACT_FRAME_POSES`) take
+        :func:`precontact_frame_rule` (``fingertip`` = the pre-place's rule); ``objects`` = {pose name: (hull key, object pose)} for the
+        ``removed_object_out`` counter of :meth:`precontact_frame_ok`."""
         tip_rule = str(self.gen("grasp_frame_rule") or "box") == "fingertip"
         for what, pose in poses.items():
             if pose is None:
                 continue
+            if what in PRECONTACT_FRAME_POSES:
+                _box, tip = self.precontact_frame_ok(what, pose, cam, (objects or {}).get(what))
+                if precontact_frame_rule() == "fingertip":
+                    if not tip:
+                        raise Reject("gripper_not_in_frame", f"{what} fingertip (+2 cm slack) outside the manipulation image (5 %)")
+                    continue
             if what == "pre-place" and pre_place_frame_rule() == "fingertip":
                 # i7-plateqtf2 (owner 2026-11-08 02:35 item 3): the program check's criterion at the pre-place (fingertip + 2 cm slack)
                 if not self.pre_place_frame_ok(pose, cam):
