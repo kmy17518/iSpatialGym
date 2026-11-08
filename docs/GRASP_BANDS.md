@@ -2602,10 +2602,14 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
     - Before the lift nothing changed: no_free_edge 128, target_placement 109.
     - Caveat: trunk_d4f6975a also carries r5's 5p.2 stance shift (830e7837), so the r4 / r6 difference is not only the touch rule.
       The lift counters are the touch rule's alone.
-  - **Arm d** (legacy kmuacd, d's switches): still running at hand-back (i7t03r6_d 18386426). At 131 attempts: 0 written;
-    target_placement 74, no_free_edge 54, approach_untrackable 3. No attempt had reached the lift, as in r4_d (4 lifts in 320), so on
-    the legacy path the blockers stay before the lift, where the touch fix cannot act. Final numbers: `tab_i.py -a i7t03r6_d`,
-    `tab_t03.py i7t03r4_d i7t03r6_d`.
+  - **Arm d** (legacy kmuacd, d's switches): 255 att / 2 written / 0 ok, 2.88 GPU-h; r4_d was 320 / 0 / 0, 2.88 GPU-h.
+    - The lift was reached 4 times, as in r4. All 4 are now allowed (`start_contact_allowed` 4), where r4 refused them as penetration.
+      Two of them were written; the other two failed the program check's retreat ("end configuration collides").
+    - Both demos (300102, 300103) failed `robot_touching_itself`, "left_arm_link5 touches torso_link2", at the retreat. This is the
+      otwukr mechanism, now on kmuacd too. The 15 cm clear-pose witness is -3.8 / -2.0 mm by mesh, while link5's spheres read
+      +10.5 / +16.2 mm. Executed, the arm reaches 0.0 mm by mesh the step before contact.
+    - Before the lift nothing changed: target_placement 141, no_free_edge 102.
+    - So the sphere-model miss now blocks touching_03 on both bookcases: 5 otwukr demos and 2 kmuacd demos. Its fix is the owner's.
 - **otwukr self-contact diagnosis (CPU only, no fix; `t03_20261108/selfc_r6/`).**
   - Method: FK of the r1pro URDF; the simulator's collision meshes (the r1pro.usda convex pieces); the sampler's cuRobo spheres.
     Checked configurations are each demo's `ik_witnesses`, executed ones are `demo.hdf5` joint positions.
@@ -2622,6 +2626,31 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
   - So the executed path does not leave the checked one: the arm runs toward the checked witness and touches as it nears it. The
     sphere model passes configurations whose real meshes touch. A fix (a sphere for link5's wrist end, or a mesh check of this
     pair on the release witnesses) changes the shared robot collision model or a shared check, so it is for the owner.
+- **Arm v: what blocks after the lift** (CPU only, from `i7t03r6_v/sample.log`; no code change). The three blockers split cleanly by the
+  manipulation stand-off.
+  - **Camera, gripper_not_in_frame 35: all at stand-off 0.45.** That is Phase 2's own stance; the stance shift moved the base only 13
+    times, all to 0.55.
+    - The failing check is the goal check's `require_in_frame` at the manipulation stance's head camera, under the customs'
+      `grasp_frame_rule: fingertip`. It fails on the pre-grasp, 10 cm back along the approach: its fingertip falls outside the image
+      with the 5 % margin.
+    - The stance gates frame only the book, so these stances pass and die after the lift and the release search.
+    - Narrowest fix: run the same pre-grasp fingertip test when the shelf tip's fixed-start grasp and stance are chosen, so a failing
+      stance becomes "need grasp" and the existing stance shift tries 0.55. It is shelf-local, the frame rule is unchanged, and it
+      is not a shared gate.
+  - **Release, place_unreachable 13 (12 at 0.45).** (c) does act: these are its release searches, 5 laterals along the free gap
+    each, 65 tries in all.
+    - Clear pose (the 15 cm arm retreat, exact IK): 35.
+    - Descent: exact IK 17, left_arm_joint2 within 2-46 mrad of its limit 10, untrackable 3.
+    - Narrowest fix: arm v plus the existing owner-approved 5p.1 switch `ISPATIALGYM_SHELF_RETREAT_BACKOFF` (off in arm v), aimed at the
+      35 clear-pose failures. It is shelf-local. The joint2-limit descents need another stance, not a rule change.
+  - **Retreat after the place, approach_untrackable 12: all at stand-off 0.55, released from the manipulation stance.**
+    - All are the program check's "the tracked chain's end configuration collides". It ignores the supports and the released book
+      along the retreat, as `release_clear` does, so the world is the same. The configuration differs: the program check tracks the
+      retreat from the place configuration, while `release_clear` solved the same 15 cm pose afresh and passed.
+    - That code branch logs no blame, so the object is unknown. It is a sphere-model collision, so it is not otwukr's mesh-only
+      link5 / torso_link2 contact.
+    - Next step: a log-only blame on that branch (`ik.py`, the end-configuration check). Fix candidate: `release_clear` checks the
+      retreat tracked from the place configuration, as the program check does (shelf tip only, not a shared gate).
 - **Left to the owner:** otwukr T7 / T8 as touching_03's templates, the eval index, the t03 switch defaults.
 
 ## Owner decisions on the open list (2026-11-08)
