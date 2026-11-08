@@ -165,6 +165,17 @@ class _PieceShim:
         self.links = {"piece": type("L", (), {"collision_meshes": {prim: cm}})()}
 
 
+#: i7-t03 round 2 2026-11-08 (owner (c), DEFAULT OFF): the shelf tip release's second base pose is not chosen by the push-inherited contact
+#: laterals but as a drive along the edge toward the partner that keeps the lifted book inside the free gap to the partner (minus the carried
+#: path margin): the drives SHELF_RELEASE_DRIVE_FRACTIONS of that room, the first whose release passes the same exact place checks
+SHELF_RELEASE_IN_GAP_ENV = "ISPATIALGYM_SHELF_RELEASE_IN_GAP"
+SHELF_RELEASE_DRIVE_FRACTIONS = (0.25, 0.5, 0.75, 1.0)
+
+
+def shelf_release_in_gap_on() -> bool:
+    return os.environ.get(SHELF_RELEASE_IN_GAP_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 def shelf_free_start_on() -> bool:
     """``ISPATIALGYM_SHELF_FREE_START`` = "1" (i7-t03 round 2 item (a); default off)."""
     return os.environ.get(SHELF_FREE_START_ENV, "").strip().lower() in ("1", "on", "true")
@@ -3429,6 +3440,36 @@ class IORSSmall(SamplerV2):
         TT._count(self, "shelf_lift.leaned_board_touch_allowed")
         return r2
 
+    def lifted_book_gap(self, manip: Stance, grasp: GraspRecord) -> float:
+        """(c): the free gap (m) along the shelf push direction between the book at the lift's end (held in the hand: ``lift_end_pose`` o
+        T_obj->eef^-1) and the partner at its start - how far the base may carry it toward the partner."""
+        u = self.shelf_push_direction(manip)[:2]
+        end = PC.lift_end_pose(grasp)
+        obj = G.compose((G.t(end[0]).float(), G.t(end[1]).float()), G.invert((G.t(grasp.eef_in_object[0]).float(), G.t(grasp.eef_in_object[1]).float())))
+        t_w = self.world.hull_at(self.hull["target"], obj)
+        p_now = self.obj("partner").get_position_orientation()
+        p_w = self.world.hull_at(self.hull["partner"], (p_now[0].float(), p_now[1].float()))
+        return float((p_w[:, :2] @ u).min() - (t_w[:, :2] @ u).max())
+
+    def shelf_release_in_gap_plan(self, manip: Stance, grasp: GraspRecord) -> List[Tuple[float, Stance]]:
+        """(c): ``[(drive m, stance)]`` - the manipulation stance moved along the edge toward the partner by the fractions
+        :data:`SHELF_RELEASE_DRIVE_FRACTIONS` of the room the free gap leaves (gap - ``carry_path_margin_m``), same stand-off / trunk, as the
+        push stance is built (``push_stance_for``: focus, the shelf push arm, ``lateral_shift_m``). [] when there is no room (counted)."""
+        room = self.lifted_book_gap(manip, grasp) - float(self.gen("carry_path_margin_m", 0.01))
+        self._release_gap_facts = {"room_m": round(room, 4)}
+        if room <= 0.005:
+            return []
+        sg = self.shelf_push_sign()
+        out = []
+        for f in SHELF_RELEASE_DRIVE_FRACTIONS:
+            d = float(f) * room
+            st = manip.shifted(lateral=float(manip.lateral) + sg * d, name="push").with_trunk(manip.translate, manip.tilt, "push")
+            st.focus, st.arms = manip.focus, [self.shelf_push_arm()]
+            st.extras.update({"second_base_pose": True, "lateral_shift_m": round(sg * d, 4), "drive_in_gap_m": round(d, 4), "room_m": round(room, 4),
+                              "rule": "shelf tip release: the base drives the lifted book toward the partner inside the free gap (i7-t03 round 2 (c))"})
+            out.append((d, st))
+        return out
+
     def books_in_frame(self, st: Stance, cam: Optional[G.Pose] = None) -> bool:
         """The shelf books at their start poses - the target AND the partner - fully in ``st``'s head-camera image (5 %), the test the
         segment draw applies to the init image (``TT.in_frame`` of the hull corners)."""
@@ -5241,6 +5282,11 @@ class IORSSmall(SamplerV2):
         tip_ok: List[Optional[Stance]] = []  # the tip release's laterals whose place passes (None = the manipulation stance itself)
         diag: List[Dict[str, Any]] = []  # i7-contact 2026-11-07: the laterals without a push class, in numbers (TOUCH_PUSH_DIAG)
         plan = [(lat, self.push_stance_for(manip, t_place_pose, lateral=lat)) for lat in laterals]  # None = the manipulation stance already puts the contact there
+        if self.shelf_tip() and shelf_release_in_gap_on():
+            # i7-t03 round 2 (c): the manipulation stance first, then drives inside the free gap (no push-inherited contact laterals)
+            plan = [(0.0, None)] + [(sg_d, st_d) for sg_d, st_d in self.shelf_release_in_gap_plan(manip, grasp)]
+            if len(plan) == 1:
+                TT._count(self, "shelf_release.no_room")
         if TT.contact_maps_on() and self.shelf_start is None and not self.shelf_tip():
             # owner A1 (2026-11-08): the push stance also moves toward / away from the edge, the stand-off chosen from the touch_push map
             # (the map-feasible (lateral, stand-off) candidates, brace-map ones first, nearest stand-off; collision-checked); none -> the laterals
@@ -5309,10 +5355,15 @@ class IORSSmall(SamplerV2):
                 try:
                     log.info("%s: push stance search: %s", self.gp.variant, " | ".join(tried))
                     draft.summary.setdefault("touching", {})["push_stance_search"] = tried
-                    return self._record_push_stance(draft, manip, grasp, cand, t_place_pose, p_pose)
+                    st_rec = self._record_push_stance(draft, manip, grasp, cand, t_place_pose, p_pose)
+                    if "drive_in_gap_m" in cand.extras:
+                        TT._count(self, "shelf_release.drive_in_gap")
+                    return st_rec
                 except Reject as e:
                     whys.append(f"{float(cand.extras.get('lateral_shift_m', 0.0)):+.2f}: {e}")
                     tried.append(f"tip release drive {whys[-1][:160]}")
+            if shelf_release_in_gap_on():
+                TT._count(self, "shelf_release.no_stance")
             raise Reject("path_collision", f"touching tip release: no passing lateral's stance + carried drive is clear ({'; '.join(whys)})")
         if best is not None:
             st, manip_ok = best[1], best[2]
@@ -5324,6 +5375,8 @@ class IORSSmall(SamplerV2):
             if manip_ok:
                 return None  # the manipulation stance itself passes: no second base pose
             if self.shelf_tip():
+                if shelf_release_in_gap_on():
+                    TT._count(self, "shelf_release.no_stance")
                 raise Reject("place_unreachable", f"touching tip release: the place fails from every lateral ({'; '.join(tried)})")
             log.info("TOUCH_PUSH_DIAG %s", json.dumps({"variant": self.gp.variant, "laterals": diag}, default=str))
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")

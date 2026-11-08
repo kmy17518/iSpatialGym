@@ -303,3 +303,18 @@ def test_oracle_lift_turn_and_the_sampler_lift_end_agree():
     assert end.position == pytest.approx([0.13, 0.2, 0.94]) and list(p) == pytest.approx(end.position, abs=1e-6)
     assert list(q) == pytest.approx(end.orientation, abs=1e-6)
     assert A.Lift(arm="left", object="book", carry_height=0.04, after=None)._segment(None, SimpleNamespace(eef_pose=lambda arm: start))[1].orientation == [0.0, 0.0, 0.0, 1.0]
+
+
+@pytest.mark.parametrize("gap,n", [(0.13, 4), (0.012, 0)])
+def test_release_drives_stay_inside_the_free_gap(gap, n):
+    """(c): every release drive moves the base toward the partner by at most the free gap less the carried path margin (1 cm)."""
+    s = _sampler()
+    s.shelf_start = {"lean_side": 1.0}  # the target leans on the LEFT board: the partner (and the drive) to the robot's right
+    s.lifted_book_gap = lambda manip, grasp: gap
+    s.shelf_push_arm = lambda: "left"
+    manip = _cand(-0.465)
+    plan = s.shelf_release_in_gap_plan(manip, None)
+    assert len(plan) == n
+    for d, st in plan:
+        move = float((st.base_xy - manip.base_xy) @ manip.tangent)
+        assert move == pytest.approx(-d, abs=1e-5) and 0.0 < d <= gap - 0.01 + 1e-9 and st.stand_off == manip.stand_off and st.name == "push"
