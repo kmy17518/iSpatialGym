@@ -1,0 +1,9 @@
+#!/bin/bash
+# i7-vast: run a submit_fast.py command for the Vast backend - the same command an agent runs for the cluster, prefixed:
+#   $OFH/vast/tool/vsubmit python3 $S/scripts/trainfast/submit_fast.py submit <alias> 4 --flow fast --code $S ... --tag <tag> ...
+# submit_fast.py runs unchanged (job dir, job.env, ledger row as for slurm); its sbatch call queues the job for Vast instead
+# (bin/sbatch). VAST_GPU="RTX 4090" pins the GPU model. Only `submit` (job_fast.sh) is supported.
+T=$(dirname "$(readlink -f "$0")")
+case " $* " in *" --shiyuc "*) echo "vsubmit: --shiyuc jobs stay on the cluster" >&2; exit 2 ;; esac
+case " $* " in *" submit "*) ;; *) echo "vsubmit: only 'submit_fast.py submit ...'" >&2; exit 2 ;; esac
+PATH=$T/bin:$PATH exec "$@"

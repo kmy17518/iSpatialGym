@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""i7-vast: the `sbatch` submit_fast.py finds on PATH under vsubmit (scripts/vast_fast/vsubmit): instead of slurm it queues the job for
+the Vast backend. submit_fast.py itself is unchanged and runs exactly as for the cluster (same job dir, job.env, ledger row); only
+the sbatch call differs:
+  job_fast.sh   -> $VJ/queue/<id>.json (the full sbatch argv + parsed fields); prints <id> (9 digits from 900000001: above slurm's
+                   MaxJobId, so sacct / squeue / scancel never meet a real job with it)
+  job_memory.sh --dependency=afterany:<vast id> -> $VJ/queue/<vast id>.memory.json: the coordinator sbatches it (real slurm, CPU)
+                   once that Vast job's results are back in its job dir; prints vm<id>
+Anything else is refused (exit 1: submit_fast.py then moves the job dir to .failed_submit), so nothing reaches slurm by accident.
+VAST_GPU=<gpu name> (e.g. "RTX 4090") in the environment pins the job to that GPU model (an A/B: every arm on the same model)."""
+import json
+import os
+import re
+import socket
+import sys
+import time
+
+VJ = os.environ.get("VAST_QUEUE_ROOT", "/vision/u/minyeong/projects/isg_home/oracle_fix/vast")
+Q = os.path.join(VJ, "queue")
+FIRST_ID = 900000001
+WITH_VALUE = {"-J", "-A", "-p", "-c", "-o", "-e", "-t", "-N", "-n", "--job-name", "--account", "--partition", "--cpus-per-task", "--output",
+              "--error", "--time", "--gres", "--mem", "--exclude", "--dependency", "--nodelist", "-w", "-x", "-d", "--qos"}
+
+
+def parse(argv):
+    opts, rest, i = {}, [], 0
+    while i < len(argv):
+        a = argv[i]
+        if rest:
+            rest.append(a)
+        elif a.startswith("--") and "=" in a:
+            k, v = a.split("=", 1)
+            opts[k] = v
+        elif a in WITH_VALUE:
+            opts[a] = argv[i + 1]
+            i += 1
+        elif a.startswith("-"):
+            opts[a] = True
+        else:
+            rest.append(a)
+        i += 1
+    return opts, rest
+
+
+def seconds(t):
+    """slurm --time: [D-]HH:MM:SS | MM:SS | M -> s"""
+    d = 0
+    if "-" in t:
+        d, t = t.split("-", 1)
+    p = [int(x) for x in t.split(":")]
+    s = {1: lambda: p[0] * 60, 2: lambda: p[0] * 60 + p[1], 3: lambda: p[0] * 3600 + p[1] * 60 + p[2]}[len(p)]()
+    return int(d) * 86400 + s
+
+
+def new_id():
+    os.makedirs(os.path.join(Q, "ids"), exist_ok=True)
+    have = [int(n) for n in os.listdir(os.path.join(Q, "ids")) if n.isdigit()]
+    i = max([FIRST_ID - 1] + have) + 1
+    while True:
+        try:
+            os.mkdir(os.path.join(Q, "ids", str(i)))  # atomic on NFS: two submitters never get one id
+            return i
+        except FileExistsError:
+            i += 1
+
+
+def main(argv):
+    opts, rest = parse(argv)
+    if not rest:
+        print("vast sbatch: no script", file=sys.stderr)
+        return 1
+    script, args = rest[0], rest[1:]
+    g = lambda *ks: next((opts[k] for k in ks if k in opts), None)  # noqa: E731
+    base = os.path.basename(script)
+    if base == "job_memory.sh":
+        dep = g("--dependency", "-d") or ""
+        m = re.fullmatch(r"afterany:(\d+)", dep)
+        if not m or int(m.group(1)) < FIRST_ID:
+            print(f"vast sbatch: job_memory.sh without a Vast dependency ({dep!r})", file=sys.stderr)
+            return 1
+        vid = m.group(1)
+        argv2 = [a for a in argv if not a.startswith("--dependency")]
+        json.dump({"after": vid, "argv": argv2, "submitted": time.time()}, open(os.path.join(Q, f"{vid}.memory.json"), "w"), indent=1)
+        print(f"vm{vid}")
+        return 0
+    if base != "job_fast.sh" or len(args) != 1:
+        print(f"vast sbatch: only job_fast.sh <job dir> runs on the Vast backend (got {base} {args})", file=sys.stderr)
+        return 1
+    jid = new_id()
+    name = g("-J", "--job-name") or "isgof_vast"
+    out = g("-o", "--output") or os.path.join(os.path.dirname(os.path.dirname(script)), "slurm-%j.out")
+    rec = {"id": jid, "name": name, "script": os.path.abspath(script), "job_dir": os.path.abspath(args[0]), "argv": argv,
+           "acct": g("-A", "--account") or "vision", "part": g("-p", "--partition") or "svl", "gres": g("--gres"),
+           "time_s": seconds(g("-t", "--time") or "4:00:00"), "cpus": int(g("-c", "--cpus-per-task") or 9), "mem": g("--mem") or "48G",
+           "log": out.replace("%x", name).replace("%j", str(jid)), "cwd": os.getcwd(), "submitted": time.time(),
+           "submitted_by": f"{os.environ.get('USER', '?')}@{socket.gethostname()}", "gpu": os.environ.get("VAST_GPU") or None}
+    tmp = os.path.join(Q, f".{jid}.json.tmp")
+    json.dump(rec, open(tmp, "w"), indent=1)
+    os.rename(tmp, os.path.join(Q, f"{jid}.json"))
+    print(str(jid))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
