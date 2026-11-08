@@ -1323,7 +1323,28 @@ class Attachment(SamplerV2):
         self.kit.sync_world()
         self._record_pinch_width(grasp, m_pose)
         ho = self._handover_search(rng, manip, m_pose, grasp, cam_manip)
-        att, work_st, tried = None, manip, 0
+        g_l = ho["g_l"]
+        idx = self.kit.robot.arm_control_idx
+        # the records first (the carried drive to a place stance attaches the male to the LEFT hand per its record)
+        grasp.carry_height = float(ho["carry"])
+        grasp.waypoints = list(ho["wps_r"])
+        grasp.extras.update({"attach_route": "handover", "handover": {"role": "pick", "object_pose": [[float(v) for v in ho["M"][0]], [float(v) for v in ho["M"][1]]],
+                                                                      "hands_apart_m": round(float(ho["hands_apart_m"]), 4), "release_retreat_m": 0.10,
+                                                                      "evaluated": ho["tried"], "fails": ho["fails"]}})
+        hold = TT.GraspRecord(object=tname, arm="left", grasp_key=self.hold_key, grasp_name=g_l.name, yaw=0.0, pre_grasp=ho["pre_l"], grasp=ho["H_l"],
+                              carry_height=0.0, finger_q=[float(v) for v in (g_l.finger_q or [])] or None, eef_in_object=(TT._t(g_l.pose[0]), TT._t(g_l.pose[1])),
+                              stance="manipulation", place_on=pname)
+        hold.extras.update({"attach_route": "handover", "handover": {"role": "hold", "object_pose": grasp.extras["handover"]["object_pose"]},
+                            "pinch_width_m": round(2.0 * self._finger_q_of(g_l), 4)})
+        manip.arms = ["right", "left"]
+        self.sidecar.add_stance(manip)
+        self.sidecar.add_grasp(grasp)
+        self.sidecar.add_grasp(hold)
+        self.record_carry_arm_q(tname, "left", TT._t(ho["q_l"])[idx["left"]])
+        # the drive: the left arm frozen at its hold (carry_arm_q), the emptied right arm at the stance's posture (the oracle re-poses an empty
+        # arm to the record's arms_q before the drive; its release-retreat configuration stood within the carried margin of the left hand)
+        arm_q = None
+        att, work_st, tried, path, legs = None, manip, 0, None, {}
         for st in self._handover_place_stances(manip):
             if tried >= SECOND_BASE_MAX_TRIES + 1:
                 break
@@ -1339,44 +1360,39 @@ class Attachment(SamplerV2):
                     continue
             tried += 1
             att = self._handover_attach_from(rng, manip, st, m_pose, ho, cam_init)
-            if att is not None:
+            if att is None:
+                continue
+            if st is manip:
                 work_st = st
                 break
-        if att is None:
-            self._route_count("place_unreachable")
-            raise Reject("partner_placement", f"hand-over: no partner cell with a reachable left-hand attach from {tried} place stance(s) ({self._att_fails})")
-        self._route_count("attach_found")
-        f_pose, attach, pre_attach = att["f_pose"], att["attach"], att["pre_attach"]
-        goal = self._attached_pose(f_pose)
-        g_l = ho["g_l"]
-        idx = self.kit.robot.arm_control_idx
-        # the records: the right hand's pick and the left hand's hold
-        grasp.carry_height = float(ho["carry"])
-        grasp.waypoints = list(ho["wps_r"])
-        grasp.extras.update({"attach_route": "handover", "handover": {"role": "pick", "object_pose": [[float(v) for v in ho["M"][0]], [float(v) for v in ho["M"][1]]],
-                                                                      "hands_apart_m": round(float(ho["hands_apart_m"]), 4), "release_retreat_m": 0.10,
-                                                                      "evaluated": ho["tried"], "fails": ho["fails"]}})
-        hold = TT.GraspRecord(object=tname, arm="left", grasp_key=self.hold_key, grasp_name=g_l.name, yaw=0.0, pre_grasp=ho["pre_l"], grasp=ho["H_l"],
-                              carry_height=0.0, finger_q=[float(v) for v in (g_l.finger_q or [])] or None, eef_in_object=(TT._t(g_l.pose[0]), TT._t(g_l.pose[1])),
-                              stance="manipulation", place_on=pname, waypoints=list(att["wps"]))
-        hold.pre_place, hold.place = pre_attach, attach
-        hold.extras.update({"attach_route": "handover", "handover": {"role": "hold", "object_pose": grasp.extras["handover"]["object_pose"]},
-                            "attach_stance": work_st.name, "lift": [float(v) for v in att["start"][0]], "slerp_policy": att.get("slerp_policy"),
-                            "pinch_width_m": round(2.0 * self._finger_q_of(g_l), 4)})
-        manip.arms = ["right", "left"]
-        self.sidecar.add_stance(manip)
-        self.sidecar.add_grasp(grasp)
-        self.sidecar.add_grasp(hold)
-        self.record_carry_arm_q(tname, "left", TT._t(ho["q_l"])[idx["left"]])
-        objects = {tname: m_pose, pname: f_pose}
-        if work_st is not manip:
-            work_st.carried = tname
-            self.sidecar.add_stance(work_st)
+            # the drive to this place stance with the male in the left hand (the heading kept, axis legs only); a failing leg -> the next stance
+            st.carried = tname
+            self.sidecar.add_stance(st)
             male.set_position_orientation(*m_pose)
             male.keep_still()
             self.kit.sync_world()
-            path = self.record_path(manip, work_st, carried=tname, arm="left", axis_leg=[0.0],
-                                    arm_q={"left": TT._t(ho["q_l"])[idx["left"]], "right": TT._t(ho["q_x"])[idx["right"]]})
+            try:
+                path = self.record_path(manip, st, carried=tname, arm="left", axis_leg=[0.0], arm_q=arm_q)
+            except Reject as e:
+                self.sidecar.stances.pop(st.name, None)
+                legs[f"lat{st.lateral:+.2f}/s{float(st.stand_off or 0.0):.2f}"] = str(e)[:160]
+                self._route_count("place_leg_failed")
+                att = None
+                continue
+            work_st = st
+            break
+        if att is None:
+            self._route_count("place_unreachable")
+            raise Reject("partner_placement", f"hand-over: no partner cell with a reachable left-hand attach and drive from {tried} place stance(s) "
+                                              f"({self._att_fails}; legs {legs})")
+        self._route_count("attach_found")
+        f_pose, attach, pre_attach = att["f_pose"], att["attach"], att["pre_attach"]
+        goal = self._attached_pose(f_pose)
+        hold.waypoints = list(att["wps"])
+        hold.pre_place, hold.place = pre_attach, attach
+        hold.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in att["start"][0]], "slerp_policy": att.get("slerp_policy")})
+        objects = {tname: m_pose, pname: f_pose}
+        if work_st is not manip:
             work_st.extras.update({"second_base_pose": True, "lateral_shift": float(work_st.lateral - manip.lateral),
                                    "stand_off_shift": float((work_st.stand_off or 0.0) - (manip.stand_off or 0.0)), "path_length_m": getattr(path, "length_m", None)})
         work_st.arms = ["left"] if work_st is not manip else work_st.arms

@@ -2430,6 +2430,21 @@ carrying hand's record. Executor: the planner attachment moves to the taking han
 Kit `attach_route.handover.{pick, handover_carry_checked, handover_found, handover_unreachable, carry_checked, carry_failed,
 attach_found, place_unreachable, rest_stable, rest_unstable, drafted}`.
 
+**Validation** (`--grasps v2only`, the staged root, alias memory off, N 4; shiyuc root `$SY/isgf_root`, base index 620300, replicate 620400):
+
+| arm (tag) | attempts | rest rejects | written | ok | GPU-h / success | demo failures |
+|---|---|---|---|---|---|---|
+| current route, brace_search false (`i7cork_base`, `_r2`) | 15 + 47 | 1 + 23 | 4 + 4 | 4 + 4 | 0.155, 0.175 | none |
+| lying90 (`i7cork_ly`, `_r2`) | 27 + 18 | 0 + 0 | 4 + 4 | 3 + 1 | 0.282, 0.610 | grasp: arm link5 on the desk; grasp approach joint jump 0.23 rad; attach: witness / plan branch 1.9-3.8 rad after the turn (x2) |
+| handover (`i7cork_ho4`; first demo: a recollect of `i7cork_ho2` 620300) | see DECISIONS | - | - | 1 / 1 first demo | - | - |
+
+- brace_search false alone makes the current route's demos clean (8 / 8; before 3 / 4 and 2 / 3 with the brace finger's
+  protected_contact); its rest rejections stay placement-dependent (1 / 15 and 23 / 47).
+- lying90 removes the rest rejections (0 / 45; the route's kit: rest_stable 15 / 15) but its in-hand 90 deg turn costs: carry_failed 44 of
+  61 carries checked, and 4 of 8 demos fail in the oracle (the IK branch of the attach after the turn, the low grasp next to the desk).
+- The hand-over runs end to end in the oracle: the first demo (1008 steps) - right grasp / lift / carry to the hand-over / LEFT grasp
+  of the held cork / right release / left carry / attach / retreat.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
