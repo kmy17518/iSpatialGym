@@ -2427,6 +2427,78 @@ cost is outside target_placement: lift_unreachable (7-9 per run, 74-303 s each).
 stance, which is only checked in goal_check. Proposed, none implemented: screen that lift at the draw; put the cap and the gate on the
 same basis, or keep touching trunks on built tilts; draw the depth within the cap.
 
+### i7-diag AUDIT (2026-11-08, owner 5m): where rejected attempts spend their seconds
+
+CPU only, from the logs; no behaviour change, no GPU run. `scripts/oracle_fix/audit_early_reject.py`:
+`scan` (on the cluster) writes one JSON row per attempt from each job's `sample.log` (the reject line's stage / reason / string, the
+per-attempt `stages:` seconds, the start draw, the kit counters and kit seconds, counts of camera / place-IK lines) and one per job (sacct,
+`job_stats.json`); `aliases` and `items` (local) tabulate it. The per-attempt seconds sum exactly to `job_stats.json` `attempts_s` in all
+1,333 jobs that have stats. Record: `$OFH/diag_20261108/early_reject/` (`attempts_r4.jsonl` = every job with a `sample.log` newer than
+2026-11-06 12:00 in both out roots, `aliases.tsv`, `items.md`, `seg_fridge.jsonl`, `seg_sink.jsonl`).
+
+**Primary set:** every `int1_*` job, plus, per alias, the latest tag whose jobs all completed. That is 147 (tag, alias) pairs: 148 jobs,
+99.8 GPU-h, 473 written, 383 ok. The owner's candidate runs (t03specs_T6, the eight fridge runs, the sink runs) are added per item.
+
+- Rejected attempts take 55.3 h, which is 77.0 % of all attempt time (train85: 79 %).
+- Split of the rejected seconds:
+  - draw (reset + start draw): 12 %;
+  - search (the rest of the sample stage): 79 %;
+  - post-sample (apply / settle / goal / program / filter): 9 %.
+- So moving a late check (goal_check / program_check) into a candidate's acceptance recovers at most that 9 %.
+- The large savings need a cheaper predicate before the expensive search (feasible-first), a memo across attempts, or a time cap.
+
+**The ranked list.** Ranked by estimated GPU-s saved per written demo of the item's runs. A job's sampling is its critical path, so
+sampling seconds count as GPU seconds. Notes:
+- "addressable" is the whole rejected attempts: an upper bound.
+- For an alias with 0 written, the denominator is the 4 demos each job asked for (marked >=).
+- The items overlap (CAP and FLOOR-memo share under_large_03's attempts), so the seconds do not add up.
+
+| rank | item | runs | rejections | rejected s | est. saved s (rule) | written / ok | est. s / written (addressable) | proposed fix | status |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | BD-board: block_design_01 board_placement | sd_on | 43 | 4,976 | 4,868 (measured: BD_BOARD_EARLY 2.5 s per rejected attempt, bd_early) | 2 / 0 | 2,434 (2,488) | BD_BOARD_EARLY + BD_BOARD_SEARCH default (search wrote on attempt 1, bd_fix 4 / 4) | DECIDED 5m.2 |
+| 2 | FLOOR-memo: IORS large floor - the same B init->manipulation path collision / C "no push chain" / C "carry leg failed" over one instance's attempts | i7diag_floor under_large_03 (330003 x9), ontop_large_02 (330002 x2, 330000 x1) | 12 | 16,123 | 11,076 (the repeats after an instance's first, each down to the alias's median written attempt, 130 / 319 s) | 8 / 4 | 1,385 (2,015) | the floor flow draws no new start per attempt (start draw 0 s), so attempts re-search the same B / C: memo dead B (same swept collision, ~(18.50, -8.99) in all of 330003's) and dead C (d, lambda) across attempts, as `generation.c_skip_dead_b` does within one; or redraw the floor init after 2 such attempts | new |
+| 3 | AT03-rest: attachment_03 rest_unstable at settle_validate (184 s each) | int1_2 / 4 / 5, i7cork_ho_r2 | 62 | 11,419 | 10,778 (nudge ~10 s right after the rest draw) | 13 / 9 | 829 (878) | the existing rest-nudge test right after the rest draw | DECIDED 5n.2 (i7-cork) |
+| 4 | T03-lift (owner): touching_03 opryhp_0 goal_check lift_unreachable, the lift with the book attached; 148 verified, 20.8 s each (goal 10.3, settle 6.9, sample 1.6, apply 1.3) | t03specs_T6 | 148 | 3,073 | 2,744 (post-sample) | 0 / 0 | >=686 (>=768) | the attached-lift IK at the candidate's acceptance. The alias writes 0: the lift geometry is the blocker, so 5k.2's straightening-lift (d) A/B comes first | owner candidate |
+| 5 | IN02-j2 (owner): inside_large_02 arm joint-2 limit at the C place / pre-place. 268 / 350 C place failures in fridge4 + A / A2 / B / B2 verified; 841 joint-2 limit rejects in 144 attempts | i7_fridge4, i7i2_fridgeA / A2 / B / B2 / _def, i7i2_j2A, j2B | 102 attempts with a joint-2 reject | 25,744 | 8,617 (regression: 10.2 s per joint-2 reject, R2 0.22) | 32 / 26 | 269 (805) | the 50 mrad joint margin in the interior place map's IK (the map has none) + 5t's inside arm side. With ARM_SIDE (j2B) 65 rejects remain = 167 s / written for the map margin | owner candidate; 5t DECIDED |
+| 6 | T0x-contact: touching_01 / 02 / 04 goal_check contact_unreachable | primary (10 pairs) | 133 | 8,175 | 6,840 (screen at the draw) | 33 / 25 | 207 (248) | screen at the draw against the push map | DECIDED 5r (switch) |
+| 7 | IN03-cam (owner): inside_large_03 plate -> sink (bar), B pick "wrist camera within 5 mm" (2-4 mm clear of bar_egwapq_0) | i7i2_sink, i7i2_sinkdiag2, ch_sh | 191 camera lines in 6 attempts | 4,568 | 1,930 (regression: 10.1 s per line, R2 0.83, 15 attempts) | 12 / 12 | 161 (381) | i7-camhull's ISPATIALGYM_CAMERA_HULL_FALLBACK (ch_sh shadow: 27 / 27 narrow failures pass the hull) | owner question (shared gate) |
+| 8 | T0x-lift: touching_01 / 02 / 04 goal_check lift_unreachable | primary | 59 | 4,388 | 2,369 (measured catch 0.61) | 33 / 25 | 72 (133) | ISPATIALGYM_TOUCH_LIFT_SCREEN default | DECIDED 5r.1 |
+| 9 | CAP: attempts far past the alias's written ones, incl. the time_budget stalls | primary | 17 | 30,318 | 17,135 (budget max(300 s, 5 x the alias's median written attempt)) | 473 / 383 | 36 (64); under_large_03 6,939 s / 4 written, articulation_open_small_02 6,528 / 1, under_large_01 3,445 / 8 | an adaptive attempt budget from the alias memory's written-attempt times; the fixed 360 / 2400 / 3000 / 3600 s budgets stay as ceilings. Cuts 1 written attempt (under_large_01, 2,158 s) | new |
+| 10 | ON02-track (owner): ontop_large_02 approach_untrackable at program_check (carry chain 7, approach 2); 9 of 18 verified | i7diag_floor | 9 | 5,531 | 120 (post-sample: the search to that C is spent either way) | 4 / 4 | 30 (1,383) | the program_check's tracked carry / approach chain in C's acceptance, with a memo. The alias's cost is its C search (104-1,533 s per attempt), so item 2 is the lever | owner candidate |
+| 11 | U3-frame (owner): under_large_03 gripper_not_in_frame (goal_check grasp eef 3, program_check pre-place fingertip 3); 6 of 21 verified | i7diag_floor | 6 | 784 | 64 (post-sample) | 4 / 0 | 16 (196) | project the grasp eef and the pre-place fingertip at the B / C acceptance (same 5 % rule) | owner candidate |
+| 12 | REPEAT: instance_filter repeats_eval | primary | 163 | 5,216 | 2,511 (post + half the search) | 473 / 383 | 5 (11); axial_02 368 s / written | the repeats-eval test right after the start / goal draw | new (5o.2 for axial_02) |
+| 13 | FOCUS-F: target_placement ending on "empty feasible set F at the focus" | primary | 321 | 10,534 | 127 (only 31 / 321 repeat a focus cell + trunk in the job) | 473 / 383 | 0 (22) | no early check helps (new disagreement per draw); a map-side margin | information |
+
+**Checks of the brief's facts.** All were checked against the logs. The 148, 9 of 18 and 6 of 21 hold. Two need correcting, and one
+needs context:
+- The sink's "over 30 min per attempt" was i7i2_sinkdiag3 300054/0: 1,836 s, 103 camera lines. That attempt **wrote**, and it ran with
+  the CAMERA_BLAME probes on. Without them, the longest sink attempt is 1,173 s (i7i2_sink 300035/2, also written, 89 lines).
+- inside_large_02's 349 place-IK failures count 350 in my join.
+- Context for opryhp's 148: touching_03's latest round-2 arm (i7t03r3_c, 0 written) is dominated by a different rejection,
+  target_placement "no library grasp reaches the fixed start pose" (8,199 s).
+
+**Highest rejected seconds per written demo** (`aliases.tsv`):
+
+| alias | rejected s per written | written |
+|---|---|---|
+| articulation_open_small_02 | 7,920 | 1 |
+| under_large_03 | 3,335 | 4 |
+| ontop_large_02 | 2,666 | 4 |
+| block_design_01 | 2,487 | 2 |
+| touching_04 | 1,968 | 8 |
+| inside_04 | 1,632 | 6 |
+| under_large_02 | 1,573 | 4 |
+| attachment_03 | 1,560 | 13 |
+| ontop_large_01 | 1,260 | 4 |
+| under_large_01 | 1,180 | 8 |
+
+Aliases with 0 written:
+- touching_03: 8,930 s;
+- touching_large_02: gm_t02_on, 5,876 s, F_init ∩ F_goal (5q.2);
+- articulation_open_large_03 / close_large_03: handle_unreachable + repeats_eval, 5,233 / 3,843 s.
+
+Implementing any item is a separate owner decision.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
