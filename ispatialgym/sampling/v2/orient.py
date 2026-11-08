@@ -154,7 +154,7 @@ CAMERA_BLAME_MARGINS = (0.004, 0.003, 0.002, 0.001, 0.0, -0.002, -0.005, -0.01)
 
 def camera_blame(ikc, q: th.Tensor, arm: str, margin: float) -> Optional[Dict[str, Any]]:
     """Opt-in (``ISPATIALGYM_CAMERA_BLAME``): why the wrist camera is within ``margin`` of the world at ``q`` - the largest probed margin
-    it clears (:data:`CAMERA_BLAME_MARGINS`: the spheres' clearance band), and the world objects within 0.4 m of the camera whose removal
+    it clears (:data:`CAMERA_BLAME_MARGINS`: the spheres' clearance band), and the world objects within 0.4 m of the eef whose removal
     ALONE clears it (``ikc.ignoring``). One ``CAMERA_BLAME`` line; kit counters ``camera_blame.<object>`` / ``camera_blame.clear_at.<mm>``."""
     import json as _json
     import math as _math
@@ -163,8 +163,9 @@ def camera_blame(ikc, q: th.Tensor, arm: str, margin: float) -> Optional[Dict[st
     out: Dict[str, Any] = {"arm": arm, "margin_m": float(margin)}
     try:
         qf = C.as_tensor(q).float()
-        cam = ikc.kit.fk([link], qf)[link][0]
-        out["camera_xyz"] = [round(float(v), 4) for v in cam]
+        eef = f"{arm}_eef_link"  # the kit's FK frames (the camera link is not one): the wrist camera sits ~0.1 m from the eef
+        cam = ikc.kit.fk([eef], qf)[eef][0]
+        out["eef_xyz"] = [round(float(v), 4) for v in cam]
         clear_at = None
         for m in CAMERA_BLAME_MARGINS:
             if bool(ikc.kit.links_clear(qf, [link], float(m))[0]):
