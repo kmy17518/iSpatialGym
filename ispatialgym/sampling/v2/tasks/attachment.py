@@ -506,12 +506,13 @@ class Attachment(SamplerV2):
         # i7-attachmap 2026-11-07: under v2 only the attach-reach band is the pair's ATTACH map (attach_maps: the held male at its seat on the
         # partner, pre-attach -> hover -> touchdown -> seat by chained IK, the oracle's hover rule); a miss rejects missing_map (+ MAP_REQUEST).
         # Every other mode loads / computes the legacy band per edge as before.
-        attach_view = self._attach_map_view() if TT.RB.v2_only() else None
         if self.attach_route == "handover":
             # i7-cork route (i): the LEFT hand attaches with its wide-end grasp - the partner cells come from the hold entry's left-arm attach map
             if not TT.RB.v2_only():
                 raise Reject("spec", "the hand-over route reads the left arm's attach map (v2 only)")
             attach_view = self._attach_map_view(self.hold_key, "left")
+        else:
+            attach_view = self._attach_map_view() if TT.RB.v2_only() else None
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
