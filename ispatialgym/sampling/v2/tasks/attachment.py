@@ -195,6 +195,45 @@ class EarlyRestUnstable(Reject):
     :meth:`Attachment.sample_instance`'s candidate loop (the late test ends the attempt too)."""
 
 
+def _env_on(env: str) -> bool:
+    return os.environ.get(env, "").strip().lower() in ("1", "on", "true", "yes")
+
+
+#: i7-cork 2026-11-08 (owner decision 5n.3, the lying route's carry check): the carry turns the male from its lifted grasp to the pre-attach;
+#: the goal's turn about the (vertical) insertion axis follows the PARTNER'S yaw, which the partner placement draws uniformly, so the
+#: recorded lying turns were 125-179 deg (8 instances, i7cork_ly / _r2) where the route's own turn is the 90 deg tilt, and the tracked SLERP
+#: of the large turns is what fails. ``ISG_LYING90_MIN_TURN=1`` (default off): on the lying route only, the partner's yaw at each cell is
+#: drawn within +-:data:`LYING90_YAW_JITTER_DEG` of the yaw whose attach makes the carry's turn smallest (:func:`min_turn_yaw`, closed
+#: form: the 90 deg tilt). Kit ``attach_route.lying90.min_turn_yaw``.
+LYING90_MIN_TURN_SWITCH = "ISG_LYING90_MIN_TURN"
+LYING90_YAW_JITTER_DEG = 30.0
+#: the carry diagnostics (every route, no decision): the turn buckets (deg) of kit ``carry_turn.<route>.<ok|failed>.<bucket>`` and the arm
+#: joint gap (rad) between the carry's tracked end and the attach witness above which kit ``attach_branch_gap.<route>.gt`` counts (the
+#: oracle's finishing bound: a witness farther than 0.6 rad is "in another IK branch")
+CARRY_TURN_BUCKETS_DEG = (100.0, 140.0)
+ATTACH_BRANCH_GAP_RAD = 0.6
+
+
+def min_turn_yaw(q_lift, q_partner_eef) -> Tuple[float, float]:
+    """``(yaw, turn)`` (rad): the partner yaw ``y`` that minimises the geodesic angle between ``q_lift`` and ``R_z(y) ⊗ q_partner_eef``
+    (the attach eef orientation of a partner at yaw ``y`` whose rest is the identity; ``q_partner_eef`` = the eef orientation in the
+    partner frame). ``R_z(y) ⊗ q = cos(y/2) q + sin(y/2) (k ⊗ q)`` with ``k = (0, 0, 1, 0)``, so ``<., q_lift> = A cos(y/2) + B sin(y/2)``,
+    largest in magnitude at ``y = 2 atan2(B, A)`` with ``|.| = hypot(A, B)``."""
+    ql = TT._t(q_lift).to(th.float64)
+    qp = TT._t(q_partner_eef).to(th.float64)
+    ql, qp = ql / th.linalg.norm(ql), qp / th.linalg.norm(qp)
+    k = th.tensor([0.0, 0.0, 1.0, 0.0], dtype=th.float64)
+    a = float(th.dot(qp, ql))
+    b = float(th.dot(C.qmul(k, qp).to(th.float64), ql))
+    yaw = (2.0 * math.atan2(b, a) + math.pi) % (2.0 * math.pi) - math.pi
+    return yaw, 2.0 * math.acos(min(1.0, math.hypot(a, b)))
+
+
+def carry_turn_bucket(turn_deg: float) -> str:
+    lo, hi = CARRY_TURN_BUCKETS_DEG
+    return f"lt{lo:.0f}" if turn_deg < lo else (f"lt{hi:.0f}" if turn_deg < hi else f"ge{hi:.0f}")
+
+
 @dataclass
 class CarryPlan:
     """The carry from the lifted grasp to the pre-attach that :meth:`Attachment._carry_to_pre_attach` settled on (or tried last):
@@ -1034,6 +1073,10 @@ class Attachment(SamplerV2):
                           "brace": brace_state, "brace_class": brace_kind, "attach_stance": work_st.name, "second_base_pose": work_st is not manip,
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
+        d.summary["carry_turn_deg"] = None if att.get("turn_deg") is None else round(float(att["turn_deg"]), 1)
+        d.summary["attach_branch_gap_rad"] = None if att.get("branch_gap_rad") is None else round(float(att["branch_gap_rad"]), 3)
+        if self._early_rest_last is not None:
+            d.summary["early_rest"] = dict(self._early_rest_last)
         if self.attach_route is not None:
             d.summary["attach_route"] = {"route": self.attach_route, "grasp_key": self.grasp_key, "turn_deg": grasp.extras.get("attach_route_turn_deg")}
             self._route_count("drafted")
@@ -1991,6 +2034,15 @@ class Attachment(SamplerV2):
             return None
         m_fp = self.world.footprint(self.hull[self.t_role], m_pose)
         focus_xy = st.focus[:2] if st.focus is not None else m_pose[0][:2]
+        yaw_c = None
+        if self.attach_route == "lying90" and _env_on(LYING90_MIN_TURN_SWITCH):
+            # i7-cork 5n.3: the partner yaw whose attach makes the carry's in-hand turn the route's 90 deg tilt (the lift keeps the grasp's
+            # orientation; the eef at the attach = R_z(yaw) ⊗ T_attach ⊗ eef_in_object)
+            q_pe = C.compose(C.compose(self.parent_link_in_female, self.root_in_child_link), (TT._t(grasp.eef_in_object[0]), TT._t(grasp.eef_in_object[1])))[1]
+            yaw_c, turn_c = min_turn_yaw(grasp.grasp[1], q_pe)
+            self._route_count("min_turn_yaw")
+            log.info("%s: LYING90_MIN_TURN partner yaw %.1f deg +- %.0f (the carry's turn %.1f deg there)", self.gp.variant, math.degrees(yaw_c),
+                     LYING90_YAW_JITTER_DEG, math.degrees(turn_c))
         perm = [int(i) for i in rng.permutation(len(cells))]
         perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
         geo: List[Tuple[Any, ...]] = []
@@ -1999,7 +2051,10 @@ class Attachment(SamplerV2):
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
                 continue
-            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
+            yaw = float(rng.uniform(-math.pi, math.pi))
+            if yaw_c is not None:
+                yaw = yaw_c + math.radians(LYING90_YAW_JITTER_DEG) * yaw / math.pi  # the same draw, mapped onto +-LYING90_YAW_JITTER_DEG
+            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
             fp = self.world.footprint(self.hull[self.p_role], pose)
             if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
@@ -2063,11 +2118,15 @@ class Attachment(SamplerV2):
                     plan = self._carry_to_pre_attach(grasp, eef_pre, pose, st, shift)
                     r_w, lift, wps, carry = plan.result, plan.lift, plan.waypoints, plan.carry
                     self._route_count("carry_checked")
+                    # i7-cork 5n.3 diagnostics (no decision): the carry's in-hand turn, per route and outcome
+                    turn_deg = math.degrees(C.quat_angle(TT._t(lift[1]), TT._t(eef_pre[1]))) if lift is not None else float("nan")
+                    TT._countn(self, f"carry_turn.{self._route_label()}.{'ok' if r_w.ok else 'failed'}.{carry_turn_bucket(turn_deg)}")
+                    log.info("%s: CARRY_CHECK route %s at %s turn %.1f deg ok %s: %s", self.gp.variant, self._route_label(), st.name, turn_deg, r_w.ok, str(r_w.reason)[:160])
                     if not r_w.ok:
                         fails["slerp"] += 1
                         self._route_count("carry_failed")
                         seq = [lift] + wps
-                        log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.variant, st.name, plan.ladder, r_w.reason,
+                        log.info("%s: SLERP_FAILURE at %s (%s, turn %.1f deg): %s | %s", self.gp.variant, st.name, plan.ladder, turn_deg, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
@@ -2090,9 +2149,25 @@ class Attachment(SamplerV2):
                         fails["brace_ik"] += 1
                         if require_joint:
                             continue
+            gap = self._attach_branch_gap(r_w.q, res.q)
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over}
+                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over, "turn_deg": turn_deg, "branch_gap_rad": gap}
         return None
+
+    def _attach_branch_gap(self, q_carry_end: Optional[th.Tensor], q_attach: Optional[th.Tensor]) -> Optional[float]:
+        """i7-cork 5n.3 diagnostic (no decision): the largest right-arm joint gap (rad) between the carry's tracked end (at the pre-attach)
+        and the exact IK's attach configuration - the two the oracle joins by the insertion; above :data:`ATTACH_BRANCH_GAP_RAD` it reports
+        "the recorded IK witness lies .. rad away .. different IK branches". Kit ``attach_branch_gap.<route>.{le, gt}``; None without both."""
+        if q_carry_end is None or q_attach is None:
+            return None
+        try:
+            idx = self.kit.robot.arm_control_idx["right"]
+            gap = float((TT._t(q_carry_end)[idx] - TT._t(q_attach)[idx]).abs().max())
+        except Exception:  # noqa: BLE001 - a diagnostic only
+            return None
+        TT._countn(self, f"attach_branch_gap.{self._route_label()}.{'gt' if gap > ATTACH_BRANCH_GAP_RAD else 'le'}")
+        log.info("%s: ATTACH_BRANCH_GAP route %s %.2f rad (carry end vs the attach witness)", self.gp.variant, self._route_label(), gap)
+        return gap
 
     def _carry_to_pre_attach(self, grasp, eef_pre: TT.Pose, f_pose: TT.Pose, st: Stance, shift: th.Tensor) -> CarryPlan:
         """The carry of the attached male from its lifted grasp to the pre-attach, tracked as the oracle runs it (``Lift``, then

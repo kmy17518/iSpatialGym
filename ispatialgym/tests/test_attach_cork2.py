@@ -1,6 +1,7 @@
 """i7-cork round 2 (owner decisions 2026-11-08 5n.1-5n.3): the early rest-nudge test (ISG_ATTACH_EARLY_REST), the per-attempt fallback
 routes (ISG_ATTACH_FALLBACK) and the lying route's min-turn partner yaw (ISG_LYING90_MIN_TURN)."""
 
+import math
 import types
 
 import pytest
@@ -50,3 +51,46 @@ def test_early_vs_late_partner_only_and_not_run():
     d = Draft()
     s._early_vs_late(d, {"cork_1": 9.0}, {"cork_1": 9.0})
     assert s.counters == {} and "early_rest" not in d.summary
+
+
+def _rand_quat(g):
+    import torch as th
+
+    q = th.tensor(g.normal(size=4), dtype=th.float64)
+    return q / th.linalg.norm(q)
+
+
+def test_min_turn_yaw_matches_brute_force():
+    import numpy as np
+
+    from ispatialgym.robot import conventions as C
+
+    g = np.random.default_rng(3)
+    for _ in range(20):
+        ql, qp = _rand_quat(g), _rand_quat(g)
+        yaw, turn = AT.min_turn_yaw(ql, qp)
+        brute = min(C.quat_angle(ql, C.qmul(C.quat_from_yaw(y), qp)) for y in np.linspace(-math.pi, math.pi, 7201))
+        assert turn == pytest.approx(brute, abs=2e-3)
+        assert C.quat_angle(ql, C.qmul(C.quat_from_yaw(yaw), qp)) == pytest.approx(turn, abs=1e-4)
+        assert -math.pi <= yaw < math.pi
+
+
+def test_min_turn_yaw_of_a_lying_male_is_its_tilt():
+    """A male lying on its side (a 90 deg tilt of the upright goal orientation, any yaw): the smallest carry turn is the 90 deg tilt,
+    a uniform partner yaw gives up to 180 deg (the recorded lying turns 125-179 deg)."""
+    import numpy as np
+    import torch as th
+
+    from ispatialgym.robot import conventions as C
+
+    g = np.random.default_rng(5)
+    for _ in range(10):
+        qp = _rand_quat(g)
+        y0 = float(g.uniform(-math.pi, math.pi))
+        tilt = C.quat_from_axis_angle(th.tensor([math.cos(y0 * 0.3), math.sin(y0 * 0.3), 0.0]), math.pi / 2)
+        ql = C.qmul(tilt, C.qmul(C.quat_from_yaw(y0), qp))
+        yaw, turn = AT.min_turn_yaw(ql, qp)
+        assert math.degrees(turn) == pytest.approx(90.0, abs=1e-3)
+        worst = max(C.quat_angle(ql, C.qmul(C.quat_from_yaw(y), qp)) for y in np.linspace(-math.pi, math.pi, 721))
+        assert math.degrees(worst) > 170.0
+    assert AT.carry_turn_bucket(95.0) == "lt100" and AT.carry_turn_bucket(120.0) == "lt140" and AT.carry_turn_bucket(150.0) == "ge140"
