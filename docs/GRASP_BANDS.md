@@ -3118,6 +3118,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 17 | i7-contact3 final (ac2a682d) | 22ae887d | adds only PUSH_LINE_COM (4822246b, lead #9, default off) + docs |
 | 18 | i7-interior2 (3749f69b) | 02ccd615 | INSIDE_ARM_SIDE + stance-C map cap for relation inside only, INSIDE_ARM_SIDE DEFAULT for inside (owner 5i.1 / 5t), opt-in joint_margin_rad; the margin maps not folded (lead #22) |
 | 19 | i7-tray up to dae908a3 | 4054c3d7 | DEFAULTS LAYOUT_PAD_CHECK=all for fixed layouts (48fe31cc), GRASP_TURN_FILTER (owner 5u.1); NOT the release-sweep gate (686c1dcd / 3115595e, lead #23) nor its root |
+| 20 | i7-axialrest final (2f25683f; code b4bcb3d0) | 1083d1f6 | AXIAL_BRACE_MAP_JOINT_MARGIN / AXIAL_BRACE_TILT_INTERSECT both off (lead #24); the margin maps not folded |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
