@@ -2471,6 +2471,100 @@ question, i7-t03): IORS small's draw is the same code with or without the switch
 (the start lateral 0.35-0.40 m from the bay) are unchanged; a bay-centred lateral would plug into `_spa_redraw_start_cached` /
 `spa_redraw_start` (core `spa_draw` counts it).
 
+### 5o: the edge restrictions, the flip-room draw, axial_02 (owner decisions 2026-11-08 c, 5o / 5o.1 / 5o.2)
+
+Owner (verbatim, 5o): "add a switch that ignores both restrictions, so every edge is offered and the existing checks decide (free floor,
+collision, framing, repeats). A/B across the families ... The default is my decision after the A/B." 5o.1: "let the flip-room rule
+(`_init_with_room_for_flips`) draw from the whole range that keeps flip room, instead of one point. Behind a switch, run together with
+the edge switch and i7-blockdesign's board search." 5o.2: "Re-measure them with the edge switch on; diagnose further only if the repeats stay."
+
+**Verification of the two mechanisms (before the change).**
+- Support-row notes: 1651 of 1938 support rows of candidates.csv carry `edges=` (127 of 142 per tabletop subtask), but in B4's
+  free-run format `edges=+u(1.65/1.65/1.65),-u(...),+v(...),-v(...)` - every free edge with its runs, not a pin. `ground_isg.parse_edges`
+  (regex `edges=([+-][uv](?:,[+-][uv])*)\b`) reads only the FIRST edge of such a note (936 rows list more than one) - a latent
+  misreading. It never acts: `ground_isg.support_surface` makes a `support_surfaces` entry only from a note with `top_z=`, and none of
+  these notes has one (0 entries from the sheet); the customs has exactly one entry with `edges` (the attachment stockpot-bar's bar +u,
+  owner 2026-10-12), and no fast-flow template carries any (every `template_meta.json` under `$OFH/out`: 0 with edges; no
+  "the support row keeps edge(s)" line in any fast-flow sample.log). So mechanism 1 is dormant in the fast flow today.
+- `generation.init_edges: ["+v"]` (block design only, 2026-11-06) is live: "generation.init_edges keeps edge(s) ['+v']" in all 15
+  block_design_01 fast-flow job logs.
+- axial_02 is not edge-pinned (sd_on, every draw): all four edges are offered; -u and -v stances collide at trunk (0.5, 0) in Phase 1a,
+  +v (the 0.56 m end) fails Phase 1c `edge_too_short` (m_R + m_L = 0.66 m > 0.56 m); only +u passes, lateral [0.19, 0.61].
+
+**Change.**
+- `ISPATIALGYM_ALL_EDGES=1` (38990f02, default off): `tabletop.edge_frames` ignores `row_edges` and `gen_edges` - every edge of the top
+  is offered and the existing checks decide; an interior surface's open sides (`top.open_edges`, geometry) still apply. Kit counters
+  `start_edges.row_ignored` / `start_edges.gen_ignored` (only when a restriction was ignored). It is the shared edge selection
+  (axial, articulation small, attachment, block design, disembedding, IORS small, IORS large support init all call `edge_frames`), not
+  IORSSmall.sample_instance.
+- `ISPATIALGYM_BD_FLIP_ROOM_DRAW=1` (7606f6ca, default off): `_init_with_room_for_flips(init, rng)` -> `_flip_room_draw`: the init lateral
+  is drawn uniformly (attempt rng) among the laterals (1 cm grid + the drawn one) of the whole range that keeps the flip room
+  (`L + need` inside the Phase 1c bounds), on the free floor, with the most Phase 2 stand-offs that keep a board position on the top
+  (`_board_fit`, as the move). Empty range / nothing on the floor: the move as before. Counters `bd_flip_room_draw.drawn` / `.no_range`
+  / `.no_floor`; `_flip_room["draw"]` records the admissible span. Unit (rhjoby-like top, bounds [0.044, 0.547], need +0.35): the move puts
+  every draw at 0.127; the draw spans [0.044, ~0.134] with the base-relative list, [0.044, 0.197] with i7-blockdesign's BD_BOARD_TABLE.
+- 7f7560af: test_start_draw's block design stub takes the rng. bd47a6d4: merge of i7-blockdesign f1fc4ac1 (5m.1 6000-step block
+  design collectors, 5m.2 BD_BOARD_EARLY / SEARCH default on, BD_BOARD_TABLE default off) for the 5o.1 run.
+
+**Runs** (`$OFH/startdraw_20261108`, loop 18383579 `loop_5o.sh`, trunk_bd47a6d4, `--grasps v2only` on v2maps_startdraw, N 4, base index
+300500 (as sd_off / sd_on), alias memory off, svl titanrtx, <= 4 jobs at a time; tab: `jobs/v2build/tab_i.py -a <tag>`,
+`startdraw_20261108/tab_5o.py <tag>` for the 5o counters / drawn edges).
+
+The edge switch across the families (se_on = `ISPATIALGYM_ALL_EDGES=1`; the comparison is sd_on, the same code path with the start draw on,
+since the switch only acts where a restriction exists - its counters say where):
+
+| alias | sd_on att / wr / ok, GPU-h | se_on att / wr / ok, GPU-h | start_edges.* ignored | drawn edges (se_on) | written distinct starts | rejections that grew |
+|---|---|---|---|---|---|---|
+| alignment-axial_02 | 25 / 3 / 3, 0.33 | 25 / 3 / 3, 0.30 | 0 | +u 25 (lateral 0.20-0.57) | 2 | none (identical: repeats_eval 11, target_placement 9) |
+| articulation_open_small_01 | 6 / 4 / 4, 0.16 | 6 / 4 / 4, 0.17 | 0 | +v 4 / -v 2 | 2 | none (identical) |
+| attachment_01 | 11 / 4 / 4, 0.48 | 10 / 4 / 4, 0.45 | 0 | -v 6 / +v 3 / +u 1 | 3 | none |
+| disembedding_02 | 7 / 4 / 4, 0.72 | 7 / 4 / 3, 0.70 | 0 | -u 5 / +u 2 | 4 | none (1 demo not_settled) |
+| ontop_large_03 (support init) | 8 / 4 / 4, 0.22 | 8 / 4 / 4, 0.21 | 0 | +v 6 (+ no_free_edge 2) | 4 | none (identical) |
+| ontop_small_02 (IORS small) | 6 / 4 / 4, 0.38 | 10 / 4 / 4, 0.39 | 0 | +u 6 / -u 4 | 4 | ik_joint_limit 0 -> 2 (N 4 noise: same code path) |
+| touching_large_03 (floor init) | 4 / 4 / 4, 0.28 (sd2_on) | 4 / 4 / 3, 0.25 | 0 (no edge list) | floor 4 | 4 | none (1 demo plan_failed) |
+
+`start_edges.row_ignored` / `.gen_ignored` = 0 on all seven: no restriction exists there, so the switch did not act (consistent with the
+verification). The differences are N 4 noise on an unchanged path.
+
+block_design_01 (where `generation.init_edges` acts), all four arms on the merge with i7-blockdesign's EARLY / SEARCH defaults and the
+6000-step collectors (`max-steps 6000` in job.env):
+
+| arm | env | att / wr / ok, GPU-h (/ success) | edges drawn (lateral) | rejections | 5o counters |
+|---|---|---|---|---|---|
+| bd5o_base | defaults (init_edges +v, the flip-room move) | 4 / 4 / 3, 0.96 (0.32) | +v 4 (0.067 every one: 1 start) | none (1 demo symbolic_only) | - |
+| bd5o_e | ALL_EDGES | 4 / 4 / 3, 1.07 (0.36) | -v 3 (0.127) / +v 1 (0.067): 2 starts | none (1 demo symbolic_only) | gen_ignored 5 |
+| bd5o_ef | ALL_EDGES + BD_FLIP_ROOM_DRAW | 6 / 4 / 3, 1.60 (0.53) | -v 4 (0.10-0.124) / +v 2 (0.044-0.064) | program_check_failed 2 (repose misses the pre-grasp, instance 300501 at -v 0.114 / 0.124; the move's -v 0.127 wrote at attempt 0 in bd5o_e) | gen_ignored 7, flip_room_draw.drawn 7 (admissible -v [0.044, 0.124] 9 laterals, +v [0.044, 0.064] 3) |
+| bd5o_eft | + BD_BOARD_TABLE (i7-blockdesign's switch) | INTERIM at 2 h 57 (job 18383614 still running): 13 att / 3 wr | +v 0.054-0.184 / -v 0.064-0.197 (admissible [0.044, 0.197] 17-18 laterals) | target_placement (board_placement) 5, settle_validate no_transition 3, repose_unplannable 1, approach_untrackable 1 | - |
+
+Written attempts: base all attempt 0 (390-882 s), e all attempt 0 (420-1111 s), ef attempts 0 / 2 / 0 / 0. ±u (the 2.90 m sides) were
+offered but never reached a draw (the first passing edge is kept; +u collided once). Every arm's demo failure (1 symbolic_only) is in the
+base arm too. Reading: the edge switch acts only here and adds the -v end (which never wrote under the 3000-step budget / without the
+board search; now 3 of 4 at attempt 0) - 2 distinct starts, no rejection grew. The flip-room draw acts on every draw; with the base-relative
+board list its admissible range is narrow (-v 8 cm, +v 2 cm), so the spread stays small; with the table-relative board positions it is the
+whole flip-room range (15 cm per edge), but that arm's board placement fails more often (the table plan is i7-blockdesign's switch; its
+own A/B decides it). N 4: the ef / eft extra rejections are not attributable to the draw from these counts alone.
+
+Suite (exported trees, lambda): 1ba40aae 23 F + 3 E; 7606f6ca + test_start_draw::test_block_design (its stub lacked the rng; fixed in
+7f7560af); bd47a6d4 (the merge) = 1ba40aae's ids = f1fc4ac1's ids.
+
+**Needs the owner:** (1) the default of `ISPATIALGYM_ALL_EDGES` - today it acts only on block design (the one live restriction), where it
+added the -v end with no rejection growth; the dormant row-note mechanism would pin the FIRST listed edge if a note ever carried
+`top_z=` (parse_edges misreads B4's multi-edge notes) - on would make that moot. (2) the default of `ISPATIALGYM_BD_FLIP_ROOM_DRAW`
+(acts; small spread with the base-relative board list, the full flip-room range with BD_BOARD_TABLE, whose own default i7-blockdesign's
+A/B decides). (3) axial_02's repeats: options (a) / (b) / (c) below.
+
+5o.2 (axial_02, re-measured with the switch on): repeats unchanged, 11 of 25 (`repeats_eval`), because nothing pinned the edge. The
+diagnosis (`ISPATIALGYM_STANCE_BLAME=1` in se_on, logging only): every draw offers all four edges; -u's stance collides with the scene
+object `fixed_window_ucejof_0` (0.07 m from the base: the desk stands against the window wall) 10 / 10, -v's with `armchair_ybcnmu_0`
+(0.23 m) 9 / 9, +v (the 0.56 m end) fails Phase 1c `edge_too_short` (m_R 0.45 + m_L 0.21 = 0.66 m > 0.56 m) 8 / 8; +u alone passes,
+lateral [0.19, 0.61]. Both eval instances (0000 / 0001) start at lateral ~0.54 of +u, and the measured entries (the book's start and goal)
+always match them (0.00 m / 1-2 deg: the push map's admitted deviations sit inside the measured tolerance), so the repeat is decided by
+the start base alone: a draw with lateral > ~0.29 is within 0.25 m of an eval start and repeats (rejected after 30-65 s each). Only
+[0.19, ~0.29] of +u is free of repeats. Options for the owner (none implemented): (a) a repeat-aware start draw (laterals outside every
+eval start's 0.25 m window first; a CPU test at the draw, the rejection after Phase 2 saved); (b) accept the 44 %; (c) the existing
+rules stay and nothing else moves the start (the other edges fail free-floor collision and the edge-length margin, both real).
+
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
