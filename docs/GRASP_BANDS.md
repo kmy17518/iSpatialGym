@@ -3316,6 +3316,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 20 | i7-axialrest final (2f25683f; code b4bcb3d0) | 1083d1f6 | AXIAL_BRACE_MAP_JOINT_MARGIN / AXIAL_BRACE_TILT_INTERSECT both off (lead #24); the margin maps not folded |
 | 21 | i7-brace (be096dd7) | 68c6ffc2 | DEFAULTS axial TURN_COVER + OPPOSITE (owner 4), WALL_BRACE_MAP (owner 5w.2); load diagnostics off; contact_library / contact_maps conflicts kept both sides |
 | 22 | i7-t03 (7ac9945a) | 2f157bbf | touching_03 rounds 1 / 2 / 5, every t03 switch off (verified); ik.py: camhull's camera rule + t03's contact rules both kept |
+| 23 | i7-overpath (6eb0712d; code a55eea8a) | 6b7fcd6d | the inside_large_01 spine guard ON via its customs; OVERHANG_OVERPATH off (lead #29) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3342,11 +3343,14 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - goalmaps (with merge 12): ontop_large_01's countertop maps (soap dispenser h0.9158 r / l) with the anchor 0.9158, and the umbrella's hall-tree
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 - ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
-  (`int2_20261108/rebuild_ft2b.sh`, same inputs) before the layer.
+  (`int2_20261108/rebuild_ft2b.sh`, same inputs): sink 36,985 feasible cells (= ft2's round b), bar 1.0505 r / l; layers ft2b_sink / ft2b_bar.
 - brace33_touch / brace34w (with merge 21): the touch_brace maps of gkpmii / dkhgxn / ntbrtz re-validated under the pusher fix, and the 8
   world_vertical wall_brace maps.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
+
+`jobs/v2build/check_int2.py` = check_int1 + the wall_brace rule (a wall map has no support anchor: its file-name height must equal the
+recorded hinge height). After merge 23 (trunk_6b7fcd6d): 77 entries, 154 maps, 26 contact (8 wall), 24 interior, 51 links, ERRORS 0.
 
 check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 contact, 12 prefix, 20 interior maps (0 spec mismatches),
 51 links, ERRORS 0. v2maps_int1 on the same snapshot: 76 / 138, ERRORS 0.
