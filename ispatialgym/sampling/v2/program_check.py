@@ -2201,7 +2201,8 @@ def _env_on(name: str) -> bool:
 
 
 #: ``1``: the middle option (owner 2026-11-08 5d.3, default off): the straight carry's nominal protect margin picks the band - below
-#: CARRY_BAND_BELOW_M: the lifted-carry framing check; above CARRY_BAND_ABOVE_M: no check; between: the torso lift when possible, else the check
+#: CARRY_BAND_BELOW_M: the lifted-carry framing check (out of frame -> reject); above CARRY_BAND_ABOVE_M: no check; between: the torso
+#: lift when possible, else NO check (owner 2026-11-08 5s.1: the near band never rejects, the lift fires in ~5 % of its carries)
 CARRY_BAND_ENV = "ISPATIALGYM_CARRY_BAND"
 #: the band edges (m of nominal margin, carry_margin.carry_protect_margin; from the replay of the written carries,
 #: $OFH/framing_20261108/margin_replay.json + margin_stats.py): above 9 mm no carry of 896 demos fired (the 42 fired all lie at

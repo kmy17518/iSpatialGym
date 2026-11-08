@@ -195,7 +195,7 @@ def test_band_far_below_out_of_frame_is_rejected(monkeypatch):
     assert "band below" in str(e.value) and s.kit.stats["framing.carry.band.rejected"] == 1 and "carry_torso" not in g.extras
 
 
-def test_band_near_takes_the_torso_lift_else_the_check(monkeypatch):
+def test_band_near_takes_the_torso_lift_else_skips(monkeypatch):
     _clear_switches(monkeypatch)
     monkeypatch.setenv(PC.CARRY_BAND_ENV, "1")
     mid = 0.5 * (PC.CARRY_BAND_BELOW_M + PC.CARRY_BAND_ABOVE_M)
@@ -203,9 +203,10 @@ def test_band_near_takes_the_torso_lift_else_the_check(monkeypatch):
     s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
     assert g.extras["carry_torso"]["translate"] == 0.5 and s.kit.stats["framing.carry.band.torso_lift_used"] == 1
     s, st, draft, g = _carry_fake(mid, torso=None)
-    with pytest.raises(Reject):
-        s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
-    assert s.kit.stats["framing.carry.torso_lift_failed.no_trunk"] == 1 and s.kit.stats["framing.carry.band.rejected"] == 1
+    s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)  # owner 5s.1: no torso lift -> the check is skipped, never a reject
+    assert s.kit.stats["framing.carry.torso_lift_failed.no_trunk"] == 1 and "framing.carry.band.rejected" not in s.kit.stats
+    assert s.kit.stats["framing.carry.band.near_skipped"] == 1 and s.kit.stats["framing.carry.band.near_skipped.no_trunk"] == 1
+    assert "carry_torso" not in g.extras and draft.summary["carry_frame"]["near_skipped"] == "no_trunk"
 
 
 def test_torso_only_mode_never_rejects(monkeypatch):

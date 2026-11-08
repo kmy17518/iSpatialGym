@@ -4974,12 +4974,13 @@ class IORSSmall(SamplerV2):
           :meth:`carry_torso_lift` is recorded as ``grasps[].carry_torso`` (the oracle executes it on the via-above); alone it never rejects;
         - ``ISPATIALGYM_CARRY_BAND=1`` (5d.3, the middle option): the straight carry's NOMINAL protect margin (:meth:`carry_nominal_margin`,
           ``carry_margin.carry_protect_margin``) picks the band - ``above`` (the lift almost surely does not fire): no check; ``below``
-          (it almost surely fires): the check, out of frame -> reject; ``near``: the torso lift when possible (it costs nothing when the
-          lift does not fire and keeps the frame when it does), else the check.
+          (it fires most often): the check, out of frame -> reject; ``near``: the torso lift when possible (it costs nothing when the
+          lift does not fire and keeps the frame when it does), else the check is SKIPPED, never a reject (owner 2026-11-08 5s.1: the
+          lift fires in ~5 % of the near band's carries).
 
         Kit ``framing.carry.checked`` / ``.failed`` / ``.skipped_drive`` / ``.torso_lift_used`` / ``.torso_lift_failed.<why>`` /
-        ``.accepted_out`` (torso-only mode, nothing rescued) and ``framing.carry.band.{below,near,above}`` / ``.band.rejected`` /
-        ``.band.torso_lift_used``."""
+        ``.accepted_out`` (torso-only mode, nothing rescued) and ``framing.carry.band.{below,near,above}`` / ``.band.rejected`` (below
+        only) / ``.band.torso_lift_used`` / ``.band.near_skipped[.<no_trunk|frame|leg_ik|collision|...|straight_out>]``."""
         if st_place is not manip:
             TT._count(self, "framing.carry.skipped_drive")  # the place is made from another base pose (a carried drive first): not modelled
             return
@@ -5014,6 +5015,14 @@ class IORSSmall(SamplerV2):
                 return
             TT._count(self, f"framing.carry.torso_lift_failed.{why}")
         draft.summary["carry_frame"] = rec
+        if band == "near":
+            # owner 2026-11-08 5s.1: the near band never rejects - the lift fires in ~5 % of its carries (22 of 410 on the replay), so
+            # where the torso lift cannot keep the frame the check is SKIPPED (only far-below carries are rejected)
+            why_skip = "straight_out" if straight is not None else (rec["torso_lift"] or {}).get("failed", "torso")
+            TT._count(self, "framing.carry.band.near_skipped")
+            TT._count(self, f"framing.carry.band.near_skipped.{why_skip}")
+            rec["near_skipped"] = why_skip
+            return
         if not check and band is None:
             TT._count(self, "framing.carry.accepted_out")  # torso-only mode: nothing rescued, nothing rejected (the rule as before)
             return
