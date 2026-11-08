@@ -28,6 +28,20 @@ Five steps (docs/GRASP_BANDS.md "Per-alias outcome memory"):
 5. FORGET (:meth:`AliasMemory.weights`): evidence from another trunk snapshot decays by ``snapshot_decay`` per newer snapshot of the
    alias; evidence under another alias customs version or another entry / map key fingerprint is RESET (weight 0).
 
+Two MODES (owner decisions 2026-11-08 2.2 / 2.4; branch i7-memory2), one switch (``submit_fast.py --memory-mode``, job.env
+``ISPATIALGYM_ALIAS_MEMORY_MODE``), two separate stores:
+
+* ``production`` (the default): store ``<root>/alias_memory``; starts EMPTY (only demos of production-mode jobs are aggregated into it);
+  an alias's evidence RESETS when its customs version or its entry / map keys change.
+* ``validation`` (opt-in): store ``<root>/alias_memory_validation``; SEEDED from the replay (``VALIDATION_SEED``: the seed version's demos,
+  and the demos of jobs submitted before the modes existed) and CARRIED OVER a customs / keys change, both at the reduced weight
+  ``VALIDATION_WEIGHT`` (1/3: three carried demos count as one fresh one), flat; evidence of the run's own context decays per newer
+  snapshot as in production but never below that weight. Only validation-mode jobs (and the seed) enter it; production never reads it.
+
+The PICK hook (owner 2.3): the same :func:`reorder` over the pick (manipulation) stance candidates - IORS large's stance B, IORS small's
+and articulation small's manipulation stance - keyed (arm x trunk, then x stand-off): the key whose findings the replay followed by
+failure (9 of 10 later demos; the grasp-family key: 6 of 10). Never a block: Thompson draws and the floor, as the place hook.
+
 Guardrails (:func:`guardrails`): per batch and alias - bins down-weighted, the share of the configuration space they hold, the yield
 and GPU-h per success before / after; ALERTS only (an alias losing > ``alert_space_share`` of its space, a yield drop, a batch where
 everything failed = a bug, not a configuration); a configuration down-weighted in >= ``shared_fix_aliases`` aliases is flagged as a
@@ -61,11 +75,24 @@ SCHEMA = "isg-alias-memory/1"
 SHARD_NAME = "alias_memory_shard.jsonl"
 ENV_PATH = "ISPATIALGYM_ALIAS_MEMORY"            # the pinned version dir (submit_fast.py writes it into job.env); "off" / unset = off
 ENV_ALIAS = "ISPATIALGYM_ALIAS_MEMORY_ALIAS"     # the alias key the job samples (job.env ALIAS_KEY)
+ENV_MODE = "ISPATIALGYM_ALIAS_MEMORY_MODE"       # i7-memory2: production (default) | validation - the store the job reads and writes
+MODES = ("production", "validation")
+#: the store of each mode under a root (separate: a validation run never writes into the production memory, nor the reverse)
+STORE_DIRS = {"production": "alias_memory", "validation": "alias_memory_validation"}
+#: i7-memory2 (owner 2.2 / 2.4): the weight of seeded and carried-over evidence in validation mode - the least weight with which the
+#: 2026-11-08 replay still flags inside_large_01's 0.85 m / trunk 0.50 bin (0 / 3: mean 1 / (2 + 3 w) <= 0.35 needs w >= 0.286) from the
+#: seed at a new snapshot, and with which the chronological replay flags nothing with a healthy record (docs/GRASP_BANDS.md)
+VALIDATION_WEIGHT = 1.0 / 3.0
+#: the replay the validation store is seeded from (owner 2.4); its LATEST version at seeding time is pinned in the store's seed.json
+VALIDATION_SEED = "/vision/u/minyeong/projects/isg_home/oracle_fix/memory_20261108/alias_memory"
 EXCLUSIONS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "alias_memory", "exclusions.json")
 PLACE_LEVELS = (("arm", "translate", "tilt"), ("arm", "translate", "tilt", "stand_off"), ("arm", "translate", "tilt", "stand_off", "yaw_slot"))
 PICK_LEVELS = (("arm", "translate", "tilt"), ("arm", "translate", "tilt", "stand_off"), ("arm", "translate", "tilt", "stand_off", "family"))
 #: the levels the place hook decides at (the goal yaw is drawn after stance C: the yaw level is recorded and reported, not used there)
 PLACE_HOOK_LEVELS = 2
+#: the levels the pick hook decides at (i7-memory2, owner 2.3): arm x trunk, then x stand-off - the grasp family is recorded and reported
+#: (the replay: stance-level findings were followed by failure in 9 of 10 later demos, family-level ones in 6 of 10)
+PICK_HOOK_LEVELS = 2
 YAW_SLOTS = 16  # the sampler's yaw grid (pi / 8): pair_key's bucket
 
 
@@ -77,8 +104,11 @@ class Thresholds:
     max_mean: float = 0.35         # the bin's posterior mean (uniform prior) must be at most this
     floor: float = 0.05            # exploration floor: the least probability a down-weighted bin keeps its prior place
     snapshot_decay: float = 0.8    # evidence weight per newer trunk snapshot of the alias
-    customs_change: float = 0.0    # evidence weight under another alias customs version (0 = reset)
-    keys_change: float = 0.0       # evidence weight under another entry / map key fingerprint (0 = reset)
+    customs_change: float = 0.0    # evidence weight under another alias customs version (0 = reset; > 0: carried over, flat)
+    keys_change: float = 0.0       # evidence weight under another entry / map key fingerprint (0 = reset; > 0: carried over, flat)
+    seed_weight: float = 0.0       # i7-memory2: the weight of a seeded demo (validation: the replay's), flat
+    weight_floor: float = 0.0      # i7-memory2: the least weight the snapshot decay leaves a demo of the run's own context
+    mode: str = "production"       # i7-memory2: the store these thresholds belong to (production | validation)
     alert_space_share: float = 0.5  # alert when the down-weighted bins hold more than this share of the alias's observed space
     alert_yield_drop: float = 0.25  # alert when the batch's yield is this much (absolute) below the alias's earlier yield
     alert_min_demos: int = 4       # demos a batch / an earlier window needs before a yield alert / an all-fail alert
@@ -88,6 +118,17 @@ class Thresholds:
     def from_dict(cls, d: Optional[Dict[str, Any]]) -> "Thresholds":
         f = {x.name for x in dataclasses.fields(cls)}
         return cls(**{k: v for k, v in (d or {}).items() if k in f})
+
+    @classmethod
+    def for_mode(cls, mode: str = "production") -> "Thresholds":
+        """The owner's thresholds (2.1) of a mode: production resets on a customs / keys change and has no seed; validation carries over
+        and seeds at :data:`VALIDATION_WEIGHT` (2.2 / 2.4), its own context's evidence never decayed below that weight."""
+        if mode not in MODES:
+            raise ValueError(f"alias memory mode {mode!r}: one of {MODES}")
+        if mode == "production":
+            return cls()
+        w = VALIDATION_WEIGHT
+        return cls(customs_change=w, keys_change=w, seed_weight=w, weight_floor=w, mode="validation")
 
 
 # ---------------------------------------------------------------------------------------------------------------- keys / context
@@ -360,7 +401,9 @@ def demo_rows(job_dir: str, rules: Optional[Sequence[Dict[str, Any]]] = None) ->
                "ctx": {"snapshot": snap, "spec": spec, "keys": keys_fp},
                "place": place, "pick": pick,
                "sampled_with": ((sidecar.get("stances") or {}).get("placement") or {}).get("alias_memory"),
-               "memory_pinned": env.get(ENV_PATH) or None}
+               "sampled_with_pick": _pick_provenance(sidecar),
+               "memory_pinned": env.get(ENV_PATH) or None,
+               "mode": env.get(ENV_MODE) or None}  # i7-memory2: the store this demo belongs to (None: a job from before the modes)
         row["outcome"] = "success" if ok else "failure"
         row["stage"] = None if ok else stage_of(meta)
         row["excluded"] = exclusion_of(row, rules)
@@ -368,6 +411,16 @@ def demo_rows(job_dir: str, rules: Optional[Sequence[Dict[str, Any]]] = None) ->
         row["place_obs"], row["pick_obs"] = po, ko
         out.append(row)
     return out
+
+
+def _pick_provenance(sidecar: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The pick hook's provenance on the written instance: the ``alias_memory_pick`` extra of its pick / manipulation stance."""
+    st = sidecar.get("stances") or {}
+    for name in ("pick", "manipulation"):
+        p = (st.get(name) or {}).get("alias_memory_pick")
+        if p is not None:
+            return p
+    return None
 
 
 def record_job(job_dir: str, out: Optional[str] = None) -> str:
@@ -472,9 +525,14 @@ class AliasMemory:
 
     # -- forgetting
     def weights(self, context: Optional[Dict[str, str]]) -> List[float]:
-        """Evidence weights for a sampling context: ``customs_change`` under another alias customs version and ``keys_change``
-        under another entry / map key fingerprint (0 = reset, the default), times ``snapshot_decay ** k`` for evidence k snapshots
-        older than the context's (the alias's snapshot order, the context's own snapshot last when it is new)."""
+        """Evidence weights for a sampling context:
+
+        * a SEEDED demo (``row["seed"]``, validation stores only): ``seed_weight``, flat;
+        * a demo under another alias customs version / another entry / map key fingerprint: ``customs_change`` / ``keys_change`` (the
+          smaller when both changed), flat (0 = reset, the production default; i7-memory2: a carried-over demo is discounted once, not
+          also by its age - compounded with the snapshot decay no weight below ~0.9 kept inside_large_01's 0 / 3 bin in the replay);
+        * a demo of the context's own customs and keys: ``snapshot_decay ** k`` for evidence k snapshots older than the context's (the
+          alias's snapshot order, the context's own snapshot last when it is new), never below ``weight_floor``."""
         self.context = dict(context) if context else None
         order = list(self.snap_order)
         if context and context.get("snapshot") and context["snapshot"] not in order:
@@ -484,13 +542,19 @@ class AliasMemory:
         out = []
         for r in self.rows:
             c = r.get("ctx") or {}
-            w = 1.0
+            if r.get("seed"):
+                out.append(max(0.0, float(self.th.seed_weight)))
+                continue
+            other = []
             if context and context.get("spec") not in (None, "-") and c.get("spec") != context.get("spec"):
-                w *= float(self.th.customs_change)
+                other.append(float(self.th.customs_change))
             if context and context.get("keys") not in (None, "-") and c.get("keys") != context.get("keys"):
-                w *= float(self.th.keys_change)
+                other.append(float(self.th.keys_change))
+            if other:
+                out.append(max(0.0, min(other)))
+                continue
             age = max(0, cur - pos.get(c.get("snapshot"), cur))
-            out.append(w * float(self.th.snapshot_decay) ** age if w > 0.0 else 0.0)
+            out.append(max(float(self.th.snapshot_decay) ** age, float(self.th.weight_floor)))
         self.w = out
         self.bins, self.totals = {}, {}
         return out
@@ -572,7 +636,8 @@ def _snap_order(rows: Sequence[Dict[str, Any]]) -> List[str]:
 # ---------------------------------------------------------------------------------------------------------------- sampling hook
 
 _SPLIT: Dict[str, Optional[str]] = {"split": None}
-_LOADED: Dict[Tuple[str, str], Optional[AliasMemory]] = {}
+_LOADED: Dict[Tuple[str, ...], Optional[AliasMemory]] = {}
+_MISMATCH: set = set()  # (path, alias, mode) whose pinned version belongs to the other mode's store
 
 
 def enable_for_split(split: Optional[str]) -> None:
@@ -616,22 +681,44 @@ def sampler_context(sampler) -> Dict[str, str]:
     return {"snapshot": snapshot_name(code), "spec": str(spec)[:16], "keys": keys}
 
 
+def job_mode() -> str:
+    """The job's memory mode (job.env ``ISPATIALGYM_ALIAS_MEMORY_MODE``; unset = production)."""
+    m = (os.environ.get(ENV_MODE) or "production").strip().lower()
+    return m if m in MODES else "production"
+
+
+def version_mode(path: str) -> str:
+    """The mode of a memory version (its meta.json thresholds; a version from before the modes = production)."""
+    meta = _json(os.path.join(path, "meta.json")) or {}
+    return str(meta.get("mode") or (meta.get("thresholds") or {}).get("mode") or "production")
+
+
 def memory_for(sampler) -> Optional[AliasMemory]:
-    """The alias memory the sampler consults (cached per process): None when off (unset, eval generation, no file for the alias)."""
+    """The alias memory the sampler consults (cached per process): None when off (unset, eval generation, no file for the alias, or a
+    version of the other mode's store - counted ``alias_memory.mode_mismatch``: a validation run never reads the production memory, nor
+    the reverse)."""
     path = active_path()
     if path is None:
         if os.environ.get(ENV_PATH) and _SPLIT["split"] != "train":
             _count(sampler, "blocked_not_train")
         return None
     alias = os.environ.get(ENV_ALIAS) or getattr(getattr(sampler, "gp", None), "variant", None) or "-"
-    k = (path, alias)
+    k = (path, alias, job_mode())
     if k not in _LOADED:
-        mem = load_version(path, alias)
-        if mem is not None:
-            mem.weights(sampler_context(sampler))
+        mem = None
+        if version_mode(path) == job_mode():
+            mem = load_version(path, alias)
+            if mem is not None:
+                mem.weights(sampler_context(sampler))
+        else:
+            _MISMATCH.add(k)
         _LOADED[k] = mem
     mem = _LOADED[k]
+    if k in _MISMATCH:
+        _count(sampler, "mode_mismatch")
+        return None
     _count(sampler, "loaded" if mem is not None else "no_alias_file")
+    _count(sampler, f"mode.{job_mode()}")
     return mem
 
 
@@ -654,6 +741,7 @@ def reorder(sampler, kind: str, order: Sequence[int], cfgs: Sequence[Optional[Di
     mem = mem if mem is not None else memory_for(sampler)
     if mem is None or not order:
         return list(order), {}
+    _count(sampler, f"{kind}.consulted")
     dec: Dict[Tuple[Any, ...], Optional[Decision]] = {}
     per: Dict[int, Optional[Decision]] = {}
     for k in order:
@@ -692,10 +780,35 @@ def reorder(sampler, kind: str, order: Sequence[int], cfgs: Sequence[Optional[Di
             if d is not None:
                 prov[k] = {"version": mem.version, "level": d.level, "bin": list(d.key), "weight": 1.0, "deferred": False, "down": False}
             front.append(k)
+    n_kept = sum(1 for k in front if (prov.get(k) or {}).get("down"))
     _count(sampler, f"{kind}.down_bins", len(downs))
     _count(sampler, f"{kind}.deferred", len(back))
-    _count(sampler, f"{kind}.kept_down", sum(1 for k in front if (prov.get(k) or {}).get("down")))
+    _count(sampler, f"{kind}.kept_down", n_kept)
+    # i7-memory2: per hook, the candidates in flagged bins, those moved to the end, those a Thompson draw / the floor kept in place
+    _count(sampler, f"{kind}.flagged", len(back) + n_kept)
+    _count(sampler, f"{kind}.reordered", len(back))
+    _count(sampler, f"{kind}.explored", n_kept)
     return front + back, prov
+
+
+def pick_cfg(arm: Optional[str], stance) -> Dict[str, Any]:
+    """The pick key of a pick (manipulation) stance candidate at sampling time - the hook's levels (arm x trunk x stand-off) of the key
+    :func:`config_keys` reads from the sidecar's pick / manipulation stance (the grasp family is drawn later and only recorded)."""
+    return {"arm": arm or "-", "stance": "manipulation", "stand_off": q(getattr(stance, "stand_off", None), 0.05),
+            "translate": q(getattr(stance, "translate", None), 0.01), "tilt": q(getattr(stance, "tilt", None), 0.01)}
+
+
+def reorder_pick(sampler, order: Sequence[int], stances: Sequence[Any], arm_of, rng) -> List[int]:
+    """i7-memory2 (owner 2.3): the pick hook - ``order`` (indices into ``stances``, the sampler's prior order of its pick / manipulation
+    stance candidates) through :func:`reorder` with :func:`pick_cfg` keys (``arm_of(stance)`` the working arm); the provenance goes into
+    each candidate's ``extras["alias_memory_pick"]``. Memory off / nothing flagged: the order as given, no random number drawn."""
+    order = [int(k) for k in order]
+    new, prov = reorder(sampler, "pick", order, [pick_cfg(arm_of(st), st) for st in stances], rng, max_level=PICK_HOOK_LEVELS)
+    for k, p in prov.items():
+        ex = getattr(stances[int(k)], "extras", None)
+        if isinstance(ex, dict):
+            ex["alias_memory_pick"] = p
+    return new
 
 
 def place_cfg(arm: Optional[str], stance) -> Dict[str, Any]:
@@ -738,6 +851,76 @@ def collect_rows(root: str, backfill: bool = True, write_backfill: bool = False,
     return rows
 
 
+def store_root(root: str, mode: str = "production") -> str:
+    """The memory store of a mode under a root (``<root>/alias_memory`` / ``<root>/alias_memory_validation``)."""
+    if mode not in MODES:
+        raise ValueError(f"alias memory mode {mode!r}: one of {MODES}")
+    return os.path.join(root, STORE_DIRS[mode])
+
+
+def store_thresholds(mem_root: str, mode: str = "production") -> Thresholds:
+    """The thresholds the store's versions are built with: ``<store>/thresholds.json`` (the owner's file: it wins), written with the
+    mode's defaults (:meth:`Thresholds.for_mode`) when it does not exist yet. A file of the other mode is refused (separate stores)."""
+    path = os.path.join(mem_root, "thresholds.json")
+    d = _json(path)
+    if d is None:
+        th = Thresholds.for_mode(mode)
+        os.makedirs(mem_root, exist_ok=True)
+        tmp = path + f".tmp{os.getpid()}"
+        with open(tmp, "w") as f:
+            json.dump(dataclasses.asdict(th), f, indent=1)
+        os.replace(tmp, path)
+        return th
+    th = Thresholds.from_dict(d)
+    if th.mode != mode:
+        raise SystemExit(f"alias memory: {path} is a {th.mode} store's thresholds - not a {mode} store (the stores are separate)")
+    return th
+
+
+def resolve_version(path: str) -> str:
+    """A version dir (its meta.json), or a memory root's LATEST version."""
+    if os.path.exists(os.path.join(path, "meta.json")):
+        return os.path.abspath(path)
+    v = latest(path)
+    if v is None:
+        raise SystemExit(f"alias memory: {path} is neither a version (meta.json) nor a memory root with a LATEST version")
+    return os.path.abspath(v)
+
+
+def seed_rows(seed_version: str) -> List[Dict[str, Any]]:
+    """Every demo of a seed version, marked ``seed`` (weighted ``seed_weight``)."""
+    tag = "seed:" + os.path.join(os.path.basename(os.path.dirname(os.path.abspath(seed_version))), os.path.basename(os.path.abspath(seed_version)))
+    out = []
+    for f in sorted(glob.glob(os.path.join(seed_version, "aliases", "*.json"))):
+        for r in (_json(f) or {}).get("rows") or []:
+            out.append({**r, "seed": tag})
+    return out
+
+
+def store_rows(rows: Sequence[Dict[str, Any]], mode: str, seed_version: Optional[str] = None) -> List[Dict[str, Any]]:
+    """The demos a mode's store holds (i7-memory2, owner 2.2 / 2.4). Production: only demos of production-mode jobs (it starts empty).
+    Validation: the seed's demos and those of jobs from before the modes (``mode`` unset; both marked ``seed``, the reduced weight), and
+    the validation-mode jobs' demos. A demo of one mode never enters the other mode's store."""
+    if mode == "production":
+        return [r for r in rows if r.get("mode") == "production"]
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    if seed_version:
+        for r in seed_rows(seed_version):
+            out.append(r)
+            seen.add((r.get("job"), r.get("inst")))
+    for r in rows:
+        k = (r.get("job"), r.get("inst"))
+        if k in seen:
+            continue
+        if r.get("mode") == "validation":
+            out.append(r)
+        elif r.get("mode") is None:
+            out.append({**r, "seed": "legacy"})
+        seen.add(k)
+    return out
+
+
 def next_version(mem_root: str) -> str:
     os.makedirs(mem_root, exist_ok=True)
     n = 1 + max([int(m.group(1)) for m in (re.match(r"v(\d{4})$", x) for x in os.listdir(mem_root)) if m] or [0])
@@ -751,7 +934,7 @@ def next_version(mem_root: str) -> str:
 
 
 def write_version(mem_root: str, rows: Sequence[Dict[str, Any]], thresholds: Thresholds, *, batch: Optional[str] = None,
-                  sources: Sequence[str] = (), gpu_s: Optional[Dict[str, float]] = None) -> str:
+                  sources: Sequence[str] = (), gpu_s: Optional[Dict[str, float]] = None, seed: Optional[str] = None) -> str:
     """A new immutable version: per alias its rows (sorted by finish time) and snapshot order, meta.json, the guardrail report."""
     path = next_version(mem_root)
     os.makedirs(os.path.join(path, "aliases"))
@@ -764,7 +947,8 @@ def write_version(mem_root: str, rows: Sequence[Dict[str, Any]], thresholds: Thr
             json.dump({"schema": SCHEMA, "alias": a, "snap_order": _snap_order(rs), "rows": rs}, f, default=str)
     meta = {"schema": SCHEMA, "version": os.path.basename(path), "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "batch": batch,
             "thresholds": dataclasses.asdict(thresholds), "n_rows": len(rows), "n_aliases": len(by_alias), "sources": list(sources),
-            "exclusions_file": EXCLUSIONS_FILE}
+            "exclusions_file": EXCLUSIONS_FILE, "mode": thresholds.mode, "seed": seed,
+            "n_seeded": sum(1 for r in rows if r.get("seed"))}
     with open(os.path.join(path, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     rep = guardrails(rows, thresholds, batch=batch, gpu_s=gpu_s)
@@ -826,15 +1010,32 @@ def batch_pending(root: str, batch: str, ledger: Optional[str] = None) -> List[s
 
 
 def aggregate(root: str, mem_root: Optional[str] = None, batch: Optional[str] = None, thresholds: Optional[Thresholds] = None,
-              write_backfill: bool = False, gpu: bool = True) -> str:
-    mem_root = mem_root or os.path.join(root, "alias_memory")
-    prev = latest(mem_root)
-    th = thresholds or Thresholds.from_dict(((_json(os.path.join(prev, "meta.json")) or {}).get("thresholds")) if prev else None)
-    if os.path.exists(os.path.join(mem_root, "thresholds.json")):
-        th = Thresholds.from_dict(_json(os.path.join(mem_root, "thresholds.json")))  # the owner's thresholds win
-    rows = collect_rows(root, write_backfill=write_backfill)
-    gpu_s = sacct_gpu_s(r.get("jobid") for r in rows) if gpu else None
-    return write_version(mem_root, rows, th, batch=batch, sources=[root], gpu_s=gpu_s)
+              write_backfill: bool = False, gpu: bool = True, mode: str = "production", seed: Optional[str] = None,
+              rows: Optional[Sequence[Dict[str, Any]]] = None) -> str:
+    """A new version of the mode's store (default ``<root>/alias_memory`` / ``<root>/alias_memory_validation``) from the root's demos
+    (:func:`store_rows`) with the store's thresholds (:func:`store_thresholds`). Validation: the seed version is pinned in the store's
+    ``seed.json`` at its first aggregation (``seed`` or :data:`VALIDATION_SEED`, a root's LATEST resolved) and kept after."""
+    mem_root = mem_root or store_root(root, mode)
+    th = thresholds or store_thresholds(mem_root, mode)
+    if th.mode != mode:
+        raise SystemExit(f"alias memory: thresholds of mode {th.mode} for a {mode} store")
+    seed_v = None
+    if mode == "validation":
+        sj = os.path.join(mem_root, "seed.json")
+        pinned = (_json(sj) or {}).get("seed")
+        if pinned:
+            if seed and resolve_version(seed) != pinned:
+                raise SystemExit(f"alias memory: {mem_root} is seeded from {pinned}, not {seed}")
+            seed_v = pinned
+        else:
+            seed_v = resolve_version(seed or VALIDATION_SEED)
+            os.makedirs(mem_root, exist_ok=True)
+            with open(sj, "w") as f:
+                json.dump({"seed": seed_v, "weight": th.seed_weight, "pinned": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, f, indent=1)
+    all_rows = list(rows) if rows is not None else collect_rows(root, write_backfill=write_backfill)
+    mine = store_rows(all_rows, mode, seed_v)
+    gpu_s = sacct_gpu_s(r.get("jobid") for r in mine) if gpu else None
+    return write_version(mem_root, mine, th, batch=batch, sources=[root] + ([seed_v] if seed_v else []), gpu_s=gpu_s, seed=seed_v)
 
 
 # ---------------------------------------------------------------------------------------------------------------- guardrails
@@ -912,7 +1113,8 @@ def guardrails(rows: Sequence[Dict[str, Any]], th: Thresholds, batch: Optional[s
 
 
 def report_md(rep: Dict[str, Any]) -> str:
-    L = [f"# alias memory {rep.get('version', '')} - batch {rep.get('batch')}", "", f"thresholds: {json.dumps(rep['thresholds'])}", ""]
+    L = [f"# alias memory {rep.get('version', '')} ({rep['thresholds'].get('mode', 'production')}) - batch {rep.get('batch')}", "",
+         f"thresholds: {json.dumps(rep['thresholds'])}", ""]
     L.append("## alerts (owner; nothing acts on them)")
     L += [f"- {json.dumps(a)}" for a in rep["alerts"]] or ["- none"]
     L.append("")
@@ -935,10 +1137,13 @@ def report_md(rep: Dict[str, Any]) -> str:
 
 # ---------------------------------------------------------------------------------------------------------------- replay
 
-def replay(root: str, out_dir: str, thresholds: Optional[Thresholds] = None, rows: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+def replay(root: str, out_dir: str, thresholds: Optional[Thresholds] = None, rows: Optional[List[Dict[str, Any]]] = None,
+           seed: Optional[str] = None) -> Dict[str, Any]:
     """Offline replay: the tags of ``root``/out in finish order are the batches; after each one a version is built; for every later
-    demo, what the memory of the version before it decided for its place / pick bin (the predictive check: down-weighted bins should
-    fail later, healthy ones should not be caught). Writes rows.jsonl, replay.json, the per-batch versions and the final version."""
+    demo, what the memory of the version before it decided for its place / pick bin at the hooks' levels (the predictive check:
+    down-weighted bins should fail later, healthy ones should not be caught; ``hist`` = the bin's raw record at that moment). Writes
+    rows.jsonl, replay.json, final_report.md. With ``seed`` (a version): what a store seeded from it decides for every alias in its
+    latest context at a NEW snapshot (``seeded``: the bins a validation run would defer on its first attempt)."""
     th = thresholds or Thresholds()
     rows = rows if rows is not None else collect_rows(root)
     os.makedirs(out_dir, exist_ok=True)
@@ -970,18 +1175,48 @@ def replay(root: str, out_dir: str, thresholds: Optional[Thresholds] = None, row
                 cfg, obs = r.get(kind), r.get(f"{kind}_obs")
                 if cfg is None or obs is None:
                     continue
-                d = mem.decide(kind, cfg, max_level=PLACE_HOOK_LEVELS if kind == "place" else 2)
+                d = mem.decide(kind, cfg, max_level=PLACE_HOOK_LEVELS if kind == "place" else PICK_HOOK_LEVELS)
                 if d is not None and d.down:
+                    b = mem._build(kind)[(d.level, d.key)]
                     pred.append({"tag": tag, "alias": r["alias"], "inst": r["inst"], "kind": kind, "bin": list(d.key), "level": d.level, "obs": obs,
-                                 "failure_type": r.get("failure_type"), "stage": r.get("stage"), "facts": d.facts()})
+                                 "failure_type": r.get("failure_type"), "stage": r.get("stage"), "facts": d.facts(),
+                                 "hist": {"n": b.n_raw, "ok": b.s_raw}})
         seen += cur
     final = guardrails(rows, th, batch=tags[-1] if tags else None)
-    res = {"tags": tags, "n_rows": len(rows), "predictions": pred, "final": final, "by_context": by_context(rows, th)}
+    summ = {k: {"later_flagged": sum(1 for p in pred if p["kind"] == k), "failed": sum(1 for p in pred if p["kind"] == k and not p["obs"]),
+                "findings": sorted({json.dumps([p["alias"], p["bin"]]) for p in pred if p["kind"] == k})} for k in ("place", "pick")}
+    res = {"tags": tags, "n_rows": len(rows), "thresholds": dataclasses.asdict(th), "summary": summ, "predictions": pred, "final": final,
+           "by_context": by_context(rows, th)}
+    if seed:
+        res["seeded"] = seeded_findings(seed, th)
     with open(os.path.join(out_dir, "replay.json"), "w") as f:
         json.dump(res, f, indent=1, default=str)
     with open(os.path.join(out_dir, "final_report.md"), "w") as f:
         f.write(report_md(final))
     return res
+
+
+def seeded_findings(seed: str, th: Thresholds, snapshot: str = "trunk_NEW") -> List[Dict[str, Any]]:
+    """Per alias of a seed version: the place / pick bins (hook levels) a store seeded from it down-weights in the alias's latest
+    context at a new snapshot - what a validation run's first attempt defers."""
+    v = resolve_version(seed)
+    rows = seed_rows(v)
+    by_alias: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        by_alias[r["alias"]].append(r)
+    out = []
+    for a, rs in sorted(by_alias.items()):
+        ctx = latest_context(rs)
+        if not ctx:
+            continue
+        mem = AliasMemory(a, rs, th)
+        mem.weights(dict(ctx, snapshot=snapshot))
+        for kind in ("place", "pick"):
+            for d in mem.down_bins(kind, max_level=PLACE_HOOK_LEVELS if kind == "place" else PICK_HOOK_LEVELS):
+                b = mem._build(kind)[(d.level, d.key)]
+                out.append({"alias": a, "kind": kind, **d.facts(), "fields": list((PLACE_LEVELS if kind == "place" else PICK_LEVELS)[d.level]),
+                            "hist": {"n": b.n_raw, "ok": b.s_raw}, "failures": dict(b.failures)})
+    return out
 
 
 def by_context(rows: Sequence[Dict[str, Any]], th: Thresholds) -> Dict[str, List[Dict[str, Any]]]:
@@ -1028,11 +1263,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     s.add_argument("--write-backfill", action="store_true")
     s.add_argument("--no-gpu", action="store_true")
     s.add_argument("--if-batch-done", action="store_true", help="exit without a version while a job of the batch (ledger tag) is queued / running")
+    s.add_argument("--mode", default="production", choices=MODES, help="i7-memory2: the store (production: <root>/alias_memory, production-mode "
+                                                                        "jobs only; validation: <root>/alias_memory_validation, seeded)")
+    s.add_argument("--seed", default=None, help="validation: the seed version / memory root at the store's first aggregation (default "
+                                                + VALIDATION_SEED + ")")
     s = sub.add_parser("replay", help="offline replay over a root (batches = tags)")
     s.add_argument("--root", required=True)
     s.add_argument("--out", required=True)
     s.add_argument("--thresholds", default=None, help="JSON of Thresholds fields")
     s.add_argument("--rows", default=None, help="reuse a rows.jsonl of an earlier replay (no job dirs read)")
+    s.add_argument("--mode", default="production", choices=MODES, help="i7-memory2: the mode's thresholds (Thresholds.for_mode), --thresholds on top")
+    s.add_argument("--seed", default=None, help="also report what a store seeded from this version defers at a new snapshot")
     s = sub.add_parser("show", help="a version's decisions for an alias")
     s.add_argument("version")
     s.add_argument("alias")
@@ -1045,13 +1286,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if pend:
                 print(f"ALIAS_MEMORY_BATCH_PENDING {a.batch}: {len(pend)} job(s) still queued / running ({','.join(pend[:10])}); the last one aggregates")
                 return 0
-        p = aggregate(a.root, a.memory, a.batch, write_backfill=a.write_backfill, gpu=not a.no_gpu)
+        p = aggregate(a.root, a.memory, a.batch, write_backfill=a.write_backfill, gpu=not a.no_gpu, mode=a.mode, seed=a.seed)
         print(f"ALIAS_MEMORY_VERSION {p}")
     elif a.cmd == "replay":
-        th = Thresholds.from_dict(json.loads(a.thresholds)) if a.thresholds else None
+        th = Thresholds.from_dict({**dataclasses.asdict(Thresholds.for_mode(a.mode)), **(json.loads(a.thresholds) if a.thresholds else {})})
         rows = [json.loads(x) for x in open(a.rows)] if a.rows else None
-        r = replay(a.root, a.out, th, rows=rows)
-        print(f"replay: {r['n_rows']} rows, {len(r['tags'])} batches, {len(r['predictions'])} later demos in down-weighted bins -> {a.out}")
+        r = replay(a.root, a.out, th, rows=rows, seed=a.seed)
+        print(f"replay ({th.mode}): {r['n_rows']} rows, {len(r['tags'])} batches, {len(r['predictions'])} later demos in down-weighted bins "
+              f"(place {r['summary']['place']['later_flagged']} / {r['summary']['place']['failed']} failed, pick {r['summary']['pick']['later_flagged']} / "
+              f"{r['summary']['pick']['failed']} failed){'; seeded findings ' + str(len(r['seeded'])) if 'seeded' in r else ''} -> {a.out}")
     elif a.cmd == "show":
         mem = load_version(a.version, a.alias)
         if mem is None:
