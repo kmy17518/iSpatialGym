@@ -26,6 +26,7 @@ the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) an
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -35,6 +36,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import contact_maps as CMAP
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import support_rules as SR
@@ -45,7 +47,7 @@ from ispatialgym.sampling.tro_writer import pose_target
 from ispatialgym.sampling.v2 import contact_poses as CPZ
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
 
 import omnigibson as og  # noqa: E402
@@ -78,6 +80,8 @@ def _axis(name: str) -> th.Tensor:
 
 @register(SUBTASK)
 class AlignmentAxial(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
@@ -96,6 +100,11 @@ class AlignmentAxial(SamplerV2):
         self.hinge: Optional[Hinge] = None
         self.front_axis = th.tensor([1.0, 0.0, 0.0])
         self.long_axis = th.tensor([0.0, 1.0, 0.0])
+        #: i7-axialrest (owner 2026-11-08, decision 2; ``contact_poses.axial_settled_rest_on``): the target's settled v2 rest (xyzw) and its
+        #: measured root height the program places / turns the target at - None: the upright identity rest (the program before the switch)
+        self.rest_quat: Optional[th.Tensor] = None
+        self.rest_h_root: Optional[float] = None
+        self.rest_info: Dict[str, Any] = {}
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -161,15 +170,38 @@ class AlignmentAxial(SamplerV2):
         self.top = self.support_top(support)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
+        self.rest_quat, self.rest_h_root, self.rest_info = None, None, {}
+        if CPZ.axial_settled_rest_on():
+            # i7-axialrest: the program's geometry at the settled rest - the extents of the hull standing at it (height = its world z extent)
+            self._settled_rest()
+            if self.rest_quat is not None:
+                long_len, short_len, ez = rest_extents(self.hull, self.rest_quat, self.long_axis)
         mc = self.choice.models["target"]
-        self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=None, grasps=None, hull=self.hull, rest_quat=C.IDENTITY_QUAT.clone(),
+        self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=None, grasps=None, hull=self.hull,
+                                     rest_quat=C.IDENTITY_QUAT.clone() if self.rest_quat is None else self.rest_quat.clone(),
                                      scale=list(mc.scale) if mc.scale else None, generic_pinch=True, height=ez)
         w_diag = 0.5 * math.hypot(long_len, short_len)
         margins = {"kind": "axial", "w_diag": w_diag, "safety": 0.02, "H_max": ez}
         self.extents = {"long": long_len, "short": short_len, "height": ez, "w_diag": w_diag}
-        ev = self.g("edge_visibility") or {}
+        self._start_margins = margins
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
+                                    "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
+                                    "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2 survivors:
+        free floor, whole-body collision-free), the init trunk (Phase 1b), <= 8 lateral draws (Phase 1c: floor, collision, trunk sweep) with
+        the reference edge in frame from the init camera (the translate moved within its range first), the Phase-2 survivors that see the
+        front edge. Sets ``edge_frame`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes; the
+        edges' failures go to ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
+        ez, w_diag = float(margins["H_max"]), float(margins["w_diag"])
+        ev = self.g("edge_visibility") or {}
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
@@ -213,16 +245,21 @@ class AlignmentAxial(SamplerV2):
                 if not cands:
                     raise Reject("edge_not_visible", "no Phase-2 survivor sees the front edge")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
-                                    "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
-                                    "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge, init stance and Phase-2 pool from the
+        attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it makes; off: the template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        if not self._start_search(rng, self._start_margins, errors):
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates)
 
     def _edge_visible_points(self, stance: Stance, cam, target_lat: float, target_pose: Optional[TT.Pose], with_in_frame: bool = False):
         """§6.10 reference edge: of 9 points along the front edge over [λ − 0.30, λ + 0.30], how many are in frame (5 %) and
@@ -249,10 +286,91 @@ class AlignmentAxial(SamplerV2):
     # ------------------------------------------------------------------ geometry
 
     def _aligned_yaw(self, stance: Stance) -> float:
-        """Long axis parallel to the front edge, front toward the robot: the object's front axis maps onto −inward."""
+        """Long axis parallel to the front edge, front toward the robot: the object's front axis maps onto −inward. i7-axialrest: the yaw of
+        ``R_z(yaw) * q_rest`` - the front axis as it stands at the settled rest (its heading about the support normal)."""
         target_dir = -stance.inward
-        f = self.front_axis[:2]
+        f = self.front_axis[:2] if getattr(self, "rest_quat", None) is None else C.quat_rotate(getattr(self, "rest_quat", None), self.front_axis.float())[:2]
         return C.wrap_angle(math.atan2(float(target_dir[1]), float(target_dir[0])) - math.atan2(float(f[1]), float(f[0])))
+
+    # ------------------------------------------------------------------ i7-axialrest: the settled rest
+
+    def _settled_rest(self) -> None:
+        """i7-axialrest (owner 2026-11-08, decision 2): ``self.rest_quat`` / ``self.rest_h_root`` = the target's v2 stable rest as the axial
+        contact library was built at it (the push_blade map's ``object.rest``: the v2 entry's measured quat and root height - the same rest
+        the library's validation settles the object at), else the v2 rest of the target's grasp key (``tabletop.v2_rest_info``); without
+        either the identity rest stays (counter ``axial_rest.no_v2_rest``). An UPRIGHT v2 rest (``contact_poses.axial_rest_upright``: tilt <=
+        0.05 rad) also leaves the identity rest (owner 2026-11-08 item 3: today's placement with the 3 mm drop; ``axial_rest.upright_identity``)."""
+        q = h = None
+        src = None
+        if TT.contact_maps_on():
+            pm = TT.contact_map(self, "push_blade", "target", self.top)
+            r = ((pm.meta.get("object") or {}).get("rest") or {}) if pm is not None else {}
+            if r.get("quat_xyzw") is not None:
+                q, h, src = r["quat_xyzw"], r.get("h_root"), f"push_blade map {os.path.basename(pm.path)}"
+        if q is None:
+            info = TT.v2_rest_info(self, self.hull)
+            if info is not None:
+                q, h, src = info["quat_xyzw"], info.get("h_root"), f"v2 entry {info.get('entry')} rest {info.get('rest_id')}"
+        if q is None:
+            TT._count(self, "axial_rest.no_v2_rest")
+            self.rest_info = {"settled": False, "why": "no v2 rest (no push_blade map, no grasp key entry): the identity rest"}
+            return
+        qt = th.tensor([float(v) for v in q], dtype=th.float32)
+        if CPZ.axial_rest_upright(qt):
+            # owner 2026-11-08 item 3: an upright v2 rest (tilt <= 0.05 rad) stays the upright identity rest - today's placement with the
+            # usual 3 mm drop gap (object_pose_on), goal and geometry; the switch acts on tilted rests only
+            TT._count(self, "axial_rest.upright_identity")
+            self.rest_info = {"settled": False, "tilt_rad": round(CPZ.axial_rest_tilt(qt), 5), "source": src,
+                              "why": f"upright v2 rest (tilt <= {CPZ.AXIAL_UPRIGHT_TILT_RAD} rad): the identity rest, as without the switch"}
+            return
+        self.rest_quat = qt
+        self.rest_h_root = None if h is None else float(h)
+        self.rest_info = {"settled": True, "quat_xyzw": [round(float(v), 7) for v in q], "h_root": self.rest_h_root,
+                          "tilt_rad": round(CPZ.axial_rest_tilt(self.rest_quat), 5), "source": src}
+        log.info("%s: AXIAL_SETTLED_REST %s", self.gp.variant, self.rest_info)
+
+    def _place(self, xy, yaw: float) -> TT.Pose:
+        """The target's pose with its root at ``xy`` turned ``yaw``: upright at the identity (``object_pose_on``, as before the switch), or
+        (i7-axialrest) ``R_z(yaw) * q_rest`` with the root at the support top + the rest's measured root height."""
+        if getattr(self, "rest_quat", None) is None:
+            return TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw, self.top.z)
+        quat = CPZ.axial_rest_pose(self.rest_quat, yaw)
+        if self.rest_h_root is not None:
+            return th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + float(self.rest_h_root)]), quat
+        return th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + self.world.bottom_offset(self.hull, quat) + float(TT.Z_OFFSET)]), quat
+
+    def _heading(self, quat) -> float:
+        """The front axis's heading about the support normal (rad) of the target at ``quat``."""
+        f = C.quat_rotate(TT._t(quat).float(), self.front_axis.float())
+        return math.atan2(float(f[1]), float(f[0]))
+
+    def settled_goal_quat(self, q_now, yaw_goal: float) -> th.Tensor:
+        """i7-axialrest: the goal orientation of the target standing at ``q_now`` - ``q_now`` turned about the support normal until its
+        front axis has the heading of ``R_z(yaw_goal) * q_rest``: the rest's tilt (as it settled) kept, only the turn compared."""
+        rest = self.rest_quat
+        h_goal = self._heading(CPZ.axial_rest_pose(rest, yaw_goal))
+        return C.qmul(C.quat_from_yaw(C.wrap_angle(h_goal - self._heading(q_now))), TT._t(q_now).float())
+
+    def _map_rest_ok(self, cm, kind: str) -> bool:
+        """i7-axialrest: a contact map serves the program only when its entries stand on the program's rest (``entry_rest_quat_xyzw`` vs
+        ``self.rest_quat`` / the identity, up axes within ``contact_poses.AXIAL_REST_MATCH_RAD``): a settled-rest map is not the upright
+        program's, nor the reverse (counter ``axial_rest.map_rest_mismatch.<kind>``, a ``MAP_REQUEST`` line)."""
+        if cm is None:
+            return True
+        rest_map = cm.meta.get("entry_rest_quat_xyzw") or [0.0, 0.0, 0.0, 1.0]
+        rest = getattr(self, "rest_quat", None)
+        mine = rest if rest is not None else C.IDENTITY_QUAT
+        if CPZ.axial_rest_match(rest_map, mine):
+            return True
+        seen = self.__dict__.setdefault("_axial_rest_mismatch", set())
+        if kind not in seen:
+            seen.add(kind)
+            TT._count(self, f"axial_rest.map_rest_mismatch.{kind}")
+            mc = self.choice.models["target"]
+            TT.map_request(self, kind=kind, role="target", object=f"{mc.category}/{mc.model}", h=round(float(self.top.z) - float(getattr(self.world, "floor_z", 0.0)), 4),
+                           support=str(getattr(self.top, "name", "")), rest_quat_xyzw=[round(float(v), 6) for v in mine.tolist()],
+                           map_rest_quat_xyzw=[round(float(v), 6) for v in rest_map], why="the map stands on another rest than the axial program")
+        return False
 
     def _com_world(self, pose: TT.Pose) -> th.Tensor:
         return TT._t(pose[0]) + C.quat_rotate(TT._t(pose[1]), self.com_local)
@@ -279,6 +397,9 @@ class AlignmentAxial(SamplerV2):
             lo, hi = TT.union_extent(self.bands)[1], TT.union_extent(self.left_bands)[0]
             mid = 0.5 * (min(lo, hi) + max(lo, hi))
             order.sort(key=lambda k: abs(self.manip_candidates[k].local(self.manip_candidates[k].focus[:2])[1] - mid))
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
         plan: List[Tuple[int, Any]] = [(int(k), None) for k in order[:6]]
         self._a5_scan = None
         if TT.contact_maps_on():
@@ -335,6 +456,8 @@ class AlignmentAxial(SamplerV2):
         if chosen is None:
             raise Reject("target_placement", f"no (yaw, position) with a long-axis end whose push point lies in the right band at this trunk ({fails})")
         pose, yaw0, delta, com, pairs = chosen
+        if getattr(self, "rest_quat", None) is not None:
+            TT._count(self, "axial_rest.settled_used")  # i7-axialrest: this attempt placed the target at its settled rest
         # target in the world for the checks below
         target.set_position_orientation(*pose)
         target.keep_still()
@@ -434,8 +557,18 @@ class AlignmentAxial(SamplerV2):
                             def eval_brace(p):
                                 res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", list(p.chain), ignore_work_last=[support, target],
                                                             ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN), q_first_brace=p.q_first)
+                                if not res_b.ok and axial_brace_probe_on():
+                                    self._brace_probe(manip, p, res_b, [p_pre, p_goal], support, target)
+                                if res_b.ok and axial_brace_pre_policy_on():
+                                    # i7-axialrest (owner 5v.2 / 5y.1): the brace's pre as the program check calls it - any failure is this
+                                    # candidate's failure (the next candidate, none left -> push-only), not a program_check_failed attempt
+                                    why_pol = self._brace_pre_policy(manip, p, target)
+                                    if why_pol:
+                                        res_b = TT._ik().IKResult(False, None, why_pol)
                                 if not res_b.ok:
                                     brace_fails.append(f"{p.label}: {res_b.reason}")
+                                if TT.contact_maps_on():
+                                    AlignmentAxial._count_brace_vs_map(self, jp, spin, p, bool(res_b.ok))
                                 return bool(res_b.ok), res_b, None, str(res_b.reason)
 
                             b_chosen, dec_brace, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal,
@@ -446,6 +579,9 @@ class AlignmentAxial(SamplerV2):
                                 brace_pre, brace, kind, extras = b_chosen.proposal.payload
                                 brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal",
                                                                         **({"orient": dec_brace} if len([o for o in dec_brace["options"] if o["source"] == "ik"]) > 1 else {})})
+                            if any("brace pre_policy:" in f for f in brace_fails):
+                                # i7-axialrest 5v.2: where the switch acted - the attempt went on push-only, or with a later candidate's brace
+                                TT._count(self, "axial_brace.pre_policy.push_only" if b_chosen is None else "axial_brace.pre_policy.other_brace")
                         finally:
                             target.set_position_orientation(*pose)
                             target.keep_still()
@@ -553,7 +689,7 @@ class AlignmentAxial(SamplerV2):
             yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
             r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
             xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
-            pose = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw0, self.top.z)
+            pose = self._place(xy, yaw0)  # i7-axialrest: R_z(yaw0) * q_rest under the switch (upright identity otherwise)
             if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
                 continue
@@ -635,7 +771,14 @@ class AlignmentAxial(SamplerV2):
         """i7-contact 2026-11-07 (step 3, under v2only): the target's ``push_blade`` map (right arm: REQUIRED, a miss rejects ``missing_map``)
         and ``axial_brace`` map (left arm: OPTIONAL, owner 2026-11-07 item 5 - a miss returns None, the brace step is skipped and the push
         runs by its own rule) at the top (``tabletop.need_contact_map``; both log the ``MAP_REQUEST`` line)."""
-        return TT.need_contact_map(self, "push_blade", "target", self.top), TT.need_contact_map(self, "axial_brace", "target", self.top)
+        pm = TT.need_contact_map(self, "push_blade", "target", self.top)
+        bm = TT.need_contact_map(self, "axial_brace", "target", self.top)
+        # i7-axialrest: a map built at another rest than the program's is a miss (the push: missing_map, the optional brace: skipped)
+        if not AlignmentAxial._map_rest_ok(self, pm, "push_blade"):
+            TT._reject("missing_map", f"the push_blade map of the target stands on another rest than the axial program's ({self.rest_info or 'identity'})")
+        if not AlignmentAxial._map_rest_ok(self, bm, "axial_brace"):
+            bm = None
+        return pm, bm
 
     def map_joint_placement(self, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float, end_sign: Optional[float] = None) -> Dict[str, Any]:
         """The A1 joint placement on the contact maps (``TT.joint_placement``'s dict) for the long-axis END ``end_sign`` (+1: the end along
@@ -674,7 +817,10 @@ class AlignmentAxial(SamplerV2):
         if bm is None:  # no axial_brace map: the optional brace step is skipped (push-only), the push placement stands on its own map
             b = {"ok": False, "why": "no axial_brace map: the optional brace step is skipped (MAP_REQUEST logged)"}
         else:
-            b = TT.contact_map_check(bm, manip, goal_pose, keep=keep_brace)
+            tilt_x = axial_brace_tilt_intersect_on()
+            b = TT.contact_map_check(bm, manip, goal_pose, keep=keep_brace, **({"tilt_read": "intersection"} if tilt_x else {}))
+            if tilt_x:
+                AlignmentAxial._count_tilt_read(self, b)
         return {"ok": bool(w["ok"] and b["ok"]), "work_ok": bool(w["ok"]), "brace_ok": bool(b["ok"]), "brace_class_ok": True, "left_band": False,
                 "brace_map_missing": bm is None,
                 "maps": {"push_blade": {k: w.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}, "turn_class_rad": t_near,
@@ -682,6 +828,40 @@ class AlignmentAxial(SamplerV2):
                          "axial_brace": {k: b.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}},
                 # the map's class labels are the library's (no band class names: the pitch order and the brace's passing classes keep their defaults)
                 "work_cell": w.get("cell"), "brace_cell": b.get("cell"), "classes": None, "brace_classes": None, "brace_class": None}
+
+    def _count_tilt_read(self, b: Dict[str, Any]) -> None:
+        """i7-axialrest 5y fix (:func:`axial_brace_tilt_intersect_on`): where the intersection read acted, per axial_brace lookup -
+        ``axial_brace.tilt_read.<built|between|outside|none>``, ``.dropped`` (lookups that lost a class the nearest column alone called feasible),
+        ``.dropped_classes`` (their sum), ``.emptied`` (the nearest column had a feasible class, the intersection none)."""
+        rec = b.get("tilt_read")
+        if not rec:
+            return
+        TT._count(self, f"axial_brace.tilt_read.{rec.get('how')}")
+        dropped = rec.get("dropped") or []
+        if dropped:
+            TT._count(self, "axial_brace.tilt_read.dropped")
+            TT._countn(self, "axial_brace.tilt_read.dropped_classes", len(dropped))
+            if not b.get("feasible") and rec.get("nearest_feasible"):
+                TT._count(self, "axial_brace.tilt_read.emptied")
+
+    def _count_brace_vs_map(self, jp: Dict[str, Any], spin: float, p, ok: bool) -> None:
+        """i7-axialrest 5y fix (diagnosis counters, every run): a live brace candidate against the axial_brace map's feasible classes at the
+        draw (``jp["maps"]["axial_brace"]["feasible"]``; the library's class label ``<end><spin>spin_<kind>@f<stop face fraction>``, the
+        end in the map's convention) - ``axial_brace.live.map_feasible.tried / .ok`` for a class the map called feasible, ``.map_other.*``
+        for the rest. Never changes a verdict."""
+        try:
+            maps = jp.get("maps") or {}
+            feas = set(((maps.get("axial_brace") or {}).get("feasible")) or [])
+            e_b = (maps.get("end_sign_map") or {}).get("axial_brace")
+            kind, extras = p.payload[2], p.payload[3] or {}
+            tail = f"{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+            hit = any(c.endswith(tail) for c in feas) if e_b is None else f"{'+' if e_b > 0 else '-'}end{tail}" in feas
+            grp = "map_feasible" if hit else "map_other"
+            TT._count(self, f"axial_brace.live.{grp}.tried")
+            if ok:
+                TT._count(self, f"axial_brace.live.{grp}.ok")
+        except Exception as ex:  # noqa: BLE001 - a diagnosis counter
+            log.debug("brace vs map counter skipped: %r", ex)
 
     def _map_end_sign(self, cm, end_sign: Optional[float]) -> Optional[float]:
         """``end_sign`` (along ``self.long_axis``) in the map library's convention (its builders' ``long_axis`` param, map meta
@@ -703,7 +883,7 @@ class AlignmentAxial(SamplerV2):
         library shares): the goal pose (COM fixed, yaw = aligned), the direction the end moves in at the goal and the points of the goal hull's
         face along it at the brace height - only the part of that face near the pushed end's arrival is free of the object before the goal,
         so the candidates run from that corner toward the far end."""
-        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace)
+        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace, rest_quat=getattr(self, "rest_quat", None))
 
     def _stop_face_points(self, goal_pose: TT.Pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=(0.08, 0.2, 0.35, 0.5, 0.65, 0.8)) -> List[th.Tensor]:
         """``contact_poses.axial_stop_face_points``: the goal hull's stop face points at ``fractions`` of its span from the end nearest ``near``."""
@@ -738,7 +918,116 @@ class AlignmentAxial(SamplerV2):
             TT._count(self, "axial_brace.opposite_tried")
             yield from CPZ.axial_opposite_brace_candidates(manip, self.hull, self.com_local, pose_init, opp_end, com, spin, yaw_goal,
                                                            TT.contact_height(self.top.z, self.extents["height"]), d_goal, z_push=self._push_height(),
-                                                           face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips)
+                                                           face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips,
+                                                           rest_quat=getattr(self, "rest_quat", None))
+
+    def _brace_pre_policy(self, manip: Stance, p, target) -> str:
+        """i7-axialrest (owner 2026-11-08 5v.2, :func:`axial_brace_pre_policy_on`): the brace candidate ``p``'s PRE pose checked the way the
+        program check checks the brace action's single ``pre`` target (``program_check.check_action_targets``): a fresh exact IK of the left
+        arm from the stance's configuration (no seed, no locked arm: the brace runs before the push), the gripper at the record's
+        ``tabletop.brace_fingers`` (closed for a stop brace), the braced target + the supports in the pose's ignore set and the target
+        approached - ``IKChecker.exact`` then applies the shared support policy to its solution, as there. Returns the refusal
+        (``"brace pre_policy: pre: <reason>"``) or ``""``. Owner 2026-11-08 5y.1: ANY failure of the call is a refusal (the support
+        policy, a joint limit, no IK, ...), since the program check rejects the attempt on any of them; counters ``refused``,
+        ``refused.<label>`` and ``refused_reason.<key>`` (:func:`_pre_policy_reason_key`). The solver's remembered solutions are restored
+        afterwards, so the brace chain's witnesses stay the recorded ones."""
+        extras = (p.payload[3] if isinstance(p.payload, (tuple, list)) and len(p.payload) > 3 else None) or {}
+        sups = [o for o in self.support_objects() if o is not target]
+        saved = dict(self.ikc.solutions)
+        TT._count(self, "axial_brace.pre_policy.checked")
+        try:
+            r = self.ikc.exact([p.chain[0]], manip, "left", ignore_for_last=[target] + sups + [target], cache=False, fingers=TT.brace_fingers(extras),
+                               approached=[target])
+        finally:
+            self.ikc.solutions.clear()
+            self.ikc.solutions.update(saved)
+        if r.ok:
+            TT._count(self, "axial_brace.pre_policy.passed")
+            return ""
+        why = str(r.reason)
+        TT._count(self, "axial_brace.pre_policy.refused")
+        TT._count(self, f"axial_brace.pre_policy.refused.{p.label}")
+        TT._count(self, f"axial_brace.pre_policy.refused_reason.{_pre_policy_reason_key(why)}")
+        log.info("%s: axial brace %s refused at sampling: pre: %s (the program check's pre call)", self.gp.variant, p.label, why[:200])
+        return f"brace pre_policy: pre: {why}"
+
+    def _brace_probe(self, manip: Stance, p, res_live, work_poses: List[TT.Pose], support, target) -> None:
+        """i7-axialrest 5v.1 (owner 2026-11-08, DIAGNOSIS ONLY, :func:`axial_brace_probe_on`): a brace candidate that failed live
+        (``tabletop.brace_second_arm``: the right arm locked at its push goal, the target at its goal pose checked at
+        ``BRACE_TARGET_MARGIN``) re-checked with one cause removed at a time, logged as one ``AXIAL_BRACE_PROBE {json}`` line:
+        ``again`` (the live call repeated: the solver's reproducibility), ``margin_0`` / ``margin_1`` / ``margin_2`` (the target check at
+        0 / 1 / 2 mm), ``no_target`` (no target check), ``no_right`` (the right arm at the stance posture instead of its push goal, the target
+        check at 3 mm), ``no_right_no_target`` (both removed), ``empty`` (the right arm at the stance posture, every spawned object out:
+        the arm's kinematics + the robot itself). Where ``no_right`` solves: ``blame`` = what that configuration hits with the right arm
+        put back at its push goal (``IKChecker._collision_blame``). The verdict is unchanged; the remembered solutions are restored."""
+        ikc, kit = self.ikc, self.kit
+        saved = dict(ikc.solutions)
+        chain = list(p.chain)
+        idx_l = kit.robot.arm_control_idx["left"]
+        idx_r = kit.robot.arm_control_idx["right"]
+        spawned = list(getattr(getattr(kit, "world", None), "spawned", {}).values())
+        out: Dict[str, Any] = {"variant": self.gp.variant, "label": p.label, "live": str(res_live.reason)[:200]}
+
+        def live(margin):
+            r = TT.brace_second_arm(self, manip, "right", work_poses, "left", chain, ignore_work_last=[support, target], ignore_brace_last=[support],
+                                    brace_only_check=None if margin is None else ([support], margin), q_first_brace=p.q_first)
+            return "ok" if r.ok else str(r.reason)[:200]
+
+        def no_right(margin, empty=False):
+            """-> (verdict, {"pre": q, "contact": q} of the solved chain or None)"""
+            q0 = ikc.q_locked(manip)
+            q_f = None
+            if p.q_first is not None:
+                q_f = q0.clone()
+                q_f[idx_l] = TT._t(p.q_first)[idx_l]
+            ign = [support, target] + (spawned if empty else [])
+            with ikc.ignoring(ign):
+                r2 = ikc.exact(chain, manip, "left", [], q_seed=q0, cache=False, q_first=q_f)
+            if not r2.ok:
+                return f"brace: {r2.reason}"[:200], None
+            qs = {"pre": ikc.solutions.get(("left", ikc._pose_key(chain[0]))), "contact": r2.q}
+            with ikc.ignoring(ign):
+                if not bool(kit.collision_free(r2.q, margin=0.01)[0]):
+                    return "combined configuration collides", qs
+            if margin is not None:
+                q_b = ikc.q_locked(manip)
+                q_b[idx_l] = r2.q[idx_l]
+                with ikc.ignoring([support] + ([o for o in spawned if o is not target] if empty else [])):
+                    if not bool(kit.collision_free(q_b, margin=float(margin))[0]):
+                        return f"intersects the target at its goal pose (margin {float(margin) * 1000:.0f} mm)", qs
+            return "ok", qs
+
+        try:
+            m3 = TT.BRACE_TARGET_MARGIN
+            out["again"] = live(m3)
+            out["margin_0"] = live(0.0)
+            if out["margin_0"] == "ok" and out["again"] != "ok":
+                out["margin_1"] = live(0.001)
+                out["margin_2"] = live(0.002)
+            out["no_target"] = live(None)
+            out["no_right"], q_nr = no_right(m3)
+            out["no_right_no_target"], q_nrt = no_right(None)
+            out["empty"], _ = no_right(None, empty=True)
+            q_any = q_nr if q_nr is not None else q_nrt
+            if q_any is not None:
+                r1 = ikc.exact(list(work_poses), manip, "right", [support, target], cache=False)
+                if r1.ok:
+                    for nm, q_l in q_any.items():
+                        if q_l is None:
+                            continue
+                        q_c = TT._t(q_l).clone()
+                        q_c[idx_r] = r1.q[idx_r]
+                        out[f"blame_{nm}"] = ikc._collision_blame(q_c, [support, target], margin=0.0)[:240]
+                else:
+                    out["blame_pre"] = f"push goal not re-solved: {r1.reason}"[:200]
+            for k in ("again", "margin_0", "no_target", "no_right", "no_right_no_target", "empty"):
+                TT._count(self, f"axial_brace.probe.{k}.{'ok' if out.get(k) == 'ok' else 'fail'}")
+        except Exception as e:  # noqa: BLE001 - a diagnostic never fails the attempt
+            out["error"] = repr(e)[:200]
+        finally:
+            ikc.solutions.clear()
+            ikc.solutions.update(saved)
+        log.info("AXIAL_BRACE_PROBE %s", json.dumps(out, sort_keys=True))
 
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
@@ -830,6 +1119,17 @@ class AlignmentAxial(SamplerV2):
         draft.object_poses[tname] = (p1.clone(), q1.clone())
         yaw_goal = draft.summary["yaw_goal"]
         q_goal = C.quat_from_yaw(yaw_goal)
+        if getattr(self, "rest_quat", None) is not None:
+            # i7-axialrest (owner 2026-11-08, decision 2): q_goal = R_z(yaw_goal) * q_rest, in the frame of the rest as it settled - the settled
+            # orientation turned about the support normal to the aligned heading; the TRO target with it (the full-quaternion check then
+            # measures the turn alone: the hinge keeps the tilt)
+            q_goal = self.settled_goal_quat(q1.float(), yaw_goal)
+            tgt = draft.pose_targets.get(tname)
+            if tgt is not None:
+                tgt["orientation"] = [float(v) for v in q_goal.tolist()]
+            draft.summary["axial_rest"] = dict(self.rest_info, settled_tilt_rad=round(CPZ.axial_rest_tilt(q1.float()), 5),
+                                               goal_tilt_rad=round(CPZ.axial_rest_tilt(q_goal), 5),
+                                               turn_rad=round(C.wrap_angle(self._heading(q_goal) - self._heading(q1.float())), 5))
         com = self._com_world((p1.float(), q1.float()))
         draft.goal_poses[tname] = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
 
@@ -856,6 +1156,17 @@ class AlignmentAxial(SamplerV2):
                  "brace": "stop_edge", "hard": False}]
 
 
+def rest_extents(hull: th.Tensor, rest_quat, long_axis: th.Tensor) -> Tuple[float, float, float]:
+    """i7-axialrest: ``(long, short, height)`` of the hull standing at ``rest_quat`` - along the long axis's heading at the rest, across it
+    (both horizontal), and its world z extent."""
+    pts = C.transform_points((th.zeros(3), TT._t(rest_quat).float()), hull.float())
+    lw = C.quat_rotate(TT._t(rest_quat).float(), long_axis.float())[:2]
+    lw = lw / th.linalg.norm(lw)
+    sw = th.tensor([-float(lw[1]), float(lw[0])])
+    a, b = pts[:, :2] @ lw, pts[:, :2] @ sw
+    return float(a.max() - a.min()), float(b.max() - b.min()), float(pts[:, 2].max() - pts[:, 2].min())
+
+
 def axial_brace_turn_cover_on() -> bool:
     """i7-brace (owner 3.4): the axial_brace map lookup keeps only the entries whose recorded start range (``goal.clear_turn_max_deg``, the
     clear-turn library build) covers the drawn turn. DEFAULT ON since 2026-11-08 (owner answers 20261108b item 4: the brace34b maps -
@@ -867,6 +1178,37 @@ def axial_brace_opposite_on() -> bool:
     """i7-brace (owner 3.4): the sampler also tries the OPPOSITE-END stop brace (the far end's face, resisting the same turn) after the current
     candidates. DEFAULT ON since 2026-11-08 (owner answers 20261108b item 4); ``ISPATIALGYM_AXIAL_BRACE_OPPOSITE=0`` turns it off."""
     return os.environ.get("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", "1") == "1"
+
+
+def axial_brace_pre_policy_on() -> bool:
+    """i7-axialrest (owner 2026-11-08 5v.2; DEFAULT ON since owner 5y.1, ``=0`` turns it off): the sampler checks each stop-brace candidate's PRE pose with the program check's
+    own call (``AlignmentAxial._brace_pre_policy``: a fresh exact IK of the pre under the shared support policy) - a brace whose pre fails that
+    call for ANY reason (owner 5y.1: the support policy, a joint limit, no IK, ...) is a failed candidate (the next one is tried; none left =
+    push-only, the brace is optional) instead of an attempt the program check rejects ``pre: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "1") == "1"
+
+
+def _pre_policy_reason_key(why: str) -> str:
+    """The counter key of a brace pre-policy refusal: the IK reason's head before its first ``:`` (``support_policy``,
+    ``ik_joint_limit``, ...), lowercased, non-alphanumerics -> ``_``, at most 40 characters."""
+    head = str(why).split(":", 1)[0].strip().lower()
+    key = "".join(c if c.isalnum() else "_" for c in head).strip("_")
+    return (key or "unknown")[:40]
+
+
+def axial_brace_tilt_intersect_on() -> bool:
+    """i7-axialrest 5y fix (lead decision 2026-11-08, owner away; default OFF): the axial_brace map is read at a manipulation stance whose trunk
+    tilt lies between two built map tilts (more than ``contact_maps.TILT_SNAP_RAD`` from both) as the INTERSECTION of the two bracketing
+    columns (``ContactMap.lookup(tilt_read="intersection")``) instead of the nearest column alone; counters ``axial_brace.tilt_read.*``.
+    ``ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT", "0") == "1"
+
+
+def axial_brace_probe_on() -> bool:
+    """i7-axialrest 5v.1 (owner 2026-11-08; DIAGNOSIS ONLY, default off): every brace candidate that fails at sampling is re-checked with the
+    locked push arm / the target margin removed one at a time (``AlignmentAxial._brace_probe``: ``AXIAL_BRACE_PROBE`` log lines, kit counters
+    ``axial_brace.probe.*``); the verdicts are unchanged. ``ISPATIALGYM_AXIAL_BRACE_PROBE=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PROBE", "0") == "1"
 
 
 def _icl_frame(category: str, model: str):

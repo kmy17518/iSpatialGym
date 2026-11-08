@@ -68,11 +68,99 @@ from ispatialgym.sampling.v2.stances import PathRecord, SidecarDraft, Stance, Tr
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
-def start_per_attempt() -> bool:
+def start_per_attempt(s: Any = None) -> bool:
     """train85 (owner 2026-10-14 ~20:45): ``ISPATIALGYM_START_PER_ATTEMPT=1``, set only by the train jobs, makes every attempt draw
     its own start (:meth:`SamplerV2.spa_redraw_start`) instead of the start ``sample_template`` drew once per template from the
-    template seed; each instance's start is in its own TRO / sidecar. Unset: nothing changes."""
-    return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1"
+    template seed; each instance's start is in its own TRO / sidecar. Unset: nothing changes. i7-startdraw (owner 2026-11-08 3.5):
+    also True for a sampler ``s`` of a start-draw family while ``ISPATIALGYM_START_DRAW=1`` (:func:`start_draw_active`)."""
+    return os.environ.get("ISPATIALGYM_START_PER_ATTEMPT") == "1" or (s is not None and start_draw_active(s))
+
+
+def start_draw_on() -> bool:
+    """i7-startdraw (owner 2026-11-08 3.5, "templates should never fix the robot's start base"): ``ISPATIALGYM_START_DRAW=1`` makes the
+    start-draw families (``SamplerV2.START_DRAW_FAMILY``: alignment-axial, articulation open / close small, attachment, block_design,
+    disembedding, IORS large inside / ontop / under / touching - nextto and the touching base push draw their stance A per attempt
+    already - and IORS small) draw the robot's start base per ATTEMPT from the attempt's rng: the template's own start search (edges in
+    random order, Phase 1b / 1c with every check it makes, the family's frame rule, Phase 2 from the drawn start) rerun per attempt
+    (:meth:`SamplerV2.spa_redraw_start`); implies :func:`start_per_attempt` for those samplers. DEFAULT ON since the owner's rule (3.5) and
+    the A/B (i7-startdraw, $OFH/startdraw_20261108): unset = on; ``ISPATIALGYM_START_DRAW=0`` = the template's start (the former behaviour)."""
+    return os.environ.get("ISPATIALGYM_START_DRAW", "1") != "0"
+
+
+def start_draw_active(s: Any) -> bool:
+    """:func:`start_draw_on` and ``s`` is a sampler of a start-draw family (``START_DRAW_FAMILY``)."""
+    return start_draw_on() and bool(getattr(s, "START_DRAW_FAMILY", False))
+
+
+def start_facts(edge: Any, init: Any, cands: Sequence[Any], **extra: Any) -> Dict[str, Any]:
+    """i7-startdraw: the drawn start's facts (``_spa_facts``: the attempt log line, ``summary.start_per_attempt``) - the edge, the lateral, the
+    trunk, the base pose and the size of the Phase-2 pool drawn from it."""
+    return {"edge": getattr(edge, "name", edge), "lateral_m": None if getattr(init, "lateral", None) is None else round(float(init.lateral), 4),
+            "trunk": [round(float(init.translate), 3), round(float(init.tilt), 3)], "base_pose2d": [round(float(v), 4) for v in init.base_pose2d],
+            "n_manipulation_candidates": len(cands), **extra}
+
+
+def _kit_count(s: Any, key: str) -> None:
+    """``tabletop._count`` (a kit counter in ``kit.stats``) without the import cycle."""
+    st = getattr(getattr(s, "kit", None), "stats", None)
+    if isinstance(st, dict):
+        st[key] = st.get(key, 0) + 1
+
+
+#: i7-attachdef 2026-11-08 (lead decision: a sampler-only bug fix, default OFF until the owner decides): the collector's queue
+#: (``run_isg.queue_ready``) takes an instance as ready once its TRO, its summary and the template meta exist, and the summary was written
+#: BEFORE the post-write screens (``check_instance_filter``, ``check_goal_occlusion``) - a collector polling in that window claimed an attempt
+#: the screen then rejected (campaign: disembedding_04 / 09 ran a goal-occluded layout and wrote its goal override into the TRO the sampler
+#: re-sampled over it; 2 mental_rotation episodes hit FileNotFoundError). With ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=1`` the summary is
+#: written as ``<iid>.summary.json.pending`` and renamed (atomic) to ``<iid>.summary.json`` only after every post-write screen passed; a
+#: rejected attempt's files are removed with it, so it is never claimable. Counters (SAMPLING_REPORT) ``publish_after_screens.{published,withheld}``.
+#: DEFAULT ON since the owner's decision 2026-11-08 (5j; ad_race disembedding_09: published 4, withheld 2, 4 / 4 ok); ``=0`` (or
+#: ``ISPATIALGYM_FAST=0``) restores the summary written in place before the screens.
+#: integration-2 2026-11-08 (lead decision #18, the owner away; a bug in the decided default, the default stays on): the pending summary
+#: lives in the ``.pending`` sub-directory of ``instances/`` under its final name (``instances/.pending/<iid>.summary.json``), not as
+#: ``<iid>.summary.json.pending`` - the suffix pushed long instance ids over the 255-character file-name limit (disembedding_07:
+#: 262 > 255, OSError Errno 36 at its first written instance; the in-place name is 254). Every reader globs ``instances/*.summary.json``
+#: (non-recursive) or opens ``<iid>.summary.json`` by name, so a pending summary is never read; :func:`publish_instance` renames it into
+#: ``instances/`` (``os.replace``, same filesystem: atomic).
+SUMMARY_SUFFIX = ".summary.json"
+PENDING_SUFFIX = ".pending"  # the old pending name's suffix (removed with a rejected attempt; no longer written)
+PENDING_DIR = ".pending"
+
+
+def publish_after_screens() -> bool:
+    return fast_on("PUBLISH_AFTER_SCREENS", default=True)
+
+
+def instance_summary_path(tro_path: str, pending: Optional[bool] = None) -> str:
+    """The summary file of the instance whose TRO is ``tro_path``: while the switch holds it back, the same name in the ``.pending``
+    sub-directory next to it (:data:`PENDING_DIR`; the caller writing it creates the directory)."""
+    base = tro_path[: -len("-tro_state.json")] + SUMMARY_SUFFIX if tro_path.endswith("-tro_state.json") else tro_path + SUMMARY_SUFFIX
+    if publish_after_screens() if pending is None else pending:
+        return os.path.join(os.path.dirname(base), PENDING_DIR, os.path.basename(base))
+    return base
+
+
+def remove_instance_files(tro_path: str) -> List[str]:
+    """A rejected attempt's files: the TRO, the sidecar, the summary (published or pending; also a pending summary of the old name).
+    Returns the removed paths."""
+    out = []
+    old_pending = instance_summary_path(tro_path, False) + PENDING_SUFFIX
+    for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), instance_summary_path(tro_path, False), instance_summary_path(tro_path, True),
+              old_pending):
+        if os.path.exists(p):
+            os.remove(p)
+            out.append(p)
+    return out
+
+
+def publish_instance(tro_path: str) -> bool:
+    """After the post-write screens: the pending summary -> the summary the queue reads (``os.replace``: atomic on one filesystem).
+    False when there was nothing pending (the switch off: the summary was written in place)."""
+    pend = instance_summary_path(tro_path, True)
+    if not os.path.exists(pend):
+        return False
+    os.replace(pend, instance_summary_path(tro_path, False))
+    return True
 
 
 class TemplateExhausted(Reject):
@@ -244,6 +332,9 @@ class SamplerV2(TaskSampler):
     """Base of every v2 task module (README "How a task module plugs in")."""
 
     subtasks: Tuple[str, ...] = ()
+    #: i7-startdraw (owner 2026-11-08 3.5): the module's ``sample_template`` fixes the start base, and its ``spa_redraw_start`` draws it per
+    #: attempt under ``ISPATIALGYM_START_DRAW=1`` (:func:`start_draw_active`)
+    START_DRAW_FAMILY: bool = False
     #: settle steps of §3.5 (90 + 10 in ``SimWorld.settle``); goal check 120
     DEFAULT_SETTLE_STEPS = 90
     GOAL_SETTLE_STEPS = 120
@@ -316,6 +407,26 @@ class SamplerV2(TaskSampler):
         """This attempt's own start drawn from the attempt's ``rng`` (:func:`start_per_attempt`): the task modules whose
         ``sample_template`` fixes the start for the template override it; the others draw the start per attempt already."""
 
+    def spa_draw(self, rng: np.random.Generator) -> None:
+        """The attempt's start (:meth:`spa_redraw_start`) timed (``_spa_draw_s``); with ``ISPATIALGYM_START_DRAW`` (i7-startdraw) the kit
+        counters ``start_draw.drawn`` / ``start_draw.edge.<edge>`` / ``start_draw.rejected.<reason>`` and one log line with the drawn start
+        (``template_meta.template_facts`` is the snapshot ``run_template`` took: an attempt's search does not reach it)."""
+        active = start_draw_active(self)
+        t_spa = time.time()
+        try:
+            self.spa_redraw_start(rng)
+        except Reject as e:
+            if active:
+                _kit_count(self, f"start_draw.rejected.{e.reason}")
+            raise
+        self._spa_draw_s = time.time() - t_spa
+        if active:
+            facts = getattr(self, "_spa_facts", None) or {}
+            _kit_count(self, "start_draw.drawn")
+            if facts.get("edge"):
+                _kit_count(self, f"start_draw.edge.{facts['edge']}")
+            log.info("%s: START_DRAW: start drawn %s", self.gp.variant, facts)
+
     def spa_template_start(self, errors: List[str], draws: int = 8) -> None:
         """start_per_attempt: the template's own start draw found no start with the template seed's draw; up to ``draws`` more draws
         from derived streams (every attempt draws its own start anyway: the template's start only shows that one exists, and one
@@ -382,7 +493,7 @@ class SamplerV2(TaskSampler):
         from ispatialgym.sampling.v2 import tabletop as TT
 
         self.sidecar.reset_instance()
-        if start_per_attempt():
+        if start_per_attempt(self):
             full = getattr(self, "_split_cone_cands", None)
             # oracle-fix 2026-11-06 (zero-yield survey, ontop_small_04 / inside_04): a task that drew this attempt's start before calling here
             # (``_spa_drawn``: iors_small.sample, whose spa_redraw_start rebuilds manip_candidates for the new start) keeps that list - the
@@ -395,15 +506,13 @@ class SamplerV2(TaskSampler):
                 # position (only iors_small's spa_redraw_start rebuilds the list): the template's full list goes back first
                 self.manip_candidates = list(full)
             if not getattr(self, "_spa_drawn", False):
-                t_spa = time.time()
-                self.spa_redraw_start(rng)
-                self._spa_draw_s = time.time() - t_spa
+                self.spa_draw(rng)
             self._spa_drawn = False
             self._split_cone_cands = self._split_cone_pools = None
             log.info("%s: start_per_attempt: start drawn in %.1fs: %s", self.gp.variant, getattr(self, "_spa_draw_s", 0.0), getattr(self, "_spa_facts", None))
         TT.split_cone_draw(self, rng)
         draft = self.sample_instance(rng)
-        if start_per_attempt():
+        if start_per_attempt(self):
             draft.summary["start_per_attempt"] = {**(getattr(self, "_spa_facts", None) or {}), "draw_s": round(float(getattr(self, "_spa_draw_s", 0.0)), 2)}
         if draft.robot_q is None and "init" in self.sidecar.stances:
             st = self.sidecar.stance("init")
@@ -1010,7 +1119,14 @@ class SamplerV2(TaskSampler):
         checks attach and pose in the hand; ``(None, arm, None)`` when nothing is carried."""
         if not carried:
             return None, arm or "right", None
-        g = self.sidecar.grasp_of(carried)
+        g = self.sidecar.grasp_of(carried, arm=arm)  # i7-cork: the record of the carrying arm when an object has two (the hand-over)
+        if arm is None and g is not None:
+            # i7-cork: an object with two records (the hand-over) is carried by the arm the task recorded (record_carry_arm_q) - only when that
+            # arm has a record of the object (a single record, or a stale entry of another draft: as before)
+            rec_arm = (self.__dict__.get("_carry_arm_of") or {}).get(carried)
+            g2 = self.sidecar.grasp_of(carried, arm=rec_arm) if rec_arm else None
+            if g2 is not None and g2.arm == rec_arm:
+                g = g2
         obj = self.objects.get(carried)
         if g is None or g.eef_in_object is None:
             log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.variant, carried)
@@ -1121,7 +1237,7 @@ class SamplerV2(TaskSampler):
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
                     arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None,
                     edge_slide: bool = False, edge_slide_back_m: float = 0.0, axis_leg: Optional[Sequence[float]] = None,
-                    arrive_straight_m: float = 0.0) -> PathRecord:
+                    arrive_straight_m: float = 0.0, heading_offset: float = 0.0, global_extra_erosion_m: float = 0.0) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
         drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
@@ -1132,7 +1248,9 @@ class SamplerV2(TaskSampler):
         slide alone (``NAV.plan_axis_leg``: the heading kept, forward / backward and lateral moves only), no grid planner;
         ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local map; ``arrive_straight_m`` (oracle-fix 2026-11-06,
         ``NAV.plan_path``): the grid path ends that far behind ``to`` along its axis and drives straight in; ``Reject(no_path |
-        path_collision | path_too_long | place_leg_collision | place_leg_heading)``."""
+        path_collision | path_too_long | place_leg_collision | place_leg_heading)``. ``heading_offset`` (i7-goalmaps, ``NAV.plan_path``; default 0):
+        the intermediate waypoints' yaw relative to the travel heading (pi / 2 = sideways); ``global_extra_erosion_m`` (i7-goalmaps, ``NAV.plan_path``;
+        default 0): the global path on the eroded map eroded this much more."""
         keep_off = self.path_keep_off_footprints()
         blocked = list(blocked) + list(self.path_blocked()) + list(keep_off)
         carried = carried or to.carried or frm.carried
@@ -1177,7 +1295,9 @@ class SamplerV2(TaskSampler):
                                   probe_face_travel=is_carried and style != "face_travel", **({"global_blocked": keep_off} if keep_off else {}),
                                   **({"face_travel_cfgs": ft_cfgs} if ft_cfgs else {}),
                                   **({"face_travel_max_extra_rotation_deg": float(ft_rot)} if ft_rot is not None else {}),
-                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}))
+                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}),
+                                  **({"heading_offset": float(heading_offset)} if heading_offset else {}),
+                                  **({"global_extra_erosion_m": float(global_extra_erosion_m)} if global_extra_erosion_m else {}))
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)
@@ -1276,9 +1396,11 @@ class SamplerV2(TaskSampler):
         if not getattr(self.world, "cameras", True):
             # train-fast SAMPLER_CAMERAS (2026-10-31): this world has no head camera; the pixel screens of this instance are still to run
             summary["visibility"] = "pending"
-        with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
+        summary_path = instance_summary_path(path)
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)  # integration-2: the pending summary's sub-directory
+        with open(summary_path, "w") as f:  # i7-attachdef: pending until the post-write screens pass (switch)
             json.dump(_jsonable(summary), f, indent=2)
-        if start_per_attempt():
+        if start_per_attempt(self):
             self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
         elif "stances" not in self.template_meta:
             self.template_meta["stances"] = {k: v.to_meta() for k, v in self.sidecar.stances.items()}
@@ -1357,6 +1479,8 @@ class SamplerV2(TaskSampler):
         why = check_record(rec)
         if why:
             self.counters["repeats_eval_early"] = self.counters.get("repeats_eval_early", 0) + 1
+            if start_draw_active(self):
+                _kit_count(self, "start_draw.repeat_rejected")
             raise Reject("repeats_eval", f"early: {why}")
 
     def check_instance_filter(self, tro_path: str) -> None:
@@ -1366,14 +1490,20 @@ class SamplerV2(TaskSampler):
         if self.instance_filter is None:
             return
         why = self.instance_filter(tro_path)
+        if start_draw_active(self):
+            _kit_count(self, "start_draw.repeat_rejected" if why else "start_draw.repeat_passed")
         if not why:
             return
-        for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), tro_path.replace("-tro_state.json", ".summary.json")):
-            if os.path.exists(p):
-                os.remove(p)
+        remove_instance_files(tro_path)
+        self._count_withheld()
         if not self.instance_seeds:
             self.template_meta.pop("stances", None)
         raise Reject("repeats_eval", str(why))
+
+    def _count_withheld(self) -> None:
+        """i7-attachdef: a post-write rejection the switch kept from the queue (its summary was still pending)."""
+        if publish_after_screens():
+            self.counters["publish_after_screens.withheld"] = self.counters.get("publish_after_screens.withheld", 0) + 1
 
     def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
         """Pre-generation goal-image occlusion (``ispatialgym.eval.goal_occlusion``): the goal state as the goal check
@@ -1440,12 +1570,10 @@ class SamplerV2(TaskSampler):
             self.kit.sync_world()
             self.configure_targets(draft)
         draft.summary["goal_occlusion"] = rep
-        summary_path = tro_path.replace("-tro_state.json", ".summary.json")
-        sidecar_path = tro_path.replace("-tro_state.json", ".oracle.json")
+        summary_path = instance_summary_path(tro_path)
         if rep["occluded"]:
-            for p in (tro_path, sidecar_path, summary_path):
-                if os.path.exists(p):
-                    os.remove(p)
+            remove_instance_files(tro_path)
+            self._count_withheld()
             if not self.instance_seeds:
                 self.template_meta.pop("stances", None)
             self.counters["goal_occluded"] = self.counters.get("goal_occluded", 0) + 1
@@ -1630,6 +1758,8 @@ class SamplerV2(TaskSampler):
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
                     clock.mark("goal_occlusion")
+                    if publish_instance(path):  # i7-attachdef: only now can a collector claim it (ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS)
+                        self.counters["publish_after_screens.published"] = self.counters.get("publish_after_screens.published", 0) + 1
                     self.instance_seeds.append(seed)
                     written.append(path)
                     # run_isg loads an instance through the template meta; demos replay instances while the rest of the
@@ -1647,7 +1777,7 @@ class SamplerV2(TaskSampler):
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
-                    if isinstance(e, TemplateExhausted) and not start_per_attempt():
+                    if isinstance(e, TemplateExhausted) and not start_per_attempt(self):
                         exhausted = True
                         self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1
                         log.warning("%s: template exhausted at instance %d attempt %d; no further attempt", self.gp.variant, index, attempt)

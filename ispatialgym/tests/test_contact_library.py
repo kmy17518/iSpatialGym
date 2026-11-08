@@ -463,7 +463,7 @@ def test_validate_library_writes_each_entrys_verdict_and_the_timing(glib):
     assert lib["validated"]["oracle_config"]["push_pre_dist_m"] == 0.04 and lib["validation_timing"] is tim
 
 
-def test_an_axial_brace_library_is_the_axial_programs_stop_brace_at_the_goal(glib, tmp_path):
+def test_an_axial_brace_library_is_the_axial_programs_stop_brace_at_the_goal(glib, tmp_path, monkeypatch):
     """``axial_brace`` (the axial program's own ``_brace_candidates`` rule): per goal yaw, end and turn sense, the stop brace at the goal - the
     thin magazine (1.2 cm) gets the blade first; the entries are in the goal object frame and are the rule's own poses; the load is the
     arriving end's direction; a v2 rest that is not the upright identity one is refused."""
@@ -495,6 +495,8 @@ def test_an_axial_brace_library_is_the_axial_programs_stop_brace_at_the_goal(gli
     assert np.allclose(x["load"]["direction"], d_stop.numpy(), atol=1e-5)
     root = str(tmp_path / "g2")
     _model_dir(root, "magazine__lying__s1", (0.20, 0.28, 0.012), rest_q=(0.7071068, 0.0, 0.0, 0.7071068))
+    # a lying (tilted) rest: refused with ISPATIALGYM_AXIAL_SETTLED_REST=0 (default on since the owner's 2026-11-08 item 3: built at it)
+    monkeypatch.setenv("ISPATIALGYM_AXIAL_SETTLED_REST", "0")
     with pytest.raises(ValueError, match="identity"):
         CL.build_job(_job("magazine__lying__s1", ["axial_brace"]), root)
 

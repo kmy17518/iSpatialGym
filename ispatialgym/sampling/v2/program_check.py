@@ -1229,11 +1229,19 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                             dep = None
                         if dep is not None:
                             report.setdefault("departure_arms", []).append(dep)
+                # i7-cork: the hand-over (the other hand's grasp of the carried male, the giver's release retreat) - the male posed at its
+                # recorded hand-over pose in the world, both hands' chains with it ignored, the other hand locked (_Tracker.handover_phase)
+                ho_phase = tracker.handover_phase(action)
+                if ho_phase == "grasp":
+                    tracker.before_handover_grasp(action, sampler)
                 try:
                     targets = action.targets(sc, state)
                 except Exception as e:
                     raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
                 stance_name, carried = tracker.before(action)
+                carried_arm = tracker.carrying_arm()
+                if ho_phase is not None:
+                    carried, carried_arm = None, None
                 locked = tracker.locked_arms(action)
                 # block design (owner 2026-09-19): the acting arm's IK is seeded from where the previous action left it - the lift
                 # tracked from the grasp witness, the reorient from the lift's end, the carry / place from the reorient's end - as
@@ -1260,16 +1268,20 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
 
                 # of-v2maps 2026-11-07 (v2open2: 'approach: support_policy: finger_penetration' 21 / 20 / 6 program-check rejections): a grasp
                 # action's approach and grasp are policed at the oracle's pre-shape of its recorded grasp (tabletop.record_policy_opening)
-                with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None):
+                ho_ignore = sampler.ikc.ignoring([sampler.objects[action.object]]) if ho_phase is not None and getattr(action, "object", None) in sampler.objects else nullcontext()
+                with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None), ho_ignore:
                     n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj,
                                                         q_seed_prev=q_prev, q_end_prev=q_end_prev,
                                                         held_since_init=tracker.carried is not None and tracker.carried_arm is None,
-                                                        locked_fingers=tracker.locked_fingers(action))
+                                                        locked_fingers=tracker.locked_fingers(action), carried_arm=carried_arm)
                 end_q = witnesses.pop("__arm_end_q__", None)
                 partial_leg = witnesses.pop("__partial__", None)
                 repose_note = witnesses.pop("__repose__", None)
+                giver = tracker.handover_giver
                 tracker.after(action, witnesses, sampler)
                 tracker.note_arm_end(action, end_q)
+                if ho_phase is not None:
+                    tracker.after_handover(action, ho_phase, giver, witnesses, sampler)
                 _carry_joint_state(action)
                 entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
                          "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
@@ -1391,6 +1403,58 @@ class _Tracker:
         self.stance_obj: Optional[Stance] = None
         #: sim objects moved by :meth:`advance_block` (name -> init (pos, quat)), restored by :meth:`restore_moved`
         self.moved: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        #: i7-cork: the arm that handed the carried object over (until its release retreat)
+        self.handover_giver: Optional[str] = None
+
+    # -- i7-cork: the hand-over (owner decision 2026-11-08 4.2 (i)) -------------------------------------------------------------------
+    def handover_phase(self, action) -> Optional[str]:
+        """``"grasp"``: a grasp of the object the OTHER arm carries (the hand-over); ``"release"``: the giving arm's retreat after it;
+        None otherwise."""
+        name = getattr(action, "name", "")
+        arms = list(getattr(action, "arms", ()) or [])
+        if name == "grasp" and arms and self.carried is not None and getattr(action, "object", None) == self.carried \
+                and self.carried_arm is not None and self.carried_arm != arms[0]:
+            return "grasp"
+        if name == "retreat" and arms and self.handover_giver is not None and arms[0] == self.handover_giver:
+            return "release"
+        return None
+
+    def before_handover_grasp(self, action, sampler) -> None:
+        """The sim object at its recorded hand-over pose (``grasps[*].handover.object_pose``; restored by :meth:`restore_moved`) and the
+        giving arm locked at the configuration its last action left it in (its carry to the hand-over)."""
+        g = getattr(action, "grasp", None)
+        ex = getattr(g, "extra", None) if isinstance(getattr(g, "extra", None), dict) else (getattr(g, "extras", None) or {})
+        pose = ((ex or {}).get("handover") or {}).get("object_pose")
+        name = getattr(action, "object", None)
+        if sampler is not None and pose and name in getattr(sampler, "objects", {}):
+            obj = sampler.objects[name]
+            if name not in self.moved:
+                p0, q0 = obj.get_position_orientation()
+                self.moved[name] = (p0.clone(), q0.clone())
+            obj.set_position_orientation(th.tensor([float(v) for v in pose[0]]), th.tensor([float(v) for v in pose[1]]))
+            obj.keep_still()
+            _sync(sampler.kit, [obj])
+        giver = self.carried_arm
+        q_end = self.arm_end_q.get(giver) if giver else None
+        if sampler is not None and giver and q_end is not None:
+            self.arm_q[giver] = q_end[sampler.kit.robot.arm_control_idx[giver]].clone()
+        self.handover_giver = giver
+
+    def after_handover(self, action, phase: str, giver: Optional[str], witnesses: Optional[Dict[str, Any]], sampler) -> None:
+        """After the hand-over grasp: the giver unlocked, the taker locked at its grasp witness for the giver's release retreat; after that
+        retreat: the taker unlocked (it carries the object from there)."""
+        arms = list(getattr(action, "arms", ()) or [])
+        if phase == "grasp":
+            if giver:
+                self.arm_q.pop(giver, None)
+                self.handover_giver = giver
+            w = (witnesses or {}).get("grasp")
+            if arms and sampler is not None and w is not None and w.get("q") is not None:
+                self.arm_q[arms[0]] = th.tensor(w["q"], dtype=th.float32)[sampler.kit.robot.arm_control_idx[arms[0]]].clone()
+        elif phase == "release":
+            if self.carried_arm:
+                self.arm_q.pop(self.carried_arm, None)
+            self.handover_giver = None
 
     def advance_block(self, action, sampler) -> None:
         """Block design (owner 2026-09-19): after the intermediate ``Place`` of a flip-in-place block (``table_flip.place``) the
@@ -1427,68 +1491,6 @@ class _Tracker:
         obj.set_position_orientation(th.tensor([float(v) for v in target["position"]]), th.tensor([float(v) for v in target["orientation"]]))
         obj.keep_still()
         _sync(sampler.kit, [obj])  # train-fast 2026-10-31: the advanced block alone
-
-    def advance_push(self, action, sampler) -> None:
-        """Block design packing tail (owner 2026-09-19 21:47): a push of ``sidecar.pack`` moves its cube (and, for a wall push, the
-        cube it drives ahead of it) by the recorded travel minus the blade's stand-off, so the next push's blade is checked
-        against the cubes where the program leaves them (a pack push of 18 mm otherwise overlaps the un-moved neighbour in this
-        static world). Restored by :meth:`restore_moved`."""
-        contact = getattr(action, "contact", None)
-        name = getattr(action, "object", None) or getattr(contact, "object", None)
-        # the tracker holds the sampler's SidecarDraft (``pack`` attribute); the F6 Sidecar keeps it under ``extra``
-        pack = getattr(self.sidecar, "pack", None)
-        if not isinstance(pack, dict):
-            pack = (self.sidecar.extra or {}).get("pack") if isinstance(getattr(self.sidecar, "extra", None), dict) else None
-        if not isinstance(pack, dict) or sampler is None or name not in getattr(sampler, "objects", {}) or contact is None:
-            if isinstance(pack, dict):
-                log.warning("program check: pack push of %s not advanced (object unknown or no contact)", name)
-            return
-        rec, best = None, 1e9
-        try:
-            p_init = th.tensor([float(v) for v in contact.init.position])
-        except Exception:  # noqa: BLE001
-            return
-        for stage in pack.get("stages") or []:
-            for p_ in stage.get("pushes") or []:
-                if p_.get("object") != name or not isinstance(p_.get("init"), dict):
-                    continue
-                d_ = float(th.linalg.norm(th.tensor([float(v) for v in p_["init"].get("position", [0, 0, 0])]) - p_init))
-                if d_ < best:
-                    rec, best = p_, d_
-        if rec is None or best > 1e-3:
-            log.warning("program check: no pack push record matches push of %s (nearest %.4f m) - the world is not advanced", name, best)
-            return
-        travel = float(rec.get("distance_m", 0.0)) - float(rec.get("standoff_m", 0.0))
-        d = th.tensor([float(v) for v in rec.get("direction", [0, 0, 0])])
-        if travel <= 0.0 or float(th.linalg.norm(d)) < 1e-6:
-            return
-        d = d / th.linalg.norm(d)
-        d2 = d[:2] / max(float(th.linalg.norm(d[:2])), 1e-9)
-        # the cubes ahead of the pushed one along the direction (the wall pushes drive the neighbour column / row along) - in the
-        # table plane: a turned cube's ROOT sits an edge higher than an unturned one's (0920-173048: the driven right column was
-        # missed on the 25 mm root-z difference and stayed 9 mm short of the sampler's world)
-        pushed = sampler.objects[name]
-        p_c, _ = pushed.get_position_orientation()
-        edge = float(getattr(sampler, "edge", 0.0254))
-        shifted: List[Any] = []  # train-fast 2026-10-31: the cubes this push moves (the partial sync re-poses these alone)
-        for other, obj in sampler.objects.items():
-            if other == name or not any(other == b.get("instance") for b in (getattr(self.sidecar, "blocks", None) or [])):
-                continue
-            p_o, _ = obj.get_position_orientation()
-            rel = (p_o - p_c)[:2]
-            along = float(th.dot(rel, d2))
-            across = float(th.linalg.norm(rel - along * d2))
-            if 0.0 < along < travel + edge and across < 0.6 * edge:
-                # it moves by what the pushed cube's travel leaves after closing the gap between them down to the sampler's packed
-                # gap (its world model keeps ``block_gap_m`` between packed cubes; 0920-093727: 1 mm off put a hand 2.7 mm from
-                # the neighbour where the sampler had 3.7)
-                g_pack = float(sampler.g("block_gap_m")) if hasattr(sampler, "g") else 0.0
-                gap = max(0.0, along - edge - g_pack)
-                move = max(0.0, travel - gap)
-                if move > 1e-4:
-                    shifted.append(self._shift(other, obj, d * move, sampler))
-        shifted.append(self._shift(name, pushed, d * travel, sampler))
-        _sync(sampler.kit, shifted)
 
     def advance_pick_push(self, action, sampler) -> None:
         """The overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``; owner 2026-10-13 ~03:15 item 4): the pushed object is
@@ -1662,8 +1664,6 @@ class _Tracker:
         elif name == "push":
             if str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang":
                 self.advance_pick_push(action, sampler)
-            else:
-                self.advance_push(action, sampler)
         arms = list(getattr(action, "arms", ()) or [])
         if name == "brace" and arms and witnesses and sampler is not None:
             # the brace hand stays at its contact until its own retreat: its solved contact configuration locks the arm for
@@ -1917,19 +1917,6 @@ def _two_point_fingers(action, name: str, after_name: Optional[str]) -> Optional
     return float(ex["fingers_opening_m"]) if ex.get("push_contact_form") == "two_point" and ex.get("fingers_opening_m") is not None else None
 
 
-def _is_pack_push(sidecar, action) -> bool:
-    """A push of the block-design packing tail (``sidecar.pack`` stages; the draft's attribute or the F6 ``extra``)."""
-    if getattr(action, "name", "") != "push":
-        return False
-    pack = getattr(sidecar, "pack", None)
-    if not isinstance(pack, dict):
-        pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
-    if not isinstance(pack, dict):
-        return False
-    obj = getattr(getattr(action, "contact", None), "object", None)
-    return any(p_.get("object") == obj for st_ in (pack.get("stages") or []) for p_ in (st_.get("pushes") or []))
-
-
 def _approached_for(action, sampler) -> Optional[List[Any]]:
     """The object an action's approach closes in on (removed along the whole tracked segment, owner 2026-09-16 10:15 A):
     the grasped / lifted / released object, the placed-on partner, the pushed / braced object; a grasp's ``grasps[].may_touch``
@@ -2175,6 +2162,151 @@ def fingertips_in_frame(sampler, stance: Stance, name: str, pose_targets: Sequen
     return None
 
 
+# ------------------------------------------------------------------ i7-framing (owner decision 2026-11-08 5.1): the lifted carry
+
+#: the oracle's protective via-above of the CARRY (``oracle/execute.py``, the place's straight carry leg when its tracked path passes a
+#: protected object too closely): the hand rises straight to ``z_top = max(lift end z, pre-place z) + protect_above_m``, crosses at
+#: ``z_top`` to above the pre-place and descends onto it. ``MotionsConfig.protect_above_m`` (0.12; a test keeps them equal).
+ORACLE_PROTECT_ABOVE_M = 0.12
+#: waypoints per leg of the via-above the frame check projects (the oracle tracks the legs straight, orientation SLERPed)
+CARRY_FRAME_LEG_WAYPOINTS = 8
+#: ``1``: the IORS small sampler checks the lifted carry's fingertip framing (default off); kit ``framing.carry.checked`` / ``.failed``
+CARRY_FRAME_CHECK_ENV = "ISPATIALGYM_CARRY_FRAME_CHECK"
+#: ``1``: where only the via-above's arm lift leaves the frame, the sampler records a TORSO lift for the carry (``grasps[].carry_torso``)
+#: and the oracle executes it on the protective via-above (default off); kit ``framing.carry.torso_lift_used``
+CARRY_TORSO_LIFT_ENV = "ISPATIALGYM_CARRY_TORSO_LIFT"
+#: the torso lift: the hand rises at least this much at both carry ends (the via-above's rise), moves at most CARRY_TORSO_MAX_SHIFT_M
+#: sideways and turns at most CARRY_TORSO_MAX_ROT_RAD (torso_link4: the JoyLo translate keeps its orientation, the tilt turns it)
+CARRY_TORSO_MIN_RISE_M = ORACLE_PROTECT_ABOVE_M
+CARRY_TORSO_MAX_SHIFT_M = 0.04
+CARRY_TORSO_MAX_ROT_RAD = 0.1
+CARRY_TORSO_STEP = 0.05
+
+
+def _env_on(name: str) -> bool:
+    return (os.environ.get(name, "") or "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+#: the middle option (owner 2026-11-08 5d.3; DEFAULT ON since 5s.1, ``0`` = the rule before: no lifted-carry check): the straight
+#: carry's nominal protect margin picks the band - below
+#: CARRY_BAND_BELOW_M: the lifted-carry framing check (out of frame -> reject); above CARRY_BAND_ABOVE_M: no check; between: the torso
+#: lift when possible, else NO check (owner 2026-11-08 5s.1: the near band never rejects, the lift fires in ~5 % of its carries)
+CARRY_BAND_ENV = "ISPATIALGYM_CARRY_BAND"
+#: the band edges (m of nominal margin, carry_margin.carry_protect_margin; from the replay of the written carries,
+#: $OFH/framing_20261108/margin_replay.json + margin_stats.py): above 9 mm no carry of 896 demos fired (the 42 fired all lie at
+#: 1.3-8.5 mm); below 2 mm 20 of 131 fired (15 %, the most any band reaches - the lift is never "almost sure"), 2-9 mm 22 of 396
+CARRY_BAND_BELOW_M = 0.002
+CARRY_BAND_ABOVE_M = 0.009
+
+
+def carry_band_on() -> bool:
+    """DEFAULT ON (owner 2026-11-08 5s.1); ``ISPATIALGYM_CARRY_BAND=0`` turns it off."""
+    return (os.environ.get(CARRY_BAND_ENV, "") or "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def carry_band(margin_m: Optional[float], below: float = CARRY_BAND_BELOW_M, above: float = CARRY_BAND_ABOVE_M) -> str:
+    """``below`` / ``near`` / ``above`` of a nominal protect margin (``carry_margin.carry_protect_margin``; None / inf = nothing to fire on)."""
+    if margin_m is None or margin_m != margin_m or margin_m == float("inf") or margin_m > above:
+        return "above"
+    return "below" if margin_m < below else "near"
+
+
+def carry_frame_check_on() -> bool:
+    return _env_on(CARRY_FRAME_CHECK_ENV)
+
+
+def carry_torso_lift_on() -> bool:
+    return _env_on(CARRY_TORSO_LIFT_ENV)
+
+
+def via_above_carry_poses(lift_end, pre_place, above_m: float = ORACLE_PROTECT_ABOVE_M, n: int = CARRY_FRAME_LEG_WAYPOINTS) -> Dict[str, List[Any]]:
+    """The oracle's protective via-above of the carry from the lift end to the pre-place (``oracle/execute.py``): ``{"rise": [...],
+    "cross": [...], "descend": [...]}`` - the lift end raised straight to ``z_top`` (its orientation), across at ``z_top`` to above the
+    pre-place (orientation SLERPed to the pre-place's), straight down onto the pre-place; ``n`` waypoints per leg, each leg's start
+    excluded (the lift end itself is checked by the caller's other checks)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    a = (G.t(lift_end[0]).float(), G.t(lift_end[1]).float())
+    b = (G.t(pre_place[0]).float(), G.t(pre_place[1]).float())
+    z_top = max(float(a[0][2]), float(b[0][2])) + float(above_m)
+    up = (th.tensor([float(a[0][0]), float(a[0][1]), z_top]), a[1])
+    over = (th.tensor([float(b[0][0]), float(b[0][1]), z_top]), b[1])
+    return {"rise": list(C.line_waypoints(a, up, n)), "cross": list(C.line_waypoints(up, over, n)), "descend": list(C.line_waypoints(over, b, n))}
+
+
+def first_out_of_frame(model, cam, legs: Dict[str, Sequence[Any]], margin: float = FINGERTIP_FRAME_MARGIN, slack_m: float = FINGERTIP_FRAME_SLACK_M) -> Optional[Dict[str, Any]]:
+    """The first pose of ``legs`` ({name: poses}) whose fingertip fails :func:`fingertip_frame_margin` (the pre-place's rule), as
+    ``{key, index, n, u, v, depth_m, margin_px}``; None when all pass."""
+    for key, poses in legs.items():
+        for i, p in enumerate(poses):
+            fm = fingertip_frame_margin(model, cam, p, margin, slack_m)
+            if not fm["inside"]:
+                return {"key": key, "index": i, "n": len(poses), "u": fm["u"], "v": fm["v"], "depth_m": fm["depth_m"], "margin_px": round(fm["margin_px"], 1)}
+    return None
+
+
+def torso_link4_world(base_pose2d, translate: float, tilt: float, floor_z: float = 0.0):
+    """World pose of ``torso_link4`` (the link the head camera and both arms hang from) at a base pose and JoyLo trunk."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    x, y, yaw = (float(v) for v in base_pose2d)
+    base = (th.tensor([x, y, float(floor_z) + C.NOMINAL_BASE_Z]), G.quat_from_yaw(yaw))
+    return C.compose(base, C.torso_fk(C.torso_q(translate, tilt, C.TORSO_JOINT_LIMITS))["torso_link4"])
+
+
+def torso_move(base_pose2d, trunk_from: Tuple[float, float], trunk_to: Tuple[float, float], floor_z: float = 0.0):
+    """The world transform ``Mt`` a trunk change applies to everything on ``torso_link4`` with the arm joints held (the hand, the head
+    camera): a world pose ``p`` at ``trunk_from`` is ``Mt ∘ p`` at ``trunk_to``. The hand's image position is unchanged by construction."""
+    from ispatialgym.sampling import geometry as G
+
+    A = torso_link4_world(base_pose2d, *trunk_from, floor_z=floor_z)
+    B = torso_link4_world(base_pose2d, *trunk_to, floor_z=floor_z)
+    return G.compose(B, G.invert(A))
+
+
+def carry_torso_choice(base_pose2d, trunk: Tuple[float, float], points: Sequence[Any], floor_z: float = 0.0, min_rise: float = CARRY_TORSO_MIN_RISE_M,
+                       max_shift: float = CARRY_TORSO_MAX_SHIFT_M, max_rot: float = CARRY_TORSO_MAX_ROT_RAD, step: float = CARRY_TORSO_STEP) -> Optional[Dict[str, Any]]:
+    """The smallest trunk change (the torso straightened along the JoyLo translate alone first - it keeps torso_link4's orientation -,
+    then with the tilt raised too) that lifts every one of ``points`` (world positions on the hand, arm joints held) by >= ``min_rise`` with <=
+    ``max_shift`` sideways and <= ``max_rot`` turn: ``{"translate", "tilt", "from": [translate, tilt], "rise_m": [...], "shift_m",
+    "rot_rad"}``, or None. Within each group in order of the change ``|d translate| + |d tilt|``, both within their ranges / joint limits."""
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    t0, k0 = float(trunk[0]), float(trunk[1])
+    lo_t = float(M.TRUNK_TRANSLATE_RANGE[0])
+    j = M.TRUNK_TILT_JOINT_INDEX
+    cands = []
+    for i in range(0, int(round((t0 - lo_t) / step)) + 1):
+        for k in range(0, int(round(max_rot / step)) + 1):
+            if i == 0 and k == 0:
+                continue
+            tr, kt = max(lo_t, t0 - i * step), k0 + k * step
+            q = C.translate_to_torso_q(tr)[j] + kt
+            if not (float(C.TORSO_JOINT_LIMITS[0][j]) <= float(q) <= float(C.TORSO_JOINT_LIMITS[1][j])):
+                continue
+            cands.append((k > 0, abs(t0 - tr) + abs(kt - k0), tr, kt))  # the translate alone first (no turn of the hand), then with the tilt
+    A_q = torso_link4_world(base_pose2d, t0, k0, floor_z)[1]
+    for _, _, tr, kt in sorted(cands):
+        Mt = torso_move(base_pose2d, (t0, k0), (tr, kt), floor_z)
+        rot = float(G.quat_angle(A_q, torso_link4_world(base_pose2d, tr, kt, floor_z)[1]))
+        if rot > max_rot + 1e-6:
+            continue
+        rises, shifts = [], []
+        for p in points:
+            p = G.t(p).float().reshape(3)
+            p2 = G.compose(Mt, (p, th.tensor([0.0, 0.0, 0.0, 1.0])))[0].float()
+            rises.append(float(p2[2] - p[2]))
+            shifts.append(float(th.linalg.norm(p2[:2] - p[:2])))
+        if min(rises) >= min_rise and max(shifts) <= max_shift:
+            return {"translate": round(tr, 4), "tilt": round(kt, 4), "from": [round(t0, 4), round(k0, 4)], "rise_m": [round(r, 4) for r in rises],
+                    "shift_m": round(max(shifts), 4), "rot_rad": round(rot, 4)}
+    return None
+
+
 def _carry_start_ignores(sampler) -> List[Any]:
     """What the carry leg may still touch where it starts (the lift end): the grasp's support objects (the floor class's floor
     included, ``grasp_ignore_objects``) - exempted for the first ``APPROACH_WAYPOINT_M`` of the leg only."""
@@ -2389,22 +2521,29 @@ def _pick_overhang_push(action) -> bool:
     return getattr(action, "name", "") == "push" and str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang"
 
 
+def _is_handover(sidecar) -> bool:
+    """i7-cork: a hand-over sidecar (``grasps[*].attach_route == "handover"``; the sampler's draft records ``extras``, the F6 sidecar ``extra``)."""
+    for g in getattr(sidecar, "grasps", None) or []:
+        ex = getattr(g, "extras", None) if isinstance(getattr(g, "extras", None), dict) else getattr(g, "extra", None)
+        if isinstance(ex, dict) and ex.get("attach_route") == "handover":
+            return True
+    return False
+
+
 def _world_advances(sidecar, action) -> bool:
     """Whether the check's world changes AFTER ``action`` (``_Tracker.after`` / ``run._carry_joint_state``), so later actions' targets
-    are not the static ones: a place while block records exist (``advance_block``), a push while a packing tail exists (``advance_push``),
-    a pick-overhang push (``advance_pick_push``), a push - or the retreat after one - with an articulation record (its joint), a base
+    are not the static ones: a place while block records exist (``advance_block``), a pick-overhang push (``advance_pick_push``), a push - or the retreat after one - with an articulation record (its joint), a base
     push (the object and the stance), a base follow (its joint; a hybrid end stance)."""
     name = getattr(action, "name", "")
     if name in ("base_push", "base_follow"):
         return True
+    if name == "lift" and _is_handover(sidecar):
+        return True  # i7-cork: the hand-over poses the male in the air before the other hand's grasp (_Tracker.before_targets)
     if name == "place":
         return bool(getattr(sidecar, "blocks", None))
     if name == "push":
         extra = getattr(getattr(action, "contact", None), "extra", None) or {}
-        pack = getattr(sidecar, "pack", None)
-        if not isinstance(pack, dict):
-            pack = (sidecar.extra or {}).get("pack") if isinstance(getattr(sidecar, "extra", None), dict) else None
-        return bool(extra.get("articulation")) or str(extra.get("kind") or "") == "pick_overhang" or isinstance(pack, dict)
+        return bool(extra.get("articulation")) or str(extra.get("kind") or "") == "pick_overhang"
     if name == "retreat":
         after = getattr(action, "after", None)
         if getattr(after, "name", "") == "push":
@@ -2414,15 +2553,9 @@ def _world_advances(sidecar, action) -> bool:
 
 def _gate_pose_targets(sidecar, sampler, action, name: str, arm: str, targets: Any) -> List[Tuple[str, List[Any]]]:
     """The ``(key, poses)`` list the frame gate of :func:`check_action_targets` sees for an action whose chains leave from no earlier
-    configuration: ``iter_pose_targets``, a pack push's ``pre`` merged into its chain, ``_place_order`` / ``_chain_order``, the skipped
+    configuration: ``iter_pose_targets``, ``_place_order`` / ``_chain_order``, the skipped
     keys out - the same keys, indices and order, so the early gate's message is the per-action gate's."""
     pose_targets = list(iter_pose_targets(targets))
-    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
-        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
-        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
-        if pre_l and wps_l:
-            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
-            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
     pose_targets = _place_order(pose_targets, None, sampler, arm) if name == "place" else _chain_order(pose_targets)
     skip = _skipped_target_keys(name, action, targets)
     return [(k_, p_) for k_, p_ in pose_targets if k_.split(".")[0] not in skip]
@@ -2482,7 +2615,8 @@ def _early_frame_gate(sidecar: SidecarDraft, sc, sampler, actions: Sequence[Any]
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
                          locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None,
                          q_seed_prev: Optional[th.Tensor] = None, q_end_prev: Optional[th.Tensor] = None,
-                         held_since_init: bool = False, locked_fingers: Optional[Dict[str, float]] = None) -> Tuple[int, Dict[str, Any]]:
+                         held_since_init: bool = False, locked_fingers: Optional[Dict[str, float]] = None,
+                         carried_arm: Optional[str] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -2517,7 +2651,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         stance_name = f"{stance_name} -> {stance_obj.name} {[round(float(v), 3) for v in stance_obj.base_pose2d]}"
     locked = {a: q for a, q in (locked_arms or {}).items() if a != arm}
     carried_obj = sampler.objects.get(carried) if carried else None
-    g = sidecar.grasp_of(carried) if carried else None
+    # i7-cork: ``carried_arm`` (the tracker's carrying arm) picks the record of that hand when the object has two (the hand-over)
+    g = sidecar.grasp_of(carried, arm=carried_arm) if carried else None
     eef_in_object = g.eef_in_object if g is not None else None
     if g is None and carried_obj is not None:
         # a block (``blocks[]`` carries no grasps[] record): the cube grasp's eef in the block frame from the record's pick and
@@ -2650,17 +2785,6 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             return 1, witnesses
     where = _where_of(action, name, stance_name, arm, carried, locked)
     pose_targets = list(iter_pose_targets(targets))
-    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
-        # a packing push (block design, owner 2026-09-19 21:47) is verified as the oracle executes it: ``arm_to(pre)`` then
-        # ``arm_along(init -> goal)`` from the pre's configuration - ONE chain pre -> init -> ... -> goal tracked from the pre's
-        # branch (the sampler's ``_pack_pushes`` checks this very chain). Checked as "pre" alone + "waypoints" from a fresh IK at
-        # init, the init pose landed in a branch that collides with the neighbour cube 2-4 mm from the blade (0920-101139: 7/8
-        # attempts 'waypoints: exact IK failed at pose 1 of 3 ... collides with <neighbour>')
-        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
-        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
-        if pre_l and wps_l:
-            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
-            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
     slab_off = _slab_off(action)
     # owner 2026-09-24 (block design 0921-050358 action 15: 'the sidecar's pre-pose and end-pose witnesses are in different IK
     # branches', finish rejected 3.2 rad away): the legs are checked as ONE chain the way the oracle runs them -
@@ -2819,8 +2943,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             and not (getattr(getattr(action, "contact", None), "extra", None) or {}).get("articulation")):
                         # owner 2026-09-26 (axial 0926-043254 / 051919): a free-object push whose pre-contact witness sits in another branch
                         # than the stance posture's IK is followed densely, as the oracle runs it (arm_to the pre-contact, then the legs
-                        # from there) - only in that situation. The pre-contact is its own single target ("pre", solved before the chain;
-                        # a pack push merges it into the chain and has q_first): the chain checked is pre + the waypoints from its witness
+                        # from there) - only in that situation. The pre-contact is its own single target ("pre", solved before the
+                        # chain): the chain checked is pre + the waypoints from its witness
                         q_ref, chain_ref = q_first, list(chain)
                         if q_ref is None and "pre" in single_q:
                             pre_poses = next((p_ for k_, p_ in pose_targets if k_ == "pre"), None)
@@ -2828,7 +2952,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                                 q_ref, chain_ref = single_q["pre"], list(pre_poses) + list(chain)
                         chk = None
                         replay = None  # the arc replay from a given pre-contact configuration (set when the replay runs)
-                        if (q_ref is not None and len(chain_ref) >= 4 and not _is_pack_push(sidecar, action)
+                        if (q_ref is not None and len(chain_ref) >= 4
                                 and os.environ.get("ISG_PUSH_REPLAY", "on").lower() not in ("off", "0", "false")):
                             # owner 2026-09-27 (A8): a free-object arc push is replayed as the oracle runs it - the straight leg, the true
                             # arc of the closed loop, the contact retreat's escape leg - and rejected when the replay cannot follow it

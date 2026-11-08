@@ -155,12 +155,43 @@ from ispatialgym.sampling.v2 import overhang as OH
 from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, register, start_draw_active, start_facts
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
+
+#: i7-interior2 2026-11-08 (owner 6.1): the overhang FALLBACK of IORS large's pick at B - when an alias sets no ``generation.pick_overhang_push``
+#: and the direct pick fails for a reason the sampler cannot fix (the shared support policy: ``overhang_fallback.reason_class``), the pick
+#: pushes the object over B's support edge and grasps the overhang (IORSLarge's own ``_overhang_pick``, the options of
+#: ``overhang_fallback.options``: :data:`overhang.DEFAULTS`, mode "fallback") - IORSSmall's fallback (``v2/overhang_fallback.py``) for this
+#: pick. Default on since the owner's 6.1 ("0" off); kit counters ``large_overhang_fallback.trigger.<class>`` / ``.mode.<grasp mode>`` / ``.found`` / ``.failed``.
+LARGE_OVERHANG_FALLBACK_ENV = "ISPATIALGYM_LARGE_OVERHANG_FALLBACK"
+#: i7-interior2 2026-11-08 (owner 6.3, inside_large_02): the inside mode's B -> C carry only with the torso STRAIGHTENED (the departure
+#: transition to a travel trunk of tilt 0) - no fallback drive at B's leaning grasp trunk. Every successful fridge demo before (fix1 / fix2
+#: 5 / 5, i7_fridge4 300023) carried straightened; the i7_fridge4 demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) succeeded 1 / 3,
+#: both failures the idle gripper against fridge_petcxr_0 in the carry drive (navigate[4]). Default on since the owner's 2026-11-08b item 1
+#: (A/B: 8 / 8 ok vs 6 / 8; "0" off); kit counters
+#: ``inside_carry_straight.rejected`` / ``.straight``.
+INSIDE_CARRY_STRAIGHT_ENV = "ISPATIALGYM_INSIDE_CARRY_STRAIGHT"
+
+
+def inside_carry_straight_on() -> bool:
+    # default ON (owner 2026-11-08, owner_answers_20261108b item 1); "0" off
+    return os.environ.get(INSIDE_CARRY_STRAIGHT_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def large_overhang_fallback_on() -> bool:
+    # default ON (owner 6.1, 2026-11-08: "implement overhang fallback" for this pick, as IORSSmall's default); "0" off
+    return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def count_pick_preshape(s, g, where: str) -> None:
+    """i7-interior2 (owner 6.1): one kit counter per IORS large pick whose support policy measures the fingers at the grasp's pre-shape
+    (``tabletop.policy_opening_of``: pinch width / 2 + the preshape margin) - ``pick_preshape.<where>`` - or at the configuration's
+    opening (``pick_preshape.<where>.q``: no width / ``ISPATIALGYM_SUPPORT_POLICY_OPENING=q``)."""
+    TT._count(s, f"pick_preshape.{where}" + ("" if TT.policy_opening_of(g) is not None else ".q"))
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -689,6 +720,71 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
     return yaw0 + math.asin(-y_off / dist)
 
 
+#: i7-goalmaps 2026-11-08 (lead decision, touching_large_02's umbrella carry): opt-in ``ISPATIALGYM_CARRY_CENTRED=1`` (default off) - the carry
+#: pose candidates of :meth:`IORSLarge.carry_poses_at_b` start with :data:`CARRY_CENTRED_POSES`: the hand in front of the body, its lateral
+#: chosen so that the CARRIED OBJECT's centre (its hull's bounding-box centre) lies on the base's centre line. The beside-the-body poses
+#: (CARRY_POSES, the hand 0.35-0.45 m to the arm's side) hold a long object held across the heading (the umbrella, 0.82 m, released along
+#: the hall tree's board) out to ~0.85 m on that side: gm_t02_umb2 / umb2s + PATH_BLAME, every carry with the hand >= 0.3 m to the side
+#: failed its B -> C path (~800 of 800; the umbrella or the gripper against standing_mirror_wwkuuf_0 / the walls), the hand within 0.1 m of
+#: the centre line passed 8 of 15. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
+#: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
+#: / carry_pose.centred_used.
+CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_SIDEWAYS=1`` (default off) - when the carried B -> C path
+#: collides at every variant tried today (straight arrival, plain; local then global), it is planned again with the base driving SIDEWAYS
+#: (``NAV.plan_path`` heading_offset +-pi / 2, the R1Pro base is holonomic): the object, held across the robot's heading because the release
+#: needs it there (the umbrella along the hall tree's board, across the robot facing the board), then lies along the way. The offset whose
+#: sideways yaw on the straight B -> C line is nearer C's yaw is tried first. The same swept check (the object attached, the carry arms,
+#: the yaw-lag envelope) judges it; the record is "recorded" style with the sideways yaws, which the oracle tracks as recorded. Kit counters
+#: carry_path.sideways_tried / carry_path.sideways_used.
+CARRY_SIDEWAYS_ENV = "ISPATIALGYM_CARRY_SIDEWAYS"
+
+
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_WIDE_PATH=1`` (default off) - after the carried B -> C path
+#: collides at every variant of today, the GLOBAL path is planned again on the eroded traversability map eroded further by each of
+#: :data:`CARRY_WIDE_PATH_EROSIONS_M` (``NAV.plan_path`` global_extra_erosion_m, a square kernel like the map's own erosion): the shortest path
+#: no longer hugs the obstacles, so an object held across the heading (the umbrella reaches ~0.4 m beyond the base's sides) passes them -
+#: the centred umbrella carries of gm_t02_cc_on collided 20-30 % along the path, base at (-0.6..-0.8, 1.4..1.5) heading north past
+#: standing_mirror_wwkuuf_0. The same swept check judges the path. Kit carry_path.wide_tried / wide_used.
+CARRY_WIDE_PATH_ENV = "ISPATIALGYM_CARRY_WIDE_PATH"
+CARRY_WIDE_PATH_EROSIONS_M: Tuple[float, ...] = (0.15, 0.30)
+
+
+def carry_wide_path_on() -> bool:
+    return os.environ.get(CARRY_WIDE_PATH_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def carry_sideways_on() -> bool:
+    return os.environ.get(CARRY_SIDEWAYS_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def sideways_offsets(from_xy: Sequence[float], to_xy: Sequence[float], to_yaw: float) -> List[float]:
+    """+-pi / 2, the one whose sideways yaw on the straight line ``from_xy`` -> ``to_xy`` lies nearer ``to_yaw`` first."""
+    h = math.atan2(float(to_xy[1]) - float(from_xy[1]), float(to_xy[0]) - float(from_xy[0]))
+    offs = [math.pi / 2, -math.pi / 2]
+    return sorted(offs, key=lambda o: abs((h + o - float(to_yaw) + math.pi) % (2.0 * math.pi) - math.pi))
+#: (ahead, raise above the lift) of the centred carry poses, tried in this order (0.45-0.55 m ahead: nearer folds the elbow, 0920-071230)
+CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
+
+
+def carry_centred_on() -> bool:
+    return os.environ.get(CARRY_CENTRED_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def centred_hand_lateral(eef: Any, eef_in_object: Any, hull_local: Optional[th.Tensor], left: th.Tensor) -> float:
+    """The hand's lateral offset (along ``left``, the base's +y) that puts the carried object's centre on the base's centre line: minus the
+    lateral of (object hull's bounding-box centre - eef position), the object posed from the eef by the grasp (``eef_in_object`` =
+    T_obj->eef). Without a hull: the object's root."""
+    obj = G.compose((G.t(eef[0]).float(), G.t(eef[1]).float()), G.invert((G.t(eef_in_object[0]).float(), G.t(eef_in_object[1]).float())))
+    if hull_local is not None and len(hull_local):
+        pts = G.local_points_world(hull_local.float(), obj)
+        centre = 0.5 * (pts.min(dim=0).values + pts.max(dim=0).values)
+    else:
+        centre = G.t(obj[0]).float()
+    d = (centre[:2] - G.t(eef[0]).float()[:2])
+    return -float(d @ G.t(left).float()[:2])
+
+
 def carry_poses_for(poses: Sequence[Sequence[Any]], arm: str) -> List[Tuple[float, Optional[float], float]]:
     """``CARRY_POSES`` / ``generation.carry_poses`` (ahead, lateral, raise) for ``arm``: the lateral beside the body on the arm's side
     (the right arm's -0.35..-0.45 m positive for the left arm); None (= the lift's lateral) kept."""
@@ -757,6 +853,8 @@ class SegmentArms:
 
 @register(*RELATION_OF_SUBTASK)
 class IORSLarge(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     relation_mode: Optional[type] = None  # the relation's mode class once adopted (inside / touching / nextto)
 
     def __init__(self, ctx):
@@ -2261,15 +2359,17 @@ class IORSLarge(SamplerV2):
         self.surface["n_c"] = len(c_survivors)
         self.template_facts["stances"] = {"init": self.surface["init"].to_meta(), "n_manipulation_candidates": len(self.surface["manip"]), "n_placement_candidates": len(c_survivors)}
 
-    def try_support_surface(self, support, rng: np.random.Generator):
+    def try_support_surface(self, support, rng: np.random.Generator, top: Optional[SupportTop] = None):
         """Stances A and B on a support (tabletop Phases 1a / 1b / 1c / 2 of ``tabletop.py``): per edge (random order)
         the init trunk, the lateral draw redrawn (≤ 6) until the partner is visible (≥ 4 / 8 corners + centre), the
         Phase-2 survivors with the band of (support, target) - with every offered arm's band (owner 2026-09-27, first-demo v2.2:
-        ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``)."""
+        ``tabletop.arm_bands_for``, the other arm's a mirror when it has none; survivors tagged ``focus_arms``). ``top``
+        (i7-startdraw, the per-attempt draw): the template's top of this support instead of measuring it again."""
         self.kit.sync_world()
         offered = TT.offered_arms(self)
         half, height = self.target_dims()
-        top = TT.support_surface(self, support, ignore=[self.target], height=height)
+        if top is None:
+            top = TT.support_surface(self, support, ignore=[self.target], height=height)
         if int(top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
         self.surface["top"] = top
@@ -2323,6 +2423,42 @@ class IORSLarge(SamplerV2):
                                  "arm_bands": dict(arm_bands or {offered[0]: getattr(self, "bands", None)})})
             return
         raise Reject("no_free_edge", f"{support.name}: " + ("; ".join(errors) or "no edge with a free, collision-free stance"))
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own robot start on the template's init surface
+        (bound in the BDDL, so it stays) from the attempt's ``rng`` - the template's own draw: on the floor the robot's stance A only
+        (:meth:`floor_stance_a`: the eroded map 0.6-1.5 m from c_t, target and partner region in frame, collision-free; then the A -> B leg,
+        as :meth:`try_floor_surface` does) around the template's anchor cell c_t and stance-B pool - c_t is the TARGET's start cell, not the
+        robot's (A/B 2026-11-08: redrawing c_t too gave no_floor_cell / 1500 s time_budget attempts at C) -; on a support
+        :meth:`try_support_surface` (edges in random order, Phase 1b / 1c with the goal region in frame - or ``free_start`` -, Phase 2) on the
+        template's top. The template's stance-C existence test is not repeated: the attempt draws its stance-C pool itself (``sample_instance``).
+        A draw that finds none keeps the template's surface for the next attempt. The nextto / base-push modes (no init surface) draw their
+        stance A per attempt already. Off: the template's start."""
+        if not start_draw_active(self):
+            return
+        keep = dict(self.surface or {})
+        kind = keep.get("kind")
+        if kind is None or keep.get("init") is None:
+            return
+        self.surface = {"kind": kind, "obj": keep.get("obj"), **({"n_c": keep["n_c"]} if "n_c" in keep else {})}
+        try:
+            if kind == "floor":
+                manip = keep["manip"]
+                init = self.floor_stance_a(keep["c_t"], rng, self.target_dims()[1], like=manip[0])
+                with self.ikc.ignoring([self.obj("floor")]):
+                    self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (try_floor_surface's check)
+                self.sidecar.transitions.clear()
+                self.sidecar.paths.clear()
+                self.surface = {**keep, "init": init}
+            else:
+                self.try_support_surface(keep["obj"], rng, top=keep.get("top"))
+        except Reject:
+            self.surface = keep
+            raise
+        init = self.surface["init"]
+        edge = self.surface.get("edge")
+        self._spa_facts = start_facts("floor" if kind == "floor" else edge, init, self.surface["manip"], kind=kind,
+                                      **({"c_t": [round(float(v), 4) for v in self.surface["c_t"].tolist()]} if kind == "floor" else {}))
 
     def goal_region_points(self, from_xy) -> th.Tensor:
         """Owner decision 2026‑09‑16 (a)/(d): the **relevant region** of the partner stance A must see — ontop: the top-face
@@ -3284,32 +3420,62 @@ class IORSLarge(SamplerV2):
         # the straightened base's wheels touched bed_rrcvaq_1 0.37 m away on the same turn)
         arrive = float(self.gp.gen("carry_arrive_straight_m") or 0.0)
         variants = ([{"arrive_straight_m": arrive}] if arrive > 0.0 else []) + [{}]
+        k_plain = len(variants) - 1
+        if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
+            variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
+        if carry_wide_path_on():  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
+            variants += [{"global_extra_erosion_m": w} for w in CARRY_WIDE_PATH_EROSIONS_M]
         chosen: Dict[str, Any] = {}
 
         def carried_path(redo=None, **kw):
             """The carried path B -> C: per variant (straight arrival first) the local path, then the eroded global one on a path_collision (the
             local shortest path hugs the partner's corner with the object out front, 0920-100543); a straight arrival that finds no path at all
-            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition)."""
-            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)]
+            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition). i7-goalmaps: the opt-in EXTRA
+            variants after the plain one (CARRY_SIDEWAYS_ENV, CARRY_WIDE_PATH_ENV) are tried after the plain one's path_collision; whatever they
+            fail with, the plain one's error is what the leg raises."""
+            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)
+                     if not (force is False and "global_extra_erosion_m" in v)]  # a wide-path variant is global only
             i = 0
+            plain_err: Optional[Reject] = None
             while True:
                 k, v, force = tries[i]
-                plain = k == len(variants) - 1
+                plain = k >= k_plain
+                extra = k > k_plain
+                if "heading_offset" in v:
+                    TT._count(self, "carry_path.sideways_tried")
+                if "global_extra_erosion_m" in v:
+                    TT._count(self, "carry_path.wide_tried")
                 try:
                     p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
                     chosen.clear()
                     chosen.update(v)
+                    if "heading_offset" in v:
+                        TT._count(self, "carry_path.sideways_used")
+                        log.info("%s: B -> C carry: SIDEWAYS path (heading offset %+.2f rad, %s) %.2f m", self.gp.variant, float(v["heading_offset"]),
+                                 "global" if force else "local", p.length_m)
+                    if "global_extra_erosion_m" in v:
+                        TT._count(self, "carry_path.wide_used")
+                        log.info("%s: B -> C carry: WIDE path (the global map eroded %.2f m more) %.2f m", self.gp.variant, float(v["global_extra_erosion_m"]),
+                                 p.length_m)
                     return p
                 except Reject as e:
-                    if plain and e.reason != "path_collision":
-                        raise
-                    if not plain:
-                        log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
-                                 str(e)[:600])
-                    # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
-                    i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
-                    if i >= len(tries):
-                        raise
+                    if extra:
+                        log.info("%s: B -> C carry: extra variant %s %s: %s: %s", self.gp.variant, v, "global" if force else "local", e.reason, str(e)[:300])
+                        i += 1
+                        if i >= len(tries):
+                            raise plain_err if plain_err is not None else e
+                    else:
+                        if plain and e.reason != "path_collision":
+                            raise
+                        if plain:
+                            plain_err = e
+                        if not plain:
+                            log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
+                                     str(e)[:600])
+                        # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
+                        i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
+                        if i >= len(tries):
+                            raise
                     self._drop_leg_records(place.name)
                     if redo is not None:
                         redo()
@@ -3327,11 +3493,13 @@ class IORSLarge(SamplerV2):
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
+                if getattr(self, "relation", None) == "inside":
+                    TT._count(self, "inside_carry_straight.straight")
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.variant, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
                                 "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors,
-                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0), "heading_offset": chosen.get("heading_offset", 0.0)}
                 return path
             except Reject as e:
                 self._drop_leg_records(place.name)
@@ -3339,6 +3507,11 @@ class IORSLarge(SamplerV2):
                 # oracle-fix 2026-11-06 (hardback): the carry leg's error text is cut at 700 characters by its caller; each travel trunk's whole reason
                 log.info("%s: B -> C carry: travel trunk %s failed: %s: %s", self.gp.variant, tuple(round(v, 2) for v in tt), e.reason, str(e)[:1500])
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
+        if inside_carry_straight_on() and getattr(self, "relation", None) == "inside" and abs(float(manip.tilt)) > 1e-6:
+            # i7-interior2 2026-11-08 (owner 6.3): the inside carry only straightened (module constant INSIDE_CARRY_STRAIGHT_ENV)
+            TT._count(self, "inside_carry_straight.rejected")
+            raise Reject("no_transition", f"inside carry straightened only ({INSIDE_CARRY_STRAIGHT_ENV}): no travel trunk admits straighten-then-navigate "
+                                          f"and B's trunk ({manip.translate:.2f}, {manip.tilt:.2f}) leans; " + "; ".join(errors)[:900])
         try:
             path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -3346,7 +3519,8 @@ class IORSLarge(SamplerV2):
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
-                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0),
+                            "heading_offset": chosen.get("heading_offset", 0.0)}
             return path
         except Reject as e:
             self._drop_leg_records(place.name)
@@ -3382,7 +3556,12 @@ class IORSLarge(SamplerV2):
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
-        for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm):
+        cands = [(ahead, lat, raise_m, False) for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm)]
+        if carry_centred_on():  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
+            lat_c = centred_hand_lateral(lift, eef_in_object, self.hull, left)
+            cands = [(a, lat_c, r, True) for a, r in CARRY_CENTRED_POSES] + cands
+        self._carry_centred_n = 0
+        for ahead, lat, raise_m, centred in cands:
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
@@ -3405,6 +3584,9 @@ class IORSLarge(SamplerV2):
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
+            if centred:
+                self._carry_centred_n += 1
+                TT._count(self, "carry_pose.centred_offered")
         log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.variant, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
@@ -3646,6 +3828,11 @@ class IORSLarge(SamplerV2):
             self.template_facts.setdefault("F_init_prescreen_arms", []).append([{a: len(F) for a, (_, F) in t[3].items()} for t in pre])
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.variant, len(pre), len(yaws), [t[0] for t in pre],
                  "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on stance B - the B candidates of a flagged (arm x trunk[, stand-off])
+        # pick bin move to the end of the order above (a Thompson draw keeps them in place, never below the floor; never removed). Memory off /
+        # nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*; provenance in B's extras)
+        k_pick = AM.reorder_pick(self, range(len(pre)), [t[1] for t in pre], lambda st: (list(getattr(st, "arms", None) or []) or [offered[0]])[0], rng)
+        pre = [pre[k] for k in k_pick]
         n_couple = int(self.num("b_candidates_max", 6))
         for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
             self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")
@@ -3872,12 +4059,15 @@ class IORSLarge(SamplerV2):
         eef = IK.grasp_pose(t_pose, g.pose)
         pre = IK.pre_pose(eef)
         kw = {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False}
-        res = self.ikc.exact([pre, eef], stance, arm, **kw)
-        pick = None
-        if twins and getattr(g, "name", None):
-            pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
-            res = pick.res
-            self._count_mirrored_ik(pick, bands)
+        # i7-interior2 2026-11-08 (owner 6.1): the support policy at the grasp's pre-shape (the oracle's descent opening), the twins included
+        count_pick_preshape(self, g, "segment_fallback")
+        with TT._policy_opening(self, g):
+            res = self.ikc.exact([pre, eef], stance, arm, **kw)
+            pick = None
+            if twins and getattr(g, "name", None):
+                pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
+                res = pick.res
+                self._count_mirrored_ik(pick, bands)
         opts = None
         if res.ok:
             opts, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), stance, arm, "B, segment fallback")
@@ -4549,7 +4739,8 @@ class IORSLarge(SamplerV2):
         grasp in B's image. ``(eef, pre, res, pick)`` or the reason it fails."""
         eef = IK.grasp_pose(obj_pose, g.pose)
         pre = IK.pre_pose(eef)
-        with self.ikc.ignoring([self.target]):
+        count_pick_preshape(self, g, "overhang")
+        with self.ikc.ignoring([self.target]), TT._policy_opening(self, g):  # i7-interior2 (owner 6.1): the policy at the pre-shape
             res = self.ikc.exact([pre, eef], st, arm, **kw)
             pick = None
             if twins and getattr(g, "name", None):
@@ -4600,7 +4791,7 @@ class IORSLarge(SamplerV2):
         self.sidecar.add_contact(rec)
         if sup is not None and self.surface.get("obj") is not None:
             self.sidecar.describe(sup, str(self.surface["obj"].category).replace("_", " "))  # the push's annotation names the support
-        opts = self.pick_overhang_opts() or {}
+        opts = self.pick_overhang_opts() or getattr(self, "_large_overhang_fallback_opts", None) or {}  # i7-interior2: the fallback's options
         c = self.choice.models["target"]
         role = (getattr(self.gp, "roles", None) or {}).get("target")
         tags = role.equivalence_tags(c.category, c.model) if role is not None and hasattr(role, "equivalence_tags") else []
@@ -5006,13 +5197,17 @@ class IORSLarge(SamplerV2):
                             continue
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
-                        res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                        if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
-                            pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
-                                                {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
-                                                support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
-                            res = pick.res
-                            self._count_mirrored_ik(pick, seg.bands)
+                        # i7-interior2 2026-11-08 (owner 6.1): the support policy measures the fingers at the grasp's pre-shape (pinch width / 2 + the
+                        # margin: the oracle's descent opening), as tabletop.grasp_at_pose since 11-06 - not fully open - for the row and its twins
+                        count_pick_preshape(self, g, "B")
+                        with TT._policy_opening(self, g):
+                            res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                            if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
+                                pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
+                                                    {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
+                                                    support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
+                                res = pick.res
+                                self._count_mirrored_ik(pick, seg.bands)
                         if res.ok:
                             arm_k = pick.arm if pick is not None else a0
                             st_k = pick.stance if pick is not None and pick.stance is not None else st_of.get(arm_k, st_of[a0])
@@ -5022,6 +5217,19 @@ class IORSLarge(SamplerV2):
                                 break
                             res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
                         why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
+                    ov_fallback = None
+                    if (res is not None and not res.ok) and ov_opts is None and large_overhang_fallback_on():
+                        # i7-interior2 2026-11-08 (owner 6.1): IORSSmall's overhang fallback for this pick - only for a reason no other stance /
+                        # position fixes (the support policy), with the overhang defaults in fallback mode
+                        from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+                        ov_fallback = OF.reason_class(str(res.reason))
+                        if ov_fallback is not None:
+                            TT._count(self, f"large_overhang_fallback.trigger.{ov_fallback}")
+                            TT._count(self, f"large_overhang_fallback.mode.{str((getattr(g, 'meta', None) or {}).get('mode') or 'none')}")
+                            ov_opts = dict(OH.options(True) or {})
+                            ov_opts["mode"] = "fallback"
+                            self._large_overhang_fallback_opts = ov_opts
                     if (res is None or not res.ok) and ov_opts is not None:
                         # owner 2026-10-13 ~03:15 item 4: the direct pick failed - push the object to B's support edge, grasp the overhang
                         key_ov = self._overhang_memo_key(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b)
@@ -5039,6 +5247,8 @@ class IORSLarge(SamplerV2):
                             if overhang is None and key_ov is not None:
                                 memo_ov[key_ov] = why_ov
                                 self._overhang_memo_persisted(key_ov, why_ov)
+                        if ov_fallback is not None:
+                            TT._count(self, "large_overhang_fallback." + ("found" if overhang is not None else "failed"))
                         if overhang is not None:
                             res, t_pose, eef, pre, pick, yaw = overhang["res"], overhang["t_pose"], overhang["eef"], overhang["pre"], overhang["pick"], yaw0
                             b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), overhang["grasp_stance"], overhang["arm"], "B, overhang")
@@ -5249,9 +5459,12 @@ class IORSLarge(SamplerV2):
                     grasp.carry_height = h
                     # carry pose candidates (beside the body first), the plain lift configuration last
                     options: List[Tuple[str, Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]]] = []
+                    self._carry_centred_n = 0
                     if str(self.gp.gen("carry_pose", "on")) != "off":
                         options += [(f"carry pose {[round(float(v), 2) for v in P0.to_base_frame(cp[0][0], manip.base_pose2d, P0.base_z(self)).tolist()]}", cp)
                                     for cp in self.carry_poses_at_b(pick_st, eef, h, target, g.pose)]
+                    n_centred = int(getattr(self, "_carry_centred_n", 0) or 0)  # the first n options are centred carry poses (CARRY_CENTRED_ENV)
+                    options = [(("centred " + lb) if i < n_centred else lb, cp) for i, (lb, cp) in enumerate(options)]
                     options.append(("lift configuration", None))
                     for label, cp in options:
                         if cp is not None:
@@ -5282,6 +5495,8 @@ class IORSLarge(SamplerV2):
                                 self.record_carry_arm_q(tname, arm, None)
                                 continue
                         log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                        if label.startswith("centred "):
+                            TT._count(self, "carry_pose.centred_used")
                         break
                     if path_bc is not None:
                         break

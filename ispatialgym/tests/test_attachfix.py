@@ -99,15 +99,22 @@ def test_attach_face_retreat_puts_the_fingers_inside_the_mating_face():
     assert CA.attach_face_retreat_m(hc, T2, q, [(m, face)], 0.001)[0] == pytest.approx(0.0, abs=1e-9)
 
 
-def test_the_two_switches_are_opt_in_and_enter_the_identity_only_when_on():
+def test_the_two_switches_are_the_default_and_enter_the_identity_only_when_on():
+    """i7-attachdef 2026-11-08 (owner 4.1): both default on for new builds after the count; a config without the fields (every entry built
+    before) reads them off, so its identity key is unchanged; an explicit False reproduces the build before the adoption."""
     from dataclasses import asdict
 
     from ispatialgym.grasping import candidates as CA
+    from ispatialgym.grasping import pipeline as PL
     from ispatialgym.grasping import schema as S
 
     sw = S.candidate_switches(asdict(CA.CandidateConfig()))
-    assert sw["outer_pinch"] is False and sw["attach_face_retreat"] is False
+    assert sw["outer_pinch"] is True and sw["attach_face_retreat"] is True
     assert "outer_pinch" in S.CANDIDATE_SWITCHES and "attach_face_retreat" in S.CANDIDATE_SWITCHES
+    old = {k: v for k, v in asdict(CA.CandidateConfig()).items() if k not in ("outer_pinch", "attach_face_retreat")}
+    assert S.candidate_switches(old)["outer_pinch"] is False and S.candidate_switches(old)["attach_face_retreat"] is False
+    cfg, _ = PL.candidate_overrides({"cand_overrides": {"outer_pinch": False, "attach_face_retreat": False}})
+    assert cfg.outer_pinch is False and cfg.attach_face_retreat is False
 
 
 # ------------------------------------------------------------------------------------------------ items 2b / 3 / 4: the world restore

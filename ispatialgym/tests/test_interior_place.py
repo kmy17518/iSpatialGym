@@ -192,3 +192,53 @@ def test_find_serves_a_place_lookup_from_a_place_map_only(tmp_path):
     assert RM.ReachMap.find(str(tmp_path), lib, sp.height_m, interior_place=IP.place_rule(pre="approach", drop_m=0.03), **ok) is None
     assert RM._map_meta_matches(place, "right", "interior", interior=sp.digest(), interior_place=rule)
     assert not RM._map_meta_matches(former, "right", "interior", interior=sp.digest(), interior_place=rule)
+
+
+# ------------------------------------------------------------------------------------------------------------------ the joint margin (owner 5x.2)
+
+
+def test_the_joint_margin_is_opt_in_and_in_the_identity_only_when_set():
+    """i7-interior2 2026-11-08 (owner 5x.2): ``joint_margin_rad`` is absent from the rule (so every existing key stays) unless set; set, it is
+    a rule field (the map key moves) that does not change which lookups the map serves."""
+    base = IP.place_rule(pre="outward", drop_m=0.03)
+    assert "joint_margin_rad" not in base and IP.place_rule(pre="outward", drop_m=0.03, joint_margin_rad=0.0) == base
+    on = IP.parse_rule('{"pre": "outward", "drop_m": 0.03, "joint_margin_rad": 0.05}')
+    assert on["joint_margin_rad"] == IP.EXACT_JOINT_MARGIN_RAD == 0.05 and {k: v for k, v in on.items() if k != "joint_margin_rad"} == base
+    assert IP.parse_rule(on) == on and IP.covers(on, base) is None and IP.covers(base, on) is None
+    with pytest.raises(ValueError):
+        IP.place_rule(joint_margin_rad=-0.01)
+    q = th.tensor([[0.0, 0.10, 1.0], [0.0, 0.04, 1.0]])
+    b = (th.tensor([1]), th.tensor([0.05]), th.tensor([0.15]))
+    assert IP.margin_ok(q, b).tolist() == [True, False] and IP.margin_ok(q, None).tolist() == [True, True]
+
+
+class MarginWorld(FakeWorld):
+    """The fake world with joint limits on the IK 'solution's 4th number (the eef's x: the fake q is the 3x4 [R | p]) - ``x_max_m`` up."""
+
+    x_max_m = 0.75
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.jidx = {f"right_arm_joint{i + 1}": i for i in range(12)}
+        lo, hi = th.full((12,), -10.0), th.full((12,), 10.0)
+        hi[3] = self.x_max_m
+        self.robot = SimpleNamespace(joint_lower_limits=lo, joint_upper_limits=hi)
+
+    def entry(self):
+        return SimpleNamespace(rsc=SimpleNamespace(joint_names=[f"right_arm_joint{i + 1}" for i in range(12)]))
+
+
+def test_the_joint_margin_drops_the_solutions_near_a_limit(fake):
+    """With the margin a (cell, yaw) stays feasible only where an IK solution keeps every working-arm joint the margin from its limits:
+    the release / pre-place x within ``x_max_m - margin`` here; without it the map is today's (the limits unread)."""
+    off_meta, arr, off = _place_map(fake, IP.place_rule(pre="outward", drop_m=0.03, laterals_m=[0.0]), MarginWorld)
+    on_meta, arr_on, on = _place_map(fake, IP.place_rule(pre="outward", drop_m=0.03, laterals_m=[0.0], joint_margin_rad=0.05), MarginWorld)
+    f_off, f_on = (off == RM.STATUS["feasible"]).any(axis=2), (on == RM.STATUS["feasible"]).any(axis=2)
+    cells = arr["cells"]
+    assert np.array_equal(cells, arr_on["cells"]) and f_on.any() and not (f_on & ~f_off).any()  # a subset
+    xs_off = cells[f_off.any(axis=1)][:, 0]
+    xs_on = cells[f_on.any(axis=1)][:, 0]
+    assert xs_off.max() > MarginWorld.x_max_m - 0.05 and xs_on.max() <= MarginWorld.x_max_m - 0.05 + 0.1  # the release's grasp offset aside
+    assert "joint_margin" not in off_meta and on_meta["joint_margin"]["rad"] == 0.05
+    assert on_meta["joint_margin"]["release_problems_lost"] + on_meta["joint_margin"]["pre_problems_lost"] > 0
+    assert on_meta["key"] != off_meta["key"] and on_meta["config"]["interior_place"]["joint_margin_rad"] == 0.05

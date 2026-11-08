@@ -620,6 +620,196 @@
     "joints_settled": {},
     "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
    }
+  },
+  "bookcase_opryhp_0@0.3722": {
+   "height_m": 0.3722,
+   "depth_m": 0.3521,
+   "width_m": 0.7213,
+   "headroom_m": 0.3301,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.7613,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.0015,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_opryhp_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_opryhp_0 raster edge +u at 0.3722 (requested 0.372 +- 0.03), 648 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.35916826128959656 / 0.3621046245098114, back ray 0.34210729598999023, moved links [], wall rim 0.32 vs headroom 0.3301 (open top False)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside, row touching#03~T6): the hardback acbrnv leaning on the left side board of opryhp_0's single 0.72 m bay at the 0.37 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh opryhp (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380823)"
+   }
+  },
+  "bookcase_otwukr_1@0.3888": {
+   "height_m": 0.3888,
+   "depth_m": 0.2811,
+   "width_m": 0.3032,
+   "headroom_m": 0.2875,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3432,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.1757,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_otwukr_1"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_otwukr_1 raster edge +u at 0.3888 (requested 0.389 +- 0.03), 450 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.16591551899909973 / 0.1372535526752472, back ray 0.2710510194301605, moved links [], wall rim 0.28 vs headroom 0.2875 (open top False), rays from the bay at lateral -0.190 m (raster cells -0.320 .. +0.320)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (row touching#03~T7): the hardback acbrnv leaning on a side board of one of otwukr_1's two bays at the 0.39 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh otw039m (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380825 (bay -0.19; bay +0.19: 18380824))",
+    "bay": "one spec per board (spec_for_support: support + height): the NARROWER of the two bays (measure --lateral -0.19: width 0.3032, centre_y -0.1757); the other bay (--lateral +0.19) measured width 0.3106, depth 0.2811, centre_y 0.1829 - a lean rest's compartment follows the cell (its lean-side wall), so only the far wall's distance differs (7.4-7.8 mm closer here). Without --lateral the rays start inside the 5 cm divider at the raster's centre: walls / back not found, width 0.66 (both bays), open back (otw039c, slurm 18380828)."
+   }
+  },
+  "bookcase_otwukr_1@0.7204": {
+   "height_m": 0.7204,
+   "depth_m": 0.2792,
+   "width_m": 0.3034,
+   "headroom_m": 0.2948,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3434,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.1756,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_otwukr_1"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_otwukr_1 raster edge +u at 0.7204 (requested 0.721 +- 0.03), 420 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.166135773062706 / 0.137253537774086, back ray 0.2691980004310608, moved links [], wall rim 0.28 vs headroom 0.2948 (open top False), rays from the bay at lateral -0.190 m (raster cells -0.320 .. +0.320)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (row touching#03~T8): the hardback acbrnv leaning on a side board of one of otwukr_1's two bays at the 0.72 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh otw072m (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380827 (bay -0.19; bay +0.19: 18380826))",
+    "bay": "one spec per board (spec_for_support: support + height): the NARROWER of the two bays (measure --lateral -0.19: width 0.3034, centre_y -0.1756); the other bay (--lateral +0.19) measured width 0.3112, depth 0.2792, centre_y 0.1829 - a lean rest's compartment follows the cell (its lean-side wall), so only the far wall's distance differs (7.4-7.8 mm closer here). Without --lateral the rays start inside the 5 cm divider at the raster's centre: walls / back not found, width 0.66 (both bays), open back (otw039c, slurm 18380828)."
+   }
+  },
+  "hall_tree_upkvgr_0@0.5809": {
+   "height_m": 0.5809,
+   "depth_m": 0.799,
+   "width_m": 1.4,
+   "headroom_m": 1.505,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 1.44,
+   "board_setback_m": 0.3047,
+   "back_thickness_m": 0.02,
+   "centre_y_m": 0.0,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.1,
+    0.2,
+    0.3
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_lower",
+     "hall_tree_upkvgr_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_lower/hall_tree_upkvgr_0 raster edge +u at 0.5809 (requested 0.580 +- 0.03), 1342 board cells, open edges ['+u', '-v'], front plane 0.3147 m out (static AABB overhang), wall rays None / 0.7048103213310242, back ray 0.474355548620224, moved links [], wall rim None vs headroom 1.5050 (open top False)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_large_02 (inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor, touching_place surface): the umbrella ziqzqo's goal board (customs inside_surface_z_m 0.58, stance side +x, inside_stand_offs_m 0.1/0.2/0.3); i7-goalmaps 2026-11-08, slurm 18379979 on trunk_fcddc495"
+   }
+  },
+  "drop_in_sink_awvzkn_0@basin": {
+   "height_m": 0.7316,
+   "depth_m": 0.4063,
+   "width_m": 0.2466,
+   "headroom_m": 1.505,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.2866,
+   "board_setback_m": 0.0801,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.0066,
+   "open_sides": [
+    "top"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "rim_m": 0.16,
+   "front_wall_x_m": 0.0713,
+   "open_top": true,
+   "supports": [
+    [
+     "house_single_floor",
+     "drop_in_sink_awvzkn_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_single_floor/drop_in_sink_awvzkn_0 raster edge +u at 0.7316 (requested 0.800 +- 0.25), 142 board cells, open edges [], front plane 0.0901 m out (static AABB overhang), wall rays 0.11670089513063431 / 0.1299097239971161, back ray 0.30616805866360663, moved links [], wall rim 0.16 vs headroom 1.5050 (open top True)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "i7-ft2 2026-11-08 (owner 7.2): the goal side of the plate-in-sink variants inside_large_scale-plate-drop_in_sink-bar / -countertop (plate luhkiz into drop_in_sink_awvzkn_0, house_single_floor kitchen_0; customs inside_surface_z_m 0.80 +- 0.25, inside_stance_side +y = the sampler's raster edge +u), as drop_in_sink_lkklqs_0@basin for inside_large_03",
+    "job": "$OFH/ft2_20261108/measure_awvzkn.sh, slurm 18377335 (trunk_fcddc495, interiors measure --side=+y)"
+   }
   }
  }
 }

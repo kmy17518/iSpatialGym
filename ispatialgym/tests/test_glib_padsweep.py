@@ -100,7 +100,10 @@ def test_generate_with_the_switch_passes_the_ring_top_grasps(tmp_path, monkeypat
     for on in (False, True):
         d = tmp_path / str(on)
         d.mkdir()
-        cfg = CA.CandidateConfig(**{**asdict(CA.CandidateConfig()), "sweep_from_preshape": on, "topk": 4, "cone_deg": 60.0})
+        # i7-attachdef: outer_pinch / attach_face_retreat (default on since 044715ef) pinned off - this test isolates the sweep switch on
+        # the one-wall pinches of the stub sampler (outer_pinch measures the ring from outside: a different pinch)
+        cfg = CA.CandidateConfig(**{**asdict(CA.CandidateConfig()), "sweep_from_preshape": on, "topk": 4, "cone_deg": 60.0,
+                                    "outer_pinch": False, "attach_face_retreat": False})
         out = CA.generate(job, str(d), cfg=cfg, densify=())
         logs[on] = out["log"]["top"]
         assert out["config"]["sweep_from_preshape"] is on and S.candidate_switches(out["config"])["sweep_from_preshape"] is on

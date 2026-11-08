@@ -1119,6 +1119,93 @@ PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert"
                     "": "floating", "attachment": "attachment", "a": "attachment", "handle_half": "floating", "h": "floating"}
 
 
+#: i7-tray 2026-11-08 (owner decision item 3, option b; disembedding_10's fork turned 12-14 deg in the hand at the close): with
+#: ``ISPATIALGYM_GRASP_TURN_FILTER`` on (DEFAULT since the owner decision 2026-11-08 5u.1; ``0`` / off = measured only, the pick before) the sampler skips a v2 library row whose recorded in-hand turn at the close (the
+#: slab validator's ``achieved.off_target_rad``, ``validation.json``) exceeds the orientation tolerance of the task using it (the isg-v2
+#: profile: ``small`` 0.10 / ``large`` 0.15 rad, the customs ``evaluation.tolerances.pose.orientation`` override first; a ``micro`` target's
+#: tolerance depends on the instance and a task without a pose target has none: unchanged). No library gate changes, nothing is rebuilt.
+#: Counters ``grasp.off_target_filtered`` / ``.<entry>.<task>`` (on) and ``grasp.off_target_would_filter`` (off: measured only).
+TURN_FILTER_SWITCH = "ISPATIALGYM_GRASP_TURN_FILTER"
+
+
+def turn_filter_on() -> bool:
+    """On by default (owner decision 2026-11-08 5u.1: A/B disembedding_10 off 12 / 4 / 0, on 14 / 4 / 4); ``0`` / off / false / no turns it off."""
+    return os.environ.get(TURN_FILTER_SWITCH, "1").strip().lower() not in ("0", "off", "false", "no")
+
+
+def grasp_turn_tolerance(variant: str) -> Optional[float]:
+    """The orientation tolerance (rad) of the grasped target's pose in an instance of ``variant`` (``ispatialgym.eval.tolerance_profile``:
+    a group pose for attachment / block_design, else a pose target), None where the profile gives none fixed at sampling time (``micro``,
+    or no rule for the target)."""
+    from ispatialgym.eval import tolerance_profile as TPR
+
+    try:
+        _fam, task = TPR.family_task(variant)
+        kind = "group_pose" if task in ("attachment", "block_design") else "pose"
+        group = TPR.scale_group(variant, kind)
+    except TPR.ToleranceProfileError:
+        return None
+    tol = (TPR.FIXED_TOLERANCES.get(group) or {}).get("orientation")
+    if tol is None:
+        return None
+    try:
+        ov = (TPR.overrides_for(variant).get("pose") or {}).get("orientation")
+    except Exception:  # noqa: BLE001 - a customs file without the entry: the profile's value
+        ov = None
+    return float(ov) if ov else float(tol)
+
+
+def recorded_turns(lib) -> Dict[str, float]:
+    """``{row name: off_target_rad}`` of the VALID trials in the entry's ``validation.json`` (next to its ``library.json``); empty when the
+    file or the measure is absent."""
+    path = os.path.join(os.path.dirname(str(getattr(lib, "path", "") or "")), "validation.json")
+    try:
+        with open(path) as f:
+            v = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for t in v.get("trials", []) or []:
+        r = (t.get("achieved") or {}).get("off_target_rad")
+        if t.get("verdict") == "valid" and r is not None:
+            out[str(t.get("candidate"))] = float(r)
+    return out
+
+
+def filter_by_turn(s, grasps: List[Any], lib, key: str) -> List[Any]:
+    """:data:`TURN_FILTER_SWITCH`: ``grasps`` without the rows whose recorded in-hand turn exceeds the task's tolerance
+    (:func:`grasp_turn_tolerance`); measured (counted, logged) with the switch off and returned unchanged then.
+    ``Reject("grasps_off_target")`` when the filter would leave no row."""
+    variant = str(getattr(getattr(s, "gp", None), "variant", "") or "")
+    tol = grasp_turn_tolerance(variant)
+    if tol is None or lib is None:
+        return grasps
+    turns = recorded_turns(lib)
+    over = [g for g in grasps if turns.get(str(getattr(g, "name", ""))) is not None and turns[str(g.name)] > tol + 1e-9]
+    if not over:
+        return grasps
+    entry = os.path.basename(os.path.dirname(str(getattr(lib, "path", "") or ""))) or key
+    try:
+        from ispatialgym.eval import tolerance_profile as TPR
+
+        fam, task = TPR.family_task(variant)
+        task = fam if fam == "disembedding" else task  # disembedding-<target>-...: the family is the task
+    except Exception:  # noqa: BLE001
+        task = "?"
+    on = turn_filter_on()
+    log.info("GRASP_TURN_FILTER (%s) %s for %s (tolerance %.3f rad): %s", "on" if on else "off: measured only", entry, task, tol,
+             ", ".join(f"{g.name} {turns[str(g.name)]:.3f} rad" for g in over))
+    if not on:
+        _countn(s, "grasp.off_target_would_filter", len(over))
+        return grasps
+    kept = [g for g in grasps if g not in over]
+    _countn(s, "grasp.off_target_filtered", len(over))
+    _countn(s, f"grasp.off_target_filtered.{entry}.{task}", len(over))
+    if not kept:
+        _reject("grasps_off_target", f"{key}: every row turns in the hand beyond the task's {tol:.3f} rad ({[g.name for g in over]})")
+    return kept
+
+
 def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False,
                    overhang: bool = False):
     """``(grasps, key, rest_quat)`` of the role's model for the pipeline the customs entry requires (``roles.<role>.
@@ -1155,6 +1242,7 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
             log.info("V2_SCALE_MISMATCH %s/%s (%s): spawned %s, entry %s", choice.category, choice.model, key, spawn, lib.scale)
             if GL.v2_only():
                 _reject("v2_scale_mismatch", f"{key}: spawned at {spawn}, v2 entry {os.path.basename(os.path.dirname(lib.path))} at {lib.scale}")
+        grasps = filter_by_turn(s, grasps, lib, key)  # i7-tray: the in-hand turn vs the task's pose tolerance (default off)
     try:
         rest = C.rest_quat(key)
     except FileNotFoundError:
@@ -1446,6 +1534,8 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     why = IN.live_mismatch(ispec, top, floor_z, joints=joints)
     if why is not None:
         miss(f"the live interior is not {ispec.name}: {why}")
+    if IN.front_side_on() and IN.open_sides_case(list(getattr(top, "open_edges", None) or [])) == "front_side":
+        _count(s, "interior_open_sides.front_side")  # i7-goalmaps (owner 5c.2): the switch's case served this lookup
     if not map_sampling_root():
         miss("no maps root (ISPATIALGYM_REACH_MAPS)")
     root = os.path.join(map_sampling_root(), entry)
@@ -1813,10 +1903,10 @@ def need_contact_map(s, kind: str, role: str, top, *, arm: Optional[str] = None)
     _reject("missing_map", f"no {kind} contact map of the {role} at {getattr(top, 'name', '?')}'s height (MAP_REQUEST logged): {CONTACT_MAP_REQUIRED.get(kind, 'required')}")
 
 
-def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06) -> Dict[str, Any]:
+def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float = 0.06, tilt_read: str = "nearest") -> Dict[str, Any]:
     """``ContactMap.lookup`` at ``stance`` for the object at ``pose`` (world): its ROOT xy in the base frame, its yaw from the stance (about z,
     over the rest the map's entries stand on: ``meta["entry_rest_quat_xyzw"]``), the stance's stand-off and trunk; ``tol`` the in-band
-    distance of a point to a cell (``stances.BAND_CELL_TOL``)."""
+    distance of a point to a cell (``stances.BAND_CELL_TOL``); ``tilt_read``: ``ContactMap.lookup``'s (i7-axialrest 5y fix: "intersection")."""
     from ispatialgym.sampling import contact_maps as CMAP
 
     xy = stance.world_to_base(_t(pose[0])[:2])
@@ -1824,7 +1914,7 @@ def contact_map_check(cm, stance: Stance, pose: Pose, *, keep=None, tol: float =
     yaw = C.wrap_angle(CMAP.yaw_of([float(v) for v in _t(pose[1]).tolist()], rest) - float(stance.base_pose2d[2]))
     so = getattr(stance, "stand_off", None)
     return cm.lookup(float(so) if so is not None else min(cm.meta["edge_distances"]), float(stance.translate), float(stance.tilt),
-                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol)
+                     [float(v) for v in xy.tolist()], float(yaw), keep=keep, tol=tol, **({"tilt_read": tilt_read} if tilt_read != "nearest" else {}))
 
 
 def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, lattice: float = RB.LATTICE, out_dir: Optional[str] = None,
@@ -2800,8 +2890,8 @@ class BraceRecord(ContactRecord):
 #: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
 #: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`).
 #: i7-contactbrace 2026-11-08: the ONE definition of the switch - the touching wide stop (``contact_poses.brace_wide_spreads``: the full-open
-#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``), the pack brace (``block_design.pack_brace_opening``)
-#: and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
+#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``) (the block design pack brace was removed with the
+#: packing tail, owner 2026-11-08 3.7) and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
 BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
 BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
 #: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
@@ -3190,10 +3280,22 @@ def gen_edges(s) -> List[str]:
     return [str(e) for e in edges or []]
 
 
+def all_edges_on() -> bool:
+    """i7-startdraw 5o (owner 2026-11-08, the 3.5 rule "templates should never fix the robot's start base"): ``ISPATIALGYM_ALL_EDGES=1``
+    makes Phase 1a (:func:`edge_frames`) ignore BOTH per-template edge restrictions - the support row's ``edges`` (:func:`row_edges`) and
+    ``generation.init_edges`` (:func:`gen_edges`) - so every edge of the top is offered and the existing checks decide (free floor,
+    whole-body collision, Phase 1b / 1c, the family's frame rules, the eval-repeat check). An interior surface's open sides
+    (``top.open_edges``) are geometry, not a template pin, and still apply. Kit counters (only when a restriction was ignored):
+    ``start_edges.row_ignored`` / ``start_edges.gen_ignored``. DEFAULT ON since 2026-11-08 (lead decision 12 while the owner was away,
+    tmp/outputs/lead_decisions_while_away.md; the A/B in $OFH/startdraw_20261108: it acts only on block design's init_edges, adding the -v
+    end with no rejection growth): unset = on; ``ISPATIALGYM_ALL_EDGES=0`` restores both restrictions."""
+    return os.environ.get("ISPATIALGYM_ALL_EDGES", "1") != "0"
+
+
 def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[EdgeFrame, Stance]]:
     """Every edge of the top (random order with ``rng``) with its stance at ``stand_off`` + overhang (>= 5 cm), trunk
     (0.5, 0) — before the floor / collision checks of Phase 1a. A support row naming ``edges`` (:func:`row_edges`) keeps only those,
-    and ``generation.init_edges`` (:func:`gen_edges`) those of them it names."""
+    and ``generation.init_edges`` (:func:`gen_edges`) those of them it names - both ignored under :func:`all_edges_on`."""
     support = s.world.obj(top.name)
     lo, hi = support.aabb
     aabb_xy = th.tensor([[float(lo[0] if sx == 0 else hi[0]), float(lo[1] if sy == 0 else hi[1])] for sx in (0, 1) for sy in (0, 1)])
@@ -3202,10 +3304,18 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     if open_edges:  # an interior surface is reached through the open sides of its compartment only
         edges = [e for e in edges if e[0] in open_edges]
     keep = row_edges(s, top)
+    keep_gen = gen_edges(s)
+    if all_edges_on() and (keep or keep_gen):
+        log.info("phase 1a: ISPATIALGYM_ALL_EDGES ignores the support row's edge(s) %s and generation.init_edges %s: every edge of %s offered",
+                 keep or "-", keep_gen or "-", [e[0] for e in edges])
+        if keep:
+            _count(s, "start_edges.row_ignored")
+        if keep_gen:
+            _count(s, "start_edges.gen_ignored")
+        keep, keep_gen = [], []
     if keep:
         log.info("phase 1a: the support row keeps edge(s) %s of %s", keep, [e[0] for e in edges])
         edges = [e for e in edges if e[0] in keep]
-    keep_gen = gen_edges(s)
     if keep_gen:
         log.info("phase 1a: generation.init_edges keeps edge(s) %s of %s", keep_gen, [e[0] for e in edges])
         edges = [e for e in edges if e[0] in keep_gen]
@@ -3447,6 +3557,17 @@ def tilt_scan(fk: CameraFK, translate: float, n: int = N_TILT_SAMPLES) -> List[f
     """§4.5 "tilt continuous from 0 to the torso_joint3 limit": ``n`` samples from 0 down to the limit at ``translate``."""
     lim = fk.tilt_limit(translate)
     return [float(v) for v in np.linspace(0.0, lim, int(n)).tolist()]
+
+
+def phase2_tilts(s, fk: CameraFK, translate: float, n: int = N_TILT_SAMPLES) -> List[float]:
+    """Phase 2's trunk tilts at ``translate``: :func:`tilt_scan`, unless the sampler's ``phase2_built_tilts(translate, limit)`` (a task's
+    opt-in, e.g. iors_small's ``ISPATIALGYM_TOUCH_BUILT_TILTS``) names the tilts - then those (None from the hook: the scan)."""
+    hook = getattr(s, "phase2_built_tilts", None)
+    if callable(hook):
+        tilts = hook(float(translate), float(fk.tilt_limit(translate)))
+        if isinstance(tilts, (list, tuple)) and tilts:
+            return [float(v) for v in tilts]
+    return tilt_scan(fk, translate, n)
 
 
 def default_in_frame(s, stance: Stance, cam: Pose, focus: th.Tensor, info: Any, half_extent: float, height: float, margin: float) -> bool:
@@ -3758,7 +3879,7 @@ def _phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, t
         if not s.kit.trav_free(base.base_xy):
             continue
         for tr in translates:
-            for ti in tilt_scan(fk, float(tr), n_tilts):
+            for ti in phase2_tilts(s, fk, float(tr), n_tilts):
                 cands.append(base.with_trunk(float(tr), float(ti), "manipulation"))
     if not cands:
         return []
@@ -3908,7 +4029,7 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
                 continue
             base.extras["lateral_shift_m"] = float(shift)
             for tr in translates:
-                for ti in tilt_scan(fk, float(tr), n_tilts):
+                for ti in phase2_tilts(s, fk, float(tr), n_tilts):
                     cands.append(base.with_trunk(float(tr), float(ti), "manipulation"))
     if cands:
         free = s.ikc.stances_collision_free(cands)
@@ -4098,6 +4219,35 @@ def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
     return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
 
 
+def camera_top_rescued(s, eef: Pose, plane_z: float, arm: str, clearance: float) -> bool:
+    """i7-camhull 2026-11-08 (``ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK``, default off; lead decision #6): the support-top screen refused the
+    wrist camera (``clearance`` < :data:`TWIN_CAMERA_CLEARANCE_M` above ``plane_z``) - True when the side_9 two-step passes it
+    (``IKChecker.camera_top_fallback``: a narrow refusal, the camera hull >= 0.5 mm above the plane) and the switch is ``1``; ``shadow``
+    judges and counts, False; off: False, nothing judged."""
+    mode = _ik().camera_top_hull_fallback_mode()
+    if mode == "off":
+        return False
+    fn = getattr(getattr(s, "ikc", None), "camera_top_fallback", None)
+    if fn is None:
+        return False
+    try:
+        out = fn(eef, float(plane_z), arm, float(clearance), TWIN_CAMERA_CLEARANCE_M, mode)
+    except Exception as e:  # noqa: BLE001 - the fallback never turns a refusal into an error
+        log.warning("camera_top_rescued: %r", e)
+        _count(s, "camera_policy.top_screen.error")
+        return False
+    return bool(out.get("ok")) and mode == "on"
+
+
+def camera_top_clear(s, eef: Pose, plane_z: float, arm: str) -> bool:
+    """The wrist camera's support-top screen: ``wrist_camera_clearance(eef, plane_z) >= TWIN_CAMERA_CLEARANCE_M``, or a narrow refusal
+    passed by :func:`camera_top_rescued` (i7-camhull, ``ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK``; off: the screen alone, as before)."""
+    cam = wrist_camera_clearance(eef, plane_z)
+    if cam < TWIN_CAMERA_CLEARANCE_M:
+        return camera_top_rescued(s, eef, plane_z, arm, cam)
+    return True
+
+
 @dataclass
 class TwinPick:
     """What :func:`pick_twin` chose. ``twin``: the recorded eef is the row's twin; ``grasp``: the library row or
@@ -4207,7 +4357,7 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
         if not r.ok or r.q is None:
             return False, r, None, str(r.reason)
         cam = None if support_z is None else wrist_camera_clearance(p.chain[-1], float(support_z))
-        if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
+        if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M and not camera_top_rescued(s, p.chain[-1], float(support_z), a, cam):  # i7-camhull
             return False, r, None, f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
         if accept is not None and not bool(accept(_t(r.q))):
             return False, r, None, "fails the caller's check"

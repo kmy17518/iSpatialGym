@@ -26,18 +26,18 @@ records, flip waypoints).
 
 from __future__ import annotations
 
-import copy
 import itertools
 import json
 import logging
 import math
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.sim_utils import Reject
@@ -45,13 +45,58 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
+from ispatialgym.sampling.v2.tasks import block_design_diag as BDD
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_from_sidecar, pose_to_sidecar
 
 from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling.v2")
+
+
+def board_search_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_SEARCH`` (default on, owner 5m.2), the board variant only:
+    (1) the manipulation candidates on whose region some board position passes the CPU tests (on the top, cells kept, the repeated-colour
+    flip set; the list, then the grid) are tried first, in score order, the others after (:meth:`BlockDesign._board_feasible`) - today
+    the 6 tried were all at stand-off 0.45 where the list's near positions are off the top, the stand-off 0.35 ones ranked 7+;
+    (2) when no position of ``generation.board_base_xy_candidates`` works, a grid of (base depth, lateral) positions
+    (:meth:`BlockDesign._board_grid`), the CPU tests before each exact place probe, at most ``generation.board_grid_max_probes`` probes
+    per candidate. Default ON since 2026-11-08 (owner 5m.2); ``0``: the score order and the list alone."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_SEARCH", "1") == "1"
+
+
+#: BD_BOARD_SEARCH: base depths / laterals (m) of the board grid, and the stand-off the customs positions were set for
+BOARD_GRID_DEPTHS = tuple(round(0.45 + 0.03 * i, 2) for i in range(8))  # 0.45 .. 0.66
+BOARD_GRID_LATERALS = tuple(round(-0.22 + 0.04 * i, 2) for i in range(8))  # -0.22 .. +0.06
+BOARD_LIST_STAND_OFF = 0.35
+
+
+def board_table_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 5m "Board positions"), ``ISPATIALGYM_BD_BOARD_TABLE=1`` (default off), board variants only: the
+    board positions are defined relative to the TABLE and filtered per candidate stance (:meth:`BlockDesign._board_table_plan`), instead
+    of the hand-set base-relative ``generation.board_base_xy_candidates`` (tuned at stand-off ``BOARD_LIST_STAND_OFF``; at 0.45 the near
+    ones fall off the top) and BD_BOARD_SEARCH's base-relative grid. A position is (inset of the board centre from the working edge,
+    lateral from the stance's centre line): the depth is the table's (it holds at every stand-off), the lateral the robot's (the right
+    arm's reach and the flip approaches are set by the centre line, ``_board_position_note``). The listed positions
+    (``generation.board_table_xy_candidates``, else the base list at the stand-off it was set for) come first, then, with
+    BD_BOARD_SEARCH, the table lattice (``BOARD_TABLE_INSETS`` x ``BOARD_GRID_LATERALS``); per stance only those on the top and with
+    the board centre in the base-depth reach window ``generation.board_table_depth_window_m`` are kept. Off: the list (+ the grid).
+    The init's flip-room move (:meth:`BlockDesign._board_fit`) keeps the base list either way (5o.1, i7-startdraw, owns that range)."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_TABLE", "0") == "1"
+
+
+#: BD_BOARD_TABLE: the table lattice's board-centre insets from the working edge (m; on the top from half plate + 1 cm = 0.055) and the
+#: base-depth window of the board centre a stance keeps (the list's nearest 0.44 at stand-off 0.35 .. BD_BOARD_SEARCH's farthest 0.66)
+BOARD_TABLE_INSETS = tuple(round(0.06 + 0.03 * i, 2) for i in range(9))  # 0.06 .. 0.30
+BOARD_TABLE_DEPTH_WINDOW = (0.40, 0.66)
+
+
+def board_early_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY`` (default on, owner 5m.2; ``0`` = off): the puzzle board's CPU checks
+    (on the top, cells kept, the repeated-colour flip set) run before the init -> manipulation travel and before the exact place probe,
+    and the probe's verdict per (stance, board pose) is kept for the process (the template's stances repeat every attempt)."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_EARLY", "1") == "1"
 
 SUBTASK = "configuration_matching-block_design"
 DEFAULT_FACES = {"+z": "red", "-z": "blue", "+x": "white", "-x": "yellow", "+y": "blue|yellow", "-y": "red|white"}
@@ -60,25 +105,6 @@ CONTACT_TILT_DEG = 30.0
 #: closed fingers beside a cube face: the measured profile's fingertip section (``tabletop.FINGER_PROFILE``; the region
 #: spacing and the brace-point band test use it, the blade poses take the profile over the face height)
 FINGER_HALF_THICKNESS = TT.FINGER_PROFILE[0][1]
-#: a FULL-open pack brace (``ISPATIALGYM_BRACE_FULL_OPEN``): the braced cubes' face kept beyond each open finger's outer side (m; the
-#: toy dice's rounded edges)
-PACK_BRACE_END_MARGIN_M = 0.005
-
-
-def pack_brace_opening(spread: float, face_half_m: Optional[float] = None) -> float:
-    """The per-finger opening of the packing tail's wide brace (``fingers_opening_m``). Switch off: each finger's centre line (pad face +
-    half the 8.4 mm finger) on a braced cube's centre - ``spread / 2 - FINGER_HALF_THICKNESS / 2`` for the end cubes' centres ``spread``
-    apart, capped at full open; 0 (a closed blade, not an open brace) for one braced cube. On (owner 2026-11-07,
-    :func:`tabletop.brace_opening`): an open brace opens fully unless the braced faces cannot take it - each finger's outer side
-    (``FINGER_HALF_THICKNESS`` beyond its pad face) :data:`PACK_BRACE_END_MARGIN_M` inside ``face_half_m``, the braced cubes' half extent
-    along the closing axis about their mid point - never narrower than the off value (the fingers on the cubes' centres)."""
-    q_today = max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
-    if q_today <= 0.0 or face_half_m is None:
-        return q_today
-    room = float(face_half_m) - FINGER_HALF_THICKNESS - PACK_BRACE_END_MARGIN_M
-    return TT.brace_opening(q_today, room=max(q_today, room))
-
-
 #: the place puts the block this far right and toward the robot of its slot; the pushes close the margin (§6.2 "small safety margin")
 PLACE_MARGIN = 0.003  # was 5 mm: with a 1 cm slot tolerance the 7 mm diagonal release offset left 3 mm for everything else (0919-183037: 1.20 cm)
 #: the oracle's retreat after a release: the ``Place`` action's own 10 cm leg (actions.RETREAT_DIST) followed by the program's
@@ -142,6 +168,13 @@ FLIP_CELL_MAX_LATERAL = -0.10
 FLIP_CELL_MIN_EDGE_DEPTH = 0.10  # 0.22 (0919-090517 / 091857) left every region with a single flip cell; the pool's 0.40 / 0.50 stand-offs put the 13 cm cell at the proven base depth
 #: step (m) of the flip-room move of the init along the edge when the minimum move leaves the board off the top (owner 2026-10-12)
 FLIP_ROOM_STEP = 0.01
+
+
+def flip_room_draw_on() -> bool:
+    """i7-startdraw 5o.1 (owner 2026-11-08, the 3.5 rule): ``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1`` makes the flip-room rule
+    (:meth:`BlockDesign._init_with_room_for_flips`) draw the init lateral from the whole range that keeps the flip room
+    (:meth:`BlockDesign._flip_room_draw`) instead of moving every draw to one point. Default off."""
+    return os.environ.get("ISPATIALGYM_BD_FLIP_ROOM_DRAW", "0") not in ("", "0")
 #: the puzzle board's (base depth, lateral) positions of the manipulation stance when the variant has no ``board_base_xy_candidates``
 BOARD_BASE_XY = ((0.46, -0.02), (0.44, -0.10), (0.50, 0.04), (0.60, 0.05))
 #: head-camera margin (fraction of the image) of the fingertips along the chain (the oracle's FOV monitor uses 5 %)
@@ -182,6 +215,8 @@ def flip_tip_clearance(lean_deg: float) -> float:
 
 @register(SUBTASK)
 class BlockDesign(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
@@ -238,6 +273,11 @@ class BlockDesign(SamplerV2):
         return [b.name for b in self.bindings.many(self.role)]
 
     def sample_template(self):
+        if bool(self.gen("block_pack_tail", False)):
+            # owner 2026-11-08 (3.7, i7-contact3): the packing tail (the wide pack brace + its pushes) is removed; the block design uses the
+            # board variant (block_4-breakfast_table_board: the pockets seat the blocks, no packing)
+            raise Reject("spec", "generation.block_pack_tail: the packing tail (pack brace) was removed (owner 2026-11-08 3.7) - the block design "
+                                 "uses the board variant")
         blocks = self.objs(self.role)
         if len(blocks) != self.n_blocks():
             raise Reject("spec", f"{len(blocks)} blocks for a {self.g('grid')} grid")
@@ -259,8 +299,24 @@ class BlockDesign(SamplerV2):
         self.band_spec = TT.BandSpec(object=f"{choice.category}/{choice.model}", grasp_key=None, grasps=None, hull=self.hull, rest_quat=C.IDENTITY_QUAT.clone(),
                                      scale=list(choice.scale) if choice.scale else None, generic_pinch=True, height=self.edge)
         margins = {"kind": "block_design", "edge": self.edge, "block_gap": float(self.g("block_gap_m")), "safety": 0.02, "H_max": self.edge}
+        self._start_margins = margins
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
+                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
+        if getattr(self, "_flip_room", None) is not None:
+            self.template_facts["init_flip_room_move"] = self._flip_room
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2
+        survivors: free floor, whole-body collision-free), the init trunk (Phase 1b), the lateral (Phase 1c: floor, collision, trunk sweep)
+        moved for the flips' room, the Phase-2 region survivors (scanned at the manipulation lateral shifts, the shallow trunks kept when
+        no flip is expected). Sets ``edge_frame`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes;
+        failures go to ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
@@ -270,7 +326,7 @@ class BlockDesign(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
-                init = self._init_with_room_for_flips(init)
+                init = self._init_with_room_for_flips(init, rng)
                 # D-009 shape for blocks (default = the tabletop classes, 20 / 30 deg since owner 2026-10-11): with the region depth
                 # caps (init cells <= 0.80 m, slots <= 0.70 m) a 20 deg cone at the arm-friendly trunks (0.5, -0.3..-0.45) meets the
                 # top beyond the caps and only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16),
@@ -308,17 +364,23 @@ class BlockDesign(SamplerV2):
                 if shallow and not self._flips_expected():
                     cands = shallow
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
-                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
-        if getattr(self, "_flip_room", None) is not None:
-            self.template_facts["init_flip_room_move"] = self._flip_room
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge, init stance (with the flips' room) and
+        Phase-2 region pool from the attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it makes.
+        Off: the template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        if not self._start_search(rng, self._start_margins, errors):
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates,
+                                      flip_room_move_m=(getattr(self, "_flip_room", None) or {}).get("move_m"))
 
     # -- Phase 2 hooks (§4.5 blocks) --------------------------------------------------------------------------------
 
@@ -436,7 +498,7 @@ class BlockDesign(SamplerV2):
                     shifts.append(s)
         return shifts
 
-    def _init_with_room_for_flips(self, init: Stance) -> Stance:
+    def _init_with_room_for_flips(self, init: Stance, rng: Optional[np.random.Generator] = None) -> Stance:
         """Phase 1c draws the init lateral anywhere in its admissible range; with right-facing flips the manipulation
         stance must stand ``manip_lateral_shifts_m[0]`` further left, so an init drawn too far left is moved right along the
         edge (same trunk / stand-off) until that shift fits the range (the in-frame / visibility / collision checks of the
@@ -448,7 +510,11 @@ class BlockDesign(SamplerV2):
         the positions that stand-off 0.55 leaves on the top by depth are off its end (s3 c1_k1: every attempt). An init whose
         shift fits the range but whose manipulation stance has a stand-off without a position on the top is searched the same way
         from its drawn lateral (and kept when no move gives more stand-offs). The drawn and the moved lateral, the reason and the
-        board fit go to ``template_facts.init_flip_room_move``."""
+        board fit go to ``template_facts.init_flip_room_move``.
+
+        Under :func:`flip_room_draw_on` (``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1``, i7-startdraw 5o.1) with an ``rng``, the init lateral is DRAWN
+        instead (:meth:`_flip_room_draw`): uniformly among the laterals of the whole range that keeps the flip room, with the most board
+        stand-offs, in place of the one point the move above lands on."""
         self._flip_room = None
         if not (self._flips_expected() and self._flip_directions()[0] in ("right", "left")):
             return init
@@ -458,6 +524,10 @@ class BlockDesign(SamplerV2):
         sign = 1.0 if self._flip_directions()[0] == "right" else -1.0
         need = sign * abs(float((self.gen("manip_lateral_shifts_m", None) or (0.35, 0.45, 0.25))[0]))
         lo, hi = float(bounds[0]), float(bounds[1])
+        if rng is not None and flip_room_draw_on():
+            drawn = self._flip_room_draw(init, rng, need, lo, hi)
+            if drawn is not None:
+                return drawn
         target = float(init.lateral) + need
         excess = (target - hi) if target > hi else ((lo - target) if target < lo else 0.0)
         half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
@@ -518,9 +588,137 @@ class BlockDesign(SamplerV2):
                  -sign * m, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)], "" if half is None else f"; board on the top: {fit} ({reason})")
         return moved
 
+    def _flip_room_draw(self, init: Stance, rng: np.random.Generator, need: float, lo: float, hi: float) -> Optional[Stance]:
+        """i7-startdraw 5o.1 (owner 2026-11-08): the init lateral drawn from the WHOLE range that keeps the flip room - every lateral
+        ``L`` of ``[lo, hi]`` (``FLIP_ROOM_STEP`` grid, the drawn lateral included) whose manipulation stance ``L + need`` stays inside
+        ``[lo, hi]``, whose base is on the free floor (:meth:`_shifted_along_edge`), and, with a puzzle board, whose manipulation stance
+        has a board position on the top at the most Phase 2 stand-offs (:meth:`_board_fit`, as the move) - uniformly with ``rng``.
+        The instance's in-frame / visibility / collision checks validate it as they validate the moved init. None (the move as
+        before) when that range is empty or no lateral of it is on the floor. Kit counters ``bd_flip_room_draw.drawn`` /
+        ``.no_range`` / ``.no_floor``; the record (``n_admissible``, the admissible lateral span) goes to ``_flip_room``."""
+        half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
+        lmin, lmax = max(lo, lo - need), min(hi, hi - need)
+        if lmax < lmin - 1e-9:
+            TT._count(self, "bd_flip_room_draw.no_range")
+            return None
+        n = int(math.floor((lmax - lmin) / FLIP_ROOM_STEP + 1e-9))
+        lats = sorted({round(lmin + k * FLIP_ROOM_STEP, 4) for k in range(n + 1)} | {round(lmax, 4)}
+                      | ({round(float(init.lateral), 4)} if lmin - 1e-9 <= float(init.lateral) <= lmax + 1e-9 else set()))
+        scored = []
+        for lat in lats:
+            shift = lat - float(init.lateral)
+            cand = init if abs(shift) < 1e-9 else self._shifted_along_edge(init, shift, "init")
+            if cand is None:
+                continue
+            fit = self._board_fit(cand, need, half) if half is not None else {}
+            scored.append((sum(1 for v in fit.values() if v), lat, shift, cand, fit))
+        if not scored:
+            TT._count(self, "bd_flip_room_draw.no_floor")
+            return None
+        best = max(sc[0] for sc in scored)
+        pool = [sc for sc in scored if sc[0] == best]
+        n_fit, lat, shift, cand, fit = pool[int(rng.integers(len(pool)))]
+        if cand is not init:
+            cand.extras.update(init.extras)
+            cand.extras["flip_room_shift_m"] = float(shift)
+        TT._count(self, "bd_flip_room_draw.drawn")
+        span = [round(min(sc[1] for sc in pool), 4), round(max(sc[1] for sc in pool), 4)]
+        self._flip_room = {"lateral_drawn": round(float(init.lateral), 4), "lateral_bounds": [round(lo, 4), round(hi, 4)], "manipulation_shift_m": need,
+                           "lateral": round(float(cand.lateral), 4), "move_m": round(float(cand.lateral - init.lateral), 4),
+                           "draw": {"n_admissible": len(pool), "n_on_floor": len(scored), "flip_room_range": [round(lmin, 4), round(lmax, 4)],
+                                    "admissible_span": span, "board_stand_offs": n_fit if half is not None else None},
+                           "reason": f"flip-room draw: lateral {lat:.2f} of {len(pool)} admissible in {span} (range keeping the {need:+.2f} m shift "
+                                     f"[{lmin:.2f}, {lmax:.2f}]" + (f", board on the top at {n_fit} of {len(TT.STAND_OFFS)} stand-offs)" if half is not None else ")"),
+                           **({"board_fit": fit} if half is not None else {})}
+        log.info("%s: %s (drawn by Phase 1c at %.2f)", self.gp.variant, self._flip_room["reason"], init.lateral)
+        return cand
+
     def _board_positions(self) -> List[Tuple[float, float]]:
         """``generation.board_base_xy_candidates``: the board centre's (base depth, lateral) at the manipulation stance, in order."""
         return [(float(d), float(l)) for d, l in (self.gen("board_base_xy_candidates", None) or BOARD_BASE_XY)]
+
+    def _board_grid(self, manip: Stance) -> List[Tuple[float, float]]:
+        """BD_BOARD_SEARCH: the grid positions not in the list, nearest first to the list's first position on the top at ``manip`` (else to
+        the list's first position moved by the stance's stand-off beyond ``BOARD_LIST_STAND_OFF``: the same distance from the edge); ties
+        to the robot's right first (bd_diag2: from the tall 0.95 trunk the place probe passes only right of the base, near the edge)."""
+        positions = self._board_positions()
+        listed = {(round(d, 3), round(l, 3)) for d, l in positions}
+        ref = None
+        if self.top is not None:
+            right, toward, _ = self._table_axes(manip)
+            half = 0.5 * float(self._board_geometry()["plate_m"])
+            ref = next(((d, l) for d, l in positions if self._board_on_top(manip, d, l, half, right, -toward)), None)
+        if ref is None:
+            so = float(manip.stand_off) if manip.stand_off is not None else BOARD_LIST_STAND_OFF
+            ref = (positions[0][0] + so - BOARD_LIST_STAND_OFF, positions[0][1])
+        grid = [(d, l) for d in BOARD_GRID_DEPTHS for l in BOARD_GRID_LATERALS if (round(d, 3), round(l, 3)) not in listed]
+        return sorted(grid, key=lambda p: (round((p[0] - ref[0]) ** 2 + (p[1] - ref[1]) ** 2, 6), p[1], p[0]))
+
+    def _board_table_positions(self) -> List[Tuple[float, float]]:
+        """BD_BOARD_TABLE: the listed board positions as (inset from the working edge, lateral from the centre line), in order:
+        ``generation.board_table_xy_candidates``, else ``board_base_xy_candidates`` at the stand-off they were set for (inset = base depth
+        - ``BOARD_LIST_STAND_OFF``; the edge overhang of the same table cancels)."""
+        tab = self.gen("board_table_xy_candidates", None)
+        if tab:
+            return [(float(e), float(l)) for e, l in tab]
+        return [(round(d - BOARD_LIST_STAND_OFF, 3), l) for d, l in self._board_positions()]
+
+    def _board_table_plan(self, manip: Stance) -> Tuple[List[Tuple[float, float, bool]], Dict[str, int]]:
+        """BD_BOARD_TABLE: the board positions (base depth, lateral, searched) at ``manip``: the listed table positions at the stance's
+        stand-off (base depth = inset + stand-off), then with BD_BOARD_SEARCH the table lattice (base depth = inset + the base's distance
+        to the edge) not listed, nearest first to the first kept listed position (ties to the robot's right), each kept only when the
+        board lies on the top and its centre's base depth is inside ``generation.board_table_depth_window_m``. Returns the plan and the
+        counts (listed / lattice: kept, off the top, out of the window). Not used by :meth:`_board_fit` (the flip-room move keeps the base
+        list): bdv_table (trunk_f1fc4ac1) let the table positions decide the move, the minimum move (init 0.35 -> 0.20) then fit every
+        stand-off, the manipulation stances stood at the range's end, 3 of 24 candidates were board-feasible and 120 / 120 attempts
+        were rejected (board_placement) - against the base list's move to 0.07 (27 candidates, 10 feasible)."""
+        so = float(manip.stand_off) if manip.stand_off is not None else BOARD_LIST_STAND_OFF
+        to_edge = float(manip.edge_depth) if manip.edge is not None else so
+        lo, hi = (float(v) for v in (self.gen("board_table_depth_window_m", None) or BOARD_TABLE_DEPTH_WINDOW))
+        on_top = None
+        if self.top is not None:
+            right, toward, _ = self._table_axes(manip)
+            half = 0.5 * float(self._board_geometry()["plate_m"])
+            on_top = lambda d, l: self._board_on_top(manip, d, l, half, right, -toward)  # noqa: E731
+        n = {"listed": 0, "listed_off_top": 0, "listed_out_of_window": 0, "lattice": 0, "lattice_off_top": 0, "lattice_out_of_window": 0}
+
+        def keep(d: float, l: float, kind: str) -> bool:
+            if not (lo - 1e-6 <= d <= hi + 1e-6):
+                n[kind + "_out_of_window"] += 1
+                return False
+            if on_top is not None and not on_top(d, l):
+                n[kind + "_off_top"] += 1
+                return False
+            n[kind] += 1
+            return True
+
+        listed = [(round(so + e, 3), round(l, 3)) for e, l in self._board_table_positions()]
+        plan = [(d, l, False) for d, l in listed if keep(d, l, "listed")]
+        if board_search_on():
+            ref = (plan[0][0], plan[0][1]) if plan else listed[0]
+            seen = {(d, l) for d, l in listed}
+            lattice = [(round(to_edge + e, 3), round(l, 3)) for e in BOARD_TABLE_INSETS for l in BOARD_GRID_LATERALS]
+            lattice = sorted({p for p in lattice if p not in seen}, key=lambda p: (round((p[0] - ref[0]) ** 2 + (p[1] - ref[1]) ** 2, 6), p[1], p[0]))
+            plan += [(d, l, True) for d, l in lattice if keep(d, l, "lattice")]
+        return plan, n
+
+    def _board_plan(self, manip: Stance, count: bool = True) -> List[Tuple[float, float, bool]]:
+        """The board positions (base depth, lateral, searched) :meth:`_place_board` and :meth:`_board_precheck` try at ``manip``, in order;
+        ``searched`` ones get the CPU tests before each place probe and the probe cap (``generation.board_grid_max_probes``). Default: the
+        list, then BD_BOARD_SEARCH's grid; BD_BOARD_TABLE: :meth:`_board_table_plan` (kit counters ``bd_board.table_*`` when ``count``).
+        Not :meth:`_board_fit`'s positions (the flip-room move keeps the base list)."""
+        if not board_table_on():
+            plan = [(d, l, False) for d, l in self._board_positions()]
+            if board_search_on():
+                plan += [(d, l, True) for d, l in self._board_grid(manip)]
+            return plan
+        plan, n = self._board_table_plan(manip)
+        if count:
+            self._kc("bd_board.table_plans")
+            for k, v in n.items():
+                if v:
+                    self._kc("bd_board.table_" + k, v)
+        return plan
 
     def _board_on_top(self, manip: Stance, depth: float, lateral: float, half: float, right: th.Tensor, far: th.Tensor) -> bool:
         """:meth:`_place_board`'s off-the-top test: the four plate corners of the table-aligned board centred ``depth`` ahead of
@@ -665,6 +863,15 @@ class BlockDesign(SamplerV2):
             return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * abs(lat - GRID_LATERAL_PREFERRED) + 0.5 * trunk_pen + shift_pen + elig_pen
 
         order.sort(key=score)
+        if board_search_on() and self._has_board():
+            feasible = [k for k in order if self._board_feasible(k, init)]
+            if feasible and feasible != order[:len(feasible)]:
+                self._kc("bd_board.order_changed")
+            self._kc("bd_board.feasible_candidates", len(feasible))
+            order = feasible + [k for k in order if k not in set(feasible)]
+            log.info("%s: BD_BOARD_SEARCH: %d of %d manipulation candidates have a board position passing the CPU tests; tried first: %s", self.gp.variant,
+                     len(feasible), len(order), feasible[: int(self.gen("manipulation_candidates_tried", 6))])
+        BDD.candidates(self, order, {k: score(k) for k in order} if BDD.level() else None)
         if self._flips_expected():
             log.info("%s: %d manipulation candidates; flip cells per candidate (first 12 by score): %s", self.gp.variant, len(order),
                      ", ".join(f"{k}:{self._n_flip_cells(self.manip_candidates[k], init)}/{len(self.manip_candidates[k].extras.get('focus_info', {}).get('cells', []))}"
@@ -675,6 +882,9 @@ class BlockDesign(SamplerV2):
                 so = float(c.stand_off if c.stand_off is not None else 0.35)
                 log.info("%s: candidate %d region cells (base depth|lateral; edge depth = base depth - %.2f): %s", self.gp.variant, k, so,
                          " ".join(f"({float(c.world_to_base(xy)[0]):.2f}|{float(c.world_to_base(xy)[1]):+.2f})" for xy in c.extras.get("focus_info", {}).get("cells", [])))
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
         for k in order[: int(self.gen("manipulation_candidates_tried", 6))]:
             cand = self.manip_candidates[k]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
@@ -685,6 +895,7 @@ class BlockDesign(SamplerV2):
             for o in self.world.spawned.values():
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
+            self._bd_k = int(k)
             try:
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
@@ -705,6 +916,10 @@ class BlockDesign(SamplerV2):
             if c not in c2f:
                 raise Reject("spec", f"pattern colour {c!r} not on the block ({sorted(c2f)})")
         d.layout_template_id = pid
+        if self._has_board():
+            BDD.sweep_all(self, pattern)
+        if board_early_on() and self._has_board():
+            self._board_precheck(init, manip, [c2f[p] for p in pattern])
         self._travel_between(init, manip)
         cam_init = self.camera_pose_at(init)
         right, toward, table_yaw = self._table_axes(manip)
@@ -915,7 +1130,6 @@ class BlockDesign(SamplerV2):
             raise Reject("layout", f"goal faces below {self.g('goal_face_visible_fraction')} visible: {bad}")
         # --- goal layout at the anchor ------------------------------------------------------------------------------
         anchor = self._centre(poses[anchor_i])[0]
-        anchor_place = anchor  # where the loose (placement) grid hangs; the packed goal grid hangs at ``anchor``
         board_goals, board_aims = None, None
         if self._has_board():
             # puzzle board (owner 2026-09-20 22:39): the goal slots ARE the pocket centres (the seat), the release aims the bias toward
@@ -923,13 +1137,8 @@ class BlockDesign(SamplerV2):
             board_goals, board_aims, _floor_z = self._board_slot_targets(board_pose, right, toward)
         plans: Dict[int, Dict[str, Any]] = {}
         slots: Dict[str, Dict[str, Any]] = {}
-        goal_pose: Dict[int, TT.Pose] = {}  # the GOAL slots (the packed grid with the pack tail): the TRO targets
-        place_goal: Dict[int, TT.Pose] = {}  # where every block is PLACED (the loose grid the pack tail closes; = goal_pose without it)
-        # packing tail (owner 2026-09-19 21:47): the blocks are placed on a loose grid (``place_gap_m`` between them, room for the
-        # descending fingers beside the placed neighbours) and then pushed together against a wide-braced column / row; the goal
-        # grid is the packed one (``block_gap_m``, "almost touching"); the anchor block (slot 0) is the fixed corner of both grids
-        pack_on = bool(self.gen("block_pack_tail", False))
-        pitch_place = self.edge + float(self.gen("place_gap_m", self.g("block_gap_m"))) if pack_on else pitch
+        goal_pose: Dict[int, TT.Pose] = {}  # the GOAL slots: the TRO targets
+        place_goal: Dict[int, TT.Pose] = {}  # where every block is PLACED (= goal_pose; the board: the release aim)
         for bi in range(n):
             si = slot_of[bi]
             r, c = divmod(si, n_cols)
@@ -944,8 +1153,7 @@ class BlockDesign(SamplerV2):
             q_goal = plan["goal_quat"]
             xy = anchor[:2] + right * (c * pitch) + toward * (r * pitch)
             goal_pose[bi] = self._root_pose(xy, q_goal, 0.001)
-            xy_p = anchor_place[:2] + right * (c * pitch_place) + toward * (r * pitch_place)
-            place_goal[bi] = goal_pose[bi] if not pack_on else self._root_pose(xy_p, q_goal, 0.001)
+            place_goal[bi] = goal_pose[bi]
             if board_name is not None:  # the slots stand on the pocket floor, a plate above the table top: goal = the seat, place = the aim
                 dz_b = th.tensor([0.0, 0.0, float(self._board_geometry()["plate_thickness_m"])])
                 goal_pose[bi] = (self._root_pose(board_goals[si], q_goal, 0.001)[0] + dz_b, q_goal)
@@ -995,27 +1203,6 @@ class BlockDesign(SamplerV2):
         for bi in range(n):  # a table flip may have re-chosen the block's table-aligned goal yaw (goal face unchanged)
             goal_pose[bi] = (goal_pose[bi][0], place_goal[bi][1])
             slots[f"slot_{slot_of[bi]}"]["orientation"] = [float(v) for v in goal_pose[bi][1]]
-        if pack_on:
-            pack, st_pack = self._pack_tail(manip, current, pool, names, records, slot_of, n_cols, right, toward, pitch_place - pitch)
-            if st_pack.name not in self.sidecar.stances:
-                st_pack.name = "manipulation_pack"
-                st_pack.arms = ["right", "left"]
-                self.sidecar.add_stance(st_pack)
-                self._teleport({rec["instance"]: (th.tensor([float(v) for v in rec["goal_pose"]["position"]]), th.tensor([float(v) for v in rec["goal_pose"]["orientation"]])) for rec in records})
-                self._travel_between(current, st_pack)
-                log.info("%s: packing from a stance of its own %s (trunk %.2f/%+.2f, stand-off %.2f)", self.gp.variant, st_pack.name, st_pack.translate, st_pack.tilt, float(st_pack.stand_off or 0.0))
-            else:
-                st_pack.arms = ["right", "left"]
-                self.sidecar.stances[st_pack.name] = st_pack
-                # the pack stance is one of the block stances, but the robot may stand elsewhere after the last block: the program
-                # needs a recorded transition / path between the two (0920-073308: "stances 'manipulation_4' and 'manipulation' differ
-                # in trunk but no transition is recorded")
-                if st_pack.name != current.name and not any({str(t.frm), str(t.to)} == {current.name, st_pack.name} for t in self.sidecar.transitions):
-                    self._teleport({rec["instance"]: (th.tensor([float(v) for v in rec["goal_pose"]["position"]]), th.tensor([float(v) for v in rec["goal_pose"]["orientation"]])) for rec in records})
-                    self._travel_between(current, st_pack)
-            pack["stance"] = st_pack.name
-            self.sidecar.pack = pack
-            self._teleport({names[bi]: poses[bi] for bi in range(n)})
         # --- draft ---------------------------------------------------------------------------------------------------
         for bi in range(n):
             d.object_poses[names[bi]] = poses[bi]
@@ -1658,7 +1845,7 @@ class BlockDesign(SamplerV2):
         # section plus 2 mm; otherwise the honest check stays and the block is rejected with the reason
         placed_neighbours = [self.objects[names[o]] for j, o in enumerate(order) if j < step]
         gap_needed = TT.FINGER_PROFILE[0][1] + 0.002  # the pad on the block face, the outer face 8.4 mm out (fingertip section)
-        place_gap = float(self.gen("place_gap_m", self.g("block_gap_m"))) if bool(self.gen("block_pack_tail", False)) else float(self.g("block_gap_m"))
+        place_gap = float(self.g("block_gap_m"))
         if placed_neighbours and not self._has_board() and place_gap + self._place_margin() < gap_needed:
             raise Reject("finger_clearance", f"block {names[bi]}: slot gap {place_gap * 1000:.0f} mm + place margin {self._place_margin() * 1000:.0f} mm < "
                                              f"{gap_needed * 1000:.1f} mm the closed finger needs beside a placed neighbour (set generation.block_gap_m >= "
@@ -2614,58 +2801,218 @@ class BlockDesign(SamplerV2):
         n_flip_needed = self._n_flips() if self._flips_expected() else 0
         board_obj = self.objects[name]
         why: List[str] = []
-        for depth, lateral in self._board_positions():
+        k_diag = getattr(self, "_bd_k", -1)
+        BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
+        positions = self._board_plan(manip)
+        table = board_table_on()
+        grid_why: Dict[str, int] = {}
+        grid_probes, grid_max = 0, int(self.gen("board_grid_max_probes", 12))
+        for depth, lateral, on_grid in positions:
+            if on_grid and not grid_why.get("_started"):
+                grid_why["_started"] = 1
+                self._kc("bd_board.grid_searched")
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
             xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+            if BDD.level():
+                log.info("BD_DIAG board k %d %s %s: %s", k_diag, tag, BDD._st(manip), BDD.corners(self, manip, depth, lateral, half, right, far))
+            def fail(text: str, short: str) -> None:
+                if on_grid:
+                    grid_why[short] = grid_why.get(short, 0) + 1
+                else:
+                    why.append(f"{tag}: {text}")
+
             if not self._board_on_top(manip, depth, lateral, half, right, far):
-                why.append(f"{tag}: off the top")
+                fail("off the top", "off the top")
                 continue
             kept = list(cells or [])
             if cells is not None:
                 kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
                 n_elig = sum(1 for c in kept if flip_eligible is not None and flip_eligible(c))
                 if len(kept) < n_blocks or n_elig < n_flip_needed:
-                    why.append(f"{tag}: {len(kept)} cells clear ({n_elig} flip-eligible)")
+                    fail(f"{len(kept)} cells clear ({n_elig} flip-eligible)", "cells")
                     continue
             pose = (th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + 0.001]), q)
-            # (c) the place probe: the cube's centre at the release aim, its bottom release_above over the pocket floor
-            self._teleport({name: pose})
-            _goals, aims, floor_z = self._board_slot_targets(pose, right, toward)
-            z_c = floor_z + self._release_above() + 0.5 * self.edge
-            probe_ok = True
-            for si in (0, len(aims) - 1):
-                sl = aims[si]
-                c_place = (th.tensor([float(sl[0]), float(sl[1]), z_c]), C.quat_from_yaw(table_yaw))
-                found = False
-                for pair in ("x", "y"):
-                    for tilt in (30.0, 45.0, 0.0):
-                        try:
-                            g = C.cube_grasp(c_place, pair, tilt, table_yaw, edge=self.edge)
-                        except ValueError:
-                            continue
-                        if not g.downward:
-                            continue
-                        r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
-                        if r.ok:
-                            found = True
-                            break
-                    if found:
-                        break
-                if not found:
-                    probe_ok = False
-                    break
-            if not probe_ok:
-                why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
+            early = board_early_on() or on_grid
+            if on_grid and layout_ok is not None and cells is not None and not layout_ok(kept):
+                fail("", "no flip set")
                 continue
-            if layout_ok is not None and cells is not None and not layout_ok(kept):
+            if on_grid:
+                if grid_probes >= grid_max:
+                    fail("", "probe cap")
+                    continue
+                grid_probes += 1
+            if early and not on_grid and layout_ok is not None and cells is not None and not layout_ok(kept):
+                # BD_BOARD_EARLY: the CPU flip-set test before the exact probe (the same verdict, the probe's IK saved)
+                self._kc("bd_board.layout_before_probe")
                 why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
                 continue
+            memo_key = (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
+                        round(float(xy[0]), 3), round(float(xy[1]), 3), round(float(table_yaw), 3)) if early else None
+            memo = self.__dict__.setdefault("_bd_probe_memo", {})
+            if early and memo.get(memo_key) is False:
+                self._kc("bd_board.probe_memo_hit")
+                fail("no pitched place reaches the pockets' release aims from the manipulation stance", "no pitched place")
+                continue
+            # (c) the place probe: the cube's centre at the release aim, its bottom release_above over the pocket floor
+            self._teleport({name: pose})
+            if BDD.level() and cells is not None and layout_ok is not None:
+                BDD.layout(self, k_diag, tag, kept, manip, self.init_stance, self._flip_directions()[0])
+            BDD.probe(self, k_diag, tag, manip, pose, right, toward, table_yaw, support, board_obj)
+            probe_ok = self._board_probe(manip, pose, right, toward, table_yaw, support)
+            if early:
+                self._kc("bd_board.probe_run")
+                memo[memo_key] = bool(probe_ok)
+            if not probe_ok:
+                fail("no pitched place reaches the pockets' release aims from the manipulation stance", "no pitched place")
+                continue
+            if layout_ok is not None and cells is not None and not layout_ok(kept):
+                fail(f"{len(kept)} cells clear, no cell set of them lets every repeated-colour block flip", "no flip set")
+                continue
+            if table:
+                self._kc("bd_board.table_lattice_placed" if on_grid else "bd_board.table_listed_placed")
+            elif on_grid:
+                self._kc("bd_board.grid_placed")
+                log.info("%s: BD_BOARD_SEARCH: the board at a grid position (%.2f, %+.2f) of the stance at stand-off %s (%d grid probes; list: %s)", self.gp.variant,
+                         float(depth), float(lateral), manip.stand_off, grid_probes, "; ".join(why))
             log.info("%s: puzzle board %s at base (%.2f, %+.2f): pitch %.1f mm, seat %.1f mm, rim %.0f mm over the floor, release bias %.1f mm; %d cells clear (%s)",
                      self.gp.variant, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,
                      float(geo["rim_top_above_floor_m"]) * 1000, float(self.gen("board_release_bias_m", 0.0035)) * 1000, len(kept), "; ".join(why) or "first candidate")
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
+        if table:
+            self._kc("bd_board.table_failed")
+            why.append(f"table positions at stand-off {manip.stand_off}: {sum(1 for p in positions if not p[2])} listed, {sum(1 for p in positions if p[2])} lattice kept")
+        if grid_why.pop("_started", None):
+            self._kc("bd_board.grid_failed")
+            why.append("grid " + ", ".join(f"{k} {v}" for k, v in sorted(grid_why.items())))
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works: " + "; ".join(why))
+
+    def _kc(self, key: str, n: int = 1) -> None:
+        """Kit counter ``key`` (``RobotKit.stats``: the attempt's kit line, ``summary.json["kit"]``)."""
+        st = getattr(getattr(self, "kit", None), "stats", None)
+        if isinstance(st, dict):
+            st[key] = st.get(key, 0) + n
+
+    def _board_precheck(self, init: Stance, manip: Stance, slot_faces: List[str], count: bool = True) -> None:
+        """BD_BOARD_EARLY: :meth:`_place_board`'s CPU checks (on the top, cells kept, the repeated-colour flip set) on the candidate's region
+        before the travel and the exact probe; Reject ``board_placement`` (the same reasons) when no position passes them. ``count``
+        False: no kit counter (the candidate order of BD_BOARD_SEARCH)."""
+        kc = self._kc if count else (lambda key, n=1: None)
+        right, toward, _ = self._table_axes(manip)
+        far = -toward
+        geo = self._board_geometry()
+        half = 0.5 * float(geo["plate_m"])
+        half_b = half + 0.5 * self.edge + float(self.gen("board_cell_margin_m", 0.06))
+        n = len(self.names())
+        n_flip = self._n_flips() if self._flips_expected() else 0
+        primary_dir = self._flip_directions()[0]
+        flip_mode = n_flip > 0 and primary_dir in ("right", "left")
+        cells = list(manip.extras["focus_info"]["cells"])
+        cam_init = self.camera_pose_at(init)
+        z_c = self.top.z + 0.5 * self.edge
+
+        def img_score(xy) -> float:
+            uv = self.world.camera_model.project(cam_init, th.tensor([[float(xy[0]), float(xy[1]), z_c]]))[0][0]
+            return float(uv[0] + uv[1])
+
+        why: List[str] = []
+        plan = self._board_plan(manip, count=False)  # the plan's counters come from _place_board
+        positions = [(d, l) for d, l, _searched in plan]
+        n_list = sum(1 for p in plan if not p[2])  # the plan puts the listed positions first
+        for i, (depth, lateral) in enumerate(positions):
+            tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
+            if i == n_list:
+                why.append(f"grid {len(positions) - n_list} positions: none passes")
+            if i >= n_list:
+                if (self._board_on_top(manip, depth, lateral, half, right, far) and self._board_cpu_ok(manip, init, depth, lateral, cells, half_b, n, n_flip,
+                                                                                                       flip_mode, primary_dir, img_score, slot_faces)):
+                    kc("bd_board.precheck_pass")
+                    return
+                continue
+            if not self._board_on_top(manip, depth, lateral, half, right, far):
+                why.append(f"{tag}: off the top")
+                continue
+            xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+            kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
+            n_elig = sum(1 for c in kept if flip_mode and self._flip_cell_ok(c, manip, init, primary_dir))
+            if len(kept) < n or n_elig < n_flip:
+                why.append(f"{tag}: {len(kept)} cells clear ({n_elig} flip-eligible)")
+                continue
+            if flip_mode and not self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True):
+                why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
+                continue
+            kc("bd_board.precheck_pass")
+            return
+        kc("bd_board.precheck_reject")
+        raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works (precheck): " + "; ".join(why))
+
+    def _board_feasible(self, k: int, init: Stance) -> bool:
+        """BD_BOARD_SEARCH (1): whether candidate ``k``'s region has a board position passing the CPU tests for some configured pattern
+        (:meth:`_board_precheck`), kept per (candidate, base pose) for the process."""
+        cand = self.manip_candidates[k]
+        memo = self.__dict__.setdefault("_bd_feasible_memo", {})
+        key = (k, tuple(round(float(v), 3) for v in cand.base_pose2d), round(float(cand.translate), 3), round(float(cand.tilt), 3),
+               tuple(round(float(v), 3) for v in init.base_pose2d))
+        if key not in memo:
+            c2f = self.color_to_face()
+            ok = False
+            for pat in (self.g("patterns") or {}).values():
+                if any(c not in c2f for c in pat):
+                    continue
+                try:
+                    self._board_precheck(init, cand, [c2f[c] for c in pat], count=False)
+                    ok = True
+                    break
+                except Reject:
+                    continue
+            memo[key] = ok
+        return memo[key]
+
+    def _board_cpu_ok(self, manip, init, depth, lateral, cells, half_b, n, n_flip, flip_mode, primary_dir, img_score, slot_faces) -> bool:
+        """The precheck's cells-kept + flip-set test of one board position (the grid positions of BD_BOARD_SEARCH)."""
+        right, toward, _ = self._table_axes(manip)
+        xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+        kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
+        n_elig = sum(1 for c in kept if flip_mode and self._flip_cell_ok(c, manip, init, primary_dir))
+        if len(kept) < n or n_elig < n_flip:
+            return False
+        return not flip_mode or self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True)
+
+    def _board_probe(self, manip: Stance, pose: TT.Pose, right: th.Tensor, toward: th.Tensor, table_yaw: float, support=None,
+                     detail: Optional[List[str]] = None, ignore: Sequence[Any] = ()) -> bool:
+        """:meth:`_place_board`'s place probe (c) with the board already at ``pose``: a pitched top-down pinch (pairs x / y, tilts 30 /
+        45 / 0) releasing the cube at the biased release aim of the far-left and the near-right pocket, the exact IK of pre-place +
+        place from ``manip`` (the support ignored at the place). ``detail`` (diagnostics) collects every try's verdict; ``ignore``
+        (diagnostics) leaves those objects out of the world for the whole probe."""
+        _goals, aims, floor_z = self._board_slot_targets(pose, right, toward)
+        z_c = floor_z + self._release_above() + 0.5 * self.edge
+        for si in (0, len(aims) - 1):
+            sl = aims[si]
+            c_place = (th.tensor([float(sl[0]), float(sl[1]), z_c]), C.quat_from_yaw(table_yaw))
+            found = False
+            for pair in ("x", "y"):
+                for tilt in (30.0, 45.0, 0.0):
+                    try:
+                        g = C.cube_grasp(c_place, pair, tilt, table_yaw, edge=self.edge)
+                    except ValueError:
+                        continue
+                    if not g.downward:
+                        continue
+                    if ignore:
+                        with self.ikc.ignoring(list(ignore)):
+                            r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
+                    else:
+                        r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
+                    if detail is not None:
+                        detail.append(f"s{si}/{pair}/t{tilt:.0f}:{'ok' if r.ok else (r.reason or 'fail')[:90]}")
+                    if r.ok:
+                        found = True
+                        break
+                if found:
+                    break
+            if not found:
+                return False
+        return True
 
     def _bddl_names(self, objs: List[Any]) -> List[str]:
         """bddl instance names of sim objects (``self.objects`` inverted)."""
@@ -2702,7 +3049,7 @@ class BlockDesign(SamplerV2):
     def _blade_height(self) -> float:
         """eef origin height of a top-down blade beside a block: the closed fingertips 3 mm above the top (a 2.5 cm cube
         sits entirely below the wrist of a horizontal contact)."""
-        floor = float(getattr(self, "_push_floor_z", None) or self.top.z)  # the board's pocket floor during its pack pushes
+        floor = float(getattr(self, "_push_floor_z", None) or self.top.z)  # a pocket floor when one is set (else the top)
         z = floor + max(0.6 * self.edge, C.FINGERTIP_LENGTH + 0.003)
         # A/B knob generation.contact_height_extra_m (D2 core helper, 0 = no-op): the fingertip stays >= 1 cm below the block's top
         return lift_contact_height(self, z, "blade", face_top_z=floor + float(self.edge))
@@ -2719,8 +3066,8 @@ class BlockDesign(SamplerV2):
         yield from self._blade_poses_at(centre, face_normal, manip, prefix)
 
     def _blade_poses_at(self, centre: th.Tensor, face_normal: th.Tensor, manip: Stance, prefix: str, modes: Tuple[str, ...] = ("pad", "side")):
-        """The blade contacts of :meth:`_blade_poses` about an arbitrary centre point (the mid-point of two braced cubes for the
-        packing tail's wide brace) and a face outward normal; ``modes`` restricts the closing-axis classes."""
+        """The blade contacts of :meth:`_blade_poses` about an arbitrary centre point and a face outward normal; ``modes`` restricts
+        the closing-axis classes."""
         z_blade = self._blade_height()
         side = th.cross(th.tensor([0.0, 0.0, 1.0]), face_normal, dim=0)
         floor = float(getattr(self, "_push_floor_z", None) or self.top.z)
@@ -2741,328 +3088,6 @@ class BlockDesign(SamplerV2):
                 origin = th.tensor([float(centre[0]), float(centre[1]), z_blade]) + face_normal * (0.5 * self.edge + so[1])
                 for c_sign in (1.0, -1.0):
                     yield (origin, C.eef_quat(a_vec, c_sign * c_axis)), a_vec, f"{prefix}_blade_{cname}_{pitch:.0f}{'' if c_sign > 0 else '-'}", so[1]
-
-    # ------------------------------------------------------------------ packing tail (owner 2026-09-19 21:47)
-
-    def _pack_tail(self, manip: Stance, current: Stance, pool: List[Stance], names: List[str], records: List[Dict[str, Any]], slot_of: Dict[int, int], n_cols: int,
-                   right: th.Tensor, toward: th.Tensor, gap_delta: float) -> Tuple[Dict[str, Any], Stance]:
-        """After the last place (every block on the loose grid, ``records[].goal_pose``) the blocks are packed: stage 1 braces the
-        LEFT column with the left gripper opened so a finger side rests on the left face of each of its cubes and pushes every
-        other column's cube against it with the right hand (closing the column gaps, the columns end aligned); stage 2 braces the
-        FAR row on its far faces and pushes the near row away from the robot (the near-row brace with a pull toward the robot
-        is the fallback - the log says which one passed). Every stage is one wide brace + one push per cube, all from the
-        manipulation stance, checked as two-arm exact IK (brace held while the push arm moves). Raises ``Reject`` when no stage
-        passes; returns the ``sidecar.pack`` section."""
-        support = self.obj("support")
-        world0: Dict[str, TT.Pose] = {}
-        for rec in records:
-            gp = rec["goal_pose"]
-            world0[rec["instance"]] = (th.tensor([float(v) for v in gp["position"]]), th.tensor([float(v) for v in gp["orientation"]]))
-        by_slot = {si: names[bi] for bi, si in slot_of.items()}
-        n_rows = max(1, len(slot_of) // n_cols)
-        braced = [by_slot[r * n_cols] for r in range(n_rows) if r * n_cols in by_slot]
-        pushes = [(by_slot[r * n_cols + c], c * gap_delta) for r in range(n_rows) for c in range(1, n_cols) if r * n_cols + c in by_slot]
-        far = [by_slot[c] for c in range(n_cols) if c in by_slot]
-        near_pushes = [(by_slot[r * n_cols + c], r * gap_delta) for r in range(1, n_rows) for c in range(n_cols) if r * n_cols + c in by_slot]
-        near = [by_slot[(n_rows - 1) * n_cols + c] for c in range(n_cols) if (n_rows - 1) * n_cols + c in by_slot]
-        far_pushes = [(by_slot[r * n_cols + c], (n_rows - 1 - r) * gap_delta) for r in range(n_rows - 1) for c in range(n_cols) if r * n_cols + c in by_slot]
-        # the stances tried: where the robot stands after the last block, the manipulation stance, then the pool ranked about the
-        # grid centre (pod run 0919-220203: from the tall manipulation stance every top-down push pre-pose 0.48 m ahead failed the IK
-        # with the left arm braced across - the grid needs to sit in the arms' sweet zone, 0.55-0.65 m ahead)
-        grid_c = th.stack([self._centre(p_)[0] for p_ in world0.values()]).mean(dim=0)
-        grid_root = (grid_c, C.IDENTITY_QUAT.clone())
-        ranked = self._rank_stances(pool, current, grid_root, grid_root, False)
-        stances = [current] + [manip] + [st for st in ranked if st is not current and st is not manip]
-        if self._has_board():
-            raise Reject("spec", "the puzzle board seats the blocks in its pockets - generation.block_pack_tail must be false for the board variant")
-        seen = set()
-        tried: List[str] = []
-        for st in stances[: int(self.gen("pack_max_stances", 6))]:
-            key = (round(float(st.base_pose2d[0]), 3), round(float(st.base_pose2d[1]), 3), round(float(st.translate), 3), round(float(st.tilt), 3))
-            if key in seen:
-                continue
-            seen.add(key)
-            world = dict(world0)
-            self._teleport(world)
-            tag_st = f"{st.name} (trunk {st.translate:.2f}/{st.tilt:+.2f}, so {float(st.stand_off or 0.0):.2f}, shift {float(st.extras.get('block_stance_shift_m', 0.0)):+.2f})"
-            # stage 1: the columns. Braced = column 0 (the robot's left) by the left hand, pushed = the cubes of the other columns by
-            # the right hand, each by its column's share of the gap (2 x 2: the right column by gap_delta) toward the left; the
-            # mirrored assignment (right column braced by the right hand, the left column pushed right by the left hand) is the
-            # fallback - the goal is judged on the layout relations, a uniform shift of the packed grid does not count
-            right_col = [by_slot[r * n_cols + n_cols - 1] for r in range(n_rows) if r * n_cols + n_cols - 1 in by_slot]
-            left_pushes = [(by_slot[r * n_cols + c], (n_cols - 1 - c) * gap_delta) for r in range(n_rows) for c in range(n_cols - 1) if r * n_cols + c in by_slot]
-            st1, why1 = self._pack_stage("columns", world, braced, pushes, -right, right, st, support)
-            moved1 = [(nm, -_xy3(right) * dist) for nm, dist in pushes]
-            if st1 is None and bool(self.gen("pack_mirror_fallback", True)):
-                st1, why1b = self._pack_stage("columns_mirrored", world, right_col, left_pushes, right, -right, st, support, brace_arm="right", push_arm="left")
-                moved1 = [(nm, _xy3(right) * dist) for nm, dist in left_pushes]
-                why1 = f"{why1}; mirrored: {why1b}"
-            if st1 is None:
-                tried.append(f"{tag_st}: columns: {why1}")
-                log.info("%s: pack @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:700])
-                continue
-            for nm, dxy in moved1:  # the world after stage 1: the pushed cubes moved
-                world[nm] = (world[nm][0] + dxy, world[nm][1])
-            self._teleport(world)
-            # stage 2: the rows. Far row braced on its far faces, the near rows pushed away from the robot; else the near row
-            # braced on its near faces and the far rows pulled toward the robot
-            st2, why2 = self._pack_stage("rows_far_brace", world, far, near_pushes, -toward, toward, st, support)
-            which = "far row braced (left hand), near row pushed away from the robot (right hand)"
-            if st2 is None:
-                st2, why2b = self._pack_stage("rows_near_brace", world, near, far_pushes, toward, -toward, st, support)
-                which = "near row braced (left hand), far row pulled toward the robot (right hand)"
-                why2 = f"far brace: {why2}; near brace: {why2b}"
-            if st2 is None and bool(self.gen("pack_mirror_fallback", True)):
-                st2, why2c = self._pack_stage("rows_far_brace_mirrored", world, far, near_pushes, -toward, toward, st, support, brace_arm="right", push_arm="left")
-                which = "far row braced (right hand), near row pushed away (left hand)"
-                if st2 is None:
-                    st2, why2d = self._pack_stage("rows_near_brace_mirrored", world, near, far_pushes, toward, -toward, st, support, brace_arm="right", push_arm="left")
-                    which = "near row braced (right hand), far row pulled (left hand)"
-                    why2 = f"{why2}; mirrored far: {why2c}; mirrored near: {why2d}"
-            if st2 is None:
-                tried.append(f"{tag_st}: rows: {why2}")
-                log.info("%s: pack @ %s: columns ok (%s), rows failed: %s", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", why2[:900])
-                continue
-            log.info("%s: packing tail from %s: columns %s; rows: %s (%s)", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", which,
-                     st2["brace"]["pose_class"] if st2.get("brace") else "push only")
-            self._teleport(world0)
-            return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "far" if which.startswith("far") else "near"}, st
-        if bool(self.gen("pack_allow_push_only", True)):
-            # no stance takes the two-arm brace + push: the pushes alone (the push is position-controlled to the packed pose - the
-            # cube travels the gap and meets its neighbour with no travel left, so the neighbour is not carried along)
-            for st in self._pack_posture_variants(stances[: int(self.gen("pack_max_stances", 6))]):
-                world = dict(world0)
-                self._teleport(world)
-                tag_st = f"{st.name} (trunk {st.translate:.2f}/{st.tilt:+.2f}, so {float(st.stand_off or 0.0):.2f}, shift {float(st.extras.get('block_stance_shift_m', 0.0)):+.2f})"
-                st1, why1 = self._pack_stage("columns_push_only", world, [], pushes, -right, right, st, support)
-                if st1 is None:
-                    log.info("%s: pack (push only) @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:500])
-                    continue
-                for nm, dist in pushes:
-                    world[nm] = (world[nm][0] - _xy3(right) * dist, world[nm][1])
-                self._teleport(world)
-                st2, why2 = self._pack_stage("rows_push_only", world, [], near_pushes, -toward, toward, st, support)
-                which = "near row pushed away from the robot, no brace"
-                if st2 is None:
-                    st2, why2b = self._pack_stage("rows_push_only_pull", world, [], far_pushes, toward, -toward, st, support)
-                    which = "far row pulled toward the robot, no brace"
-                    if st2 is None:
-                        log.info("%s: pack (push only) @ %s: rows failed: %s; pull: %s", self.gp.variant, tag_st, why2[:400], why2b[:400])
-                        continue
-                log.info("%s: packing tail (push only) from %s: %s", self.gp.variant, tag_st, which)
-                self._teleport(world0)
-                return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "none", "push_only": True}, st
-        self._teleport(world0)
-        raise Reject("pack_tail", "no stance packs the grid: " + " | ".join(tried)[:1500])
-
-    def _pack_posture_variants(self, stances: List[Stance]) -> List[Stance]:
-        """Each candidate pack stance as it is, then clones with the idle LEFT arm in the ``ready`` / ``tucked`` posture (a new
-        name, so the block chains' stance records stay untouched and the oracle drives the arm there at the pack transition):
-        the pushes that reach across the robot's centre line (the board left of it, 0920-011816) collide with the hanging
-        untucked left arm."""
-        out: List[Stance] = []
-        postures = list(self.gen("pack_left_postures", ["ready", "tucked"]) or [])
-        for st in stances:
-            out.append(st)
-            for name in postures:
-                try:
-                    vec = self.kit.arm_q(name, "left")
-                except Exception:  # noqa: BLE001
-                    continue
-                st2 = copy.copy(st)
-                st2.extras = dict(st.extras, pack_left_posture=name)
-                st2.q = self.ikc.q_locked(st, left_arm=vec)
-                st2.name = f"{st.name}_pack_{name}"
-                if not bool(self.kit.collision_free(st2.q, margin=0.01)[0]):
-                    continue
-                out.append(st2)
-        return out
-
-    def _pack_face_half(self, world: Dict[str, TT.Pose], braced: List[str], mid: th.Tensor, b_dxy: th.Tensor) -> Optional[float]:
-        """Half the extent (m) the braced cubes' faces offer the pack brace's fingers along its closing axis (horizontal, across the brace
-        direction ``b_dxy``) about the brace's ``mid`` point - the nearer of the two outer ends; None without the cube hull."""
-        if self.hull is None or not braced:
-            return None
-        u = th.cross(th.tensor([0.0, 0.0, 1.0]), b_dxy.float(), dim=0)
-        u = u / th.linalg.norm(u)
-        proj = th.cat([(C.transform_points(world[nm], self.hull) - TT._t(mid).float()) @ u for nm in braced])
-        return float(min(proj.max(), -proj.min()))
-
-    def _pack_stage(self, tag: str, world: Dict[str, TT.Pose], braced: List[str], pushes: List[Tuple[str, float]], push_dir: th.Tensor, brace_dir: th.Tensor,
-                    manip: Stance, support, brace_arm: Optional[str] = None, push_arm: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], str]:
-        """One packing stage: the wide brace (left arm; the fingers opened so a finger SIDE rests on the face of each braced cube,
-        the closing axis along the braced line) held while the right hand pushes each ``(cube, distance)`` along ``push_dir`` with
-        the closed blade. Returns ``(stage dict, "")`` or ``(None, reason)``."""
-        if not pushes:
-            return None, "nothing to push"
-        brace_arm = str(brace_arm or self.gen("pack_brace_arm", "left"))
-        push_arm = str(push_arm or self.gen("pack_push_arm", "right"))
-        if not braced:
-            # push only: the pushes from the stance posture, no second arm
-            push_recs, why = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, self.ikc.q_locked(manip, fingers=0.0).clone(), [], "no brace")
-            if push_recs is None:
-                return None, why
-            return {"tag": tag, "brace": None, "pushes": push_recs}, ""
-        centres = [self._centre(world[nm])[0] for nm in braced]
-        mid = th.stack(centres).mean(dim=0)
-        spread = float(th.linalg.norm(centres[0][:2] - centres[-1][:2])) if len(centres) > 1 else 0.0
-        b_dxy = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])
-        b_dxy = b_dxy / th.linalg.norm(b_dxy)
-        # per-finger opening (:func:`pack_brace_opening`): the finger centre line (pad face + half the 8.4 mm finger) on each cube's centre;
-        # ISPATIALGYM_BRACE_FULL_OPEN (owner 2026-11-07): fully open unless the braced cubes' faces along the closing axis cannot take it
-        q_open = pack_brace_opening(spread, self._pack_face_half(world, braced, mid, b_dxy) if TT.brace_full_open() else None)
-        braced_objs = [self.objects[nm] for nm in braced]
-        brace_fails: List[str] = []
-        push_fails: List[str] = []
-        idx_b = self.kit.robot.arm_control_idx[brace_arm]
-        pushes_of: Dict[int, List[Dict[str, Any]]] = {}
-
-        def eval_brace(p):
-            r_b = self.ikc.exact(list(p.chain), manip, brace_arm, ignore_for_last=[support] + braced_objs, cache=False, fingers=q_open, q_first=p.q_first)
-            if not r_b.ok:
-                brace_fails.append(f"{p.label}: {r_b.reason}")
-            return bool(r_b.ok), r_b, None, str(r_b.reason)
-
-        def pushes_with(sc):
-            # the pushes, one per cube, each checked with the brace arm locked at its contact - its fingers at the brace's opening, as the
-            # oracle holds them (i7-braceopen 2026-11-07: the seed's 0.0 closed the braced hand for every push check), the push hand closed
-            q_seed = TT.with_gripper(self.kit, self.ikc.q_locked(manip, fingers=0.0), brace_arm, q_open)
-            q_seed[idx_b] = sc.result.q[idx_b]
-            push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, sc.proposal.label)
-            if push_recs is None:
-                push_fails.append(why_p)
-                return False, why_p
-            pushes_of[id(sc)] = push_recs
-            return True, ""
-
-        # a blade class's two wrist turns by the orientation rule (owner 2026-09-27); the other turn when the pushes fail with the first
-        chosen_b, dec_b, _fails_b = O.choose_first(self.ikc, brace_arm, self._blade_poses_at(mid, -b_dxy, manip, "pack_brace", modes=("side",)), key=lambda c: c[0],
-                                                   label=lambda c: c[2], chain=lambda c: [C.pre_pose(c[0]), c[0]], evaluate=eval_brace,
-                                                   q_start=self.ikc.q_locked(manip, fingers=0.0), stage="pack brace", downstream=pushes_with)
-        if chosen_b is not None:
-            b_pose, b_a, b_name, b_half = chosen_b.proposal.payload
-            b_pre = chosen_b.proposal.chain[0]
-            push_recs = pushes_of[id(chosen_b)]
-            brace_rec = annotate_height_extra(TT.BraceRecord("brace", brace_arm, b_pre, b_pose, direction=b_a, brace_kind=f"pack_{tag}", object=braced[0],
-                                                             extras={"pose_class": b_name, "blade_half_thickness_m": None if b_half is None else float(b_half), "stop_clearance_m": 0.0,
-                                                                     "fingers_opening_m": round(float(q_open), 4), "stop_width_m": round(float(spread), 4),
-                                                                     "braced": list(braced),
-                                                                     # the program check removes BOTH braced cubes at the contact (a finger side on each), the support throughout
-                                                                     "ignore_last": list(braced), "ignore_every": ["supports"],
-                                                                     **_orient_extra(dec_b)}), self).to_sidecar()
-            return {"tag": tag, "brace": brace_rec, "pushes": push_recs}, ""
-        why = (sorted(set(push_fails)) or sorted(set(brace_fails)))[:3]
-        return None, f"no brace + pushes pass ({len(brace_fails)} brace, {len(push_fails)} push failures; e.g. {why})"
-
-    def _pack_pushes(self, world: Dict[str, TT.Pose], pushes: List[Tuple[str, float]], push_dir: th.Tensor, manip: Stance, support, push_arm: str, q_seed: th.Tensor,
-                     braced_objs: List[Any], b_name: str) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-        """The packing pushes of one stage, one per ``(cube, distance)``: the first blade / tilted class whose pre + init (the cube
-        removed) and pre + goal pass the exact IK from ``q_seed`` (the other arm where it is - at its brace contact, or the stance
-        posture) and whose contact configuration is collision-free together with that arm. Returns ``(records, "")`` or
-        ``(None, reason)``."""
-        idx_other = self.kit.robot.arm_control_idx["left" if push_arm == "right" else "right"]
-        fails: List[str] = []
-        recs: List[Dict[str, Any]] = []
-        d3 = th.tensor([float(push_dir[0]), float(push_dir[1]), 0.0])
-        d3 = d3 / th.linalg.norm(d3)
-        standoff = float(self.gen("pack_push_standoff_m", 0.005))
-        for nm, dist in pushes:
-            found = None
-            # the cubes the push drives ahead of the pushed one (in line along the push direction within its travel): they move
-            # with it, so they are out of the blade's way at the goal - ignored for the goal / chain checks and recorded as
-            # ``driven`` for the program check (the wall pushes of the board variant drive the inner column / row along)
-            c_nm = self._centre(world[nm])[0][:2]
-            driven: List[str] = []
-            for other in world:
-                if other == nm:
-                    continue
-                rel = self._centre(world[other])[0][:2] - c_nm
-                along = float(th.dot(rel, d3[:2]))
-                across = float(th.linalg.norm(rel - along * d3[:2]))
-                if 0.0 < along < float(dist) + self.edge and across < 0.6 * self.edge:
-                    driven.append(other)
-            driven_objs = [self.objects[o] for o in driven]
-            cands = list(self._blade_poses(world[nm], push_dir, False, manip, "pack_push"))
-            t_pt, t_a = self._face_contact(world[nm], push_dir, into=False)
-            c_axis_t = th.tensor([float(-push_dir[1]), float(push_dir[0]), 0.0])  # pads close across the push direction
-            cands.append((C.contact_eef(t_pt, t_a, c_axis_t), t_a, "pack_push_tilted", None))
-
-            def evaluate(p, nm=nm, dist=dist, driven=driven, driven_objs=driven_objs):
-                p_face, p_a, p_name, p_half = p.payload
-                # the blade starts ``pack_push_standoff_m`` short of the face (a cube placed a few mm toward the blade is met, not
-                # landed on) and travels that plus the gap; the neighbour stops the cube at the packed position
-                p_init = (p_face[0] - d3 * standoff, p_face[1])
-                p_goal = (p_face[0] + d3 * float(dist), p_face[1])
-                p_pre = C.pre_pose(p_init)
-                r_i = self.ikc.exact([p_pre, p_init], manip, push_arm, ignore_for_last=[support, self.objects[nm]], q_seed=q_seed, cache=False, fingers=0.0,
-                                     q_first=p.q_first)
-                if not r_i.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: init {r_i.reason}")
-                    return False, None, None, f"init {r_i.reason}"
-                qs = O.chain_qs(self.ikc, push_arm, [p_pre, p_init])
-                r_g = self.ikc.exact([p_pre, p_goal], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=q_seed, cache=False, fingers=0.0)
-                if not r_g.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: goal {r_g.reason}")
-                    return False, None, None, f"goal {r_g.reason}"
-                # the program check's own verdict on the push (``check_action_targets``: waypoints pre -> init -> goal with the pushed
-                # cube and the support removed throughout, closed pads): run it here so the sampler never records a push the check
-                # rejects (0920-055948: 'push: waypoints: exact IK failed at pose 1 of 3' on a board push the two exact checks passed)
-                # the oracle's motion: arm_to(pre), then arm_along over ``actions._line(init, goal)`` - the start excluded, so the
-                # first tracked segment runs from the pre to a third of the push (the program check verifies this very chain)
-                line = [(pt, p_goal[1]) for pt in C.line_waypoints(p_init[0], p_goal[0], 3)]
-                r_w = self.ikc.waypoints_ok([p_pre] + line, manip, push_arm, ignore_all=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=q_seed,
-                                            cache=False, fingers=0.0, approached=[self.objects[nm]])
-                if not r_w.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: chain {r_w.reason}")
-                    return False, None, None, f"chain {r_w.reason}"
-                # the oracle's retreat from a push (``execute_retreat``, contact_retreat_escape_m 0.05): the pad leaves RADIALLY -
-                # opposite the push - by ``Retreat.escape_far`` (5 cm for the pack retreats; the default 10 cm left the arm 14 mm
-                # short after the board's rightward wall push, 0920-192950 action 33) and up by the same, reached by ``arm_to`` at
-                # a 5 mm tolerance - the end pose must have a solution polished to that tolerance
-                esc_far = float(self.gen("pack_retreat_dist_m", 0.05))  # = Retreat.escape_far of the program's pack retreats
-                r_end = (p_goal[0] - d3 * esc_far + th.tensor([0.0, 0.0, min(0.05, esc_far)]), p_goal[1])
-                r_r = self.ikc.exact([r_end], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=r_w.q, cache=False, fingers=0.0)
-                if not r_r.ok or r_r.q is None:
-                    fails.append(f"{b_name}/{nm}/{p_name}: retreat end {r_r.reason}")
-                    return False, None, None, f"retreat end {r_r.reason}"
-                with self.ikc.ignoring([support, self.objects[nm]] + braced_objs + driven_objs):
-                    _q_pol, res_r = self.ikc.polish_witness(r_r.q, r_end, push_arm, ignore=[])
-                if res_r > 0.005:
-                    fails.append(f"{b_name}/{nm}/{p_name}: retreat end {res_r * 1000:.1f} mm beyond the arm's reach")
-                    return False, None, None, f"retreat end {res_r * 1000:.1f} mm beyond the arm's reach"
-                q_both = r_g.q.clone()
-                q_both[idx_other] = q_seed[idx_other]
-                # with a brace the two contact configurations are checked together at 5 mm; a single-handed push only needs its own
-                # (collision-aware) IK - the 5 mm margin against the idle other arm rejected every row push of 0919-233714
-                with self.ikc.ignoring([support, self.objects[nm]] + braced_objs):
-                    free = bool(self.kit.collision_free(q_both, margin=0.005 if braced_objs else 0.0)[0])
-                if not free:
-                    fails.append(f"{b_name}/{nm}/{p_name}: the two arms collide at the contacts")
-                    return False, None, None, "the two arms collide at the contacts"
-                rec = annotate_height_extra(ContactRecord("push", push_arm, p_pre, p_init, None, p_goal, d3, float(dist) + standoff, object=nm), self).to_sidecar()
-                rec["pose_class"] = p_name
-                rec["standoff_m"] = standoff
-                if driven:
-                    rec["driven"] = list(driven)
-                # the chain's pre configuration as the program check's / oracle's IK seed (``q_hint``, the press mechanism of
-                # articulation_small): the branch the sampler's chain check passed in
-                q_hint = self.ikc.solutions.get((push_arm, self.ikc._pose_key(p_pre)))
-                if q_hint is not None:
-                    rec["q_hint"] = [round(float(v), 5) for v in q_hint.tolist()]
-                if p_half is not None:
-                    rec["blade_half_thickness_m"] = float(p_half)
-                return True, rec, (qs or []) + [r_w.q, r_r.q], ""
-
-            # a class's two wrist turns by the orientation rule (owner 2026-09-27); the classes in their order
-            chosen_p, dec_p, _fails_p = O.choose_first(self.ikc, push_arm, cands, key=lambda c: c[0], label=lambda c: c[2],
-                                                       chain=lambda c: [C.pre_pose((c[0][0] - d3 * standoff, c[0][1])), (c[0][0] - d3 * standoff, c[0][1])],
-                                                       evaluate=evaluate, q_start=q_seed, camera_idx=[1], stage="pack push")
-            if chosen_p is not None:
-                found = dict(chosen_p.result, **_orient_extra(dec_p))
-            if found is None:
-                return None, f"{nm}: no push class passes ({len(fails)} failures; e.g. {sorted(set(fails))[:3]})"
-            recs.append(found)
-        return recs, ""
 
     def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance) -> str:
         """Right-hand push of ``pushed`` along ``direction`` by the place margin while the closed left gripper braces
