@@ -2440,6 +2440,19 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   cases are the camera vs bar_egwapq_0 (the init support; nothing else frees it), clear at 3 mm (66) / 4 (6) / 2 (1): the buffered spheres'
   narrow gap, not a collision. The sink is not blocked (i7i2_sink + i7i2_sinkdiag2: 11 att, 8 written, 8 / 8 ok); the fix (the hull fallback
   extended to the wrist camera at the policed support) is a shared gate - asked, not implemented.
+- **Owner 5t (2026-11-08c), the arm side for "inside" only.** SurfaceTouchingMode (touching_large_02, the umbrella on the hall tree's board,
+  relation "touching") subclasses InsideMode and so inherited stance C's two switches. 4f973d68: `ISPATIALGYM_INSIDE_ARM_SIDE` and the
+  stance-C map cap (`ISPATIALGYM_INSIDE_MAP_CAP`) act only with relation "inside" (unit test: the surface place's stance C with both on equals
+  both off, a map-view band included; with relation "inside" they act). 440d3c89: `ISPATIALGYM_INSIDE_ARM_SIDE` DEFAULT ON ("0" off).
+  Readers now: the 15 inside_large_scale variants only (counted inside_large_01 - its `inside_goal_lateral_m` 0.3 keeps its aim, the
+  other-end lateral is added -, 02, 03). Confirmation i7i2_armdef (trunk_440d3c89, v2maps_int1, N 4 v2only): 12 att / 4 written / 3 of 4 ok,
+  0.28 GPU-h per success (j2B 0.31, j2A 0.45), `inside_arm_side.aimed` 12; stance-C place-IK joint-2 failures 1.7 per attempt (j2A 2.9,
+  j2B 1.3; every joint-2 IK line 7.3 / 8.1 / 6.6). touching_large_02 is tested with both switches once the umbrella has grasps (5q.2).
+- **Owner 5x.2, the place map's joint margin.** 4b3ca4f1: the place rule's opt-in field `joint_margin_rad` (in the rule / key only when set):
+  a pre-place or release IK solution counts only with every working-arm joint at least that far from its limits (0.05 rad = the exact
+  check's `JOINT_LIMIT_MARGIN`); a margin map serves the same lookups (the field is not compared); `meta.joint_margin` counts the dropped
+  seeds / problems. Fridge maps rebuilt with 0.05 (record `$OFH/interior2_jm_20261108`), staged in `v2maps_int2_jm`; A/B i7i2_jmA
+  (v2maps_int2) vs i7i2_jmB (margin maps), same code / indices / backend, arm side on.
 
 ## Limitations / not done
 
