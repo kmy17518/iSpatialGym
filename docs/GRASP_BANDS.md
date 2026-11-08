@@ -2471,7 +2471,13 @@ cuRobo attach sphere fitting). Every demo ended `oracle_failed:timeout` at actio
 the oracle's 3000-action-step budget (`eval/instances.DEFAULT_MAX_STEPS`: no demo length, no --max-steps); 320100 / 320102 had three
 blocks seated within 1 mm, 320101 / 320103 three blocks 4.0-4.5 cm off their slots (not diagnosed). The eval85 block_design_01
 successes took 3520 / 4149 steps. The step budget is a shared gate: the owner decides (measurement: recollect with
-`ISGF_COLLECT_EXTRA="--max-steps 6000"`, RECOLLECT_RESULT).
+`ISGF_COLLECT_EXTRA="--max-steps 6000"`, slurm 18381777: 4 / 4 SUCCESS at 3267 / 3382 / 3457 / 3512 action steps, every block <= 1 mm -
+the 4 cm of 320101 / 320103 were mid-program - demo walls 635-904 s, 0.46 GPU-h). GPU-h per success: off / early - (0 ok); fix +
+recollect (0.82 + 0.46) / 4 = 0.32, one job with the larger budget ~0.21-0.23 (estimate).
+
+Needs the owner: (a) the demo step budget for block design (`DEFAULT_MAX_STEPS` 3000 without a demo length is a shared gate; e.g.
+`--max-steps 6000` for the block_design collectors via `ISGF_COLLECT_EXTRA`, or a per-family budget); (b) the defaults of
+`BD_BOARD_EARLY` / `BD_BOARD_SEARCH` (both off; they act only on board variants).
 
 ## Limitations / not done
 
