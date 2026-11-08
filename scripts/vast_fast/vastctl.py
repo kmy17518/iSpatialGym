@@ -684,17 +684,16 @@ def tick(c, s3, state):
     for s in states.values():
         if s["status"] in ("assigned",) and s["id"] in dones:
             d = r2_json(s3, f"done/{s['id']}.json") or {}
-            host_fail = (d.get("rc") not in (0, None) or d.get("error")) and not d.get("attempts") and s["tries"] < C["retries"]
+            # a job that made no sampling attempt at all (inputs failed, Kit died at its first frame, ...) runs once more on another
+            # instance before its result counts; the instance is kept (a code error fails everywhere: the second result is synced)
+            host_fail = (not d.get("attempts")) and not s.get("zero_retried") and s["tries"] < C["retries"]
             if host_fail:
-                s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t})
-                ledger("bad_machine", machine_id=s.get("machine_id"), instance=s.get("instance"), reason=f"job {s['id']} rc={d.get('rc')} 0 attempts")
-                log(f"REQUEUE {s['id']}: rc={d.get('rc')} err={d.get('error')} with 0 attempts on {s.get('instance')} (host suspect)")
-                bad_iid = s.get("instance")
+                s["history"].append({"instance": s.get("instance"), "rc": d.get("rc"), "error": d.get("error"), "time": t, "zero_attempts": True})
+                ledger("suspect", machine_id=s.get("machine_id"), instance=s.get("instance"), job=s["id"], rc=d.get("rc"), error=d.get("error"))
+                log(f"REQUEUE {s['id']}: rc={d.get('rc')} err={d.get('error')} with 0 attempts on {s.get('instance')}")
                 s3.delete_object(Bucket=BUCKET, Key=f"{PREFIX}/done/{s['id']}.json")
-                s3.delete_object(Bucket=BUCKET, Key=f"{PREFIX}/assign/{bad_iid}/{s['id']}.json")
-                s.update(status="queued", instance=None)
-                if bad_iid in live:
-                    r2_put(s3, f"ctl/stop_{bad_iid}", "host suspect")
+                s3.delete_object(Bucket=BUCKET, Key=f"{PREFIX}/assign/{s.get('instance')}/{s['id']}.json")
+                s.update(status="queued", instance=None, zero_retried=True, avoid=s.get("instance"))
                 save_state(s)
                 continue
             try:
@@ -741,7 +740,7 @@ def tick(c, s3, state):
         for s in list(queued):
             if free <= 0:
                 break
-            if s.get("gpu") and s["gpu"] != gpu:
+            if (s.get("gpu") and s["gpu"] != gpu) or s.get("avoid") == iid:
                 continue
             try:
                 spec = stage(s3, s, state)
