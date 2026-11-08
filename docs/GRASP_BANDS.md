@@ -2491,6 +2491,50 @@ template exists yet. Rerun once 6.1 lands: `$OFH/ft2_20261108/chain72b.sh`'s tem
   narrow gap, not a collision. The sink is not blocked (i7i2_sink + i7i2_sinkdiag2: 11 att, 8 written, 8 / 8 ok); the fix (the hull fallback
   extended to the wrist camera at the policed support) is a shared gate - asked, not implemented.
 
+#### The wrist-camera hull fallback (branch i7-camhull, 2026-11-08; owner_20261108g item 1)
+
+The owner approved this shared-gate change behind a switch. The default stays the owner's decision after the A/B.
+
+- **Rule (5e4fc9c4, `ISPATIALGYM_CAMERA_HULL_FALLBACK` = `0` default / `shadow` / `1`).** `orient.camera_clear` stays the screen: the
+  camera's padded spheres must keep 5 mm from the world at a grasp configuration. A NARROW failure is judged by the camera's exact hull:
+  - narrow means the spheres clear at 5 mm less the model's 2 mm buffer, and clear at 5 mm with the policed supports out of the world;
+  - the hull (role `wrist_camera`) must then clear the policed supports' registered planes by 0.5 mm.
+
+  The check is i7-plateqtf2's `contact_policy.hull_fallback`, reached through `IKChecker._hull_fallback`. That method gains margin / roles /
+  counter-prefix / mode parameters; its defaults are unchanged. The policed supports are the ones the support policy polices at that
+  exact-IK result, recorded by `exact` only when the switch is on or shadow. A configuration with no policed support, or a floor, keeps
+  today's verdict.
+- **Not double-applied.** The support policy's sphere stage (`ISPATIALGYM_SUPPORT_HULL_FALLBACK`) and FingerTouch (i7-ft2
+  `ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`) are untouched; this is the separate 5 mm camera rule. The support-top screen
+  (`tabletop.wrist_camera_clearance` < 5 mm) is counted only (`camera_policy.top_screen.*`, `tabletop.camera_top_clear`); its verdict never
+  changes.
+- **Identity, counters, tests.** Under `1` the cache scope gains `camera_hull_fallback`, but not the exact-IK key. Counters are
+  `camera_policy.hull_fallback_{checked,passed,shadow_pass,failed.<why>,error}`, with log lines `CAMERA_HULL_FALLBACK` / `CAMERA_TOP_SCREEN`.
+  `test_camera_hull_fallback.py` has 13 tests. The suite matches the base eec4ca60: the same 23 failed + 3 errors from the env.
+- **Count (record `$OFH/camhull_20261108`).**
+  - Logs: every v2 log, including i7-ft2's sink templates. Of 103 aliases, the camera rule refused anything in only 11; 92 never hit it.
+  - Shadow runs `ch_sh`: N 4, judged -> would pass, with the hull clearance:
+
+    | alias | judged -> would pass | hull clearance |
+    |---|---|---|
+    | inside_large_03 | 27 -> 27 | 3.55-5.40 mm |
+    | under_small_03 | 34 -> 34 | 4.76-6.11 mm |
+    | under_small_01 | 2 -> 2 | 4.01 mm |
+    | nextto_02 | 0 (its 59 are the support-top screen, all deeper than the buffer) | - |
+    | touching_04, touching_01 | 0 | - |
+
+- **A/B** (v2only N 4, the same indices 335000-3, svl):
+
+  | alias | arm | att / written / ok | GPU-h (per success) | camera judged |
+  |---|---|---|---|---|
+  | inside_large_03 | shadow | 4 / 4 / 4 | 0.64 (0.16) | 27 (exact IK 109 per attempt) |
+  | inside_large_03 | on | 4 / 4 / 4 | 0.54 (0.135) | 5 passed (exact IK 48 per attempt) |
+  | under_small_03 | shadow | 27 / 3 / 2 | 1.14 (0.57) | 34 |
+  | under_small_03 | on | 29 / 4 / 4 | 1.07 (0.27) | 12 passed |
+
+  The arm with the switch on had 0 refusals and 0 demo failures. The success gain is within N 4 noise. The counters show the rule acts only
+  on narrow camera-vs-support gaps whose hulls clear by 3.5 mm or more. The default stays off: the owner decides.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
