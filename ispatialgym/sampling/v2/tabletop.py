@@ -1351,6 +1351,13 @@ def map_view_of(s, rm) -> RB.ReachBands:
     view = MS.as_bands(rm, overhang=0.0)
     view._map_tilt_sampler = s
     view.meta["map_tilt"] = MT.view_tag(str(rm.meta.get("key")))
+    if view.meta["map_tilt"] is not None:
+        # i7-plateqtf2 (owner 2026-11-08 02:35 item 5): which merged overlay version the view applies and how it was pinned (r<M> = a release)
+        ov = MT.overlay_of(str(rm.meta.get("key")))
+        view.meta["map_overlay"] = {"version": int(ov.base_version), "pin": ov.pin}
+        _count(s, f"map_overlay.read_v{int(ov.base_version)}")
+        if ov.pin == "latest":
+            _count(s, "map_overlay.unpinned")
     return view
 
 
@@ -1389,7 +1396,8 @@ def v2_map_view(s, spec: BandSpec, top, arm: Optional[str] = None) -> Optional[R
     return map_bands(s, spec, top, arm)
 
 
-def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joints: Optional[Dict[str, float]] = None, police: bool = True) -> RB.ReachBands:
+def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joints: Optional[Dict[str, float]] = None, police: bool = True,
+                       place: Optional[Dict[str, Any]] = None) -> RB.ReachBands:
     """i7-lean 2026-11-07 (owner decision; prompt I item 7, the INTERIOR kind): the interior reach map of the spec's LEAN rest
     (``reach_maps`` kind ``interior``) inside the compartment the sampler works on, as a band view (``map_sampling.as_bands``, overhang 0:
     the stand-offs = the map's edge distances to the compartment's front plane). The compartment is the registry's spec of the support at
@@ -1401,7 +1409,10 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     ``missing_map`` - there is no legacy fallback for a lean rest. ``joints`` (the fridge, inside_large_scale_02): the support's joint values
     (``generation.partner_joint_init`` applied) - the spec must have been measured at them (the door's open box is in its identity).
     ``police`` False: no support-policy registration (a PLACE band - the goal side of iors_large_inside: the grasp scope never polices it).
-    The entry's rest is the key's (a lean key: its lean rest; a plain key: the stable rest)."""
+    The entry's rest is the key's (a lean key: its lean rest; a plain key: the stable rest). i7-interior 2026-11-07: ``place`` (an
+    ``interior_place.place_rule``: the goal side of iors_large_inside at a stable rest) - only an interior PLACE map whose rule covers it
+    serves (the former interior maps judged the whole robot at the rest pose: stricter than stance C's exact place); the rule goes into the
+    MAP_REQUEST."""
     arm = arm or spec.arm
     from ispatialgym.grasping import contact_policy as CP
     from ispatialgym.sampling import interiors as IN
@@ -1414,6 +1425,8 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     req = dict(kind="interior", plane="interior", h=round(h, 4), arm=arm, support=support, scene=scene, grasp_key=spec.grasp_key)
     if joints:
         req["joints"] = {str(k): round(float(v), 4) for k, v in joints.items()}
+    if place is not None:
+        req["interior_place"] = place
 
     def miss(why: str):
         log.info("interior reach map miss for %s (%s) in %s at h %.4f, %s arm: %s", spec.object, spec.grasp_key, support, h, arm, why)
@@ -1437,13 +1450,14 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
         miss("no maps root (ISPATIALGYM_REACH_MAPS)")
     root = os.path.join(map_sampling_root(), entry)
     rm = RMAP.ReachMap.find(root, lib, float(ispec.height_m), rest_id=rid, arm=arm, anchors=None, kind="interior", policy_key=CP.DEFAULT.key(arm),
-                            robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec)
+                            robot=RMAP.robot_digest(), config_require=_map_config_require(), interior=ispec, interior_place=place)
     if rm is None:
-        miss(f"no map of {ispec.name} ({ispec.digest()}) in {root}")
+        miss(f"no map of {ispec.name} ({ispec.digest()}){' under the place rule' if place is not None else ''} in {root}")
     if police:
         _register_map_policy(s, lib, rid, {support: float(top.z)})
     view = MS.as_bands(rm, overhang=0.0)
-    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid, "rest_id": rid})
+    view.meta.update({"interior": ispec.name, "interior_digest": ispec.digest(), "lean_rest": rid, "rest_id": rid,
+                      "interior_place": (rm.meta.get("config") or {}).get("interior_place")})
     log.info("interior reach map hit for %s in %s (%s) at h %.4f, %s arm: %s", spec.object, support, ispec.name, h, arm, rm.path)
     return view
 
@@ -5255,6 +5269,20 @@ def _phase3_draw(s, F, rng, jitter, n_positions, focus_radius, fx, pose_at, hull
                     fb = support_policy_fallback(s, st_of.get(arm_c, st_of[a0]), arm_c, pose, hull, eef_in_object, exact_kw)
                     if fb is not None:
                         res, eef, pre, eef_in_object, sp_note = fb["res"], fb["eef"], fb["pre"], fb["eio"], fb["note"]
+            if not res.ok and getattr(s, "overhang_fallback_enabled", False):
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 2): a SIDE grasp failing for a reason the sampler cannot fix (the support policy)
+                # falls back to the overhang pick - push the object over the support edge, grasp the overhang (v2/overhang_fallback.py)
+                from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+                fb_ov = OF.try_fallback(s, st_of[a0], a0, g, pose, str(res.reason), twins, name, eef_of)
+                if fb_ov is not None:
+                    t_ov, rec = fb_ov
+                    NB.note_grasp_from(top, fp, rec)
+                    if st_of[rec.arm] is not manip:
+                        adopt_arm(manip, st_of[rec.arm])
+                    rec.stance = manip.name
+                    _scene_mask_draw_note(s, yaw0, g, a0, fails_at, fails, "ok")
+                    return t_ov, rec
             n_ik += 1
             if not res.ok:
                 fails["ik"] += 1

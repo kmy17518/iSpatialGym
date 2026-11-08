@@ -43,12 +43,13 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put, cache_root  # train-fast 2026-10-31: the SPA lateral-cell memo on disk
 from ispatialgym.sampling.sim_utils import PARK_POSITION, Reject, SupportTop
-from ispatialgym.sampling.tasks.base import Draft
+from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import contact_poses as CPZ  # i7-contact 2026-11-07: the touching push / brace pose rules (shared with the contact maps)
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
+from ispatialgym.sampling.v2 import overhang_fallback as OF
 from ispatialgym.sampling.v2 import program_check as PC
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, TemplateExhausted, annotate_height_extra, contact_height_extra, register, requested_height_extra
@@ -148,6 +149,17 @@ def _tabletop():
 
 from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band, nearer_side_lateral  # noqa: E402,F401  (pure rules, tested there)
 
+#: i7-plateqtf2 (owner decision 2026-11-08 02:35 item 3): the draw's pre-place frame rule - ``fingertip`` (default: the program check's
+#: fingertip point + 2 cm slack, ``IORSSmall.pre_place_frame_ok``) or ``box`` (the eef box, the rule before)
+PREPLACE_FRAME_RULE_ENV = "ISPATIALGYM_PREPLACE_FRAME_RULE"
+
+
+def pre_place_frame_rule() -> str:
+    v = (os.environ.get(PREPLACE_FRAME_RULE_ENV, "") or "fingertip").strip().lower()
+    if v not in ("fingertip", "box"):
+        raise ValueError(f"{PREPLACE_FRAME_RULE_ENV}={v!r}: expected fingertip or box")
+    return v
+
 
 def left_contact_band_cells(s, trunk: Tuple[float, float], height: float, stance=None):
     """Base-frame cells of the left-arm generic CONTACT band (closed gripper, brace approach; one band per object height
@@ -239,6 +251,11 @@ PAIR_STAGGER_MAX_M = 0.03
 START_REGION_LATERAL_DRAWS = 4
 #: A1: partner orientations tried per attempt, each with the start region's gap interval re-evaluated at the drawn target pose
 PARTNER_YAW_DRAWS = 16
+#: owner A1 (2026-11-08): the stand-offs a touching push stance may take (the touch_push maps' edge distances 0.35 / 0.45 / 0.55 and closer
+#: ones: the placed target sits 0.66-0.93 m ahead, the map reaches ~0.75 m); the whole-body collision check is the lower limit
+PUSH_STANCE_STAND_OFFS_M = (0.15, 0.20, 0.25, 0.30, 0.35, 0.45, 0.55)
+#: owner A1: at most this many map-feasible push stances get the exact push-chain checks
+PUSH_STANCE_MAX_EXACT = 8
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -646,6 +663,15 @@ def place_approached(s, inside: Optional[bool] = None) -> List[Any]:
 @register(*RELATION_OF_SUBTASK)
 class IORSSmall(SamplerV2):
     """One class for the five small-scale relations; the relation comes from the subtask id."""
+
+    @property
+    def overhang_fallback_enabled(self) -> bool:
+        """i7-plateqtf2 (owner 2026-11-08 02:35 item 2): the side grasp's overhang fallback in ``tabletop._phase3_draw``
+        (``v2/overhang_fallback.py``) - for the relations whose program is ``programs.program_iors_small`` (its pick takes the recorded
+        push: ``_pick_actions``); touching's program picks without it."""
+        from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+        return OF.on() and getattr(self, "relation", None) != "touching"
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -2200,6 +2226,7 @@ class IORSSmall(SamplerV2):
                             raise
                         self.sidecar.stances.pop("manipulation", None)
                         self.sidecar.grasps.clear()
+                        OF.drop_records(self)
                         g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=self.support_objects(),
                                                        scale_key=self.choice.models["target"].scale, support_z=float(self.top.z), why=f"[{e.reason}] {e}")
                         if g2 is None:
@@ -2240,6 +2267,7 @@ class IORSSmall(SamplerV2):
                 errors.append(f"candidate {int(k)}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.grasps.clear()
+                OF.drop_records(self)
         if self.start_region_exhausted():
             raise TemplateExhausted("target_placement", f"start region exhausted: no candidate left after {self.counters.get('travel_dropped', 0)} deterministic "
                                                         f"init -> manipulation travel failures ({'; '.join(errors[-3:])})")
@@ -2256,7 +2284,7 @@ class IORSSmall(SamplerV2):
 
             def frame_score(pp, _cam=cam_m):
                 place_g = IK.grasp_pose(self.goal_pose(t_pose, pp), grasp.eef_in_object)
-                return min(self.ikc.eef_frame_margin(place_g, _cam), self.ikc.eef_frame_margin(self.pre_place_of(place_g), _cam))
+                return min(self.ikc.eef_frame_margin(place_g, _cam), self.pre_place_frame_margin(self.pre_place_of(place_g), _cam))
             # goal_pose reads the sidecar's manipulation stance (abv2_rank 2026-11-07: KeyError 'manipulation' in 21 / 21 iors_small runs): it is
             # registered here, before the partner draw, instead of after it (the caller pops it again when this candidate is rejected)
             self.sidecar.add_stance(manip)
@@ -2307,6 +2335,8 @@ class IORSSmall(SamplerV2):
         grasp.place_on = pname
         self.sidecar.add_stance(manip)
         self.sidecar.add_grasp(grasp)  # (popped again by the caller when this candidate is rejected)
+        if OF.record(self, grasp):  # i7-plateqtf2: the overhang fallback's push (contacts.push_pick) and grasps[0].pick_overhang
+            d.summary["pick_overhang"] = _jsonable(OF.summary(grasp))
         # the place / pre-place of this candidate must project into its manipulation image (owner 1b: the FOV
         # monitor arms from the pre-pose): checked here, before the settle, so the next candidate is tried instead of
         # the attempt dying in the goal check (inside: release rim + 4-5 cm and the pre-place 10 cm above it)
@@ -2315,11 +2345,14 @@ class IORSSmall(SamplerV2):
             goal_guess = self.goal_pose(t_pose, p_pose)
             place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
             for what, pose in (("place", place_guess), ("pre-place", self.pre_place_of(place_guess))):
-                if not self.ikc.eef_in_frame(pose, cam_manip):
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 3): the place (a contact pose) keeps the eef box; the pre-place is judged as the
+                # program check judges it (the fingertip point, QA's 5 % + 2 cm slack: pre_place_frame_ok)
+                if not (self.ikc.eef_in_frame(pose, cam_manip) if what == "place" else self.pre_place_frame_ok(pose, cam_manip)):
                     # of-v2maps 2026-11-06: opt-in ISPATIALGYM_FRAME_DIAG (the projected box / fingers, a rendered image for the first few)
                     TT.frame_diag(self, manip, grasp.arm, pose, what, obj=self.obj("target"), obj_pose=goal_guess, cam_pose=cam_manip,
                                   tag=f"candidate {int(k)} grasp {getattr(grasp, 'grasp_name', '')}")
-                    raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
+                    rule = "eef pose" if what == "place" or pre_place_frame_rule() == "box" else "fingertip (+2 cm slack)"
+                    raise Reject("gripper_not_in_frame", f"{what} {rule} outside the manipulation image (5 %) for candidate {int(k)} "
                                                          f"(trunk {manip.translate}, {manip.tilt:.2f})")
         # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the
         # object attached must pass the exact IK (margin + reach quality) from THIS candidate's stance - else the
@@ -2584,6 +2617,7 @@ class IORSSmall(SamplerV2):
             faces_yaws = [self.pair_partner_yaw(t_pose)]  # the front at the required turn from the target's
         errors = []
         p_pose = None
+        push_only: Optional[Tuple[G.Pose, Dict[str, Any], Dict[str, Any]]] = None  # owner A1: the first position whose push fits a push stance
         # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
         # footprints (long side along / across the edge) alternate over the tries; without it a random yaw per try
         yaw0 = (self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else
@@ -2598,11 +2632,21 @@ class IORSSmall(SamplerV2):
                 continue
             p_pose = pose
             if maps:
-                g = self.contact_map_gate(manip, self.place_pose_for(t_pose, p_pose, manip), p_pose)
+                t_place = self.place_pose_for(t_pose, p_pose, manip)
+                g = self.contact_map_gate(manip, t_place, p_pose)
                 if g["ok"]:
                     self._brace_gate = g
                     return p_pose
-                errors.append(g["why"])
+                # owner A1 (2026-11-08): the push happens from the push stance, which moves along AND toward / away from the edge - the
+                # maps over those candidates decide (map lookups only)
+                a1 = self.push_map_any(manip, t_place, p_pose)
+                if a1["pair_any"]:
+                    self._brace_gate = dict(g, ok=True, why=None, at="a push stance candidate (owner A1)", a1=a1)
+                    TT._count(self, "touch_push.gate_at_push_stance")
+                    return p_pose
+                if a1["push_any"] and push_only is None:
+                    push_only = (p_pose, dict(self.partner_draw or {}), a1)
+                errors.append(f"{g['why']} (push stances: {a1['n']})")
                 continue
             if left_cells is None or right_cells is None:
                 self._brace_gate = {"ok": None, "why": "left contact band unavailable"}  # unknown: the two-arm IK decides
@@ -2618,8 +2662,15 @@ class IORSSmall(SamplerV2):
         if p_pose is None:
             raise Reject("partner_placement", f"no partner yaw of 8 admits a gap on the {TT.side_name(side)} of the target ({'; '.join(misses[-3:])})")
         if maps:
-            self._brace_gate = {"ok": False, "maps": True, "why": f"none of 8 partner positions has the push (touch_push map) and the brace (touch_brace map) "
-                                                                  f"feasible at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
+            if push_only is None:
+                # owner A1 (2026-11-08): the push fails the map from every push stance at every partner position - the attempt would grasp, lift
+                # and place before dying in goal_check (i7_contact2: 107 / 150 attempts); rejected here instead
+                TT._count(self, "touch_push.partner_rejected")
+                raise Reject("contact_unreachable", f"touching partner draw: no push stance (laterals x stand-offs) has a feasible touch_push class at any "
+                                                    f"of 8 partner positions (trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]})")
+            p_pose, self.partner_draw, a1 = push_only
+            self._brace_gate = {"ok": False, "maps": True, "a1": a1, "why": f"none of 8 partner positions has the push (touch_push map) and the brace (touch_brace map) "
+                                                                            f"feasible together from any push stance at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
             return p_pose
         self._brace_gate = {"ok": False, "why": f"none of 8 partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace point "
                                                 f"in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
@@ -4157,7 +4208,11 @@ class IORSSmall(SamplerV2):
         self.note_pair_goal(draft, goal, (p.clone(), q.clone()), self.sidecar.stance("manipulation"))
         # the recorded grasp poses follow the settled target pose (what the oracle re-derives from the loaded instance)
         grasp = self.sidecar.grasp_of(tname)
-        if grasp is not None and grasp.eef_in_object is not None:
+        if grasp is not None and (grasp.extras or {}).get("pick_overhang"):
+            # i7-plateqtf2 (item 2): an overhang grasp is taken where the push leaves the object (the record's post_push_pose, settled by
+            # the overhang pick's own physics settle) - not re-derived from the settled INIT pose, never re-selected there
+            draft.summary["target_settle"] = self.settle_motion(draft, tname)
+        elif grasp is not None and grasp.eef_in_object is not None:
             grasp.grasp = IK.grasp_pose(draft.object_poses[tname], grasp.eef_in_object)
             grasp.pre_grasp = IK.pre_pose(grasp.grasp)
             manip = self.sidecar.stance("manipulation")
@@ -4502,7 +4557,7 @@ class IORSSmall(SamplerV2):
                                       approached=approached_place)
 
         res = descent(pre_place, place)
-        if not res.ok and res.code and "self-collision (attached_object" in res.reason:
+        if not res.ok and res.code and "self-collision (attached_object" in res.reason and not (grasp.extras or {}).get("pick_overhang"):
             # A7 relay (oracle, 2026-09-16 21:07): a collision appearing along the descent between the carried object and the
             # forearm / torso / head is a genuine infeasibility of *this* grasp yaw / approach class, not a hand-fixed pair
             # (those are not checked) — try the other library grasps at the settled init pose before rejecting
@@ -4758,14 +4813,16 @@ class IORSSmall(SamplerV2):
             out["diag_error"] = repr(e)[:200]
         return out
 
-    def push_stance_for(self, manip: Stance, t_place_pose: G.Pose, lateral: Optional[float] = None) -> Optional[Stance]:
+    def push_stance_for(self, manip: Stance, t_place_pose: G.Pose, lateral: Optional[float] = None, stand_off: Optional[float] = None) -> Optional[Stance]:
         """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge, same
         trunk, so that the push contact (the placed box's right face) lies at ``push_contact_lateral_m`` from the robot's centre
         line (default -0.12: every push that worked had it 7-18 cm right of centre; at -0.05 the right arm crosses the body
         and joints 2 / 3 sit on their limits, 0918-173814). The box is carried there in hand and set down from there.
         Pure geometry (nothing recorded); None when the shift is below ``push_stance_min_shift_m`` or the feature is off
         (``generation.push_stance``). Shelf layout: the contact on the target's face away from the partner and the right hand's
-        lateral mirrored for the left hand (+0.12: left of centre), the stance's working arm the shelf push arm."""
+        lateral mirrored for the left hand (+0.12: left of centre), the stance's working arm the shelf push arm. ``stand_off`` (owner A1,
+        2026-11-08, :meth:`push_stance_candidates`): the stance also moves toward / away from the edge to that stand-off (None: the
+        manipulation stance's); a stand-off change alone is a push stance too."""
         if self.relation != "touching" or not bool(self.gen("push_stance", True)):
             return None
         tangent = manip.tangent
@@ -4779,10 +4836,15 @@ class IORSSmall(SamplerV2):
             if lateral is None:
                 want = sg * float(self.gen("push_contact_lateral_m", -0.12))
         dlat = float(lat_work - want)
+        so_manip = float(manip.stand_off) if manip.stand_off is not None else None
+        d_so = 0.0 if (stand_off is None or so_manip is None) else float(stand_off) - so_manip
         if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
-            return None
-        target_xy = G.t(manip.base_xy) + G.t(tangent) * dlat
-        cands = [manip.shifted(lateral=manip.lateral + s * dlat, name="push") for s in (1.0, -1.0)]  # the edge frame's lateral sign
+            if abs(d_so) < 1e-6:
+                return None
+            dlat = 0.0
+        so_new = None if abs(d_so) < 1e-6 else float(stand_off)
+        target_xy = G.t(manip.base_xy) + G.t(tangent) * dlat - G.t(manip.inward) * d_so
+        cands = [manip.shifted(stand_off=so_new, lateral=manip.lateral + s * dlat, name="push") for s in (1.0, -1.0)]  # the edge frame's lateral sign
         st = min(cands, key=lambda c: float(th.linalg.norm(G.t(c.base_xy) - target_xy)))
         st = st.with_trunk(manip.translate, manip.tilt, "push")
         st.focus, st.arms = G.t(t_place_pose[0]).clone(), ["right"]
@@ -4790,7 +4852,68 @@ class IORSSmall(SamplerV2):
             st.arms = [self.shelf_push_arm()]
         st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4), "push_contact_lateral_m": round(float(lat_work - dlat), 4),
                           "rule": "base moved along the edge (box in hand) so the push contact lies at push_contact_lateral_m from the centre line"})
+        if so_new is not None:
+            st.extras.update({"stand_off_shift_m": round(d_so, 4), "stand_off_rule": "owner A1 2026-11-08: the stand-off chosen from the touch_push map"})
         return st
+
+    def push_stance_stand_offs(self, manip: Stance) -> List[float]:
+        """Owner A1 (2026-11-08): the stand-offs a touching push stance may take - ``generation.push_stance_stand_offs_m`` (default
+        :data:`PUSH_STANCE_STAND_OFFS_M`: the touch_push maps' edge distances and closer ones) plus the manipulation stance's own. The lower
+        limit is the base's distance to the table: every candidate passes the whole-body collision check (:meth:`push_stance_candidates`)."""
+        vals = [float(v) for v in (self.gen("push_stance_stand_offs_m", None) or PUSH_STANCE_STAND_OFFS_M)]
+        if manip.stand_off is not None:
+            vals.append(float(manip.stand_off))
+        return sorted({round(v, 4) for v in vals})
+
+    def push_stance_candidates(self, manip: Stance, t_place_pose: G.Pose, laterals: Sequence[float], p_pose: Optional[G.Pose] = None,
+                               collision: bool = True) -> Tuple[List[Tuple[float, Optional[Stance], Dict[str, Any]]], Dict[str, Any]]:
+        """Owner A1 (2026-11-08, under v2only, sampler-only): the push stance moves along the edge (the contact laterals) AND toward / away
+        from it (:meth:`push_stance_stand_offs`), the stand-off chosen from the target's ``touch_push`` map at its place pose: the candidates
+        whose map lookup has a feasible push class, those whose partner (``p_pose``) also fits the ``touch_brace`` map first, then per
+        lateral (in the laterals' order) the stand-off nearest the manipulation stance's (least base travel). With ``collision`` the
+        candidates pass the whole-body collision check (the base's minimum distance to the table: the footprint against the support).
+        Returns ``([(lateral, stance or None = the manipulation stance, lookup facts)], facts)``."""
+        pm, bm = self.contact_maps_of_pair()
+        so_m = float(manip.stand_off) if manip.stand_off is not None else 0.0
+        rows: List[Tuple[Tuple[int, int, float], float, Optional[Stance], Dict[str, Any]]] = []
+        n_all = n_map = 0
+        for li, lat in enumerate(laterals):
+            for so in self.push_stance_stand_offs(manip):
+                cand = self.push_stance_for(manip, t_place_pose, lateral=lat, stand_off=so)
+                probe = cand if cand is not None else manip
+                n_all += 1
+                w = TT.contact_map_check(pm, probe, t_place_pose)
+                if not w["ok"]:
+                    continue
+                n_map += 1
+                b_ok = bool(TT.contact_map_check(bm, probe, p_pose)["ok"]) if (p_pose is not None and bm is not None) else False
+                facts = {"lateral": lat, "stand_off": so, "push_feasible": list(w.get("feasible") or []), "brace_map": b_ok, "cell": w.get("cell")}
+                rows.append(((0 if b_ok else 1, li, abs(so - so_m)), lat, cand, facts))
+        rows.sort(key=lambda r: r[0])
+        seen, out = set(), []
+        for _k, lat, cand, facts in rows:
+            key = None if cand is None else (round(float(cand.base_pose2d[0]), 4), round(float(cand.base_pose2d[1]), 4))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((lat, cand, facts))
+        n_free = len(out)
+        if collision and out:
+            stances = [c for _l, c, _f in out if c is not None]
+            free = self.ikc.stances_collision_free(stances).tolist() if stances else []
+            ok = {id(c): bool(f) for c, f in zip(stances, free)}
+            out = [r for r in out if r[1] is None or ok.get(id(r[1]), False)]
+            n_free = len(out)
+        return out, {"candidates": n_all, "map_feasible": n_map, "collision_free": n_free}
+
+    def push_map_any(self, manip: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
+        """Owner A1 (2026-11-08): the touch_push / touch_brace maps over every push stance candidate (:meth:`push_stance_candidates`: map
+        lookups and the batched whole-body collision check of the map-feasible stances - the base's limit at the table; i7_contactfu on the
+        bar: the map fitted only at stand-offs < 0.35 m, where the base collides, so a map-only test passed 65 partner draws that died in
+        goal_check): ``{"push_any", "pair_any", "n"}``."""
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        rows, facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose, collision=True)
+        return {"push_any": bool(rows), "pair_any": any(f["brace_map"] for _l, _c, f in rows), "n": facts}
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
         """Record the ``push`` stance of ``push_stance_for``: whole-body check with the objects at the place, the path
@@ -4823,8 +4946,19 @@ class IORSSmall(SamplerV2):
         best: Optional[Tuple[Tuple[float, int], Optional[Stance], bool]] = None  # ((height, unbraced), stance or None for the manipulation stance, manip_ok)
         tip_ok: List[Optional[Stance]] = []  # the tip release's laterals whose place passes (None = the manipulation stance itself)
         diag: List[Dict[str, Any]] = []  # i7-contact 2026-11-07: the laterals without a push class, in numbers (TOUCH_PUSH_DIAG)
-        for lat in laterals:
-            cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
+        plan = [(lat, self.push_stance_for(manip, t_place_pose, lateral=lat)) for lat in laterals]  # None = the manipulation stance already puts the contact there
+        if TT.contact_maps_on() and self.shelf_start is None and not self.shelf_tip():
+            # owner A1 (2026-11-08): the push stance also moves toward / away from the edge, the stand-off chosen from the touch_push map
+            # (the map-feasible (lateral, stand-off) candidates, brace-map ones first, nearest stand-off; collision-checked); none -> the laterals
+            # at the manipulation stand-off as before (the exact chain decides, TOUCH_PUSH_DIAG explains)
+            a1, a1_facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose)
+            draft.summary.setdefault("touching", {})["push_stance_a1"] = dict(a1_facts, tried=[{k: f[k] for k in ("lateral", "stand_off", "brace_map")} for _l, _c, f in a1[:PUSH_STANCE_MAX_EXACT]])
+            log.info("%s: A1 push stances %s: %s", self.gp.variant, json.dumps(a1_facts), [(f["lateral"], f["stand_off"], f["brace_map"]) for _l, _c, f in a1[:PUSH_STANCE_MAX_EXACT]])
+            if a1:
+                plan = [(lat, cand) for lat, cand, _f in a1[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]]
+            else:
+                TT._count(self, "touch_push.a1_no_map_stance")
+        for lat, cand in plan:
             probe = cand if cand is not None else manip
             if self.shelf_tip():
                 # oracle-fix 2026-11-04 round 4: the tip release keeps the second base pose for the PLACE (where the place passed under the push
@@ -4855,7 +4989,7 @@ class IORSSmall(SamplerV2):
             # oracle-fix 2026-11-06 (push_gripper_open_on): an open class's height is named too (today's mid-height classes carry none), and a
             # brace that joined today's class instead of the open push names that class
             both_push = both.split("+", 1)[0] if both else None
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or no_class}{f' @ {100 * h:.1f} cm' if h is not None else ''}"
+            tried.append(f"{lat:+.2f}{f' s{float(probe.stand_off):.2f}' if probe.stand_off is not None else ''}{' (manipulation)' if cand is None else ''}: {kind or no_class}{f' @ {100 * h:.1f} cm' if h is not None else ''}"
                          f"{'; place: ' + place_why if place_why else ''}"
                          f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}"
                          f"{f' (with {both_push})' if both_push and both_push != kind else ''}")
@@ -4935,7 +5069,10 @@ class IORSSmall(SamplerV2):
         self._brace_gate = self.brace_gate_at(st, t_place_pose, p_pose)
         self.sidecar.set_goal(st.base_pose2d, st.translate, st.tilt, arms="same")  # the goal observation is taken from the push stance
         draft.summary["push_stance"] = {"lateral_shift_m": st.extras["lateral_shift_m"], "base_pose2d": [float(v) for v in st.base_pose2d],
-                                        "path_length_m": st.extras["path_length_m"], "brace_gate": self._brace_gate}
+                                        "path_length_m": st.extras["path_length_m"], "brace_gate": self._brace_gate,
+                                        "stand_off": st.stand_off, "stand_off_shift_m": st.extras.get("stand_off_shift_m")}
+        if st.extras.get("stand_off_shift_m"):
+            TT._count(self, "touch_push.stand_off_moved")
         log.info("%s: push stance recorded %+.3f m along the edge (path %.2f m, box in hand)", self.gp.variant, st.extras["lateral_shift_m"],
                  float(st.extras["path_length_m"] or 0.0))
         return st
@@ -4961,6 +5098,28 @@ class IORSSmall(SamplerV2):
         if over:
             log.info("%s: the carried drive to the push stance passes %.3f m from the partner: the lift clears its top (%.2f m)", self.gp.variant, gap, grasp.carry_height)
 
+    def pre_place_frame_ok(self, pose: G.Pose, cam: G.Pose) -> bool:
+        """i7-plateqtf2 (owner decision 2026-11-08 02:35 item 3, a camera-frame rule change): the draw's pre-place frame check is the program
+        check's (``program_check.fingertip_frame_margin``: the fingertip point inside QA's 5 % margin plus 2 cm slack at the fingertip) instead
+        of the eef box (``IKChecker.eef_in_frame``), which was stricter than both the program check and QA (fingertip only) there.
+        ``ISPATIALGYM_PREPLACE_FRAME_RULE=box``: the box as before. Kit ``preplace_frame.checked`` / ``.rejected`` / ``.removed`` (the box
+        would have rejected, the fingertip rule passes)."""
+        if pre_place_frame_rule() == "box":
+            return bool(self.ikc.eef_in_frame(pose, cam))
+        fm = PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)
+        TT._count(self, "preplace_frame.checked")
+        if not fm["inside"]:
+            TT._count(self, "preplace_frame.rejected")
+        elif not self.ikc.eef_in_frame(pose, cam):
+            TT._count(self, "preplace_frame.removed")
+        return bool(fm["inside"])
+
+    def pre_place_frame_margin(self, pose: G.Pose, cam: G.Pose) -> float:
+        """The pre-place's frame margin (px; >= 0 passes) under :func:`pre_place_frame_rule` (the frame ranking's score)."""
+        if pre_place_frame_rule() == "box":
+            return float(self.ikc.eef_frame_margin(pose, cam))
+        return float(PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)["margin_px"])
+
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
         with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not. Opt-in
@@ -4969,6 +5128,11 @@ class IORSSmall(SamplerV2):
         tip_rule = str(self.gen("grasp_frame_rule") or "box") == "fingertip"
         for what, pose in poses.items():
             if pose is None:
+                continue
+            if what == "pre-place" and pre_place_frame_rule() == "fingertip":
+                # i7-plateqtf2 (owner 2026-11-08 02:35 item 3): the program check's criterion at the pre-place (fingertip + 2 cm slack)
+                if not self.pre_place_frame_ok(pose, cam):
+                    raise Reject("gripper_not_in_frame", f"{what} fingertip (+2 cm slack) outside the manipulation image (5 %)")
                 continue
             if tip_rule:
                 tip = C.fingertip((G.t(pose[0]).float(), G.t(pose[1]).float()))
@@ -5098,6 +5262,8 @@ class IORSSmall(SamplerV2):
             push_rec.extras["layout"] = TOUCHING_SHELF_LAYOUT
         push_rec.stance = manip.name  # the stance the chain was checked from ("manipulation" or the second base pose "push")
         self.sidecar.add_contact(push_rec)
+        if TT.contact_maps_on() and self.shelf_start is None:
+            self._note_contacts(draft, manip, t_pose, p_pose, push_kind, push_extras, brace_chosen)
         if brace_chosen is not None:
             pre, contact, kind, extras = brace_chosen
             brace_rec = TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras)
@@ -5117,6 +5283,22 @@ class IORSSmall(SamplerV2):
                 manip.arms = [self.shelf_push_arm()]
             manip.contacts = ["push"]
             self.sidecar.contacts.pop("brace", None)
+
+    def _note_contacts(self, draft: Draft, st: Stance, t_pose: G.Pose, p_pose: G.Pose, push_kind: str, push_extras: Dict[str, Any], brace_chosen) -> None:
+        """Owner A6 (2026-11-08): the library entries this touching instance executes (the push's class label as the library builds it -
+        ``kind@<contact height cm>`` when the class records a height -, the brace's kind), noted for the contact maps' learned overlay
+        (``contact_overlay.note_used``; harvested after a successful demo). Advisory: never rejects."""
+        from ispatialgym.sampling import contact_overlay as CO
+
+        try:
+            pm, bm = self.contact_maps_of_pair()
+            h = (push_extras or {}).get("contact_height_m")
+            cls = push_kind if h is None else f"{push_kind}@{100.0 * float(h):.1f}cm"
+            CO.note_used(draft.summary, pm, "touch_push", cls, TT.contact_map_check(pm, st, t_pose), "target", stance=st.name)
+            if brace_chosen is not None:
+                CO.note_used(draft.summary, bm, "touch_brace", str(brace_chosen[2]), TT.contact_map_check(bm, st, p_pose), "partner", stance=st.name)
+        except Exception as ex:  # noqa: BLE001 - the overlay is advisory
+            log.info("%s: contact overlay note skipped: %r", self.gp.variant, ex)
 
     def _touching_push_choice(self, st: Stance, t_pose: G.Pose, p_init: th.Tensor, t_face_z: Tuple[float, float], direction: th.Tensor, dist: float,
                               ignore_push: Sequence[Any], arm: Optional[str] = None, height_range: Optional[Tuple[Optional[float], Optional[float]]] = None,

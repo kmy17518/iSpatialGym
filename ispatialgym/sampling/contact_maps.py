@@ -221,11 +221,41 @@ def contact_config(kind: str, **kw) -> RM.MapConfig:
     return RM.floor_config(**kw) if KINDS[kind]["plane"] == "floor" else RM.MapConfig(**kw)
 
 
+def identity_meta(lib_k: Dict[str, Any], kind: str, height: float, cfg: RM.MapConfig, policy: CP.ContactPolicy, entries: Sequence[Dict[str, Any]],
+                  verdicts: Optional[Sequence[str]], robot: Optional[str] = None) -> Dict[str, Any]:
+    """The fields :func:`map_key` reads, known before the map is computed (the overlay's LINEAGE key is the key of the map built from
+    ``entries`` alone)."""
+    spec = KINDS[kind]
+    return {"schema": SCHEMA, "kind": kind, "arm": cfg.arm, "plane": spec["plane"], "edge_distances": list(cfg.edge_distances), "config": cfg.key(),
+            "policy_key": policy.key(cfg.arm), "robot": robot if robot is not None else RM.robot_digest(), "object": dict(lib_k.get("object") or {}),
+            "height": {"value": float(height)}, "pose_set": pose_set(kind, entries, verdicts)}
+
+
+def overlay_entries(lib_k: Dict[str, Any], kind: str, height: float, cfg: RM.MapConfig, policy: CP.ContactPolicy, entries: List[Dict[str, Any]],
+                    verdicts: Optional[Sequence[str]], overlay: Optional[Dict[str, Any]], robot: Optional[str] = None
+                    ) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Owner A6: the map's entries with the learned overlay (:mod:`contact_overlay`): ``overlay = {"root", "version"?}`` names the merged
+    overlay of the map's LINEAGE (the key of the map of ``entries`` alone); every library entry it confirmed (a real oracle success)
+    joins. Returns ``(entries, overlay meta or None)`` - None when no merged version exists (the map is the lineage's frozen map)."""
+    from ispatialgym.sampling import contact_overlay as CO
+
+    if not overlay or not overlay.get("root"):
+        return entries, None
+    lin = map_key(identity_meta(lib_k, kind, height, cfg, policy, entries, verdicts, robot=robot))
+    conf, v = CO.confirmed(overlay["root"], lin, overlay.get("version"))
+    if v <= 0:
+        return entries, None
+    out, joined = CO.join_entries(lib_k.get("entries") or [], entries, conf, KINDS[kind]["families"])
+    return out, {"lineage": lin, "version": int(v), "root": overlay["root"], "joined": joined, "n_confirmed": len(conf)}
+
+
 def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, height: float, anchor: Dict[str, Any], geom, *,
                         cfg: Optional[RM.MapConfig] = None, policy: CP.ContactPolicy = CP.DEFAULT,
-                        verdicts: Optional[Sequence[str]] = DEFAULT_VERDICTS) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
+                        verdicts: Optional[Sequence[str]] = DEFAULT_VERDICTS, overlay: Optional[Dict[str, Any]] = None
+                        ) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
     """One contact map: ``(meta, arrays)`` (module docstring). ``geom``: the object's collision pieces (the support fit, the arm-vs-object
-    check). Raises ``ValueError`` when the library has no entry of the kind under ``verdicts``."""
+    check). Raises ``ValueError`` when the library has no entry of the kind under ``verdicts``. ``overlay`` (owner A6): the entries a merged
+    overlay version confirmed join (:func:`overlay_entries`); the version enters the identity."""
     from ispatialgym.sampling.reach_bands import trunk_grid
 
     cfg = cfg or world.cfg
@@ -240,6 +270,7 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
     entries = select_entries(lib_k, kind, verdicts)
     if not entries:
         raise ValueError(f"{(lib_k.get('object') or {}).get('entry')}: no {kind} entry with a verdict in {verdicts}")
+    entries, ov_meta = overlay_entries(lib_k, kind, height, cfg, policy, entries, verdicts, overlay)
     yaws, classes, grid = axes(entries)
     pset = pose_set(kind, entries, verdicts)
     cells = RM.lattice(cfg)
@@ -422,6 +453,8 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
             "pose_set": pset, "classes": [class_row(grid[(y, g)]) if (y, g) in grid else None for y in range(nY) for g in range(nG)],
             "chain": "the executed pre -> contact (+ a straight push's end / an arc's mid and end): IK seeded along the chain, branch <= branch_max_rad",
             "trunks": meta_trunks, "status_codes": STATUS, "timing": tim, "created": S.now()}
+    if ov_meta is not None:
+        meta["overlay"] = ov_meta
     meta["key"] = map_key(meta)
     return meta, arrays
 
@@ -455,6 +488,8 @@ def map_key(meta: Dict[str, Any]) -> str:
 
     ident = {k: meta[k] for k in ("schema", "kind", "arm", "plane", "edge_distances", "config", "policy_key", "robot")}
     ident.update(object=object_key(meta["object"]), height=meta["height"]["value"], pose_set=meta["pose_set"]["digest"])
+    if meta.get("overlay"):  # owner A6: a learned map's lineage + merged overlay version (a frozen map's key is unchanged)
+        ident["overlay"] = {"lineage": meta["overlay"]["lineage"], "version": int(meta["overlay"]["version"])}
     return CPZ.digest(ident)
 
 
@@ -635,9 +670,12 @@ def _compute_cli(a) -> None:
             t0 = time.time()
             try:
                 anchor = RM.FLOOR_ANCHOR if spec["plane"] == "floor" else {"key": f"h{h:.4f}", "height": h, "surfaces": [f"library validate.support_z ({eid})"]}
-                meta, arrays = compute_contact_map(world, lib_k, a.kind, h, anchor, geom, cfg=cfg, verdicts=verdicts)
+                meta, arrays = compute_contact_map(world, lib_k, a.kind, h, anchor, geom, cfg=cfg, verdicts=verdicts,
+                                                   overlay={"root": a.overlay_root, "version": a.overlay_version} if a.overlay_root else None)
                 p = save(a.out, meta, arrays)
                 log({"id": eid, "kind": a.kind, "h": h, "ok": True, "path": p, "s": round(time.time() - t0, 1), "n_entries": meta["pose_set"]["n_entries"],
+                     "overlay": {k: (meta.get("overlay") or {}).get(k) for k in ("lineage", "version", "n_confirmed")} if meta.get("overlay") else None,
+                     "n_joined": len((meta.get("overlay") or {}).get("joined") or []),
                      "n_feasible": sum(sum(t.get("n_feasible", {}).values()) for t in meta["trunks"])})
             except Exception as e:  # noqa: BLE001 - the next model goes on; the log names the failure
                 log({"id": eid, "kind": a.kind, "h": h, "ok": False, "error": repr(e)[:500]})
@@ -657,6 +695,9 @@ def main(argv=None):
     c.add_argument("--only", nargs="*", default=None)
     c.add_argument("--lattice", type=float, default=0.08)
     c.add_argument("--seeds", type=int, default=8)
+    c.add_argument("--overlay-root", default=None, help="owner A6: the merged contact overlay root (<root>/<lineage key>/v<N>.json): the entries a "
+                   "real oracle success confirmed join the validated ones; the version enters the map identity")
+    c.add_argument("--overlay-version", type=int, default=None, help="the overlay version (default the latest)")
     i = sub.add_parser("info", help="a contact map's summary")
     i.add_argument("map")
     a = ap.parse_args(argv)

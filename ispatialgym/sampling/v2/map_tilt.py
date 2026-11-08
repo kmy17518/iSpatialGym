@@ -25,10 +25,16 @@ map identity (the map's ``key``):
 * :func:`merge` (offline, ``python -m ispatialgym.sampling.v2.map_tilt merge``) folds shards into ``<overlay root>/<map key>/v<N>.json``,
   a NEW version file each time (written to a temp file and renamed; the shards it folded are listed in ``sources`` and skipped by the next
   merge);
-* a job reads a merged version only when ``ISPATIALGYM_MAP_OVERLAY`` names the overlay root (latest version, or
-  ``ISPATIALGYM_MAP_OVERLAY_VERSION``); the version then enters the view's identity (:func:`view_tag`: ``inherit+ov<N>``), which the
-  start-cell caches key on. In-process corrections apply at once (Phase 2 drops invalidated cells; a cached candidate whose focus cell
-  is invalidated leaves the draws).
+* a job reads a merged version only when ``ISPATIALGYM_MAP_OVERLAY`` names the overlay root; the version then enters the view's
+  identity (:func:`view_tag`: ``inherit+ov<N>``), which the start-cell caches key on. In-process corrections apply at once (Phase 2
+  drops invalidated cells; a cached candidate whose focus cell is invalidated leaves the draws).
+* PINNED (i7-plateqtf2, owner decision 2026-11-08 02:35 item 5): every merge also writes a RELEASE ``<root>/releases/r<M>.json`` =
+  ``{map key: version}`` of every map key's latest version (:func:`release`); a job pins one release
+  (``ISPATIALGYM_MAP_OVERLAY_RELEASE=<M>``, written into job.env by ``submit_fast.py`` / ``job_fast.sh``) and reads exactly those
+  versions - a map key the release does not name reads no overlay (``ov0``), a merge during the job changes nothing for it. Without a
+  release the per-key ``ISPATIALGYM_MAP_OVERLAY_VERSION`` (legacy), else the latest version (unpinned: logged once, kit counter
+  ``map_overlay.unpinned``). The process's overlays are keyed by (map key, root, release, version), the inherited-column cache of a
+  view by the overlay object and its version, so a process never mixes an overlaid with a non-overlaid view of one map.
 
 No true column is ever built here (no GPU): the union prior, pruned during normal sampling, is the whole mechanism.
 
@@ -57,6 +63,9 @@ K = 2  # reachability failures (no success) before an inherited entry is invalid
 ENV_SHARDS = "ISPATIALGYM_MAP_OVERLAY_SHARDS"
 ENV_ROOT = "ISPATIALGYM_MAP_OVERLAY"
 ENV_VERSION = "ISPATIALGYM_MAP_OVERLAY_VERSION"
+ENV_RELEASE = "ISPATIALGYM_MAP_OVERLAY_RELEASE"
+RELEASE_SCHEMA = "isg-map-overlay-release/1"
+RELEASES_DIR = "releases"
 #: exact-IK failure reasons that are reachability (IK / reach bound / joint limit); anything else (collisions, the support policy, the
 #: approach tracking against an obstacle, the camera frame) never counts against an inherited entry
 REACH_REASONS = ("exact ik failed", "ik failed", "ik_reach", "reach", "joint limit", "joint_limit", "ik_joint_limit", "no ik")
@@ -254,6 +263,7 @@ class Overlay:
     shard_path: Optional[str] = None
     version: int = 0  # bumps on every own event (caches of pruned columns key on it)
     inherited_cols: set = field(default_factory=set)
+    pin: str = "off"  # how base_version was chosen (:func:`resolve`): r<M> / v<N> / latest / off
 
     def rec(self, entry: str) -> Dict[str, int]:
         out = new_rec()
@@ -297,7 +307,8 @@ class Overlay:
         return out
 
 
-_OVERLAYS: Dict[str, Overlay] = {}
+_OVERLAYS: Dict[Tuple[str, str, str, str], Overlay] = {}
+_UNPINNED_LOGGED: set = set()
 
 
 def shard_path(map_key: str) -> Optional[str]:
@@ -305,6 +316,85 @@ def shard_path(map_key: str) -> Optional[str]:
     if not d:
         return None
     return os.path.join(d, str(map_key), f"{socket.gethostname()}_{os.getpid()}.jsonl")
+
+
+def _is_map_dir(name: str) -> bool:
+    return not name.startswith(".") and name != RELEASES_DIR
+
+
+def latest_release(root: Optional[str]) -> int:
+    """The newest release number under ``root`` (0: none)."""
+    if not root:
+        return 0
+    vs = []
+    for p in glob.glob(os.path.join(root, RELEASES_DIR, "r*.json")):
+        b = os.path.basename(p)[1:-5]
+        if b.isdigit():
+            vs.append(int(b))
+    return max(vs) if vs else 0
+
+
+def load_release(root: str, number: int) -> Dict[str, int]:
+    """``{map key: version}`` of release ``number`` (``FileNotFoundError`` / ``ValueError`` when it does not exist or is not a release:
+    a pinned release that cannot be read must fail the job, never fall back to another version)."""
+    p = os.path.join(root, RELEASES_DIR, f"r{int(number)}.json")
+    with open(p) as f:
+        d = json.load(f)
+    if d.get("schema") != RELEASE_SCHEMA or int(d.get("release", -1)) != int(number):
+        raise ValueError(f"{p}: not overlay release {number}")
+    return {str(k): int(v) for k, v in (d.get("maps") or {}).items()}
+
+
+def release(root: str) -> int:
+    """Write a new release ``<root>/releases/r<M>.json`` naming the latest version of every map key under ``root`` - unless the latest
+    release names exactly those versions (then its number is returned). Temp file + rename, never overwrites (a concurrent release wins:
+    ``FileExistsError``, rerun)."""
+    maps = {}
+    for d in sorted(glob.glob(os.path.join(root, "*"))):
+        mk = os.path.basename(d)
+        if os.path.isdir(d) and _is_map_dir(mk):
+            v = latest_version(root, mk)
+            if v > 0:
+                maps[mk] = v
+    cur = latest_release(root)
+    if cur and load_release(root, cur) == maps:
+        return cur
+    nr = cur + 1
+    os.makedirs(os.path.join(root, RELEASES_DIR), exist_ok=True)
+    doc = {"schema": RELEASE_SCHEMA, "release": nr, "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "maps": maps}
+    tmp = os.path.join(root, RELEASES_DIR, f".r{nr}.json.tmp{os.getpid()}")
+    with open(tmp, "w") as f:
+        json.dump(doc, f, indent=1, sort_keys=True)
+    final = os.path.join(root, RELEASES_DIR, f"r{nr}.json")
+    if os.path.exists(final):
+        os.remove(tmp)
+        raise FileExistsError(final)
+    os.rename(tmp, final)
+    return nr
+
+
+def pinned_env(root: Optional[str]) -> Dict[str, str]:
+    """What a job's ``job.env`` pins (``submit_fast.py``): the overlay root and its latest release (``r0``: no release yet - the job then
+    reads no overlay). ``{}`` without a root."""
+    if not root:
+        return {}
+    return {ENV_ROOT: str(root), ENV_RELEASE: str(latest_release(root))}
+
+
+def resolve(map_key: str) -> Tuple[Optional[str], Optional[int], str]:
+    """``(root, version or None = latest, pin)`` of ``map_key`` under the environment (module doc): ``pin`` = ``r<M>`` (a release),
+    ``v<N>`` (``ISPATIALGYM_MAP_OVERLAY_VERSION``), ``latest`` (unpinned) or ``off`` (no root)."""
+    root = os.environ.get(ENV_ROOT) or None
+    if not root:
+        return None, None, "off"
+    rel = (os.environ.get(ENV_RELEASE) or "").strip()
+    if rel:
+        n = int(rel)
+        return root, (load_release(root, n).get(str(map_key), 0) if n > 0 else 0), f"r{n}"
+    ver = (os.environ.get(ENV_VERSION) or "").strip()
+    if ver:
+        return root, int(ver), f"v{int(ver)}"
+    return root, None, "latest"
 
 
 def latest_version(root: str, map_key: str) -> int:
@@ -320,6 +410,8 @@ def load_merged(root: Optional[str], map_key: str, version: Optional[int] = None
     """``(entries, version)`` of a merged overlay (``<root>/<map key>/v<N>.json``; the latest unless ``version``); ``({}, 0)`` when none."""
     if not root:
         return {}, 0
+    if version is not None and int(version) <= 0:
+        return {}, 0  # pinned to "no overlay" (a release that does not name this map key)
     v = int(version) if version else latest_version(root, map_key)
     if v <= 0:
         return {}, 0
@@ -336,11 +428,17 @@ def load_merged(root: Optional[str], map_key: str, version: Optional[int] = None
 def overlay_of(map_key: str) -> Overlay:
     """The process's overlay of a map identity (created on first use: the merged base named by ``ISPATIALGYM_MAP_OVERLAY``, this
     process's shard)."""
-    ov = _OVERLAYS.get(str(map_key))
+    root, version, pin = resolve(str(map_key))
+    ck = (str(map_key), str(root or ""), os.environ.get(ENV_RELEASE) or "", os.environ.get(ENV_VERSION) or "")
+    ov = _OVERLAYS.get(ck)
     if ov is None:
-        ver = os.environ.get(ENV_VERSION) or None
-        base, v = load_merged(os.environ.get(ENV_ROOT) or None, str(map_key), int(ver) if ver else None)
-        ov = _OVERLAYS[str(map_key)] = Overlay(str(map_key), base, v, shard_path=shard_path(str(map_key)))
+        base, v = load_merged(root, str(map_key), version)
+        ov = _OVERLAYS[ck] = Overlay(str(map_key), base, v, shard_path=shard_path(str(map_key)), pin=pin)
+        if pin == "latest" and str(map_key) not in _UNPINNED_LOGGED:
+            _UNPINNED_LOGGED.add(str(map_key))
+            import logging
+
+            logging.getLogger(__name__).warning("map overlay %s read UNPINNED (latest v%d under %s): set %s", map_key, v, root, ENV_RELEASE)
     return ov
 
 
@@ -410,6 +508,10 @@ def merge(shards: Sequence[str], root: str) -> Dict[str, Dict[str, Any]]:
             raise FileExistsError(final)  # another merge won: rerun (it reads the newer version)
         os.rename(tmp, final)
         out[mk] = {"version": nv, "entries": entries, "new_events": n_new}
+    if any(r["new_events"] for r in out.values()):
+        rel = release(root)  # i7-plateqtf2: the batch's new versions as one release jobs pin (ISPATIALGYM_MAP_OVERLAY_RELEASE)
+        for r in out.values():
+            r["release"] = rel
     return out
 
 
@@ -449,7 +551,8 @@ def view_columns(bands, translate: float, tilt: float, stand_off: Optional[float
     ov = overlay_of(mk)
     cache = bands.__dict__.setdefault("_map_tilt_cols", {})
     hit = cache.get((so, ckey))
-    if hit is not None and hit[0] == ov.version:
+    token = (id(ov), ov.base_version, ov.version)  # i7-plateqtf2: the overlay object (its pin) and its version, not the event count alone
+    if hit is not None and hit[0] == token:
         return hit[1]
     full = hit[1][1] if hit is not None else union_column(*bands._maps(stand_off), translate, tilt, all_keys=keys)
     if full is None:
@@ -461,7 +564,7 @@ def view_columns(bands, translate: float, tilt: float, stand_off: Optional[float
         _count(s, "map_tilt.inherited_columns", 1, mk)
         _count(s, "map_tilt.inherited_feasible", len(full.cells), mk)
     out = (prune(full, ov.dead_cells(cid)), full, cid)
-    cache[(so, ckey)] = (ov.version, out)
+    cache[(so, ckey)] = (token, out)
     return out
 
 
@@ -540,17 +643,26 @@ def main(argv=None) -> None:
     m.add_argument("shards", nargs="+", help="shard files or globs (e.g. $OFH/out/<tag>/*/g*/map_overlay/*/*.jsonl)")
     i = sub.add_parser("info", help="summary of the latest merged version of each map key under a root")
     i.add_argument("--root", required=True)
+    r = sub.add_parser("release", help="write a release naming the latest version of every map key under a root (merge does this itself)")
+    r.add_argument("--root", required=True)
     a = ap.parse_args(argv)
+    if a.cmd == "release":
+        n = release(a.root)
+        print(f"release r{n}: {json.dumps(load_release(a.root, n), sort_keys=True)}")
+        return
     if a.cmd == "merge":
         paths = sorted({p for g in a.shards for p in (glob.glob(g) or [g]) if os.path.isfile(p)})
         res = merge(paths, a.root)
         for mk, r in sorted(res.items()):
             ent = r["entries"]
             print(f"{mk} v{r['version']} new_events {r['new_events']} entries {len(ent)} invalidated {sum(1 for x in ent.values() if is_dead(x))} "
-                  f"confirmed {sum(1 for x in ent.values() if is_confirmed(x))}")
+                  f"confirmed {sum(1 for x in ent.values() if is_confirmed(x))}" + (f" release r{r['release']}" if r.get("release") else ""))
     else:
+        print(f"latest release r{latest_release(a.root)}")
         for d in sorted(glob.glob(os.path.join(a.root, "*"))):
             mk = os.path.basename(d)
+            if not _is_map_dir(mk):
+                continue
             ent, v = load_merged(a.root, mk)
             print(f"{mk} v{v} entries {len(ent)} invalidated {sum(1 for x in ent.values() if is_dead(x))} confirmed {sum(1 for x in ent.values() if is_confirmed(x))}")
 

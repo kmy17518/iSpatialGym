@@ -1416,6 +1416,11 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 11 | i7-memory (c49eacf6; outcome memory default on for train splits; $OFH/alias_memory not seeded, no thresholds.json) | a8baafe3 |
 | 12 | i7-placeorder (3d8492fc; trunk-first order before the memory hook) | f313237f |
 | 13 | i7-contactbrace (3d5cd9bb = i7-contact + i7-braceopen; one switch ISPATIALGYM_BRACE_FULL_OPEN, default on) | 0f8e95c0 |
+| 14 | i7-attachfix (9681dac8; collector attach restore, witness FK check, opt-in outer_pinch / attach_face_retreat) | 6e5c6cba |
+| 15 | i7-plateqtf2 (93072af3; hull fallback on, IORSSmall overhang fallback, pre-place framing, pinned map overlay on) | 543d6d1a |
+| 16 | i7-artic (603ad557; prefix maps from own-arm segments, v2only articulation_small) | 61d52902 |
+| 17 | i7-contactfu (ec81e006; owner part A; map_tilt.py kept once, the single brace switch kept) | 76a4a4e4 |
+| 18 | i7-interior (d67158a7; interior PLACE map rule for stable rests, in the identity) | d9dd4565 |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1455,6 +1460,12 @@ Later layers:
   a pre-identity male key.
 - plate qtfzeq = the merged entry of v2maps_i7pq (27 valid; replaced entry in `_superseded_merged`).
 - 30 per_d_e merged maps of v2maps_i7unblock, only for entries int1 still holds unchanged (`_superseded_trunkelig`).
+- i7-interior:
+  - plate luhkiz (bar 0.8874 tabletop maps and sink-basin maps) from v2maps_i7sink2, with anchor 0.8874;
+  - the jar's fridge place maps from v2maps_i7fridge4;
+  - the fridge spec (door per piece) and the sink spec those maps were built with are now in the code registry
+    (`assets/interiors/interiors.json`; lead decision, fcddc495), so no job needs ISPATIALGYM_INTERIORS. test_interior_registry.py pins their
+    digests. The earlier overlay moved to `_superseded_registry/`.
 - Contact maps (16), from three roots:
   - v2maps_icb_on: the touch_brace maps built with full-open on (ntbrtz, dkhgxn, gkpmii), plus the touch_push maps;
   - v2maps_i7contact2: the axial h maps (qgvsnb, injrgc, tfovwy), with the pushed-end / spin fix;
@@ -1462,13 +1473,41 @@ Later layers:
 
   The gkpmii v2 export is added to glib. The check also reads the contact maps, including the touch_brace knob at the run's default.
 
-**Open:** the per_d_e count and merge for the 46 former-rule maps of the 23 entries int1 replaced, plus the 8 interior / overhang maps
-i7-unblock deferred.
+- Articulation prefix maps (12) in `maps/_articulation`: right-arm maps from artic_prefix_20261107b, left-arm maps from
+  artic_prefix_20261107c.
+- i7-contactfu's validated-entry contact maps: touch_push x3 and the axial maps of qgvsnb / injrgc / tfovwy. The touch_brace maps stay the
+  ON builds.
 
-`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_0f8e95c0: 75 entries, 128 maps, 8 attach maps and 16 contact maps, 0 key mismatches, 50 links resolving,
+**per_d_e count and merge** (`int1_20261108/trunkelig`):
+- The count found 58 maps that gain (trunk, d_e) columns: 52 tabletop, 4 interior and 2 overhang.
+- All 58 were rebuilt with per_d_e and merged by i7-unblock's rule: the former arrays are kept and the new columns added. Cells grew by
+  +24109 over 116707.
+- 60 maps are staged in all, including the cork's 2 and plate luhkiz's 0.8874 pair.
+- plate luhkiz's sink non-place maps were rebuilt but gain no cell, so they are not staged.
+- i7-unblock deferred 8 maps:
+  - the bqvvvx lean_right / overhang maps are merged;
+  - the old right-validated bqvvvx lean_left maps are superseded by the valleft maps, which are merged;
+  - the acbrnv lean_left_20 maps (touching_03) are not in v2maps_int1.
+
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_d9dd4565: 76 entries, 138 maps, 8 attach, 16 contact, 12 prefix and 12 interior maps (specs match), 0 key mismatches, 51 links,
 21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
-**Validation** (int1_1, `--grasps v2only` N 4 on the affected aliases only): see DECISIONS for the list, the skips and the results.
+**Validation** (`--grasps v2only` N 4, affected aliases only; `tab_i.py -a int1_1 .. int1_5`; DECISIONS "integration RESULTS").
+- **int1_1** (merges 1-7, 33 aliases): 658 attempts, 126 written, 105 ok; 0.164 GPU-h per success.
+- **Two regressions with a cause.** disembedding_01 and _10 went 0 / 4. Their earlier runs with the v2maps_i7 entries were 4 / 4 + 4 / 4 each.
+  The sampler now draws new grasps of the rebuilt entries (jigsaw: switches + pad sweep; tablefork: switches). Those grasps are
+  physics-valid in the library but fail in the tray execution. This goes to the owner.
+- **Later batches.**
+  - Attachment (after i7-attachfix): 01 4 / 4, 02 2 / 4, 04 4 / 4.
+  - inside_large_01: 4 / 4 (trunk-first order).
+  - axial_01 / 03 / 04: 3 / 4, 4 / 4, 4 / 4.
+  - touching_01 3 / 4; touching_02 2 / 2 (its place-depth limit).
+  - inside_01 3 / 4.
+- **Pre-existing gaps.**
+  - axial_02: repeats_eval.
+  - axial_05: no push_blade map of tablespoon tqqwys.
+  - ontop_large_01: no goal map at h 0.9158.
+
 
 ### i7-unblock (2026-11-07): nextto_04, under_small_03, camera_relocalization teddy_bear
 
@@ -2071,6 +2110,345 @@ support_split.finger_touch_allowed 0). No arm wrote a demo; the base shift fixes
 **Open (owner).** The start lateral (a bay-centred init draw, the separate switch item 1 names); the attached book against the side board it
 leans on (support split) at the lift; the carried drive to the push stance; the computed stance colliding at the candidate's own trunk
 (`stance_shift.rejected.collision`); clipped straddlers in `contact_rejudge`; any default change.
+### i7-attachfix (2026-11-08): the attachment aliases diagnosed with numbers (owner direction 2026-11-08 02:20)
+
+Branch i7-attachfix from of-v2maps 386ab2b4; record `$OFH/attachfix_20261108`. Run diagnosed: i7_attswept (trunk_54439eee, 62 att / 16
+written / 6 ok).
+
+**One class: the held object / partner not where the plan thinks (items 2b, 3, 4).** Every failing instance of that class was the
+instance AFTER a joined episode on the same reused collector world (`run_isg --queue`): the live start pose vs the TRO
+(meta.start_state vs tro_state) - attachment_01 300114 lid 103.8 mm + teapot 81.6 mm (after 300113 joined), 300115 lid 76.6 mm
+(after 300112), attachment_04 300116 lid 549 mm (after 300114), attachment_03 300020 wine bottle 40 mm (after 300019); every other
+of the 16 demos 0.0 mm. The off lid sat exactly at the PREBUILD instance's pose (300108 / 300110: the world's `scene_state0`).
+`Loader.attach` released the grasps / hinges / planner attachments but not the BEHAVIOR attachment joint the attach rule made;
+`scene.load_state(scene_state0)` then detached it inside the load (`AttachedTo._load_state -> _detach -> og.sim.update_handles()`)
+and the TRO pose of the pair did not stick. Consequences: (3) the oracle's grasp target = live lid o eef_in_object, the sidecar's
+witness = the TRO lid: the "77.1 / 576 mm witness residual" plan_failed is that offset (the witness itself reaches its pose: the hand
+at the witness ended 2.8 mm from the recorded pre-grasp); (4) 300114 grasped the displaced lid correctly (in-hand 0.7 mm / 0.002 rad
+vs eef_in_object, rigid through the carry), the arm reached the recorded place within 4.8 mm - over where the TRO puts the teapot,
+82 mm from where it stood; the release check was right; (2b) 300020: in-hand 0.8-1.9 mm / 0.06 rad through the carry (the AG
+attachment rigid, no slip, the executed grasp on the recorded one), the bottle 40 mm off -> the seat pose inside the bottle.
+Also: meta.attach_joins listed the PREVIOUS episodes' joins (PRED.JOINS is per process).
+Fix (d9de0ff1, `oracle/run_isg.py`, the loader - not an oracle program): `detach_scene_attachments` before the state load; after the
+restore every TRO object is compared with its TRO root pose (`tro_pose_mismatches`, 5 mm / 0.05 rad), re-applied once, else
+LoadError; `meta.attach_joins` = this episode's joins only. First validation (i7af_v, trunk_b4d8f3d4): the check still met the pair off
+after a joined episode (attachment_01: lid 113 mm / 2.11 rad + teapot 240 mm / 3.06 rad; lid 95 mm / 0.64 rad) and re-applied it (the
+episodes ran from the TRO). Remaining cause: the joined pair stays collision-FILTERED in USD across the state load and its deferred
+un-filter (`predicates.set_pair_collision_filter`: dump, stop, edit, play, load) ran inside the next restore - the vectorized loader's
+cleanup already calls `predicates.reset_pair_records`, the single-world `attach` did not. 74fef537: `attach` resets the pair records
+(un-filter) before the state load.
+
+**Recorded IK witnesses (item 3).** Independent numpy FK of the planner's holonomic URDF over every written sidecar under `$OFH/out`
+(2463 sidecars, 24399 witness targets; 120 q-only regrasp targets skipped): FK vs pose p50 0.43 / p99 1.60 / max 3.46 mm, rotation
+max 0.010 rad; 0 above 5 mm or 0.05 rad; 18 instances with a target 2-3.5 mm (push / base_push pre-poses, the sampler's looser pre
+limit); the recorded fk_residual_m agrees with this FK to 0.024 mm. Guard (d0a96dda): `sampling/v2/witness_check.py` runs the same FK
+on every witness before an instance is written (`witness_unreachable` > 5 mm / 0.05 rad; ISPATIALGYM_WITNESS_WRITE_CHECK=0 off).
+
+**Cap xxqyrt (item 1).** Rest r0 = canonical, open side DOWN (confirmed: top disc piece z 1.20-3.47 mm, seven wall pieces radius
+22.6-26.2 mm (3 mm wall) z -7.76..+2.2 mm, nothing on the axis below z 1.2: the cavity opens onto the table); 52.3 mm x 11.2 mm, 16 g;
+gripper max opening 96.9 mm. Pieces: the hulls of 20-70 deg wall arcs bridge INWARD (chords into the cavity), none bulges outward.
+Causes (generation): (a) the Isaac sampler asks `multiple_hits=True` and keeps the furthest hit within the aperture, but embree here
+returns only the FIRST hit, so every antipodal pair spans one 3 mm wall, the 2.3 mm disc or a piece-cut face (local reproduction:
+4000 samples, 100 % of the pad centres inside a collision piece, widths p50 2.3 mm, max 18.1 mm = piece 1's cut faces; the gate dump's
+top width drops 0.09-12.7 mm): no pinch across the diameter was ever proposed, the 33 "selected" were tangential piece-cut pinches
+(top_0 = width 18.07 mm across piece 1's cut faces) - hence finger_blade_in_object by 1.5-2.7 mm and the single physics-valid
+top_0 that does not hold in the demo; (b) the width rays started at the pad centre (in the cavity: the inner wall); (c) the top support
+retreat stops the fingers 1 mm below the table, the attachment rule then needs them 2 mm above the rim (face_gap): every retreated
+grasp of the 11 mm cap dropped at face_gap -1.0 mm (27 / 27). Side pool: every side grasp loses its width after the support lift
+(lift 30-106 mm: the wrist camera / palm sink into the table beside an 11 mm object; the pinch line ends 2.6-27.8 mm above the cap
+top) - geometry, unchanged under the pre-shape sweep (the sweep never runs: width_lost first). The 4 pick failures: failed_grasp "not
+in the right hand after closing" twice each (AG never formed), fingers closed to 0, executed eef-in-cap 4.3-7.3 mm / 0.02-0.12 rad off
+the recorded (the cap pushed 2.9-6.1 mm by the closing fingers of the piece-cut pinch).
+Fix (b4d8f3d4, opt-in, identity when on): `CandidateConfig.outer_pinch` (every ray hit - repeated first-hit casts; width / antipodal /
+the blade check's pinched points measured from outside along the closing axis) + `attach_face_retreat` (an attach top grasp retreats
+until the fingers clear the rule's face gap; the rule unchanged). Local candidates (default density): both on 16 selected / 16
+geometry-ok, diametric pinches 50.9-51.0 mm, tilts 2-31 deg; outer_pinch alone 1264 -> 0 at face_gap; face retreat alone 0 at
+object clearance; off 0.
+Rebuild (trunk_b4d8f3d4, `$OFH/attachfix_20261108/cap`, manifest cand_overrides {outer_pinch, attach_face_retreat, gate_dump}; job
+18372013 glib + maps 0.8126 right + left; job 18372014 attach maps box + swept right, both ok): 10 representatives -> 6 PHYSICS-VALID
+(top_1..top_6; top_0 object_pressed_into_table) - was 1 (top_0, the piece-cut pinch). Staged root `$OFH/attachfix_20261108/v2maps_af`
+(cp -a v2maps_int1 + this entry and its maps; the int1 cap entry -> `_superseded_attachfix`; legacy_keys cap__xxqyrt; links.json).
+Next blocker (i7af_v, trunk_b4d8f3d4: 300026 / 300030 QA pause in the grasp, fingers closed to 0, the cap pushed 5 mm): the cap
+aliases' own custom `generation.grasp_height_extra_m` 5 mm (isg_customs, only the four cap aliases; the knob lift made for the legacy
+grasps) lifted every written grasp by 2.5 mm (clipped: "fingertips 3 mm below the male's top") - the validated pinch's contact z 0 mm
+-> 2.1-2.5 mm (rim edge), tips 0.5 mm above the cap's bottom. d4f1bdcd (`attachment._apply_grasp_height_extra`): that alias lift is
+not applied to a v2 library grasp (validated at its own height); the support / partner floors still apply (cap: 1.4 mm finger
+envelope). Lid / cork aliases have no such custom (their lifts are floors) - unchanged.
+
+**Cork ncxgpe (item 2).** (a) 24 of 41 attempts rejected for the rest (rest_unstable 20 + unstable_init 4), mean 189.5 s each
+(4549 s, 71 % of the attempt time; the ~180 s sample stage runs before the settle / nudge, attachment.py after_settle :1656-1698):
+the entry's only rest r0 = standing on the TAPERED male end (ring radius 6.1-6.5 mm under a CoM ~18 mm up; tipping margin 0.33 vs 0.48
+on the wide end); the 2 deg nudge tilts it 4.7-25 deg (12) or tips it over 61-93 deg (8). r0 was called stable from one 36-step settle
+(no perturbation; final angular velocity 0.148 rad/s; no settle-first survey, so no other rest exists). The fallback
+`_rest_flip_forced` (attachment.py:1694) is never read again. NOT FIXED (owner decision): a nudge test in the rest survey is a shared
+validation gate, and a stable rest of this cork that keeps the male end down probably does not exist (the wide end down needs a 180 deg
+in-hand turn, lying needs a 90 deg reorient). (b) = the restore bug above. (c) the left-finger touches (300021 failed protected_contact
+at step 989, 300019 same at 658, retried ok) are the BRACING left arm: the brace's touch-stop pushed the bottle 4.6-5.1 mm / 2.8-3.4 deg,
+the 4 mm back-off left the closed finger where the bottle rocked back upright within 3 steps of the carry; `_check_protected`
+(qa.py:648-666) ignores the brace-allowed pairs. Neither (a) nor (b) explains it (bottle 0.0 mm off its TRO in 300019 / 300021).
+NOT FIXED (an oracle program change): wait for the braced object to stop rocking before backing off / back off by the measured push +
+4 mm, and / or exempt brace-allowed pairs in the run-time protected check.
+
+**Validation (--grasps v2only N 4).** attachment_01 / 03 / 04 from trunk_74fef537 on v2maps_int1 (tag i7af_v2), attachment_02 from
+trunk_d4f1bdcd on `$OFH/attachfix_20261108/v2maps_af` (tag i7af_v3): 01 att 6 / wr 4 / ok 3 (one place plan_failed: the pre-place and
+place witnesses 3.00 rad apart - another class), 02 att 7 / wr 4 / ok 3 (0.41 GPU-h = 0.136 / success; one symbolic_only; the first cap
+successes: hover 13.2 mm, touched, drop <= 0.3 mm, joined), 03 3 written / 3 ok (4th still sampling at the report: 14 target_placement +
+5 rest rejections), 04 att 13 / wr 4 / ok 4. Restore on the final code: 17 demos, 6 after a joined episode (1 joint detached + 1 pair
+un-filtered each), 0 TRO mismatches, 0 re-applies. Earlier snapshots: i7af_v (b4d8f3d4: the check re-applied 2 of 2 off pairs; 01 4 / 4
+ok; 02 cap 2 / 2 QA pause at the grasp - the alias lift, fixed in d4f1bdcd). Suite (8 matched shards, base 386ab2b4 vs tip): 23 failed +
+3 errors on both, the same tests; test_attachfix 9 pass.
+
+### Owner decisions 2026-11-08 (DECISIONS 02:35): plate qtfzeq follow-ups (i7-plateqtf2)
+
+Work: branch `i7-plateqtf2` (from the integration tip of-v2maps 386ab2b4). Record: `$OFH/plateqtf2_20261108/`, DECISIONS.md "i7-plateqtf2" lines.
+
+The owner's decisions (2026-11-07, relayed 2026-11-08 02:35):
+1. **side_9 / the support policy's palm check.** Keep the padded sphere check as a fast, conservative SCREEN. When it fails NARROWLY (the
+   sphere misses by less than its buffer; here 0.9 of 2 mm), judge with the palm's EXACT hull against the support, requiring a small real
+   clearance (propose the value). Only non-finger links; the 2 mm finger allowance (FingerTouch) unchanged. First find where the 2 mm buffer
+   is set and whether it is a deliberate non-finger margin or a reused constant. Shared gate APPROVED: behind a switch, count before adopting
+   (campaign library + the aliases' sampling logs; who gains), then the default in a separate commit; kit `support_policy.hull_fallback_passed`;
+   unit tests (narrow miss + clear hull passes, real hull contact fails, clear sphere pass unchanged); validate under_small_03 + the aliases the
+   count names.
+2. **Overhang fallback** (APPROVED incl. the oracle program change). When a chosen SIDE grasp fails in sampling for a reason the sampler cannot
+   fix (count the reasons), switch to the overhang approach (push over the support edge, then pick) as pick_overhang_push does in IORSLarge;
+   add the push step to under_small_03's oracle program and generalize to every alias whose pick can fall back this way (list them first);
+   fallback only; kit `overhang_fallback.*`; the same exact checks as IORSLarge (reuse pick_overhang_push / v2/overhang.py); unit tests;
+   validate under_small_03 N 4 + the other alias with the most side-grasp failures.
+3. **Pre-place framing** (camera-frame rule change APPROVED): the draw's pre-place check matches the program check (fingertip point + 2 cm
+   slack) instead of the hand box; QA unchanged; list the call sites; count per alias the rejections removed; unit test; validate under_small_03.
+4. **The expanding tilt / yaw map** (`ISPATIALGYM_FAST_MAP_TILT_INHERIT`): CONFIRMED as the default for all aliases (no change).
+5. **The merged map overlay** (`ISPATIALGYM_MAP_OVERLAY`): jobs START reading it - first confirm the frozen map is never written, the reader
+   applies a PINNED version (job.env + the map identity), the in-memory map cache keys on the overlay version; fix what is not so; the
+   offline merge after each batch makes a new version, jobs pin the version they read; on by default (separate commit).
+Validation: unit tests; under_small_03 `--grasps v2only` N 4 ONCE with 1 + 2 + 3 + 5 (each item's counters) + the extra aliases of items 1 / 2.
+
+**1. The hull fallback** (`ik.IKChecker._hull_fallback`, switch `ISPATIALGYM_SUPPORT_HULL_FALLBACK` = 1 | shadow | 0; 3a2ce4ec, default ON
+6a6731ca). Where the 2 mm comes from: the robot model's cuRobo `collision_sphere_buffer` (`r1pro_model.build_curobo_robot_dict(...,
+collision_sphere_buffer=0.002)`, the value of OmniGibson's shipped `r1pro_description_curobo_default.yaml`, a49d8f54 "Instance sampler v1.0.0")
+- ONE global padding of every sphere of every link in every cuRobo query (planner, IK, the sampler's checks); the contact policy reuses it
+(its own sphere margin `sphere_support_margin_m` is 0; the module doc's rule 3 only names "the model's 2 mm sphere buffer"): a reused
+constant, not a deliberate non-finger margin. Now `contact_policy.MODEL_SPHERE_BUFFER_M`. The rule: the sphere stage (non-finger links vs
+the world minus the approached objects, margin 0) stays first; when it fails, the fallback applies only if (a) every link but the hand's
+rigid links (palm `{arm}_gripper_link`, wrist camera `{arm}_realsense_link`, wrist `{arm}_arm_link7` - the links with exact hulls) is
+clear at the margin, (b) the hand's rigid links are clear at the margin less the buffer (each sphere < 2 mm deep), (c) they are clear at
+the full margin with the policed supports out of the world (the touch is the support's, not another obstacle's), (d) no policed support is
+a floor; then their exact hulls (`HandChecker.clearance`: vertices + face samples) must clear every policed support's plane by
+**0.5 mm** (`HULL_FALLBACK_MIN_CLEARANCE_M`, `ISPATIALGYM_SUPPORT_HULL_FALLBACK_MIN_M`). Why 0.5 mm: the hull-vs-plane clearance is exact
+(a convex hull's minimum over a plane is at a vertex), so the margin only has to cover the support's own unevenness about its measured
+plane (breakfast_table rhjoby: 8 pieces within 0.3 mm) - 0.5 mm covers it with margin and still admits side_9 (1.0 mm nominal); 1.0 mm
+would reject side_9 itself (its nominal hull is 0.99-1.03 mm). The rest of the policy (the hull stage incl. the fingers' 2 mm, rule 2)
+follows unchanged. Kit `support_policy.hull_fallback_passed` / `.hull_fallback_shadow_pass` / `.hull_fallback_failed.<why>` (floor,
+no_hand_link, non_hand_link, deeper_than_buffer, other_obstacle, no_plane, hull_clearance). Tests `test_support_hull_fallback.py` (8).
+COUNT before adopting (`$OFH/plateqtf2_20261108/`): library (`hull_fallback_count.py` over the 102 int1 entries' 260 valid grasps at their
+nominal pose on the rest): 245 clear, **7 narrow with hull >= 0.5 mm** (plate qtfzeq side_9 -0.85 / +1.03 mm, lip_shallow_4 -0.33 / +0.98,
+lip_shallow_5 -0.23 / +1.02; cork ncxgpe side_0 -1.65 / +5.22; brussels sprouts mbkrxe side_10 -0.61 / +1.77; webcam fabztm side_2 -0.73 /
++3.05; hardback lean_right side_3 -0.58 / +1.00), 8 deeper than the buffer (hard candy vwegtt side_2 -2.9 mm; the 6 hardback overhang-rest
+grasps and the lean_left one, whose support is a slab box, not a plane); at 1.0 mm one of the 7 drops. Sampling logs (`count_sphere_logs.py`,
+every v2 run under `$OFH/out`): sphere-stage rejections under_small_03 1434 (side_9 1133 pose + 274 approach tail; lip_shallow 27),
+attachment_03 129 (cork side_0), inside_01 100 (brussels sprouts side_8 96 - an earlier library -, side_10 4), inside_02 47 (hard candy
+side_2: deeper, no gain), touching_04 9, nextto_02 8, disembedding_05 7. Who gains: under_small_03, attachment_03, inside_01 (and the
+entries without logged rejections: webcam fabztm, hardback lean_right).
+
+**2. The overhang fallback** (`v2/overhang_fallback.py`, 1344b250; switch `ISPATIALGYM_OVERHANG_FALLBACK`, default on). Side-grasp failure
+reasons per alias (`count_side_reasons.py`, v2 runs): the support policy (the sampler cannot fix it: the grasp pose is fixed relative to the
+object on its support) under_small_03 1409, disembedding_05 292 (palm_contact 285), attachment_03 129, inside_01 100, inside_02 47,
+touching_04 9, nextto_02 8; the rest are IK / joint limit / tracking / collisions with other objects (another stance or position can fix
+them). Which picks can fall back this way (`side_overhang_list.py`: entries whose SIDE grasps' closing sweep reaches below the support top
+at the nominal pose, i.e. a flat object whose lower finger needs free space): plate qtfzeq side_9 (under_small_03, `program_iors_small`),
+brussels sprouts mbkrxe side_10 (inside_01, `program_iors_small` inside), hard candy vwegtt side_2 (inside_02, idem), cork ncxgpe side_0
+(attachment_03: the attachment program / sampler - not wired: the attachment code is i7-attachfix's; owner), hardback bqvvvx overhang rest
+(inside_large_01: IORSLarge, already its primary path). Mechanism: in `tabletop._phase3_draw`, when a drawn pair's exact IK fails, the
+grasp is library mode `side` and the reason is the support policy (pose or approach tail: `overhang_fallback.reason_class`), IORSSmall (not
+touching: its program picks without the push) calls `overhang_fallback.try_fallback`: IORSLarge's `_overhang_pick` and its helpers
+(`_overhang_geometry` / `_edges` / `_grasp` / `_push_chain` / `_push_branch` / `_touch_ok` / `_drifted` / `_settle`, `overhang_records`)
+bound UNCHANGED on an adapter of the small sampler (`SmallOverhangPick`: per-role target / hull / rest, the support top as `surface`, the
+drawn pose as `pose_on`) - the same exact checks; options `generation.pick_overhang_push` or the defaults (mode fallback, no second grasp
+stance). A failed pick is memoised (stance, trunk, grasp, yaw, cell). The record is written with the grasp (`contacts.push_pick` +
+`grasps[0].pick_overhang`, dropped with a rejected candidate); `after_settle` keeps the overhang grasp (no re-derivation / re-selection at
+the settled init pose). Oracle program (approved): `program_iors_small` picks through `_pick_actions` - push -> retreat -> grasp -> lift
+when `contacts.push_pick` is recorded, unchanged otherwise. Kit `overhang_fallback.trigger.<class>` / `.tried` / `.found` / `.failed` /
+`.memo_hit` + IORSLarge's `pick_overhang.*`. Tests `test_overhang_fallback.py` (6, on test_iors_large_overhang's stubs).
+
+**3. Pre-place framing** (7fce56ee; `ISPATIALGYM_PREPLACE_FRAME_RULE` = fingertip (default) | box). Call sites where a draw checked the
+hand box at the pre-place: `iors_small._segment_draw` (the place / pre-place screen before the settle), `IORSSmall.require_in_frame` (the
+grasp check's `{"pre-place", "place"}`), the FRAME_RANK score in `_segment_draw` (`frame_score`). They now judge the PRE-PLACE by
+`program_check.fingertip_frame_margin` (the criterion `fingertips_in_frame` applies, factored out: the fingertip point inside QA's 5 % plus
+2 cm slack at its depth); the PLACE (a contact pose, `CONTACT_POSE_KEYS`) keeps the eef box, as the program check does. No other draw checks
+a pre-place with the box (block_design's `_chain_in_frame` checks the eef + fingertip points; iors_large / inside / attachment check
+contact poses). Not changed (camera-frame changes beyond item 3 -> owner): the pre-GRASP box in `require_in_frame`, touching's push / brace
+pre-contact boxes, the carry waypoint box in `core.py`. Kit `preplace_frame.checked` / `.rejected` / `.removed`. Tests
+`test_preplace_frame.py` (3). Count (`count_preplace.py`, every run under `$OFH/out`): pre-place box rejections per alias inside_04 2635,
+inside_03 783, ontop_small_02 331, ontop_small_04 318, under_small_04 173, under_small_03 165, ontop_small_01 80, under_small_01 28,
+inside_02 27, under_small_02 18, nextto_03 11, inside_01 8, ontop_small_03 6, nextto_02 / 01 / 04 1-2; only under_small_03 logged the box
+corners (FRAME_DIAG, 19 pre-place rejections): 13 / 19 pass the fingertip rule (fingertip reconstructed from the corners' projections).
+
+**5. The merged map overlay, pinned** (4f374e8c mechanism, 14634552 default). Confirmed: the frozen map is never written (map_tilt writes
+only its shards and merged version files; `test_overlay_never_touches_the_frozen_map`). Not so before, fixed: (a) the reader took the
+LATEST version at first use (per process; another process of the same job or a merge mid-job could read another) - now every merge also
+writes a RELEASE `<root>/releases/r<M>.json` = {map key: version}, `submit_fast.py --map-overlay <root>` pins the root's latest release
+into job.env (`ISPATIALGYM_MAP_OVERLAY` + `ISPATIALGYM_MAP_OVERLAY_RELEASE`; `job_fast.sh` pins at the job's start when job.env has none),
+the reader applies exactly that release's versions (a key it does not name: ov0; an unreadable pinned release fails); unpinned reads are
+logged and counted (`map_overlay.unpinned`); the version applied stays in the view identity (`inherit_k2+ov<N>`, the start-cell caches) and
+in `meta.map_overlay` (kit `map_overlay.read_v<N>`); (b) the process's overlays were keyed by map key only and a view's inherited-column
+cache by the overlay's own-event counter - now keyed by (map key, root, release, version) and by the overlay object + version, so a process
+never mixes an overlaid and a plain view. Default ON: `--map-overlay` defaults to `$OFH/map_overlay` (seeded with the plateqtf overlay v1,
+release r1 = right ce1af987a8df9d69 v1, left b2f36adb26c194ad v1); `--map-overlay off` = none. After each batch: `python -m
+ispatialgym.sampling.v2.map_tilt merge --root $OFH/map_overlay $OFH/out/<tag>/*/g*/map_overlay/*/*.jsonl` (new versions + a new release).
+Tests: `test_map_tilt.py` +3 (pinned release vs latest, never mixed views, the view's pin record).
+
+**Reusable hull check** (1f368d64, for i7-t03: the owner applies the item-1 rule to touching_03 too): `contact_policy.narrow_sphere_failure`
+/ `hull_clearance_min` / `hull_fallback` - input the sphere query and the links that failed, the hand links with hulls, the HandChecker, the
+eef pose, the support / obstacle geometry (planes or boxes, e.g. split-off support pieces), the threshold (`HULL_FALLBACK_MIN_CLEARANCE_M`
+0.5 mm); `IKChecker._hull_fallback` calls it (behaviour unchanged). Cherry-pick 3a2ce4ec (`MODEL_SPHERE_BUFFER_M`) + 1f368d64.
+
+**Validation** (trunk_14634552, v2-root `$OFH/v2maps_int1`, `--grasps v2only` N 4, overlay `$OFH/map_overlay` release r1; counters summed
+over the kit blocks by `$OFH/plateqtf2_20261108/tab_pq2.py`, the same script on i7_pq_merged for "before"):
+- under_small_03 `i7pq2_us03` (18372123; items 1+2+3+5): 36 attempts / 4 written / demos 3 of 4 ok, 1.36 GPU-h = 0.455 per success (i7_pq_merged
+  32 / 3 / 3 of 3, 0.448). Written grasps lip_shallow_6~r180 x 3, top_4. Item 1: `hull_fallback_passed` 16, failed deeper_than_buffer 31 /
+  hull_clearance 9 / non_hand_link 1; side_9 drawn 10 times, never rejected by the support policy (it failed on IK / joint limits: fixable),
+  never chosen. Item 2: no trigger (no side grasp failed on the policy). Item 3: `preplace_frame.checked` 62 / `.removed` 24 / `.rejected` 2;
+  gripper_not_in_frame log lines at the pre-place 12 -> 1, at the place 4 -> 4. The failed demo (300150): `gripper_out_of_fov` in the place's
+  carry (u 122, v 58, depth 0.50 m) after the oracle's PROTECT via-above lifted the carry over the mat; that instance's pre-place passed only
+  under the new rule (`removed` 2 in its written attempt). Item 5: `map_overlay.read_v1`; empty_f_on_inherited 133 -> 95, reach_fail 132 -> 95,
+  cells_invalidated 32 -> 13, cells_confirmed 57 -> 38, map_yaw.pairs_confirmed 82 -> 73.
+- attachment_03 `i7pq2_at03` (18372125; item 1): 39 / 4 / 4 of 4 ok, 0.411 GPU-h per success; `hull_fallback_passed` 9, no sphere-stage
+  rejection (historically 129, cork side_0); written side_0 x 1, top_15~r180 x 3.
+- inside_01 `i7pq2_in01` (18372124; items 1+2): 15 / 4 / 4 of 4 ok, 0.101 GPU-h per success; no support-policy rejection of a side grasp (the
+  int1 entry's side grasps failed on IK / tracking), `hull_fallback_failed.deeper_than_buffer` 1; the overhang fallback did not trigger.
+- Overlay merged after the batch: `$OFH/map_overlay` release r2 (ce1af987a8df9d69 v2 212 entries / 29 invalidated / 179 confirmed,
+  b2f36adb26c194ad v2 92 / 15 / 71, + 3 new map keys of attachment_03 / inside_01).
+
+### i7-contactfu (owner decisions 2026-11-08 01:45, part A; branch `i7-contactfu` from 521dc344)
+
+- **A1 touching_02 push stance** (`iors_small.push_stance_candidates`, sampler-only): the push stance moves along the edge AND toward /
+  away from it - stand-offs `PUSH_STANCE_STAND_OFFS_M` (0.15-0.55) plus the manipulation stance's, chosen from the target's `touch_push`
+  map at its place pose (brace-map fits first, then the stand-off nearest the manipulation stance's), limited by the whole-body collision
+  check (the base's distance to the table); at most 8 get the exact push chain. The partner draw (`place_partner`, v2only) tests the maps
+  over those push stances; a partner whose push fails the map from every push stance at all 8 positions rejects `contact_unreachable` at
+  the draw (kit `touch_push.partner_rejected`) instead of ~30 s later. Kit `touch_push.stand_off_moved` / `.gate_at_push_stance`.
+- **A2 touching_02 tipping**: a scene load of the demo (fix2 300008) found NO physics material on the bar, the boxes or the grippers and
+  no scene default (PhysX default 0.5 / 0.5 / 0, average) - the same as the validator; both boxes 0.5 kg (iucshm s0.8 density 342 kg/m3),
+  same COM, solver iterations, sleep settings. The difference was the validator's partner stand-in: built `kinematic_only=True` without a
+  fixed base, which OmniGibson ignores (`compute_kinematic_only`: no fixed base -> dynamic) - a 2.4 kg dynamic box that gave way under the
+  tilting target (the demo's partner is held by the left brace: it moved 5 mm). Fix: `STOP_STANDIN_KINEMATIC` (fixed_base + kinematic).
+  Replay at the default friction 0.5: VALID (tilt 0.000, orientation err 0.0025, touch gap 2.0 mm; was 0.463 rad). The brace-load pusher is
+  built the same way (dynamic) - not changed (it would move brace verdicts; owner question).
+- **A3 hand-overlap screen**: enforced; `ISPATIALGYM_HAND_OVERLAP_RANK` and `validate_contacts --screen-as-rank` stay default off; the
+  stratified validation marks screened entries `screened` and never counts them.
+- **A4 axial_02 repeats** (analysis, `$OFH/contactfu_20261108/a4/`): `instance_separation.measured_repeat` (base <= 0.25 m / 15 deg + the
+  task tolerances: goal and start orientation within 0.1 rad) against 2 eval instances (start yaw delta +24.3 / +34.4 deg, the same pinned
+  init base) -> a draft repeats iff delta in [18.6, 40.1] deg. The jhaltj s1x1x2.5 `push_blade` map admits at the drawn cells (x 0.79-0.91)
+  only `+end-spin_0@t25` (delta 22-34 deg: inside the window) - the map gate narrows the start onto the eval instances (6 classes, turns 25 /
+  45 only, 30 / 48 valid). Proposals: widen the library (turns 35 / 55 / 65, the -end 45 class, 16 yaw slots), order candidate stances by
+  map coverage; drawing delta outside the eval windows touches the repeat path (owner).
+- **A5 axial brace pairing** (`alignment_axial._scan_candidates`, v2only, map lookups only): per candidate stance (the first 6), the placement
+  draws until one has a PAIR - one pushed end whose `push_blade` class (init root) and `axial_brace` class (goal root) both fit, the same
+  end and spin in both maps; the paired stances first, else the first push-feasible draw (push-only); the paired end is tried first. Kit
+  `axial_brace.paired` / `.push_only`. axial_01-04 have no orientation equivalences: one goal yaw per stance.
+- **A6 stratified validation + learned maps**: `validate_contacts --per-group-valid 3 --per-group-max 8` (`GroupQuota`: per (yaw x end x
+  spin) group, library order, round-robin; kept verdicts with `--skip-validated`; a fresh run moves unreached old verdicts to
+  `validation_prev`); maps from VALID entries only. Learning (`sampling/contact_overlay.py`, the ONE overlay mechanism of
+  `v2/map_tilt.py`): the sampler notes the executed library entry per instance (`summary.contact_entries`: lineage key, class, yaw slot),
+  `python -m ispatialgym.sampling.contact_overlay harvest <job dirs>` turns each SUCCESSFUL demo into `ok` events
+  (`<job>/map_overlay/<lineage>/harvest__<instance>.jsonl`, immutable), `python -m ispatialgym.sampling.v2.map_tilt merge --root R` folds
+  them into `R/<lineage>/v<N>.json`, `contact_maps compute --overlay-root R` (job_contacts.sh `GC_MAP_OVERLAY`) rebuilds with the
+  confirmed entries joined; the map identity carries `{lineage, version}`; frozen maps are never edited.
+- **A6 run** (trunk_1da26c1c; `$OFH/contactfu_20261108/submit_gpu.sh`): touching push FRESH (the stand-in changed) on
+  `contact_libs_20261108s`: valid cereal iucshm 12 (groups short 4 / 8: 4 yaw slots with no valid entry), napkins 14 (short 4), spray 22
+  (short 1), 43-44 entries tried each, 578-883 s per library; touching brace kept (dkhgxn 40, ntbrtz 32 valid, 3 / group everywhere, 0 s);
+  axial (`contact_libs_axial_20261108s`, kept + stratified) push qgvsnb 101 (short 0), injrgc 62 (short 14), tfovwy 86 (short 8), brace
+  104 / 97 (short 3) / 120; jhaltj s1x1x2.5 (`_20261108sj`) push 80 (short 6), brace 96. GPU: touching ~0.6 h, axial ~4.8 h (tfovwy push
+  6725 s, jhaltj push 5381 s - the slow re-contact pushes); today's capped run: 48 entries / library, 470-3330 s. Maps (valid only) staged
+  in `v2maps_i7contactfu_t` (touching) / `_a` (axial). job_contacts.sh: the maps stage now maps the validate stage's partition (the
+  library-id partition let shard 1 map the napkins / cereal push libraries before their validation ended; rebuilt).
+- **A1 runs** (touching_02 v2only N 4, v2maps_i7contactfu_t; i7_contact2 before: 150 att / 1 written / 1 ok, 107 contact_unreachable,
+  1.21 GPU-h): i7_contactfu (trunk_1da26c1c, map-only partner test) 112 att / 3 wr / 3 ok, 53 contact_unreachable, 0.32 GPU-h per
+  success; the A1 log showed the map fits at 14-18 of 28 (lateral x stand-off) candidates but only 2-6 pass the collision check (the base
+  cannot go closer than ~0.30-0.35 m at the bar), so the partner test now includes it (89dd63aa): i7_contactfu2 82 att / 3 wr / 3 ok
+  (brace present 3 / 3), contact_unreachable 11, 45 partner draws rejected at ~1-6 s, 0.20 GPU-h per success; the recorded push stances
+  moved 0.10 / 0.25 / 0.10 m toward the bar (stand-offs 0.45 / 0.30 / 0.35).
+- **Overlay trial**: `contact_overlay harvest` over the i7_contactfu jobs: 13 successes -> 16 ok events in 5 lineages (1 entry not in its
+  map: it would join), merged to `$OFH/contactfu_20261108/overlay_trial/<lineage>/v1.json`; no map rebuilt.
+- **A5 run** (i7_contactfu, v2maps_i7contactfu_a): axial_01 11 att / 4 wr / 4 ok, axial_03 6 / 4 / 3, axial_04 17 / 4 / 3 (12 written,
+  10 / 12 demos, 0.125 GPU-h per success); kit `axial_brace.paired` 5 / `.push_only` 35 (scan per attempt); brace present 0 / 12 - axial_04
+  3 instances had a map pair but the exact two-arm brace failed (side contacts all sweep-skipped, blades IK at the pre / target at goal):
+  the brace library is built at one turn (45 deg, `AXIAL_TURN_DEG`) while the sampler's sweep test uses the drawn turn; axial_01 now draws
+  both spins (2 / 2; i7_contact2 all +1).
+
+#### Interior PLACE maps: the goal side as stance C checks it (branch i7-interior, 2026-11-07)
+
+Why the interior maps of a STABLE rest were too thin for stance C under `--grasps v2only` (i7_fridge3, i7_sink: 0 attempts, "no stance C"),
+measured against the legacy stance C of the same aliases (fix2 / ft_sph / ft2_sph logs and summaries):
+
+- **inside_large_02 (jar exmsmm, fridge_petcxr_0 @ 0.7064, door 2.3).** Legacy stance C: 36 lattice candidates (9 band trunks x 4
+  stand-offs x the ONE lateral -0.035: `lattice_values(-half_run, half_run, 0.10)` starts at -half_run), 8-9 survivors in postures
+  ready 6-7 / tucked 1-2 / untucked 0-1, at stand-offs 0.35-0.65 (tried C: d 0.35 trunk (0.50, 0.00), d 0.45 trunks (0.50, -0.3) /
+  (0.75, 0 / -0.3) / (0.95, 0 / -0.3)); the 3 written demos at d 0.55, lateral -0.035, trunk (0.95, -0.3), idle `ready`, the goal
+  0.871 m ahead / -0.025 m lateral of the base. The former map (fridge_maps_20261107c): 29 feasible entries, all at d_e 0.55 and all in
+  the first lattice row (x 0.83, 0.05 m behind the board front); 0 at d_e 0.35 / 0.45 / 0.65; legacy (d, trunk) pairs covered 1 / 7; the
+  written goal 0.048 m from the nearest feasible cell (the snap admits 0.51 x 0.08 = 0.041) -> stance C `band_cells` 2 / 5, `goal_in_band`
+  0. What removed the cells: (1) the WHOLE robot against the boxes in ONE idle posture per trunk (hits obstacle:left_arm_link1 64906 /
+  link3 24113 in the right-arm map - the idle arm in the door; untucked collides at every stand-off; no posture is clear at d_e 0.35 /
+  0.45 / 0.55 / 0.65 for 18 / 13 / 8 / 2 of the 20 trunks) - stance C judges that static body exactly in the real scene, per candidate, in
+  the first free posture; (2) the pre-place 0.10 m back along the gripper's approach (a side pinch's approach runs across the 0.34 m
+  compartment into a wall) - the variant's exact
+  pre-place is 0.10 m straight out of the opening (`inside_pre_outward`); (3) the place at the REST pose on the board with the hand at its
+  pre-shape opening - the exact place is the release 0.03 m up (+ the open-gripper clearance lift), the hand closed on the object; (4) the
+  compartment at lateral 0 (centre_y 0.0049) while stance C's only lateral puts it at +0.040 in the base frame; (5) the 0.08 lattice (first
+  row 0.041+ m from the first eroded goal cell); (6) found with (1)-(5) removed (85 entries at lateral 0, the WORKING forearm
+  right_arm_link4 / 5 in the walls ~2 M times): the side walls boxed from the static FRONT PLANE, measured only at the board's mid depth -
+  probe 18371680 (rays from the compartment centre line): for x < 0.13 m the open left door (0.20-0.30 m to the left) and the closed right
+  door (0.222-0.245 m to the right), the cabinet walls (0.172-0.179) only from ~0.15 m; the spec's walls are phantom over the first ~0.13 m
+  of the 0.231 m setback, exactly where the forearm enters. Not causes: the stand-off reference (stance C's so + the 0.241 AABB overhang = the map's
+  d_e from the static front plane; the board 0.2309 behind it in both) and the yaw (both square to the opening).
+- **inside_large_03 (plate luhkiz, drop_in_sink_lkklqs_0 basin @ 0.7751, rim 0.11).** Legacy stance C had NO band (NO_BAND_TRUNKS): 80
+  candidates (20 trunks x 4 stand-offs x lateral 0), 29 collision-free (untucked), 27 visible, 9 kept; the 24 written demos at d 0.55 /
+  0.65, trunks (0.95, 0) / (0.25, -0.6) / (0.0, -0.6) / (0.5, -0.3), the goal 0.16 m behind the raster edge, the release TILTED 30 / 45 deg
+  (`release_tilt_deg`), grasp_5 (a legacy rim pinch). The former map: 1 feasible entry per arm, at d_e 0.35 (where the real counter
+  blocks the robot: stance C collision_free 0), 0 legacy pairs covered; its rejections are hand_policy (2.9-5.8 k per d_e) and ik_pre: the
+  level plate RESTING on the basin floor with the rim-pinching hand at its pre-shape opening inside the 0.11 m basin - the exact place is
+  the release lifted (drop 0.02 + the open-gripper clearance) and tilted 30 / 45 deg (grasp side up, the hand above the rim).
+
+The fix (`sampling/interior_place.py`, `reach_maps --kind interior --interior-place <rule>`, job_glib `GB_INTERIOR_PLACE`): an interior
+PLACE map of a stable rest judges the place as the exact check does - the WORKING arm and its hand (closed on the object, each grasp's
+contact opening) against the compartment's boxes, along the variant's pre-place (`outward` / `approach`, `pre_m`) -> release line and at
+the release; the release = the object's bottom `drop_m` + the open-gripper clearance lift (`clearance_m`; every library grasp, or the
+grasp's own with `lift_per_grasp`) above the board, level and at each of `tilts_deg`; feasible under ANY self-collision-free idle posture
+(the posture's only remaining effect is the IK's self-collision), at ANY lateral of `laterals_m` (default -0.08..0.08 by 0.04: the
+compartment centred at `centre_y_m - lateral`), lattice `lattice_m` 0.04 over the compartment's span only, the side walls only along the
+board's depth (`walls` "board": `InteriorSpec.boxes(walls=)`, default "front" = every former box and digest unchanged). Exact checks unchanged
+(stance C's body check, goal cells, frame, F_goal, the exact place IK with the object attached). Identity: `MapConfig.interior_place` (the
+canonical rule) in the config and so the key; maps without it keep their keys (tabletop / floor / generic / lean-interior / the former
+interior maps). Lookup: `iors_large_inside.inside_place_rule` (the variant's pre-place, drop, clearance, tilts, lift rule) ->
+`tabletop.interior_map_bands(place=)` -> `ReachMap.find(interior_place=)` serves only a place map whose rule covers it
+(`interior_place.covers`: equal pre / drop / clearance / lift / body / release / walls, its tilts contain the variant's); a lean goal rest
+(inside_large_01) keeps its lean map. The rule fields `body` "robot" / `release` "rest" / `walls` "front" put back the former assumptions (measurements only;
+never served). Tests: `test_interior_place.py` (rule, sampler-identical tilt / gripper / lift geometry, the static body left to stance C,
+laterals, find, walls), `test_interior_fridge.py` (inside_band reads only the place map of its rule). Commits 2059ee0c, 77166591
+(snapshot trunk_77166591; suite = base: 23 failed + 3 errors, the same set).
+
+Rebuilt maps (record `$OFH/interior_place_20261107`, `ip_count.py`; feasible cells per d_e 0.35 / 0.45 / 0.55 / 0.65; "pairs" = the legacy
+stance-C (d, trunk) pairs with a feasible cell in the real goal region):
+
+| map | arm | entries | cells per d_e | pairs | legacy written goal to the nearest feasible cell |
+|---|---|---|---|---|---|
+| fridge, former (fridge_maps_20261107c) | R / L | 4 / 25 | 0/0/1/0, 0/0/2/0 | 1/7 | 0.048 m (snap 0.041) |
+| fridge, place rule (fridge_full2) | R / L | 45563 / 10482 | 49/57/48/54, 25/33/30/35 | 7/7 | 0.018 m (snap 0.020) |
+| sink, former (i7lean_inside sink_maps) | R / L | 1 / 1 | 1/0/0/0 | 0/5 | - |
+| sink, place rule (sink_full2) | R / L | 65849 / 62670 | 28/35/28/35 | 5/5 | 0.00-0.02 m |
+
+One-element ablations (right arm; each puts back one former assumption): sink - release at rest 187 entries (0/5: THE cause), level only
+(no tilts) 1606, whole robot 59316, lateral 0 28480, lattice 0.08 14148; fridge (on the walls-from-the-front-plane base, 7007) - lateral 0
+85 (3/7), whole robot 1355 (0 cells at 0.35), pre along the approach 6002, release at rest 5085, lattice 0.08 1963; walls along the board
+45563.
+
+Validation `--grasps v2only` N 4 (trunk_77166591): i7_sink2 (v2maps_i7sink2): stance C 26 survivors (band_cells 79 / 80, goal_in_band 78,
+collision-free 29 = legacy's, visible 26; F_goal at C: 0 level, 8-41 at 30 / 45 deg); 3 attempts, 0 written, 3.0 GPU-h, all time_budget -
+every one of 249 C tries failed at B, the PICK of the v2 plate lip_shallow grasps on bar_egwapq_0 (approach_untrackable, support policy on
+the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridge4 (v2maps_i7fridge4): stance C 17 survivors (band_cells
+55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
+carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
 ## Limitations / not done
 

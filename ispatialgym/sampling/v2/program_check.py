@@ -2131,6 +2131,23 @@ FINGERTIP_FRAME_MARGIN = 0.05
 FINGERTIP_FRAME_SLACK_M = 0.02
 
 
+def fingertip_frame_margin(model, cam, pose, margin: float = FINGERTIP_FRAME_MARGIN, slack_m: float = FINGERTIP_FRAME_SLACK_M) -> Dict[str, Any]:
+    """The program check's per-pose frame criterion (:func:`fingertips_in_frame`): the fingertip point ``C.fingertip(pose)`` projected into
+    the camera ``cam`` of ``model``, inside the image less QA's ``margin`` (5 %) plus ``slack_m`` at the fingertip projected through its
+    depth. ``{inside, margin_px (signed: the smallest distance to that border, negative outside; -inf behind the camera), u, v, depth_m,
+    slack_px}``. i7-plateqtf2 2026-11-08 (owner item 3): the draws' pre-place frame check uses it too."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling import geometry as G
+
+    tip = C.fingertip((G.t(pose[0]).float(), G.t(pose[1]).float()))
+    uv, depth = model.project(cam, G.t(tip).reshape(1, 3))
+    u, v, d = float(uv[0, 0]), float(uv[0, 1]), float(depth[0])
+    px = float(model.fx) * slack_m / max(d, 0.05) if slack_m > 0 else 0.0
+    mu, mv = margin * float(model.width) + px, margin * float(model.height) + px
+    m = min(u - mu, float(model.width) - mu - u, v - mv, float(model.height) - mv - v) if d > 0.05 else float("-inf")
+    return {"inside": bool(d > 0.05 and m >= 0.0), "margin_px": m, "u": round(u, 1), "v": round(v, 1), "depth_m": round(d, 3), "slack_px": round(px, 1)}
+
+
 def fingertips_in_frame(sampler, stance: Stance, name: str, pose_targets: Sequence[Tuple[str, Sequence[Any]]], margin: float = FINGERTIP_FRAME_MARGIN,
                         slack_m: float = FINGERTIP_FRAME_SLACK_M) -> Optional[Dict[str, Any]]:
     """Owner 2026-09-25 (cap 0925-191101: ``gripper_out_of_fov`` twice at the place - the pre-attach 20 cm from the head camera put
@@ -2140,9 +2157,6 @@ def fingertips_in_frame(sampler, stance: Stance, name: str, pose_targets: Sequen
     pose but the contact poses (``CONTACT_POSE_KEYS``: the box check of the task modules) and a place's post-release retreat leg.
     The oracle moves straight between the recorded poses, so the endpoints cover the motion (the carry's SLERP waypoints are all
     listed). Returns ``None`` when every pose passes, else ``{key, index, u, v, depth}`` of the first pose outside."""
-    from ispatialgym.robot import conventions as C
-    from ispatialgym.sampling import geometry as G
-
     if name in UNWATCHED_ACTIONS or stance is None:
         return None
     model = getattr(getattr(sampler.kit, "world", None), "camera_model", None)
@@ -2154,15 +2168,10 @@ def fingertips_in_frame(sampler, stance: Stance, name: str, pose_targets: Sequen
         if k0 in CONTACT_POSE_KEYS or (name == "place" and k0 == "retreat"):
             continue
         for i, p in enumerate(poses):
-            tip = C.fingertip((G.t(p[0]).float(), G.t(p[1]).float()))
-            uv, depth = model.project(cam, G.t(tip).reshape(1, 3))
-            u, v, d = float(uv[0, 0]), float(uv[0, 1]), float(depth[0])
             # QA's 5 % of the image, plus ``slack_m`` at the fingertip projected through its depth (execution error)
-            px = float(model.fx) * slack_m / max(d, 0.05) if slack_m > 0 else 0.0
-            mu, mv = margin * float(model.width) + px, margin * float(model.height) + px
-            inside = d > 0.05 and mu <= u <= float(model.width) - mu and mv <= v <= float(model.height) - mv
-            if not inside:
-                return {"key": key, "index": i, "n": len(poses), "u": round(u, 1), "v": round(v, 1), "depth_m": round(d, 3), "slack_px": round(px, 1)}
+            fm = fingertip_frame_margin(model, cam, p, margin, slack_m)
+            if not fm["inside"]:
+                return {"key": key, "index": i, "n": len(poses), "u": fm["u"], "v": fm["v"], "depth_m": fm["depth_m"], "slack_px": fm["slack_px"]}
     return None
 
 

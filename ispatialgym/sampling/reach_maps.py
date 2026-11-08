@@ -59,12 +59,18 @@ has its own row of lateral cells, ``off_support`` at the others), the lateral la
 kind's (policed: beyond its near edge the space below its top is free - where the lower finger of a pinch across the thickness is).
 Meta ``plane: "slab_edge"`` and ``overhang`` (the rest's identity, the edge offset, the yaw) - in the key; ``ReachMap.find(kind="overhang")``
 checks them; an overhang rest is mapped and looked up in this kind only, a stable rest never in it. Config: :func:`overhang_config`.
+**Articulation prefix maps** (``kind="articulation_prefix"``, i7-artic 2026-11-07; the in-process legacy handle band of ``articulation_small``'s
+successor): where the oracle's own motion of a small-articulation alias - ``validate_artic motions``' physics-validated segments (the pull-open
+prefix, v2 / v4's main pinch from q_ajar, the push-close tip contact) - is reachable from one fixed stance, per (edge distance, trunk, cell,
+the task's face yaw, segment) as the contiguous joint travel reached (:func:`compute_prefix_map`); own key / files / reader
+(:func:`find_prefix`, :class:`PrefixMap`) and a handle-only band view (:func:`prefix_bands`), under ``<maps root>/_articulation``.
 
     python -m ispatialgym.sampling.reach_maps bench
     python -m ispatialgym.sampling.reach_maps compute --jobs M.json --glib ROOT --anchors anchors.json [--heights 0.7351 ...] --out MAPS
     python -m ispatialgym.sampling.reach_maps compute --kind floor --jobs M.json --glib ROOT --out MAPS [--arm left]
     python -m ispatialgym.sampling.reach_maps compute --kind interior --interior bookcase_kmuacd_0@0.8354 --jobs LEAN.json --glib ROOT --out MAPS [--arm left]
     python -m ispatialgym.sampling.reach_maps compute --kind overhang --jobs OVERHANG.json --glib ROOT --anchors anchors.json --heights 0.7671 --out MAPS [--arm left]
+    python -m ispatialgym.sampling.reach_maps prefix --artic-lib LIB.json ... --anchors anchors.json --heights 0.8126 --arm right --out MAPS/_articulation
     python -m ispatialgym.sampling.reach_maps info MAP.json
 """
 
@@ -153,11 +159,14 @@ class MapConfig:
     # i7-overhang 2026-11-07: an overhang map's rest identity (``grasping.overhang.OverhangSpec.digest``); None for every other kind (left out
     # of key(): their keys stay)
     overhang: Optional[str] = None
+    # i7-interior 2026-11-07: an interior PLACE map's rule (``interior_place.place_rule``: the stable rest's release as stance C's exact place
+    # checks it); None for every other map (left out of key(): their keys stay - the former interior maps included)
+    interior_place: Optional[Dict[str, Any]] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place"):
             if d.get(k) is None:
                 d.pop(k)
         return d
@@ -294,15 +303,24 @@ def floor_config(**kw) -> MapConfig:
     return MapConfig(**kw)
 
 
-def interior_config(spec, rest_kind: str = "lean", **kw) -> MapConfig:
+def interior_config(spec, rest_kind: str = "lean", place: Optional[Dict[str, Any]] = None, **kw) -> MapConfig:
     """i7-lean 2026-11-07: the :class:`MapConfig` of an interior map of compartment ``spec`` (``interiors.InteriorSpec``) at a ``rest_kind``
     rest: the spec's stand-offs (``edge_distances``), one object yaw at a LEAN rest (measured against its board; a stable rest keeps the
     yaw axis), the lattice from the nearest front plane to the farthest board back, the spec's digest; ``kw`` sets the other fields (arm,
-    lattice, seeds, edge distances, ...)."""
+    lattice, seeds, edge distances, ...). i7-interior 2026-11-07: ``place`` (``interior_place.place_rule``; a STABLE rest only) = an
+    interior PLACE map - the rule in the config, its lattice over the compartment's span at every lateral (``place_config_fields``)."""
     kw = dict(kw)
     d_es = tuple(kw.pop("edge_distances", tuple(spec.edge_distances)))
     cfg = {"n_yaws": 1 if rest_kind == "lean" else MapConfig.n_yaws, "edge_distances": d_es, "x_max_m": round(max(d_es) + float(spec.depth_m), 4),
            "interior": spec.digest(), **kw}
+    if place is not None:
+        from ispatialgym.sampling import interior_place as IP
+
+        if rest_kind != "stable":
+            raise ValueError(f"an interior place map is computed at a stable rest (got a {rest_kind} rest)")
+        rule = IP.parse_rule(place)
+        cfg.update(IP.place_config_fields(spec, rule, d_es))
+        cfg["interior_place"] = rule
     return MapConfig(**cfg)
 
 
@@ -767,6 +785,13 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 raise ValueError(f"rest {rest_id!r}: a lean rest record without its side / board face")
     elif interior is not None or cfg.interior is not None:
         raise ValueError(f"interior is an interior map's field (kind {kind!r})")
+    if cfg.interior_place is not None:
+        # i7-interior 2026-11-07: an interior PLACE map (a stable rest in a fixed compartment, judged as stance C's exact place) - its own module
+        if not interior_kind or lean_placed:
+            raise ValueError(f"interior_place is an interior map's field at a stable rest (kind {kind!r}, rest kind {r_kind!r})")
+        from ispatialgym.sampling import interior_place as IP
+
+        return IP.compute_place_map(world, lib, rest_id, height, anchor, geom, cfg, policy, interior)
     # i7-overhang 2026-11-07: an overhang map - the rest's geometry fixes the yaw and the cells' x per edge distance
     overhang_kind = kind == "overhang"
     ov_geo: Dict[str, Any] = {}
@@ -1216,6 +1241,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     return meta, arrays
 
 
+def _place_covers(have, want) -> Optional[str]:
+    from ispatialgym.sampling import interior_place as IP
+
+    return IP.covers(have, want)
+
+
 @functools.lru_cache(maxsize=1)
 def robot_digest() -> str:
     from ispatialgym.oracle import r1pro_model as M
@@ -1272,7 +1303,7 @@ class ReachMap:
     @staticmethod
     def find(maps_root: str, lib: S.ModelLibrary, height: float, *, rest_id: str, arm: str = "right", policy_key: Optional[str] = None,
              anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None,
-             interior=None) -> Optional["ReachMap"]:
+             interior=None, interior_place: Optional[Dict[str, Any]] = None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
         metadata (object identity, rest, policy, schema are all checked). ``kind="floor"`` (i7-floor 2026-11-07): ``height`` 0.0 and
@@ -1281,7 +1312,9 @@ class ReachMap:
         ``kind="interior"`` (i7-lean 2026-11-07): ``interior`` (an ``interiors.InteriorSpec`` or its digest) is required and must be the map's
         compartment (meta ``interior.digest``), the rest a LEAN rest of the entry whose lean identity is the map's (meta ``lean.digest``);
         no other kind serves a lean rest, and an interior map never serves another kind. ``kind="overhang"`` (i7-overhang 2026-11-07): the rest
-        an OVERHANG rest of the entry whose overhang identity is the map's (meta ``overhang.digest``); no other kind serves an overhang rest."""
+        an OVERHANG rest of the entry whose overhang identity is the map's (meta ``overhang.digest``); no other kind serves an overhang rest.
+        i7-interior 2026-11-07: ``interior_place`` (an ``interior_place.place_rule``) - only a PLACE map whose rule covers it
+        (``interior_place.covers``); without it only a map without a place rule (the lean / former interior maps' lookups stay as they were)."""
         want_plane = PLANE_OF_KIND.get(kind, "slab")
         want_interior = None
         if kind == "interior":
@@ -1323,6 +1356,8 @@ class ReachMap:
                 continue
             if (m.get("overhang") or {}).get("digest") != want_overhang:  # i7-overhang: the overhang rest's identity (None for any other)
                 continue
+            if kind == "interior" and _place_covers((m.get("config") or {}).get("interior_place"), interior_place) is not None:
+                continue  # i7-interior: a place lookup reads a place map of its rule; a lean / former lookup none
             if policy_key is not None and m.get("policy_key") != policy_key:
                 continue
             if robot is not None and m.get("robot") != robot:  # of-v2maps 2026-11-07 (P2 §11): a map of another robot model does not serve
@@ -1745,120 +1780,442 @@ def _compute_generic_cli(a) -> None:
     print("GB_MAP_DONE", flush=True)
 
 
-# ------------------------------------------------------------------------------------------------ articulation opening prefixes (prompt 2 §7)
+# ------------------------------------------------------------------------------------------------ articulation prefixes (prompt 2 §7; i7-artic)
+#
+# i7-artic 2026-11-07 (owner decision: handles stay with the ARTICULATION library): the PREFIX kind - where, relative to the robot, the
+# oracle's own articulation motion of an alias is reachable from one fixed stance. Read from ``validate_artic motions``' physics-validated
+# segments (``artic_library__<alias>.json``, schema ``isg-artic-library/2``: per segment the nominal contact pose at the start q and the
+# measured eef poses of the validated motion, object-relative, with their joint values); kept apart from the grasp maps (own key, own
+# files ``prefix__*`` under ``<maps root>/_articulation``, own reader :class:`PrefixMap` / :func:`find_prefix`, own band view
+# :func:`prefix_bands`): a prefix map never answers a ``ReachMap.find`` and a grasp map never a prefix lookup.
+
+
+PREFIX_KIND = "articulation_prefix"
+#: the maps-root directory of the prefix maps (``<ISPATIALGYM_REACH_MAPS>/_articulation``; the sampler's default)
+PREFIX_DIR = "_articulation"
+PREFIX_VERSION = "isg-artic-prefix/2"
+ARTIC_LIBRARY_V2 = "isg-artic-library/2"
+#: find tolerances: a map's start joint value / face yaw vs the sampler's
+PREFIX_Q_TOL_RAD = 0.03
+PREFIX_YAW_TOL_RAD = 0.05
+#: the identity fields of a prefix map's key (:func:`prefix_map_key`; the height is added from ``meta["height"]["value"]``)
+PREFIX_IDENTITY = ("schema", "kind", "prefix_version", "arm", "object_key", "rest_id", "joint", "motion", "q_start", "handle_sig", "face_yaw_offset",
+                   "yaws", "segment_ids", "min_open_rad", "step_max_rad", "edge_distances", "config", "policy_key", "robot")
+
+
+def _wrap(a: float) -> float:
+    return math.atan2(math.sin(float(a)), math.cos(float(a)))
+
+
+def prefix_object_key(alib: Dict[str, Any], rest: Dict[str, Any]) -> str:
+    """The object identity of a prefix map: category, model, scale and the measured rest (yaw-free quat, root height, intended rest)."""
+    return S.digest({"artic": alib.get("category"), "m": alib.get("model"), "scale": list(S.canonical_scale(alib.get("scale"))),
+                     "rest": [round(float(v), 5) for v in rest["quat_xyzw"]], "h_root": round(float(rest["h_root"]), 5),
+                     "intended": [round(float(v), 5) for v in (rest.get("intended_quat_xyzw") or [0.0, 0.0, 0.0, 1.0])]}, 16)
+
+
+def prefix_map_key(meta: Dict[str, Any]) -> str:
+    ident = {k: meta.get(k) for k in PREFIX_IDENTITY}
+    ident["height"] = meta["height"]["value"]
+    return hashlib.sha1(json.dumps(ident, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
 def compute_prefix_map(world: SynthWorld, alib: Dict[str, Any], height: float, anchor: Dict[str, Any], cfg: Optional[MapConfig] = None,
-                       policy: CP.ContactPolicy = CP.DEFAULT, min_open_rad: float = 0.2, subsample: int = 2, step_max_rad: float = 0.5
-                       ) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
-    """Reachable opening prefixes of an articulated tabletop object (``validate_artic``'s ``artic_library.json``: the measured rest and,
-    per tested handle, the FIRST fixed-stance pull segment as object-relative eef waypoints with the joint value). Per (edge distance,
-    trunk, cell, yaw, segment): the pre-grasp and the waypoints in order by batched IK, each seeded from the previous waypoint's
-    solution; a configuration counts only while every joint stays within ``step_max_rad`` of the previous one (no branch jumps between
-    disconnected successes) and the whole robot keeps the contact policy against the slab (spheres; the hand hulls at the FK eef).
-    Stored: the contiguous prefix (rad of joint travel from the initial state) - ``accepted`` where it reaches ``min_open_rad`` (the full
-    validated range is not required). Hybrid demonstrations contribute their first fixed-stance segment only; the achieved range is that
-    of the tested grasp / stance / controller, not the object's limit. The moving link's geometry is not posed per waypoint: the arm-vs-
-    object check is not run here (the exact sampler checks the articulated target)."""
+                       policy: CP.ContactPolicy = CP.DEFAULT, min_open_rad: float = 0.0, step_max_rad: float = 0.5, yaw_offsets: Sequence[float] = (0.0,),
+                       geom=None, segments: Optional[Sequence[str]] = None) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:
+    """The prefix map of one alias motion (``validate_artic``'s ``artic_library__<alias>.json``) at an anchor height for ``cfg.arm``.
+
+    The object stands at the library's measured rest (``schema.place_object``: root at the cell, ``h_root`` above the slab top) turned by
+    the task's FACE YAW (``face_yaw_offset``: the yaw of the object relative to a robot facing the edge, ``articulation_small``) plus
+    ``yaw_offsets`` (rad; default the face yaw alone - not the grasp maps' yaw grid). Per (edge distance, trunk, cell, yaw, segment): the
+    segment's pre-grasp (``conventions.PRE_DIST`` back along the approach of its first waypoint, the fingers at its pre-shape) and then its
+    waypoints in order by batched IK, each seeded from the previous configuration and taking the successful seed NEAREST it; a waypoint
+    counts only while every arm joint stays within ``step_max_rad`` of the previous configuration (no branch jump) and the whole robot keeps
+    the contact policy against the slab: the non-finger spheres (``contact_policy.sphere_support_ok``) and the hand hulls at the FK eef (the
+    fingers at the segment's path opening: closed on the handle, or the closed fist); the object's footprint behind the edge (``support_mask``,
+    the closed geometry of ``geom``). Trunks: ``reach_bands.trunk_grid`` with the grasp maps' eligibility (the first idle-arm posture free of
+    itself and of the slab at every d_e). Stored per (d_e, trunk, segment): ``(cells, yaws)`` float32 - the contiguous joint travel (rad) from
+    the segment's start reached (0 = the pre-grasp and the first contact only), -1 = not even that. The moving link is not posed per waypoint
+    (no arm-vs-object check: the exact sampler checks the articulated target); the scope is the validated segment's - the tested handle
+    variant / stance / controller -, not the object's opening limit."""
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.reach_bands import trunk_grid
 
+    if alib.get("schema") != ARTIC_LIBRARY_V2:
+        raise ValueError(f"an articulation prefix map reads a {ARTIC_LIBRARY_V2} library (validate_artic motions), got {alib.get('schema')!r}")
     cfg = cfg or world.cfg
     t_all = time.time()
     dev = world.dev
-    rest = S.Rest.from_record(alib["rests"]["r0"])
+    segs = [s for s in alib.get("segments") or [] if (segments is None or s.get("id") in set(segments)) and s.get("waypoints")]
+    if not segs:
+        raise ValueError(f"{alib.get('alias')}: no validated segment in the library")
+    # owner 2026-11-07: an arm's map reads ONLY segments validated in physics with that arm - a left map from right-arm segments is refused
+    other = sorted({str(s.get("arm_validated")) for s in segs if s.get("arm_validated") != cfg.arm})
+    segs = [s for s in segs if s.get("arm_validated") == cfg.arm]
+    if not segs:
+        raise ValueError(f"{alib.get('alias')}: no {cfg.arm}-arm validated segment (the library's segments were validated with {other}); a {cfg.arm}-arm "
+                         f"prefix map needs validate_artic motions --arm {cfg.arm}")
+    rid = str(segs[0].get("rest_id") or "r0")
+    if any(str(s.get("rest_id") or "r0") != rid for s in segs):
+        raise ValueError(f"{alib.get('alias')}: the segments stand on different rests")
+    rest_rec = alib["rests"][rid]
+    rest = S.Rest.from_record(rest_rec)
+    face = float(alib["face_yaw_offset"])
+    yaws = [_wrap(face + float(dy)) for dy in yaw_offsets]
     cells = lattice(cfg)
-    yaws = [2 * math.pi * k / cfg.n_yaws for k in range(cfg.n_yaws)]
     nC, nY = len(cells), len(yaws)
+    N = nC * nY
     To = np.stack([S.place_object(rest, y, (0.0, 0.0), height) for y in yaws])  # (Y, 4, 4) at the origin cell
     arrays: Dict[str, np.ndarray] = {"cells": cells.astype(np.float32), "yaws": np.array(yaws, dtype=np.float32)}
+    if geom is not None:
+        V = np.asarray(geom.union.vertices) @ S.quat_to_mat(rest.quat_xyzw).T
+        reach_back = np.array([float((V @ R.T)[:, 0].min()) for R in _yaw_R(yaws)])
+    else:
+        reach_back = np.zeros(nY)
+    onsup = {d_e: th.as_tensor(support_mask(cells, reach_back, d_e).reshape(-1), device=dev) for d_e in cfg.edge_distances}  # (C * Y,) cell-major
     entry = world.entry()
     links = world.link_of_sphere()
     hc = CP.HandChecker(cfg.arm, policy, device=str(dev), spacing=cfg.hand_spacing_m)
+    sbs = {d_e: slab(height, d_e, cfg) for d_e in cfg.edge_distances}
+    # trunk eligibility (compute_map's rule)
+    meta_trunks: List[Dict[str, Any]] = []
+    locks: Dict[str, Optional[th.Tensor]] = {}
+    for tr, ti in trunk_grid(height):
+        key = f"t{tr:.2f}_k{ti:+.1f}"
+        rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
+        posture, q_lock = None, None
+        for p in cfg.postures:
+            q = world.q_config(tr, ti, p)
+            if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
+                continue
+            sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
+            if all(bool(CP.sphere_support_ok(sph, ln, sbs[d_e], cfg.arm, policy)[0][0]) for d_e in cfg.edge_distances):
+                posture, q_lock = p, q
+                break
+        rec.update({"posture": posture, "eligible": q_lock is not None, "n_reached": {}})
+        if q_lock is None:
+            rec["reason"] = "every idle-arm posture collides (self or the slab at some d_e)"
+        meta_trunks.append(rec)
+        locks[key] = q_lock
+    # every segment's problems in one batch per trunk (segment-major: problem = (segment, cell, yaw)); a shorter segment is padded with its
+    # last waypoint and leaves the chain after its own length - one padded IK batch serves every segment (not one per segment)
+    nS = len(segs)
+    Ks = [len(s["waypoints"]) for s in segs]
+    Kmax = max(Ks)
+    travel = np.zeros((nS, Kmax))
+    T = th.zeros(nS, N, Kmax, 4, 4, dtype=th.float32, device=dev)
+    f_pre = th.zeros(nS * N, device=dev)
+    f_path = th.zeros(nS * N, device=dev)
     segs_meta = []
-    t_ik = 0.0
-    n_ik = 0
-    for si, seg in enumerate(alib.get("segments") or []):
-        wps = seg["waypoints"][::max(1, subsample)]
-        if len(wps) < 2:
-            continue
+    for si, seg in enumerate(segs):
+        wps = seg["waypoints"]
+        K = Ks[si]
         q0 = float(wps[0]["q"])
-        travel = np.array([abs(float(w["q"]) - q0) for w in wps])
-        W = np.stack([S.pose_of(w["eef_in_object"]) for w in wps])  # (K, 4, 4)
-        TW = np.einsum("yij,kjl->ykil", To, W)  # (Y, K, 4, 4)
-        T = th.as_tensor(TW, dtype=th.float32, device=dev).unsqueeze(0).repeat(nC, 1, 1, 1, 1)
-        T[..., 0, 3] += th.as_tensor(cells[:, 0], dtype=th.float32, device=dev).view(nC, 1, 1)
-        T[..., 1, 3] += th.as_tensor(cells[:, 1], dtype=th.float32, device=dev).view(nC, 1, 1)
-        T = T.reshape(nC * nY, len(wps), 4, 4)
-        segs_meta.append({"index": si, "candidate": seg.get("candidate"), "joint": seg.get("joint"), "n_waypoints": len(wps),
-                          "validated_travel_rad": round(float(travel.max()), 4), "trial_stop": seg.get("stop"), "profile": seg.get("profile")})
-        for tr, ti in trunk_grid(height):
-            key = f"t{tr:.2f}_k{ti:+.1f}"
-            q_lock = world.q_config(tr, ti, "untucked")
-            if bool(world.backend.check_collision(q_lock.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
-                for d_e in cfg.edge_distances:
-                    arrays[f"s{d_e:.2f}_{key}__seg{si}"] = np.full((nC, nY), -1.0, dtype=np.float32)
-                continue
-            sh, L = world.shoulder(tr, ti)
+        tr_s = np.array([abs(float(w["q"]) - q0) for w in wps])
+        travel[si, :K], travel[si, K:] = tr_s, tr_s[-1]
+        W = np.stack([S.pose_of(w["eef_in_object"]) for w in wps] + [S.pose_of(wps[-1]["eef_in_object"])] * (Kmax - K))  # (Kmax, 4, 4)
+        TW = th.as_tensor(np.einsum("yij,kjl->ykil", To, W), dtype=th.float32, device=dev)  # (Y, Kmax, 4, 4)
+        Ts = TW.unsqueeze(0).repeat(nC, 1, 1, 1, 1)
+        Ts[..., 0, 3] += th.as_tensor(cells[:, 0], dtype=th.float32, device=dev).view(nC, 1, 1)
+        Ts[..., 1, 3] += th.as_tensor(cells[:, 1], dtype=th.float32, device=dev).view(nC, 1, 1)
+        T[si] = Ts.reshape(N, Kmax, 4, 4)
+        fg = seg.get("fingers") or {}
+        f_pre[si * N:(si + 1) * N] = float(fg.get("pre") or 0.0)
+        f_path[si * N:(si + 1) * N] = float(fg.get("path") or 0.0)
+        segs_meta.append({"index": si, "id": seg.get("id"), "variant": seg.get("variant"), "assignment": seg.get("assignment"), "n_waypoints": K,
+                          "q_list": [round(float(w["q"]), 4) for w in wps], "validated_travel_rad": round(float(tr_s.max()), 4), "trial_stop": seg.get("trial_stop"),
+                          "fingers": {"pre": float(fg.get("pre") or 0.0), "path": float(fg.get("path") or 0.0)}, "arm_validated": seg.get("arm_validated"),
+                          "source": seg.get("source")})
+    P = nS * N
+    T = T.reshape(P, Kmax, 4, 4)
+    seg_of = th.arange(P, device=dev) // N
+    K_of = th.as_tensor(Ks, device=dev)[seg_of]
+    travel_t = th.as_tensor(travel, dtype=th.float32, device=dev)
+    Tp = T[:, 0].clone()
+    Tp[:, :3, 3] -= C.PRE_DIST * Tp[:, :3, 2]
+
+    def hand_ok(Tq, fq, sb_):
+        """``hc.check`` with each problem's own finger opening (grouped by value)."""
+        out = th.ones(Tq.shape[0], dtype=th.bool, device=dev)
+        vals = th.round(fq * 1e5) / 1e5
+        for v in th.unique(vals).tolist():
+            m = vals == v
+            out[m] = hc.check(Tq[m], sb_, (float(v), float(v)))[0].to(dev)
+        return out
+
+    hand_pre = {d_e: hand_ok(Tp, f_pre, sbs[d_e]) for d_e in cfg.edge_distances}  # IK-independent prefilter
+    onsup_p = {d_e: onsup[d_e].repeat(nS) for d_e in cfg.edge_distances}
+    t_ik, n_ik = 0.0, 0
+    for trec in meta_trunks:
+        key = trec["key"]
+        q_lock = locks[key]
+        prefix = {d_e: th.full((P,), -1.0, device=dev) for d_e in cfg.edge_distances}
+        if q_lock is not None:
+            sh, L = world.shoulder(trec["translate"], trec["tilt"])
             sh_t = th.as_tensor(sh, dtype=th.float32, device=dev)
-            in_reach = (th.linalg.norm(T[:, 0, :3, 3] - sh_t, dim=1) <= L + cfg.reach_margin_m)
-            prefix = {d_e: th.full((nC * nY,), -1.0, device=dev) for d_e in cfg.edge_distances}
-            alive = {d_e: in_reach.clone() for d_e in cfg.edge_distances}
-            # the pre-grasp of the first waypoint, then the chain
-            Tp = T[:, 0].clone()
-            Tp[:, :3, 3] -= C.PRE_DIST * Tp[:, :3, 2]
-            idx = th.nonzero(in_reach).flatten()
-            if idx.numel() == 0:
-                for d_e in cfg.edge_distances:
-                    arrays[f"s{d_e:.2f}_{key}__seg{si}"] = prefix[d_e].view(nC, nY).cpu().numpy()
-                continue
-            ta = time.time()
-            sp_ok, qp = _solve(world, entry, Tp[idx], q_lock)
-            t_ik += time.time() - ta
-            n_ik += int(idx.numel())
-            ok_any = sp_ok.any(dim=1)
-            prev = th.zeros(nC * nY, qp.shape[-1], device=dev)
-            prev[idx] = qp[th.arange(idx.numel(), device=dev), th.argmax(sp_ok.int(), dim=1)]
+            reach = L + cfg.reach_margin_m
+            in_reach = (th.linalg.norm(T[:, 0, :3, 3] - sh_t, dim=1) <= reach) & (th.linalg.norm(Tp[:, :3, 3] - sh_t, dim=1) <= reach)
+            alive = {d_e: in_reach & onsup_p[d_e] & hand_pre[d_e] for d_e in cfg.edge_distances}
+            live = th.zeros(P, dtype=th.bool, device=dev)
             for d_e in cfg.edge_distances:
-                a = alive[d_e]
-                a[idx[~ok_any]] = False
-            for k in range(len(wps)):
-                live = alive[cfg.edge_distances[0]].clone()
-                for d_e in cfg.edge_distances[1:]:
-                    live |= alive[d_e]
-                ii = th.nonzero(live).flatten()
-                if ii.numel() == 0:
-                    break
+                live |= alive[d_e]
+            idx = th.nonzero(live).flatten()
+            if idx.numel() > 0:
                 ta = time.time()
-                sk, qk = _solve(world, entry, T[ii, k], q_lock, seed_active=prev[ii])
+                sp_ok, qp = _solve(world, entry, Tp[idx], q_lock)
                 t_ik += time.time() - ta
-                n_ik += int(ii.numel())
-                best = th.argmax(sk.int(), dim=1)
-                qsel = qk[th.arange(ii.numel(), device=dev), best]
-                okk = sk.any(dim=1) & ((qsel - prev[ii]).abs().max(dim=1).values <= step_max_rad)
-                qf = world.full_q(entry, qsel, q_lock)
-                sp = world.spheres(qf)
-                eef = world.eef(qf)
+                n_ik += int(idx.numel())
+                first = th.argmax(sp_ok.int(), dim=1)
+                qsel = qp[th.arange(idx.numel(), device=dev), first]
+                sp = world.spheres(world.full_q(entry, qsel, q_lock))
+                ok_any = sp_ok.any(dim=1)
                 for d_e in cfg.edge_distances:
-                    sb = slab(height, d_e, cfg)
-                    o_s, _ = CP.sphere_support_ok(sp, links, sb, cfg.arm, policy)
-                    o_h, _, _ = hc.check(eef, sb, (0.0, 0.0))
-                    good = okk & o_s.to(dev) & o_h & alive[d_e][ii]
-                    alive[d_e][ii] = good
-                    prefix[d_e][ii[good]] = float(travel[k])
-                prev[ii] = qsel
+                    o_s, _ = CP.sphere_support_ok(sp, links, sbs[d_e], cfg.arm, policy)
+                    alive[d_e][idx] = alive[d_e][idx] & ok_any & o_s.to(dev)
+                prev = th.zeros(P, qp.shape[-1], device=dev)
+                prev[idx] = qsel
+                for k in range(Kmax):
+                    live = th.zeros(P, dtype=th.bool, device=dev)
+                    for d_e in cfg.edge_distances:
+                        live |= alive[d_e]
+                    live &= K_of > k  # a segment leaves the chain after its own last waypoint
+                    ii = th.nonzero(live).flatten()
+                    if ii.numel() == 0:
+                        break
+                    ta = time.time()
+                    sk, qk = _solve(world, entry, T[ii, k], q_lock, seed_active=prev[ii])
+                    t_ik += time.time() - ta
+                    n_ik += int(ii.numel())
+                    # the successful seed nearest the previous configuration (one IK branch along the motion)
+                    dist = (qk - prev[ii].unsqueeze(1)).abs().max(dim=2).values
+                    dist = th.where(sk, dist, th.full_like(dist, float("inf")))
+                    best = th.argmin(dist, dim=1)
+                    ar = th.arange(ii.numel(), device=dev)
+                    qsel = qk[ar, best]
+                    okk = sk.any(dim=1) & (dist[ar, best] <= step_max_rad)
+                    qf = world.full_q(entry, qsel, q_lock)
+                    sp = world.spheres(qf)
+                    eef = world.eef(qf)
+                    trav_k = travel_t[seg_of[ii], k]
+                    for d_e in cfg.edge_distances:
+                        o_s, _ = CP.sphere_support_ok(sp, links, sbs[d_e], cfg.arm, policy)
+                        o_h = hand_ok(eef, f_path[ii], sbs[d_e])
+                        # the chain ends where a waypoint fails: a problem dead at this d_e stays dead (alive), live ones advance
+                        good = okk & o_s.to(dev) & o_h & alive[d_e][ii]
+                        alive[d_e][ii] = good
+                        prefix[d_e][ii[good]] = trav_k[good]
+                    prev[ii] = qsel
+        for si in range(nS):
             for d_e in cfg.edge_distances:
-                arrays[f"s{d_e:.2f}_{key}__seg{si}"] = prefix[d_e].view(nC, nY).cpu().numpy()
-    meta = {"schema": SCHEMA, "kind": "articulation_prefix", "arm": cfg.arm, "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
-            "object": {"category": alib.get("category"), "model": alib.get("model"), "scale": alib.get("scale"), "rests": {"r0": {k: alib["rests"]["r0"][k] for k in ("quat_xyzw", "h_root")}}},
-            "object_key": S.digest({"artic": alib.get("category"), "m": alib.get("model"), "rest": alib["rests"]["r0"]["quat_xyzw"], "segs": [s_["candidate"] for s_ in segs_meta]}, 16),
-            "rest_id": "r0", "height": {"value": height, "anchor_key": anchor.get("key")}, "edge_distances": list(cfg.edge_distances), "config": cfg.key(),
-            "policy_key": policy.key(cfg.arm), "segments": segs_meta, "min_open_rad": min_open_rad, "step_max_rad": step_max_rad,
-            "value": "contiguous joint travel (rad) from the initial state reachable from the cell / yaw / trunk; -1 = not even the grasp",
-            "scope": "the tested grasp / stance / controller's first fixed-stance segment - not the object's global opening limit",
-            "robot": robot_digest(), "timing": {"ik_s": round(t_ik, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)}, "created": S.now()}
-    meta["key"] = S.digest({k: meta[k] for k in ("schema", "kind", "arm", "object_key", "edge_distances", "config", "policy_key", "robot")} | {"h": height}, 16)
+                arrays[f"s{d_e:.2f}_{key}__seg{si}"] = prefix[d_e][si * N:(si + 1) * N].view(nC, nY).cpu().numpy()
+        for d_e in cfg.edge_distances:
+            trec["n_reached"][f"{d_e:.2f}"] = [int((prefix[d_e][si * N:(si + 1) * N] >= float(min_open_rad) - 1e-9).sum()) for si in range(nS)]
+    rest_meta = {k: rest_rec.get(k) for k in ("quat_xyzw", "h_root", "intended_quat_xyzw", "stable", "tilt_from_intended_rad", "settled_at_yaw")}
+    meta = {"schema": SCHEMA, "kind": PREFIX_KIND, "prefix_version": PREFIX_VERSION, "arm": cfg.arm,
+            "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
+            "object": {"category": alib.get("category"), "model": alib.get("model"), "scale": list(S.canonical_scale(alib.get("scale"))), "rest": rest_meta},
+            "object_key": prefix_object_key(alib, rest_rec), "rest_id": rid, "alias": alib.get("alias"), "joint": alib.get("joint"), "motion": alib.get("motion"),
+            "q_start": round(float(alib["q_start"]), 4), "handle_sig": alib.get("handle_sig"), "face_yaw_offset": round(face, 4),
+            "yaw_offsets": [round(float(v), 4) for v in yaw_offsets], "yaws": [round(float(y), 4) for y in yaws], "segments": segs_meta,
+            "segment_ids": [s.get("id") for s in segs], "validated_travel_rad": round(max(float(s["validated_travel_rad"]) for s in segs_meta), 4),
+            "min_open_rad": float(min_open_rad), "step_max_rad": float(step_max_rad), "height": {"value": height, "anchor_key": anchor.get("key")},
+            "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "robot": robot_digest(),
+            "arms_offered": list(alib.get("arms_offered") or []), "arm_validated": sorted({str(s.get("arm_validated")) for s in segs}),
+            "profile": {k: (alib.get("profile") or {}).get(k) for k in ("brake_candidate", "stable_set", "other_joint_drives")},
+            "source": {"library": alib.get("_path"), "library_digest": S.digest({k: alib.get(k) for k in ("alias", "segments", "rests")}, 16),
+                       "validator": alib.get("validator"), "motions_version": alib.get("motions_version")},
+            "trunks": meta_trunks, "value": "contiguous joint travel (rad) from the segment's start reachable from the cell / yaw / trunk; 0 = the pre-grasp and the first contact; -1 = not even that",
+            "scope": "the validated segment (one handle variant, the oracle's fixed-stance motion) - not the object's opening limit; the moving link is not posed (no arm-vs-object check)",
+            "timing": {"ik_s": round(t_ik, 2), "ik_problems": n_ik, "total_s": round(time.time() - t_all, 2)}, "created": S.now()}
+    meta["key"] = prefix_map_key(meta)
     return meta, arrays
+
+
+def save_prefix(out_dir: str, meta: Dict[str, Any], arrays: Dict[str, np.ndarray]) -> str:
+    """``<out_dir>/prefix__<category>__<model>__<motion>__<arm>__h<h>__<key>.{json,npz}`` (``out_dir`` = ``<maps root>/_articulation``)."""
+    os.makedirs(out_dir, exist_ok=True)
+    o = meta["object"]
+    base = os.path.join(out_dir, f"prefix__{o['category']}__{o['model']}__{meta['motion']}__{meta['arm']}__h{float(meta['height']['value']):.4f}__{meta['key']}")
+    np.savez_compressed(base + ".npz", **arrays)
+    S.save_json(base + ".json", meta)
+    return base + ".json"
+
+
+class PrefixMap(ReachMap):
+    """One prefix map: the travel per (edge distance, trunk, segment) as (cells, yaws), never a grasp map's status array."""
+
+    def __init__(self, path_json: str):
+        super().__init__(path_json)
+        if self.meta.get("kind") != PREFIX_KIND:
+            raise S.IncompatibleRecord(f"{path_json}: kind {self.meta.get('kind')!r} is not {PREFIX_KIND}")
+
+    def status(self, edge_distance: float, translate: float, tilt: float) -> np.ndarray:  # a grasp map's query: not this kind's
+        raise KeyError("a prefix map has no grasp status arrays (PrefixMap.prefix)")
+
+    def _d(self, edge_distance: float) -> float:
+        d = min(self.meta["edge_distances"], key=lambda v: abs(v - edge_distance))
+        if abs(d - edge_distance) > 1e-6:
+            raise KeyError(f"edge distance {edge_distance} is not in the map ({self.meta['edge_distances']})")
+        return d
+
+    def prefix(self, edge_distance: float, translate: float, tilt: float, seg: int) -> np.ndarray:
+        return self.arrays[f"s{self._d(edge_distance):.2f}_t{translate:.2f}_k{tilt:+.1f}__seg{int(seg)}"]
+
+    def accepted(self, edge_distance: float, translate: float, tilt: float, needed_rad: float, yaw_index: Optional[int] = None) -> np.ndarray:
+        """(C,) bool: some segment reaches ``needed_rad`` of travel at the cell (at ``yaw_index``, else any yaw)."""
+        yi = slice(None) if yaw_index is None else slice(int(yaw_index), int(yaw_index) + 1)
+        P = np.stack([self.prefix(edge_distance, translate, tilt, si)[:, yi] for si in range(len(self.meta["segments"]))])
+        return (P >= float(needed_rad) - 1e-6).any(axis=(0, 2))
+
+
+def find_prefix(maps_root: str, spec: Dict[str, Any], *, anchors=None, policy_key: Optional[str] = None, robot: Optional[str] = None,
+                config_require: Optional[Dict[str, Any]] = None, q_tol: float = PREFIX_Q_TOL_RAD, yaw_tol: float = PREFIX_YAW_TOL_RAD) -> Optional[PrefixMap]:
+    """The prefix map of ``spec`` in ``maps_root`` (the ``_articulation`` directory) at the anchor covering ``spec["height"]``
+    (``AnchorSet.lookup``: exact or within the anchor's clipped range; without ``anchors`` the height itself), or None. ``spec`` (what the
+    sampler builds, ``sampling.v2.artic_prefix.prefix_spec``): ``category``, ``model``, ``scale``, ``rest_quat`` (the sampler's placement
+    rest), ``joint``, ``motion``, ``q_start``, ``needed_travel``, ``arm``, ``face_yaw_offset``, ``handle_sig``, ``height``; optional
+    ``step_max_rad`` (the map's must not be larger) and ``min_open_rad`` (equal). Identity enforced: schema, kind, prefix version, the map's own
+    key over its identity, arm, segments validated with that same arm (``arm_validated``), category / model / scale, a STABLE rest whose intended rest is ``rest_quat`` (q or -q, 1e-4), joint, motion,
+    the start value within ``q_tol``, the handle signature, the face yaw within ``yaw_tol``, a validated travel >= the needed one, the policy
+    key, the robot digest, the required config fields, the height. The hit carries ``lookup`` = ``{how, query_h, map_h}``."""
+    target, how = float(spec["height"]), "height"
+    if anchors is not None:
+        a, how = anchors.lookup(float(spec["height"]))
+        if a is None:
+            return None
+        target = float(a["height"])
+    rq = np.asarray(spec.get("rest_quat") or [0.0, 0.0, 0.0, 1.0], dtype=float)
+    for fn in sorted(os.listdir(maps_root)) if os.path.isdir(maps_root) else []:
+        if not fn.endswith(".json") or not fn.startswith("prefix__"):
+            continue
+        p = os.path.join(maps_root, fn)
+        try:
+            with open(p) as f:
+                m = json.load(f)
+        except Exception:  # noqa: BLE001
+            continue
+        if m.get("schema") != SCHEMA or m.get("kind") != PREFIX_KIND or m.get("prefix_version") != PREFIX_VERSION:
+            continue
+        try:
+            if m.get("key") != prefix_map_key(m):
+                continue  # a hand-edited identity does not serve
+        except (KeyError, TypeError):
+            continue
+        o = m.get("object") or {}
+        r = o.get("rest") or {}
+        if m.get("arm") != spec["arm"] or o.get("category") != spec["category"] or o.get("model") != spec["model"]:
+            continue
+        if list(m.get("arm_validated") or []) != [spec["arm"]]:
+            continue  # owner 2026-11-07: only a map built from segments validated with ITS arm serves (never a left map of right segments)
+        if S.canonical_scale(o.get("scale")) != S.canonical_scale(spec.get("scale")):
+            continue
+        iq = np.asarray(r.get("intended_quat_xyzw") or [9.0, 9.0, 9.0, 9.0], dtype=float)
+        if not r.get("stable") or min(float(np.abs(iq - rq).max()), float(np.abs(iq + rq).max())) > 1e-4:
+            continue
+        if m.get("joint") != spec["joint"] or m.get("motion") != spec["motion"] or m.get("handle_sig") != spec["handle_sig"]:
+            continue
+        if abs(float(m["q_start"]) - float(spec["q_start"])) > q_tol or abs(_wrap(float(m["face_yaw_offset"]) - float(spec["face_yaw_offset"]))) > yaw_tol:
+            continue
+        if float(m.get("validated_travel_rad", -1.0)) < float(spec.get("needed_travel", 0.0)) - 1e-6:
+            continue
+        if spec.get("step_max_rad") is not None and float(m.get("step_max_rad", 1e9)) > float(spec["step_max_rad"]) + 1e-9:
+            continue
+        if spec.get("min_open_rad") is not None and abs(float(m.get("min_open_rad", -1.0)) - float(spec["min_open_rad"])) > 1e-9:
+            continue
+        if policy_key is not None and m.get("policy_key") != policy_key:
+            continue
+        if robot is not None and m.get("robot") != robot:
+            continue
+        if config_require and any(config_value(m, k) != v for k, v in config_require.items()):
+            continue
+        if abs(float(m["height"]["value"]) - target) > 1e-6:
+            continue
+        pm = PrefixMap(p)
+        pm.lookup = {"how": how, "query_h": round(float(spec["height"]), 4), "map_h": float(m["height"]["value"])}
+        return pm
+    return None
+
+
+def nearest_yaw_index(pm: PrefixMap, face_yaw_offset: float) -> int:
+    return int(np.argmin([abs(_wrap(float(y) - float(face_yaw_offset))) for y in pm.yaws]))
+
+
+def prefix_bands(pm: PrefixMap, needed_rad: float, *, overhang: float = 0.0, yaw_index: Optional[int] = None):
+    """The HANDLE-ONLY band view of a prefix map (the successor of ``articulation_small._brace_band``'s in-process handle band): per stored
+    edge distance (stand-off = d_e - ``overhang``) and eligible trunk the cells where some validated segment reaches ``needed_rad`` of travel
+    (at ``yaw_index``: the task's face yaw; else any stored yaw); pairs ``[cell, yaw index, segment]``, ``grasp_names`` the segments' variants;
+    meta ``handle_only`` (the brace comes from the exact IK), ``map_kind`` articulation_prefix."""
+    from ispatialgym.sampling import reach_bands as RB
+
+    segs = pm.meta["segments"]
+    yis = list(range(len(pm.yaws))) if yaw_index is None else [int(yaw_index)]
+    meta = {"mode": "map_view", "map_kind": PREFIX_KIND, "handle_only": True, "map_key": pm.meta["key"], "map_path": pm.path,
+            "lattice": float(pm.meta["config"]["lattice_m"]), "arm": pm.meta["arm"], "grasp_names": [str(s.get("variant")) for s in segs], "trunks": [],
+            "stand_offs": [], "stand_off": None, "overhang": float(overhang), "height": pm.meta["height"], "needed_travel_rad": float(needed_rad),
+            "q_start": pm.meta["q_start"], "motion": pm.meta["motion"], "joint": pm.meta["joint"], "yaws": [float(pm.yaws[i]) for i in yis],
+            "lookup": dict(getattr(pm, "lookup", None) or {})}
+    cells_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
+    pairs_so: Dict[float, Dict[Tuple[float, float], np.ndarray]] = {}
+    for d_e in pm.meta["edge_distances"]:
+        so = round(float(d_e) - float(overhang), 4)
+        meta["stand_offs"].append(so)
+        cells_so[so], pairs_so[so] = {}, {}
+        for t in pm.meta["trunks"]:
+            if not t.get("eligible"):
+                continue
+            key = (float(t["translate"]), float(t["tilt"]))
+            P = np.stack([pm.prefix(d_e, key[0], key[1], si)[:, yis] for si in range(len(segs))])  # (S, C, Y')
+            ok = P >= float(needed_rad) - 1e-6
+            ci = np.nonzero(ok.any(axis=(0, 2)))[0]
+            cells_so[so][key] = pm.cells[ci].astype(np.float64)
+            remap = {int(c): i for i, c in enumerate(ci)}
+            pairs_so[so][key] = np.array([[remap[int(c)], yis[int(y)], int(s_)] for s_, c, y in np.argwhere(ok)], dtype=np.int32).reshape(-1, 3)
+            meta["trunks"].append({"translate": key[0], "tilt": key[1], "stand_off": so, "posture": t.get("posture")})
+    ref = meta["stand_offs"][len(meta["stand_offs"]) // 2]
+    meta["stand_off"] = ref
+    return RB.ReachBands(meta, dict(cells_so[ref]), dict(pairs_so[ref]), None, {}, cells_so, pairs_so, {})
+
+
+def _prefix_cli(a) -> None:
+    """``prefix``: one map per (library, anchor) for ``--arm``; a library whose offered arms lack it is skipped (``--any-arm``: computed); a library
+    without segments validated with ``--arm`` (``validate_artic motions --arm``) gives no map (compute_prefix_map refuses another arm's segments)."""
+    from ispatialgym.grasping import object_geometry as OG
+
+    an = json.load(open(a.anchors))
+    anchors = {x["key"]: x for x in an["anchors"]}
+    cfg = MapConfig(arm=a.arm, lattice_m=a.lattice, seeds=a.seeds, batch=a.batch, twins=False)
+    w = None
+    yaw_offsets = [math.radians(float(v)) for v in (a.yaw_offsets_deg or [0.0])]
+    for p in a.artic_lib:
+        alib = json.load(open(p))
+        alib["_path"] = os.path.abspath(p)
+        offered = list(alib.get("arms_offered") or [])
+        if offered and a.arm not in offered and not a.any_arm:
+            print("GB_PREFIX " + json.dumps({"lib": p, "arm": a.arm, "ok": True, "skipped": f"the task offers {offered}"}), flush=True)
+            continue
+        geom = OG.load(os.path.dirname(os.path.abspath(p)))
+        for hk in a.heights:
+            if hk not in anchors:
+                print("GB_PREFIX " + json.dumps({"lib": p, "h": hk, "arm": a.arm, "ok": False, "reason": "not an anchor key of --anchors"}), flush=True)
+                continue
+            h = float(anchors[hk]["height"])
+            o = os.path.join(a.out, f"prefix__{alib.get('category')}__{alib.get('model')}__{alib.get('motion')}__{a.arm}__h{h:.4f}__*.json")
+            if a.skip_existing and any(list((S.load_json(x) or {}).get("arm_validated") or []) == [a.arm] for x in glob.glob(o)):
+                continue  # only a map of this arm's own validated segments counts as existing
+            try:
+                if w is None:
+                    w = SynthWorld(cfg)
+                meta, arrays = compute_prefix_map(w, alib, h, anchors[hk], cfg=cfg, min_open_rad=a.min_open_rad, step_max_rad=a.step_max_rad,
+                                                  yaw_offsets=yaw_offsets, geom=geom)
+                path = save_prefix(a.out, meta, arrays)
+                print("GB_PREFIX " + json.dumps({"lib": p, "h": hk, "arm": a.arm, "ok": True, "path": path, "timing": meta["timing"], "n_segments": len(meta["segments"]),
+                                                 "face_yaw_offset": meta["face_yaw_offset"], "validated_travel_rad": meta["validated_travel_rad"],
+                                                 "reached_cells_x_yaws": {t["key"]: t["n_reached"] for t in meta["trunks"] if t.get("eligible")}}), flush=True)
+            except Exception as e:  # noqa: BLE001
+                import traceback
+
+                print("GB_PREFIX " + json.dumps({"lib": p, "h": hk, "arm": a.arm, "ok": False, "error": repr(e), "tb": traceback.format_exc()[-1500:]}), flush=True)
+    print("GB_PREFIX_DONE", flush=True)
 
 
 # ------------------------------------------------------------------------------------------------ CLI
@@ -1889,7 +2246,7 @@ def _bench(args):
 
 
 def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT,
-                      interior: Optional[str] = None, overhang: Optional[str] = None) -> bool:
+                      interior: Optional[str] = None, overhang: Optional[str] = None, interior_place: Optional[Dict[str, Any]] = None) -> bool:
     """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
     its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one), and its
     trunk eligibility rule (i7-unblock 2026-11-07: ``trunk_eligibility``, None = "all_d_e"; a map of the former rule does not stand in for
@@ -1904,6 +2261,8 @@ def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[st
     if config_value(m, "trunk_eligibility") != (trunk_eligibility or "all_d_e"):
         return False
     if kind == "interior" and (m.get("interior") or {}).get("digest") != interior:  # i7-lean: another compartment does not count
+        return False
+    if kind == "interior" and (m.get("config") or {}).get("interior_place") != interior_place:  # i7-interior: another place rule does not count
         return False
     if kind == "overhang" and (m.get("overhang") or {}).get("digest") != overhang:  # i7-overhang: another overhang rest does not count
         return False
@@ -1935,43 +2294,35 @@ def main(argv=None):
                         "interior: the lean entries inside --interior's compartment (at its board height; no anchors); "
                         "overhang: the overhang entries on a slab whose near edge lies under them (anchors / heights as tabletop)")
     c.add_argument("--interior", default=None, help="--kind interior: an interiors.json name (ispatialgym/assets/interiors) or a spec json file")
+    c.add_argument("--interior-place", default=None, help="--kind interior, a STABLE rest: the place rule (JSON, interior_place.place_rule) - an interior "
+                        "PLACE map as stance C's exact place checks it (i7-interior); default none = the former interior map")
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
     c.add_argument("--trunk-eligibility", default=None, choices=list(TRUNK_ELIGIBILITY_RULES),
                    help="the trunk eligibility rule (MapConfig.trunk_eligibility; default: MapConfig's, per_d_e). all_d_e = the former rule (the field is left out "
                         "of the map's config and key); per_d_e = a trunk is ineligible only at the edge distances where every idle-arm posture collides")
-    pf = sub.add_parser("prefix")
-    pf.add_argument("--artic-lib", nargs="+", required=True, help="artic_library.json files (validate_artic)")
+    pf = sub.add_parser("prefix", help="articulation prefix maps (i7-artic): validate_artic motions' artic_library__<alias>.json -> <out>/prefix__*")
+    pf.add_argument("--artic-lib", nargs="+", required=True, help="artic_library__<alias>.json files (validate_artic motions)")
     pf.add_argument("--anchors", required=True)
-    pf.add_argument("--heights", nargs="+", required=True)
-    pf.add_argument("--out", required=True)
-    pf.add_argument("--min-open-rad", type=float, default=0.2)
+    pf.add_argument("--heights", nargs="+", required=True, help="anchor keys")
+    pf.add_argument("--out", required=True, help="the prefix maps directory (the sampler reads <ISPATIALGYM_REACH_MAPS>/_articulation)")
+    pf.add_argument("--arm", default="right", choices=["right", "left"])
+    pf.add_argument("--any-arm", action="store_true", help="also for an arm the task does not offer (the library's arms_offered)")
+    pf.add_argument("--min-open-rad", type=float, default=0.0, help="the summary threshold of the per-trunk counts (in the map's identity)")
+    pf.add_argument("--step-max-rad", type=float, default=0.5)
+    pf.add_argument("--yaw-offsets-deg", nargs="*", type=float, default=[0.0], help="object yaws about the task's face yaw (default the face yaw alone)")
+    pf.add_argument("--lattice", type=float, default=0.08)
+    pf.add_argument("--seeds", type=int, default=8)
+    pf.add_argument("--batch", type=int, default=2048)
+    pf.add_argument("--skip-existing", action="store_true")
     i = sub.add_parser("info")
     i.add_argument("map")
     a = ap.parse_args(argv)
     if a.cmd == "bench":
         _bench(a)
     elif a.cmd == "prefix":
-        an = json.load(open(a.anchors))
-        anchors = {x["key"]: x for x in an["anchors"]}
-        w = SynthWorld(MapConfig())
-        for p in a.artic_lib:
-            alib = json.load(open(p))
-            for hk in a.heights:
-                try:
-                    meta, arrays = compute_prefix_map(w, alib, float(anchors[hk]["height"]), anchors[hk], min_open_rad=a.min_open_rad)
-                    base = os.path.join(a.out, f"prefix__{alib['category']}__{alib['model']}__h{float(hk):.4f}__{meta['key']}")
-                    os.makedirs(a.out, exist_ok=True)
-                    np.savez_compressed(base + ".npz", **arrays)
-                    S.save_json(base + ".json", meta)
-                    acc = {k: int((v >= a.min_open_rad).sum()) for k, v in arrays.items() if k.startswith("s0.45") and k.endswith("__seg0")}
-                    print("GB_PREFIX " + json.dumps({"lib": p, "h": hk, "timing": meta["timing"], "segments": meta["segments"], "accepted_cells_x_yaws@0.45": acc,
-                                                     "max_prefix_rad": max(float(v.max()) for k, v in arrays.items() if "__seg" in k)}), flush=True)
-                except Exception as e:  # noqa: BLE001
-                    import traceback
-
-                    print("GB_PREFIX " + json.dumps({"lib": p, "h": hk, "error": repr(e), "tb": traceback.format_exc()[-1500:]}), flush=True)
+        _prefix_cli(a)
     elif a.cmd == "info":
         m = ReachMap(a.map)
         print(json.dumps({k: m.meta[k] for k in ("key", "rest_id", "height", "edge_distances", "screening", "timing")}, indent=1))
@@ -2082,12 +2433,14 @@ def _compute_cli(a):
             if a.kind == "overhang":  # i7-overhang: the rest's own config (its digest, one yaw, the edge distances, the lateral lattice)
                 cfg_r = overhang_config(r, **{k: v for k, v in kw.items() if k != "lattice_m"})
             else:
-                cfg_r = interior_config(spec, rest_kind=getattr(r, "kind", "stable"), **kw) if interior_kind else cfg
+                rk = getattr(r, "kind", "stable")
+                place = getattr(a, "interior_place", None) if rk == "stable" else None  # i7-interior: the place rule (stable rests only)
+                cfg_r = interior_config(spec, rest_kind=rk, place=place, **kw) if interior_kind else cfg
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
                 if a.skip_existing and any(_map_meta_matches(p, cfg_r.arm, a.kind, cfg_r.floor_fingers, cfg_r.trunk_eligibility, cfg_r.interior,
-                                                             cfg_r.overhang)
+                                                             cfg_r.overhang, cfg_r.interior_place)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:

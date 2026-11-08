@@ -1412,6 +1412,7 @@ def test_a_grasp_lift_a_floor_demands_is_not_optional():
         s.gp = SimpleNamespace(variant="cork-test")
         s.gen = lambda key, default=None: extra_m if key == "grasp_height_extra_m" else default
         s.hull, s.t_role = {"male": cork}, "male"
+        s.grasp_key = None  # integration (i7-attachfix d4f1bdcd reads the sampler's grasp key): a legacy key - the knob lift applies
         s.world = SimpleNamespace(hull_at=lambda hull, pose: hull.clone())
         s.counters = {}
         s.choice = SimpleNamespace(models={"male": SimpleNamespace(scale=1.0)})

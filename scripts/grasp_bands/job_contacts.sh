@@ -16,6 +16,10 @@
 #   GC_STAGES=maps GC_MANIFEST=none GC_GLIB=none GC_ROOT=<library root> GC_NSHARD=N ISG_GB_ROOT=<snapshot> sbatch --array=0-$((N-1)) job_contacts.sh
 # A re-validation in a new order that keeps the earlier verdicts (i7-contact 2026-11-07: the axial (end, spin) groups): GC_VALIDATE_ARGS=--skip-validated
 # on a cp -a of the library root.
+# owner A6 (i7-contactfu 2026-11-08): STRATIFIED validation - GC_VALIDATE_ARGS="--per-group-valid 3 --per-group-max 8 [--skip-validated]" (2-3 valid
+# per (yaw x end x spin) group; without --skip-validated a fresh run: unreached entries lose old verdicts); maps from VALID entries only (the
+# default GC_MAP_VERDICTS); GC_MAP_OVERLAY=<merged contact overlay root> rebuilds a map with the entries real oracle successes confirmed
+# (contact_overlay.py harvest -> map_tilt merge; the overlay version enters the map identity).
 #SBATCH --job-name=isgcontact
 #SBATCH --account=vision
 #SBATCH --partition=svl
@@ -59,10 +63,28 @@ if [[ " $STAGES " == *" validate "* ]]; then
 fi
 if [[ " $STAGES " == *" maps "* ]]; then
   MOUT=${GC_MAPS_OUT:-$ROOT/maps}; mkdir -p $MOUT
+  # i7-contactfu 2026-11-08: with a manifest the maps stage maps THIS shard's manifest ids (the validate stage's partition) - the library ids'
+  # own sorted partition let a shard map another shard's library before its validation ended (contact_libs_20261108s: napkins / cereal
+  # touch_push maps read the old verdicts)
+  MSEL="--shard $I/$N"
+  if [ -f "$M" ]; then
+    # (the validate stage's --only in GC_VALIDATE_ARGS filters before the partition: the same here)
+    MIDS=$(python -c "
+import sys
+from ispatialgym.grasping import contact_library as CL
+a = sys.argv[3].split(); only = []
+if '--only' in a:
+    for t in a[a.index('--only') + 1:]:
+        if t.startswith('--'):
+            break
+        only.append(t)
+print(' '.join(j['id'] for j in CL._jobs(sys.argv[1], only or None, sys.argv[2])))" $M $I/$N "${GC_VALIDATE_ARGS:-}")
+    MSEL="--only ${MIDS:-__none__}"
+  fi
   for KIND in ${GC_MAP_KINDS:-touch_push touch_brace push_blade axial_brace}; do
     t0=$(date +%s)
-    python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT --shard $I/$N --verdicts ${GC_MAP_VERDICTS:-valid} \
-      ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} >> $ROOT/logs/maps_${I}_$KIND.log 2>&1
+    python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT $MSEL --verdicts ${GC_MAP_VERDICTS:-valid} \
+      ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} ${GC_MAP_OVERLAY:+--overlay-root $GC_MAP_OVERLAY} >> $ROOT/logs/maps_${I}_$KIND.log 2>&1
     rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $ROOT/logs/maps_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
     echo "GC_STAGE maps kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
   done

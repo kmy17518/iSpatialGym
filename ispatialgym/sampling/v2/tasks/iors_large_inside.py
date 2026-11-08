@@ -832,10 +832,14 @@ class InsideMode:
             # partner's compartment (the registry's spec at the live board height and joint values: walls, back, the board above, the open door;
             # tabletop.interior_map_bands) - a miss rejects missing_map (no legacy band, no mirror, no band-less fallback)
             # i7-overhang 2026-11-07: the book's GOAL rest (generation.inside_goal_lean: the v2 lean entry on the arm's shelf side) when given
-            gkey = inside_goal_key(self, arm) or self.grasp_key
+            lean_key = inside_goal_key(self, arm)
+            gkey = lean_key or self.grasp_key
             spec = TT.BandSpec(object=f"{c.category}/{c.model}", grasp_key=gkey, scale=list(c.scale) if c.scale else None, arm=arm)
+            # i7-interior 2026-11-07: the target's own (stable) rest in the compartment - an interior PLACE map of this variant's place
+            # (inside_place_rule: the release lift / tilts, the pre-place); a lean goal rest keeps its lean map (inside_large_01)
+            place = None if lean_key else self.inside_place_rule()
             try:
-                rb = TT.interior_map_bands(self, spec, self.place["top"], arm, joints=joints, police=False)
+                rb = TT.interior_map_bands(self, spec, self.place["top"], arm, joints=joints, police=False, place=place)
             except Reject as e:
                 if e.reason != "missing_map" or os.environ.get("ISPATIALGYM_INSIDE_NO_BAND_FALLBACK", "") != "1":
                     raise
@@ -872,6 +876,17 @@ class InsideMode:
     def inside_goal_key(self, arm: str) -> Optional[str]:
         """:func:`inside_goal_key` of this sampler."""
         return inside_goal_key(self, arm)
+
+    def inside_place_rule(self) -> Dict[str, Any]:
+        """i7-interior 2026-11-07: the place this variant's exact check judges, as the interior PLACE map's rule
+        (``interior_place.place_rule``): the pre-place (:meth:`pre_place_of`: ``inside_pre_outward`` -> "outward", ``inside_pre_m``), the
+        release (:meth:`release_above`: ``drop_height_m``, ``release_clearance_m``, ``release_lift_per_grasp``) and its tilts
+        (``release_tilt_deg``). A release roll (``release_roll_deg``) has no place map (a lean goal rest instead)."""
+        from ispatialgym.sampling import interior_place as IP
+
+        return IP.place_rule(pre="outward" if self.gp.gen("inside_pre_outward") else "approach", pre_m=float(self.num("inside_pre_m", IK.PRE_DIST)),
+                             drop_m=float(self.num("drop_height_m", DROP_HEIGHT_M)), clearance_m=float(self.num("release_clearance_m", RELEASE_CLEARANCE_M)),
+                             tilts_deg=self.release_tilts_deg(), lift_per_grasp=self.release_lift_per_grasp())
 
     # ------------------------------------------------------------------ stance C
 

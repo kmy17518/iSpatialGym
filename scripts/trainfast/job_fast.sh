@@ -53,6 +53,14 @@ mkdir -p $ISPATIALGYM_SAMPLING_CACHE
 # i7-plateqtf 2026-11-07: the expanding reach map's corrections (v2/map_tilt.py) - this job's own overlay shards (one file per process,
 # never the frozen maps; merged offline by `python -m ispatialgym.sampling.v2.map_tilt merge`)
 export ISPATIALGYM_MAP_OVERLAY_SHARDS=${ISPATIALGYM_MAP_OVERLAY_SHARDS:-$JOBDIR/map_overlay}
+# i7-plateqtf2 (owner 2026-11-08 02:35 item 5): a job that reads the merged overlay reads a PINNED release - submit_fast.py writes it into
+# job.env; a job.env without one (an older submission, a hand-made job) is pinned here, at the job's start, to the latest release
+if [ -n "${ISPATIALGYM_MAP_OVERLAY:-}" ] && [ -z "${ISPATIALGYM_MAP_OVERLAY_RELEASE:-}" ]; then
+  ISPATIALGYM_MAP_OVERLAY_RELEASE=$(python -c "from ispatialgym.sampling.v2 import map_tilt as M; print(M.latest_release('$ISPATIALGYM_MAP_OVERLAY'))")
+  export ISPATIALGYM_MAP_OVERLAY_RELEASE
+  echo "ISPATIALGYM_MAP_OVERLAY_RELEASE=$ISPATIALGYM_MAP_OVERLAY_RELEASE" >> $JOBDIR/job.env
+fi
+[ -n "${ISPATIALGYM_MAP_OVERLAY:-}" ] && echo "MAP_OVERLAY $ISPATIALGYM_MAP_OVERLAY release r${ISPATIALGYM_MAP_OVERLAY_RELEASE}" >> $JOBDIR/job.txt
 trap 'kit_appdata_teardown; case "$JB" in /tmp/*|$F/jobs/*|${ISGF_JB_NFS:-$F/jobs}/*) rm -rf "$JB" ;; esac; rm -rf ${OMNIGIBSON_APPDATA_PATH}.c* 2>/dev/null' EXIT
 mkdir -p $JOBDIR/claims
 echo "$SLURM_JOB_ID" > $JOBDIR/jobid
