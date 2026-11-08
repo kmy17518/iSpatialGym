@@ -489,6 +489,80 @@ Owner decision 2026-11-07: an "overhang" grasp-library option as the overhang pi
 - **Consumers:** touching_03's shelf path (`tabletop.interior_map_bands`, a miss = `missing_map`); `iors_large_inside.inside_band` under
   v2only (fridge inside_large_02, sink inside_large_03, bookcase inside_large_01): the arm's own interior map, a miss = `missing_map`.
 
+#### Interior PLACE maps: the goal side as stance C checks it (branch i7-interior, 2026-11-07)
+
+Why the interior maps of a STABLE rest were too thin for stance C under `--grasps v2only` (i7_fridge3, i7_sink: 0 attempts, "no stance C"),
+measured against the legacy stance C of the same aliases (fix2 / ft_sph / ft2_sph logs and summaries):
+
+- **inside_large_02 (jar exmsmm, fridge_petcxr_0 @ 0.7064, door 2.3).** Legacy stance C: 36 lattice candidates (9 band trunks x 4
+  stand-offs x the ONE lateral -0.035: `lattice_values(-half_run, half_run, 0.10)` starts at -half_run), 8-9 survivors in postures
+  ready 6-7 / tucked 1-2 / untucked 0-1, at stand-offs 0.35-0.65 (tried C: d 0.35 trunk (0.50, 0.00), d 0.45 trunks (0.50, -0.3) /
+  (0.75, 0 / -0.3) / (0.95, 0 / -0.3)); the 3 written demos at d 0.55, lateral -0.035, trunk (0.95, -0.3), idle `ready`, the goal
+  0.871 m ahead / -0.025 m lateral of the base. The former map (fridge_maps_20261107c): 29 feasible entries, all at d_e 0.55 and all in
+  the first lattice row (x 0.83, 0.05 m behind the board front); 0 at d_e 0.35 / 0.45 / 0.65; legacy (d, trunk) pairs covered 1 / 7; the
+  written goal 0.048 m from the nearest feasible cell (the snap admits 0.51 x 0.08 = 0.041) -> stance C `band_cells` 2 / 5, `goal_in_band`
+  0. What removed the cells: (1) the WHOLE robot against the boxes in ONE idle posture per trunk (hits obstacle:left_arm_link1 64906 /
+  link3 24113 in the right-arm map - the idle arm in the door; untucked collides at every stand-off; no posture is clear at d_e 0.35 /
+  0.45 / 0.55 / 0.65 for 18 / 13 / 8 / 2 of the 20 trunks) - stance C judges that static body exactly in the real scene, per candidate, in
+  the first free posture; (2) the pre-place 0.10 m back along the gripper's approach (a side pinch's approach runs across the 0.34 m
+  compartment into a wall) - the variant's exact
+  pre-place is 0.10 m straight out of the opening (`inside_pre_outward`); (3) the place at the REST pose on the board with the hand at its
+  pre-shape opening - the exact place is the release 0.03 m up (+ the open-gripper clearance lift), the hand closed on the object; (4) the
+  compartment at lateral 0 (centre_y 0.0049) while stance C's only lateral puts it at +0.040 in the base frame; (5) the 0.08 lattice (first
+  row 0.041+ m from the first eroded goal cell); (6) found with (1)-(5) removed (85 entries at lateral 0, the WORKING forearm
+  right_arm_link4 / 5 in the walls ~2 M times): the side walls boxed from the static FRONT PLANE, measured only at the board's mid depth -
+  probe 18371680 (rays from the compartment centre line): for x < 0.13 m the open left door (0.20-0.30 m to the left) and the closed right
+  door (0.222-0.245 m to the right), the cabinet walls (0.172-0.179) only from ~0.15 m; the spec's walls are phantom over the first ~0.13 m
+  of the 0.231 m setback, exactly where the forearm enters. Not causes: the stand-off reference (stance C's so + the 0.241 AABB overhang = the map's
+  d_e from the static front plane; the board 0.2309 behind it in both) and the yaw (both square to the opening).
+- **inside_large_03 (plate luhkiz, drop_in_sink_lkklqs_0 basin @ 0.7751, rim 0.11).** Legacy stance C had NO band (NO_BAND_TRUNKS): 80
+  candidates (20 trunks x 4 stand-offs x lateral 0), 29 collision-free (untucked), 27 visible, 9 kept; the 24 written demos at d 0.55 /
+  0.65, trunks (0.95, 0) / (0.25, -0.6) / (0.0, -0.6) / (0.5, -0.3), the goal 0.16 m behind the raster edge, the release TILTED 30 / 45 deg
+  (`release_tilt_deg`), grasp_5 (a legacy rim pinch). The former map: 1 feasible entry per arm, at d_e 0.35 (where the real counter
+  blocks the robot: stance C collision_free 0), 0 legacy pairs covered; its rejections are hand_policy (2.9-5.8 k per d_e) and ik_pre: the
+  level plate RESTING on the basin floor with the rim-pinching hand at its pre-shape opening inside the 0.11 m basin - the exact place is
+  the release lifted (drop 0.02 + the open-gripper clearance) and tilted 30 / 45 deg (grasp side up, the hand above the rim).
+
+The fix (`sampling/interior_place.py`, `reach_maps --kind interior --interior-place <rule>`, job_glib `GB_INTERIOR_PLACE`): an interior
+PLACE map of a stable rest judges the place as the exact check does - the WORKING arm and its hand (closed on the object, each grasp's
+contact opening) against the compartment's boxes, along the variant's pre-place (`outward` / `approach`, `pre_m`) -> release line and at
+the release; the release = the object's bottom `drop_m` + the open-gripper clearance lift (`clearance_m`; every library grasp, or the
+grasp's own with `lift_per_grasp`) above the board, level and at each of `tilts_deg`; feasible under ANY self-collision-free idle posture
+(the posture's only remaining effect is the IK's self-collision), at ANY lateral of `laterals_m` (default -0.08..0.08 by 0.04: the
+compartment centred at `centre_y_m - lateral`), lattice `lattice_m` 0.04 over the compartment's span only, the side walls only along the
+board's depth (`walls` "board": `InteriorSpec.boxes(walls=)`, default "front" = every former box and digest unchanged). Exact checks unchanged
+(stance C's body check, goal cells, frame, F_goal, the exact place IK with the object attached). Identity: `MapConfig.interior_place` (the
+canonical rule) in the config and so the key; maps without it keep their keys (tabletop / floor / generic / lean-interior / the former
+interior maps). Lookup: `iors_large_inside.inside_place_rule` (the variant's pre-place, drop, clearance, tilts, lift rule) ->
+`tabletop.interior_map_bands(place=)` -> `ReachMap.find(interior_place=)` serves only a place map whose rule covers it
+(`interior_place.covers`: equal pre / drop / clearance / lift / body / release / walls, its tilts contain the variant's); a lean goal rest
+(inside_large_01) keeps its lean map. The rule fields `body` "robot" / `release` "rest" / `walls` "front" put back the former assumptions (measurements only;
+never served). Tests: `test_interior_place.py` (rule, sampler-identical tilt / gripper / lift geometry, the static body left to stance C,
+laterals, find, walls), `test_interior_fridge.py` (inside_band reads only the place map of its rule). Commits 2059ee0c, 77166591
+(snapshot trunk_77166591; suite = base: 23 failed + 3 errors, the same set).
+
+Rebuilt maps (record `$OFH/interior_place_20261107`, `ip_count.py`; feasible cells per d_e 0.35 / 0.45 / 0.55 / 0.65; "pairs" = the legacy
+stance-C (d, trunk) pairs with a feasible cell in the real goal region):
+
+| map | arm | entries | cells per d_e | pairs | legacy written goal to the nearest feasible cell |
+|---|---|---|---|---|---|
+| fridge, former (fridge_maps_20261107c) | R / L | 4 / 25 | 0/0/1/0, 0/0/2/0 | 1/7 | 0.048 m (snap 0.041) |
+| fridge, place rule (fridge_full2) | R / L | 45563 / 10482 | 49/57/48/54, 25/33/30/35 | 7/7 | 0.018 m (snap 0.020) |
+| sink, former (i7lean_inside sink_maps) | R / L | 1 / 1 | 1/0/0/0 | 0/5 | - |
+| sink, place rule (sink_full2) | R / L | 65849 / 62670 | 28/35/28/35 | 5/5 | 0.00-0.02 m |
+
+One-element ablations (right arm; each puts back one former assumption): sink - release at rest 187 entries (0/5: THE cause), level only
+(no tilts) 1606, whole robot 59316, lateral 0 28480, lattice 0.08 14148; fridge (on the walls-from-the-front-plane base, 7007) - lateral 0
+85 (3/7), whole robot 1355 (0 cells at 0.35), pre along the approach 6002, release at rest 5085, lattice 0.08 1963; walls along the board
+45563.
+
+Validation `--grasps v2only` N 4 (trunk_77166591): i7_sink2 (v2maps_i7sink2): stance C 26 survivors (band_cells 79 / 80, goal_in_band 78,
+collision-free 29 = legacy's, visible 26; F_goal at C: 0 level, 8-41 at 30 / 45 deg); 3 attempts, 0 written, 3.0 GPU-h, all time_budget -
+every one of 249 C tries failed at B, the PICK of the v2 plate lip_shallow grasps on bar_egwapq_0 (approach_untrackable, support policy on
+the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridge4 (v2maps_i7fridge4): stance C 17 survivors (band_cells
+55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
+carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
