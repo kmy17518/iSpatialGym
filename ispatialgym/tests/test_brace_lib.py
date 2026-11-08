@@ -227,3 +227,175 @@ def test_the_wall_brace_library_keys_by_tilt_sign_and_records_the_clear_range(mo
     assert abs(float(d @ n)) < 1e-5 and abs(float(d @ (B - np.asarray(e["wall"]["hinge_object"])))) < 1e-5
     with pytest.raises(ValueError):
         CL.build_wall_brace(hull.numpy(), None, {}, {})  # no reviewed frame: no default
+
+
+# ------------------------------------------------------------------------------------------------ 3.4 world_vertical: the wall world, the map, the switch
+
+
+def _wall_entries():
+    hull = _painting().numpy()
+    return hull, CL.build_wall_brace(hull, None, {}, {"front_axis": "+x", "up_axis": "+z"}, pieces=[hull])
+
+
+def test_the_wall_brace_entry_carries_the_brace_arm_the_oracle_record_and_a_push_driven_load():
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    hull, es = _wall_entries()
+    f, s_, u = AW.frame_axes("+x", "+z")
+    g = AW.WallGeometry.standalone(th.as_tensor(hull, dtype=th.float32), f, s_, u, th.zeros(3))
+    spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in CL.WALL_RULE_SPOT.items()}
+    for sign in (1.0, -1.0):
+        geo = g.contacts_for(spot, sign * math.radians(20.0))
+        mine = [e for e in es if e["goal"]["tilt_sign"] == sign]
+        assert mine and {e["wall"]["brace_arm"] for e in mine} == {geo["brace_arm"]} and {e["wall"]["push_arm"] for e in mine} == {geo["push"]["arm"]}
+    assert {e["wall"]["brace_arm"] for e in es} == {"left", "right"}
+    for e in es:
+        ex = e["extras"]
+        assert ex["pose_class"] == ex["kind"] and ex["placed_at"] == "goal" and ex["contact_face"] == "finger_side"  # the sampler's brace record
+        assert abs(S_pose(e)[2, 3]) < 1e-6  # the hinge (the COM, here the origin) at z 0 of the rule frame
+        ld = e["load"]
+        a = np.asarray(e["wall"]["approach_object"])
+        assert float(a @ np.asarray(ld["brace_direction"])) < 0  # the brace's approach opposes what it stops
+        E, d = np.asarray(ld["point_object"]), np.asarray(ld["direction"])
+        hinge, n = np.asarray(e["wall"]["hinge_object"]), np.asarray(e["wall"]["normal_object"])
+        assert abs(float(d @ n)) < 1e-5 and abs(float(d @ (E - hinge))) < 1e-5  # tangential at the pushed corner, in the wall plane
+        assert ld["r_push_m"] > 0.1 and ld["r_brace_m"] > 0.1 and e["wall"]["extents_perp_m"] == [0.6, 0.4]
+
+
+def S_pose(e):
+    from ispatialgym.grasping import schema as S
+
+    return S.pose_of(e["T_rule_object"])
+
+
+def test_pieces_com_is_the_volume_centroid():
+    box = np.array([[x, y, z] for x in (0.0, 0.2) for y in (0.0, 0.1) for z in (0.0, 0.4)])
+    tip = box[:4] + np.array([1.0, 0, 0])  # 4 points: too few for a volume -> ignored? (a degenerate tetra counts 0)
+    assert np.allclose(CL.pieces_com([box]), [0.1, 0.05, 0.2], atol=1e-6)
+    assert np.allclose(CL.pieces_com([box, tip]), [0.1, 0.05, 0.2], atol=1e-6)
+    assert CL.pieces_com([]) is None
+
+
+def test_a_wall_library_validates_its_arm_entries_from_the_hung_pose():
+    _hull, es = _wall_entries()
+    lib = {"kind": "brace", "object": {"rest": {"quat_xyzw": [0, 0, 0, 1]}, "rest_id": "r0"}, "entries": es, "validate": {"support_z": 1.45}}
+    hung = []
+
+    class W(_World):
+        def hang(self, obj, geom, T, h, e):
+            hung.append((round(float(T[2, 3]), 6), h))
+            return {"world_position": [0, 0, h], "world_quat_xyzw": [0, 0, 0, 1]}, None
+
+        def settle(self, *a):
+            raise AssertionError("a wall library hangs, it does not settle")
+
+    w = W(lambda e: True)
+    VC.validate_library(w, lib, None, None, np.zeros((8, 3)), VC.ContactValidateConfig(max_entries=100), "left")
+    left = [e["class"] for e in es if e["wall"]["brace_arm"] == "left"]
+    assert sorted(w.calls) == sorted(left) and hung == [(0.0, 1.45)]
+    assert all(e.get("validation") is None for e in es if e["wall"]["brace_arm"] == "right") and len(lib["entries"]) == len(es)
+    VC.validate_library(w, lib, None, None, np.zeros((8, 3)), VC.ContactValidateConfig(max_entries=100), "right")
+    assert all(e["validation"]["verdict"] == "valid" for e in es) and set(lib["validation_timing_by_arm"]) == {"left", "right"}
+
+
+def test_the_wall_stance_relation_mirrors_for_the_right_arm():
+    left = VC.placement_offsets("wall_brace", (0.0, 0.0), (0.0, 0.0), 0.05, 0.3, arm="left")
+    right = VC.placement_offsets("wall_brace", (0.0, 0.0), (0.0, 0.0), 0.05, 0.3, arm="right")
+    assert [o[0] for o in left] == [o[0] for o in right] and [o[1] for o in left] == [-o[1] for o in right]
+    assert VC.placement_offsets("touching_brace", (0, 0), (0, 0), 0.3, 0.3, arm="right") == VC.placement_offsets("touching_brace", (0, 0), (0, 0), 0.3, 0.3)
+
+
+def _turn_about(n, ang, c):
+    n = np.asarray(n, dtype=float) / np.linalg.norm(n)
+    K = np.array([[0, -n[2], n[1]], [n[2], 0, -n[0]], [-n[1], n[0], 0]])
+    R = np.eye(3) + math.sin(ang) * K + (1 - math.cos(ang)) * K @ K
+    T = np.eye(4)
+    T[:3, :3] = R
+    T[:3, 3] = np.asarray(c) - R @ np.asarray(c)
+    return T
+
+
+def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_point():
+    hull, es = _wall_entries()
+    e = es[0]
+    cfg = VC.ContactValidateConfig()
+    T0 = S_pose(e).copy()
+    T0[2, 3] += 1.45
+    path, q, facts = VC.wall_pusher_path(e, T0, hull, cfg, 1.0 / 30.0)
+    d = np.asarray(facts["direction"])
+    R = np.array(__import__("ispatialgym.grasping.schema", fromlist=["quat_to_mat"]).quat_to_mat(q))
+    assert np.allclose(R[:, 1], d, atol=1e-4)  # the thin axis along the travel
+    E = T0[:3, :3] @ np.asarray(e["load"]["point_object"]) + T0[:3, 3]
+    # the pusher's face starts brace_pusher_gap_m before the corner (the corner is the material's extreme along d at its line)
+    face0 = float((path[0] - E) @ d) + 0.5 * cfg.brace_pusher_size_m[0]
+    assert abs(face0 + cfg.brace_pusher_gap_m) < 1e-3
+    lever = e["load"]["r_push_m"] / e["load"]["r_brace_m"]
+    assert abs(float((path[-1] - path[0]) @ d) - (cfg.brace_pusher_gap_m + (0.005 + cfg.brace_press_m) * lever)) < 1e-5
+    # the judge: the target turned past level by an angle about the hinge -> the braced point moved along its load direction
+    n_w = T0[:3, :3] @ np.asarray(e["wall"]["normal_object"])
+    H = T0[:3, :3] @ np.asarray(e["wall"]["hinge_object"]) + T0[:3, 3]
+    vB = T0[:3, :3] @ np.asarray(e["load"]["brace_direction"])
+    B = T0[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T0[:3, 3]
+    for ang in (0.02, -0.02):
+        T1 = _turn_about(n_w, ang, H) @ T0
+        mv = float((T1[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T1[:3, 3] - B) @ vB)
+        out = VC.judge_wall_brace(e, T0, T1, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None})
+        assert abs(out["measures"]["brace_point_moved_m"] - round(mv, 5)) < 1e-5 and out["measures"]["hinge_axis_twist_rad"] < 1e-5
+        assert (out["measures"]["turn_past_level_rad"] > 0) == (mv > 0)
+    big = _turn_about(n_w, 0.06 if float(np.cross(n_w, B - H) @ vB) > 0 else -0.06, H) @ T0
+    Te = np.eye(4)
+    Te[0, 3] = 0.02
+    out = VC.judge_wall_brace(e, T0, big, np.eye(4), Te, cfg, {"completed": True, "postcondition": None}, other_N=1.0)
+    assert set(out["reasons"]) == {"not_held", "hand_pushed", "non_finger_contact"}
+    assert VC.judge_wall_standing({"completed": True, "postcondition": "x"}, cfg)["reasons"] == ["oracle:x"]
+
+
+def test_the_wall_map_cells_are_one_row_per_stand_off_and_the_lookup_stays_in_its_row():
+    _hull, es = _wall_entries()
+    cfg = CMAP.contact_config("wall_brace", arm="left", lattice_m=0.08, seeds=8)
+    assert cfg.edge_distances == CMAP.WALL_EDGE_DISTANCES and cfg.lattice_m == CMAP.WALL_LATTICE_M and cfg.postures == ("tucked",)
+    rx = CMAP.wall_root_x(es[0])
+    cells, idx = CMAP.wall_cells(cfg, rx)
+    assert len(cells) == len(cfg.edge_distances) * 25 and np.allclose(cells[idx == 3][:, 0], cfg.edge_distances[3] + rx)
+    left = CMAP.select_entries({"kind": "brace", "entries": es}, "wall_brace", None, arm="left")
+    assert left and all(e["wall"]["brace_arm"] == "left" for e in left)
+    row = CMAP.class_row(left[0])
+    assert row["goal"]["tilt_sign"] == left[0]["goal"]["tilt_sign"] and row["goal"]["clear_delta_max_deg"] > 0 and row["wall"]["brace_arm"] == "left"
+    sb = CMAP.wall_support(0.6)
+    assert abs(sb.centre[0] - sb.half[0] - 0.6) < 1e-9 and sb.centre[2] - sb.half[2] == 0.0
+    # a fake map: one class feasible in the d_e = 0.80 row only; a root half-way between rows reads the stand-off's own row
+    classes = sorted({e["class"] for e in left})
+    nC, nG = len(cells), len(classes)
+    cm = CMAP.ContactMap.__new__(CMAP.ContactMap)
+    k = cfg.edge_distances.index(0.8)
+    st = np.full((nC, 1, nG), CMAP.STATUS["off_support"], dtype=np.uint8)
+    st[idx == k, 0, 0] = CMAP.STATUS["feasible"]
+    cm.meta = {"kind": "wall_brace", "edge_distances": list(cfg.edge_distances), "trunks": [{"translate": 0.25, "tilt": 0.0, "key": "t0.25_k+0.0", "eligible": True}],
+               "classes": [CMAP.class_row(next(e for e in left if e["class"] == c)) for c in classes]}
+    cm.arrays = {"cells": cells.astype(np.float32), "yaws": np.zeros(1, np.float32), "cell_de": idx.astype(np.int16)}
+    cm.arrays.update({f"s{d:.2f}_t0.25_k+0.0": (st if d == 0.8 else np.full_like(st, CMAP.STATUS["off_support"])) for d in cfg.edge_distances})
+    cm.cells, cm.yaws, cm.classes, cm.path = cm.arrays["cells"], cm.arrays["yaws"], classes, "fake"
+    out = cm.lookup(0.8, 0.25, 0.0, [0.8 + rx + 0.024, 0.0], 0.0)
+    assert out["ok"] and out["feasible"] == [classes[0]] and abs(out["cell"][0] - round(0.8 + rx, 3)) < 1e-3
+    # the sampler's reading of it: the stand-off from the root's position, the tilt sign's classes, then the cover of |delta|
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    stance = SimpleNamespace(world_to_base=lambda xy: th.as_tensor(xy, dtype=th.float32), translate=0.25, tilt=0.0)
+    c0 = next(e for e in left if e["class"] == classes[0])
+    sign = c0["goal"]["tilt_sign"]
+    root = th.tensor([0.8 + rx, 0.0, 1.45])
+    wf = AW.wall_map_feasible(cm, stance, root, sign * math.radians(20.0))
+    assert wf["ok"] and wf["classes"] == [classes[0]] and abs(wf["d_eff"] - 0.8) < 1e-4
+    assert not AW.wall_map_feasible(cm, stance, root, -sign * math.radians(20.0))["ok"]  # the other tilt sign's class set
+    wf_far = AW.wall_map_feasible(cm, stance, root, sign * math.radians(c0["goal"]["clear_delta_max_deg"] + 1.0))
+    assert not wf_far["ok"] and wf_far["cover_dropped"] == 1
+    assert AW.wall_brace_class({"kind": c0["extras"]["kind"], "wrist": c0["extras"]["wrist"]}, sign * 0.3) == c0["class"]
+
+
+def test_the_wall_brace_map_switch_is_off_by_default(monkeypatch):
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    monkeypatch.delenv("ISPATIALGYM_WALL_BRACE_MAP", raising=False)
+    assert not AW.wall_brace_map_on()
+    monkeypatch.setenv("ISPATIALGYM_WALL_BRACE_MAP", "1")
+    assert AW.wall_brace_map_on()

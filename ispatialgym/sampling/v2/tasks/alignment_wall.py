@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -326,6 +327,42 @@ def push_arm_of(E_low, C_, tangent_left) -> str:
 
 def other_arm(arm: str) -> str:
     return "left" if arm == "right" else "right"
+
+
+def wall_brace_map_on() -> bool:
+    """i7-brace (owner 3.4; default OFF): the brace candidates of a stance come from the ``wall_brace`` contact map (the wall-frame reach map
+    of the validated library entries: :func:`wall_brace_class` feasible at the stance, recorded clear range covering the drawn |delta|) instead
+    of the reach volume; the exact two-arm check is unchanged. Needs the contact maps (``tabletop.contact_maps_on``: v2only + a maps root);
+    a missing map keeps the reach-volume rule (kit ``wall_brace_map.miss``). ``ISPATIALGYM_WALL_BRACE_MAP=1``."""
+    return os.environ.get("ISPATIALGYM_WALL_BRACE_MAP", "0") == "1"
+
+
+#: the wall_brace map's height tolerance (m: the hinge height above the floor vs the map's)
+WALL_BRACE_MAP_H_TOL_M = 0.03
+
+
+def wall_brace_class(brace: Dict[str, Any], delta: float) -> str:
+    """The ``wall_brace`` library class of a live brace candidate (``contact_library.build_wall_brace``): tilt sign, kind, wrist."""
+    return f"{'+' if delta > 0 else '-'}tilt_{brace['kind']}_{brace.get('wrist', 'n+')}"
+
+
+def wall_map_feasible(cm, stance: Stance, root_world, delta: float) -> Dict[str, Any]:
+    """The wall_brace map at ``stance`` for the target hung at its level pose (root ``root_world``): the stand-off of the map row = the root's
+    distance ahead of the base minus the map's root-to-wall offset (the protruding patch and the hinge's COM are in the root's position),
+    the root's lateral in the base frame, the stance's trunk; the classes of the drawn tilt sign, then those whose recorded clear range
+    (``goal.clear_delta_max_deg``) covers |delta|. ``{"ok", "classes", "all_sign", "cover_dropped", "d_eff", "look"}``."""
+    xy = stance.world_to_base(th.as_tensor(root_world, dtype=th.float32)[:2])
+    x_off = float(cm.cells[0, 0]) - float(cm.meta["edge_distances"][0])
+    d_eff = float(xy[0]) - x_off
+    sign = 1.0 if delta > 0 else -1.0
+    look = cm.lookup(d_eff, float(stance.translate), float(stance.tilt), [float(v) for v in xy.tolist()], 0.0,
+                     keep=lambda row: float((row.get("goal") or {}).get("tilt_sign") or 0.0) == sign)
+    rows = {r["class"]: r for r in cm.class_rows(0) if r}
+    d_abs = abs(math.degrees(delta))
+    feas = list(look.get("feasible") or []) if look.get("ok") else []
+    cover = [c for c in feas if float((rows[c].get("goal") or {}).get("clear_delta_max_deg") or 0.0) >= d_abs - 1e-6]
+    return {"ok": bool(cover), "classes": cover, "all_sign": feas, "cover_dropped": len(feas) - len(cover), "d_eff": round(d_eff, 4),
+            "look": {k: look.get(k) for k in ("why", "cell", "edge_distance", "trunk")}}
 
 
 def half_turn_equivalence(front) -> List[float]:
@@ -686,6 +723,9 @@ class AlignmentWall(SamplerV2, WallGeometry):
         push_only = bool(geo.get("no_corner"))
         if not braces and not push_only:
             return []
+        # i7-brace (owner 3.4, ISPATIALGYM_WALL_BRACE_MAP): the wall_brace map picks each stance's brace candidates (counted per instance screen)
+        wmap = self._wall_brace_map(geo) if (wall_brace_map_on() and braces and not push_only) else None
+        count = stats is not None and wmap is not None
         reach: List[Tuple[Stance, List[Dict[str, Any]]]] = []
         n_push = 0
         kinds_ok: Dict[str, int] = {}
@@ -694,6 +734,22 @@ class AlignmentWall(SamplerV2, WallGeometry):
                 continue
             n_push += 1
             ok = [b for b, sp in braces if sp.volume_ok(rv, st, bz)]
+            if wmap is not None:
+                wf = wall_map_feasible(wmap, st, geo["pose_level"][0], geo["delta"])
+                live = ok
+                ok = [b for b, _sp in braces if wall_brace_class(b, geo["delta"]) in set(wf["classes"])]
+                st.extras["brace_classes"] = [wall_brace_class(b, geo["delta"]) for b in ok]
+                st.extras["wall_brace_map"] = {"d_eff": wf["d_eff"], "n_classes": len(wf["classes"]), "cover_dropped": wf["cover_dropped"]}
+                if count:
+                    self._wcount("wall_brace_map.stances")
+                    self._wcount("wall_brace_map.stance_feasible" if ok else "wall_brace_map.stance_none")
+                    self._wcount("wall_brace_map.reach_volume_kept" if live else "wall_brace_map.reach_volume_none")
+                    if ok and not live:
+                        self._wcount("wall_brace_map.map_only")
+                    if live and not ok:
+                        self._wcount("wall_brace_map.reach_only")
+                    if wf["cover_dropped"]:
+                        self._wcount("wall_brace_map.cover_dropped", wf["cover_dropped"])
             for b in ok:
                 kinds_ok[b["kind"]] = kinds_ok.get(b["kind"], 0) + 1
             if ok or push_only:
@@ -1001,12 +1057,14 @@ class AlignmentWall(SamplerV2, WallGeometry):
                 i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers,
                                                 clearance_ignore=[self.target])
                 kinds = pool[i].extras.get("brace_kinds", [])
+                classes = pool[i].extras.get("brace_classes")  # i7-brace: the wall_brace map's classes (switch on)
                 pool.pop(i)
                 if manip is None:
                     errors.append("drawn tilt fails the re-check")
                     continue
                 try:
-                    self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds])
+                    self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds
+                                                                and (classes is None or wall_brace_class(b, delta) in classes)])
                 except Reject as e:
                     errors.append(f"{e.reason}: {e}")
                     self.sidecar.stances.pop("manipulation", None)
@@ -1021,6 +1079,10 @@ class AlignmentWall(SamplerV2, WallGeometry):
         if not done:
             raise Reject("push_unreachable", f"{len(survivors)} Phase-2 survivors (δ {math.degrees(delta):+.1f}°, {stats}), none passes step 5 / step 6: " + "; ".join(errors[-4:]))
         manip = self.sidecar.stance("manipulation")
+        wmap_acted = wall_brace_map_on() and any("brace_classes" in st.extras for st in survivors)
+        if wmap_acted:
+            b_rec = self.sidecar.contacts.get("brace")
+            self._wcount("wall_brace_map.written_brace" if b_rec is not None else "wall_brace_map.written_push_only")
         d = Draft()
         d.object_poses[tname] = pose_t
         d.goal_poses[tname] = geo["pose_level"]
@@ -1042,6 +1104,9 @@ class AlignmentWall(SamplerV2, WallGeometry):
                           "scale": self.choice.models["target"].scale, "phase2": stats,
                           "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip), "symmetric_180": self.symmetric_180(),
                           "frame": dict(self.template_facts.get("frame") or {}),
+                          **({"wall_brace_map": {"map": getattr(self._wall_brace_map(geo), "path", None),
+                                                 "brace_class": None if brace is None else wall_brace_class({"kind": brace.brace_kind, "wrist": (brace.extras or {}).get("wrist")}, delta)}}
+                             if wmap_acted else {}),
                           "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),
                                    "back_from_com_m": self.depth_extents()[0], "thickness_m": self.depth_extents()[1]}})
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), deviation_deg=math.degrees(delta),
@@ -1202,6 +1267,60 @@ class AlignmentWall(SamplerV2, WallGeometry):
         self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname,
                                                extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist"), **_orient_extra(dec_b)}))
         self.sidecar.waypoint_policy = "push arc: screening at δ/2, exact at init and goal; brace: exact pre / approach / contact; wall-present margin-0 re-check of every contact configuration"
+
+    # ------------------------------------------------------------------ i7-brace (owner 3.4): the wall_brace map
+
+    def _wcount(self, key: str, n: int = 1) -> None:
+        st = getattr(getattr(self, "kit", None), "stats", None)
+        if isinstance(st, dict):
+            st[key] = st.get(key, 0) + int(n)
+
+    def _wall_brace_map(self, geo: Dict[str, Any]):
+        """The ``wall_brace`` contact map of the target (its model id's map directories under the maps root, ``contact_maps.ContactMap.find_near``)
+        for this tilt sign's brace arm at the hinge's height above the floor (within :data:`WALL_BRACE_MAP_H_TOL_M`), the contact policy and the
+        robot; cached per (arm, height). None on a miss (one ``MAP_REQUEST`` line, kit ``wall_brace_map.miss``: the reach-volume rule stays)."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.grasping import schema as GS
+        from ispatialgym.sampling import contact_maps as CMAP
+        from ispatialgym.sampling import reach_maps as RMAP
+        from ispatialgym.sampling.v2 import tabletop as TT
+
+        if not TT.contact_maps_on():
+            return None
+        arm = geo["brace_arm"]
+        try:
+            h = float(geo["C"][2]) - float(self.obj("floor").aabb[1][2])
+        except Exception:  # noqa: BLE001
+            h = float(geo["C"][2])
+        cache = self.__dict__.setdefault("_wall_brace_maps", {})
+        ck = (arm, round(h, 3))
+        if ck in cache:
+            return cache[ck]
+        mc = self.choice.models["target"]
+        mid = GS.model_id(mc.category, mc.model, list(mc.scale) if mc.scale else None)
+        root = TT.map_sampling_root()
+        cands = [d for d in sorted(os.listdir(root)) if d == mid or d.startswith(mid + "__")] if root and os.path.isdir(root) else []
+        cm = None
+        for entry in cands:
+            cm = CMAP.ContactMap.find_near(root, "wall_brace", entry, h, WALL_BRACE_MAP_H_TOL_M, arm=arm, policy_key=CP.DEFAULT.key(arm),
+                                           robot=RMAP.robot_digest(), config_require=TT._map_config_require())
+            if cm is not None:
+                break
+        if cm is None:
+            TT.map_request(self, kind="wall_brace", role="target", object=f"{mc.category}/{mc.model}", entry=cands[0] if cands else mid, h=round(h, 4), arm=arm,
+                           support=str(self._spot_wall_name()), scene=str(getattr(self.world, "scene_model", "")))
+            self._wcount("wall_brace_map.miss")
+        else:
+            log.info("wall_brace map hit (%s arm) at h %.4f: %s", arm, h, cm.path)
+            self._wcount("wall_brace_map.hit")
+        cache[ck] = cm
+        return cm
+
+    def _spot_wall_name(self) -> str:
+        try:
+            return self.bindings.one(self.wall_role).name
+        except Exception:  # noqa: BLE001
+            return ""
 
     # ------------------------------------------------------------------ pipeline hooks (§5.5 Phase 3)
 

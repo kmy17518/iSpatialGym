@@ -447,8 +447,40 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
 
 #: i7-brace (owner 3.4): the world_vertical tilt grid (deg) a wall_brace entry's clear range is tested over (the task draws |delta| U(15, 45))
 WALL_CLEAR_DELTAS_DEG = tuple(float(v) for v in range(5, 50, 5))
-#: the synthetic wall spot of the wall_brace rule frame: the wall plane x = 0 facing -x (the robot stands at x < 0 facing +x), the hinge height
-WALL_RULE_SPOT = {"point": (0.0, 0.0, 0.0), "normal": (-1.0, 0.0, 0.0), "hang_z": 1.2, "wall_protrusion_m": 0.0}
+#: the synthetic wall spot of the wall_brace rule frame: the wall plane x = 0 facing -x (the robot stands at x < 0 facing +x), the HINGE (the
+#: centre of mass) at z 0 - a map / the validator adds the hinge height above the floor (``T_rule_object`` z + height, as a slab entry's
+#: support z 0 + the support height)
+WALL_RULE_SPOT = {"point": (0.0, 0.0, 0.0), "normal": (-1.0, 0.0, 0.0), "hang_z": 0.0, "wall_protrusion_m": 0.0}
+#: the tilt the wall_brace load's pushed corner is read at (deg; the middle of the task's |delta| range 15-25, A8)
+WALL_LOAD_DELTA_DEG = 20.0
+
+
+def pieces_com(pieces: Sequence[np.ndarray]) -> Optional[List[float]]:
+    """The volume-weighted centre of mass of the object's convex collision pieces (each piece's convex hull; uniform density - what PhysX
+    gives a single-link object), None when no piece has a volume."""
+    import trimesh
+
+    acc, vol = np.zeros(3), 0.0
+    for P in pieces or []:
+        P = np.asarray(P, dtype=float).reshape(-1, 3)
+        if len(P) < 4:
+            continue
+        try:
+            h = trimesh.Trimesh(vertices=P).convex_hull
+        except Exception:  # noqa: BLE001 - a degenerate piece has no volume
+            continue
+        v = float(h.volume)
+        if v > 1e-12:
+            acc += v * np.asarray(h.center_mass, dtype=float)
+            vol += v
+    return None if vol <= 0 else [round(float(x), 6) for x in acc / vol]
+
+
+def wall_tangent(n: th.Tensor, p: th.Tensor, C_: th.Tensor, sign: float) -> th.Tensor:
+    """The unit direction a point ``p`` of the hung target moves in when the leveling push turns it on past level (the leveling turn is -delta
+    about the wall normal ``n`` through the hinge ``C_``: angular velocity -sign(delta) n)."""
+    v = -float(sign) * th.cross(n, p - C_, dim=0)
+    return v / max(float(th.linalg.norm(v)), 1e-9)
 
 
 def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any], pieces: Optional[Sequence[np.ndarray]] = None) -> List[Dict[str, Any]]:
@@ -456,10 +488,15 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns`` braces on the LEVEL (goal) pose, the stop at the
     goal edge) at the synthetic wall spot :data:`WALL_RULE_SPOT`, keyed by the TILT SIGN (which end is high: the brace side), each recording
     the start range it stays clear for - ``goal.clear_delta_max_deg``, the largest |delta| of :data:`WALL_CLEAR_DELTAS_DEG` up to which the
-    task's ``brace_clear`` (2 cm from the tilted hull) holds at every grid tilt. The entry is in the object frame at the level pose; ``load``
-    = the direction the leveling push would carry the braced point past level (about the wall normal through the COM hinge). Needs the
-    reviewed frame ``params["front_axis"]`` / ``["up_axis"]`` (as the task: no default); ``params["com_local"]`` (default the hull centroid);
-    the task's generation knobs (``wall_contact_tilt_deg``, ``brace_kinds``, ``brace_offset_m``, ``brace_clearance_m``, ...) from ``knobs``."""
+    task's ``brace_clear`` (2 cm from the tilted hull) holds at every grid tilt. The entry is in the object frame at the level pose
+    (``T_rule_object``: the hinge at z 0, the wall plane x = 0); ``wall`` = the hang facts (the braced point B and its approach, the wall normal,
+    the hinge, the BRACE ARM - the task's ``brace_arm`` of that tilt sign - and the push arm); ``load`` = the leveling push carried on past level
+    (the validator's pusher at the pushed corner ``E_push`` of the :data:`WALL_LOAD_DELTA_DEG` tilt, along the corner's tangent, 3-D in the wall
+    plane) with the braced point's own direction (``brace_direction``: B's motion past level, what the brace stops). The extras are the
+    sampler's brace record's (``placed_at: goal``, ``contact_face: finger_side``, ``pose_class`` = the brace kind: the oracle's
+    ``BraceContact.kind``). Needs the reviewed frame ``params["front_axis"]`` / ``["up_axis"]`` (as the task: no default);
+    ``params["com_local"]`` (the hinge; default the hull centroid - ``build_job`` passes the pieces' volume centroid); the task's generation
+    knobs (``wall_contact_tilt_deg``, ``brace_kinds``, ``brace_offset_m``, ``brace_clearance_m``, ...) from ``knobs``."""
     from ispatialgym.sampling.v2 import contact_poses as CPZ
     from ispatialgym.sampling.v2.tasks import alignment_wall as AW
 
@@ -471,7 +508,8 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     g = AW.WallGeometry.standalone(hull, front, side, up, com_local, [th.as_tensor(P, dtype=th.float32) for P in (pieces or [])], params=knobs)
     spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in WALL_RULE_SPOT.items()}
     deltas = sorted(float(v) for v in (params.get("clear_deltas_deg") or WALL_CLEAR_DELTAS_DEG))
-    _, _, h = g.dims()
+    _, w_side, h = g.dims()
+    back, thick = g.depth_extents()
     out = []
     for sign in (1.0, -1.0):
         geos = [g.contacts_for(spot, sign * math.radians(d)) for d in deltas]
@@ -482,6 +520,12 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
         Ti = np.linalg.inv(T_l)
         n = ref["normal"]
         C_ = ref["C"]
+        # the pushed corner (a material point: read at the load tilt, carried to the level pose) and its tangent past level
+        g_load = g.contacts_for(spot, sign * math.radians(float(params.get("load_delta_deg", WALL_LOAD_DELTA_DEG))))
+        Tt = CPZ._mat(g_load["pose_tilted"])
+        E_obj = np.linalg.inv(Tt)[:3, :3] @ g_load["E_push"].double().numpy() + np.linalg.inv(Tt)[:3, 3]
+        E_l = th.tensor(T_l[:3, :3] @ E_obj + T_l[:3, 3], dtype=th.float32)
+        v_E = wall_tangent(n, E_l, C_, sign)
         seen = set()
         for i, b in enumerate(ref["braces"]):
             # the brace poses live on the level pose: the same at every tilt of this sign (checked)
@@ -498,22 +542,30 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
                 cls += "#"
             seen.add(cls)
             e = CPZ.contact_entry("brace", cls, "wall_brace", "brace", T_l, b["pose"], b["pre"],
-                                  {"kind": b["kind"], "wrist": b["wrist"], "tilt_deg": b["tilt_deg"], "face_m": b["face_m"]},
+                                  {"kind": b["kind"], "wrist": b["wrist"], "tilt_deg": b["tilt_deg"], "face_m": b["face_m"], "pose_class": b["kind"],
+                                   "placed_at": "goal", "contact_face": "finger_side"},
                                   face_rule="AlignmentWall.contacts_for's brace on the level pose (the stop at the goal edge), in the wall plane",
                                   object_height=h)
             Bo = Ti[:3, :3] @ b["B"].double().numpy() + Ti[:3, 3]
             ao = Ti[:3, :3] @ b["a"].double().numpy()
             # the leveling push turns the target by -delta about n: past level it carries B on along -sign x n x (B - C)
-            v = -sign * th.cross(n, b["B"] - C_, dim=0)
-            v = v / max(float(th.linalg.norm(v)), 1e-9)
+            v = wall_tangent(n, b["B"], C_, sign)
             e["yaw_deg"] = 0.0
             e["goal"] = {"tilt_sign": sign, "clear_delta_max_deg": t_max, "deltas_deg": deltas}
             e["wall"] = {"B_object": [round(float(x), 6) for x in Bo], "approach_object": [round(float(x), 6) for x in ao],
                          "normal_object": [round(float(x), 6) for x in (Ti[:3, :3] @ n.double().numpy())],
-                         "hinge_object": [round(float(x), 6) for x in com_local.tolist()]}
-            e["load"] = {"frame": "object", "direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v.double().numpy())],
-                         "point_object": [round(float(x), 6) for x in Bo],
-                         "what": "the leveling push carries the braced point past level about the wall normal through the COM hinge"}
+                         "hinge_object": [round(float(x), 6) for x in com_local.tolist()], "brace_arm": ref["brace_arm"], "push_arm": ref["push"]["arm"],
+                         "rule_spot": {k: (list(v) if isinstance(v, tuple) else v) for k, v in WALL_RULE_SPOT.items()},
+                         "back_off_wall_m": round(float(g.wall_offset(spot)), 6), "back_from_com_m": round(back, 6), "thickness_m": round(thick, 6),
+                         # the hinge resistance's extents (AlignmentWall.hinge_resistance: width along the wall x height) and the stop's gap
+                         "extents_perp_m": [round(float(w_side), 6), round(float(h), 6)], "brace_offset_m": float(g.param("brace_offset_m", 0.005))}
+            r_E = float(th.linalg.norm(E_l - C_))
+            r_B = float(th.linalg.norm(b["B"] - C_))
+            e["load"] = {"frame": "object", "kind": "wall_rotation", "direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v_E.double().numpy())],
+                         "point_object": [round(float(x), 6) for x in E_obj], "brace_point_object": [round(float(x), 6) for x in Bo],
+                         "brace_direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v.double().numpy())], "r_push_m": round(r_E, 6), "r_brace_m": round(r_B, 6),
+                         "what": "the leveling push carried on past level: the pusher drives the pushed corner along its tangent about the COM hinge, "
+                                 "turning the braced point into the brace"}
             out.append(_redigest(e))
     return out
 
@@ -638,6 +690,12 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
             raise NotImplementedError(f"family {fam}: {spec['missing']}")
         knobs = dict(job.get("generation") or {})
         params = dict((job.get("params") or {}).get(fam) or {}, subtask=job.get("subtask"))
+        if spec.get("needs_pieces") and params.get("com_local") is None:
+            # i7-brace: the hinge at the pieces' volume centroid (the task hinges the target at its PhysX COM), else the hull centroid
+            com = pieces_com(_pieces(geom))
+            if com is not None:
+                params["com_local"] = com
+                params["com_rule"] = "the collision pieces' volume centroid (pieces_com)"
         t0 = time.time()
         entries = (spec["builder"](pts, rest, knobs, params, pieces=_pieces(geom)) if spec.get("needs_pieces") else spec["builder"](pts, rest, knobs, params))
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})

@@ -93,7 +93,18 @@ STANCE_RELATIONS: Dict[str, Dict[str, Any]] = {
                     "trunks": ((0.0, -0.92), (0.0, -0.61), (0.25, -0.8), (0.25, -0.53), (0.5, -0.45), (0.5, -0.68), (0.75, -0.38), (0.75, -0.19), (0.95, -0.16),
                                (0.95, -0.31)),
                     "source": "derived (0 braced axial demos): the axial stance's depths, the stop face on the left arm's side"},
+    # i7-brace (owner 3.4): 26 braced world_vertical demos ($OFH/out/*/alignment-world_vertical_0*, 2026-11-08): the brace contact 0.75-0.88 m
+    # ahead of the manipulation stance (square to the wall, stand-off 0.80-0.90), 0.05-0.35 m to the BRACE ARM's side (left +, right -:
+    # ``mirror_right``), trunks (0 | 0.25, 0 .. -0.12)
+    "wall_brace": {"ahead_m": (0.76, 0.81, 0.86, 0.73), "lateral_m": (0.05, 0.10, 0.20, 0.30), "mirror_right": True,
+                   "trunks": ((0.25, 0.0), (0.0, 0.0), (0.0, -0.1), (0.25, -0.1), (0.5, 0.0)),
+                   "source": "26 braced world_vertical demos: brace contact 0.75-0.88 m ahead, 0.05-0.35 m to the brace arm's side"},
 }
+#: i7-brace (owner 3.4): the families validated in the WALL world (:meth:`KitContactWorld.hang`: the target hung on its COM hinge at a
+#: kinematic wall, no slab) - each entry with its own brace arm (``wall.brace_arm``: a validation run of one arm skips the other's entries)
+WALL_FAMILIES = ("wall_brace",)
+#: the hinge height (m above the floor) of a wall library without ``validate.support_z`` (world_vertical's hang_height_m)
+WALL_HANG_DEFAULT_M = 1.45
 
 
 @dataclass
@@ -150,6 +161,13 @@ class ContactValidateConfig:
     brace_hold_steps: int = 30
     brace_hold_max_m: float = 0.012
     brace_eef_drift_m: float = 0.01
+    # i7-brace (owner 3.4): the wall world (WALL_FAMILIES) - the kinematic wall box (thickness along its normal, width, height from the floor),
+    # the hang's settle steps on the hinge and the drift it may show, the pusher line's radius (the hull points it meets)
+    wall_size_m: Tuple[float, float, float] = (0.10, 3.0, 2.6)
+    wall_hang_steps: int = 20
+    wall_hang_drift_max_rad: float = 0.01
+    wall_pusher_line_r_m: float = 0.02
+    wall_pusher_travel_max_m: float = 0.06
 
 
 # ------------------------------------------------------------------------------------------------ the entry as the oracle's action
@@ -545,6 +563,114 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
     return [start + d * travel * k / n for k in range(n + 1)]
 
 
+def wall_entry(entry: Dict[str, Any]) -> bool:
+    """i7-brace: a wall-world entry (:data:`WALL_FAMILIES`)."""
+    return entry.get("family") in WALL_FAMILIES
+
+
+def wall_arm_entries(entries: Sequence[Dict[str, Any]], arm: str) -> List[Dict[str, Any]]:
+    """The entries a validation run of ``arm`` validates: every non-wall entry, and the wall entries whose brace arm (``wall.brace_arm``) it is."""
+    return [e for e in entries if not wall_entry(e) or str((e.get("wall") or {}).get("brace_arm") or "left") == arm]
+
+
+def _unit(v) -> np.ndarray:
+    v = np.asarray(v, dtype=float)
+    return v / max(float(np.linalg.norm(v)), 1e-12)
+
+
+def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, cfg: ContactValidateConfig, dt: float
+                     ) -> Tuple[List[np.ndarray], np.ndarray, Dict[str, Any]]:
+    """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres per control step, the pusher's xyzw quaternion, facts)``. The leveling
+    push carried on past level: the pusher meets the PUSHED corner (``load.point_object``) on the line along the corner's tangent
+    (``load.direction``, 3-D in the wall plane - not flattened as :func:`pusher_path`), starting ``brace_pusher_gap_m`` before the hull points
+    within ``wall_pusher_line_r_m`` of that line, and drives on so far that the braced point (``load.brace_point_object``) would travel the
+    stop's gap (``wall.brace_offset_m``) + ``brace_press_m`` with no brace (the lever ratio r_push / r_brace about the hinge; at most
+    ``wall_pusher_travel_max_m`` past the gap), at ``brace_pusher_speed_m_s``. The box's thin axis (local y) along the travel, local z along the
+    wall normal."""
+    load = entry.get("load") or {}
+    R, t = T_obj[:3, :3], T_obj[:3, 3]
+    d = _unit(R @ np.asarray(load["direction"], dtype=float))
+    P = R @ np.asarray(load["point_object"], dtype=float) + t
+    n = _unit(R @ np.asarray((entry.get("wall") or {}).get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
+    pts = pts_obj @ R.T + t
+    rel = pts - P
+    along = rel @ d
+    perp = np.linalg.norm(rel - along[:, None] * d[None], axis=1)
+    near = perp <= cfg.wall_pusher_line_r_m
+    if not near.any():
+        near = perp <= float(np.sort(perp)[min(7, len(perp) - 1)])
+    face = float(along[near].min())
+    half = 0.5 * float(cfg.brace_pusher_size_m[0])  # the box's thin axis (the pusher's scale is (sy, sx, sz): local y = sx)
+    start = P + d * (face - cfg.brace_pusher_gap_m - half)
+    r_E, r_B = float(load.get("r_push_m") or 0.0), float(load.get("r_brace_m") or 0.0)
+    gap_b = float((entry.get("wall") or {}).get("brace_offset_m", 0.005))
+    past = min((gap_b + cfg.brace_press_m) * (r_E / max(r_B, 0.05) if r_E > 0 else 1.0), cfg.wall_pusher_travel_max_m)
+    travel = cfg.brace_pusher_gap_m + past
+    k = max(1, int(math.ceil(travel / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
+    x = _unit(np.cross(d, n))
+    z = np.cross(x, d)
+    q = S.mat_to_quat(np.stack([x, d, z], axis=1))
+    facts = {"start": [round(float(v), 4) for v in start], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
+             "travel_m": round(travel, 5), "past_contact_m": round(past, 5), "n_line_points": int(near.sum())}
+    return [start + d * travel * i / k for i in range(k + 1)], np.asarray(q, dtype=float), facts
+
+
+def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, cfg: ContactValidateConfig,
+                     run: Dict[str, Any], other_N: float = 0.0) -> Dict[str, Any]:
+    """The wall brace acceptance (i7-brace, owner 3.4; ``*0`` the brace standing, ``*1`` after the load): the oracle's brace ran to its end
+    with a clean postcondition; under the load the BRACED point moved along its own load direction (``load.brace_direction``: past level)
+    by <= ``brace_hold_max_m`` (``not_held``), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
+    (``topple``: off its hinge), the brace hand stayed within ``brace_eef_drift_m`` (``hand_pushed``), and no non-finger robot link loaded the
+    wall beyond ``non_finger_contact_N``. Measures: the turn about the wall normal (rad, + past level) and the braced point's motion."""
+    load = entry.get("load") or {}
+    wall = entry.get("wall") or {}
+    R0, R1 = T_obj0[:3, :3], T_obj1[:3, :3]
+    Bo = np.asarray(load.get("brace_point_object") or wall.get("B_object"), dtype=float)
+    B0, B1 = R0 @ Bo + T_obj0[:3, 3], R1 @ Bo + T_obj1[:3, 3]
+    vB = _unit(R0 @ np.asarray(load.get("brace_direction"), dtype=float))
+    n = _unit(R0 @ np.asarray(wall.get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
+    moved = float((B1 - B0) @ vB)
+    Rr = R1 @ R0.T
+    twist = float(math.acos(max(-1.0, min(1.0, float(n @ (Rr @ n))))))
+    # the signed turn about n: the braced point's lever (B - hinge) turned toward vB is + (past level)
+    H = R0 @ np.asarray(wall.get("hinge_object") or [0.0, 0.0, 0.0], dtype=float) + T_obj0[:3, 3]
+    r0 = B0 - H
+    r0 = r0 - n * float(r0 @ n)
+    r1 = Rr @ r0
+    turn = math.atan2(float(np.cross(r0, r1) @ n), float(r0 @ r1))
+    turn *= 1.0 if float(np.cross(n, r0) @ vB) >= 0 else -1.0
+    drift = float(np.linalg.norm(T_eef1[:3, 3] - T_eef0[:3, 3]))
+    reasons = []
+    if not run.get("completed", True):
+        reasons.append("incomplete")
+    if run.get("postcondition"):
+        reasons.append(f"oracle:{run['postcondition']}")
+    if moved > cfg.brace_hold_max_m:
+        reasons.append("not_held")
+    if twist > cfg.topple_tilt_rad:
+        reasons.append("topple")
+    if drift > cfg.brace_eef_drift_m:
+        reasons.append("hand_pushed")
+    if other_N > cfg.non_finger_contact_N:
+        reasons.append("non_finger_contact")
+    return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
+            "measures": {"brace_point_moved_m": round(moved, 5), "turn_past_level_rad": round(turn, 5), "hinge_axis_twist_rad": round(twist, 5),
+                         "eef_drift_m": round(drift, 5), "other_wall_N": round(float(other_N), 4)}}
+
+
+def judge_wall_standing(run: Dict[str, Any], cfg: ContactValidateConfig, other_N: float = 0.0) -> Dict[str, Any]:
+    """The wall brace BEFORE the load (i7-brace: "valid before / after the load"): the oracle's brace reached its stop (ran to its end, clean
+    postcondition) with no non-finger robot link loading the wall."""
+    reasons = []
+    if not run.get("completed", True):
+        reasons.append("incomplete")
+    if run.get("postcondition"):
+        reasons.append(f"oracle:{run['postcondition']}")
+    if other_N > cfg.non_finger_contact_N:
+        reasons.append("non_finger_contact")
+    return {"verdict": "invalid" if reasons else "valid", "reasons": reasons, "other_wall_N": round(float(other_N), 4)}
+
+
 # ------------------------------------------------------------------------------------------------ one model (any world with the KitContactWorld surface)
 
 
@@ -660,7 +786,25 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     ``settle(obj, geom, quat)``, ``plan_entry(obj, geom, entry, T_world_obj, arm)``, ``trial_push / trial_brace(obj, entry, plan, state, rest,
     arm)``); writes each entry's ``validation`` (verdict ``valid`` / ``invalid`` / ``unreachable``) and returns the timing (per model / rest /
     kind). Every entry is planned against its yaw's SETTLED rest pose and tried from the restored rest snapshot, and an entry that cannot be
-    placed or run fails alone (``no_placement``, ``chain_unreachable``, ``unreachable``, ``error:...``)."""
+    placed or run fails alone (``no_placement``, ``chain_unreachable``, ``unreachable``, ``error:...``). A WALL library (i7-brace,
+    :data:`WALL_FAMILIES`): the entries of ``arm``'s brace only (:func:`wall_arm_entries`), each from the target hung at its level pose
+    (``world.hang``: the entry's ``T_rule_object`` at the library's hinge height ``validate.support_z``) instead of the settled rest."""
+    # i7-brace (owner 3.4): a wall library is validated per brace arm - this run validates its arm's entries only (the others untouched)
+    all_entries = lib_k["entries"]
+    is_wall = any(wall_entry(e) for e in all_entries)
+    if is_wall:
+        lib_k["entries"] = wall_arm_entries(all_entries, arm)
+    try:
+        tim = _validate_library(world, lib_k, obj, geom, pts_obj, cfg, arm, is_wall)
+    finally:
+        lib_k["entries"] = all_entries
+    if is_wall:  # the two arms' runs keep their own records
+        lib_k.setdefault("validation_timing_by_arm", {})[arm] = lib_k["validation_timing"]
+        lib_k.setdefault("validated_by_arm", {})[arm] = lib_k["validated"]
+    return tim
+
+
+def _validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarray, cfg: ContactValidateConfig, arm: str, is_wall: bool) -> Dict[str, Any]:
     from ispatialgym.sampling.v2 import contact_poses as CPZ
 
     t_all = time.time()
@@ -668,6 +812,7 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     rest_q = np.asarray(lib_k["object"]["rest"]["quat_xyzw"], dtype=float)
     settled: Dict[float, Tuple[Dict[str, Any], Any]] = {}
     n_live = 0
+    hang_z = float((lib_k.get("validate") or {}).get("support_z") or WALL_HANG_DEFAULT_M)
 
     def run_entry(e: Dict[str, Any], screen) -> Optional[str]:
         """Validate one entry (its ``validation`` written); returns the verdict."""
@@ -676,8 +821,11 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
         try:
             t0 = time.time()
             if yaw not in settled:
-                q0 = S.quat_mul(S.quat_yaw(math.radians(yaw)), rest_q)
-                settled[yaw] = world.settle(obj, geom, q0)
+                if is_wall:  # the level (goal) pose at the wall, the hinge at hang_z (the same for every entry of the library)
+                    settled[yaw] = world.hang(obj, geom, S.pose_of(e["T_rule_object"]), hang_z, e)
+                else:
+                    q0 = S.quat_mul(S.quat_yaw(math.radians(yaw)), rest_q)
+                    settled[yaw] = world.settle(obj, geom, q0)
             rest, state = settled[yaw]
             tim["settle_s"] += time.time() - t0
             T_obj = S.pose_mat(rest["world_position"], rest["world_quat_xyzw"]) if "world_position" in rest else None
@@ -780,14 +928,16 @@ def validate_library(world, lib_k: Dict[str, Any], obj, geom, pts_obj: np.ndarra
     return tim
 
 
-def placement_offsets(family: str, contact_xy, obj_xy, support_half_x: float, edge_clear: float) -> Tuple[Tuple[float, float], ...]:
+def placement_offsets(family: str, contact_xy, obj_xy, support_half_x: float, edge_clear: float, arm: str = "left") -> Tuple[Tuple[float, float], ...]:
     """The family's stance relation (:data:`STANCE_RELATIONS`: the contact ``ahead`` / ``lateral`` of the base, yaw 0) as
     ``TabletopWorld.plan``'s object-relative base offsets (it puts the base ``support half + edge clear + off[0]`` behind the OBJECT and
-    ``off[1]`` to its side): the base at ``contact - (ahead, lateral)``."""
+    ``off[1]`` to its side): the base at ``contact - (ahead, lateral)``. A relation with ``mirror_right`` (the wall brace: either arm braces)
+    has its laterals mirrored for the right arm."""
     rel = STANCE_RELATIONS[family]
+    flip = -1.0 if (rel.get("mirror_right") and arm == "right") else 1.0
     out = []
     for ah in rel["ahead_m"]:
-        for la in rel["lateral_m"]:
+        for la in (flip * v for v in rel["lateral_m"]):
             bx, by = float(contact_xy[0]) - ah, float(contact_xy[1]) - la
             out.append((round(float(obj_xy[0]) - bx - float(support_half_x) - float(edge_clear), 5), round(float(obj_xy[1]) - by, 5)))
     return tuple(out)
@@ -885,11 +1035,19 @@ class KitContactWorld:
         self._pusher_obj()  # before any object: no prim is added while an object's probe view is live
         self._stop = None
         self._stop_obj()
+        # i7-brace (owner 3.4): the wall world's kinematic wall (created before any object, parked; WALL_FAMILIES libraries place it)
+        self._wall = None
+        self._wall_on = False
+        self._wall_support = None
+        self._wall_obj()
 
     def load(self, job: Dict[str, Any], model_dir: str):
         return self.tw.load(job, model_dir)
 
     def unload(self, obj):
+        if self._wall_on:  # the next library is a slab library until it hangs its own target
+            self._wall_on = False
+            self._park_wall()
         self.tw.unload(obj)
 
     def settle(self, obj, geom, quat0):
@@ -903,7 +1061,7 @@ class KitContactWorld:
         sampler's exact IK at a contact (the support and the pushed / braced object ignored at the contact pose; the contact policy and the
         arm-object check are explicit). The oracle's planning syncs the world with the slab and the object in it (Motions.arm_to), and the
         stale meshes made every IK after a model's first trial fail (run C: 1 valid, then 47 no_placement / chain_unreachable)."""
-        ignore = [self.tw.slab, obj] + [o for o in (self._pusher, getattr(self, "_stop", None)) if o is not None]
+        ignore = [self.tw.slab, obj] + [o for o in (self._pusher, getattr(self, "_stop", None), getattr(self, "_wall", None)) if o is not None]
         self.tw.backend.update_world(ignore_objects=ignore)
 
     def set_support_height(self, z: Optional[float]) -> None:
@@ -931,6 +1089,8 @@ class KitContactWorld:
 
         if T_obj is None:
             T_obj = CPZ._mat(obj.get_position_orientation())
+        if self._wall_on:  # the wall is the support the whole robot's contact policy is checked against (a trial's restore set the slab)
+            self.tw.support = self._wall_support
         self.clean_world(obj)
         start = start_pose_of(entry, hull_points(geom), T_obj)
         if start is None:
@@ -939,7 +1099,7 @@ class KitContactWorld:
         fam = entry.get("family")
         cfg0 = self.tw.cfg
         if fam in STANCE_RELATIONS:
-            offs = placement_offsets(fam, w["contact"][0][:2].tolist(), T_obj[:2, 3], float(self.tw.support.half[0]), cfg0.slab_edge_clear_m)
+            offs = placement_offsets(fam, w["contact"][0][:2].tolist(), T_obj[:2, 3], float(self.tw.support.half[0]), cfg0.slab_edge_clear_m, arm=arm)
             self.tw.cfg = dataclasses.replace(cfg0, base_yaws=1, base_offsets=offs, trunks=tuple(STANCE_RELATIONS[fam]["trunks"]))
         try:
             cand = {"name": entry["digest"], "T_object_eef": entry["pre"][start], "preshape_q": float(entry["fingers"]["opening_m"])}
@@ -982,13 +1142,18 @@ class KitContactWorld:
         motions = Motions(self.tw.env, self.tw.backend, cfg=MotionsConfig(), robot=self.tw.robot)
         motions.state.hold_current()
         tro = None if goal is None else SimpleNamespace(meta=SimpleNamespace(pose_targets={obj.name: goal_pose_target(obj.name, goal)}))
-        task = SimpleNamespace(object_scope={obj.name: obj, self.tw.slab.name: self.tw.slab}, _tro=tro)
+        scope = {obj.name: obj, self.tw.slab.name: self.tw.slab}
+        if self._wall_on:  # i7-brace: the wall in the task scope - SimState.contact_supports gives it to the oracle's planner as the target's support
+            scope[self._wall.name] = self._wall
+        task = SimpleNamespace(object_scope=scope, _tro=tro)
         return motions, SimState(self.tw.env, task, self.tw.robot)
 
     def _start(self, obj, entry, plan, state, rest):
         """The rest snapshot restored (verified), the robot set at the planned configuration with the entry's fingers, the drive targets held,
         two hold steps with the sleep assist (as ``validate_tabletop``'s trial)."""
         rec = self.tw.restore(obj, state, rest)
+        if self._wall_on:
+            self.tw.support = self._wall_support
         q = plan["q"].clone()
         q[self.tw.robot.gripper_control_idx[self.arm]] = float(entry["fingers"]["opening_m"])
         self.tw.robot.set_joint_positions(q)
@@ -1083,9 +1248,17 @@ class KitContactWorld:
             T0, Te0 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
             trace.rec["braced"] = {"obj": _pose7(T0), "eef": _pose7(Te0)}
             pusher = self._pusher_obj()
-            for c in pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0) + [None] * self.cfg.brace_hold_steps:
+            if wall_entry(entry):  # i7-brace: the leveling push carried on past level (3-D, in the wall plane), judged before and after it
+                pre_load = judge_wall_standing(run, self.cfg, max(series) if series else 0.0)
+                n_pre = len(series)
+                path, q_push, push_facts = wall_pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0)
+                trace.rec["pusher"] = push_facts
+                q_t = th_.tensor(q_push, dtype=th_.float32)
+            else:
+                path, q_t = pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0), th_.tensor([0.0, 0.0, 0.0, 1.0])
+            for c in path + [None] * self.cfg.brace_hold_steps:
                 if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
-                    pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0]))
+                    pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), q_t)
                 self._hold(motions, step, 1)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
             self._park_pusher()
@@ -1097,6 +1270,11 @@ class KitContactWorld:
             self._park_pusher()
         T1, Te1 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
         self._hinge_off(hinge, obj)
+        if wall_entry(entry):
+            out = judge_wall_brace(entry, T0, T1, Te0, Te1, self.cfg, run, max(series[n_pre:]) if len(series) > n_pre else 0.0)
+            out["pre_load"] = pre_load
+            return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
+                        hinge=None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"}, wall_s=round(time.time() - t0, 3))
         load = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
         out = judge_brace(entry, T0, T1, Te0, Te1, load, self.cfg, run, max(series) if series else 0.0)
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
@@ -1159,7 +1337,8 @@ class KitContactWorld:
         try:
             return fn()
         finally:
-            self.tw.probe = self.VT.ForceProbe(self.tw.robot, self.tw.slab, obj, self.arm)
+            # i7-brace: in the wall world the probe's support column is the wall (a non-finger link loading it)
+            self.tw.probe = self.VT.ForceProbe(self.tw.robot, self._wall if getattr(self, "_wall_on", False) else self.tw.slab, obj, self.arm)
             self.tw.probe.install()
 
     def physics_facts(self, obj) -> Dict[str, Any]:
@@ -1200,6 +1379,8 @@ class KitContactWorld:
         """The axial task's COM hinge (``AlignmentAxial.after_settle``: ``constraints.create_hinge`` at the object's PhysX COM on its vertical,
         ``hinge_sink_m`` below the slab top, parented to the slab, the variant's resistance) for an axial trial at the object's start pose;
         None for every other trial."""
+        if wall_entry(entry):
+            return self._wall_hinge_on(obj, entry)
         if not axial_hinged(entry, self.variant):
             return None
         from ispatialgym.sampling import constraints as CN
@@ -1257,6 +1438,97 @@ class KitContactWorld:
         th_ = self.tw.th
         self._stop.set_position_orientation(th_.tensor(c["centre"], dtype=th_.float32), th_.tensor(S.mat_to_quat(c["R"]), dtype=th_.float32))
         return c
+
+    # ------------------------------------------------------------------ i7-brace (owner 3.4): the wall world
+
+    def _wall_obj(self):
+        """The wall of the WALL_FAMILIES libraries: a KINEMATIC box (``PUSHER_KINEMATIC``: fixed_base + kinematic_only, as the pusher fix),
+        category ``walls`` (the oracle's ``SimState.contact_supports`` then hands it to the planner as the hung target's support, as a scene
+        wall), ``wall_size_m``; parked far below the floor between wall libraries."""
+        if self._wall is None:
+            from omnigibson.objects.primitive_object import PrimitiveObject
+
+            sx, sy, sz = self.cfg.wall_size_m
+            self._wall = PrimitiveObject(name="isg_validate_wall", primitive_type="Cube", category="walls", size=1.0, **PUSHER_KINEMATIC,
+                                         rgba=(0.85, 0.85, 0.8, 1.0), scale=self.tw.th.tensor([sx, sy, sz]))
+            self.tw.scene.add_object(self._wall)
+            self._park_wall()
+            self.tw.og.sim.step()
+        return self._wall
+
+    def _park_wall(self):
+        if self._wall is not None:
+            self._wall.set_position_orientation(self.tw.th.tensor([-30.0, 30.0, -10.0]), self.tw.th.tensor([0.0, 0.0, 0.0, 1.0]))
+
+    def hang(self, obj, geom, T_rule: np.ndarray, hang_z: float, entry: Dict[str, Any]):
+        """The wall world's "settle" (i7-brace, owner 3.4): the slab out of reach, the wall at the rule frame's plane (x = 0, facing -x: the robot
+        faces it from x < 0), the target at its LEVEL pose ``T_rule`` with the hinge ``hang_z`` above the floor, hung on the task's COM hinge
+        (:meth:`_wall_hinge_on`) for ``wall_hang_steps`` (the robot parked), the hinge removed again (each trial installs its own) and the scene
+        snapshot taken - ``(rest, state)`` as :meth:`settle` returns them (the restore keys, ``slab`` = where the slab was parked, ``hang`` =
+        the facts: the drift on the hinge, the PhysX COM's offset from the library's hinge point)."""
+        th_ = self.tw.th
+        cfg = self.cfg
+        sx, sy, sz = cfg.wall_size_m
+        centre = [0.5 * sx, 0.0, 0.5 * sz]
+        self._wall_on = True
+        self._wall.set_position_orientation(th_.tensor(centre, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0]))
+        from ispatialgym.grasping import contact_policy as CP
+
+        self._wall_support = CP.Support.box(centre, [0.5 * sx, 0.5 * sy, 0.5 * sz], name="wall")
+        self.tw.park()
+        slab_c, slab_d = [-20.0, -20.0, -5.0], [0.6, 0.6, float(self.tw.cfg.slab_thickness_m)]
+        self.tw.place_slab(slab_c, slab_d)
+        self.tw.support = self._wall_support
+        self._reprobe(obj, lambda: None)  # the probe's support column: the wall
+        T = np.array(T_rule, dtype=float)
+        T[2, 3] += float(hang_z)
+        q_i = S.mat_to_quat(T[:3, :3])
+        obj.set_position_orientation(th_.tensor(T[:3, 3], dtype=th_.float32), th_.tensor(q_i, dtype=th_.float32))
+        obj.keep_still()
+        hinge = self._wall_hinge_on(obj, entry)
+        a = self.tw.hold_action()
+        for _ in range(int(cfg.wall_hang_steps)):
+            self.tw.step(a)
+        p, q = (x.clone() for x in obj.get_position_orientation())
+        drift = _quat_angle(S.quat_to_mat(q.numpy().astype(float)), T[:3, :3])
+        shift = float(np.linalg.norm(p.numpy().astype(float) - T[:3, 3]))
+        self._hinge_off(hinge, obj)
+        obj.keep_still()
+        state = self.tw.scene.dump_state(serialized=False)
+        rest = {"schema": S.REST, "rest_kind": "wall_hang", "quat_xyzw": [round(float(v), 7) for v in q.tolist()],
+                "h_root": round(float(p[2]) - float(self.tw.cfg.slab_top_z), 6), "slab": {"centre": slab_c, "dims": slab_d},
+                "world_position": [float(v) for v in p.tolist()], "world_quat_xyzw": [float(v) for v in q.tolist()],
+                "hang": {"hang_z": float(hang_z), "drift_rad": round(drift, 5), "shift_m": round(shift, 5), "steps": int(cfg.wall_hang_steps),
+                         "stable": bool(drift <= cfg.wall_hang_drift_max_rad), "wall_centre": centre, "wall_size_m": list(cfg.wall_size_m),
+                         "hinge": None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"}}}
+        return rest, state
+
+    def _wall_hinge_on(self, obj, entry: Dict[str, Any]) -> Dict[str, Any]:
+        """The world_vertical task's hinge (``AlignmentWall.apply_draft_extras``): ``constraints.create_hinge`` at the target's PhysX COM about
+        the wall normal, parented to the wall, the resistance of ``AlignmentWall.hinge_resistance`` (the mass over the width x height, the
+        variant's ``hinge_*`` knobs over the world_vertical defaults)."""
+        from ispatialgym.oracle import execute as EX
+        from ispatialgym.sampling import constraints as CN
+        from ispatialgym.sampling import generation_defaults as GD
+        from ispatialgym.sampling.v2.tasks.alignment_wall import AlignmentWall
+
+        wall = entry.get("wall") or {}
+        T = _T(obj.get_position_orientation())
+        com_l = np.asarray(AlignmentWall._com_local(None, obj).tolist(), dtype=float)
+        com = T[:3, :3] @ com_l + T[:3, 3]
+        axis = _unit(T[:3, :3] @ np.asarray(wall.get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
+        gen = dict(GD.defaults_for("alignment-world_vertical"))
+        gen.update(EX.variant_generation(oracle_ctx(self.variant)) if self.variant else {})
+        ext = wall.get("extents_perp_m") or [0.3, 0.3]
+        res = CN.hinge_resistance(float(obj.mass), (float(ext[0]), float(ext[1])), decel=float(gen.get("hinge_stop_decel_rad_s2", CN.HINGE_STOP_DECEL_RAD_S2)),
+                                  tau=float(gen.get("hinge_viscous_tau_s", CN.HINGE_VISCOUS_TAU_S)),
+                                  omega_brake=float(gen.get("hinge_brake_omega_rad_s", CN.HINGE_BRAKE_OMEGA_RAD_S)))
+        th_ = self.tw.th
+        h = self._reprobe(obj, lambda: CN.create_hinge(obj, th_.tensor(com, dtype=th_.float32), th_.tensor(axis, dtype=th_.float32), parent_link=self._wall.root_link,
+                                                       name="isg_validate_wall_hinge", friction=res["friction"], damping=res["damping"]))
+        off = float(np.linalg.norm(com_l - np.asarray(wall.get("hinge_object") or com_l, dtype=float)))
+        return {"hinge": h, "anchor": [round(float(v), 4) for v in com], "axis": [round(float(v), 4) for v in axis], "com_offset_m": round(off, 5),
+                "resistance": {k: v for k, v in res.items() if isinstance(v, (int, float))}}
 
     def _park_pusher(self):
         if self._pusher is not None:
