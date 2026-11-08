@@ -63,7 +63,7 @@ def test_front_plus_side_is_its_own_case_only_with_the_switch(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
     reg = IN.load_registry()
     ht = reg["hall_tree_upkvgr_0@0.5809"]
-    monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)  # default off: today's rule - two open edges = front + back
+    monkeypatch.setenv(IN.FRONT_SIDE_ENV, "0")  # off: the rule before - two open edges = front + back
     assert IN.open_sides_case(["+u", "-v"]) == "front_back"
     assert "open sides" in IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"]))
     monkeypatch.setenv(IN.FRONT_SIDE_ENV, "1")
@@ -74,6 +74,44 @@ def test_front_plus_side_is_its_own_case_only_with_the_switch(monkeypatch):
     for name, edges in (("bookcase_jaysra_0@0.9472", ["+u", "-u"]), ("drop_in_sink_lkklqs_0@basin", ["+u", "-u", "+v", "-v"]),
                         ("fridge_petcxr_0@0.7064/j_left_door2.3", ["+u"])):
         sp = reg[name]
+        verdicts = []
+        for on in ("0", "1"):
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+            verdicts.append(IN.live_mismatch(sp, _Raster(sp.height_m, edges), joints=dict(sp.joint_values) or None))
+        assert verdicts[0] == verdicts[1] is None, (name, verdicts)
+
+
+def test_the_front_side_switch_is_on_by_default(monkeypatch):
+    """owner decision 5q.1: ISPATIALGYM_INTERIOR_FRONT_SIDE is the default; ``=0`` restores the rule before."""
+    monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)
+    assert IN.front_side_on() and IN.open_sides_case(["+u", "-v"]) == "front_side"
+    ht = IN.load_registry()["hall_tree_upkvgr_0@0.5809"]
+    assert IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"])) is None
+    for off in ("0", "off", "false"):
+        monkeypatch.setenv(IN.FRONT_SIDE_ENV, off)
+        assert not IN.front_side_on()
+
+
+def test_every_registry_spec_keeps_its_digest_and_verdict_on_and_off(monkeypatch):
+    """5q.1: EVERY spec of the registry (not only a listed subset) has a known digest, unchanged with the switch on / off / unset, and the
+    live-raster verdict for its own open sides (one open edge for a back panel, an opposite pair for an open back) is the same either way;
+    only the hall tree's adjacent pair (front + side) changes verdict."""
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    names = None
+    for on in (None, "0", "1"):
+        if on is None:
+            monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)
+        else:
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+        reg = IN.load_registry()
+        names = set(reg) if names is None else names
+        assert set(reg) == names
+        for name, sp in reg.items():
+            assert name in ALL_KNOWN_DIGESTS, f"a registry spec without a recorded digest: {name} ({sp.digest()})"
+            assert sp.digest() == ALL_KNOWN_DIGESTS[name], (on, name, sp.digest())
+    reg = IN.load_registry()
+    for name, sp in reg.items():
+        edges = ["+u"] if sp.back_thickness_m is not None else ["+u", "-u"]
         verdicts = []
         for on in ("0", "1"):
             monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)

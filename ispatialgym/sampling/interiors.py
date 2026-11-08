@@ -51,15 +51,15 @@ HEADROOM_TOL_M = 0.02
 #: ``SimWorld.support_interior`` measures a cell's headroom from 5 mm above the board (its up-ray start): board top to the underside above
 #: = the raster's headroom + this
 RASTER_HEADROOM_OFFSET_M = 0.005
-#: i7-goalmaps 2026-11-08 (owner decision 5c.2, default off): ``ISPATIALGYM_INTERIOR_FRONT_SIDE=1`` - "front + side" is its own open-sides
-#: case of :func:`live_mismatch`: two ADJACENT open raster edges (``+u`` / ``-v``: the front and one side, hall_tree_upkvgr_0's alcove
-#: board) leave the back closed; only an OPPOSITE pair (``+u`` / ``-u``) is an open front and back. Off: any two open edges = front + back
-#: (the rule before). A lookup-side switch: no spec digest, map key or map changes with it.
+#: i7-goalmaps 2026-11-08 (owner decision 5c.2; DEFAULT ON since owner decision 5q.1): ``ISPATIALGYM_INTERIOR_FRONT_SIDE`` - "front + side"
+#: is its own open-sides case of :func:`live_mismatch`: two ADJACENT open raster edges (``+u`` / ``-v``: the front and one side,
+#: hall_tree_upkvgr_0's alcove board) leave the back closed; only an OPPOSITE pair (``+u`` / ``-u``) is an open front and back.
+#: ``=0``: any two open edges = front + back (the rule before). A lookup-side switch: no spec digest, map key or map changes with it.
 FRONT_SIDE_ENV = "ISPATIALGYM_INTERIOR_FRONT_SIDE"
 
 
 def front_side_on() -> bool:
-    return os.environ.get(FRONT_SIDE_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+    return os.environ.get(FRONT_SIDE_ENV, "1").strip().lower() not in ("0", "off", "false", "no")
 
 
 def open_sides_case(edges: Sequence[str], front_side: Optional[bool] = None) -> str:
