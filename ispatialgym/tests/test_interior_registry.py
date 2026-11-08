@@ -24,3 +24,13 @@ def test_the_sink_is_an_open_top_basin_and_the_fridge_door_is_boxed_per_piece():
     assert sink.open_top and "top" in sink.open_sides
     fr = reg["fridge_petcxr_0@0.7064/j_left_door2.3"]
     assert len(fr.extra_boxes) > 1 and all(b[0].startswith("door_left_door_") for b in fr.extra_boxes)
+
+
+def test_the_plate_in_sink_variants_basin_is_registered():
+    """i7-ft2 2026-11-08 (owner 7.2): drop_in_sink_awvzkn_0's basin (house_single_floor; the bar / countertop plate-in-sink variants), measured
+    by interiors.measure (slurm 18377335): an open-top basin at 0.7316 m, the digest its interior maps are built with."""
+    reg = IN.load_registry(IN.REGISTRY)
+    sink = reg["drop_in_sink_awvzkn_0@basin"]
+    assert sink.open_top and "top" in sink.open_sides and abs(sink.height_m - 0.7316) < 1e-6
+    assert sink.digest() == "4571693d44c4"
+    assert IN.spec_for_support("house_single_floor", "drop_in_sink_awvzkn_0", 0.7316) is not None
