@@ -271,6 +271,50 @@ PUSH_FAR_DROP_AHEAD_M = (0.25, 0.80)
 PUSH_FAR_DROP_AHEAD_PREF_M = 0.68
 PUSH_FAR_TRUNKS = ((2.0, 0.0), (1.75, 0.0))
 PUSH_FAR_LANE_OFFSETS = (0.3, 0.25)
+# ---- i7-floorpush (owner decision 2026-11-08 item 5, under_large_02 / 03: the pitched floor push leaves the briefcase 0.11-0.23 m short and
+# turned, and turns the ashcan 0.34-0.66 rad): the approved oracle push-program variants of the PITCHED hand, each behind its own switch,
+# default off, acting only where ``push_under_hand`` = ``"pitched_far"`` (the under_large_02 / 03 variants). Diagnosis (CPU, the int1_1 /
+# i7_floorfix / i7diag_floor demos): the closed hand (two fingers side by side, pitch 60, wrist "lateral") meets the back at 0.086 m (centre
+# of mass 0.114 / 0.139 m) within 1-10 mm of the line through the centre of mass; the yaw starts in the first centimetres and grows with the
+# travel (a point push of a long box from its end / of a round can is unstable); the briefcase's hand slides off its 0.12 m end face.
+#: (a) ``ISPATIALGYM_FLOORPUSH_OPEN=1``: the lateral turns pushed with the gripper OPEN - both fingertips across the back
+#: (:func:`pitched_open_contact`), today's closed turns after them
+FLOORPUSH_OPEN_ENV = "ISPATIALGYM_FLOORPUSH_OPEN"
+#: (b) ``ISPATIALGYM_FLOORPUSH_BOTH=1``: the other arm's pitched hand beside the push arm's when IK-feasible from stance C, else one hand
+FLOORPUSH_BOTH_ENV = "ISPATIALGYM_FLOORPUSH_BOTH"
+#: (c) ``ISPATIALGYM_FLOORPUSH_STROKE_M=<m>``: the push in strokes of at most this length, re-measured and re-aimed between them
+#: (``execute._push_strokes``; the yaw term :data:`FLOORPUSH_YAW_GAIN_M_PER_RAD`, at most :data:`FLOORPUSH_STROKES_MAX` strokes)
+FLOORPUSH_STROKE_ENV = "ISPATIALGYM_FLOORPUSH_STROKE_M"
+#: (d) ``ISPATIALGYM_FLOORPUSH_TIP_M=<m>``: the fingertips this high above the floor (today ``push_far_tip_m`` 0.08), today's height after it
+FLOORPUSH_TIP_ENV = "ISPATIALGYM_FLOORPUSH_TIP_M"
+#: (c) the re-aim's yaw term (m of contact offset per rad of yaw, toward the side that turns the object back; ``ISPATIALGYM_FLOORPUSH_YAW_GAIN``)
+#: and the stroke count cap (``ISPATIALGYM_FLOORPUSH_STROKES_MAX``): 0.31 m in 0.05 m strokes is 7
+FLOORPUSH_YAW_GAIN_M_PER_RAD = 0.15
+FLOORPUSH_STROKES_MAX = 8
+#: (b) the other hand's chain this far across the push from the push hand's (both hands on a 0.12 m briefcase end / a 0.22 m can back)
+FLOORPUSH_BOTH_OFFSETS_M = (0.06, 0.09, 0.12)
+_ON = ("1", "true", "yes", "on")
+
+
+def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """The i7-floorpush switches set in ``env`` (default ``os.environ``): ``open`` / ``both`` (bool), ``stroke_m`` / ``tip_m`` (m), with the
+    knobs ``yaw_gain`` / ``strokes_max`` when ``stroke_m`` is set; ``{}`` with none set. ``ValueError`` for a length that is not positive."""
+    env = os.environ if env is None else env
+    out: Dict[str, Any] = {}
+    for key, name in (("open", FLOORPUSH_OPEN_ENV), ("both", FLOORPUSH_BOTH_ENV)):
+        if str(env.get(name, "")).strip().lower() in _ON:
+            out[key] = True
+    for key, name in (("stroke_m", FLOORPUSH_STROKE_ENV), ("tip_m", FLOORPUSH_TIP_ENV)):
+        v = str(env.get(name, "") or "").strip()
+        if v:
+            f = float(v)
+            if not (math.isfinite(f) and f > 0.0):
+                raise ValueError(f"{name}={v!r}: a positive length (m)")
+            out[key] = f
+    if "stroke_m" in out:
+        out["yaw_gain"] = float(env.get("ISPATIALGYM_FLOORPUSH_YAW_GAIN", "") or FLOORPUSH_YAW_GAIN_M_PER_RAD)
+        out["strokes_max"] = int(env.get("ISPATIALGYM_FLOORPUSH_STROKES_MAX", "") or FLOORPUSH_STROKES_MAX)
+    return out
 #: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9) + the ground half of the
 #: JoyLo curve (W1, owner 2026-09-20 22:15: (2.0, 0) puts the shoulder 8 cm lower than (0.95, -1.2) and reaches the floor blade
 #: 0.40-0.85 m ahead instead of 0.40-0.70; ``eef_reach_volume.GROUND_TRUNKS``)
@@ -451,6 +495,61 @@ def under_clearance_cells(grid: Dict[str, Any], min_clearance: float) -> th.Tens
 def under_admissible(clearance_at_goal: float, target_height: float, extra: float = 0.17) -> bool:
     """§6.12 under admissibility: clearance ≥ target height + 0.12 (gripper below the wrist) + 0.05."""
     return float(clearance_at_goal) >= float(target_height) + float(extra)
+
+
+def band_section_xy(pts: th.Tensor, z_lo: float, z_hi: float) -> th.Tensor:
+    """The xy points of the posed hull ``pts`` (N, 3) in the height band ``[z_lo, z_hi]`` above their lowest point: the hull points inside it
+    and the hull's cross-sections at both ends (:func:`band_back_offset`'s ``section``), (M, 2); empty when nothing lies in the band."""
+    z = pts[:, 2] - pts[:, 2].min()
+    out = [pts[(z >= float(z_lo)) & (z <= float(z_hi))][:, :2]]
+    for zp in (float(z_lo), float(z_hi)):
+        below, above = z < zp, z > zp
+        if bool(below.any()) and bool(above.any()):
+            zb, za = z[below], z[above]
+            t = (zp - zb[:, None]) / (za[None, :] - zb[:, None])
+            xy = pts[below][:, None, :2] + t[..., None] * (pts[above][None, :, :2] - pts[below][:, None, :2])
+            out.append(xy.reshape(-1, 2))
+    return th.cat(out, dim=0)
+
+
+def pitched_open_contact(pts: th.Tensor, d2, z_lo: float, z_hi: float, opening: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """i7-floorpush (a): where the OPEN pitched hand (a lateral wrist turn: the closing axis across the push) meets the target pushed along
+    ``d2`` through its root - both fingertips across the back, :func:`push_contact_strips` ``"two_point"``, within the fingertips' height band
+    ``[z_lo, z_hi]`` above the target's lowest point (its cross-sections counted, :func:`band_section_xy`). The gap is ``opening`` or
+    :data:`PUSH_TWO_POINT_WIDTH_FRAC` of the band's width :data:`PUSH_TWO_POINT_DEPTH_M` ahead of its rearmost point, within
+    :data:`PUSH_TWO_POINT_OPENING_M` (:func:`push_form_contact`'s rule). ``{"off_m": how far behind the root the first fingertip meets the
+    back, "strips_m", "face_half_m", "opening_m", "fingers_m"}``; None when the band holds no footprint or no fingertip meets it."""
+    from ispatialgym.oracle.execute import push_back_along
+
+    P = th.as_tensor(pts, dtype=th.float32).reshape(-1, 3)
+    xy = band_section_xy(P, z_lo, z_hi)
+    if len(xy) < 3:
+        return None
+    P3 = th.cat([xy, th.zeros(len(xy), 1)], dim=1)
+    d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
+    d = d / th.linalg.norm(d)
+    origin = th.zeros(2)
+    if opening is None:
+        rear = push_back_along(P3, origin, d, 0.0, ((0.0, 10.0),), -1.0, 1.0)
+        if rear is None:
+            return None
+        n = th.stack([-d[1], d[0]])
+        hull = G.convex_hull_2d(th.stack([xy @ d, xy @ n], dim=1))
+        cut = rear + PUSH_TWO_POINT_DEPTH_M
+        lats = [float(v[1]) for v in hull if float(v[0]) <= cut]
+        for a, b in zip(hull, th.roll(hull, -1, dims=0)):
+            da, db = float(a[0]) - cut, float(b[0]) - cut
+            if da * db < 0.0:
+                lats.append(float(a[1]) + da / (da - db) * (float(b[1]) - float(a[1])))
+        width = (max(lats) - min(lats)) if lats else 0.0
+        lo, hi = PUSH_TWO_POINT_OPENING_M
+        opening = max(lo, min(hi, PUSH_TWO_POINT_WIDTH_FRAC * width))
+    strips, face = push_contact_strips("two_point", float(opening))
+    along = push_back_along(P3, origin, d, 0.0, strips, -1.0, 1.0)
+    if along is None:
+        return None
+    return {"off_m": -float(along), "strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "face_half_m": face, "opening_m": float(opening),
+            "fingers_m": finger_joint_for_opening(float(opening))}
 
 
 def band_back_offset(pts: th.Tensor, direction_xy, z_lo: float, z_hi: float, section: bool = False) -> Optional[float]:
@@ -1248,6 +1347,16 @@ class IORSLarge(SamplerV2):
             raise Reject("spec", f"generation.push_under_hand {v!r} is not one of {PUSH_UNDER_HANDS}")
         return v
 
+    def floorpush(self) -> Dict[str, Any]:
+        """The i7-floorpush switches (:func:`floorpush_switches`) that act here: all of them for the under relation's pitched-hand floor push
+        (``push_under_hand`` = ``"pitched_far"``: under_large_02 / 03), none anywhere else. ``Reject("spec")`` for a malformed length."""
+        if getattr(self, "relation", None) != "under" or self.push_hand != "pitched_far":
+            return {}
+        try:
+            return floorpush_switches()
+        except ValueError as e:
+            raise Reject("spec", str(e))
+
     #: ground-like scene categories whose AABB spans rooms (the garden lawn's AABB covers the child's room floor strip)
     GROUND_CATEGORIES = ("floors", "ceilings", "walls", "lawn", "driveway", "roof", "pool", "carpet", "rug", "mat", "doormat", "fence", "rail_fence")
     GROUND_FOOTPRINT_M2 = 15.0
@@ -1431,13 +1540,14 @@ class IORSLarge(SamplerV2):
         """The pitched hand's pitch ladder (``generation.push_under_far_pitches_deg``, default :data:`PUSH_FAR_PITCHES_DEG`)."""
         return [float(v) for v in (self.gp.gen("push_under_far_pitches_deg") or PUSH_FAR_PITCHES_DEG)]
 
-    def pitched_turns(self, pitch_deg: float, d2, com_h: Optional[float] = None) -> List[Tuple[Optional[float], float, str, th.Tensor]]:
+    def pitched_turns(self, pitch_deg: float, d2, com_h: Optional[float] = None, tip_m: Optional[float] = None) -> List[Tuple[Optional[float], float, str, th.Tensor]]:
         """The pitched hand's wrist turns at ``pitch_deg`` pushing along ``d2`` (:func:`tabletop.pitched_hand_quats`), the hand's lowest part
         nearest the fingertips first: ``(fingertip height above the floor, the lowest collision sphere below the fingertips, label, eef quat)``.
-        The fingertips stand ``generation.push_far_tip_m`` up, at least that sphere + ``push_far_floor_clearance_m`` (the hand never scrapes
-        the floor, the IK keeps the ground slab) and, given the target's centre-of-mass height ``com_h``, low enough that their leading edge
-        stays below it; None when the two bounds cross (the turn cannot push below the centre of mass)."""
-        target = float(self.num("push_far_tip_m", PUSH_FAR_TIP_M))
+        The fingertips stand ``generation.push_far_tip_m`` up (``tip_m`` instead when given: i7-floorpush (d)), at least that sphere +
+        ``push_far_floor_clearance_m`` (the hand never scrapes the floor, the IK keeps the ground slab) and, given the target's centre-of-mass
+        height ``com_h``, low enough that their leading edge stays below it; None when the two bounds cross (the turn cannot push below the
+        centre of mass)."""
+        target = float(self.num("push_far_tip_m", PUSH_FAR_TIP_M)) if tip_m is None else float(tip_m)
         clear = float(self.num("push_far_floor_clearance_m", PUSH_FAR_FLOOR_CLEARANCE_M))
         rise = math.sin(math.radians(float(pitch_deg)))
         out = []
@@ -1619,18 +1729,26 @@ class IORSLarge(SamplerV2):
         sim check 17838968 re-aimed the open hand at the line through the sandal's root and one fingertip met the round heel first - the
         sandal turned 80 deg, where the strokes with the blade turned it -2 deg. ``Reject("spec")`` for a stroke that is not a positive
         length."""
-        v = self.gp.gen("push_under_stroke_m")
+        fp = self.floorpush()
+        # i7-floorpush (c): ISPATIALGYM_FLOORPUSH_STROKE_M sets the stroke of the pitched hand's push (its count cap and yaw term with it)
+        v = fp["stroke_m"] if "stroke_m" in fp else self.gp.gen("push_under_stroke_m")
         if v is None:
             return {}
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not float(v) > 0.0:
             raise Reject("spec", f"generation.push_under_stroke_m {v!r}: a positive length (m)")
         if form == "two_point":
             log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f) not recorded for the two-point hand: one stroke", self.gp.variant, float(v))
+            if "stroke_m" in fp:
+                TT._count(self, "floorpush.strokes.skipped_two_point")
             return {}
-        plan = push_stroke_plan(distance_m, float(v), int(self.num("push_under_strokes_max", PUSH_STROKES_MAX)),
+        n_max = int(fp["strokes_max"]) if "stroke_m" in fp else int(self.num("push_under_strokes_max", PUSH_STROKES_MAX))
+        gain = float(fp["yaw_gain"]) if "stroke_m" in fp else float(self.num("push_under_reaim_yaw_gain", 0.0))
+        plan = push_stroke_plan(distance_m, float(v), n_max,
                                 backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=float(self.num("push_under_reaim_max_m", 0.03)),
-                                yaw_gain_m_per_rad=float(self.num("push_under_reaim_yaw_gain", 0.0)),
+                                yaw_gain_m_per_rad=gain,
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
+        if "stroke_m" in fp:
+            TT._count(self, "floorpush.strokes.recorded")
         log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f): %d strokes over %.3f m, the object's progress after each %s m, back-off %.3f m, "
                  "re-aim within %.3f m, yaw gain %.3f m/rad", self.gp.variant, float(v), plan["n"], float(distance_m), plan["ends_m"], plan["backoff_m"], plan["reaim_max_m"],
                  plan["yaw_gain_m_per_rad"])
@@ -1844,6 +1962,37 @@ class IORSLarge(SamplerV2):
         return None
 
     def _push_under_pitched_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
+        """The pitched hand's push chain (:meth:`_pitched_chain_once`). i7-floorpush (owner 2026-11-08 item 5, :meth:`floorpush`): with
+        ``ISPATIALGYM_FLOORPUSH_TIP_M`` (d) the chain at that fingertip height first, with ``ISPATIALGYM_FLOORPUSH_OPEN`` (a) the open lateral
+        turns first; today's chain after them (the fall-back). The record carries ``floorpush`` (the variant that solved, the switches set) and,
+        with ``ISPATIALGYM_FLOORPUSH_STROKE_M`` (c), the hand's ``face_half_m`` / ``contact_strips_m`` for the oracle's strokes. Counters
+        ``floorpush.<variant>.chain`` / ``.unsolved`` per stance C chain."""
+        fp = self.floorpush()
+        ladder: List[Tuple[str, Dict[str, Any]]] = []
+        if fp.get("tip_m"):
+            ladder.append(("low_tip", {"tip_m": float(fp["tip_m"])}))
+        if fp.get("open"):
+            ladder.append(("open", {"open_hand": True}))
+        ladder.append(("today", {}))
+        for name, kw in ladder:
+            ch = self._pitched_chain_once(place, quat, drop_xy, goal_xy, d2, strokes="stroke_m" in fp, **kw)
+            if fp:
+                TT._count(self, f"floorpush.{name}.{'chain' if ch is not None else 'unsolved'}")
+            if ch is None:
+                continue
+            if fp:
+                ch["record"]["floorpush"] = {"variant": name, **{k: v for k, v in fp.items()}}
+                if fp.get("both"):
+                    ch["record"]["floorpush"]["both"] = self._floorpush_both_probe(place, ch, d2)
+                if name != "today" or len(ladder) == 1:
+                    log.info("%s: i7-floorpush chain '%s' solved (switches %s)", self.gp.variant, name, fp)
+                else:
+                    log.info("%s: i7-floorpush fall-back to today's chain (switches %s: %s unsolved)", self.gp.variant, fp, [n for n, _ in ladder[:-1]])
+            return ch
+        return None
+
+    def _pitched_chain_once(self, place: Stance, quat, drop_xy, goal_xy, d2, tip_m: Optional[float] = None, open_hand: bool = False,
+                            strokes: bool = False) -> Optional[Dict[str, Any]]:
         """The pitched hand's push chain (``generation.push_under_hand`` = ``"pitched_far"``, owner 2026-10-12 ~20:55 item C): the blade's
         contact point and straight push with the closed hand pitched 60-70° from straight down toward the push (:meth:`far_pitches`, tried in
         turn), the palm leaning away from the face and the fingertips low on it. Per pitch the wrist turns of :meth:`pitched_turns` (the
@@ -1854,7 +2003,10 @@ class IORSLarge(SamplerV2):
         ``push_far_pre_m`` back and up from the start. Exact IK from stance C, closed gripper, the floor object and the target ignored, the
         ground slab kept; the turn by the orientation rule. Returns :meth:`_push_under_chain`'s fields (``wrist_sign`` the turn's label) +
         ``record`` (``push_hand``, ``palm_clear``: the oracle's palm clearance of a top-down blade leaves it alone; the contact and
-        centre-of-mass heights) or None."""
+        centre-of-mass heights) or None. i7-floorpush: ``tip_m`` the fingertip height (d); ``open_hand`` (a) only the lateral turns, the gripper
+        open with both fingertips across the back (:func:`pitched_open_contact`; the IK, the pinned check, the goal check and the program check
+        with that opening: the record's ``push_contact_form`` ``"two_point"`` / ``fingers_opening_m``); ``strokes`` (c) the record's
+        ``face_half_m`` (the fingertips' leading edge ahead of the eef origin) and ``contact_strips_m`` for ``execute._push_strokes``."""
         floor, target = self.obj("floor"), self.target
         arm = self.seg_arm
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
@@ -1873,15 +2025,23 @@ class IORSLarge(SamplerV2):
         for pitch in self.far_pitches():
             rise_p = math.sin(math.radians(pitch))
             props: List[O.Proposal] = []
-            for tip, drop, label, q in self.pitched_turns(pitch, d2, com_h):
+            for tip, drop, label, q in self.pitched_turns(pitch, d2, com_h, tip_m=tip_m):
+                if open_hand and not label.startswith("lateral"):
+                    continue  # i7-floorpush (a): only a lateral closing axis spreads the open fingertips across the push
                 if tip is None:
                     why.append(f"pitch {pitch:.0f} {label}: the hand's lowest sphere {drop:.3f} m below the tips keeps their edge above the centre of mass ({com_h:.3f} m)")
                     continue
                 standoff, rise, h = TT.pitched_tip_offsets(pitch, q, PUSH_UNDER_CLEARANCE_M)
                 band = (tip - h * rise_p, tip + h * rise_p)
-                off = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, band[0], band[1], section=True)
+                fc = None
+                if open_hand:
+                    fc = pitched_open_contact(pts, d2, band[0], band[1], opening=self.gp.gen("push_under_two_point_opening_m"))
+                    off = None if fc is None else (float(off_cfg) if off_cfg is not None else fc["off_m"])
+                else:
+                    off = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, band[0], band[1], section=True)
                 if off is None:
-                    why.append(f"pitch {pitch:.0f} {label}: nothing of the target within the fingertips' band {band[0]:.3f}-{band[1]:.3f} m")
+                    why.append(f"pitch {pitch:.0f} {label}: nothing of the target within the fingertips' band {band[0]:.3f}-{band[1]:.3f} m"
+                               + (" (open fingertips)" if open_hand else ""))
                     continue
                 gap, part = pitched_palm_gap(pts, d2, th.tensor([-float(d2[0]) * (off + standoff), -float(d2[1]) * (off + standoff), tip + rise]), q)
                 if gap < 0.0:
@@ -1891,19 +2051,23 @@ class IORSLarge(SamplerV2):
                 chain = CPZ.floor_push_chain(cd, gc, d2, z, off + standoff, extra, q, pre=("back_up", pre_back, pre_up))  # i7-contact: the shared chain
                 facts = {"wrist_turn": label, "pitch_deg": float(pitch), "fingertip_z_m": float(tip), "push_height_m": float(tip + rise), "half_extent_m": float(off),
                          "standoff_m": float(standoff), "contact_height_m": float(band[1]), "fingertip_band_m": [float(band[0]), float(band[1])],
-                         "palm_gap_m": float(gap) if math.isfinite(gap) else None, "palm_part": part or None, "hand_low_m": float(tip - drop)}
-                props.append(O.Proposal(f"pitch {pitch:.0f} {label}", len(props), facts, chain))
+                         "palm_gap_m": float(gap) if math.isfinite(gap) else None, "palm_part": part or None, "hand_low_m": float(tip - drop),
+                         "fingers": float(fc["fingers_m"]) if fc is not None else C.FINGER_CLOSED, "open": fc}
+                props.append(O.Proposal(f"pitch {pitch:.0f} {label}{' open' if fc is not None else ''}", len(props), facts, chain))
             if not props:
                 continue
             first = first or props[0]
 
             def evaluate(p):
                 with self.ikc.ignoring([floor, target]):  # the ground slab stays: the hand's lowest sphere rides above the floor
-                    res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=C.FINGER_CLOSED, q_first=p.q_first)
+                    res = self.ikc.exact(p.chain, place, arm, cache=False, fingers=float(p.payload.get("fingers", C.FINGER_CLOSED)), q_first=p.q_first)
                 return bool(res.ok), res, None, str(res.reason)
 
-            chosen, decision = O.choose(self.ikc, arm, props, evaluate, self.ikc.q_locked(place), camera_idx=[1], stage=f"push-under pitched hand {pitch:.0f}",
-                                        downstream=lambda s: self.push_pinned_check(place, s, arm, True))
+            # the open hand's (a) start configuration holds its opening (one per pitch: every proposal of it has it); today's is unchanged
+            q_start = self.ikc.q_locked(place, fingers=float(props[0].payload["fingers"])) if open_hand else self.ikc.q_locked(place)
+            chosen, decision = O.choose(self.ikc, arm, props, evaluate, q_start, camera_idx=[1],
+                                        stage=f"push-under pitched hand {pitch:.0f}{' open' if open_hand else ''}",
+                                        downstream=lambda s: self.push_pinned_check(place, s, arm, True, fingers=float(s.proposal.payload.get("fingers", C.FINGER_CLOSED))))
             if chosen is not None:
                 pre, start_p, mid_p, goal_p = chosen.proposal.chain
                 f = chosen.proposal.payload
@@ -1919,13 +2083,64 @@ class IORSLarge(SamplerV2):
                         "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
                         "record": {"push_hand": "pitched_far", "palm_clear": True, "wrist_turn": f["wrist_turn"], "contact_height_m": f["contact_height_m"],
                                    "target_com_height_m": float(com_h), "palm_gap_m": f["palm_gap_m"], "hand_low_m": f["hand_low_m"],
-                                   "fingertip_band_m": f["fingertip_band_m"]}}
+                                   "fingertip_band_m": f["fingertip_band_m"], **self._floorpush_hand_record(f, strokes)}}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         ends = (f"start {[round(float(v), 2) for v in P0.to_base_frame(first.chain[1][0], place.base_pose2d, P0.base_z(self)).tolist()]}, goal "
                 f"{[round(float(v), 2) for v in P0.to_base_frame(first.chain[3][0], place.base_pose2d, P0.base_z(self)).tolist()]} in base" if first is not None else "no turn")
         log.info("%s: push-under pitched-hand chain unreachable from stance C (d %.2f λ %+.2f trunk %s; eef %s): %s", self.gp.variant, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)), ends, "; ".join(why))
         return None
+
+    def _floorpush_both_probe(self, place: Stance, ch: Dict[str, Any], d2) -> Dict[str, Any]:
+        """i7-floorpush (b) ``ISPATIALGYM_FLOORPUSH_BOTH``: whether the OTHER arm's pitched hand can push beside the solved chain ``ch`` - the
+        same poses moved :data:`FLOORPUSH_BOTH_OFFSETS_M` across the push toward the other arm (both hands on the target's back), each wrist
+        twin of the chain's pitch (``tabletop.pitched_hand_quats`` lateral turns), exact IK of the other arm from stance C with the floor object
+        and the target ignored. The CPU pre-check (2026-11-08, the 13 right-arm demos' stances: FK of the URDF, joint limits only) left the other
+        hand 0.19-0.53 m from those poses at offsets <= 0.12 m. No two-hand oracle push exists: a feasible chain is counted and logged
+        (``floorpush.both.feasible``) and the push stays one-handed - the fall-back. Returns ``{"arm", "feasible", "offset_m", "why"}``."""
+        arm = self.seg_arm
+        other = "left" if arm == "right" else "right"
+        d3 = ch["direction"]
+        n3 = th.tensor([-float(d3[1]), float(d3[0]), 0.0])
+        yaw = float(place.base_pose2d[2])
+        toward = th.tensor([-math.sin(yaw), math.cos(yaw), 0.0]) * (1.0 if arm == "right" else -1.0)
+        sgn = 1.0 if float(n3 @ toward) > 0.0 else -1.0
+        poses = [ch["pre"], ch["start"], ch["mid"], ch["goal"]]
+        quats = [q for label, q in TT.pitched_hand_quats(float(ch["pitch_deg"]), d2) if label.startswith("lateral")]
+        floor, target = self.obj("floor"), self.target
+        TT._count(self, "floorpush.both.probe")
+        why = []
+        for off in FLOORPUSH_BOTH_OFFSETS_M:
+            for q in quats:
+                chain_o = [(G.t(p).float() + n3 * (sgn * off), G.t(q).float()) for p, _ in poses]
+                with self.ikc.ignoring([floor, target]):
+                    res = self.ikc.exact(chain_o, place, other, cache=False, fingers=C.FINGER_CLOSED)
+                if res.ok:
+                    TT._count(self, "floorpush.both.feasible")
+                    log.warning("%s: i7-floorpush (b) the %s hand's pitched chain is IK-feasible %.2f m beside the %s hand's - no two-hand oracle push is built: "
+                                "pushing with one hand", self.gp.variant, other, off, arm)
+                    return {"arm": other, "feasible": True, "offset_m": off, "why": ""}
+                why.append(f"{off:.2f} m: {str(res.reason)[:80]}")
+        TT._count(self, "floorpush.both.infeasible")
+        log.info("%s: i7-floorpush (b) the %s hand cannot push beside the %s hand from stance C (d %.2f λ %+.2f): %s - one hand", self.gp.variant, other, arm,
+                 place.stand_off or 0.0, place.lateral, "; ".join(why[:3]))
+        return {"arm": other, "feasible": False, "offset_m": None, "why": "; ".join(why[:2])[:240]}
+
+    @staticmethod
+    def _floorpush_hand_record(f: Dict[str, Any], strokes: bool) -> Dict[str, Any]:
+        """The pitched chain's record fields of the i7-floorpush hand variants (``f`` the chosen proposal's facts): the open hand's (a)
+        ``push_contact_form`` ``"two_point"``, ``fingers_opening_m`` (the per-finger joint the oracle holds), ``contact_width_m``,
+        ``contact_strips_m`` / ``face_half_m``; with ``strokes`` (c) the closed hand's ``face_half_m`` (the fingertips' leading edge ahead of the eef
+        origin: the stand-off less its clearance) and ``contact_strips_m`` (a lateral turn's two fingers side by side, 16.8 mm; a plane turn's
+        14 mm) for ``execute._push_strokes``; ``{}`` otherwise (today's record)."""
+        fc = f.get("open")
+        if fc is not None:
+            return {"push_contact_form": "two_point", "fingers_opening_m": round(float(fc["fingers_m"]), 5), "contact_width_m": round(float(fc["opening_m"]), 4),
+                    "contact_strips_m": fc["strips_m"], "face_half_m": round(float(f["standoff_m"]) - PUSH_UNDER_CLEARANCE_M, 5)}
+        if strokes:
+            strips, _ = push_contact_strips("closed_turned" if str(f["wrist_turn"]).startswith("lateral") else "blade")
+            return {"face_half_m": round(float(f["standoff_m"]) - PUSH_UNDER_CLEARANCE_M, 5), "contact_strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips]}
+        return {}
 
     def push_pinned_check(self, stance: Stance, scored, arm: str, ground: bool, fingers: float = C.FINGER_CLOSED) -> Tuple[bool, str]:
         """The push-under chain's ``orient.choose`` downstream (owner 2026-10-13 ~03:15 item 1): the configuration the goal check pins
