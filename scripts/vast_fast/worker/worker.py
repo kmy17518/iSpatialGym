@@ -7,7 +7,7 @@ R2 ($ISG_S3, this job's prefix only):
                                 code / jobdata archives, scenes, git roots
   hb/<instance>.json            this worker's heartbeat (every 60 s): slots, running, done, free resources
   out/<id>/                     jobdir.tar.zst (the whole job dir), slurm.log (the job's stdout + stderr = its slurm log),
-                                cache_new.tar.zst (sampling / asset cache files the instance wrote meanwhile: the coordinator adds the
+                                cache_new.tar.zst (sampling cache files the instance wrote meanwhile: the coordinator adds the
                                 ones the cluster lacks, as a cluster job would have written them)
   done/<id>.json                written after every upload succeeded: rc, timing, GPU, instance
   ctl/stop, ctl/stop_<instance> finish the running jobs, take no new ones, exit
@@ -30,7 +30,7 @@ VRAM_PER_JOB_GB = float(os.environ.get("ISG_VRAM_PER_JOB_GB", "20"))
 RAM_PER_JOB_GB = float(os.environ.get("ISG_RAM_PER_JOB_GB", "40"))
 MAX_JOBS = int(os.environ.get("ISG_MAX_JOBS", "0"))  # 0: as many as fit
 LC = "/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache"
-CACHES = ["/vision/u/minyeong/projects/isg_home/trainfast/cache/sampling", "/vision/u/minyeong/projects/isg_home/oracle_fix/asset_cache"]
+CACHES = ["/vision/u/minyeong/projects/isg_home/trainfast/cache/sampling"]  # the asset-geometry cache stays on the instance (derived from decrypted meshes)
 SECRET_ENV = ("AWS_", "CONTAINER_API_KEY", "VAST_", "GHCR_", "ISG_", "S3_", "REPLAY_S3", "RUNPOD_")
 LOCK = threading.Lock()
 STATE = {"running": {}, "done": 0, "failed": 0, "started": time.time(), "last_work": time.time(), "phase": "ready"}

@@ -11,11 +11,13 @@
 #   assets/objects_rest_NN.tar.zst  every behavior-1k-assets model the replay's 959-model packs lack (encrypted as on disk; mtimes kept)
 #   env_delta.tar.zst               env files changed since the replay env packs (2026-10-21), at their absolute paths
 #   stores.tar.zst                  the read-only band / reach-volume stores env_fast.sh + job_fast.sh copy, kit_appdata.sh
-#   cache/<name>_NN.tar.zst         base copies of the campaign caches the jobs read AND write (the exact-IK / start-draw sampling
-#                                   cache, the asset-geometry cache); cache/<name>.time = the listing time (deltas: newer files)
+#   cache/sampling_base_NN.tar.zst  a base copy of the campaign's sampling cache (exact-IK witnesses, start-draw cells), which the jobs
+#                                   read AND write; cache/sampling.time = the listing time (a delta takes newer files)
+# NOT shipped: the asset-geometry cache ($OFH/asset_cache: link-local collision points derived from the decrypted BEHAVIOR meshes - no
+# decrypted asset data leaves the cluster); the instances start it empty (bit-identical demos, a slower first world load).
 # Every archive is rooted at / (absolute cluster paths) unless named otherwise; boot_list.txt says where each one goes.
 # Reads only NFS sources; writes only R2 ($JOB_S3) and $VJ/bundle (lists).
-#   sbatch pack_static.sh [part ...]   parts: objects env stores sampling asset (default: all)
+#   sbatch pack_static.sh [part ...]   parts: objects env stores sampling (default: all)
 set -uo pipefail
 source ${VTOOL:-/vision/u/minyeong/projects/isg_home/oracle_fix/vast/tool}/creds.sh   # VTOOL: a deployed tool copy (deploy.sh)
 D=/vision/u/minyeong/projects/ispatialgym/Behavior-1K/datasets
@@ -25,7 +27,7 @@ mkdir -p $B
 t0=$SECONDS
 log() { echo "[$(date -u +%FT%TZ) +$(( SECONDS - t0 ))s] $*"; }
 export -f log; export t0 S3_ENDPOINT_URL JOB_S3
-PARTS="${*:-objects env stores sampling asset}"
+PARTS="${*:-objects env stores sampling}"
 fail=0
 log "START host=$(hostname -s) parts=$PARTS"
 
@@ -99,12 +101,11 @@ for e in os.scandir(d):
     if e.is_file(follow_symlinks=False) and not e.name.startswith("."):
         print(f"{e.stat(follow_symlinks=False).st_size}\t{os.path.relpath(e.path, '/')}")
 EOF
-  split_lists $B/cache_$name.sizes $B/cache_${name}_base 8
-  ls $B/cache_${name}_base_*.txt | xargs -P 8 -I{} bash -c 'f={}; n=$(basename $f .txt); put $f cache/${n#cache_}.tar.zst / 3' || fail=1
+  split_lists $B/cache_$name.sizes $B/cache_${name}_base 16
+  ls $B/cache_${name}_base_*.txt | xargs -P 16 -I{} bash -c 'f={}; n=$(basename $f .txt); put $f cache/${n#cache_}.tar.zst / 3' || fail=1
   s5cmd --endpoint-url $S3_ENDPOINT_URL cp $B/cache_$name.time "$JOB_S3/bundle/cache/${name}.time" > /dev/null
 }
 [[ " $PARTS " == *" sampling "* ]] && cache_base sampling /vision/u/minyeong/projects/isg_home/trainfast/cache/sampling
-[[ " $PARTS " == *" asset "* ]] && cache_base asset /vision/u/minyeong/projects/isg_home/oracle_fix/asset_cache
 
 s5cmd --endpoint-url $S3_ENDPOINT_URL ls "$JOB_S3/bundle/*" > $B/r2_listing.txt 2>&1
 s5cmd --endpoint-url $S3_ENDPOINT_URL du --humanize "$JOB_S3/bundle/*" 2>&1 | tail -1

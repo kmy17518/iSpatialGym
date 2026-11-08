@@ -55,8 +55,11 @@ QUEUE = os.path.join(VJ, "queue")
 ACCOUNTS = ("VAST_API_KEY", "VAST_QUERY_API_KEY_1", "VAST_QUERY_API_KEY_2", "VAST_QUERY_API_KEY_3")
 SHORT = {"VAST_API_KEY": "main", "VAST_QUERY_API_KEY_1": "q1", "VAST_QUERY_API_KEY_2": "q2", "VAST_QUERY_API_KEY_3": "q3"}
 ACCOUNT_ERRORS = ("spend_limit", "credit", "balance", "fund", "billing", "payment", "verif")
-#: caches the jobs read and write: shipped as base + deltas at boot, new files synced back (never overwritten)
-CACHES = (os.path.join(F, "cache", "sampling"), os.path.join(OFH, "asset_cache"))
+#: the cache the jobs read and write: shipped as base + deltas at boot, new files synced back (never overwritten)
+CACHES = (os.path.join(F, "cache", "sampling"),)
+#: never shipped: the asset-geometry cache holds link-local collision points of the decrypted BEHAVIOR meshes (no decrypted asset data
+#: goes to R2 or back); the instances fill their own copy (demos bit-identical with or without it)
+NOT_SHIPPED = (os.path.join(OFH, "asset_cache"),)
 #: read stores shipped in stores.tar.zst (pack_static.sh)
 STORES = ("/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/reach_bands", "/vision/u/minyeong/projects/isg_home/eval85/bands_eval",
           "/vision/u/minyeong/projects/isg_home/.cache/ispatialgym-vecenv/reach_volume", os.path.join(T85, "bands_train"))
@@ -279,7 +282,7 @@ def stage(s3, rec, state):
     code_keys = [ensure_code(s3, code, state)]
     if not under(b1k, [code]):
         code_keys.append(ensure_code(s3, b1k, state))
-    shipped = [code, b1k] + list(STORES) + list(CACHES)
+    shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)
     L = Lister(shipped)
     L.add_tree(jd)
     scripts = env.get("ISGF_SCRIPTS") or os.path.join(F, "scripts")
@@ -496,7 +499,7 @@ def search(c, C, gpu=None, force=False):
     tried = {e.get("offer") for e in events() if e["ev"] == "tried" and now() - e["time"] < 3600}
     out = []
     for o in rows:
-        if gpu and o.get("gpu_name") != gpu:
+        if (gpu and o.get("gpu_name") != gpu) or int(o.get("num_gpus") or 0) != 1:  # the worker runs every job on GPU 0
             continue
         if o.get("machine_id") in bad or o["id"] in tried or str(o.get("geolocation") or "").endswith("CN"):
             continue
