@@ -134,7 +134,7 @@ def _check_varied(draws, blocked=BLOCKED_EDGE):
 
 
 def _check_off(s, monkeypatch, attr="init_stance"):
-    monkeypatch.delenv("ISPATIALGYM_START_DRAW", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     before = getattr(s, attr)
     rng = np.random.default_rng(3)
     state = rng.bit_generator.state
@@ -148,7 +148,7 @@ def _check_off(s, monkeypatch, attr="init_stance"):
 
 def test_switch_is_family_scoped(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_START_PER_ATTEMPT", raising=False)
-    monkeypatch.delenv("ISPATIALGYM_START_DRAW", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     fam, other = SimpleNamespace(START_DRAW_FAMILY=True), SimpleNamespace(START_DRAW_FAMILY=False)
     assert not CORE.start_per_attempt(fam) and not CORE.start_per_attempt()
     monkeypatch.setenv("ISPATIALGYM_START_DRAW", "1")
@@ -191,7 +191,7 @@ class _Stub:
 
 def test_core_off_is_identical_on_counts(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_START_PER_ATTEMPT", raising=False)
-    monkeypatch.delenv("ISPATIALGYM_START_DRAW", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     s = _Stub()
     d = s.sample(np.random.default_rng(0))
     assert s.drawn == 0 and "start_per_attempt" not in d.summary and s.kit.stats == {}
@@ -223,7 +223,7 @@ def test_repeat_outcome_counters(monkeypatch):
     with pytest.raises(Reject):
         CORE.SamplerV2.check_instance_filter(s, "/nonexistent-tro_state.json")
     assert s.kit.stats == {"start_draw.repeat_passed": 1, "start_draw.repeat_rejected": 1}
-    monkeypatch.delenv("ISPATIALGYM_START_DRAW")
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     s.kit.stats.clear()
     s.instance_filter = lambda p: None
     CORE.SamplerV2.check_instance_filter(s, "/nonexistent-tro_state.json")
@@ -398,8 +398,16 @@ def test_iors_small_sample_draws_under_the_switch(monkeypatch):
     s.spa_redraw_start = lambda rng: calls.append(1) or setattr(s, "_spa_facts", {"edge": "e0"})
     s.draw_partner_side = lambda rng: 1.0
     monkeypatch.setattr(CORE.SamplerV2, "sample", lambda self, rng: "drawn")
-    monkeypatch.delenv("ISPATIALGYM_START_DRAW", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     assert IS.IORSSmall.sample(s, np.random.default_rng(0)) == "drawn" and calls == []
     monkeypatch.setenv("ISPATIALGYM_START_DRAW", "1")
     IS.IORSSmall.sample(s, np.random.default_rng(0))
     assert calls == [1] and s._spa_drawn and s.kit.stats["start_draw.drawn"] == 1
+
+
+def test_default_is_on(monkeypatch):
+    """Owner 3.5 decided the rule; after the A/B the switch defaults on (unset = on, 0 = the template's start)."""
+    monkeypatch.delenv("ISPATIALGYM_START_DRAW", raising=False)
+    assert CORE.start_draw_on() and CORE.start_draw_active(SimpleNamespace(START_DRAW_FAMILY=True))
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
+    assert not CORE.start_draw_on()

@@ -65,6 +65,8 @@ def _sampler(monkeypatch, gen=None, spa=True, layouts=LAYOUTS, lean=(11.0, 20.0)
 
     IS = _iors()
     monkeypatch.setenv("ISPATIALGYM_START_PER_ATTEMPT", "1" if spa else "0")
+    if not spa:  # i7-startdraw: no start per attempt at all = the start draw off too (it defaults on)
+        monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     monkeypatch.setattr(TT, "arm_bands_for", lambda s, arms, **kw: {a: f"band-{a}" for a in arms})
     generation = {"shelf_spine_behind_edge_m": 0.06, "shelf_free_span_min_m": 0.12, "shelf_working_arm_default": True}
     if layouts is not None:

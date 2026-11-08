@@ -82,8 +82,9 @@ def start_draw_on() -> bool:
     disembedding, IORS large inside / ontop / under / touching - nextto and the touching base push draw their stance A per attempt
     already - and IORS small) draw the robot's start base per ATTEMPT from the attempt's rng: the template's own start search (edges in
     random order, Phase 1b / 1c with every check it makes, the family's frame rule, Phase 2 from the drawn start) rerun per attempt
-    (:meth:`SamplerV2.spa_redraw_start`); implies :func:`start_per_attempt` for those samplers. Unset / 0: nothing changes."""
-    return os.environ.get("ISPATIALGYM_START_DRAW") == "1"
+    (:meth:`SamplerV2.spa_redraw_start`); implies :func:`start_per_attempt` for those samplers. DEFAULT ON since the owner's rule (3.5) and
+    the A/B (i7-startdraw, $OFH/startdraw_20261108): unset = on; ``ISPATIALGYM_START_DRAW=0`` = the template's start (the former behaviour)."""
+    return os.environ.get("ISPATIALGYM_START_DRAW", "1") != "0"
 
 
 def start_draw_active(s: Any) -> bool:
