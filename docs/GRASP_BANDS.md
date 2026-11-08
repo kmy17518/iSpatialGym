@@ -2411,6 +2411,59 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
 
+### i7-axialrest (owner decision 2, 2026-11-08): the axial program at the target's settled rest
+
+Owner decision, verbatim prompt `prompt_goalmaps_axialrest_overpath.md` section 2 (DECISIONS 2026-11-08 "OWNER DECISIONS"): spawn the axial target
+at its v2 settled rest, compose the goal yaw with that rest's tilt, build the axial library at the settled rest, and compare the goal in that
+frame. It is approved as a program and goal-definition change. Switch `ISPATIALGYM_AXIAL_SETTLED_REST=1`, default off (4d22896d); the merge of
+i7-brace 9d2ce7e3 (6ab54ba7) supplies the clear-turn axial_brace builder.
+
+**Diagnosis.**
+- The success check (`pose_reached`, geometric success, QA `not_reached`) compares the full quaternion with the TRO target. Before the
+  switch that target was the upright `R_z(yaw_goal)`.
+- The evaluation tolerance comes from the isg-v2 profile: max(0.05, 10 % of the change), 0.05-0.117 rad for these demos, not the TRO's
+  0.10.
+- The oracle's push stops use the yaw about z, so the tilt does not affect them.
+- The 19 past axial_05 demos: 2 succeeded, 14 not_reached, 3 plan_failed. The spoon settles 0.087-0.093 rad tilted; the v2 rest r0_other
+  is tilted 0.0866.
+- Of the 14 not_reached:
+  - 7 reached the goal heading within 0.0055 rad and failed on the tilt alone;
+  - 5 fell 0.087-0.18 rad short of the turn;
+  - 2 lost the target.
+- The 2 successes turned more than 0.92 rad, so their tolerance exceeded the tilt.
+
+**What the switch changes.**
+- **Placement:** `R_z(yaw0) * q_rest`, with the root at the support top + `h_root`. The rest is the push_blade map's `object.rest`, the
+  v2 entry the library was built and validated at.
+- **Goal:** `R_z(yaw_goal) * q_rest`. After the settle the goal is the settled orientation turned about the vertical to the aligned
+  heading, written into the TRO target. The full check then measures the turn alone, because the hinge keeps the tilt.
+- **Sites changed (identity / upright assumptions):**
+  - `band_spec.rest_quat`;
+  - the placement draw;
+  - `after_settle`'s goal;
+  - `_aligned_yaw` (the front axis at the rest);
+  - the template extents and height;
+  - `axial_stop_geometry`'s goal pose, and the stop points flush with a tilted face's outermost projection;
+  - the opposite-end brace;
+  - `contact_library.axial_rest`: under the switch it returns the v2 rest (family param `settled_rest`, in the library identity only
+    when on);
+  - the start pose of the 45 deg build, the clear-turn build and `clear_turn_max`.
+- **Map rest check:** a map whose entry rest is not the program's rest is a miss. The push rejects `missing_map`; the optional brace is
+  skipped.
+- **Counters:** `axial_rest.settled_used`, `.no_v2_rest`, `.map_rest_mismatch.<kind>`; `summary.axial_rest` records the tilts and the
+  turn.
+- The validator already settles at `R_z(yaw) * v2 rest` and judges the turn from the settled start, so the library entries and the
+  program now stand on the same rest.
+
+**tqqwys library and maps** (`$OFH/axialrest_20261108`):
+- push: 85 valid of the validated entries;
+- axial_brace (clear-turn build): 48 valid, 12 per end x spin group;
+- both maps are at h0.8126;
+- staged in `$OFH/v2maps_int1_axialrest` (= brace34b + the two maps).
+
+**A/B:** tags `i7ar_off` / `i7ar_on`, trunk_4d22896d, the same indices 310000-310003. Both arms run with TURN_COVER=1 and OPPOSITE=1; the
+results are in DECISIONS ("i7-axialrest" lines).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
