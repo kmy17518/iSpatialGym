@@ -421,3 +421,46 @@ def test_board_table_places_the_board_where_the_base_list_is_off_the_top(monkeyp
     fit_on = s._board_fit(init, 0.35, _half(s))
     monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "0")
     assert s._board_fit(init, 0.35, _half(s)) == fit_on
+
+
+def test_flip_room_draw_spreads_the_init_over_the_range_that_keeps_the_flip_room(monkeypatch):
+    """i7-startdraw 5o.1 (``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1``): every init the move would put at the one point 0.1274 is drawn instead
+    from the whole range that keeps the +0.35 m flip room and the board on the top at every stand-off ([0.044, < 0.1374] here - 0.1374
+    is bare at 0.55; without a board [0.044, 0.1974]); off (or no rng) = the move, unchanged."""
+    import numpy as np
+
+    top, edge = _top_and_edge()
+    monkeypatch.delenv("ISPATIALGYM_BD_FLIP_ROOM_DRAW", raising=False)
+    s = _sampler(top)
+    assert s._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(0)).lateral == pytest.approx(0.1274, abs=1e-6)
+    monkeypatch.setenv("ISPATIALGYM_BD_FLIP_ROOM_DRAW", "1")
+    assert s._init_with_room_for_flips(_init(edge, 0.38)).lateral == pytest.approx(0.1274, abs=1e-6)  # no rng: the move
+    s.kit.stats = {}
+    lats = []
+    for seed in range(12):
+        init = _init(edge, (0.24, 0.38, 0.48, 0.07)[seed % 4])
+        st = s._init_with_room_for_flips(init, np.random.default_rng(seed))
+        assert BOUNDS[0] - 1e-6 <= st.lateral < 0.1374 and st.lateral + 0.35 <= BOUNDS[1] + 1e-6
+        assert all(s._board_fit(st, 0.35, _half(s)).values())
+        assert st.translate == init.translate and st.stand_off == init.stand_off and st.extras["lateral_bounds"] == BOUNDS
+        rec = s._flip_room
+        span = rec["draw"]["admissible_span"]
+        assert span[0] == pytest.approx(BOUNDS[0]) and 0.1274 - 1e-6 <= span[1] < 0.1374 and rec["draw"]["board_stand_offs"] == 3
+        assert rec["lateral"] == pytest.approx(st.lateral, abs=1e-4) and rec["lateral_drawn"] == init.lateral
+        lats.append(round(st.lateral, 3))
+    assert len(set(lats)) >= 6 and max(lats) - min(lats) >= 0.05 and s.kit.stats == {"bd_flip_room_draw.drawn": 12}
+    bare = _sampler(top, board=False)
+    bare_lats = {round(bare._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(k)).lateral, 3) for k in range(12)}
+    assert min(bare_lats) >= BOUNDS[0] - 1e-6 and max(bare_lats) <= BOUNDS[1] - 0.35 + 1e-6 and max(bare_lats) > 0.13
+    # integration-2 (merge with i7-blockdesign a2f89901): since 2774e392 BD_BOARD_TABLE acts on the board positions only and leaves the
+    # init's flip-room move on the base list, so the draw's admissible span is the same with it on (startdraw's f1fc4ac1-era expectation
+    # of the whole [0.044, 0.1974] no longer holds; BD_BOARD_TABLE stays off, lead decision)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    s._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(0))
+    assert s._flip_room["draw"]["admissible_span"][0] == pytest.approx(BOUNDS[0]) and s._flip_room["draw"]["admissible_span"][1] < 0.1374
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_TABLE")
+    # no lateral of the range on the floor: the move as before (here: none either -> the drawn init)
+    off = _sampler(top)
+    off.kit = SimpleNamespace(trav_free=lambda xy: False, stats={})
+    init = _init(edge, 0.38)
+    assert off._init_with_room_for_flips(init, np.random.default_rng(0)) is init and off.kit.stats == {"bd_flip_room_draw.no_floor": 1}

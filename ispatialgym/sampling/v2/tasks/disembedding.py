@@ -59,7 +59,7 @@ from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import support_split as SS  # i7-split 2026-11-07
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
@@ -418,6 +418,8 @@ class TrayFloorWorld:
 
 @register(SUBTASK)
 class Disembedding(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
@@ -684,7 +686,24 @@ class Disembedding(SamplerV2):
         # longest of its turns with a fixed layout)
         margins = {"kind": "disembedding", "lateral_margin": float(self.g("lateral_margin_m")), "safety": 0.02, "H_max": H_max,
                    "destination_side": side, "source_half_length": self._source_half_length()}
+        self._start_margins = margins
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
+                                    "band": getattr(self.bands, "path", None), "placed_key": self.placed_key, "source_tray_scale": src_scale,
+                                    "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
+                                    "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")], "segment_arms": list(self.segment_arms)})
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): every edge with a free-floor run
+        (``rng`` order), the init trunk (Phase 1b), the lateral (Phase 1c: floor, collision, trunk sweep; the margins hold the template's
+        destination side), the segment arms, the Phase-2 survivors with the source tray in frame and the destination tray fitting beside
+        it. Sets ``edge`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes; failures go to
+        ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
+        H_max = float(margins["H_max"])
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
         # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
@@ -717,17 +736,25 @@ class Disembedding(SamplerV2):
                                  f"Phase 2: the destination tray fits beside the source tray at none of the positions ({fits[-1]['positions']} positions, "
                                  f"{fits[-1]['candidates_before']} candidates; e.g. {(fits[-1]['examples'] or [''])[0][:300]})")
                 self.edge, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
-                                    "band": getattr(self.bands, "path", None), "placed_key": self.placed_key, "source_tray_scale": src_scale,
-                                    "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
-                                    "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")], "segment_arms": list(self.segment_arms)})
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge, init stance and Phase-2 pool from the
+        attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it makes; the destination side stays the
+        template's (an eval variant's assignment). A search that finds none restores the template's edge / segment arms. Off: the
+        template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        keep = (self.edge, self.init_stance, self.manip_candidates, self.segment_arms, self.arm_offer_why, self.arm_bands)
+        if not self._start_search(rng, self._start_margins, errors):
+            self.edge, self.init_stance, self.manip_candidates, self.segment_arms, self.arm_offer_why, self.arm_bands = keep
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge, self.init_stance, self.manip_candidates)
 
     def _destination_side(self, rng) -> str:
         """Owner 2026-10-12 (A2a): the destination tray's side, chosen before the Phase-1c margins - ``generation.destination_side``

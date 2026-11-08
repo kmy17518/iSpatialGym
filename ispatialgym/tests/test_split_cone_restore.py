@@ -18,6 +18,7 @@ def _cand(pos, k):
 class _Stub:
     sample = CORE.SamplerV2.sample
     spa_redraw_start = CORE.SamplerV2.spa_redraw_start
+    spa_draw = CORE.SamplerV2.spa_draw  # i7-startdraw: sample times the hook through spa_draw
 
     def __init__(self):
         self.manip_candidates = [_cand(p, k) for p in range(6) for k in range(2)]

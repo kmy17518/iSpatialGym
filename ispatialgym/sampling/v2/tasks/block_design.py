@@ -46,7 +46,7 @@ from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.tasks import block_design_diag as BDD
-from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_from_sidecar, pose_to_sidecar
 
@@ -168,6 +168,13 @@ FLIP_CELL_MAX_LATERAL = -0.10
 FLIP_CELL_MIN_EDGE_DEPTH = 0.10  # 0.22 (0919-090517 / 091857) left every region with a single flip cell; the pool's 0.40 / 0.50 stand-offs put the 13 cm cell at the proven base depth
 #: step (m) of the flip-room move of the init along the edge when the minimum move leaves the board off the top (owner 2026-10-12)
 FLIP_ROOM_STEP = 0.01
+
+
+def flip_room_draw_on() -> bool:
+    """i7-startdraw 5o.1 (owner 2026-11-08, the 3.5 rule): ``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1`` makes the flip-room rule
+    (:meth:`BlockDesign._init_with_room_for_flips`) draw the init lateral from the whole range that keeps the flip room
+    (:meth:`BlockDesign._flip_room_draw`) instead of moving every draw to one point. Default off."""
+    return os.environ.get("ISPATIALGYM_BD_FLIP_ROOM_DRAW", "0") not in ("", "0")
 #: the puzzle board's (base depth, lateral) positions of the manipulation stance when the variant has no ``board_base_xy_candidates``
 BOARD_BASE_XY = ((0.46, -0.02), (0.44, -0.10), (0.50, 0.04), (0.60, 0.05))
 #: head-camera margin (fraction of the image) of the fingertips along the chain (the oracle's FOV monitor uses 5 %)
@@ -208,6 +215,8 @@ def flip_tip_clearance(lean_deg: float) -> float:
 
 @register(SUBTASK)
 class BlockDesign(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         if self.gp.bddl is None:
@@ -290,8 +299,24 @@ class BlockDesign(SamplerV2):
         self.band_spec = TT.BandSpec(object=f"{choice.category}/{choice.model}", grasp_key=None, grasps=None, hull=self.hull, rest_quat=C.IDENTITY_QUAT.clone(),
                                      scale=list(choice.scale) if choice.scale else None, generic_pinch=True, height=self.edge)
         margins = {"kind": "block_design", "edge": self.edge, "block_gap": float(self.g("block_gap_m")), "safety": 0.02, "H_max": self.edge}
+        self._start_margins = margins
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
+                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
+        if getattr(self, "_flip_room", None) is not None:
+            self.template_facts["init_flip_room_move"] = self._flip_room
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2
+        survivors: free floor, whole-body collision-free), the init trunk (Phase 1b), the lateral (Phase 1c: floor, collision, trunk sweep)
+        moved for the flips' room, the Phase-2 region survivors (scanned at the manipulation lateral shifts, the shallow trunks kept when
+        no flip is expected). Sets ``edge_frame`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes;
+        failures go to ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
@@ -301,7 +326,7 @@ class BlockDesign(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
-                init = self._init_with_room_for_flips(init)
+                init = self._init_with_room_for_flips(init, rng)
                 # D-009 shape for blocks (default = the tabletop classes, 20 / 30 deg since owner 2026-10-11): with the region depth
                 # caps (init cells <= 0.80 m, slots <= 0.70 m) a 20 deg cone at the arm-friendly trunks (0.5, -0.3..-0.45) meets the
                 # top beyond the caps and only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16),
@@ -339,17 +364,23 @@ class BlockDesign(SamplerV2):
                 if shallow and not self._flips_expected():
                     cands = shallow
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
-                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
-        if getattr(self, "_flip_room", None) is not None:
-            self.template_facts["init_flip_room_move"] = self._flip_room
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge, init stance (with the flips' room) and
+        Phase-2 region pool from the attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it makes.
+        Off: the template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        if not self._start_search(rng, self._start_margins, errors):
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates,
+                                      flip_room_move_m=(getattr(self, "_flip_room", None) or {}).get("move_m"))
 
     # -- Phase 2 hooks (§4.5 blocks) --------------------------------------------------------------------------------
 
@@ -467,7 +498,7 @@ class BlockDesign(SamplerV2):
                     shifts.append(s)
         return shifts
 
-    def _init_with_room_for_flips(self, init: Stance) -> Stance:
+    def _init_with_room_for_flips(self, init: Stance, rng: Optional[np.random.Generator] = None) -> Stance:
         """Phase 1c draws the init lateral anywhere in its admissible range; with right-facing flips the manipulation
         stance must stand ``manip_lateral_shifts_m[0]`` further left, so an init drawn too far left is moved right along the
         edge (same trunk / stand-off) until that shift fits the range (the in-frame / visibility / collision checks of the
@@ -479,7 +510,11 @@ class BlockDesign(SamplerV2):
         the positions that stand-off 0.55 leaves on the top by depth are off its end (s3 c1_k1: every attempt). An init whose
         shift fits the range but whose manipulation stance has a stand-off without a position on the top is searched the same way
         from its drawn lateral (and kept when no move gives more stand-offs). The drawn and the moved lateral, the reason and the
-        board fit go to ``template_facts.init_flip_room_move``."""
+        board fit go to ``template_facts.init_flip_room_move``.
+
+        Under :func:`flip_room_draw_on` (``ISPATIALGYM_BD_FLIP_ROOM_DRAW=1``, i7-startdraw 5o.1) with an ``rng``, the init lateral is DRAWN
+        instead (:meth:`_flip_room_draw`): uniformly among the laterals of the whole range that keeps the flip room, with the most board
+        stand-offs, in place of the one point the move above lands on."""
         self._flip_room = None
         if not (self._flips_expected() and self._flip_directions()[0] in ("right", "left")):
             return init
@@ -489,6 +524,10 @@ class BlockDesign(SamplerV2):
         sign = 1.0 if self._flip_directions()[0] == "right" else -1.0
         need = sign * abs(float((self.gen("manip_lateral_shifts_m", None) or (0.35, 0.45, 0.25))[0]))
         lo, hi = float(bounds[0]), float(bounds[1])
+        if rng is not None and flip_room_draw_on():
+            drawn = self._flip_room_draw(init, rng, need, lo, hi)
+            if drawn is not None:
+                return drawn
         target = float(init.lateral) + need
         excess = (target - hi) if target > hi else ((lo - target) if target < lo else 0.0)
         half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
@@ -548,6 +587,51 @@ class BlockDesign(SamplerV2):
         log.info("%s: init moved %+.2f m along the edge (lateral %.2f -> %.2f) so the manipulation stance can stand %+.2f m from it within %s%s", self.gp.variant,
                  -sign * m, init.lateral, moved.lateral, need, [round(lo, 2), round(hi, 2)], "" if half is None else f"; board on the top: {fit} ({reason})")
         return moved
+
+    def _flip_room_draw(self, init: Stance, rng: np.random.Generator, need: float, lo: float, hi: float) -> Optional[Stance]:
+        """i7-startdraw 5o.1 (owner 2026-11-08): the init lateral drawn from the WHOLE range that keeps the flip room - every lateral
+        ``L`` of ``[lo, hi]`` (``FLIP_ROOM_STEP`` grid, the drawn lateral included) whose manipulation stance ``L + need`` stays inside
+        ``[lo, hi]``, whose base is on the free floor (:meth:`_shifted_along_edge`), and, with a puzzle board, whose manipulation stance
+        has a board position on the top at the most Phase 2 stand-offs (:meth:`_board_fit`, as the move) - uniformly with ``rng``.
+        The instance's in-frame / visibility / collision checks validate it as they validate the moved init. None (the move as
+        before) when that range is empty or no lateral of it is on the floor. Kit counters ``bd_flip_room_draw.drawn`` /
+        ``.no_range`` / ``.no_floor``; the record (``n_admissible``, the admissible lateral span) goes to ``_flip_room``."""
+        half = 0.5 * float(self._board_geometry()["plate_m"]) if self._has_board() else None
+        lmin, lmax = max(lo, lo - need), min(hi, hi - need)
+        if lmax < lmin - 1e-9:
+            TT._count(self, "bd_flip_room_draw.no_range")
+            return None
+        n = int(math.floor((lmax - lmin) / FLIP_ROOM_STEP + 1e-9))
+        lats = sorted({round(lmin + k * FLIP_ROOM_STEP, 4) for k in range(n + 1)} | {round(lmax, 4)}
+                      | ({round(float(init.lateral), 4)} if lmin - 1e-9 <= float(init.lateral) <= lmax + 1e-9 else set()))
+        scored = []
+        for lat in lats:
+            shift = lat - float(init.lateral)
+            cand = init if abs(shift) < 1e-9 else self._shifted_along_edge(init, shift, "init")
+            if cand is None:
+                continue
+            fit = self._board_fit(cand, need, half) if half is not None else {}
+            scored.append((sum(1 for v in fit.values() if v), lat, shift, cand, fit))
+        if not scored:
+            TT._count(self, "bd_flip_room_draw.no_floor")
+            return None
+        best = max(sc[0] for sc in scored)
+        pool = [sc for sc in scored if sc[0] == best]
+        n_fit, lat, shift, cand, fit = pool[int(rng.integers(len(pool)))]
+        if cand is not init:
+            cand.extras.update(init.extras)
+            cand.extras["flip_room_shift_m"] = float(shift)
+        TT._count(self, "bd_flip_room_draw.drawn")
+        span = [round(min(sc[1] for sc in pool), 4), round(max(sc[1] for sc in pool), 4)]
+        self._flip_room = {"lateral_drawn": round(float(init.lateral), 4), "lateral_bounds": [round(lo, 4), round(hi, 4)], "manipulation_shift_m": need,
+                           "lateral": round(float(cand.lateral), 4), "move_m": round(float(cand.lateral - init.lateral), 4),
+                           "draw": {"n_admissible": len(pool), "n_on_floor": len(scored), "flip_room_range": [round(lmin, 4), round(lmax, 4)],
+                                    "admissible_span": span, "board_stand_offs": n_fit if half is not None else None},
+                           "reason": f"flip-room draw: lateral {lat:.2f} of {len(pool)} admissible in {span} (range keeping the {need:+.2f} m shift "
+                                     f"[{lmin:.2f}, {lmax:.2f}]" + (f", board on the top at {n_fit} of {len(TT.STAND_OFFS)} stand-offs)" if half is not None else ")"),
+                           **({"board_fit": fit} if half is not None else {})}
+        log.info("%s: %s (drawn by Phase 1c at %.2f)", self.gp.variant, self._flip_room["reason"], init.lateral)
+        return cand
 
     def _board_positions(self) -> List[Tuple[float, float]]:
         """``generation.board_base_xy_candidates``: the board centre's (base depth, lateral) at the manipulation stance, in order."""

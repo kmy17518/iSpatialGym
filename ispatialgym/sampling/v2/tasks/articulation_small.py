@@ -51,7 +51,7 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, register, start_draw_active, start_facts
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
@@ -176,6 +176,8 @@ class _MeshSubset:
 
 @register(*SUBTASKS)
 class ArticulationSmall(SamplerV2):
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
+
     def __init__(self, ctx):
         super().__init__(ctx)
         self.direction = "close" if "close" in self.subtask else "open"
@@ -469,8 +471,25 @@ class ArticulationSmall(SamplerV2):
         H_max = float(ext_i[2])
         w_a = 0.5 * float(max(ext_i[0], ext_i[1]))
         margins = {"kind": "articulation_small", "w_a": w_a, "safety": 0.02, "H_max": H_max}
+        self._start_margins = margins
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
+        self._start_search(rng, margins, errors)
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "stable_set": self.stable, "q_init": self.q_init, "q_goal": self.q_goal,
+                                    "required_waypoints": self.required, "passive_from": self.passive_from, "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
+                                    "face_yaw": self.face_yaw, "H_max": H_max, "w_a": w_a})
+
+    def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
+        """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2
+        survivors: free floor, whole-body collision-free) - the target's facing yaw follows the edge -, the work / brace bands, the init
+        trunk (Phase 1b), the lateral (Phase 1c: floor, collision, trunk sweep), the Phase-2 survivors with the target, handle and brace
+        point in frame. Sets ``edge_frame`` / ``init_stance`` / ``manip_candidates`` / ``face_yaw`` and returns True on the first edge that
+        passes; failures go to ``errors`` (a v2-only ``missing_map`` raises). ``sample_template`` runs it with the template seed,
+        :meth:`spa_redraw_start` with the attempt's rng. The joint's init / goal values stay the template's."""
+        H_max, w_a = float(margins["H_max"]), float(margins["w_a"])
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 self.face_yaw = C.wrap_angle(math.atan2(float(-edge.inward[1]), float(-edge.inward[0])) - math.atan2(float(self.facing_local[1]), float(self.facing_local[0])))
@@ -500,18 +519,27 @@ class ArticulationSmall(SamplerV2):
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the target, handle and brace point in frame")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
-                break
+                return True
             except Reject as e:
                 if e.reason == "missing_map" and RB.v2_only():
                     raise  # i7-artic 2026-11-07: the prefix map lookup of _brace_band does not depend on the edge - a miss rejects missing_map
                 errors.append(f"edge {edge.name}: {e}")
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
-        if self.init_stance is None:
-            raise Reject("no_stance", "; ".join(errors)[:1500])
-        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
-                                    "n_manipulation_candidates": len(self.manip_candidates), "stable_set": self.stable, "q_init": self.q_init, "q_goal": self.q_goal,
-                                    "required_waypoints": self.required, "passive_from": self.passive_from, "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
-                                    "face_yaw": self.face_yaw, "H_max": H_max, "w_a": w_a})
+        return False
+
+    def spa_redraw_start(self, rng: np.random.Generator) -> None:
+        """i7-startdraw (owner 2026-11-08 3.5, ``ISPATIALGYM_START_DRAW=1``): this attempt's own edge (the target's facing yaw follows it),
+        init stance and Phase-2 pool from the attempt's ``rng`` - the template's start search (:meth:`_start_search`) with every check it
+        makes; a search that finds none restores the template's facing yaw / bands. The joint values stay the template's. Off: the
+        template's start."""
+        if not start_draw_active(self):
+            return
+        errors: List[str] = []
+        keep = (self.edge_frame, self.init_stance, self.manip_candidates, self.face_yaw, self.bands, self.left_bands)
+        if not self._start_search(rng, self._start_margins, errors):
+            self.edge_frame, self.init_stance, self.manip_candidates, self.face_yaw, self.bands, self.left_bands = keep
+            raise Reject("no_stance", "start_draw: " + "; ".join(errors)[:1500])
+        self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates, face_yaw=round(float(self.face_yaw), 4))
 
     # -- joint states -------------------------------------------------------------------------------------------------
 
