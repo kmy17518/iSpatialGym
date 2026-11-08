@@ -2790,6 +2790,8 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 5 | i7-inside04 (1a4d0604), docs only | 24dde33b, 1b5e5525 | CHERRY-PICKS of the two docs commits a0e41b4b / 1a4d0604; 6d9445a9 (ISPATIALGYM_IORS_FAR_ARM, owner 5h: dropped) is NOT in of-v2maps |
 | 6 | i7-framing (18d78f83) | 6d9c7c15 | DEFAULTS fingertip pre-contact rule (3ada83b0, owner 5.2), CARRY_BAND with the torso-or-skip middle band (5a9c191e / 40e38218, owner 5s.1); CARRY_FRAME_CHECK / standalone CARRY_TORSO_LIFT off |
 | 7 | i7-axialrest (64efe96b; carries i7-brace 9d2ce7e3) | 691086c4 | DEFAULT AXIAL_SETTLED_REST (dee19fcb, owner 5g); BRACE_PROBE / BRACE_PRE_POLICY off; i7-brace's TURN_COVER / OPPOSITE default (59f7967b) comes with i7-brace |
+| 8 | i7-attachdef (5f81fc86) | ab50b82b | DEFAULTS outer_pinch + attach_face_retreat (044715ef, owner 4.1), outer_pinch_preshape (7ac55021 after 71b4d1fc / 599fdad9 / dbd8f4bd / d1ad9cb4, owner 5.1), PUBLISH_AFTER_SCREENS (917f7232, owner 5j) |
+| 9 | i7-cork (1d92b089) | e1b91b94 | customs attachment_03 brace_search false (22a13e67, owner 4.3); the lying90 / hand-over / fallback / early-rest / min-turn routes all off; conflicts in candidates.py (attachdef's defaults + cork's finger_axis_window_m) and attachment.py (memory2's pick hook kept in cork's route draw) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -2808,6 +2810,10 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - brace34b (with merge 7): the axial brace maps of `v2maps_int1_brace34b` (clear-turn + opposite-end library) for board_game, keyboard,
   magazine, paperback s1 / s1x1x2.5; the old ones superseded. Its touch_brace rebuilds wait for i7-brace's own fold.
 - axialrest: the spoon tqqwys's settled-rest push_blade / axial_brace maps (axial_05), shipped with the settled-rest default.
+- attachdef (with merge 8): the 25 entries of `attachdef_20261108/v2maps_ad2` that differ from int2 (owner 4.1 and 5.1 rebuilds), whole entry
+  directories; the int1 teacup / lid builds stay (owner 5.2). The qtfzeq overlay follows the new keys in `$OFH/map_overlay` r3.
+- i7-cork's staged root is not folded. Its extra cork entries serve only the default-off routes. They share the cork's model, so the sampler's
+  entry lookup would see four candidates instead of one.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
 
@@ -2821,8 +2827,12 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
   rejections target_placement 154, no_free_edge 129, goal_check path_collision 21 (i7_lean3 148 / 129 / 31). No regression.
 - int2_2 (trunk_691086c4): axial_05 / 01 / 03 / 04 at i7ar_def's indices, TURN_COVER=1 + OPPOSITE=1 set explicitly until i7-brace's default
   lands; vs i7ar_def 49 / 16 / 11 (0.093 GPU-h per success) and i7ar_pol0 51 / 16 / 13 (0.071).
-- int2_3 (trunk_691086c4): under_small_03 / inside_04 / touching_02 at the framing runs' indices; vs ifr3 21 / 3 / 3 (0.215), 32 / 4 / 4
-  (0.192), ifr_t02_B 25 / 4 / 4 (0.126).
+- int2_2 result: 51 / 16 / 12, 0.083 GPU-h per success (axial_01 11/4/2, _03 6/4/4, _04 14/4/3, _05 20/4/3); i7ar_def 49 / 16 / 11, 0.093. No
+  regression.
+- int2_3 was cancelled 5 min in: the attachdef layer swapped entries while it started. Its three aliases rerun in int2_4.
+- int2_4 (trunk_e1b91b94, own ledger = the branches' indices): under_small_03 / inside_04 / touching_02 (framing: ifr3 21/3/3 0.215, 32/4/4 0.192,
+  ifr_t02_B 25/4/4 0.126), nextto_03 / 04, inside_01 / 02, disembedding_07, attachment_03 (ad_v51 + i7cork2_cur_r 25/4/4 0.164), disembedding_09
+  (ad_race 11/4/4).
 
 ### i7-framing (owner decisions 2026-11-08 5.1 / 5.2): the lifted carry, pre-grasp / pre-contact by the fingertip rule
 
