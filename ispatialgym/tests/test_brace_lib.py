@@ -433,10 +433,13 @@ def test_the_wall_map_cells_are_one_row_per_stand_off_and_the_lookup_stays_in_it
     assert AW.wall_brace_class({"kind": c0["extras"]["kind"], "wrist": c0["extras"]["wrist"]}, sign * 0.3) == c0["class"]
 
 
-def test_the_wall_brace_map_switch_is_off_by_default(monkeypatch):
+def test_the_wall_brace_map_switch_is_on_by_default(monkeypatch):
+    """owner decisions 20261108h 5w.2: ISPATIALGYM_WALL_BRACE_MAP default ON; =0 turns it off."""
     from ispatialgym.sampling.v2.tasks import alignment_wall as AW
 
     monkeypatch.delenv("ISPATIALGYM_WALL_BRACE_MAP", raising=False)
+    assert AW.wall_brace_map_on()
+    monkeypatch.setenv("ISPATIALGYM_WALL_BRACE_MAP", "0")
     assert not AW.wall_brace_map_on()
     monkeypatch.setenv("ISPATIALGYM_WALL_BRACE_MAP", "1")
     assert AW.wall_brace_map_on()

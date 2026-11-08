@@ -330,11 +330,12 @@ def other_arm(arm: str) -> str:
 
 
 def wall_brace_map_on() -> bool:
-    """i7-brace (owner 3.4; default OFF): the brace candidates of a stance come from the ``wall_brace`` contact map (the wall-frame reach map
-    of the validated library entries: :func:`wall_brace_class` feasible at the stance, recorded clear range covering the drawn |delta|) instead
-    of the reach volume; the exact two-arm check is unchanged. Needs the contact maps (``tabletop.contact_maps_on``: v2only + a maps root);
-    a missing map keeps the reach-volume rule (kit ``wall_brace_map.miss``). ``ISPATIALGYM_WALL_BRACE_MAP=1``."""
-    return os.environ.get("ISPATIALGYM_WALL_BRACE_MAP", "0") == "1"
+    """i7-brace (owner 3.4): the brace candidates of a stance come from the ``wall_brace`` contact map (the wall-frame reach map of the
+    validated library entries: :func:`wall_brace_class` feasible at the stance, recorded clear range covering the drawn |delta|) instead of
+    the reach volume; the exact two-arm check is unchanged. Needs the contact maps (``tabletop.contact_maps_on``: v2only + a maps root);
+    a missing map keeps the reach-volume rule (kit ``wall_brace_map.miss``). DEFAULT ON since 2026-11-08 (owner decisions 20261108h 5w.2:
+    the wall maps staged in ``$OFH/v2maps_int1_brace34w``); ``ISPATIALGYM_WALL_BRACE_MAP=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_WALL_BRACE_MAP", "1") == "1"
 
 
 #: the wall_brace map's height tolerance (m: the hinge height above the floor vs the map's)

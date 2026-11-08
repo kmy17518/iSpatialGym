@@ -2451,6 +2451,13 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
     side_high: its below_high entries fail the load); 04 51/2/2 vs 51/2/2 (too_few_visible, not the brace); 05 27/4/4 vs 33/4/4. Brace
     present 14 / 14 in both; where it acted, the map's feasible stances vs the reach volume's: 01 1047 vs 485, 03 137 vs 211, 04 7450 vs
     7155, 05 2953 vs 2709 (of 1886 / 873 / 17420 / 8904 screened). The switch stays default OFF (owner).
+- **Owner 2026-11-08 (decisions 20261108h 5w.1): the wall load test APPROVED** for the `wall_brace` family only: the corner's arc load
+  stopped `brace_press_m` at the braced point after the measured (signed-turn) contact, and its rejection reasons `not_loaded` /
+  `not_braced` / `slipped_past` (4 mm). It already is the code of run 7 (45612c00, `validate_contacts.judge_wall_brace` /
+  `wall_load_stop`, read only for a `wall_brace` library); no shared gate or contact policy changed, no code change.
+- **Owner 2026-11-08 (5w.2): `ISPATIALGYM_WALL_BRACE_MAP` DEFAULT ON** (separate commit; `=0` turns it off), with the wall maps staged in
+  **`$OFH/v2maps_int1_brace34w`** (= v2maps_int1_brace34b + the 8 run-7 wall_brace maps: the root to fold into the integration).
+  Confirmation run: world_vertical 01-05, N 4 v2only on that snapshot and root, no switch in the environment (numbers in DECISIONS).
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
