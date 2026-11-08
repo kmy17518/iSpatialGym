@@ -577,13 +577,14 @@ class Disembedding(SamplerV2):
     def pick_grasps(self) -> List[Any]:
         """The rows the target's pick draws from: ``self.grasps``, without the rows whose fingers stand on a layout part when
         ``ISPATIALGYM_LAYOUT_PAD_CHECK`` is on (:meth:`_layout_pad_screen`, i7-tray 2026-11-08)."""
-        return self._pad_kept if self._pad_kept is not None else self.grasps
+        kept = getattr(self, "_pad_kept", None)  # a sampler built without __init__ (tests) has none
+        return kept if kept is not None else self.grasps
 
     def _part_pieces_in(self, name: str, pose, target_pose) -> List[HullObstacle]:
         """The convex collision pieces of the layout part ``name`` at the layout pose ``pose``, in the frame of the target at
         ``target_pose`` (the part's pieces read off its body wherever it is, relative to its root)."""
         o = self.objects[name]
-        backend = getattr(getattr(self.ikc, "kit", None), "backend", None) or getattr(self.kit, "backend", None)
+        backend = getattr(getattr(getattr(self, "ikc", None), "kit", None), "backend", None) or getattr(getattr(self, "kit", None), "backend", None)
         root = SS._root(o)
         if backend is None or root is None:
             return []
