@@ -1297,8 +1297,44 @@ class Attachment(SamplerV2):
                     fails["carry"] += 1
                     self._route_count("carry_failed")
                     continue
+            # the hand-over's own chains again with the partner standing at this cell (they were searched with it parked): the pick, the
+            # right hand's carry to the hand-over, the left hand's grasp there
+            why = self._handover_chains_with_partner(manip, m_pose, ho)
+            if why is not None:
+                fails[f"partner_blocks_{why}"] = fails.get(f"partner_blocks_{why}", 0) + 1
+                self._route_count(f"partner_blocks.{why}")
+                continue
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "start": start, "q_attach": res.q, "slerp_policy": r_w.reason}
         return None
+
+    def _handover_chains_with_partner(self, manip: Stance, m_pose: TT.Pose, ho: Dict[str, Any]) -> Optional[str]:
+        """The pick [pre-grasp, grasp], the right hand's tracked carry to the hand-over and the left hand's [pre-grasp, grasp] there (the right
+        arm locked, the male out of the world as in :meth:`_handover_search`) with the partner where it now stands; the first that fails
+        (``pick`` / ``carry`` / ``left``) or None."""
+        male, support = self.obj(self.t_role), self.obj("support")
+        grasp, scale = ho["grasp"], self.choice.models[self.t_role].scale
+        male.set_position_orientation(*m_pose)
+        male.keep_still()
+        self.kit.sync_world()
+        r = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", ignore_for_last=[support, male], cache=False, scale_key=scale)
+        if not r.ok:
+            return "pick"
+        with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+            with attached(self.kit, "right", male):
+                r = self.ikc.waypoints_ok([ho["lift"]] + list(ho["wps_r"]), manip, "right", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
+        if not r.ok:
+            return "carry"
+        male.set_position_orientation(TT._t(ho["M"][0]), TT._t(ho["M"][1]))
+        male.keep_still()
+        self.kit.sync_world()
+        try:
+            with self.ikc.ignoring([male]):
+                r = self.ikc.exact([ho["pre_l"], ho["H_l"]], manip, "left", q_seed=ho["q_r"], cache=False, scale_key=scale)
+        finally:
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+        return None if r.ok else "left"
 
     def _sample_with_handover(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
         """i7-cork route (i) (owner decision 2026-11-08 4.2 (i)): the male rests wide end down; the right hand pinches its narrow (mating) end
@@ -1323,6 +1359,7 @@ class Attachment(SamplerV2):
         self.kit.sync_world()
         self._record_pinch_width(grasp, m_pose)
         ho = self._handover_search(rng, manip, m_pose, grasp, cam_manip)
+        ho["grasp"] = grasp
         g_l = ho["g_l"]
         idx = self.kit.robot.arm_control_idx
         # the records first (the carried drive to a place stance attaches the male to the LEFT hand per its record)
