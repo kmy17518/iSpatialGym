@@ -2577,6 +2577,39 @@ Every instance was written in both arms of every alias.
   - under_large_03: the 5 % projection of the pre-place fingertip at C's acceptance, and of the grasp eef at B's.
 
 
+### r2: the cap default, and the start draw's stance A redrawn within the attempt (lead decisions #33-36, 2026-11-08)
+
+- #33: `ISPATIALGYM_ATTEMPT_CAP` is the default (69d70a41, in its own commit); `=0` = no cap.
+- #34: `ISPATIALGYM_STANCE_MEMO` / `ISPATIALGYM_FLOOR_REDRAW` stay off, in the code.
+- #35: 5x.4 is deferred to the owner.
+- #36: the start draw's `no_stance` (a bug of the i7-startdraw default, merged here at 1ba40aae).
+
+**Diagnosis.**
+- `run_instances` charges every start-draw rejection (0.3-0.9 s) as one of the instance's 15 attempts. sm_a lost two under_large_03
+  instances this way: each ran out of its 15 attempts after 8-9 `no_stance`.
+- Why stance A fails: new per-bearing counters (r2_sd1, under_large_03) split the failed bearings as follows:
+  - 78 % off the eroded free floor or the task rooms;
+  - 19 % with no straight trunk seeing the target and the partner region;
+  - 1 % colliding.
+- The 0.6-1.5 m ring around the template's c_t (beside a cubicle desk) is mostly not free floor, so one draw of 30 bearings finds A with
+  p ~ 1/3.
+
+**Fix (b2a51679).**
+- `ISPATIALGYM_START_DRAW_A_REDRAWS` (default 8; `0` = the single draw): up to 8 more draws of stance A and its A -> B leg inside the
+  attempt's start draw.
+- Kit counters `start_draw.redraws`, `start_draw.redraw.<reason>`, `start_draw.no_stance_final`, `stance_a.reject.<floor|frame|body|sweep>`.
+
+**A/B** (trunk_b2a51679, cap on in both arms, v2maps_int2, v2only N 4, svl titanrtx):
+
+| alias | single draw (r2_sd1) | + 8 redraws (r2_sd9) | counters |
+|---|---|---|---|
+| under_large_03 | 30 / 4 / 1, 0.99 GPU-h, 19 no_stance attempts | 17 / 4 / 0, 1.30 GPU-h, 1 no_stance | 27 redraws (24 no_stance, 3 no_transition), 1 no_stance_final |
+| ontop_large_02 (control) | 26 / 3 / 3, 2.10 GPU-h, 5 start rejections, 1 instance lost | 11 / 4 / 4, 0.96 GPU-h, 0 | 1 redraw |
+
+- Start-draw attempts charged: 24 -> 1. Instances lost: 1 -> 0.
+- GPU-h per success over both aliases: 0.77 -> 0.57, inside the ~15-point N 4 noise. under_large_03's ok count is held back by the
+  oracle push.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
