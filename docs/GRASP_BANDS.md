@@ -2680,6 +2680,25 @@ pose). 0 written in every arm so far: after a carry the C tries end at B's exact
 attached place IK - the next blockers, outside the carry. umb2 vs umb2s: 23 att / 5 carries vs 30 / 15, both 0 written - umb2 stays primary
 until the final numbers.
 
+**Final A/B (root umb2, N 4, svl titanrtx):** OFF 60 att / 0 written / 0 ok, 5.07 GPU-h (carry legs failed 828); CENTRED 60 / 0 / 0, 5.88
+(782; 96 centred carries); CENTRED + WIDE 46 / 1 / 1, 3.39 GPU-h per success (140; 354 wide paths, 331 centred carries). umb2s (L2) 60 / 0 / 0.
+
+### Lead decision #42 (2026-11-08, owner away)
+
+**(1) f9f0829f - CARRY_CENTRED + CARRY_WIDE_PATH on for touching_large_02 only.** `generation.carry_centred` / `carry_wide_path` true in its
+customs entry; `iors_large._switch` reads the env var when it is set (so `=0` turns a switch off), else the alias's generation key, else
+off. A test pins touching_large_02 as the only customs entry setting them; other IORS large aliases reach the code with the keys absent.
+umb2 stays the umbrella root.
+
+**(2) The B blocker, `B: [pre-grasp, grasp] exact IK`** (gm_t02_wide_on, 106 failure lines, first try's reason): approach_untrackable 67,
+every one a self-collision of the robot's base_link with a gripper finger (2-4 mm) at every intermediate approach configuration - the tilted
+top grasps top_0 / top_10 (27-33 deg) at the deep-crouch B trunks (0.95, -0.9 / -1.2) and the stretched (1.75 / 2.0, 0): the floor umbrella
+close to the chassis, not the hall tree or the mirror; ik_joint_limit 33 (joint 2: reach at the floor); no solution 6. The floor map's
+approach check has no base_link x finger term. Fix: the ladder's next round - L3v (the gym shoe's L3 levels + the accepted slab_half_m 0.05,
+max_valid 12): 12 of 12 trials valid, tilts 14-35 deg incl. three low-tilt grasps (top_0 14, top_33 15, top_32 19); maps (floor r + l,
+interior r / l) on trunk_f9f0829f; staged `$OFH/v2maps_goalmaps_umb3` (copy of umb2, the L2v entry in `_superseded_ladder_r2`) by
+`umbrella_r3/chain3.sh`, which then runs touching_large_02 N 4 on the new defaults (gm_t02_r3, no env switch).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
