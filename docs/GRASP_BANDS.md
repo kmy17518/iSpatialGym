@@ -2411,6 +2411,92 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
 
+## The start base per attempt (branch `i7-startdraw`, owner decision 2026-11-08 3.5)
+
+Owner 3.5 (verbatim): "templates should never fix the robot's start base. so alignment-axial, articulation open/close small, attachment,
+block_design, disembedding, all IORS large (inside, ontop, under, nextto, touching), IORS small (inside, nextto, ontop, touching, under)
+should all be drawn per attempt." It replaces the options (a) turn classes / (b) repeat path for axial_02 (57 of 60 attempts rejected
+`repeats_eval`: both eval instances sit at the template's start base; the push map admits start deviations of 22-34 deg, inside the repeat
+window 18.6-40.1 deg).
+
+### Audit (diagnosis before the change; file:line at of-v2maps cf1f5d2d)
+
+The robot's start base is the `init` stance. `ISPATIALGYM_START_PER_ATTEMPT=1` (train85, core.py:71) is set by `submit_fast.py:228` for
+EVERY registry alias and every counted alias of these families (all but nextto_large_02), and `SamplerV2.sample` (core.py:381) then calls
+the `spa_redraw_start` hook each attempt - but on the trunk only IORS small overrides it. train85's spa2 patch (train85/patches/make_spa.py)
+had ports for axial / attachment / block design / small articulation / disembedding / IORS large; they lived only in the train85 snapshots
+and never reached the trunk. So today:
+
+| family | start source today | constraints the start passes today | file:line |
+|---|---|---|---|
+| alignment-axial | TEMPLATE: `sample_template` draws edge / lateral from `default_rng(base_seed)`; every attempt reuses it | §4.2 edge stance on free floor + whole-body collision-free (`edge_candidates`); Phase 1b trunk; Phase 1c lateral: floor, collision (translate retry), trunk sweep; reference edge >= 3 / 9 points in frame and unoccluded from init (<= 8 laterals, translate moved in range); Phase 2 survivors see the front edge; per instance: edge visible with the target placed from init AND manipulation, target in the init image | alignment_axial.py:150-221, 171, 173, 197; instance 317, 552 |
+| articulation open / close small | TEMPLATE (the target's facing yaw follows the template's edge) | §4.2, 1b, 1c as above; Phase 2 with target / handle / brace point in frame (`_target_in_frame`); a v2-only prefix-map miss rejects; per instance: target in the init image (`view_margin_m`) | articulation_small.py:347, 471-504; instance 1272-1281 |
+| attachment | TEMPLATE | §4.2, 1b, 1c; Phase 2 + `_with_partner_room` (a partner cell at the gap); per instance: the partner in the init image; `_candidate_rejects` memory keyed by candidate index | attachment.py:385, 459-485; instance 745, 781, 1416 |
+| block_design | TEMPLATE | §4.2, 1b, 1c; `_init_with_room_for_flips` (lateral moved for the flip shift / board fit); Phase 2 region survivors (`_region_in_frame`, depth caps) at the manipulation lateral shifts, shallow trunks kept without flips; per instance: every block in the init image; `_stance_pool` = trunk variations along the edge DURING the instance (not the start) | block_design.py:240-308; instance 709, 906, 969-972 |
+| disembedding | TEMPLATE (destination side drawn per template / `generation.destination_side` for eval) | every edge with a free-floor run (1/3 of the 10 cm raster), 1b, 1c with the destination-side margins; segment arms; Phase 2 with the source tray in frame and the destination tray fitting beside it (`_destination_fit` as `keep_pairs`); per instance: the destination 4 cm inside the init image, every other object in frame | disembedding.py:679-723; instance 1038-1057 |
+| IORS large ontop / under / inside / touching (push-under, lean, surface) | TEMPLATE: `bind_init_surface` -> `try_surface` -> `try_support_surface` (edge, lateral <= 6 redraws until the goal region is in frame, or `free_start`; Phase 2) or `try_floor_surface` (anchor c_t, stance B facing it, stance A on the eroded map with target + partner in frame, A -> B leg); `generation.init_setup_draws` = more TEMPLATE draws | §4.2, 1b, 1c; the partner's relevant region in frame from A (`goal_region_visible`, `partner_view_min_points`); the stance-C existence test of the template; per instance: target in the init image, A -> B leg, B -> C carry | iors_large.py:1112-1145, 2246-2325, 2286-2292, 2375-2451, 2600; instance 3512, 5350-5352 |
+| IORS large nextto, touching base push (`TouchingBasePushMode`) | PER ATTEMPT already: stance A drawn per goal candidate in the attempt's draw (`_stance_a`: free eroded floor, bearing / distance, target + goal in frame, body-free, trunk sweep) | as listed | iors_large_nextto.py:1081, 1213 |
+| IORS small (all five) | PER ATTEMPT already under START_PER_ATTEMPT=1 (every alias of the family): `spa_redraw_start` / `_spa_redraw_start_cached` (SPA_CACHE lateral cells), shelf_start_draw layouts per attempt; template start otherwise | edges with a free-floor run, 1b, 1c, Phase 2 cut to the A1 start region (lateral redrawn), the shelf rules (`shelf_width`, leans); SPLIT_CONE_RESTORE / `_spa_drawn` (core.py:392); per instance: target and partner in the init image (§4.6 step 4), partner placement incl. "partner not in the init image" | iors_small.py:1618-1636, 1928-1980, 1982-2058; instance 2277-2280, 2460 |
+
+Shared by all: the eval-repeat check (`instance_separation.find_repeat`: start base <= 0.25 m / 15 deg of an eval instance AND every
+compared orientation <= 0.1 rad; early on the draft `check_early_repeat` core.py:1330, final on the written TRO `check_instance_filter`
+core.py:1362); the init -> manipulation travel (`record_stance_travel` / `record_edge_travel`, path length / collision) and the back-off /
+transit rules in `sample_instance` (they read the attempt's init); the trajectory recorder's start = the TRO's `robot_poses` and the
+sidecar `init` stance written per instance (`write_instance`; under start-per-attempt `template_meta.start_per_attempt` = no template-level
+start). The collectors read the instance's TRO, so a per-attempt start needs no collector change.
+
+### Change (switch `ISPATIALGYM_START_DRAW`, default off in d80e7e07, ON since the default commit)
+
+- One switch for all families: `core.start_draw_on()`; `SamplerV2.START_DRAW_FAMILY` marks the families (True on AlignmentAxial,
+  ArticulationSmall, Attachment, BlockDesign, Disembedding, IORSLarge, IORSSmall; False on the nextto / base-push modes, which draw
+  stance A per attempt already). `start_per_attempt(s)` is also True for such a sampler under the switch (so the hook runs without
+  train85's variable too).
+- No new search: each family's start loop of `sample_template` is moved VERBATIM into `_start_search(rng, ...)` (axial, attachment,
+  block design, articulation small, disembedding) - `sample_template` calls it with the template seed as before (same rng stream, same
+  results), `spa_redraw_start` with the attempt's rng under the switch. IORS large: `spa_redraw_start` reruns `try_floor_surface` /
+  `try_support_surface` on the template's bound init surface (the support's top reused); the template's stance-C existence test is not
+  repeated (the attempt draws its stance-C pool itself). IORS small: its existing draw, unchanged (`spa_draw` now times it).
+  Every check of the reused code stays: free floor, collision, trunk sweep, the camera-frame rules (never relaxed), the eval-repeat check,
+  the travel / back-off rules of the instance. A search that finds no start rejects the attempt (`no_stance` / the family's reason);
+  articulation / disembedding / IORS large then keep the previous start's state.
+- Kit counters (only under the switch): `start_draw.drawn`, `start_draw.edge.<edge>`, `start_draw.rejected.<reason>`,
+  `start_draw.repeat_passed` / `start_draw.repeat_rejected` (the repeat-check outcome of every written / early-checked draft); the log
+  line `START_DRAW: start drawn {...}` and `summary.start_per_attempt` carry the drawn base pose / edge / lateral / trunk (the spread).
+- Not drawn per attempt (out of the rule's scope): the joint goal value (articulation), the destination side and tray flips
+  (disembedding) - train85's patch drew those too.
+- Tests: ispatialgym/tests/test_start_draw.py (off = the template's start and the rng untouched; on = a different start per attempt
+  per family; every drawn start passes the fake phases' rules AND the family's own rule in the reused code).
+- IORS large FLOOR init (d50cb1b9, after the first A/B): only the robot's stance A is redrawn (`floor_stance_a` around the template's
+  anchor c_t + the A -> B leg); c_t is the TARGET's start cell. Rerunning `try_floor_surface` redrew c_t too: touching_large_03 sd_on
+  attempt 0 no_floor_cell (0 of the 40 drawn anchors within the geodesic), attempts 1 / 2 time_budget 1500 s at C (job cancelled).
+
+Evidence for the audit (int1_1 / 3 / 4 / 6, written instances): 1 distinct start base per alias for axial, attachment, articulation small,
+disembedding, IORS large; 2-4 per alias (= written) for IORS small and the nextto / touching small aliases.
+
+### A/B (2026-11-08, $OFH/startdraw_20261108; sd_off vs sd_on = `--extra-env ISPATIALGYM_START_DRAW=1`, trunk_d80e7e07, the floor pair
+### sd2_* on trunk_d50cb1b9; --grasps v2only on the staged copy v2maps_startdraw; N 4, base index 300500 in both arms; titanrtx)
+
+| alias | off att / wr / ok, GPU-h | on att / wr / ok, GPU-h | drawn starts (on) | repeats_eval off -> on |
+|---|---|---|---|---|
+| alignment-axial_02 | 60 / 0 / 0, 0.29 | 25 / 3 / 3, 0.33 (0.11 / success) | 25 draws, edge +u only (the others fail 1a / the edge rule), lateral span 0.37 m | 46 / 60 -> 11 / 25 (start_draw.repeat_rejected 11, passed 3) |
+| articulation_open_small_01 | 6 / 4 / 4, 0.18 | 6 / 4 / 4, 0.16 | 6 draws, edges +v 4 / -v 2 (yaw 180 apart), x 5.39-9.19 | 0 -> 0 |
+| attachment_01 | 9 / 4 / 4, 0.45 | 11 / 4 / 4, 0.48 | 11 draws, edges -v 7 / +v 3 / +u 1 | 0 -> 0 |
+| block_design_01 | 60 / 0 / 0, 0.55 | 45 / 2 / 0 (oracle timeout x2), 2.25 | 45 draws, edge +v only (`init_edges`), lateral 3.55-3.57: `_init_with_room_for_flips` moves every drawn lateral to the board-fit position | 0 -> 0 |
+| disembedding_02 | 6 / 4 / 4, 0.37 | 7 / 4 / 4, 0.72 | 7 draws, edges -u 5 / +u 2, 4 distinct written starts | 0 -> 0 |
+| ontop_large_03 (support init) | 8 / 4 / 4, 0.28 | 8 / 4 / 4, 0.22 | 6 draws + 2 rejected no_free_edge, edge +v, x span 0.70 m | 0 -> 0 |
+| touching_large_03 (floor init, sd2) | 4 / 4 / 3, 0.23 | 4 / 4 / 4, 0.28 | 4 draws, stance A x span 1.2 m, yaw span 64 deg | 0 -> 0 |
+| ontop_small_02 (IORS small, unchanged path) | 7 / 4 / 3, 0.43 | 6 / 4 / 4, 0.38 | 6 draws, edges +u 5 / -u 1 (off: 4 distinct starts as well) | 0 -> 0 |
+
+The draw acts in every family (start_draw.drawn on every attempt; distinct written starts 2-4 per alias where off had 1) and no existing
+constraint broke: no not_in_frame / collision / path rejection appeared or grew (the new reason is the draw's own no_free_edge 2 on
+ontop_large_03; attachment's trembling 2 is the settle). Block design draws but its flip-room rule pins the lateral (2 cm spread) -
+varying it would mean changing that rule (owner). axial_02: the repeat share fell 77 % -> 44 %; the remaining repeats are draws on the
+same edge within 0.25 m of the eval start (the edge rule leaves +u only). GPU-h on block design rose (2 instances got to the demo).
+DEFAULT ON (owner 3.5 decided the rule): separate commit; `ISPATIALGYM_START_DRAW=0` restores the template's start. touching_03 (open
+question, i7-t03): IORS small's draw is the same code with or without the switch, so its "partner not in the init image" rejects
+(the start lateral 0.35-0.40 m from the bay) are unchanged; a bay-centred lateral would plug into `_spa_redraw_start_cached` /
+`spa_redraw_start` (core `spa_draw` counts it).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

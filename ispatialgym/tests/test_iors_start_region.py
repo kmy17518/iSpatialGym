@@ -228,7 +228,9 @@ def test_side_is_fixed_before_the_target_eval_assigned_train_uniform(monkeypatch
     s.region_sides = []
     with pytest.raises(Reject):
         s.draw_partner_side(rng)
-    # the attempt draws the side before anything else is sampled (the split cone's position and the target come after)
+    # the attempt draws the side before anything else is sampled (the split cone's position and the target come after); the stub has no
+    # start search: the template's start (i7-startdraw: ISPATIALGYM_START_DRAW=0)
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "0")
     seen = []
     monkeypatch.setattr(IS.SamplerV2, "sample", lambda self, rng: seen.append(self.region_side) or "draft")
     s.region_sides = [-1.0]

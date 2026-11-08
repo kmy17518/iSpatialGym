@@ -620,6 +620,7 @@ def place_approached(s, inside: Optional[bool] = None) -> List[Any]:
 @register(*RELATION_OF_SUBTASK)
 class IORSSmall(SamplerV2):
     """One class for the five small-scale relations; the relation comes from the subtask id."""
+    START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
 
     @property
     def overhang_fallback_enabled(self) -> bool:
@@ -894,7 +895,7 @@ class IORSSmall(SamplerV2):
                                                                           + " / ".join(TT.side_name(sd) for sd in self.template_sides())))
         if "start_region" in self.template_facts:
             self.template_facts["start_region"]["failed_lateral_draws"] = failed
-        if not self.manip_candidates and start_per_attempt():
+        if not self.manip_candidates and start_per_attempt(self):
             self.spa_template_start(failed)
         if not self.manip_candidates:
             if not phase2_any:
@@ -1623,12 +1624,8 @@ class IORSSmall(SamplerV2):
             # oracle-fix 2026-11-06 (generation.shelf_start_draw): the board the target leans against first - it names the working arm, whose
             # band this attempt's Phase 2 reads
             self.draw_shelf_side(rng)
-        if start_per_attempt():  # this attempt's start first: the partner sides come from its start region
-            import time
-
-            t_spa = time.time()
-            self.spa_redraw_start(rng)
-            self._spa_draw_s = time.time() - t_spa
+        if start_per_attempt(self):  # this attempt's start first: the partner sides come from its start region
+            self.spa_draw(rng)  # timed (_spa_draw_s); i7-startdraw: the START_DRAW counters
             self._spa_drawn = True
         if shelf_draw:
             self.draw_shelf_layout(rng)  # the compartment and the leans: the two books' poses follow the attempt's edge
@@ -1656,7 +1653,7 @@ class IORSSmall(SamplerV2):
         ``region_sides``. Recorded in ``template_meta.travel_dropped`` and the counter ``travel_dropped``."""
         why = f"[{err.reason}] {err}"
         cand.extras[TRAVEL_DROPPED] = why[:400]
-        if start_per_attempt() and fast_on("SPA_CACHE"):
+        if start_per_attempt(self) and fast_on("SPA_CACHE"):
             # train-fast 2026-10-31: a reused lateral cell hands out fresh copies of its candidates, so the mark above does not carry; the
             # candidate's identity does (:meth:`_spa_apply_cell` filters it out of every later reuse in this process)
             self.__dict__.setdefault("_spa_dropped", set()).add(self._spa_drop_key(cand))
@@ -3078,7 +3075,7 @@ class IORSSmall(SamplerV2):
         return {"layouts": [[bay, TT.side_name(sd)] for bay, sd in spec["layouts"]], "lean_deg": spec["lean_deg"], "spine_behind_edge_m": spec["spine_behind_edge_m"],
                 "tries": spec["tries"], "template_layout": [float(bays.get(self.support.name, 0.0)) if isinstance(bays, dict) else 0.0,
                                                             TT.side_name(self._shelf_template["lean_side"])],
-                "mirror": bool(start_per_attempt()) and any(sd != self._shelf_template["lean_side"] for _, sd in spec["layouts"])}
+                "mirror": bool(start_per_attempt(self)) and any(sd != self._shelf_template["lean_side"] for _, sd in spec["layouts"])}
 
     def shelf_use_arm(self, arm: str) -> None:
         """The shelf layout's working arm (owner 2026-10-11 11:46): the arm on the target's side grasps, places and pushes, the other arm has no
@@ -3112,7 +3109,7 @@ class IORSSmall(SamplerV2):
         fixed = (-1.0 if assigned == "left" else 1.0) if assigned in ("left", "right") else None
         if fixed is not None:
             why = f"generation.partner_side {assigned}: the target on the {TT.side_name(fixed)} board"
-        elif not start_per_attempt():
+        elif not start_per_attempt(self):
             fixed, why = float(base["lean_side"]), "no start_per_attempt: the template's arm and candidates"
         lean_side = TT.lean_rest_side(getattr(self, "grasp_key", None))
         if lean_side is not None:  # i7-lean 2026-11-07: a v2 lean rest leans on one board (its grasps and its map are that rest's)
