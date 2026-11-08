@@ -719,8 +719,8 @@ CARRY_WIDE_PATH_ENV = "ISPATIALGYM_CARRY_WIDE_PATH"
 CARRY_WIDE_PATH_EROSIONS_M: Tuple[float, ...] = (0.15, 0.30)
 
 
-def carry_wide_path_on() -> bool:
-    return os.environ.get(CARRY_WIDE_PATH_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+def carry_wide_path_on(gp: Any = None) -> bool:
+    return _switch(CARRY_WIDE_PATH_ENV, gp, "carry_wide_path")
 
 
 def carry_sideways_on() -> bool:
@@ -736,8 +736,20 @@ def sideways_offsets(from_xy: Sequence[float], to_xy: Sequence[float], to_yaw: f
 CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
 
 
-def carry_centred_on() -> bool:
-    return os.environ.get(CARRY_CENTRED_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+def _switch(env: str, gp: Any, key: str) -> bool:
+    """An opt-in carry switch: the env var when set (1 / on / true / yes = on, anything else off), else the alias's ``generation.<key>``
+    (lead decision #42, 2026-11-08: the alias-scoped default - only touching_large_02's customs set carry_centred / carry_wide_path), else off."""
+    v = os.environ.get(env)
+    if v is not None and v.strip() != "":
+        return v.strip().lower() in ("1", "on", "true", "yes")
+    try:
+        return bool(gp.gen(key, False)) if gp is not None else False
+    except Exception:  # noqa: BLE001 - a stand-in gp without generation keys
+        return False
+
+
+def carry_centred_on(gp: Any = None) -> bool:
+    return _switch(CARRY_CENTRED_ENV, gp, "carry_centred")
 
 
 def centred_hand_lateral(eef: Any, eef_in_object: Any, hull_local: Optional[th.Tensor], left: th.Tensor) -> float:
@@ -3352,7 +3364,7 @@ class IORSLarge(SamplerV2):
         k_plain = len(variants) - 1
         if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
             variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
-        if carry_wide_path_on():  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
+        if carry_wide_path_on(self.gp):  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
             variants += [{"global_extra_erosion_m": w} for w in CARRY_WIDE_PATH_EROSIONS_M]
         chosen: Dict[str, Any] = {}
 
@@ -3479,7 +3491,7 @@ class IORSLarge(SamplerV2):
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
         cands = [(ahead, lat, raise_m, False) for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm)]
-        if carry_centred_on():  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
+        if carry_centred_on(self.gp):  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
             lat_c = centred_hand_lateral(lift, eef_in_object, self.hull, left)
             cands = [(a, lat_c, r, True) for a, r in CARRY_CENTRED_POSES] + cands
         self._carry_centred_n = 0

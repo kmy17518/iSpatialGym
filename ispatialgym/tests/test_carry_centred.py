@@ -93,3 +93,40 @@ def test_erode_more_grows_the_obstacles_by_a_square_kernel():
     out = NAV.erode_more(free, 2)
     assert not out[3:8, 3:8].any() and out[2, 5] and out[5, 8] and out[0, 0]
     assert th.equal(NAV.erode_more(free, 0), free)
+
+
+# ---------------------------------------------------------------------------------------------- lead decision #42: alias-scoped defaults
+
+
+class _GP:
+    def __init__(self, gen):
+        self._g = dict(gen)
+
+    def gen(self, key, default=None):
+        return self._g.get(key, default)
+
+
+def test_the_customs_key_turns_a_switch_on_and_the_env_overrides_it(monkeypatch):
+    monkeypatch.delenv(IL.CARRY_CENTRED_ENV, raising=False)
+    monkeypatch.delenv(IL.CARRY_WIDE_PATH_ENV, raising=False)
+    on = _GP({"carry_centred": True, "carry_wide_path": True})
+    assert IL.carry_centred_on(on) and IL.carry_wide_path_on(on)
+    assert not IL.carry_centred_on(_GP({})) and not IL.carry_wide_path_on(_GP({})) and not IL.carry_centred_on(None)
+    monkeypatch.setenv(IL.CARRY_CENTRED_ENV, "0")
+    monkeypatch.setenv(IL.CARRY_WIDE_PATH_ENV, "0")
+    assert not IL.carry_centred_on(on) and not IL.carry_wide_path_on(on)
+    monkeypatch.setenv(IL.CARRY_CENTRED_ENV, "1")
+    assert IL.carry_centred_on(_GP({}))
+
+
+def test_only_touching_large_02_sets_the_carry_switches_in_the_customs():
+    import json
+    import os
+
+    from ispatialgym import REPO_ROOT
+
+    d = json.load(open(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")))
+    setters = sorted(k for k, v in d.items() if isinstance(v, dict) and any(x in (v.get("generation") or {}) for x in ("carry_centred", "carry_wide_path")))
+    assert setters == ["inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor"], setters
+    g = d[setters[0]]["generation"]
+    assert g["carry_centred"] is True and g["carry_wide_path"] is True
