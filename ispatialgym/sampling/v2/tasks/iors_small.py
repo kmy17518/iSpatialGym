@@ -4972,7 +4972,7 @@ class IORSSmall(SamplerV2):
           torso lift (below) rescues it;
         - ``ISPATIALGYM_CARRY_TORSO_LIFT=1`` (5.1 / 5d.2): where only the arm lift leaves the frame (the straight carry framed),
           :meth:`carry_torso_lift` is recorded as ``grasps[].carry_torso`` (the oracle executes it on the via-above); alone it never rejects;
-        - ``ISPATIALGYM_CARRY_BAND=1`` (5d.3, the middle option): the straight carry's NOMINAL protect margin (:meth:`carry_nominal_margin`,
+        - ``ISPATIALGYM_CARRY_BAND`` (5d.3, the middle option; DEFAULT ON since 5s.1, ``0`` = off): the straight carry's NOMINAL protect margin (:meth:`carry_nominal_margin`,
           ``carry_margin.carry_protect_margin``) picks the band - ``above`` (the lift almost surely does not fire): no check; ``below``
           (it fires most often): the check, out of frame -> reject; ``near``: the torso lift when possible (it costs nothing when the
           lift does not fire and keeps the frame when it does), else the check is SKIPPED, never a reject (owner 2026-11-08 5s.1: the

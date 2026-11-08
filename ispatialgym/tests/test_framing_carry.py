@@ -140,7 +140,11 @@ def test_oracle_reads_carry_torso_only_with_its_switch(monkeypatch):
     ctx = {"sidecar": SimpleNamespace(grasps=[g])}
     act = SimpleNamespace(object="plate_0", arm="right")
     monkeypatch.delenv(EX.CARRY_TORSO_LIFT_ENV, raising=False)
+    monkeypatch.setenv(EX.CARRY_BAND_ENV, "0")
     assert EX._carry_torso_record(act, ctx) is None
+    monkeypatch.delenv(EX.CARRY_BAND_ENV, raising=False)  # the band is the default (5s.1): its recorded torso lift is executed
+    assert EX._carry_torso_record(act, ctx) == (0.5, -0.19)
+    monkeypatch.setenv(EX.CARRY_BAND_ENV, "0")
     monkeypatch.setenv(EX.CARRY_TORSO_LIFT_ENV, "1")
     assert EX._carry_torso_record(act, ctx) == (0.5, -0.19)
     g.extra = {}
@@ -166,9 +170,11 @@ def _clear_switches(monkeypatch):
         monkeypatch.delenv(env, raising=False)
 
 
-def test_band_switch_off_is_today(monkeypatch):
+def test_band_is_the_default_and_0_turns_it_off(monkeypatch):
     _clear_switches(monkeypatch)
-    assert not PC.carry_band_on() and not PC.carry_frame_check_on() and not PC.carry_torso_lift_on()
+    assert PC.carry_band_on() and not PC.carry_frame_check_on() and not PC.carry_torso_lift_on()  # owner 5s.1: the default
+    monkeypatch.setenv(PC.CARRY_BAND_ENV, "0")
+    assert not (PC.carry_frame_check_on() or PC.carry_torso_lift_on() or PC.carry_band_on())  # off = the rule before: no lifted-carry look
 
 
 def test_band_edges():
@@ -211,6 +217,7 @@ def test_band_near_takes_the_torso_lift_else_skips(monkeypatch):
 
 def test_torso_only_mode_never_rejects(monkeypatch):
     _clear_switches(monkeypatch)
+    monkeypatch.setenv(PC.CARRY_BAND_ENV, "0")  # the band is the default since 5s.1: the torso-only mode is the band off
     monkeypatch.setenv(PC.CARRY_TORSO_LIFT_ENV, "1")
     s, st, draft, g = _carry_fake(None, torso=None)
     s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)

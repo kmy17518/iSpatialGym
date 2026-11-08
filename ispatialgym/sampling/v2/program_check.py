@@ -2200,7 +2200,8 @@ def _env_on(name: str) -> bool:
     return (os.environ.get(name, "") or "0").strip().lower() in ("1", "on", "true", "yes")
 
 
-#: ``1``: the middle option (owner 2026-11-08 5d.3, default off): the straight carry's nominal protect margin picks the band - below
+#: the middle option (owner 2026-11-08 5d.3; DEFAULT ON since 5s.1, ``0`` = the rule before: no lifted-carry check): the straight
+#: carry's nominal protect margin picks the band - below
 #: CARRY_BAND_BELOW_M: the lifted-carry framing check (out of frame -> reject); above CARRY_BAND_ABOVE_M: no check; between: the torso
 #: lift when possible, else NO check (owner 2026-11-08 5s.1: the near band never rejects, the lift fires in ~5 % of its carries)
 CARRY_BAND_ENV = "ISPATIALGYM_CARRY_BAND"
@@ -2212,7 +2213,8 @@ CARRY_BAND_ABOVE_M = 0.009
 
 
 def carry_band_on() -> bool:
-    return _env_on(CARRY_BAND_ENV)
+    """DEFAULT ON (owner 2026-11-08 5s.1); ``ISPATIALGYM_CARRY_BAND=0`` turns it off."""
+    return (os.environ.get(CARRY_BAND_ENV, "") or "1").strip().lower() in ("1", "on", "true", "yes")
 
 
 def carry_band(margin_m: Optional[float], below: float = CARRY_BAND_BELOW_M, above: float = CARRY_BAND_ABOVE_M) -> str:
