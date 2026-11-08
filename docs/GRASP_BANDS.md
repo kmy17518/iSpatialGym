@@ -2708,6 +2708,54 @@ The low boards are reachable only from bent-knee trunks and not at the 0.35 stan
     final line goes to DECISIONS (CPU job 18381965).
 - Suite at ee781f49: 23 failed + 3 errors = the 93229922 baseline; interior tests at c4a6956a all pass.
 
+### i7-inside04 (2026-11-08): inside_04's plan failures past the saucepot are the partner's side, not the new grasps
+
+Owner request 2026-11-08 ("four blocked aliases", item 1): inside_04 went 4/4 -> 4/1 in i7-attachdef's validation (ad_int1 old entries
+vs ad_v with outer_pinch + attach_face_retreat), the 3 failures oracle `plan_failed` (the protected re-plan past the saucepot), and the
+outcome memory showed a pick bin at 0 / 5. Diagnose; hand to i7-attachdef if it is their cause, else fix sampler-side behind a
+default-off switch. Record `$OFH/inside04_20261108` (scripts `grasps_of.py`, `all_runs.py`, `geom.py`, `transit.py`; tables
+`rows.json`, `geom.json`, `transit.json`), DECISIONS "i7-inside04" lines.
+
+**The entry.** `garlic_clove__xotobt__s3.724__tabletop_insert` (legacy key `garlic_clove__xotobt__s`): int1 grasps top_0 / top_1 /
+top_3 (width 25.7 mm, pre-shape 22.9 mm per finger) -> rebuilt top_1 / top_5 (25.7 mm) and the new wide pinches top_8 / top_11
+(47.8 mm, pre-shape 33.9 mm); maps right e7d2ec24 -> 7aa9789a, left ee514a32 -> a54f625e. The failed ad_v demos used top_8~r180
+(right), top_8~r180 (left) and **top_1 (left, the same grasp in both entries)**; the ok one top_8 (right). ad_int1 and ad_v ran
+different indices (300137-140 vs 300141-144), so their draws differ.
+
+**Where it fails.** All 3 at the transit to the pre-grasp (grasp[3]): the straight joint ramp hits the table and the saucepot, the
+transit is planned with the supports ignored, the protected-object check fires (clearance -0.044 / -0.015 / -0.029 m) and the
+via-above re-plan still passes the saucepot.
+
+**The cause: the saucepot on the working arm's side.** The template puts the saucepot beside the clove (same depth, 0.19-0.32 m to the
+side); the partner side is drawn uniformly (A1) and the arm is fixed by the candidate (`arm_offer`: "only arm offered" in nearly every
+demo). Over every inside_04 v2 demo in `$OFH/out` before ad_v (77 demos, 30 tags, the old entry):
+
+| partner vs working arm | demos | ok | plan_failed | first straight ramp to the pre-grasp clear |
+|---|---|---|---|---|
+| on the arm's side | 58 | 31 | 22 | 0 / 58 |
+| on the far side | 19 | 18 | 0 (1 arm_stutter) | 16 / 19 |
+
+By trunk on the arm's side: 0.0 13 / 18, 0.25 17 / 32 (stand-off 0.35: 9 / 21), 0.50 1 / 8 (stand-off 0.35: 0 / 4); on the far side
+trunk 0.50 7 / 7. ad_v drew 4 / 4 arm-side, 3 of them trunk 0.50 / stand-off 0.35 (0 / 3); ad_int1 3 arm-side at trunk 0.0 / 0.25
+plus one far-side (4 / 4). P(at most 1 ok of 4 at the old rate 0.64) = 0.14. Legacy grasps: 9 / 10 ok (arm side 8 / 9, mostly
+stand-off 0.45-0.55). So the regression is the draw, not outer_pinch's width or attach_face_retreat - not i7-attachdef's.
+
+**The pick bin.** The memory2 replays flag (right, 0.25, -0.53, 0.35); the "0 / 5" is the first replay's family finding (left, 0.25,
+-0.53, 0.35, top_3): i_base 300084, i_mfseed 300098 / 300099, i_ctl 300102, i_pol1 300112 - 4 plan_failed + 1 collision at the
+pre-grasp transit, all arm-side - then 2 ok (300122 far side, 300130 arm side). In the left top_3 bin arm side 2 / 7, far side 1 / 1;
+in the right bin arm side 5 / 10. The bin is a proxy for the arm-side draw (far-side draws in the same trunk / stand-off bins: 0.25 /
+0.35 4 / 5, 0.50 / 0.35 7 / 7); it still occurs as such (ad_v 3 / 3).
+
+**The switch (6d9445a9, default off).** `ISPATIALGYM_IORS_FAR_ARM` (`1` = relation `inside`; else a comma list of relations):
+`IORSSmall.sample_instance` tries the attempt's candidates that offer the arm on the far side of the drawn partner side first (each
+group in its drawn order; none removed), and a candidate offering both arms offers the far arm alone. Kit counters
+`far_arm.{consulted, candidates_far, candidates_near, no_far, reordered, restricted, written_far, written_near}`; the draft summary
+records `far_arm`. Off is bit-identical (`offered_arms` is the former inline filter). No oracle, planner, gate or map change. Tests
+`ispatialgym/tests/test_iors_far_arm.py` (the real candidate loop on a stub).
+
+**A/B** (Vast, both arms; trunk_6d9445a9, v2only, `$OFH/v2maps_int1`, `--alias-memory off --no-memory-aggregate`, per-arm ledgers,
+the same indices g332000-3 + g332100-3): arm a `i7in04_a` (off), arm b `i7in04_b` (`ISPATIALGYM_IORS_FAR_ARM=1`). Results below.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
