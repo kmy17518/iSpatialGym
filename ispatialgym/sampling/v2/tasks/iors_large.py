@@ -152,6 +152,7 @@ from ispatialgym.sampling.v2 import contact_poses as CPZ  # i7-contact 2026-11-0
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang as OH
+from ispatialgym.oracle import overpath as OPATH  # i7-overpath 2026-11-08: the overhang pick's recorded transit over the book
 from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
@@ -163,6 +164,66 @@ from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
+
+
+class _PosedObject:
+    """i7-overpath: an object stand-in at a given pose (``get_position_orientation``) - the settled post-push pose the contact escape
+    leaves radially from (``program_check.replay_contact_escape`` reads only that)."""
+
+    def __init__(self, pose):
+        self._pose = (G.t(pose[0]).float(), G.t(pose[1]).float())
+
+    def get_position_orientation(self):
+        return self._pose
+
+
+# ---------------------------------------------------------------------------------------------------- i7-overpath 2026-11-08 (owner 3(b))
+
+
+def overhang_spine_required(s) -> Optional[str]:
+    """Opt-in ``generation.overhang_required_side`` (owner 3(b), the spine guard): the face of the object the v2 overhang entry and every
+    drawn grasp must pinch ("-y" = the hardback's spine); None = off."""
+    req = s.gp.gen("overhang_required_side")
+    if req is None:
+        return None
+    try:
+        OH.side_axis(req)
+    except ValueError as e:
+        raise Reject("spec", f"{s.gp.variant}: generation.overhang_required_side: {e}")
+    return str(req)
+
+
+def overhang_spine_entry(s) -> None:
+    """The spine guard on the v2 overhang entry (:func:`overhang.spine_entry_why`): its side must be the required one, else the attempt is
+    rejected (``overhang_side``; kit ``overhang.side_rejected`` / ``.entry``). No-op when off or without a v2 overhang entry."""
+    req = overhang_spine_required(s)
+    v2 = getattr(s, "v2_overhang", None)
+    if req is None or v2 is None:
+        return
+    TT._count(s, "overhang.side_checked.entry")
+    why = OH.spine_entry_why(req, v2.get("side"))
+    if why is not None:
+        TT._count(s, "overhang.side_rejected")
+        TT._count(s, "overhang.side_rejected.entry")
+        raise Reject("overhang_side", f"{s.gp.variant}: {why} (entry {v2.get('entry')})")
+
+
+def overhang_spine_grasp(s, g) -> None:
+    """The spine guard on a drawn overhang grasp (:func:`overhang.spine_grasp_why`): its pinch - the library row's ``T_object_eef``
+    position - within ``generation.overhang_pinch_edge_max_m`` (0.03) inside the required face of the target's local hull, else the
+    attempt is rejected (``overhang_side``; kit ``overhang.side_rejected`` / ``.grasp``). No-op when off or without a v2 overhang entry."""
+    if getattr(s, "v2_overhang", None) is None:
+        return
+    req = overhang_spine_required(s)
+    if req is None:
+        return
+    TT._count(s, "overhang.side_checked.grasp")
+    mx = s.gp.gen("overhang_pinch_edge_max_m")
+    why = OH.spine_grasp_why(req, getattr(g, "name", g), G.t(g.pose[0]).float(), s.hull, float(mx) if mx is not None else OH.PINCH_EDGE_MAX_M)
+    if why is not None:
+        TT._count(s, "overhang.side_rejected")
+        TT._count(s, "overhang.side_rejected.grasp")
+        raise Reject("overhang_side", f"{s.gp.variant}: {why}")
 
 RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-ontop_large_scale": "ontop",
@@ -1084,6 +1145,7 @@ class IORSLarge(SamplerV2):
         if self.v2_overhang is not None:
             self.template_facts["v2_overhang"] = {k: self.v2_overhang.get(k) for k in ("tag", "side", "distance_m", "measured_distance_m", "edge_along_m",
                                                                                       "com_inside_m", "normal_xy", "entry", "rest_id")}
+            overhang_spine_entry(self)  # i7-overpath (owner 3(b)): opt-in generation.overhang_required_side
         keep = self.gp.gen("grasp_rows")
         if keep and self.v2_overhang is not None:
             # the rows name the LEGACY library's pinches; the v2 overhang entry's grasps are its own (generated at the overhanging face)
@@ -4418,6 +4480,7 @@ class IORSLarge(SamplerV2):
         if self.surface.get("kind") == "floor" or manip.edge is None:
             return None, "no support edge at B (the floor init never pushes)"
         TT._count(self, "pick_overhang.tried")
+        overhang_spine_grasp(self, g)  # i7-overpath (owner 3(b)): the drawn grasp pinches the required face, else the attempt is rejected
         t_pose = self.pose_on(xy, yaw, z_init)
         z_top = float(z_init)
         u = OH.unit_xy(-manip.edge.inward)
@@ -4469,6 +4532,16 @@ class IORSLarge(SamplerV2):
                 else:
                     settled = post
                 eef, pre, res, pick = grasp
+                overpath = None
+                if OPATH.on():
+                    # i7-overpath 2026-11-08 (owner 3(a)): the transit over the book from the escape to this pre-grasp, planned and recorded
+                    overpath, key_o, why_o = self._overpath_plan(st, grasp_st, arm, chain, settled, pre, eef)
+                    if overpath is None:
+                        TT._count(self, "overpath.rejected")
+                        TT._count(self, f"overpath.rejected.{key_o}")
+                        why.append(f"{arm} push {push:.3f}: overpath {key_o}: {why_o}")
+                        continue
+                    TT._count(self, "overpath.planned")
                 overhang = OH.overhang_m(geo["edge_finger_m"], push, geo["extent_front_m"])
                 facts = {**geo, "arm": arm, "push_m": round(float(push), 4), "overhang_m": round(overhang, 4),
                          "com_inside_m": round(float(geo["edge_com_m"]) - float(push), 4), "settle": sfacts,
@@ -4481,8 +4554,10 @@ class IORSLarge(SamplerV2):
                          "%.3f m inside), %s hand pitch %.0f (%s), settle %s, grasp from %s", self.gp.variant, manip.translate, manip.tilt, arm, getattr(g, "name", g), yaw, push,
                          geo["edge_finger_m"], overhang, facts["com_inside_m"], chain["fingers"], chain["pitch_deg"], chain["wrist"], sfacts,
                          "B" if grasp_st is st else f"B backed off to stand-off {grasp_st.stand_off:.2f} at trunk ({grasp_st.translate:.2f}, {grasp_st.tilt:.2f})")
+                if overpath is not None:
+                    facts["overpath"] = {k: overpath.get(k) for k in ("clearance_m", "min_book_clearance_m", "max_step_rad", "start", "n_waypoints")}
                 return {"arm": arm, "stance": st, "grasp_stance": grasp_st, "t_pose": t_pose, "post_pose": settled, "predicted_pose": post, "eef": eef, "pre": pre, "res": res,
-                        "pick": pick, "chain": chain, "push_m": float(push), "facts": facts}, ""
+                        "pick": pick, "chain": chain, "push_m": float(push), "facts": facts, "overpath": overpath}, ""
         TT._count(self, "pick_overhang.failed")
         return None, f"ladder {geo['ladder_m']} m: " + " | ".join(why)[:1200]
 
@@ -4499,8 +4574,11 @@ class IORSLarge(SamplerV2):
         def st_key(st: Stance) -> Tuple[Any, ...]:
             return tuple(round(float(v), 3) for v in st.base_pose2d) + (round(float(st.translate), 3), round(float(st.tilt), 3))
 
-        return (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
-                tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
+        key = (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
+               tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
+        # i7-overpath 2026-11-08: a pick the recorded transit rejected is another failure - the switch enters the key only when on (the
+        # persisted memo is shared between the jobs of an alias: an A/B's arms must not read each other's failures)
+        return key + ("overpath",) if OPATH.on() else key
 
     def _overhang_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
         """Opt-in ``generation.overhang_fail_memo_persist`` (oracle-fix 2026-11-05, speed): the failed-pick memo of
@@ -4519,6 +4597,143 @@ class IORSLarge(SamplerV2):
             return why
         hit = cache_get(ck)
         return None if not isinstance(hit, dict) else hit.get("why")
+
+    # ------------------------------------------------------------------ i7-overpath 2026-11-08 (owner 3(a) / 3(b), inside_large_01)
+
+    def _overpath_start(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose) -> Tuple[Optional[th.Tensor], str, str]:
+        """Where the recorded transit starts (:mod:`ispatialgym.oracle.overpath`): from B, the contact escape after the push as the oracle
+        runs it (``program_check.replay_contact_escape`` from the push chain's end configuration, the object at its settled post-push pose,
+        ``generation.overhang_retreat_up_m``), the fingers then opened (``execute_grasp`` opens them before its transit); at the grasp stance
+        "pick", the arm where the escape left it when that is collision-free there (the program check's first departure-arm candidate),
+        else the stance's posture. ``(q, start label, "")`` or ``(None, reason, why)``; the program check and the oracle follow the record
+        only from within ``overpath.START_GAP_MAX_RAD`` of its start (the planned transit otherwise)."""
+        from ispatialgym.oracle.actions import RETREAT_DIST
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        idx = self.kit.robot.arm_control_idx[arm]
+        opening = float(chain.get("opening", C.FINGER_CLOSED))
+        q_push = self.ikc.q_locked(st, fingers=opening).clone()
+        arm_q = list((chain.get("seed") or {}).get("chain_arm_q") or [])
+        if arm_q:
+            q_push[idx] = th.tensor([float(v) for v in arm_q[-1]], dtype=q_push.dtype)
+        else:
+            with self.ikc.ignoring([self.target]):
+                r = self.ikc.exact([chain["goal"]], st, arm, cache=False, fingers=opening)
+            if not r.ok or r.q is None:
+                return None, "push_end", f"the push's end pose has no IK ({r.reason})"
+            q_push = G.t(r.q).float().clone()
+        sup = list(self.support_objects())
+        up = self.gp.gen("overhang_retreat_up_m")
+        status, why_e, _, q_esc = PCK.replay_contact_escape(self, arm, q_push, _PosedObject(settled), sup, [self.target] + sup, RETREAT_DIST,
+                                                            start="the overhang push's end", escape_up_m=float(up) if isinstance(up, (int, float)) and up > 0 else None)
+        if status == "failed":
+            return None, "escape", why_e
+        if grasp_st is st:
+            q0 = self.ikc.q_locked(st, fingers=C.FINGER_OPEN).clone()
+            q0[idx] = G.t(q_esc).float().reshape(-1)[idx]
+            return q0, "escape", ""
+        # the drive B -> pick: the program check keeps the arm where the escape left it when the drive's sweep allows
+        # (``program_check.choose_departure_arms``' first candidate), else the drive re-poses it to the stance's posture
+        q0 = self.ikc.q_locked(grasp_st, fingers=C.FINGER_OPEN).clone()
+        q0[idx] = G.t(q_esc).float().reshape(-1)[idx]
+        with self.ikc.ignoring([self.target]):
+            if bool(self.kit.collision_free(q0, margin=0.0)[0]):
+                return q0, "escape (kept through the drive to pick)", ""
+        return self.ikc.q_locked(grasp_st, fingers=C.FINGER_OPEN).clone(), "stance posture", ""
+
+    def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                       ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath 2026-11-08 (owner 3(a), switch ``ISPATIALGYM_OVERHANG_OVERPATH``): the transit of the overhang pick from where the
+        escape leaves the hand (:meth:`_overpath_start`) over the book to the pre-grasp ``pre`` - rise to the book's top + a clearance
+        (:data:`overpath.CLEARANCES_M`, the first that passes), across to above the pre-grasp, down to it (:func:`overpath.leg_poses`) -
+        tracked by differential IK from the start as the oracle tracks (``IKChecker.track_chain``: every dense configuration exact, no
+        joint step above 0.2 rad, collision-free with the target out of the world); the tracked configurations subsampled
+        (:func:`overpath.subsample`) and the path the oracle runs through them (:func:`overpath.densify`) checked again whole-body
+        (margin 0, the desk and the scene present) and with the arm's spheres >= :data:`overpath.BOOK_MARGIN_M` from the book's box at
+        its settled post-push pose (``protection.transit_violations``); the grasp's approach tracked from the path's end. No camera-frame
+        rule applies to the transit (the oracle's frame hook is off until the pre-grasp; the pre-grasp's own check stays). Returns
+        ``(record, "", "")`` - :func:`overpath.record` - or ``(None, reason, why)``."""
+        from ispatialgym.oracle import protection as PROT
+        from ispatialgym.oracle import r1pro_model as M
+
+        q0, start, why0 = self._overpath_start(st, grasp_st, arm, chain, settled)
+        if q0 is None:
+            return None, start, why0
+        idx = self.kit.robot.arm_control_idx[arm]
+        frame = M.EEF_LINK[arm]
+        p0 = self.kit.fk([frame], q0)[frame]
+        pts = G.local_points_world(self.hull, (G.t(settled[0]).float(), G.t(settled[1]).float()))
+        top = float(pts[:, 2].max())
+        box = OPATH.box_of(settled, self.hull)
+        tried: List[str] = []
+        last = ("track", "no clearance tried")
+        for c in OPATH.CLEARANCES_M:
+            legs = OPATH.leg_poses(G.t(p0[0]).float(), G.t(p0[1]).float(), G.t(pre[0]).float(), G.t(pre[1]).float(), top + float(c))
+            q_end, why_t = self.ikc.track_chain(q0, legs, arm, ignore=[self.target], max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS)
+            if q_end is None:
+                last = ("jump" if "joint jump" in str(why_t) else ("collision" if "collide" in str(why_t) else "track"), str(why_t)[:300])
+                tried.append(f"{c:.2f}: {last[0]}")
+                continue
+            traj = G.t(getattr(self.ikc, "last_track_traj", None)).float()
+            keep = OPATH.subsample(traj[:, idx])
+            qs = traj[keep]
+            dense = OPATH.densify(qs[0], list(qs[1:]))
+            with self.ikc.ignoring([self.target]):
+                free = self.kit.collision_free(dense, margin=0.0)
+            if not bool(free[1:].all()):
+                k = int(th.nonzero(~free[1:]).reshape(-1)[0]) + 1
+                last = ("collision", f"the executed joint path collides at {k}/{len(dense) - 1} ({self.ikc._collision_blame(dense[k], [self.target])})")
+                tried.append(f"{c:.2f}: collision")
+                continue
+            spheres, links = self.kit.backend.robot_spheres_world(dense, "whole_body")
+            mask = PROT.moving_sphere_mask(links, [arm])
+            val, _ = PROT.sphere_box_clearance(spheres[:, mask], box)
+            viol = PROT.transit_violations(val, OPATH.BOOK_MARGIN_M)
+            if viol is not None:
+                last = ("book", f"the arm passes the book at {viol['clearance_m']} m (threshold {viol['threshold_m']} m, configuration {viol['index']}/{len(dense) - 1})")
+                tried.append(f"{c:.2f}: book {viol['clearance_m']}")
+                continue
+            with self.ikc.ignoring([self.target]):
+                r_a = self.ikc.continue_chain(traj[-1], [pre, eef], arm, soft_stall_m=None)
+            if not r_a.ok:
+                last = ("approach", f"the approach from the path's end: {str(r_a.reason)[:240]}")
+                tried.append(f"{c:.2f}: approach")
+                continue
+            step = float((traj[1:, idx] - traj[:-1, idx]).abs().max()) if len(traj) > 1 else 0.0
+            eef_pts = [self.kit.fk([frame], q)[frame][0] for q in qs]
+            rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], eef_pts, clearance_m=float(c), book_top_z=round(top, 4),
+                               z_across=round(top + float(c), 4), min_book_clearance_m=round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4),
+                               start_book_clearance_m=round(float(val[0]), 4), end_book_clearance_m=round(float(val[-1]), 4), margin_m=OPATH.BOOK_MARGIN_M,
+                               max_step_rad=round(step, 4), n_tracked=int(len(traj)), n_waypoints=int(len(qs)), n_dense=int(len(dense)),
+                               pre_grasp={"position": [round(float(v), 5) for v in G.t(pre[0]).tolist()], "orientation": [round(float(v), 6) for v in G.t(pre[1]).tolist()]},
+                               legs=len(legs), tried=tried)
+            log.info("%s: overpath planned (%s arm, from the %s at stance %s): eef %.2f m over the book top %.3f, %d waypoints / %d executed steps, the book "
+                     "cleared by >= %.3f m, largest tracked step %.3f rad%s", self.gp.variant, arm, start, grasp_st.name, c, top, len(qs), len(dense) - 1,
+                     rec["min_book_clearance_m"], step, f" (lower clearances: {tried})" if tried else "")
+            return rec, "", ""
+        return None, last[0], f"{last[1]} (clearances tried: {tried})"
+
+    def overpath_record(self, ov: Dict[str, Any], grasp: GraspRecord) -> None:
+        """``grasps[0].overpath`` (i7-overpath): the transit :meth:`_overpath_plan` planned for the overhang pick ``ov`` when the switch is
+        on - planned again to the recorded pre-grasp when the coupling chose another of the pick's options (the twin) - else the attempt
+        is rejected (``overpath_unplannable``). No-op when off."""
+        if not OPATH.on():
+            return
+        rec = ov.get("overpath")
+        same = False
+        if rec is not None and grasp.pre_grasp is not None and rec.get("arm") == grasp.arm:
+            p = rec.get("pre_grasp") or {}
+            same = (float(th.linalg.norm(th.tensor(p.get("position", [0.0] * 3)) - G.t(grasp.pre_grasp[0]).float())) <= 0.002
+                    and G.quat_angle(th.tensor(p.get("orientation", [0.0, 0.0, 0.0, 1.0])), G.t(grasp.pre_grasp[1]).float()) <= 0.01)
+        if not same:
+            TT._count(self, "overpath.replanned")
+            rec, key_o, why_o = self._overpath_plan(ov["stance"], ov["grasp_stance"], grasp.arm, ov["chain"], ov["post_pose"], grasp.pre_grasp, grasp.grasp)
+            if rec is None:
+                TT._count(self, "overpath.rejected")
+                TT._count(self, f"overpath.rejected.{key_o}")
+                raise Reject("overpath_unplannable", f"overpath to the recorded pre-grasp ({grasp.grasp_name}): {key_o}: {why_o}")
+        grasp.extras[OPATH.RECORD_KEY] = _jsonable(rec)
+        TT._count(self, "overpath.recorded")
 
     def _overhang_grasp_stances(self, st: Stance, arm: str, opts: Dict[str, Any]) -> List[Stance]:
         """The grasp stances of the two-stance overhang pick (stance ``"pick"``): B backed off along its axis by ``grasp_back_offs_m``,
@@ -5347,6 +5562,7 @@ class IORSLarge(SamplerV2):
                                                              **chain.get("record", {}), **chain.get("seed", {})))
                 if hit.get("overhang") is not None:
                     self.overhang_records(hit["overhang"], grasp)
+                    self.overpath_record(hit["overhang"], grasp)  # i7-overpath (owner 3(a)): grasps[0].overpath when the switch planned one
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")

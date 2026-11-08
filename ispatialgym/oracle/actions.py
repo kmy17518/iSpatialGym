@@ -721,6 +721,10 @@ class Grasp(Action):
     #: "from_stance"}`` - the arm first makes a planned joint-space move to ``q`` (this grasp's recorded pre-grasp configuration), then
     #: the transit; None = the transit from wherever the arm is
     repose: Optional[Dict[str, Any]] = None
+    #: i7-overpath 2026-11-08 (owner 3(a), ``programs._pick_actions``): the overhang pick's recorded transit over the book
+    #: (``grasps[k].overpath``, :mod:`ispatialgym.oracle.overpath`) - the arm follows its joint waypoints from where the escape left it to
+    #: the pre-grasp instead of planning that transit; None = the planned transit
+    overpath: Optional[Dict[str, Any]] = None
     TARGET_KEYS = ("pre_grasp", "grasp", "approach")
 
     def __post_init__(self):

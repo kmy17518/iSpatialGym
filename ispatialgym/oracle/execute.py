@@ -2198,6 +2198,101 @@ def transit_preshape_held(motions: Motions, arm: str) -> Optional[float]:
     return float(q_m) if held else None
 
 
+def _overhang_grasp(action: Grasp) -> bool:
+    """The grasp of an overhang pick (``grasps[k].pick_overhang``: after the push toward the support edge)."""
+    return isinstance(getattr(getattr(action, "grasp", None), "extra", None), dict) and action.grasp.extra.get("pick_overhang") is not None
+
+
+class TransitClearance:
+    """i7-overpath 2026-11-08 (diagnostic, the overhang pick's grasp only): the smallest clearance of the moving arm's collision spheres to
+    the grasped object's box along the EXECUTED transit to the pre-grasp - the configurations sampled every ``every`` control steps of
+    whatever moved the arm (the recorded overpath or the planned transit), measured after the leg (``protection.sphere_box_clearance``).
+    ``ctx["transit_book_clearance"]``: ``{"min_m", "n", "at"}`` (``at`` = the sample's fraction of the leg)."""
+
+    def __init__(self, motions: Motions, state, action: Grasp, arm: str, every: int = 2):
+        self.motions, self.arm, self.every = motions, arm, max(1, int(every))
+        try:
+            self.obj = state.object(action.object)
+        except Exception:  # noqa: BLE001
+            self.obj = None
+        self.qs: List[th.Tensor] = []
+        self.k = 0
+
+    def sampled(self, gen):
+        while True:
+            try:
+                x = next(gen)
+            except StopIteration as e:
+                return e.value
+            self.k += 1
+            if self.k % self.every == 1 or self.every == 1:
+                try:
+                    self.qs.append(C.as_tensor(self.motions.backend.q_full()).reshape(-1).float().clone())
+                except Exception:  # noqa: BLE001 - a diagnostic
+                    pass
+            yield x
+
+    def report(self) -> Dict[str, Any]:
+        from ispatialgym.oracle import protection as PROT
+
+        fn = getattr(getattr(self.motions, "backend", None), "robot_spheres_world", None)
+        box = PROT.object_box(self.obj) if self.obj is not None else None
+        if fn is None or box is None or not self.qs:
+            return {"min_m": None, "n": len(self.qs)}
+        try:
+            spheres, links = fn(th.stack(self.qs), f"{self.arm}_arm")
+            mask = PROT.moving_sphere_mask(links, [self.arm])
+            val, _ = PROT.sphere_box_clearance(spheres[:, mask], box)
+        except Exception as e:  # noqa: BLE001 - a diagnostic
+            return {"min_m": None, "n": len(self.qs), "error": repr(e)[:160]}
+        k = int(th.argmin(val))
+        return {"min_m": round(float(val[k]), 4), "n": len(self.qs), "at": round(k / max(1, len(self.qs) - 1), 3),
+                "start_m": round(float(val[0]), 4), "end_m": round(float(val[-1]), 4)}
+
+
+def follow_overpath(action: Grasp, motions: Motions, targets, ctx, arm: str) -> Generator[th.Tensor, None, bool]:
+    """i7-overpath 2026-11-08 (owner 3(a)): the overhang pick's recorded transit over the book (``Grasp.overpath``,
+    :mod:`ispatialgym.oracle.overpath`): the arm follows the recorded joint waypoints from where the escape (and the drive to the grasp
+    stance) left it to the pre-grasp - ``Motions.recorded_joint_path`` (checked against the world and the protected objects) streamed by
+    ``execute_joint_trajectory`` - instead of planning that transit. True when it ran; False when its run-time check refuses it (nothing
+    moved: the planned transit runs as before). ``ctx["overpath"]``: the record's facts, the check, ``followed``, the tracking error
+    (``joint_err_rad`` to the last waypoint, ``pre_grasp_err_m`` of the eef to the live pre-grasp)."""
+    from ispatialgym.oracle import overpath as OPATH
+
+    rec = action.overpath
+    note: Dict[str, Any] = {"waypoints": len(rec.get("q") or []), "clearance_m": rec.get("clearance_m"), "sampler_min_book_clearance_m": rec.get("min_book_clearance_m"),
+                            "start": rec.get("start"), "followed": False}
+    ctx["overpath"] = note
+    fn = getattr(motions, "recorded_joint_path", None)
+    if fn is None:
+        note["fallback"] = "no recorded-path support in this Motions"
+        return False
+    try:
+        qs = OPATH.parse(rec)
+    except ValueError as e:
+        note["fallback"] = str(e)
+        return False
+    traj, chk = fn(arm, qs)
+    note.update({k: v for k, v in chk.items() if k != "what"})
+    if traj is None:
+        note["fallback"] = chk.get("why")
+        log.warning("grasp(%s): the recorded overpath is refused at run time (%s): the planned transit instead", arm, chk.get("why"))
+        return False
+    log.info("grasp(%s): following the recorded overpath over %s (%d waypoints, %d steps, start %.3f rad off the record)", arm, action.object,
+             len(qs), int(chk.get("n_steps", 0)), float(chk.get("start_gap_rad", 0.0)))
+    yield from motions.execute_joint_trajectory(traj, arms=[arm])
+    try:
+        idx = motions.robot.arm_control_idx[arm]
+        q_after = C.as_tensor(motions.q_full()).reshape(-1).float()
+        note["joint_err_rad"] = round(float((q_after[idx] - qs[-1]).abs().max()), 4)
+        note["pre_grasp_err_m"] = round(float(th.linalg.norm(as_world_pose(motions.eef_pose(arm))[0].float() - as_world_pose(targets["pre_grasp"])[0].float())), 4)
+    except Exception as e:  # noqa: BLE001 - a diagnostic
+        note["tracking_error"] = repr(e)[:160]
+    note["followed"] = True
+    ctx["pre_grasp_transit"] = "recorded overpath"
+    return True
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
@@ -2256,11 +2351,23 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     pre_touch = [o for o in may_touch_objects(state, action, pre_grasp=True).values() if all(o is not s for s in ignored_supports)]
     if pre_touch:
         ctx["plan_ignored"] = list(ctx["plan_ignored"]) + [getattr(o, "name", str(o)) for o in pre_touch]
-    with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
-        if action.repose is not None:
-            yield from repose_arm(action, motions, ctx)
-        yield from _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
-        yield from _into_witness_posture(motions, targets, ctx, arm)
+    clearance = TransitClearance(motions, state, action, arm) if _overhang_grasp(action) else None  # i7-overpath diagnostic
+    try:
+        with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
+            if action.repose is not None:
+                yield from repose_arm(action, motions, ctx)
+            followed = False
+            if getattr(action, "overpath", None) is not None:
+                # i7-overpath 2026-11-08 (owner 3(a)): the overhang pick's transit over the book follows the sampler's recorded joint path
+                leg = follow_overpath(action, motions, targets, ctx, arm)
+                followed = yield from (clearance.sampled(leg) if clearance is not None else leg)
+            if not followed:
+                leg = _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
+                yield from (clearance.sampled(leg) if clearance is not None else leg)
+            yield from _into_witness_posture(motions, targets, ctx, arm)
+    finally:
+        if clearance is not None:
+            ctx["transit_book_clearance"] = clearance.report()
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)

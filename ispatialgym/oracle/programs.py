@@ -203,7 +203,26 @@ def _pick_actions(sc: Sidecar, g: GraspRecord, stance: str = "manipulation") -> 
     to_grasp = _travel(sc, stance, _grasp_stance(g)) if _grasp_stance(g) != stance else []
     up = push.extra.get("retreat_up_m")  # oracle-fix 2026-11-05: the escape off the support before the travel to the grasp stance
     up = float(up) if isinstance(up, (int, float)) and up > 0 else None
+    grasp.overpath = _overpath(g)
     return [p, Retreat(arm=push.arm, object=push.object, after=p, escape_up_m=up)] + to_grasp + [grasp, lift]
+
+
+def _overpath(g: GraspRecord) -> Optional[Dict[str, Any]]:
+    """i7-overpath 2026-11-08 (owner 3(a)): ``grasps[k].overpath`` - the overhang pick's recorded transit over the book
+    (:mod:`ispatialgym.oracle.overpath`), checked (its arm is the grasp's, its joints parse); None when the sidecar records none."""
+    from ispatialgym.oracle import overpath as OPATH
+
+    rec = (g.extra or {}).get(OPATH.RECORD_KEY) if isinstance(g.extra, dict) else None
+    if rec is None:
+        return None
+    where = f"grasps[{g.object}].{OPATH.RECORD_KEY}"
+    try:
+        OPATH.parse(rec, where)
+    except ValueError as e:
+        raise SidecarError(str(e))
+    if rec.get("arm") != g.arm:
+        raise SidecarError(f"{where}.arm {rec.get('arm')!r} differs from the grasp arm {g.arm!r}")
+    return rec
 
 
 def _place_and_retreat(g: GraspRecord, kind: str, relation: str = "on", avoid: Tuple[str, ...] = ()) -> List[Action]:

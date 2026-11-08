@@ -2302,6 +2302,7 @@ class IKChecker:
             if not bool(clear.all()):
                 bad = [i for i, c in enumerate(clear.tolist()) if not c]
                 return None, f"arm_proximity: {len(bad)}/{len(clear)} tracked configurations put an arm link within {clear_margin * 1000:.0f} mm of the world (first at dense pose {bad[0]})"
+        self.last_track_traj = traj  # i7-overpath 2026-11-08: the tracked configurations of the last passing chain (the recorded transit's source)
         return traj[-1].clone(), "ok" + finished
 
     def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any], margin: float = 0.0) -> str:

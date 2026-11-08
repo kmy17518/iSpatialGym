@@ -1268,6 +1268,7 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                 end_q = witnesses.pop("__arm_end_q__", None)
                 partial_leg = witnesses.pop("__partial__", None)
                 repose_note = witnesses.pop("__repose__", None)
+                overpath_note = witnesses.pop("__overpath__", None)
                 tracker.after(action, witnesses, sampler)
                 tracker.note_arm_end(action, end_q)
                 _carry_joint_state(action)
@@ -1279,6 +1280,8 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                     entry["partial_leg"] = partial_leg
                 if repose_note is not None:
                     entry["repose"] = repose_note
+                if overpath_note is not None:
+                    entry["overpath"] = overpath_note
                 report["actions"].append(entry)
                 _STATS["n_actions_checked"] += 1
                 _STATS["n_poses"] += int(n)
@@ -2095,6 +2098,73 @@ def check_repose(sampler, stance: Stance, arm: str, repose: Dict[str, Any], pre_
     return q_goal, note
 
 
+#: i7-overpath: the finger opening the recorded transit runs at (``execute_grasp`` opens the hand fully before its transit)
+OPATH_FINGERS = 0.05
+
+
+def check_overpath(sampler, stance: Stance, arm: str, rec: Dict[str, Any], pre_pose, q_from: Optional[th.Tensor], obj=None,
+                   where: str = "") -> Tuple[th.Tensor, Dict[str, Any]]:
+    """i7-overpath 2026-11-08 (owner 3(a), ``Grasp.overpath``): the overhang pick's recorded transit over the book replayed as the oracle
+    runs it (``execute.follow_overpath`` -> ``Motions.recorded_joint_path``): from where the previous arm action left the arm (the escape
+    after the push; the stance posture after the drive to the grasp stance) - within ``overpath.START_GAP_MAX_RAD`` of the record's first
+    configuration - the piecewise-linear joint path through the recorded waypoints (:func:`overpath.densify`) must be collision-free in the
+    world the program leaves (the pushed object at its post-push pose, the support, the scene; margin 0), keep the arm's spheres
+    ``protection.INFLATION_M`` from ``obj``'s box (the oracle's protected-object check) and end at this grasp's pre-grasp. Returns
+    ``(the end configuration - the grasp's pre-grasp witness, note)``; ``(None, note)`` when the arm starts farther than the gap from it
+    (the oracle then plans the transit, checked as before); ``Reject`` otherwise."""
+    from ispatialgym.oracle import overpath as OPATH
+    from ispatialgym.oracle import protection as PROT
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.sim_utils import Reject
+
+    try:
+        qs = OPATH.parse(rec)
+    except ValueError as e:
+        raise Reject("program_check_failed", f"overpath: {e} ({where})", action="grasp")
+    idx = sampler.kit.robot.arm_control_idx[arm]
+    q0 = sampler.ikc.q_locked(stance, fingers=OPATH_FINGERS).clone()
+    label = "the stance posture"
+    if q_from is not None:
+        q0[idx] = th.as_tensor(q_from, dtype=th.float32)[idx]
+        label = "where the previous action left the arm"
+    gap = float((q0[idx] - qs[0]).abs().max())
+    if gap > OPATH.START_GAP_MAX_RAD:
+        # the oracle refuses the record from there too (``Motions.recorded_joint_path``) and plans the transit as before: checked as before
+        log.warning("program check: the recorded overpath starts %.2f rad from %s (> %.2f): the oracle plans this transit (not followed)", gap, label,
+                    OPATH.START_GAP_MAX_RAD)
+        return None, {"from": label, "start_gap_rad": round(gap, 4), "followed": False, "why": f"start {gap:.2f} rad off (> {OPATH.START_GAP_MAX_RAD:.2f})"}
+    rows = []
+    for q in qs[1:]:
+        r = q0.clone()
+        r[idx] = q
+        rows.append(r)
+    dense = OPATH.densify(q0, rows, OPATH.STEP_RAD)
+    free = sampler.kit.collision_free(dense, margin=0.0)
+    if not bool(free[1:].all()):
+        k = int(th.nonzero(~free[1:]).reshape(-1)[0]) + 1
+        raise Reject("program_check_failed", f"overpath: configuration {k}/{len(dense) - 1} of the recorded transit collides ({sampler.ikc._collision_blame(dense[k], [])}; "
+                                             f"{where})", action="grasp")
+    min_clear = None
+    if obj is not None:
+        box = PROT.object_box(obj)
+        fn = getattr(sampler.kit.backend, "robot_spheres_world", None)
+        if box is not None and fn is not None:
+            spheres, links = fn(dense, "whole_body")
+            val, _ = PROT.sphere_box_clearance(spheres[:, PROT.moving_sphere_mask(links, [arm])], box)
+            viol = PROT.transit_violations(val, PROT.INFLATION_M)
+            if viol is not None:
+                raise Reject("program_check_failed", f"overpath: the recorded transit passes {getattr(obj, 'name', obj)} at {viol['clearance_m']} m (threshold "
+                                                     f"{viol['threshold_m']} m; {where})", action="grasp")
+            min_clear = round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4)
+    pre = (G.t(pre_pose[0]).float(), G.t(pre_pose[1]).float())
+    if not sampler.ikc.reaches(dense[-1], pre, arm):
+        raise Reject("program_check_failed", f"overpath: the recorded transit does not end at this grasp's pre-grasp ({where})", action="grasp")
+    note = {"from": label, "start_gap_rad": round(gap, 4), "waypoints": len(qs), "steps": len(dense) - 1, "min_book_clearance_m": min_clear, "followed": True}
+    log.info("program check: grasp follows the recorded overpath from %s (start %.3f rad off, %d waypoints, %d steps, book clearance %s m)", label, gap, len(qs),
+             len(dense) - 1, min_clear)
+    return dense[-1].clone(), note
+
+
 def _same_pose(a, b, pos_tol: float = 0.002, ang_tol: float = 0.01) -> bool:
     """Two eef poses within 2 mm / 0.01 rad (the same recorded key pose reached by two target keys of one action)."""
     from ispatialgym.sampling import geometry as G
@@ -2697,6 +2767,15 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         if not pre_l:
             raise Reject("program_check_failed", f"repose: the grasp has no pre_grasp target ({where})", action=name)
         repose_q, repose_note = check_repose(sampler, stance, arm, action.repose, pre_l[0], q_end_prev, fingers=fingers, where=where)
+    overpath_q: Optional[th.Tensor] = None
+    overpath_note: Optional[Dict[str, Any]] = None
+    if name == "grasp" and getattr(action, "overpath", None) is not None:
+        # i7-overpath 2026-11-08 (owner 3(a)): the overhang pick's recorded transit over the book, replayed; its end is the pre-grasp witness
+        pre_l = next((p_ for k_, p_ in pose_targets if k_ == "pre_grasp"), None)
+        if not pre_l:
+            raise Reject("program_check_failed", f"overpath: the grasp has no pre_grasp target ({where})", action=name)
+        overpath_q, overpath_note = check_overpath(sampler, stance, arm, action.overpath, pre_l[0], q_end_prev, obj=sampler.objects.get(getattr(action, "object", None)),
+                                                   where=where)
     motion_ends: List[th.Tensor] = []  # tracked chain ends of this action, most recent first
     single_q: Dict[str, th.Tensor] = {}  # single-pose key -> its witness configuration (this frame)
     partial: Optional[Dict[str, Any]] = None
@@ -2729,6 +2808,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 elif repose_q is not None and key == "pre_grasp":
                     res = IKResult(True, repose_q.clone(), "re-pose target", 1)
                     chain_notes[key] = f"the recorded re-pose target, planned from {repose_note['planned_from']}"
+                elif overpath_q is not None and key == "pre_grasp":
+                    res = IKResult(True, overpath_q.clone(), "overpath end", 1)
+                    chain_notes[key] = f"the recorded overpath's end, followed from {overpath_note['from']}"
                 else:
                     # a single end pose (``grasp``, ``place``, ``contact``) is the end of its approach: the approached object is
                     # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
@@ -3056,4 +3138,6 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         witnesses["__partial__"] = partial  # popped by ``run``: a Retreat leg accepted short, as the oracle accepts it
     if repose_note is not None:
         witnesses["__repose__"] = repose_note  # popped by ``run``: the re-pose planned before the grasp
+    if overpath_note is not None:
+        witnesses["__overpath__"] = overpath_note  # popped by ``run``: the recorded transit replayed before the grasp (i7-overpath)
     return n, witnesses
