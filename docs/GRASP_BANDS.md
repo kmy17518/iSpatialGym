@@ -2477,6 +2477,29 @@ approach: 0.38 m in front of the base) fails the IK with the support and the par
 A/B (legacy, N 4, 300100-103, kmuacd template only): a (trunk_2f815f1b) 320 att / 0 written, 1.79 GPU-h; b / c / d rerun on
 trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d's switches - numbers in DECISIONS "i7-t03 ROUND 2".
 
+#### Round 2 results (2026-11-08; DECISIONS "i7-t03 ROUND 2 RESULTS" parts 1 / 2; `t03_20261108/tab_t03.py` + `tab_t03_extra.py`)
+
+| arm | att | written | ok | GPU-h | where the switches acted |
+|---|---|---|---|---|---|
+| a all off (trunk_2f815f1b) | 320 | 0 | 0 | 1.79 | - |
+| b (a) free start | 320 | 0 | 0 | 1.47 | free_start.used 76 / edge_ok 107 |
+| c (a)+(b)+(c) | 320 | 0 | 0 | 2.69 | free_start.used 76; stance_shift.both_passed 13 / grasp_only 2; shelf_release.* 0 |
+| d c+(d) | 133 | 0 | 0 | 1.49 | CRASH at the first goal_check pass; shelf_lift.* 0 |
+| v v2only, d's switches | 9 | 0 | 0 | 0.13 | CRASH at the first goal_check pass |
+
+- Layouts (a / b / c): bay +0.00 right 63, bay -0.37 left 64, bay -0.37 right 56 attempts, 0 written. The per-attempt draw is the same in
+  every arm.
+- Start stage: no_free_edge 137 in a / b / c (+u stance_collision 69, -u free floor 68). The free start does not change it, because the
+  edge draw rejects before the fallback is asked. not_in_frame 0 at attempt level.
+- (a): the fixed-start grasp rejections fall from 167 to 124-128, but 40 attempts now fail as no_path init -> manipulation (the free start
+  disconnected on the eroded map).
+- (b): 13 stances passed both the grasp and the release. Still, every attempt that reached goal_check in c died at the LIFT (4, vs 2 in
+  a), before the release. So (c)'s in-gap drive never acted: carried drive 0 (a 2).
+- (d) bug (832fad79): `shelf_lift_plan` calls `up_vector()`, and `IORSSmall.up_axis()` returns None for every relation except inside.
+  On touching_03 this gives `ValueError: None is not a model axis`. The lift needs the book's standing axis for touching. Until that is
+  fixed, d and v have no numbers.
+- touching_03 still writes no demo. All switches stay default OFF.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
