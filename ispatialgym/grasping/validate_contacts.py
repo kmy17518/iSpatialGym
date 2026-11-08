@@ -1267,9 +1267,14 @@ class KitContactWorld:
                 q_t = th_.tensor(q_push, dtype=th_.float32)
             else:
                 path, q_t = pusher_path(entry, T0, pts, self.cfg, 1.0 / 30.0), th_.tensor([0.0, 0.0, 0.0, 1.0])
+            wake = wall_entry(entry)
             for c in path + [None] * self.cfg.brace_hold_steps:
                 if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
                     pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), q_t)
+                    if wake:
+                        # i7-brace: the sleep assist sleeps the still hung target while the brace stands, and a teleported kinematic pusher
+                        # does not wake it (2026-11-08 run 2: 6 / 12 signpost trials did not move at all) - the push hand it stands in for does
+                        obj.wake()
                 self._hold(motions, step, 1)
         except Exception as ex:  # noqa: BLE001 - the entry fails alone, with its trace
             self._park_pusher()
