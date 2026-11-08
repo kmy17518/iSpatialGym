@@ -5130,6 +5130,40 @@ memory OFF, TURN_COVER=1 + OPPOSITE=1, map overlay r3; `i7ar_5yf_off` root v2map
     - it still moves as far as an awake body and no kick was measured (object speeds within the awake control's range). In the demos 2325 first motions after an assist
     sleep came without the assist's wake (1514 with a slow hand); kicks 2.2 % vs 1.7 % after a wake. Teleports (`set_position_orientation`,
     the scene state load) wake the teleported body; Executor.restore wakes every tracked object.
+- **Lead decision 2026-11-08 (owner away) on 5w.3: the FIX** - `ISPATIALGYM_GC_BRACE_LOAD_GEOM=1` (default OFF, next to the 5w.3
+  diagnostic switches; 8ec97f10 + 1fb0fe77 + 6dcb94f8, merged with of-v2maps 68c6ffc2 in daf44408):
+  - *Axial load* (`axial_pusher_path`, `KitContactWorld._axial_load`): on the COM hinge the pusher meets the PUSHED end - the library end
+    point's distance along the long axis THROUGH THE HINGE (the library's point sits on its builder's hull-vertex-mean centre, 6.8 cm off
+    jhaltj's centre line), the far end's mirror for an opposite-end entry - square to that end's arc tangent (= +-`load.direction`), and is
+    carried along the arc about the hinge, stopped `brace_press_m` at the braced end after the MEASURED turn. The box as the wall load's:
+    8 cm upright, 3 cm across, 5 cm along the travel. The old straight load used an UNTURNED box (thickness along world y): a load along x
+    met the target with its 8 cm side (contacts 11-25 mm early), thin targets started inside it and were lifted, not turned.
+  - *Judge* (`judge_axial_brace`): the TURN, not the hinge-pinned root - `not_held` = the braced end's arc travel > `brace_hold_max_m`,
+    `not_loaded` = the pushed end never travelled 1 mm (never a pass), `not_braced` = the brace fingers never pressed 1 N during the load
+    (the wall judge's rule). Touching braces (load +y, unchanged box): `not_loaded` from the measured load point (`brace_load_reached`).
+  - *Tests* (test_brace_lib.py, 30 pass): switch off by default; box along the load; the arc / face / opposite / yaw 90 / on-axis pushed end;
+    the face never spans a short lever; no material raises; the judge never passes a missed load and reads the turn on a pinned root.
+    Suite trunk_1fb0fe77 = the of-v2maps baseline's same 21 ids.
+  - *Re-validation* (arm F = WAKE + MEASURED + GEOM, --revalidate of cp -a copies, `$OFH/brace_20261108/w53fix/F`, axial on trunk_6dcb94f8,
+    touch on trunk_1fb0fe77; table `w53fix/tab_fix.py`): valid int2-map -> F, the load reached the target (touched) in 648 / 648 trials
+    (the record: 48 / 462 valid): gkpmii 40 -> 40, dkhgxn 38 -> 37 (1 not_held), ntbrtz 32 -> 32; board_game 28 -> 107 (90 invalid ->
+    valid: the old box over-pressed them, hand_pushed), keyboard 94 -> 68 (26 not_braced), magazine 96 -> 92, jhaltj s1 44 -> 12 (32
+    not_braced: the blades beside the thin book never touch it during a 1 cm turn), jhaltj s1x1x2.5 90 -> 96, tablespoon tqqwys 48 -> 40;
+    510 -> 524. Earlier runs v1 (box unturned, pushed point off-axis: jhaltj 44 / 44 never turned) and v2 (8 cm across face spanning the
+    spoon's hinge: 29 / 48 not loaded) are in `w53fix/v1_cancelled`, `w53fix/v2_axial`. Note: the kinematic load drives the braced end
+    ~1 cm in every trial (held or not); a valid verdict means the brace hand stood (drift < 1 cm) and its fingers took the load.
+  - *Maps*: the 9 brace maps rebuilt from the F verdicts with trunk_6dcb94f8's builder (control: the recorded libraries reproduce int2's 6
+    axial keys exactly; the touch maps in int2 are int1's older builds, 889c0dbb / 8e3aee3b / b87cb752) and staged in
+    **`$OFH/v2maps_int2_braceload`** = cp -a v2maps_int2 at INT2.txt line 46 + the 9 maps (old -> maps/_superseded_braceload; log
+    BRACELOAD.txt); check_int2 ERRORS 0. v2maps_int2 untouched.
+  - *A/B* (N 4 v2only, trunk_6dcb94f8 both arms, base 350000 per-tag ledgers, alias memory off, svl titanrtx; `w53fix/ab_bl.py`):
+    int2 `i7b_bl_int2` vs staged `i7b_bl_load` (att / wr / ok, GPU-h per success): touching_01 9/4/4 0.116 vs 10/4/4 0.102; touching_02
+    46/4/4 0.127 vs 46/4/4 0.096; touching_04 26/4/1 1.021 vs 26/4/2 0.407; axial_01 14/4/4 0.076 vs 12/4/4 0.077; axial_03 4/4/3 0.067
+    both; axial_04 12/4/4 0.042 vs 26/3/3 0.070 - its replicate at 350100 is IDENTICAL in both arms (26/4/4 0.068, the same brace
+    counters; no brace in either: brace_ik_failed / no_joint_cell), so run noise. Total 111/24/20 0.133 vs 124/23/20 0.117; written brace
+    9 vs 9, landed 8 vs 9. No alias worse, touching_04 better -> ready to fold under lead #40: the three commits (switch default OFF) +
+    `$OFH/v2maps_int2_braceload`. The woken validator does not strengthen the case for the shared sleep-assist change (1 / 110 touch
+    verdicts; the axial changes are the geometry).
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
