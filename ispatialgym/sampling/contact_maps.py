@@ -657,7 +657,7 @@ class ContactMap:
         for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
             if fn.startswith(f"cmap__{kind}__") and fn.endswith(".json"):
                 try:
-                    hs.append(float(fn.split("__h", 1)[1].split("__", 1)[0]))
+                    hs.append(float(fn[:-5].rsplit("__", 2)[1][1:]))  # cmap__<kind>__<category>__<model>__h<h>__<key>.json
                 except (IndexError, ValueError):
                     continue
         for h in sorted(set(hs), key=lambda v: abs(v - float(height))):

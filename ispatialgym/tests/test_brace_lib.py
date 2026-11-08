@@ -420,3 +420,15 @@ def test_a_small_targets_stop_clears_from_some_tilt_on():
         b = next(x for x in geo["braces"] if f"{'+' if sign > 0 else '-'}tilt_{x['kind']}_{x['wrist']}" == e["class"])
         assert g.brace_clear(geo, b) == clear
     assert e["goal"]["clear_deltas_deg"][0] == 10.0
+
+
+def test_find_near_reads_the_map_heights_whatever_the_model_name(tmp_path, monkeypatch):
+    d = tmp_path / "hanger__hjdaqn__s1"
+    d.mkdir()
+    for h in (1.45, 1.2):
+        (d / f"cmap__wall_brace__hanger__hjdaqn__h{h:.4f}__0123abcd.json").write_text("{}")
+    asked = []
+    monkeypatch.setattr(CMAP.ContactMap, "find", staticmethod(lambda root, kind, entry, h, **kw: asked.append(h) or (SimpleNamespace() if h == 1.45 else None)))
+    cm = CMAP.ContactMap.find_near(str(tmp_path), "wall_brace", "hanger__hjdaqn__s1", 1.46, 0.03)
+    assert cm is not None and asked == [1.45] and cm.lookup_how["map_h"] == 1.45
+    assert CMAP.ContactMap.find_near(str(tmp_path), "wall_brace", "hanger__hjdaqn__s1", 1.30, 0.03) is None
