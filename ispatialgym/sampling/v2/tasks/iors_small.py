@@ -4907,9 +4907,12 @@ class IORSSmall(SamplerV2):
                 idx = self.kit.robot.arm_control_idx
                 arm_q = {"right": r.q[idx["right"]].clone(), "left": r.q[idx["left"]].clone()}
         if self.relation == "touching":
-            why_clear, _code = self.release_clear_why(st_place, grasp.place, grasp.arm)
-            if why_clear is not None:
-                return f"place retreat clear pose: {why_clear}"
+            r = self.ikc.exact([IK.pre_pose(grasp.place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st_place, grasp.arm, ignore_for_last=self.support_objects() + [tgt], cache=False)
+            if not r.ok:
+                # owner 5p.1 (ISPATIALGYM_SHELF_RETREAT_BACKOFF, the shelf tip release): the place's end + the base backing off may pass instead
+                why_b = self._retreat_backoff_why(st_place, grasp.place, grasp.arm, False) if (shelf_retreat_backoff_on() and self.shelf_tip()) else r.reason
+                if why_b is not None:
+                    return f"place retreat clear pose: {r.reason}" + ("" if why_b == r.reason else f"; base back-off: {why_b}")
         if push is not None:
             # the push stance got its carried object after ``check_stances_with_objects``: the drive's sweep covers its pose
             why = self.recheck_carried_travel(self.bindings.one("target").name, arm_q=arm_q, stances=False)

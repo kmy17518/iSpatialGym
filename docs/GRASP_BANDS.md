@@ -2500,6 +2500,34 @@ trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d
   fixed, d and v have no numbers.
 - touching_03 still writes no demo. All switches stay default OFF.
 
+#### (d) fix and the owner's decisions c (2026-11-08; DECISIONS "i7-t03 ROUND 2 (d) FIX" / "i7-t03 DECISIONS C")
+
+- **(d) fix, b6da685d.** `shelf_lift_plan` takes the book's standing axis from the new `IORSSmall.shelf_standing_axis`, which is local
+  to the shelf lift; `up_axis()` stays inside-only. The axis is the signed model axis most aligned with world +z (the rule
+  `upright_shelf_facts` reads the lean from), applied to the v2 lean entry's upright base (`lean_base_wxyz`), else to the template's
+  rest. For acbrnv both give -x. It is used only within 40 deg of vertical at the attempt's start.
+  - Without an axis, or on any error in the plan, the lift is today's: no turn and no leaned-board touch. Kit
+    `shelf_lift.fallback_no_axis.<why>` / `.fallback_error`.
+  - Reruns: i7t03r4_d / _v on trunk_b6da685d (numbers in DECISIONS).
+- **Merge** of i7-t03specs c4a6956a (0dcfa115): the opryhp_0 / otwukr_1 interior specs, the measure `--lateral` option and their tests.
+- **5k.1, the computed shelf-width rule** (`ISPATIALGYM_SHELF_SPAN_RULE`, default off; 830e7837).
+  - Required free span = the carried book's extent along the edge at the drawn lean (its thickness upright when (d) is on) + the
+    open jaw's excess over the pinch, both sides: pre-shape opening `w + 2 x 10 mm` (else 0.10 m) + 2 x 12 mm fingers - `w`.
+  - acbrnv: 0.148 m leaning 19.6 deg and 0.075 m upright, against otwukr's 0.09-0.10 and kmuacd's 0.128 at 20 / 20.
+  - It is checked per attempt at the drawn leans, and at the template stage at the most favourable drawable leans. Kit
+    `shelf_span.passed` / `.rejected` / `.template_rejected`.
+- **5p.2, every candidate's trunk in the stance shift** (under `ISPATIALGYM_SHELF_JOINT_STANCE`; 830e7837).
+  - Each shifted base position is tried at the candidate's trunk, then at the other trunks of the attempt's candidates.
+  - The scan budget counts only the stances that reach the exact checks. Kit `stance_shift.trunk.other_tried` / `.other_passed`.
+- **(c) tests.** 2f815f1b had one test (the drive fractions). Added `lifted_book_gap` and the plan built from it.
+- **5p.1, the retreat by the base** (`ISPATIALGYM_SHELF_RETREAT_BACKOFF`, default off; approved oracle change; 36e67650).
+  - Applies to the shelf tip release, when its 15 cm clear pose fails.
+  - The sampler checks the place's own end (10 cm back) by exact IK, then a 5 cm drive-back along the stance axis with both arms frozen
+    there and the fingers open (the strides of `navigation.path_collision_free`).
+  - It records stance `retreat` plus the transition into it. The oracle's shelf tip program then runs place -> that transition, instead
+    of place -> the 5 cm arm retreat.
+  - Kit `shelf_retreat.backoff_passed` / `.backoff_failed.<place_end|drive|no_edge>` / `.recorded`.
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
