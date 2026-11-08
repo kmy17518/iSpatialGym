@@ -219,3 +219,36 @@ def test_tracked_end_blame_switch(monkeypatch):
     monkeypatch.setenv(IK.TRACKED_END_BLAME_ENV, "0")
     assert not IK.tracked_end_blame_on()
 
+
+
+# ---------------------------------------------------------------- round 8: per-family switch defaults
+
+def test_shelf_tip_family_switch_defaults(monkeypatch):
+    from ispatialgym.sampling.v2 import alias_switches as AS
+
+    monkeypatch.delenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, raising=False)
+    monkeypatch.setattr(AS, "SHELF_TIP_DEFAULTS", (IS.SHELF_LIFT_STRAIGHTEN_ENV,))
+    t03 = SimpleNamespace(shelf_tip=lambda: True)
+    other = SimpleNamespace(shelf_tip=lambda: False)  # every other IORS small alias: no shelf tip release
+
+    def broken():
+        raise AttributeError("shelf_start")
+
+    assert IS.shelf_lift_straighten_on(t03) and not IS.shelf_lift_straighten_on(other) and not IS.shelf_lift_straighten_on()
+    assert not IS.shelf_lift_straighten_on(SimpleNamespace()) and not IS.shelf_lift_straighten_on(SimpleNamespace(shelf_tip=broken))
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, "0")  # the environment wins both ways
+    assert not IS.shelf_lift_straighten_on(t03)
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, "1")
+    assert IS.shelf_lift_straighten_on(other)
+
+
+def test_only_touching_03_is_the_shelf_tip_family():
+    """The family defaults reach touching_03 only: no other customs entry has generation.shelf_tip_release (IORSSmall.shelf_tip), and only
+    IORSSmall defines shelf_tip."""
+    import json
+
+    from ispatialgym import REPO_ROOT
+
+    d = json.load(open(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")))
+    have = sorted(k for k, v in d.items() if isinstance(v, dict) and (v.get("generation") or {}).get("shelf_tip_release"))
+    assert have == ["inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside"]
