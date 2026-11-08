@@ -1446,6 +1446,8 @@ def interior_map_bands(s, spec: BandSpec, top, arm: Optional[str] = None, *, joi
     why = IN.live_mismatch(ispec, top, floor_z, joints=joints)
     if why is not None:
         miss(f"the live interior is not {ispec.name}: {why}")
+    if IN.front_side_on() and IN.open_sides_case(list(getattr(top, "open_edges", None) or [])) == "front_side":
+        _count(s, "interior_open_sides.front_side")  # i7-goalmaps (owner 5c.2): the switch's case served this lookup
     if not map_sampling_root():
         miss("no maps root (ISPATIALGYM_REACH_MAPS)")
     root = os.path.join(map_sampling_root(), entry)

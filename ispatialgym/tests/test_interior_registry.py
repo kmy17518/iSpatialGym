@@ -33,8 +33,49 @@ def test_the_sink_is_an_open_top_basin_and_the_fridge_door_is_boxed_per_piece():
 
 def test_the_hall_tree_board_is_found_at_the_touching_goal_height(monkeypatch):
     """i7-goalmaps: the spec serves touching_large_02's lookup (house_double_floor_lower / hall_tree_upkvgr_0 at the live 0.5809 m); its
-    raster has a back panel and two open edges (front +u, side -v) - ``live_mismatch`` reads two open edges as an open back (owner question)."""
+    raster has a back panel and two open edges (front +u, side -v)."""
     monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
     sp = IN.spec_for_support("house_double_floor_lower", "hall_tree_upkvgr_0", 0.5809)
     assert sp is not None and sp.name == "hall_tree_upkvgr_0@0.5809" and sp.back_thickness_m is not None
     assert tuple(sp.edge_distances) == (0.1, 0.2, 0.3) and abs(sp.board_setback_m - 0.3047) < 1e-9
+
+
+#: i7-goalmaps 2026-11-08 (owner decision 5c.2): the specs the front-side switch must leave unchanged - this registry's plus the ones
+#: i7-ft2 (awvzkn) and i7-t03specs (opryhp / otwukr_1) measured on their branches (digests of those branches' registries)
+ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e"}
+
+
+class _Raster:
+    def __init__(self, z, edges):
+        self.z, self.headroom, self.mask, self.open_edges = z, None, None, list(edges)
+
+
+def test_the_front_side_switch_changes_no_digest(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    for on in ("0", "1"):
+        monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+        reg = IN.load_registry()
+        for name, digest in ALL_KNOWN_DIGESTS.items():
+            assert reg[name].digest() == digest, (on, name, reg[name].digest(), digest)
+
+
+def test_front_plus_side_is_its_own_case_only_with_the_switch(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    reg = IN.load_registry()
+    ht = reg["hall_tree_upkvgr_0@0.5809"]
+    monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)  # default off: today's rule - two open edges = front + back
+    assert IN.open_sides_case(["+u", "-v"]) == "front_back"
+    assert "open sides" in IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"]))
+    monkeypatch.setenv(IN.FRONT_SIDE_ENV, "1")
+    assert IN.open_sides_case(["+u", "-v"]) == "front_side" and IN.open_sides_case(["+u", "-u"]) == "front_back"
+    assert IN.open_sides_case(["+u", "-u", "+v"]) == "front_back" and IN.open_sides_case(["+u"]) == "front"
+    assert IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"])) is None
+    # the measured rasters of the other specs give the same verdict with the switch on and off
+    for name, edges in (("bookcase_jaysra_0@0.9472", ["+u", "-u"]), ("drop_in_sink_lkklqs_0@basin", ["+u", "-u", "+v", "-v"]),
+                        ("fridge_petcxr_0@0.7064/j_left_door2.3", ["+u"])):
+        sp = reg[name]
+        verdicts = []
+        for on in ("0", "1"):
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+            verdicts.append(IN.live_mismatch(sp, _Raster(sp.height_m, edges), joints=dict(sp.joint_values) or None))
+        assert verdicts[0] == verdicts[1] is None, (name, verdicts)
