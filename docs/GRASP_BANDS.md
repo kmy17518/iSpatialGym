@@ -2496,6 +2496,64 @@ i7-brace 9d2ce7e3 (6ab54ba7) supplies the clear-turn axial_brace builder.
     missing_map.
   - Option: keep the 3 mm drop under the switch, so upright rests stay draw-identical.
 
+#### Owner item 3 (2026-11-08, owner_20261108g): the settled rest is the DEFAULT
+
+Owner decision, verbatim: "Make ISPATIALGYM_AXIAL_SETTLED_REST the default, in its own commit, together with tablespoon tqqwys's
+settled-rest push_blade / axial_brace maps in the consolidated root (they must go together: switch off with those maps gives missing_map).
+Keep the usual 3 mm drop gap for upright rests (tilt <= 0.05 rad), so axial_01/03/04 draw exactly as today. Unit test that an upright rest
+places identically with the switch on and off. Snapshot; confirm with one N 4 v2only run of axial_05 and axial_01 / 03 / 04 on the staged
+root, same indices as i7ar_on. axial_05's brace never landing (IK failed in all 4) is a follow-up: diagnose it (CPU first), report, no fix
+without asking."
+
+- Checked first: the switch was not the default on this branch (4d22896d read "0").
+- **289ca4c3 - upright rests stay today's program.** An upright v2 rest (tilt <= `contact_poses.AXIAL_UPRIGHT_TILT_RAD` = 0.05 rad,
+  the same test `contact_library.axial_rest` already applied) is the identity rest under the switch too:
+  - `object_pose_on` places it, with the usual 3 mm drop gap, not top + h_root;
+  - the goal, aligned yaw, extents and stop geometry are today's; counter `axial_rest.upright_identity`;
+  - the library side matches: `axial_rest` returns the identity for an upright rest under the switch, and `build_job` writes
+    `settled_rest` into the library identity only for a TILTED rest (one the switch-off build refuses). So no library identity moves with
+    the flip: upright libraries carry no param, and tqqwys's settled-rest maps keep their keys.
+  - Tests (`test_axial_settled_rest.py`, 16 pass): an upright rest places bit-identically on and off (pose, orientation, aligned yaw,
+    stop geometry; z = top + bottom offset + 3 mm) for the identity, magazine tfovwy's rest and a 0.04 rad tilt; a tilted rest still
+    settles at top + h_root; an upright library has the same digest and entries on and off.
+- **dee19fcb - the default flip** (own commit): `ISPATIALGYM_AXIAL_SETTLED_REST` defaults on; `=0` turns it off.
+- **The maps that must go with it** (the flip and these two maps fold in together; with the switch off they are a rest mismatch, so
+  axial_05 gets `missing_map`):
+  - `maps/tablespoon__tqqwys__s1/cmap__push_blade__tablespoon__tqqwys__h0.8126__cba67061f6a58376` (.json + .npz; library digest
+    3318755d5aaa873e, params settled_rest);
+  - `maps/tablespoon__tqqwys__s1/cmap__axial_brace__tablespoon__tqqwys__h0.8126__8753ec81a0698bed` (.json + .npz; library digest
+    da04050a5da62ad3, clear-turn build + opposite end, settled_rest);
+  - staged root for the integration: `$OFH/v2maps_int1_axialrest` (= `v2maps_int1_brace34b` + these two maps; source
+    `$OFH/axialrest_20261108/libs_push`, `libs_brace`).
+- The axial brace switches: this branch merged i7-brace at 9d2ce7e3, before i7-brace's own default commit 59f7967b. The confirm run
+  passes `ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1` and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1` explicitly, as i7ar_on did; 59f7967b is not
+  merged here (it would bring i7-brace's wall_brace work along).
+- Suite on 38ee02e8: 23 failed + 3 errors, the same set as with the base d72185da's files. 38ee02e8 moves test_contact_library's
+  lying-rest refusal to the switch-off setting (`=0`).
+- **Confirm run** `i7ar_def` (trunk_38ee02e8, svl titanrtx, v2only N 4, indices 310000-310003 as i7ar_on, root
+  `$OFH/v2maps_int1_axialrest`, alias memory v0027 pinned, no settled-rest env, both brace switches explicit): see DECISIONS
+  "i7-axialrest CONFIRM".
+
+**axial_05's brace never landing: CPU diagnosis (no fix made).** Script `$OFH/axialrest_20261108/brace05.py` rebuilds the sampler's
+brace candidates of the 4 written i7ar_on demos and reads the axial_brace map at the goal cell.
+- **Arm:** the left (stop brace); the right is locked at its push goal while the brace is solved.
+- **Entries:** the map has 16 classes, all blades at face fraction f0, pitch 0 / 30, either wrist turn. The -end groups hold only their
+  own-end blades, the +end groups only opposite-end blades. In every draw one side is skipped whole by the sweep (the reconstruction
+  reproduces the recorded skips 5 / 5 / 6 / 6).
+- **Map vs live:** the map calls 1-2 classes of the drawn group feasible at the goal cell; those exact classes fail live. blade_0- /
+  opp_blade_0 fail the exact IK at the pre; blade_30- intersects the target at its goal pose (3 mm) or is untrackable.
+- **Pre vs reach:** not reach. Every pre is 0.17-0.33 m inside the left arm's reach sphere at the stance trunk, 7-12 cm above the top.
+- **Collisions (CPU evidence):** the map is single-arm, the live check is two-arm. 310001's opposite-end blade sits 7 mm from the right
+  push hand's goal pose; the own-end blades sit 8.7-9.0 cm from it. The locked push arm (or the goal hull's 3 mm margin) is the likely
+  cause; a GPU replay of `brace_second_arm` with the collision pairs would separate them.
+- **The 3 braces that did land** were `left_h-` pads, which have no map class: the thin target's fallback after every blade failed. The
+  pad's pre stands 2.2 cm above the table. program_check rejected the whole attempt ("support_policy: non-finger link touches the
+  support"), 3 of the 4 program_check_failed. The sampler's brace screening does not apply the support policy at the pre, so a refused
+  brace costs the attempt instead of leaving it push-only.
+- **Options for the owner:** (1) screen the brace pre with the program check's support policy (a refused brace -> push-only); (2) thin
+  targets try only the map's validated classes; (3) the map / joint placement checks the brace with the right arm at its push goal. A GPU
+  probe of the collisions comes first.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
