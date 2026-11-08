@@ -700,6 +700,8 @@ class BlockDesign(SamplerV2):
             if c not in c2f:
                 raise Reject("spec", f"pattern colour {c!r} not on the block ({sorted(c2f)})")
         d.layout_template_id = pid
+        if self._has_board():
+            BDD.sweep_all(self, pattern)
         if board_early_on() and self._has_board():
             self._board_precheck(init, manip, [c2f[p] for p in pattern])
         self._travel_between(init, manip)
