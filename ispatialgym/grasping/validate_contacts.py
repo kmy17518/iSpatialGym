@@ -588,10 +588,166 @@ def brace_load_switches() -> Dict[str, bool]:
     partner while the brace stands and a teleported kinematic pusher does not wake it); ``ISPATIALGYM_GC_BRACE_LOAD_MEASURED=1`` stops the
     pusher ``brace_press_m`` after the MEASURED first contact (the load point moved ``brace_contact_m``; the wall fix fae1e4d8: the computed
     face from the hull's vertices ignores the contact offsets), extending the path up to ``brace_pusher_travel_max_m``. Either correction
-    implies the record. All unset = today's load, bit-identical."""
-    on = {k: os.environ.get(f"ISPATIALGYM_GC_BRACE_LOAD_{k.upper()}", "0") == "1" for k in ("diag", "wake", "measured")}
-    on["diag"] = on["diag"] or on["wake"] or on["measured"]
+    implies the record. All unset = today's load, bit-identical.
+
+    i7-brace 5w.3 FIX (lead decision, owner away; default OFF): ``ISPATIALGYM_GC_BRACE_LOAD_GEOM=1`` - the AXIAL load geometry and hold judge
+    (:func:`axial_pusher_path`, :func:`judge_axial_brace`): on the axial COM hinge the pusher meets the PUSHED end's material square to the
+    end's arc about the hinge and is carried along that arc (the oracle's push turns the end about the COM), stopped ``brace_press_m`` at the
+    braced end after the MEASURED turn; the judge reads the TURN (the braced end's arc travel), not the hinge-pinned root, and a load that
+    never turned the target is ``not_loaded`` (never a pass); the touching brace's judge gets the same ``not_loaded`` (its load point moved
+    < ``wall_loaded_min_m``). It implies the record; the wake stays its own switch."""
+    on = {k: os.environ.get(f"ISPATIALGYM_GC_BRACE_LOAD_{k.upper()}", "0") == "1" for k in ("diag", "wake", "measured", "geom")}
+    on["diag"] = on["diag"] or on["wake"] or on["measured"] or on["geom"]
     return on
+
+
+def pusher_quat_square_to(d: np.ndarray) -> np.ndarray:
+    """i7-brace 5w.3 FIX: the pusher box's orientation (xyzw) with its THICKNESS (``brace_pusher_size_m[0]``, the box's local y:
+    :meth:`KitContactWorld._pusher_obj` scales it (width, thickness, height)) along the horizontal load ``d`` - :func:`pusher_path` assumes it,
+    but the box was never turned (identity: thickness along world y), so a load along x met the target with the box's 8 cm side (its face
+    2.5 cm early: 5w.3 WM, keyboard / board_game / jhaltj s1x1x2.5 contacts 11-25 mm early; the thin magazine / jhaltj s1 started inside the
+    box). Identity for ``d`` = +y (the touching braces' load)."""
+    yaw = math.atan2(float(d[1]), float(d[0])) - 0.5 * math.pi
+    return np.array([0.0, 0.0, math.sin(0.5 * yaw), math.cos(0.5 * yaw)])
+
+
+def axial_load_geometry(entry: Dict[str, Any], T_obj: np.ndarray, hinge_xy) -> Dict[str, Any]:
+    """i7-brace 5w.3 FIX: the axial brace load on the COM hinge (``hinge_xy``: the hinge anchor, world) at the braced pose ``T_obj``:
+    ``B`` the BRACED end (``load.point_object``: the end the brace stands at, arriving along ``load.direction``), the turn sense ``spin``
+    (+1 = about +z, the sense that carries ``B`` along ``load.direction``; the library's ``goal.spin``), ``P`` the PUSHED end (the oracle's
+    push: ``B`` itself, or for an opposite-end entry - the brace at the far end - ``B`` reflected through the hinge), ``t`` the pushed end's
+    arc tangent in the turn sense (horizontal unit), ``r_B`` / ``r_P`` their radii about the hinge."""
+    load = entry.get("load") or {}
+    goal = entry.get("goal") or {}
+    R, tr = T_obj[:3, :3], T_obj[:3, 3]
+    H = np.array([float(hinge_xy[0]), float(hinge_xy[1]), 0.0])
+    B = R @ np.asarray(load["point_object"], dtype=float) + tr
+    d = np.asarray(load.get("direction") or [0.0, 1.0, 0.0], dtype=float).copy()
+    d[2] = 0.0
+    d = _unit(d)
+    rB = B - H
+    rB[2] = 0.0
+    cz = float(rB[0] * d[1] - rB[1] * d[0])
+    spin = float(goal.get("spin") or (1.0 if cz >= 0 else -1.0))
+    opp = bool(goal.get("opposite_end"))
+    P = B.copy()
+    if opp:
+        P[:2] = 2.0 * H[:2] - B[:2]
+    rP = P - H
+    rP[2] = 0.0
+    r_P = float(np.linalg.norm(rP))
+    if r_P < 0.01:
+        raise ValueError(f"axial load: the pushed end is {r_P:.4f} m from the hinge (no lever: no load can be placed)")
+    t = _unit(np.cross(np.array([0.0, 0.0, spin]), rP))
+    return {"B": B, "P": P, "H": H, "spin": spin, "opposite": opp, "t": t, "d": d, "r_B": float(np.linalg.norm(rB)), "r_P": r_P,
+            "spin_agrees_d": bool(spin * cz > 0)}
+
+
+def axial_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, hinge_xy, cfg: ContactValidateConfig, dt: float
+                      ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict[str, Any]]:
+    """i7-brace 5w.3 FIX (``ISPATIALGYM_GC_BRACE_LOAD_GEOM``): the axial brace load's pusher ``(centres, xyzw quaternions, facts)`` - the
+    oracle's push carried on past the goal: the pusher's face meets the PUSHED end's material (:func:`axial_load_geometry` ``P``) square to
+    its arc tangent ``t`` and is carried along the ARC about the hinge (the wall load's :func:`wall_pusher_path`, here about the vertical
+    through the hinge), from ``brace_pusher_gap_m`` before the material to the sweep's end (``brace_pusher_travel_max_m`` at the face); the
+    trial stops it ``phi_press`` = ``brace_press_m`` / r_B after the MEASURED turn (:func:`measured_load_stop` on the angles: the braced end
+    driven ``brace_press_m`` past contact unbraced, the touching / wall calibration). The old straight load (:func:`pusher_path`) met the
+    hull's GLOBAL extreme with an unturned box along a fixed line (5w.3 WM: magazine 48 / 96, jhaltj s1 34 / 44 loads never turned the
+    target). The material: the hull's points and edges within the box's face (half-width across the line, half-height) on the pushed end's
+    line; none raises (the trial errors, never a vacuous pass). The box (scaled width x thickness x height = local x, y, z): its thickness
+    along the tangent (:func:`pusher_quat_square_to`), upright, its bottom 2 mm above the target's lowest point."""
+    g = axial_load_geometry(entry, T_obj, hinge_xy)
+    R, tr = T_obj[:3, :3], T_obj[:3, 3]
+    P, H, t = g["P"], g["H"], g["t"]
+    pts = hull_edge_points(pts_obj) @ R.T + tr
+    z_lo = float(pts[:, 2].min())
+    sw, sth, sh = (float(v) for v in cfg.brace_pusher_size_m)
+    zc = max(float(P[2]), z_lo + 0.5 * sh + 0.002)
+    Pc = np.array([P[0], P[1], zc])
+    y = _unit(np.cross(np.array([0.0, 0.0, 1.0]), t))
+    rel = pts - Pc
+    near = (np.abs(rel @ y) <= 0.5 * sw) & (np.abs(rel[:, 2]) <= 0.5 * sh)
+    if not near.any():
+        raise ValueError("axial load: no hull point within the pusher's face on the pushed end's line (no load can be placed)")
+    face = float((rel[near] @ t).min())
+    F0 = Pc + t * face
+    rF = F0 - np.array([H[0], H[1], zc])
+    r_F = max(float(np.linalg.norm(rF)), 1e-3)
+    axis = np.array([0.0, 0.0, 1.0 if float(np.cross(np.array([0.0, 0.0, 1.0]), rF) @ t) >= 0 else -1.0])
+    half = 0.5 * sth
+    phi0 = -cfg.brace_pusher_gap_m / r_F
+    phi1 = phi0 + (cfg.brace_pusher_gap_m + cfg.brace_pusher_travel_max_m) / r_F
+    phi_press = cfg.brace_press_m / max(g["r_B"], 0.02)
+    k = max(1, int(math.ceil((phi1 - phi0) * r_F / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
+    Hz = np.array([H[0], H[1], zc])
+    centres, quats, phis = [], [], []
+    for i in range(k + 1):
+        phi = phi0 + (phi1 - phi0) * i / k
+        Rp = _rot(axis, phi)
+        ti = Rp @ t
+        centres.append(Hz + Rp @ (F0 - Hz) - ti * half)
+        quats.append(pusher_quat_square_to(ti))
+        phis.append(phi)
+    facts = {"start": [round(float(v), 4) for v in centres[0]], "tangent": [round(float(v), 4) for v in t], "face_along_m": round(face, 5),
+             "pushed_point": [round(float(v), 4) for v in P], "braced_point": [round(float(v), 4) for v in g["B"]],
+             "hinge_xy": [round(float(v), 4) for v in H[:2]], "opposite": g["opposite"], "spin": g["spin"], "spin_agrees_d": g["spin_agrees_d"],
+             "tangent_vs_load_dir": round(float(t @ g["d"]), 4), "r_face_m": round(r_F, 5), "r_braced_m": round(g["r_B"], 5),
+             "arc_rad": [round(phi0, 5), round(phi1, 5)], "phi_press_rad": round(phi_press, 6), "contact_rad": round(cfg.brace_contact_m / r_F, 6),
+             "phis": phis, "steps": k, "axis": [float(v) for v in axis], "n_line_points": int(near.sum())}
+    return centres, quats, facts
+
+
+def brace_load_reached(out: Dict[str, Any], loaded: bool, finger_N: Optional[float] = None) -> Dict[str, Any]:
+    """i7-brace 5w.3 FIX (``ISPATIALGYM_GC_BRACE_LOAD_GEOM``): a :func:`judge_brace` verdict whose load never reached the partner (its load
+    point moved < ``wall_loaded_min_m`` during the load and hold: the diagnostic load's ``loaded``) gets ``not_loaded`` - invalid, never a
+    pass; the brace fingers' largest load on the partner during the load is recorded (``finger_obj_N``, a measure only)."""
+    out = dict(out, reasons=list(out.get("reasons") or []), measures=dict(out.get("measures") or {}))
+    if finger_N is not None:
+        out["measures"]["finger_obj_N"] = round(float(finger_N), 3)
+    if not loaded:
+        out["reasons"].append("not_loaded")
+        out["verdict"] = "invalid"
+    return out
+
+
+def judge_axial_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, cfg: ContactValidateConfig,
+                      run: Dict[str, Any], load: Dict[str, Any], other_slab_N: float = 0.0, finger_N: Optional[float] = None) -> Dict[str, Any]:
+    """i7-brace 5w.3 FIX (``ISPATIALGYM_GC_BRACE_LOAD_GEOM``): the axial brace acceptance on the COM hinge (``*0`` the brace standing, ``*1``
+    after the load; ``load`` = :func:`axial_pusher_path`'s facts + ``turn_max_rad``, the largest turn during the load and hold). The hinge pins
+    the root, so the hold is the TURN: the braced end's arc travel past the braced pose (signed turn about ``load["axis"]`` x ``r_braced_m``)
+    <= ``brace_hold_max_m`` (``not_held``); the pushed end travelled >= ``wall_loaded_min_m`` at the largest turn (``not_loaded``: the load
+    never reached the target - no verdict on the brace, never a pass); the brace fingers pressed the target >= ``wall_braced_min_N`` during
+    the load (``not_braced``: it turned past an untouched brace - the wall judge's rule); the rest as :func:`judge_brace` (the oracle ran to
+    its end with a clean postcondition, ``topple``, ``hand_pushed``, ``non_finger_contact``)."""
+    axis = np.asarray(load["axis"], dtype=float)
+    turn = signed_turn(T_obj0[:3, :3], T_obj1[:3, :3], axis)
+    turn_max = max(float(load.get("turn_max_rad", turn)), turn)
+    moved_b = turn * float(load["r_braced_m"])
+    pushed_max = turn_max * float(load["r_face_m"])
+    tilt = _tilt(T_obj0[:3, :3], T_obj1[:3, :3])
+    drift = float(np.linalg.norm(T_eef1[:3, 3] - T_eef0[:3, 3]))
+    root = float(np.linalg.norm(T_obj1[:2, 3] - T_obj0[:2, 3]))
+    reasons = []
+    if not run.get("completed", True):
+        reasons.append("incomplete")
+    if run.get("postcondition"):
+        reasons.append(f"oracle:{run['postcondition']}")
+    if moved_b > cfg.brace_hold_max_m:
+        reasons.append("not_held")
+    if pushed_max < cfg.wall_loaded_min_m:
+        reasons.append("not_loaded")
+    if finger_N is not None and finger_N < cfg.wall_braced_min_N:
+        reasons.append("not_braced")
+    if tilt > cfg.topple_tilt_rad:
+        reasons.append("topple")
+    if drift > cfg.brace_eef_drift_m:
+        reasons.append("hand_pushed")
+    if other_slab_N > cfg.non_finger_contact_N:
+        reasons.append("non_finger_contact")
+    return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
+            "measures": {"braced_point_moved_m": round(moved_b, 5), "turn_rad": round(turn, 5), "turn_max_rad": round(turn_max, 5),
+                         "pushed_point_max_m": round(pushed_max, 5), "root_moved_m": round(root, 5), "tilt_change_rad": round(tilt, 5),
+                         "eef_drift_m": round(drift, 5), "finger_obj_N": None if finger_N is None else round(float(finger_N), 3),
+                         "other_slab_N": round(float(other_slab_N), 4)}}
 
 
 def _asleep(obj) -> Optional[bool]:
@@ -1387,6 +1543,9 @@ class KitContactWorld:
             T0, Te0 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
             trace.rec["braced"] = {"obj": _pose7(T0), "eef": _pose7(Te0)}
             pusher = self._pusher_obj()
+            sw = brace_load_switches()
+            axial_geom = bool(sw["geom"] and hinge is not None and not wall_entry(entry))  # i7-brace 5w.3 FIX (default off)
+            n_load = len(fingers)
             if wall_entry(entry):  # i7-brace: the leveling push carried on past level (3-D, in the wall plane), judged before and after it
                 pre_load = judge_wall_standing(run, self.cfg, max(series) if series else 0.0)
                 n_pre = len(series)
@@ -1415,8 +1574,10 @@ class KitContactWorld:
                                            contact_step=next((j for j, t in enumerate(turns) if t >= self.cfg.wall_contact_turn_rad), None))
                 for _ in range(self.cfg.brace_hold_steps):
                     self._hold(motions, step, 1)
-            elif brace_load_switches()["diag"]:  # i7-brace 5w.3: the diagnostic load (record / wake / measured), default off
-                trace.rec["load_diag"] = self._brace_load_diag(obj, entry, T0, path, pusher, motions, step, sa, brace_load_switches())
+            elif axial_geom:  # i7-brace 5w.3 FIX: the pushed end carried along its arc about the hinge, stopped after the measured turn
+                trace.rec["load_diag"] = axial_load = self._axial_load(obj, entry, T0, pts, hinge, pusher, motions, step, sa, sw)
+            elif sw["diag"]:  # i7-brace 5w.3: the diagnostic load (record / wake / measured), default off
+                trace.rec["load_diag"] = self._brace_load_diag(obj, entry, T0, path, pusher, motions, step, sa, sw)
             else:
                 for i, c in enumerate(path + [None] * self.cfg.brace_hold_steps):
                     if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
@@ -1438,8 +1599,15 @@ class KitContactWorld:
             out["pre_load"] = pre_load
             return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
                         hinge=None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"}, wall_s=round(time.time() - t0, 3))
+        finger_load = max(fingers[n_load:]) if len(fingers) > n_load else 0.0
+        if axial_geom:
+            out = judge_axial_brace(entry, T0, T1, Te0, Te1, self.cfg, run, axial_load, max(series) if series else 0.0, finger_N=finger_load)
+            return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
+                        wall_s=round(time.time() - t0, 3))
         load = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
         out = judge_brace(entry, T0, T1, Te0, Te1, load, self.cfg, run, max(series) if series else 0.0)
+        if sw["geom"]:  # i7-brace 5w.3 FIX: a touching load that never moved the partner is not_loaded (never a pass); the fingers recorded
+            out = brace_load_reached(out, bool((trace.rec.get("load_diag") or {}).get("loaded")), finger_load)
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
                     wall_s=round(time.time() - t0, 3))
 
@@ -1466,8 +1634,10 @@ class KitContactWorld:
                                  "computed_contact_m": round(float(cfg.brace_pusher_gap_m), 5), "step_m": round(float(ds), 6), "path_steps": n}
         travels, moved, asleep_n = [], [], 0
         stop = s_c = None
+        # i7-brace 5w.3 FIX (geom): the box's thickness along the load (identity for the touching braces' +y)
+        q_box = pusher_quat_square_to(d) if sw.get("geom") else np.array([0.0, 0.0, 0.0, 1.0])
         for k, c in enumerate(pts):
-            pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0], dtype=th_.float32))
+            pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(q_box, dtype=th_.float32))
             if sw["wake"]:
                 obj.wake()
             self._hold(motions, step, 1)
@@ -1608,6 +1778,44 @@ class KitContactWorld:
                 "obj_w_max_after_motion": None if not after else round(max(r["w"] for r in after), 4),
                 "moved_total_m": round(float(np.linalg.norm(np.asarray(rows[-1]["p"]) - p0)), 5) if p0 is not None else None,
                 "error": err, "steps": len(rows)}
+
+    def _axial_load(self, obj, entry, T0, pts, hinge, pusher, motions, step, sa, sw: Dict[str, bool]) -> Dict[str, Any]:
+        """i7-brace 5w.3 FIX (``ISPATIALGYM_GC_BRACE_LOAD_GEOM``): the axial brace load (:func:`axial_pusher_path`): the pusher carried along
+        the pushed end's arc about the hinge, the target woken at every step with ``sw["wake"]``, stopped ``phi_press`` after the MEASURED
+        turn (:func:`measured_load_stop` on (pusher angle, signed turn): the turn reached ``contact_rad`` = ``brace_contact_m`` at the face),
+        then ``brace_hold_steps`` held in place. Returns the path's facts + the turn record (``turn_max_rad`` for :func:`judge_axial_brace`)."""
+        th_ = self.tw.th
+        cfg = self.cfg
+        path, quats, f = axial_pusher_path(entry, T0, pts, hinge["anchor"][:2], cfg, 1.0 / 30.0)
+        axis = f["axis"]
+        name = obj.name
+        facts: Dict[str, Any] = {k: v for k, v in f.items() if k != "phis"}
+        facts.update(switches=dict(sw), asleep_at_load=_asleep(obj), sa_sleeps_before=list((sa.sleeps.get(name) or []) if sa is not None else []))
+        turns: List[float] = []
+        asleep_n = 0
+        stop = s_c = None
+        for i, c in enumerate(path):
+            pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor(quats[i], dtype=th_.float32))
+            if sw["wake"]:
+                obj.wake()
+            self._hold(motions, step, 1)
+            asleep_n += int(bool(_asleep(obj)))
+            turns.append(signed_turn(T0[:3, :3], _T(obj.get_position_orientation())[:3, :3], axis))
+            stop, s_c = measured_load_stop(f["phis"][: len(turns)], turns, f["phi_press_rad"], f["contact_rad"])
+            if stop is not None:
+                break
+        hold = []
+        for _ in range(cfg.brace_hold_steps):
+            self._hold(motions, step, 1)
+            asleep_n += int(bool(_asleep(obj)))
+            hold.append(signed_turn(T0[:3, :3], _T(obj.get_position_orientation())[:3, :3], axis))
+        allt = turns + hold
+        facts.update(swept_steps=len(turns), stop_step=stop, contact_step=next((j for j, t in enumerate(turns) if t >= f["contact_rad"]), None),
+                     contact_rad_at=None if s_c is None else round(float(s_c), 6), phi_end_rad=round(float(f["phis"][len(turns) - 1]), 6) if turns else None,
+                     turn_max_rad=round(max(allt), 6) if allt else 0.0, turn_end_rad=round(allt[-1], 6) if allt else 0.0,
+                     loaded=bool(allt and max(allt) * f["r_face_m"] >= cfg.wall_loaded_min_m), asleep_steps=asleep_n,
+                     sa_sleeps=list((sa.sleeps.get(name) or []) if sa is not None else []), sa_wakes=list((sa.wakes.get(name) or []) if sa is not None else []))
+        return facts
 
     def replay(self, sit: Dict[str, Any], obj, geom) -> Dict[str, Any]:
         """A recorded demo's situation (:func:`replay_situation`) rebuilt: the slab at the recorded support height, the object settled at
