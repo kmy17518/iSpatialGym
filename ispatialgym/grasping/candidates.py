@@ -157,7 +157,8 @@ class CandidateConfig:
     # measured across it and dropped (teacup wopjex 5 -> 1, tablespoon yxxfdj 5 -> 1, beer glass mxsliu 2 -> 1 physics-valid) - pads the
     # oracle pre-shapes to the pinch never sweep that far. :class:`PreshapeOuter`: the self-consistent pinch nearest the pad centre.
     # The PROPOSALS too: with every hit the Isaac sampler pairs a point with the furthest hit, so no thin pinch is proposed; with this
-    # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape.
+    # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape; and the policy
+    # geometry check judges each candidate at its own pre-shape, not the selected batch's widest (CP.check_grasp_geometry per-pose open_q).
     outer_pinch_preshape: bool = False
 
 
@@ -1318,7 +1319,11 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         # 7) the full policy geometry: pre-grasp, approach, closing sweep (fingers from the pre-shape to the contact opening)
         Ts = T[sel]
         contact_q = np.clip(0.5 * feats["width"][sel] + pad_face_offset(arm), 0.0, FINGER_OPEN)  # joint value at the pads' first touch
-        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])), obstacles=obstacles)
+        # i7-attachdef (owner 5.1, outer_pinch_preshape): each candidate judged at its OWN pre-shape (check_grasp_geometry takes one opening
+        # per pose) - the batch's max pre-shape judged a thin pinch selected with wide ones (the first-hit proposals next to the all-hit
+        # ones) fully open: tablespoon yxxfdj's 8-16 mm top pinches failed finger_penetration at the 37-48 mm pinches' opening
+        open_q = pre_q[sel] if (cfg.outer_pinch and cfg.outer_pinch_preshape) else float(np.max(pre_q[sel]))
+        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=open_q, obstacles=obstacles)
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
         blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default on since i7-switches)

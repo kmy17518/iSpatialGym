@@ -122,19 +122,34 @@ def test_with_the_switch_the_first_hit_proposals_join_the_all_hit_ones(tmp_path,
     g = _ring()
     monkeypatch.setattr(OG, "load", lambda model_dir: g)
     calls = []
+    T_stub = np.stack([_wall_pinch(z, a) for a in np.linspace(0, 2 * math.pi, 8, endpoint=False) for z in (0.0, 0.006)])
 
     class _Sampler:
         @staticmethod
         def sample_antipodal(mesh, *a, **k):
             calls.append(bool(mesh.ray.all_hits))
-            return [_wall_pinch(0.0, 0.3)] if not mesh.ray.all_hits else [_wall_pinch(0.0, 0.0)]
+            return list(T_stub)
 
     monkeypatch.setattr(CA, "_isaac_sampler", lambda: _Sampler)
+    seen = []
+    real_geo = CA.CP.check_grasp_geometry
+
+    def _geo(*a, **k):  # the opening the policy check judges each candidate at
+        seen.append(k.get("open_q"))
+        return real_geo(*a, **k)
+
+    monkeypatch.setattr(CA.CP, "check_grasp_geometry", _geo)
     job = {"category": "tape", "model": "ring", "scale": [1, 1, 1], "constraint": "tabletop", "rest_hint_wxyz": None, "id": "tape__ring__s1"}
     for pre, want in ((False, [True]), (True, [True, False])):
         calls.clear()
+        seen.clear()
         d = tmp_path / str(pre)
         d.mkdir()
-        cfg = CA.CandidateConfig(**{**asdict(CA.CandidateConfig()), "outer_pinch": True, "outer_pinch_preshape": pre, "topk": 4})
+        cfg = CA.CandidateConfig(**{**asdict(CA.CandidateConfig()), "outer_pinch": True, "outer_pinch_preshape": pre, "topk": 4,
+                                    "cone_deg": 60.0})
         out = CA.generate(job, str(d), cfg=cfg, densify=())
-        assert calls == want and out["log"]["n_sampled"] == len(want)
+        assert calls == want and out["log"]["n_sampled"] == len(want) * len(T_stub)
+        # with the switch one opening per candidate (its own pre-shape), without it the batch's widest (a scalar)
+        assert all((np.ndim(q) == 1) if pre else isinstance(q, float) for q in seen)
+        if pre:  # the ring's one-wall pinches pass the width gate only judged at the pre-shape (the fully-open measure spans the core)
+            assert seen and out["log"]["top"].get("n_selected", 0) > 0
