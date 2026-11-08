@@ -231,3 +231,61 @@ def test_board_placement_keeps_a_flip_set():
     with pytest.raises(Reject) as e:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=lambda kept: False)
     assert e.value.reason == "board_placement" and "no cell set of them lets every repeated-colour block flip" in str(e.value)
+
+
+def _early_scene(monkeypatch, stand_off=0.35):
+    s, init, manip, img_score, faces = _layout_scene(stand_off=stand_off)
+    probes = []
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name="tray.n.01_1"))
+    s.objects = {"tray.n.01_1": object()}
+    s._teleport = lambda objects: None
+    s.world = SimpleNamespace(park=lambda obj, i: None)
+    s.kit = SimpleNamespace(trav_free=lambda xy: True, stats={})
+    s.ikc = SimpleNamespace(exact=lambda poses, st, arm, **kw: probes.append(st) or SimpleNamespace(ok=False))
+    right, toward, yaw = s._table_axes(manip)
+    eligible = lambda c: s._flip_cell_ok(c, manip, init, "right")  # noqa: E731
+    layout_ok = lambda kept: s._has_flip_set(kept, 4, img_score, faces, manip, init, "right", True)  # noqa: E731
+    return s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok
+
+
+def test_board_early_runs_the_layout_before_the_probe_and_keeps_the_probe_verdict(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_EARLY=1: a position whose kept cells have no flip set is dropped before its place probe (the same reason),
+    a failed probe's verdict is kept per (stance, board pose) - the next attempt's identical stance runs no IK; off: unchanged."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY", raising=False)
+    with pytest.raises(Reject) as off:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    n_off = len(probes)
+    assert n_off > 0 and s.kit.stats == {}
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "1")
+    probes.clear()
+    with pytest.raises(Reject) as on:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    # (0.46, -0.02): no flip set -> dropped before its probe (its reason is now the layout's); (0.44, -0.10) keeps one -> probed (fails here)
+    assert on.value.reason == off.value.reason == "board_placement"
+    assert "(0.46, -0.02): 5 cells clear, no cell set" in str(on.value) and "(0.46, -0.02): no pitched place" in str(off.value)
+    assert 0 < len(probes) < n_off and s.kit.stats["bd_board.layout_before_probe"] >= 1 and s.kit.stats["bd_board.probe_run"] >= 1
+    probes.clear()
+    with pytest.raises(Reject):
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert probes == [] and s.kit.stats["bd_board.probe_memo_hit"] == s.kit.stats["bd_board.probe_run"]
+
+
+def test_board_precheck_rejects_before_the_travel(monkeypatch):
+    """The precheck (BD_BOARD_EARLY) runs _place_board's CPU checks on the candidate's region: candidate 10's cells (no flip set with any
+    position) are rejected as board_placement without an IK call; candidate 11's pass (a position keeps a set)."""
+    s, init, manip, faces, probes, _axes, _e, _l = _early_scene(monkeypatch, stand_off=0.45)
+    cam = C.camera_pose(C.torso_q(init.translate, init.tilt), base_pose=tuple(float(v) for v in init.base_pose2d))
+    s.camera_pose_at = lambda st: cam
+    s.world = SimpleNamespace(camera_model=CameraModel(1080, 1080, 459.0, 459.0, 540.0, 540.0), park=lambda obj, i: None)
+    s.names = lambda: ["b0", "b1", "b2", "b3"]
+    manip.extras["focus_info"] = {"cells": [manip.base_to_world(th.tensor(c)) for c in REGION_10]}
+    with pytest.raises(Reject) as e:
+        s._board_precheck(init, manip, faces)
+    assert e.value.reason == "board_placement" and "(precheck)" in str(e.value) and "(0.46, -0.02): off the top" in str(e.value)
+    assert probes == [] and s.kit.stats["bd_board.precheck_reject"] == 1
+    s0 = _layout_scene(stand_off=0.35)[2]
+    s0.extras["focus_info"] = {"cells": [s0.base_to_world(th.tensor(c)) for c in REGION_11]}
+    s._board_precheck(init, s0, faces)
+    assert s.kit.stats["bd_board.precheck_pass"] == 1

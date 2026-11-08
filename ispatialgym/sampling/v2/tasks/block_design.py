@@ -53,6 +53,13 @@ from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
+
+def board_early_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY=1`` (default off): the puzzle board's CPU checks
+    (on the top, cells kept, the repeated-colour flip set) run before the init -> manipulation travel and before the exact place probe,
+    and the probe's verdict per (stance, board pose) is kept for the process (the template's stances repeat every attempt)."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_EARLY", "0") == "1"
+
 SUBTASK = "configuration_matching-block_design"
 DEFAULT_FACES = {"+z": "red", "-z": "blue", "+x": "white", "-x": "yellow", "+y": "blue|yellow", "-y": "red|white"}
 #: approach tilt below the horizontal of the push / brace contacts on a block face (the pads stay above the table)
@@ -693,6 +700,8 @@ class BlockDesign(SamplerV2):
             if c not in c2f:
                 raise Reject("spec", f"pattern colour {c!r} not on the block ({sorted(c2f)})")
         d.layout_template_id = pid
+        if board_early_on() and self._has_board():
+            self._board_precheck(init, manip, [c2f[p] for p in pattern])
         self._travel_between(init, manip)
         cam_init = self.camera_pose_at(init)
         right, toward, table_yaw = self._table_axes(manip)
@@ -2592,12 +2601,28 @@ class BlockDesign(SamplerV2):
                     why.append(f"{tag}: {len(kept)} cells clear ({n_elig} flip-eligible)")
                     continue
             pose = (th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + 0.001]), q)
+            early = board_early_on()
+            if early and layout_ok is not None and cells is not None and not layout_ok(kept):
+                # BD_BOARD_EARLY: the CPU flip-set test before the exact probe (the same verdict, the probe's IK saved)
+                self._kc("bd_board.layout_before_probe")
+                why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
+                continue
+            memo_key = (tuple(round(float(v), 3) for v in manip.base_pose2d), round(float(manip.translate), 3), round(float(manip.tilt), 3),
+                        round(float(xy[0]), 3), round(float(xy[1]), 3), round(float(table_yaw), 3)) if early else None
+            memo = self.__dict__.setdefault("_bd_probe_memo", {})
+            if early and memo.get(memo_key) is False:
+                self._kc("bd_board.probe_memo_hit")
+                why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
+                continue
             # (c) the place probe: the cube's centre at the release aim, its bottom release_above over the pocket floor
             self._teleport({name: pose})
             if BDD.level() and cells is not None and layout_ok is not None:
                 BDD.layout(self, k_diag, tag, kept, manip, self.init_stance, self._flip_directions()[0])
             BDD.probe(self, k_diag, tag, manip, pose, right, toward, table_yaw, support, board_obj)
             probe_ok = self._board_probe(manip, pose, right, toward, table_yaw, support)
+            if early:
+                self._kc("bd_board.probe_run")
+                memo[memo_key] = bool(probe_ok)
             if not probe_ok:
                 why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
                 continue
@@ -2610,6 +2635,52 @@ class BlockDesign(SamplerV2):
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works: " + "; ".join(why))
+
+    def _kc(self, key: str, n: int = 1) -> None:
+        """Kit counter ``key`` (``RobotKit.stats``: the attempt's kit line, ``summary.json["kit"]``)."""
+        st = getattr(getattr(self, "kit", None), "stats", None)
+        if isinstance(st, dict):
+            st[key] = st.get(key, 0) + n
+
+    def _board_precheck(self, init: Stance, manip: Stance, slot_faces: List[str]) -> None:
+        """BD_BOARD_EARLY: :meth:`_place_board`'s CPU checks (on the top, cells kept, the repeated-colour flip set) on the candidate's region
+        before the travel and the exact probe; Reject ``board_placement`` (the same reasons) when no position passes them."""
+        right, toward, _ = self._table_axes(manip)
+        far = -toward
+        geo = self._board_geometry()
+        half = 0.5 * float(geo["plate_m"])
+        half_b = half + 0.5 * self.edge + float(self.gen("board_cell_margin_m", 0.06))
+        n = len(self.names())
+        n_flip = self._n_flips() if self._flips_expected() else 0
+        primary_dir = self._flip_directions()[0]
+        flip_mode = n_flip > 0 and primary_dir in ("right", "left")
+        cells = list(manip.extras["focus_info"]["cells"])
+        cam_init = self.camera_pose_at(init)
+        z_c = self.top.z + 0.5 * self.edge
+
+        def img_score(xy) -> float:
+            uv = self.world.camera_model.project(cam_init, th.tensor([[float(xy[0]), float(xy[1]), z_c]]))[0][0]
+            return float(uv[0] + uv[1])
+
+        why: List[str] = []
+        for depth, lateral in self._board_positions():
+            tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
+            if not self._board_on_top(manip, depth, lateral, half, right, far):
+                why.append(f"{tag}: off the top")
+                continue
+            xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+            kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
+            n_elig = sum(1 for c in kept if flip_mode and self._flip_cell_ok(c, manip, init, primary_dir))
+            if len(kept) < n or n_elig < n_flip:
+                why.append(f"{tag}: {len(kept)} cells clear ({n_elig} flip-eligible)")
+                continue
+            if flip_mode and not self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True):
+                why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
+                continue
+            self._kc("bd_board.precheck_pass")
+            return
+        self._kc("bd_board.precheck_reject")
+        raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works (precheck): " + "; ".join(why))
 
     def _board_probe(self, manip: Stance, pose: TT.Pose, right: th.Tensor, toward: th.Tensor, table_yaw: float, support=None,
                      detail: Optional[List[str]] = None, ignore: Sequence[Any] = ()) -> bool:
