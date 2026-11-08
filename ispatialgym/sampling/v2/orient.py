@@ -143,6 +143,21 @@ def camera_clear(ikc, q: th.Tensor, arm: str, margin: float = CAMERA_MARGIN) -> 
         return True
     if not ok and os.environ.get(CAMERA_BLAME_ENV):
         camera_blame(ikc, q, arm, margin)
+    if not ok:
+        # i7-camhull 2026-11-08 (owner_20261108g item 1, ``ISPATIALGYM_CAMERA_HULL_FALLBACK``, default off): a narrow sphere failure against
+        # the policed support judged by the camera's exact hull (``IKChecker.camera_hull_fallback``); ``shadow`` judges and counts only
+        from ispatialgym.sampling.v2 import ik as IK
+
+        mode = IK.camera_hull_fallback_mode()
+        fb = getattr(ikc, "camera_hull_fallback", None)
+        if mode != "off" and fb is not None:
+            try:
+                out = fb(C.as_tensor(q).float(), arm, float(margin), mode)
+            except Exception as e:  # noqa: BLE001 - the fallback never turns a refusal into an error
+                log.warning("camera hull fallback: %r", e)
+                _count(ikc, "camera_policy.hull_fallback_error")
+                out = {"ok": False}
+            ok = bool(out.get("ok")) and mode == "on"
     return ok
 
 
