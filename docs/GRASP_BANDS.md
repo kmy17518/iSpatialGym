@@ -2614,6 +2614,13 @@ cells (any yaw) r / l 174 / 166 -> 203 / 202 (L2) -> 234 / 227 (L2v), still only
 v2maps_goalmaps, round-1 entry and maps in `_superseded_ladder_r1`, check_int1 ERRORS 0): **`$OFH/v2maps_goalmaps_umb2`** (L2v, the
 primary) and `$OFH/v2maps_goalmaps_umb2s` (L2, the standard validator). L2v's validator change is per entry; the owner confirms it.
 
+**touching_large_02 on the new roots** (N 4 v2only, trunk_1af21ad3, memory off: gm_t02_umb2 18383997 on umb2, gm_t02_umb2s 18383999 on
+umb2s; the final numbers are appended to DECISIONS by `umbrella_r2/final.sh`). Interim: the F_goal blocker is gone - F_goal > 0 at 294 / 308
+C's (umb2) and 432 / 474 (umb2s), against 521 / 3392 in gm_t02_on. 0 written so far: the C tries end at the B -> C carry path (145 of 227 /
+225 of 332) and the B exact IK (89 / 91). The carry blame (gm_t02_umb2_pathblame, `ISPATIALGYM_PATH_BLAME=1`): of 30 blamed collisions 18
+are the carried umbrella against standing_mirror_wwkuuf_0 (removing the mirror alone frees them), 7 walls_oqrbxo_0, 5 walls_owxeej_0, around
+(-0.87, 1.15..1.26) beside the hall tree - the next blocker, outside 5q.2.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
