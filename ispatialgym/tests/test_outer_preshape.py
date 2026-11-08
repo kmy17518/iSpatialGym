@@ -97,7 +97,7 @@ def test_a_non_convex_single_piece_is_judged_by_containment():
     assert abs(w - 0.03) < 1e-4
 
 
-def test_the_switch_is_off_by_default_and_enters_the_identity_only_when_on():
+def test_the_switch_is_the_default_and_enters_the_identity_only_when_on():
     from dataclasses import asdict
 
     from ispatialgym.grasping import candidates as CA
@@ -105,7 +105,7 @@ def test_the_switch_is_off_by_default_and_enters_the_identity_only_when_on():
 
     assert "outer_pinch_preshape" in S.CANDIDATE_SWITCHES
     assert S.candidate_switches({})["outer_pinch_preshape"] is False
-    assert isinstance(CA.CandidateConfig().outer_pinch_preshape, bool)
+    assert CA.CandidateConfig().outer_pinch_preshape is True  # owner 5.1: the default for new builds (its own commit)
     assert "outer_pinch_preshape" in asdict(CA.CandidateConfig())
 
 

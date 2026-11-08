@@ -149,8 +149,9 @@ class CandidateConfig:
     # 1 mm below the support (the support policy's allowance) and the rule then dropped every retreated grasp at face_gap -1.0 mm (cap
     # xxqyrt: 27 of 27 rule drops). The rule itself is unchanged.
     attach_face_retreat: bool = True
-    # i7-attachdef 2026-11-08 (OWNER DECISION 5.1, an approved gate change; default off = outer_pinch as in i7-attachfix; part of the entry
-    # identity when on - schema.CANDIDATE_SWITCHES): with outer_pinch, the pinch the pads close on is judged at the oracle's PRE-SHAPE
+    # i7-attachdef 2026-11-08 (OWNER DECISION 5.1, an approved gate change; ADOPTED: default True for new builds after the count on the
+    # campaign library, attachdef_20261108/count_pre4; False = outer_pinch as in i7-attachfix, which every entry built without the field reads
+    # as; part of the entry identity when on - schema.CANDIDATE_SWITCHES): with outer_pinch, the pinch the pads close on is judged at the oracle's PRE-SHAPE
     # opening (:func:`preshape_pad_half` = :func:`oracle_preshape_q`: pinch width / 2 + MotionsConfig.gripper_preshape_margin, as
     # execute.execute_grasp pre-shapes before the descent), not from the fully open pads (+-aperture / 2 = +-44.45 mm). Measured from the
     # fully open pads, a rim / wall / handle pinch whose line meets another surface within 44 mm (a cup's far wall, a spoon bowl) was
@@ -159,7 +160,7 @@ class CandidateConfig:
     # The PROPOSALS too: with every hit the Isaac sampler pairs a point with the furthest hit, so no thin pinch is proposed; with this
     # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape; and the policy
     # geometry check judges each candidate at its own pre-shape, not the selected batch's widest (CP.check_grasp_geometry per-pose open_q).
-    outer_pinch_preshape: bool = False
+    outer_pinch_preshape: bool = True
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}

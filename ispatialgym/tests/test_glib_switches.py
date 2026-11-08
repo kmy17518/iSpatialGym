@@ -249,7 +249,7 @@ def test_new_builds_record_both_switches_on(monkeypatch):
 
     monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
     # i7-attachdef 2026-11-08: outer_pinch / attach_face_retreat default on too (owner 4.1)
-    assert S.candidate_switches(asdict(CA.CandidateConfig())) == dict({k: True for k in OFF3}, outer_pinch_preshape=False)
+    assert S.candidate_switches(asdict(CA.CandidateConfig())) == {k: True for k in OFF3}  # i7-attachdef: outer_pinch_preshape too (owner 5.1)
     cfg, _ = PL.candidate_overrides({"cand_overrides": {k: False for k in OFF3}})
     assert S.candidate_switches(asdict(cfg)) == OFF3
 
