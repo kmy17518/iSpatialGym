@@ -1,4 +1,4 @@
-"""i7-attachdef 2026-11-08 (lead decision: sampler-only bug fix, default off): ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS`` - the instance
+"""i7-attachdef 2026-11-08 (lead decision: sampler-only bug fix; the default since the owner's 5j, 2026-11-08): ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS`` - the instance
 summary (the collector queue's ready marker, ``run_isg.queue_ready``) is written as ``.pending`` and renamed only after the post-write
 screens pass, so a rejected attempt is never claimable and an accepted one is claimable exactly once."""
 
@@ -57,9 +57,17 @@ def test_an_accepted_attempt_is_claimable_exactly_once(tmp_path, monkeypatch, mo
     assert RI._claim(claims, "a__300002") and not RI._claim(claims, "a__300002")
 
 
+def test_switch_is_on_by_default(monkeypatch, mods):
+    CORE, _ = mods
+    monkeypatch.delenv("ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS", raising=False)
+    monkeypatch.delenv("ISPATIALGYM_FAST", raising=False)
+    assert CORE.publish_after_screens()  # owner 2026-11-08 (5j): the default
+    assert CORE.instance_summary_path("x/a__1-tro_state.json").endswith(".summary.json.pending")
+
+
 def test_switch_off_writes_the_summary_in_place_as_before(tmp_path, monkeypatch, mods):
     CORE, RI = mods
-    monkeypatch.delenv("ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS", "0")
     root = str(tmp_path / "inst")
     tro = _write_attempt(root, "a__300003", CORE)
     assert [i for i, _ in RI.queue_ready(root)] == ["a__300003"]  # ready at once (the window the switch closes)

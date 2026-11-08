@@ -82,12 +82,14 @@ def start_per_attempt() -> bool:
 #: re-sampled over it; 2 mental_rotation episodes hit FileNotFoundError). With ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=1`` the summary is
 #: written as ``<iid>.summary.json.pending`` and renamed (atomic) to ``<iid>.summary.json`` only after every post-write screen passed; a
 #: rejected attempt's files are removed with it, so it is never claimable. Counters (SAMPLING_REPORT) ``publish_after_screens.{published,withheld}``.
+#: DEFAULT ON since the owner's decision 2026-11-08 (5j; ad_race disembedding_09: published 4, withheld 2, 4 / 4 ok); ``=0`` (or
+#: ``ISPATIALGYM_FAST=0``) restores the summary written in place before the screens.
 SUMMARY_SUFFIX = ".summary.json"
 PENDING_SUFFIX = ".pending"
 
 
 def publish_after_screens() -> bool:
-    return fast_on("PUBLISH_AFTER_SCREENS", default=False)
+    return fast_on("PUBLISH_AFTER_SCREENS", default=True)
 
 
 def instance_summary_path(tro_path: str, pending: Optional[bool] = None) -> str:
