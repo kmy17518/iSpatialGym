@@ -122,7 +122,8 @@ CPUS = effective_cpus()
 RAM = ram_gb()
 FREE_CPUS = list(CPUS[1:])  # CPU 0 for the worker, the transfers and the heartbeat
 CPUS_PER_JOB = int(os.environ.get("ISG_CPUS_PER_JOB", "9"))
-SLOTS = int(min(GPU["n_gpus"] * (GPU["vram_gb"] // VRAM_PER_JOB_GB), len(FREE_CPUS) // CPUS_PER_JOB, RAM // RAM_PER_JOB_GB))
+# every job runs on GPU 0 (CUDA_VISIBLE_DEVICES=0): a second GPU adds no slot
+SLOTS = int(min(GPU["vram_gb"] // VRAM_PER_JOB_GB, len(FREE_CPUS) // CPUS_PER_JOB, RAM // RAM_PER_JOB_GB))
 if MAX_JOBS:
     SLOTS = min(SLOTS, MAX_JOBS)
 
