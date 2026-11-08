@@ -2403,6 +2403,17 @@ opposite_face braces climb to +20 mm and slide 5.0-10.2 mm. The September demos 
 rungs, peak carton 3.3-6.2 mm (300006 stays protected_contact: the left finger touches the carton in the push's pre-contact). Record
 `$OFH/contact3_20261108/close02_diag` (scan.py / scan_out.txt / scan_recollect.txt).
 
+**close_02 fix, option (a) (owner answers b item 2: an approved oracle change limited to this).** `Executor.push_outcome(push, ctx,
+brace=)`: with `ISPATIALGYM_TOP_PRESS_ACCEPT` (default "1" since d555c53d; "0" = the ladder for every brace) an in-tolerance push braced by a
+`top_press` is accepted as it is - no improvement rung, so `offset_brace` never raises the press; every other brace kind and every push out
+of tolerance keep the ladder. Counter `result.counters["push_outcome.top_press_in_tolerance_accepted"]`; tests `test_top_press_accept.py`.
+A/B (trunk_2844d8c2, cluster, close_02 300006-300009): fresh v2only 0 / 4 -> 3 / 4 (0.167 GPU-h per success), the int1_6 instances
+re-collected 0 / 4 -> 3 / 4; object_tilt 3 -> 0, the carton's peak 10.0-11.7 mm -> 3.3-6.2 mm. The remaining failure (300006,
+protected_contact; diagnosis only): the QA protection run-check exempts only the contacts present when the push's pre_contact span opened
+and a `press_hold` hand, not an active Brace, although `brace_allowed` lists the pair - the left top-press finger's contact with the carton
+starts 19 steps into the right arm's pre_contact (step 409) and reads as protected_contact (the carton moved 3.2 mm). Candidate fix (oracle
+QA rule, owner): the active brace's allowed pairs as the transit's hold exemption.
+
 **3.6 place depth cap (`ISPATIALGYM_PLACE_DEPTH_CAP`; "0" off, "shadow" counts only, "1" on).** `IORSSmall.place_depth_caps`: the touching
 target is placed at its start depth (level with the partner) and pushed from an A1 push stance on the same edge and trunk; per
 manipulation candidate the push stances at A1's stand-offs are whole-body collision-checked (the base's real minimum distance to the
