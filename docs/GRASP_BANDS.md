@@ -1972,13 +1972,19 @@ defaults when it is missing. Every version's `meta.json` carries the thresholds 
 
 | | production (default) | validation (opt-in) |
 |---|---|---|
-| store | `<root>/alias_memory` | `<root>/alias_memory_validation` |
+| store | `<root>/alias_memory_production` | `<root>/alias_memory_validation` |
 | demos aggregated | production-mode jobs only: starts EMPTY | the seed + jobs from before the modes (both marked `seed`) + validation-mode jobs |
 | customs / keys change | RESET (weight 0) | carried over at w = 1/3, flat |
 | seeded demo | (none) | w = 1/3, flat |
 | own context, older snapshot | 0.8 per newer snapshot | 0.8 per newer snapshot, never below w |
 | bootstrap | the first production job's batch aggregation | `alias_memory aggregate --root R --mode validation --no-gpu` (pins the seed in `seed.json`) |
 
+- `<root>/alias_memory` is the LEGACY store, and neither mode reads it.
+  - Snapshots from before the modes (every round-4 branch until it carries this code) aggregate every demo of the root into it after
+    each batch: `$OFH/alias_memory` v0001 (i7tray_gs, trunk_fcddc495) and v0002 (i7i2_fridgeB2, trunk_c7fcb37a), 2,672 demos each,
+    with no mode.
+  - A production store there would not have started empty, and its LATEST would flip with every old-snapshot batch. So production
+    has its own directory, and a version without a mode is `legacy`: submit_fast and the sampler refuse it in either mode.
 - Separation is enforced three times:
   - each mode aggregates only its own demos;
   - a store's `thresholds.json` carries its mode, and aggregating the other mode into it is refused;

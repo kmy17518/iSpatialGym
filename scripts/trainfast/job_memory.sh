@@ -3,7 +3,7 @@
 # queues after every GPU job (--dependency=afterany); it builds a NEW version <root>/alias_memory/v<NNNN> only when no other job of the
 # batch (the ledger's rows with this tag) is still queued / running (the last one aggregates). Reads job dirs, writes only the memory root.
 #   sbatch -A vision -p svl --exclude=svl9 -c 2 --mem=8G --time=1:00:00 --dependency=afterany:<id> job_memory.sh <root> <tag> <code snapshot> [mode]
-# i7-memory2: <mode> production (default: <root>/alias_memory, production-mode jobs only) | validation (<root>/alias_memory_validation)
+# i7-memory2: <mode> production (default: <root>/alias_memory_production, production-mode jobs only) | validation (<root>/alias_memory_validation)
 #SBATCH -c 2
 #SBATCH --mem=8G
 set -u

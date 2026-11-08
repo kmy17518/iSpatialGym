@@ -388,7 +388,7 @@ def test_production_starts_empty_and_resets(tmp_path):
     _fake_job(root, "t1", "al_01", 1, False, "place", translate=0.5)                       # a job from before the modes
     _fake_job(root, "t1", "al_01", 2, False, "place", translate=0.5, mode="validation")
     v = AM.aggregate(str(root), mode="production", gpu=False)
-    assert os.path.dirname(v) == str(root / "alias_memory")
+    assert os.path.dirname(v) == str(root / "alias_memory_production")
     meta = json.load(open(os.path.join(v, "meta.json")))
     assert meta["n_rows"] == 0 and meta["mode"] == "production" and meta["seed"] is None  # starts EMPTY: no history, no validation demo
     _fake_job(root, "t2", "al_01", 3, False, "place", translate=0.5, mode="production")
@@ -451,7 +451,7 @@ def test_stores_are_separate(tmp_path, monkeypatch):
     _fake_job(root, "t1", "al_01", 3, True, mode="production")
     vv = AM.aggregate(str(root), mode="validation", seed=str(tmp_path / "seedroot"), gpu=False)
     vp = AM.aggregate(str(root), mode="production", gpu=False)
-    assert os.path.dirname(vv) == str(root / "alias_memory_validation") and os.path.dirname(vp) == str(root / "alias_memory")
+    assert os.path.dirname(vv) == str(root / "alias_memory_validation") and os.path.dirname(vp) == str(root / "alias_memory_production")
     rv = AM.load_version(vv, "al_01").rows
     rp = AM.load_version(vp, "al_01").rows
     assert sorted(r.get("index") for r in rv if not str(r.get("seed", "")).startswith("seed:")) == [1, 2]
@@ -460,18 +460,24 @@ def test_stores_are_separate(tmp_path, monkeypatch):
     mv = json.load(open(os.path.join(vv, "meta.json")))
     assert mv["mode"] == "validation" and mv["seed"] == os.path.abspath(seed) and mv["n_seeded"] == 9
     assert json.load(open(root / "alias_memory_validation" / "seed.json"))["seed"] == os.path.abspath(seed)
-    assert json.load(open(root / "alias_memory" / "thresholds.json"))["mode"] == "production"
+    assert json.load(open(root / "alias_memory_production" / "thresholds.json"))["mode"] == "production"
     # a store's thresholds file belongs to its mode: aggregating the other mode into it is refused
     with pytest.raises(SystemExit):
-        AM.aggregate(str(root), mem_root=str(root / "alias_memory"), mode="validation", gpu=False)
+        AM.aggregate(str(root), mem_root=str(root / "alias_memory_production"), mode="validation", gpu=False)
     with pytest.raises(SystemExit):
         AM.aggregate(str(root), mem_root=str(root / "alias_memory_validation"), mode="production", gpu=False)
-    # the sampler refuses a version of the other mode's store
+    # the sampler refuses a version of the other mode's store, and a legacy one (pre-mode aggregation of every demo into <root>/alias_memory)
+    legacy = AM.write_version(str(root / "alias_memory"), AM.collect_rows(str(root)), AM.Thresholds(), batch="old")
+    meta = json.load(open(os.path.join(legacy, "meta.json")))
+    meta.pop("mode")
+    json.dump(meta, open(os.path.join(legacy, "meta.json"), "w"))
+    assert AM.version_mode(legacy) == "legacy"
     monkeypatch.setenv(AM.ENV_ALIAS, "al_01")
     monkeypatch.setenv("ISGE_CODE", "/x/trunk_a")
     AM.enable_for_split("train")
     try:
-        for path, mode, ok in ((vv, "production", False), (vp, "validation", False), (vv, "validation", True), (vp, "production", True)):
+        for path, mode, ok in ((vv, "production", False), (vp, "validation", False), (vv, "validation", True), (vp, "production", True),
+                               (legacy, "production", False), (legacy, "validation", False)):
             AM._LOADED.clear()
             AM._MISMATCH.clear()
             monkeypatch.setenv(AM.ENV_PATH, path)
@@ -488,7 +494,7 @@ def test_stores_are_separate(tmp_path, monkeypatch):
 def test_thresholds_read_from_the_file(tmp_path):
     root = tmp_path / "root"
     _fake_job(root, "t1", "al_01", 1, True, mode="production")
-    store = root / "alias_memory"
+    store = root / "alias_memory_production"
     store.mkdir(parents=True)
     (store / "thresholds.json").write_text(json.dumps({"min_n": 5, "p_worse": 0.9, "floor": 0.1}))
     v = AM.aggregate(str(root), gpu=False)

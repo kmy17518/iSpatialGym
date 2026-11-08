@@ -110,7 +110,8 @@ def shiyuc_env(a):
 
 
 #: i7-memory2 (owner 2026-11-08 2.2 / 2.4): the store of each memory mode under --root (alias_memory.STORE_DIRS) - separate stores
-MEMORY_STORES = {"production": "alias_memory", "validation": "alias_memory_validation"}
+#: (<root>/alias_memory stays the legacy store the pre-mode snapshots aggregate every demo into: never pinned by a mode)
+MEMORY_STORES = {"production": "alias_memory_production", "validation": "alias_memory_validation"}
 
 
 def _version_mode(path):
@@ -118,13 +119,13 @@ def _version_mode(path):
         meta = json.load(open(os.path.join(path, "meta.json")))
     except (OSError, ValueError):
         return "production"
-    return str(meta.get("mode") or (meta.get("thresholds") or {}).get("mode") or "production")
+    return str(meta.get("mode") or "legacy")
 
 
 def alias_memory_pin(a):
     """i7-memory (owner 2026-11-08 part C): the outcome-memory VERSION the job reads, pinned in job.env (ISPATIALGYM_ALIAS_MEMORY):
     --alias-memory auto (default) = the mode's store's LATEST when one exists, else off; off; or a version dir / a memory root (its LATEST).
-    i7-memory2: --memory-mode production (default; store <root>/alias_memory, starts empty) | validation (store <root>/alias_memory_validation,
+    i7-memory2: --memory-mode production (default; store <root>/alias_memory_production, starts empty) | validation (store <root>/alias_memory_validation,
     seeded from the replay; it must exist - its first version is built by `alias_memory aggregate --root R --mode validation`); a pinned
     version of the other mode's store is refused."""
     mode = getattr(a, "memory_mode", "production") or "production"
@@ -452,10 +453,10 @@ def main():
     s.add_argument("--grasps", default="legacy", choices=["legacy", "v2", "v2only"],
                    help="grasp library + reach bands: legacy (default) or v2 (the campaign's v2 library, reach maps and anchors, GRASPS_V2)")
     s.add_argument("--alias-memory", default="auto",
-                   help="i7-memory: the per-alias outcome memory the sampler reads, pinned in job.env - auto (default: <root>/alias_memory/LATEST "
+                   help="i7-memory: the per-alias outcome memory the sampler reads, pinned in job.env - auto (default: the --memory-mode store's LATEST "
                         "if any, else off), off, or a version dir / memory root")
     s.add_argument("--memory-mode", default="production", choices=sorted(MEMORY_STORES),
-                   help="i7-memory2 (owner 2026-11-08 2.2 / 2.4): production (default: <root>/alias_memory, starts empty, resets on a customs / "
+                   help="i7-memory2 (owner 2026-11-08 2.2 / 2.4): production (default: <root>/alias_memory_production, starts empty, resets on a customs / "
                         "keys change) or validation (<root>/alias_memory_validation: seeded from the replay, carried over at the reduced weight)")
     s.add_argument("--no-memory-aggregate", dest="memory_aggregate", action="store_false",
                    help="i7-memory: do not queue the batch's aggregation job (job_memory.sh, CPU, afterany this job)")

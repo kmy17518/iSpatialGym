@@ -31,7 +31,7 @@ Five steps (docs/GRASP_BANDS.md "Per-alias outcome memory"):
 Two MODES (owner decisions 2026-11-08 2.2 / 2.4; branch i7-memory2), one switch (``submit_fast.py --memory-mode``, job.env
 ``ISPATIALGYM_ALIAS_MEMORY_MODE``), two separate stores:
 
-* ``production`` (the default): store ``<root>/alias_memory``; starts EMPTY (only demos of production-mode jobs are aggregated into it);
+* ``production`` (the default): store ``<root>/alias_memory_production``; starts EMPTY (only demos of production-mode jobs are aggregated into it);
   an alias's evidence RESETS when its customs version or its entry / map keys change.
 * ``validation`` (opt-in): store ``<root>/alias_memory_validation``; SEEDED from the replay (``VALIDATION_SEED``: the seed version's demos,
   and the demos of jobs submitted before the modes existed) and CARRIED OVER a customs / keys change, both at the reduced weight
@@ -78,7 +78,9 @@ ENV_ALIAS = "ISPATIALGYM_ALIAS_MEMORY_ALIAS"     # the alias key the job samples
 ENV_MODE = "ISPATIALGYM_ALIAS_MEMORY_MODE"       # i7-memory2: production (default) | validation - the store the job reads and writes
 MODES = ("production", "validation")
 #: the store of each mode under a root (separate: a validation run never writes into the production memory, nor the reverse)
-STORE_DIRS = {"production": "alias_memory", "validation": "alias_memory_validation"}
+#: ``<root>/alias_memory`` stays the LEGACY store: snapshots from before the modes aggregate every demo of the root into it (their
+#: versions carry no mode and neither mode reads them)
+STORE_DIRS = {"production": "alias_memory_production", "validation": "alias_memory_validation"}
 #: i7-memory2 (owner 2.2 / 2.4): the weight of seeded and carried-over evidence in validation mode - the least weight with which the
 #: 2026-11-08 replay still flags inside_large_01's 0.85 m / trunk 0.50 bin (0 / 3: mean 1 / (2 + 3 w) <= 0.35 needs w >= 0.286) from the
 #: seed at a new snapshot, and with which the chronological replay flags nothing with a healthy record (docs/GRASP_BANDS.md)
@@ -688,9 +690,10 @@ def job_mode() -> str:
 
 
 def version_mode(path: str) -> str:
-    """The mode of a memory version (its meta.json thresholds; a version from before the modes = production)."""
+    """The mode of a memory version (its meta.json); ``legacy`` for a version from before the modes (the old aggregation of every demo of
+    a root into ``<root>/alias_memory``) - neither mode reads one."""
     meta = _json(os.path.join(path, "meta.json")) or {}
-    return str(meta.get("mode") or (meta.get("thresholds") or {}).get("mode") or "production")
+    return str(meta.get("mode") or "legacy")
 
 
 def memory_for(sampler) -> Optional[AliasMemory]:
@@ -852,7 +855,7 @@ def collect_rows(root: str, backfill: bool = True, write_backfill: bool = False,
 
 
 def store_root(root: str, mode: str = "production") -> str:
-    """The memory store of a mode under a root (``<root>/alias_memory`` / ``<root>/alias_memory_validation``)."""
+    """The memory store of a mode under a root (``<root>/alias_memory_production`` / ``<root>/alias_memory_validation``)."""
     if mode not in MODES:
         raise ValueError(f"alias memory mode {mode!r}: one of {MODES}")
     return os.path.join(root, STORE_DIRS[mode])
@@ -1012,7 +1015,7 @@ def batch_pending(root: str, batch: str, ledger: Optional[str] = None) -> List[s
 def aggregate(root: str, mem_root: Optional[str] = None, batch: Optional[str] = None, thresholds: Optional[Thresholds] = None,
               write_backfill: bool = False, gpu: bool = True, mode: str = "production", seed: Optional[str] = None,
               rows: Optional[Sequence[Dict[str, Any]]] = None) -> str:
-    """A new version of the mode's store (default ``<root>/alias_memory`` / ``<root>/alias_memory_validation``) from the root's demos
+    """A new version of the mode's store (default ``<root>/alias_memory_production`` / ``<root>/alias_memory_validation``) from the root's demos
     (:func:`store_rows`) with the store's thresholds (:func:`store_thresholds`). Validation: the seed version is pinned in the store's
     ``seed.json`` at its first aggregation (``seed`` or :data:`VALIDATION_SEED`, a root's LATEST resolved) and kept after."""
     mem_root = mem_root or store_root(root, mode)
@@ -1258,12 +1261,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     s.add_argument("job_dir")
     s = sub.add_parser("aggregate", help="merge the shards of a root into a new version")
     s.add_argument("--root", required=True)
-    s.add_argument("--memory", default=None, help="the memory root (default <root>/alias_memory)")
+    s.add_argument("--memory", default=None, help="the memory root (default: the --mode store, <root>/alias_memory_production / _validation)")
     s.add_argument("--batch", default=None, help="the batch's tag (the report's 'batch' column)")
     s.add_argument("--write-backfill", action="store_true")
     s.add_argument("--no-gpu", action="store_true")
     s.add_argument("--if-batch-done", action="store_true", help="exit without a version while a job of the batch (ledger tag) is queued / running")
-    s.add_argument("--mode", default="production", choices=MODES, help="i7-memory2: the store (production: <root>/alias_memory, production-mode "
+    s.add_argument("--mode", default="production", choices=MODES, help="i7-memory2: the store (production: <root>/alias_memory_production, production-mode "
                                                                         "jobs only; validation: <root>/alias_memory_validation, seeded)")
     s.add_argument("--seed", default=None, help="validation: the seed version / memory root at the store's first aggregation (default "
                                                 + VALIDATION_SEED + ")")
