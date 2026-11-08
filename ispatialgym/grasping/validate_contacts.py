@@ -659,39 +659,44 @@ def axial_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndar
     driven ``brace_press_m`` past contact unbraced, the touching / wall calibration). The old straight load (:func:`pusher_path`) met the
     hull's GLOBAL extreme with an unturned box along a fixed line (5w.3 WM: magazine 48 / 96, jhaltj s1 34 / 44 loads never turned the
     target). The material: the hull's points and edges within the box's face (half-width across the line, half-height) on the pushed end's
-    line; none raises (the trial errors, never a vacuous pass). The box (scaled width x thickness x height = local x, y, z): its thickness
-    along the tangent (:func:`pusher_quat_square_to`), upright, its bottom 2 mm above the target's lowest point."""
+    line; none raises (the trial errors, never a vacuous pass). The box as the wall load's: 8 cm upright (its bottom 2 mm above the
+    target's lowest point), 3 cm across the line, 5 cm along the travel (square to the tangent, turned with the arc)."""
     g = axial_load_geometry(entry, T_obj, hinge_xy)
     R, tr = T_obj[:3, :3], T_obj[:3, 3]
     P, H, t = g["P"], g["H"], g["t"]
     pts = hull_edge_points(pts_obj) @ R.T + tr
     z_lo = float(pts[:, 2].min())
-    sw, sth, sh = (float(v) for v in cfg.brace_pusher_size_m)
-    zc = max(float(P[2]), z_lo + 0.5 * sh + 0.002)
+    # the box as the wall load's (its scale: local x 8 cm, y 3 cm, z 5 cm): x UPRIGHT (8 cm), y ACROSS the line (3 cm: the push fist's width -
+    # run F v2 turned it 8 cm across, and on the short tablespoon (pushed end 2.5-3.8 cm from the hinge) the face spanned the hinge: no
+    # torque, 29 / 48 never loaded), z along the travel (5 cm)
+    across, upright, along = (float(cfg.brace_pusher_size_m[i]) for i in (0, 1, 2))
+    zc = max(float(P[2]), z_lo + 0.5 * upright + 0.002)
     Pc = np.array([P[0], P[1], zc])
-    y = _unit(np.cross(np.array([0.0, 0.0, 1.0]), t))
+    zax = np.array([0.0, 0.0, 1.0])
+    y = _unit(np.cross(t, zax))
     rel = pts - Pc
-    near = (np.abs(rel @ y) <= 0.5 * sw) & (np.abs(rel[:, 2]) <= 0.5 * sh)
+    near = (np.abs(rel @ y) <= 0.5 * across + 0.002) & (np.abs(rel[:, 2]) <= 0.5 * upright)
     if not near.any():
         raise ValueError("axial load: no hull point within the pusher's face on the pushed end's line (no load can be placed)")
     face = float((rel[near] @ t).min())
     F0 = Pc + t * face
     rF = F0 - np.array([H[0], H[1], zc])
     r_F = max(float(np.linalg.norm(rF)), 1e-3)
-    axis = np.array([0.0, 0.0, 1.0 if float(np.cross(np.array([0.0, 0.0, 1.0]), rF) @ t) >= 0 else -1.0])
-    half = 0.5 * sth
+    axis = np.array([0.0, 0.0, 1.0 if float(np.cross(zax, rF) @ t) >= 0 else -1.0])
+    half = 0.5 * along
     phi0 = -cfg.brace_pusher_gap_m / r_F
     phi1 = phi0 + (cfg.brace_pusher_gap_m + cfg.brace_pusher_travel_max_m) / r_F
     phi_press = cfg.brace_press_m / max(g["r_B"], 0.02)
     k = max(1, int(math.ceil((phi1 - phi0) * r_F / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
     Hz = np.array([H[0], H[1], zc])
+    R0 = np.stack([zax, y, t], axis=1)  # local x upright, y across, z along the travel (y = t x z: a rotation)
     centres, quats, phis = [], [], []
     for i in range(k + 1):
         phi = phi0 + (phi1 - phi0) * i / k
         Rp = _rot(axis, phi)
         ti = Rp @ t
         centres.append(Hz + Rp @ (F0 - Hz) - ti * half)
-        quats.append(pusher_quat_square_to(ti))
+        quats.append(np.asarray(S.mat_to_quat(Rp @ R0), dtype=float))
         phis.append(phi)
     facts = {"start": [round(float(v), 4) for v in centres[0]], "tangent": [round(float(v), 4) for v in t], "face_along_m": round(face, 5),
              "pushed_point": [round(float(v), 4) for v in P], "braced_point": [round(float(v), 4) for v in g["B"]],

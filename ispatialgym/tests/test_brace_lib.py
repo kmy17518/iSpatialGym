@@ -558,21 +558,22 @@ def test_the_axial_load_meets_the_pushed_end_square_to_its_arc():
     path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
     assert f["spin_agrees_d"] and f["tangent_vs_load_dir"] > 0.99 and not f["opposite"]
     assert abs(f["face_along_m"] + 0.05) < 1e-6  # the -y face of the pushed end, not the hull's global extreme
-    half = 0.5 * cfg.brace_pusher_size_m[1]
-    yaw0 = 2.0 * math.atan2(quats[0][2], quats[0][3])
-    front0 = path[0] + np.array([-math.sin(yaw0), math.cos(yaw0), 0.0]) * half  # the first step: the box's front face gap before the material
+    from ispatialgym.grasping import schema as SC
+
+    half = 0.5 * cfg.brace_pusher_size_m[2]
+    front0 = path[0] + SC.quat_to_mat(quats[0])[:, 2] * half  # the first step: the box's front face (local z = the travel) gap before the material
     assert abs(math.hypot(front0[0], front0[1]) - math.hypot(0.13, 0.05)) < 1e-3
     assert abs(math.atan2(front0[1], front0[0]) - (math.atan2(-0.05, 0.13) + f["arc_rad"][0])) < 1e-4
     assert abs(f["arc_rad"][0] * f["r_face_m"] + cfg.brace_pusher_gap_m) < 1e-5
     # carried along the arc about the hinge: every centre's front face at the face radius, the box turned with the tangent
     for c, q in zip(path, quats):
-        yaw = 2.0 * math.atan2(q[2], q[3])
-        t = np.array([-math.sin(yaw), math.cos(yaw), 0.0])  # the box's local y (its thickness) = the tangent
-        fr = c + t * half
+        R = SC.quat_to_mat(q)
+        assert np.allclose(R[:, 0], [0.0, 0.0, 1.0], atol=1e-6)  # 8 cm upright, 3 cm across, 5 cm along the travel
+        fr = c + R[:, 2] * half
         assert abs(math.hypot(fr[0], fr[1]) - f["r_face_m"]) < 1e-5
     assert f["axis"] == [0.0, 0.0, 1.0] and f["phi_press_rad"] == round(cfg.brace_press_m / 0.13, 6)
     # the box's bottom above the target's bottom
-    assert path[0][2] - 0.5 * cfg.brace_pusher_size_m[2] > pts[:, 2].min()
+    assert path[0][2] - 0.5 * cfg.brace_pusher_size_m[1] > pts[:, 2].min()
 
 
 def test_the_axial_load_pushes_the_pushed_end_of_an_opposite_entry_and_turns_with_the_yaw_slot():
@@ -589,8 +590,9 @@ def test_the_axial_load_pushes_the_pushed_end_of_an_opposite_entry_and_turns_wit
     e = _axial_entry([0.13, 0.0, 0.0], [-1.0, 0.0, 0.0], 1.0)
     path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.5 * math.pi), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
     assert np.allclose(f["tangent"], [-1.0, 0.0, 0.0], atol=1e-4) and abs(f["face_along_m"] + 0.05) < 1e-6
-    yaw0 = 2.0 * math.atan2(quats[0][2], quats[0][3])
-    assert abs(abs(math.remainder(yaw0, 2 * math.pi)) - 0.5 * math.pi) < 0.2  # turned ~90 deg (thickness along x), not identity
+    from ispatialgym.grasping import schema as SC
+
+    assert np.allclose(SC.quat_to_mat(quats[0])[:, 2], [-1.0, 0.0, 0.0], atol=0.1)  # the box's travel axis along -x (the old box: identity)
 
 
 def test_an_axial_load_with_no_material_on_its_line_raises():
@@ -655,3 +657,20 @@ def test_the_pushed_end_lies_on_the_long_axis_through_the_hinge():
     e = _axial_entry([-0.1223, 0.0676, 0.0], [0.0, -1.0, 0.0], 1.0, opposite=True)
     _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
     assert f["pushed_point"][:2] == [0.1223, 0.0] and np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4)
+
+
+def test_the_axial_pusher_face_is_narrow_enough_not_to_span_a_short_lever():
+    """F v2 (tablespoon tqqwys, pushed end 2.5-3.8 cm from the hinge): an 8 cm wide face spanned the hinge (no torque, 29 / 48 never
+    loaded); the face is 3 cm across, all on the pushed end's side."""
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull(0.18, 0.06, 0.02)
+    e = _axial_entry([-0.032, 0.0, 0.0], [0.0, -1.0, 0.0], 1.0)
+    path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (-0.007, 0.0), cfg, 1.0 / 30.0)
+    from ispatialgym.grasping import schema as SC
+
+    assert f["pushed_point"][:2] == [-0.032, 0.0]
+    H = np.array([-0.007, 0.0, path[0][2]])
+    for c, q in zip(path, quats):  # along the whole arc the hinge lies outside the face's 3 cm across
+        assert abs(float((H - c) @ SC.quat_to_mat(q)[:, 1])) > 0.5 * cfg.brace_pusher_size_m[0]
