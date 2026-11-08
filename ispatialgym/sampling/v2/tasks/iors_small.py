@@ -119,7 +119,7 @@ def pre_place_frame_rule() -> str:
 
 
 #: i7-framing (owner decision 2026-11-08 5.2): the frame rule of the PRE-GRASP and the touching PRE-CONTACTS (push / brace) - ``box`` (the
-#: eef box, the rule before) or ``fingertip`` (the pre-place's rule: ``program_check.fingertip_frame_margin``, the fingertip point inside
+#: eef box, the rule before) or ``fingertip`` (DEFAULT since the count: the pre-place's rule: ``program_check.fingertip_frame_margin``, the fingertip point inside
 #: QA's 5 % plus 2 cm slack). Both rules are evaluated either way and the disagreements counted (``precontact_frame.<pose>.removed``: the
 #: box fails and the fingertip passes; ``.added``: the box passes and the fingertip fails; ``.removed_object_out``: a removed rejection
 #: whose object - the target at the pre-grasp / push, the partner at the brace - is not wholly in that image). The contact poses (grasp,
@@ -129,7 +129,7 @@ PRECONTACT_FRAME_POSES = ("pre-grasp", "push pre-contact", "brace pre-contact")
 
 
 def precontact_frame_rule() -> str:
-    v = (os.environ.get(PRECONTACT_FRAME_RULE_ENV, "") or "box").strip().lower()
+    v = (os.environ.get(PRECONTACT_FRAME_RULE_ENV, "") or "fingertip").strip().lower()  # i7-framing: DEFAULT fingertip (owner 5.2, after the count)
     if v not in ("fingertip", "box"):
         raise ValueError(f"{PRECONTACT_FRAME_RULE_ENV}={v!r}: expected fingertip or box")
     return v

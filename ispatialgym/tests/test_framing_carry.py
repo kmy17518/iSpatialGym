@@ -54,8 +54,8 @@ def _edge_pose():
 
 
 @pytest.mark.parametrize("what", IS.PRECONTACT_FRAME_POSES)
-def test_precontact_rule_box_default_counts_the_disagreement(monkeypatch, what):
-    monkeypatch.delenv(IS.PRECONTACT_FRAME_RULE_ENV, raising=False)
+def test_precontact_rule_box_counts_the_disagreement(monkeypatch, what):
+    monkeypatch.setenv(IS.PRECONTACT_FRAME_RULE_ENV, "box")
     assert IS.precontact_frame_rule() == "box"
     s, pose = _fake(), _edge_pose()
     far_obj = ("target", (th.tensor([3.0, 0.0, 0.5]), th.tensor([0.0, 0.0, 0.0, 1.0])))  # the object outside the image
@@ -66,7 +66,8 @@ def test_precontact_rule_box_default_counts_the_disagreement(monkeypatch, what):
 
 
 def test_precontact_rule_fingertip_admits_and_keeps_contacts_on_the_box(monkeypatch):
-    monkeypatch.setenv(IS.PRECONTACT_FRAME_RULE_ENV, "fingertip")
+    monkeypatch.delenv(IS.PRECONTACT_FRAME_RULE_ENV, raising=False)
+    assert IS.precontact_frame_rule() == "fingertip"  # the default since the count (owner 5.2)
     s, pose = _fake(), _edge_pose()
     s.require_in_frame(CAM, {"pre-grasp": pose, "push pre-contact": pose, "brace pre-contact": pose})  # all pass the fingertip rule
     with pytest.raises(Reject) as e:  # the grasp (a contact pose) keeps the eef box
