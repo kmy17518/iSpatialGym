@@ -1,6 +1,7 @@
 """i7-axialrest (owner 2026-11-08 5v.2): the stop brace's pre pose checked at sampling with the program check's own call behind
 ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY`` (default off) - simulator-free: the call matches the program check's brace ``pre`` target, a
-support-policy refusal fails the candidate, any other IK failure is counted and not refused, the remembered solutions are restored."""
+support-policy refusal fails the candidate, and (owner 5y.1) so does any other failure of the call (a joint limit, no IK), the remembered
+solutions are restored."""
 
 from __future__ import annotations
 
@@ -58,9 +59,23 @@ def test_a_support_policy_failure_refuses_the_candidate():
     why = s._brace_pre_policy("manip", p, target)
     assert why.startswith("brace pre_policy: pre: support_policy: non-finger link touches the support")
     assert s.kit.stats["axial_brace.pre_policy.refused"] == 1 and s.kit.stats["axial_brace.pre_policy.refused.left_h-"] == 1
+    assert s.kit.stats["axial_brace.pre_policy.refused_reason.support_policy"] == 1
 
 
-def test_another_ik_failure_is_counted_not_refused():
+def test_a_joint_limit_failure_is_refused():
+    """owner 2026-11-08 5y.1: the pre call refuses on ANY failure, e.g. axial_03 310002 att 0's opp_blade_45- (i7ar_pol)."""
+    reason = ("ik_joint_limit: left_arm_joint6 within 47 mrad of its limit at the pose (every solution found; the approach from it would "
+              "stall)")
+    s, p, target, _ = _stub(IK.IKResult(False, None, reason))
+    why = s._brace_pre_policy("manip", p, target)
+    assert why == f"brace pre_policy: pre: {reason}"
+    st = s.kit.stats
+    assert st["axial_brace.pre_policy.refused"] == 1 and st["axial_brace.pre_policy.refused.left_h-"] == 1
+    assert st["axial_brace.pre_policy.refused_reason.ik_joint_limit"] == 1 and "axial_brace.pre_policy.passed" not in st
+    assert list(s.ikc.solutions) == [("left", (1.0,))]
+
+
+def test_any_other_ik_failure_is_refused():
     s, p, target, _ = _stub(IK.IKResult(False, None, "exact IK failed at pose 1 of 1"))
-    assert s._brace_pre_policy("manip", p, target) == ""
-    assert s.kit.stats["axial_brace.pre_policy.other_fail"] == 1 and "axial_brace.pre_policy.refused" not in s.kit.stats
+    assert s._brace_pre_policy("manip", p, target) == "brace pre_policy: pre: exact IK failed at pose 1 of 1"
+    assert s.kit.stats["axial_brace.pre_policy.refused_reason.exact_ik_failed_at_pose_1_of_1"] == 1

@@ -533,8 +533,8 @@ class AlignmentAxial(SamplerV2):
                                 if not res_b.ok and axial_brace_probe_on():
                                     self._brace_probe(manip, p, res_b, [p_pre, p_goal], support, target)
                                 if res_b.ok and axial_brace_pre_policy_on():
-                                    # i7-axialrest (owner 5v.2): the brace's pre as the program check polices it - a refusal is this candidate's
-                                    # failure (the next candidate, none left -> push-only), not a program_check_failed attempt
+                                    # i7-axialrest (owner 5v.2 / 5y.1): the brace's pre as the program check calls it - any failure is this
+                                    # candidate's failure (the next candidate, none left -> push-only), not a program_check_failed attempt
                                     why_pol = self._brace_pre_policy(manip, p, target)
                                     if why_pol:
                                         res_b = TT._ik().IKResult(False, None, why_pol)
@@ -861,8 +861,9 @@ class AlignmentAxial(SamplerV2):
         arm from the stance's configuration (no seed, no locked arm: the brace runs before the push), the gripper at the record's
         ``tabletop.brace_fingers`` (closed for a stop brace), the braced target + the supports in the pose's ignore set and the target
         approached - ``IKChecker.exact`` then applies the shared support policy to its solution, as there. Returns the refusal
-        (``"brace pre_policy: pre: support_policy: ..."``) or ``""``. An IK failure for another reason is counted, never refused (the
-        sampler's own brace chain passed; the decision is about the support policy only). The solver's remembered solutions are restored
+        (``"brace pre_policy: pre: <reason>"``) or ``""``. Owner 2026-11-08 5y.1: ANY failure of the call is a refusal (the support
+        policy, a joint limit, no IK, ...), since the program check rejects the attempt on any of them; counters ``refused``,
+        ``refused.<label>`` and ``refused_reason.<key>`` (:func:`_pre_policy_reason_key`). The solver's remembered solutions are restored
         afterwards, so the brace chain's witnesses stay the recorded ones."""
         extras = (p.payload[3] if isinstance(p.payload, (tuple, list)) and len(p.payload) > 3 else None) or {}
         sups = [o for o in self.support_objects() if o is not target]
@@ -878,14 +879,11 @@ class AlignmentAxial(SamplerV2):
             TT._count(self, "axial_brace.pre_policy.passed")
             return ""
         why = str(r.reason)
-        if why.startswith("support_policy"):
-            TT._count(self, "axial_brace.pre_policy.refused")
-            TT._count(self, f"axial_brace.pre_policy.refused.{p.label}")
-            log.info("%s: axial brace %s refused at sampling: pre: %s (the program check's support policy)", self.gp.variant, p.label, why[:200])
-            return f"brace pre_policy: pre: {why}"
-        TT._count(self, "axial_brace.pre_policy.other_fail")
-        log.info("%s: axial brace %s: the program check's pre call failed for another reason (%s) - not refused", self.gp.variant, p.label, why[:200])
-        return ""
+        TT._count(self, "axial_brace.pre_policy.refused")
+        TT._count(self, f"axial_brace.pre_policy.refused.{p.label}")
+        TT._count(self, f"axial_brace.pre_policy.refused_reason.{_pre_policy_reason_key(why)}")
+        log.info("%s: axial brace %s refused at sampling: pre: %s (the program check's pre call)", self.gp.variant, p.label, why[:200])
+        return f"brace pre_policy: pre: {why}"
 
     def _brace_probe(self, manip: Stance, p, res_live, work_poses: List[TT.Pose], support, target) -> None:
         """i7-axialrest 5v.1 (owner 2026-11-08, DIAGNOSIS ONLY, :func:`axial_brace_probe_on`): a brace candidate that failed live
@@ -1117,10 +1115,18 @@ def axial_brace_opposite_on() -> bool:
 
 def axial_brace_pre_policy_on() -> bool:
     """i7-axialrest (owner 2026-11-08 5v.2; default OFF): the sampler checks each stop-brace candidate's PRE pose with the program check's
-    own call (``AlignmentAxial._brace_pre_policy``: the shared support policy on a fresh exact IK of the pre) - a brace the policy refuses is a
-    failed candidate (the next one is tried; none left = push-only, the brace is optional) instead of an attempt the program check rejects
-    ``pre: support_policy: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1``."""
+    own call (``AlignmentAxial._brace_pre_policy``: a fresh exact IK of the pre under the shared support policy) - a brace whose pre fails that
+    call for ANY reason (owner 5y.1: the support policy, a joint limit, no IK, ...) is a failed candidate (the next one is tried; none left =
+    push-only, the brace is optional) instead of an attempt the program check rejects ``pre: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1``."""
     return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "0") == "1"
+
+
+def _pre_policy_reason_key(why: str) -> str:
+    """The counter key of a brace pre-policy refusal: the IK reason's head before its first ``:`` (``support_policy``,
+    ``ik_joint_limit``, ...), lowercased, non-alphanumerics -> ``_``, at most 40 characters."""
+    head = str(why).split(":", 1)[0].strip().lower()
+    key = "".join(c if c.isalnum() else "_" for c in head).strip("_")
+    return (key or "unknown")[:40]
 
 
 def axial_brace_probe_on() -> bool:
