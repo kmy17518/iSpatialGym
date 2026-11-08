@@ -3190,10 +3190,20 @@ def gen_edges(s) -> List[str]:
     return [str(e) for e in edges or []]
 
 
+def all_edges_on() -> bool:
+    """i7-startdraw 5o (owner 2026-11-08, the 3.5 rule "templates should never fix the robot's start base"): ``ISPATIALGYM_ALL_EDGES=1``
+    makes Phase 1a (:func:`edge_frames`) ignore BOTH per-template edge restrictions - the support row's ``edges`` (:func:`row_edges`) and
+    ``generation.init_edges`` (:func:`gen_edges`) - so every edge of the top is offered and the existing checks decide (free floor,
+    whole-body collision, Phase 1b / 1c, the family's frame rules, the eval-repeat check). An interior surface's open sides
+    (``top.open_edges``) are geometry, not a template pin, and still apply. Kit counters (only when a restriction was ignored):
+    ``start_edges.row_ignored`` / ``start_edges.gen_ignored``. Default off (the owner decides the default after the A/B)."""
+    return os.environ.get("ISPATIALGYM_ALL_EDGES", "0") not in ("", "0")
+
+
 def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[EdgeFrame, Stance]]:
     """Every edge of the top (random order with ``rng``) with its stance at ``stand_off`` + overhang (>= 5 cm), trunk
     (0.5, 0) — before the floor / collision checks of Phase 1a. A support row naming ``edges`` (:func:`row_edges`) keeps only those,
-    and ``generation.init_edges`` (:func:`gen_edges`) those of them it names."""
+    and ``generation.init_edges`` (:func:`gen_edges`) those of them it names - both ignored under :func:`all_edges_on`."""
     support = s.world.obj(top.name)
     lo, hi = support.aabb
     aabb_xy = th.tensor([[float(lo[0] if sx == 0 else hi[0]), float(lo[1] if sy == 0 else hi[1])] for sx in (0, 1) for sy in (0, 1)])
@@ -3202,10 +3212,18 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
     if open_edges:  # an interior surface is reached through the open sides of its compartment only
         edges = [e for e in edges if e[0] in open_edges]
     keep = row_edges(s, top)
+    keep_gen = gen_edges(s)
+    if all_edges_on() and (keep or keep_gen):
+        log.info("phase 1a: ISPATIALGYM_ALL_EDGES ignores the support row's edge(s) %s and generation.init_edges %s: every edge of %s offered",
+                 keep or "-", keep_gen or "-", [e[0] for e in edges])
+        if keep:
+            _count(s, "start_edges.row_ignored")
+        if keep_gen:
+            _count(s, "start_edges.gen_ignored")
+        keep, keep_gen = [], []
     if keep:
         log.info("phase 1a: the support row keeps edge(s) %s of %s", keep, [e[0] for e in edges])
         edges = [e for e in edges if e[0] in keep]
-    keep_gen = gen_edges(s)
     if keep_gen:
         log.info("phase 1a: generation.init_edges keeps edge(s) %s of %s", keep_gen, [e[0] for e in edges])
         edges = [e for e in edges if e[0] in keep_gen]
