@@ -157,7 +157,7 @@ def _cand_one(payload):
         return {"id": j["id"], "ok": True, "s": round(time.time() - t0, 2), "n_candidates": len(out["candidates"]), "n_geometry_ok": n_ok,
                 "cand_config": {k: getattr(cfg, k) for k in ("n_candidates", "n_orientations", "cone_deg", "max_representatives", "topk", "families",
                                                               "blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape",
-                                                              "outer_pinch", "attach_face_retreat")},
+                                                              "outer_pinch", "attach_face_retreat", "outer_pinch_preshape")},
                 "densify": [list(x) for x in densify], "densified_from": (out["log"] or {}).get("densified_from") is not None,
                 "n_representatives": len(out["representatives"]), "n_families": len(fams),
                 "family_types": sorted({f.get("type") for f in fams.values()}),
