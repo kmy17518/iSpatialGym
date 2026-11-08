@@ -153,11 +153,16 @@ class MapConfig:
     # i7-interior 2026-11-07: an interior PLACE map's rule (``interior_place.place_rule``: the stable rest's release as stance C's exact place
     # checks it); None for every other map (left out of key(): their keys stay - the former interior maps included)
     interior_place: Optional[Dict[str, Any]] = None
+    # i7-axialrest 5y fix (lead decision 2026-11-08, owner away): a contact map's IK acceptance keeps the LIVE joint-limit margin (rad; every
+    # chain configuration's arm joints at least this far from their limits, as ``IKChecker.JOINT_LIMIT_MARGIN`` / ``away_from_limits`` keep
+    # live). None = the former acceptance (cuRobo's success alone); left out of key() while None (the maps built before keep their keys).
+    # Set by ``contact_maps.contact_config`` for the axial_brace kind under ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN=1 only
+    joint_margin_rad: Optional[float] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place", "joint_margin_rad"):
             if d.get(k) is None:
                 d.pop(k)
         return d

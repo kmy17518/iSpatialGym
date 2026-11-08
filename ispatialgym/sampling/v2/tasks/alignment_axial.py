@@ -567,6 +567,8 @@ class AlignmentAxial(SamplerV2):
                                         res_b = TT._ik().IKResult(False, None, why_pol)
                                 if not res_b.ok:
                                     brace_fails.append(f"{p.label}: {res_b.reason}")
+                                if TT.contact_maps_on():
+                                    AlignmentAxial._count_brace_vs_map(self, jp, spin, p, bool(res_b.ok))
                                 return bool(res_b.ok), res_b, None, str(res_b.reason)
 
                             b_chosen, dec_brace, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal,
@@ -815,7 +817,10 @@ class AlignmentAxial(SamplerV2):
         if bm is None:  # no axial_brace map: the optional brace step is skipped (push-only), the push placement stands on its own map
             b = {"ok": False, "why": "no axial_brace map: the optional brace step is skipped (MAP_REQUEST logged)"}
         else:
-            b = TT.contact_map_check(bm, manip, goal_pose, keep=keep_brace)
+            tilt_x = axial_brace_tilt_intersect_on()
+            b = TT.contact_map_check(bm, manip, goal_pose, keep=keep_brace, **({"tilt_read": "intersection"} if tilt_x else {}))
+            if tilt_x:
+                AlignmentAxial._count_tilt_read(self, b)
         return {"ok": bool(w["ok"] and b["ok"]), "work_ok": bool(w["ok"]), "brace_ok": bool(b["ok"]), "brace_class_ok": True, "left_band": False,
                 "brace_map_missing": bm is None,
                 "maps": {"push_blade": {k: w.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}, "turn_class_rad": t_near,
@@ -823,6 +828,40 @@ class AlignmentAxial(SamplerV2):
                          "axial_brace": {k: b.get(k) for k in ("cell", "yaw_slot_deg", "yaw_err_deg", "feasible", "why")}},
                 # the map's class labels are the library's (no band class names: the pitch order and the brace's passing classes keep their defaults)
                 "work_cell": w.get("cell"), "brace_cell": b.get("cell"), "classes": None, "brace_classes": None, "brace_class": None}
+
+    def _count_tilt_read(self, b: Dict[str, Any]) -> None:
+        """i7-axialrest 5y fix (:func:`axial_brace_tilt_intersect_on`): where the intersection read acted, per axial_brace lookup -
+        ``axial_brace.tilt_read.<built|between|outside|none>``, ``.dropped`` (lookups that lost a class the nearest column alone called feasible),
+        ``.dropped_classes`` (their sum), ``.emptied`` (the nearest column had a feasible class, the intersection none)."""
+        rec = b.get("tilt_read")
+        if not rec:
+            return
+        TT._count(self, f"axial_brace.tilt_read.{rec.get('how')}")
+        dropped = rec.get("dropped") or []
+        if dropped:
+            TT._count(self, "axial_brace.tilt_read.dropped")
+            TT._countn(self, "axial_brace.tilt_read.dropped_classes", len(dropped))
+            if not b.get("feasible") and rec.get("nearest_feasible"):
+                TT._count(self, "axial_brace.tilt_read.emptied")
+
+    def _count_brace_vs_map(self, jp: Dict[str, Any], spin: float, p, ok: bool) -> None:
+        """i7-axialrest 5y fix (diagnosis counters, every run): a live brace candidate against the axial_brace map's feasible classes at the
+        draw (``jp["maps"]["axial_brace"]["feasible"]``; the library's class label ``<end><spin>spin_<kind>@f<stop face fraction>``, the
+        end in the map's convention) - ``axial_brace.live.map_feasible.tried / .ok`` for a class the map called feasible, ``.map_other.*``
+        for the rest. Never changes a verdict."""
+        try:
+            maps = jp.get("maps") or {}
+            feas = set(((maps.get("axial_brace") or {}).get("feasible")) or [])
+            e_b = (maps.get("end_sign_map") or {}).get("axial_brace")
+            kind, extras = p.payload[2], p.payload[3] or {}
+            tail = f"{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+            hit = any(c.endswith(tail) for c in feas) if e_b is None else f"{'+' if e_b > 0 else '-'}end{tail}" in feas
+            grp = "map_feasible" if hit else "map_other"
+            TT._count(self, f"axial_brace.live.{grp}.tried")
+            if ok:
+                TT._count(self, f"axial_brace.live.{grp}.ok")
+        except Exception as ex:  # noqa: BLE001 - a diagnosis counter
+            log.debug("brace vs map counter skipped: %r", ex)
 
     def _map_end_sign(self, cm, end_sign: Optional[float]) -> Optional[float]:
         """``end_sign`` (along ``self.long_axis``) in the map library's convention (its builders' ``long_axis`` param, map meta
@@ -1154,6 +1193,14 @@ def _pre_policy_reason_key(why: str) -> str:
     head = str(why).split(":", 1)[0].strip().lower()
     key = "".join(c if c.isalnum() else "_" for c in head).strip("_")
     return (key or "unknown")[:40]
+
+
+def axial_brace_tilt_intersect_on() -> bool:
+    """i7-axialrest 5y fix (lead decision 2026-11-08, owner away; default OFF): the axial_brace map is read at a manipulation stance whose trunk
+    tilt lies between two built map tilts (more than ``contact_maps.TILT_SNAP_RAD`` from both) as the INTERSECTION of the two bracketing
+    columns (``ContactMap.lookup(tilt_read="intersection")``) instead of the nearest column alone; counters ``axial_brace.tilt_read.*``.
+    ``ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT", "0") == "1"
 
 
 def axial_brace_probe_on() -> bool:
