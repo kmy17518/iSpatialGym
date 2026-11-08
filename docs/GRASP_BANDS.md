@@ -2411,6 +2411,62 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
 
+### i7-t03specs (2026-11-08, owner item 4): touching_03's bookcases opryhp_0 and otwukr_1
+
+Branch `i7-t03specs` (from of-v2maps 93229922, not pushed); record `$OFH/t03specs_20261108`, DECISIONS "i7-t03specs" lines.
+
+**Diagnosis.** touching_03's customs bind four support rows: kmuacd_0 at 0.84 (T1), opryhp_0 at 0.37 (T6), otwukr_1 at 0.39 (T7) and
+0.72 (T8). Only kmuacd had an interior spec. No log showed the other rows rejecting `missing_map`: every round-4 touching_03 job ran the
+kmuacd T1 template, which the registry row and the eval index pin (43 job dirs over 24 tags, ~6062 attempts, 1 `missing_map` line - the
+stale kmuacd digest of i7_lean2). opryhp / otwukr ran only in round 3, under the legacy flow and without maps. Template jobs under
+v2only on the lean root confirm the gap: each of T6 / T7 / T8 rejects at setup (0 attempts) with "no interior spec of
+house_double_floor_upper/bookcase_<x> at <h> m".
+
+**Measure option** (ee781f49). `interiors measure --lateral <m>` (`measure(lateral_m=)`, default None = unchanged) starts the wall,
+rim and back rays in the bay at that offset from the raster edge's midpoint. otwukr_1's boards span two 0.30 m bays on either side of a
+5 cm divider at the raster's centre. Without the option the rays start inside the divider and find nothing: width 0.66 (both bays) and
+an open back, both wrong.
+
+**Specs** (c4a6956a, `assets/interiors/interiors.json`; `test_interior_registry.py` pins the digests and resolves every touching_03
+board to its spec). Measured in house_double_floor_upper, stand-offs 0.35 / 0.45 / 0.55 (kmuacd's), thickness 0.02 assumed (jaysra's):
+
+| spec | digest | width | depth | headroom | back |
+|---|---|---|---|---|---|
+| bookcase_opryhp_0@0.3722 | b8577f909128 | 0.7213 | 0.3521 | 0.3301 | panel |
+| bookcase_otwukr_1@0.3888 | 41a3fa72d143 | 0.3032 | 0.2811 | 0.2875 | panel |
+| bookcase_otwukr_1@0.7204 | 71e59f596aa4 | 0.3034 | 0.2792 | 0.2948 | panel |
+
+One spec per board (`spec_for_support` keys support + height). For otwukr the narrower bay is registered (`--lateral -0.19`). The
+other bay is 0.3106 / 0.3112 wide with the same depth and headroom. A lean rest's compartment follows its lean-side wall, so only the far
+wall moves, by 7-8 mm.
+
+**Maps** (job_glib `GB_STAGES=maps GB_KIND=interior GB_INTERIOR=<name>`, both arms, the lean entry
+`hardback__acbrnv__s1__lean_left_20_c5c708`, as kmuacd's). Feasible (cell, grasp) entries summed over trunks, d_e 0.35 / 0.45 / 0.55:
+
+| board | right | left |
+|---|---|---|
+| opryhp 0.3722 | 423 (3 / 168 / 252) | 298 (0 / 85 / 213) |
+| otwukr 0.3888 | 365 (0 / 142 / 223) | 412 (0 / 109 / 303) |
+| otwukr 0.7204 | 771 (150 / 231 / 390) | 839 (130 / 208 / 501) |
+| kmuacd 0.8354 (existing) | 706 | 689 |
+
+The low boards are reachable only from bent-knee trunks and not at the 0.35 stand-off.
+
+**Staged root** `$OFH/t03specs_20261108/v2maps_t03specs` = `cp -a v2maps_i7lean` (identical to i7-t03's `t03_20261108/v2maps_t03`) + the
+6 maps. Jobs need a snapshot containing c4a6956a's registry.
+
+**Validation** (trunk_c4a6956a, v2only, i7-t03's switches off, memory off): 
+- Before (lean root, trunk_ee781f49), template jobs: T6 / T7 / T8 each reject at setup with missing_map (0 attempts).
+- After (staged root), every row hits its interior map (missing_map 0):
+  - T7 / T8 (otwukr, template jobs 18381023 / 18381024): then stop at the template's `shelf_width` check. At the v2 lean rest's
+    20 deg (the only lean rest with grasps; the legacy key leaned 15 deg), the two books leave 0.09 / 0.10 m in the 0.30 m bay; the
+    minimum is 0.12. Not changed (a customs / rule choice for the owner). Without a template these rows cannot run in the fast flow.
+  - T6 (opryhp, fast flow N 4 `t03specs_T6` 18381022; validation registry `t03specs_20261108/registry_T6.tsv`, template from
+    `runs/t03tip4_opryhp_s0`): interim 240 attempts, 0 written - goal_check lift_unreachable 104 (the 4 cm lift with the book attached:
+    exact IK), target_placement 77, repeats_eval 26, ik_joint_limit 20, path_collision 9, gripper_not_in_frame 3, place_unreachable 1. The
+    final line goes to DECISIONS (CPU job 18381965).
+- Suite at ee781f49: 23 failed + 3 errors = the 93229922 baseline; interior tests at c4a6956a all pass.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
