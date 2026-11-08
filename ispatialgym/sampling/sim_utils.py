@@ -1456,25 +1456,35 @@ class SupportTop:
         v = pts @ ay
         return float(u.min()), float(u.max()), float(v.min()), float(v.max())
 
+    @staticmethod
+    def _margin_offsets(margin: float) -> th.Tensor:
+        """The (dx, dy) of :meth:`contains`'s neighbours (the point itself first), as ``th.tensor([dx, dy])`` made them one by one."""
+        if margin > 0:
+            return th.tensor([[0.0, 0.0], [margin, 0], [-margin, 0], [0, margin], [0, -margin], [margin, margin], [-margin, -margin], [margin, -margin],
+                              [-margin, margin]])
+        return th.zeros(1, 2)
+
+    def _all_free(self, pts: th.Tensor) -> bool:
+        """Every point of ``pts`` (N, 2) on a free raster cell: the index arithmetic of the former per-point loop, elementwise (the same
+        float ops, so the same cells), with ``free`` built once instead of per point (i7-stancememo r3: disembedding's start draw spent
+        220 of 285 s in 343k scalar ``contains`` calls)."""
+        i = th.round((pts[:, 0] - self.xs[0]) / self.resolution)
+        j = th.round((pts[:, 1] - self.ys[0]) / self.resolution)
+        if bool(((i < 0) | (j < 0) | (i >= len(self.xs)) | (j >= len(self.ys))).any()):
+            return False
+        return bool(self.free[i.long(), j.long()].all())
+
     def contains(self, xy, margin: float = 0.0) -> bool:
         """True if world ``xy`` lies on an exposed (free) cell; ``margin`` requires neighbours within it to be free too."""
-        pts = [G.t(xy)]
-        if margin > 0:
-            for dx, dy in ((margin, 0), (-margin, 0), (0, margin), (0, -margin), (margin, margin), (-margin, -margin), (margin, -margin), (-margin, margin)):
-                pts.append(G.t(xy) + th.tensor([dx, dy]))
-        for p in pts:
-            i = int(th.round((p[0] - self.xs[0]) / self.resolution))
-            j = int(th.round((p[1] - self.ys[0]) / self.resolution))
-            if i < 0 or j < 0 or i >= len(self.xs) or j >= len(self.ys) or not bool(self.free[i, j]):
-                return False
-        return True
+        p = G.t(xy)
+        offs = self._margin_offsets(margin)
+        return self._all_free(p.reshape(1, 2) + offs if margin > 0 else p.reshape(1, 2))
 
     def polygon_supported(self, poly_xy: th.Tensor, margin: float = 0.02) -> bool:
         """Every vertex and the centroid of a footprint polygon lie on free cells (with margin)."""
-        for p in poly_xy:
-            if not self.contains(p, margin):
-                return False
-        return self.contains(poly_xy.mean(dim=0), 0.0)
+        verts = G.t(poly_xy)
+        pts = (verts[:, None, :] + self._margin_offsets(margin)[None]).reshape(-1, 2) if margin > 0 else verts
+        return self._all_free(pts) and self.contains(poly_xy.mean(dim=0), 0.0)
 
     def edges(self):
         """The four sides of the exposed top in the local frame: list of (name, midpoint_world, outward_normal_world, length)."""
