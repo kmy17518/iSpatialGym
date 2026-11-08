@@ -2385,6 +2385,43 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+## i7-contact3 (owner answers 2026-11-08 3.1 / 3.2 / 3.6 / 3.7; branch `i7-contact3` from of-v2maps cf1f5d2d)
+
+Owner decisions implemented here (verbatim in `tmp/outputs/owner_answers_20261108.md`): 3.1 full-open brace CONFIRMED as the default
+(unchanged); 3.2 the close_02 slide diagnosis approved; 3.6 "cap the place depth by the push map's reach for all affected aliases";
+3.7 "remove the pack brace. use the board variant for the block design".
+
+**3.2 close_02 (diagnosis; the fix needs the owner).** The ~1 cm "slide" is not friction, push force or the brace opening. Rung 0 of every
+`top_press` braced push already ends inside the lid's 0.1 rad tolerance (residual +0.002-0.016 rad, carton drift ~5e-6 m), but
+`Executor.push_outcome` aims at -0.05 +- 0.04 rad (`brace_retry_aim_bias_rad` 0.05, `brace_retry_aim_frac` 0.4 x the 0.1 tolerance), so a
+small positive residual is "not aimed"; the top press touches the carton all along (brace hits 117-186) -> "short" -> the retry ladder
+re-runs with `offset_brace` +5 / +10 mm "outward" along -direction, which for a top press (direction (0, 0, -1)) LIFTS the hand; at
++10 mm the press no longer holds the carton and it slides with the push until the hard object_tilt QA (10 mm from the first pose)
+aborts (hence 10.0-12.1 mm). All 20 top_press object_tilt failures (i7_artic3, icb_off / on, int1_6) follow this rung pattern; the
+opposite_face braces climb to +20 mm and slide 5.0-10.2 mm. The September demos passed because the carton tolerance was 0.2 rad (aim
+-0.05 +- 0.08 admitted +0.006). Re-run of int1_6 300006-300009 (trunk_fcddc495) with the existing knob `ISG_AIM_FRAC=1.0`: 3 / 4 ok, no
+rungs, peak carton 3.3-6.2 mm (300006 stays protected_contact: the left finger touches the carton in the push's pre-contact). Record
+`$OFH/contact3_20261108/close02_diag` (scan.py / scan_out.txt / scan_recollect.txt).
+
+**3.6 place depth cap (`ISPATIALGYM_PLACE_DEPTH_CAP`; "0" off, "shadow" counts only, "1" on).** `IORSSmall.place_depth_caps`: the touching
+target is placed at its start depth (level with the partner) and pushed from an A1 push stance on the same edge and trunk; per
+manipulation candidate the push stances at A1's stand-offs are whole-body collision-checked (the base's real minimum distance to the
+support), and from each free one the target's touch_push map reaches roots up to the deepest feasible cell (a present class, any yaw /
+lateral) + half the lattice; cap = max over the free stand-offs of that reach - the stance's edge depth. `place_depth_cap_filter` (before
+the candidate draw in `sample_instance`): on - candidates whose focus depth exceeds the cap leave the draw; shadow - kept, the would-be
+removals' outcomes counted per candidate / attempt. Affected aliases: touching_01, touching_02, touching_04 (iors_small touching, mapped
+push after the place). Not affected: touching_03 (shelf layout: no drawn depth), touching_large_01-03 and the under_large push-under (floor
+pushes: no floor_push map), axial (no place: the start placement is already map-driven), close / open push (no place).
+
+**3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
+_pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
+`_pack_stage_actions` (a sidecar that still carries `pack` is refused: SidecarError), the program check's pack push handling
+(`advance_push`, `_is_pack_push`) and `SidecarDraft.pack` are gone. Customs: the four pack-tail variants (block_4 breakfast_table /
+coffee_table / conference_table / desk; BDDL problems 32 / 7 / 76 / 6 keep their ids) carry `superseded_by` the board variant
+(`block_4-breakfast_table_board`), `place_gap_m` / `_pack_note` dropped, `block_pack_tail: true` kept as the marker the sampler refuses
+(Reject spec); the board variants lose their `block_pack_tail: false`. No library / map existed for the pack brace. block_design_01 =
+the board variant (never ran the pack).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
