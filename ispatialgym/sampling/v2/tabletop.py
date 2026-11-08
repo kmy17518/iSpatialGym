@@ -1119,6 +1119,92 @@ PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert"
                     "": "floating", "attachment": "attachment", "a": "attachment", "handle_half": "floating", "h": "floating"}
 
 
+#: i7-tray 2026-11-08 (owner decision item 3, option b; disembedding_10's fork turned 12-14 deg in the hand at the close): with
+#: ``ISPATIALGYM_GRASP_TURN_FILTER`` on (default OFF) the sampler skips a v2 library row whose recorded in-hand turn at the close (the
+#: slab validator's ``achieved.off_target_rad``, ``validation.json``) exceeds the orientation tolerance of the task using it (the isg-v2
+#: profile: ``small`` 0.10 / ``large`` 0.15 rad, the customs ``evaluation.tolerances.pose.orientation`` override first; a ``micro`` target's
+#: tolerance depends on the instance and a task without a pose target has none: unchanged). No library gate changes, nothing is rebuilt.
+#: Counters ``grasp.off_target_filtered`` / ``.<entry>.<task>`` (on) and ``grasp.off_target_would_filter`` (off: measured only).
+TURN_FILTER_SWITCH = "ISPATIALGYM_GRASP_TURN_FILTER"
+
+
+def turn_filter_on() -> bool:
+    return os.environ.get(TURN_FILTER_SWITCH, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def grasp_turn_tolerance(variant: str) -> Optional[float]:
+    """The orientation tolerance (rad) of the grasped target's pose in an instance of ``variant`` (``ispatialgym.eval.tolerance_profile``:
+    a group pose for attachment / block_design, else a pose target), None where the profile gives none fixed at sampling time (``micro``,
+    or no rule for the target)."""
+    from ispatialgym.eval import tolerance_profile as TPR
+
+    try:
+        _fam, task = TPR.family_task(variant)
+        kind = "group_pose" if task in ("attachment", "block_design") else "pose"
+        group = TPR.scale_group(variant, kind)
+    except TPR.ToleranceProfileError:
+        return None
+    tol = (TPR.FIXED_TOLERANCES.get(group) or {}).get("orientation")
+    if tol is None:
+        return None
+    try:
+        ov = (TPR.overrides_for(variant).get("pose") or {}).get("orientation")
+    except Exception:  # noqa: BLE001 - a customs file without the entry: the profile's value
+        ov = None
+    return float(ov) if ov else float(tol)
+
+
+def recorded_turns(lib) -> Dict[str, float]:
+    """``{row name: off_target_rad}`` of the VALID trials in the entry's ``validation.json`` (next to its ``library.json``); empty when the
+    file or the measure is absent."""
+    path = os.path.join(os.path.dirname(str(getattr(lib, "path", "") or "")), "validation.json")
+    try:
+        with open(path) as f:
+            v = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for t in v.get("trials", []) or []:
+        r = (t.get("achieved") or {}).get("off_target_rad")
+        if t.get("verdict") == "valid" and r is not None:
+            out[str(t.get("candidate"))] = float(r)
+    return out
+
+
+def filter_by_turn(s, grasps: List[Any], lib, key: str) -> List[Any]:
+    """:data:`TURN_FILTER_SWITCH`: ``grasps`` without the rows whose recorded in-hand turn exceeds the task's tolerance
+    (:func:`grasp_turn_tolerance`); measured (counted, logged) with the switch off and returned unchanged then.
+    ``Reject("grasps_off_target")`` when the filter would leave no row."""
+    variant = str(getattr(getattr(s, "gp", None), "variant", "") or "")
+    tol = grasp_turn_tolerance(variant)
+    if tol is None or lib is None:
+        return grasps
+    turns = recorded_turns(lib)
+    over = [g for g in grasps if turns.get(str(getattr(g, "name", ""))) is not None and turns[str(g.name)] > tol + 1e-9]
+    if not over:
+        return grasps
+    entry = os.path.basename(os.path.dirname(str(getattr(lib, "path", "") or ""))) or key
+    try:
+        from ispatialgym.eval import tolerance_profile as TPR
+
+        fam, task = TPR.family_task(variant)
+        task = fam if fam == "disembedding" else task  # disembedding-<target>-...: the family is the task
+    except Exception:  # noqa: BLE001
+        task = "?"
+    on = turn_filter_on()
+    log.info("GRASP_TURN_FILTER (%s) %s for %s (tolerance %.3f rad): %s", "on" if on else "off: measured only", entry, task, tol,
+             ", ".join(f"{g.name} {turns[str(g.name)]:.3f} rad" for g in over))
+    if not on:
+        _countn(s, "grasp.off_target_would_filter", len(over))
+        return grasps
+    kept = [g for g in grasps if g not in over]
+    _countn(s, "grasp.off_target_filtered", len(over))
+    _countn(s, f"grasp.off_target_filtered.{entry}.{task}", len(over))
+    if not kept:
+        _reject("grasps_off_target", f"{key}: every row turns in the hand beyond the task's {tol:.3f} rad ({[g.name for g in over]})")
+    return kept
+
+
 def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", kinds: Optional[Sequence[str]] = None, lean: bool = False,
                    overhang: bool = False):
     """``(grasps, key, rest_quat)`` of the role's model for the pipeline the customs entry requires (``roles.<role>.
@@ -1155,6 +1241,7 @@ def library_grasps(s, role: str = "target", default_pipeline: str = "tabletop", 
             log.info("V2_SCALE_MISMATCH %s/%s (%s): spawned %s, entry %s", choice.category, choice.model, key, spawn, lib.scale)
             if GL.v2_only():
                 _reject("v2_scale_mismatch", f"{key}: spawned at {spawn}, v2 entry {os.path.basename(os.path.dirname(lib.path))} at {lib.scale}")
+        grasps = filter_by_turn(s, grasps, lib, key)  # i7-tray: the in-hand turn vs the task's pose tolerance (default off)
     try:
         rest = C.rest_quat(key)
     except FileNotFoundError:
