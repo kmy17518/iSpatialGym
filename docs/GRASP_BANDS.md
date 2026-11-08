@@ -2627,6 +2627,79 @@ axial_05 (+ axial_01/03/04 as the regression check). Default after I see it."
   only the support policy (it would have caught axial_03 310002/0); (c) the brace itself: 67 of 87 candidates have no IK in the empty
   world, so the map / live brace pose mismatch, not the two-arm check, is what keeps axial_05's brace from landing.
 
+**5y: the pre policy refuses on any failure and is the default; the map / live brace disagreement (owner 2026-11-08 5y).**
+Owner decision: "(1) the sampling brace pre call refuses on ANY failure (not only the support policy), then
+ISPATIALGYM_AXIAL_BRACE_PRE_POLICY -> DEFAULT (own commit), with an N 4 confirm on axial_05 / 01 / 03 / 04; (2) diagnose (CPU first) why the
+axial_brace map and the live check disagree on the brace pose ... Do not rebuild maps or change the builder without asking."
+
+- Checked first: neither was on the branch (384c25de refused on `support_policy` only, default off).
+- **12a1a49a**: `_brace_pre_policy` refuses a brace candidate on ANY failure of the program check's pre call (the support policy,
+  `ik_joint_limit`, no IK, ...); a refused optional brace still leaves the attempt push-only. Counters `axial_brace.pre_policy.refused`,
+  `refused.<label>`, `refused_reason.<key>` (the reason's head before its first `:`), `push_only`, `other_brace`; `other_fail` is gone.
+  Unit test: a joint-limit pre failure is refused (and any other IK failure).
+- **2de8f35d**: `ISPATIALGYM_AXIAL_BRACE_PRE_POLICY` DEFAULT ON (its own commit; `=0` turns it off).
+- Tests `test_axial_brace_pre_policy.py` 5 + `test_axial_settled_rest.py` 16 pass; pyflakes clean; suite at 2de8f35d 23 failed + 3 errors,
+  the same 26 ids as 384c25de. Snapshot trunk_2de8f35d.
+- Confirm run `i7ar_pd` (no pre-policy env = the default): see the table below.
+
+**5y.2 diagnosis (CPU): the brace POSE is the same; the map is read at another trunk.**
+
+- Same pose. Rebuilt the live candidates of the 4 written i7ar_probe draws (`contact_poses.axial_brace_candidates` from the recorded
+  stance / target pose / spin / goal yaw) and the map's own chain for the same class (`contact_maps.chain_world`: the library entry's
+  `T_rule_object` with the root at the live goal root xy, the live support top). In the base frame the pre and the contact agree to
+  < 0.1 mm and 0.01 deg for every class (blade_0 / blade_0- / blade_30 / blade_30-), including the settled rest's 0.087 rad tilt (the
+  entry's `T_rule_object` carries q_rest; the blade's approach is straight down in both). Script `$OFH/axialrest_20261108/diag5y/cmp_pose.py`.
+- Different trunk. `ContactMap.lookup` reads the NEAREST built trunk tilt (0 / -0.3 / -0.6 / -0.9), but Phase 2's stances take continuous
+  tilts (`tilt_scan`: 7 samples from 0 to the torso limit). The axial_05 draws stand at translate 0.5 / tilt -0.454 (3 of 4) - 0.146 rad
+  from -0.6 and 0.154 from -0.3 - and at 0.0 / -0.916. The reach maps got the inherited / self-correcting tilt columns for this
+  (`map_tilt.py`, i7-plateqtf); the contact maps did not.
+- At 310002's goal cell (0.83, 0.00), translate 0.5, every d_e: blade_0- is `feasible` at tilt -0.6 only - `ik_pre` at -0.3, `reach_bound`
+  at 0, `branch_jump` at -0.9 (blade_30-: feasible at -0.6, `ik_grasp` at -0.3). The stance at -0.454 lies half way: the map's "feasible"
+  is the -0.6 column's, and the live IK (fresh, 32 seeds) fails there as the -0.3 column does.
+- How often neighbouring columns agree (whole axial_brace map, d_e 0.45): P(feasible at the next built tilt | feasible) = 0.36-0.62 at
+  translate 0.5 (of 1348 feasible entries at -0.6, 36 % are feasible at -0.3), 0.22-0.74 over all translates. Neighbouring 8 cm cells agree
+  0.62-0.67 (the live root is up to 6 cm from its cell: 15-44 mm for these draws). These are boundary poses (left_arm_joint2 near its
+  limit), so a column 0.15 rad away is close to a coin flip. Scripts `trunk_status.py`, `tilt_agree.py`, `cell_agree.py` (same dir).
+- Second difference: the live exact IK keeps a 0.05 rad joint-limit margin (`IKChecker.JOINT_LIMIT_MARGIN`, `away_from_limits`), and the map's
+  cuRobo IK keeps none. In the probe, 2 of the 6 blade_0- empty-world failures were `ik_joint_limit` (left_arm_joint2 within 3-22 mrad).
+- GPU decomposition with the MAP'S OWN IK (diagnosis only, no map written; `diag5y/brace_ik_decomp.py`, job 18385226, `decomp.out`): the
+  map's problem (A: lattice cell x map trunk), the live root xy at the map trunk (B), the live root xy at the live trunk (C), 64 seeds,
+  best solution's joint-limit margin (left_arm_joint2 every time):
+
+| draw / class (map status) | A map's problem | B live xy | C live xy + live trunk |
+|---|---|---|---|
+| 310002 blade_0- (feasible) | 26 / 64, 0.062 rad | 18 / 64, 0.061 | **0 / 64 (no IK)** |
+| 310003 blade_0- (feasible) | 26 / 64, 0.063 | 26 / 64, 0.018 | **0 / 64** |
+| 310000 blade_30- (feasible) | 28 / 64, 0.017 | 28 / 64, 0.029 | pre only, no chain |
+| 310001 blade_30 / 30- (feasible at -0.9) | 15 / 19 of 64, 0.003 / 0.022 | pre only, no chain | pre only, no chain |
+| 310002 / 310003 blade_30- (feasible) | 0.003 / 0.003 | 0.003 / 0.003 | 0.17 / 0.13 (live: fails the 3 mm target check) |
+| i7ar_on 310001 opp_blade_0 (feasible) | 0.044 | 0.056 | 0.060 (live: "exact IK at pose 1" in the full world) |
+
+- So: of 8 map-feasible (draw, class) pairs, 6 sit below the live 0.05 rad margin already at the map's own problem, and only 3 are
+  solvable with the margin at the live xy and trunk; the owner's example (blade_0-) is lost to the trunk alone (0.146 rad).
+- Proposed (owner; nothing changed, no map rebuilt): (a) builder - accept a map IK solution only with the live 0.05 rad joint-limit margin
+  (rebuild); (b) sampler, no rebuild - read a contact map at a tilt more than 5 mrad from a built tilt as the INTERSECTION of the two
+  bracketing columns, or snap the axial manipulation stance to the brace map's built tilt (camera rules re-checked, as TILT_SNAP did for
+  grasps); (c) rebuild with Phase 2's `tilt_scan` tilts as columns and a 4 cm lattice for these boundary-pose classes. (a) + (b) together
+  make the map's "feasible" mean what the live check accepts.
+
+**5y.1 confirm** (`i7ar_pd`, trunk_2de8f35d, the default; same indices / root / memory / overlay / switches as 5v; jobs 18384731-34, all
+completed first run). att / written / ok, GPU-h per success:
+
+| alias | i7ar_pol0 (off) | i7ar_pol (support policy only) | i7ar_pd (any failure, default) | where it acted (i7ar_pd) |
+|---|---|---|---|---|
+| axial_05 | 20 / 4 / 3, 0.093 | 20 / 4 / 3, 0.087 | 20 / 4 / 3, 0.10 | 310000 att 10: left_h x2, left_h- (support_policy) -> push-only |
+| axial_01 | 9 / 4 / 3, 0.090 | 11 / 4 / 2, 0.17 | 9 / 4 / 3, 0.083 | 310003 att 1: opp_blade_45, opp_blade_60- (ik_joint_limit) -> another brace |
+| axial_03 | 6 / 4 / 4, 0.045 | 8 / 4 / 3, 0.067 | 4 / 4 / 3, 0.057 | 310002 att 0: opp_blade_45- (ik_joint_limit) -> another brace, written, success |
+| axial_04 | 16 / 4 / 3, 0.067 | 18 / 4 / 4, 0.050 | 16 / 4 / 3, 0.060 | 0 checked |
+| all | 51 / 16 / 13, 0.071 | 57 / 16 / 12, 0.082 | 49 / 16 / 12, 0.075 | 13 checked, 7 passed, 6 refused (support_policy 3, ik_joint_limit 3) |
+
+- Push-only fallbacks 1 (axial_05 310000 att 10, which then dies at the program check on the push - "push pre-contact witness 3.16 rad" - as
+  in every arm); other_brace 2. Program-check brace ("pre:", left arm) rejections: i7ar_pd 0, i7ar_pol 1 (03 ik_joint_limit), i7ar_pol0 2
+  (05 support_policy, 01 ik_joint_limit). axial_01 310003 att 1 then fails at the program check on the push; 310003 is written at attempt 3
+  in both arms. The default removes every brace rejection at the program check; success at N 4 is within noise (12 vs 13; the failed demos
+  - 03 310003 plan_failed, 01 310003 not_reached - are not the attempts where it acted).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
