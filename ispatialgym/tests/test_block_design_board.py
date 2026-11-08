@@ -203,10 +203,13 @@ def test_flip_set_needs_two_flip_cells_with_a_clear_approach_side():
     assert s._flip_plan(sorted(blocked, key=img_score), img_score, faces, manip, init, "right", True) is None
 
 
-def test_board_placement_keeps_a_flip_set():
+def test_board_placement_keeps_a_flip_set(monkeypatch):
     """``_place_board`` takes the first position that also leaves a cell set the layout accepts: at stand-off 0.35 every position is
     on the top; (0.46, -0.02) passes the count of flip cells but leaves candidate 11's cells no set, (0.44, -0.10) keeps one. Without
-    the test the first position is kept, as before; when no position keeps a set the board is not placed."""
+    the test the first position is kept, as before; when no position keeps a set the board is not placed. BD_BOARD_EARLY / SEARCH off
+    (the probe order before them); the defaults (on, 5m.2): the same positions, the first one's probe saved by the layout test."""
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
     s, init, manip, img_score, faces = _layout_scene(stand_off=0.35)
     cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
     probes = []
@@ -231,6 +234,192 @@ def test_board_placement_keeps_a_flip_set():
     with pytest.raises(Reject) as e:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=lambda kept: False)
     assert e.value.reason == "board_placement" and "no cell set of them lets every repeated-colour block flip" in str(e.value)
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY")
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_SEARCH")
+    s.kit = SimpleNamespace(trav_free=lambda xy: True, stats={})
+    probes.clear()
+    assert placed_at(layout_ok=layout_ok) == ((0.44, -0.10), 6) and len(probes) == n_probe and s.kit.stats["bd_board.layout_before_probe"] == 1
+
+
+def _early_scene(monkeypatch, stand_off=0.35):
+    s, init, manip, img_score, faces = _layout_scene(stand_off=stand_off)
+    probes = []
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name="tray.n.01_1"))
+    s.objects = {"tray.n.01_1": object()}
+    s._teleport = lambda objects: None
+    s.world = SimpleNamespace(park=lambda obj, i: None)
+    s.kit = SimpleNamespace(trav_free=lambda xy: True, stats={})
+    s.ikc = SimpleNamespace(exact=lambda poses, st, arm, **kw: probes.append(st) or SimpleNamespace(ok=False))
+    right, toward, yaw = s._table_axes(manip)
+    eligible = lambda c: s._flip_cell_ok(c, manip, init, "right")  # noqa: E731
+    layout_ok = lambda kept: s._has_flip_set(kept, 4, img_score, faces, manip, init, "right", True)  # noqa: E731
+    return s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok
+
+
+def test_board_early_runs_the_layout_before_the_probe_and_keeps_the_probe_verdict(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_EARLY=1: a position whose kept cells have no flip set is dropped before its place probe (the same reason),
+    a failed probe's verdict is kept per (stance, board pose) - the next attempt's identical stance runs no IK; off: unchanged."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")  # the list alone (the grid is BD_BOARD_SEARCH's test)
+    with pytest.raises(Reject) as off:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    n_off = len(probes)
+    assert n_off > 0 and s.kit.stats == {}
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "1")
+    probes.clear()
+    with pytest.raises(Reject) as on:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    # (0.46, -0.02): no flip set -> dropped before its probe (its reason is now the layout's); (0.44, -0.10) keeps one -> probed (fails here)
+    assert on.value.reason == off.value.reason == "board_placement"
+    assert "(0.46, -0.02): 5 cells clear, no cell set" in str(on.value) and "(0.46, -0.02): no pitched place" in str(off.value)
+    assert 0 < len(probes) < n_off and s.kit.stats["bd_board.layout_before_probe"] >= 1 and s.kit.stats["bd_board.probe_run"] >= 1
+    probes.clear()
+    with pytest.raises(Reject):
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert probes == [] and s.kit.stats["bd_board.probe_memo_hit"] == s.kit.stats["bd_board.probe_run"]
+
+
+def test_board_precheck_rejects_before_the_travel(monkeypatch):
+    """The precheck (BD_BOARD_EARLY) runs _place_board's CPU checks on the candidate's region: candidate 10's cells (no flip set with any
+    position) are rejected as board_placement without an IK call; candidate 11's pass (a position keeps a set)."""
+    s, init, manip, faces, probes, _axes, _e, _l = _early_scene(monkeypatch, stand_off=0.45)
+    cam = C.camera_pose(C.torso_q(init.translate, init.tilt), base_pose=tuple(float(v) for v in init.base_pose2d))
+    s.camera_pose_at = lambda st: cam
+    s.world = SimpleNamespace(camera_model=CameraModel(1080, 1080, 459.0, 459.0, 540.0, 540.0), park=lambda obj, i: None)
+    s.names = lambda: ["b0", "b1", "b2", "b3"]
+    manip.extras["focus_info"] = {"cells": [manip.base_to_world(th.tensor(c)) for c in REGION_10]}
+    with pytest.raises(Reject) as e:
+        s._board_precheck(init, manip, faces)
+    assert e.value.reason == "board_placement" and "(precheck)" in str(e.value) and "(0.46, -0.02): off the top" in str(e.value)
+    assert probes == [] and s.kit.stats["bd_board.precheck_reject"] == 1
+    s0 = _layout_scene(stand_off=0.35)[2]
+    s0.extras["focus_info"] = {"cells": [s0.base_to_world(th.tensor(c)) for c in REGION_11]}
+    s._board_precheck(init, s0, faces)
+    assert s.kit.stats["bd_board.precheck_pass"] == 1
+
+
+# bd_diag2 (2026-11-08, v2only, trunk_6cc832b5): candidate 12's region cells (stand-off 0.45, shift +0.35, trunk 0.95 / 0)
+REGION_12 = [(0.67, -0.16), (0.75, -0.08), (0.75, -0.24), (0.59, -0.08), (0.59, -0.24), (0.67, -0.32), (0.67, 0.00), (0.51, -0.16)]
+
+
+def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_SEARCH=1: at stand-off 0.45 the list's first three positions are off the top and its last two leave candidate
+    12's cells no flip set; the grid (nearest to the first position at the same distance from the edge first) is searched with the CPU
+    tests before each probe, the probes capped by board_grid_max_probes. Off: the list's verdict."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+
+    def reach(poses, st, arm, **kw):  # the tall trunk's reach in bd_diag2: the hand right of -0.08 and nearer than 0.57 only
+        probes.append(st)
+        b = [st.world_to_base(th.as_tensor(p[0])[:2]) for p in poses]
+        return SimpleNamespace(ok=all(float(v[1]) <= -0.08 and float(v[0]) <= 0.57 for v in b))
+
+    s.ikc = SimpleNamespace(exact=reach)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
+    with pytest.raises(Reject) as off:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert "(0.46, -0.02): off the top" in str(off.value) and "grid" not in str(off.value)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "1")
+    probes.clear()
+    _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    b = manip.world_to_base(pose[0][:2])
+    pos = (round(float(b[0]), 2), round(float(b[1]), 2))
+    assert pos not in [tuple(p) for p in BOARD_XY] and s.kit.stats["bd_board.grid_placed"] == 1
+    assert layout_ok(kept) and s._board_on_top(manip, pos[0], pos[1], _half(s), right, -toward)
+    assert pos == (0.51, -0.1)  # bd_diag2: the one position candidates 12 / 15 pass (layout + probe from the 0.95 trunk)
+    # the grid is ordered by the distance to the list's first position on the top, (0.52, -0.06); none on the top: (0.46 + 0.10, -0.02)
+    g = s._board_grid(manip)
+    assert g[:2] == [(0.51, -0.06), (0.54, -0.06)] and (0.51, -0.1) in g[:5] and len(g) == len(BD.BOARD_GRID_DEPTHS) * len(BD.BOARD_GRID_LATERALS)
+    s.top, g_top = None, s.top
+    assert s._board_grid(manip)[0] == (0.57, -0.02)
+    s.top = g_top
+    s.spec.generation["board_grid_max_probes"] = 0
+    with pytest.raises(Reject) as capped:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert "grid" in str(capped.value) and "probe cap" in str(capped.value)
+
+
+def test_board_search_puts_the_board_feasible_candidates_first(monkeypatch):
+    """BD_BOARD_SEARCH (1): a candidate counts as board-feasible when some position passes the CPU tests on its region (candidate 10's
+    cells at stand-off 0.45: none; candidate 11's at stand-off 0.35: (0.44, -0.10)); the verdict is kept per candidate."""
+    s, init, manip, faces, probes, _axes, _e, _l = _early_scene(monkeypatch, stand_off=0.45)
+    cam = C.camera_pose(C.torso_q(init.translate, init.tilt), base_pose=tuple(float(v) for v in init.base_pose2d))
+    calls = []
+    s.camera_pose_at = lambda st: calls.append(st) or cam
+    s.world = SimpleNamespace(camera_model=CameraModel(1080, 1080, 459.0, 459.0, 540.0, 540.0), park=lambda obj, i: None)
+    s.names = lambda: ["b0", "b1", "b2", "b3"]
+    s.faces = dict(BD.DEFAULT_FACES)
+    bad = manip
+    bad.extras["focus_info"] = {"cells": th.stack([bad.base_to_world(th.tensor(c)) for c in REGION_10])}
+    good = _layout_scene(stand_off=0.35)[2]
+    good.extras["focus_info"] = {"cells": th.stack([good.base_to_world(th.tensor(c)) for c in REGION_11])}
+    s.manip_candidates = [bad, good]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    assert [s._board_feasible(k, init) for k in (0, 1)] == [False, True]
+    n = len(calls)
+    assert [s._board_feasible(k, init) for k in (0, 1)] == [False, True] and len(calls) == n  # kept
+    assert probes == [] and "bd_board.precheck_reject" not in s.kit.stats
+
+
+def test_board_table_positions_hold_at_every_stand_off(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_TABLE=1 (owner 5m): the listed positions are the table's (inset from the edge = base depth - 0.35, the lateral
+    the centre line's), so at stand-off 0.45 they stand 0.10 m deeper from the base and stay on the top (base-relative, the first three
+    were off it); per stance only the positions on the top and inside the depth window are kept, then the table lattice (SEARCH on),
+    nearest first to the first kept listed position. Off: the base list unchanged."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "0")
+    plan_off = s._board_plan(manip)
+    assert [(d, l) for d, l, g in plan_off if not g] == [tuple(p) for p in BOARD_XY] and s.kit.stats == {}
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    plan = s._board_plan(manip)
+    listed = [(d, l) for d, l, g in plan if not g]
+    # (0.60, +0.05) -> 0.70: beyond the 0.66 window; the others 0.10 deeper, all on the top
+    assert listed == [(0.56, -0.02), (0.54, -0.1), (0.58, 0.04), (0.62, -0.06)]
+    assert all(s._board_on_top(manip, d, l, _half(s), right, -toward) for d, l, _g in plan)
+    lattice = [(d, l) for d, l, g in plan if g]
+    assert lattice and all(0.40 - 1e-6 <= d <= 0.66 + 1e-6 for d, _l in lattice) and not set(lattice) & set(listed)
+    ref = listed[0]
+    dist = [round((d - ref[0]) ** 2 + (l - ref[1]) ** 2, 6) for d, l in lattice]
+    assert dist == sorted(dist)
+    assert s.kit.stats["bd_board.table_plans"] == 1 and s.kit.stats["bd_board.table_listed"] == 4 and s.kit.stats["bd_board.table_listed_out_of_window"] == 1
+    # stand-off 0.35: the table positions are the base list (its own stand-off)
+    m35 = manip.shifted(stand_off=0.35)
+    assert [(d, l) for d, l, g in s._board_plan(m35) if not g] == [tuple(p) for p in BOARD_XY]
+    # SEARCH off: the listed table positions only
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    assert all(not g for _d, _l, g in s._board_plan(manip))
+    # the window and the listed positions are generation knobs
+    s.spec.generation.update({"board_table_xy_candidates": [[0.08, -0.10]], "board_table_depth_window_m": [0.40, 0.52]})
+    assert [(d, l) for d, l, _g in s._board_plan(manip)] == []
+    s.spec.generation["board_table_depth_window_m"] = [0.40, 0.56]
+    assert [(d, l) for d, l, _g in s._board_plan(manip)] == [(0.53, -0.1)]
+
+
+def test_board_table_places_the_board_where_the_base_list_is_off_the_top(monkeypatch):
+    """BD_BOARD_TABLE on candidate 12's stance (stand-off 0.45, the tall trunk's reach of bd_diag2: right of -0.08, nearer than 0.57):
+    the base list is off the top / leaves no flip set and BD_BOARD_SEARCH's grid finds (0.51, -0.10); the table's listed (0.54, -0.10)
+    (= the list's (0.44, -0.10) at its own distance from the edge) is placed from the list, without the grid, and the flip-room fit
+    keeps a listed position at every stand-off."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+
+    def reach(poses, st, arm, **kw):
+        probes.append(st)
+        b = [st.world_to_base(th.as_tensor(p[0])[:2]) for p in poses]
+        return SimpleNamespace(ok=all(float(v[1]) <= -0.08 and float(v[0]) <= 0.57 for v in b))
+
+    s.ikc = SimpleNamespace(exact=reach)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    b = manip.world_to_base(pose[0][:2])
+    pos = (round(float(b[0]), 2), round(float(b[1]), 2))
+    assert layout_ok(kept) and s._board_on_top(manip, pos[0], pos[1], _half(s), right, -toward)
+    assert pos == (0.54, -0.1) and s.kit.stats["bd_board.table_listed_placed"] == 1 and "bd_board.grid_placed" not in s.kit.stats
+    fit = s._board_fit(init, 0.35, _half(s))
+    assert all(fit.values()) and set(fit) == {f"{so:.2f}" for so in TT.STAND_OFFS}
 
 
 def test_flip_room_draw_spreads_the_init_over_the_range_that_keeps_the_flip_room(monkeypatch):
@@ -262,6 +451,12 @@ def test_flip_room_draw_spreads_the_init_over_the_range_that_keeps_the_flip_room
     bare = _sampler(top, board=False)
     bare_lats = {round(bare._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(k)).lateral, 3) for k in range(12)}
     assert min(bare_lats) >= BOUNDS[0] - 1e-6 and max(bare_lats) <= BOUNDS[1] - 0.35 + 1e-6 and max(bare_lats) > 0.13
+    # with the table-relative board positions (i7-blockdesign BD_BOARD_TABLE) every lateral of the flip-room range keeps a board
+    # position at every stand-off: the draw spans the whole [0.044, 0.1974] (the move: 0.1974 only)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    tab = {round(s._init_with_room_for_flips(_init(edge, 0.38), np.random.default_rng(k)).lateral, 3) for k in range(12)}
+    assert s._flip_room["draw"]["admissible_span"] == [pytest.approx(BOUNDS[0]), pytest.approx(BOUNDS[1] - 0.35, abs=1e-4)] and max(tab) > 0.14
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_TABLE")
     # no lateral of the range on the floor: the move as before (here: none either -> the drawn init)
     off = _sampler(top)
     off.kit = SimpleNamespace(trav_free=lambda xy: False, stats={})
