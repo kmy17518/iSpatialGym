@@ -133,3 +133,96 @@ def test_filter_all_removed_rejects_and_no_map_keeps(monkeypatch):
     me, stats = _me(monkeypatch, None)
     cands = [_cand(0.9)]
     assert me.place_depth_cap_filter(cands) == (cands, {}) and stats["place_depth_cap.no_map"] == 1
+
+
+# ------------------------------------------------------------------------------------------------ touching_04 follow-ups (lead 2026-11-08)
+
+
+def test_follow_up_switches_default_off(monkeypatch):
+    for env in (IS.PLACE_DEPTH_CAP_REDRAW_ENV, IS.PLACE_DEPTH_CAP_BASIS_ENV, IS.TOUCH_LIFT_SCREEN_ENV):
+        monkeypatch.delenv(env, raising=False)
+    assert not IS.place_depth_cap_redraw_on() and IS.place_depth_cap_basis() == "map" and IS.touch_lift_screen_mode() == "off"
+    monkeypatch.setenv(IS.PLACE_DEPTH_CAP_BASIS_ENV, "a1")
+    monkeypatch.setenv(IS.TOUCH_LIFT_SCREEN_ENV, "shadow")
+    assert IS.place_depth_cap_basis() == "a1" and IS.touch_lift_screen_mode() == "shadow"
+
+
+def test_a1_basis_replaces_the_map_verdict(monkeypatch):
+    """(b): with the a1 basis a candidate is kept when A1's own push stance test passes for the target at its focus at some map yaw slot."""
+    pm = _Map(0.75)
+    me, stats = _me(monkeypatch, pm, free=lambda st: float(st.stand_off) >= 0.35 - 1e-9)
+    monkeypatch.setenv(IS.PLACE_DEPTH_CAP_BASIS_ENV, "a1")
+    me.segment_arms = ["right"]
+    me.hull, me.rest = {"target": None}, {"target": None}
+    me.top = SimpleNamespace(z=1.0)
+    monkeypatch.setattr(TT, "object_pose_on", lambda s, hull, rest, xy, yaw, z: (th.tensor([float(xy[0]), float(xy[1]), z]), yaw))
+    calls = []
+
+    def psc(manip, pose, laterals, p_pose=None, collision=True):
+        calls.append(pose[1])
+        return ([(laterals[0], None, {})], {}) if abs(pose[1] - np.pi / 2) < 1e-6 else ([], {})  # only the second yaw slot passes
+
+    me.push_stance_candidates = psc
+    me._a1_reach_at_focus = IS.IORSSmall._a1_reach_at_focus.__get__(me)
+    deep = _cand(0.50)  # beyond the map cap (0.44): kept by the a1 basis
+    f = me.place_depth_caps([deep])[id(deep)]
+    assert f["remove_map"] and not f["remove"] and f["basis"] == "a1" and f["a1_yaw_slot"] == 90.0 and len(calls) == 2
+    assert stats["place_depth_cap.a1_ok_map_off"] == 1
+    me.push_stance_candidates = lambda *a, **k: ([], {})
+    f = me.place_depth_caps([_cand(0.30)])
+    assert list(f.values())[0]["remove"] and not list(f.values())[0]["remove_map"]
+
+
+def _lift_me(monkeypatch, mode, rows, gap, ik_ok, rule="auto"):
+    from contextlib import contextmanager
+
+    monkeypatch.setenv(IS.TOUCH_LIFT_SCREEN_ENV, mode)
+    monkeypatch.setattr(TT, "contact_maps_on", lambda: True)
+
+    @contextmanager
+    def att(*a, **k):
+        yield
+
+    monkeypatch.setattr(IS, "attached", att)
+    monkeypatch.setattr(IS.PC, "lift_end_pose", lambda g: ("lift", g.carry_height))
+    seen = {}
+
+    def exact(poses, st, arm, **kw):
+        seen["h"] = poses[0][1]
+        return SimpleNamespace(ok=ik_ok, q=th.zeros(3) if ik_ok else None, reason="exact IK failed at pose 1 of 1")
+
+    stats = {}
+    me = SimpleNamespace(shelf_start=None, gen=lambda k, d=None: d, kit=SimpleNamespace(stats=stats), ikc=SimpleNamespace(exact=exact),
+                         carry_rule=lambda: rule, place_pose_for=lambda t, p, m: "place", push_stance_candidates=lambda *a, **k: (rows, {}),
+                         drive_partner_gap=lambda t, p, frm, to: gap, carry_height_over=lambda partner: 0.31 if partner else 0.03,
+                         obj=lambda r: None, support_objects=lambda: [], _lift_screen_shadow=False)
+    grasp = SimpleNamespace(carry_height=0.03, arm="right", eef_in_object=None)
+    return me, grasp, stats, seen
+
+
+def test_lift_screen_rejects_only_where_the_goal_check_is_certain_to(monkeypatch):
+    """(a): the goal check's lift test at the partner height, at the draw; certain = every A1 push stance is a real second base pose whose
+    drive passes within carry_clearance_m of the partner (the auto rule then raises the box over the partner)."""
+    st = SimpleNamespace(name="push")
+    screen = IS.IORSSmall._touch_lift_screen
+    me, g, stats, seen = _lift_me(monkeypatch, "1", [(-0.12, st, {}), (-0.16, st, {})], gap=0.0, ik_ok=False)
+    with pytest.raises(Reject) as e:
+        screen(me, SimpleNamespace(name="manipulation"), g, "t", "p", 3)
+    assert e.value.reason == "lift_unreachable" and seen["h"] == 0.31 and g.carry_height == 0.03 and stats["touch_lift_screen.rejected"] == 1
+    # shadow: counted, nothing rejected
+    me, g, stats, _ = _lift_me(monkeypatch, "shadow", [(-0.12, st, {})], gap=0.0, ik_ok=False)
+    screen(me, SimpleNamespace(name="manipulation"), g, "t", "p", 3)
+    assert stats["touch_lift_screen.shadow_would_reject"] == 1 and me._lift_screen_shadow
+    # uncertain: a drive that clears the partner (the box would stay at the table height), a manipulation-stance entry, no A1 stance
+    for rows, gap in (([(-0.12, st, {})], 0.05), ([(-0.12, None, {})], 0.0), ([], 0.0)):
+        me, g, stats, seen = _lift_me(monkeypatch, "1", rows, gap=gap, ik_ok=False)
+        screen(me, SimpleNamespace(name="manipulation"), g, "t", "p", 3)
+        assert stats == {"touch_lift_screen.uncertain": 1} and not seen
+    # the partner rule is certain without the A1 test; a passing lift passes
+    me, g, stats, _ = _lift_me(monkeypatch, "1", [], gap=0.0, ik_ok=True, rule="partner")
+    screen(me, SimpleNamespace(name="manipulation"), g, "t", "p", 3)
+    assert stats == {"touch_lift_screen.checked": 1, "touch_lift_screen.passed": 1}
+    # off / the table-only rule: nothing
+    me, g, stats, _ = _lift_me(monkeypatch, "1", [], gap=0.0, ik_ok=False, rule="table")
+    screen(me, SimpleNamespace(name="manipulation"), g, "t", "p", 3)
+    assert stats == {}
