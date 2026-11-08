@@ -2563,6 +2563,57 @@ with the switch. Maps: umbrella__ziqzqo__s1 interior PLACE maps in hall_tree_upk
 missing_map is gone with the switch; the next blocker is the exact place at stance C with the umbrella's single library grasp (top_2)
 at the board's goal yaw - not in this decision.
 
+### Owner decisions 2026-11-08 (5q.1 / 5q.2, `prompt_decisions_20261108c`)
+
+**5q.1 - the front-side switch is the default (1af21ad3, its own commit).** `interiors.front_side_on()` reads
+`ISPATIALGYM_INTERIOR_FRONT_SIDE` as on unless it is `0` / `off` / `false` / `no`. Digest check over EVERY spec of the repo registry, the
+switch unset / 0 / 1: fridge 0b539d8a83ab, sink lkklqs bdb7f8c6f92e, jaysra 9d713ac87564, kmuacd b58d4e5c790e, hall tree d6947c534b88 -
+identical. test_interior_registry.py now requires a recorded digest for every registry spec (a spec added without one fails), checks the
+digests unset / 0 / 1 and each spec's own open-sides verdict on / off, and the default on. Snapshot trunk_1af21ad3.
+
+**5q.2 - why F_goal was empty in gm_t02_on (diagnosis from its log and the staged maps, no new code).** `SurfaceTouchingMode.release_feasible`
+screens only the F_init yaws whose CARRIED yaw (init yaw + the base-yaw change B -> C) lies within half a screening step (11.25 deg) of
+one of the board's axes, and whose footprint then fits the board (90 / 270 deg only: `fit_per_yaw {0: 0, 90: 268, 180: 0, 270: 279}`).
+
+| per (C, yaw) entry, 3392 C tries / 28111 entries | entries | share |
+|---|---|---|
+| not alignable (carried yaw > 11.25 deg from every axis) | 21201 | 75.4 % |
+| aligned ACROSS the board (0 / 180 deg): `footprint_off_board` | 6069 | 21.6 % |
+| aligned along the board -> screening IK | 841 | 3.0 % (573 pass; -90 deg 240 / 384 fail, -270 deg 28 / 457) |
+
+Per C: F_goal empty at 2871 of 3392 (85 %): 2608 (77 %) had no yaw to screen at all (the release-yaw constraint), 263 (8 %) lost their
+screened yaw in the IK screen (IK + collision together). The camera is not part of F_goal (stance C's frame filter comes first). F_init's
+size decides: <= 10 yaws -> 56 of 2402 C's with an F_goal, >= 11 -> 465 of 990. **Map vs exact: no disagreement** - the interior PLACE
+maps hold the object yaw (8 base-frame yaws x 10 grasp members): only 90 / 270 (along the board) are feasible (r 96 / 164 cells, l 106 /
+149; all other yaws off_support), as the exact rule. The map is yaw-blind only in the stance-C lookup (any feasible (yaw, grasp) admits a
+cell); the exact check needs the carried yaw, i.e. a pick at B with the shaft across B's heading, which the one-grasp F_init rarely holds.
+The 521 C's with an F_goal then failed later: 288 B -> C carry path (the 0.82 m umbrella collides near (-0.65, 1.35) / (-0.85, 1.20)),
+186 B exact IK, 14 the A -> B drive passes the target, ~30 C attached place IK (joint limits), 5 branch swing. Round 1's entry
+(roles_all_20261102): 12 top candidates within 6 cm of the shaft centre, 10 reps -> 1 valid (top_2); 6 of 7 top reps `no_placement` in
+the validator (the square slab = footprint radius 0.41 + 0.20 m, the base 0.30 m from its edge: the shaft centre 0.91 m ahead).
+
+The IK part was split by a STANCE_BLAME run (gm_t02_blame, N 1, the round-1 root, trunk_1af21ad3 with the front-side DEFAULT and no env switch:
+interior map hit, missing_map 0): every blamed release (release yaws -90 / -270, top_2) is "not reached with collisions off", 32-333 mm short
+or joint 2 at its limit - reach, not collision.
+
+**5q.2 - ladder round 2 for umbrella__ziqzqo__s1** (as the gym shoe's; record `$OFH/goalmaps_20261108/umbrella_r2`: prep.py, plan.json,
+submit_glib.sh, submit_maps.sh, stage.py, chain.sh). trunk_1af21ad3 (candidate switches on by default) + gate_dump, geometry copied, the job
+of manifest_settle25 + legacy_key umbrella__ziqzqo__t. L2v = L2 with one per-entry validator change, `slab_half_m` 0.20 -> 0.05 (the slab
+still covers the footprint radius + 5 cm; every physics gate unchanged) - an arm added because round 1 lost its top reps to no_placement.
+
+| level | candidates / geometry-ok | trials | physics-valid | losses |
+|---|---|---|---|---|
+| round 1 (roles_all_20261102) | 15 / 10 reps | 10 | 1 (top_2) | 6 no_placement, 3 finger_penetration |
+| L2 (24000 x 24, 20 reps, cone 45) | 40 / 33 | 20 | 2 (top_2, top_23) | 17 no_placement, 1 palm_contact |
+| L3 (48000 x 48, 30 reps, cone 60) | 56 / 41 | 25 | 1 (top_25) | 20 no_placement, 3 palm_contact, 1 grasp_off_target |
+| L2v (L2 + slab_half_m 0.05) | 40 / 33 | 6 | 6 (max_valid: top_0 / 2 / 9 / 10 / 14 / 19) | none |
+
+The L2v grasps tilt 14-33 deg toward +-x (along the shaft) and +-y (across). Maps (trunk_1af21ad3, floor h 0 and interior PLACE in
+hall_tree_upkvgr_0@0.5809 with the round-1 rule): floor cells per yaw 31-39 (round 1) -> 47-57 (L2) -> 61-67 (L2v) of 72-73; interior
+cells (any yaw) r / l 174 / 166 -> 203 / 202 (L2) -> 234 / 227 (L2v), still only at yaws 90 / 270. Staged roots (copies of
+v2maps_goalmaps, round-1 entry and maps in `_superseded_ladder_r1`, check_int1 ERRORS 0): **`$OFH/v2maps_goalmaps_umb2`** (L2v, the
+primary) and `$OFH/v2maps_goalmaps_umb2s` (L2, the standard validator). L2v's validator change is per entry; the owner confirms it.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
