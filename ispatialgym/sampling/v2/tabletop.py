@@ -4098,28 +4098,32 @@ def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
     return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
 
 
-def camera_top_count(s, eef: Pose, plane_z: float, arm: str, clearance: float) -> None:
-    """i7-camhull 2026-11-08 (owner_20261108g item 1, COUNT ONLY; ``ISPATIALGYM_CAMERA_HULL_FALLBACK`` shadow / 1): where the support-top
-    screen refused the wrist camera (``clearance`` < :data:`TWIN_CAMERA_CLEARANCE_M` above ``plane_z``), what the side_9 two-step would
-    decide (``IKChecker.camera_top_fallback``: counters ``camera_policy.top_screen.*``). The screen's verdict is never changed here."""
-    if _ik().camera_hull_fallback_mode() == "off":
-        return
+def camera_top_rescued(s, eef: Pose, plane_z: float, arm: str, clearance: float) -> bool:
+    """i7-camhull 2026-11-08 (``ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK``, default off; lead decision #6): the support-top screen refused the
+    wrist camera (``clearance`` < :data:`TWIN_CAMERA_CLEARANCE_M` above ``plane_z``) - True when the side_9 two-step passes it
+    (``IKChecker.camera_top_fallback``: a narrow refusal, the camera hull >= 0.5 mm above the plane) and the switch is ``1``; ``shadow``
+    judges and counts, False; off: False, nothing judged."""
+    mode = _ik().camera_top_hull_fallback_mode()
+    if mode == "off":
+        return False
     fn = getattr(getattr(s, "ikc", None), "camera_top_fallback", None)
     if fn is None:
-        return
+        return False
     try:
-        fn(eef, float(plane_z), arm, float(clearance), TWIN_CAMERA_CLEARANCE_M)
-    except Exception as e:  # noqa: BLE001 - a count only
-        log.debug("camera_top_count: %r", e)
+        out = fn(eef, float(plane_z), arm, float(clearance), TWIN_CAMERA_CLEARANCE_M, mode)
+    except Exception as e:  # noqa: BLE001 - the fallback never turns a refusal into an error
+        log.warning("camera_top_rescued: %r", e)
+        _count(s, "camera_policy.top_screen.error")
+        return False
+    return bool(out.get("ok")) and mode == "on"
 
 
 def camera_top_clear(s, eef: Pose, plane_z: float, arm: str) -> bool:
-    """The wrist camera's support-top screen (``wrist_camera_clearance(eef, plane_z) >= TWIN_CAMERA_CLEARANCE_M``) - unchanged; a refusal
-    is counted by :func:`camera_top_count` (i7-camhull, switch on / shadow only)."""
+    """The wrist camera's support-top screen: ``wrist_camera_clearance(eef, plane_z) >= TWIN_CAMERA_CLEARANCE_M``, or a narrow refusal
+    passed by :func:`camera_top_rescued` (i7-camhull, ``ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK``; off: the screen alone, as before)."""
     cam = wrist_camera_clearance(eef, plane_z)
     if cam < TWIN_CAMERA_CLEARANCE_M:
-        camera_top_count(s, eef, plane_z, arm, cam)
-        return False
+        return camera_top_rescued(s, eef, plane_z, arm, cam)
     return True
 
 
@@ -4232,8 +4236,7 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
         if not r.ok or r.q is None:
             return False, r, None, str(r.reason)
         cam = None if support_z is None else wrist_camera_clearance(p.chain[-1], float(support_z))
-        if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
-            camera_top_count(s, p.chain[-1], float(support_z), a, cam)  # i7-camhull: a count only (switch on / shadow)
+        if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M and not camera_top_rescued(s, p.chain[-1], float(support_z), a, cam):  # i7-camhull
             return False, r, None, f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
         if accept is not None and not bool(accept(_t(r.q))):
             return False, r, None, "fails the caller's check"
