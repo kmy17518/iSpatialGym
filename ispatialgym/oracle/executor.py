@@ -96,8 +96,10 @@ def revolution_axis(category: str, model: str, path: str = REVOLUTION_AXES_PATH)
 #: small-scale articulation's push-close) and whose residual lies within the task's tolerance is accepted as it is - no improvement rung, so
 #: ``offset_brace`` never raises the press off the object (close_02: the +10 mm rung lifted the press and the carton slid until the
 #: 10 mm object_tilt QA). Every other brace kind, and every push out of tolerance, keeps the retry ladder. "0" = the ladder for all.
+#: Default "1" since the 2026-11-08 A/B (the owner decided the rule): close_02 at 300006-009, off -> on 0 / 4 -> 3 / 4 (fresh v2only) and
+#: 0 / 4 -> 3 / 4 (the int1_6 instances re-collected); object_tilt 3 -> 0, the carton's peak 10.0-11.7 -> 3.3-6.2 mm.
 TOP_PRESS_ACCEPT_ENV = "ISPATIALGYM_TOP_PRESS_ACCEPT"
-TOP_PRESS_ACCEPT_DEFAULT = "0"
+TOP_PRESS_ACCEPT_DEFAULT = "1"
 
 
 def top_press_accept_on() -> bool:
