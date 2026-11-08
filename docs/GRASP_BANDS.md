@@ -2573,6 +2573,13 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
   - So the refusal is the book's own resting contact at the start pose, refused by the rule's `cl < -1e-9`; the lift does not
     enter the board.
   - Exempting the start pose, or a tolerance, is a contact-rule change for the owner (not made).
+- **Still blocking.**
+  - otwukr: the left_arm_link5 / torso_link2 self-contact at the retreat and place (next: diagnose the check against the execution).
+  - kmuacd: before the lift (start edge 137, fixed-start grasp 123, init -> manipulation 40), plus on the v2 path the start-pose
+    contact refusals (53).
+  - opryhp T6: the single drawn layout (repeats_eval 158) and the camera (53).
+- **For the owner.** The touch rule's start-pose contact; whether otwukr T7 / T8 become touching_03's templates; the defaults of
+  the t03 switches. All stay off; no code changed in round 5.
 
 ## Owner decisions on the open list (2026-11-08)
 
