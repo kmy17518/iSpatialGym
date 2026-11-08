@@ -2754,7 +2754,24 @@ records `far_arm`. Off is bit-identical (`offered_arms` is the former inline fil
 `ispatialgym/tests/test_iors_far_arm.py` (the real candidate loop on a stub).
 
 **A/B** (Vast, both arms; trunk_6d9445a9, v2only, `$OFH/v2maps_int1`, `--alias-memory off --no-memory-aggregate`, per-arm ledgers,
-the same indices g332000-3 + g332100-3): arm a `i7in04_a` (off), arm b `i7in04_b` (`ISPATIALGYM_IORS_FAR_ARM=1`). Results below.
+the same indices g332000-3 + g332100-3): arm a `i7in04_a` (off), arm b `i7in04_b` (`ISPATIALGYM_IORS_FAR_ARM=1`).
+
+| arm | attempts | written | ok | GPU-h / success |
+|---|---|---|---|---|
+| a (off) | 110 | 8 | 7 | 0.173 |
+| b (far arm) | 175 | 8 | 6 | 0.219 |
+
+**The switch does not act as intended.** Over arm b's 175 attempts: far-arm candidates 117 (near 536), no far candidate in 95
+attempts, 56 both-arm candidates narrowed to the far arm, drafts written with the near arm 55 and with the far arm **0**. Every
+far-arm candidate failed in the sampler - the place screening (`place_unreachable`), the place out of the image
+(`gripper_not_in_frame`), empty F: the far arm cannot make the cross-body place into the pot. The far side happens only when the far
+arm's place passes, which no ordering creates; the preference only adds attempts (+59 %). All 8 arm-b demos are arm-side (arm a 7 +
+1 far side). **6d9445a9 is not proposed for adoption (it stays off).**
+
+Arm-side outcomes by trunk including this A/B: 0.0 20 / 26, 0.25 20 / 37, 0.50 2 / 12 (ad_v 0 / 3). The trunk-0.50 arm-side cell is
+an arm x trunk bin of the decided outcome-memory pick hook (i7-memory2), so no second rule is added. inside_04 on the current trunk
+writes 7 / 8 and 6 / 8 here (ad_int1 4 / 4): nothing for i7-attachdef from inside_04. Suite: 23 failed + 3 errors, the base
+93229922's set (3104 vs 3100 passed: the 4 new tests).
 
 ## Limitations / not done
 
