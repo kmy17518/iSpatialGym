@@ -2926,6 +2926,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 11 | i7-axialrest (7d21c982; code 2de8f35d) | 0973a5f7 | brace pre call refuses on any failure; AXIAL_BRACE_PRE_POLICY DEFAULT (owner 5y.1) |
 | 12 | i7-goalmaps (c54620d5) | fb031c15 | DEFAULTS goal-surface anchors, floor-datum fix, INTERIOR_FRONT_SIDE; hall tree spec; carry switches off; interiors.json = union of every spec, registry test knows every digest |
 | 13 | i7-blockdesign (a2f89901) | cd38c3d1 | 6000 collector steps for block design, BD_BOARD_EARLY + BD_BOARD_SEARCH DEFAULT; BD_BOARD_TABLE off; submit_fast summary line keeps memory_mode + collect_extra |
+| fix | (integration-2, lead decision #18) | 339fc2bd | the PUBLISH_AFTER_SCREENS pending summary in `instances/.pending/<iid>.summary.json`: the old `.summary.json.pending` name broke the 255-character limit for 235-240-character ids (disembedding_07); default unchanged |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -2970,6 +2971,8 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
 - int2_4 (trunk_e1b91b94, own ledger = the branches' indices): under_small_03 / inside_04 / touching_02 (framing: ifr3 21/3/3 0.215, 32/4/4 0.192,
   ifr_t02_B 25/4/4 0.126), nextto_03 / 04, inside_01 / 02, disembedding_07, attachment_03 (ad_v51 + i7cork2_cur_r 25/4/4 0.164), disembedding_09
   (ad_race 11/4/4).
+- int2_4 disembedding_07 crashed at its first written instance (OSError Errno 36: `<iid>.summary.json.pending` = 261 characters) - fixed in
+  339fc2bd; int2_6 reruns disembedding_07 / _09 on it.
 - int2_5 (trunk_cd38c3d1, after the goalmaps check): touching_02 / 04 and close_02 at i7-contact3's indices, axial_05 / 01 / 03 / 04 (i7ar_pd
   49/16/12, 0.075), block_design_01 at 6000 steps (bdv_grid 8/8/6), ontop_large_01 (gm_after 14/4/3), touching_large_02 (known 0 written).
 
