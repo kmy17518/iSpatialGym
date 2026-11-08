@@ -2567,6 +2567,66 @@ brace candidates of the 4 written i7ar_on demos and reads the axial_brace map at
   targets try only the map's validated classes; (3) the map / joint placement checks the brace with the right arm at its push goal. A GPU
   probe of the collisions comes first.
 
+**5v: axial_05's brace - the GPU probe and the pre-policy switch (owner 2026-11-08 5v.1 / 5v.2).**
+Owner decision, verbatim: "5v.1 APPROVED: a GPU probe to separate the locked push arm from the 3 mm target margin as the cause of the brace
+IK / collision failures (diagnosis only). 5v.2 Then the first fix, behind a switch: check the brace pre pose against the program check's
+support policy at sampling, so a refused optional brace leaves the attempt push-only instead of costing the whole attempt. N 4 v2only A/B on
+axial_05 (+ axial_01/03/04 as the regression check). Default after I see it."
+
+- Checked first: neither was on the branch (tip e9d39ac9).
+- **384c25de** (snapshot trunk_384c25de), both switches default OFF:
+  - `ISPATIALGYM_AXIAL_BRACE_PROBE=1` (diagnosis only): every brace candidate that fails at sampling is re-checked with one cause removed at
+    a time - `again` (the same call), the target check at 2 / 1 / 0 mm, no target check, `no_right` (the right arm at the stance posture,
+    not at its push goal), both, `empty` (also every spawned object out) - one `AXIAL_BRACE_PROBE {json}` log line, plus the blame of the
+    no-right configuration with the right arm put back at its goal. Verdicts unchanged; the solver's remembered solutions are restored.
+  - `ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1`: a candidate that passed `brace_second_arm` gets the program check's own brace `pre` call
+    (fresh exact IK of the left arm from the stance configuration, closed fingers, target + supports in the ignore set, target approached;
+    `IKChecker.exact` applies the shared support policy). A `support_policy` failure fails the candidate (next one; none left = push-only);
+    any other failure is counted (`other_fail`), not refused. Counters `axial_brace.pre_policy.checked / passed / refused[.<label>] /
+    push_only / other_brace / other_fail`. No shared gate or policy changed.
+  - Tests `test_axial_brace_pre_policy.py` (4; with test_axial_settled_rest 20 pass). Suite at 384c25de: 23 failed + 3 errors, the same 26
+    ids as the base e9d39ac9 run side by side on lambda. pyflakes clean.
+- Runs: svl titanrtx, v2only N 4, indices 310000-310003 (i7ar_def's), root `$OFH/v2maps_int1_axialrest`, alias memory v0027, overlay r3,
+  `TURN_COVER=1` + `OPPOSITE=1` explicit in every arm. Tags `i7ar_probe` (axial_05, PROBE=1), `i7ar_pol` (PRE_POLICY=1), `i7ar_pol0` (same
+  snapshot, off). Record `$OFH/axialrest_20261108` (`loop_5v.sh`, `jobids_5v.txt`, `probe_tab.py`, `probe_sum.py`).
+
+**5v.1 probe** (i7ar_probe, 87 failed candidates, 20 att / 4 wr / 3 ok): neither the locked push arm nor the 3 mm margin is the main cause.
+
+| what frees the candidate | count | where |
+|---|---|---|
+| nothing: fails with the right arm at the stance posture and every spawned object out (the left arm's IK / joint limits at that pose) | 67 | ik at the pre 48, contact untrackable 10, ik_joint_limit 9; all pads, all opposite-end blades, blade_0 / blade_0- 12 of 12 |
+| removing the target check entirely (the blade overlaps the target's goal hull: still fails at 2 / 1 / 0 mm) | 11 | blade_30 3, blade_30- 2, blade_45 3, blade_45- 3 |
+| removing the locked push arm AND the target check | 7 | blade_30- 2, blade_45- 2, blade_60 2, blade_60- 1 |
+| removing the locked push arm alone | 1 | left_v |
+| other spawned objects | 1 | blade_45 |
+| the 3 mm margin alone (ok at 2, 1 or 0 mm) | 0 | |
+| the same call again (solver noise) | 0 | |
+
+- Where the push arm is in the way, the blame is the two hands: left gripper / finger vs the right wrist camera / gripper, 4-40 mm deep.
+- The axial_brace map calls blade_0- feasible at 310002 / 310003's goal cell, yet live it has no IK even in the empty world: the map and
+  the live check disagree on the brace pose itself (one-arm map vs two-arm live is not the explanation for these).
+
+**5v.2 A/B** (att / written / ok, GPU-h per success):
+
+| alias | i7ar_def (38ee02e8) | i7ar_pol0 (off) | i7ar_pol (on) | where the switch acted |
+|---|---|---|---|---|
+| axial_05 | 20 / 4 / 3, 0.10 | 20 / 4 / 3, 0.093 | 20 / 4 / 3, 0.087 | 310000 att 10: left_h, left_h-, left_h refused -> push-only |
+| axial_01 | 11 / 4 / 2, 0.17 | 9 / 4 / 3, 0.090 | 11 / 4 / 2, 0.17 | 3 checked, 3 passed |
+| axial_03 | 6 / 4 / 4, 0.048 | 6 / 4 / 4, 0.045 | 8 / 4 / 3, 0.067 | 3 checked, 0 refused, 1 other_fail |
+| axial_04 | 12 / 4 / 2, 0.095 | 16 / 4 / 3, 0.067 | 18 / 4 / 4, 0.050 | 310001 att 6: left_v refused -> push-only |
+| all | 49 / 16 / 11, 0.093 | 51 / 16 / 13, 0.071 | 57 / 16 / 12, 0.082 | 4 refusals, 2 attempts made push-only |
+
+- "pre: support_policy" program-check rejections: 1 in each off arm (and the probe run), always axial_05 310000 attempt 10; 0 in the on arm.
+- That attempt then still died at the program check on the push itself ("push pre-contact witness 3.16 rad ... another branch"), as
+  attempt 11 does in the off arms; axial_04 310001 attempt 6 was written push-only in all arms. So the switch removes the brace rejection
+  but changes no success at N 4.
+- axial_03 diverged at 310002 attempt 0 before the switch refused anything: live, `opp_blade_45-` passed `brace_second_arm` (the off arms
+  drew `opp_blade_60`); the sampling pre call already failed it on `ik_joint_limit` (`other_fail`, not refused, outside the decision), and
+  the program check rejected the attempt on the same reason.
+- Default unchanged (owner decides). Open for the owner: (a) the flip; (b) whether the sampling pre call should refuse on any failure, not
+  only the support policy (it would have caught axial_03 310002/0); (c) the brace itself: 67 of 87 candidates have no IK in the empty
+  world, so the map / live brace pose mismatch, not the two-arm check, is what keeps axial_05's brace from landing.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
