@@ -166,7 +166,7 @@ from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecor
 #: and the direct pick fails for a reason the sampler cannot fix (the shared support policy: ``overhang_fallback.reason_class``), the pick
 #: pushes the object over B's support edge and grasps the overhang (IORSLarge's own ``_overhang_pick``, the options of
 #: ``overhang_fallback.options``: :data:`overhang.DEFAULTS`, mode "fallback") - IORSSmall's fallback (``v2/overhang_fallback.py``) for this
-#: pick. Default off ("1" on); kit counters ``large_overhang_fallback.trigger.<class>`` / ``.mode.<grasp mode>`` / ``.found`` / ``.failed``.
+#: pick. Default on since the owner's 6.1 ("0" off); kit counters ``large_overhang_fallback.trigger.<class>`` / ``.mode.<grasp mode>`` / ``.found`` / ``.failed``.
 LARGE_OVERHANG_FALLBACK_ENV = "ISPATIALGYM_LARGE_OVERHANG_FALLBACK"
 #: i7-interior2 2026-11-08 (owner 6.3, inside_large_02): the inside mode's B -> C carry only with the torso STRAIGHTENED (the departure
 #: transition to a travel trunk of tilt 0) - no fallback drive at B's leaning grasp trunk. Every successful fridge demo before (fix1 / fix2
@@ -181,7 +181,8 @@ def inside_carry_straight_on() -> bool:
 
 
 def large_overhang_fallback_on() -> bool:
-    return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+    # default ON (owner 6.1, 2026-11-08: "implement overhang fallback" for this pick, as IORSSmall's default); "0" off
+    return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
 
 
 def count_pick_preshape(s, g, where: str) -> None:

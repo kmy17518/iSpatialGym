@@ -110,9 +110,9 @@ SIDE_MAX_DEG = 45.0
 #: i7-interior2 2026-11-08 (owner 6.2): with a goal-side band / map, stance C's survivors are capped per base pose as without one (the
 #: ``generation.inside_map_trunks`` trunks with the most reach margin, default :data:`NO_BAND_TRUNKS`; every base pose keeps at least one) -
 #: the interior place maps admitted 17-26 survivors and each attempt ran ~3x longer (690 s vs 234 s legacy). Switch
-#: ``ISPATIALGYM_INSIDE_MAP_CAP`` ("1" on); kit counters ``inside_map_cap.kept`` / ``.dropped``, placement_stats ``map_cap``.
+#: ``ISPATIALGYM_INSIDE_MAP_CAP`` (default on since the owner's 6.2; "0" off); kit counters ``inside_map_cap.kept`` / ``.dropped``, placement_stats ``map_cap``.
 INSIDE_MAP_CAP_ENV = "ISPATIALGYM_INSIDE_MAP_CAP"
-INSIDE_MAP_CAP_DEFAULT = "0"
+INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
 
 
 def inside_map_cap_on() -> bool:
