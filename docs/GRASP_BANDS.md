@@ -2452,7 +2452,12 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   a pre-place or release IK solution counts only with every working-arm joint at least that far from its limits (0.05 rad = the exact
   check's `JOINT_LIMIT_MARGIN`); a margin map serves the same lookups (the field is not compared); `meta.joint_margin` counts the dropped
   seeds / problems. Fridge maps rebuilt with 0.05 (record `$OFH/interior2_jm_20261108`), staged in `v2maps_int2_jm`; A/B i7i2_jmA
-  (v2maps_int2) vs i7i2_jmB (margin maps), same code / indices / backend, arm side on.
+  (v2maps_int2) vs i7i2_jmB (margin maps), same code / backend, arm side on (B's base index advanced to 300062: not A's indices).
+  Maps: feasible entries right 45563 -> 33267 (-27 %), left 10482 -> 6293 (-40 %). A 10 att / 4 written / 3 ok, 0.21 GPU-h per success,
+  sample wall 2084 s; B 11 / 4 / 4 ok, 0.14 GPU-h per success, 1818 s (-13 %). Stance-C place-IK joint-2 failures per attempt A 0.8, B 1.2
+  (every joint-2 IK line 5.1 / 5.5): the margin did NOT remove them (B's still 0-3 mrad from the limit). Hypothesis (unverified): the map
+  folds 5 laterals and every trunk / grasp / posture into one "feasible" status; the exact place is one lateral and one grasp. Not folded,
+  no default proposed.
 
 ## Limitations / not done
 
