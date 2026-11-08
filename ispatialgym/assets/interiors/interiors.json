@@ -620,6 +620,119 @@
     "joints_settled": {},
     "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
    }
+  },
+  "bookcase_opryhp_0@0.3722": {
+   "height_m": 0.3722,
+   "depth_m": 0.3521,
+   "width_m": 0.7213,
+   "headroom_m": 0.3301,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.7613,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.0015,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_opryhp_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_opryhp_0 raster edge +u at 0.3722 (requested 0.372 +- 0.03), 648 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.35916826128959656 / 0.3621046245098114, back ray 0.34210729598999023, moved links [], wall rim 0.32 vs headroom 0.3301 (open top False)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (inter_object_relation_satisfaction-touching_small_scale-hardback-hardback-bookcase_inside, row touching#03~T6): the hardback acbrnv leaning on the left side board of opryhp_0's single 0.72 m bay at the 0.37 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh opryhp (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380823)"
+   }
+  },
+  "bookcase_otwukr_1@0.3888": {
+   "height_m": 0.3888,
+   "depth_m": 0.2811,
+   "width_m": 0.3032,
+   "headroom_m": 0.2875,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3432,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.1757,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_otwukr_1"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_otwukr_1 raster edge +u at 0.3888 (requested 0.389 +- 0.03), 450 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.16591551899909973 / 0.1372535526752472, back ray 0.2710510194301605, moved links [], wall rim 0.28 vs headroom 0.2875 (open top False), rays from the bay at lateral -0.190 m (raster cells -0.320 .. +0.320)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (row touching#03~T7): the hardback acbrnv leaning on a side board of one of otwukr_1's two bays at the 0.39 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh otw039m (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380825 (bay -0.19; bay +0.19: 18380824))",
+    "bay": "one spec per board (spec_for_support: support + height): the NARROWER of the two bays (measure --lateral -0.19: width 0.3032, centre_y -0.1757); the other bay (--lateral +0.19) measured width 0.3106, depth 0.2811, centre_y 0.1829 - a lean rest's compartment follows the cell (its lean-side wall), so only the far wall's distance differs (7.4-7.8 mm closer here). Without --lateral the rays start inside the 5 cm divider at the raster's centre: walls / back not found, width 0.66 (both bays), open back (otw039c, slurm 18380828)."
+   }
+  },
+  "bookcase_otwukr_1@0.7204": {
+   "height_m": 0.7204,
+   "depth_m": 0.2792,
+   "width_m": 0.3034,
+   "headroom_m": 0.2948,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.3434,
+   "board_setback_m": 0.0,
+   "back_thickness_m": 0.02,
+   "centre_y_m": -0.1756,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_otwukr_1"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_upper/bookcase_otwukr_1 raster edge +u at 0.7204 (requested 0.721 +- 0.03), 420 board cells, open edges ['+u'], front plane 0.0000 m out (static AABB overhang), wall rays 0.166135773062706 / 0.137253537774086, back ray 0.2691980004310608, moved links [], wall rim 0.28 vs headroom 0.2948 (open top False), rays from the bay at lateral -0.190 m (raster cells -0.320 .. +0.320)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_03 (row touching#03~T8): the hardback acbrnv leaning on a side board of one of otwukr_1's two bays at the 0.72 m board (lean entry hardback__acbrnv__s1__lean_left_20_c5c708)",
+    "job": "$OFH/t03specs_20261108/measure.sh otw072m (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380827 (bay -0.19; bay +0.19: 18380826))",
+    "bay": "one spec per board (spec_for_support: support + height): the NARROWER of the two bays (measure --lateral -0.19: width 0.3034, centre_y -0.1756); the other bay (--lateral +0.19) measured width 0.3112, depth 0.2792, centre_y 0.1829 - a lean rest's compartment follows the cell (its lean-side wall), so only the far wall's distance differs (7.4-7.8 mm closer here). Without --lateral the rays start inside the 5 cm divider at the raster's centre: walls / back not found, width 0.66 (both bays), open back (otw039c, slurm 18380828)."
+   }
   }
  }
 }

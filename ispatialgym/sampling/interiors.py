@@ -359,7 +359,8 @@ def link_yaw_in(link_quat_xyzw, tangent) -> float:
 
 def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Optional[str] = None, joints: Optional[Dict[str, float]] = None,
             moved_links: Sequence[str] = (), edge_distances: Sequence[float] = (0.35, 0.45, 0.55), z_margin: float = 0.03, thickness_m: float = 0.02,
-            static_aabb=None, side=None, open_top: Optional[bool] = None, door_boxes: str = "pieces") -> InteriorSpec:
+            static_aabb=None, side=None, open_top: Optional[bool] = None, door_boxes: str = "pieces",
+            lateral_m: Optional[float] = None) -> InteriorSpec:
     """The :class:`InteriorSpec` of ``support``'s compartment at ``z_surface`` (m above the floor) in the live ``world`` (``SimWorld``; the
     support's joints already set to ``joints``, e.g. by ``reach_bands.apply_support_joints``). Measured, in the compartment frame of the
     open raster edge ``edge`` (default the first open edge; origin = its midpoint moved out to the front plane, the support's static AABB
@@ -380,7 +381,10 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     bottom is under :data:`OVERHEAD_MAX_Z_M`. ``side`` (a world xy direction, the stance side) picks the raster edge whose outward normal
     faces it when no raster edge is open. ``door_boxes`` "pieces" (default since 2026-11-07 15:5x: one box per collision piece of a moved
     link - the fridge door's single box with its bins, 0.29 x 0.44 x 1.98 m, held the idle shoulder at every near stand-off) or "link" (one
-    box over the link's pieces: the registered fridge spec's)."""
+    box over the link's pieces: the registered fridge spec's). ``lateral_m`` (i7-t03specs 2026-11-08; None = as before): the wall / rim / back
+    rays start this far along the edge tangent (the robot's left facing inward) from the raster edge's midpoint instead of the board cells'
+    lateral centre - a board spanning several bays (bookcase_otwukr_1: two 0.30 m bays either side of a 5 cm divider at the raster's centre,
+    where a ray starting inside the divider meets nothing) is measured in the bay at that offset."""
     import math
 
     import torch as th
@@ -422,7 +426,7 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
         return float(h["distance"])
 
     d_mid = 0.5 * (float(d.min()) + float(d.max()))
-    lc0 = 0.5 * (float(l.min()) + float(l.max()))
+    lc0 = 0.5 * (float(l.min()) + float(l.max())) if lateral_m is None else float(lateral_m)
     p_c = origin + inward * d_mid + tangent * lc0
     front_x = None
     # the walls' top: the highest 1 cm step (under the headroom) at which a short ray from the cells' centre still meets the support toward the
@@ -515,7 +519,8 @@ def measure(world, support, z_surface: float, *, name: str, scene: str, edge: Op
     src = {"measured": f"interiors.measure: {scene}/{support.name} raster edge {en} at {zb:.4f} (requested {float(z_surface):.3f} +- {z_margin}), "
                        f"{int(itop.mask.sum())} board cells, open edges {open_e}, front plane {front:.4f} m out (static AABB overhang), "
                        f"wall rays {left} / {right}, back ray {back}, moved links {list(moved_links)}, wall rim {rim_found} vs headroom {hr:.4f} "
-                       f"(open top {open_top}{'' if auto_open == open_top else ', overridden'})",
+                       f"(open top {open_top}{'' if auto_open == open_top else ', overridden'})"
+                       + ("" if lateral_m is None else f", rays from the bay at lateral {float(lateral_m):+.3f} m (raster cells {float(l.min()):+.3f} .. {float(l.max()):+.3f})"),
            **({"overhead": overhead} if overhead else {}),
            "joints_settled": {k: round(float(joints_set.get(k, v)), 4) for k, v in (joints or {}).items()}, "door_boxes": door_boxes,
            "assumed": f"board / board above / walls / back thickness {thickness_m} m; long_m = the walls' outer span"}
@@ -563,6 +568,8 @@ def main(argv=None):
     m.add_argument("--door-boxes", default="pieces", choices=["pieces", "link"], help="a moved link (an open door) as one box per collision piece or one box")
     m.add_argument("--stand-offs", nargs="+", type=float, default=[0.35, 0.45, 0.55])
     m.add_argument("--thickness", type=float, default=0.02)
+    m.add_argument("--lateral", type=float, default=None, help="the rays from this lateral offset (m, along the edge tangent = the robot's left facing "
+                   "inward) from the raster edge's midpoint: one bay of a board spanning several (default: the cells' lateral centre)")
     m.add_argument("--name", required=True)
     m.add_argument("--out", required=True)
     a = ap.parse_args(argv)
@@ -587,7 +594,7 @@ def main(argv=None):
         side = {"+x": (1.0, 0.0), "-x": (-1.0, 0.0), "+y": (0.0, 1.0), "-y": (0.0, -1.0)}[a.side]
     spec = measure(world, support, a.surface_z, name=a.name, scene=a.scene, edge=a.edge, joints=joints, moved_links=[n for n in moved if n != root],
                    edge_distances=a.stand_offs, z_margin=a.surface_tol, thickness_m=a.thickness, static_aabb=static, side=side,
-                   open_top={"auto": None, "yes": True, "no": False}[a.open_top], door_boxes=a.door_boxes)
+                   open_top={"auto": None, "yes": True, "no": False}[a.open_top], door_boxes=a.door_boxes, lateral_m=a.lateral)
     write_registry(a.out, [spec])
     print("INTERIOR_SPEC " + json.dumps(spec.to_json()), flush=True)
     import omnigibson as og

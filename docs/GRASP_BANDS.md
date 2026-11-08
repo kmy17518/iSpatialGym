@@ -2500,6 +2500,32 @@ trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d
   fixed, d and v have no numbers.
 - touching_03 still writes no demo. All switches stay default OFF.
 
+## Owner decisions on the open list (2026-11-08)
+
+Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
+open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documented on its own branch (all from of-v2maps cf1f5d2d):
+
+| item | decision | branch |
+|---|---|---|
+| 1.1 | disembedding_01/10: diagnose the tray failure first (open-slab validation vs tray walls); gym shoe switches-on entry: ladder round 2 | i7-tray |
+| 1.2 | the full 100-alias pass waits until all blockers are solved and integrated | - |
+| 2.1-2.4 | outcome memory: proposed thresholds adopted; production starts empty and resets on customs / keys change; validation runs seed from the replay and carry over at reduced weight; add a pick hook | i7-memory2 |
+| 3.1 | full-open brace default confirmed | - |
+| 3.2 | close_02 carton slide: diagnosis | i7-contact3 |
+| 3.3, 3.4 | fix the validator's brace-load pusher (fixed base), rebuild; then the axial / world_vertical brace libraries | i7-brace |
+| 3.5 | templates never fix the robot's start base: drawn per attempt in alignment-axial, articulation open/close small, attachment, block_design, disembedding, all IORS large and IORS small | i7-startdraw |
+| 3.6 | cap the place depth by the push map's reach, all affected aliases | i7-contact3 |
+| 3.7 | remove the pack brace; block design uses the board variant | i7-contact3 |
+| 4.1 | outer_pinch + attach_face_retreat become the default (after a count) | i7-attachdef |
+| 4.2, 4.3, 4.5 | cork: try wide-end-down with a hand-over and lying down with a 90 deg reorient, compare yield; brace_search false for attachment_03; no overhang fallback for the cork | i7-cork |
+| 4.4 | audit past attachment demos for the collector reload offset; re-collect affected instances | i7-attachdef |
+| 4.6 | the oracle's 45 deg seat-axis rule stays | - |
+| 5.1, 5.2 | framing also at the lifted carry (torso lift with the arm lift where needed); pre-grasp and touching pre-contact framing use the fingertip rule | i7-framing |
+| 6.1-6.3 | IORS large pick checks fingers at the pre-shape opening + overhang fallback; stance-C survivor cap with a map; fridge carry / place diagnosis | i7-interior2 |
+| 7.1, 7.2 | FingerTouch: sphere screen then exact hull for palm / camera / wrist; rerun the bar / countertop sink templates with interior maps | i7-ft2 |
+| 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
+| 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
