@@ -2700,6 +2700,88 @@ completed first run). att / written / ok, GPU-h per success:
   in both arms. The default removes every brace rejection at the program check; success at N 4 is within noise (12 vs 13; the failed demos
   - 03 310003 plan_failed, 01 310003 not_reached - are not the attempts where it acted).
 
+**5y fix: the live joint margin in the axial_brace map builder, the intersection read between built tilts (lead decision 2026-11-08,
+owner away).** The lead's decision on the 5y.2 diagnosis: "(a) In the contact-map builder, accept an IK solution only with the live
+0.05 rad joint-limit margin ... behind a switch that enters the map identity only when on ... axial_brace only. Rebuild the axial_brace maps
+the axial aliases read ... (b) In the sampler, when the live stance's trunk tilt lies between two built tilts, read the contact map as the
+INTERSECTION of the two columns ... its own default-off switch. ... Never relax the live check."
+
+- Checked first: neither was on the branch (7d21c982).
+- **b4bcb3d0** (both default OFF; the live check is untouched):
+  - (a) `ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN=1`: `contact_maps.compute_contact_map` counts a chain IK seed only when every left-arm
+    joint (the robot's `arm_control_idx`, as `IKChecker.joint_limit_margin` reads it) is at least 0.05 rad (`LIVE_JOINT_LIMIT_MARGIN` =
+    `IKChecker.JOINT_LIMIT_MARGIN`) from its limit, at the pre and at the contact (the interpolated approach configurations lie between
+    them). A problem with IK only nearer a limit gets the status `ik_margin` (13; in a map's `status_codes` only when on); timing
+    `ik_margin_lost`. Set through `contact_config` for the axial_brace kind only; `MapConfig.joint_margin_rad` enters the map key only when
+    set, so every earlier map keeps its key.
+  - (b) `ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT=1`: `AlignmentAxial.map_joint_placement` reads the axial_brace map with
+    `ContactMap.lookup(tilt_read="intersection")`: a stance tilt more than 5 mrad (`TILT_SNAP_RAD`) from every built tilt and between two
+    eligible built tilts calls a class feasible only when BOTH bracketing columns do; within 5 mrad of a built tilt, or outside the eligible
+    tilts (e.g. -0.916 beyond -0.9), the nearest column alone. Counters `axial_brace.tilt_read.<built|between|outside|none>`, `.dropped`,
+    `.dropped_classes`, `.emptied`. The push_blade read is unchanged.
+  - Diagnosis counters, every run, no verdict change: `axial_brace.live.map_feasible.tried / .ok` (a live brace candidate whose class the
+    map called feasible at the draw) and `axial_brace.live.map_other.tried / .ok` (the rest).
+  - Tests `test_axial_brace_map_fix.py` (5): the margin is the live one, both switches off by default, axial_brace only; the builder refuses
+    a 30 mrad contact (`ik_margin`), keeps a 60 mrad one, the key moves only when on; the intersection / built / outside reads; the sampler
+    uses it only under its switch, with the counters; the live-vs-map counters. Suite at b4bcb3d0: 23 failed + 3 errors, the same 26 ids as
+    2de8f35d (3132 passed = +5). Snapshot trunk_b4bcb3d0.
+- **Maps rebuilt** (`$OFH/axialrest_20261108/maps5y`: `job_maps.sh`, `cmp5y.py` -> `cmp5y.out`, `stage5y.sh`; viscam titanrtx jobs
+  18385353 on / 18385354 off): the 6 axial_brace maps the axial aliases read, from the libraries v2maps_int2's maps were built from (matched
+  by library digest), with this snapshot's builder (i7-brace's, merged 6ab54ba7), switch on and off. The off rebuild reproduces every int2
+  key (status agreement 0.997-1.000); the margin keeps 75-80 % of the feasible entries:
+
+| entry | library root | int2 key (off rebuild) | margin key | feasible on / off |
+|---|---|---|---|---|
+| board_game qgvsnb s1 | brace_20261108/libs_axial_ct2 | 3a8443377a1578e7 (same) | e1bda3a8e1bb118e | 16896 / 21111 = 0.80 |
+| keyboard injrgc s1 | libs_axial_ct2 | a8839f1f1b62c385 (same) | cc20e10390e1e91a | 40158 / 50699 = 0.79 |
+| magazine tfovwy s1 | libs_axial_ct2 | 0050d164c30ef2fc (same) | 945104cb8ab7c56a | 51474 / 67556 = 0.76 |
+| paperback jhaltj s1 | libs_axial_e | 7391a59f4cad4df0 (same) | 97f6d0d61ae81f0f | 20823 / 27142 = 0.77 |
+| paperback jhaltj s1x1x2.5 | libs_axial_sj | 43ff4775fb3bc8a5 (same) | 5450eb863c3579c9 | 38909 / 52036 = 0.75 |
+| tablespoon tqqwys s1 (settled rest) | axialrest_20261108/libs_brace | 8753ec81a0698bed (same) | 4957182e0672ff07 | 34262 / 43514 = 0.79 |
+
+- Not a pure subset: 4-9 % of the margin map's feasible entries were not feasible off. The map keeps ONE seed per pose (the first that
+  passes); with the margin it keeps a different pre seed, whose contact solve can then pass where the first seed's branch jumped or hit the
+  slab. Lost to `ik_margin` where off was feasible: 4206 / 11133 / 14645 / 5775 / 11845 / 8103.
+- **Staged root** `$OFH/v2maps_int2_axialmargin` = `cp -a v2maps_int2` (int2 holds all 6 maps; INT2.txt 37 lines) + the 6 margin maps; the
+  replaced maps under `maps/_superseded_axialmargin/<entry>`; log `AXIALMARGIN.txt`. v2maps_int2 is not touched.
+- **The 5y.2 draws on the maps** (`maps5y/pairs5y.py` -> `pairs5y.out`; tqqwys, the draw's (end, spin) group): map-feasible (draw, class)
+  pairs - old map, nearest read 8 (the diagnosis's 8; live-solvable with the margin 3, live-solved 0); old map + intersection 3 (the three at
+  -0.916, outside the built tilts); (a) nearest 2 (310002 / 310003 blade_0- at -0.454 - the pairs the diagnosis found lost to the TRUNK:
+  0 / 64 seeds live); (a) + intersection 0. So (a) alone does not make (b) moot: the trunk losses survive the margin.
+
+**5y fix A/B** (trunk_b4bcb3d0; viscam titanrtx for every arm - minyeong's svl QoS was full; v2only N 4, indices 310000-310003, alias
+memory OFF, TURN_COVER=1 + OPPOSITE=1, map overlay r3; `i7ar_5yf_off` root v2maps_int2, `i7ar_5yf_a` root v2maps_int2_axialmargin,
+`i7ar_5yf_ab` the same + `ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT=1`; 12 jobs, all completed first run; `axialrest_20261108/ab5y.py` ->
+`ab5y_5yfix.out`). att / written / ok, GPU-h per success:
+
+| alias | off | (a) margin maps | (a) + (b) intersection |
+|---|---|---|---|
+| axial_05 | 20 / 4 / 3, 0.108 | 12 / 4 / 4, 0.057 | 18 / 4 / 3, 0.091 |
+| axial_01 | 11 / 4 / 2, 0.157 | 12 / 4 / 3, 0.088 | 9 / 4 / 4, 0.049 |
+| axial_03 | 12 / 4 / 4, 0.048 | 7 / 4 / 3, 0.059 | 8 / 4 / 4, 0.036 |
+| axial_04 | 18 / 4 / 4, 0.045 | 12 / 4 / 2, 0.081 | 12 / 4 / 2, 0.081 |
+| all | 61 / 16 / 13, 1.01 GPU-h = 0.077 | 43 / 16 / 12, 0.83 = 0.069 | 47 / 16 / 13, 0.78 = 0.060 |
+| draws paired on the maps / push-only | 41 / 27 | 20 / 31 | 4 / 58 |
+| live brace candidates of a MAP-FEASIBLE class: ok / tried | 0 / 41 | 0 / 32 | 0 / 8 |
+| live brace candidates of other classes: ok / tried | 15 / 1149 | 14 / 556 | 2 / 189 |
+| brace present in the written demos (executed in the demo) | 4 (4) | 3 (3) | 1 (1) |
+| target met the brace (push brace_hits > 0) | 0 | 0 | 0 |
+| intersection read: between / dropped / emptied lookups | - | - | 3470 / 368 / 351 (outside 930, built 24) |
+
+- Both switches act where they should: the margin maps halve the paired draws (41 -> 20) and the map-feasible brace classes tried live
+  (41 -> 32); the intersection read empties 351 brace lookups and leaves 4 paired draws and 8 map-feasible candidates.
+- But no map-feasible brace class solved live in ANY arm (0 / 41, 0 / 32, 0 / 8): the failures stay "exact IK failed at pose 1 of 2" (the
+  pre) and "intersects the target at its goal pose (margin 3 mm)". Every brace in a written demo came from a class the map did not call
+  feasible at the draw (opposite-end blades at another pitch / face index - `opp_blade_60`, `opp_blade_30@f2` - tried because the draw was
+  paired). So making the map stricter removes pairs, and with them the incidental braces: brace present 4 -> 3 -> 1; none of them met the
+  target (brace_hits 0) in any arm.
+- Success 13 / 12 / 13 of 16 is within N 4 noise; GPU-h per success falls (fewer attempts: the draws stop at a push-feasible draw when no
+  pair exists).
+- On the diagnosis's 5 draws (`pairs5y.out`) (a) + (b) leave 0 of the 8 false map-feasible pairs; in the runs the remaining
+  map-feasible candidates still fail live, so the 8 cm lattice / full-world collisions ((c), not built) are what is left.
+- **Defaults: neither flipped.** Both act, but the result is not "no worse" for what they are for: the brace present drops (4 -> 3 -> 1) and
+  the map's live precision stays 0. Both stay default OFF; the margin maps are staged in v2maps_int2_axialmargin, not in int2.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
