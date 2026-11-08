@@ -122,16 +122,70 @@ def test_an_upright_rest_gives_the_same_contacts(tmp_path, monkeypatch):
     monkeypatch.setenv(ENV, "1")
     on = CL.build_job(jm, root)
     for kind in ("push", "brace"):
-        assert all(f["params"].get("settled_rest") is True for f in on[kind]["families"].values())  # on: in the identity
+        # owner 2026-11-08 item 3: an upright rest builds today's identity-rest library under the switch too - not in the identity, the
+        # same digest and entries
+        assert all("settled_rest" not in f["params"] for f in on[kind]["families"].values())
+        assert on[kind]["digest"] == off[kind]["digest"]
         eo, en = off[kind]["entries"], on[kind]["entries"]
-        assert [e["class"] for e in eo] == [e["class"] for e in en] and len(eo) > 0
-        for a, b in zip(eo, en):
-            Ta, Tb = S.pose_of(a["T_rule_object"]), S.pose_of(b["T_rule_object"])
-            assert np.allclose(Ta[:3, 3], Tb[:3, 3], atol=1e-4) and np.allclose(Ta[:3, :3], Tb[:3, :3], atol=1e-4)
-            Ea, Eb = S.pose_of(a["T_object_eef"]), S.pose_of(b["T_object_eef"])
-            assert np.allclose(Ea[:3, 3], Eb[:3, 3], atol=1e-4) and np.allclose(Ea[:3, :3], Eb[:3, :3], atol=1e-4)
-        if kind == "brace":
-            assert [e["goal"]["clear_turn_max_deg"] for e in eo] == [e["goal"]["clear_turn_max_deg"] for e in en]
+        assert len(eo) > 0 and eo == en
+
+
+def _bottom_offset(hull, q):
+    return -float(C.transform_points((th.zeros(3), TT._t(q).float()), hull.float())[:, 2].min())
+
+
+def _setup_rest(s, monkeypatch, map_rest, h_root):
+    """``AlignmentAxial``'s setup of the rest (``self.rest_quat`` ... ; ``_settled_rest`` under the switch) with a push_blade map at ``map_rest``."""
+    pm = SimpleNamespace(path="/m/cmap__push_blade__x", meta={"object": {"rest": {"quat_xyzw": list(map_rest), "h_root": h_root}}})
+    monkeypatch.setattr(TT, "contact_maps_on", lambda: True)
+    monkeypatch.setattr(TT, "contact_map", lambda self, kind, role, top: pm)
+    s.rest_quat, s.rest_h_root, s.rest_info = None, None, {}
+    if CPZ.axial_settled_rest_on():
+        AX.AlignmentAxial._settled_rest(s)
+    return s
+
+
+@pytest.mark.parametrize("rest", [(0.0, 0.0, 0.0, 1.0), UPRIGHT_REST, (0.02, 0.0, 0.0, 0.9998)])
+def test_an_upright_rest_places_identically_with_the_switch_on_and_off(monkeypatch, rest):
+    """owner 2026-11-08 item 3: an upright rest (tilt <= 0.05 rad) keeps the usual 3 mm drop gap - the placement (pose and orientation),
+    the aligned yaw and the stop geometry are bit-identical with the switch on and off (axial_01 / 03 / 04 draw exactly as today)."""
+    assert CPZ.axial_rest_tilt(_unit(rest)) <= CPZ.AXIAL_UPRIGHT_TILT_RAD
+    poses = {}
+    for sw in ("0", "1"):
+        monkeypatch.setenv(ENV, sw)
+        s = _ax()
+        s.world.bottom_offset = _bottom_offset
+        s.gp = SimpleNamespace(variant="v")
+        _setup_rest(s, monkeypatch, rest, 0.0047)
+        assert s.rest_quat is None
+        if sw == "1":
+            assert s.kit.stats == {"axial_rest.upright_identity": 1} and s.rest_info["settled"] is False
+        st = SimpleNamespace(inward=th.tensor([0.6, 0.8]))
+        out = []
+        for xy, yaw in ((th.tensor([0.5, 0.1]), 0.0), (th.tensor([0.42, -0.2]), 0.7), (th.tensor([0.6, 0.3]), -2.4)):
+            out.append(s._place(xy, yaw))
+        pose = out[1]
+        com = pose[0] + C.quat_rotate(pose[1], s.com_local)
+        end = com + C.quat_rotate(pose[1], s.long_axis) * 0.06
+        poses[sw] = (out, s._aligned_yaw(st), s._stop_geometry(pose, end, com, 1.0, 1.3, 0.83))
+    (o0, a0, g0), (o1, a1, g1) = poses["0"], poses["1"]
+    for (p0, q0), (p1, q1) in zip(o0, o1):
+        assert th.equal(p0, p1) and th.equal(q0, q1)
+        # the usual drop gap: support top + bottom offset + 3 mm (not the measured h_root)
+        assert float(p1[2]) == pytest.approx(0.8126 + _bottom_offset(_hull(), q1) + TT.Z_OFFSET, abs=1e-7)
+    assert a0 == a1 and th.equal(g0[0][0], g1[0][0]) and th.equal(g0[0][1], g1[0][1]) and th.equal(g0[2], g1[2])
+    assert all(th.equal(x, y) for x, y in zip(g0[1], g1[1]))
+
+
+def test_a_tilted_rest_is_still_settled_without_the_drop_gap(monkeypatch):
+    monkeypatch.setenv(ENV, "1")
+    s = _ax()
+    s.world.bottom_offset = _bottom_offset
+    s.gp = SimpleNamespace(variant="v")
+    _setup_rest(s, monkeypatch, SPOON_REST, 0.0085)
+    assert s.rest_quat is not None and s.rest_info["settled"] is True and "axial_rest.upright_identity" not in s.kit.stats
+    p, q = s._place(th.tensor([0.5, 0.1]), 0.9)
+    assert float(p[2]) == pytest.approx(0.8126 + 0.0085) and _tilt(q) == pytest.approx(0.0866, abs=5e-4)
 
 
 def test_upright_extents_are_the_object_frame_extents():
@@ -169,6 +223,8 @@ def test_the_settled_library_is_built_at_the_tilted_rest(tmp_path, monkeypatch):
     monkeypatch.setenv(ENV, "1")
     libs = CL.build_job(job, root)
     from ispatialgym.sampling import contact_maps as CMAP
+
+    assert all(f["params"].get("settled_rest") is True for lib in libs.values() for f in lib["families"].values())  # tilted: in the identity
 
     for kind in ("push", "brace"):
         es = libs[kind]["entries"]

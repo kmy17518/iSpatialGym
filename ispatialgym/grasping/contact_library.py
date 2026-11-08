@@ -209,10 +209,13 @@ def axial_rest(rest, settled: bool = False) -> Any:
     """The axial program's placement: the target upright at the IDENTITY orientation turned about z (``object_pose_on(..., IDENTITY_QUAT, ...)``,
     the goal ``quat_from_yaw(yaw_goal)``) with the v2 entry's measured root height - the v2 rest must be that upright rest (tilt <= 0.05 rad),
     else ``ValueError``. ``settled`` (i7-axialrest, :func:`axial_settled`): the program places the target AT the v2 rest
-    (``R_z(yaw) * q_rest``, ``contact_poses.axial_settled_rest_on``) - the rest is returned unchanged, a tilted one too."""
-    if settled:
+    (``R_z(yaw) * q_rest``, ``contact_poses.axial_settled_rest_on``) - a TILTED rest is returned unchanged; an upright one (tilt <=
+    ``contact_poses.AXIAL_UPRIGHT_TILT_RAD``) stays the identity rest under the switch too (owner 2026-11-08 item 3: upright draws as today)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    if settled and not CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float)):
         return rest
-    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > 0.05:
+    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > CPZ.AXIAL_UPRIGHT_TILT_RAD:
         raise ValueError(f"the v2 rest {list(np.round(rest.quat_xyzw, 4))} is not the axial program's upright identity rest")
     return S.Rest(rest_id=rest.rest_id, quat_xyzw=np.array([0.0, 0.0, 0.0, 1.0]), h_root=float(rest.h_root), reference_yaw=0.0, record=rest.record)
 
@@ -575,6 +578,12 @@ def _settled_switch_on() -> bool:
     return CPZ.axial_settled_rest_on()
 
 
+def _upright(rest) -> bool:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float))
+
+
 def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, Any]]:
     """The push / brace libraries (``{kind: library}``) of one job: ``{"id", category / model / scale / entry, "families": [...],
     "generation": {knobs of the alias family}, "subtask", "params": {family: {stroke_m, yaws, turn_deg, long_axis, com_local}}}``."""
@@ -595,8 +604,10 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
             raise NotImplementedError(f"family {fam}: {spec['missing']}")
         knobs = dict(job.get("generation") or {})
         params = dict((job.get("params") or {}).get(fam) or {}, subtask=job.get("subtask"))
-        if fam in ("axial_push", "axial_brace") and _settled_switch_on():
-            params["settled_rest"] = True  # i7-axialrest: the library's identity carries the switch only when on
+        if fam in ("axial_push", "axial_brace") and _settled_switch_on() and not _upright(rest):
+            # i7-axialrest: the library's identity carries the switch only where it changes the build - a TILTED rest (refused without the
+            # switch); an upright rest builds today's identity-rest library under the switch too (owner 2026-11-08 item 3), its identity unchanged
+            params["settled_rest"] = True
         t0 = time.time()
         entries = spec["builder"](pts, rest, knobs, params)
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})

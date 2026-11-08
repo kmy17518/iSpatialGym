@@ -1200,6 +1200,10 @@ AXIAL_PUSH_TIP_CLEARANCE_M = 0.003
 #: i7-axialrest (owner 2026-11-08, decision 2): a library / map rest and the axial program's rest are the same rest when their up axes agree
 #: within this (rad) - the upright identity-built maps (tilt ~1e-5) vs a tilted v2 rest (tablespoon tqqwys 0.0866)
 AXIAL_REST_MATCH_RAD = 0.02
+#: i7-axialrest (owner 2026-11-08 item 3): a v2 rest at most this tilted (rad; ``contact_library.axial_rest``'s upright test) is the upright
+#: identity rest under the switch too - today's placement (``object_pose_on``: the bottom offset + the usual 3 mm drop), goal, geometry and
+#: library (identity) - so the switch acts on tilted rests only (tablespoon tqqwys 0.0866; the upright axial targets ~1e-5)
+AXIAL_UPRIGHT_TILT_RAD = 0.05
 
 
 def axial_settled_rest_on() -> bool:
@@ -1216,6 +1220,11 @@ def axial_rest_tilt(rest_quat) -> float:
     """The tilt (rad) of a rest: the angle between its up axis and the world vertical (0 for the identity)."""
     u = C.quat_rotate(TT._t(rest_quat).float(), th.tensor([0.0, 0.0, 1.0]))
     return math.acos(max(-1.0, min(1.0, float(u[2]))))
+
+
+def axial_rest_upright(rest_quat, tol: float = AXIAL_UPRIGHT_TILT_RAD) -> bool:
+    """i7-axialrest (owner 2026-11-08 item 3): whether a v2 rest counts as the upright identity rest (tilt <= ``AXIAL_UPRIGHT_TILT_RAD``)."""
+    return axial_rest_tilt(rest_quat) <= float(tol)
 
 
 def axial_rest_match(rest_a, rest_b, tol: float = AXIAL_REST_MATCH_RAD) -> bool:

@@ -273,7 +273,8 @@ class AlignmentAxial(SamplerV2):
         """i7-axialrest (owner 2026-11-08, decision 2): ``self.rest_quat`` / ``self.rest_h_root`` = the target's v2 stable rest as the axial
         contact library was built at it (the push_blade map's ``object.rest``: the v2 entry's measured quat and root height - the same rest
         the library's validation settles the object at), else the v2 rest of the target's grasp key (``tabletop.v2_rest_info``); without
-        either the identity rest stays (counter ``axial_rest.no_v2_rest``)."""
+        either the identity rest stays (counter ``axial_rest.no_v2_rest``). An UPRIGHT v2 rest (``contact_poses.axial_rest_upright``: tilt <=
+        0.05 rad) also leaves the identity rest (owner 2026-11-08 item 3: today's placement with the 3 mm drop; ``axial_rest.upright_identity``)."""
         q = h = None
         src = None
         if TT.contact_maps_on():
@@ -289,7 +290,15 @@ class AlignmentAxial(SamplerV2):
             TT._count(self, "axial_rest.no_v2_rest")
             self.rest_info = {"settled": False, "why": "no v2 rest (no push_blade map, no grasp key entry): the identity rest"}
             return
-        self.rest_quat = th.tensor([float(v) for v in q], dtype=th.float32)
+        qt = th.tensor([float(v) for v in q], dtype=th.float32)
+        if CPZ.axial_rest_upright(qt):
+            # owner 2026-11-08 item 3: an upright v2 rest (tilt <= 0.05 rad) stays the upright identity rest - today's placement with the
+            # usual 3 mm drop gap (object_pose_on), goal and geometry; the switch acts on tilted rests only
+            TT._count(self, "axial_rest.upright_identity")
+            self.rest_info = {"settled": False, "tilt_rad": round(CPZ.axial_rest_tilt(qt), 5), "source": src,
+                              "why": f"upright v2 rest (tilt <= {CPZ.AXIAL_UPRIGHT_TILT_RAD} rad): the identity rest, as without the switch"}
+            return
+        self.rest_quat = qt
         self.rest_h_root = None if h is None else float(h)
         self.rest_info = {"settled": True, "quat_xyzw": [round(float(v), 7) for v in q], "h_root": self.rest_h_root,
                           "tilt_rad": round(CPZ.axial_rest_tilt(self.rest_quat), 5), "source": src}
