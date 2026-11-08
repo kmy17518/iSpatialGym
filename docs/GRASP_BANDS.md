@@ -3360,6 +3360,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 21 | i7-brace (be096dd7) | 68c6ffc2 | DEFAULTS axial TURN_COVER + OPPOSITE (owner 4), WALL_BRACE_MAP (owner 5w.2); load diagnostics off; contact_library / contact_maps conflicts kept both sides |
 | 22 | i7-t03 (7ac9945a) | 2f157bbf | touching_03 rounds 1 / 2 / 5, every t03 switch off (verified); ik.py: camhull's camera rule + t03's contact rules both kept |
 | 23 | i7-overpath (6eb0712d; code a55eea8a) | 6b7fcd6d | the inside_large_01 spine guard ON via its customs; OVERHANG_OVERPATH off (lead #29) |
+| 24 | i7-t03 round 6 (63bde7f9; code d4f6975a) | 2a760c8d | the (d) pose-0 touch-rule fix behind SHELF_LIFT_STRAIGHTEN (off) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
