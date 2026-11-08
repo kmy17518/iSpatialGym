@@ -18,7 +18,10 @@ def clean(monkeypatch):
     AC.end()
 
 
-def test_off_by_default_and_a_noop():
+def test_on_by_default_and_zero_turns_it_off(clean):
+    assert AC.on() and AC.cap_for("inter_object_relation_satisfaction-under_large_scale_03")[0] == 650.0  # decision #33: default ON
+    assert AC.cap_for() == (None, "no alias")  # no alias key (not a fast-flow job): uncapped
+    clean.setenv(AC.ENV, "0")
     assert not AC.on() and AC.cap_for("x") == (None, "off")
     AC.check("kit.ik")  # nothing armed
 

@@ -2512,13 +2512,13 @@ attempt. The repeats that do not depend on A remain: the C tries of a B (in atte
 exhausted in an earlier attempt, mostly by pairs dead at B's exact IK or "no push chain"), and ontop_large_02's C skipped for a failed
 carry leg. The audit's 1,385 s per written demo is therefore an upper bound for the code before the start draw.
 
-### The switches (default off)
+### The switches (memo / redraw default off; the cap default on since decision #33)
 
 | switch | commit | what |
 |---|---|---|
 | `ISPATIALGYM_STANCE_MEMO=1` (a) | c280fab6 | per-INSTANCE memo of failing stance B / C of an IORS large floor init (`ispatialgym/sampling/v2/stance_memo.py`). A B that failed is dropped from the pre-screen's random draw; a C that failed at that B is skipped and does not use up one of the `n_try` tries. A failure that depends on stance A (the A -> B leg, the A -> B drive past the placed target) is keyed with A's pose; the others with B (and C) and A's trunk translate (the carry's travel trunk). Cleared when the sampler moves to the next instance and on a redraw. Every 4th hit (`ISPATIALGYM_STANCE_MEMO_RECHECK`) is searched fresh. |
 | `ISPATIALGYM_FLOOR_REDRAW=1` (b) | c280fab6 | after 2 attempts on one floor start failed in the B / C search, the next attempt redraws the floor start with `try_surface("floor")` and all its checks (free floor anchor within the geodesic, stances B collision-free and seeing c_t, stance A framing the target and the partner region, the A -> B leg, the stance-C existence test; the attempt's eval-repeat checks as always). A redraw that finds none keeps the start (`redraw.failed.<reason>`); the next instance starts on the template's start again. |
-| `ISPATIALGYM_ATTEMPT_CAP=1` | 1a68082b | the per-attempt cap max(300 s, 5 x the alias's median written attempt) from `ispatialgym/sampling/v2/attempt_cap_medians.tsv` (the audit's primary set, `scripts/oracle_fix/time_cap_count.py table`); armed while the attempt samples (the start draw / redraw exempt), checked at the kit's IK and collision queries and the samplers' deadline checks; a cut attempt is `Reject("time_cap")`. The fixed budgets stay as ceilings. |
+| `ISPATIALGYM_ATTEMPT_CAP` (DEFAULT ON since the lead's decision #33, own commit; `=0` = no cap) | 1a68082b | the per-attempt cap max(300 s, 5 x the alias's median written attempt) from `ispatialgym/sampling/v2/attempt_cap_medians.tsv` (the audit's primary set, `scripts/oracle_fix/time_cap_count.py table`); armed while the attempt samples (the start draw / redraw exempt), checked at the kit's IK and collision queries and the samplers' deadline checks; a cut attempt is `Reject("time_cap")`. The fixed budgets stay as ceilings. |
 
 Kit counters: `memo.recorded.<b|c>`, `memo.skipped.<b|c>.<reason>`, `memo.recheck.<b|c>`, `memo.would_have_passed.<b|c>` (must be ~0),
 `memo.recheck_failed.<b|c>`, `memo.cleared.<instance|redraw>`; `redraw.search_fail`, `redraw.fired`, `redraw.failed.<reason>`,

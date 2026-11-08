@@ -350,7 +350,7 @@ class SamplerV2(TaskSampler):
 
     def attempt_cap(self) -> Tuple[Optional[float], str]:
         """i7-stancememo (owner 2026-11-08, 5x.3): this job's per-attempt cap (:mod:`ispatialgym.sampling.attempt_cap`): max(300 s, 5 x the
-        alias's median written attempt) under ``ISPATIALGYM_ATTEMPT_CAP=1``, (None, "off") without it; logged once, ``time_cap.armed`` per
+        alias's median written attempt) (``ISPATIALGYM_ATTEMPT_CAP``, default on since decision #33), (None, "off") with ``=0``; logged once, ``time_cap.armed`` per
         attempt with a cap."""
         if "_attempt_cap" not in self.__dict__:
             self._attempt_cap = AC.cap_for()

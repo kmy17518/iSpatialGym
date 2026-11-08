@@ -1,10 +1,12 @@
-"""i7-stancememo (owner 2026-11-08, 5x.3): the adaptive per-attempt time cap, behind ``ISPATIALGYM_ATTEMPT_CAP`` (default off).
+"""i7-stancememo (owner 2026-11-08, 5x.3): the adaptive per-attempt time cap, ``ISPATIALGYM_ATTEMPT_CAP``: DEFAULT ON since
+the lead's decision #33 (2026-11-08, owner away; A/B $OFH/stancememo_20261108: open_small_02 2.74 -> 1.49 GPU-h, under_large_03 2.12 -> 0.98,
+the control inside_large_01 0.30 / success in both, no instance lost); ``ISPATIALGYM_ATTEMPT_CAP=0`` = no cap (the former behaviour).
 
 Rule (owner): per alias, an attempt is capped at max(300 s, 5 x the median written-attempt time of that alias), from the existing runs.
 The medians are the table ``attempt_cap_medians.tsv`` next to this module (``scripts/oracle_fix/time_cap_count.py table``: the i7-diag
 audit's primary set of round-4 runs, upper median as the audit computed it); ``ISPATIALGYM_ATTEMPT_CAP_TABLE`` names another table.
 
-- ``ISPATIALGYM_ATTEMPT_CAP=1``: the cap of the job's alias (``ISPATIALGYM_ATTEMPT_CAP_ALIAS``, else ``ISPATIALGYM_ALIAS_MEMORY_ALIAS``,
+- ``ISPATIALGYM_ATTEMPT_CAP=1`` (the default): the cap of the job's alias (``ISPATIALGYM_ATTEMPT_CAP_ALIAS``, else ``ISPATIALGYM_ALIAS_MEMORY_ALIAS``,
   which submit_fast.py sets for every job); an alias without a row is not capped. ``=<seconds>``: that cap for every alias (tests).
 - The cap runs while the attempt SAMPLES (``SamplerV2.run_instances`` around ``sample``; the start draw is exempt - it restores its
   state only on a ``Reject``): the expensive kit queries (``RobotKit.ik`` / ``ik_all`` / ``ik_batch_solve`` / ``ik_path`` /
@@ -43,7 +45,7 @@ _TABLE_CACHE: Dict[str, Dict[str, float]] = {}
 
 
 def on() -> bool:
-    return os.environ.get(ENV, "0") not in ("", "0")
+    return os.environ.get(ENV, "1") not in ("", "0")
 
 
 def load_table(path: str) -> Dict[str, float]:
@@ -66,7 +68,7 @@ def cap_of_median(median_s: float) -> float:
 
 def cap_for(alias: Optional[str] = None) -> Tuple[Optional[float], str]:
     """(cap seconds or None, provenance) for the job's alias under the switch; (None, "off") when off."""
-    v = os.environ.get(ENV, "0").strip()
+    v = os.environ.get(ENV, "1").strip()  # default on (decision #33)
     if v in ("", "0"):
         return None, "off"
     if v != "1":
