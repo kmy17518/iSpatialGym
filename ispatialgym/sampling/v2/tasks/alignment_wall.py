@@ -350,7 +350,7 @@ def wall_map_feasible(cm, stance: Stance, root_world, delta: float) -> Dict[str,
     """The wall_brace map at ``stance`` for the target hung at its level pose (root ``root_world``): the stand-off of the map row = the root's
     distance ahead of the base minus the map's root-to-wall offset (the protruding patch and the hinge's COM are in the root's position),
     the root's lateral in the base frame, the stance's trunk; the classes of the drawn tilt sign, then those whose recorded clear range
-    (``goal.clear_delta_max_deg``) covers |delta|. ``{"ok", "classes", "all_sign", "cover_dropped", "d_eff", "look"}``."""
+    (``goal.clear_delta_min_deg`` .. ``clear_delta_max_deg``) covers |delta|. ``{"ok", "classes", "all_sign", "cover_dropped", "d_eff", "look"}``."""
     xy = stance.world_to_base(th.as_tensor(root_world, dtype=th.float32)[:2])
     x_off = float(cm.cells[0, 0]) - float(cm.meta["edge_distances"][0])
     d_eff = float(xy[0]) - x_off
@@ -360,7 +360,11 @@ def wall_map_feasible(cm, stance: Stance, root_world, delta: float) -> Dict[str,
     rows = {r["class"]: r for r in cm.class_rows(0) if r}
     d_abs = abs(math.degrees(delta))
     feas = list(look.get("feasible") or []) if look.get("ok") else []
-    cover = [c for c in feas if float((rows[c].get("goal") or {}).get("clear_delta_max_deg") or 0.0) >= d_abs - 1e-6]
+    def covers(c):
+        g = rows[c].get("goal") or {}
+        return float(g.get("clear_delta_min_deg") or 0.0) - 1e-6 <= d_abs <= float(g.get("clear_delta_max_deg") or 0.0) + 1e-6
+
+    cover = [c for c in feas if covers(c)]
     return {"ok": bool(cover), "classes": cover, "all_sign": feas, "cover_dropped": len(feas) - len(cover), "d_eff": round(d_eff, 4),
             "look": {k: look.get(k) for k in ("why", "cell", "edge_distance", "trunk")}}
 

@@ -399,3 +399,24 @@ def test_the_wall_brace_map_switch_is_off_by_default(monkeypatch):
     assert not AW.wall_brace_map_on()
     monkeypatch.setenv("ISPATIALGYM_WALL_BRACE_MAP", "1")
     assert AW.wall_brace_map_on()
+
+
+def test_a_small_targets_stop_clears_from_some_tilt_on():
+    """The stop at the goal edge clears the tilted hull more the farther the target is tilted: a small plate's brace is clear from 10 deg on
+    (at 5 deg its high end rises only ~1.3 cm toward the 5 mm stop) - the entry keeps that range instead of being dropped."""
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    L, W, T = 0.15, 0.30, 0.01
+    hull = np.array([[sx * T / 2, sy * W / 2, sz * L / 2] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)])
+    es = CL.build_wall_brace(hull, None, {}, {"front_axis": "+x", "up_axis": "+z"}, pieces=[hull])
+    assert es and all(e["goal"]["clear_delta_min_deg"] == 10.0 for e in es)
+    f, s_, u = AW.frame_axes("+x", "+z")
+    g = AW.WallGeometry.standalone(th.as_tensor(hull, dtype=th.float32), f, s_, u, th.zeros(3))
+    spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in CL.WALL_RULE_SPOT.items()}
+    e = next(x for x in es if "below_high" in x["class"])
+    sign = e["goal"]["tilt_sign"]
+    for d, clear in ((5.0, False), (10.0, True), (e["goal"]["clear_delta_max_deg"], True)):
+        geo = g.contacts_for(spot, sign * math.radians(d))
+        b = next(x for x in geo["braces"] if f"{'+' if sign > 0 else '-'}tilt_{x['kind']}_{x['wrist']}" == e["class"])
+        assert g.brace_clear(geo, b) == clear
+    assert e["goal"]["clear_deltas_deg"][0] == 10.0

@@ -487,8 +487,9 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     """i7-brace (owner 3.4): the world_vertical BRACE entries - AlignmentWall's own candidates (``WallGeometry.contacts_for``: the
     ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns`` braces on the LEVEL (goal) pose, the stop at the
     goal edge) at the synthetic wall spot :data:`WALL_RULE_SPOT`, keyed by the TILT SIGN (which end is high: the brace side), each recording
-    the start range it stays clear for - ``goal.clear_delta_max_deg``, the largest |delta| of :data:`WALL_CLEAR_DELTAS_DEG` up to which the
-    task's ``brace_clear`` (2 cm from the tilted hull) holds at every grid tilt. The entry is in the object frame at the level pose
+    the start range it stays clear for - ``goal.clear_delta_min_deg`` .. ``clear_delta_max_deg``, the longest contiguous run of
+    :data:`WALL_CLEAR_DELTAS_DEG` at which the task's ``brace_clear`` (2 cm from the tilted hull) holds (``clear_deltas_deg``: every clear
+    grid tilt; the stop at the goal edge clears the tilted hull from some |delta| on). The entry is in the object frame at the level pose
     (``T_rule_object``: the hinge at z 0, the wall plane x = 0); ``wall`` = the hang facts (the braced point B and its approach, the wall normal,
     the hinge, the BRACE ARM - the task's ``brace_arm`` of that tilt sign - and the push arm); ``load`` = the leveling push carried on past level
     (the validator's pusher at the pushed corner ``E_push`` of the :data:`WALL_LOAD_DELTA_DEG` tilt, along the corner's tangent, 3-D in the wall
@@ -530,13 +531,20 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
         for i, b in enumerate(ref["braces"]):
             # the brace poses live on the level pose: the same at every tilt of this sign (checked)
             same = all(bool(th.allclose(G_["braces"][i]["pose"][0], b["pose"][0], atol=1e-5)) for G_ in geos if len(G_["braces"]) > i)
-            t_max = 0.0
-            for d, G_ in zip(deltas, geos):
-                if not g.brace_clear(G_, b):
-                    break
-                t_max = d
-            if t_max <= 0.0 or not same:
+            # the start range: the grid tilts at which the task's brace_clear holds - the longest contiguous run (the stop at the goal edge
+            # clears the tilted hull more the farther it is tilted: a small target's stop is clear from some |delta| on, not from 5 deg)
+            clear = [bool(g.brace_clear(G_, b)) for G_ in geos]
+            ok = [d for d, c in zip(deltas, clear) if c]
+            runs: List[List[float]] = []
+            for k, (d, c) in enumerate(zip(deltas, clear)):
+                if c and k > 0 and clear[k - 1]:
+                    runs[-1].append(d)
+                elif c:
+                    runs.append([d])
+            if not runs or not same:
                 continue
+            run = max(runs, key=lambda r: (len(r), -r[0]))
+            t_min, t_max = run[0], run[-1]
             cls = f"{'+' if sign > 0 else '-'}tilt_{b['kind']}_{b['wrist']}"
             while cls in seen:
                 cls += "#"
@@ -551,7 +559,7 @@ def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
             # the leveling push turns the target by -delta about n: past level it carries B on along -sign x n x (B - C)
             v = wall_tangent(n, b["B"], C_, sign)
             e["yaw_deg"] = 0.0
-            e["goal"] = {"tilt_sign": sign, "clear_delta_max_deg": t_max, "deltas_deg": deltas}
+            e["goal"] = {"tilt_sign": sign, "clear_delta_min_deg": t_min, "clear_delta_max_deg": t_max, "clear_deltas_deg": ok, "deltas_deg": deltas}
             e["wall"] = {"B_object": [round(float(x), 6) for x in Bo], "approach_object": [round(float(x), 6) for x in ao],
                          "normal_object": [round(float(x), 6) for x in (Ti[:3, :3] @ n.double().numpy())],
                          "hinge_object": [round(float(x), 6) for x in com_local.tolist()], "brace_arm": ref["brace_arm"], "push_arm": ref["push"]["arm"],
