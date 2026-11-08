@@ -2813,6 +2813,160 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
   Result: 320 attempts / 0 written, 0.70 GPU-h, as its branches' runs (i7_lean3 320 / 0, 0.69 GPU-h); interior map hits from v2maps_int2;
   rejections target_placement 154, no_free_edge 129, goal_check path_collision 21 (i7_lean3 148 / 129 / 31). No regression.
 
+### i7-framing (owner decisions 2026-11-08 5.1 / 5.2): the lifted carry, pre-grasp / pre-contact by the fingertip rule
+
+The owner's decisions (verbatim intent, tmp/outputs/owner_answers_20261108.md): **5.1** also check framing at the LIFTED carry pose (after
+the oracle's protective lift); if only the arm lift takes the gripper out of the frame, consider lifting the torso (changing the tilt)
+with it. **5.2** the pre-grasp and the touching pre-contact framing use the fingertip rule (the pre-place's function and thresholds); count
+first (verdicts that change both ways), the default flips in a separate commit; report first if it admits poses whose fingertips are
+framed but whose object is not. The torso change in the oracle is approved as the owner's suggestion behind its own switch, A/B before any
+default.
+
+**Where the protective lift is computed.** `oracle/execute.py`, the place's straight carry leg: the leg's tracked path (the carried object
+included) is plan-checked against the protected goal objects (`oracle.protection`, `motions.protecting`); on a protected verdict
+(`stage == "protected"`) the caller re-runs it via above: the hand rises straight to `z_top = max(lift end z, pre-place z) +
+MotionsConfig.protect_above_m` (0.12), crosses at `z_top`, descends onto the pre-place. Deterministic from the recorded poses, so the
+sampler can predict it exactly (`program_check.via_above_carry_poses`); whether it fires is decided at run time (clearance vs threshold).
+**Diagnosis of 300150** (i7pq2_us03, CPU replay): the straight carry is framed (worst fingertip margin 34 px of 1080), the via-above leaves
+the image at u 1034, depth 0.50 m (the oracle logged u 122 of 128 at 0.50 m) - the gripper leaves the frame ONLY because of the arm lift.
+**Why a torso lift fixes exactly that.** The head camera (`zed_link`) and both arms hang from `torso_link4` (`conventions.torso_fk`), so
+the hand's image position depends on the arm joints alone: a rise made by the trunk with the arm held leaves the image unchanged. The JoyLo
+translate keeps `torso_link4`'s orientation (<= 0.005 rad over 0.25-0.5 of translate): 300150's trunk 0.75 -> 0.50 lifts the hand 0.14 m
+with 1.6 cm sideways; the tilt turns it (0.2 rad per 0.2 of tilt), so it comes second.
+
+**5.2 switch** (`ISPATIALGYM_PRECONTACT_FRAME_RULE` = box | fingertip; addb8606 default box): `IORSSmall.require_in_frame` judges
+`PRECONTACT_FRAME_POSES` (pre-grasp, push pre-contact, brace pre-contact) by `program_check.fingertip_frame_margin` (QA's 5 % + 2 cm slack)
+under `fingertip`; the brace-drop check too; the contact poses keep the eef box (as the program check). Both verdicts are always computed:
+kit `precontact_frame.<pose>.checked` / `.removed` (box fails, fingertip passes) / `.added` (box passes, fingertip fails) /
+`.removed_object_out` (removed, and the object - the target at the pre-grasp / push, the partner at the brace - not wholly in that image).
+**Count** (`$OFH/framing_20261108`: `count_precontact_logs.py` over every sample.log under `$OFH/out`; `replay_all.py` over the 1610
+written IORS small sidecars): box rejections ever logged - pre-grasp 12 (all touching_02, 8 runs), push / brace pre-contact 0, brace drops
+0; on accepted poses box-pass -> fingertip-fail 0 of 1610 pre-grasps, 294 push and 210 brace pre-contacts (the box contains the
+fingertip's 2 cm ball). The logs hold no poses, so the object-framing question is answered by the runs' shadow counter (below).
+
+**5.1 switches** (addb8606, both default off). `ISPATIALGYM_CARRY_FRAME_CHECK=1`: `IORSSmall.carry_frame_check` after the pre-place
+check - the via-above poses (8 per leg) by the fingertip rule from the manipulation stance; out -> `Reject("gripper_not_in_frame",
+"lifted carry ...")`; a place made from another base pose (touching's push stance: a carried drive first) is skipped. Kit
+`framing.carry.checked` / `.failed` / `.skipped_drive`. `ISPATIALGYM_CARRY_TORSO_LIFT=1` (with the check): where the straight carry is
+framed (the arm lift alone leaves the frame), `program_check.carry_torso_choice` (translate alone first, then with tilt; >= 0.12 m rise
+at both ends, <= 4 cm sideways, <= 0.1 rad turn, joint limits) and `IORSSmall.carry_torso_lift` (the object attached: the straight leg
+moved with torso_link4 as a tracked exact IK from the carry-trunk stance and framed; the two trunk sweeps, arm at the lift-end / pre-place
+configuration, whole body with the supports out, 4 steps each) -> `grasps[].carry_torso` {translate, tilt, from, rise_m, shift_m,
+rot_rad}; kit `framing.carry.torso_lift_used` / `.torso_lift_failed.<no_trunk|no_lift_q|frame|leg_ik|sweep_collision>`. Oracle (same
+switch, only with the record, only on the protective via-above): `execute._carry_torso_lift` - `trunk_to(carry_torso)` arm held, the
+recorded straight carry moved by `Mt` = torso_link4 after o before^-1 (finish: arm_to its end with the pre-place witness at the carry
+trunk), `trunk_to` back; `ctx["carry_leg"].kind = "straight via torso lift"`. **Count** (CPU replay, 1367 carries without a carried
+drive): the via-above leaves the frame in 100 (inside_04 37, nextto_02 17, inside_03 14, ontop_small_04 8, ontop_small_01 6, nextto_03 6,
+under_small_03 4, under_small_04 4, inside_01 2, inside_02 2), the straight carry framed in all 100, torso geometry available in 49; the
+demos of those 100: 73 succeeded (the via-above did not fire), 1 gripper_out_of_fov (300150) - a hard check costs ~7 % of written
+instances, three quarters of them good demos. Tests `test_framing_carry.py` (13; 300150's numbers replayed).
+
+**Default** (3ada83b0, owner 5.2 decided): `ISPATIALGYM_PRECONTACT_FRAME_RULE` defaults to fingertip (`box` = before). The 5.1 switches stay
+off (no owner default).
+
+**Validation** (trunk_addb8606, shiyuc, `--grasps v2only` N 4 on a staged copy of `$OFH/v2maps_int1` (identical files), alias memory v0002
+pinned in every arm, titanrtx; one ledger per arm, the same base index; `$OFH/framing_20261108/tab_fr.py`):
+
+| arm | att / written / ok | GPU-h / success | counters | out-of-frame demo failures |
+|---|---|---|---|---|
+| us03 A (box, carry off) 18379235 | 27 / 3 / 2 | 0.622 | precontact pre_grasp checked 5, removed 0, added 0 | 0 (via-above fired 3x) |
+| us03 B (fingertip + carry check) 18379237 | 43 / 4 / 3 | 0.497 | carry checked 9, failed 5 (= 5 gripper_not_in_frame rejections); precontact removed 0 / added 0 | 0 (via-above fired 3x) |
+| us03 C (B + torso lift) 18379239 | 32 / 3 / 2 | 0.622 | carry checked 5, failed 3: torso_lift_used 2, torso_lift_failed.no_trunk 1 (rejected) | 0; torso carry executed 1x (trunk (0.25, -0.53) -> (0.05, -0.43), hand back 1.4 mm from the pre-place, demo ok) |
+| touching_02 A (box) 18379241 | 25 / 4 / 4 | 0.153 | pre_grasp / push / brace pre-contact checked 4 each, removed 0, added 0 | 0 |
+| touching_02 B (fingertip) 18379473 | 25 / 4 / 4 | 0.126 | idem (identical sampling to A) | 0 |
+
+Before (i7pq2_us03, trunk_14634552): 36 / 4 / 3, 0.455, 1 gripper_out_of_fov (300150, the via-above carry). The us03 failures in A / B / C
+are one plan_failed each (place[5]: the left arm's finishing plan swings a joint 1.08-1.09 rad), not framing. 5.2 never acted in these
+runs (0 removed, 0 added, 0 removed_object_out) - consistent with the count; no pose with framed fingertips and an unframed object was seen.
+
+### i7-framing round 2 (owner decisions 2026-11-08 5d.1-5d.3): the torso lift's runs and the middle option
+
+The owner's decisions: **5d.1** `ISPATIALGYM_CARRY_FRAME_CHECK` stays off (not a default). **5d.2** `ISPATIALGYM_CARRY_TORSO_LIFT` stays off;
+more runs - N 4, torso on vs off, same indices / backend, on under_small_03 and the aliases where the replay found the lifted carry
+leaves the frame (inside_04, nextto_02, inside_03, ontop_small_04); report how often the lift fired, torso lift used / failed by reason,
+out-of-frame failures, att / written / ok, GPU-h per success. **5d.3** a middle option behind a new switch (default off): from the
+nominal straight carry compute its clearance to the protected objects against the oracle's lift trigger; far below (the lift will
+almost surely fire): the lifted-carry framing check; far above: skip; near: check or the torso lift (say which); band edges from the
+replay; then an N 4 A/B (middle option vs off) on under_small_03 + the replay's top aliases; kit `framing.carry.band.{below,near,above}`
+/ `.rejected` / `.torso_lift_used`; unit tests (switch off = today, far above never rejected, far below out of frame rejected).
+
+**The trigger** (`oracle.protection.check_trajectory`, `Motions._protect_violations`): the tracked straight carry's configurations ->
+cuRobo spheres of the moving arm and the attached object -> the smallest signed distance to each protected object's base-aligned box
+(the goal objects the task placed, minus what is in the hand: IORS small = the partner); the threshold `min(0.02, start - 0.002, end -
+0.002)` (endpoint-relative), the leg fires when its interior dips below it. **Firing history** (`fired_carry.py`, 1715 IORS small
+demos' collect logs): under_small_03 28, ontop_small_02 19, touching_01 63, touching_04 12, touching_02 1 - never in inside_04 /
+nextto_02 / inside_03 / ontop_small_04, the aliases where the lifted carry would leave the frame.
+
+**The nominal margin** (`v2/carry_margin.py`, f0cc5c48): the same rule on a cheap proxy - the carried object's base-aligned box posed by
+the grasp's `eef_in_object` (the hand box left out: every logged carry firing, 42 / 42, was the attached object's), every 1 cm of the
+straight leg lift end -> [vias] -> pre-place, against the partner's box, every clearance less `SPHERE_OVERHANG_M` = 9 mm (cuRobo's sphere
+fit overhangs the mesh; the offset with the best separation). **Replay** (`margin_replay.py` + `band_table.py`, 1447 carries / 1423
+demos / 42 fired; the boxes from B1K metadata + the template scale): AUC 0.893 (0.825 without the offset); the fired carries all lie at
++1.3..+8.5 mm; above +9 mm 0 of 896 fired; below +2 mm 20 of 131 (15 %), +2..+9 mm 22 of 396 (6 %). The nominal margin predicts
+"will NOT fire" well and "will fire" never surely (the trigger is a 2 mm endpoint-relative test; the proxy's noise is of that order).
+**Edges** `CARRY_BAND_BELOW_M` +2 mm, `CARRY_BAND_ABOVE_M` +9 mm. **Near: the torso lift when possible, else the check** - the
+recorded torso lift costs nothing when the lift does not fire (the oracle runs it only on the protective via-above) and keeps the frame
+when it does; without it the camera-frame rule decides (reject). **The 100 out-of-frame carries** by band: above 65 skipped (49 good
+demos, 16 other failures), below 4 rejected (3 good + 300150, the out-of-frame failure), near 31: 15 torso lift (10 good) + 16 rejected
+(11 good) - 20 rejections instead of the hard check's 100.
+
+**Switches** (f0cc5c48): `ISPATIALGYM_CARRY_BAND=1` (`IORSSmall.carry_frame_check` -> `carry_nominal_margin` -> `PC.carry_band`; the
+oracle executes a recorded `carry_torso` under it too); `ISPATIALGYM_CARRY_TORSO_LIFT=1` alone = the torso-only mode (records the torso
+lift wherever only the arm lift leaves the frame; never rejects: `framing.carry.accepted_out`). Kit `framing.carry.band.{below,near,
+above}` / `.band.rejected` / `.band.torso_lift_used`. Tests `test_framing_carry.py` (+8: switch off = today, the edges, far above never
+rejected, far below out of frame rejected, near torso else check, torso-only never rejects, the margin geometry and the oracle constants).
+
+**Runs** (round 2; trunk_f0cc5c48, shiyuc, `--grasps v2only` N 4 on the staged int1 copy, titanrtx, alias memory off, one ledger per
+tag with the same base index per alias; `$OFH/framing_20261108/round2_tab.txt`, `tab_fr.py`). att / written / ok, GPU-h per success;
+lift fired = the oracle's carry protect check (collect logs); torso executed = `execute._carry_torso_lift` ran:
+
+| alias | off | torso (5d.2) | band (5d.3) |
+|---|---|---|---|
+| under_small_03 | 33 / 3 / 3, 0.412; lift 2 | 21 / 4 / 3, 0.332; lift 4, torso used 2, executed 1 (demo ok) | 8 / 4 / 4, 0.176; lift 3; band below 1 / near 2 / above 1, torso used 1, executed 1 (ok), rejected 0 |
+| inside_04 | 50 / 4 / 4, 0.282; lift 0 | 51 / 4 / 2, 0.594; lift 0; carry out 7: torso used 1, no_trunk 6 (accepted) | 42 / 4 / 3, 0.349; lift 0; above 4 / near 3, rejected 2 (no_trunk) |
+| nextto_02 | 27 / 4 / 4, 0.216; lift 0 | 27 / 4 / 4, 0.140; lift 0; carry out 0 | 27 / 4 / 4, 0.129; above 2 / near 2, rejected 0 |
+| inside_03 | 21 / 4 / 4, 0.128; lift 0 | 21 / 4 / 4, 0.119; carry out 3, torso used 3 | 21 / 4 / 4, 0.103; below 1 / near 1 / above 2, torso used 1 |
+| ontop_small_04 | 6 / 4 / 4, 0.108; lift 0 | 6 / 4 / 4, 0.109; carry out 2: torso used 1, no_trunk 1 | 6 / 4 / 4, 0.108; below 1 / near 3 / above 1, torso used 1 |
+
+Out-of-frame demo failures: 0 in all 15 arms. The other demo failures: inside_04 torso 2 protected_contact (the pre-grasp transit,
+before any carry: the finger on the saucepot), inside_04 band 1 robot_wobble, under_small_03 torso 1 plan_failed. The protective lift
+fired only in under_small_03 (as the replay's history says: 0 in the other four aliases); the torso carry executed twice (both demos
+ok, the hand back within 1.4 mm of the pre-place in the first run). Defaults unchanged; the owner decides.
+
+### i7-framing 5s (owner decisions 2026-11-08c): the middle band skips, ISPATIALGYM_CARRY_BAND the default
+
+The owner's decisions: **5s.1** `ISPATIALGYM_CARRY_BAND` becomes the default, with one change to its middle band (+2 to +9 mm): use the
+torso lift when possible, otherwise SKIP the check, do not reject (the lift fires in ~5 % of that band's carries, 22 of 410); only
+far-below carries (< +2 mm, 15 % fired) are rejected when they leave the frame. Commit the band change, re-run the replay numbers, then
+the default commit. **5s.2** the standalone `ISPATIALGYM_CARRY_TORSO_LIFT` stays off (nothing done).
+
+**The band change** (40e38218): `IORSSmall.carry_frame_check`, band `near`, the lifted carry out of frame and no torso lift (`no_trunk`
+/ `frame` / `leg_ik` / `sweep_collision` / `no_lift_q`, or the straight carry itself out of frame): accepted, kit
+`framing.carry.band.near_skipped` + `.near_skipped.<why>`, summary `carry_frame.near_skipped`. `below` and `above` unchanged.
+
+**The replay** (`$OFH/framing_20261108/band_table_5s1.py` -> `band_table_5s1.out`; the inputs, margin and torso proxy of
+`band_table.py`): of the 100 out-of-frame carries **4 rejected** (5d.3: 20) = **3 good demos** (5d.3: 14) + **300150** (under_small_03,
+margin +1.5 mm, band below: still caught); near 31 = 15 torso lift + 16 skipped (11 good, 5 other failures; none of the 16 had its lift
+fire); above 65 skipped (unchanged).
+
+**The default** (5a9c191e, its own commit): `program_check.carry_band_on` and `execute._carry_torso_record` read
+`ISPATIALGYM_CARRY_BAND` with default `1` (`0` = the rule before: the lifted carry not looked at, no recorded torso lift executed). The
+torso-only mode (5d.2) is now `CARRY_TORSO_LIFT=1` with `CARRY_BAND=0`. Tests: the band is the default and `0` turns it off; near
+without a torso lift skips; the oracle executes the band's torso lift by default. Suite: 23 failed + 3 errors = the base set (the 40e38218
+run had 5 more, test_split_cone's FileNotFoundError on the stray `tabletop__s__t__apple-x__k.json`; they pass alone).
+
+**Confirmation** (trunk_5a9c191e, shiyuc, titanrtx, v2only N 4 on the round-2 staged root, alias memory off, no extra env = the default;
+the same base indices as round 2; `$OFH/framing_20261108/round3_tab.txt`). att / written / ok, GPU-h per success:
+
+| alias | round 2 band (5d.3) | default (5s.1) |
+|---|---|---|
+| under_small_03 (620000) | 8 / 4 / 4, 0.176; below 1 / near 2 / above 1, torso used 1 (executed, ok), rejected 0 | 21 / 3 / 3, 0.215; below 1 / near 2 / above 1, torso used 1 (executed, ok), lift fired 2, rejected 1 (below: 620002 attempt 7, cross 8/8 out of frame) |
+| inside_04 (620100) | 42 / 4 / 3, 0.349; near 3, rejected 2 (no_trunk) | 32 / 4 / 4, 0.192; above 4 / near 2, **near_skipped 2 (no_trunk), rejected 0**; lift fired 0 |
+
+inside_04's 2 near-band rejections are gone (the same two no_trunk cases now skipped). Out-of-frame demo failures 0 in both.
+under_small_03's 620002 wrote nothing (15 attempts: target_placement 17 - grasp / place reach - and the one below-band reject); the
+near band did not act there (near_skipped 0), so the 8 -> 21 attempts are N 4 sampling variance, not the change.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
