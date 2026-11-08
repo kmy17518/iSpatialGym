@@ -350,6 +350,12 @@ class ExecuteConfig:
     #: ... unless the faces at the lifted pads' fingertip-side end slope more than this (|normal z|, sin 20 deg): a curved side above
     #: its widest section - the milk bottle lying on its side, pinched 13 mm higher, rolled 14 deg under the closure (0927-210646)
     grasp_support_face_slope_max: float = 0.34
+    #: i7-yield2 2026-11-08 (disembedding_10 tablefork pqrtkc: a 5.8 mm lift put the pads' fingertip-side end 3 mm ABOVE the fork's
+    #: neck - the AABB top the pad-margin rule reads is the raised handle end 0.84, the neck tops out at 0.830 - so top_9 closed on
+    #: nothing (failed_grasp, 5 / 5 lifted attempts, retried unlifted) and top_2 closed on one edge (pause, 2 / 2 demos lost): ... unless
+    #: the library's own pad sweep (``grasping.candidates.pad_sweep``: rays along the closing axis over the pad footprint PAD_Z x PAD_X)
+    #: meets no face of the object at the lifted pose - the lift is refused and the recorded grasp runs. ``ISPATIALGYM_LIFT_PAD_SWEEP=1``
+    grasp_support_pad_sweep: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_LIFT_PAD_SWEEP", "0") == "1")
     #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
     #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
     place_inhand_raise_min_m: float = 0.002
@@ -1905,6 +1911,37 @@ def _pinch_face_slope(obj, centre, closing, reach: float = 0.15) -> Optional[flo
     return max(slopes)
 
 
+#: the library's pad footprint (``grasping.candidates.PAD_Z`` / ``PAD_X`` / ``PAD_OPEN_HALF``; test_lift_pad_sweep checks they agree):
+#: offsets along the eef approach axis / the eef x axis, and the open pads' half-width the sweep rays start from
+LIFT_SWEEP_PAD_Z = (-0.035, -0.02, -0.005, 0.01)
+LIFT_SWEEP_PAD_X = (-0.01, 0.0, 0.01)
+LIFT_SWEEP_OPEN_HALF = 0.0485
+
+
+def _pad_sweep_hits(obj, pos, quat) -> Optional[Tuple[int, int]]:
+    """``(rays meeting obj, rays cast)`` for the library's pad sweep at the eef pose (pos, quat): from each open pad face, over the pad
+    footprint, a ray across the pinch to the other open pad face; a hit counts when it is on ``obj`` (its prim path). None when ``obj``
+    has no prim path (the test stubs) - the caller then does not judge."""
+    root = str(getattr(obj, "prim_path", "") or "")
+    if not root:
+        return None
+    p = C.as_tensor(pos).reshape(-1).float()
+    R = C.quat_to_mat(C.as_tensor(quat).reshape(-1).float())
+    x, y, z = R[:, 0], R[:, 1], R[:, 2]
+    starts, ends = [], []
+    for dz in LIFT_SWEEP_PAD_Z:
+        for dx in LIFT_SWEEP_PAD_X:
+            o = p + float(dz) * z + float(dx) * x
+            for sgn in (1.0, -1.0):
+                starts.append((o + sgn * LIFT_SWEEP_OPEN_HALF * y).tolist())
+                ends.append((o - sgn * LIFT_SWEEP_OPEN_HALF * y).tolist())
+    n = 0
+    for ray in _raycast_all(starts, ends):
+        if any(h.get("hit") and str(h.get("rigidBody") or "").startswith(root) for h in (ray if isinstance(ray, list) else [ray])):
+            n += 1
+    return n, len(starts)
+
+
 def _approach_tracks(motions: Optional[Motions], arm: str, q_hint, poses: Sequence[Any]) -> Optional[bool]:
     """Whether the differential IK tracks the straight legs through ``poses`` (the pre-grasp, its approach, the lifted grasp)
     from ``q_hint``'s arm joints - the pre-grasp witness the transit ends in and the approach leaves from (the current configuration
@@ -2000,6 +2037,20 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     if index is not None and index in getattr(motions, "support_lift_refused", ()):
         rec["reason"] = "the lifted grasp failed the previous attempt of this action: the recorded grasp runs"
         return targets
+    if cfg.grasp_support_pad_sweep:
+        # i7-yield2: the lifted pads must still close on the object - the library's pad sweep at the lifted pose
+        try:
+            sweep = _pad_sweep_hits(state.object(action.object), pos + th.tensor([0.0, 0.0, need]), quat)
+        except Exception as e:  # noqa: BLE001 - no scene queries: the sweep is not judged
+            log.debug("lift pad sweep of %s failed (%r)", action.object, e)
+            sweep = None
+        if sweep is not None:
+            rec["pad_sweep"] = {"hits": sweep[0], "rays": sweep[1]}
+            if sweep[0] == 0:
+                rec["reason"] = (f"the {need * 1000:.1f} mm lifted pads meet no face of the object (the library's pad sweep, {sweep[1]} rays): "
+                                 f"the recorded grasp runs")
+                log.info("grasp(%s): %s", action.object, rec["reason"])
+                return targets
     out = dict(targets)
     out["grasp"] = _raised(targets["grasp"], need)
     out["approach"] = _ramped(targets["pre_grasp"], list(targets["approach"]), targets["grasp"], need)
