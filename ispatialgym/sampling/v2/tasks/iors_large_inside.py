@@ -107,6 +107,16 @@ MAX_PROTRUSION_FRACTION = 0.5
 #: the collision-free ones with the goal in frame (the most margin = the deepest lean, which the counter run in front of a basin blocks)
 NO_BAND_TRUNKS = 3
 SIDE_MAX_DEG = 45.0
+#: i7-interior2 2026-11-08 (owner 6.2): with a goal-side band / map, stance C's survivors are capped per base pose as without one (the
+#: ``generation.inside_map_trunks`` trunks with the most reach margin, default :data:`NO_BAND_TRUNKS`; every base pose keeps at least one) -
+#: the interior place maps admitted 17-26 survivors and each attempt ran ~3x longer (690 s vs 234 s legacy). Switch
+#: ``ISPATIALGYM_INSIDE_MAP_CAP`` ("1" on); kit counters ``inside_map_cap.kept`` / ``.dropped``, placement_stats ``map_cap``.
+INSIDE_MAP_CAP_ENV = "ISPATIALGYM_INSIDE_MAP_CAP"
+INSIDE_MAP_CAP_DEFAULT = "0"
+
+
+def inside_map_cap_on() -> bool:
+    return os.environ.get(INSIDE_MAP_CAP_ENV, INSIDE_MAP_CAP_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
 #: ``generation.inside_stance_postures``: the arm postures stance C's collision check tries in order (the goal-side band's ``trunk_config``
 #: tries untucked -> ready -> tucked, both arms in one posture)
 STANCE_POSTURES = ("untucked",)
@@ -1014,6 +1024,21 @@ class InsideMode:
             kept = {id(st) for st in best_per_base([st for st, _ in classed], int(self.num("inside_no_band_trunks", NO_BAND_TRUNKS)))}
             classed = [(st, k) for st, k in classed if id(st) in kept]
             stats["no_band_kept"] = len(classed)
+        elif inside_map_cap_on() and classed and (getattr(rb, "meta", None) or {}).get("mode") == "map_view":
+            # i7-interior2 2026-11-08 (owner 6.2): the band / map survivors capped per base pose by reach margin, as without a band
+            for st, _ in classed:
+                if "reach_margin_m" not in st.extras:
+                    gc = st.extras["goal_cell"]
+                    st.extras["reach_margin_m"] = round(self.reach_margin(st, [float(gc[0]), float(gc[1]), z_mid], arm), 4)
+            k_cap = int(self.num("inside_map_trunks", NO_BAND_TRUNKS))
+            kept = {id(st) for st in best_per_base([st for st, _ in classed], k_cap)}
+            n0 = len(classed)
+            bases0 = {tuple(round(float(v), 4) for v in st.base_pose2d) for st, _ in classed}
+            classed = [(st, k) for st, k in classed if id(st) in kept]
+            bases1 = {tuple(round(float(v), 4) for v in st.base_pose2d) for st, _ in classed}
+            TT._countn(self, "inside_map_cap.kept", len(classed))
+            TT._countn(self, "inside_map_cap.dropped", n0 - len(classed))
+            stats["map_cap"] = {"k": k_cap, "before": n0, "after": len(classed), "bases_before": len(bases0), "bases_after": len(bases1)}
         out = P0.best_class(classed)
         log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out), stats)
         return out
