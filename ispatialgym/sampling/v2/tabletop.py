@@ -2800,8 +2800,8 @@ class BraceRecord(ContactRecord):
 #: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
 #: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`).
 #: i7-contactbrace 2026-11-08: the ONE definition of the switch - the touching wide stop (``contact_poses.brace_wide_spreads``: the full-open
-#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``), the pack brace (``block_design.pack_brace_opening``)
-#: and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
+#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``) (the block design pack brace was removed with the
+#: packing tail, owner 2026-11-08 3.7) and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
 BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
 BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
 #: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
@@ -3449,6 +3449,17 @@ def tilt_scan(fk: CameraFK, translate: float, n: int = N_TILT_SAMPLES) -> List[f
     return [float(v) for v in np.linspace(0.0, lim, int(n)).tolist()]
 
 
+def phase2_tilts(s, fk: CameraFK, translate: float, n: int = N_TILT_SAMPLES) -> List[float]:
+    """Phase 2's trunk tilts at ``translate``: :func:`tilt_scan`, unless the sampler's ``phase2_built_tilts(translate, limit)`` (a task's
+    opt-in, e.g. iors_small's ``ISPATIALGYM_TOUCH_BUILT_TILTS``) names the tilts - then those (None from the hook: the scan)."""
+    hook = getattr(s, "phase2_built_tilts", None)
+    if callable(hook):
+        tilts = hook(float(translate), float(fk.tilt_limit(translate)))
+        if isinstance(tilts, (list, tuple)) and tilts:
+            return [float(v) for v in tilts]
+    return tilt_scan(fk, translate, n)
+
+
 def default_in_frame(s, stance: Stance, cam: Pose, focus: th.Tensor, info: Any, half_extent: float, height: float, margin: float) -> bool:
     """§4.5 step 3 default: the target AABB (a box of ``half_extent`` around the focus from the top to ``height``) in frame."""
     z0 = float(focus[2]) - 0.5 * height
@@ -3758,7 +3769,7 @@ def _phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, t
         if not s.kit.trav_free(base.base_xy):
             continue
         for tr in translates:
-            for ti in tilt_scan(fk, float(tr), n_tilts):
+            for ti in phase2_tilts(s, fk, float(tr), n_tilts):
                 cands.append(base.with_trunk(float(tr), float(ti), "manipulation"))
     if not cands:
         return []
@@ -3908,7 +3919,7 @@ def phase2_split_cone(s, init: Stance, target_half_extent: float, *, init_view_c
                 continue
             base.extras["lateral_shift_m"] = float(shift)
             for tr in translates:
-                for ti in tilt_scan(fk, float(tr), n_tilts):
+                for ti in phase2_tilts(s, fk, float(tr), n_tilts):
                     cands.append(base.with_trunk(float(tr), float(ti), "manipulation"))
     if cands:
         free = s.ikc.stances_collision_free(cands)

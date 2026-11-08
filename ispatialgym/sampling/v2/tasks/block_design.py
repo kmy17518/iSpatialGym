@@ -26,7 +26,6 @@ records, flip waypoints).
 
 from __future__ import annotations
 
-import copy
 import itertools
 import json
 import logging
@@ -61,25 +60,6 @@ CONTACT_TILT_DEG = 30.0
 #: closed fingers beside a cube face: the measured profile's fingertip section (``tabletop.FINGER_PROFILE``; the region
 #: spacing and the brace-point band test use it, the blade poses take the profile over the face height)
 FINGER_HALF_THICKNESS = TT.FINGER_PROFILE[0][1]
-#: a FULL-open pack brace (``ISPATIALGYM_BRACE_FULL_OPEN``): the braced cubes' face kept beyond each open finger's outer side (m; the
-#: toy dice's rounded edges)
-PACK_BRACE_END_MARGIN_M = 0.005
-
-
-def pack_brace_opening(spread: float, face_half_m: Optional[float] = None) -> float:
-    """The per-finger opening of the packing tail's wide brace (``fingers_opening_m``). Switch off: each finger's centre line (pad face +
-    half the 8.4 mm finger) on a braced cube's centre - ``spread / 2 - FINGER_HALF_THICKNESS / 2`` for the end cubes' centres ``spread``
-    apart, capped at full open; 0 (a closed blade, not an open brace) for one braced cube. On (owner 2026-11-07,
-    :func:`tabletop.brace_opening`): an open brace opens fully unless the braced faces cannot take it - each finger's outer side
-    (``FINGER_HALF_THICKNESS`` beyond its pad face) :data:`PACK_BRACE_END_MARGIN_M` inside ``face_half_m``, the braced cubes' half extent
-    along the closing axis about their mid point - never narrower than the off value (the fingers on the cubes' centres)."""
-    q_today = max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
-    if q_today <= 0.0 or face_half_m is None:
-        return q_today
-    room = float(face_half_m) - FINGER_HALF_THICKNESS - PACK_BRACE_END_MARGIN_M
-    return TT.brace_opening(q_today, room=max(q_today, room))
-
-
 #: the place puts the block this far right and toward the robot of its slot; the pushes close the margin (§6.2 "small safety margin")
 PLACE_MARGIN = 0.003  # was 5 mm: with a 1 cm slot tolerance the 7 mm diagonal release offset left 3 mm for everything else (0919-183037: 1.20 cm)
 #: the oracle's retreat after a release: the ``Place`` action's own 10 cm leg (actions.RETREAT_DIST) followed by the program's
@@ -239,6 +219,11 @@ class BlockDesign(SamplerV2):
         return [b.name for b in self.bindings.many(self.role)]
 
     def sample_template(self):
+        if bool(self.gen("block_pack_tail", False)):
+            # owner 2026-11-08 (3.7, i7-contact3): the packing tail (the wide pack brace + its pushes) is removed; the block design uses the
+            # board variant (block_4-breakfast_table_board: the pockets seat the blocks, no packing)
+            raise Reject("spec", "generation.block_pack_tail: the packing tail (pack brace) was removed (owner 2026-11-08 3.7) - the block design "
+                                 "uses the board variant")
         blocks = self.objs(self.role)
         if len(blocks) != self.n_blocks():
             raise Reject("spec", f"{len(blocks)} blocks for a {self.g('grid')} grid")
@@ -919,7 +904,6 @@ class BlockDesign(SamplerV2):
             raise Reject("layout", f"goal faces below {self.g('goal_face_visible_fraction')} visible: {bad}")
         # --- goal layout at the anchor ------------------------------------------------------------------------------
         anchor = self._centre(poses[anchor_i])[0]
-        anchor_place = anchor  # where the loose (placement) grid hangs; the packed goal grid hangs at ``anchor``
         board_goals, board_aims = None, None
         if self._has_board():
             # puzzle board (owner 2026-09-20 22:39): the goal slots ARE the pocket centres (the seat), the release aims the bias toward
@@ -927,13 +911,8 @@ class BlockDesign(SamplerV2):
             board_goals, board_aims, _floor_z = self._board_slot_targets(board_pose, right, toward)
         plans: Dict[int, Dict[str, Any]] = {}
         slots: Dict[str, Dict[str, Any]] = {}
-        goal_pose: Dict[int, TT.Pose] = {}  # the GOAL slots (the packed grid with the pack tail): the TRO targets
-        place_goal: Dict[int, TT.Pose] = {}  # where every block is PLACED (the loose grid the pack tail closes; = goal_pose without it)
-        # packing tail (owner 2026-09-19 21:47): the blocks are placed on a loose grid (``place_gap_m`` between them, room for the
-        # descending fingers beside the placed neighbours) and then pushed together against a wide-braced column / row; the goal
-        # grid is the packed one (``block_gap_m``, "almost touching"); the anchor block (slot 0) is the fixed corner of both grids
-        pack_on = bool(self.gen("block_pack_tail", False))
-        pitch_place = self.edge + float(self.gen("place_gap_m", self.g("block_gap_m"))) if pack_on else pitch
+        goal_pose: Dict[int, TT.Pose] = {}  # the GOAL slots: the TRO targets
+        place_goal: Dict[int, TT.Pose] = {}  # where every block is PLACED (= goal_pose; the board: the release aim)
         for bi in range(n):
             si = slot_of[bi]
             r, c = divmod(si, n_cols)
@@ -948,8 +927,7 @@ class BlockDesign(SamplerV2):
             q_goal = plan["goal_quat"]
             xy = anchor[:2] + right * (c * pitch) + toward * (r * pitch)
             goal_pose[bi] = self._root_pose(xy, q_goal, 0.001)
-            xy_p = anchor_place[:2] + right * (c * pitch_place) + toward * (r * pitch_place)
-            place_goal[bi] = goal_pose[bi] if not pack_on else self._root_pose(xy_p, q_goal, 0.001)
+            place_goal[bi] = goal_pose[bi]
             if board_name is not None:  # the slots stand on the pocket floor, a plate above the table top: goal = the seat, place = the aim
                 dz_b = th.tensor([0.0, 0.0, float(self._board_geometry()["plate_thickness_m"])])
                 goal_pose[bi] = (self._root_pose(board_goals[si], q_goal, 0.001)[0] + dz_b, q_goal)
@@ -999,27 +977,6 @@ class BlockDesign(SamplerV2):
         for bi in range(n):  # a table flip may have re-chosen the block's table-aligned goal yaw (goal face unchanged)
             goal_pose[bi] = (goal_pose[bi][0], place_goal[bi][1])
             slots[f"slot_{slot_of[bi]}"]["orientation"] = [float(v) for v in goal_pose[bi][1]]
-        if pack_on:
-            pack, st_pack = self._pack_tail(manip, current, pool, names, records, slot_of, n_cols, right, toward, pitch_place - pitch)
-            if st_pack.name not in self.sidecar.stances:
-                st_pack.name = "manipulation_pack"
-                st_pack.arms = ["right", "left"]
-                self.sidecar.add_stance(st_pack)
-                self._teleport({rec["instance"]: (th.tensor([float(v) for v in rec["goal_pose"]["position"]]), th.tensor([float(v) for v in rec["goal_pose"]["orientation"]])) for rec in records})
-                self._travel_between(current, st_pack)
-                log.info("%s: packing from a stance of its own %s (trunk %.2f/%+.2f, stand-off %.2f)", self.gp.variant, st_pack.name, st_pack.translate, st_pack.tilt, float(st_pack.stand_off or 0.0))
-            else:
-                st_pack.arms = ["right", "left"]
-                self.sidecar.stances[st_pack.name] = st_pack
-                # the pack stance is one of the block stances, but the robot may stand elsewhere after the last block: the program
-                # needs a recorded transition / path between the two (0920-073308: "stances 'manipulation_4' and 'manipulation' differ
-                # in trunk but no transition is recorded")
-                if st_pack.name != current.name and not any({str(t.frm), str(t.to)} == {current.name, st_pack.name} for t in self.sidecar.transitions):
-                    self._teleport({rec["instance"]: (th.tensor([float(v) for v in rec["goal_pose"]["position"]]), th.tensor([float(v) for v in rec["goal_pose"]["orientation"]])) for rec in records})
-                    self._travel_between(current, st_pack)
-            pack["stance"] = st_pack.name
-            self.sidecar.pack = pack
-            self._teleport({names[bi]: poses[bi] for bi in range(n)})
         # --- draft ---------------------------------------------------------------------------------------------------
         for bi in range(n):
             d.object_poses[names[bi]] = poses[bi]
@@ -1662,7 +1619,7 @@ class BlockDesign(SamplerV2):
         # section plus 2 mm; otherwise the honest check stays and the block is rejected with the reason
         placed_neighbours = [self.objects[names[o]] for j, o in enumerate(order) if j < step]
         gap_needed = TT.FINGER_PROFILE[0][1] + 0.002  # the pad on the block face, the outer face 8.4 mm out (fingertip section)
-        place_gap = float(self.gen("place_gap_m", self.g("block_gap_m"))) if bool(self.gen("block_pack_tail", False)) else float(self.g("block_gap_m"))
+        place_gap = float(self.g("block_gap_m"))
         if placed_neighbours and not self._has_board() and place_gap + self._place_margin() < gap_needed:
             raise Reject("finger_clearance", f"block {names[bi]}: slot gap {place_gap * 1000:.0f} mm + place margin {self._place_margin() * 1000:.0f} mm < "
                                              f"{gap_needed * 1000:.1f} mm the closed finger needs beside a placed neighbour (set generation.block_gap_m >= "
@@ -2706,7 +2663,7 @@ class BlockDesign(SamplerV2):
     def _blade_height(self) -> float:
         """eef origin height of a top-down blade beside a block: the closed fingertips 3 mm above the top (a 2.5 cm cube
         sits entirely below the wrist of a horizontal contact)."""
-        floor = float(getattr(self, "_push_floor_z", None) or self.top.z)  # the board's pocket floor during its pack pushes
+        floor = float(getattr(self, "_push_floor_z", None) or self.top.z)  # a pocket floor when one is set (else the top)
         z = floor + max(0.6 * self.edge, C.FINGERTIP_LENGTH + 0.003)
         # A/B knob generation.contact_height_extra_m (D2 core helper, 0 = no-op): the fingertip stays >= 1 cm below the block's top
         return lift_contact_height(self, z, "blade", face_top_z=floor + float(self.edge))
@@ -2723,8 +2680,8 @@ class BlockDesign(SamplerV2):
         yield from self._blade_poses_at(centre, face_normal, manip, prefix)
 
     def _blade_poses_at(self, centre: th.Tensor, face_normal: th.Tensor, manip: Stance, prefix: str, modes: Tuple[str, ...] = ("pad", "side")):
-        """The blade contacts of :meth:`_blade_poses` about an arbitrary centre point (the mid-point of two braced cubes for the
-        packing tail's wide brace) and a face outward normal; ``modes`` restricts the closing-axis classes."""
+        """The blade contacts of :meth:`_blade_poses` about an arbitrary centre point and a face outward normal; ``modes`` restricts
+        the closing-axis classes."""
         z_blade = self._blade_height()
         side = th.cross(th.tensor([0.0, 0.0, 1.0]), face_normal, dim=0)
         floor = float(getattr(self, "_push_floor_z", None) or self.top.z)
@@ -2745,328 +2702,6 @@ class BlockDesign(SamplerV2):
                 origin = th.tensor([float(centre[0]), float(centre[1]), z_blade]) + face_normal * (0.5 * self.edge + so[1])
                 for c_sign in (1.0, -1.0):
                     yield (origin, C.eef_quat(a_vec, c_sign * c_axis)), a_vec, f"{prefix}_blade_{cname}_{pitch:.0f}{'' if c_sign > 0 else '-'}", so[1]
-
-    # ------------------------------------------------------------------ packing tail (owner 2026-09-19 21:47)
-
-    def _pack_tail(self, manip: Stance, current: Stance, pool: List[Stance], names: List[str], records: List[Dict[str, Any]], slot_of: Dict[int, int], n_cols: int,
-                   right: th.Tensor, toward: th.Tensor, gap_delta: float) -> Tuple[Dict[str, Any], Stance]:
-        """After the last place (every block on the loose grid, ``records[].goal_pose``) the blocks are packed: stage 1 braces the
-        LEFT column with the left gripper opened so a finger side rests on the left face of each of its cubes and pushes every
-        other column's cube against it with the right hand (closing the column gaps, the columns end aligned); stage 2 braces the
-        FAR row on its far faces and pushes the near row away from the robot (the near-row brace with a pull toward the robot
-        is the fallback - the log says which one passed). Every stage is one wide brace + one push per cube, all from the
-        manipulation stance, checked as two-arm exact IK (brace held while the push arm moves). Raises ``Reject`` when no stage
-        passes; returns the ``sidecar.pack`` section."""
-        support = self.obj("support")
-        world0: Dict[str, TT.Pose] = {}
-        for rec in records:
-            gp = rec["goal_pose"]
-            world0[rec["instance"]] = (th.tensor([float(v) for v in gp["position"]]), th.tensor([float(v) for v in gp["orientation"]]))
-        by_slot = {si: names[bi] for bi, si in slot_of.items()}
-        n_rows = max(1, len(slot_of) // n_cols)
-        braced = [by_slot[r * n_cols] for r in range(n_rows) if r * n_cols in by_slot]
-        pushes = [(by_slot[r * n_cols + c], c * gap_delta) for r in range(n_rows) for c in range(1, n_cols) if r * n_cols + c in by_slot]
-        far = [by_slot[c] for c in range(n_cols) if c in by_slot]
-        near_pushes = [(by_slot[r * n_cols + c], r * gap_delta) for r in range(1, n_rows) for c in range(n_cols) if r * n_cols + c in by_slot]
-        near = [by_slot[(n_rows - 1) * n_cols + c] for c in range(n_cols) if (n_rows - 1) * n_cols + c in by_slot]
-        far_pushes = [(by_slot[r * n_cols + c], (n_rows - 1 - r) * gap_delta) for r in range(n_rows - 1) for c in range(n_cols) if r * n_cols + c in by_slot]
-        # the stances tried: where the robot stands after the last block, the manipulation stance, then the pool ranked about the
-        # grid centre (pod run 0919-220203: from the tall manipulation stance every top-down push pre-pose 0.48 m ahead failed the IK
-        # with the left arm braced across - the grid needs to sit in the arms' sweet zone, 0.55-0.65 m ahead)
-        grid_c = th.stack([self._centre(p_)[0] for p_ in world0.values()]).mean(dim=0)
-        grid_root = (grid_c, C.IDENTITY_QUAT.clone())
-        ranked = self._rank_stances(pool, current, grid_root, grid_root, False)
-        stances = [current] + [manip] + [st for st in ranked if st is not current and st is not manip]
-        if self._has_board():
-            raise Reject("spec", "the puzzle board seats the blocks in its pockets - generation.block_pack_tail must be false for the board variant")
-        seen = set()
-        tried: List[str] = []
-        for st in stances[: int(self.gen("pack_max_stances", 6))]:
-            key = (round(float(st.base_pose2d[0]), 3), round(float(st.base_pose2d[1]), 3), round(float(st.translate), 3), round(float(st.tilt), 3))
-            if key in seen:
-                continue
-            seen.add(key)
-            world = dict(world0)
-            self._teleport(world)
-            tag_st = f"{st.name} (trunk {st.translate:.2f}/{st.tilt:+.2f}, so {float(st.stand_off or 0.0):.2f}, shift {float(st.extras.get('block_stance_shift_m', 0.0)):+.2f})"
-            # stage 1: the columns. Braced = column 0 (the robot's left) by the left hand, pushed = the cubes of the other columns by
-            # the right hand, each by its column's share of the gap (2 x 2: the right column by gap_delta) toward the left; the
-            # mirrored assignment (right column braced by the right hand, the left column pushed right by the left hand) is the
-            # fallback - the goal is judged on the layout relations, a uniform shift of the packed grid does not count
-            right_col = [by_slot[r * n_cols + n_cols - 1] for r in range(n_rows) if r * n_cols + n_cols - 1 in by_slot]
-            left_pushes = [(by_slot[r * n_cols + c], (n_cols - 1 - c) * gap_delta) for r in range(n_rows) for c in range(n_cols - 1) if r * n_cols + c in by_slot]
-            st1, why1 = self._pack_stage("columns", world, braced, pushes, -right, right, st, support)
-            moved1 = [(nm, -_xy3(right) * dist) for nm, dist in pushes]
-            if st1 is None and bool(self.gen("pack_mirror_fallback", True)):
-                st1, why1b = self._pack_stage("columns_mirrored", world, right_col, left_pushes, right, -right, st, support, brace_arm="right", push_arm="left")
-                moved1 = [(nm, _xy3(right) * dist) for nm, dist in left_pushes]
-                why1 = f"{why1}; mirrored: {why1b}"
-            if st1 is None:
-                tried.append(f"{tag_st}: columns: {why1}")
-                log.info("%s: pack @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:700])
-                continue
-            for nm, dxy in moved1:  # the world after stage 1: the pushed cubes moved
-                world[nm] = (world[nm][0] + dxy, world[nm][1])
-            self._teleport(world)
-            # stage 2: the rows. Far row braced on its far faces, the near rows pushed away from the robot; else the near row
-            # braced on its near faces and the far rows pulled toward the robot
-            st2, why2 = self._pack_stage("rows_far_brace", world, far, near_pushes, -toward, toward, st, support)
-            which = "far row braced (left hand), near row pushed away from the robot (right hand)"
-            if st2 is None:
-                st2, why2b = self._pack_stage("rows_near_brace", world, near, far_pushes, toward, -toward, st, support)
-                which = "near row braced (left hand), far row pulled toward the robot (right hand)"
-                why2 = f"far brace: {why2}; near brace: {why2b}"
-            if st2 is None and bool(self.gen("pack_mirror_fallback", True)):
-                st2, why2c = self._pack_stage("rows_far_brace_mirrored", world, far, near_pushes, -toward, toward, st, support, brace_arm="right", push_arm="left")
-                which = "far row braced (right hand), near row pushed away (left hand)"
-                if st2 is None:
-                    st2, why2d = self._pack_stage("rows_near_brace_mirrored", world, near, far_pushes, toward, -toward, st, support, brace_arm="right", push_arm="left")
-                    which = "near row braced (right hand), far row pulled (left hand)"
-                    why2 = f"{why2}; mirrored far: {why2c}; mirrored near: {why2d}"
-            if st2 is None:
-                tried.append(f"{tag_st}: rows: {why2}")
-                log.info("%s: pack @ %s: columns ok (%s), rows failed: %s", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", why2[:900])
-                continue
-            log.info("%s: packing tail from %s: columns %s; rows: %s (%s)", self.gp.variant, tag_st, st1["brace"]["pose_class"] if st1.get("brace") else "push only", which,
-                     st2["brace"]["pose_class"] if st2.get("brace") else "push only")
-            self._teleport(world0)
-            return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "far" if which.startswith("far") else "near"}, st
-        if bool(self.gen("pack_allow_push_only", True)):
-            # no stance takes the two-arm brace + push: the pushes alone (the push is position-controlled to the packed pose - the
-            # cube travels the gap and meets its neighbour with no travel left, so the neighbour is not carried along)
-            for st in self._pack_posture_variants(stances[: int(self.gen("pack_max_stances", 6))]):
-                world = dict(world0)
-                self._teleport(world)
-                tag_st = f"{st.name} (trunk {st.translate:.2f}/{st.tilt:+.2f}, so {float(st.stand_off or 0.0):.2f}, shift {float(st.extras.get('block_stance_shift_m', 0.0)):+.2f})"
-                st1, why1 = self._pack_stage("columns_push_only", world, [], pushes, -right, right, st, support)
-                if st1 is None:
-                    log.info("%s: pack (push only) @ %s: columns failed: %s", self.gp.variant, tag_st, why1[:500])
-                    continue
-                for nm, dist in pushes:
-                    world[nm] = (world[nm][0] - _xy3(right) * dist, world[nm][1])
-                self._teleport(world)
-                st2, why2 = self._pack_stage("rows_push_only", world, [], near_pushes, -toward, toward, st, support)
-                which = "near row pushed away from the robot, no brace"
-                if st2 is None:
-                    st2, why2b = self._pack_stage("rows_push_only_pull", world, [], far_pushes, toward, -toward, st, support)
-                    which = "far row pulled toward the robot, no brace"
-                    if st2 is None:
-                        log.info("%s: pack (push only) @ %s: rows failed: %s; pull: %s", self.gp.variant, tag_st, why2[:400], why2b[:400])
-                        continue
-                log.info("%s: packing tail (push only) from %s: %s", self.gp.variant, tag_st, which)
-                self._teleport(world0)
-                return {"stance": st.name, "gap_delta_m": float(gap_delta), "stages": [st1, st2], "rows_brace": "none", "push_only": True}, st
-        self._teleport(world0)
-        raise Reject("pack_tail", "no stance packs the grid: " + " | ".join(tried)[:1500])
-
-    def _pack_posture_variants(self, stances: List[Stance]) -> List[Stance]:
-        """Each candidate pack stance as it is, then clones with the idle LEFT arm in the ``ready`` / ``tucked`` posture (a new
-        name, so the block chains' stance records stay untouched and the oracle drives the arm there at the pack transition):
-        the pushes that reach across the robot's centre line (the board left of it, 0920-011816) collide with the hanging
-        untucked left arm."""
-        out: List[Stance] = []
-        postures = list(self.gen("pack_left_postures", ["ready", "tucked"]) or [])
-        for st in stances:
-            out.append(st)
-            for name in postures:
-                try:
-                    vec = self.kit.arm_q(name, "left")
-                except Exception:  # noqa: BLE001
-                    continue
-                st2 = copy.copy(st)
-                st2.extras = dict(st.extras, pack_left_posture=name)
-                st2.q = self.ikc.q_locked(st, left_arm=vec)
-                st2.name = f"{st.name}_pack_{name}"
-                if not bool(self.kit.collision_free(st2.q, margin=0.01)[0]):
-                    continue
-                out.append(st2)
-        return out
-
-    def _pack_face_half(self, world: Dict[str, TT.Pose], braced: List[str], mid: th.Tensor, b_dxy: th.Tensor) -> Optional[float]:
-        """Half the extent (m) the braced cubes' faces offer the pack brace's fingers along its closing axis (horizontal, across the brace
-        direction ``b_dxy``) about the brace's ``mid`` point - the nearer of the two outer ends; None without the cube hull."""
-        if self.hull is None or not braced:
-            return None
-        u = th.cross(th.tensor([0.0, 0.0, 1.0]), b_dxy.float(), dim=0)
-        u = u / th.linalg.norm(u)
-        proj = th.cat([(C.transform_points(world[nm], self.hull) - TT._t(mid).float()) @ u for nm in braced])
-        return float(min(proj.max(), -proj.min()))
-
-    def _pack_stage(self, tag: str, world: Dict[str, TT.Pose], braced: List[str], pushes: List[Tuple[str, float]], push_dir: th.Tensor, brace_dir: th.Tensor,
-                    manip: Stance, support, brace_arm: Optional[str] = None, push_arm: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], str]:
-        """One packing stage: the wide brace (left arm; the fingers opened so a finger SIDE rests on the face of each braced cube,
-        the closing axis along the braced line) held while the right hand pushes each ``(cube, distance)`` along ``push_dir`` with
-        the closed blade. Returns ``(stage dict, "")`` or ``(None, reason)``."""
-        if not pushes:
-            return None, "nothing to push"
-        brace_arm = str(brace_arm or self.gen("pack_brace_arm", "left"))
-        push_arm = str(push_arm or self.gen("pack_push_arm", "right"))
-        if not braced:
-            # push only: the pushes from the stance posture, no second arm
-            push_recs, why = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, self.ikc.q_locked(manip, fingers=0.0).clone(), [], "no brace")
-            if push_recs is None:
-                return None, why
-            return {"tag": tag, "brace": None, "pushes": push_recs}, ""
-        centres = [self._centre(world[nm])[0] for nm in braced]
-        mid = th.stack(centres).mean(dim=0)
-        spread = float(th.linalg.norm(centres[0][:2] - centres[-1][:2])) if len(centres) > 1 else 0.0
-        b_dxy = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])
-        b_dxy = b_dxy / th.linalg.norm(b_dxy)
-        # per-finger opening (:func:`pack_brace_opening`): the finger centre line (pad face + half the 8.4 mm finger) on each cube's centre;
-        # ISPATIALGYM_BRACE_FULL_OPEN (owner 2026-11-07): fully open unless the braced cubes' faces along the closing axis cannot take it
-        q_open = pack_brace_opening(spread, self._pack_face_half(world, braced, mid, b_dxy) if TT.brace_full_open() else None)
-        braced_objs = [self.objects[nm] for nm in braced]
-        brace_fails: List[str] = []
-        push_fails: List[str] = []
-        idx_b = self.kit.robot.arm_control_idx[brace_arm]
-        pushes_of: Dict[int, List[Dict[str, Any]]] = {}
-
-        def eval_brace(p):
-            r_b = self.ikc.exact(list(p.chain), manip, brace_arm, ignore_for_last=[support] + braced_objs, cache=False, fingers=q_open, q_first=p.q_first)
-            if not r_b.ok:
-                brace_fails.append(f"{p.label}: {r_b.reason}")
-            return bool(r_b.ok), r_b, None, str(r_b.reason)
-
-        def pushes_with(sc):
-            # the pushes, one per cube, each checked with the brace arm locked at its contact - its fingers at the brace's opening, as the
-            # oracle holds them (i7-braceopen 2026-11-07: the seed's 0.0 closed the braced hand for every push check), the push hand closed
-            q_seed = TT.with_gripper(self.kit, self.ikc.q_locked(manip, fingers=0.0), brace_arm, q_open)
-            q_seed[idx_b] = sc.result.q[idx_b]
-            push_recs, why_p = self._pack_pushes(world, pushes, push_dir, manip, support, push_arm, q_seed, braced_objs, sc.proposal.label)
-            if push_recs is None:
-                push_fails.append(why_p)
-                return False, why_p
-            pushes_of[id(sc)] = push_recs
-            return True, ""
-
-        # a blade class's two wrist turns by the orientation rule (owner 2026-09-27); the other turn when the pushes fail with the first
-        chosen_b, dec_b, _fails_b = O.choose_first(self.ikc, brace_arm, self._blade_poses_at(mid, -b_dxy, manip, "pack_brace", modes=("side",)), key=lambda c: c[0],
-                                                   label=lambda c: c[2], chain=lambda c: [C.pre_pose(c[0]), c[0]], evaluate=eval_brace,
-                                                   q_start=self.ikc.q_locked(manip, fingers=0.0), stage="pack brace", downstream=pushes_with)
-        if chosen_b is not None:
-            b_pose, b_a, b_name, b_half = chosen_b.proposal.payload
-            b_pre = chosen_b.proposal.chain[0]
-            push_recs = pushes_of[id(chosen_b)]
-            brace_rec = annotate_height_extra(TT.BraceRecord("brace", brace_arm, b_pre, b_pose, direction=b_a, brace_kind=f"pack_{tag}", object=braced[0],
-                                                             extras={"pose_class": b_name, "blade_half_thickness_m": None if b_half is None else float(b_half), "stop_clearance_m": 0.0,
-                                                                     "fingers_opening_m": round(float(q_open), 4), "stop_width_m": round(float(spread), 4),
-                                                                     "braced": list(braced),
-                                                                     # the program check removes BOTH braced cubes at the contact (a finger side on each), the support throughout
-                                                                     "ignore_last": list(braced), "ignore_every": ["supports"],
-                                                                     **_orient_extra(dec_b)}), self).to_sidecar()
-            return {"tag": tag, "brace": brace_rec, "pushes": push_recs}, ""
-        why = (sorted(set(push_fails)) or sorted(set(brace_fails)))[:3]
-        return None, f"no brace + pushes pass ({len(brace_fails)} brace, {len(push_fails)} push failures; e.g. {why})"
-
-    def _pack_pushes(self, world: Dict[str, TT.Pose], pushes: List[Tuple[str, float]], push_dir: th.Tensor, manip: Stance, support, push_arm: str, q_seed: th.Tensor,
-                     braced_objs: List[Any], b_name: str) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-        """The packing pushes of one stage, one per ``(cube, distance)``: the first blade / tilted class whose pre + init (the cube
-        removed) and pre + goal pass the exact IK from ``q_seed`` (the other arm where it is - at its brace contact, or the stance
-        posture) and whose contact configuration is collision-free together with that arm. Returns ``(records, "")`` or
-        ``(None, reason)``."""
-        idx_other = self.kit.robot.arm_control_idx["left" if push_arm == "right" else "right"]
-        fails: List[str] = []
-        recs: List[Dict[str, Any]] = []
-        d3 = th.tensor([float(push_dir[0]), float(push_dir[1]), 0.0])
-        d3 = d3 / th.linalg.norm(d3)
-        standoff = float(self.gen("pack_push_standoff_m", 0.005))
-        for nm, dist in pushes:
-            found = None
-            # the cubes the push drives ahead of the pushed one (in line along the push direction within its travel): they move
-            # with it, so they are out of the blade's way at the goal - ignored for the goal / chain checks and recorded as
-            # ``driven`` for the program check (the wall pushes of the board variant drive the inner column / row along)
-            c_nm = self._centre(world[nm])[0][:2]
-            driven: List[str] = []
-            for other in world:
-                if other == nm:
-                    continue
-                rel = self._centre(world[other])[0][:2] - c_nm
-                along = float(th.dot(rel, d3[:2]))
-                across = float(th.linalg.norm(rel - along * d3[:2]))
-                if 0.0 < along < float(dist) + self.edge and across < 0.6 * self.edge:
-                    driven.append(other)
-            driven_objs = [self.objects[o] for o in driven]
-            cands = list(self._blade_poses(world[nm], push_dir, False, manip, "pack_push"))
-            t_pt, t_a = self._face_contact(world[nm], push_dir, into=False)
-            c_axis_t = th.tensor([float(-push_dir[1]), float(push_dir[0]), 0.0])  # pads close across the push direction
-            cands.append((C.contact_eef(t_pt, t_a, c_axis_t), t_a, "pack_push_tilted", None))
-
-            def evaluate(p, nm=nm, dist=dist, driven=driven, driven_objs=driven_objs):
-                p_face, p_a, p_name, p_half = p.payload
-                # the blade starts ``pack_push_standoff_m`` short of the face (a cube placed a few mm toward the blade is met, not
-                # landed on) and travels that plus the gap; the neighbour stops the cube at the packed position
-                p_init = (p_face[0] - d3 * standoff, p_face[1])
-                p_goal = (p_face[0] + d3 * float(dist), p_face[1])
-                p_pre = C.pre_pose(p_init)
-                r_i = self.ikc.exact([p_pre, p_init], manip, push_arm, ignore_for_last=[support, self.objects[nm]], q_seed=q_seed, cache=False, fingers=0.0,
-                                     q_first=p.q_first)
-                if not r_i.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: init {r_i.reason}")
-                    return False, None, None, f"init {r_i.reason}"
-                qs = O.chain_qs(self.ikc, push_arm, [p_pre, p_init])
-                r_g = self.ikc.exact([p_pre, p_goal], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=q_seed, cache=False, fingers=0.0)
-                if not r_g.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: goal {r_g.reason}")
-                    return False, None, None, f"goal {r_g.reason}"
-                # the program check's own verdict on the push (``check_action_targets``: waypoints pre -> init -> goal with the pushed
-                # cube and the support removed throughout, closed pads): run it here so the sampler never records a push the check
-                # rejects (0920-055948: 'push: waypoints: exact IK failed at pose 1 of 3' on a board push the two exact checks passed)
-                # the oracle's motion: arm_to(pre), then arm_along over ``actions._line(init, goal)`` - the start excluded, so the
-                # first tracked segment runs from the pre to a third of the push (the program check verifies this very chain)
-                line = [(pt, p_goal[1]) for pt in C.line_waypoints(p_init[0], p_goal[0], 3)]
-                r_w = self.ikc.waypoints_ok([p_pre] + line, manip, push_arm, ignore_all=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=q_seed,
-                                            cache=False, fingers=0.0, approached=[self.objects[nm]])
-                if not r_w.ok:
-                    fails.append(f"{b_name}/{nm}/{p_name}: chain {r_w.reason}")
-                    return False, None, None, f"chain {r_w.reason}"
-                # the oracle's retreat from a push (``execute_retreat``, contact_retreat_escape_m 0.05): the pad leaves RADIALLY -
-                # opposite the push - by ``Retreat.escape_far`` (5 cm for the pack retreats; the default 10 cm left the arm 14 mm
-                # short after the board's rightward wall push, 0920-192950 action 33) and up by the same, reached by ``arm_to`` at
-                # a 5 mm tolerance - the end pose must have a solution polished to that tolerance
-                esc_far = float(self.gen("pack_retreat_dist_m", 0.05))  # = Retreat.escape_far of the program's pack retreats
-                r_end = (p_goal[0] - d3 * esc_far + th.tensor([0.0, 0.0, min(0.05, esc_far)]), p_goal[1])
-                r_r = self.ikc.exact([r_end], manip, push_arm, ignore_for_last=[support, self.objects[nm]] + braced_objs + driven_objs, q_seed=r_w.q, cache=False, fingers=0.0)
-                if not r_r.ok or r_r.q is None:
-                    fails.append(f"{b_name}/{nm}/{p_name}: retreat end {r_r.reason}")
-                    return False, None, None, f"retreat end {r_r.reason}"
-                with self.ikc.ignoring([support, self.objects[nm]] + braced_objs + driven_objs):
-                    _q_pol, res_r = self.ikc.polish_witness(r_r.q, r_end, push_arm, ignore=[])
-                if res_r > 0.005:
-                    fails.append(f"{b_name}/{nm}/{p_name}: retreat end {res_r * 1000:.1f} mm beyond the arm's reach")
-                    return False, None, None, f"retreat end {res_r * 1000:.1f} mm beyond the arm's reach"
-                q_both = r_g.q.clone()
-                q_both[idx_other] = q_seed[idx_other]
-                # with a brace the two contact configurations are checked together at 5 mm; a single-handed push only needs its own
-                # (collision-aware) IK - the 5 mm margin against the idle other arm rejected every row push of 0919-233714
-                with self.ikc.ignoring([support, self.objects[nm]] + braced_objs):
-                    free = bool(self.kit.collision_free(q_both, margin=0.005 if braced_objs else 0.0)[0])
-                if not free:
-                    fails.append(f"{b_name}/{nm}/{p_name}: the two arms collide at the contacts")
-                    return False, None, None, "the two arms collide at the contacts"
-                rec = annotate_height_extra(ContactRecord("push", push_arm, p_pre, p_init, None, p_goal, d3, float(dist) + standoff, object=nm), self).to_sidecar()
-                rec["pose_class"] = p_name
-                rec["standoff_m"] = standoff
-                if driven:
-                    rec["driven"] = list(driven)
-                # the chain's pre configuration as the program check's / oracle's IK seed (``q_hint``, the press mechanism of
-                # articulation_small): the branch the sampler's chain check passed in
-                q_hint = self.ikc.solutions.get((push_arm, self.ikc._pose_key(p_pre)))
-                if q_hint is not None:
-                    rec["q_hint"] = [round(float(v), 5) for v in q_hint.tolist()]
-                if p_half is not None:
-                    rec["blade_half_thickness_m"] = float(p_half)
-                return True, rec, (qs or []) + [r_w.q, r_r.q], ""
-
-            # a class's two wrist turns by the orientation rule (owner 2026-09-27); the classes in their order
-            chosen_p, dec_p, _fails_p = O.choose_first(self.ikc, push_arm, cands, key=lambda c: c[0], label=lambda c: c[2],
-                                                       chain=lambda c: [C.pre_pose((c[0][0] - d3 * standoff, c[0][1])), (c[0][0] - d3 * standoff, c[0][1])],
-                                                       evaluate=evaluate, q_start=q_seed, camera_idx=[1], stage="pack push")
-            if chosen_p is not None:
-                found = dict(chosen_p.result, **_orient_extra(dec_p))
-            if found is None:
-                return None, f"{nm}: no push class passes ({len(fails)} failures; e.g. {sorted(set(fails))[:3]})"
-            recs.append(found)
-        return recs, ""
 
     def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance) -> str:
         """Right-hand push of ``pushed`` along ``direction`` by the place margin while the closed left gripper braces

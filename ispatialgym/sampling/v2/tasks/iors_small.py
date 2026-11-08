@@ -231,6 +231,50 @@ PARTNER_YAW_DRAWS = 16
 PUSH_STANCE_STAND_OFFS_M = (0.15, 0.20, 0.25, 0.30, 0.35, 0.45, 0.55)
 #: owner A1: at most this many map-feasible push stances get the exact push-chain checks
 PUSH_STANCE_MAX_EXACT = 8
+#: owner 3.6 (2026-11-08, i7-contact3): the touching place depth capped by the touch_push map's reach (:meth:`IORSSmall.place_depth_caps`) -
+#: "0" off, "shadow" (the cap computed and counted, no candidate removed: sampling as with it off), "1" on (a manipulation candidate whose
+#: target - placed at its start depth - no collision-free push stance's map reaches leaves the attempt's draws). Default "1" since the
+#: 2026-11-08 A/B (the owner decided the rule, 3.6): of the would-be removals that reached a push test none was reachable (touching_02 85 / 85,
+#: touching_04 58 / 58), none was written; on vs shadow 0.33 vs 0.53 GPU-h per success
+PLACE_DEPTH_CAP_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP"
+PLACE_DEPTH_CAP_DEFAULT = "1"
+#: i7-contact3 touching_04 follow-up (c) (lead 2026-11-08, within owner 3.6): "1" = the attempt's start is re-drawn (start per attempt) while every
+#: candidate of the partner side lies beyond the cap, at most :data:`PLACE_DEPTH_CAP_REDRAWS` times - the place depth DRAWN within the cap
+#: instead of an attempt that loses every candidate. Default "0" (the owner decides after the A/B).
+PLACE_DEPTH_CAP_REDRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_REDRAW"
+PLACE_DEPTH_CAP_REDRAWS = 8
+#: follow-up (c), the draw itself: "1" = Phase 2's (stance, position) pairs are cut to the cap (``keep_pairs``: the start / place positions
+#: the attempt draws from lie within the push's reach; an empty class falls back as Phase 2 does) - the redraw above re-draws whole starts,
+#: this draws the position within the cap. Enters the start-per-attempt cell cache key when on. Default "1" since the owner's 5r.1
+#: (2026-11-08; A/B c3_fu_c2: attempts losing every candidate 47 -> 0, written per attempt touching_04 0.044 -> 0.11, touching_02 0.045 ->
+#: 0.16); "0" = the draw of before
+PLACE_DEPTH_CAP_DRAW_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_DRAW"
+PLACE_DEPTH_CAP_DRAW_DEFAULT = "1"
+#: follow-up (b): the cap's basis - "map" (default: the deepest feasible map cell at any yaw / lateral from the base stand-offs that are
+#: collision-free at the candidate's own lateral) or "a1" (A1's own push stance test, :meth:`IORSSmall.push_stance_candidates` with the
+#: collision check, for the target at the candidate's focus at each map yaw slot: the same basis as the partner-draw gate)
+PLACE_DEPTH_CAP_BASIS_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_BASIS"
+#: follow-up (a) (lead-approved, sampler-only): the carried drive's lift (the box over the partner's top, ``carry_clears`` auto) screened at
+#: the draw - the goal check's own test, made where it is certain the goal check makes it (every A1 push stance is a real second base pose
+#: whose drive passes over the partner): "0" off, "shadow" (computed and counted, nothing rejected), "1" on. Default "1" since the owner's
+#: 5r.1 (2026-11-08; A/B c3_fu_a: goal_check lift_unreachable touching_04 6 -> 2, touching_02 12 -> 5; in shadow all 18 would-be rejections
+#: failed at or before the goal check)
+TOUCH_LIFT_SCREEN_ENV = "ISPATIALGYM_TOUCH_LIFT_SCREEN"
+TOUCH_LIFT_SCREEN_DEFAULT = "1"
+#: owner 5r.1 touching_04 follow-up (2026-11-08): the goal check's contact_unreachable screened at the draw against the push map - the goal
+#: check's own A1 push stances (:meth:`IORSSmall.push_stance_candidates`: touch_push map + whole-body collision, the same call and inputs) must
+#: hold one stance from which the carried box's place passes (:meth:`IORSSmall.place_infeasible_why`, the goal check's own "place:" verdict);
+#: when none does, the goal check rejects contact_unreachable ~130 s later, after the draft. "0" off, "shadow" (counted, nothing rejected),
+#: "1" on. Only where the goal check is certain to use those stances (A1 non-empty; not the shelf layout / tip release). Default "1" since
+#: the lead's decision 7 (2026-11-08, owner away; A/B c3_r1: shadow 3 / 3 would-be rejections failed at the goal check, on: goal-check
+#: contact_unreachable 8 -> 5, touching_04 1.33 -> 0.99 GPU-h per success)
+TOUCH_A1_SCREEN_ENV = "ISPATIALGYM_TOUCH_A1_SCREEN"
+TOUCH_A1_SCREEN_DEFAULT = "1"
+#: owner 5r.1 touching_04 follow-up (2026-11-08): "1" = the touching Phase 2 scans the trunk tilts the touch_push map is built at (its
+#: eligible trunks at each translate, within the torso limit) instead of ``tabletop.tilt_scan``'s continuous samples, so the manipulation
+#: and push stances (same trunk) read built map columns, not the nearest / inherited ones (c2's place-screen and A1 failures sat at
+#: (0.25, -0.53) and (0.0, -0.61)). Only with a touch_push map; enters the start-per-attempt cell cache key when on. Default "0"
+TOUCH_BUILT_TILTS_ENV = "ISPATIALGYM_TOUCH_BUILT_TILTS"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -250,6 +294,40 @@ SPA_CELL_KIND = "spa_cell_v1"
 #: the rejections of one lateral cell that the per-attempt draw retries on another cell / edge (every other rejection ends the attempt)
 SPA_CELL_REJECTS = ("no_workspace", "edge_too_short", "stance_collision", "shelf_width", "no_manipulation_stance", "no_start_region")
 _SPA_CACHE_ANNOUNCED = False
+
+
+def place_depth_cap_redraw_on() -> bool:
+    return (os.environ.get(PLACE_DEPTH_CAP_REDRAW_ENV) or "0").strip() == "1"
+
+
+def place_depth_cap_draw_on() -> bool:
+    return (os.environ.get(PLACE_DEPTH_CAP_DRAW_ENV) or PLACE_DEPTH_CAP_DRAW_DEFAULT).strip() == "1"
+
+
+def place_depth_cap_basis() -> str:
+    return "a1" if (os.environ.get(PLACE_DEPTH_CAP_BASIS_ENV) or "map").strip().lower() == "a1" else "map"
+
+
+def touch_lift_screen_mode() -> str:
+    v = (os.environ.get(TOUCH_LIFT_SCREEN_ENV) or TOUCH_LIFT_SCREEN_DEFAULT).strip().lower()
+    return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
+
+
+def touch_a1_screen_mode() -> str:
+    v = (os.environ.get(TOUCH_A1_SCREEN_ENV) or TOUCH_A1_SCREEN_DEFAULT).strip().lower()
+    return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
+
+
+def touch_built_tilts_on() -> bool:
+    return (os.environ.get(TOUCH_BUILT_TILTS_ENV) or "0").strip() == "1"
+
+
+def place_depth_cap_mode() -> str:
+    """``"off"`` / ``"shadow"`` / ``"on"`` from :data:`PLACE_DEPTH_CAP_ENV` (unset or empty: :data:`PLACE_DEPTH_CAP_DEFAULT`)."""
+    v = (os.environ.get(PLACE_DEPTH_CAP_ENV) or PLACE_DEPTH_CAP_DEFAULT).strip().lower()
+    if v in ("1", "on", "true", "yes"):
+        return "on"
+    return "shadow" if v == "shadow" else "off"
 
 
 def hand_overlap_rank_on() -> bool:
@@ -902,7 +980,7 @@ class IORSSmall(SamplerV2):
                 self.init_stance.name = "init"
             cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                   target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                                   **phase2_band)
             phase2_any = phase2_any or bool(cands)
             self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
@@ -1652,6 +1730,21 @@ class IORSSmall(SamplerV2):
             self.draw_shelf_layout(rng)  # the compartment and the leans: the two books' poses follow the attempt's edge
         # A1 step 3: the partner's side is fixed before the target is placed - before the split cone draws the start position too
         self.region_side = None if self.shelf_start is not None else self.draw_partner_side(rng)
+        if start_per_attempt() and place_depth_cap_redraw_on() and place_depth_cap_mode() == "on" and self.place_depth_cap_applies():
+            # follow-up (c): the start (= place) depth drawn within the cap - re-drawn while every candidate of the side lies beyond it
+            for i in range(PLACE_DEPTH_CAP_REDRAWS + 1):
+                cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
+                facts = self.place_depth_caps(cands) if cands else {}
+                if not cands or not facts or any(not f["remove"] for f in facts.values()):
+                    if i > 0:
+                        TT._count(self, "place_depth_cap.redraw_found")
+                    break
+                if i == PLACE_DEPTH_CAP_REDRAWS:
+                    TT._count(self, "place_depth_cap.redraw_exhausted")
+                    break
+                TT._count(self, "place_depth_cap.redraws")
+                self.spa_redraw_start(rng)
+                self.region_side = self.draw_partner_side(rng)
         return super().sample(rng)
 
     def live_candidates(self, side: Optional[float]) -> List[Stance]:
@@ -1820,6 +1913,10 @@ class IORSSmall(SamplerV2):
                 "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
         if shelf_draw_on(self):
             payload["shelf_poses"] = "per_attempt"
+        if self._built_tilts_map() is not None:  # the cell's Phase 2 on the map's built tilts (only when on: keys unchanged off)
+            payload["phase2_built_tilts"] = True
+        if self._pdc_keep_pairs() is not None:  # follow-up (c): the cell's Phase 2 is cut to the cap (only when on: keys unchanged off)
+            payload["place_depth_cap_draw"] = {"basis": place_depth_cap_basis(), "stand_offs": self.push_stance_stand_offs(init_trunk)}
         return payload
 
     def _spa_cell_compute(self, edge: EdgeFrame, init_trunk: Stance, lateral: float, margins: Dict[str, Any], H_max: float, nb_top) -> Dict[str, Any]:
@@ -1857,7 +1954,7 @@ class IORSSmall(SamplerV2):
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
         cands = TT.phase2_manipulation_stance(self, init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                               target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                              arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                               **phase2_band)
         kept = cands if self.shelf_start is not None else self.start_region(cands)
         if not kept:
@@ -2053,7 +2150,7 @@ class IORSSmall(SamplerV2):
                 self.init_stance.name = "init"
             cands = TT.phase2_manipulation_stance(self, self.init_stance, TT.half_extent(self.hull["target"], self.rest["target"]),
                                                   target_height=TT.height_of(self.hull["target"], self.rest["target"]), top=self.top if nb_top is None else nb_top,
-                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                  arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self), keep_pairs=self._pdc_keep_pairs(),
                                                   **phase2_band)
             phase2_any = phase2_any or bool(cands)
             self.manip_candidates = cands if self.shelf_start is not None else self.start_region(cands)
@@ -2084,6 +2181,15 @@ class IORSSmall(SamplerV2):
         cam_init = self.camera_pose_at(init)
         # A1: the target starts in the start region of the attempt's partner side (7e: never on a candidate dropped for its travel)
         cands = [c for c in self.manip_candidates if TT.in_start_region(c, self.region_side) and TRAVEL_DROPPED not in c.extras]
+        # owner 3.6 (2026-11-08, ISPATIALGYM_PLACE_DEPTH_CAP): the touching place depth capped by the push map's reach - before the draw
+        self._pdc_shadow_drafted = False
+        if getattr(self, "_lift_screen_shadow", False):  # the previous attempt was drafted past a would-be lift rejection and not rejected
+            log.info("TOUCH_LIFT_SCREEN shadow outcome: written")
+        self._lift_screen_shadow = False
+        if getattr(self, "_a1_screen_shadow", False):  # the same for the A1 place screen's shadow
+            log.info("TOUCH_A1_SCREEN shadow outcome: written")
+        self._a1_screen_shadow = False
+        cands, pdc = self.place_depth_cap_filter(cands)
         order = rng.permutation(len(cands))
         if os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" and self.shelf_pose is None and self.relation != "touching" and cands:
             # oracle-fix 2026-11-07 (owner prompt E 2, opt-in): the candidates whose expected place sits deepest in their manipulation image first
@@ -2104,6 +2210,10 @@ class IORSSmall(SamplerV2):
         order = AM.reorder_pick(self, order, cands, lambda st: default, rng)
         for k in order[:6]:
             cand = cands[int(k)]
+            pdc_c = pdc.get(id(cand))
+            pdc_wr = bool(pdc_c and pdc_c["remove"])  # shadow: the cap would have removed this candidate
+            if pdc_wr:
+                TT._count(self, "place_depth_cap.shadow.tried")
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, [default]
             manip.extras.update(cand.extras)
@@ -2230,8 +2340,22 @@ class IORSSmall(SamplerV2):
                 d.summary["target_draft_pose"] = [[float(v) for v in t_pose[0]], [float(v) for v in t_pose[1]]]
                 self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "))
                 self.sidecar.describe(pname, self.choice.models["partner"].category.replace("_", " "))
+                if pdc_c is not None:
+                    d.summary["place_depth_cap"] = dict(pdc_c, mode=place_depth_cap_mode(),
+                                                        place_depth_m=round(float(manip.local(t_pose[0][:2])[0]), 4))
+                    if pdc_wr:
+                        TT._count(self, "place_depth_cap.shadow.drafted")
+                        self._pdc_shadow_drafted = True
                 return d
             except Reject as e:
+                if getattr(self, "_lift_screen_shadow", False):  # follow-up (a) shadow: this candidate died later in the draw
+                    log.info("TOUCH_LIFT_SCREEN shadow outcome: candidate [%s] %s", e.reason, str(e)[:160])
+                    self._lift_screen_shadow = False
+                if getattr(self, "_a1_screen_shadow", False):
+                    log.info("TOUCH_A1_SCREEN shadow outcome: candidate [%s] %s", e.reason, str(e)[:160])
+                    self._a1_screen_shadow = False
+                if pdc_wr:
+                    TT._count(self, f"place_depth_cap.shadow.candidate.{e.reason}")
                 errors.append(f"candidate {int(k)}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.grasps.clear()
@@ -2348,7 +2472,91 @@ class IORSSmall(SamplerV2):
                 if why is not None:
                     self.counters["push_screen.rejected"] = self.counters.get("push_screen.rejected", 0) + 1
                     raise Reject("contact_unreachable", f"push screening at the draw (candidate {int(k)}, trunk {manip.translate}, {manip.tilt:.2f}): {why}")
+        if self.relation == "touching" and touch_lift_screen_mode() != "off":
+            self._touch_lift_screen(manip, grasp, t_pose, p_pose, int(k))
+        if self.relation == "touching" and touch_a1_screen_mode() != "off":
+            self._touch_a1_screen(manip, grasp, t_pose, p_pose, int(k))
         return p_pose
+
+    def _touch_a1_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
+        """Follow-up :data:`TOUCH_A1_SCREEN_ENV`: the goal check's push stance search (:meth:`touching_push_stance`) at the draw, as far as it
+        is certain - its plan is A1's map-feasible, collision-free stances (the same :meth:`push_stance_candidates` call, first
+        ``push_stance_max_exact``), and a stance passes only when the box's place from it passes (:meth:`place_infeasible_why`). No stance
+        placing = the goal check's contact_unreachable, made here before the draft (~1-2 s per stance instead of ~130 s). No A1 stance (the
+        goal check then falls back to the laterals at the manipulation stand-off), the shelf layout or the tip release: not screened
+        (``touch_a1_screen.uncertain``). Kit ``touch_a1_screen.checked`` / ``.passed`` / ``.rejected`` / ``.shadow_would_reject``,
+        ``.place_checks``."""
+        if self.shelf_start is not None or self.shelf_tip() or not TT.contact_maps_on():
+            return
+        t_place = self.place_pose_for(t_pose, p_pose, manip)
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        rows, _f = self.push_stance_candidates(manip, t_place, laterals, p_pose=p_pose)
+        rows = rows[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]
+        if not rows:
+            TT._count(self, "touch_a1_screen.uncertain")
+            return
+        TT._count(self, "touch_a1_screen.checked")
+        whys = []
+        for lat, cand, _x in rows:
+            probe = cand if cand is not None else manip
+            TT._count(self, "touch_a1_screen.place_checks")
+            why = self.place_infeasible_why(probe, t_place, grasp)
+            if why is None:
+                TT._count(self, "touch_a1_screen.passed")
+                return
+            so = getattr(probe, "stand_off", None)
+            whys.append(f"{lat:+.2f}{f' s{float(so):.2f}' if so is not None else ''}: {why}")
+        msg = f"no A1 push stance places the box (screened at the draw, candidate {k}, trunk {manip.translate}, {manip.tilt:.2f}): {'; '.join(whys)}"
+        if touch_a1_screen_mode() == "shadow":
+            TT._count(self, "touch_a1_screen.shadow_would_reject")
+            self._a1_screen_shadow = True
+            log.info("TOUCH_A1_SCREEN shadow would reject candidate %d: %s", k, msg[:400])
+            return
+        TT._count(self, "touch_a1_screen.rejected")
+        raise Reject("contact_unreachable", msg)
+
+    def _touch_lift_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
+        """Follow-up (a) (:data:`TOUCH_LIFT_SCREEN_ENV`): the goal check's carried-drive lift test (:meth:`_record_push_stance`: the box
+        ``carry_height`` above the grasp, exact IK at the manipulation stance with the box attached) made at the draw - only where the goal
+        check is certain to make it at the partner's height: the carry rule "auto" or "partner", the push stance search will try the A1
+        candidates (:meth:`push_stance_candidates` - the same call, the same inputs), every one is a real second base pose (no manipulation
+        stance entry, which records no drive) and every drive passes within ``carry_clearance_m`` of the partner (:meth:`drive_partner_gap`:
+        the auto rule raises the box over the partner). Then a failing lift fails the attempt there as it would ~150 s later. Shadow: the
+        verdict counted (``touch_lift_screen.shadow_would_reject``) and the candidate kept. Kit ``touch_lift_screen.checked`` / ``.uncertain``
+        / ``.passed`` / ``.rejected``."""
+        rule = self.carry_rule()
+        if self.shelf_start is not None or rule not in ("auto", "partner") or not TT.contact_maps_on():
+            return
+        t_place = self.place_pose_for(t_pose, p_pose, manip)
+        if rule == "auto":
+            laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+            rows, _f = self.push_stance_candidates(manip, t_place, laterals, p_pose=p_pose)
+            rows = rows[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]
+            clear = float(self.gen("carry_clearance_m", CARRY_CLEARANCE_M))
+            if not rows or any(c is None for _l, c, _x in rows) or any(self.drive_partner_gap(t_pose, p_pose, manip, c) >= clear for _l, c, _x in rows):
+                TT._count(self, "touch_lift_screen.uncertain")
+                return
+        TT._count(self, "touch_lift_screen.checked")
+        saved = grasp.carry_height
+        try:
+            grasp.carry_height = self.carry_height_over(True)
+            lift_end = PC.lift_end_pose(grasp)
+            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+                r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+            height = float(grasp.carry_height)
+        finally:
+            grasp.carry_height = saved
+        if r_lift.ok and r_lift.q is not None:
+            TT._count(self, "touch_lift_screen.passed")
+            return
+        if touch_lift_screen_mode() == "shadow":
+            TT._count(self, "touch_lift_screen.shadow_would_reject")
+            self._lift_screen_shadow = True
+            log.info("TOUCH_LIFT_SCREEN shadow would reject candidate %d: lift %.2f m: %s", k, height, r_lift.reason)
+            return
+        TT._count(self, "touch_lift_screen.rejected")
+        raise Reject("lift_unreachable", f"lift ({height:.2f} m above the grasp) has no configuration at the {manip.name} stance for the carried drive to "
+                                         f"the push stance (screened at the draw, candidate {k}): {r_lift.reason}")
 
     def push_screen_why(self, manip: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
         """``ISPATIALGYM_TOUCHING_PUSH_SCREEN`` (of-v2maps 2026-11-07): None when a push class passes (:meth:`push_chain_feasible`, the chain +
@@ -4762,6 +4970,189 @@ class IORSSmall(SamplerV2):
         laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
         rows, facts = self.push_stance_candidates(manip, t_place_pose, laterals, p_pose=p_pose, collision=True)
         return {"push_any": bool(rows), "pair_any": any(f["brace_map"] for _l, _c, f in rows), "n": facts}
+
+    # -- owner 3.6 (2026-11-08, i7-contact3): the place depth capped by the push map's reach ------------------------------------------------
+
+    def place_depth_cap_applies(self) -> bool:
+        """:func:`place_depth_cap_mode` is not off and the attempt's place is followed by a mapped push: touching, not the shelf layout (its
+        place is the board compartment, not a drawn depth), the push stance on, the contact maps read (v2only + a maps root)."""
+        return (place_depth_cap_mode() != "off" and TT.contact_maps_on() and getattr(self, "relation", None) == "touching"
+                and getattr(self, "shelf_start", None) is None and getattr(self, "shelf_pose", None) is None and bool(self.gen("push_stance", True)))
+
+    def push_reach_x(self, pm, translate: float, tilt: float) -> Dict[float, Optional[float]]:
+        """Per edge distance of the ``touch_push`` map ``pm`` at the trunk nearest (``translate``, ``tilt``) (``ContactMap.nearest_trunk``, as
+        the lookup): the deepest base-frame root x that a lookup can find a feasible class at - the deepest cell with a feasible class at
+        any yaw slot and any lateral, plus half the lattice (a root nearer the next cell maps to it). None: no feasible cell."""
+        from ispatialgym.sampling import contact_maps as CMAP
+
+        tk = pm.nearest_trunk(translate, tilt)
+        if tk is None:
+            return {}
+        cache = self.__dict__.setdefault("_push_reach_x", {})
+        key = (pm.path, tuple(tk))
+        if key not in cache:
+            present = np.array([[r is not None for r in pm.class_rows(y)] for y in range(len(pm.yaws))], dtype=bool)  # (yaw, class)
+            half = 0.5 * float((pm.meta.get("config") or {}).get("lattice_m", 0.08))
+            out: Dict[float, Optional[float]] = {}
+            for d_e in pm.meta["edge_distances"]:
+                feas = ((pm.status(float(d_e), tk[0], tk[1]) == CMAP.STATUS["feasible"]) & present[None]).any(axis=(1, 2))
+                out[float(d_e)] = float(pm.cells[feas, 0].max()) + half if feas.any() else None
+            cache[key] = out
+        return cache[key]
+
+    def place_depth_caps(self, cands: Sequence[Stance]) -> Dict[int, Dict[str, Any]]:
+        """Owner 3.6 (2026-11-08): the deepest place a push can reach, per manipulation candidate (``id(cand)`` -> facts). The touching target is
+        placed at its start depth (:meth:`place_pose_for`: ``depth_t`` of the start; level with the partner), and its push is made from a push
+        stance on the same edge and trunk at one of :meth:`push_stance_stand_offs` (A1). The stand-offs the base really takes are those whose
+        stance passes the whole-body collision check (the base's minimum distance to the support; one batched check per candidate base pose
+        and trunk, at the candidate's lateral); from each, the target's ``touch_push`` map reaches roots up to :meth:`push_reach_x` ahead of
+        the base, i.e. a place depth of ``x_reach - edge_depth``. ``cap_m`` = the largest over those stand-offs (None: no free stance or no
+        feasible cell = nothing reachable); ``depth_m`` = the candidate's focus depth (the start / place position is drawn within
+        ``tabletop.FOCUS_RADIUS`` of it; the rest stays with A1's partner-draw gate); ``remove`` = depth beyond the cap. Empty when the map
+        misses (A1's required map rejects later, as before)."""
+        pm = TT.contact_map(self, "touch_push", "target", self.top)
+        if pm is None:
+            TT._count(self, "place_depth_cap.no_map")
+            return {}
+        memo = self.__dict__.setdefault("_pdc_free", {})
+
+        def key_of(c: Stance):
+            return tuple(round(float(v), 3) for v in c.base_pose2d) + (round(float(c.translate), 3), round(float(c.tilt), 3))
+
+        todo: Dict[Tuple, Stance] = {}
+        for c in cands:
+            if c.focus is not None and key_of(c) not in memo:
+                todo.setdefault(key_of(c), c)
+        if todo:
+            stances, owners = [], []
+            for k, c in todo.items():
+                for so in self.push_stance_stand_offs(c):
+                    st = c.shifted(stand_off=so, name="push").with_trunk(c.translate, c.tilt, "push")
+                    st.arms = ["right"]  # as push_stance_for records it
+                    stances.append(st)
+                    owners.append((k, float(so), float(st.edge_depth)))
+            free = self.ikc.stances_collision_free(stances).tolist()
+            for (k, so, ed), f in zip(owners, free):
+                memo.setdefault(k, []).append((so, ed, bool(f)))
+            TT._countn(self, "place_depth_cap.stances_checked", len(stances))
+        d_es = [float(v) for v in pm.meta["edge_distances"]]
+        out: Dict[int, Dict[str, Any]] = {}
+        for c in cands:
+            if c.focus is None:
+                continue
+            rows = memo.get(key_of(c)) or []
+            xr = self.push_reach_x(pm, c.translate, c.tilt)
+            caps = []
+            for so, ed, f in rows:
+                x = xr.get(min(d_es, key=lambda v: abs(v - so))) if f else None
+                if x is not None:
+                    caps.append((x - ed, so))
+            free_sos = [so for so, _ed, f in rows if f]
+            cap = max(caps)[0] if caps else None
+            depth = float(c.local(c.focus[:2])[0])
+            out[id(c)] = {"cap_m": None if cap is None else round(cap, 4), "depth_m": round(depth, 4), "remove": cap is None or depth > cap,
+                          "s_min": min(free_sos) if free_sos else None, "trunk": [float(c.translate), round(float(c.tilt), 3)]}
+            if place_depth_cap_basis() == "a1":
+                ok_a1, slot = self._a1_reach_at_focus(pm, c)
+                out[id(c)].update(remove_map=out[id(c)]["remove"], remove=not ok_a1, basis="a1", a1_yaw_slot=slot)
+                TT._count(self, "place_depth_cap.a1_" + ("ok" if ok_a1 else "off") + ("_map_ok" if not out[id(c)]["remove_map"] else "_map_off"))
+        return out
+
+    def _a1_reach_at_focus(self, pm, c: Stance) -> Tuple[bool, Optional[float]]:
+        """Follow-up (b): A1's push stance test (:meth:`push_stance_candidates`, map + whole-body collision of the shifted / stood-off stances)
+        for the target at ``c``'s focus, tried at the map's yaw slots in turn; ``(any passes, the first passing slot in degrees)``."""
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        manip = c.with_trunk(c.translate, c.tilt, "manipulation")
+        manip.focus, manip.arms = c.focus, [self.segment_arms[0]]
+        base_yaw = float(c.base_pose2d[2])
+        for y in [float(v) for v in pm.yaws.tolist()]:
+            pose = TT.object_pose_on(self, self.hull["target"], self.rest["target"], c.focus[:2], base_yaw + y, float(self.top.z))
+            rows, _facts = self.push_stance_candidates(manip, pose, laterals, p_pose=None, collision=True)
+            if rows:
+                return True, round(math.degrees(y), 1)
+        return False, None
+
+    def _built_tilts_map(self):
+        """The touch_push map :meth:`phase2_built_tilts` reads, or None where the switch does not act (off, not touching, the shelf layout,
+        no contact maps or no map: kit ``touch_built_tilts.no_map``)."""
+        if not (touch_built_tilts_on() and getattr(self, "relation", None) == "touching" and getattr(self, "shelf_start", None) is None
+                and getattr(self, "shelf_pose", None) is None and TT.contact_maps_on()):
+            return None
+        pm = TT.contact_map(self, "touch_push", "target", self.top)
+        if pm is None:
+            TT._count(self, "touch_built_tilts.no_map")
+        return pm
+
+    def phase2_built_tilts(self, translate: float, limit: float) -> Optional[List[float]]:
+        """Follow-up :data:`TOUCH_BUILT_TILTS_ENV` (``tabletop.phase2_tilts``' hook): the tilts of the touch_push map's eligible trunks at
+        ``translate`` (2 cm, as ``ContactMap.nearest_trunk``) within the torso limit ``limit``, 0 first; None (the continuous scan) when off,
+        not touching / the shelf layout, without the contact maps or the map, or no built tilt there."""
+        pm = self._built_tilts_map()
+        if pm is None:
+            return None
+        tilts = sorted({round(float(ti), 4) for tr, ti in pm.trunks() if abs(float(tr) - float(translate)) <= 0.02 and float(ti) >= float(limit) - 1e-6},
+                       reverse=True)
+        if not tilts:
+            TT._count(self, "touch_built_tilts.none_at_translate")
+            return None
+        TT._count(self, "touch_built_tilts.scans")
+        return tilts
+
+    def _pdc_keep_pairs(self):
+        """Follow-up (c) (:data:`PLACE_DEPTH_CAP_DRAW_ENV`, with the cap on): Phase 2's ``keep_pairs`` - the (stance, position) pairs whose
+        focus lies within the cap (:meth:`place_depth_caps`); None when off or the cap does not apply (no map: every pair kept)."""
+        if not (place_depth_cap_draw_on() and place_depth_cap_mode() == "on" and self.place_depth_cap_applies()):
+            return None
+
+        def keep(cands: List[Stance]) -> List[Stance]:
+            facts = self.place_depth_caps(cands)
+            if not facts:
+                return cands
+            kept = [c for c in cands if not (facts.get(id(c)) or {}).get("remove")]
+            TT._countn(self, "place_depth_cap.phase2_removed", len(cands) - len(kept))
+            log.info("%s: place depth cap in Phase 2: %d of %d (stance, position) pairs within the cap", self.gp.variant, len(kept), len(cands))
+            return kept
+        return keep
+
+    def place_depth_cap_filter(self, cands: List[Stance]) -> Tuple[List[Stance], Dict[int, Dict[str, Any]]]:
+        """:meth:`place_depth_caps` applied to the attempt's candidates: on - the ``remove`` ones leave the draws; shadow - all kept, the would-be
+        removals counted (their outcomes are tallied per candidate in :meth:`sample_instance` and per attempt in :meth:`on_reject`). Kit counters
+        ``place_depth_cap.candidates`` / ``.removed`` (on) / ``.shadow_would_remove`` (shadow) / ``.all_removed``."""
+        if not self.place_depth_cap_applies() or not cands:
+            return cands, {}
+        facts = self.place_depth_caps(cands)
+        if not facts:
+            return cands, {}
+        n_rm = sum(1 for f in facts.values() if f["remove"])
+        TT._countn(self, "place_depth_cap.candidates", len(facts))
+        log.info("%s: place depth cap (%s, basis %s): %d of %d candidates beyond it: %s", self.gp.variant, place_depth_cap_mode(), place_depth_cap_basis(), n_rm, len(facts),
+                 [(f["depth_m"], f["cap_m"], f["s_min"], f["trunk"]) for f in facts.values()][:12])
+        if place_depth_cap_mode() == "shadow":
+            TT._countn(self, "place_depth_cap.shadow_would_remove", n_rm)
+            return cands, facts
+        TT._countn(self, "place_depth_cap.removed", n_rm)
+        kept = [c for c in cands if not (facts.get(id(c)) or {}).get("remove")]
+        if not kept:
+            TT._count(self, "place_depth_cap.all_removed")
+            caps = [f["cap_m"] for f in facts.values() if f["cap_m"] is not None]
+            raise Reject("contact_unreachable", f"place depth cap (owner 3.6): none of {len(cands)} candidates places the target within the touch_push "
+                                                f"map's reach of a collision-free push stance (depths {min(f['depth_m'] for f in facts.values()):.2f}-"
+                                                f"{max(f['depth_m'] for f in facts.values()):.2f} m, caps {('%.2f-%.2f m' % (min(caps), max(caps))) if caps else 'none'})")
+        return kept, facts
+
+    def on_reject(self, err: Reject):
+        """Owner 3.6 (shadow mode): an attempt drafted from a candidate the place depth cap would have removed is tallied by its rejection
+        (``place_depth_cap.shadow.attempt.<reason>``)."""
+        if getattr(self, "_pdc_shadow_drafted", False):
+            TT._count(self, f"place_depth_cap.shadow.attempt.{err.reason}")
+            self._pdc_shadow_drafted = False
+        if getattr(self, "_lift_screen_shadow", False):
+            log.info("TOUCH_LIFT_SCREEN shadow outcome: [%s] %s", err.reason, str(err)[:160])
+            self._lift_screen_shadow = False
+        if getattr(self, "_a1_screen_shadow", False):
+            log.info("TOUCH_A1_SCREEN shadow outcome: [%s] %s", err.reason, str(err)[:160])
+            self._a1_screen_shadow = False
+        super().on_reject(err)
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
         """Record the ``push`` stance of ``push_stance_for``: whole-body check with the objects at the place, the path

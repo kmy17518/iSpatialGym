@@ -588,9 +588,6 @@ class SidecarDraft:
         self.contacts: Dict[str, ContactRecord] = {}
         self.articulation: Optional[Dict[str, Any]] = None
         self.blocks: List[Dict[str, Any]] = []
-        #: block design packing tail (owner 2026-09-19 21:47): ``{"stance", "stages": [{"brace": ..., "pushes": [...]}]}`` - after the
-        #: last place, the wide left brace on one column / row and the right-hand pushes that close the placement gaps
-        self.pack: Optional[Dict[str, Any]] = None
         self.goal: Optional[Dict[str, Any]] = None
         self.language: Dict[str, Any] = {"objects": {}, "goal_numbers": {}}
         self.waypoint_policy: str = "checked"
@@ -665,8 +662,6 @@ class SidecarDraft:
             d["articulation"] = _jsonable(self.articulation)
         if self.blocks:
             d["blocks"] = _jsonable(self.blocks)
-        if self.pack:
-            d["pack"] = _jsonable(self.pack)
         if self.goal:
             d["goal"] = dict(self.goal)
         d["language"] = _jsonable(self.language)
@@ -700,7 +695,6 @@ class SidecarDraft:
         self.contacts.clear()
         self.articulation = None
         self.blocks = []
-        self.pack = None
         self.goal = None
         self.language = {"objects": {}, "goal_numbers": {}}
         self.checked_waypoints = []

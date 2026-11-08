@@ -3561,6 +3561,129 @@ orientations are hard to reach; the switch stays off. Note i7cork2_ly's own demo
 **Defaults / decisions needed:** none flipped. EARLY_REST, FALLBACK and MIN_TURN stay off. The full suite (23 failed) fails identically with
 the base attachment module (all 23 in unrelated modules: ground_isg, support_candidates, ag_release_hook, v2_core ...).
 
+## i7-contact3 (owner answers 2026-11-08 3.1 / 3.2 / 3.6 / 3.7; branch `i7-contact3` from of-v2maps cf1f5d2d)
+
+Owner decisions implemented here (verbatim in `tmp/outputs/owner_answers_20261108.md`): 3.1 full-open brace CONFIRMED as the default
+(unchanged); 3.2 the close_02 slide diagnosis approved; 3.6 "cap the place depth by the push map's reach for all affected aliases";
+3.7 "remove the pack brace. use the board variant for the block design".
+
+**3.2 close_02 (diagnosis; the fix needs the owner).** The ~1 cm "slide" is not friction, push force or the brace opening. Rung 0 of every
+`top_press` braced push already ends inside the lid's 0.1 rad tolerance (residual +0.002-0.016 rad, carton drift ~5e-6 m), but
+`Executor.push_outcome` aims at -0.05 +- 0.04 rad (`brace_retry_aim_bias_rad` 0.05, `brace_retry_aim_frac` 0.4 x the 0.1 tolerance), so a
+small positive residual is "not aimed"; the top press touches the carton all along (brace hits 117-186) -> "short" -> the retry ladder
+re-runs with `offset_brace` +5 / +10 mm "outward" along -direction, which for a top press (direction (0, 0, -1)) LIFTS the hand; at
++10 mm the press no longer holds the carton and it slides with the push until the hard object_tilt QA (10 mm from the first pose)
+aborts (hence 10.0-12.1 mm). All 20 top_press object_tilt failures (i7_artic3, icb_off / on, int1_6) follow this rung pattern; the
+opposite_face braces climb to +20 mm and slide 5.0-10.2 mm. The September demos passed because the carton tolerance was 0.2 rad (aim
+-0.05 +- 0.08 admitted +0.006). Re-run of int1_6 300006-300009 (trunk_fcddc495) with the existing knob `ISG_AIM_FRAC=1.0`: 3 / 4 ok, no
+rungs, peak carton 3.3-6.2 mm (300006 stays protected_contact: the left finger touches the carton in the push's pre-contact). Record
+`$OFH/contact3_20261108/close02_diag` (scan.py / scan_out.txt / scan_recollect.txt).
+
+**close_02 fix, option (a) (owner answers b item 2: an approved oracle change limited to this).** `Executor.push_outcome(push, ctx,
+brace=)`: with `ISPATIALGYM_TOP_PRESS_ACCEPT` (default "1" since d555c53d; "0" = the ladder for every brace) an in-tolerance push braced by a
+`top_press` is accepted as it is - no improvement rung, so `offset_brace` never raises the press; every other brace kind and every push out
+of tolerance keep the ladder. Counter `result.counters["push_outcome.top_press_in_tolerance_accepted"]`; tests `test_top_press_accept.py`.
+A/B (trunk_2844d8c2, cluster, close_02 300006-300009): fresh v2only 0 / 4 -> 3 / 4 (0.167 GPU-h per success), the int1_6 instances
+re-collected 0 / 4 -> 3 / 4; object_tilt 3 -> 0, the carton's peak 10.0-11.7 mm -> 3.3-6.2 mm. The remaining failure (300006,
+protected_contact; diagnosis only): the QA protection run-check exempts only the contacts present when the push's pre_contact span opened
+and a `press_hold` hand, not an active Brace, although `brace_allowed` lists the pair - the left top-press finger's contact with the carton
+starts 19 steps into the right arm's pre_contact (step 409) and reads as protected_contact (the carton moved 3.2 mm). Candidate fix (oracle
+QA rule, owner): the active brace's allowed pairs as the transit's hold exemption.
+
+**3.6 place depth cap (`ISPATIALGYM_PLACE_DEPTH_CAP`; "0" off, "shadow" counts only, "1" on).** `IORSSmall.place_depth_caps`: the touching
+target is placed at its start depth (level with the partner) and pushed from an A1 push stance on the same edge and trunk; per
+manipulation candidate the push stances at A1's stand-offs are whole-body collision-checked (the base's real minimum distance to the
+support), and from each free one the target's touch_push map reaches roots up to the deepest feasible cell (a present class, any yaw /
+lateral) + half the lattice; cap = max over the free stand-offs of that reach - the stance's edge depth. `place_depth_cap_filter` (before
+the candidate draw in `sample_instance`): on - candidates whose focus depth exceeds the cap leave the draw; shadow - kept, the would-be
+removals' outcomes counted per candidate / attempt. Affected aliases: touching_01, touching_02, touching_04 (iors_small touching, mapped
+push after the place). Not affected: touching_03 (shelf layout: no drawn depth), touching_large_01-03 and the under_large push-under (floor
+pushes: no floor_push map), axial (no place: the start placement is already map-driven), close / open push (no place).
+A/B (trunk_5aeb9da4, v2only N 4, indices 320100-320103, memory off; record `$OFH/contact3_20261108`): shadow (= off sampling) - the cap
+would remove 196 / 508 candidate draws on touching_02 and 214 / 369 on touching_04; of the would-be removals tried, every one that
+reached a push test was unreachable (touching_02 85 / 85: 83 A1 partner-draw contact_unreachable + 2 drafted, both contact_unreachable in
+goal_check; touching_04 58 / 58), the rest died earlier (grasp_unreachable 60 / 77, 4 other), none was written. On: removed 108 / 297 and
+188 / 315 (all_removed attempts 30 / 27, rejected in ~1 s). Results shadow -> on: touching_02 118 att / 2 wr / 2 ok, 0.40 GPU-h per success
+-> 78 / 3 / 3, 0.18; touching_04 61 / 4 / 2, 0.66 -> 53 / 4 / 2, 0.56; total 0.53 -> 0.33. DEFAULT ON (the owner decided the rule) in a
+separate commit; "0" restores the draw of before. (The attempt-level shadow counters are counted after the attempt's kit line; the drafted
+attempts' outcomes were read from the rejection lines.)
+block_design_01 base (trunk_fcddc495) vs pack removed (trunk_5aeb9da4), v2only N 4 at 320100-320103: identical - 60 / 60 attempts, the same
+rejection sequence, 0 written in both: every attempt target_placement / board_placement ("off the top" at board positions (0.46, -0.02),
+(0.44, -0.10), (0.48, 0.04); "no pitched place reaches the pockets' release aims" at (0.52, -0.06), (0.60, 0.05)) - a pre-existing blocker
+of block_design_01 under v2only on the integration trunk, unrelated to the pack removal.
+
+**Touching follow-ups (lead 2026-11-08, from i7-diag's touching_04 diagnosis; all default OFF, the owner decides).**
+(a) `ISPATIALGYM_TOUCH_LIFT_SCREEN` (shadow / 1): the goal check's carried-drive lift test (box over the partner's top) at the draw, only where
+the goal check is certain to make it (carry rule partner, or auto with every A1 push stance a real second base pose whose drive passes
+within `carry_clearance_m` of the partner). (b) `ISPATIALGYM_PLACE_DEPTH_CAP_BASIS=a1`: the cap's verdict = A1's own push stance test at the
+focus. (c) `ISPATIALGYM_PLACE_DEPTH_CAP_REDRAW=1` (start re-drawn while all candidates are beyond the cap) and `ISPATIALGYM_PLACE_DEPTH_CAP_DRAW=1`
+(Phase 2's pairs cut to the cap, `keep_pairs`; in the SPA cell key when on). A/B (cluster, v2only N 4, 320200-320203, cap on): (a) goal_check
+lift_unreachable touching_04 6 -> 2 (118 s each), touching_02 12 -> 5 (~30 s), 46 candidates screened at the draw; in shadow all 18 would-be
+rejections failed at or before goal_check (0 passed it). (b) verdicts equal to the map basis in 805 / 808 candidates; the A1 failures at
+trunk (0.0, -0.61) fail at the partner-drawn place, the (0.25, -0.53) place-screen failures are exact IK: no gain, not recommended. (c)
+redraw: no effect (no start cell under the cap). DRAW: all-removed attempts 47 -> 0, written per attempt touching_04 0.044 -> 0.11,
+touching_02 0.045 -> 0.16; GPU-h per success 1.22 -> 0.61 / 0.15 -> 0.20 (demo success N 4 noise).
+
+**Owner decisions 2026-11-08 c, 5r (i7-contact3).**
+- 5r.1 defaults (each its own commit): `ISPATIALGYM_PLACE_DEPTH_CAP_DRAW` default "1" (e60b4dc5; "0" = the draw of before; the SPA cell key
+  keeps its entry when on) and `ISPATIALGYM_TOUCH_LIFT_SCREEN` default "1" (fcb75869; "0" off, "shadow" counts only).
+- 5r.2 (an oracle QA rule, approved for exactly this): `ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED=1` (913e8692, default off). While a brace is
+  active, `Monitors._check_protected` skips a new contact whose (link, object) pair is one of the running action's `allowed` pairs
+  (`Executor.brace_allowed_pairs`: the brace hand's finger / gripper links on the object it braces, set only while a brace's span contains the
+  action), limited to the links of an arm that does not move in the action (the other arm's move). Every other pair keeps its rule; the
+  1 cm movement check is unchanged; no active brace = nothing changes. Stats event `protect_brace_allowed` (once per pair and span) + a log
+  line. Tests (test_protection.py): the listed pair is allowed; unlisted pairs (moving arm's finger, brace-arm wrist, brace fingers on another
+  protected object, the brace arm's own move) fail; no brace / switch off unchanged.
+- touching_04 follow-ups (b4b4e9aa, default off): `ISPATIALGYM_TOUCH_A1_SCREEN=shadow|1` - the goal check's push stance search at the draw as
+  far as it is certain: A1's map-feasible, collision-free push stances (the same `push_stance_candidates` call, first `push_stance_max_exact`)
+  must hold one from which the carried box's place passes (`place_infeasible_why`, the goal check's own "place:" verdict); none =
+  contact_unreachable at the draw. No A1 stance (the goal check then falls back to laterals), the shelf layout, the tip release: not screened.
+  Kit `touch_a1_screen.*`. In c2 the 5 goal-check contact_unreachable (~129 s each) were 2 x "every A1 stance's place fails" (what the screen
+  catches) and 3 x "the only A1 stance (-0.08, s0.30) at trunk (0.25, -0.533) is map-feasible but has no exact class" (hand overlap
+  -15 mm, IK). `ISPATIALGYM_TOUCH_BUILT_TILTS=1` - `tabletop.phase2_tilts`' hook: the touching Phase 2 (plain and split cone) scans the
+  touch_push map's eligible trunk tilts at each translate within the torso limit instead of `tilt_scan`'s 7 continuous samples (at translate
+  0.25: 0, -0.266, -0.533, ...; at 0: 0, -0.305, -0.611, ...), so the manipulation and push stances read built columns; in the SPA cell key
+  when on; kit `touch_built_tilts.*`.
+- RUNS (trunk_b4b4e9aa, cluster svl titanrtx, v2only on v2maps_int1, memory off; `contact3_20261108/submit_r1.sh`, tabulate `tab_r1.py`).
+  Suite: 23 failed + 3 errors = base 1697372a's exact set, +5 new tests pass. 5r.2: 300006 re-collected (c3_tp1's sampled instance) with
+  the rule on = SUCCESS (carton 0.9 mm, qa {}; the rule acted once, left_gripper_finger_link1 on the carton at step 409 of the right push's
+  pre_contact), =0 control = protected_contact as before; close_02 fresh N 4 at 300006-300009 (c3_qa_on) 4 att / 4 wr / 4 ok, 0.55 GPU-h
+  (0.138 per success; c3_tp1 before: 4 / 4 / 3, 0.167); the rule acted only in 300006. 5r.1 rerun with both defaults on (c3_r1_base,
+  320300-320303): touching_02 56 att / 4 wr / 3 ok, 0.58 GPU-h (0.19 per success; lift screen rejected 47 candidates at the draw, goal-check
+  lift_unreachable 3); touching_04 46 / 4 / 1, 1.33 GPU-h (lift screen 7 at the draw, goal-check lift_unreachable 1; the largest late cost
+  is now goal-check contact_unreachable, 8 x 139 s). touching_04 follow-ups vs that base (same snapshot / indices): built tilts
+  (c3_r1_tilts) 55 / 4 / 1, 1.34 GPU-h - the switch acted (4725 scans; candidates at (0.25, -0.6) / (0.0, -0.6) / (0.5, -0.3)) but the
+  same failures moved with it: place screening from the push stance 23 at (0.25, -0.60) (base 22 at (0.25, -0.53)), goal-check
+  contact_unreachable 11 (base 8) - the cause is the exact place IK from the push stance at that translate / deep tilt, not the unbuilt
+  column: NOT recommended. A1 screen (c3_r1_a1s) 46 / 4 / 2, 0.99 GPU-h (0.50 per success): checked 22, passed 16, rejected 6-7 at the
+  draw (48 place checks, ~1-2 s each); goal-check contact_unreachable 8 -> 5 (the 5 left: 3 "no class" at the one A1 stance (-0.08,
+  s0.30) - the map says feasible, the exact push fails on hand overlap -15 mm / IK; 2 where a placing stance exists but not the one whose
+  push passes). Note: the a1s / a1sh arms read the SPA cells base cached (same key), so their sampling is cheaper; judge on the counters.
+  A1 screen shadow (c3_r1_a1sh) 46 / 4 / 2, 1.08 GPU-h: 3 would-be rejections, all 3 attempts died contact_unreachable in the goal check
+  (0 passed it); goal-check contact_unreachable 9 (on: 5). Recommendation (owner decides): the A1 screen default on (moves ~130 s
+  rejections to the draw, rejects nothing that passes); the built tilts stay off. Demo failures (all arms): gripper_out_of_fov,
+  plan_failed, symbolic_only (the push turn below), not switch-related.
+- symbolic_only diagnosis (diagnosis only; `$OFH/contact3_20261108/sym_diag`: sym_scan.py, rows.json, SUMMARY.txt): over 87 touching_04
+  demos with a push (40 tags) 38 failed symbolic_only, every one on the spray bottle's ORIENTATION, turned during the push: median |dyaw|
+  8.8 deg (failures) vs 0.8 (successes), limit 5.7. It turns while it slides (0 -> 45 mm in 0.4-0.6 s), before it reaches the detergent
+  (c2 320203, no brace: the detergent moved 0.0 mm, the bottle -16.5 deg). The push line runs through the FOOTPRINT centroid
+  (`swept_push_candidates`), +3.7..4.2 mm (median) off the object's root; in 37 of 46 turned demos the turn's sign is the one an off-centre
+  push gives; |offset| 6-9 mm: 13 / 16 turned > 5.7 deg, 0-3 mm: 7 / 23. Higher contacts tip the bottle more (max tilt median 5.8 / 11.4 /
+  17.3 deg for height fraction < 0.22 / 0.22-0.33 / > 0.33); the 5 cm pushes (0.18) with offset < 3 mm: 5 / 5 ok. The brace is always on the
+  partner (detergent) and does not matter (none 25 / 54 failed, brace_tip_h-_p15 9 / 18). c2's two failures: 8.2 / 8.0 cm (0.30 / 0.29),
+  offset +7.9 / +5.5 mm, -15.0 / -16.5 deg, both at trunk (0.25, -0.533); lower classes failed the hand-overlap screen. Fix candidates for
+  the owner (not implemented): the push line through the mass centre / root; lower contacts first; a yaw guard in the push; a guide on
+  the target instead of the partner brace.
+
+**3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
+_pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
+`_pack_stage_actions` (a sidecar that still carries `pack` is refused: SidecarError), the program check's pack push handling
+(`advance_push`, `_is_pack_push`) and `SidecarDraft.pack` are gone. Customs: the four pack-tail variants (block_4 breakfast_table /
+coffee_table / conference_table / desk; BDDL problems 32 / 7 / 76 / 6 keep their ids) carry `superseded_by` the board variant
+(`block_4-breakfast_table_board`), `place_gap_m` / `_pack_note` dropped, `block_pack_tail: true` kept as the marker the sampler refuses
+(Reject spec); the board variants lose their `block_pack_tail: false`. No library / map existed for the pack brace. block_design_01 =
+the board variant (never ran the pack).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

@@ -51,7 +51,7 @@ from ispatialgym.oracle.actions import (
     Transition,
     block_reorients,
 )
-from ispatialgym.oracle.sidecar import ARMS, BraceContact, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_variant
+from ispatialgym.oracle.sidecar import ARMS, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_variant
 from ispatialgym.robot import base_path as BP
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -218,29 +218,6 @@ _IORS_RELATION_WORDS = {"ontop": "on", "under": "under", "under_small": "on", "i
 #: board of an interior shelf and the partner against the other; the hand that carried the target pushes it toward the partner
 #: (the left hand rightward for a partner on the right board) and nothing braces the partner
 TOUCHING_SHELF_LAYOUT = "upright_shelf"
-
-
-def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Action]:
-    """Block design packing stage (owner 2026-09-19 21:47): the wide brace (fingers pre-shaped to ``fingers_opening_m`` so a
-    finger side rests on each of the two braced cubes) is placed and held, every listed push closes one cube's gap against it
-    (the push arm retreats a little between pushes), then the brace arm releases and retreats."""
-    out: List[Action] = []
-    b = None
-    if brace is not None:
-        b = Brace(contact=brace, base_yaw=base_yaw)
-        out.append(b)
-    for push in pushes:
-        if brace is not None and push.arm == brace.arm:
-            raise SidecarError(f"pack: brace and push both use the {brace.arm} arm")
-        p = Push(contact=push, base_yaw=base_yaw)
-        # the pad leaves a pack push 5 cm opposite the push and 5 cm up (Retreat.escape_far; the sampler validates that pose)
-        out += [p, Retreat(arm=push.arm, object=push.object, after=p, distance=0.05, escape_far=0.05)]
-    if b is not None:
-        # a wide brace holds nothing: its fingers stay at the recorded opening while the arm lifts off (a release would slide the
-        # finger sides along the cubes' faces first); a closed-blade brace releases as before
-        wide = (getattr(brace, "extra", None) or {}).get("fingers_opening_m") is not None
-        out.append(Retreat(arm=brace.arm, object=brace.object, after=b, release=not wide))
-    return out
 
 
 def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float, follow_braced: bool = False) -> List[Action]:
@@ -484,21 +461,11 @@ def program_block_design(sc: Sidecar) -> List[Action]:
             if push.arm != arm:
                 raise SidecarError(f"blocks[{b.order}].push_{kind}: the working arm is {arm!r}, the push is recorded for {push.arm!r}")
             actions += _brace_push_retreat(sc, brace, push, base_yaw)
-    # packing tail (owner 2026-09-19 21:47, ``sidecar.pack``): with every block at its (loose) place, the columns are closed
-    # against the wide-braced left column, then the rows against the wide-braced far (or near) row - the blocks end packed
+    # owner 2026-11-08 (3.7, i7-contact3): the packing tail (``sidecar.pack``: the wide pack brace + its pushes) was removed - a sidecar
+    # that still carries one is refused, not run without its packing
     pack = (sc.extra or {}).get("pack") if isinstance(getattr(sc, "extra", None), dict) else None
-    if isinstance(pack, dict) and pack.get("stages"):
-        wanted = str(pack.get("stance") or "manipulation")
-        if wanted != current:
-            actions += _travel(sc, current, wanted)
-            current = wanted
-        base_yaw = sc.stance(current).base_pose2d[2]
-        for i, stage in enumerate(pack["stages"]):
-            brace = BraceContact.from_dict(stage["brace"], f"pack.stages[{i}].brace") if stage.get("brace") else None  # None: pushes only
-            pushes = [PushContact.from_dict(p, f"pack.stages[{i}].pushes[{j}]") for j, p in enumerate(stage.get("pushes") or [])]
-            if not pushes:
-                raise SidecarError(f"pack.stages[{i}]: no pushes")
-            actions += _pack_stage_actions(sc, brace, pushes, base_yaw)
+    if pack:
+        raise SidecarError("pack: the block-design packing tail (pack brace) was removed (owner 2026-11-08 3.7); the block design uses the board variant")
     return actions
 
 
