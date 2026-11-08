@@ -2480,6 +2480,40 @@ heights come from the registry (the hall tree has none).
 (2) touching_large_02 - umbrella__ziqzqo__s1, hall_tree_upkvgr_0 board, h 0.5809, interior PLACE (rule drop 0.005, pre approach) - needs
 an interior spec first (no inventory / registry measurement). In progress elsewhere: inside_large_03's awvzkn / bar variants (i7-ft2).
 
+### The anchor rule change (912c12d1)
+
+`height_anchors.GOAL_PLANES` names, per IORS large subtask, the plane its goal side reads a map at (ontop "top", inside "interior",
+under / nextto / touching None). For a "top" goal the `partner` rows of both role tables (`representatives.csv` by its `name` column)
+become surfaces, after the support rows, with the support rows' rules: the inventory `top.z` (`supports/<name>.json`, else
+`partners/<name>.json`), the floor datum, the `%.4f` key, the 10 mm window. A goal row on a surface a support row already measured adds
+its row and `Surface.goal_subtasks` only (no new anchor, key unchanged); the support surfaces' height / key / status / `subtasks` are
+unchanged. `model_surfaces` (one table or several) returns the supports and the goal surfaces of the target's subtasks; `workload` lists
+the goal surfaces. Default on (the decision is the rule change; it is an offline tool - nothing at run time reads it);
+`goal_surfaces=False` / `--no-goal-surfaces` = the former set. On the repo tables (candidates + representatives): 44 partner rows, 16 new
+surfaces, 15 new anchors (93 -> 108), 0 without an inventory top; the 93 former anchors keep their keys and resolve exactly to themselves.
+Tests `ispatialgym/tests/test_goal_anchors.py` (3): a partner goal surface becomes an anchor of its target (both schemas, off = former
+set); the real tables' former surfaces / anchors / keys are identical; an uncovered height stays uncovered (no union; the int1 live set
++ 0.9158: 0.9158 exact, 0.9050 uncovered, every former live anchor exact).
+
+Not changed (owner question): the floor datum (countertop_kelzer_0's `under_clearance.floor_z` 0.4977 measures 15 house_single_floor
+tops - countertop_fjkase_0 0.4180 instead of 0.9157 - so the rule alone does not give ontop_large_01's height; the campaign anchors
+are the live heights anyway), and the representatives.csv SUPPORT rows (still read by `model`, i.e. skipped: reading them adds
+surfaces beyond this decision).
+
+**Staged root** `$OFH/v2maps_goalmaps` (`$OFH/goalmaps_20261108/stage_anchors.py`): `cp -a v2maps_int1` + anchor **0.9158**
+(house_single_floor/countertop_fjkase_0/top, `measured_live` = the MAP_REQUEST h, as every int1 anchor), midpoint rule: 0.9158
+[0.9058, 0.92165], 0.9275 [0.9175, 0.93055] -> [0.92165, 0.93055] (no live query in (0.9175, 0.92165] in `$OFH/out`; the inventory has
+no top there); the old file `anchors.json.4_before_goalmaps`; log `STAGED_goalmaps.txt`. v2maps_int1 untouched.
+
+**touching_large_02 (the hall tree) - not built, owner decision.** The existing measure CLI (`interiors measure`, slurm 18379979,
+trunk_fcddc495; output `$OFH/goalmaps_20261108/interiors_upkvgr.json`, NOT in the registry) measures hall_tree_upkvgr_0's board at
+0.5809 (1342 board cells, depth 0.799, board setback 0.3047 = the canopy's static-AABB overhang 0.3147 as the front plane, headroom
+1.505, back ray 0.474 -> a back panel, one side wall found (0.705) the other not, open edges ['+u', '-v'], digest d6947c534b88). The
+consumer's `interiors.live_mismatch` reads two open raster edges as "open front AND back" (`back_thickness_m` None) - this spec has a
+back and an open SIDE, so every lookup would miss ("open sides") and a map built on it would never be read. Options: (a) the
+open-sides rule tells an open side from an open back (a rule shared by every interior lookup), (b) register the board without its back
+panel (misstates the geometry). Not done either way.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
