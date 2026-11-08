@@ -1107,7 +1107,7 @@ class Attachment(SamplerV2):
             holds = []
             for g_l in self.hold_grasps:
                 H_l = IK.grasp_pose(M, (TT._t(g_l.pose[0]), TT._t(g_l.pose[1])))
-                if not self.ikc.eef_in_frame(H_l, cam_manip):
+                if not self.ikc.eef_in_frame(H_l, cam_manip) or self._carry_out_of_frame(manip, [IK.pre_pose(H_l)]) is not None:
                     fails["frame"] += 1
                     continue
                 gap = self._hands_apart_m(H_r, q_fr, H_l, self._finger_q_of(g_l))
@@ -1152,6 +1152,11 @@ class Attachment(SamplerV2):
             for carry in CARRY_HEIGHTS:
                 lift = (TT._t(grasp.grasp[0]) + th.tensor([0.0, 0.0, carry]), TT._t(grasp.grasp[1]))
                 wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, H_r, n)]
+                out = self._carry_out_of_frame(manip, wps)  # the program check's fingertip rule on the recorded carry
+                if out is not None:
+                    note("carry_frame", "out of frame")
+                    r_c = IK.IKResult(False, None, "carry_frame", len(wps))
+                    continue
                 with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
                     with attached(self.kit, "right", male):
                         r_c = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
@@ -1282,6 +1287,9 @@ class Attachment(SamplerV2):
                     fails["fingers"] += 1
                     continue
                 wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(start, eef_pre, n)]
+                if self._carry_out_of_frame(st, wps) is not None:  # the program check's fingertip rule on the recorded carry
+                    fails["carry_frame"] = fails.get("carry_frame", 0) + 1
+                    continue
                 with attached(self.kit, "left", male):
                     r_w = self.ikc.waypoints_ok([start] + wps, st, "left", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)), q_first=q_first)
                 self._route_count("carry_checked")
