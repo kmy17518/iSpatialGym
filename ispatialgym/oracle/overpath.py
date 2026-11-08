@@ -18,6 +18,12 @@ The hand turns from the push's orientation to the pre-grasp's in place above the
 :data:`ORIENT_SCHEDULES`; i7op2_b showed the turn spread over the across leg unreachable mid-way), else where the escape ends, else
 spread over the across leg.
 
+P1 (owner 2026-11-08 item 4; :data:`DESIGN_ENV` ``planner``, the switch-on default since): the Cartesian legs planned 0 of 27 (the
+push and the pre-grasp configurations lie on different IK branches), so the sampler runs the ORACLE'S OWN transit planner from the
+escape's end to the pre-grasp (``Motions.arm_to`` with the book protected at :data:`BOOK_MARGIN_M`, the desk and the scene as obstacles;
+:mod:`ispatialgym.sampling.v2.overpath_planner`) and records that joint trajectory, subsampled, in the same record; the oracle follows it
+and the program check replays it exactly as below. The Cartesian design (``cartesian``) stays as a diagnostic:
+
 The sampler tracks those Cartesian legs by differential IK from the start (no branch flip: ``track_chain``'s 0.2 rad step bound),
 subsamples the tracked configurations every :data:`WAYPOINT_SPACING_RAD` and checks the path the oracle runs - the piecewise-linear joint
 path through them, :func:`densify` - whole-body against the desk and the scene and with the moving arm's spheres at least
@@ -57,8 +63,18 @@ IK_JUMP_MAX_RAD = 0.3
 #: a rise shorter than this is skipped (the start is already above the across height)
 MIN_LEG_M = 0.01
 #: the version of the transit in the sampler's failed-pick memo key (``IORSLarge._overhang_memo_key``; persisted between the jobs of an
-#: alias): a failure of an earlier path design never applies to this one (i7op2_b skipped 28 picks remembered from the buggy i7op_b)
-MEMO_VERSION = "overpath/2"
+#: alias): a failure of an earlier path design never applies to this one (i7op2_b skipped 28 picks remembered from the buggy i7op_b).
+#: "overpath/3" (i7-overpath P1, owner 2026-11-08 item 4): the transit planned by the oracle's own motion planner - no failure of the
+#: Cartesian designs ("overpath" / "overpath/2") applies
+MEMO_VERSION = "overpath/3"
+#: i7-overpath P1 (owner 2026-11-08 item 4): how the sampler makes the transit under :data:`ENV` - ``planner`` (the default of the switch-on
+#: path): the oracle's own live transit planner (``execute.reach_pre_pose`` -> ``Motions.arm_to`` with the book protected at
+#: :data:`BOOK_MARGIN_M`, the desk and the scene as obstacles; :mod:`ispatialgym.sampling.v2.overpath_planner`) and its joint trajectory
+#: recorded; ``cartesian``: the rise / across / down legs of e4443d14..09f97815 (planned 0 of 27; kept as a diagnostic, it enters the memo key)
+DESIGN_ENV = "ISPATIALGYM_OVERPATH_DESIGN"
+DESIGNS = ("planner", "cartesian")
+#: the planner's rounds per pick (trajopt is stochastic: a round whose transit fails the re-check is planned again)
+PLANNER_ROUNDS = 2
 #: where the hand turns from the push's orientation to the pre-grasp's (:func:`leg_plan`), tried in this order:
 #: ``over_pre`` - across in the start's orientation, the turn in place above the pre-grasp, the descent in the pre-grasp's orientation;
 #: ``at_start`` - the turn in place where the escape ends, then rise / across / descend in the pre-grasp's orientation;
@@ -88,10 +104,19 @@ def try_all() -> bool:
     return os.environ.get(TRY_ALL_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
 
 
+def design() -> str:
+    """The transit design of the switch-on path (:data:`DESIGN_ENV`; unknown -> ``planner``)."""
+    raw = os.environ.get(DESIGN_ENV, "").strip().lower()
+    return raw if raw in DESIGNS else DESIGNS[0]
+
+
 def memo_tag() -> Tuple[str, ...]:
-    """The transit's part of the failed-pick memo key: :data:`MEMO_VERSION` (+ the schedule override when set)."""
+    """The transit's part of the failed-pick memo key: :data:`MEMO_VERSION` (+ the design when not the default ``planner``, + the
+    Cartesian schedule override when set)."""
+    d = design()
     raw = os.environ.get(ORIENT_ENV, "").strip()
-    return (MEMO_VERSION,) + ((f"orient={','.join(orient_schedules())}",) if raw else ())
+    return ((MEMO_VERSION,) + ((f"design={d}",) if d != DESIGNS[0] else ())
+            + ((f"orient={','.join(orient_schedules())}",) if raw and d == "cartesian" else ()))
 
 
 def leg_plan(start_pos, start_quat, pre_pos, pre_quat, z_across: float, orient: str = "slerp") -> List[Tuple[th.Tensor, th.Tensor, str]]:

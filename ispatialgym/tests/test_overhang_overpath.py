@@ -8,7 +8,9 @@ import contextlib
 import json
 import math
 import os
+from dataclasses import dataclass, field
 from types import SimpleNamespace
+from typing import List, Optional
 
 import pytest
 import torch as th
@@ -179,7 +181,7 @@ def _plan(s, q_start, book_pose, pre_pos):
     _bind(s)
     pre = (th.tensor(pre_pos), th.tensor([0.0, 0.0, 0.0, 1.0]))
     st = SimpleNamespace(name="manipulation")
-    return IL.IORSLarge._overpath_plan(s, st, st, "right", {}, book_pose, pre, pre)
+    return IL.IORSLarge._overpath_plan_cartesian(s, st, st, "right", {}, book_pose, pre, pre)
 
 
 def test_overpath_clears_the_book_by_its_margin():
@@ -513,9 +515,13 @@ def test_memo_key_carries_the_transit_version(monkeypatch):
     k_off = IL.IORSLarge._overhang_memo_key(sm, *args)
     monkeypatch.setenv(OP.ENV, "1")
     k_on = IL.IORSLarge._overhang_memo_key(sm, *args)
-    assert k_on == k_off + ("overpath", "overpath/2") and k_on != k_off + ("overpath",)  # the first design's key never matches
+    # P1 (owner 2026-11-08 item 4): "overpath/3" - no failure of the Cartesian designs ("overpath", "overpath/2") applies
+    assert k_on == k_off + ("overpath", "overpath/3") and k_on not in (k_off + ("overpath",), k_off + ("overpath", "overpath/2"))
     monkeypatch.setenv(OP.ORIENT_ENV, "slerp")
-    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_on + ("orient=slerp",)
+    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_on  # the schedules belong to the Cartesian design only
+    monkeypatch.setenv(OP.DESIGN_ENV, "cartesian")
+    assert IL.IORSLarge._overhang_memo_key(sm, *args) == k_on + ("design=cartesian", "orient=slerp")
+    monkeypatch.delenv(OP.DESIGN_ENV)
     assert OP.orient_schedules() == ("slerp",)
     monkeypatch.setenv(OP.ORIENT_ENV, "nonsense")
     assert OP.orient_schedules() == OP.ORIENT_SCHEDULES
@@ -592,3 +598,244 @@ def test_try_all_plans_every_schedule(monkeypatch):
     rec, key, why = _plan(s, q0, book, [0.0, -0.16, 0.79])
     assert rec is not None and rec["orient"] == OP.ORIENT_SCHEDULES[0]
     assert all(s.kit.stats.get(f"overpath.orient.{o}.planned") == 1 for o in OP.ORIENT_SCHEDULES)
+
+
+# ------------------------------------------------------------------------------------------------ P1 (owner 2026-11-08 item 4): the oracle's planner
+#
+# the toy arm again (joints 0..2 = the eef position, one 2 cm sphere at the eef), now under the oracle's own Motions code: a toy cuRobo
+# backend whose first joint-space plan runs straight (low over the book: inside its 3 cm margin, not touching) and whose plans after
+# that run straight too - the oracle's protected-object gate then takes its via-above (lift, plan to above the goal, straight down)
+
+
+@dataclass
+class _PlanRes:
+    success: bool
+    q_traj: Optional[th.Tensor] = None
+    status: str = "ok"
+    plan_time: float = 0.0
+    diagnostics: dict = field(default_factory=dict)
+
+    @property
+    def duration(self):
+        return 0.0 if self.q_traj is None else (len(self.q_traj) - 1) / 30.0
+
+
+BOOK_P1 = (th.tensor([0.0, 0.0, 0.7671 + 0.0153]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+
+
+class _ToyCurobo:
+    control_dt = 1.0 / 30.0
+
+    def __init__(self, box):
+        self.box = box
+        self.calls: List[str] = []
+
+    def _sp(self, q):
+        return _ToyKit._spheres(q)
+
+    def robot_spheres_world(self, q, emb="whole_body"):
+        return self._sp(q)
+
+    def check_collision(self, q, emb_name="whole_body", sync_world=False, margin=0.0, **kw):
+        sp, _ = self._sp(th.as_tensor(q).reshape(-1, 28))
+        val, _ = PROT.sphere_box_clearance(sp[:, :1], self.box)
+        return val < float(margin)
+
+    def update_world(self, ignore_objects=(), ignore_links=(), **kw):
+        self.calls.append("update_world")
+
+    def fk(self, frames, q_full=None, emb_name="whole_body"):
+        q = th.as_tensor(q_full).reshape(-1)
+        return {f: (q[0:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0])) for f in frames}
+
+    def fk_batch(self, frame, q, emb_name="whole_body"):
+        q = th.as_tensor(q).reshape(-1, 28)
+        return q[:, 0:3].clone(), th.tensor([0.0, 0.0, 0.0, 1.0]).repeat(len(q), 1)
+
+    def solve_ik(self, emb, targets, q_seed=None, sync_world=True, **kw):
+        q = th.as_tensor(q_seed).clone().float().reshape(-1)
+        q[0:3] = th.as_tensor(list(targets.values())[0][0]).float()
+        return q
+
+    def solve_ik_path(self, emb, waypoints, q_start=None, check_collisions=True, **kw):
+        q = th.as_tensor(q_start).clone().float().reshape(-1)
+        rows = [q.clone()]
+        for wp in waypoints:
+            q = q.clone()
+            q[0:3] = th.as_tensor(list(wp.values())[0][0]).float()
+            rows.append(q)
+        traj = th.stack(rows)
+        if check_collisions and bool(self.check_collision(traj[1:]).any()):
+            return _PlanRes(False, traj[:1], status="collision (toy)", diagnostics={"stage": "collision", "converged": 0})
+        return _PlanRes(True, traj)
+
+    def _line(self, q0, q1, n=40):
+        return th.stack([q0 + (q1 - q0) * (k / n) for k in range(n + 1)])
+
+    def plan_joint(self, emb, q_goal, q_start=None, max_attempts=4, sync_world=True):
+        self.calls.append("plan_joint")
+        return _PlanRes(True, self._line(th.as_tensor(q_start).float(), th.as_tensor(q_goal).float()))
+
+    def plan_pose(self, emb, targets, q_start=None, max_attempts=4, sync_world=True):
+        self.calls.append("plan_pose")
+        q1 = self.solve_ik(emb, targets, q_seed=q_start)
+        return _PlanRes(True, self._line(th.as_tensor(q_start).float(), q1))
+
+
+class _PosedBook:
+    """The book in the sampler's scene (``get/set_position_orientation``) with the protection box at its pose."""
+
+    def __init__(self, pose):
+        self.name = "hardback_0"
+        self.pose = (th.as_tensor(pose[0]).float(), th.as_tensor(pose[1]).float())
+        self.moves = []
+
+    def get_position_orientation(self):
+        return self.pose
+
+    def set_position_orientation(self, p, q):
+        self.pose = (th.as_tensor(p).float(), th.as_tensor(q).float())
+        self.moves.append(self.pose[0].tolist())
+
+    def keep_still(self):
+        pass
+
+    def get_base_aligned_bbox(self, visual=False):
+        c, R, h = OP.box_of(self.pose, _hb_hull())
+        return c, th.tensor([0.0, 0.0, 0.0, 1.0]), 2 * h, None
+
+
+def _p1_sampler():
+    box = OP.box_of(BOOK_P1, _hb_hull())
+    kit = _ToyKit()
+    kit.backend = _ToyCurobo(box)
+    kit.robot = SimpleNamespace(arm_control_idx={"right": th.arange(7), "left": th.arange(7, 14)})
+    kit.syncs = 0
+    kit.sync_world = lambda **kw: setattr(kit, "syncs", kit.syncs + 1)
+    kit.collide = lambda qs: kit.backend.check_collision(qs)
+    ikc = _ToyIKC()
+    ikc.exact = lambda poses, st, arm, **kw: IKResult(True, kit.ik(poses[-1], th.zeros(28)), "ok", 1)
+    s = SimpleNamespace(kit=kit, ikc=ikc, target=_PosedBook((th.tensor([5.0, 5.0, -10.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))), tname="hardback.n.01_1",
+                        gp=SimpleNamespace(variant="toy", gen=lambda k, d=None: d), hull=_hb_hull(), support_objects=lambda: [], _check_deadline=lambda stage: None)
+    for name in ("_overpath_verify", "_overpath_plan_planner"):
+        setattr(s, name, getattr(IL.IORSLarge, name).__get__(s))
+    return s
+
+
+def _p1_plan(s, q_start, pre_pos):
+    s._overpath_start = lambda st, gst, arm, chain, settled: (q_start, "escape", "")
+    pre = (th.tensor(pre_pos), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    st = SimpleNamespace(name="manipulation")
+    return IL.IORSLarge._overpath_plan_planner(s, st, st, "right", {}, BOOK_P1, pre, pre)
+
+
+def _p1_q0():
+    q0 = th.zeros(28)
+    q0[0:3] = th.tensor([0.0, 0.20, 0.98])  # the escape's end beyond the far side; the straight plan to the pre-grasp passes the book at 7.8 mm (the live 6-9 mm)
+    return q0
+
+
+def test_p1_switch_on_runs_the_oracle_planner_switch_off_is_today(monkeypatch):
+    """Switch on, no design given: the planner design (P1); ``cartesian`` only on request; off: nothing planned (test_switch_off_is_today)."""
+    monkeypatch.setenv(OP.ENV, "1")
+    monkeypatch.delenv(OP.DESIGN_ENV, raising=False)
+    assert OP.design() == "planner" and OP.memo_tag() == ("overpath/3",)
+    seen = []
+    s = SimpleNamespace(_overpath_plan_planner=lambda *a: seen.append("planner") or (None, "plan", ""),
+                        _overpath_plan_cartesian=lambda *a: seen.append("cartesian") or (None, "track", ""))
+    IL.IORSLarge._overpath_plan(s, *([None] * 7))
+    monkeypatch.setenv(OP.DESIGN_ENV, "cartesian")
+    IL.IORSLarge._overpath_plan(s, *([None] * 7))
+    monkeypatch.setenv(OP.DESIGN_ENV, "nonsense")
+    IL.IORSLarge._overpath_plan(s, *([None] * 7))
+    assert seen == ["planner", "cartesian", "planner"]
+
+
+def test_p1_the_oracle_planner_records_a_path_clearing_the_book_by_its_margin(monkeypatch):
+    """The oracle's own ladder on the toy backend: the joint-space plan to the witness passes the book inside the 3 cm margin, the
+    protected-object gate (inflation BOOK_MARGIN_M) takes the via-above; the recorded waypoints, run as the oracle runs them, keep the
+    moving sphere >= 3 cm from the book's box, start at the escape's end and end at the pre-grasp. The book stood at its settled pose for
+    the plan and is put back."""
+    monkeypatch.setenv("ISPATIALGYM_FAST_STRAIGHT_ARM", "0")  # no straight ramps: the trajopt rung (the toy cannot model the ramp's obstacles)
+    s = _p1_sampler()
+    q0 = _p1_q0()
+    pre = [0.0, -0.16, 0.79]
+    # the plan the oracle would stream without the gate: inside the margin
+    line = s.kit.backend._line(q0, th.cat([th.tensor(pre), q0[3:]]))
+    v0, _ = PROT.sphere_box_clearance(_ToyKit._spheres(line)[0][:, :1], OP.box_of(BOOK_P1, _hb_hull()))
+    assert 0.0 < float(v0.min()) < OP.BOOK_MARGIN_M
+    parked = s.target.pose[0].clone()
+    rec, key, why = _p1_plan(s, q0, pre)
+    assert rec is not None, (key, why)
+    assert rec["design"] == "planner" and rec["source"] == "oracle planner (via_above)" and rec["planner"]["branch"] == "via_above"
+    assert rec["min_book_clearance_m"] >= OP.BOOK_MARGIN_M and rec["margin_m"] == OP.BOOK_MARGIN_M and rec["rounds"] == 1
+    assert s.kit.stats["overpath.planner.rounds"] == 1 and s.kit.stats["overpath.planner.branch.via_above"] == 1 and "overpath.planner_s" in s.kit.stats
+    assert "plan_joint" in s.kit.backend.calls
+    qs = OP.parse(rec)
+    assert th.allclose(qs[0][0:3], q0[0:3]) and th.allclose(qs[-1][0:3], th.tensor(pre), atol=1e-4)
+    full = []
+    for q in qs:
+        r = th.zeros(28)
+        r[0:7] = q
+        full.append(r)
+    dense = OP.densify(full[0], full[1:])
+    val, _ = PROT.sphere_box_clearance(_ToyKit._spheres(dense)[0][:, :1], OP.box_of(BOOK_P1, _hb_hull()))
+    assert float(val[1:-1].min()) >= OP.BOOK_MARGIN_M - 1e-4
+    # the book was at its settled pose while planning, then back where it was
+    assert s.target.moves[0] == pytest.approx(BOOK_P1[0].tolist()) and th.allclose(s.target.pose[0], parked) and s.kit.syncs == 2
+    json.dumps(rec)
+
+
+def test_p1_rejects_or_replans_a_transit_that_fails_the_recheck(monkeypatch):
+    """A round whose transit passes the book inside the margin is planned again (trajopt is stochastic); both rounds failing: rejected
+    with the reason (kit overpath.planner.failed.<stage> for a planner failure)."""
+    from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+    s = _p1_sampler()
+    q0 = _p1_q0()
+    pre = [0.0, -0.16, 0.79]
+    q_pre = q0.clone()
+    q_pre[0:3] = th.tensor(pre)
+    low = s.kit.backend._line(q0, q_pre)  # 7.8 mm from the book
+    up, over = q0.clone(), q_pre.clone()
+    up[2] = over[2] = 1.10
+    L = s.kit.backend._line
+    high = th.cat([L(q0, up), L(up, over)[1:], L(over, q_pre)[1:]])  # up, across, down: >= 5 cm from the book
+    plans = [low, high]
+    monkeypatch.setattr(OPP, "plan_transit", lambda *a, **k: (plans.pop(0), {"branch": "trajopt", "plan_s": 1.0}))
+    rec, key, why = _p1_plan(s, q0, pre)
+    assert rec is not None and rec["rounds"] == 2 and rec["tried"] == ["1: book"] and rec["min_book_clearance_m"] >= OP.BOOK_MARGIN_M
+    plans[:] = [low, low]
+    rec, key, why = _p1_plan(s, q0, pre)
+    assert rec is None and key == "book" and "passes the book" in why
+    monkeypatch.setattr(OPP, "plan_transit", lambda *a, **k: (None, {"why": "plan_failed: arm_to(right): protected-object re-plan failed", "stage": "protected"}))
+    rec, key, why = _p1_plan(s, q0, pre)
+    assert rec is None and key == "plan" and "protected-object" in why and s.kit.stats["overpath.planner.failed.protected"] == OP.PLANNER_ROUNDS
+    # the witness: no exact IK of the pre-grasp -> rejected before any plan
+    s.ikc.exact = lambda poses, st, arm, **kw: IKResult(False, None, "ik_reach: no solution", 1)
+    rec, key, why = _p1_plan(s, q0, pre)
+    assert rec is None and key == "witness"
+
+
+def test_p1_plan_only_motions_records_instead_of_simulating():
+    """The plan-only Motions: its state is a joint vector; a streamed trajectory is recorded and moves it; the backend's implicit robot
+    reads (q_full, fk without a configuration, the start of a plan / an IK path) come from that vector."""
+    from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+    box = OP.box_of(BOOK_P1, _hb_hull())
+    b = _ToyCurobo(box)
+    robot = SimpleNamespace(arm_control_idx={"right": th.arange(7), "left": th.arange(7, 14)})
+    q0 = _p1_q0()
+    m = OPP.plan_only_motions(robot, b, q0)
+    assert th.allclose(m.backend.q_full(), q0) and th.allclose(m.eef_pose("right")[0], q0[0:3])
+    q1 = q0.clone()
+    q1[0:3] = th.tensor([0.0, 0.0, 1.0])
+    q1[20] = 5.0  # not an arm joint of the motion: never moved
+    assert list(m.execute_joint_trajectory(th.stack([q0, q1]), arms=["right"])) == []
+    assert th.allclose(m.q_full()[0:3], q1[0:3]) and float(m.q_full()[20]) == 0.0 and len(m.segments) == 1
+    assert th.allclose(m.backend.solve_ik_path("right_arm", [], check_collisions=False).q_traj[0], m.q_full())
+    cfg = OPP.oracle_motions_config()
+    from ispatialgym.fastflags import fast_on
+
+    if fast_on("PLAN_LADDER"):
+        assert cfg.plan_attempts == 2 and cfg.witness_plan_retries == 1

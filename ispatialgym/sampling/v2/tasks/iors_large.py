@@ -129,6 +129,7 @@ legacy band and no legacy grasp.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -4555,7 +4556,7 @@ class IORSLarge(SamplerV2):
                          geo["edge_finger_m"], overhang, facts["com_inside_m"], chain["fingers"], chain["pitch_deg"], chain["wrist"], sfacts,
                          "B" if grasp_st is st else f"B backed off to stand-off {grasp_st.stand_off:.2f} at trunk ({grasp_st.translate:.2f}, {grasp_st.tilt:.2f})")
                 if overpath is not None:
-                    facts["overpath"] = {k: overpath.get(k) for k in ("clearance_m", "min_book_clearance_m", "max_step_rad", "start", "n_waypoints")}
+                    facts["overpath"] = {k: overpath.get(k) for k in ("design", "source", "clearance_m", "min_book_clearance_m", "max_step_rad", "start", "n_waypoints")}
                 return {"arm": arm, "stance": st, "grasp_stance": grasp_st, "t_pose": t_pose, "post_pose": settled, "predicted_pose": post, "eef": eef, "pre": pre, "res": res,
                         "pick": pick, "chain": chain, "push_m": float(push), "facts": facts, "overpath": overpath}, ""
         TT._count(self, "pick_overhang.failed")
@@ -4644,7 +4645,121 @@ class IORSLarge(SamplerV2):
 
     def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
                        ) -> Tuple[Optional[Dict[str, Any]], str, str]:
-        """i7-overpath 2026-11-08 (owner 3(a), switch ``ISPATIALGYM_OVERHANG_OVERPATH``): the transit of the overhang pick from where the
+        """i7-overpath (switch ``ISPATIALGYM_OVERHANG_OVERPATH``): the overhang pick's recorded transit over the book by the design of
+        :func:`overpath.design` - ``planner`` (P1, owner 2026-11-08 item 4; the default of the switch-on path): :meth:`_overpath_plan_planner`;
+        ``cartesian`` (the diagnostic of e4443d14..09f97815): :meth:`_overpath_plan_cartesian`. ``(record, "", "")`` or ``(None, reason, why)``."""
+        if OPATH.design() == "cartesian":
+            return self._overpath_plan_cartesian(st, grasp_st, arm, chain, settled, pre, eef)
+        return self._overpath_plan_planner(st, grasp_st, arm, chain, settled, pre, eef)
+
+    def _overpath_plan_planner(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                               ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath P1 (owner 2026-11-08 item 4): the transit from where the escape leaves the hand (:meth:`_overpath_start`) to the
+        pre-grasp ``pre`` planned by the ORACLE'S OWN live transit planner (:func:`overpath_planner.plan_transit`: ``execute.reach_pre_pose``
+        -> ``Motions.arm_to(pose=pre, q_hint=witness)`` inside the dip gate and the protect context, kinematically on the sampler's backend)
+        with the book at its settled post-push pose in the scene and protected at :data:`overpath.BOOK_MARGIN_M`, the desk (``support_objects``)
+        and the scene as obstacles; the witness is the exact IK of the pre-grasp at the grasp stance. The trajectory is subsampled
+        (:func:`overpath.subsample`) and :meth:`_overpath_verify` re-checks the path the oracle will run through the waypoints. Up to
+        :data:`overpath.PLANNER_ROUNDS` rounds (trajopt is stochastic). The book is put back where it was. Kit ``overpath.planner.rounds``,
+        ``.planner.branch.<b>``, ``.planner.failed.<stage>``, ``.planner_s`` (whole seconds)."""
+        from ispatialgym.oracle import r1pro_model as M
+        from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+        q0, start, why0 = self._overpath_start(st, grasp_st, arm, chain, settled)
+        if q0 is None:
+            return None, start, why0
+        idx = self.kit.robot.arm_control_idx[arm]
+        box = OPATH.box_of(settled, self.hull)
+        tgt = self.target
+        p_prev = tuple(x.clone() for x in tgt.get_position_orientation())
+        t0 = time.time()
+        tried: List[str] = []
+        last = ("plan", "no round planned")
+        try:
+            tgt.set_position_orientation(G.t(settled[0]).float(), G.t(settled[1]).float())
+            tgt.keep_still()
+            self.kit.sync_world()
+            r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+            if not r_w.ok or r_w.q is None:
+                with self.ikc.ignoring([tgt]):  # the pick's own pre-grasp check (``_overhang_grasp``) ran with the target out of the world
+                    r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+                TT._count(self, "overpath.planner.witness_book_ignored")
+            if not r_w.ok or r_w.q is None:
+                return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
+            q_hint = G.t(r_w.q).float().reshape(-1)
+            supports = list(self.support_objects())
+            for k in range(int(OPATH.PLANNER_ROUNDS)):
+                self._check_deadline(f"overpath planner round {k + 1} ({arm} arm)")
+                TT._count(self, "overpath.planner.rounds")
+                traj, note = OPP.plan_transit(self.kit, arm, q0, pre, q_hint, supports, [(self.tname, tgt)], approach=[eef], inflation=OPATH.BOOK_MARGIN_M)
+                if traj is None:
+                    TT._count(self, f"overpath.planner.failed.{note.get('stage') or 'plan'}")
+                    last = ("plan", f"round {k + 1}: {note.get('why')}")
+                    tried.append(f"{k + 1}: plan ({str(note.get('why'))[:120]})")
+                    continue
+                out, key_v, why_v = self._overpath_verify(traj, arm, pre, eef, box, ignore_target=False)
+                if out is None:
+                    last = (key_v, f"round {k + 1} ({note.get('branch')}): {why_v}")
+                    tried.append(f"{k + 1}: {key_v}")
+                    continue
+                qs, dense, val = out
+                TT._count(self, f"overpath.planner.branch.{note.get('branch')}")
+                frame = M.EEF_LINK[arm]
+                top = float(G.local_points_world(self.hull, (G.t(settled[0]).float(), G.t(settled[1]).float()))[:, 2].max())
+                step = float((traj[1:, idx] - traj[:-1, idx]).abs().max()) if len(traj) > 1 else 0.0
+                rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], [self.kit.fk([frame], q)[frame][0] for q in qs], design="planner",
+                                   source=f"oracle planner ({note.get('branch')})", clearance_m=None, book_top_z=round(top, 4),
+                                   min_book_clearance_m=round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4),
+                                   start_book_clearance_m=round(float(val[0]), 4), end_book_clearance_m=round(float(val[-1]), 4), margin_m=OPATH.BOOK_MARGIN_M,
+                                   max_step_rad=round(step, 4), n_tracked=int(len(traj)), n_waypoints=int(len(qs)), n_dense=int(len(dense)),
+                                   pre_grasp={"position": [round(float(v), 5) for v in G.t(pre[0]).tolist()], "orientation": [round(float(v), 6) for v in G.t(pre[1]).tolist()]},
+                                   planner={k_: note.get(k_) for k_ in ("branch", "plan_s", "segments", "protect_events", "dip", "pre_pose_standoff", "via_posture", "straight")},
+                                   rounds=k + 1, tried=tried)
+                log.info("%s: overpath planned by the oracle's planner (%s arm, from the %s at stance %s, %s, round %d, %.1f s): %d waypoints, the book cleared by "
+                         ">= %.3f m (margin %.2f), largest planned step %.3f rad", self.gp.variant, arm, start, grasp_st.name, note.get("branch"), k + 1,
+                         float(note.get("plan_s") or 0.0), rec["n_waypoints"], rec["min_book_clearance_m"], OPATH.BOOK_MARGIN_M, rec["max_step_rad"])
+                return rec, "", ""
+            return None, last[0], f"{last[1]} (rounds: {tried})"
+        finally:
+            TT._countn(self, "overpath.planner_s", int(round(time.time() - t0)))
+            tgt.set_position_orientation(*p_prev)
+            tgt.keep_still()
+            self.kit.sync_world()
+
+    def _overpath_verify(self, traj: th.Tensor, arm: str, pre: G.Pose, eef: G.Pose, box, ignore_target: bool = True
+                         ) -> Tuple[Optional[Tuple[th.Tensor, th.Tensor, th.Tensor]], str, str]:
+        """The re-check of a transit ``traj`` ((T, 28), the start first) as the oracle will run it: the recorded waypoints
+        (:func:`overpath.subsample` of the arm joints), the executed path through them (:func:`overpath.densify`) collision-free at margin 0
+        (the desk and the scene present; the book too unless ``ignore_target``), the moving arm's spheres >= :data:`overpath.BOOK_MARGIN_M`
+        from the book's ``box`` (``protection.transit_violations``), the end at the pre-grasp and the grasp's approach tracked from it.
+        ``((waypoint rows, dense path, clearances), "", "")`` or ``(None, reason, why)``."""
+        from ispatialgym.oracle import protection as PROT
+
+        idx = self.kit.robot.arm_control_idx[arm]
+        keep = OPATH.subsample(traj[:, idx])
+        qs = traj[keep]
+        dense = OPATH.densify(qs[0], list(qs[1:]))
+        with (self.ikc.ignoring([self.target]) if ignore_target else contextlib.nullcontext()):
+            free = self.kit.collision_free(dense, margin=0.0)
+        if not bool(free[1:].all()):
+            k = int(th.nonzero(~free[1:]).reshape(-1)[0]) + 1
+            return None, "collision", f"the executed joint path collides at {k}/{len(dense) - 1} ({self.ikc._collision_blame(dense[k], [self.target] if ignore_target else [])})"
+        spheres, links = self.kit.backend.robot_spheres_world(dense, "whole_body")
+        val, _ = PROT.sphere_box_clearance(spheres[:, PROT.moving_sphere_mask(links, [arm])], box)
+        viol = PROT.transit_violations(val, OPATH.BOOK_MARGIN_M)
+        if viol is not None:
+            return None, "book", f"the arm passes the book at {viol['clearance_m']} m (threshold {viol['threshold_m']} m, configuration {viol['index']}/{len(dense) - 1})"
+        if not self.ikc.reaches(dense[-1], pre, arm):
+            return None, "end", "the path does not end at the pre-grasp"
+        with self.ikc.ignoring([self.target]):
+            r_a = self.ikc.continue_chain(dense[-1], [pre, eef], arm, soft_stall_m=None)
+        if not r_a.ok:
+            return None, "approach", f"the approach from the path's end: {str(r_a.reason)[:240]}"
+        return (qs, dense, val), "", ""
+
+    def _overpath_plan_cartesian(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                                 ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath 2026-11-08 (owner 3(a), switch ``ISPATIALGYM_OVERHANG_OVERPATH``; since P1 the diagnostic design ``cartesian``): the transit of the overhang pick from where the
         escape leaves the hand (:meth:`_overpath_start`) over the book to the pre-grasp ``pre`` - rise to the book's top + a clearance
         (:data:`overpath.CLEARANCES_M`, the first that passes), across to above the pre-grasp, down to it (:func:`overpath.leg_poses`) -
         tracked by differential IK from the start as the oracle tracks (``IKChecker.track_chain``: every dense configuration exact, no
