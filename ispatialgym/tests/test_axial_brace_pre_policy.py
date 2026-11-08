@@ -1,5 +1,5 @@
 """i7-axialrest (owner 2026-11-08 5v.2): the stop brace's pre pose checked at sampling with the program check's own call behind
-``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY`` (default off) - simulator-free: the call matches the program check's brace ``pre`` target, a
+``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY`` (default ON since owner 5y.1; ``=0`` off) - simulator-free: the call matches the program check's brace ``pre`` target, a
 support-policy refusal fails the candidate, and (owner 5y.1) so does any other failure of the call (a joint limit, no IK), the remembered
 solutions are restored."""
 
@@ -34,13 +34,13 @@ def _stub(result):
     return s, p, target, table
 
 
-def test_the_switches_are_off_by_default(monkeypatch):
+def test_the_pre_policy_is_on_by_default_and_the_probe_off(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", raising=False)
     monkeypatch.delenv("ISPATIALGYM_AXIAL_BRACE_PROBE", raising=False)
-    assert not AX.axial_brace_pre_policy_on() and not AX.axial_brace_probe_on()
-    monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "1")
+    assert AX.axial_brace_pre_policy_on() and not AX.axial_brace_probe_on()  # owner 5y.1: the pre policy is the default
+    monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "0")
     monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_PROBE", "1")
-    assert AX.axial_brace_pre_policy_on() and AX.axial_brace_probe_on()
+    assert not AX.axial_brace_pre_policy_on() and AX.axial_brace_probe_on()
 
 
 def test_the_check_is_the_program_checks_pre_call():

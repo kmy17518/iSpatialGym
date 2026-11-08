@@ -1114,11 +1114,11 @@ def axial_brace_opposite_on() -> bool:
 
 
 def axial_brace_pre_policy_on() -> bool:
-    """i7-axialrest (owner 2026-11-08 5v.2; default OFF): the sampler checks each stop-brace candidate's PRE pose with the program check's
+    """i7-axialrest (owner 2026-11-08 5v.2; DEFAULT ON since owner 5y.1, ``=0`` turns it off): the sampler checks each stop-brace candidate's PRE pose with the program check's
     own call (``AlignmentAxial._brace_pre_policy``: a fresh exact IK of the pre under the shared support policy) - a brace whose pre fails that
     call for ANY reason (owner 5y.1: the support policy, a joint limit, no IK, ...) is a failed candidate (the next one is tried; none left =
-    push-only, the brace is optional) instead of an attempt the program check rejects ``pre: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1``."""
-    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "0") == "1"
+    push-only, the brace is optional) instead of an attempt the program check rejects ``pre: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "1") == "1"
 
 
 def _pre_policy_reason_key(why: str) -> str:
