@@ -2385,6 +2385,36 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+## i7-diag (2026-11-08): the IORS large floor aliases and touching_04 (diagnosis only)
+
+Owner request 2026-11-08 ("two diagnoses, no behaviour changes"). CPU tabulation with `scripts/oracle_fix/diag_floor_t04.py`
+(`ssh minyeong@svl11 python3 - floor|t04|pdc <tags> < scripts/oracle_fix/diag_floor_t04.py`). The only GPU runs are integration-tip runs
+of the aliases that had none (tag `i7diag_floor`, trunk_fcddc495, `--grasps v2only`, `$OFH/v2maps_int1`, N 4, memory off, index 330000).
+The record is `$OFH/DECISIONS.md` ("i7-diag" lines).
+
+**A. Floor aliases.** All 12 shiyuc floor-fix jobs (i7_floor, i7_floorfix) COMPLETED. The 0-attempt ones are real setup rejections. The 7
+long ones (3-6.4 h) finished after the copy-back and had never been copied; they are copied now with `sy_copyback.sh`. `tab_i.py` shows 0
+attempts for running jobs because `job_stats.json` is only written at the end.
+
+| alias | latest finished run | att / wr / ok | GPU-h / success | blocker | covering branch |
+|---|---|---|---|---|---|
+| under_large_01 (sandal, bed) | int1_1 | 5 / 4 / 3 | 0.27 | none (1 robot_wobble) | - |
+| under_large_02 (briefcase, desk) | int1_1 | 6 / 4 / 0 | - (3.22 GPU-h) | oracle push-under: not_reached / symbolic_only, briefcase 0.11-0.23 m short and turned | none |
+| under_large_03 (trash can, desk) | i7_floorfix (+ i7diag_floor) | 19 / 3 / 1 | 3.24 | oracle push: ashcan turned 0.34-0.66 rad | none |
+| ontop_large_01 (soap dispenser, countertop) | int1_1 | 0 / 0 / 0 | - | missing_map tabletop h 0.9158 at countertop_fjkase_0: no anchor covers it, no tabletop map | none |
+| ontop_large_02 | i7_floorfix (+ i7diag_floor) | 24 / 4 / 4 | 0.94 | low yield: approach_untrackable 13 | none |
+| touching_large_02 (umbrella, hall tree) | i7diag_floor | 0 / 0 / 0 | - | missing_map interior: no registry spec of hall_tree_upkvgr_0 at 0.5809 (the surface place) | none |
+
+**B. touching_04.** int1_7 had 156 target_placement rejections: touching_04 94, touching_02 25, touching_01 22, axial_04 11, axial_01 and
+axial_03 2 each. In touching_04 the candidates fail on the place depth. The start draw puts the spray bottle 0.56 / 0.64 m deep from the
+table edge. At commercial_kitchen_table the base is collision-free only from stand-off 0.30 m, and from there the touch_push map reaches
+only 0.25-0.44 m deep (at most 0.57 m). The failures appear as the A1 partner-draw gate "push stances fit the map but none collision-free"
+(109 candidates in 70 of 94 attempts) and as the init grasp's empty F at 0.91-0.99 m ahead of the base. i7-contact3's cap (owner 3.6;
+touching_04 is in its list) was A/B-tested. In the shadow arm, 214 of 369 candidates were over the cap; 139 of them were tried and none
+was drafted. With the cap on, target_placement drops from 45 to 7 and each removed candidate costs about 2 s. But 27 of 53 attempts lose
+all their candidates, and written stays 4 / 4 (0.56 vs 0.66 GPU-h per success). Proposed fix, within 3.6's scope and for i7-contact3:
+limit the drawn start / place depth to the cap, instead of only filtering on it.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
