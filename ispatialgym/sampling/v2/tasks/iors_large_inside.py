@@ -107,6 +107,30 @@ MAX_PROTRUSION_FRACTION = 0.5
 #: the collision-free ones with the goal in frame (the most margin = the deepest lean, which the counter run in front of a basin blocks)
 NO_BAND_TRUNKS = 3
 SIDE_MAX_DEG = 45.0
+#: i7-interior2 2026-11-08 (owner 6.2): with a goal-side band / map, stance C's survivors are capped per base pose as without one (the
+#: ``generation.inside_map_trunks`` trunks with the most reach margin, default :data:`NO_BAND_TRUNKS`; every base pose keeps at least one) -
+#: the interior place maps admitted 17-26 survivors and each attempt ran ~3x longer (690 s vs 234 s legacy). Switch
+#: ``ISPATIALGYM_INSIDE_MAP_CAP`` (default on since the owner's 6.2; "0" off); kit counters ``inside_map_cap.kept`` / ``.dropped``, placement_stats ``map_cap``.
+INSIDE_MAP_CAP_ENV = "ISPATIALGYM_INSIDE_MAP_CAP"
+INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
+
+
+#: i7-interior2 2026-11-08 (owner item 2, the fridge's place joint-2 limit): stance C with the goal on the WORKING ARM's side - the base laterals
+#: also at the other end of the side's run (a narrow opening has the one lateral -half_run: the fridge's -0.035) and the goal cell nearest
+#: a point :data:`INSIDE_ARM_SIDE_AIM_M` to the arm's side of the base (``inside_goal_lateral_m``'s rule) unless the alias sets that key.
+#: The place's arm joint 2 (shoulder adduction: right upper limit +0.1745 rad, left lower -0.1745) stood at its limit (median 3 mrad with
+#: collisions off) in 268 place IKs of the fridge runs - the goal ~0.025 m from the base's centre line, the right arm reaching inward.
+#: Switch ``ISPATIALGYM_INSIDE_ARM_SIDE`` (default off); kit counters ``inside_arm_side.lateral_added`` / ``.aimed``.
+INSIDE_ARM_SIDE_ENV = "ISPATIALGYM_INSIDE_ARM_SIDE"
+INSIDE_ARM_SIDE_AIM_M = 0.17
+
+
+def inside_arm_side_on() -> bool:
+    return os.environ.get(INSIDE_ARM_SIDE_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def inside_map_cap_on() -> bool:
+    return os.environ.get(INSIDE_MAP_CAP_ENV, INSIDE_MAP_CAP_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
 #: ``generation.inside_stance_postures``: the arm postures stance C's collision check tries in order (the goal-side band's ``trunk_config``
 #: tries untucked -> ready -> tucked, both arms in one posture)
 STANCE_POSTURES = ("untucked",)
@@ -914,6 +938,13 @@ class InsideMode:
             trunks = [(float(t), float(k)) for t, k in self.gp.gen("inside_trunks")]
         half_run = edge.length / 2 - (half + 0.10)
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
+        arm_side = inside_arm_side_on()
+        if arm_side and half_run > 0:
+            # i7-interior2 (owner item 2): the run's other end too (INSIDE_ARM_SIDE_ENV)
+            side_l = round(half_run if arm == "right" else -half_run, 6)  # the base to the arm's far side: the goal toward the arm's shoulder
+            if all(abs(side_l - v) > 1e-6 for v in laterals):
+                laterals = laterals + [side_l]
+                TT._count(self, "inside_arm_side.lateral_added")
         goal_cells = self.place["cells"]
         z_mid = float(self.place["z"]) + height / 2
         lattice = float(rb.meta.get("lattice", RB.LATTICE)) if rb is not None else RB.LATTICE
@@ -950,6 +981,9 @@ class InsideMode:
                     # working arm's side of the base (in front of its shoulder; straight ahead of the base the standing book's pre-place put the forearm
                     # across the chest: right_arm_link4/5 x torso_link4 13-27 mm, joint2 at its limit)
                     lat_g = float(self.gp.gen("inside_goal_lateral_m", 0.0) or 0.0)
+                    if arm_side and not lat_g:
+                        lat_g = INSIDE_ARM_SIDE_AIM_M  # i7-interior2 (owner item 2): the goal cell toward the working arm's shoulder
+                        TT._count(self, "inside_arm_side.aimed")
                     aim = xy
                     if lat_g:
                         yaw_b = float(st.base_pose2d[2])
@@ -1014,6 +1048,21 @@ class InsideMode:
             kept = {id(st) for st in best_per_base([st for st, _ in classed], int(self.num("inside_no_band_trunks", NO_BAND_TRUNKS)))}
             classed = [(st, k) for st, k in classed if id(st) in kept]
             stats["no_band_kept"] = len(classed)
+        elif inside_map_cap_on() and classed and (getattr(rb, "meta", None) or {}).get("mode") == "map_view":
+            # i7-interior2 2026-11-08 (owner 6.2): the band / map survivors capped per base pose by reach margin, as without a band
+            for st, _ in classed:
+                if "reach_margin_m" not in st.extras:
+                    gc = st.extras["goal_cell"]
+                    st.extras["reach_margin_m"] = round(self.reach_margin(st, [float(gc[0]), float(gc[1]), z_mid], arm), 4)
+            k_cap = int(self.num("inside_map_trunks", NO_BAND_TRUNKS))
+            kept = {id(st) for st in best_per_base([st for st, _ in classed], k_cap)}
+            n0 = len(classed)
+            bases0 = {tuple(round(float(v), 4) for v in st.base_pose2d) for st, _ in classed}
+            classed = [(st, k) for st, k in classed if id(st) in kept]
+            bases1 = {tuple(round(float(v), 4) for v in st.base_pose2d) for st, _ in classed}
+            TT._countn(self, "inside_map_cap.kept", len(classed))
+            TT._countn(self, "inside_map_cap.dropped", n0 - len(classed))
+            stats["map_cap"] = {"k": k_cap, "before": n0, "after": len(classed), "bases_before": len(bases0), "bases_after": len(bases1)}
         out = P0.best_class(classed)
         log.info("%s: inside stance C at %s side %s: %d survivors (%s)", self.gp.variant, partner.name, edge.name, len(out), stats)
         return out

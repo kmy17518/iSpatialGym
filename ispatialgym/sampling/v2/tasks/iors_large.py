@@ -162,6 +162,37 @@ from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
+#: i7-interior2 2026-11-08 (owner 6.1): the overhang FALLBACK of IORS large's pick at B - when an alias sets no ``generation.pick_overhang_push``
+#: and the direct pick fails for a reason the sampler cannot fix (the shared support policy: ``overhang_fallback.reason_class``), the pick
+#: pushes the object over B's support edge and grasps the overhang (IORSLarge's own ``_overhang_pick``, the options of
+#: ``overhang_fallback.options``: :data:`overhang.DEFAULTS`, mode "fallback") - IORSSmall's fallback (``v2/overhang_fallback.py``) for this
+#: pick. Default on since the owner's 6.1 ("0" off); kit counters ``large_overhang_fallback.trigger.<class>`` / ``.mode.<grasp mode>`` / ``.found`` / ``.failed``.
+LARGE_OVERHANG_FALLBACK_ENV = "ISPATIALGYM_LARGE_OVERHANG_FALLBACK"
+#: i7-interior2 2026-11-08 (owner 6.3, inside_large_02): the inside mode's B -> C carry only with the torso STRAIGHTENED (the departure
+#: transition to a travel trunk of tilt 0) - no fallback drive at B's leaning grasp trunk. Every successful fridge demo before (fix1 / fix2
+#: 5 / 5, i7_fridge4 300023) carried straightened; the i7_fridge4 demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) succeeded 1 / 3,
+#: both failures the idle gripper against fridge_petcxr_0 in the carry drive (navigate[4]). Default on since the owner's 2026-11-08b item 1
+#: (A/B: 8 / 8 ok vs 6 / 8; "0" off); kit counters
+#: ``inside_carry_straight.rejected`` / ``.straight``.
+INSIDE_CARRY_STRAIGHT_ENV = "ISPATIALGYM_INSIDE_CARRY_STRAIGHT"
+
+
+def inside_carry_straight_on() -> bool:
+    # default ON (owner 2026-11-08, owner_answers_20261108b item 1); "0" off
+    return os.environ.get(INSIDE_CARRY_STRAIGHT_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def large_overhang_fallback_on() -> bool:
+    # default ON (owner 6.1, 2026-11-08: "implement overhang fallback" for this pick, as IORSSmall's default); "0" off
+    return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def count_pick_preshape(s, g, where: str) -> None:
+    """i7-interior2 (owner 6.1): one kit counter per IORS large pick whose support policy measures the fingers at the grasp's pre-shape
+    (``tabletop.policy_opening_of``: pinch width / 2 + the preshape margin) - ``pick_preshape.<where>`` - or at the configuration's
+    opening (``pick_preshape.<where>.q``: no width / ``ISPATIALGYM_SUPPORT_POLICY_OPENING=q``)."""
+    TT._count(s, f"pick_preshape.{where}" + ("" if TT.policy_opening_of(g) is not None else ".q"))
+
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 RELATION_OF_SUBTASK = {
@@ -3327,6 +3358,8 @@ class IORSLarge(SamplerV2):
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
+                if getattr(self, "relation", None) == "inside":
+                    TT._count(self, "inside_carry_straight.straight")
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.variant, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
@@ -3339,6 +3372,11 @@ class IORSLarge(SamplerV2):
                 # oracle-fix 2026-11-06 (hardback): the carry leg's error text is cut at 700 characters by its caller; each travel trunk's whole reason
                 log.info("%s: B -> C carry: travel trunk %s failed: %s: %s", self.gp.variant, tuple(round(v, 2) for v in tt), e.reason, str(e)[:1500])
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
+        if inside_carry_straight_on() and getattr(self, "relation", None) == "inside" and abs(float(manip.tilt)) > 1e-6:
+            # i7-interior2 2026-11-08 (owner 6.3): the inside carry only straightened (module constant INSIDE_CARRY_STRAIGHT_ENV)
+            TT._count(self, "inside_carry_straight.rejected")
+            raise Reject("no_transition", f"inside carry straightened only ({INSIDE_CARRY_STRAIGHT_ENV}): no travel trunk admits straighten-then-navigate "
+                                          f"and B's trunk ({manip.translate:.2f}, {manip.tilt:.2f}) leans; " + "; ".join(errors)[:900])
         try:
             path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -3872,12 +3910,15 @@ class IORSLarge(SamplerV2):
         eef = IK.grasp_pose(t_pose, g.pose)
         pre = IK.pre_pose(eef)
         kw = {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False}
-        res = self.ikc.exact([pre, eef], stance, arm, **kw)
-        pick = None
-        if twins and getattr(g, "name", None):
-            pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
-            res = pick.res
-            self._count_mirrored_ik(pick, bands)
+        # i7-interior2 2026-11-08 (owner 6.1): the support policy at the grasp's pre-shape (the oracle's descent opening), the twins included
+        count_pick_preshape(self, g, "segment_fallback")
+        with TT._policy_opening(self, g):
+            res = self.ikc.exact([pre, eef], stance, arm, **kw)
+            pick = None
+            if twins and getattr(g, "name", None):
+                pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
+                res = pick.res
+                self._count_mirrored_ik(pick, bands)
         opts = None
         if res.ok:
             opts, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), stance, arm, "B, segment fallback")
@@ -4549,7 +4590,8 @@ class IORSLarge(SamplerV2):
         grasp in B's image. ``(eef, pre, res, pick)`` or the reason it fails."""
         eef = IK.grasp_pose(obj_pose, g.pose)
         pre = IK.pre_pose(eef)
-        with self.ikc.ignoring([self.target]):
+        count_pick_preshape(self, g, "overhang")
+        with self.ikc.ignoring([self.target]), TT._policy_opening(self, g):  # i7-interior2 (owner 6.1): the policy at the pre-shape
             res = self.ikc.exact([pre, eef], st, arm, **kw)
             pick = None
             if twins and getattr(g, "name", None):
@@ -4600,7 +4642,7 @@ class IORSLarge(SamplerV2):
         self.sidecar.add_contact(rec)
         if sup is not None and self.surface.get("obj") is not None:
             self.sidecar.describe(sup, str(self.surface["obj"].category).replace("_", " "))  # the push's annotation names the support
-        opts = self.pick_overhang_opts() or {}
+        opts = self.pick_overhang_opts() or getattr(self, "_large_overhang_fallback_opts", None) or {}  # i7-interior2: the fallback's options
         c = self.choice.models["target"]
         role = (getattr(self.gp, "roles", None) or {}).get("target")
         tags = role.equivalence_tags(c.category, c.model) if role is not None and hasattr(role, "equivalence_tags") else []
@@ -5006,13 +5048,17 @@ class IORSLarge(SamplerV2):
                             continue
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
-                        res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                        if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
-                            pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
-                                                {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
-                                                support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
-                            res = pick.res
-                            self._count_mirrored_ik(pick, seg.bands)
+                        # i7-interior2 2026-11-08 (owner 6.1): the support policy measures the fingers at the grasp's pre-shape (pinch width / 2 + the
+                        # margin: the oracle's descent opening), as tabletop.grasp_at_pose since 11-06 - not fully open - for the row and its twins
+                        count_pick_preshape(self, g, "B")
+                        with TT._policy_opening(self, g):
+                            res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                            if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
+                                pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
+                                                    {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
+                                                    support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
+                                res = pick.res
+                                self._count_mirrored_ik(pick, seg.bands)
                         if res.ok:
                             arm_k = pick.arm if pick is not None else a0
                             st_k = pick.stance if pick is not None and pick.stance is not None else st_of.get(arm_k, st_of[a0])
@@ -5022,6 +5068,19 @@ class IORSLarge(SamplerV2):
                                 break
                             res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
                         why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
+                    ov_fallback = None
+                    if (res is not None and not res.ok) and ov_opts is None and large_overhang_fallback_on():
+                        # i7-interior2 2026-11-08 (owner 6.1): IORSSmall's overhang fallback for this pick - only for a reason no other stance /
+                        # position fixes (the support policy), with the overhang defaults in fallback mode
+                        from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+                        ov_fallback = OF.reason_class(str(res.reason))
+                        if ov_fallback is not None:
+                            TT._count(self, f"large_overhang_fallback.trigger.{ov_fallback}")
+                            TT._count(self, f"large_overhang_fallback.mode.{str((getattr(g, 'meta', None) or {}).get('mode') or 'none')}")
+                            ov_opts = dict(OH.options(True) or {})
+                            ov_opts["mode"] = "fallback"
+                            self._large_overhang_fallback_opts = ov_opts
                     if (res is None or not res.ok) and ov_opts is not None:
                         # owner 2026-10-13 ~03:15 item 4: the direct pick failed - push the object to B's support edge, grasp the overhang
                         key_ov = self._overhang_memo_key(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b)
@@ -5039,6 +5098,8 @@ class IORSLarge(SamplerV2):
                             if overhang is None and key_ov is not None:
                                 memo_ov[key_ov] = why_ov
                                 self._overhang_memo_persisted(key_ov, why_ov)
+                        if ov_fallback is not None:
+                            TT._count(self, "large_overhang_fallback." + ("found" if overhang is not None else "failed"))
                         if overhang is not None:
                             res, t_pose, eef, pre, pick, yaw = overhang["res"], overhang["t_pose"], overhang["eef"], overhang["pre"], overhang["pick"], yaw0
                             b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), overhang["grasp_stance"], overhang["arm"], "B, overhang")
