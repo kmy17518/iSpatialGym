@@ -2457,7 +2457,33 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   `wall_load_stop`, read only for a `wall_brace` library); no shared gate or contact policy changed, no code change.
 - **Owner 2026-11-08 (5w.2): `ISPATIALGYM_WALL_BRACE_MAP` DEFAULT ON** (separate commit; `=0` turns it off), with the wall maps staged in
   **`$OFH/v2maps_int1_brace34w`** (= v2maps_int1_brace34b + the 8 run-7 wall_brace maps: the root to fold into the integration).
-  Confirmation run: world_vertical 01-05, N 4 v2only on that snapshot and root, no switch in the environment (numbers in DECISIONS).
+  Confirmation run: world_vertical 01-05, N 4 v2only on that snapshot and root, no switch in the environment: `i7_wall_def`
+  (trunk_b1a07ba6) 104 att / 18 wr / 18 ok, 0.105 GPU-h per success, 62.6 exact IK per attempt - per alias identical to `i7_wall_on`.
+- **Owner 2026-11-08 (5w.3): the touching / axial brace validator, DIAGNOSIS AND COUNT ONLY** (no rebuild, no default; the switches below
+  are diagnostic, default off, unset = today's load bit-identical): `ISPATIALGYM_GC_BRACE_LOAD_DIAG=1` records the load
+  (`debug.load_diag`: asleep at the load, the assist's sleeps / wakes, the LOAD POINT's travel along the load - the arriving end on the
+  axial COM hinge, whose root never translates -, the measured first contact vs the computed face); `_WAKE=1` wakes the braced object at
+  every pusher step (the wall's 220ff7db); `_MEASURED=1` stops the pusher `brace_press_m` after the measured contact (the wall's
+  fae1e4d8). Re-validation arms D / W / WM of the live libraries (libs_touch, libs_axial_ct2, libs_axial_e jhaltj s1, libs_axial_sj) under
+  `$OFH/brace_20261108/w53/<arm>`; counts in DECISIONS ("i7-brace 5w.3"). `validate_contacts probe` (5w.3(b)): the real arm pressed into
+  a sleeping partner at 0.1-3.3 mm/step under each sleep condition (`KitContactWorld.probe_wake`).
+  - *The sleeping object*: the restored partner falls asleep by PhysX's OWN sleep (threshold 0.005) ~12 steps after the trial's wake,
+    before the assist's 30-step window (the assist slept none of them), and the teleported kinematic pusher never wakes it: in the record
+    414 of the 462 valid touching / axial brace verdicts were judged with the load never reaching the object (touch 110 / 110, magazine
+    96 / 96, keyboard 79 / 94, jhaltj 44 / 44 and 85 / 90; board_game 0 / 28 - its blades press it awake). Woken at every pusher step
+    (W) 84 verdicts change (83 hand_pushed, 1 not_held): touch 1 / 110, keyboard 12 / 94, magazine 18 / 96, jhaltj s1x1x2.5 53 / 90.
+  - *The load start*: the measured contact is at the computed face on the touch partners but 1.1-2.8 cm EARLY (medians) on the axial
+    keyboard / jhaltj s1x1x2.5 / board_game, so the computed load over-presses them; stopped 1 cm after the measured contact (WM) 104
+    verdicts change both ways (60 invalid -> valid, 44 valid -> invalid at the 1 cm hand_pushed threshold). Valid D -> W -> WM: 462 -> 378 ->
+    394. Still vacuous with both (awake, the load point < 1 mm): magazine 48 / 96, jhaltj s1 34 / 44 trials - the axial load path misses or
+    pushes through the COM hinge, and `not_held` cannot fire on a hinged target (the judge reads its pinned root). Owner: rebuild / fix.
+  - *Collection / replay / eval* (the same `SleepAssist` in run_isg and run_isg_vec; 3246 written demos mined, the probe): a hand slower
+    than 0.3 mm/step is not "moving" for the assist - it neither wakes the body proactively nor keeps it awake; PhysX itself wakes a
+    sleeping body when the hand is 1.8-2.2 cm from its box, at every speed (21 / 21); but under the assist a 0.1-0.2 mm/step approach is
+    RE-SLEPT at once (the window is already full of still poses) and stays asleep while pressed (12 / 12 probes, 73-124 steps, up to 15 N)
+    - it still moves as far as an awake body and no kick was measured (object speeds within the awake control's range). In the demos 2325 first motions after an assist
+    sleep came without the assist's wake (1514 with a slow hand); kicks 2.2 % vs 1.7 % after a wake. Teleports (`set_position_orientation`,
+    the scene state load) wake the teleported body; Executor.restore wakes every tracked object.
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
