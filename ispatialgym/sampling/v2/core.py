@@ -84,8 +84,15 @@ def start_per_attempt() -> bool:
 #: rejected attempt's files are removed with it, so it is never claimable. Counters (SAMPLING_REPORT) ``publish_after_screens.{published,withheld}``.
 #: DEFAULT ON since the owner's decision 2026-11-08 (5j; ad_race disembedding_09: published 4, withheld 2, 4 / 4 ok); ``=0`` (or
 #: ``ISPATIALGYM_FAST=0``) restores the summary written in place before the screens.
+#: integration-2 2026-11-08 (lead decision #18, the owner away; a bug in the decided default, the default stays on): the pending summary
+#: lives in the ``.pending`` sub-directory of ``instances/`` under its final name (``instances/.pending/<iid>.summary.json``), not as
+#: ``<iid>.summary.json.pending`` - the suffix pushed long instance ids over the 255-character file-name limit (disembedding_07:
+#: 262 > 255, OSError Errno 36 at its first written instance; the in-place name is 254). Every reader globs ``instances/*.summary.json``
+#: (non-recursive) or opens ``<iid>.summary.json`` by name, so a pending summary is never read; :func:`publish_instance` renames it into
+#: ``instances/`` (``os.replace``, same filesystem: atomic).
 SUMMARY_SUFFIX = ".summary.json"
-PENDING_SUFFIX = ".pending"
+PENDING_SUFFIX = ".pending"  # the old pending name's suffix (removed with a rejected attempt; no longer written)
+PENDING_DIR = ".pending"
 
 
 def publish_after_screens() -> bool:
@@ -93,15 +100,21 @@ def publish_after_screens() -> bool:
 
 
 def instance_summary_path(tro_path: str, pending: Optional[bool] = None) -> str:
-    """The summary file of the instance whose TRO is ``tro_path``: the pending name while the switch holds it back."""
+    """The summary file of the instance whose TRO is ``tro_path``: while the switch holds it back, the same name in the ``.pending``
+    sub-directory next to it (:data:`PENDING_DIR`; the caller writing it creates the directory)."""
     base = tro_path[: -len("-tro_state.json")] + SUMMARY_SUFFIX if tro_path.endswith("-tro_state.json") else tro_path + SUMMARY_SUFFIX
-    return base + PENDING_SUFFIX if (publish_after_screens() if pending is None else pending) else base
+    if publish_after_screens() if pending is None else pending:
+        return os.path.join(os.path.dirname(base), PENDING_DIR, os.path.basename(base))
+    return base
 
 
 def remove_instance_files(tro_path: str) -> List[str]:
-    """A rejected attempt's files: the TRO, the sidecar, the summary (published or pending). Returns the removed paths."""
+    """A rejected attempt's files: the TRO, the sidecar, the summary (published or pending; also a pending summary of the old name).
+    Returns the removed paths."""
     out = []
-    for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), instance_summary_path(tro_path, False), instance_summary_path(tro_path, True)):
+    old_pending = instance_summary_path(tro_path, False) + PENDING_SUFFIX
+    for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), instance_summary_path(tro_path, False), instance_summary_path(tro_path, True),
+              old_pending):
         if os.path.exists(p):
             os.remove(p)
             out.append(p)
@@ -1330,7 +1343,9 @@ class SamplerV2(TaskSampler):
         if not getattr(self.world, "cameras", True):
             # train-fast SAMPLER_CAMERAS (2026-10-31): this world has no head camera; the pixel screens of this instance are still to run
             summary["visibility"] = "pending"
-        with open(instance_summary_path(path), "w") as f:  # i7-attachdef: pending until the post-write screens pass (switch)
+        summary_path = instance_summary_path(path)
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)  # integration-2: the pending summary's sub-directory
+        with open(summary_path, "w") as f:  # i7-attachdef: pending until the post-write screens pass (switch)
             json.dump(_jsonable(summary), f, indent=2)
         if start_per_attempt():
             self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
