@@ -352,16 +352,17 @@ def hand_overlap(eef_pose, hull_local, obj_pose, margin: float = 0.005, against:
 
 
 def touching_push_candidates(gs, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
-                             t_hull_w: Optional[th.Tensor] = None):
+                             t_hull_w: Optional[th.Tensor] = None, line_xy: Optional[th.Tensor] = None):
     """Push poses of the closed right gripper at the target's right face (``face_point``, mid height), pushing along
     ``direction`` (robot's left, into the partner), in the order to try: (1) the pads on the face — pad centre on the
     point, approach along ``direction``, closing horizontal then vertical; (2) the top-down blade beside the face
     (``tabletop.blade_standoff`` over the target's face height above the tips, pitched per ``approach_pitch_order``,
     pads' faces parallel to the pushed face, either wrist turn) — a sideways pad push 10 cm right of the target was
     out of reach for the right arm on every attempt of the sanitary-napkins loop. Yields ``(kind, eef pose, extras)``.
-    ``t_hull_w`` (the target's hull at the place, given under :meth:`push_height_sweep_on`): :meth:`swept_push_candidates` instead."""
+    ``t_hull_w`` (the target's hull at the place, given under :meth:`push_height_sweep_on`): :meth:`swept_push_candidates` instead
+    (``line_xy``: its push line's point, :func:`push_line_t0`)."""
     if t_hull_w is not None:
-        yield from swept_push_candidates(gs, manip, t_hull_w, face_point, face_z, direction)
+        yield from swept_push_candidates(gs, manip, t_hull_w, face_point, face_z, direction, line_xy=line_xy)
         return
     d = C.unit(G.t(direction))
     outward = -d  # the pushed (right) face's outward normal
@@ -499,7 +500,23 @@ def raised_blade(gs, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, 
             "palm_clear": True, "height_extra_m": requested_height_extra(gs), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "palm_clear"}
 
 
-def swept_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+def push_line_t0(sec: "HullSections", t_hull_w: th.Tensor, z0: float, side2: th.Tensor, line_xy: Optional[th.Tensor] = None) -> Tuple[float, Dict[str, Any]]:
+    """The push line's offset along ``side2`` (the across-the-push axis): through the target's FOOTPRINT centre (the area centroid of its
+    hull's cut :data:`PUSH_SWEEP_BASE_CUT_M` above the bottom; the whole hull's when the cut misses) - or, with ``line_xy`` (world xy, the
+    i7-contact3 switch ``ISPATIALGYM_PUSH_LINE_COM``: the target's mass centre / root), through that point. ``(t0, facts)``; the facts name the
+    line's point and its offset from the footprint centre (m, + = along ``side2``) when ``line_xy`` is given, else ``{}``."""
+    centre = sec.centroid(z0 + PUSH_SWEEP_BASE_CUT_M)
+    if centre is None:
+        centre = polygon_centroid(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
+    t_fp = float(centre @ side2)
+    if line_xy is None:
+        return t_fp, {}
+    t0 = float(G.t(line_xy)[:2].float() @ side2)
+    return t0, {"push_line": {"through": "com", "offset_from_footprint_m": round(t0 - t_fp, 4)}}
+
+
+def swept_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
+                          line_xy: Optional[th.Tensor] = None):
     """:meth:`push_height_sweep_on` (touching#04: every class at mid height failed, so the palm-clear raised blade pushed the 27 cm
     spray bottle at 83 % of its height and it tilted 3.6 -> 20.3 deg): today's push classes - the fingertip pushes ``push_tip_h`` /
     ``push_tip_v-``, the pad pushes ``push_h`` / ``push_v``, the leaning blades ``blade_lean_deg``, the vertical blade - at every
@@ -523,15 +540,12 @@ def swept_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_point: th
     z0, z1 = float(face_z[0]), float(face_z[1])
     height = max(z1 - z0, 1e-6)
     sec = HullSections(t_hull_w)
-    centre = sec.centroid(z0 + PUSH_SWEEP_BASE_CUT_M)
-    if centre is None:
-        centre = polygon_centroid(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
-    t0 = float(centre @ side2)
+    t0, line_facts = push_line_t0(sec, t_hull_w, z0, side2, line_xy)
     clearance = float(gs.gen("stop_clearance_m", STOP_CLEARANCE))
     step = max(float(TT.phase2_gen(gs, "push_height_step_m", 0.01)), 0.002)
     h_cap = float(TT.phase2_gen(gs, "push_max_height_fraction", 0.5)) * height
     tip_pre = float(gs.gen("push_tip_pre_dist_m", 0.05))
-    knob = {"height_extra_m": requested_height_extra(gs), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_height_sweep"}
+    knob = {"height_extra_m": requested_height_extra(gs), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_height_sweep", **line_facts}
 
     def face(z: float, dz: float = PUSH_SWEEP_WINDOW_M) -> Optional[float]:
         """The outermost material (along ``outward``) within the window around the centre line at height ``z``; None where the line
@@ -649,7 +663,7 @@ def swept_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_point: th
                                    aspect=round(aspect, 2))
 
 
-def open_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+def open_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor, line_xy: Optional[th.Tensor] = None):
     """:meth:`push_gripper_open_on`: the right gripper open ``push_open_opening_m`` per finger (:data:`PUSH_OPEN_OPENING_M`), approaching
     along the push with both fingertips ``stop_clearance_m`` before the face on the line through the target's footprint centre (as
     :meth:`swept_push_candidates`). ``push_open_v-``: closing vertical, the wrist camera up (``push_tip_v-``'s turn) - the tips one above
@@ -669,10 +683,7 @@ def open_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[f
     z0, z1 = float(face_z[0]), float(face_z[1])
     height = max(z1 - z0, 1e-6)
     sec = HullSections(t_hull_w)
-    centre = sec.centroid(z0 + PUSH_SWEEP_BASE_CUT_M)
-    if centre is None:
-        centre = polygon_centroid(G.convex_hull_2d(G.t(t_hull_w)[:, :2].float()))
-    t0 = float(centre @ side2)
+    t0, line_facts = push_line_t0(sec, t_hull_w, z0, side2, line_xy)
     clearance = float(gs.gen("stop_clearance_m", STOP_CLEARANCE))
     step = max(float(TT.phase2_gen(gs, "push_height_step_m", 0.01)), 0.002)
     h_cap = float(TT.phase2_gen(gs, "push_max_height_fraction", 0.5)) * height
@@ -680,7 +691,7 @@ def open_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_z: Tuple[f
     q_open = min(float(C.FINGER_OPEN), max(0.0, float(TT.phase2_gen(gs, "push_open_opening_m", PUSH_OPEN_OPENING_M))))
     tip_off = q_open + OPEN_TIP_CENTRE_M  # a fingertip centre from the eef axis
     tip_half = float(TT.FINGER_SIDE_PROFILE[0][1])  # a fingertip's half width across the closing axis
-    knob = {"height_extra_m": requested_height_extra(gs), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_gripper_open"}
+    knob = {"height_extra_m": requested_height_extra(gs), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "push_gripper_open", **line_facts}
     down = th.tensor([0.0, 0.0, -1.0])
     h_axis = C.default_closing_axis(d)
 

@@ -4008,6 +4008,24 @@ touching_02 0.045 -> 0.16; GPU-h per success 1.22 -> 0.61 / 0.15 -> 0.20 (demo s
   the owner (not implemented): the push line through the mass centre / root; lower contacts first; a yaw guard in the push; a guide on
   the target instead of the partner brace.
 
+**Lead decisions 7-10 (2026-11-08, owner away; tmp/outputs/lead_decisions_while_away.md).** bba2a9bd `ISPATIALGYM_TOUCH_A1_SCREEN`
+DEFAULT ON; 015b815a `ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED` DEFAULT ON (each its own commit; snapshot trunk_015b815a; suite = base's set);
+`ISPATIALGYM_TOUCH_BUILT_TILTS` stays off. Decision 9 (the spray bottle's turn): 4822246b `ISPATIALGYM_PUSH_LINE_COM=1` (default off) - the
+swept and open-gripper push classes' contact line runs through the target's mass centre (`alignment_axial._com_local`: PhysX link COMs,
+mass-weighted; the AABB centre without masses) at its place instead of its footprint centre (`contact_poses.push_line_t0`,
+`IORSSmall.push_line_xy`); the extras record `push_line.offset_from_footprint_m`; kit `push_line_com.used`. The touch_push maps / library keep
+the footprint line (the exact chain decides). Tests (test_contact_poses.py): the contact shifts across the push by the point's offset with the
+heights and classes unchanged; off, the golden records are unchanged; the sampler's point (off None, on the cached COM at the pose). The
+default and the other options (lower contacts, a yaw guard, a target guide) stay the owner's.
+A/B (trunk_4822246b, both new defaults on in both arms, cluster svl titanrtx, touching_04 v2only, two N 4 blocks per arm 320400-03 / 320410-13,
+`contact3_20261108/submit_pl.sh`; turns from `sym_diag/sym_scan.py` -> rows_pl.json): off (c3_pl0) 73 att / 8 wr / 4 ok, 2.03 GPU-h = 0.51 per
+success, symbolic_only 2; on (c3_pl1) 80 / 8 / 3, 2.03 = 0.68 per success, symbolic_only 2. The bottle's turn during the push (the pushes that
+moved it; 2 + 1 plan_failed demos never pushed): off 7 demos |dyaw| median 2.1 deg, max 18.4, 2 above 5.7; on 6 demos median 5.2, max 15.2, 2
+above 5.7. The switch acted (the COM is 4 mm off the root in the root frame; the line moved 0.4-2.8 mm, the contact's offset from the root
+3-5 mm -> 1.7-2.9 mm) but the turn did not change: the same instance turns -18.4 (off) / -15.2 deg (on) at push_tip_v- 8.2 cm with a 17 mm
+side slip and a 14 deg tilt. So the line offset is not the main cause at these magnitudes; the tipping and sliding at mid-height contacts
+remain (the 5 cm pushes turn < 2 deg in both arms). Not recommended as a default; the other options are the owner's.
+
 **3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
 _pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
 `_pack_stage_actions` (a sidecar that still carries `pack` is refused: SidecarError), the program check's pack push handling
