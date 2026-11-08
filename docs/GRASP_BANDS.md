@@ -2435,6 +2435,20 @@ spent its 3000 s budget at "F draw at C (exact IK at B / C)", and the job hit it
 This is the IORS-large pick's missing pre-shape (owner item 6.1, assigned to i7-interior2), the same symptom as i7_sink2 on lkklqs. No
 template exists yet. Rerun once 6.1 lands: `$OFH/ft2_20261108/chain72b.sh`'s template step on v2maps_ft2b.
 
+**7.2, after the merges** (eval:0, v2only, v2maps_ft2b; neither variant has a template yet, so no N 4):
+- Round c, after merging i7-interior2 eec4ca60 (8ebca4dd): with the pick at the pre-shape, finger_penetration went to 0. The pick then
+  failed on the wrist camera (bar 28 of 35 tries) and on joint limits (countertop 7 of 10).
+- Round d, after merging i7-camhull 9e697ac1 (1640bc16), with `ISPATIALGYM_CAMERA_HULL_FALLBACK=1`: the camera fallback passed 72 of 74
+  (bar) and 29 of 33 (countertop), and failed pick tries fell from 35 to 3 (bar) and 10 to 11 (countertop, 9 of them joint limits).
+- Both runs still spent the 3000 s first attempt and wrote nothing. The block is now stance C, the attached place into the 0.2466 m basin:
+  - C tries exhausted: 46 (bar) / 37 (countertop);
+  - right-arm joint limits: 67 / 67;
+  - approach collisions with drop_in_sink_awvzkn_0: 85 / 69;
+  - exact IK failures: 22 / 31.
+- The 0.241 m plate leaves 2.8 mm on each side. The shoulder (joint 2) reaches its limit with the base at lateral 0. i7-interior2's
+  `ISPATIALGYM_INSIDE_ARM_SIDE`, or a stance choice off lateral 0, could reduce the joint-limit share but not the collisions.
+- Not fixed: the lead decides. Record: DECISIONS "i7-ft2" round c / d and the countertop diagnosis.
+
 #### Owner decisions 6.1-6.3 on the interior goals (branch i7-interior2, 2026-11-08)
 
 - **6.1 sink pick (inside_large_03).** The oracle pre-shapes to pinch width / 2 + the margin before the descent; since 11-06 the support
