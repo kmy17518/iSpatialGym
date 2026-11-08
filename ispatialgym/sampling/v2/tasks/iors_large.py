@@ -185,6 +185,15 @@ SUPPORT_CATEGORIES = ("breakfast_table", "desk", "coffee_table", "conference_tab
 INIT_SURFACE_CLASSES = ("support", "partner", "floor")
 SCENE_INVENTORY_ROOT = os.path.join(REPO_ROOT, "runlogs", "scene_inventory_20260915")
 STAND_OFFS = (0.35, 0.45, 0.55)
+
+
+def start_draw_a_redraws() -> int:
+    """i7-stancememo r2 (lead decision #36): the extra draws of the floor init's stance A (and its A -> B leg) within one attempt's start
+    draw, ``ISPATIALGYM_START_DRAW_A_REDRAWS`` (default 8; 0 = one draw, the behaviour of i7-startdraw d50cb1b9)."""
+    try:
+        return max(0, int(os.environ.get("ISPATIALGYM_START_DRAW_A_REDRAWS", "8")))
+    except ValueError:
+        return 8
 SUPPORT_MARGIN = 0.02
 # ---- push-under (owner decision 2026‑09‑16 06:50, item 7): the under goal is reached by a drop just outside the partner's
 # footprint edge and a straight floor-level push of the target under the edge ------------------------------------------------
@@ -2359,9 +2368,26 @@ class IORSLarge(SamplerV2):
         try:
             if kind == "floor":
                 manip = keep["manip"]
-                init = self.floor_stance_a(keep["c_t"], rng, self.target_dims()[1], like=manip[0])
-                with self.ikc.ignoring([self.obj("floor")]):
-                    self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (try_floor_surface's check)
+                # i7-stancememo r2 (lead decision #36, a bug of the start-draw default): one draw of stance A (30 bearings) found none in 17-24
+                # of 25-39 under_large_03 attempts, each a sub-second rejection charged against the instance's 15 attempts (two instances
+                # lost). Up to ``ISPATIALGYM_START_DRAW_A_REDRAWS`` (default 8; 0 = the single draw) more draws of A and its A -> B leg from
+                # the attempt's stream before the attempt is rejected; kit start_draw.redraws / .redraw.<reason> / .no_stance_final
+                n_more = start_draw_a_redraws()
+                for k in range(n_more + 1):
+                    try:
+                        init = self.floor_stance_a(keep["c_t"], rng, self.target_dims()[1], like=manip[0])
+                        with self.ikc.ignoring([self.obj("floor")]):
+                            self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (try_floor_surface's check)
+                        break
+                    except Reject as e:
+                        self.sidecar.transitions.clear()
+                        self.sidecar.paths.clear()
+                        if k >= n_more or e.reason not in ("no_stance", "no_transition"):
+                            if n_more and e.reason == "no_stance":
+                                TT._count(self, "start_draw.no_stance_final")
+                            raise
+                        TT._count(self, "start_draw.redraws")
+                        TT._count(self, f"start_draw.redraw.{e.reason}")
                 self.sidecar.transitions.clear()
                 self.sidecar.paths.clear()
                 self.surface = {**keep, "init": init}
@@ -2608,6 +2634,7 @@ class IORSLarge(SamplerV2):
             dist = float(rng.uniform(float(d_lo), float(d_hi)))
             xy = c_t + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
             if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
+                TT._count(self, "stance_a.reject.floor")  # i7-stancememo r2 diagnostics: why a bearing gives no stance A
                 continue
             yaw = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
             trunks = [(float(t), 0.0) for t in RB.TRANSLATES]  # (i): straight torso, any height
@@ -2619,6 +2646,7 @@ class IORSLarge(SamplerV2):
                     continue
                 feas.append((st, P0.axis_angle(self, cam, focus)))
             if not feas:
+                TT._count(self, "stance_a.reject.frame")  # no straight trunk sees the target at c_t and the partner region
                 continue
             # floor class: A spawns UNTUCKED like every other family's init (owner 2026-09-24; ``Stance.arms`` default). 1dd3820b
             # (2026-09-16) spawned it tucked because A then stood at B's crouch (0.95, 0) and the untucked hands hanging at floor
@@ -2628,7 +2656,11 @@ class IORSLarge(SamplerV2):
             # ``path_collision`` and the init is re-drawn.
             free = P0.body_free(self, [st for st, _ in feas])
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
-            if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
+            if not feas:
+                TT._count(self, "stance_a.reject.body")
+                continue
+            if not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
+                TT._count(self, "stance_a.reject.sweep")
                 continue
             # the most upright translate wins (the hands highest on the drive, the carry's travel trunk straightest); the
             # optical-axis angle breaks ties (owner 2026-09-24)
