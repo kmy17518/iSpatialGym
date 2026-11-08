@@ -3112,6 +3112,9 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 12 | i7-goalmaps (c54620d5) | fb031c15 | DEFAULTS goal-surface anchors, floor-datum fix, INTERIOR_FRONT_SIDE; hall tree spec; carry switches off; interiors.json = union of every spec, registry test knows every digest |
 | 13 | i7-blockdesign (a2f89901) | cd38c3d1 | 6000 collector steps for block design, BD_BOARD_EARLY + BD_BOARD_SEARCH DEFAULT; BD_BOARD_TABLE off; submit_fast summary line keeps memory_mode + collect_extra |
 | fix | (integration-2, lead decision #18) | 339fc2bd | the PUBLISH_AFTER_SCREENS pending summary in `instances/.pending/<iid>.summary.json`: the old `.summary.json.pending` name broke the 255-character limit for 235-240-character ids (disembedding_07); default unchanged |
+| 14 | i7-startdraw (8e2de681) | f2468042 | DEFAULTS START_DRAW (owner 3.5), floor init redraws stance A only, ALL_EDGES (lead #12); BD_FLIP_ROOM_DRAW off; old blockdesign resolved toward a2f89901; the attachment start search factored with cork's hand-over view, `_start_args` per route |
+| 15 | i7-ft2 (72ebd8a4; carries i7-interior2 eec4ca60, i7-camhull 9e697ac1) | 9b87ede1 | DEFAULT FINGER_TOUCH_HAND_HULLS (owner 7.1), awvzkn sink spec; interior2's owner 6.1-6.3 defaults; registry = union of every spec |
+| 16 | i7-camhull (e939ade6) | 540478e0 | DEFAULT CAMERA_HULL_FALLBACK (lead #5); CAMERA_TOP_HULL_FALLBACK off |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3137,6 +3140,8 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
   in `$SY/v2/v2maps_int1_cork`.
 - goalmaps (with merge 12): ontop_large_01's countertop maps (soap dispenser h0.9158 r / l) with the anchor 0.9158, and the umbrella's hall-tree
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
+- ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
+  (`int2_20261108/rebuild_ft2b.sh`, same inputs) before the layer.
 
 After merge 7 (trunk_691086c4): 77 entries, 146 maps, 18 contact maps, 20 interior, ERRORS 0. Suites of 6d9c7c15 / 691086c4: the baseline's 21 ids.
 
@@ -3158,6 +3163,8 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
   (ad_race 11/4/4).
 - int2_4 disembedding_07 crashed at its first written instance (OSError Errno 36: `<iid>.summary.json.pending` = 261 characters) - fixed in
   339fc2bd; int2_6 reruns disembedding_07 / _09 on it.
+- int2_7 (trunk_540478e0, after int2_5): the startdraw set at 300500, under_large_01 (floor watch), camhull's inside_large_03 / under_small_03
+  at 335000, the sinkbreakfast variant at 300700.
 - int2_5 (trunk_cd38c3d1, after the goalmaps check): touching_02 / 04 and close_02 at i7-contact3's indices, axial_05 / 01 / 03 / 04 (i7ar_pd
   49/16/12, 0.075), block_design_01 at 6000 steps (bdv_grid 8/8/6), ontop_large_01 (gm_after 14/4/3), touching_large_02 (known 0 written).
 
