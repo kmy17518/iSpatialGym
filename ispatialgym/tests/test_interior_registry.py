@@ -67,7 +67,9 @@ def test_the_hall_tree_board_is_found_at_the_touching_goal_height(monkeypatch):
 #: i7-goalmaps 2026-11-08 (owner decision 5c.2): the specs the front-side switch must leave unchanged - this registry's plus the ones
 #: i7-ft2 (awvzkn) and i7-t03specs (opryhp / otwukr_1) measured on their branches (digests of those branches' registries)
 # integration-2 (merge of i7-goalmaps after i7-t03specs): + the touching_03 bookcases now in this registry (T03_INTERIOR_DIGESTS)
-ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e", **T03_INTERIOR_DIGESTS}
+# integration-2 (merge of i7-ft2): + its sink awvzkn (the digest i7-goalmaps checked on / off on i7-ft2's registry)
+ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e", **T03_INTERIOR_DIGESTS,
+                     "drop_in_sink_awvzkn_0@basin": "4571693d44c4"}
 
 
 class _Raster:
@@ -142,3 +144,12 @@ def test_every_registry_spec_keeps_its_digest_and_verdict_on_and_off(monkeypatch
             monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
             verdicts.append(IN.live_mismatch(sp, _Raster(sp.height_m, edges), joints=dict(sp.joint_values) or None))
         assert verdicts[0] == verdicts[1] is None, (name, verdicts)
+
+def test_the_plate_in_sink_variants_basin_is_registered():
+    """i7-ft2 2026-11-08 (owner 7.2): drop_in_sink_awvzkn_0's basin (house_single_floor; the bar / countertop plate-in-sink variants), measured
+    by interiors.measure (slurm 18377335): an open-top basin at 0.7316 m, the digest its interior maps are built with."""
+    reg = IN.load_registry(IN.REGISTRY)
+    sink = reg["drop_in_sink_awvzkn_0@basin"]
+    assert sink.open_top and "top" in sink.open_sides and abs(sink.height_m - 0.7316) < 1e-6
+    assert sink.digest() == "4571693d44c4"
+    assert IN.spec_for_support("house_single_floor", "drop_in_sink_awvzkn_0", 0.7316) is not None

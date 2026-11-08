@@ -1425,7 +1425,7 @@ class Disembedding(SamplerV2):
         if not res.ok:
             return f"pick: {res.reason}"
         floor_z = float(self.src_floor.at(draft.object_poses[self.bindings.one(self.src_role).name]).z)
-        if TT.wrist_camera_clearance(grasp.grasp, floor_z) < TT.TWIN_CAMERA_CLEARANCE_M or not camera_clear:
+        if not TT.camera_top_clear(self, grasp.grasp, floor_z, grasp.arm) or not camera_clear:
             return "pick: the wrist camera on the tray floor / within 5 mm of the world"
         why = self.recheck_carried_travel(self.tname)
         if why:

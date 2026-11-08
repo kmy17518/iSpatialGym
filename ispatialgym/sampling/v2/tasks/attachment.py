@@ -2801,7 +2801,7 @@ class Attachment(SamplerV2):
                 res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
         if not res.ok:
             return f"pick: {res.reason}"
-        if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, "right"):
+        if not TT.camera_top_clear(self, grasp.grasp, float(self.top.z), "right") or not O.camera_clear(self.ikc, res.q, "right"):
             return "pick: the wrist camera on the support top / within 5 mm of the world"
         if grasp.extras.get("approach_standoff_m"):
             standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), float(grasp.extras["approach_standoff_m"]))

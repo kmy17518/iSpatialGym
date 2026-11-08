@@ -4131,6 +4131,31 @@ def wrist_camera_clearance(eef: Pose, plane_z: float) -> float:
     return float(pts[:, 2].min()) - WRIST_CAMERA_SPHERE_R - float(plane_z)
 
 
+def camera_top_count(s, eef: Pose, plane_z: float, arm: str, clearance: float) -> None:
+    """i7-camhull 2026-11-08 (owner_20261108g item 1, COUNT ONLY; ``ISPATIALGYM_CAMERA_HULL_FALLBACK`` shadow / 1): where the support-top
+    screen refused the wrist camera (``clearance`` < :data:`TWIN_CAMERA_CLEARANCE_M` above ``plane_z``), what the side_9 two-step would
+    decide (``IKChecker.camera_top_fallback``: counters ``camera_policy.top_screen.*``). The screen's verdict is never changed here."""
+    if _ik().camera_hull_fallback_mode() == "off":
+        return
+    fn = getattr(getattr(s, "ikc", None), "camera_top_fallback", None)
+    if fn is None:
+        return
+    try:
+        fn(eef, float(plane_z), arm, float(clearance), TWIN_CAMERA_CLEARANCE_M)
+    except Exception as e:  # noqa: BLE001 - a count only
+        log.debug("camera_top_count: %r", e)
+
+
+def camera_top_clear(s, eef: Pose, plane_z: float, arm: str) -> bool:
+    """The wrist camera's support-top screen (``wrist_camera_clearance(eef, plane_z) >= TWIN_CAMERA_CLEARANCE_M``) - unchanged; a refusal
+    is counted by :func:`camera_top_count` (i7-camhull, switch on / shadow only)."""
+    cam = wrist_camera_clearance(eef, plane_z)
+    if cam < TWIN_CAMERA_CLEARANCE_M:
+        camera_top_count(s, eef, plane_z, arm, cam)
+        return False
+    return True
+
+
 @dataclass
 class TwinPick:
     """What :func:`pick_twin` chose. ``twin``: the recorded eef is the row's twin; ``grasp``: the library row or
@@ -4241,6 +4266,7 @@ def pick_twin(s, stance: Stance, arm: str, g, eef_in_object: Pose, eef: Pose, pr
             return False, r, None, str(r.reason)
         cam = None if support_z is None else wrist_camera_clearance(p.chain[-1], float(support_z))
         if cam is not None and cam < TWIN_CAMERA_CLEARANCE_M:
+            camera_top_count(s, p.chain[-1], float(support_z), a, cam)  # i7-camhull: a count only (switch on / shadow)
             return False, r, None, f"wrist camera {cam * 1000:+.0f} mm from the support top (< {TWIN_CAMERA_CLEARANCE_M * 1000:.0f} mm)"
         if accept is not None and not bool(accept(_t(r.q))):
             return False, r, None, "fails the caller's check"

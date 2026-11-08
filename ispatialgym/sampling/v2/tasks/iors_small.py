@@ -4400,7 +4400,7 @@ class IORSSmall(SamplerV2):
                 res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, **kw)
         if not res.ok:
             return f"pick: {res.reason}"
-        if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, grasp.arm):
+        if not TT.camera_top_clear(self, grasp.grasp, float(self.top.z), grasp.arm) or not O.camera_clear(self.ikc, res.q, grasp.arm):
             return "pick: the wrist camera on the support top / within 5 mm of the world"
         clear = self.open_pads_clear_of_support(res.q)
         if grasp.extras.get("open_pads_clear_of_support") and not clear:

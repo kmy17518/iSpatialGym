@@ -4352,6 +4352,170 @@ pose). 0 written in every arm so far: after a carry the C tries end at B's exact
 attached place IK - the next blockers, outside the carry. umb2 vs umb2s: 23 att / 5 carries vs 30 / 15, both 0 written - umb2 stays primary
 until the final numbers.
 
+### i7-ft2 (2026-11-08): owner decisions 7.1 (FingerTouch hand hulls) and 7.2 (the bar / countertop plate-in-sink templates)
+
+**7.1, the decision:** apply the two-step to the FingerTouch path. Before this, the geometry rule judged the palm, wrist camera + mount
+and wrist (the hand's rigid links) by their padded spheres only. That is more lenient than the spec's P1 §3, which asks for hulls AND
+spheres.
+
+**7.1, the implementation:** `ISPATIALGYM_FINGER_TOUCH_HAND_HULLS` (6cc62a73; default on since e9efae38; `0` restores the former stage,
+`shadow` only counts). It lives in `IKChecker._finger_touch_geometry_ok`'s non-finger stage, against the touched support's geometry
+(its registered plane, else its convex pieces):
+- A narrow sphere failure is judged by i7-plateqtf2's reusable `contact_policy.hull_fallback`, with the same 0.5 mm threshold (side_9's).
+  Narrow means only hand links touch, each sphere less than the 2 mm buffer deep, and only into the touched support.
+- A sphere pass also needs the hulls clear by `hand_support_margin_m` (`contact_policy.hull_clearance_min`).
+- Counters: `finger_touch.hand_hulls.*` (`fallback_*`, `spec_*`, `verdict_to_pass` / `verdict_to_fail`, `decision_to_*`).
+
+**7.1, the A/B:** `ft2hh_sh` (shadow: today's verdicts plus the count) vs `ft2hh_on`, run on the same indices with a cold cache per job
+and the alias memory off.
+
+| alias (grasps) | written / attempts | demos ok | GPU-h per success (sh / on) | fallback judged -> passed | spec hull rejected |
+|---|---|---|---|---|---|
+| under_small_03 (v2only) | 4 / 22 both | 4 / 4 both | 0.217 / 0.218 | 30 -> 6 (hull 0.53-1.44 mm) | 0 of 327 / 333 |
+| inside_large_03 (legacy A/B arm) | 4 / 9 both | 4 / 4 both | 0.080 / 0.077 | 38 -> 13 / 12 | 0 of 131 / 143 |
+| plate-in-sink lkklqs_0-breakfast_table (legacy) | 4 / 4 both | 4 / 4 both | 0.051 / 0.051 | 4 -> 2 | 0 of 51 |
+
+- The refused narrow candidates were non_hand_link 23, deeper_than_buffer 27-28 and hull_clearance 1.
+- Groups flipped to pass: 6, 1 and 0. None flipped to fail.
+- Attempt outcomes were identical in 33 of 35 attempts. In the other two (inside_large_03 300702), both arms rejected the attempt, for
+  different reasons after the trajectories diverged.
+- touching_03 is still blocked.
+
+**7.2, the sink spec and maps:**
+- `drop_in_sink_awvzkn_0@basin` was measured (`interiors.measure`, house_single_floor) and committed to the code registry (3030ddfd).
+  It is an open-top basin at 0.7316 m: width 0.2466, depth 0.4063, rim 0.16, digest 4571693d44c4.
+- v2only template probes asked for the interior map of that sink and for a plate luhkiz tabletop map at bar_udatjt_0 h 1.0505. The
+  countertop pick reads the existing 0.8874 maps.
+- Built in `$OFH/ft2_20261108`:
+  - the bar maps (right / left), about 600-1900 cells per trunk and d_e;
+  - the interior PLACE maps, with the lkklqs sink's rule (pre approach, drop 0.02, tilts 30 / 45).
+- The first sink build was EMPTY. The plate's level footprint (0.241 m) must lie between the 0.2466 m walls, a 2.8 mm margin. The
+  default laterals put the compartment centre 6.6 mm off every 0.04 lattice row, so every problem was off_support.
+- Rebuilt with the laterals shifted by the spec's centre_y (-0.0866 .. 0.0734; the builder's resolution, not an identity-equal field):
+  36,985 feasible cells over both arms. Staged as `$OFH/v2maps_ft2b` (a copy of v2maps_int1 plus these maps).
+
+**7.2, the templates:** at eval:0, v2only on v2maps_ft2b, both variants now pass setup (stance C at the sink). The first attempt then
+spent its 3000 s budget at "F draw at C (exact IK at B / C)", and the job hit its 4500 s limit with no instance:
+- bar: 70 of 108 B tries failed "support policy on the approach tail (finger_penetration on bar_udatjt_0)";
+- countertop: 65 of 95 on countertop_kelzer_0.
+
+This is the IORS-large pick's missing pre-shape (owner item 6.1, assigned to i7-interior2), the same symptom as i7_sink2 on lkklqs. No
+template exists yet. Rerun once 6.1 lands: `$OFH/ft2_20261108/chain72b.sh`'s template step on v2maps_ft2b.
+
+**7.2, after the merges** (eval:0, v2only, v2maps_ft2b; neither variant has a template yet, so no N 4):
+- Round c, after merging i7-interior2 eec4ca60 (8ebca4dd): with the pick at the pre-shape, finger_penetration went to 0. The pick then
+  failed on the wrist camera (bar 28 of 35 tries) and on joint limits (countertop 7 of 10).
+- Round d, after merging i7-camhull 9e697ac1 (1640bc16), with `ISPATIALGYM_CAMERA_HULL_FALLBACK=1`: the camera fallback passed 72 of 74
+  (bar) and 29 of 33 (countertop), and failed pick tries fell from 35 to 3 (bar) and 10 to 11 (countertop, 9 of them joint limits).
+- Both runs still spent the 3000 s first attempt and wrote nothing. The block is now stance C, the attached place into the 0.2466 m basin:
+  - C tries exhausted: 46 (bar) / 37 (countertop);
+  - right-arm joint limits: 67 / 67;
+  - approach collisions with drop_in_sink_awvzkn_0: 85 / 69;
+  - exact IK failures: 22 / 31.
+- The 0.241 m plate leaves 2.8 mm on each side. The shoulder (joint 2) reaches its limit with the base at lateral 0. i7-interior2's
+  `ISPATIALGYM_INSIDE_ARM_SIDE`, or a stance choice off lateral 0, could reduce the joint-limit share but not the collisions.
+- Not fixed: the lead decides. Record: DECISIONS "i7-ft2" round c / d and the countertop diagnosis.
+
+#### Owner decisions 6.1-6.3 on the interior goals (branch i7-interior2, 2026-11-08)
+
+- **6.1 sink pick (inside_large_03).** The oracle pre-shapes to pinch width / 2 + the margin before the descent; since 11-06 the support
+  policy measures the fingers there (`tabletop.policy_opening_of`) - but only in `tabletop.grasp_at_pose`. IORS large's picks judged the
+  fingers fully open (0.05 m): the plate luhkiz lip pinches (mode "top", widths 4-8 mm: pre-shape ~0.012-0.014 m per finger) failed
+  `support policy on the approach tail` (finger_penetration on bar_egwapq_0) at every one of 249 C tries in i7_sink2. a7f2acb0 wraps the
+  main pick at B, the segment-fallback regrasp, the overhang grasp and their twins (`pick_twin`) in `_policy_opening` (the existing switch
+  `ISPATIALGYM_SUPPORT_POLICY_OPENING=q` turns it off; counters `pick_preshape.<B | segment_fallback | overhang>[.q]`). Plus the overhang
+  FALLBACK of this pick (IORSSmall's, `v2/overhang_fallback.py`): without an alias `pick_overhang_push`, a direct pick failing for a
+  support-policy class (`overhang_fallback.reason_class`) takes IORSLarge's own `_overhang_pick` with the overhang defaults in fallback
+  mode; any grasp mode (the plate's grasps are "top": a side-only filter would never trigger); switch `ISPATIALGYM_LARGE_OVERHANG_FALLBACK`,
+  default ON since c7fcb37a (owner 6.1); counters `large_overhang_fallback.trigger.<class>` / `.mode.<mode>` / `.found` / `.failed`.
+- **6.2 stance-C cap with a map.** `ISPATIALGYM_INSIDE_MAP_CAP` (default ON since c7fcb37a): the survivors of a map-view band are capped per
+  base pose by reach margin as without a band (`generation.inside_map_trunks`, default `NO_BAND_TRUNKS` 3; every base pose keeps its best;
+  `placement_stats.map_cap` before / after / bases, counters `inside_map_cap.kept` / `.dropped`). Legacy bands are not capped.
+- **6.3 fridge carry / place (inside_large_02).** i7_fridge4 finished 16 att / 4 written / 2 ok (0.96 GPU-h per success). C-try rejections
+  (i7_fridge4 / legacy fix2): B -> C path / transition 158 / 529, the place IK's joint2 near its limit 58 / 189 - the legacy mix. The path
+  collision is the BASE turning in place beside the init table (fix1 PATH_BLAME: base_link + wheels vs breakfast_table_xftrki_0, ~0.08 m
+  from B), not the carried jar. The demo failures (2 / 2): navigate[4], the idle right gripper (ready) against fridge_petcxr_0. Every earlier
+  successful fridge demo (fix1 / fix2, 5 / 5) carried STRAIGHTENED (straighten_then_navigate, travel tilt 0; right arm, C so 0.55, trunk
+  (0.95, -0.3), goal 0.871 m ahead); i7_fridge4's demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) 1 / 3 ok, the straightened one 1 / 1.
+  No demo failed at the place (release 0.03 + lift, finger clearance 0.080 m, no tilt). Switch `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` (default off):
+  the inside carry only straightened (counters `inside_carry_straight.rejected` / `.straight`); A/B below.
+- **Commits** a7f2acb0 (the code, switches off), c7fcb37a (defaults on: 6.1 overhang fallback, 6.2 cap); snapshot trunk_c7fcb37a; suite =
+  base (cf1f5d2d on this host: 23 failed + 3 errors, the same set).
+- **Validation** (`--grasps v2only` N 4, `$OFH/v2maps_int1`):
+
+| run | alias | switch | att | written | ok | GPU-h / success | s / attempt |
+|---|---|---|---|---|---|---|---|
+| i7_sink2 (before) | inside_large_03 | - | 3 | 0 | - | - (3.0 GPU-h) | 3000 (budget) |
+| i7i2_sink | inside_large_03 | defaults | 6 | 4 | 4 | 0.32 | 688 |
+| i7_fridge4 (before, uncapped) | inside_large_02 | - | 16 | 4 | 2 | 0.96 | 406 |
+| i7i2_fridgeA + A2 | inside_large_02 | defaults | 27 + 13 | 4 + 4 | 3 + 3 | 0.62 / 0.31 | 229 / 229 |
+| i7i2_fridgeB + B2 | inside_large_02 | + CARRY_STRAIGHT | 19 + 6 | 4 + 4 | 4 + 4 | 0.34 / 0.135 | 232 / 239 |
+
+  Counters: sink `pick_preshape.B` 163 (fingers 0.0141 m, pre-shaped), the overhang fallback 0 triggers on the sink (3 on the fridge,
+  non_finger_link side grasps, 0 found); map cap fridge 17 -> 10, sink 26 -> 9 survivors, base poses 4 -> 4 / 3 -> 3. Where 6.3 acted: the
+  leaning grasp-trunk drives 1 / 4 ok over the v2 runs (each failure navigate[4], the idle right gripper on the fridge), straight carries
+  15 / 16 (one robot_wobble); B rejected the leaning drive (`inside_carry_straight.rejected` 224 / 47) and wrote straight carries only.
+  Default: `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` ON since b165883c (owner 2026-11-08b item 1; "0" off). It is read only by
+  `IORSLarge.record_carry_leg` with relation "inside" - the 15 inside_large_scale variants (fridge jar, sink plate, bookcase hardback;
+  counted inside_large_01 / 02 / 03); no other alias or family. Validation on trunk_b165883c: i7i2_fridge_def 19 att / 4 written /
+  3 of 4 ok (0.35 GPU-h per success), every carry straightened; the failure was the pick (right_arm_link6 vs the breakfast table).
+- **Owner item 2 (2026-11-08d), the fridge's place joint 2.** 268 of 349 C place-IK diagnostics (i7_fridge4 + i7i2_fridgeA/A2/B/B2) were
+  arm joint 2 at its limit (right 201 / left 67), median 3 mrad from the limit WITH COLLISIONS OFF: shoulder adduction (URDF right upper
+  +0.1745 rad) - the goal ~0.025 m from the base's centre line (stance C's single lateral -0.035, the nearest goal cell); the place map's
+  IK has no 50 mrad joint margin. Legacy successes (5 / 5): right arm, so 0.55, trunk (0.95, -0.3), goal 0.871 ahead / -0.025, no tilt.
+  f288f376 `ISPATIALGYM_INSIDE_ARM_SIDE` (default off): the side's other lateral and the goal cell 0.17 m toward the working arm's
+  shoulder (counters `inside_arm_side.*`). A/B: A i7i2_j2A 31 / 4 / 3 ok (0.45 GPU-h per success, joint-2 rejections 5.7 per attempt), B
+  i7i2_j2B 13 / 4 / 4 ok (0.31, 5.0 per attempt); every B demo's goal 0.117 m toward its arm.
+- **Owner item 3, the sink pick.** i7i2_sink: 41 B-failure lines, 123 reasons - the wrist camera within 5 mm of the world 63, exact IK
+  34, joint limit 25. Opt-in `ISPATIALGYM_CAMERA_BLAME` (f288f376 / 19c00c0f, `orient.camera_blame`, no verdict change): 73 / 73 blamed
+  cases are the camera vs bar_egwapq_0 (the init support; nothing else frees it), clear at 3 mm (66) / 4 (6) / 2 (1): the buffered spheres'
+  narrow gap, not a collision. The sink is not blocked (i7i2_sink + i7i2_sinkdiag2: 11 att, 8 written, 8 / 8 ok); the fix (the hull fallback
+  extended to the wrist camera at the policed support) is a shared gate - asked, not implemented.
+
+#### The wrist-camera hull fallback (branch i7-camhull, 2026-11-08; owner_20261108g item 1)
+
+The owner approved this shared-gate change behind a switch. The default stays the owner's decision after the A/B.
+
+- **Rule (5e4fc9c4, `ISPATIALGYM_CAMERA_HULL_FALLBACK` = `0` default / `shadow` / `1`).** `orient.camera_clear` stays the screen: the
+  camera's padded spheres must keep 5 mm from the world at a grasp configuration. A NARROW failure is judged by the camera's exact hull:
+  - narrow means the spheres clear at 5 mm less the model's 2 mm buffer, and clear at 5 mm with the policed supports out of the world;
+  - the hull (role `wrist_camera`) must then clear the policed supports' registered planes by 0.5 mm.
+
+  The check is i7-plateqtf2's `contact_policy.hull_fallback`, reached through `IKChecker._hull_fallback`. That method gains margin / roles /
+  counter-prefix / mode parameters; its defaults are unchanged. The policed supports are the ones the support policy polices at that
+  exact-IK result, recorded by `exact` only when the switch is on or shadow. A configuration with no policed support, or a floor, keeps
+  today's verdict.
+- **Not double-applied.** The support policy's sphere stage (`ISPATIALGYM_SUPPORT_HULL_FALLBACK`) and FingerTouch (i7-ft2
+  `ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`) are untouched; this is the separate 5 mm camera rule. The support-top screen
+  (`tabletop.wrist_camera_clearance` < 5 mm) is counted only (`camera_policy.top_screen.*`, `tabletop.camera_top_clear`); its verdict never
+  changes.
+- **Identity, counters, tests.** Under `1` the cache scope gains `camera_hull_fallback`, but not the exact-IK key. Counters are
+  `camera_policy.hull_fallback_{checked,passed,shadow_pass,failed.<why>,error}`, with log lines `CAMERA_HULL_FALLBACK` / `CAMERA_TOP_SCREEN`.
+  `test_camera_hull_fallback.py` has 13 tests. The suite matches the base eec4ca60: the same 23 failed + 3 errors from the env.
+- **Count (record `$OFH/camhull_20261108`).**
+  - Logs: every v2 log, including i7-ft2's sink templates. Of 103 aliases, the camera rule refused anything in only 11; 92 never hit it.
+  - Shadow runs `ch_sh`: N 4, judged -> would pass, with the hull clearance:
+
+    | alias | judged -> would pass | hull clearance |
+    |---|---|---|
+    | inside_large_03 | 27 -> 27 | 3.55-5.40 mm |
+    | under_small_03 | 34 -> 34 | 4.76-6.11 mm |
+    | under_small_01 | 2 -> 2 | 4.01 mm |
+    | nextto_02 | 0 (its 59 are the support-top screen, all deeper than the buffer) | - |
+    | touching_04, touching_01 | 0 | - |
+
+- **A/B** (v2only N 4, the same indices 335000-3, svl):
+
+  | alias | arm | att / written / ok | GPU-h (per success) | camera judged |
+  |---|---|---|---|---|
+  | inside_large_03 | shadow | 4 / 4 / 4 | 0.64 (0.16) | 27 (exact IK 109 per attempt) |
+  | inside_large_03 | on | 4 / 4 / 4 | 0.54 (0.135) | 5 passed (exact IK 48 per attempt) |
+  | under_small_03 | shadow | 27 / 3 / 2 | 1.14 (0.57) | 34 |
+  | under_small_03 | on | 29 / 4 / 4 | 1.07 (0.27) | 12 passed |
+
+  The arm with the switch on had 0 refusals and 0 demo failures. The success gain is within N 4 noise. The counters show the rule acts only
+  on narrow camera-vs-support gaps whose hulls clear by 3.5 mm or more. The default stays off: the owner decides.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
