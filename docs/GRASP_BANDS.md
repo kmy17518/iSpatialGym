@@ -2516,6 +2516,13 @@ None), and this board has a back and an open SIDE. It runs before the map lookup
 map built. Options: (a) the open-sides rule tells an open side from an open back (a rule every interior lookup shares), (b) register the
 board without its back panel (misstates the geometry).
 
+**Validation, ontop_large_01** (N 4 v2only, trunk_912c12d1, alias memory off, svl titanrtx; missing_map 1 -> 0):
+
+| arm | root | att / written / ok | GPU-h (per success) | notes |
+|---|---|---|---|---|
+| gm_before | v2maps_int1 | 0 / 0 / 0 | 0.11 | setup no_init_surface: MAP_REQUEST tabletop h 0.9158 |
+| gm_after | v2maps_goalmaps | 14 / 4 / 3 | 1.85 (0.62) | goal map h0.9158 hit (r / l); rejections target_placement 7, program_check_failed 1, approach_untrackable 1, place_unreachable 1; 1 demo robot_touching_itself |
+
 ### Owner decisions 2026-11-08 (5c.1 / 5c.2, `owner_20261108e_goal_framing.md` items 1 and 2)
 
 **1. The floor datum: fixed (ce7b75d4, on by default as the rule's bug fix).** A partner's `under_clearance.floor_z` is a floor level
