@@ -2479,6 +2479,68 @@ Needs the owner: (a) the demo step budget for block design (`DEFAULT_MAX_STEPS` 
 `--max-steps 6000` for the block_design collectors via `ISGF_COLLECT_EXTRA`, or a per-family budget); (b) the defaults of
 `BD_BOARD_EARLY` / `BD_BOARD_SEARCH` (both off; they act only on board variants).
 
+### i7-blockdesign 5m (owner decisions 2026-11-08c): the step budget, the defaults, table-relative board positions
+
+The owner's 5m.1 / 5m.2 / "Board positions" (verbatim in the 2026-11-08c decisions; the early-reject audit of 5m is i7-diag's):
+
+* **5m.1 (de5779b0) a 6000-step oracle budget for block-design collectors only.** Mechanism: `scripts/trainfast/submit_fast.py`
+  `COLLECTOR_MAX_STEPS = {"configuration_matching-block_design": 6000}` (alias-key prefix) - `with_collector_max_steps` appends
+  `--max-steps 6000` to `ISGF_COLLECT_EXTRA` in the job's `job.env` (fast_env.sh -> `COLLECT_EXTRA` -> every `run_isg --mode oracle`
+  collector of the job), on `submit` and on `recollect` (a recollect of an older job without it gets it too); a job that passes its own
+  `--max-steps` in `ISGF_COLLECT_EXTRA` (--extra-env) keeps it. The shared `eval/instances.DEFAULT_MAX_STEPS` 3000 is unchanged; the
+  SUBMITTED line prints `collect_extra=...`. Not a customs field: the collectors take the budget from the command line, and job.env
+  is the job's record.
+* **5m.2 (73d54d48) `ISPATIALGYM_BD_BOARD_EARLY` and `ISPATIALGYM_BD_BOARD_SEARCH` default ON** (own commit; `0` restores each; board
+  variants only). The tests pin the off arms explicitly.
+* **Board positions (f1fc4ac1) `ISPATIALGYM_BD_BOARD_TABLE=1`, default off.** The hand-set `board_base_xy_candidates` are base-relative
+  (base depth, lateral) and were tuned at stand-off 0.35 (`BOARD_LIST_STAND_OFF`), so at 0.45 the near ones are off the top. With the
+  switch a board position is (inset of the board centre from the working edge, lateral from the stance's centre line): the depth is
+  the TABLE's, so it holds at every stand-off; the lateral stays the robot's, because the right arm's reach and the flip approaches are
+  set by the centre line (`_board_position_note`: right of the grid it blocks the flips, left of the centre line the arm misses the
+  slots). The listed positions are `generation.board_table_xy_candidates`, else the base list at its own stand-off (inset = depth -
+  0.35; the same table's edge overhang cancels); with BD_BOARD_SEARCH the table lattice follows (insets 0.06-0.30 step 0.03 x laterals
+  -0.22..+0.06 step 0.04, nearest first to the first kept listed position, ties right first). Per candidate stance a position is kept
+  only when the plate lies on the top (1 cm margin) and the board centre's base depth is in `generation.board_table_depth_window_m`
+  (default 0.40-0.66: the list's nearest at its stand-off .. the grid's farthest). The lattice positions get the grid's treatment (CPU
+  tests before each probe, `board_grid_max_probes`). One function, `_board_plan(manip)`, is the position plan of `_place_board`,
+  `_board_precheck` (hence BD_BOARD_SEARCH's candidate order); the init's flip-room move (`_board_fit`) keeps the base list either
+  way (2774e392, see the first run below): i7-startdraw's 5o.1 flip-room range can call `_board_fit` / `_board_plan` unchanged.
+  Example (unit test, rhjoby-like top, stand-off 0.45): the list becomes (0.56, -0.02), (0.54, -0.10), (0.58, +0.04), (0.62, -0.06),
+  and (0.70, +0.05) is out of the window; at 0.35 it is the base list. Counters `bd_board.table_plans / table_listed /
+  table_listed_off_top / table_listed_out_of_window / table_lattice / table_lattice_off_top / table_lattice_out_of_window /
+  table_listed_placed / table_lattice_placed / table_failed`.
+
+Runs (cluster svl titanrtx, N 4 v2only, alias memory off, two replicates per arm at 320100-103 / 320200-203; every job with
+`ISGF_COLLECT_EXTRA='--max-steps 6000'` from 5m.1, the collector logs `max_steps: 6000`; `$OFH/blockdesign_20261108/submit_5m.sh`):
+
+| arm | snapshot | att / written / ok | rejections | written attempt (s) | GPU-h | GPU-h / success |
+|---|---|---|---|---|---|---|
+| bdv_grid (defaults: list + SEARCH grid; = 5m validation) | trunk_f1fc4ac1 | 8 / 8 / 6 | none | 345-878 | 1.93 | 0.32 |
+| bdv_table (TABLE=1, flip-room move on the table positions) | trunk_f1fc4ac1 | 120 / 0 / 0 | 120 board_placement | - | 0.48 | - |
+| bdv_tableb (TABLE=1, flip-room move on the base list) | trunk_2774e392 | 16 / 5 / 5 (cancelled at 2 h 37) | 8 approach_untrackable + 3 gripper_not_in_frame (program_check, 0.87-1.29 ks each) | 818-1808 | 5.23 | 1.05 |
+
+* **5m validation (bdv_grid, the defaults after 5m.1 / 5m.2):** every instance written on attempt 0 (candidate 12, stand-off 0.45, the
+  board at the grid's (0.51, -0.10) after 3 grid probes; 5 probes per attempt); 6 / 8 demos succeed at 3314-3539 action steps (all
+  past the old 3000 budget). Failures: 320101 symbolic_only (one die 4.0 cm off slot_2, rotated pi: the same instance was 4.0-4.5 cm
+  off at the 3000-step timeout in bd_fix and succeeded in the 6000-step recollect, so it varies between runs), 320201 not_reached
+  (layout error 3.9 mm at the closest approach). Neither diagnosed further.
+* **bdv_table (first table run):** the table positions also drove the init's flip-room fit; the minimum move (init 0.35 -> 0.20
+  instead of 0.07) then "fit" every stand-off, the manipulation stances stood at the lateral range's end, 3 of 24 candidates were
+  board-feasible and all 120 attempts ended board_placement (precheck: no flip set, grid none). Fixed in 2774e392 (the flip-room
+  move keeps the base list); the result is evidence for i7-startdraw's 5o.1: the move to 0.07 is what gives the workable candidates.
+* **bdv_tableb (the A/B arm):** the same 27 candidates and the same order as the grid (12, 15, 11, 17, 19, 18). Candidate 12 (stand-off
+  0.45, trunk 0.95) fails board_placement: its listed table positions (0.56, -0.02) / (0.54, -0.10) / (0.58, +0.04) / (0.62, -0.06) are
+  0.10 m deeper than the base list and all out of the tall trunk's reach (the probe passes only at depth <= 0.54 and lateral <= -0.10,
+  bd_diag2), and the lattice, ordered nearest to the first listed position, spends the 12-probe cap before (0.51, -0.10) - the
+  position the grid finds on its 3rd probe because its order starts near the edge. Candidate 15 gets (0.51, -0.10) from the lattice and
+  fails path_collision; candidate 11 board_placement; candidate 17 (stand-off 0.35, the list's own stand-off, the board at (0.46,
+  -0.02)) writes, but its program check rejects 11 of 16 attempts (approach_untrackable, gripper_not_in_frame at the place descent).
+  31 probes per attempt vs 5. Its 5 written demos all succeed (3004-3525 steps).
+* **Verdict: the table-relative positions are worse than BD_BOARD_SEARCH's grid** (5 written / 16 attempts and 1.05 GPU-h per success
+  vs 8 / 8 and 0.32). Holding the board's inset from the edge constant moves it away from the base as the stand-off grows, while the
+  reach that limits the board is base-relative; the hand-set list worked at 0.35 because there inset and reach coincide. The switch
+  stays default off (no default change asked); the owner decides whether to keep it.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
