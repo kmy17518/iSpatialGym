@@ -80,9 +80,18 @@ def on(policy, monkeypatch):
     monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, "1")
 
 
-def test_off_by_default_is_today(policy, monkeypatch):
+def test_on_by_default(policy, monkeypatch):
+    """Lead decision 2026-11-08 #5 (owner away): the default after the A/B."""
     monkeypatch.delenv(IK.CAMERA_HULL_FALLBACK_ENV, raising=False)
-    assert IK.camera_hull_fallback_mode() == "off" and IK.CAMERA_HULL_FALLBACK_DEFAULT == "0"
+    assert IK.camera_hull_fallback_mode() == "on" and IK.CAMERA_HULL_FALLBACK_DEFAULT == "1"
+    chk, _ = _checker({CAM: 0.0035}, {"wrist_camera": 0.0008})
+    _picked(chk)
+    assert O.camera_clear(chk, Q, "right") is True
+
+
+def test_switch_off_is_today(policy, monkeypatch):
+    monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, "0")
+    assert IK.camera_hull_fallback_mode() == "off"
     chk, st = _checker({CAM: 0.0035}, {"wrist_camera": 0.003})
     _picked(chk)
     assert chk.__dict__.get("_policed_at", {}) == {}  # nothing recorded with the switch off

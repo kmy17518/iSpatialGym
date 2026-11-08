@@ -325,7 +325,7 @@ def support_hull_fallback_min_m() -> float:
 
 
 #: i7-camhull 2026-11-08 (owner_20261108g item 1, an APPROVED shared-gate change behind this switch; the default is the owner's after the
-#: A/B): the side_9 two-step of :data:`SUPPORT_HULL_FALLBACK_ENV` for the WRIST CAMERA against the POLICED support in the general pick
+#: A/B - DEFAULT ON since the lead's decision #5 of 2026-11-08, owner away): the side_9 two-step of :data:`SUPPORT_HULL_FALLBACK_ENV` for the WRIST CAMERA against the POLICED support in the general pick
 #: check. ``orient.camera_clear`` (the camera's padded spheres keep ``orient.CAMERA_MARGIN`` = 5 mm from the world at a grasp
 #: configuration, its support and the contacted object present) stays the screen; a NARROW failure - the camera's spheres clear at that
 #: margin less the model's 2 mm sphere buffer, and clear at the full margin with the policed supports out of the world (the touch is
@@ -336,10 +336,10 @@ def support_hull_fallback_min_m() -> float:
 #: support policy's own sphere stage (:data:`SUPPORT_HULL_FALLBACK_ENV`) nor FingerTouch (i7-ft2's ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS``)
 #: is touched: this is the separate 5 mm camera rule, so no verdict is judged by two fallbacks. The camera's support-top screen
 #: (``tabletop.wrist_camera_clearance`` < 5 mm) is only COUNTED by the same two-step (``camera_policy.top_screen.*``: what the rule would do
-#: there; its verdict never changes). ``0`` off (the default) / ``shadow`` (judged and counted, the verdict unchanged) / ``1`` on; kit
+#: there; its verdict never changes). ``0`` off (today's rule before the flip) / ``shadow`` (judged and counted, the verdict unchanged) / ``1`` on (the default); kit
 #: counters ``camera_policy.hull_fallback_{checked, passed, shadow_pass, failed.<why>}``, one ``CAMERA_HULL_FALLBACK`` line per judgement.
 CAMERA_HULL_FALLBACK_ENV = "ISPATIALGYM_CAMERA_HULL_FALLBACK"
-CAMERA_HULL_FALLBACK_DEFAULT = "0"
+CAMERA_HULL_FALLBACK_DEFAULT = "1"  # lead decision 2026-11-08 (owner away, delegated; lead_decisions_while_away #5) after the A/B; "0" = the former rule
 #: version of the camera rule's measurement (the cache identity under ``1``)
 CAMERA_HULL_FALLBACK_VERSION = 1
 
@@ -676,7 +676,9 @@ class IKChecker:
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
         #: i7-camhull (:data:`CAMERA_HULL_FALLBACK_ENV`): (arm, :func:`_q_key`) -> the supports the policy polices at that exact-IK result
         self._policed_at: Dict[Tuple[str, Tuple[float, ...]], List[Any]] = {}
-        if camera_hull_fallback_mode() == "on":  # only when it changes verdicts (shadow / off keep every key); not an exact-IK key
+        # under 1 (the default since the flip) the identity stays: a cached verdict written under the former rule (a persisted failure memo, a
+        # start-draw cell) must not satisfy this one; shadow / off keep the former keys; never an exact-IK key
+        if camera_hull_fallback_mode() == "on":
             self.cache_scope["camera_hull_fallback"] = [round(support_hull_fallback_min_m(), 5), CAMERA_HULL_FALLBACK_VERSION]
 
     def _holding(self, arm: str) -> bool:
