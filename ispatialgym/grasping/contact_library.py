@@ -199,11 +199,25 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
     return out
 
 
-def axial_rest(rest) -> Any:
+def axial_settled(params: Optional[Dict[str, Any]]) -> bool:
+    """i7-axialrest (owner 2026-11-08, decision 2): whether an axial family builds at the target's SETTLED v2 rest - the family param
+    ``settled_rest`` (``build_job`` sets it under the switch - the default since the owner's 2026-11-08 item 3 - for a TILTED rest only: the
+    one case the switch changes the build, refused without it, so the flip changed no library identity: upright libraries carry no param,
+    tqqwys's settled-rest maps keep theirs)."""
+    return bool((params or {}).get("settled_rest"))
+
+
+def axial_rest(rest, settled: bool = False) -> Any:
     """The axial program's placement: the target upright at the IDENTITY orientation turned about z (``object_pose_on(..., IDENTITY_QUAT, ...)``,
     the goal ``quat_from_yaw(yaw_goal)``) with the v2 entry's measured root height - the v2 rest must be that upright rest (tilt <= 0.05 rad),
-    else ``ValueError``."""
-    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > 0.05:
+    else ``ValueError``. ``settled`` (i7-axialrest, :func:`axial_settled`): the program places the target AT the v2 rest
+    (``R_z(yaw) * q_rest``, ``contact_poses.axial_settled_rest_on``) - a TILTED rest is returned unchanged; an upright one (tilt <=
+    ``contact_poses.AXIAL_UPRIGHT_TILT_RAD``) stays the identity rest under the switch too (owner 2026-11-08 item 3: upright draws as today)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    if settled and not CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float)):
+        return rest
+    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > CPZ.AXIAL_UPRIGHT_TILT_RAD:
         raise ValueError(f"the v2 rest {list(np.round(rest.quat_xyzw, 4))} is not the axial program's upright identity rest")
     return S.Rest(rest_id=rest.rest_id, quat_xyzw=np.array([0.0, 0.0, 0.0, 1.0]), h_root=float(rest.h_root), reference_yaw=0.0, record=rest.record)
 
@@ -219,6 +233,15 @@ def _axial_long(pts_obj: np.ndarray, params: Dict[str, Any]) -> np.ndarray:
     return np.array([math.cos(ang), math.sin(ang), 0.0])
 
 
+def _axial_height(pts_obj: np.ndarray, q_rest) -> float:
+    """The axial target's height above its support: the object-frame z extent at the upright identity rest (``q_rest`` None), else the world
+    z extent at the settled rest (i7-axialrest; ``AlignmentAxial``'s extents)."""
+    if q_rest is None:
+        return float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    z = pts_obj @ S.quat_to_mat(np.asarray([float(v) for v in q_rest], dtype=float))[2, :]
+    return float(z.max() - z.min())
+
+
 def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The axial STOP BRACE entries (``contact_poses.axial_stop_geometry`` + ``axial_brace_candidates`` - ``AlignmentAxial._stop_geometry`` /
     ``_brace_candidates``' rule): per GOAL yaw slot (relative to the stance; the object's root at its goal pose), long-axis end
@@ -227,17 +250,21 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     under 4 cm) and the pads on it (closing v / h, pad centre 5 mm outside the goal face), each clear of the target's sweep from its init
     pose. The entries are in the object frame AT THE GOAL POSE (the brace holds the object there while the push completes); ``load`` = the
     direction the end arrives in (``d_stop``, rule frame) and the end's point (goal object frame)."""
+    if params.get("clear_turns"):
+        return build_axial_brace_clear_turns(pts_obj, rest, knobs, params)
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.v2 import contact_poses as CPZ
     from ispatialgym.sampling.v2 import tabletop as TT
 
-    r0 = axial_rest(rest)
+    settled = axial_settled(params)
+    r0 = axial_rest(rest, settled)
+    q_rest = th.tensor([float(v) for v in r0.quat_xyzw], dtype=th.float32) if settled else None  # i7-axialrest: the settled rest (None: identity)
     hull = th.as_tensor(pts_obj, dtype=th.float32)
     turn = math.radians(float(params.get("turn_deg", AXIAL_TURN_DEG)))
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
     proj = (hull - com_local) @ long_local
-    h = float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    h = _axial_height(pts_obj, q_rest)
     z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
     out = []
     for yaw_goal in _yaws(params):
@@ -246,11 +273,11 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
             for spin in (1.0, -1.0):
                 d_goal = spin * turn
                 yaw0 = yaw_goal - d_goal
-                q0 = C.quat_from_yaw(yaw0)
+                q0 = C.quat_from_yaw(yaw0) if q_rest is None else CPZ.axial_rest_pose(q_rest, yaw0)
                 pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
                 com = pose_init[0] + C.quat_rotate(q0, com_local)
                 end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
-                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace)
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace, rest_quat=q_rest)
                 T_goal = CPZ._mat(goal_pose)
                 Ti = np.linalg.inv(T_goal)
                 end_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), end - pose_init[0])) + goal_pose[0]
@@ -276,6 +303,109 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     return out
 
 
+
+#: i7-brace (owner 3.4): the turn grid (deg) a clear-turn axial brace entry is tested over (the axial deviation range is 20-70 deg)
+AXIAL_CLEAR_TURNS_DEG = tuple(float(v) for v in range(5, 95, 5))
+
+
+def clear_turn_max(hull: th.Tensor, com_local: th.Tensor, goal_pose, spin: float, disc: Dict[str, Any], turns_deg: Sequence[float] = AXIAL_CLEAR_TURNS_DEG,
+                   settled: bool = False) -> float:
+    """The largest turn (deg, of ``turns_deg``) up to which the brace's sweep disc stays clear (``tabletop.blade_sweep_clear`` - the sampler's own
+    test - at EVERY grid turn up to it): the object rotated back from ``goal_pose`` by ``spin x turn`` about its fixed centre of mass. 0 when
+    the smallest turn already fails. ``settled`` (i7-axialrest): the start orientation is the goal's turned about z (``R_z(-turn) q_goal``,
+    which keeps a tilted rest) instead of the upright ``R_z(yaw_goal - turn)``."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    com = goal_pose[0] + C.quat_rotate(goal_pose[1], com_local)
+    yaw_goal = math.atan2(float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[1]), float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[0]))
+    best = 0.0
+    for t in sorted(float(v) for v in turns_deg):
+        d_goal = spin * math.radians(t)
+        q0 = C.qmul(C.quat_from_yaw(-d_goal), goal_pose[1].float()) if settled else C.quat_from_yaw(yaw_goal - d_goal)
+        pose_init = (com - C.quat_rotate(q0, com_local), q0)
+        ok, _gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, disc["xy"], float(disc["radius"]), float(disc["clearance"]))
+        if not ok:
+            break
+        best = t
+    return best
+
+
+def build_axial_brace_clear_turns(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """i7-brace (owner 3.4, library param ``clear_turns``; default off): the axial stop brace entries at the GOAL pose keyed by pushed end x
+    spin (not turn size), each recording the START RANGE it stays clear for - ``goal.clear_turn_max_deg``, the largest turn of
+    :data:`AXIAL_CLEAR_TURNS_DEG` at which the sampler's sweep test (``blade_sweep_clear``) holds at every grid turn up to it - instead of one
+    45 deg build: the candidates of ``axial_brace_candidates`` without its sweep filter (``sweep_check=False``) and, after them, the
+    OPPOSITE-END candidates (``axial_opposite_brace_candidates``: the far end's face, resisting the same turn; classes ``<end><spin>spin_opp_*``).
+    A candidate clear at no grid turn is left out. The candidate poses at the goal do not depend on the turn (the stop face and d_stop are
+    the pushed end's at the goal); ``load`` is the arriving end's (the far end's for an opposite entry)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    settled = axial_settled(params)
+    r0 = axial_rest(rest, settled)
+    q_rest = th.tensor([float(v) for v in r0.quat_xyzw], dtype=th.float32) if settled else None  # i7-axialrest: the settled rest (None: identity)
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    turns = [float(v) for v in (params.get("clear_turns_deg") or AXIAL_CLEAR_TURNS_DEG)]
+    ref = math.radians(min(turns))  # the reference init pose of the candidate generator (the poses at the goal do not depend on it)
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
+    proj = (hull - com_local) @ long_local
+    h = _axial_height(pts_obj, q_rest)
+    z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
+    out = []
+    for yaw_goal in _yaws(params):
+        for end_sign in (1.0, -1.0):
+            half_len = float(proj.max() if end_sign > 0 else -proj.min()) - AXIAL_END_INSET_M
+            opp_half = float(-proj.min() if end_sign > 0 else proj.max()) - AXIAL_END_INSET_M
+            for spin in (1.0, -1.0):
+                d_goal = spin * ref
+                q0 = C.quat_from_yaw(yaw_goal - d_goal) if q_rest is None else CPZ.axial_rest_pose(q_rest, yaw_goal - d_goal)
+                pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
+                com = pose_init[0] + C.quat_rotate(q0, com_local)
+                end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
+                opp_end = com - C.quat_rotate(q0, long_local) * end_sign * opp_half
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace, rest_quat=q_rest)
+                T_goal = CPZ._mat(goal_pose)
+                Ti = np.linalg.inv(T_goal)
+                skips: Dict[str, int] = {}
+                seen = set()
+                gens = [(False, CPZ.axial_brace_candidates(CPZ.MAP_FRAME, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push, face_z=face_z,
+                                                           height=h, skips=skips, sweep_check=False))]
+                if params.get("opposite_end", True):
+                    gens.append((True, CPZ.axial_opposite_brace_candidates(CPZ.MAP_FRAME, hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace,
+                                                                           d_goal, z_push=z_push, face_z=face_z, height=h, skips=skips, sweep_check=False,
+                                                                           rest_quat=q_rest)))
+                for opp, gen in gens:
+                    for pre, contact, kind, extras in gen:
+                        disc = extras.pop("sweep_disc")
+                        t_max = clear_turn_max(hull, com_local, goal_pose, spin, disc, turns, settled=settled)
+                        if t_max <= 0.0:
+                            skips["never_clear"] = skips.get("never_clear", 0) + 1
+                            continue
+                        cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+                        while cls in seen:
+                            cls += "#"
+                        seen.add(cls)
+                        pitch = float(str(extras["pose_class"])[len("blade_"):]) if str(extras.get("pose_class", "")).startswith("blade_") else 0.0
+                        e = CPZ.contact_entry("brace", cls, "axial_brace", "brace", T_goal, contact, pre, dict(extras, kind=kind),
+                                              face_rule=("the far end's face the far end arrives at (opposite d_stop)" if opp else
+                                                         "the goal hull's stop face the pushed end arrives at (d_stop)") + ", at 3/4 of the height; the blade at the push height",
+                                              support_z=0.0, object_height=h, pitch_deg=pitch)
+                        e["yaw_deg"] = round(math.degrees(yaw_goal), 4)
+                        e["goal"] = {"yaw_goal_deg": round(math.degrees(yaw_goal), 4), "turn_rad": round(spin * math.radians(t_max), 6), "end_sign": end_sign,
+                                     "spin": spin, "clear_turn_max_deg": t_max, "opposite_end": bool(opp), "skips": dict(skips)}
+                        a_end = opp_end if opp else end
+                        a_d = th.tensor(extras["opp_d_stop"]) if opp else d_stop
+                        a_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), a_end - pose_init[0])) + goal_pose[0]
+                        e["load"] = {"frame": "rule", "direction": [round(float(v), 6) for v in a_d.tolist()],
+                                     "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ a_goal.double().numpy() + Ti[:3, 3])],
+                                     "what": "the right arm's axial push brings the " + ("far end into its stop" if opp else "end into the stop") + " at the goal"}
+                        out.append(_redigest(e))
+    return out
+
+
 def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The axial push entries (``AlignmentAxial._sample_with``'s classes on the shared rules: ``axial_push_height``, ``axial_blade_geometry``,
     ``extreme_point``, ``axial_push_chain``) of the target at each yaw slot: per long-axis end (``AXIAL_END_INSET_M`` inside it) and turn sense,
@@ -292,7 +422,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     turns = [math.radians(float(v)) for v in (params.get("turns_deg") or ([params["turn_deg"]] if params.get("turn_deg") is not None else AXIAL_PUSH_TURNS_DEG))]
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = params.get("long_axis")
-    rest = axial_rest(rest)  # the axial program's upright identity placement
+    rest = axial_rest(rest, axial_settled(params))  # the axial program's upright identity placement (i7-axialrest: or its settled v2 rest)
     out = []
     for yaw in _yaws(params):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
@@ -444,6 +574,18 @@ def resolved_knobs(family: str, knobs: Dict[str, Any], subtask: Optional[str]) -
     return {k: v for k, v in out.items() if v is not None}
 
 
+def _settled_switch_on() -> bool:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.axial_settled_rest_on()
+
+
+def _upright(rest) -> bool:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float))
+
+
 def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, Any]]:
     """The push / brace libraries (``{kind: library}``) of one job: ``{"id", category / model / scale / entry, "families": [...],
     "generation": {knobs of the alias family}, "subtask", "params": {family: {stroke_m, yaws, turn_deg, long_axis, com_local}}}``."""
@@ -464,6 +606,10 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
             raise NotImplementedError(f"family {fam}: {spec['missing']}")
         knobs = dict(job.get("generation") or {})
         params = dict((job.get("params") or {}).get(fam) or {}, subtask=job.get("subtask"))
+        if fam in ("axial_push", "axial_brace") and _settled_switch_on() and not _upright(rest):
+            # i7-axialrest: the library's identity carries the switch only where it changes the build - a TILTED rest (refused without the
+            # switch); an upright rest builds today's identity-rest library under the switch too (owner 2026-11-08 item 3), its identity unchanged
+            params["settled_rest"] = True
         t0 = time.time()
         entries = spec["builder"](pts, rest, knobs, params)
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})

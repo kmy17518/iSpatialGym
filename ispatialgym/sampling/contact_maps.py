@@ -117,6 +117,9 @@ def class_row(entry: Dict[str, Any]) -> Dict[str, Any]:
            "pose_digest": entry_pose_digest(entry), "verdict": (entry.get("validation") or {}).get("verdict")}
     if entry.get("goal"):
         row["goal"] = {k: entry["goal"].get(k) for k in ("yaw_goal_deg", "turn_rad", "end_sign", "spin")}
+        for k in ("clear_turn_max_deg", "opposite_end"):  # i7-brace (owner 3.4): the clear-turn build's facts, only when the entry has them
+            if entry["goal"].get(k) is not None:
+                row["goal"][k] = entry["goal"][k]
     return row
 
 

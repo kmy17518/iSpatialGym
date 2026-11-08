@@ -2967,6 +2967,222 @@ inside_04's 2 near-band rejections are gone (the same two no_trunk cases now ski
 under_small_03's 620002 wrote nothing (15 attempts: target_placement 17 - grasp / place reach - and the one below-band reject); the
 near band did not act there (near_skipped 0), so the 8 -> 21 attempts are N 4 sampling variance, not the change.
 
+### i7-axialrest (owner decision 2, 2026-11-08): the axial program at the target's settled rest
+
+Owner decision, verbatim prompt `prompt_goalmaps_axialrest_overpath.md` section 2 (DECISIONS 2026-11-08 "OWNER DECISIONS"): spawn the axial target
+at its v2 settled rest, compose the goal yaw with that rest's tilt, build the axial library at the settled rest, and compare the goal in that
+frame. It is approved as a program and goal-definition change. Switch `ISPATIALGYM_AXIAL_SETTLED_REST=1`, default off (4d22896d); the merge of
+i7-brace 9d2ce7e3 (6ab54ba7) supplies the clear-turn axial_brace builder.
+
+**Diagnosis.**
+- The success check (`pose_reached`, geometric success, QA `not_reached`) compares the full quaternion with the TRO target. Before the
+  switch that target was the upright `R_z(yaw_goal)`.
+- The evaluation tolerance comes from the isg-v2 profile: max(0.05, 10 % of the change), 0.05-0.117 rad for these demos, not the TRO's
+  0.10.
+- The oracle's push stops use the yaw about z, so the tilt does not affect them.
+- The 19 past axial_05 demos: 2 succeeded, 14 not_reached, 3 plan_failed. The spoon settles 0.087-0.093 rad tilted; the v2 rest r0_other
+  is tilted 0.0866.
+- Of the 14 not_reached:
+  - 7 reached the goal heading within 0.0055 rad and failed on the tilt alone;
+  - 5 fell 0.087-0.18 rad short of the turn;
+  - 2 lost the target.
+- The 2 successes turned more than 0.92 rad, so their tolerance exceeded the tilt.
+
+**What the switch changes.**
+- **Placement:** `R_z(yaw0) * q_rest`, with the root at the support top + `h_root`. The rest is the push_blade map's `object.rest`, the
+  v2 entry the library was built and validated at.
+- **Goal:** `R_z(yaw_goal) * q_rest`. After the settle the goal is the settled orientation turned about the vertical to the aligned
+  heading, written into the TRO target. The full check then measures the turn alone, because the hinge keeps the tilt.
+- **Sites changed (identity / upright assumptions):**
+  - `band_spec.rest_quat`;
+  - the placement draw;
+  - `after_settle`'s goal;
+  - `_aligned_yaw` (the front axis at the rest);
+  - the template extents and height;
+  - `axial_stop_geometry`'s goal pose, and the stop points flush with a tilted face's outermost projection;
+  - the opposite-end brace;
+  - `contact_library.axial_rest`: under the switch it returns the v2 rest (family param `settled_rest`, in the library identity only
+    when on);
+  - the start pose of the 45 deg build, the clear-turn build and `clear_turn_max`.
+- **Map rest check:** a map whose entry rest is not the program's rest is a miss. The push rejects `missing_map`; the optional brace is
+  skipped.
+- **Counters:** `axial_rest.settled_used`, `.no_v2_rest`, `.map_rest_mismatch.<kind>`; `summary.axial_rest` records the tilts and the
+  turn.
+- The validator already settles at `R_z(yaw) * v2 rest` and judges the turn from the settled start, so the library entries and the
+  program now stand on the same rest.
+
+**tqqwys library and maps** (`$OFH/axialrest_20261108`):
+- push: 85 valid of the validated entries;
+- axial_brace (clear-turn build): 48 valid, 12 per end x spin group;
+- both maps are at h0.8126;
+- staged in `$OFH/v2maps_int1_axialrest` (= brace34b + the two maps).
+
+**A/B:** tags `i7ar_off` / `i7ar_on`, trunk_4d22896d, svl titanrtx, v2only N 4, the same indices 310000-310003, root
+`$OFH/v2maps_int1_axialrest`. Both arms run with TURN_COVER=1 and OPPOSITE=1; the switch is the only difference. Full record: DECISIONS
+"i7-axialrest RESULTS" (2026-11-08).
+
+| alias | off att / wr / ok | off GPU-h per success | on att / wr / ok | on GPU-h per success | brace present (off / on) |
+|---|---|---|---|---|---|
+| axial_05 (tqqwys, tilt 0.0866) | 0 / 0 / 0 (missing_map) | - (0.09 GPU-h) | 30 / 4 / 2 | 0.17 | - / 0 of 4 |
+| axial_01 | 11 / 4 / 2 | 0.17 | 12 / 4 / 3 | 0.090 | 2 / 1 of 4 |
+| axial_03 | 6 / 4 / 4 | 0.048 | 10 / 4 / 4 | 0.050 | 2 / 3 of 4 |
+| axial_04 | 21 / 4 / 4 | 0.055 | 14 / 4 / 2 | 0.090 | 0 / 0 of 4 |
+| all | 38 / 12 / 10 | 0.083 | 66 / 16 / 11 | 0.090 | |
+
+- **axial_05 off:** 0 attempts, as expected. The setup is rejected `no_stance` because both edges are `missing_map`: the settled-rest map
+  is not the identity program's rest (`axial_rest.map_rest_mismatch.push_blade` 1). tab_i's missing_map column shows 0, because the
+  reject happens at setup.
+- **axial_05 on:** `axial_rest.settled_used` 32.
+  - Rejections: target_placement 19 (mostly no push-feasible placement on the push_blade map), program_check_failed 4, approach_untrackable 3.
+  - The brace never landed: brace_ik_failed in all 4 written demos (kit paired 21, push_only 11, opposite_used 0).
+- **Turn vs tilt on axial_05 on.** In every demo the goal tilt equals the settled tilt (0.086-0.087); the full error equals the heading
+  error within 0.0002 rad.
+  - 310002 and 310003 succeeded: turns 1.21 / 1.22 rad, errors 0.016 / 0.020 (tolerance 0.12).
+  - 310000 not_settled: turn 0.425, short by 0.088 (tolerance 0.05).
+  - 310001 robot_wobble: lost by 1.21.
+  - No demo here was decided by the goal frame. The frame matters for turns below ~0.87 rad.
+- **Regression on axial_01 / 03 / 04.** The rests are the identity within 5e-6 rad.
+  - The only program difference: the pre-settle drop is 3.0 mm lower (top + h_root instead of `object_pose_on`'s + Z_OFFSET 3 mm). The
+    settled pose is identical within 0.1 mm.
+  - The same draws (6 instances) give identical attempt, yaw, push end, brace and status in both arms.
+  - The other draws diverge on the 3 mm. axial_04 on's 2 failures are spin +1 draws the off arm never drew: within N 4 noise, not
+    attributed to the switch.
+- **For the owner (default unchanged):** the switch works as approved and is inert on upright rests except the 3 mm drop.
+  - Recommend default on, together with tqqwys's settled-rest maps in the consolidated root. The switch off with those maps gives
+    missing_map.
+  - Option: keep the 3 mm drop under the switch, so upright rests stay draw-identical.
+
+#### Owner item 3 (2026-11-08, owner_20261108g): the settled rest is the DEFAULT
+
+Owner decision, verbatim: "Make ISPATIALGYM_AXIAL_SETTLED_REST the default, in its own commit, together with tablespoon tqqwys's
+settled-rest push_blade / axial_brace maps in the consolidated root (they must go together: switch off with those maps gives missing_map).
+Keep the usual 3 mm drop gap for upright rests (tilt <= 0.05 rad), so axial_01/03/04 draw exactly as today. Unit test that an upright rest
+places identically with the switch on and off. Snapshot; confirm with one N 4 v2only run of axial_05 and axial_01 / 03 / 04 on the staged
+root, same indices as i7ar_on. axial_05's brace never landing (IK failed in all 4) is a follow-up: diagnose it (CPU first), report, no fix
+without asking."
+
+- Checked first: the switch was not the default on this branch (4d22896d read "0").
+- **289ca4c3 - upright rests stay today's program.** An upright v2 rest (tilt <= `contact_poses.AXIAL_UPRIGHT_TILT_RAD` = 0.05 rad,
+  the same test `contact_library.axial_rest` already applied) is the identity rest under the switch too:
+  - `object_pose_on` places it, with the usual 3 mm drop gap, not top + h_root;
+  - the goal, aligned yaw, extents and stop geometry are today's; counter `axial_rest.upright_identity`;
+  - the library side matches: `axial_rest` returns the identity for an upright rest under the switch, and `build_job` writes
+    `settled_rest` into the library identity only for a TILTED rest (one the switch-off build refuses). So no library identity moves with
+    the flip: upright libraries carry no param, and tqqwys's settled-rest maps keep their keys.
+  - Tests (`test_axial_settled_rest.py`, 16 pass): an upright rest places bit-identically on and off (pose, orientation, aligned yaw,
+    stop geometry; z = top + bottom offset + 3 mm) for the identity, magazine tfovwy's rest and a 0.04 rad tilt; a tilted rest still
+    settles at top + h_root; an upright library has the same digest and entries on and off.
+- **dee19fcb - the default flip** (own commit): `ISPATIALGYM_AXIAL_SETTLED_REST` defaults on; `=0` turns it off.
+- **The maps that must go with it** (the flip and these two maps fold in together; with the switch off they are a rest mismatch, so
+  axial_05 gets `missing_map`):
+  - `maps/tablespoon__tqqwys__s1/cmap__push_blade__tablespoon__tqqwys__h0.8126__cba67061f6a58376` (.json + .npz; library digest
+    3318755d5aaa873e, params settled_rest);
+  - `maps/tablespoon__tqqwys__s1/cmap__axial_brace__tablespoon__tqqwys__h0.8126__8753ec81a0698bed` (.json + .npz; library digest
+    da04050a5da62ad3, clear-turn build + opposite end, settled_rest);
+  - staged root for the integration: `$OFH/v2maps_int1_axialrest` (= `v2maps_int1_brace34b` + these two maps; source
+    `$OFH/axialrest_20261108/libs_push`, `libs_brace`).
+- The axial brace switches: this branch merged i7-brace at 9d2ce7e3, before i7-brace's own default commit 59f7967b. The confirm run
+  passes `ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1` and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1` explicitly, as i7ar_on did; 59f7967b is not
+  merged here (it would bring i7-brace's wall_brace work along).
+- Suite on 38ee02e8: 23 failed + 3 errors, the same set as with the base d72185da's files. 38ee02e8 moves test_contact_library's
+  lying-rest refusal to the switch-off setting (`=0`).
+- **Confirm run** `i7ar_def`: trunk_38ee02e8, svl titanrtx, v2only N 4, indices 310000-310003 as i7ar_on, root
+  `$OFH/v2maps_int1_axialrest`, alias memory v0027 pinned, no settled-rest env, both brace switches explicit (DECISIONS "i7-axialrest
+  CONFIRM").
+
+| alias | att / wr / ok | GPU-h per success | vs |
+|---|---|---|---|
+| axial_05 | 20 / 4 / 3 | 0.10 | i7ar_on 30 / 4 / 2 |
+| axial_01 | 11 / 4 / 2 | 0.17 | all 4 draws identical to i7ar_off (11 / 4 / 2) |
+| axial_03 | 6 / 4 / 4 | 0.048 | all 4 draws identical to i7ar_off (6 / 4 / 4) |
+| axial_04 | 12 / 4 / 2 | 0.095 | 2 draws identical to i7ar_off; 2 diverge at a run-to-run program_check IK-branch verdict |
+| all | 49 / 16 / 11 | 0.093 | i7ar_on 0.090, i7ar_off 0.083 |
+
+  - The upright placements are back at the off arm's push heights (no 3 mm lower drop).
+  - axial_05 310001 succeeded at a 0.445 rad turn: full error 0.0027 against a 0.050 tolerance. The upright goal would have failed it on
+    the 0.087 tilt, so this is the first success the goal frame decides.
+  - The brace still failed in all 4 axial_05 demos (`brace_ik_failed`), as diagnosed below.
+
+**axial_05's brace never landing: CPU diagnosis (no fix made).** Script `$OFH/axialrest_20261108/brace05.py` rebuilds the sampler's
+brace candidates of the 4 written i7ar_on demos and reads the axial_brace map at the goal cell.
+- **Arm:** the left (stop brace); the right is locked at its push goal while the brace is solved.
+- **Entries:** the map has 16 classes, all blades at face fraction f0, pitch 0 / 30, either wrist turn. The -end groups hold only their
+  own-end blades, the +end groups only opposite-end blades. In every draw one side is skipped whole by the sweep (the reconstruction
+  reproduces the recorded skips 5 / 5 / 6 / 6).
+- **Map vs live:** the map calls 1-2 classes of the drawn group feasible at the goal cell; those exact classes fail live. blade_0- /
+  opp_blade_0 fail the exact IK at the pre; blade_30- intersects the target at its goal pose (3 mm) or is untrackable.
+- **Pre vs reach:** not reach. Every pre is 0.17-0.33 m inside the left arm's reach sphere at the stance trunk, 7-12 cm above the top.
+- **Collisions (CPU evidence):** the map is single-arm, the live check is two-arm. 310001's opposite-end blade sits 7 mm from the right
+  push hand's goal pose; the own-end blades sit 8.7-9.0 cm from it. The locked push arm (or the goal hull's 3 mm margin) is the likely
+  cause; a GPU replay of `brace_second_arm` with the collision pairs would separate them.
+- **The 3 braces that did land** were `left_h-` pads, which have no map class: the thin target's fallback after every blade failed. The
+  pad's pre stands 2.2 cm above the table. program_check rejected the whole attempt ("support_policy: non-finger link touches the
+  support"), 3 of the 4 program_check_failed. The sampler's brace screening does not apply the support policy at the pre, so a refused
+  brace costs the attempt instead of leaving it push-only.
+- **Options for the owner:** (1) screen the brace pre with the program check's support policy (a refused brace -> push-only); (2) thin
+  targets try only the map's validated classes; (3) the map / joint placement checks the brace with the right arm at its push goal. A GPU
+  probe of the collisions comes first.
+
+**5v: axial_05's brace - the GPU probe and the pre-policy switch (owner 2026-11-08 5v.1 / 5v.2).**
+Owner decision, verbatim: "5v.1 APPROVED: a GPU probe to separate the locked push arm from the 3 mm target margin as the cause of the brace
+IK / collision failures (diagnosis only). 5v.2 Then the first fix, behind a switch: check the brace pre pose against the program check's
+support policy at sampling, so a refused optional brace leaves the attempt push-only instead of costing the whole attempt. N 4 v2only A/B on
+axial_05 (+ axial_01/03/04 as the regression check). Default after I see it."
+
+- Checked first: neither was on the branch (tip e9d39ac9).
+- **384c25de** (snapshot trunk_384c25de), both switches default OFF:
+  - `ISPATIALGYM_AXIAL_BRACE_PROBE=1` (diagnosis only): every brace candidate that fails at sampling is re-checked with one cause removed at
+    a time - `again` (the same call), the target check at 2 / 1 / 0 mm, no target check, `no_right` (the right arm at the stance posture,
+    not at its push goal), both, `empty` (also every spawned object out) - one `AXIAL_BRACE_PROBE {json}` log line, plus the blame of the
+    no-right configuration with the right arm put back at its goal. Verdicts unchanged; the solver's remembered solutions are restored.
+  - `ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1`: a candidate that passed `brace_second_arm` gets the program check's own brace `pre` call
+    (fresh exact IK of the left arm from the stance configuration, closed fingers, target + supports in the ignore set, target approached;
+    `IKChecker.exact` applies the shared support policy). A `support_policy` failure fails the candidate (next one; none left = push-only);
+    any other failure is counted (`other_fail`), not refused. Counters `axial_brace.pre_policy.checked / passed / refused[.<label>] /
+    push_only / other_brace / other_fail`. No shared gate or policy changed.
+  - Tests `test_axial_brace_pre_policy.py` (4; with test_axial_settled_rest 20 pass). Suite at 384c25de: 23 failed + 3 errors, the same 26
+    ids as the base e9d39ac9 run side by side on lambda. pyflakes clean.
+- Runs: svl titanrtx, v2only N 4, indices 310000-310003 (i7ar_def's), root `$OFH/v2maps_int1_axialrest`, alias memory v0027, overlay r3,
+  `TURN_COVER=1` + `OPPOSITE=1` explicit in every arm. Tags `i7ar_probe` (axial_05, PROBE=1), `i7ar_pol` (PRE_POLICY=1), `i7ar_pol0` (same
+  snapshot, off). Record `$OFH/axialrest_20261108` (`loop_5v.sh`, `jobids_5v.txt`, `probe_tab.py`, `probe_sum.py`).
+
+**5v.1 probe** (i7ar_probe, 87 failed candidates, 20 att / 4 wr / 3 ok): neither the locked push arm nor the 3 mm margin is the main cause.
+
+| what frees the candidate | count | where |
+|---|---|---|
+| nothing: fails with the right arm at the stance posture and every spawned object out (the left arm's IK / joint limits at that pose) | 67 | ik at the pre 48, contact untrackable 10, ik_joint_limit 9; all pads, all opposite-end blades, blade_0 / blade_0- 12 of 12 |
+| removing the target check entirely (the blade overlaps the target's goal hull: still fails at 2 / 1 / 0 mm) | 11 | blade_30 3, blade_30- 2, blade_45 3, blade_45- 3 |
+| removing the locked push arm AND the target check | 7 | blade_30- 2, blade_45- 2, blade_60 2, blade_60- 1 |
+| removing the locked push arm alone | 1 | left_v |
+| other spawned objects | 1 | blade_45 |
+| the 3 mm margin alone (ok at 2, 1 or 0 mm) | 0 | |
+| the same call again (solver noise) | 0 | |
+
+- Where the push arm is in the way, the blame is the two hands: left gripper / finger vs the right wrist camera / gripper, 4-40 mm deep.
+- The axial_brace map calls blade_0- feasible at 310002 / 310003's goal cell, yet live it has no IK even in the empty world: the map and
+  the live check disagree on the brace pose itself (one-arm map vs two-arm live is not the explanation for these).
+
+**5v.2 A/B** (att / written / ok, GPU-h per success):
+
+| alias | i7ar_def (38ee02e8) | i7ar_pol0 (off) | i7ar_pol (on) | where the switch acted |
+|---|---|---|---|---|
+| axial_05 | 20 / 4 / 3, 0.10 | 20 / 4 / 3, 0.093 | 20 / 4 / 3, 0.087 | 310000 att 10: left_h, left_h-, left_h refused -> push-only |
+| axial_01 | 11 / 4 / 2, 0.17 | 9 / 4 / 3, 0.090 | 11 / 4 / 2, 0.17 | 3 checked, 3 passed |
+| axial_03 | 6 / 4 / 4, 0.048 | 6 / 4 / 4, 0.045 | 8 / 4 / 3, 0.067 | 3 checked, 0 refused, 1 other_fail |
+| axial_04 | 12 / 4 / 2, 0.095 | 16 / 4 / 3, 0.067 | 18 / 4 / 4, 0.050 | 310001 att 6: left_v refused -> push-only |
+| all | 49 / 16 / 11, 0.093 | 51 / 16 / 13, 0.071 | 57 / 16 / 12, 0.082 | 4 refusals, 2 attempts made push-only |
+
+- "pre: support_policy" program-check rejections: 1 in each off arm (and the probe run), always axial_05 310000 attempt 10; 0 in the on arm.
+- That attempt then still died at the program check on the push itself ("push pre-contact witness 3.16 rad ... another branch"), as
+  attempt 11 does in the off arms; axial_04 310001 attempt 6 was written push-only in all arms. So the switch removes the brace rejection
+  but changes no success at N 4.
+- axial_03 diverged at 310002 attempt 0 before the switch refused anything: live, `opp_blade_45-` passed `brace_second_arm` (the off arms
+  drew `opp_blade_60`); the sampling pre call already failed it on `ik_joint_limit` (`other_fail`, not refused, outside the decision), and
+  the program check rejected the attempt on the same reason.
+- Default unchanged (owner decides). Open for the owner: (a) the flip; (b) whether the sampling pre call should refuse on any failure, not
+  only the support policy (it would have caught axial_03 310002/0); (c) the brace itself: 67 of 87 candidates have no IK in the empty
+  world, so the map / live brace pose mismatch, not the two-arm check, is what keeps axial_05's brace from landing.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
