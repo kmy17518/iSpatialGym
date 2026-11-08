@@ -2448,6 +2448,38 @@ trunk (0.0, -0.61) fail at the partner-drawn place, the (0.25, -0.53) place-scre
 redraw: no effect (no start cell under the cap). DRAW: all-removed attempts 47 -> 0, written per attempt touching_04 0.044 -> 0.11,
 touching_02 0.045 -> 0.16; GPU-h per success 1.22 -> 0.61 / 0.15 -> 0.20 (demo success N 4 noise).
 
+**Owner decisions 2026-11-08 c, 5r (i7-contact3).**
+- 5r.1 defaults (each its own commit): `ISPATIALGYM_PLACE_DEPTH_CAP_DRAW` default "1" (e60b4dc5; "0" = the draw of before; the SPA cell key
+  keeps its entry when on) and `ISPATIALGYM_TOUCH_LIFT_SCREEN` default "1" (fcb75869; "0" off, "shadow" counts only).
+- 5r.2 (an oracle QA rule, approved for exactly this): `ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED=1` (913e8692, default off). While a brace is
+  active, `Monitors._check_protected` skips a new contact whose (link, object) pair is one of the running action's `allowed` pairs
+  (`Executor.brace_allowed_pairs`: the brace hand's finger / gripper links on the object it braces, set only while a brace's span contains the
+  action), limited to the links of an arm that does not move in the action (the other arm's move). Every other pair keeps its rule; the
+  1 cm movement check is unchanged; no active brace = nothing changes. Stats event `protect_brace_allowed` (once per pair and span) + a log
+  line. Tests (test_protection.py): the listed pair is allowed; unlisted pairs (moving arm's finger, brace-arm wrist, brace fingers on another
+  protected object, the brace arm's own move) fail; no brace / switch off unchanged.
+- touching_04 follow-ups (b4b4e9aa, default off): `ISPATIALGYM_TOUCH_A1_SCREEN=shadow|1` - the goal check's push stance search at the draw as
+  far as it is certain: A1's map-feasible, collision-free push stances (the same `push_stance_candidates` call, first `push_stance_max_exact`)
+  must hold one from which the carried box's place passes (`place_infeasible_why`, the goal check's own "place:" verdict); none =
+  contact_unreachable at the draw. No A1 stance (the goal check then falls back to laterals), the shelf layout, the tip release: not screened.
+  Kit `touch_a1_screen.*`. In c2 the 5 goal-check contact_unreachable (~129 s each) were 2 x "every A1 stance's place fails" (what the screen
+  catches) and 3 x "the only A1 stance (-0.08, s0.30) at trunk (0.25, -0.533) is map-feasible but has no exact class" (hand overlap
+  -15 mm, IK). `ISPATIALGYM_TOUCH_BUILT_TILTS=1` - `tabletop.phase2_tilts`' hook: the touching Phase 2 (plain and split cone) scans the
+  touch_push map's eligible trunk tilts at each translate within the torso limit instead of `tilt_scan`'s 7 continuous samples (at translate
+  0.25: 0, -0.266, -0.533, ...; at 0: 0, -0.305, -0.611, ...), so the manipulation and push stances read built columns; in the SPA cell key
+  when on; kit `touch_built_tilts.*`.
+- symbolic_only diagnosis (diagnosis only; `$OFH/contact3_20261108/sym_diag`: sym_scan.py, rows.json, SUMMARY.txt): over 87 touching_04
+  demos with a push (40 tags) 38 failed symbolic_only, every one on the spray bottle's ORIENTATION, turned during the push: median |dyaw|
+  8.8 deg (failures) vs 0.8 (successes), limit 5.7. It turns while it slides (0 -> 45 mm in 0.4-0.6 s), before it reaches the detergent
+  (c2 320203, no brace: the detergent moved 0.0 mm, the bottle -16.5 deg). The push line runs through the FOOTPRINT centroid
+  (`swept_push_candidates`), +3.7..4.2 mm (median) off the object's root; in 37 of 46 turned demos the turn's sign is the one an off-centre
+  push gives; |offset| 6-9 mm: 13 / 16 turned > 5.7 deg, 0-3 mm: 7 / 23. Higher contacts tip the bottle more (max tilt median 5.8 / 11.4 /
+  17.3 deg for height fraction < 0.22 / 0.22-0.33 / > 0.33); the 5 cm pushes (0.18) with offset < 3 mm: 5 / 5 ok. The brace is always on the
+  partner (detergent) and does not matter (none 25 / 54 failed, brace_tip_h-_p15 9 / 18). c2's two failures: 8.2 / 8.0 cm (0.30 / 0.29),
+  offset +7.9 / +5.5 mm, -15.0 / -16.5 deg, both at trunk (0.25, -0.533); lower classes failed the hand-overlap screen. Fix candidates for
+  the owner (not implemented): the push line through the mass centre / root; lower contacts first; a yaw guard in the push; a guide on
+  the target instead of the partner brace.
+
 **3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
 _pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
 `_pack_stage_actions` (a sidecar that still carries `pack` is refused: SidecarError), the program check's pack push handling
