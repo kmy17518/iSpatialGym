@@ -476,3 +476,31 @@ def test_find_near_reads_the_map_heights_whatever_the_model_name(tmp_path, monke
     cm = CMAP.ContactMap.find_near(str(tmp_path), "wall_brace", "hanger__hjdaqn__s1", 1.46, 0.03)
     assert cm is not None and asked == [1.45] and cm.lookup_how["map_h"] == 1.45
     assert CMAP.ContactMap.find_near(str(tmp_path), "wall_brace", "hanger__hjdaqn__s1", 1.30, 0.03) is None
+
+
+def test_the_brace_load_diagnostic_switches_are_off_by_default(monkeypatch):
+    """i7-brace 5w.3 (owner 20261108h: count only): unset = today's load; a correction implies the record."""
+    from ispatialgym.grasping import validate_contacts as VC
+
+    for k in ("DIAG", "WAKE", "MEASURED"):
+        monkeypatch.delenv(f"ISPATIALGYM_GC_BRACE_LOAD_{k}", raising=False)
+    assert VC.brace_load_switches() == {"diag": False, "wake": False, "measured": False}
+    monkeypatch.setenv("ISPATIALGYM_GC_BRACE_LOAD_WAKE", "1")
+    assert VC.brace_load_switches() == {"diag": True, "wake": True, "measured": False}
+
+
+def test_the_measured_brace_load_stops_press_after_the_measured_contact():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    ds = 0.02 / 30.0
+    tr = [ds * k for k in range(91)]
+    # the load point starts to move 4 mm before the computed face (10 mm travel): contact travel 6 mm, stop at 16 mm
+    mv = [max(0.0, t - 0.006) for t in tr]
+    k, s_c = VC.measured_load_stop(tr, mv, 0.01, 0.0005)
+    assert abs(s_c - 0.006) < 1e-9 and abs(tr[k] - 0.016) < ds
+    # a slept object never moves: no contact, no stop
+    assert VC.measured_load_stop(tr, [0.0] * len(tr), 0.01, 0.0005) == (None, None)
+    # the hinged axial target: the load point is the arriving end, not the root
+    T = np.eye(4)
+    assert np.allclose(VC.brace_load_point({"load": {"point_object": [0.1, 0.0, 0.0]}}, T), [0.1, 0.0, 0.0])
+    assert np.allclose(VC.brace_load_point({"load": {}}, T), [0.0, 0.0, 0.0])

@@ -175,6 +175,11 @@ class ContactValidateConfig:
     #: the wall load's contact: the target turned this far (rad) under the sweep
     wall_contact_turn_rad: float = 0.002
     wall_pusher_travel_max_m: float = 0.06
+    # i7-brace 5w.3 (owner 20261108h, DIAGNOSIS ONLY: :func:`brace_load_switches`, default off) - the touching / axial brace load measured
+    #: the load point counts as met once it moved this far along the load (the measured first contact)
+    brace_contact_m: float = 0.0005
+    #: MEASURED mode: the pusher may travel at most this far (gap + press + the contact found late)
+    brace_pusher_travel_max_m: float = 0.06
 
 
 # ------------------------------------------------------------------------------------------------ the entry as the oracle's action
@@ -573,6 +578,47 @@ def pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarray, c
 def wall_entry(entry: Dict[str, Any]) -> bool:
     """i7-brace: a wall-world entry (:data:`WALL_FAMILIES`)."""
     return entry.get("family") in WALL_FAMILIES
+
+
+def brace_load_switches() -> Dict[str, bool]:
+    """i7-brace 5w.3 (owner 20261108h: diagnose and COUNT only - no default, no rebuild) - the touching / axial brace load (not the wall's):
+    ``ISPATIALGYM_GC_BRACE_LOAD_DIAG=1`` records the load's facts in the trial (``debug.load_diag``: the object asleep at the load's start /
+    per step, the sleep assist's sleeps / wakes, the load point's travel along the load, the measured first contact vs the computed face);
+    ``ISPATIALGYM_GC_BRACE_LOAD_WAKE=1`` wakes the braced object at every pusher step (the wall fix 220ff7db: the sleep assist sleeps a still
+    partner while the brace stands and a teleported kinematic pusher does not wake it); ``ISPATIALGYM_GC_BRACE_LOAD_MEASURED=1`` stops the
+    pusher ``brace_press_m`` after the MEASURED first contact (the load point moved ``brace_contact_m``; the wall fix fae1e4d8: the computed
+    face from the hull's vertices ignores the contact offsets), extending the path up to ``brace_pusher_travel_max_m``. Either correction
+    implies the record. All unset = today's load, bit-identical."""
+    on = {k: os.environ.get(f"ISPATIALGYM_GC_BRACE_LOAD_{k.upper()}", "0") == "1" for k in ("diag", "wake", "measured")}
+    on["diag"] = on["diag"] or on["wake"] or on["measured"]
+    return on
+
+
+def _asleep(obj) -> Optional[bool]:
+    try:
+        a = getattr(obj, "is_asleep", None)
+        return bool(a() if callable(a) else a)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def brace_load_point(entry: Dict[str, Any], T_obj: np.ndarray) -> np.ndarray:
+    """The world point the brace load drives (:func:`pusher_path`'s line: ``load.point_object`` - the axial push's arriving end - else the
+    object's root): on the axial task's COM hinge the root does not translate, the arriving end does."""
+    po = (entry.get("load") or {}).get("point_object")
+    return T_obj[:3, :3] @ np.asarray(po, dtype=float) + T_obj[:3, 3] if po is not None else T_obj[:3, 3].copy()
+
+
+def measured_load_stop(travels: Sequence[float], moved: Sequence[float], press_m: float, contact_m: float) -> Tuple[Optional[int], Optional[float]]:
+    """(stop index, contact travel): the first step whose load point moved >= ``contact_m`` along the load is the measured contact, its pusher
+    travel less that motion the contact travel; the stop is the first step whose travel >= contact travel + ``press_m``. (None, None) before
+    a contact; (None, contact) before the stop."""
+    c = next((i for i, m in enumerate(moved) if m >= contact_m), None)
+    if c is None:
+        return None, None
+    s_c = float(travels[c]) - float(moved[c])
+    k = next((i for i in range(c, len(travels)) if travels[i] >= s_c + press_m - 1e-9), None)
+    return k, s_c
 
 
 def wall_arm_entries(entries: Sequence[Dict[str, Any]], arm: str) -> List[Dict[str, Any]]:
@@ -1369,6 +1415,8 @@ class KitContactWorld:
                                            contact_step=next((j for j, t in enumerate(turns) if t >= self.cfg.wall_contact_turn_rad), None))
                 for _ in range(self.cfg.brace_hold_steps):
                     self._hold(motions, step, 1)
+            elif brace_load_switches()["diag"]:  # i7-brace 5w.3: the diagnostic load (record / wake / measured), default off
+                trace.rec["load_diag"] = self._brace_load_diag(obj, entry, T0, path, pusher, motions, step, sa, brace_load_switches())
             else:
                 for i, c in enumerate(path + [None] * self.cfg.brace_hold_steps):
                     if c is not None:  # the pusher one step further along the load; the robot holds (the brace arm stays at its contact)
@@ -1394,6 +1442,59 @@ class KitContactWorld:
         out = judge_brace(entry, T0, T1, Te0, Te1, load, self.cfg, run, max(series) if series else 0.0)
         return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
                     wall_s=round(time.time() - t0, 3))
+
+    def _brace_load_diag(self, obj, entry, T0, path, pusher, motions, step, sa, sw: Dict[str, bool]) -> Dict[str, Any]:
+        """i7-brace 5w.3 (diagnosis): today's brace load (:func:`pusher_path`, the same steps and hold), recorded - and with ``sw["wake"]``
+        the object woken at every pusher step, with ``sw["measured"]`` the pusher stopped ``brace_press_m`` after the measured contact
+        (:func:`measured_load_stop`, the path extended at the same step up to ``brace_pusher_travel_max_m``)."""
+        th_ = self.tw.th
+        cfg = self.cfg
+        d = np.asarray((entry.get("load") or {}).get("direction") or [0.0, 1.0, 0.0], dtype=float)
+        d[2] = 0.0
+        d = d / max(float(np.linalg.norm(d)), 1e-12)
+        n = len(path) - 1
+        ds = (cfg.brace_pusher_gap_m + cfg.brace_press_m) / max(n, 1)
+        pts = list(path)
+        if sw["measured"]:
+            n_max = int(math.ceil(cfg.brace_pusher_travel_max_m / max(ds, 1e-9)))
+            pts = [path[0] + d * ds * k for k in range(n_max + 1)]
+        p0 = brace_load_point(entry, T0)
+        name = obj.name
+        facts: Dict[str, Any] = {"switches": dict(sw), "asleep_at_load": _asleep(obj),
+                                 "sa_sleeps_before": list((sa.sleeps.get(name) or []) if sa is not None else []),
+                                 "sa_wakes_before": list((sa.wakes.get(name) or []) if sa is not None else []),
+                                 "computed_contact_m": round(float(cfg.brace_pusher_gap_m), 5), "step_m": round(float(ds), 6), "path_steps": n}
+        travels, moved, asleep_n = [], [], 0
+        stop = s_c = None
+        for k, c in enumerate(pts):
+            pusher.set_position_orientation(th_.tensor(c, dtype=th_.float32), th_.tensor([0.0, 0.0, 0.0, 1.0], dtype=th_.float32))
+            if sw["wake"]:
+                obj.wake()
+            self._hold(motions, step, 1)
+            asleep_n += int(bool(_asleep(obj)))
+            travels.append(ds * k)
+            moved.append(float((brace_load_point(entry, _T(obj.get_position_orientation())) - p0) @ d))
+            if sw["measured"]:
+                stop, s_c = measured_load_stop(travels, moved, cfg.brace_press_m, cfg.brace_contact_m)
+                if stop is not None:
+                    break
+        if not sw["measured"]:
+            _st, s_c = measured_load_stop(travels, moved, cfg.brace_press_m, cfg.brace_contact_m)
+        hold_moved = []
+        for _ in range(cfg.brace_hold_steps):
+            self._hold(motions, step, 1)
+            asleep_n += int(bool(_asleep(obj)))
+            hold_moved.append(float((brace_load_point(entry, _T(obj.get_position_orientation())) - p0) @ d))
+        facts.update(swept_steps=len(travels), stop_step=stop, travel_end_m=round(travels[-1], 5) if travels else None,
+                     contact_travel_m=None if s_c is None else round(s_c, 5),
+                     early_m=None if s_c is None else round(float(cfg.brace_pusher_gap_m) - s_c, 5),
+                     load_point_moved_max_m=round(max(moved + hold_moved), 5) if moved else None,
+                     load_point_moved_end_m=round((hold_moved or moved or [0.0])[-1], 5),
+                     load_point_moved_at_path_end_m=round(moved[min(n, len(moved) - 1)], 5) if moved else None,
+                     asleep_steps=asleep_n, loaded=bool(moved and max(moved + hold_moved) >= cfg.wall_loaded_min_m),
+                     sa_sleeps=list((sa.sleeps.get(name) or []) if sa is not None else []),
+                     sa_wakes=list((sa.wakes.get(name) or []) if sa is not None else []))
+        return facts
 
     def replay(self, sit: Dict[str, Any], obj, geom) -> Dict[str, Any]:
         """A recorded demo's situation (:func:`replay_situation`) rebuilt: the slab at the recorded support height, the object settled at
