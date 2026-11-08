@@ -2400,9 +2400,9 @@ attempts for running jobs because `job_stats.json` is only written at the end.
 |---|---|---|---|---|---|
 | under_large_01 (sandal, bed) | int1_1 | 5 / 4 / 3 | 0.27 | none (1 robot_wobble) | - |
 | under_large_02 (briefcase, desk) | int1_1 | 6 / 4 / 0 | - (3.22 GPU-h) | oracle push-under: not_reached / symbolic_only, briefcase 0.11-0.23 m short and turned | none |
-| under_large_03 (trash can, desk) | i7_floorfix (+ i7diag_floor) | 19 / 3 / 1 | 3.24 | oracle push: ashcan turned 0.34-0.66 rad | none |
+| under_large_03 (trash can, desk) | i7diag_floor (fcddc495) | 21 / 4 / 0 | - (4.00 GPU-h) | oracle push: 2 symbolic_only (ashcan turned 0.38-0.43 rad), 2 protected_contact (right_arm_link7 touches the can in the push pre-contact); i7_floorfix 19 / 3 / 1 | none |
 | ontop_large_01 (soap dispenser, countertop) | int1_1 | 0 / 0 / 0 | - | missing_map tabletop h 0.9158 at countertop_fjkase_0 (entry soap_dispenser__zwudcz__s1, plane top): no anchor covers it, no tabletop map | i7-goalmaps |
-| ontop_large_02 | i7_floorfix (+ i7diag_floor) | 24 / 4 / 4 | 0.94 | low yield: approach_untrackable 13 | none |
+| ontop_large_02 | i7diag_floor (fcddc495) | 18 / 4 / 4 | 0.84 | none (approach_untrackable 9 of 14 rejections) | - |
 | touching_large_02 (umbrella, hall tree) | i7diag_floor | 0 / 0 / 0 | - | missing_map interior h 0.5809 at hall_tree_upkvgr_0 (entry umbrella__ziqzqo__s1): no registry spec of the board (the surface place) | i7-goalmaps if it covers interior goals, else none |
 
 **B. touching_04.** int1_7 had 156 target_placement rejections: touching_04 94, touching_02 25, touching_01 22, axial_04 11, axial_01 and
