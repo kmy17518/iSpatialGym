@@ -40,6 +40,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import attempt_cap as AC
 from ispatialgym.sampling import constraints as CN
 from ispatialgym.sampling import generation_defaults as GD
@@ -1276,6 +1277,9 @@ class ArticulationSmall(SamplerV2):
             # owner 2026-09-19 14:34: the box as close to the robot as the survivors allow (the crossing / centre-line pinches of the
             # two-flap v2 sequence) - the Phase-2 survivors ordered by the focus depth in the base frame, nearest first
             order = sorted(range(len(self.manip_candidates)), key=lambda i: float(self.manip_candidates[i].world_to_base(self.manip_candidates[i].focus[:2])[0]))
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the handle arm's manipulation stances (alias_memory.reorder_pick:
+        # a flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: self.handle_arm, rng)
         for k in order[:int(self.gen("candidates_per_attempt", 6))]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")

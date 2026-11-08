@@ -129,6 +129,7 @@ legacy band and no legacy grasp.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -153,6 +154,7 @@ from ispatialgym.sampling.v2 import contact_poses as CPZ  # i7-contact 2026-11-0
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang as OH
+from ispatialgym.oracle import overpath as OPATH  # i7-overpath 2026-11-08: the overhang pick's recorded transit over the book
 from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import stance_memo as SM
@@ -164,7 +166,98 @@ from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
+#: i7-interior2 2026-11-08 (owner 6.1): the overhang FALLBACK of IORS large's pick at B - when an alias sets no ``generation.pick_overhang_push``
+#: and the direct pick fails for a reason the sampler cannot fix (the shared support policy: ``overhang_fallback.reason_class``), the pick
+#: pushes the object over B's support edge and grasps the overhang (IORSLarge's own ``_overhang_pick``, the options of
+#: ``overhang_fallback.options``: :data:`overhang.DEFAULTS`, mode "fallback") - IORSSmall's fallback (``v2/overhang_fallback.py``) for this
+#: pick. Default on since the owner's 6.1 ("0" off); kit counters ``large_overhang_fallback.trigger.<class>`` / ``.mode.<grasp mode>`` / ``.found`` / ``.failed``.
+LARGE_OVERHANG_FALLBACK_ENV = "ISPATIALGYM_LARGE_OVERHANG_FALLBACK"
+#: i7-interior2 2026-11-08 (owner 6.3, inside_large_02): the inside mode's B -> C carry only with the torso STRAIGHTENED (the departure
+#: transition to a travel trunk of tilt 0) - no fallback drive at B's leaning grasp trunk. Every successful fridge demo before (fix1 / fix2
+#: 5 / 5, i7_fridge4 300023) carried straightened; the i7_fridge4 demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) succeeded 1 / 3,
+#: both failures the idle gripper against fridge_petcxr_0 in the carry drive (navigate[4]). Default on since the owner's 2026-11-08b item 1
+#: (A/B: 8 / 8 ok vs 6 / 8; "0" off); kit counters
+#: ``inside_carry_straight.rejected`` / ``.straight``.
+INSIDE_CARRY_STRAIGHT_ENV = "ISPATIALGYM_INSIDE_CARRY_STRAIGHT"
+
+
+def inside_carry_straight_on() -> bool:
+    # default ON (owner 2026-11-08, owner_answers_20261108b item 1); "0" off
+    return os.environ.get(INSIDE_CARRY_STRAIGHT_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def large_overhang_fallback_on() -> bool:
+    # default ON (owner 6.1, 2026-11-08: "implement overhang fallback" for this pick, as IORSSmall's default); "0" off
+    return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
+
+
+def count_pick_preshape(s, g, where: str) -> None:
+    """i7-interior2 (owner 6.1): one kit counter per IORS large pick whose support policy measures the fingers at the grasp's pre-shape
+    (``tabletop.policy_opening_of``: pinch width / 2 + the preshape margin) - ``pick_preshape.<where>`` - or at the configuration's
+    opening (``pick_preshape.<where>.q``: no width / ``ISPATIALGYM_SUPPORT_POLICY_OPENING=q``)."""
+    TT._count(s, f"pick_preshape.{where}" + ("" if TT.policy_opening_of(g) is not None else ".q"))
+
 log = logging.getLogger("ispatialgym.sampling.v2")
+
+
+class _PosedObject:
+    """i7-overpath: an object stand-in at a given pose (``get_position_orientation``) - the settled post-push pose the contact escape
+    leaves radially from (``program_check.replay_contact_escape`` reads only that)."""
+
+    def __init__(self, pose):
+        self._pose = (G.t(pose[0]).float(), G.t(pose[1]).float())
+
+    def get_position_orientation(self):
+        return self._pose
+
+
+# ---------------------------------------------------------------------------------------------------- i7-overpath 2026-11-08 (owner 3(b))
+
+
+def overhang_spine_required(s) -> Optional[str]:
+    """Opt-in ``generation.overhang_required_side`` (owner 3(b), the spine guard): the face of the object the v2 overhang entry and every
+    drawn grasp must pinch ("-y" = the hardback's spine); None = off."""
+    req = s.gp.gen("overhang_required_side")
+    if req is None:
+        return None
+    try:
+        OH.side_axis(req)
+    except ValueError as e:
+        raise Reject("spec", f"{s.gp.variant}: generation.overhang_required_side: {e}")
+    return str(req)
+
+
+def overhang_spine_entry(s) -> None:
+    """The spine guard on the v2 overhang entry (:func:`overhang.spine_entry_why`): its side must be the required one, else the attempt is
+    rejected (``overhang_side``; kit ``overhang.side_rejected`` / ``.entry``). No-op when off or without a v2 overhang entry."""
+    req = overhang_spine_required(s)
+    v2 = getattr(s, "v2_overhang", None)
+    if req is None or v2 is None:
+        return
+    TT._count(s, "overhang.side_checked.entry")
+    why = OH.spine_entry_why(req, v2.get("side"))
+    if why is not None:
+        TT._count(s, "overhang.side_rejected")
+        TT._count(s, "overhang.side_rejected.entry")
+        raise Reject("overhang_side", f"{s.gp.variant}: {why} (entry {v2.get('entry')})")
+
+
+def overhang_spine_grasp(s, g) -> None:
+    """The spine guard on a drawn overhang grasp (:func:`overhang.spine_grasp_why`): its pinch - the library row's ``T_object_eef``
+    position - within ``generation.overhang_pinch_edge_max_m`` (0.03) inside the required face of the target's local hull, else the
+    attempt is rejected (``overhang_side``; kit ``overhang.side_rejected`` / ``.grasp``). No-op when off or without a v2 overhang entry."""
+    if getattr(s, "v2_overhang", None) is None:
+        return
+    req = overhang_spine_required(s)
+    if req is None:
+        return
+    TT._count(s, "overhang.side_checked.grasp")
+    mx = s.gp.gen("overhang_pinch_edge_max_m")
+    why = OH.spine_grasp_why(req, getattr(g, "name", g), G.t(g.pose[0]).float(), s.hull, float(mx) if mx is not None else OH.PINCH_EDGE_MAX_M)
+    if why is not None:
+        TT._count(s, "overhang.side_rejected")
+        TT._count(s, "overhang.side_rejected.grasp")
+        raise Reject("overhang_side", f"{s.gp.variant}: {why}")
 
 RELATION_OF_SUBTASK = {
     "inter_object_relation_satisfaction-ontop_large_scale": "ontop",
@@ -700,6 +793,71 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
     return yaw0 + math.asin(-y_off / dist)
 
 
+#: i7-goalmaps 2026-11-08 (lead decision, touching_large_02's umbrella carry): opt-in ``ISPATIALGYM_CARRY_CENTRED=1`` (default off) - the carry
+#: pose candidates of :meth:`IORSLarge.carry_poses_at_b` start with :data:`CARRY_CENTRED_POSES`: the hand in front of the body, its lateral
+#: chosen so that the CARRIED OBJECT's centre (its hull's bounding-box centre) lies on the base's centre line. The beside-the-body poses
+#: (CARRY_POSES, the hand 0.35-0.45 m to the arm's side) hold a long object held across the heading (the umbrella, 0.82 m, released along
+#: the hall tree's board) out to ~0.85 m on that side: gm_t02_umb2 / umb2s + PATH_BLAME, every carry with the hand >= 0.3 m to the side
+#: failed its B -> C path (~800 of 800; the umbrella or the gripper against standing_mirror_wwkuuf_0 / the walls), the hand within 0.1 m of
+#: the centre line passed 8 of 15. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
+#: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
+#: / carry_pose.centred_used.
+CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_SIDEWAYS=1`` (default off) - when the carried B -> C path
+#: collides at every variant tried today (straight arrival, plain; local then global), it is planned again with the base driving SIDEWAYS
+#: (``NAV.plan_path`` heading_offset +-pi / 2, the R1Pro base is holonomic): the object, held across the robot's heading because the release
+#: needs it there (the umbrella along the hall tree's board, across the robot facing the board), then lies along the way. The offset whose
+#: sideways yaw on the straight B -> C line is nearer C's yaw is tried first. The same swept check (the object attached, the carry arms,
+#: the yaw-lag envelope) judges it; the record is "recorded" style with the sideways yaws, which the oracle tracks as recorded. Kit counters
+#: carry_path.sideways_tried / carry_path.sideways_used.
+CARRY_SIDEWAYS_ENV = "ISPATIALGYM_CARRY_SIDEWAYS"
+
+
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_WIDE_PATH=1`` (default off) - after the carried B -> C path
+#: collides at every variant of today, the GLOBAL path is planned again on the eroded traversability map eroded further by each of
+#: :data:`CARRY_WIDE_PATH_EROSIONS_M` (``NAV.plan_path`` global_extra_erosion_m, a square kernel like the map's own erosion): the shortest path
+#: no longer hugs the obstacles, so an object held across the heading (the umbrella reaches ~0.4 m beyond the base's sides) passes them -
+#: the centred umbrella carries of gm_t02_cc_on collided 20-30 % along the path, base at (-0.6..-0.8, 1.4..1.5) heading north past
+#: standing_mirror_wwkuuf_0. The same swept check judges the path. Kit carry_path.wide_tried / wide_used.
+CARRY_WIDE_PATH_ENV = "ISPATIALGYM_CARRY_WIDE_PATH"
+CARRY_WIDE_PATH_EROSIONS_M: Tuple[float, ...] = (0.15, 0.30)
+
+
+def carry_wide_path_on() -> bool:
+    return os.environ.get(CARRY_WIDE_PATH_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def carry_sideways_on() -> bool:
+    return os.environ.get(CARRY_SIDEWAYS_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def sideways_offsets(from_xy: Sequence[float], to_xy: Sequence[float], to_yaw: float) -> List[float]:
+    """+-pi / 2, the one whose sideways yaw on the straight line ``from_xy`` -> ``to_xy`` lies nearer ``to_yaw`` first."""
+    h = math.atan2(float(to_xy[1]) - float(from_xy[1]), float(to_xy[0]) - float(from_xy[0]))
+    offs = [math.pi / 2, -math.pi / 2]
+    return sorted(offs, key=lambda o: abs((h + o - float(to_yaw) + math.pi) % (2.0 * math.pi) - math.pi))
+#: (ahead, raise above the lift) of the centred carry poses, tried in this order (0.45-0.55 m ahead: nearer folds the elbow, 0920-071230)
+CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
+
+
+def carry_centred_on() -> bool:
+    return os.environ.get(CARRY_CENTRED_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def centred_hand_lateral(eef: Any, eef_in_object: Any, hull_local: Optional[th.Tensor], left: th.Tensor) -> float:
+    """The hand's lateral offset (along ``left``, the base's +y) that puts the carried object's centre on the base's centre line: minus the
+    lateral of (object hull's bounding-box centre - eef position), the object posed from the eef by the grasp (``eef_in_object`` =
+    T_obj->eef). Without a hull: the object's root."""
+    obj = G.compose((G.t(eef[0]).float(), G.t(eef[1]).float()), G.invert((G.t(eef_in_object[0]).float(), G.t(eef_in_object[1]).float())))
+    if hull_local is not None and len(hull_local):
+        pts = G.local_points_world(hull_local.float(), obj)
+        centre = 0.5 * (pts.min(dim=0).values + pts.max(dim=0).values)
+    else:
+        centre = G.t(obj[0]).float()
+    d = (centre[:2] - G.t(eef[0]).float()[:2])
+    return -float(d @ G.t(left).float()[:2])
+
+
 def carry_poses_for(poses: Sequence[Sequence[Any]], arm: str) -> List[Tuple[float, Optional[float], float]]:
     """``CARRY_POSES`` / ``generation.carry_poses`` (ahead, lateral, raise) for ``arm``: the lateral beside the body on the arm's side
     (the right arm's -0.35..-0.45 m positive for the left arm); None (= the lift's lateral) kept."""
@@ -1106,6 +1264,7 @@ class IORSLarge(SamplerV2):
         if self.v2_overhang is not None:
             self.template_facts["v2_overhang"] = {k: self.v2_overhang.get(k) for k in ("tag", "side", "distance_m", "measured_distance_m", "edge_along_m",
                                                                                       "com_inside_m", "normal_xy", "entry", "rest_id")}
+            overhang_spine_entry(self)  # i7-overpath (owner 3(b)): opt-in generation.overhang_required_side
         keep = self.gp.gen("grasp_rows")
         if keep and self.v2_overhang is not None:
             # the rows name the LEGACY library's pinches; the v2 overhang entry's grasps are its own (generated at the overhanging face)
@@ -2685,44 +2844,13 @@ class IORSLarge(SamplerV2):
         start pose anywhere on free floor (eroded map, the task rooms) ``distance_range_m`` from the target's cell ``c_xy`` on its support
         (top at ``z_top``), facing it, from which the target (its hull at rest on the top) and the partner's goal region
         (:meth:`goal_region_visible`, the edge stance's test) are in the head-camera frame - straight torso, the most upright translate
-        that sees both (:meth:`floor_stance_a`'s rule), collision-free with a free trunk sweep."""
-        cfg = self.gp.gen("free_start")
-        cfg = dict(cfg) if isinstance(cfg, dict) else {}
-        d_lo, d_hi = (float(v) for v in cfg.get("distance_range_m", [0.6, 2.5]))
-        tries = int(cfg.get("tries", 120))
+        that sees both (:meth:`floor_stance_a`'s rule), collision-free with a free trunk sweep. The draw is :func:`free_floor_stance`
+        (i7-t03 2026-11-08: shared with IORSSmall's shelf start, behaviour unchanged)."""
         c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
         focus = th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + height / 2])
         pts = G.local_points_world(self.hull, (th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + self.world.bottom_offset(self.hull, self.rest)]), self.rest))
-        stats = {"floor": 0, "view": 0, "body": 0, "sweep": 0}
-        for k in range(tries):
-            bearing = float(rng.uniform(-math.pi, math.pi))
-            dist = float(rng.uniform(d_lo, d_hi))
-            xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
-            if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
-                stats["floor"] += 1
-                continue
-            yaw = math.atan2(float(c_xy[1] - xy[1]), float(c_xy[0] - xy[0]))
-            cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), float(t), 0.0, dist) for t in RB.TRANSLATES]
-            cams = P0.camera_poses(self, cands)
-            feas = [(st, P0.axis_angle(self, cam, focus)) for st, cam in zip(cands, cams)
-                    if P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy)]
-            if not feas:
-                stats["view"] += 1
-                continue
-            free = P0.body_free(self, [st for st, _ in feas])
-            feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
-            if not feas:
-                stats["body"] += 1
-                continue
-            if not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
-                stats["sweep"] += 1
-                continue
-            st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
-            st.extras.update({"bearing_deg": round(math.degrees(bearing), 1), "distance": round(dist, 3), "tries": k + 1, "free_start": True})
-            log.info("%s: free start: stance A at %s (%.2f m from the target cell, trunk (%.2f, 0)) after %d draws %s", self.gp.variant,
-                     [round(float(v), 2) for v in st.base_pose2d], dist, st.translate, k + 1, stats)
-            return st
-        raise Reject("no_stance", f"free start: no stance A {d_lo:.1f}-{d_hi:.1f} m from the target sees it and the goal region ({tries} draws: {stats})")
+        return free_floor_stance(self, c_xy, focus, lambda st, cam: P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy), rng,
+                                 what="the goal region")
 
     # ------------------------------------------------------------------ stance C (placement)
 
@@ -3472,32 +3600,62 @@ class IORSLarge(SamplerV2):
         # the straightened base's wheels touched bed_rrcvaq_1 0.37 m away on the same turn)
         arrive = float(self.gp.gen("carry_arrive_straight_m") or 0.0)
         variants = ([{"arrive_straight_m": arrive}] if arrive > 0.0 else []) + [{}]
+        k_plain = len(variants) - 1
+        if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
+            variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
+        if carry_wide_path_on():  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
+            variants += [{"global_extra_erosion_m": w} for w in CARRY_WIDE_PATH_EROSIONS_M]
         chosen: Dict[str, Any] = {}
 
         def carried_path(redo=None, **kw):
             """The carried path B -> C: per variant (straight arrival first) the local path, then the eroded global one on a path_collision (the
             local shortest path hugs the partner's corner with the object out front, 0920-100543); a straight arrival that finds no path at all
-            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition)."""
-            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)]
+            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition). i7-goalmaps: the opt-in EXTRA
+            variants after the plain one (CARRY_SIDEWAYS_ENV, CARRY_WIDE_PATH_ENV) are tried after the plain one's path_collision; whatever they
+            fail with, the plain one's error is what the leg raises."""
+            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)
+                     if not (force is False and "global_extra_erosion_m" in v)]  # a wide-path variant is global only
             i = 0
+            plain_err: Optional[Reject] = None
             while True:
                 k, v, force = tries[i]
-                plain = k == len(variants) - 1
+                plain = k >= k_plain
+                extra = k > k_plain
+                if "heading_offset" in v:
+                    TT._count(self, "carry_path.sideways_tried")
+                if "global_extra_erosion_m" in v:
+                    TT._count(self, "carry_path.wide_tried")
                 try:
                     p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
                     chosen.clear()
                     chosen.update(v)
+                    if "heading_offset" in v:
+                        TT._count(self, "carry_path.sideways_used")
+                        log.info("%s: B -> C carry: SIDEWAYS path (heading offset %+.2f rad, %s) %.2f m", self.gp.variant, float(v["heading_offset"]),
+                                 "global" if force else "local", p.length_m)
+                    if "global_extra_erosion_m" in v:
+                        TT._count(self, "carry_path.wide_used")
+                        log.info("%s: B -> C carry: WIDE path (the global map eroded %.2f m more) %.2f m", self.gp.variant, float(v["global_extra_erosion_m"]),
+                                 p.length_m)
                     return p
                 except Reject as e:
-                    if plain and e.reason != "path_collision":
-                        raise
-                    if not plain:
-                        log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
-                                 str(e)[:600])
-                    # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
-                    i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
-                    if i >= len(tries):
-                        raise
+                    if extra:
+                        log.info("%s: B -> C carry: extra variant %s %s: %s: %s", self.gp.variant, v, "global" if force else "local", e.reason, str(e)[:300])
+                        i += 1
+                        if i >= len(tries):
+                            raise plain_err if plain_err is not None else e
+                    else:
+                        if plain and e.reason != "path_collision":
+                            raise
+                        if plain:
+                            plain_err = e
+                        if not plain:
+                            log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
+                                     str(e)[:600])
+                        # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
+                        i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
+                        if i >= len(tries):
+                            raise
                     self._drop_leg_records(place.name)
                     if redo is not None:
                         redo()
@@ -3515,11 +3673,13 @@ class IORSLarge(SamplerV2):
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm=arm, trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
+                if getattr(self, "relation", None) == "inside":
+                    TT._count(self, "inside_carry_straight.straight")
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.variant, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
                                 "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors,
-                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0), "heading_offset": chosen.get("heading_offset", 0.0)}
                 return path
             except Reject as e:
                 self._drop_leg_records(place.name)
@@ -3527,6 +3687,11 @@ class IORSLarge(SamplerV2):
                 # oracle-fix 2026-11-06 (hardback): the carry leg's error text is cut at 700 characters by its caller; each travel trunk's whole reason
                 log.info("%s: B -> C carry: travel trunk %s failed: %s: %s", self.gp.variant, tuple(round(v, 2) for v in tt), e.reason, str(e)[:1500])
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
+        if inside_carry_straight_on() and getattr(self, "relation", None) == "inside" and abs(float(manip.tilt)) > 1e-6:
+            # i7-interior2 2026-11-08 (owner 6.3): the inside carry only straightened (module constant INSIDE_CARRY_STRAIGHT_ENV)
+            TT._count(self, "inside_carry_straight.rejected")
+            raise Reject("no_transition", f"inside carry straightened only ({INSIDE_CARRY_STRAIGHT_ENV}): no travel trunk admits straighten-then-navigate "
+                                          f"and B's trunk ({manip.translate:.2f}, {manip.tilt:.2f}) leans; " + "; ".join(errors)[:900])
         try:
             path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -3534,7 +3699,8 @@ class IORSLarge(SamplerV2):
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
-                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0),
+                            "heading_offset": chosen.get("heading_offset", 0.0)}
             return path
         except Reject as e:
             self._drop_leg_records(place.name)
@@ -3570,7 +3736,12 @@ class IORSLarge(SamplerV2):
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
-        for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm):
+        cands = [(ahead, lat, raise_m, False) for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm)]
+        if carry_centred_on():  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
+            lat_c = centred_hand_lateral(lift, eef_in_object, self.hull, left)
+            cands = [(a, lat_c, r, True) for a, r in CARRY_CENTRED_POSES] + cands
+        self._carry_centred_n = 0
+        for ahead, lat, raise_m, centred in cands:
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
@@ -3593,6 +3764,9 @@ class IORSLarge(SamplerV2):
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
+            if centred:
+                self._carry_centred_n += 1
+                TT._count(self, "carry_pose.centred_offered")
         log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.variant, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
@@ -3839,6 +4013,11 @@ class IORSLarge(SamplerV2):
             self.template_facts.setdefault("F_init_prescreen_arms", []).append([{a: len(F) for a, (_, F) in t[3].items()} for t in pre])
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.variant, len(pre), len(yaws), [t[0] for t in pre],
                  "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on stance B - the B candidates of a flagged (arm x trunk[, stand-off])
+        # pick bin move to the end of the order above (a Thompson draw keeps them in place, never below the floor; never removed). Memory off /
+        # nothing flagged: the order unchanged and no random number drawn (alias_memory.reorder_pick; kit alias_memory.pick.*; provenance in B's extras)
+        k_pick = AM.reorder_pick(self, range(len(pre)), [t[1] for t in pre], lambda st: (list(getattr(st, "arms", None) or []) or [offered[0]])[0], rng)
+        pre = [pre[k] for k in k_pick]
         n_couple = int(self.num("b_candidates_max", 6))
         if sm is not None and self._sm_skipped_b:
             errors.append(f"stance memo: {self._sm_skipped_b} B candidates of the pool skipped (failed in earlier attempts of this instance)")
@@ -4077,12 +4256,15 @@ class IORSLarge(SamplerV2):
         eef = IK.grasp_pose(t_pose, g.pose)
         pre = IK.pre_pose(eef)
         kw = {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False}
-        res = self.ikc.exact([pre, eef], stance, arm, **kw)
-        pick = None
-        if twins and getattr(g, "name", None):
-            pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
-            res = pick.res
-            self._count_mirrored_ik(pick, bands)
+        # i7-interior2 2026-11-08 (owner 6.1): the support policy at the grasp's pre-shape (the oracle's descent opening), the twins included
+        count_pick_preshape(self, g, "segment_fallback")
+        with TT._policy_opening(self, g):
+            res = self.ikc.exact([pre, eef], stance, arm, **kw)
+            pick = None
+            if twins and getattr(g, "name", None):
+                pick = TT.pick_twin(self, stance, arm, g, g.pose, eef, pre, res, kw, support_z=float(z_init), where="B, segment fallback", arms=[arm], stances={arm: stance})
+                res = pick.res
+                self._count_mirrored_ik(pick, bands)
         opts = None
         if res.ok:
             opts, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), stance, arm, "B, segment fallback")
@@ -4623,6 +4805,7 @@ class IORSLarge(SamplerV2):
         if self.surface.get("kind") == "floor" or manip.edge is None:
             return None, "no support edge at B (the floor init never pushes)"
         TT._count(self, "pick_overhang.tried")
+        overhang_spine_grasp(self, g)  # i7-overpath (owner 3(b)): the drawn grasp pinches the required face, else the attempt is rejected
         t_pose = self.pose_on(xy, yaw, z_init)
         z_top = float(z_init)
         u = OH.unit_xy(-manip.edge.inward)
@@ -4674,6 +4857,16 @@ class IORSLarge(SamplerV2):
                 else:
                     settled = post
                 eef, pre, res, pick = grasp
+                overpath = None
+                if OPATH.on():
+                    # i7-overpath 2026-11-08 (owner 3(a)): the transit over the book from the escape to this pre-grasp, planned and recorded
+                    overpath, key_o, why_o = self._overpath_plan(st, grasp_st, arm, chain, settled, pre, eef)
+                    if overpath is None:
+                        TT._count(self, "overpath.rejected")
+                        TT._count(self, f"overpath.rejected.{key_o}")
+                        why.append(f"{arm} push {push:.3f}: overpath {key_o}: {why_o}")
+                        continue
+                    TT._count(self, "overpath.planned")
                 overhang = OH.overhang_m(geo["edge_finger_m"], push, geo["extent_front_m"])
                 facts = {**geo, "arm": arm, "push_m": round(float(push), 4), "overhang_m": round(overhang, 4),
                          "com_inside_m": round(float(geo["edge_com_m"]) - float(push), 4), "settle": sfacts,
@@ -4686,8 +4879,10 @@ class IORSLarge(SamplerV2):
                          "%.3f m inside), %s hand pitch %.0f (%s), settle %s, grasp from %s", self.gp.variant, manip.translate, manip.tilt, arm, getattr(g, "name", g), yaw, push,
                          geo["edge_finger_m"], overhang, facts["com_inside_m"], chain["fingers"], chain["pitch_deg"], chain["wrist"], sfacts,
                          "B" if grasp_st is st else f"B backed off to stand-off {grasp_st.stand_off:.2f} at trunk ({grasp_st.translate:.2f}, {grasp_st.tilt:.2f})")
+                if overpath is not None:
+                    facts["overpath"] = {k: overpath.get(k) for k in ("design", "source", "clearance_m", "min_book_clearance_m", "max_step_rad", "start", "n_waypoints")}
                 return {"arm": arm, "stance": st, "grasp_stance": grasp_st, "t_pose": t_pose, "post_pose": settled, "predicted_pose": post, "eef": eef, "pre": pre, "res": res,
-                        "pick": pick, "chain": chain, "push_m": float(push), "facts": facts}, ""
+                        "pick": pick, "chain": chain, "push_m": float(push), "facts": facts, "overpath": overpath}, ""
         TT._count(self, "pick_overhang.failed")
         return None, f"ladder {geo['ladder_m']} m: " + " | ".join(why)[:1200]
 
@@ -4704,8 +4899,12 @@ class IORSLarge(SamplerV2):
         def st_key(st: Stance) -> Tuple[Any, ...]:
             return tuple(round(float(v), 3) for v in st.base_pose2d) + (round(float(st.translate), 3), round(float(st.tilt), 3))
 
-        return (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
-                tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
+        key = (st_key(manip), tuple((a, st_key(st_of.get(a, manip))) for a in arms), getattr(g, "name", str(g)), round(float(yaw0), 4),
+               tuple(round(float(v), 3) for v in G.t(focus_xy).reshape(-1).tolist()), round(float(z_init), 4), bool(twins))
+        # i7-overpath 2026-11-08: a pick the recorded transit rejected is another failure - the switch enters the key only when on (the
+        # persisted memo is shared between the jobs of an alias: an A/B's arms must not read each other's failures)
+        # i7-overpath CORRECTION 2026-11-08: + the transit's version (overpath.MEMO_VERSION): failures of an earlier path design never apply
+        return key + ("overpath",) + OPATH.memo_tag() if OPATH.on() else key
 
     def _overhang_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
         """Opt-in ``generation.overhang_fail_memo_persist`` (oracle-fix 2026-11-05, speed): the failed-pick memo of
@@ -4724,6 +4923,394 @@ class IORSLarge(SamplerV2):
             return why
         hit = cache_get(ck)
         return None if not isinstance(hit, dict) else hit.get("why")
+
+    # ------------------------------------------------------------------ i7-overpath 2026-11-08 (owner 3(a) / 3(b), inside_large_01)
+
+    def _overpath_start(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose) -> Tuple[Optional[th.Tensor], str, str]:
+        """Where the recorded transit starts (:mod:`ispatialgym.oracle.overpath`): from B, the contact escape after the push as the oracle
+        runs it (``program_check.replay_contact_escape`` from the push chain's end configuration, the object at its settled post-push pose,
+        ``generation.overhang_retreat_up_m``), the fingers then opened (``execute_grasp`` opens them before its transit); at the grasp stance
+        "pick", the arm where the escape left it when that is collision-free there (the program check's first departure-arm candidate),
+        else the stance's posture. ``(q, start label, "")`` or ``(None, reason, why)``; the program check and the oracle follow the record
+        only from within ``overpath.START_GAP_MAX_RAD`` of its start (the planned transit otherwise)."""
+        from ispatialgym.oracle.actions import RETREAT_DIST
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        idx = self.kit.robot.arm_control_idx[arm]
+        opening = float(chain.get("opening", C.FINGER_CLOSED))
+        q_push = self.ikc.q_locked(st, fingers=opening).clone()
+        arm_q = list((chain.get("seed") or {}).get("chain_arm_q") or [])
+        if arm_q:
+            q_push[idx] = th.tensor([float(v) for v in arm_q[-1]], dtype=q_push.dtype)
+        else:
+            with self.ikc.ignoring([self.target]):
+                r = self.ikc.exact([chain["goal"]], st, arm, cache=False, fingers=opening)
+            if not r.ok or r.q is None:
+                return None, "push_end", f"the push's end pose has no IK ({r.reason})"
+            q_push = G.t(r.q).float().clone()
+        sup = list(self.support_objects())
+        up = self.gp.gen("overhang_retreat_up_m")
+        status, why_e, _, q_esc = PCK.replay_contact_escape(self, arm, q_push, _PosedObject(settled), sup, [self.target] + sup, RETREAT_DIST,
+                                                            start="the overhang push's end", escape_up_m=float(up) if isinstance(up, (int, float)) and up > 0 else None)
+        if status == "failed":
+            return None, "escape", why_e
+        if grasp_st is st:
+            q0 = self.ikc.q_locked(st, fingers=C.FINGER_OPEN).clone()
+            q0[idx] = G.t(q_esc).float().reshape(-1)[idx]
+            return q0, "escape", ""
+        # the drive B -> pick: the program check keeps the arm where the escape left it when the drive's sweep allows
+        # (``program_check.choose_departure_arms``' first candidate), else the drive re-poses it to the stance's posture
+        q0 = self.ikc.q_locked(grasp_st, fingers=C.FINGER_OPEN).clone()
+        q0[idx] = G.t(q_esc).float().reshape(-1)[idx]
+        with self.ikc.ignoring([self.target]):
+            if bool(self.kit.collision_free(q0, margin=0.0)[0]):
+                return q0, "escape (kept through the drive to pick)", ""
+        return self.ikc.q_locked(grasp_st, fingers=C.FINGER_OPEN).clone(), "stance posture", ""
+
+    def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                       ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath (switch ``ISPATIALGYM_OVERHANG_OVERPATH``): the overhang pick's recorded transit over the book by the design of
+        :func:`overpath.design` - ``planner`` (P1, owner 2026-11-08 item 4; the default of the switch-on path): :meth:`_overpath_plan_planner`;
+        ``cartesian`` (the diagnostic of e4443d14..09f97815): :meth:`_overpath_plan_cartesian`. ``(record, "", "")`` or ``(None, reason, why)``."""
+        if OPATH.design() == "cartesian":
+            return self._overpath_plan_cartesian(st, grasp_st, arm, chain, settled, pre, eef)
+        return self._overpath_plan_planner(st, grasp_st, arm, chain, settled, pre, eef)
+
+    def _overpath_plan_planner(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                               ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath P1 (owner 2026-11-08 item 4): the transit from where the escape leaves the hand (:meth:`_overpath_start`) to the
+        pre-grasp ``pre`` planned by the ORACLE'S OWN live transit planner (:func:`overpath_planner.plan_transit`: ``execute.reach_pre_pose``
+        -> ``Motions.arm_to(pose=pre, q_hint=witness)`` inside the dip gate and the protect context, kinematically on the sampler's backend)
+        with the book at its settled post-push pose in the scene and protected at :data:`overpath.BOOK_MARGIN_M`, the desk (``support_objects``)
+        and the scene as obstacles; the witness is the exact IK of the pre-grasp at the grasp stance. The trajectory is subsampled
+        (:func:`overpath.subsample`) and :meth:`_overpath_verify` re-checks the path the oracle will run through the waypoints. Up to
+        :data:`overpath.PLANNER_ROUNDS` rounds (trajopt is stochastic). The book is put back where it was. Kit ``overpath.planner.rounds``,
+        ``.planner.branch.<b>``, ``.planner.failed.<stage>``, ``.planner_s`` (whole seconds)."""
+        from ispatialgym.oracle import r1pro_model as M
+        from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+        q0, start, why0 = self._overpath_start(st, grasp_st, arm, chain, settled)
+        if q0 is None:
+            return None, start, why0
+        idx = self.kit.robot.arm_control_idx[arm]
+        box = OPATH.box_of(settled, self.hull)
+        tgt = self.target
+        p_prev = tuple(x.clone() for x in tgt.get_position_orientation())
+        t0 = time.time()
+        tried: List[str] = []
+        last = ("plan", "no round planned")
+        try:
+            tgt.set_position_orientation(G.t(settled[0]).float(), G.t(settled[1]).float())
+            tgt.keep_still()
+            self.kit.sync_world()
+            r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+            if not r_w.ok or r_w.q is None:
+                with self.ikc.ignoring([tgt]):  # the pick's own pre-grasp check (``_overhang_grasp``) ran with the target out of the world
+                    r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+                TT._count(self, "overpath.planner.witness_book_ignored")
+            if not r_w.ok or r_w.q is None:
+                return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
+            q_hint = G.t(r_w.q).float().reshape(-1)
+            supports = list(self.support_objects())
+            for k in range(int(OPATH.PLANNER_ROUNDS)):
+                self._check_deadline(f"overpath planner round {k + 1} ({arm} arm)")
+                TT._count(self, "overpath.planner.rounds")
+                traj, note = OPP.plan_transit(self.kit, arm, q0, pre, q_hint, supports, [(self.tname, tgt)], approach=[eef], inflation=OPATH.BOOK_MARGIN_M)
+                if traj is None:
+                    TT._count(self, f"overpath.planner.failed.{note.get('stage') or 'plan'}")
+                    last = ("plan", f"round {k + 1}: {note.get('why')}")
+                    tried.append(f"{k + 1}: plan ({str(note.get('why'))[:120]})")
+                    continue
+                out, key_v, why_v = self._overpath_verify(traj, arm, pre, eef, box, ignore_target=False)
+                if out is None:
+                    last = (key_v, f"round {k + 1} ({note.get('branch')}): {why_v}")
+                    tried.append(f"{k + 1}: {key_v}")
+                    continue
+                qs, dense, val = out
+                TT._count(self, f"overpath.planner.branch.{note.get('branch')}")
+                frame = M.EEF_LINK[arm]
+                top = float(G.local_points_world(self.hull, (G.t(settled[0]).float(), G.t(settled[1]).float()))[:, 2].max())
+                step = float((traj[1:, idx] - traj[:-1, idx]).abs().max()) if len(traj) > 1 else 0.0
+                rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], [self.kit.fk([frame], q)[frame][0] for q in qs], design="planner",
+                                   source=f"oracle planner ({note.get('branch')})", clearance_m=None, book_top_z=round(top, 4),
+                                   min_book_clearance_m=round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4),
+                                   start_book_clearance_m=round(float(val[0]), 4), end_book_clearance_m=round(float(val[-1]), 4), margin_m=OPATH.BOOK_MARGIN_M,
+                                   max_step_rad=round(step, 4), n_tracked=int(len(traj)), n_waypoints=int(len(qs)), n_dense=int(len(dense)),
+                                   pre_grasp={"position": [round(float(v), 5) for v in G.t(pre[0]).tolist()], "orientation": [round(float(v), 6) for v in G.t(pre[1]).tolist()]},
+                                   planner={k_: note.get(k_) for k_ in ("branch", "plan_s", "segments", "protect_events", "dip", "pre_pose_standoff", "via_posture", "straight")},
+                                   rounds=k + 1, tried=tried)
+                log.info("%s: overpath planned by the oracle's planner (%s arm, from the %s at stance %s, %s, round %d, %.1f s): %d waypoints, the book cleared by "
+                         ">= %.3f m (margin %.2f), largest planned step %.3f rad", self.gp.variant, arm, start, grasp_st.name, note.get("branch"), k + 1,
+                         float(note.get("plan_s") or 0.0), rec["n_waypoints"], rec["min_book_clearance_m"], OPATH.BOOK_MARGIN_M, rec["max_step_rad"])
+                return rec, "", ""
+            return None, last[0], f"{last[1]} (rounds: {tried})"
+        finally:
+            TT._countn(self, "overpath.planner_s", int(round(time.time() - t0)))
+            tgt.set_position_orientation(*p_prev)
+            tgt.keep_still()
+            self.kit.sync_world()
+
+    def _overpath_verify(self, traj: th.Tensor, arm: str, pre: G.Pose, eef: G.Pose, box, ignore_target: bool = True
+                         ) -> Tuple[Optional[Tuple[th.Tensor, th.Tensor, th.Tensor]], str, str]:
+        """The re-check of a transit ``traj`` ((T, 28), the start first) as the oracle will run it: the recorded waypoints
+        (:func:`overpath.subsample` of the arm joints), the executed path through them (:func:`overpath.densify`) collision-free at margin 0
+        (the desk and the scene present; the book too unless ``ignore_target``), the moving arm's spheres >= :data:`overpath.BOOK_MARGIN_M`
+        from the book's ``box`` (``protection.transit_violations``), the end at the pre-grasp and the grasp's approach tracked from it.
+        ``((waypoint rows, dense path, clearances), "", "")`` or ``(None, reason, why)``."""
+        from ispatialgym.oracle import protection as PROT
+
+        idx = self.kit.robot.arm_control_idx[arm]
+        keep = OPATH.subsample(traj[:, idx])
+        qs = traj[keep]
+        dense = OPATH.densify(qs[0], list(qs[1:]))
+        with (self.ikc.ignoring([self.target]) if ignore_target else contextlib.nullcontext()):
+            free = self.kit.collision_free(dense, margin=0.0)
+        if not bool(free[1:].all()):
+            k = int(th.nonzero(~free[1:]).reshape(-1)[0]) + 1
+            return None, "collision", f"the executed joint path collides at {k}/{len(dense) - 1} ({self.ikc._collision_blame(dense[k], [self.target] if ignore_target else [])})"
+        spheres, links = self.kit.backend.robot_spheres_world(dense, "whole_body")
+        val, _ = PROT.sphere_box_clearance(spheres[:, PROT.moving_sphere_mask(links, [arm])], box)
+        viol = PROT.transit_violations(val, OPATH.BOOK_MARGIN_M)
+        if viol is not None:
+            return None, "book", f"the arm passes the book at {viol['clearance_m']} m (threshold {viol['threshold_m']} m, configuration {viol['index']}/{len(dense) - 1})"
+        if not self.ikc.reaches(dense[-1], pre, arm):
+            return None, "end", "the path does not end at the pre-grasp"
+        with self.ikc.ignoring([self.target]):
+            r_a = self.ikc.continue_chain(dense[-1], [pre, eef], arm, soft_stall_m=None)
+        if not r_a.ok:
+            return None, "approach", f"the approach from the path's end: {str(r_a.reason)[:240]}"
+        return (qs, dense, val), "", ""
+
+    def _overpath_plan_cartesian(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                                 ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-overpath 2026-11-08 (owner 3(a), switch ``ISPATIALGYM_OVERHANG_OVERPATH``; since P1 the diagnostic design ``cartesian``): the transit of the overhang pick from where the
+        escape leaves the hand (:meth:`_overpath_start`) over the book to the pre-grasp ``pre`` - rise to the book's top + a clearance
+        (:data:`overpath.CLEARANCES_M`, the first that passes), across to above the pre-grasp, down to it (:func:`overpath.leg_poses`) -
+        tracked by differential IK from the start as the oracle tracks (``IKChecker.track_chain``: every dense configuration exact, no
+        joint step above 0.2 rad, collision-free with the target out of the world); the tracked configurations subsampled
+        (:func:`overpath.subsample`) and the path the oracle runs through them (:func:`overpath.densify`) checked again whole-body
+        (margin 0, the desk and the scene present) and with the arm's spheres >= :data:`overpath.BOOK_MARGIN_M` from the book's box at
+        its settled post-push pose (``protection.transit_violations``); the grasp's approach tracked from the path's end. No camera-frame
+        rule applies to the transit (the oracle's frame hook is off until the pre-grasp; the pre-grasp's own check stays). Returns
+        ``(record, "", "")`` - :func:`overpath.record` - or ``(None, reason, why)``."""
+        from ispatialgym.oracle import protection as PROT
+        from ispatialgym.oracle import r1pro_model as M
+
+        q0, start, why0 = self._overpath_start(st, grasp_st, arm, chain, settled)
+        if q0 is None:
+            return None, start, why0
+        frame = M.EEF_LINK[arm]
+        p0 = self.kit.fk([frame], q0)[frame]
+        pts = G.local_points_world(self.hull, (G.t(settled[0]).float(), G.t(settled[1]).float()))
+        top = float(pts[:, 2].max())
+        box = OPATH.box_of(settled, self.hull)
+        turn_deg = round(math.degrees(float(G.quat_angle(G.t(p0[1]).float(), G.t(pre[1]).float()))), 1)
+        b2 = getattr(grasp_st, "base_pose2d", None)
+        base_xy = [float(v) for v in th.as_tensor(b2).reshape(-1)[:2].tolist()] if b2 is not None else None
+        results: List[Tuple[str, Optional[Dict[str, Any]], str, str]] = []
+        for orient in OPATH.orient_schedules():
+            rec, key_o, why_o = self._overpath_plan_one(q0, start, p0, top, box, PROT, frame, grasp_st, arm, pre, eef, orient, base_xy)
+            if rec is not None:
+                rec["orient"], rec["turn_deg"] = orient, turn_deg
+            TT._count(self, f"overpath.orient.{orient}.{'planned' if rec is not None else 'rejected'}")
+            results.append((orient, rec, key_o, why_o))
+            if rec is not None and not OPATH.try_all():
+                break
+        if OPATH.try_all():
+            log.info("%s: OVERPATH_DIAG %s arm, stance %s, turn %.1f deg, start eef (%.3f, %.3f, %.3f), pre-grasp (%.3f, %.3f, %.3f), book top %.3f: %s", self.gp.variant,
+                     arm, grasp_st.name, turn_deg, *[float(v) for v in G.t(p0[0]).tolist()], *[float(v) for v in G.t(pre[0]).tolist()], top,
+                     " || ".join(f"{o}: " + ("planned" if r is not None else f"{k}: {w[:700]}") for o, r, k, w in results))
+        ok = [r for r in results if r[1] is not None]
+        if ok:
+            orient, rec = ok[0][0], ok[0][1]
+            rec["orients_failed"] = [f"{o}: {k}" for o, r, k, _ in results if r is None]
+            log.info("%s: overpath planned (%s arm, from the %s at stance %s, turn %s of %.1f deg): eef %.2f m over the book top %.3f, %d waypoints, the book "
+                     "cleared by >= %.3f m, largest tracked step %.3f rad%s", self.gp.variant, arm, start, grasp_st.name, orient, turn_deg, rec["clearance_m"], top,
+                     rec["n_waypoints"], rec["min_book_clearance_m"], rec["max_step_rad"], f" (failed first: {rec['orients_failed']})" if rec["orients_failed"] else "")
+            return rec, "", ""
+        key = results[0][2] if results else "track"
+        return None, key, f"turn {turn_deg} deg; " + " || ".join(f"{o}: {k}: {w}" for o, _, k, w in results)
+
+    def _overpath_plan_one(self, q0: th.Tensor, start: str, p0: G.Pose, top: float, box, PROT, frame: str, grasp_st: Stance, arm: str, pre: G.Pose,
+                           eef: G.Pose, orient: str, base_xy=None) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """:meth:`_overpath_plan` for one turn schedule (:func:`overpath.leg_plan`): the clearances in order, the first passing path."""
+        idx = self.kit.robot.arm_control_idx[arm]
+        tried: List[str] = []
+        last = ("track", "no clearance tried")
+        for c in OPATH.CLEARANCES_M:
+            plan = OPATH.leg_plan(G.t(p0[0]).float(), G.t(p0[1]).float(), G.t(pre[0]).float(), G.t(pre[1]).float(), top + float(c), orient)
+            legs = [(p, q) for p, q, _ in plan]
+            traj, src, why_t = self._overpath_configs(q0, legs, arm, pre, labels=[lb for _, _, lb in plan], base_xy=base_xy)
+            if traj is None:
+                last = ("jump" if "jump" in str(why_t) else ("collision" if "collide" in str(why_t) else "track"), str(why_t)[:900])
+                tried.append(f"{c:.2f}: {last[0]}")
+                continue
+            keep = OPATH.subsample(traj[:, idx])
+            qs = traj[keep]
+            dense = OPATH.densify(qs[0], list(qs[1:]))
+            with self.ikc.ignoring([self.target]):
+                free = self.kit.collision_free(dense, margin=0.0)
+            if not bool(free[1:].all()):
+                k = int(th.nonzero(~free[1:]).reshape(-1)[0]) + 1
+                last = ("collision", f"the executed joint path collides at {k}/{len(dense) - 1} ({self.ikc._collision_blame(dense[k], [self.target])})")
+                tried.append(f"{c:.2f}: collision")
+                continue
+            spheres, links = self.kit.backend.robot_spheres_world(dense, "whole_body")
+            mask = PROT.moving_sphere_mask(links, [arm])
+            val, _ = PROT.sphere_box_clearance(spheres[:, mask], box)
+            viol = PROT.transit_violations(val, OPATH.BOOK_MARGIN_M)
+            if viol is not None:
+                last = ("book", f"the arm passes the book at {viol['clearance_m']} m (threshold {viol['threshold_m']} m, configuration {viol['index']}/{len(dense) - 1})")
+                tried.append(f"{c:.2f}: book {viol['clearance_m']}")
+                continue
+            with self.ikc.ignoring([self.target]):
+                r_a = self.ikc.continue_chain(traj[-1], [pre, eef], arm, soft_stall_m=None)
+            if not r_a.ok:
+                last = ("approach", f"the approach from the path's end: {str(r_a.reason)[:240]}")
+                tried.append(f"{c:.2f}: approach")
+                continue
+            step = float((traj[1:, idx] - traj[:-1, idx]).abs().max()) if len(traj) > 1 else 0.0
+            eef_pts = [self.kit.fk([frame], q)[frame][0] for q in qs]
+            rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], eef_pts, clearance_m=float(c), book_top_z=round(top, 4), source=src,
+                               z_across=round(top + float(c), 4), min_book_clearance_m=round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4),
+                               start_book_clearance_m=round(float(val[0]), 4), end_book_clearance_m=round(float(val[-1]), 4), margin_m=OPATH.BOOK_MARGIN_M,
+                               max_step_rad=round(step, 4), n_tracked=int(len(traj)), n_waypoints=int(len(qs)), n_dense=int(len(dense)),
+                               pre_grasp={"position": [round(float(v), 5) for v in G.t(pre[0]).tolist()], "orientation": [round(float(v), 6) for v in G.t(pre[1]).tolist()]},
+                               legs=len(legs), leg_labels=[lb for _, _, lb in plan], tried=tried)
+            return rec, "", ""
+        return None, last[0], f"{last[1]} (clearances tried: {tried})"
+
+    def _overpath_configs(self, q0: th.Tensor, legs: Sequence[G.Pose], arm: str, pre: G.Pose, labels: Optional[Sequence[str]] = None,
+                          base_xy=None) -> Tuple[Optional[th.Tensor], str, str]:
+        """The configurations of the transit's legs from ``q0`` (the target out of the world, the desk / scene in): first tracked as the
+        oracle tracks a Cartesian leg (``track_chain`` at the oracle's soft tolerances, no step above 0.2 rad); when that stalls (the escape
+        leaves the elbow at its limit: hb i7op_b 'right_arm_joint4 at_lower'), the exact IK of every waypoint ~2 cm / 0.1 rad apart seeded
+        at the previous solution, no joint jump above :data:`overpath.IK_JUMP_MAX_RAD` (a branch flip). The last configuration reaches the
+        pre-grasp within the IK acceptance (polished by its IK when the tracking ended within the soft tolerance). ``(traj (T, 28) with
+        ``q0`` first, source, "")`` or ``(None, "", why)``; ``why`` names the failing leg (``labels``: :func:`overpath.leg_plan`), the
+        waypoint, the joint nearest its limit and, for the seeded IK, whether any IK branch reaches that waypoint (:meth:`_overpath_where`)."""
+        idx = self.kit.robot.arm_control_idx[arm]
+        labels = list(labels) if labels is not None and len(labels) == len(legs) else ["start"] + [f"leg{i}" for i in range(1, len(legs))]
+        q_end, why_t = self.ikc.track_chain(q0, legs, arm, ignore=[self.target], soft_pos_tol=self.ikc.ORACLE_SOFT_POS_TOL, soft_rot_tol=self.ikc.ORACLE_SOFT_ROT_TOL,
+                                            max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS)
+        traj, src = None, ""
+        if q_end is not None:
+            traj, src = G.t(getattr(self.ikc, "last_track_traj")).float().clone(), "tracked"
+            if not th.allclose(traj[0], G.t(q0).float(), atol=1e-6):
+                traj = th.cat([G.t(q0).float().reshape(1, -1), traj], dim=0)
+        else:
+            TT._count(self, "overpath.track_stalled")
+            where_t = self._overpath_where_track(legs, labels, str(why_t), arm)
+            wps: List[G.Pose] = []
+            counts: List[int] = []
+            for a, b in zip(legs[:-1], legs[1:]):
+                n = max(1, int(math.ceil(max(float(th.linalg.norm(G.t(b[0]) - G.t(a[0]))) / OPATH.IK_STEP_M, float(G.quat_angle(G.t(a[1]), G.t(b[1]))) / OPATH.IK_STEP_RAD))))
+                wps.extend(tuple(w) for w in C.line_waypoints(a, b, n))
+                counts.append(n)
+            rows = [G.t(q0).float().clone()]
+            with self.ikc.ignoring([self.target]):
+                for k, w in enumerate(wps):
+                    q_k = self.kit.ik(w, rows[-1], arm=arm)
+                    if q_k is None:
+                        where = self._overpath_where(legs, labels, counts, k + 1, w, rows[-1], arm, base_xy)
+                        return None, "", f"track: {why_t[:200]} [{where_t}]; seeded IK: no solution at waypoint {k + 1}/{len(wps)} [{where}]"
+                    q_k = G.t(q_k).float().reshape(-1)
+                    jump = float((q_k[idx] - rows[-1][idx]).abs().max())
+                    if jump > OPATH.IK_JUMP_MAX_RAD:
+                        where = self._overpath_where(legs, labels, counts, k + 1, w, rows[-1], arm, base_xy, probe=False)
+                        jn = int(th.argmax((q_k[idx] - rows[-1][idx]).abs()))
+                        return None, "", (f"track: {why_t[:200]} [{where_t}]; seeded IK: joint jump {jump:.2f} rad ({arm}_arm_joint{jn + 1}) at waypoint {k + 1}/{len(wps)} "
+                                          f"(> {OPATH.IK_JUMP_MAX_RAD:.2f}) [{where}]")
+                    r = rows[-1].clone()
+                    r[idx] = q_k[idx]
+                    rows.append(r)
+            traj, src = th.stack(rows), "seeded IK"
+        if not self.ikc.reaches(traj[-1], pre, arm):
+            with self.ikc.ignoring([self.target]):
+                q_p = self.kit.ik(pre, traj[-1], arm=arm)
+            if q_p is None or float((G.t(q_p).float().reshape(-1)[idx] - traj[-1][idx]).abs().max()) > OPATH.IK_JUMP_MAX_RAD:
+                return None, "", f"the path ends {src} off the pre-grasp and its IK from there jumps / fails"
+            r = traj[-1].clone()
+            r[idx] = G.t(q_p).float().reshape(-1)[idx]
+            traj = th.cat([traj, r.reshape(1, -1)], dim=0)
+        return traj, src, ""
+
+    def _overpath_limit(self, q: th.Tensor, arm: str) -> str:
+        """``"<joint> <margin> rad from its limit"`` of the arm joint nearest a limit at ``q`` (diagnostic)."""
+        try:
+            m, jn = self.ikc.joint_limit_margin(q, arm)
+            return f"{jn} {m:.3f} rad from its limit"
+        except Exception:  # noqa: BLE001 - a diagnostic (the unit-test kits have no limits)
+            return "limits n/a"
+
+    def _overpath_where_track(self, legs: Sequence[G.Pose], labels: Sequence[str], why: str, arm: str) -> str:
+        """Where the oracle-tolerance tracking stalled: the leg and the fraction of it (from ``waypoint k/N`` of ``why`` and
+        ``track_chain``'s own densification), the joint nearest its limit where it stalled (``ikc.last_track_stall``)."""
+        import re
+
+        m = re.search(r"waypoint (\d+)/(\d+)", why)
+        if m is None:
+            return "stall point n/a"
+        counts = []
+        for a, b in zip(legs[:-1], legs[1:]):
+            dist = float(th.linalg.norm(G.t(b[0]) - G.t(a[0])))
+            ang = float(G.quat_angle(G.t(a[1]), G.t(b[1])))
+            counts.append(max(1, int(math.ceil(max(dist / float(getattr(self.ikc, "TRACK_STEP_M", 0.01)), ang / float(getattr(self.ikc, "TRACK_STEP_RAD", 0.05)))))))
+        leg, frac = OPATH.leg_of(counts, labels, int(m.group(1)))
+        stall = getattr(self.ikc, "last_track_stall", None) or {}
+        lim = self._overpath_limit(stall["q"], arm) if isinstance(stall, dict) and stall.get("q") is not None else "stall configuration n/a"
+        return f"stalled in the {leg} leg at {frac:.2f} of it, {lim}"
+
+    def _overpath_where(self, legs: Sequence[G.Pose], labels: Sequence[str], counts: Sequence[int], k: int, w: G.Pose, q_prev: th.Tensor, arm: str,
+                        base_xy=None, probe: bool = True) -> str:
+        """Where the seeded exact IK lost the transit: the leg and the fraction of it, the waypoint's height, its horizontal distance from
+        the base, how far the hand has turned from the start's orientation there, the joint nearest its limit at the last solution, and
+        (``probe``) whether ANY IK branch reaches that waypoint (``kit.ik_all``: the smallest largest-joint change from the last solution)."""
+        leg, frac = OPATH.leg_of(counts, labels, k)
+        p, q = G.t(w[0]).float().reshape(-1), G.t(w[1]).float().reshape(-1)
+        turned = math.degrees(float(G.quat_angle(G.t(legs[0][1]).float(), q)))
+        total = math.degrees(float(G.quat_angle(G.t(legs[0][1]).float(), G.t(legs[-1][1]).float())))
+        out = [f"{leg} leg at {frac:.2f}", f"z {float(p[2]):.3f}"]
+        if base_xy is not None:
+            out.append(f"{float(th.linalg.norm(p[:2] - th.tensor(base_xy[:2]).float())):.3f} m from the base")
+        out.append(f"turned {turned:.0f} of {total:.0f} deg")
+        out.append(f"last solution: {self._overpath_limit(q_prev, arm)}")
+        if probe and getattr(self.kit, "ik_all", None) is not None:
+            try:
+                sols = self.kit.ik_all(w, q_prev, arm=arm)
+            except Exception as e:  # noqa: BLE001 - a diagnostic
+                sols = None
+                out.append(f"ik_all error {repr(e)[:80]}")
+            if sols is None or len(sols) == 0:
+                out.append("no IK branch reaches it")
+            else:
+                idx = self.kit.robot.arm_control_idx[arm]
+                d = (G.t(sols).float()[:, idx] - G.t(q_prev).float()[idx]).abs()
+                j = int(th.argmin(d.max(dim=1).values))
+                out.append(f"{len(sols)} IK branches reach it, nearest {float(d[j].max()):.2f} rad away ({arm}_arm_joint{int(th.argmax(d[j])) + 1})")
+        return ", ".join(out)
+
+    def overpath_record(self, ov: Dict[str, Any], grasp: GraspRecord) -> None:
+        """``grasps[0].overpath`` (i7-overpath): the transit :meth:`_overpath_plan` planned for the overhang pick ``ov`` when the switch is
+        on - planned again to the recorded pre-grasp when the coupling chose another of the pick's options (the twin) - else the attempt
+        is rejected (``overpath_unplannable``). No-op when off."""
+        if not OPATH.on():
+            return
+        rec = ov.get("overpath")
+        same = False
+        if rec is not None and grasp.pre_grasp is not None and rec.get("arm") == grasp.arm:
+            p = rec.get("pre_grasp") or {}
+            same = (float(th.linalg.norm(th.tensor(p.get("position", [0.0] * 3)) - G.t(grasp.pre_grasp[0]).float())) <= 0.002
+                    and G.quat_angle(th.tensor(p.get("orientation", [0.0, 0.0, 0.0, 1.0])), G.t(grasp.pre_grasp[1]).float()) <= 0.01)
+        if not same:
+            TT._count(self, "overpath.replanned")
+            rec, key_o, why_o = self._overpath_plan(ov["stance"], ov["grasp_stance"], grasp.arm, ov["chain"], ov["post_pose"], grasp.pre_grasp, grasp.grasp)
+            if rec is None:
+                TT._count(self, "overpath.rejected")
+                TT._count(self, f"overpath.rejected.{key_o}")
+                raise Reject("overpath_unplannable", f"overpath to the recorded pre-grasp ({grasp.grasp_name}): {key_o}: {why_o}")
+        grasp.extras[OPATH.RECORD_KEY] = _jsonable(rec)
+        TT._count(self, "overpath.recorded")
 
     def _overhang_grasp_stances(self, st: Stance, arm: str, opts: Dict[str, Any]) -> List[Stance]:
         """The grasp stances of the two-stance overhang pick (stance ``"pick"``): B backed off along its axis by ``grasp_back_offs_m``,
@@ -4754,7 +5341,8 @@ class IORSLarge(SamplerV2):
         grasp in B's image. ``(eef, pre, res, pick)`` or the reason it fails."""
         eef = IK.grasp_pose(obj_pose, g.pose)
         pre = IK.pre_pose(eef)
-        with self.ikc.ignoring([self.target]):
+        count_pick_preshape(self, g, "overhang")
+        with self.ikc.ignoring([self.target]), TT._policy_opening(self, g):  # i7-interior2 (owner 6.1): the policy at the pre-shape
             res = self.ikc.exact([pre, eef], st, arm, **kw)
             pick = None
             if twins and getattr(g, "name", None):
@@ -4805,7 +5393,7 @@ class IORSLarge(SamplerV2):
         self.sidecar.add_contact(rec)
         if sup is not None and self.surface.get("obj") is not None:
             self.sidecar.describe(sup, str(self.surface["obj"].category).replace("_", " "))  # the push's annotation names the support
-        opts = self.pick_overhang_opts() or {}
+        opts = self.pick_overhang_opts() or getattr(self, "_large_overhang_fallback_opts", None) or {}  # i7-interior2: the fallback's options
         c = self.choice.models["target"]
         role = (getattr(self.gp, "roles", None) or {}).get("target")
         tags = role.equivalence_tags(c.category, c.model) if role is not None and hasattr(role, "equivalence_tags") else []
@@ -5231,13 +5819,17 @@ class IORSLarge(SamplerV2):
                             continue
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
-                        res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                        if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
-                            pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
-                                                {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
-                                                support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
-                            res = pick.res
-                            self._count_mirrored_ik(pick, seg.bands)
+                        # i7-interior2 2026-11-08 (owner 6.1): the support policy measures the fingers at the grasp's pre-shape (pinch width / 2 + the
+                        # margin: the oracle's descent opening), as tabletop.grasp_at_pose since 11-06 - not fully open - for the row and its twins
+                        count_pick_preshape(self, g, "B")
+                        with TT._policy_opening(self, g):
+                            res = self.ikc.exact([pre, eef], st_of[a0], a0, ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                            if (twins_b or len(arms_p) > 1) and getattr(g, "name", None):
+                                pick = TT.pick_twin(self, st_of[a0], a0, g, g.pose, eef, pre, res,
+                                                    {"ignore_for_last": self.grasp_ignore_objects(), "scale_key": self.choice.models["target"].scale, "cache": False},
+                                                    support_z=float(z_init), where="B", arms=arms_p, stances=st_of, twins=twins_b)
+                                res = pick.res
+                                self._count_mirrored_ik(pick, seg.bands)
                         if res.ok:
                             arm_k = pick.arm if pick is not None else a0
                             st_k = pick.stance if pick is not None and pick.stance is not None else st_of.get(arm_k, st_of[a0])
@@ -5247,6 +5839,19 @@ class IORSLarge(SamplerV2):
                                 break
                             res = IK.IKResult(False, None, f"grasp reach margin: {why_m}", 2)
                         why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
+                    ov_fallback = None
+                    if (res is not None and not res.ok) and ov_opts is None and large_overhang_fallback_on():
+                        # i7-interior2 2026-11-08 (owner 6.1): IORSSmall's overhang fallback for this pick - only for a reason no other stance /
+                        # position fixes (the support policy), with the overhang defaults in fallback mode
+                        from ispatialgym.sampling.v2 import overhang_fallback as OF
+
+                        ov_fallback = OF.reason_class(str(res.reason))
+                        if ov_fallback is not None:
+                            TT._count(self, f"large_overhang_fallback.trigger.{ov_fallback}")
+                            TT._count(self, f"large_overhang_fallback.mode.{str((getattr(g, 'meta', None) or {}).get('mode') or 'none')}")
+                            ov_opts = dict(OH.options(True) or {})
+                            ov_opts["mode"] = "fallback"
+                            self._large_overhang_fallback_opts = ov_opts
                     if (res is None or not res.ok) and ov_opts is not None:
                         # owner 2026-10-13 ~03:15 item 4: the direct pick failed - push the object to B's support edge, grasp the overhang
                         key_ov = self._overhang_memo_key(manip, st_of, arms_p, g, yaw0, focus_xy, z_init, twins_b)
@@ -5264,6 +5869,8 @@ class IORSLarge(SamplerV2):
                             if overhang is None and key_ov is not None:
                                 memo_ov[key_ov] = why_ov
                                 self._overhang_memo_persisted(key_ov, why_ov)
+                        if ov_fallback is not None:
+                            TT._count(self, "large_overhang_fallback." + ("found" if overhang is not None else "failed"))
                         if overhang is not None:
                             res, t_pose, eef, pre, pick, yaw = overhang["res"], overhang["t_pose"], overhang["eef"], overhang["pre"], overhang["pick"], yaw0
                             b_opts_m, why_m = self._b_margin_options(self._b_options(pick, g, eef, pre), overhang["grasp_stance"], overhang["arm"], "B, overhang")
@@ -5475,9 +6082,12 @@ class IORSLarge(SamplerV2):
                     grasp.carry_height = h
                     # carry pose candidates (beside the body first), the plain lift configuration last
                     options: List[Tuple[str, Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]]] = []
+                    self._carry_centred_n = 0
                     if str(self.gp.gen("carry_pose", "on")) != "off":
                         options += [(f"carry pose {[round(float(v), 2) for v in P0.to_base_frame(cp[0][0], manip.base_pose2d, P0.base_z(self)).tolist()]}", cp)
                                     for cp in self.carry_poses_at_b(pick_st, eef, h, target, g.pose)]
+                    n_centred = int(getattr(self, "_carry_centred_n", 0) or 0)  # the first n options are centred carry poses (CARRY_CENTRED_ENV)
+                    options = [(("centred " + lb) if i < n_centred else lb, cp) for i, (lb, cp) in enumerate(options)]
                     options.append(("lift configuration", None))
                     for label, cp in options:
                         if cp is not None:
@@ -5508,6 +6118,8 @@ class IORSLarge(SamplerV2):
                                 self.record_carry_arm_q(tname, arm, None)
                                 continue
                         log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                        if label.startswith("centred "):
+                            TT._count(self, "carry_pose.centred_used")
                         break
                     if path_bc is not None:
                         break
@@ -5573,6 +6185,7 @@ class IORSLarge(SamplerV2):
                                                              **chain.get("record", {}), **chain.get("seed", {})))
                 if hit.get("overhang") is not None:
                     self.overhang_records(hit["overhang"], grasp)
+                    self.overpath_record(hit["overhang"], grasp)  # i7-overpath (owner 3(a)): grasps[0].overpath when the switch planned one
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")
@@ -5861,3 +6474,48 @@ class IORSLarge(SamplerV2):
         from ispatialgym.sampling.v2.tasks import iors_large_nextto as M
 
         return M.NextToMode
+
+
+def free_floor_stance(s, c_xy: th.Tensor, focus: th.Tensor, view_ok, rng: np.random.Generator, cfg: Optional[Dict[str, Any]] = None,
+                      what: str = "the goal region") -> Stance:
+    """The free-floor start draw of :meth:`IORSLarge.free_start_stance` (oracle-fix 2026-11-04; factored out by i7-t03 2026-11-08 so
+    IORSSmall's shelf start reuses it): up to ``tries`` draws of a base position on free floor (eroded map, the task rooms)
+    ``distance_range_m`` from ``c_xy`` (``cfg``, default ``s.gp.gen("free_start")``: 0.6-2.5 m, 120 tries), facing it, at every
+    ``reach_bands.TRANSLATES`` translate with a straight torso; a candidate survives ``view_ok(stance, head camera)`` (the caller's frame
+    test), the body check and a free trunk sweep; the most upright translate, then the smallest axis angle to ``focus``. A Stance named
+    ``"init"`` (``extras.free_start``), else ``Reject("no_stance")`` with the per-test counts."""
+    cfg = cfg if cfg is not None else s.gp.gen("free_start")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    d_lo, d_hi = (float(v) for v in cfg.get("distance_range_m", [0.6, 2.5]))
+    tries = int(cfg.get("tries", 120))
+    c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
+    stats = {"floor": 0, "view": 0, "body": 0, "sweep": 0}
+    for k in range(tries):
+        bearing = float(rng.uniform(-math.pi, math.pi))
+        dist = float(rng.uniform(d_lo, d_hi))
+        xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
+        if not s.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(s, xy):
+            stats["floor"] += 1
+            continue
+        yaw = math.atan2(float(c_xy[1] - xy[1]), float(c_xy[0] - xy[0]))
+        cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), float(t), 0.0, dist) for t in RB.TRANSLATES]
+        cams = P0.camera_poses(s, cands)
+        feas = [(st, P0.axis_angle(s, cam, focus)) for st, cam in zip(cands, cams) if view_ok(st, cam)]
+        if not feas:
+            stats["view"] += 1
+            continue
+        free = P0.body_free(s, [st for st, _ in feas])
+        feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
+        if not feas:
+            stats["body"] += 1
+            continue
+        if not P0.trunk_sweep_free(s, (float(xy[0]), float(xy[1]), yaw)):
+            stats["sweep"] += 1
+            continue
+        st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
+        st.extras.update({"bearing_deg": round(math.degrees(bearing), 1), "distance": round(dist, 3), "tries": k + 1, "free_start": True})
+        log.info("%s: free start: stance A at %s (%.2f m from the target cell, trunk (%.2f, 0)) after %d draws %s", s.gp.variant,
+                 [round(float(v), 2) for v in st.base_pose2d], dist, st.translate, k + 1, stats)
+        return st
+    raise Reject("no_stance", f"free start: no stance A {d_lo:.1f}-{d_hi:.1f} m from the target sees it and {what} ({tries} draws: {stats})")
+

@@ -11,6 +11,11 @@ set -u
 JOBDIR=$1
 F=/vision/u/minyeong/projects/isg_home/trainfast
 source $JOBDIR/job.env
+# i7-cork 2026-11-08: shiyuc mode as job_fast.sh (a recollect of a --shiyuc job: the kit overlay, the kit stores, git safe.directory)
+[ -n "${ISGF_EXP_PATH:-}" ] && export EXP_PATH=$ISGF_EXP_PATH
+if [ "${ISGF_GIT_SAFE_ALL:-0}" = 1 ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; fi
+[ -n "${KIT_TPL_NFS_ROOT:-}" ] && export KIT_TPL_NFS_ROOT
+[ -n "${KIT_TEX_STORE:-}" ] && export KIT_TEX_STORE
 # the snapshot's scripts and the job's root (job_fast.sh, submit_fast.py)
 S=${ISGF_SCRIPTS:-$F/scripts}
 ROOT=${ISGF_ROOT:-$F}

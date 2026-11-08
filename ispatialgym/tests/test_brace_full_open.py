@@ -2,11 +2,10 @@
 
 * ``ISPATIALGYM_BRACE_FULL_OPEN`` ("0" default = the openings of before 2026-11-07, "1" = an open brace opens fully, narrower only
   when the braced face cannot take the full spread): ``tabletop.brace_opening``, ``articulation_small.wide_stop_layout`` (the
-  push-close brace ``close_push_brace_opening_m`` and the carton-v4 wide stop ``v4_brace_opening_m``), ``block_design.pack_brace_opening``
-  (the packing tail's wide brace).
+  push-close brace ``close_push_brace_opening_m`` and the carton-v4 wide stop ``v4_brace_opening_m``) (the block design pack brace was
+  removed with the packing tail, owner 2026-11-08 3.7).
 * Default on, independent of the switch: every check of a wide brace uses the record's ``fingers_opening_m`` - the opening the oracle
-  executes (``execute_brace``) - not closed fingers: ``tabletop.brace_second_arm(brace_fingers=...)`` (the two-arm solve), the pack's
-  pushes with the brace locked, the program check's brace retreat and locked brace hand (``program_check.brace_open_fingers``,
+  executes (``execute_brace``) - not closed fingers: ``tabletop.brace_second_arm(brace_fingers=...)`` (the two-arm solve), the program check's brace retreat and locked brace hand (``program_check.brace_open_fingers``,
   ``locked_seed``, ``_Tracker.locked_fingers``).
 """
 
@@ -200,121 +199,7 @@ def test_brace_second_arm_without_brace_fingers_is_unchanged():
     assert all(q[GRIP_IDX["left"]].tolist() == [0.0, 0.0] for q in seen)
 
 
-# ---------------------------------------------------------------------------------------------------------- block design pack brace
-
-def _bd():
-    from ispatialgym.sampling.v2.tasks import block_design as BD
-
-    return BD
-
-
-def _old_pack(spread):
-    BD = _bd()
-    return max(0.0, min(float(C.FINGER_OPEN), 0.5 * spread - 0.5 * BD.FINGER_HALF_THICKNESS)) if spread > 0 else 0.0
-
-
-@pytest.mark.parametrize("spread", [0.0, 0.026, 0.035, 0.12, 0.3])
-def test_pack_brace_opening_switch_off_is_today(switch, spread):
-    BD = _bd()
-    assert BD.pack_brace_opening(spread) == _old_pack(spread)
-    assert BD.pack_brace_opening(spread, face_half_m=0.2) == _old_pack(spread)  # the face is not consulted with the switch off
-
-
-def test_pack_brace_opening_full_open(switch):
-    BD = _bd()
-    switch(True)
-    m, half_t = BD.PACK_BRACE_END_MARGIN_M, BD.FINGER_HALF_THICKNESS
-    # two 2.5 cm dice 3.5 cm apart (the 10 mm place grid): the faces span +-3 cm - each finger's outer side 5 mm inside the outer edges
-    assert BD.pack_brace_opening(0.035, face_half_m=0.03) == pytest.approx(0.03 - half_t - m)
-    assert BD.pack_brace_opening(0.035, face_half_m=0.03) > _old_pack(0.035)
-    # a long braced line takes the full spread
-    assert BD.pack_brace_opening(0.12, face_half_m=0.0725) == 0.05
-    # never narrower than the fingers on the cubes' centres
-    assert BD.pack_brace_opening(0.035, face_half_m=0.02) == pytest.approx(_old_pack(0.035))
-    # one braced cube is a closed blade, not an open brace
-    assert BD.pack_brace_opening(0.0, face_half_m=0.0125) == 0.0
-    assert BD.pack_brace_opening(0.035) == pytest.approx(_old_pack(0.035))  # no face known: today's
-
-
-def _cube_hull(e=0.025):
-    h = 0.5 * e
-    return th.tensor([[x, y, z] for x in (-h, h) for y in (-h, h) for z in (-h, h)])
-
-
-def test_pack_face_half_is_the_braced_cubes_extent_along_the_closing_axis():
-    BD = _bd()
-    s = object.__new__(BD.BlockDesign)
-    s.hull = _cube_hull()
-    world = {"a": (th.tensor([0.5, 0.0175, 0.8]), Q_ID), "b": (th.tensor([0.5, -0.0175, 0.8]), Q_ID)}
-    mid = th.tensor([0.5, 0.0, 0.8])
-    # braced on their -x faces (brace direction +x): the closing axis runs along y, the faces span -0.03 .. 0.03
-    assert s._pack_face_half(world, ["a", "b"], mid, th.tensor([1.0, 0.0, 0.0])) == pytest.approx(0.03)
-    assert s._pack_face_half(world, ["a", "b"], mid + th.tensor([0.0, 0.005, 0.0]), th.tensor([-1.0, 0.0, 0.0])) == pytest.approx(0.025)
-    s.hull = None
-    assert s._pack_face_half(world, ["a", "b"], mid, th.tensor([1.0, 0.0, 0.0])) is None
-
-
-def _pack_sampler(monkeypatch, captured):
-    BD = _bd()
-    s = object.__new__(BD.BlockDesign)
-    s.spec = SimpleNamespace(generation={})
-    s.gp = SimpleNamespace(variant="configuration_matching-block_design-block_4-breakfast_table")
-    s.hull = _cube_hull()
-    s.c_local = th.zeros(3)
-    s.edge = 0.025
-    s.objects = {"a": object(), "b": object(), "c": object()}
-    ikc = _BraceIKC()
-    s.ikc = ikc
-    s.kit = _kit()
-    s._blade_poses_at = lambda mid, normal, manip, prefix, modes=("pad", "side"): iter([((th.tensor([0.48, 0.0, 0.82]), Q_ID), th.tensor([0.0, 0.0, -1.0]),
-                                                                                         "pack_brace_blade_side_0", 0.007)])
-
-    def pushes(world, pushes_, push_dir, manip, support, push_arm, q_seed, braced_objs, b_name):
-        captured["q_seed"] = q_seed.clone()
-        return [{"arm": push_arm}], ""
-
-    s._pack_pushes = pushes
-
-    def choose_first(ikc_, arm, stream, *, key, label, chain, evaluate, q_start, camera_idx=None, stage="", downstream=None, arm_of=None):
-        c = next(iter(stream))
-        p = SimpleNamespace(label=label(c), payload=c, chain=chain(c), q_first=None)
-        ok, res, _qs, why = evaluate(p)
-        assert ok, why
-        sc = SimpleNamespace(proposal=p, result=res)
-        assert downstream(sc)[0]
-        return sc, None, []
-
-    monkeypatch.setattr(BD.O, "choose_first", choose_first)
-    world = {"a": (th.tensor([0.5, 0.0175, 0.8]), Q_ID), "b": (th.tensor([0.5, -0.0175, 0.8]), Q_ID), "c": (th.tensor([0.55, 0.0175, 0.8]), Q_ID)}
-    return s, ikc, world
-
-
-@pytest.mark.parametrize("on", [False, True])
-def test_pack_pushes_are_checked_with_the_brace_hand_at_its_opening(switch, monkeypatch, on):
-    BD = _bd()
-    switch(on)
-    captured = {}
-    s, ikc, world = _pack_sampler(monkeypatch, captured)
-    stage, why = s._pack_stage("columns", world, ["a", "b"], [("c", 0.009)], th.tensor([-1.0, 0.0, 0.0]), th.tensor([1.0, 0.0, 0.0]),
-                               Stance_("manipulation"), object())
-    assert stage is not None, why
-    q_open = BD.pack_brace_opening(0.035, 0.03 if on else None)
-    assert stage["brace"]["fingers_opening_m"] == round(q_open, 4)
-    if not on:
-        assert stage["brace"]["fingers_opening_m"] == round(_old_pack(0.035), 4)  # the record is today's with the switch off
-    else:
-        assert q_open == pytest.approx(0.03 - BD.FINGER_HALF_THICKNESS - BD.PACK_BRACE_END_MARGIN_M)
-    # the brace chain at its opening (as before), the pushes with the brace hand held there and the push hand closed (the fix)
-    assert ikc.calls[0]["arm"] == "left" and ikc.calls[0]["grip"]["left"] == pytest.approx([q_open] * 2)
-    q_seed = captured["q_seed"]
-    assert q_seed[GRIP_IDX["left"]].tolist() == pytest.approx([q_open] * 2) and q_seed[GRIP_IDX["right"]].tolist() == [0.0, 0.0]
-    assert q_seed[ARM_IDX["left"]].tolist() == pytest.approx([0.3] * 7)  # the brace arm at its contact
-
-
-def Stance_(name):
-    from ispatialgym.sampling.v2.stances import Stance
-
-    return Stance(name, (0.0, 0.0, 0.0), 0.75, -0.3, stand_off=0.35)
+# (the block design pack brace's tests left with the packing tail: owner 2026-11-08 3.7, i7-contact3)
 
 
 # ----------------------------------------------------------------------------------------------------------------- program check

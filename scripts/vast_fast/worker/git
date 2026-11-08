@@ -1,0 +1,53 @@
+#!/bin/sh
+# i7-vast stand-in for git on the instance (no repositories are shipped). Answers what the fast flow asks, as the cluster's git
+# answers it for the same tree:
+#   git [-C <dir>] rev-parse [--short[=N]] HEAD      the commit of the nearest mapped root above <dir>'s path
+#   git [-C <dir>] status --porcelain [...]          that root's recorded porcelain lines (the frozen Behavior-1K's overlay patches)
+# Roots come from /etc/isg_git_heads (one "<dir> TAB <full sha> TAB <porcelain file or ->" per line; worker.py adds the
+# Behavior-1K of every code snapshot it unpacks: the cluster's $R/Behavior-1K/.git leads to that commit), else a .git_head file.
+# Everything else (and a tree without a root, like a snapshot's own root: a git archive) fails as git does outside a repository.
+dir=.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -C) dir=$2; shift 2 ;;
+    -c) shift 2 ;;
+    *) break ;;
+  esac
+done
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+short=""
+case "$cmd" in
+  rev-parse)
+    for a in "$@"; do
+      case "$a" in --short) short=7 ;; --short=*) short=${a#--short=} ;; HEAD) ;; *) cmd=bad ;; esac
+    done ;;
+  status) ;;
+  *) cmd=bad ;;
+esac
+find_root() {
+  d0=$(cd "$dir" 2>/dev/null && pwd -L) || return 1
+  for d in "$d0" "$(cd "$dir" 2>/dev/null && pwd -P)"; do
+    while :; do
+      if [ -f /etc/isg_git_heads ]; then
+        line=$(awk -F '\t' -v d="$d" '$1 == d {print; exit}' /etc/isg_git_heads)
+        [ -n "$line" ] && { echo "$line"; return 0; }
+      fi
+      [ -f "$d/.git_head" ] && { printf '%s\t%s\t-\n' "$d" "$(cat "$d/.git_head")"; return 0; }
+      [ "$d" = / ] && break
+      d=$(dirname "$d")
+    done
+  done
+  return 1
+}
+if [ "$cmd" != bad ] && root=$(find_root); then
+  sha=$(printf '%s' "$root" | cut -f2); por=$(printf '%s' "$root" | cut -f3)
+  if [ "$cmd" = rev-parse ]; then
+    if [ -n "$short" ]; then printf '%s\n' "$sha" | cut -c1-"$short"; else printf '%s\n' "$sha"; fi
+    exit 0
+  fi
+  [ "$por" != - ] && [ -f "$por" ] && cat "$por"
+  exit 0
+fi
+echo "fatal: not a git repository (or any of the parent directories): .git" >&2
+exit 128

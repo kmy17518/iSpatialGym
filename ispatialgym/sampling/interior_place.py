@@ -35,6 +35,12 @@ Every exact check stays: stance C's body check, the goal cells, the camera frame
 object attached. The rule (:func:`place_rule`) is part of the map's identity (``MapConfig.interior_place`` in the config -> the key);
 ``ReachMap.find(..., interior_place=)`` serves a lookup only from a map whose rule covers it (:func:`covers`); maps without the field are
 the former rule and keep their keys (tabletop / floor / generic / lean-interior keys unchanged).
+
+i7-interior2 2026-11-08 (owner 5x.2): the rule field ``joint_margin_rad`` (opt-in, default 0 = absent from the rule and the key): an IK
+solution of the pre-place or of the release counts only when every WORKING-arm joint is at least that far from its limits - the exact
+place check's ``ik.JOINT_LIMIT_MARGIN`` (0.05 rad: ``away_from_limits`` at the pose, the tracked approach's end). Without it the fridge's
+map admitted cells whose only solutions had arm joint 2 at its limit (268 of ~350 stance-C place-IK failures, median 3 mrad). A margin map
+serves the same lookups (the field is not compared: it only removes entries the exact check rejects); ``meta["joint_margin"]`` counts them.
 """
 
 from __future__ import annotations
@@ -61,13 +67,16 @@ WALL_RULES = ("board", "front")
 DROP_M = 0.005
 CLEARANCE_M = 0.02
 PRE_M = 0.10
+#: the exact place check's arm joint margin (``ik.IKCache.JOINT_LIMIT_MARGIN``) - the value of the opt-in rule field ``joint_margin_rad``
+EXACT_JOINT_MARGIN_RAD = 0.05
 
 
 def place_rule(pre: str = "approach", pre_m: float = PRE_M, drop_m: float = DROP_M, clearance_m: float = CLEARANCE_M, tilts_deg: Sequence[float] = (),
                lift_per_grasp: bool = False, laterals_m: Sequence[float] = DEFAULT_LATERALS_M, lattice_m: float = DEFAULT_LATTICE_M, body: str = "arm",
-               release: str = "lift", walls: str = "board") -> Dict[str, Any]:
+               release: str = "lift", walls: str = "board", joint_margin_rad: float = 0.0) -> Dict[str, Any]:
     """The canonical place rule (the map identity's ``interior_place``). ``body`` "robot", ``release`` "rest" and ``walls`` "front" are the
-    former interior map's assumptions, kept for measurements (a lookup never asks for them)."""
+    former interior map's assumptions, kept for measurements (a lookup never asks for them). ``joint_margin_rad`` > 0 (owner 5x.2, opt-in):
+    the working arm's joint margin of the pre-place and release IK, in the rule (and so the key) only when set."""
     if pre not in PRE_RULES:
         raise ValueError(f"interior place: pre {pre!r} (one of {PRE_RULES})")
     if body not in BODY_RULES:
@@ -82,9 +91,13 @@ def place_rule(pre: str = "approach", pre_m: float = PRE_M, drop_m: float = DROP
     lats = sorted({round(float(v), 4) for v in laterals_m}) or [0.0]
     if not float(lattice_m) > 0:
         raise ValueError(f"interior place: lattice_m {lattice_m}")
+    jm = round(float(joint_margin_rad or 0.0), 4)
+    if not 0.0 <= jm < 0.5:
+        raise ValueError(f"interior place: joint_margin_rad {joint_margin_rad} (0 <= margin < 0.5)")
+    extra = {"joint_margin_rad": jm} if jm > 0 else {}
     return {"rule": RULE, "pre": pre, "pre_m": round(float(pre_m), 4), "drop_m": round(float(drop_m), 4), "clearance_m": round(float(clearance_m), 4),
             "tilts_deg": tilts, "lift_per_grasp": bool(lift_per_grasp), "laterals_m": lats, "lattice_m": round(float(lattice_m), 4), "body": body,
-            "release": release, "walls": walls}
+            "release": release, "walls": walls, **extra}
 
 
 def parse_rule(value: Any) -> Optional[Dict[str, Any]]:
@@ -159,6 +172,29 @@ def release_lift(lows: Sequence[float], surface_z: float, clearance: float) -> f
     if not lows:
         return 0.0
     return max(0.0, float(surface_z) + float(clearance) - min(float(v) for v in lows))
+
+
+def arm_joint_bounds(world, entry, arm: str, margin: float) -> Optional[Tuple[th.Tensor, th.Tensor, th.Tensor]]:
+    """``(active indices of the arm's joints in the IK entry, lower + margin, upper - margin)`` for :func:`margin_ok`; None without a margin."""
+    if not margin > 0:
+        return None
+    names = list(entry.rsc.joint_names)
+    sel = [i for i, n in enumerate(names) if n.startswith(f"{arm}_arm_joint")]
+    if not sel:
+        raise ValueError(f"interior place: no {arm}_arm_joint* among the IK entry's joints {names}")
+    full = th.tensor([world.jidx[names[i]] for i in sel])
+    lo = world.robot.joint_lower_limits[full].float().to(world.dev) + float(margin)
+    hi = world.robot.joint_upper_limits[full].float().to(world.dev) - float(margin)
+    return th.tensor(sel, device=world.dev), lo, hi
+
+
+def margin_ok(q: th.Tensor, bounds: Optional[Tuple[th.Tensor, th.Tensor, th.Tensor]]) -> th.Tensor:
+    """(...,) True where every arm joint of the active configurations ``q`` (..., dof) keeps the margin of ``bounds`` (all True without)."""
+    if bounds is None:
+        return th.ones(q.shape[:-1], dtype=th.bool, device=q.device)
+    idx, lo, hi = bounds
+    qa = q[..., idx]
+    return ((qa >= lo) & (qa <= hi)).all(dim=-1)
 
 
 def release_table(V: np.ndarray, R_rest: np.ndarray, yaws: Sequence[float], T_og: np.ndarray, base_rows: Sequence[int], height: float,
@@ -329,6 +365,9 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
                                                                                             dtype=th.float32, device=dev)) for pc in geom.pieces]
     hand_links = set(policy.finger_links(cfg.arm)) | set(policy.hand_rigid_links(cfg.arm))
     entry = world.entry()
+    jm = float(rule.get("joint_margin_rad", 0.0) or 0.0)
+    jbounds = arm_joint_bounds(world, entry, cfg.arm, jm)
+    jm_stats = {"pre_seeds_dropped": 0, "release_seeds_dropped": 0, "pre_problems_lost": 0, "release_problems_lost": 0}
     links = world.link_of_sphere()
     arm_mask = th.tensor([(l not in hand_links) and bool(l) and l.startswith(f"{cfg.arm}_arm") for l in links], device=dev)
     body = rule["body"]
@@ -414,6 +453,11 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
             succ_pre, q_pre = RM._solve(world, entry, TP_flat[idx], q_lock)
             n_ik += int(idx.numel())
             t_ik += time.time() - ta
+            if jbounds is not None:  # owner 5x.2: the exact check's joint margin at the pre-place
+                keep = succ_pre & margin_ok(q_pre, jbounds)
+                jm_stats["pre_seeds_dropped"] += int((succ_pre & ~keep).sum())
+                jm_stats["pre_problems_lost"] += int((succ_pre.any(dim=1) & ~keep.any(dim=1)).sum())
+                succ_pre = keep
             pre_any = succ_pre.any(dim=1)
             first_seed = th.argmax(succ_pre.int(), dim=1)
             q_pre1 = q_pre[th.arange(idx.numel(), device=dev), first_seed]
@@ -424,6 +468,11 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
             succ_g, q_g = RM._solve(world, entry, TE_flat[idx[sel]], q_lock, seed_active=q_pre1[sel])
             n_ik += int(sel.numel())
             t_ik += time.time() - ta
+            if jbounds is not None:  # owner 5x.2: the exact check's joint margin at the release
+                keep = succ_g & margin_ok(q_g, jbounds)
+                jm_stats["release_seeds_dropped"] += int((succ_g & ~keep).sum())
+                jm_stats["release_problems_lost"] += int((succ_g.any(dim=1) & ~keep.any(dim=1)).sum())
+                succ_g = keep
             tb = time.time()
             for d_e in d_es:
                 why_de[d_e][idx[sel]] = th.where(feas[d_e][idx[sel]], why_de[d_e][idx[sel]], th.full_like(why_de[d_e][idx[sel]], STATUS["ik_grasp"]))
@@ -519,6 +568,7 @@ def compute_place_map(world, lib, rest_id: str, height: float, anchor: Dict[str,
             "grasps": [{k: v for k, v in g.items() if k != "T"} | {"T_object_eef": S.mat_pose(g["T"])} for g in grasps],
             "brace": None, "trunks": meta_trunks, "status_codes": STATUS, "robot": RM.robot_digest(), "timing": tim, "created": S.now(),
             "interior": interior.to_json(), "interior_placement": "fixed_place", "interior_place": rule,
+            **({"joint_margin": {"rad": jm, **jm_stats}} if jbounds is not None else {}),
             "interior_sphere_hits": dict(sorted(sphere_hits.items(), key=lambda kv: -kv[1])[:12]),
             "release": {"tilts_deg": tilts, "lift_m": {f"{t:g}": [round(float(lift_tab[:, k].min()), 4), round(float(lift_tab[:, k].max()), 4)] for k, t in enumerate(tilts)},
                         "base_rows": [grasps[i]["name"] for i in base_rows], "centres_y_m": [round(v, 4) for v in centres]},

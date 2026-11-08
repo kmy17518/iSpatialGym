@@ -18,7 +18,8 @@ from ispatialgym.grasping import schema as S
 GOLDEN_KEY = "cd78dd8e53bcfdbf"
 #: every candidate switch off (i7-padsweep added the third)
 OFF3 = {"blade_contact_at_retreat": False, "retreat_shift_exact": False, "sweep_from_preshape": False,
-        "outer_pinch": False, "attach_face_retreat": False}  # i7-attachfix: two opt-in switches joined
+        "outer_pinch": False, "attach_face_retreat": False,  # i7-attachfix: two opt-in switches joined
+        "outer_pinch_preshape": False}  # i7-attachdef (owner 5.1)
 
 
 def _lib_data(**extra):
@@ -52,7 +53,8 @@ def _write_entry(root, data, cand_config=None):
 
 def test_switch_state_reads_off_and_keeps_every_existing_key(tmp_path):
     # i7-padsweep: a third switch (sweep_from_preshape) joined; the record carries it, the identity only when on (keys unchanged)
-    assert S.CANDIDATE_SWITCHES == ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape", "outer_pinch", "attach_face_retreat")
+    assert S.CANDIDATE_SWITCHES == ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape", "outer_pinch", "attach_face_retreat",
+                                    "outer_pinch_preshape")
     assert S.candidate_switches(None) == S.candidate_switches({}) == OFF3
     lib = _lib(_lib_data())
     assert lib.candidate_switches() == OFF3
@@ -115,7 +117,7 @@ def test_build_library_records_the_switch_state():
                       ({"blade_contact_at_retreat": True, "retreat_shift_exact": True}, (True, True))):
         cand_doc = {"candidates": [], "families": {}, "arm": "right", "pipeline": "a1v2", **({"config": cfg} if cfg is not None else {})}
         lib = VT.build_library(job, cand_doc, {}, [], CP.DEFAULT, None)
-        assert lib["candidate_switches"] == dict(zip(S.CANDIDATE_SWITCHES, want + (False, False, False))) and lib["legacy_key"] == "plate__synthetic"
+        assert lib["candidate_switches"] == dict(zip(S.CANDIDATE_SWITCHES, want + (False, False, False, False))) and lib["legacy_key"] == "plate__synthetic"
 
 
 def test_a_map_of_the_off_entry_never_serves_the_on_entry(tmp_path):
@@ -246,8 +248,9 @@ def test_new_builds_record_both_switches_on(monkeypatch):
     from ispatialgym.grasping import pipeline as PL
 
     monkeypatch.delenv("ISG_GLIB_CAND_OVERRIDES", raising=False)
-    assert S.candidate_switches(asdict(CA.CandidateConfig())) == dict(OFF3, blade_contact_at_retreat=True, retreat_shift_exact=True, sweep_from_preshape=True)
-    cfg, _ = PL.candidate_overrides({"cand_overrides": {"blade_contact_at_retreat": False, "retreat_shift_exact": False, "sweep_from_preshape": False}})
+    # i7-attachdef 2026-11-08: outer_pinch / attach_face_retreat default on too (owner 4.1)
+    assert S.candidate_switches(asdict(CA.CandidateConfig())) == {k: True for k in OFF3}  # i7-attachdef: outer_pinch_preshape too (owner 5.1)
+    cfg, _ = PL.candidate_overrides({"cand_overrides": {k: False for k in OFF3}})
     assert S.candidate_switches(asdict(cfg)) == OFF3
 
 

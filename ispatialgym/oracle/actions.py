@@ -640,6 +640,9 @@ class Transition(Action):
             fine = f"back off{with_obj} and straighten the trunk before driving to {_dest(self.transition.to)}"
             numbers = f"drive back{with_obj} to {self.transition.stand_off:.2f} m stand-off, set trunk translate {tt:.2f} / tilt {kt:.2f} (from {t0:.2f} / {k0:.2f})"
             return fine, numbers
+        if self.transition.to == "retreat" and (getattr(self.transition, "extra", None) or {}).get("retreat_backoff_m") is not None:
+            # i7-t03 owner 5p.1: the shelf tip release's retreat by the base (the arm frozen at the place's end, the trunk unchanged)
+            return "back away from the shelf", f"drive back to {self.transition.stand_off:.2f} m stand-off with the arm held, trunk unchanged"
         fine = f"back off{with_obj}, set the trunk for {purpose} and move in to {_dest(self.transition.to)}"
         t1, k1 = self.stance_to.trunk
         s = self.stance_to.stand_off
@@ -721,6 +724,10 @@ class Grasp(Action):
     #: "from_stance"}`` - the arm first makes a planned joint-space move to ``q`` (this grasp's recorded pre-grasp configuration), then
     #: the transit; None = the transit from wherever the arm is
     repose: Optional[Dict[str, Any]] = None
+    #: i7-overpath 2026-11-08 (owner 3(a), ``programs._pick_actions``): the overhang pick's recorded transit over the book
+    #: (``grasps[k].overpath``, :mod:`ispatialgym.oracle.overpath`) - the arm follows its joint waypoints from where the escape left it to
+    #: the pre-grasp instead of planning that transit; None = the planned transit
+    overpath: Optional[Dict[str, Any]] = None
     TARGET_KEYS = ("pre_grasp", "grasp", "approach")
 
     def __post_init__(self):
@@ -801,6 +808,16 @@ class Grasp(Action):
         return fine, numbers
 
 
+def _quat_mul_xyzw(a: Sequence[float], b: Sequence[float]) -> List[float]:
+    """Hamilton product a * b of xyzw quaternions, normalised (i7-t03 round 2: ``Lift.turn``)."""
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    q = [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw,
+         aw * bw - ax * bx - ay * by - az * bz]
+    n = math.sqrt(sum(v * v for v in q)) or 1.0
+    return [v / n for v in q]
+
+
 @dataclass(kw_only=True)
 class Lift(Action):
     """Lift the grasped object straight up by ``carry_height`` (``grasps[i].carry_height`` / the block's), object
@@ -818,6 +835,9 @@ class Lift(Action):
     #: oracle-fix 2026-11-04 round 4 (``grasps[i].lift_away``, touching#03's shelf tip release): a world offset (m) added to the lift's end - the book
     #: leaning on a side board is lifted away from it; None = straight up
     away: Optional[Sequence[float]] = None
+    #: i7-t03 round 2 (owner decision (d), APPROVED oracle change): a world rotation (xyzw) applied to the hand over the lift - the leaning book on the
+    #: shelf is turned upright while it rises (``grasps[i].lift_turn``); the waypoints interpolate it (``line_waypoints`` on poses). None = kept
+    turn: Optional[Sequence[float]] = None
     TARGET_KEYS = ("lift",)
 
     def __post_init__(self):
@@ -842,7 +862,10 @@ class Lift(Action):
         if start is None:
             raise SidecarError(f"lift: the preceding action {self.after.name} leaves no eef pose")
         dx, dy, dz = (float(v) for v in (self.away or (0.0, 0.0, 0.0)))
-        return start, start.translated([dx, dy, self.carry_height + dz])
+        end = start.translated([dx, dy, self.carry_height + dz])
+        if self.turn:
+            end = type(end)(list(end.position), _quat_mul_xyzw([float(v) for v in self.turn], list(end.orientation)))
+        return start, end
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -854,6 +877,8 @@ class Lift(Action):
 
     def annotate(self, sidecar):
         obj = sidecar.language.phrase(self.object)
+        if self.turn:
+            return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} up and straighten it"
         if self.away:
             return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} up and {_cm(math.hypot(float(self.away[0]), float(self.away[1])))} away from the board"
         return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} straight up"

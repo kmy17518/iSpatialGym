@@ -597,3 +597,106 @@ def test_the_lift_away_offset_reaches_the_oracle_lift_and_the_sampler_lift_end()
     g.extras = {}
     p, _ = lift_end_pose(g)
     assert p.tolist() == pytest.approx([1.0, 2.0, 0.84], abs=1e-6)
+
+
+def _retreat_record() -> dict:
+    """The shelf tip record with the backed-off retreat (i7-t03 owner 5p.1): stance ``retreat`` = the manipulation stance 5 cm farther back
+    along its axis (the robot faces +y), the transition into it with the arms held where the place left them."""
+    d = _shelf_record()
+    d["contacts"].pop("push")
+    d["grasps"][0]["place_kind"] = "shelf_tip"
+    m = d["stances"]["manipulation"]
+    back = dict(m, base_pose2d=[m["base_pose2d"][0], m["base_pose2d"][1] - 0.05, m["base_pose2d"][2]], stand_off=m["stand_off"] + 0.05)
+    d["stances"]["retreat"] = back
+    d["transitions"].append({"from": "manipulation", "to": "retreat", "stand_off": back["stand_off"], "order": ["drive-back", "trunk", "drive-in"],
+                             "arms_q": {"left": [0.1] * 7, "right": [0.0] * 7}, "retreat_backoff_m": 0.05})
+    return d
+
+
+def test_the_shelf_tip_release_backs_the_base_off_instead_of_the_last_retreat():
+    """5p.1: with the recorded ``retreat`` stance the program is pick, place (its own 10 cm lift-off), then the recorded drive-back - no arm
+    retreat; the drive holds the recorded arms and keeps the trunk; without the stance the program is unchanged."""
+    from ispatialgym.oracle.programs import SHELF_RETREAT_STANCE, expand
+    from ispatialgym.oracle.sidecar import Sidecar
+
+    d = _retreat_record()
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc
+    actions = expand(sc.variant, sc)
+    assert [a.name for a in actions] == ["transition", "grasp", "lift", "place", "transition"] and SHELF_RETREAT_STANCE == "retreat"
+    tr = actions[-1]
+    t = tr.targets(sc, None)
+    assert t["trunk"] == pytest.approx(tuple(sc.stance("manipulation").trunk)) and t["arms_q"] is not None
+    assert list(t["drive_in"])[:2] == pytest.approx([d["stances"]["retreat"]["base_pose2d"][0], d["stances"]["retreat"]["base_pose2d"][1]], abs=1e-6)
+    fine, numbers = tr.annotate(sc)
+    assert "back away" in fine and "arm held" in numbers
+    plain = copy.deepcopy(d)
+    del plain["stances"]["retreat"]
+    plain["transitions"] = plain["transitions"][:1]
+    assert [a.name for a in expand(Sidecar.from_dict(plain).variant, Sidecar.from_dict(plain))] == ["transition", "grasp", "lift", "place", "retreat"]
+
+
+def _clear_sampler(monkeypatch, clear_ok=False, end_ok=True, drive_ok=True, switch="1"):
+    from ispatialgym.sampling.v2 import navigation as NAV
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    from ispatialgym.sampling import geometry as G
+
+    monkeypatch.setenv(IS.SHELF_RETREAT_BACKOFF_ENV, switch)
+    s = _sampler()
+    for name in ("release_clear_why", "_drop_retreat_record", "_retreat_backoff_why"):
+        setattr(s, name, types.MethodType(getattr(IS.IORSSmall, name), s))
+    s.shelf_tip = lambda: True
+    s.support_objects = lambda: []
+    s.obj = lambda role: SimpleNamespace(name=role)
+    s.gp = SimpleNamespace(variant="t03")
+    s.kit = SimpleNamespace(stats={}, robot=SimpleNamespace(arm_control_idx={"right": list(range(0, 7)), "left": list(range(7, 14))}))
+    place = (th.tensor([0.0, 0.6, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    calls = []
+
+    def exact(poses, st, arm, **kw):
+        back = float(th.linalg.norm(G.t(poses[0][0]) - place[0]))
+        calls.append(round(back, 3))
+        ok = clear_ok if back > 0.12 else end_ok
+        return SimpleNamespace(ok=ok, q=th.arange(14, dtype=th.float32) if ok else None, reason="exact IK failed at pose 1 of 1", code="place_unreachable")
+
+    @__import__("contextlib").contextmanager
+    def ignoring(objs, split=True):
+        yield
+
+    s.ikc = SimpleNamespace(exact=exact, ignoring=ignoring)
+    monkeypatch.setattr(NAV, "path_collision_free", lambda kit, poses, trunk, posture, margin=0.01, q_arms=None, fingers=None: (drive_ok, 0 if drive_ok else 2))
+    s.sidecar = SimpleNamespace(stances={}, transitions=[])
+    s.sidecar.add_stance = lambda st: s.sidecar.stances.__setitem__(st.name, st)
+    s.sidecar.add_transition = lambda tr: s.sidecar.transitions.append(tr)
+    st = _stance("push")
+    return s, st, place, calls
+
+
+def test_the_retreat_back_off_is_off_by_default_and_today_when_the_clear_pose_passes(monkeypatch):
+    s, st, place, calls = _clear_sampler(monkeypatch, switch="0")
+    why, code = s.release_clear_why(st, place, "left", record=True)
+    assert why.startswith("exact IK failed") and code == "place_unreachable" and calls == [0.15] and s.sidecar.stances == {}
+    s, st, place, calls = _clear_sampler(monkeypatch, clear_ok=True)
+    assert s.release_clear_why(st, place, "left", record=True) == (None, None) and calls == [0.15] and s.kit.stats == {}
+
+
+@pytest.mark.parametrize("end_ok,drive_ok,why", [(True, True, None), (False, True, "place_end"), (True, False, "drive")])
+def test_the_retreat_backs_the_base_off_when_the_clear_pose_is_out_of_reach(monkeypatch, end_ok, drive_ok, why):
+    """5p.1: the 15 cm clear pose fails -> the place's end (10 cm) by IK and the 5 cm drive-back with the arms frozen; recorded on the
+    final release only."""
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    s, st, place, calls = _clear_sampler(monkeypatch, end_ok=end_ok, drive_ok=drive_ok)
+    w, code = s.release_clear_why(st, place, "left", record=True)
+    assert calls == [0.15, 0.1]
+    if why is None:
+        assert w is None and s.kit.stats == {"shelf_retreat.backoff_passed": 1, "shelf_retreat.recorded": 1}
+        back = s.sidecar.stances[IS.RETREAT_STANCE]
+        assert back.stand_off == pytest.approx(st.stand_off + 0.05) and back.translate == st.translate and back.tilt == st.tilt
+        tr = s.sidecar.transitions[-1]
+        assert (tr.frm, tr.to) == ("push", "retreat") and tr.extras["arms_q"]["left"] == pytest.approx(list(range(7, 14)))
+        assert tr.extras["retreat_backoff_m"] == 0.05
+    else:
+        assert "base back-off" in w and code == "place_unreachable" and s.kit.stats == {f"shelf_retreat.backoff_failed.{why}": 1}
+        assert IS.RETREAT_STANCE not in s.sidecar.stances

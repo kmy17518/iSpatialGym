@@ -38,6 +38,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import attempt_cap as AC
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import predicates as PRED
@@ -130,6 +131,140 @@ def v2_library_lift_off(grasp_key: Optional[str]) -> bool:
         return GL.v2_entry(grasp_key) is not None
     except Exception:  # noqa: BLE001 - no v2 root / unreadable entry: as before
         return False
+
+
+#: i7-cork 2026-11-08 (owner decision 4.2, attachment_03's cork): the male's alternative ROUTES, each behind its own DEFAULT-OFF switch.
+#: ``lying90`` (``ISG_ATTACH_LYING90=1``): the male rests on its side (the v2 entry served by ``<key>__lying90``: its stable lying rest and
+#: its grasps), the grasp, the lift and the recorded SLERP carry turn it 90 deg so the male end points along the insertion axis - the
+#: attachment program as it is (``grasps[0].attach_route``). ``handover`` (``ISG_ATTACH_HANDOVER=1``): the male rests wide end down
+#: (``<key>__handover_pick``), the right hand grasps its narrow (mating) end, brings it to a hand-over pose in front of the robot with the wide
+#: end toward the left hand, the left hand grasps the wide end (``<key>__handover_hold``: fingers off the mating side), the right hand lets
+#: go, the base moves to the place pose (heading kept, axis legs) and the left hand attaches. A route whose entry is not in the v2 library
+#: is not taken (counter ``attach_route.<route>.no_entry``): the alias keeps the current route.
+ATTACH_ROUTE_SWITCHES = {"lying90": "ISG_ATTACH_LYING90", "handover": "ISG_ATTACH_HANDOVER"}
+ATTACH_ROUTE_KEYS = {"lying90": ("__lying90",), "handover": ("__handover_pick", "__handover_hold")}
+
+
+#: the hand-over (route i): the male's centre in the grasp stance's base frame (forward, left) and above the support top (m), its turns
+#: about its own axis, the candidates an attempt evaluates with the exact IK, the two hands' smallest hull distance, the place stances'
+#: stand-off shifts (the lateral ones are SECOND_BASE_LATERALS)
+HANDOVER_FORWARD_M = (0.42, 0.50, 0.58)
+HANDOVER_LEFT_M = (0.0, -0.06, 0.06)
+HANDOVER_RISE_M = (0.12, 0.18, 0.24)
+#: the male's axis tilted from the robot's left toward the world's up (+) / down (-) at the hand-over (deg)
+HANDOVER_TILTS_DEG = (0.0, -25.0, 25.0)
+HANDOVER_ROLLS = 8
+HANDOVER_TRIES = 40
+HANDOVER_HANDS_MIN_M = 0.003
+HANDOVER_STANDOFF_SHIFTS_M = (-0.10, 0.10)
+
+
+def attach_route_requested() -> Optional[str]:
+    """The route a switch asks for (None: the current route). Both switches on is a configuration error."""
+    on = [r for r, env in ATTACH_ROUTE_SWITCHES.items() if os.environ.get(env, "").strip().lower() in ("1", "on", "true", "yes")]
+    if len(on) > 1:
+        raise ValueError(f"attachment routes {on}: at most one of {sorted(ATTACH_ROUTE_SWITCHES.values())} may be on")
+    return on[0] if on else None
+
+
+def attach_route_keys(base_key: str, route: str) -> Tuple[str, ...]:
+    """The grasp keys a route reads (``<base key><suffix>``, served by the v2 entries whose ``legacy_keys`` list them)."""
+    return tuple(f"{base_key}{sfx}" for sfx in ATTACH_ROUTE_KEYS[route])
+
+
+#: i7-cork 2026-11-08 (owner decision 5n.2): the rest-nudge test of :meth:`Attachment.check_rest_stability` run on the MALE right after its
+#: rest is drawn (``phase3_target``: the male at the focus, its grasp confirmed), before the partner / attach / carry search (~180 s), in
+#: the sampler's own world: the male put there with gravity on, settled as ``settle_and_validate`` settles it (``settle_steps`` + the
+#: tremble window), nudged the same 2 deg / 300 steps / 3 deg (:meth:`Attachment._nudge_tilts`); the world restored and the male back at its
+#: drawn pose afterwards. ``0`` (default): not run. ``shadow``: run and recorded (``draft.summary.early_rest``, kit
+#: ``early_rest.<route>.{stable, unstable}``) and compared with the late test after the settle (kit / counters
+#: ``early_rest.vs_late.<agreement>``, log ``EARLY_REST_VS_LATE``); nothing is rejected early. ``1``: an unstable male ends the attempt
+#: there (``Reject("rest_unstable", "early: ...")``, counter ``rest_unstable_early``). The late test runs as before in every mode (it also
+#: tests the partner).
+EARLY_REST_SWITCH = "ISG_ATTACH_EARLY_REST"
+
+
+def early_rest_mode() -> str:
+    """``off`` | ``shadow`` | ``on`` (:data:`EARLY_REST_SWITCH`)."""
+    v = os.environ.get(EARLY_REST_SWITCH, "").strip().lower()
+    if v == "shadow":
+        return "shadow"
+    return "on" if v in ("1", "on", "true", "yes") else "off"
+
+
+class EarlyRestUnstable(Reject):
+    """The male's drawn rest failed the early nudge test; the reason stays ``rest_unstable``. It leaves
+    :meth:`Attachment.sample_instance`'s candidate loop (the late test ends the attempt too)."""
+
+
+def _env_on(env: str) -> bool:
+    return os.environ.get(env, "").strip().lower() in ("1", "on", "true", "yes")
+
+
+#: i7-cork 2026-11-08 (owner decision 5n.1): per-attempt FALLBACK routes behind ``ISG_ATTACH_FALLBACK=1`` (default off). The current route
+#: (the template's library rest, no route switch) stays primary. When the current route's drawn rest fails the nudge test - the early test
+#: (:meth:`Attachment._early_rest`), run on every drawn rest as the route decision whatever ``ISG_ATTACH_EARLY_REST`` says - the SAME
+#: attempt goes on with ``lying90``, and when that route's draw is rejected too (its rest, or any rejection of its sampling stage) with
+#: ``handover`` (:data:`ATTACH_FALLBACK_ORDER`); each route gets the attempt budget afresh. The current route's other rejections end the
+#: attempt as before, and so does any rejection after the sampling stage (the late rest test included). Each route's template state
+#: (grasps, rest, bands / maps, init and manipulation stances) is built once by ``sample_template``; a route whose v2 entries are missing or
+#: whose template fails is left out (``template_facts.attach_fallback``). Kit / counters ``attach_fallback.used.<route>``,
+#: ``attach_fallback.<route>.rest_unstable``, ``attach_fallback.<route>.rejected.<reason>``, ``attach_fallback.exhausted``;
+#: ``draft.summary.attach_fallback`` (the route used, the routes tried). Exclusive with the single-route switches.
+ATTACH_FALLBACK_SWITCH = "ISG_ATTACH_FALLBACK"
+ATTACH_FALLBACK_ORDER = ("lying90", "handover")
+#: the sampler state a route's template sets (``Attachment._capture_route_state``; plus the male's rest / height entries)
+ROUTE_STATE_KEYS = ("attach_route", "hold_grasps", "hold_key", "grasps", "grasp_key", "band_spec", "bands", "attach_bands", "left_bands", "edge_frame",
+                    "init_stance", "manip_candidates",
+                    # integration-2 (merge of i7-startdraw): each route's start-search inputs, so the per-attempt start draw redraws a route's
+                    # start with its own attach view (the hand-over's left-arm map)
+                    "_start_args")
+
+
+def attach_fallback_on() -> bool:
+    on = _env_on(ATTACH_FALLBACK_SWITCH)
+    if on and attach_route_requested() is not None:
+        raise ValueError(f"{ATTACH_FALLBACK_SWITCH} is exclusive with {sorted(ATTACH_ROUTE_SWITCHES.values())}")
+    return on
+
+
+#: i7-cork 2026-11-08 (owner decision 5n.3, the lying route's carry check): the carry turns the male from its lifted grasp to the pre-attach;
+#: the goal's turn about the (vertical) insertion axis follows the PARTNER'S yaw, which the partner placement draws uniformly, so the
+#: recorded lying turns were 125-179 deg (8 instances, i7cork_ly / _r2) where the route's own turn is the 90 deg tilt, and the tracked SLERP
+#: of the large turns is what fails. ``ISG_LYING90_MIN_TURN=1`` (default off): on the lying route only, each partner cell is offered the
+#: yaw whose attach makes the carry's turn smallest (:func:`min_turn_yaw`, closed form: the 90 deg tilt; jittered +-:data:`LYING90_YAW_JITTER_DEG`)
+#: and the :data:`LYING90_YAW_LADDER_DEG` offsets around it; the batched screen keeps per cell the smallest-turn yaw it reaches and the
+#: exact checks take the cells in the order of that turn (30 deg classes), then the focus distance. Kit ``attach_route.lying90.min_turn_yaw``.
+LYING90_MIN_TURN_SWITCH = "ISG_LYING90_MIN_TURN"
+LYING90_YAW_JITTER_DEG = 15.0
+#: the partner yaws tried per cell around the min-turn yaw (deg, in this order; the screen keeps the smallest turn it reaches): the
+#: min-turn attach alone was out of the stance's reach at most cells (i7cork2_lymt: 0 written / 23 attempts, the pairs failing the screen)
+LYING90_YAW_LADDER_DEG = (0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0)
+#: the carry diagnostics (every route, no decision): the turn buckets (deg) of kit ``carry_turn.<route>.<ok|failed>.<bucket>`` and the arm
+#: joint gap (rad) between the carry's tracked end and the attach witness above which kit ``attach_branch_gap.<route>.gt`` counts (the
+#: oracle's finishing bound: a witness farther than 0.6 rad is "in another IK branch")
+CARRY_TURN_BUCKETS_DEG = (100.0, 140.0)
+ATTACH_BRANCH_GAP_RAD = 0.6
+
+
+def min_turn_yaw(q_lift, q_partner_eef) -> Tuple[float, float]:
+    """``(yaw, turn)`` (rad): the partner yaw ``y`` that minimises the geodesic angle between ``q_lift`` and ``R_z(y) ⊗ q_partner_eef``
+    (the attach eef orientation of a partner at yaw ``y`` whose rest is the identity; ``q_partner_eef`` = the eef orientation in the
+    partner frame). ``R_z(y) ⊗ q = cos(y/2) q + sin(y/2) (k ⊗ q)`` with ``k = (0, 0, 1, 0)``, so ``<., q_lift> = A cos(y/2) + B sin(y/2)``,
+    largest in magnitude at ``y = 2 atan2(B, A)`` with ``|.| = hypot(A, B)``."""
+    ql = TT._t(q_lift).to(th.float64)
+    qp = TT._t(q_partner_eef).to(th.float64)
+    ql, qp = ql / th.linalg.norm(ql), qp / th.linalg.norm(qp)
+    k = th.tensor([0.0, 0.0, 1.0, 0.0], dtype=th.float64)
+    a = float(th.dot(qp, ql))
+    b = float(th.dot(C.qmul(k, qp).to(th.float64), ql))
+    yaw = (2.0 * math.atan2(b, a) + math.pi) % (2.0 * math.pi) - math.pi
+    return yaw, 2.0 * math.acos(min(1.0, math.hypot(a, b)))
+
+
+def carry_turn_bucket(turn_deg: float) -> str:
+    lo, hi = CARRY_TURN_BUCKETS_DEG
+    return f"lt{lo:.0f}" if turn_deg < lo else (f"lt{hi:.0f}" if turn_deg < hi else f"ge{hi:.0f}")
 
 
 @dataclass
@@ -313,6 +448,17 @@ class HoldingTransition(Transition):
 
 @register(SUBTASK)
 class Attachment(SamplerV2):
+    #: i7-cork: class defaults of the route state (instances made without __init__, the tests' stubs, keep the current route)
+    attach_route: Optional[str] = None
+    hold_key: Optional[str] = None
+    hold_grasps: Sequence[Any] = ()
+    #: i7-cork 5n.2: the early nudge verdict of the attempt's last drawn rest (:meth:`_early_rest`), None when not run
+    _early_rest_last: Optional[Dict[str, Any]] = None
+    #: i7-cork 5n.1 (ISG_ATTACH_FALLBACK): every available route's template state (None = off), the primary's live state while an attempt
+    #: runs on a fallback route, the early nudge test as the route decision
+    _route_states: Optional[Dict[Optional[str], Dict[str, Any]]] = None
+    _primary_live: Optional[Dict[str, Any]] = None
+    _early_force: bool = False
     START_DRAW_FAMILY = True  # i7-startdraw: the start base per attempt under ISPATIALGYM_START_DRAW (spa_redraw_start)
 
     def __init__(self, ctx):
@@ -344,6 +490,10 @@ class Attachment(SamplerV2):
         self.left_bands = None  # A1: the left arm's contact band (partner brace), None until B3's bands exist
         self._att_fails: Dict[str, Any] = {}
         self.brace_missing = False  # the last instance has no partner brace (owner 17:10: optional only without a joint cell)
+        #: i7-cork: the route taken (None = the current route; :meth:`_select_attach_route`), the left hand's hold grasps (hand-over)
+        self.attach_route: Optional[str] = None
+        self.hold_grasps: List[Any] = []
+        self.hold_key: Optional[str] = None
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -386,6 +536,94 @@ class Attachment(SamplerV2):
     # ------------------------------------------------------------------ template
 
     def sample_template(self):
+        """The template of the current route, or of the route a switch asks for; with :data:`ATTACH_FALLBACK_SWITCH` also each fallback
+        route's (:meth:`_sample_template_fallback`)."""
+        if attach_fallback_on():
+            return self._sample_template_fallback()
+        return self._sample_template_route(attach_route_requested())
+
+    def _sample_template_fallback(self) -> None:
+        """i7-cork 5n.1: the current route's template (the primary; its failure is the template's), then each of :data:`ATTACH_FALLBACK_ORDER`
+        in turn from a cleared band / stance state - a route that is not served or whose template rejects is left out; the template facts
+        stay the primary's plus ``attach_fallback`` (per route: available, why not, grasps, candidates, seconds). The sampler is left in the
+        primary's state; ``self._route_states`` holds every available route's."""
+        import copy
+
+        self._route_states, self._primary_live, self._early_force = None, None, False
+        self._sample_template_route(None)
+        primary_facts = copy.deepcopy(self.template_facts)
+        primary = self._capture_route_state()
+        states: Dict[Optional[str], Dict[str, Any]] = {None: primary}
+        facts: Dict[str, Any] = {"order": ["current"] + list(ATTACH_FALLBACK_ORDER), "routes": {}}
+        for route in ATTACH_FALLBACK_ORDER:
+            for k in ("bands", "attach_bands", "left_bands", "band_spec", "edge_frame", "init_stance"):
+                setattr(self, k, None)
+            self.manip_candidates = []
+            t0 = time.time()
+            try:
+                self._sample_template_route(route)
+            except Reject as e:
+                facts["routes"][route] = {"available": False, "why": f"[{e.reason}] {str(e)[:300]}"}
+                log.info("%s: ATTACH_FALLBACK route %s unavailable: %s", self.gp.variant, route, facts["routes"][route]["why"])
+                continue
+            if self.attach_route != route:
+                facts["routes"][route] = {"available": False, "why": (self.template_facts.get("attach_route") or {}).get("why")}
+                log.info("%s: ATTACH_FALLBACK route %s unavailable: %s", self.gp.variant, route, facts["routes"][route]["why"])
+                continue
+            states[route] = self._capture_route_state()
+            facts["routes"][route] = {"available": True, "grasp_key": self.grasp_key, "n_grasps": len(self.grasps), "hold_key": self.hold_key,
+                                      "n_manipulation_candidates": len(self.manip_candidates), "s": round(time.time() - t0, 1)}
+            log.info("%s: ATTACH_FALLBACK route %s ready: %s", self.gp.variant, route, json.dumps(facts["routes"][route], default=str))
+        self.template_facts.clear()
+        self.template_facts.update(primary_facts)
+        self.template_facts["attach_fallback"] = facts
+        self._apply_route_state(primary)
+        self._route_states, self._early_force = states, True
+
+    def _capture_route_state(self) -> Dict[str, Any]:
+        st = {k: getattr(self, k, None) for k in ROUTE_STATE_KEYS}
+        st["manip_candidates"] = list(self.manip_candidates or [])
+        st["rest_t"], st["height_t"] = self.rest.get(self.t_role), self.height.get(self.t_role)
+        st["_rejects"] = {}
+        return st
+
+    def _apply_route_state(self, st: Dict[str, Any]) -> None:
+        for k in ROUTE_STATE_KEYS:
+            setattr(self, k, st[k])
+        self.manip_candidates = list(st["manip_candidates"])
+        self.rest[self.t_role], self.height[self.t_role] = st["rest_t"], st["height_t"]
+
+    def _switch_route(self, route: str, rng: np.random.Generator) -> None:
+        """i7-cork 5n.1: this attempt goes on with ``route``'s template state (the primary's live state kept for :meth:`sample`), its own
+        reject memory, its manipulation candidates narrowed by the split cone as ``SamplerV2.sample`` narrows the primary's."""
+        if self._primary_live is None:
+            self._primary_live = {**self._capture_route_state(), "_split_cone_cands": getattr(self, "_split_cone_cands", None),
+                                  "_split_cone_pools": getattr(self, "_split_cone_pools", None), "_candidate_rejects": getattr(self, "_candidate_rejects", None)}
+        st = self._route_states[route]
+        self._apply_route_state(st)
+        self._candidate_rejects = st["_rejects"]
+        self._split_cone_cands = self._split_cone_pools = None
+        TT.split_cone_draw(self, rng)
+
+    def _restore_primary_route(self) -> None:
+        live = getattr(self, "_primary_live", None)
+        if live is None:
+            return
+        self._apply_route_state(live)
+        self._split_cone_cands, self._split_cone_pools, self._candidate_rejects = live["_split_cone_cands"], live["_split_cone_pools"], live["_candidate_rejects"]
+        self._primary_live = None
+
+    def _fb_count(self, step: str) -> None:
+        key = f"attach_fallback.{step}"
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+
+    def sample(self, rng: np.random.Generator) -> Draft:
+        """i7-cork 5n.1: every attempt starts on the primary route (a fallback the previous attempt switched to is undone first)."""
+        self._restore_primary_route()
+        return super().sample(rng)
+
+    def _sample_template_route(self, want: Optional[str]):
         male, female = self.obj(self.t_role), self.obj(self.p_role)
         if AttachedTo not in male.states:
             raise Reject("spec", f"{male.name} has no AttachedTo state (no attachment meta links?)")
@@ -394,6 +632,7 @@ class Attachment(SamplerV2):
             raise Reject("spec", f"{male.name} has no male attachment link matching a female link of {female.name}")
         child_link, parent_link = self.pair
         self.grasps, self.grasp_key, self.rest[self.t_role] = TT.library_grasps(self, self.t_role, "attachment", kinds=["attachment", "tabletop"])
+        self._select_attach_route(want)
         self.rest[self.p_role] = C.IDENTITY_QUAT.clone()
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
@@ -401,7 +640,10 @@ class Attachment(SamplerV2):
         # horizontal axis when that end carries the mass centre with a clearly larger tipping margin (cork/ncxgpe stood on its
         # tapered end: 5-6.5 mm contact radius under a mass centre 1.7 cm up, the 2 deg rest nudge toppled 8/8 draws, 0925-093339;
         # the carry turns the male in hand toward the attach orientation anyway, so the rest end is free). Facts on the template.
-        if bool(self.gen("male_rest_by_stability", True)):
+        if self.attach_route is not None:
+            # i7-cork: a route's rest is its entry's measured rest (lying / wide end down) - never flipped
+            flip = {"flipped": False, "route": self.attach_route, "reason": f"route {self.attach_route}: the rest of {self.grasp_key}"}
+        elif bool(self.gen("male_rest_by_stability", True)):
             com = None
             try:
                 com = male.root_link.center_of_mass  # PhysX's, in the link frame (the cork's is at its origin: the vertex mean sat 5 mm lower)
@@ -464,7 +706,13 @@ class Attachment(SamplerV2):
         # i7-attachmap 2026-11-07: under v2 only the attach-reach band is the pair's ATTACH map (attach_maps: the held male at its seat on the
         # partner, pre-attach -> hover -> touchdown -> seat by chained IK, the oracle's hover rule); a miss rejects missing_map (+ MAP_REQUEST).
         # Every other mode loads / computes the legacy band per edge as before.
-        attach_view = self._attach_map_view() if TT.RB.v2_only() else None
+        if self.attach_route == "handover":
+            # i7-cork route (i): the LEFT hand attaches with its wide-end grasp - the partner cells come from the hold entry's left-arm attach map
+            if not TT.RB.v2_only():
+                raise Reject("spec", "the hand-over route reads the left arm's attach map (v2 only)")
+            attach_view = self._attach_map_view(self.hold_key, "left")
+        else:
+            attach_view = self._attach_map_view() if TT.RB.v2_only() else None
         self._start_args = (attach_spec, attach_view, H_max, margins)
         self._start_search(rng, attach_spec, attach_view, H_max, margins, errors)
         if self.init_stance is None:
@@ -518,6 +766,49 @@ class Attachment(SamplerV2):
         self._candidate_rejects = {}
         self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates)
 
+    def _route_count(self, step: str, n: int = 1) -> None:
+        """Kit counter ``attach_route.<route>.<step>`` (per instance in ``summary.json["kit"]``); nothing off the routes."""
+        if self.attach_route is not None:
+            TT._countn(self, f"attach_route.{self.attach_route}.{step}", n)
+
+    def _select_attach_route(self, want: Optional[str] = None) -> None:
+        """i7-cork (owner decision 4.2): the route a switch asks for (:func:`attach_route_requested`) when the v2 library serves its keys
+        (:func:`attach_route_keys`): the male's grasps, key and rest become the route's pick entry's (``lying90``: the lying entry;
+        ``handover``: the wide-end-down entry of the right hand's narrow-end pinch, ``self.hold_grasps`` / ``self.hold_key`` the left
+        hand's wide-end grasps). Otherwise ``self.attach_route`` stays None and nothing changes (``template_facts.attach_route``)."""
+        from ispatialgym.sampling import grasp_library as GL
+
+        self.attach_route, self.hold_grasps, self.hold_key = None, [], None
+        if want is None:
+            return
+        keys = attach_route_keys(self.grasp_key, want)
+        facts: Dict[str, Any] = {"requested": want, "keys": list(keys), "base_key": self.grasp_key}
+        try:
+            libs = [GL.v2_entry(k) for k in keys]
+        except ValueError as e:  # an entry under another contact policy: not served
+            libs, facts["error"] = [None], str(e)[:300]
+        if any(lib is None for lib in libs):
+            facts["taken"] = False
+            facts["why"] = "no v2 entry serves " + ", ".join(k for k, lib in zip(keys, libs) if lib is None) if "error" not in facts else facts["error"]
+            self.template_facts["attach_route"] = facts
+            self.counters[f"attach_route.{want}.no_entry"] = self.counters.get(f"attach_route.{want}.no_entry", 0) + 1
+            log.info("%s: ATTACH_ROUTE %s not taken: %s", self.gp.variant, want, facts["why"])
+            return
+        grasps = GL.load_grasps(keys[0])
+        rest = C.rest_quat(keys[0])
+        self.grasps, self.grasp_key, self.rest[self.t_role] = grasps, keys[0], rest
+        if want == "handover":
+            self.hold_key = keys[1]
+            self.hold_grasps = GL.load_grasps(keys[1])
+        self.attach_route = want
+        facts.update(taken=True, pick_entry=os.path.basename(os.path.dirname(libs[0].path)), n_pick_grasps=len(grasps),
+                     rest_quat_xyzw=[round(float(v), 5) for v in rest])
+        if want == "handover":
+            facts.update(hold_entry=os.path.basename(os.path.dirname(libs[1].path)), n_hold_grasps=len(self.hold_grasps))
+        self.template_facts["attach_route"] = facts
+        self.counters[f"attach_route.{want}.template"] = self.counters.get(f"attach_route.{want}.template", 0) + 1
+        log.info("%s: ATTACH_ROUTE %s %s", self.gp.variant, want, json.dumps(facts, default=str))
+
     def _attachment_links(self, male, female):
         return attachment_links(male, female)
 
@@ -531,7 +822,7 @@ class Attachment(SamplerV2):
         except FileNotFoundError:
             return TT.compute_bands(self, attach_spec, self.top, edge)
 
-    def _attach_map_view(self):
+    def _attach_map_view(self, grasp_key: Optional[str] = None, arm: str = "right"):
         """i7-attachmap 2026-11-07 (v2 only): the attach map of the pair (``attach_maps.sampler_view``: the male's v2 entry + stable rest,
         the partner model / scale, the top's height (anchors), the right arm, the oracle's hover rule, ``pre_attach_back_m``, the contact
         policy, the robot; the map's pair spec checked against the live one) as the attach-reach band view; a miss logs MAP_REQUEST and
@@ -541,8 +832,8 @@ class Attachment(SamplerV2):
         pc = self.choice.models[self.p_role]
         live = {"T_partner_male": C.compose(self.parent_link_in_female, self.root_in_child_link), "insertion_axis": self.insertion_axis_local,
                 "partner_bottom_offset_m": float(self.world.bottom_offset(self.hull[self.p_role], C.IDENTITY_QUAT))}
-        view, req, why = AM.sampler_view(self, grasp_key=self.grasp_key, partner=(pc.category, pc.model, list(pc.scale) if pc.scale else None),
-                                         top=self.top, live=live, pre_back_m=float(self.g("pre_attach_back_m")), arm="right")
+        view, req, why = AM.sampler_view(self, grasp_key=grasp_key or self.grasp_key, partner=(pc.category, pc.model, list(pc.scale) if pc.scale else None),
+                                         top=self.top, live=live, pre_back_m=float(self.g("pre_attach_back_m")), arm=arm)
         self.template_facts["attach_map"] = {"hit": view is not None, "why": why, "path": None if view is None else view.meta.get("map_path")}
         if view is None:
             TT.map_request(self, **req)
@@ -761,6 +1052,39 @@ class Attachment(SamplerV2):
         return (focus, round(float(c.stand_off or 0.0), 3), round(float(c.lateral), 3), round(float(c.translate), 3), round(float(c.tilt), 4))
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        """The attempt's draw on the template's route; with :data:`ATTACH_FALLBACK_SWITCH` the current route first and, after its drawn
+        rest failed the nudge test, each available fallback route in turn (:data:`ATTACH_FALLBACK_ORDER`)."""
+        states = getattr(self, "_route_states", None)
+        if not states:
+            return self._sample_instance_route(rng)
+        routes = [None] + [r for r in ATTACH_FALLBACK_ORDER if r in states]
+        tried: List[Dict[str, Any]] = []
+        for i, route in enumerate(routes):
+            label = route or "current"
+            if i > 0:
+                self._switch_route(route, rng)
+                log.info("%s: ATTACH_FALLBACK attempt goes on with route %s (after %s)", self.gp.variant, route, json.dumps(tried, default=str))
+            try:
+                d = self._sample_instance_route(rng)
+            except Reject as e:
+                early = isinstance(e, EarlyRestUnstable)
+                if route is None and not early:
+                    raise  # the current route's other rejections end the attempt as before
+                rec = {"route": label, "reject": e.reason, "early_rest": early}
+                if early and self._early_rest_last is not None:
+                    rec["tilt_deg"] = self._early_rest_last.get("tilt_deg")
+                tried.append(rec)
+                self._fb_count(f"{label}.rest_unstable" if early else f"{label}.rejected.{e.reason}")
+                if i + 1 < len(routes):
+                    continue
+                self._fb_count("exhausted")
+                raise
+            self._fb_count(f"used.{label}")
+            d.summary["attach_fallback"] = {"route": label, "tried": tried}
+            return d
+        raise Reject("target_placement", "attach fallback: no route")  # not reached
+
+    def _sample_instance_route(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
         self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))
@@ -771,6 +1095,10 @@ class Attachment(SamplerV2):
         if rejects is None:
             rejects = self._candidate_rejects = {}
         order = self._candidate_order(rng, rejects)
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
+        self._early_rest_last = None
         for k in order[:6]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
@@ -784,7 +1112,11 @@ class Attachment(SamplerV2):
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
             try:
+                if self.attach_route == "handover":
+                    return self._sample_with_handover(rng, init, manip, int(k))
                 return self._sample_with(rng, init, manip, int(k))
+            except EarlyRestUnstable:
+                raise  # i7-cork 5n.2: the drawn rest fails the nudge test - the attempt ends there, as the late test ends it
             except Reject as e:
                 key = self._candidate_key(cand)
                 rejects[key] = rejects.get(key, 0) + 1
@@ -817,9 +1149,11 @@ class Attachment(SamplerV2):
                     raise
                 log.info("%s: no %s grasp confirmed at the focus (%s); every library grasp is screened next", self.gp.variant, label, e)
         grasp.place_on = pname
+        self._route_count("pick")
         male.set_position_orientation(*m_pose)
         male.keep_still()
         self.kit.sync_world()
+        self._early_rest(m_pose)  # i7-cork 5n.2 (ISG_ATTACH_EARLY_REST): the nudge test on the drawn rest before the partner / attach / carry search
         self._apply_grasp_height_extra(grasp, m_pose, manip)  # generation.grasp_height_extra_m (owner 2026-09-19 16:49; 0 = no-op)
         self._record_pinch_width(grasp, m_pose)  # the pre-shape width from the male's own geometry at the pinch (pwgbsb 0919-210926)
         # step 2 (+ §6.8 owner 2026-09-16 17:10): the partner on an attach-reach cell with the attach pose and the left brace
@@ -848,6 +1182,7 @@ class Attachment(SamplerV2):
                 raise Reject("partner_placement", f"no partner cell with a reachable attach pose from the grasp stance or a second base pose ({self._att_fails})")
             if att.get("brace") is not None:
                 brace_state = "present"
+        self._route_count("attach_found")
         f_pose, attach, pre_attach, wps, carry, lift = att["f_pose"], att["attach"], att["pre_attach"], att["wps"], att["carry"], att["lift"]
         goal = self._attached_pose(f_pose)
         brace_pre, brace, brace_kind = att["brace"] if att.get("brace") is not None else (None, None, None)
@@ -881,6 +1216,11 @@ class Attachment(SamplerV2):
                              "slerp_policy": att.get("slerp_policy")})
         if att.get("carry_over") is not None:
             grasp.extras["carry_over"] = att["carry_over"]
+        if self.attach_route is not None:
+            # i7-cork: the route the oracle program reads (programs.program_attachment); lying90 = the program as it is, the recorded SLERP
+            # carry being the 90 deg in-hand turn
+            grasp.extras["attach_route"] = self.attach_route
+            grasp.extras["attach_route_turn_deg"] = round(math.degrees(C.quat_angle(TT._t(lift[1]) if lift is not None else TT._t(grasp.grasp[1]), TT._t(pre_attach[1]))), 1)
         self._record_approach_standoff(grasp, f_pose, manip)  # over-the-top pre-grasp approach when the partner stands near the male
         # owner item 3 (release height): the attach pose is fixed by the mating links (no release above a surface), but the
         # surface under the male's footprint centre at the goal (the female's mating face) is recorded for the audit
@@ -918,6 +1258,462 @@ class Attachment(SamplerV2):
                           "brace": brace_state, "brace_class": brace_kind, "attach_stance": work_st.name, "second_base_pose": work_st is not manip,
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
+        d.summary["carry_turn_deg"] = None if att.get("turn_deg") is None else round(float(att["turn_deg"]), 1)
+        d.summary["attach_branch_gap_rad"] = None if att.get("branch_gap_rad") is None else round(float(att["branch_gap_rad"]), 3)
+        if self._early_rest_last is not None:
+            d.summary["early_rest"] = dict(self._early_rest_last)
+        if self.attach_route is not None:
+            d.summary["attach_route"] = {"route": self.attach_route, "grasp_key": self.grasp_key, "turn_deg": grasp.extras.get("attach_route_turn_deg")}
+            self._route_count("drafted")
+        return d
+
+    # ------------------------------------------------------------------ i7-cork route (i): the hand-over (owner decision 2026-11-08 4.2 (i))
+
+    def _hand_points(self, arm: str, q_f: float) -> np.ndarray:
+        """Surface points (eef frame) of every hand hull of ``arm`` (fingers, palm, wrist camera, wrist) with both fingers at ``q_f``."""
+        cache = self.__dict__.setdefault("_hand_pts_cache", {})
+        key = (arm, round(float(q_f), 4))
+        if key not in cache:
+            from ispatialgym.grasping import hand_geometry as HG
+
+            P, _ = HG.load(arm).surface(spacing=0.0015, finger_q=(float(q_f), float(q_f)))
+            cache[key] = np.asarray(P, dtype=float)
+        return cache[key]
+
+    def _hands_apart_m(self, eef_r: TT.Pose, q_r: float, eef_l: TT.Pose, q_l: float) -> float:
+        """The smallest distance between the two hands' exact hulls (surface samples 1.5 mm apart) with the right hand at ``eef_r``
+        (fingers at ``q_r``) and the left at ``eef_l`` (``q_l``)."""
+        from scipy.spatial import cKDTree
+
+        def world(arm, eef, q):
+            R = C.quat_to_mat(TT._t(eef[1])).numpy().astype(float)
+            return self._hand_points(arm, q) @ R.T + TT._t(eef[0]).numpy().astype(float)
+
+        d, _ = cKDTree(world("left", eef_l, q_l)).query(world("right", eef_r, q_r), k=1)
+        return float(np.min(d))
+
+    @staticmethod
+    def _finger_q_of(g, default: float = 0.008) -> float:
+        """A library pinch's finger joint value at its hold (half its width when it records none)."""
+        fq = getattr(g, "finger_q", None)
+        if fq:
+            return float(max(fq))
+        w = (getattr(g, "meta", None) or {}).get("width") or (getattr(g, "extras", None) or {}).get("pinch_width_m")
+        return 0.5 * float(w) if w else default
+
+    def _handover_object_poses(self, st: Stance, rng: np.random.Generator) -> List[TT.Pose]:
+        """The male's poses at the hand-over, in front of the robot at ``st`` (base-frame ``HANDOVER_FORWARD_M`` x ``HANDOVER_LEFT_M``, its centre
+        ``HANDOVER_RISE_M`` above the support top), its +z axis (male end -> wide end) along the robot's left (the wide end toward the left
+        hand), turned ``HANDOVER_ROLLS`` ways about that axis; in the draw's order."""
+        f = th.tensor([float(st.forward[0]), float(st.forward[1]), 0.0])
+        lft = th.tensor([float(st.left[0]), float(st.left[1]), 0.0])
+        up = th.tensor([0.0, 0.0, 1.0])
+        frames = []
+        for t in HANDOVER_TILTS_DEG:
+            z = math.cos(math.radians(t)) * lft + math.sin(math.radians(t)) * up
+            frames.append(th.stack([f, th.linalg.cross(z, f), z], dim=1))  # columns: object x -> forward, z -> left (tilted), y = z x x
+        out = []
+        for fx in HANDOVER_FORWARD_M:
+            for ly in HANDOVER_LEFT_M:
+                for dz in HANDOVER_RISE_M:
+                    xy = st.base_to_world([fx, ly])
+                    p = th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + dz])
+                    for R0 in frames:
+                        for k in range(HANDOVER_ROLLS):
+                            Rz = C.quat_to_mat(C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), 2.0 * math.pi * k / HANDOVER_ROLLS))
+                            out.append((p, C.mat_to_quat(R0 @ Rz)))
+        return [out[int(i)] for i in rng.permutation(len(out))]
+
+    def _handover_search(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_manip) -> Dict[str, Any]:
+        """The hand-over from the right hand's lifted pinch (``grasp``, the male at ``m_pose`` on the support) at the grasp stance: per
+        candidate male pose M (:meth:`_handover_object_poses`) and left hold grasp (``self.hold_grasps``) - both eef poses in the stance
+        camera's image (the box rule, 5 %), the two hands' exact hulls >= ``HANDOVER_HANDS_MIN_M`` apart, the right hand's carry from the lift
+        to M tracked with the male attached (the oracle's dense tracking, as the SLERP carry), the left hand's [pre-grasp, grasp] exact IK
+        with the right arm locked at M and the male in the world (ignored at the grasp), the combined whole-body check, and the right hand's
+        release retreat (``RETREAT_DIST`` back along its approach) exact with the left arm locked at its grasp. The first candidate that
+        passes; ``Reject("handover_unreachable")`` with the counts otherwise."""
+        from ispatialgym.oracle.actions import RETREAT_DIST
+
+        male, support = self.obj(self.t_role), self.obj("support")
+        scale = self.choice.models[self.t_role].scale
+        q_fr = self._finger_q_of(grasp)
+        fails: Dict[str, int] = {"frame": 0, "right_ik": 0, "hands": 0, "left_ik": 0, "combined": 0, "carry": 0, "retreat": 0}
+        why: Dict[str, int] = {}
+
+        def note(kind, reason):
+            k = f"{kind}:{str(reason).split(':')[0].split(' (')[0][:40]}"
+            why[k] = why.get(k, 0) + 1
+
+        n = int(self.g("reorientation_waypoints")) + 1
+        tried = 0
+        for M in self._handover_object_poses(manip, rng):
+            if tried >= HANDOVER_TRIES:
+                break
+            self._check_deadline()
+            H_r = IK.grasp_pose(M, grasp.eef_in_object)
+            if not self.ikc.eef_in_frame(H_r, cam_manip):
+                fails["frame"] += 1
+                continue
+            tried += 1
+            # the right hand at the hand-over, the male attached (a cheap exact IK before the tracked carry)
+            with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+                with attached(self.kit, "right", male):
+                    r_h = self.ikc.exact([H_r], manip, "right", ignore_for_last=[support], cache=False, scale_key=scale)
+            if not r_h.ok:
+                fails["right_ik"] += 1
+                note("right_ik", r_h.reason)
+                continue
+            holds = []
+            for g_l in self.hold_grasps:
+                H_l = IK.grasp_pose(M, (TT._t(g_l.pose[0]), TT._t(g_l.pose[1])))
+                if not self.ikc.eef_in_frame(H_l, cam_manip) or self._carry_out_of_frame(manip, [IK.pre_pose(H_l)]) is not None:
+                    fails["frame"] += 1
+                    continue
+                gap = self._hands_apart_m(H_r, q_fr, H_l, self._finger_q_of(g_l))
+                if gap < HANDOVER_HANDS_MIN_M:
+                    fails["hands"] += 1
+                    continue
+                holds.append((g_l, H_l, gap))
+            if not holds:
+                continue
+            # the male where the right hand holds it at the hand-over, in the world for the left hand's chain
+            male.set_position_orientation(TT._t(M[0]), TT._t(M[1]))
+            male.keep_still()
+            self.kit.sync_world()
+            try:
+                found_l = None
+                for g_l, H_l, gap in holds:
+                    pre_l = IK.pre_pose(H_l)
+                    # the male is touched by both hands here: it leaves the world for both hands' chains (the locked right hand's fingers
+                    # stand on it); the two hands' distance is the exact-hull check above, the left approach the entry's validated one
+                    with self.ikc.ignoring([male]):
+                        r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_h.q, cache=False, scale_key=scale)
+                    if not r_l.ok:
+                        fails["left_ik"] += 1
+                        note("left_ik", r_l.reason)
+                        continue
+                    with self.ikc.ignoring([male]):
+                        free = bool(self.kit.collision_free(r_l.q, margin=0.005)[0])
+                    if not free:
+                        fails["combined"] += 1
+                        continue
+                    found_l = (g_l, H_l, gap, pre_l, r_l)
+                    break
+            finally:
+                male.set_position_orientation(TT._t(m_pose[0]), TT._t(m_pose[1]))
+                male.keep_still()
+                self.kit.sync_world()
+            if found_l is None:
+                continue
+            g_l, H_l, gap, pre_l, r_l = found_l
+            # the right hand's carry lift -> hand-over, tracked (the lift ladder)
+            r_c, lift, wps, carry = None, None, None, None
+            for carry in CARRY_HEIGHTS:
+                lift = (TT._t(grasp.grasp[0]) + th.tensor([0.0, 0.0, carry]), TT._t(grasp.grasp[1]))
+                wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, H_r, n)]
+                out = self._carry_out_of_frame(manip, wps)  # the program check's fingertip rule on the recorded carry
+                if out is not None:
+                    note("carry_frame", "out of frame")
+                    r_c = IK.IKResult(False, None, "carry_frame", len(wps))
+                    continue
+                with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+                    with attached(self.kit, "right", male):
+                        r_c = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
+                self._route_count("handover_carry_checked")
+                if r_c.ok and r_c.q is not None:
+                    break
+                note("carry", r_c.reason)
+            if r_c is None or not r_c.ok or r_c.q is None:
+                fails["carry"] += 1
+                continue
+            # the left hand again from the tracked right configuration, then the right hand's release retreat with the left locked
+            male.set_position_orientation(TT._t(M[0]), TT._t(M[1]))
+            male.keep_still()
+            self.kit.sync_world()
+            try:
+                with self.ikc.ignoring([male]):
+                    r_l = self.ikc.exact([pre_l, H_l], manip, "left", q_seed=r_c.q, cache=False, scale_key=scale)
+                    free = bool(r_l.ok) and bool(self.kit.collision_free(r_l.q, margin=0.005)[0])
+                if not free:
+                    fails["combined"] += 1
+                    continue
+                retreat_r = IK.pre_pose(H_r, RETREAT_DIST)
+                with self.ikc.ignoring([male]):
+                    r_x = self.ikc.exact([retreat_r], manip, "right", q_seed=r_l.q, cache=False)
+            finally:
+                male.set_position_orientation(TT._t(m_pose[0]), TT._t(m_pose[1]))
+                male.keep_still()
+                self.kit.sync_world()
+            if not r_x.ok:
+                fails["retreat"] += 1
+                note("retreat", r_x.reason)
+                continue
+            self._route_count("handover_found")
+            return {"M": M, "H_r": H_r, "lift": lift, "carry": carry, "wps_r": wps, "q_r": r_c.q, "g_l": g_l, "H_l": H_l, "pre_l": pre_l,
+                    "q_l": r_l.q, "retreat_r": retreat_r, "q_x": r_x.q, "hands_apart_m": gap, "tried": tried, "fails": fails}
+        for k_, v_ in fails.items():
+            if v_:
+                self._route_count(f"handover_fail.{k_}", v_)
+        self._route_count("handover_unreachable")
+        raise Reject("handover_unreachable", f"no hand-over pose passes ({tried} evaluated): {fails}; reasons {dict(sorted(why.items(), key=lambda kv: -kv[1])[:6])}")
+
+    @staticmethod
+    def _carried_pose(frm: Stance, to: Stance, pose: TT.Pose) -> TT.Pose:
+        """Where an eef pose at ``frm`` is after the base drove to ``to`` with the arm frozen (same trunk; the same pose in the base frame)."""
+        b = frm.world_to_base(TT._t(pose[0])[:2])
+        xy = to.base_to_world(b)
+        dyaw = to.yaw - frm.yaw
+        q = C.qmul(C.quat_from_axis_angle(th.tensor([0.0, 0.0, 1.0]), dyaw), TT._t(pose[1])) if abs(dyaw) > 1e-9 else TT._t(pose[1])
+        return (th.tensor([float(xy[0]), float(xy[1]), float(TT._t(pose[0])[2])]), q)
+
+    def _handover_place_stances(self, manip: Stance) -> Iterator[Stance]:
+        """The place stances the left hand attaches from, in order: the grasp stance, then the grasp stance driven sideways along the edge
+        (``SECOND_BASE_LATERALS``) or back / forward (``HANDOVER_STANDOFF_SHIFTS_M``), the heading and the trunk kept (axis legs only)."""
+        yield manip
+        for dlat in SECOND_BASE_LATERALS:
+            yield manip.shifted(lateral=manip.lateral + dlat, name="attach")
+        for ds in HANDOVER_STANDOFF_SHIFTS_M:
+            if manip.stand_off is not None:
+                yield manip.shifted(stand_off=float(manip.stand_off) + ds, name="attach")
+
+    def _handover_attach_from(self, rng, manip: Stance, st: Stance, m_pose: TT.Pose, ho: Dict[str, Any], cam_init) -> Optional[Dict[str, Any]]:
+        """The left hand's attach from stance ``st`` (the grasp stance or a place stance): the partner on a cell of the left-arm attach map of
+        the hold entry (``self.attach_bands``: distance / support / gap / init-frame screens as :meth:`_attach_and_brace`), the [pre-attach,
+        attach] exact IK of the left hand with the male attached, the fingers clear of the partner, and the left hand's carry from the hold
+        pose (carried with the base from the grasp stance) to the pre-attach tracked from the hold configuration. Returns the attach facts or
+        None (reasons in ``self._att_fails``)."""
+        male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
+        g_l = ho["g_l"]
+        eio_l = (TT._t(g_l.pose[0]), TT._t(g_l.pose[1]))
+        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "screen": 0, "ik": 0, "fingers": 0, "carry": 0, "attach_frame": 0}
+        self._att_fails[f"handover:{st.name}@lat{st.lateral:+.2f}/s{float(st.stand_off or 0.0):.2f}"] = fails
+        cells = TT.band_cells_world(self.attach_bands, st)
+        if len(cells) == 0:
+            fails["no_cells"] = 1
+            return None
+        m_fp = self.world.footprint(self.hull[self.t_role], m_pose)
+        focus_xy = st.focus[:2] if st.focus is not None else m_pose[0][:2]
+        perm = [int(i) for i in rng.permutation(len(cells))]
+        perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
+        geo = []
+        for i in perm[:PARTNER_CELLS_TRIED]:
+            xy = cells[int(i)]
+            if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
+                fails["distance"] += 1
+                continue
+            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
+            fp = self.world.footprint(self.hull[self.p_role], pose)
+            if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
+                fails["support"] += 1
+                continue
+            if TT._polygons_overlap(m_fp, fp, float(self.g("partner_gap_min_m"))):
+                fails["gap"] += 1
+                continue
+            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
+                fails["frame"] += 1
+                continue
+            goal = self._attached_pose(pose)
+            eef_attach = IK.grasp_pose(goal, eio_l)
+            eef_pre = (eef_attach[0] + self._insertion_axis_world(pose) * float(self.g("pre_attach_back_m")), eef_attach[1])
+            geo.append((pose, eef_pre, eef_attach))
+        if not geo:
+            return None
+        with TT.posed_in_hand(self, "left", male, eio_l):
+            with attached(self.kit, "left", male):
+                ok = self.ikc.screen_pairs([[g_[1], g_[2]] for g_ in geo], st, "left", ignore_for_last=[support])
+        screened = [g_ for g_, o in zip(geo, ok.tolist()) if o]
+        fails["screen"] = len(geo) - len(screened)
+        cam_st = self.camera_pose_at(st)
+        start = self._carried_pose(manip, st, ho["H_l"])
+        idx_l = self.kit.robot.arm_control_idx["left"]
+        q_first = self.ikc.q_locked(st, left_arm=TT._t(ho["q_l"])[idx_l])
+        n = int(self.g("reorientation_waypoints")) + 1
+        for pose, eef_pre, eef_attach in screened[:PARTNER_EXACT_CAP]:
+            self._check_deadline()
+            if not self.ikc.eef_in_frame(eef_attach, cam_st):
+                fails["attach_frame"] += 1
+                continue
+            female.set_position_orientation(*pose)
+            female.keep_still()
+            self.kit.sync_world()
+            with TT.posed_in_hand(self, "left", male, eio_l):
+                with attached(self.kit, "left", male):
+                    res = self.ikc.exact([eef_pre, eef_attach], st, "left", ignore_for_last=[support, female], scale_key=self.choice.models[self.t_role].scale)
+                if not res.ok:
+                    fails["ik"] += 1
+                    continue
+                if not self.ikc.collision_free_at(res.q, eef_attach, "left", ignore=[support, male]):
+                    fails["fingers"] += 1
+                    continue
+                wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(start, eef_pre, n)]
+                if self._carry_out_of_frame(st, wps) is not None:  # the program check's fingertip rule on the recorded carry
+                    fails["carry_frame"] = fails.get("carry_frame", 0) + 1
+                    continue
+                with attached(self.kit, "left", male):
+                    r_w = self.ikc.waypoints_ok([start] + wps, st, "left", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)), q_first=q_first)
+                self._route_count("carry_checked")
+                if not r_w.ok:
+                    fails["carry"] += 1
+                    self._route_count("carry_failed")
+                    continue
+            # the hand-over's own chains again with the partner standing at this cell (they were searched with it parked): the pick, the
+            # right hand's carry to the hand-over, the left hand's grasp there
+            why = self._handover_chains_with_partner(manip, m_pose, ho)
+            if why is not None:
+                fails[f"partner_blocks_{why}"] = fails.get(f"partner_blocks_{why}", 0) + 1
+                self._route_count(f"partner_blocks.{why}")
+                continue
+            return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "start": start, "q_attach": res.q, "slerp_policy": r_w.reason}
+        return None
+
+    def _handover_chains_with_partner(self, manip: Stance, m_pose: TT.Pose, ho: Dict[str, Any]) -> Optional[str]:
+        """The pick [pre-grasp, grasp], the right hand's tracked carry to the hand-over and the left hand's [pre-grasp, grasp] there (the right
+        arm locked, the male out of the world as in :meth:`_handover_search`) with the partner where it now stands; the first that fails
+        (``pick`` / ``carry`` / ``left``) or None."""
+        male, support = self.obj(self.t_role), self.obj("support")
+        grasp, scale = ho["grasp"], self.choice.models[self.t_role].scale
+        male.set_position_orientation(*m_pose)
+        male.keep_still()
+        self.kit.sync_world()
+        r = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", ignore_for_last=[support, male], cache=False, scale_key=scale)
+        if not r.ok:
+            return "pick"
+        with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+            with attached(self.kit, "right", male):
+                r = self.ikc.waypoints_ok([ho["lift"]] + list(ho["wps_r"]), manip, "right", ignore_all=[support], track_dense=bool(self.gen("slerp_tracked", True)))
+        if not r.ok:
+            return "carry"
+        male.set_position_orientation(TT._t(ho["M"][0]), TT._t(ho["M"][1]))
+        male.keep_still()
+        self.kit.sync_world()
+        try:
+            with self.ikc.ignoring([male]):
+                r = self.ikc.exact([ho["pre_l"], ho["H_l"]], manip, "left", q_seed=ho["q_r"], cache=False, scale_key=scale)
+        finally:
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+        return None if r.ok else "left"
+
+    def _sample_with_handover(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
+        """i7-cork route (i) (owner decision 2026-11-08 4.2 (i)): the male rests wide end down; the right hand pinches its narrow (mating) end
+        (the pick entry, ``self.grasps``), lifts it and carries it to a hand-over pose in front of the robot with the wide end toward the left
+        hand (:meth:`_handover_search`); the left hand pinches the wide end (the hold entry, fingers off the mating side), the right hand lets
+        go and backs off; the base drives to the place stance along the edge or straight back / forward, the heading and the trunk kept
+        (:meth:`_handover_place_stances`; the recorded path is an axis leg), the left hand carries the male to the pre-attach and attaches
+        (:meth:`_handover_attach_from`). Records: ``grasps[0]`` = the right hand's pick (``waypoints`` = the carry to the hand-over,
+        ``handover``), ``grasps[1]`` = the left hand's hold (grasp at the hand-over, ``waypoints`` / pre_place / place = the attach),
+        ``grasps[*].attach_route = "handover"``; the program is ``programs.program_attachment_handover``."""
+        d = Draft()
+        tname, pname = self.tname, self.pname
+        male, support = self.obj(self.t_role), self.obj("support")
+        self.record_stance_travel(init, manip)
+        cam_init, cam_manip = self.camera_pose_at(init), self.camera_pose_at(manip)
+        m_pose, grasp = TT.phase3_target(self, manip, rng, list(self.grasps), self.hull[self.t_role], self.rest[self.t_role], [support], object_name=tname,
+                                         scale_key=self.choice.models[self.t_role].scale, bands=self.bands)
+        grasp.place_on = pname
+        self._route_count("pick")
+        male.set_position_orientation(*m_pose)
+        male.keep_still()
+        self.kit.sync_world()
+        self._early_rest(m_pose)  # i7-cork 5n.2 (ISG_ATTACH_EARLY_REST): before the hand-over search
+        self._record_pinch_width(grasp, m_pose)
+        ho = self._handover_search(rng, manip, m_pose, grasp, cam_manip)
+        ho["grasp"] = grasp
+        g_l = ho["g_l"]
+        idx = self.kit.robot.arm_control_idx
+        # the records first (the carried drive to a place stance attaches the male to the LEFT hand per its record)
+        grasp.carry_height = float(ho["carry"])
+        grasp.waypoints = list(ho["wps_r"])
+        grasp.extras.update({"attach_route": "handover", "handover": {"role": "pick", "object_pose": [[float(v) for v in ho["M"][0]], [float(v) for v in ho["M"][1]]],
+                                                                      "hands_apart_m": round(float(ho["hands_apart_m"]), 4), "release_retreat_m": 0.10,
+                                                                      "evaluated": ho["tried"], "fails": ho["fails"]}})
+        hold = TT.GraspRecord(object=tname, arm="left", grasp_key=self.hold_key, grasp_name=g_l.name, yaw=0.0, pre_grasp=ho["pre_l"], grasp=ho["H_l"],
+                              carry_height=0.0, finger_q=[float(v) for v in (g_l.finger_q or [])] or None, eef_in_object=(TT._t(g_l.pose[0]), TT._t(g_l.pose[1])),
+                              stance="manipulation", place_on=pname)
+        hold.extras.update({"attach_route": "handover", "handover": {"role": "hold", "object_pose": grasp.extras["handover"]["object_pose"]},
+                            "pinch_width_m": round(2.0 * self._finger_q_of(g_l), 4)})
+        manip.arms = ["right", "left"]
+        self.sidecar.add_stance(manip)
+        self.sidecar.add_grasp(grasp)
+        self.sidecar.add_grasp(hold)
+        self.record_carry_arm_q(tname, "left", TT._t(ho["q_l"])[idx["left"]])
+        # the drive: the left arm frozen at its hold (carry_arm_q), the emptied right arm at the stance's posture (the oracle re-poses an empty
+        # arm to the record's arms_q before the drive; its release-retreat configuration stood within the carried margin of the left hand)
+        arm_q = None
+        att, work_st, tried, path, legs = None, manip, 0, None, {}
+        for st in self._handover_place_stances(manip):
+            if tried >= SECOND_BASE_MAX_TRIES + 1:
+                break
+            self._check_deadline()
+            st.focus, st.arms = manip.focus, ["left"]
+            if st is not manip:
+                if not self.kit.trav_free(st.base_xy):
+                    continue
+                male.set_position_orientation(*m_pose)
+                male.keep_still()
+                self.kit.sync_world()
+                if not self.ikc.stance_collision_free(st):
+                    continue
+            tried += 1
+            att = self._handover_attach_from(rng, manip, st, m_pose, ho, cam_init)
+            if att is None:
+                continue
+            if st is manip:
+                work_st = st
+                break
+            # the drive to this place stance with the male in the left hand (the heading kept, axis legs only); a failing leg -> the next stance
+            st.carried = tname
+            self.sidecar.add_stance(st)
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+            try:
+                path = self.record_path(manip, st, carried=tname, arm="left", axis_leg=[0.0], arm_q=arm_q)
+            except Reject as e:
+                self.sidecar.stances.pop(st.name, None)
+                legs[f"lat{st.lateral:+.2f}/s{float(st.stand_off or 0.0):.2f}"] = str(e)[:160]
+                self._route_count("place_leg_failed")
+                att = None
+                continue
+            work_st = st
+            break
+        if att is None:
+            self._route_count("place_unreachable")
+            raise Reject("partner_placement", f"hand-over: no partner cell with a reachable left-hand attach and drive from {tried} place stance(s) "
+                                              f"({self._att_fails}; legs {legs})")
+        self._route_count("attach_found")
+        f_pose, attach, pre_attach = att["f_pose"], att["attach"], att["pre_attach"]
+        goal = self._attached_pose(f_pose)
+        hold.waypoints = list(att["wps"])
+        hold.pre_place, hold.place = pre_attach, attach
+        hold.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in att["start"][0]], "slerp_policy": att.get("slerp_policy")})
+        objects = {tname: m_pose, pname: f_pose}
+        if work_st is not manip:
+            work_st.extras.update({"second_base_pose": True, "lateral_shift": float(work_st.lateral - manip.lateral),
+                                   "stand_off_shift": float((work_st.stand_off or 0.0) - (manip.stand_off or 0.0)), "path_length_m": getattr(path, "length_m", None)})
+        work_st.arms = ["left"] if work_st is not manip else work_st.arms
+        for nm, p in (("grasp", grasp.grasp), ("hand-over (right)", ho["H_r"]), ("hand-over (left)", ho["H_l"])):
+            if not self.ikc.eef_in_frame(p, cam_manip):
+                raise Reject("gripper_not_in_frame", f"{nm} eef pose outside the manipulation image (5 %)")
+        TT.whole_body_check_at(self, [init, manip] + ([work_st] if work_st is not manip else []), objects, require=True, reason="stance_collision")
+        work_st.extras.update({"brace": "none", "handover": True})
+        d.object_poses.update(objects)
+        d.goal_poses[tname] = goal
+        d.robot_q = self.stance_q(init)
+        d.base_pose2d = tuple(init.base_pose2d)
+        d.groups[self._group_name([tname, pname])] = self._group_target(f_pose, goal, tname, pname)
+        child_link, parent_link = self.pair
+        d.extras["attachment_targets"] = [{"child": tname, "parent": pname, "child_link": child_link.body_name, "parent_link": parent_link.body_name, "joint_type": "fixed"}]
+        mc, pc = self.choice.models[self.t_role], self.choice.models[self.p_role]
+        self.sidecar.describe(tname, mc.category.replace("_", " "))
+        self.sidecar.describe(pname, pc.category.replace("_", " "))
+        d.summary.update({"grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw}, "hold": {"key": hold.grasp_key, "name": hold.grasp_name},
+                          "manipulation_candidate": k, "partner_fails": self._att_fails, "brace": "none", "attach_stance": work_st.name,
+                          "second_base_pose": work_st is not manip,
+                          "attach_route": {"route": "handover", "pick_key": self.grasp_key, "hold_key": self.hold_key, "hands_apart_m": round(float(ho["hands_apart_m"]), 4)}})
+        self.brace_missing = True
+        self._route_count("drafted")
         return d
 
     # ------------------------------------------------------------------ asymmetric library grasps re-centred (cap/xxqyrt)
@@ -1423,49 +2219,67 @@ class Attachment(SamplerV2):
             return None
         m_fp = self.world.footprint(self.hull[self.t_role], m_pose)
         focus_xy = st.focus[:2] if st.focus is not None else m_pose[0][:2]
+        yaw_c = None
+        if self.attach_route == "lying90" and _env_on(LYING90_MIN_TURN_SWITCH):
+            # i7-cork 5n.3: the partner yaw whose attach makes the carry's in-hand turn the route's 90 deg tilt (the lift keeps the grasp's
+            # orientation; the eef at the attach = R_z(yaw) ⊗ T_attach ⊗ eef_in_object)
+            q_pe = C.compose(C.compose(self.parent_link_in_female, self.root_in_child_link), (TT._t(grasp.eef_in_object[0]), TT._t(grasp.eef_in_object[1])))[1]
+            yaw_c, turn_c = min_turn_yaw(grasp.grasp[1], q_pe)
+            self._route_count("min_turn_yaw")
+            log.info("%s: LYING90_MIN_TURN partner yaw %.1f deg +- %.0f (the carry's turn %.1f deg there)", self.gp.variant, math.degrees(yaw_c),
+                     LYING90_YAW_JITTER_DEG, math.degrees(turn_c))
         perm = [int(i) for i in rng.permutation(len(cells))]
         perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
         geo: List[Tuple[Any, ...]] = []
+        geo_rank: List[Tuple[int, float]] = []  # (cell order, carry turn deg) per geo entry
+        geo_cells: List[int] = []
         for i in perm[:PARTNER_CELLS_TRIED]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
                 continue
-            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
-            fp = self.world.footprint(self.hull[self.p_role], pose)
-            if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
-                fails["support"] += 1
-                continue
-            if TT._polygons_overlap(m_fp, fp, float(self.g("partner_gap_min_m"))):
-                fails["gap"] += 1
-                continue
-            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
-                fails["frame"] += 1
-                continue
-            hand_hit = self._hand_clear_of_partner(grasp, pose)
-            if hand_hit is not None:
-                fails["hand"] = fails.get("hand", 0) + 1
-                fails.setdefault("hand_example", hand_hit)
-                continue
-            # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
-            jp = None
-            for point, b_dir in self._partner_brace_points(pose, st):
-                jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
-                if not jp_["ok"] and jp_["brace_ok"] and not jp_["brace_class_ok"]:
-                    jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
-                if jp is None or (jp_["ok"] and not jp["ok"]) or (jp_["brace_ok"] and not jp["brace_ok"] and not jp["ok"]):
-                    jp, point_best, b_dir_best = jp_, point, b_dir
-                if jp["ok"]:
-                    break
-            point, b_dir = point_best, b_dir_best
-            if require_joint and not jp["ok"]:
-                fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
-                continue
-            goal = self._attached_pose(pose)
-            eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
-            axis = self._insertion_axis_world(pose)
-            eef_pre = (eef_attach[0] + axis * float(self.g("pre_attach_back_m")), eef_attach[1])
-            geo.append((pose, eef_pre, eef_attach, point, b_dir, jp.get("brace_classes"), bool(jp["ok"])))
+            yaw = float(rng.uniform(-math.pi, math.pi))
+            # i7-cork 5n.3 (ISG_LYING90_MIN_TURN): the ladder of partner yaws in the order of the carry's turn - the min-turn yaw first (one
+            # jittered draw), then the LYING90_YAW_LADDER_DEG offsets around it; the screen below keeps per cell the smallest-turn yaw it reaches
+            yaws = [yaw] if yaw_c is None else [yaw_c + math.radians(LYING90_YAW_JITTER_DEG) * yaw / math.pi + math.radians(o) for o in LYING90_YAW_LADDER_DEG]
+            geo_cells.append(i)
+            for yaw in yaws:
+                pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
+                fp = self.world.footprint(self.hull[self.p_role], pose)
+                if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
+                    fails["support"] += 1
+                    continue
+                if TT._polygons_overlap(m_fp, fp, float(self.g("partner_gap_min_m"))):
+                    fails["gap"] += 1
+                    continue
+                if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
+                    fails["frame"] += 1
+                    continue
+                hand_hit = self._hand_clear_of_partner(grasp, pose)
+                if hand_hit is not None:
+                    fails["hand"] = fails.get("hand", 0) + 1
+                    fails.setdefault("hand_example", hand_hit)
+                    continue
+                # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
+                jp = None
+                for point, b_dir in self._partner_brace_points(pose, st):
+                    jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
+                    if not jp_["ok"] and jp_["brace_ok"] and not jp_["brace_class_ok"]:
+                        jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
+                    if jp is None or (jp_["ok"] and not jp["ok"]) or (jp_["brace_ok"] and not jp["brace_ok"] and not jp["ok"]):
+                        jp, point_best, b_dir_best = jp_, point, b_dir
+                    if jp["ok"]:
+                        break
+                point, b_dir = point_best, b_dir_best
+                if require_joint and not jp["ok"]:
+                    fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
+                    continue
+                goal = self._attached_pose(pose)
+                eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
+                axis = self._insertion_axis_world(pose)
+                eef_pre = (eef_attach[0] + axis * float(self.g("pre_attach_back_m")), eef_attach[1])
+                geo.append((pose, eef_pre, eef_attach, point, b_dir, jp.get("brace_classes"), bool(jp["ok"])))
+                geo_rank.append((len(geo_cells), math.degrees(C.quat_angle(TT._t(grasp.grasp[1]), TT._t(eef_pre[1])))))
         if not geo:
             return None
         with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
@@ -1473,6 +2287,15 @@ class Attachment(SamplerV2):
                 ok = self.ikc.screen_pairs([[g_[1], g_[2]] for g_ in geo], st, "right", ignore_for_last=[support])
         screened = [g_ for g_, o in zip(geo, ok.tolist()) if o]
         fails["screen"] = len(geo) - len(screened)
+        if yaw_c is not None:
+            # per cell its smallest-turn screened yaw; the cells by that turn (30 deg classes), then by their focus distance
+            best: Dict[int, Tuple[float, Tuple[Any, ...]]] = {}
+            for g_, o, (cell, turn) in zip(geo, ok.tolist(), geo_rank):
+                if o and (cell not in best or turn < best[cell][0]):
+                    best[cell] = (turn, g_)
+            order_c = sorted(best, key=lambda c: (int(best[c][0] // 30.0), c))
+            screened = [best[c][1] for c in order_c]
+            fails["min_turn_screened_deg"] = [round(best[c][0], 1) for c in order_c[:PARTNER_EXACT_CAP]]
         shift = th.tensor([float(st.base_xy[0] - manip.base_xy[0]), float(st.base_xy[1] - manip.base_xy[1]), 0.0])
         for pose, eef_pre, eef_attach, point, b_dir, brace_classes, joint_ok in screened[:PARTNER_EXACT_CAP]:
             self._check_deadline()
@@ -1494,10 +2317,16 @@ class Attachment(SamplerV2):
                     # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
                     plan = self._carry_to_pre_attach(grasp, eef_pre, pose, st, shift)
                     r_w, lift, wps, carry = plan.result, plan.lift, plan.waypoints, plan.carry
+                    self._route_count("carry_checked")
+                    # i7-cork 5n.3 diagnostics (no decision): the carry's in-hand turn, per route and outcome
+                    turn_deg = math.degrees(C.quat_angle(TT._t(lift[1]), TT._t(eef_pre[1]))) if lift is not None else float("nan")
+                    TT._countn(self, f"carry_turn.{self._route_label()}.{'ok' if r_w.ok else 'failed'}.{carry_turn_bucket(turn_deg)}")
+                    log.info("%s: CARRY_CHECK route %s at %s turn %.1f deg ok %s: %s", self.gp.variant, self._route_label(), st.name, turn_deg, r_w.ok, str(r_w.reason)[:160])
                     if not r_w.ok:
                         fails["slerp"] += 1
+                        self._route_count("carry_failed")
                         seq = [lift] + wps
-                        log.info("%s: SLERP_FAILURE at %s (%s): %s | %s", self.gp.variant, st.name, plan.ladder, r_w.reason,
+                        log.info("%s: SLERP_FAILURE at %s (%s, turn %.1f deg): %s | %s", self.gp.variant, st.name, plan.ladder, turn_deg, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
@@ -1520,9 +2349,25 @@ class Attachment(SamplerV2):
                         fails["brace_ik"] += 1
                         if require_joint:
                             continue
+            gap = self._attach_branch_gap(r_w.q, res.q)
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over}
+                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over, "turn_deg": turn_deg, "branch_gap_rad": gap}
         return None
+
+    def _attach_branch_gap(self, q_carry_end: Optional[th.Tensor], q_attach: Optional[th.Tensor]) -> Optional[float]:
+        """i7-cork 5n.3 diagnostic (no decision): the largest right-arm joint gap (rad) between the carry's tracked end (at the pre-attach)
+        and the exact IK's attach configuration - the two the oracle joins by the insertion; above :data:`ATTACH_BRANCH_GAP_RAD` it reports
+        "the recorded IK witness lies .. rad away .. different IK branches". Kit ``attach_branch_gap.<route>.{le, gt}``; None without both."""
+        if q_carry_end is None or q_attach is None:
+            return None
+        try:
+            idx = self.kit.robot.arm_control_idx["right"]
+            gap = float((TT._t(q_carry_end)[idx] - TT._t(q_attach)[idx]).abs().max())
+        except Exception:  # noqa: BLE001 - a diagnostic only
+            return None
+        TT._countn(self, f"attach_branch_gap.{self._route_label()}.{'gt' if gap > ATTACH_BRANCH_GAP_RAD else 'le'}")
+        log.info("%s: ATTACH_BRANCH_GAP route %s %.2f rad (carry end vs the attach witness)", self.gp.variant, self._route_label(), gap)
+        return gap
 
     def _carry_to_pre_attach(self, grasp, eef_pre: TT.Pose, f_pose: TT.Pose, st: Stance, shift: th.Tensor) -> CarryPlan:
         """The carry of the attached male from its lifted grasp to the pre-attach, tracked as the oracle runs it (``Lift``, then
@@ -1710,6 +2555,29 @@ class Attachment(SamplerV2):
         95 deg over the 130 steps of the transition - the demo then aimed at a cork lying 26 mm away (the "IK 235 mm off").
         The world is restored afterwards (the recorded poses are the settled ones)."""
         roles = [r for r in (self.t_role, self.p_role) if self.obj(r) is not None]
+        tilts = self._nudge_tilts(roles)
+        draft.summary["rest_tilt_after_nudge_deg"] = tilts
+        bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
+        self._route_count("rest_unstable" if bad else "rest_stable")
+        self._early_vs_late(draft, tilts, bad)
+        if early_rest_mode() == "shadow" and self.obj(self.t_role) is not None:
+            self._late_repeat(draft, tilts)
+        if bad:
+            self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
+            male = self.obj(self.t_role)
+            if male is not None and male.name in bad and not self._rest_flip_forced and not (self.template_facts.get("male_rest_orientation") or {}).get("flipped"):
+                # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
+                # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
+                self._rest_flip_forced = True
+                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.variant, male.name, bad[male.name])
+            raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
+                                          f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
+        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.variant, REST_NUDGE_DEG, tilts)
+
+    def _nudge_tilts(self, roles: Sequence[str]) -> Dict[str, float]:
+        """The nudge of :meth:`check_rest_stability` on ``roles`` as they lie now: each tilted REST_NUDGE_DEG about world x and lifted 1 mm,
+        REST_STABILITY_STEPS physics steps with the robot held, the up axis's angle (deg) to the pose before the nudge per object name.
+        The world is restored afterwards."""
         up = th.tensor([0.0, 0.0, 1.0])
         state = self.world.snapshot()
         tilts: Dict[str, float] = {}
@@ -1731,19 +2599,90 @@ class Attachment(SamplerV2):
         finally:
             self.world.restore(state)
             self.world.keep_still(self.objects.values())
-        draft.summary["rest_tilt_after_nudge_deg"] = tilts
-        bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
-        if bad:
-            self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
-            male = self.obj(self.t_role)
-            if male is not None and male.name in bad and not self._rest_flip_forced and not (self.template_facts.get("male_rest_orientation") or {}).get("flipped"):
-                # owner 2026-09-25: the male toppled on its library end - the next draws may turn it onto the other end when that keeps
-                # the insertion direction and library grasps (stable_rest_quat(force=True)); otherwise the rejection stands as it is
-                self._rest_flip_forced = True
-                log.info("%s: %s toppled on its library rest end (%.1f deg) - the next draw considers the other end", self.gp.variant, male.name, bad[male.name])
-            raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
-                                          f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
-        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.variant, REST_NUDGE_DEG, tilts)
+        return tilts
+
+    def _route_label(self) -> str:
+        return self.attach_route or "current"
+
+    def _early_rest(self, m_pose: TT.Pose, force: bool = False) -> Optional[Dict[str, Any]]:
+        """i7-cork (owner decision 5n.2, :data:`EARLY_REST_SWITCH`): the nudge test on the male at its drawn rest ``m_pose`` right after the
+        draw - the male placed with gravity on, settled as ``settle_and_validate`` settles it (``settle_steps``, then the tremble window),
+        then :meth:`_nudge_tilts`; the world restored, the male back at ``m_pose`` without gravity (as the draw left it). ``force``: run
+        whatever the switch says (the fallback routes' decision). Records ``self._early_rest_last`` (compared with the late test) and kit
+        ``early_rest.<route>.{stable, unstable}``; raises :class:`EarlyRestUnstable` for an unstable male in mode ``on`` / with ``force``."""
+        mode = early_rest_mode()
+        force = force or bool(getattr(self, "_early_force", False))
+        if mode == "off" and not force:
+            return None
+        male, W = self.obj(self.t_role), self.world
+        t0 = time.time()
+        state = W.snapshot()
+        settle_err = tremble_err = None
+        try:
+            male.set_position_orientation(*m_pose)
+            W.activate(male)
+            still = self.settle_still_entities(Draft())
+            settle_err = W.settle([male], steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)), still=still)
+            tremble_err = W.tremble_after([male], frames=int(self.gen("tremble_frames", W.TREMBLE_FRAMES)),
+                                          pos_tol=float(self.gen("tremble_pos_tol_m", W.TREMBLE_POS_TOL)), ang_tol=float(self.gen("tremble_ang_tol_rad", W.TREMBLE_ANG_TOL)),
+                                          drift_pos_tol=float(self.gen("tremble_drift_pos_tol_m", W.TREMBLE_DRIFT_POS_TOL)),
+                                          drift_ang_tol=float(self.gen("tremble_drift_ang_tol_rad", W.TREMBLE_DRIFT_ANG_TOL)), still=still)
+            tilts = self._nudge_tilts([self.t_role])
+        finally:
+            W.restore(state)
+            W.set_gravity(male, False)
+            male.set_position_orientation(*m_pose)
+            male.keep_still()
+            self.kit.sync_world()
+        tilt = float(tilts.get(male.name, 0.0))
+        unstable = tilt > REST_TIP_MAX_DEG
+        rec = {"route": self._route_label(), "mode": mode if not force else f"{mode}+route_decision", "tilt_deg": round(tilt, 2), "unstable": unstable,
+               "settle": settle_err, "tremble": tremble_err, "s": round(time.time() - t0, 2)}
+        self._early_rest_last = rec
+        key = f"early_rest.{rec['route']}.{'unstable' if unstable else 'stable'}"
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+        log.info("%s: EARLY_REST %s", self.gp.variant, json.dumps(rec, default=str))
+        if unstable and (mode == "on" or force):
+            if mode == "on":
+                self.counters["rest_unstable_early"] = self.counters.get("rest_unstable_early", 0) + 1
+            raise EarlyRestUnstable("rest_unstable", f"early ({rec['route']} route): the drawn rest's up axis {tilt:.1f} deg off {REST_STABILITY_STEPS} steps after a "
+                                                     f"{REST_NUDGE_DEG:.0f} deg nudge (> {REST_TIP_MAX_DEG:.0f})", route=rec["route"])
+        return rec
+
+    def _late_repeat(self, draft: Draft, tilts: Dict[str, float]) -> None:
+        """Shadow only (:data:`EARLY_REST_SWITCH`): the late nudge test of the male repeated on the very same settled state (the world was
+        restored after the first) - the test's own repeatability, against which the early-vs-late disagreements are read. Kit / counters
+        ``early_rest.late_repeat.{agree, disagree}``, ``draft.summary.rest_late_repeat_deg``, log ``REST_LATE_REPEAT``."""
+        male = self.obj(self.t_role)
+        again = self._nudge_tilts([self.t_role]).get(male.name)
+        first = tilts.get(male.name)
+        if again is None or first is None:
+            return
+        key = "early_rest.late_repeat." + ("agree" if (again > REST_TIP_MAX_DEG) == (first > REST_TIP_MAX_DEG) else "disagree")
+        TT._countn(self, key)
+        self.counters[key] = self.counters.get(key, 0) + 1
+        draft.summary["rest_late_repeat_deg"] = again
+        log.info("%s: REST_LATE_REPEAT %s first %.2f deg repeat %.2f deg", self.gp.variant, key.rsplit(".", 1)[-1], float(first), float(again))
+
+    def _early_vs_late(self, draft: Draft, tilts: Dict[str, float], bad: Dict[str, float]) -> None:
+        """Shadow bookkeeping of :data:`EARLY_REST_SWITCH`: the early verdict on the drafted male vs this (late) test - kit / counters
+        ``early_rest.vs_late.{agree_stable, agree_unstable, early_unstable_late_stable, early_stable_late_unstable}`` (the male) and
+        ``late_partner_only`` (the late test failed on the partner alone), ``draft.summary.early_rest``, log ``EARLY_REST_VS_LATE``."""
+        rec = getattr(self, "_early_rest_last", None)
+        if rec is None:
+            return
+        male = self.obj(self.t_role)
+        late_bad = male is not None and male.name in bad
+        early_bad = bool(rec.get("unstable"))
+        agree = {(False, False): "agree_stable", (True, True): "agree_unstable", (True, False): "early_unstable_late_stable",
+                 (False, True): "early_stable_late_unstable"}[(early_bad, late_bad)]
+        keys = [f"early_rest.vs_late.{agree}"] + (["early_rest.vs_late.late_partner_only"] if bad and not late_bad else [])
+        for key in keys:
+            TT._countn(self, key)
+            self.counters[key] = self.counters.get(key, 0) + 1
+        draft.summary["early_rest"] = {**rec, "late_tilt_deg": tilts.get(male.name) if male is not None else None, "vs_late": agree}
+        log.info("%s: EARLY_REST_VS_LATE %s early %.2f deg late %s deg (route %s)", self.gp.variant, agree, float(rec.get("tilt_deg") or 0.0), tilts, rec.get("route"))
 
     def after_settle(self, draft: Draft):
         tname, pname = self.tname, self.pname
@@ -1787,6 +2726,8 @@ class Attachment(SamplerV2):
         """The attach / pre-attach at the settled partner pose (male in hand), from the stance the attach was recorded at: the
         second base pose when the attach needed one (``grasp.extras["attach_stance"]``), else the manipulation stance."""
         tname, pname = self.tname, self.pname
+        if self.attach_route == "handover":
+            return self._after_goal_check_handover(draft)
         grasp = self.sidecar.grasp_of(tname)
         manip = self.sidecar.stance("manipulation")
         manip = self.sidecar.stances.get(str(grasp.extras.get("attach_stance") or "manipulation")) or manip
@@ -1814,6 +2755,32 @@ class Attachment(SamplerV2):
         if grasp.waypoints:
             grasp.waypoints[-1] = pre
 
+    def _after_goal_check_handover(self, draft: Draft) -> None:
+        """:meth:`after_goal_check` of the hand-over: the LEFT hand's pre-attach / attach at the settled partner pose from the attach stance
+        (the male attached to the left hand), the fingers clear of the partner; the hold record's pre_place / place / last waypoint."""
+        tname, pname = self.tname, self.pname
+        hold = self.sidecar.grasp_of(tname, arm="left")
+        st = self.sidecar.stances.get(str(hold.extras.get("attach_stance") or "manipulation")) or self.sidecar.stance("manipulation")
+        f_pose = draft.object_poses[pname]
+        attach = IK.grasp_pose(self._attached_pose(f_pose), hold.eef_in_object)
+        pre = (attach[0] + self._insertion_axis_world(f_pose) * float(self.g("pre_attach_back_m")), attach[1])
+        male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
+        with TT.posed_in_hand(self, "left", male, hold.eef_in_object):
+            with attached(self.kit, "left", male):
+                res = self.ikc.exact([pre, attach], st, "left", ignore_for_last=[support, female], scale_key=self.choice.models[self.t_role].scale)
+            clear = self.ikc.collision_free_at(res.q, attach, "left", ignore=[support, male]) if res.ok else True
+        if not res.ok:
+            raise Reject("place_unreachable", f"settled partner: the left hand's pre-attach / attach fail the exact IK: {res.reason}")
+        if not clear:
+            self.counters["fingers_in_partner"] = self.counters.get("fingers_in_partner", 0) + 1
+            raise Reject("fingers_in_partner", "settled partner: the left hand's links collide with the partner at the attach (male detached)")
+        regime = self.gen("attach_correction", None)
+        if isinstance(regime, dict) and regime:
+            self.sidecar.extra["attach_correction"] = {k: float(v) if k != "max_passes" and k != "settle_steps" else int(v) for k, v in regime.items()}
+        hold.pre_place, hold.place = pre, attach
+        if hold.waypoints:
+            hold.waypoints[-1] = pre
+
     def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
         """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
         assignment - the pick as the draw solved it (support ignored at the grasp; from ``q_first``, the recorded pre-grasp witness
@@ -1822,6 +2789,9 @@ class Attachment(SamplerV2):
         attach stance the lift + SLERP carry tracked as ``_attach_and_brace`` tracks it, the pre-attach -> attach, the left brace
         solved again with the right arm locked at this attach (``tabletop.brace_second_arm``) when one is recorded, and the fingers
         clear of the partner at the attach (``_fingers_in_partner``). None when every check passes, else the first failure."""
+        if self.attach_route == "handover":
+            # i7-cork: the hand-over's two pinches are solved together (the hands' distance, both arms locked in turn): no wrist turn
+            raise TT.TurnNotOffered("the hand-over route: the two hands' pinches are checked together")
         male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
         manip = self.sidecar.stance("manipulation")
         st = self.sidecar.stances.get(str(grasp.extras.get("attach_stance") or "manipulation")) or manip
@@ -1833,7 +2803,7 @@ class Attachment(SamplerV2):
                 res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, "right", **kw)
         if not res.ok:
             return f"pick: {res.reason}"
-        if TT.wrist_camera_clearance(grasp.grasp, float(self.top.z)) < TT.TWIN_CAMERA_CLEARANCE_M or not O.camera_clear(self.ikc, res.q, "right"):
+        if not TT.camera_top_clear(self, grasp.grasp, float(self.top.z), "right") or not O.camera_clear(self.ikc, res.q, "right"):
             return "pick: the wrist camera on the support top / within 5 mm of the world"
         if grasp.extras.get("approach_standoff_m"):
             standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), float(grasp.extras["approach_standoff_m"]))

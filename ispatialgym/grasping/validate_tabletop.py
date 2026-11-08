@@ -1064,6 +1064,9 @@ def build_library(job, cand_doc, rests, trials, policy: CP.ContactPolicy, physic
             # i7-attach 2026-11-07: the attachment rule's axis (attach entries only; part of the identity when not "meta_z")
             **({"attach_axis": S.attach_axis(cand_doc.get("config"), cand_doc.get("constraint") or job.get("constraint"))}
                if (cand_doc.get("constraint") or job.get("constraint")) == "attachment_free" else {}),
+            # i7-cork 2026-11-08: the fingers' window along the object's +z (CandidateConfig.finger_axis_window_m; only when set)
+            **({"finger_axis_window_m": list((cand_doc.get("config") or {})["finger_axis_window_m"])}
+               if (cand_doc.get("config") or {}).get("finger_axis_window_m") is not None else {}),
             "provenance": {"candidates": cand_doc.get("pipeline"), "validator": VALIDATOR_VERSION, "created": S.now()},
             # i7-ladder 2026-11-07: the ladder step that built this entry (scripts/grasp_ladder), only when the job names one
             **({"ladder": job["ladder"]} if job.get("ladder") else {}),

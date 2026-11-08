@@ -92,6 +92,21 @@ def revolution_axis(category: str, model: str, path: str = REVOLUTION_AXES_PATH)
     return revolution_axes(path).get(f"{category}/{model}")
 
 
+#: owner 2026-11-08 (answers b, item 2; i7-contact3): a braced push whose brace is a TOP PRESS (``contacts.brace.kind == "top_press"``,
+#: small-scale articulation's push-close) and whose residual lies within the task's tolerance is accepted as it is - no improvement rung, so
+#: ``offset_brace`` never raises the press off the object (close_02: the +10 mm rung lifted the press and the carton slid until the
+#: 10 mm object_tilt QA). Every other brace kind, and every push out of tolerance, keeps the retry ladder. "0" = the ladder for all.
+#: Default "1" since the 2026-11-08 A/B (the owner decided the rule): close_02 at 300006-009, off -> on 0 / 4 -> 3 / 4 (fresh v2only) and
+#: 0 / 4 -> 3 / 4 (the int1_6 instances re-collected); object_tilt 3 -> 0, the carton's peak 10.0-11.7 -> 3.3-6.2 mm.
+TOP_PRESS_ACCEPT_ENV = "ISPATIALGYM_TOP_PRESS_ACCEPT"
+TOP_PRESS_ACCEPT_DEFAULT = "1"
+
+
+def top_press_accept_on() -> bool:
+    """:data:`TOP_PRESS_ACCEPT_ENV` (unset / empty: :data:`TOP_PRESS_ACCEPT_DEFAULT`) is "1"."""
+    return (os.environ.get(TOP_PRESS_ACCEPT_ENV) or TOP_PRESS_ACCEPT_DEFAULT).strip() == "1"
+
+
 @dataclass
 class ExecutorConfig:
     n_render_iterations: int = 1
@@ -409,6 +424,7 @@ NOTE_KEYS = NOTE_KEYS + ("axis_leg",)
 NOTE_KEYS = NOTE_KEYS + ("push_speed_m_s", "push_nudge_brace_hold")
 NOTE_KEYS = NOTE_KEYS + ("preshape_set", "preshape_kept_from_transition_m")  # oracle-fix 2026-11-06: the shelf back-off's pre-shape (transition / grasp)
 NOTE_KEYS = NOTE_KEYS + ("push_gripper",)  # oracle-fix 2026-11-06: an open-hand push's opening (execute_push; touching's generation.push_gripper_open)
+NOTE_KEYS = NOTE_KEYS + ("overpath", "transit_book_clearance")  # i7-overpath 2026-11-08: the overhang pick's recorded transit / its book clearance
 
 
 @dataclass
@@ -757,6 +773,8 @@ class Executor:
         self.last_ctx: Dict[str, Any] = {}
         self._defer_commit = False
         self.brace_retries: List[Dict[str, Any]] = []
+        #: the oracle's own counters of the episode (``result.counters``): ``push_outcome.top_press_in_tolerance_accepted``
+        self.counters: Dict[str, int] = {}
         self._stream = False  # a replay / policy stream: the retry rules are off (only the step budget)
         # oracle.protection (owner 2026-09-26): the goal objects protected during transits ([(bddl name, scene object)], set by
         # run_isg), and the actions whose retry takes the via-above re-plan at once (after a run-time protected verdict)
@@ -1696,12 +1714,13 @@ class Executor:
 
     # ------------------------------------------------------------------ braced push: the brace retry ladder
 
-    def push_outcome(self, push: Push, ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def push_outcome(self, push: Push, ctx: Dict[str, Any], brace: Optional[Brace] = None) -> Dict[str, Any]:
         """How the push ended against the task goal: ``residual`` (signed in the push sense: > 0 short, < 0
         overshoot), ``tolerance`` (the TRO target's, None when the object has no gating target of the push's kind),
         ``in_tolerance``, ``brace_hits`` (steps the watched brace fingers touched the target before the goal first
         held) and the ladder ``reason``: ``"short"`` (out of tolerance, short, the target touched the stop before the
-        goal), ``"overshoot"`` (out of tolerance, the residual flipped sign) or None."""
+        goal), ``"overshoot"`` (out of tolerance, the residual flipped sign) or None. ``brace`` (the push's brace): with
+        :func:`top_press_accept_on` an in-tolerance push braced by a ``top_press`` is accepted as it is (``accepted``; no rung)."""
         res = ctx.get("push_residual") or {}
         value = res.get("final", res.get("after", res.get("value")))  # the residual the object is left with after the back-off
         kind = res.get("kind", "line")
@@ -1728,6 +1747,13 @@ class Executor:
         out["aim"] = {"centre": centre, "half": half}
         out["aimed"] = abs(signed - centre) <= half
         if out["in_tolerance"] and out["aimed"]:
+            return out
+        if out["in_tolerance"] and brace is not None and str(getattr(brace.contact, "kind", "")) == "top_press" and top_press_accept_on():
+            # owner 2026-11-08 (answers b, item 2): a top press holds the object down, it is no stop on the push path - an improvement rung
+            # moves it "outward" along -direction, i.e. UP, off the object (close_02: +10 mm and the carton slid); in tolerance is accepted
+            out["accepted"] = "top press in tolerance: accepted as it is (no improvement rung lifts the press; owner 2026-11-08)"
+            self.counters["push_outcome.top_press_in_tolerance_accepted"] = self.counters.get("push_outcome.top_press_in_tolerance_accepted", 0) + 1
+            log.info("braced push: top press, residual %.4f within the tolerance %.4f (aim %+.3f +- %.3f): accepted, no retry", signed, float(tol), centre, half)
             return out
         if signed < centre:
             out["reason"] = "overshoot"
@@ -1791,7 +1817,7 @@ class Executor:
                         k += 1
                         continue
                     break
-                outcome = self.push_outcome(push, self.last_ctx)
+                outcome = self.push_outcome(push, self.last_ctx, brace=brace)
                 outcome["shortened_rad"] = shorten
                 self.action_records[-1].notes["push_outcome"] = outcome
                 if outcome.get("in_tolerance"):
@@ -2240,6 +2266,7 @@ class Executor:
             "qa": qa_report,
             "checkpoint_reports": list(self.checkpoint_reports),
             "brace_retry": _jsonable(self.brace_retries),
+            "counters": dict(self.counters),
             "goal_observation": goal_obs,
             "timings": dict(self.timings),
             "release_check": _jsonable(self.release_check),

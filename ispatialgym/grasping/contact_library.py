@@ -199,11 +199,25 @@ def build_touching_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], param
     return out
 
 
-def axial_rest(rest) -> Any:
+def axial_settled(params: Optional[Dict[str, Any]]) -> bool:
+    """i7-axialrest (owner 2026-11-08, decision 2): whether an axial family builds at the target's SETTLED v2 rest - the family param
+    ``settled_rest`` (``build_job`` sets it under the switch - the default since the owner's 2026-11-08 item 3 - for a TILTED rest only: the
+    one case the switch changes the build, refused without it, so the flip changed no library identity: upright libraries carry no param,
+    tqqwys's settled-rest maps keep theirs)."""
+    return bool((params or {}).get("settled_rest"))
+
+
+def axial_rest(rest, settled: bool = False) -> Any:
     """The axial program's placement: the target upright at the IDENTITY orientation turned about z (``object_pose_on(..., IDENTITY_QUAT, ...)``,
     the goal ``quat_from_yaw(yaw_goal)``) with the v2 entry's measured root height - the v2 rest must be that upright rest (tilt <= 0.05 rad),
-    else ``ValueError``."""
-    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > 0.05:
+    else ``ValueError``. ``settled`` (i7-axialrest, :func:`axial_settled`): the program places the target AT the v2 rest
+    (``R_z(yaw) * q_rest``, ``contact_poses.axial_settled_rest_on``) - a TILTED rest is returned unchanged; an upright one (tilt <=
+    ``contact_poses.AXIAL_UPRIGHT_TILT_RAD``) stays the identity rest under the switch too (owner 2026-11-08 item 3: upright draws as today)."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    if settled and not CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float)):
+        return rest
+    if S.tilt_distance(np.asarray(rest.quat_xyzw, dtype=float), np.array([0.0, 0.0, 0.0, 1.0])) > CPZ.AXIAL_UPRIGHT_TILT_RAD:
         raise ValueError(f"the v2 rest {list(np.round(rest.quat_xyzw, 4))} is not the axial program's upright identity rest")
     return S.Rest(rest_id=rest.rest_id, quat_xyzw=np.array([0.0, 0.0, 0.0, 1.0]), h_root=float(rest.h_root), reference_yaw=0.0, record=rest.record)
 
@@ -219,6 +233,15 @@ def _axial_long(pts_obj: np.ndarray, params: Dict[str, Any]) -> np.ndarray:
     return np.array([math.cos(ang), math.sin(ang), 0.0])
 
 
+def _axial_height(pts_obj: np.ndarray, q_rest) -> float:
+    """The axial target's height above its support: the object-frame z extent at the upright identity rest (``q_rest`` None), else the world
+    z extent at the settled rest (i7-axialrest; ``AlignmentAxial``'s extents)."""
+    if q_rest is None:
+        return float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    z = pts_obj @ S.quat_to_mat(np.asarray([float(v) for v in q_rest], dtype=float))[2, :]
+    return float(z.max() - z.min())
+
+
 def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The axial STOP BRACE entries (``contact_poses.axial_stop_geometry`` + ``axial_brace_candidates`` - ``AlignmentAxial._stop_geometry`` /
     ``_brace_candidates``' rule): per GOAL yaw slot (relative to the stance; the object's root at its goal pose), long-axis end
@@ -227,17 +250,21 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     under 4 cm) and the pads on it (closing v / h, pad centre 5 mm outside the goal face), each clear of the target's sweep from its init
     pose. The entries are in the object frame AT THE GOAL POSE (the brace holds the object there while the push completes); ``load`` = the
     direction the end arrives in (``d_stop``, rule frame) and the end's point (goal object frame)."""
+    if params.get("clear_turns"):
+        return build_axial_brace_clear_turns(pts_obj, rest, knobs, params)
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.v2 import contact_poses as CPZ
     from ispatialgym.sampling.v2 import tabletop as TT
 
-    r0 = axial_rest(rest)
+    settled = axial_settled(params)
+    r0 = axial_rest(rest, settled)
+    q_rest = th.tensor([float(v) for v in r0.quat_xyzw], dtype=th.float32) if settled else None  # i7-axialrest: the settled rest (None: identity)
     hull = th.as_tensor(pts_obj, dtype=th.float32)
     turn = math.radians(float(params.get("turn_deg", AXIAL_TURN_DEG)))
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
     proj = (hull - com_local) @ long_local
-    h = float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    h = _axial_height(pts_obj, q_rest)
     z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
     out = []
     for yaw_goal in _yaws(params):
@@ -246,11 +273,11 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
             for spin in (1.0, -1.0):
                 d_goal = spin * turn
                 yaw0 = yaw_goal - d_goal
-                q0 = C.quat_from_yaw(yaw0)
+                q0 = C.quat_from_yaw(yaw0) if q_rest is None else CPZ.axial_rest_pose(q_rest, yaw0)
                 pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
                 com = pose_init[0] + C.quat_rotate(q0, com_local)
                 end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
-                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace)
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace, rest_quat=q_rest)
                 T_goal = CPZ._mat(goal_pose)
                 Ti = np.linalg.inv(T_goal)
                 end_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), end - pose_init[0])) + goal_pose[0]
@@ -276,6 +303,109 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     return out
 
 
+
+#: i7-brace (owner 3.4): the turn grid (deg) a clear-turn axial brace entry is tested over (the axial deviation range is 20-70 deg)
+AXIAL_CLEAR_TURNS_DEG = tuple(float(v) for v in range(5, 95, 5))
+
+
+def clear_turn_max(hull: th.Tensor, com_local: th.Tensor, goal_pose, spin: float, disc: Dict[str, Any], turns_deg: Sequence[float] = AXIAL_CLEAR_TURNS_DEG,
+                   settled: bool = False) -> float:
+    """The largest turn (deg, of ``turns_deg``) up to which the brace's sweep disc stays clear (``tabletop.blade_sweep_clear`` - the sampler's own
+    test - at EVERY grid turn up to it): the object rotated back from ``goal_pose`` by ``spin x turn`` about its fixed centre of mass. 0 when
+    the smallest turn already fails. ``settled`` (i7-axialrest): the start orientation is the goal's turned about z (``R_z(-turn) q_goal``,
+    which keeps a tilted rest) instead of the upright ``R_z(yaw_goal - turn)``."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    com = goal_pose[0] + C.quat_rotate(goal_pose[1], com_local)
+    yaw_goal = math.atan2(float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[1]), float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[0]))
+    best = 0.0
+    for t in sorted(float(v) for v in turns_deg):
+        d_goal = spin * math.radians(t)
+        q0 = C.qmul(C.quat_from_yaw(-d_goal), goal_pose[1].float()) if settled else C.quat_from_yaw(yaw_goal - d_goal)
+        pose_init = (com - C.quat_rotate(q0, com_local), q0)
+        ok, _gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, disc["xy"], float(disc["radius"]), float(disc["clearance"]))
+        if not ok:
+            break
+        best = t
+    return best
+
+
+def build_axial_brace_clear_turns(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """i7-brace (owner 3.4, library param ``clear_turns``; default off): the axial stop brace entries at the GOAL pose keyed by pushed end x
+    spin (not turn size), each recording the START RANGE it stays clear for - ``goal.clear_turn_max_deg``, the largest turn of
+    :data:`AXIAL_CLEAR_TURNS_DEG` at which the sampler's sweep test (``blade_sweep_clear``) holds at every grid turn up to it - instead of one
+    45 deg build: the candidates of ``axial_brace_candidates`` without its sweep filter (``sweep_check=False``) and, after them, the
+    OPPOSITE-END candidates (``axial_opposite_brace_candidates``: the far end's face, resisting the same turn; classes ``<end><spin>spin_opp_*``).
+    A candidate clear at no grid turn is left out. The candidate poses at the goal do not depend on the turn (the stop face and d_stop are
+    the pushed end's at the goal); ``load`` is the arriving end's (the far end's for an opposite entry)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    settled = axial_settled(params)
+    r0 = axial_rest(rest, settled)
+    q_rest = th.tensor([float(v) for v in r0.quat_xyzw], dtype=th.float32) if settled else None  # i7-axialrest: the settled rest (None: identity)
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    turns = [float(v) for v in (params.get("clear_turns_deg") or AXIAL_CLEAR_TURNS_DEG)]
+    ref = math.radians(min(turns))  # the reference init pose of the candidate generator (the poses at the goal do not depend on it)
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
+    proj = (hull - com_local) @ long_local
+    h = _axial_height(pts_obj, q_rest)
+    z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
+    out = []
+    for yaw_goal in _yaws(params):
+        for end_sign in (1.0, -1.0):
+            half_len = float(proj.max() if end_sign > 0 else -proj.min()) - AXIAL_END_INSET_M
+            opp_half = float(-proj.min() if end_sign > 0 else proj.max()) - AXIAL_END_INSET_M
+            for spin in (1.0, -1.0):
+                d_goal = spin * ref
+                q0 = C.quat_from_yaw(yaw_goal - d_goal) if q_rest is None else CPZ.axial_rest_pose(q_rest, yaw_goal - d_goal)
+                pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
+                com = pose_init[0] + C.quat_rotate(q0, com_local)
+                end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
+                opp_end = com - C.quat_rotate(q0, long_local) * end_sign * opp_half
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace, rest_quat=q_rest)
+                T_goal = CPZ._mat(goal_pose)
+                Ti = np.linalg.inv(T_goal)
+                skips: Dict[str, int] = {}
+                seen = set()
+                gens = [(False, CPZ.axial_brace_candidates(CPZ.MAP_FRAME, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push, face_z=face_z,
+                                                           height=h, skips=skips, sweep_check=False))]
+                if params.get("opposite_end", True):
+                    gens.append((True, CPZ.axial_opposite_brace_candidates(CPZ.MAP_FRAME, hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace,
+                                                                           d_goal, z_push=z_push, face_z=face_z, height=h, skips=skips, sweep_check=False,
+                                                                           rest_quat=q_rest)))
+                for opp, gen in gens:
+                    for pre, contact, kind, extras in gen:
+                        disc = extras.pop("sweep_disc")
+                        t_max = clear_turn_max(hull, com_local, goal_pose, spin, disc, turns, settled=settled)
+                        if t_max <= 0.0:
+                            skips["never_clear"] = skips.get("never_clear", 0) + 1
+                            continue
+                        cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+                        while cls in seen:
+                            cls += "#"
+                        seen.add(cls)
+                        pitch = float(str(extras["pose_class"])[len("blade_"):]) if str(extras.get("pose_class", "")).startswith("blade_") else 0.0
+                        e = CPZ.contact_entry("brace", cls, "axial_brace", "brace", T_goal, contact, pre, dict(extras, kind=kind),
+                                              face_rule=("the far end's face the far end arrives at (opposite d_stop)" if opp else
+                                                         "the goal hull's stop face the pushed end arrives at (d_stop)") + ", at 3/4 of the height; the blade at the push height",
+                                              support_z=0.0, object_height=h, pitch_deg=pitch)
+                        e["yaw_deg"] = round(math.degrees(yaw_goal), 4)
+                        e["goal"] = {"yaw_goal_deg": round(math.degrees(yaw_goal), 4), "turn_rad": round(spin * math.radians(t_max), 6), "end_sign": end_sign,
+                                     "spin": spin, "clear_turn_max_deg": t_max, "opposite_end": bool(opp), "skips": dict(skips)}
+                        a_end = opp_end if opp else end
+                        a_d = th.tensor(extras["opp_d_stop"]) if opp else d_stop
+                        a_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), a_end - pose_init[0])) + goal_pose[0]
+                        e["load"] = {"frame": "rule", "direction": [round(float(v), 6) for v in a_d.tolist()],
+                                     "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ a_goal.double().numpy() + Ti[:3, 3])],
+                                     "what": "the right arm's axial push brings the " + ("far end into its stop" if opp else "end into the stop") + " at the goal"}
+                        out.append(_redigest(e))
+    return out
+
+
 def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The axial push entries (``AlignmentAxial._sample_with``'s classes on the shared rules: ``axial_push_height``, ``axial_blade_geometry``,
     ``extreme_point``, ``axial_push_chain``) of the target at each yaw slot: per long-axis end (``AXIAL_END_INSET_M`` inside it) and turn sense,
@@ -292,7 +422,7 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     turns = [math.radians(float(v)) for v in (params.get("turns_deg") or ([params["turn_deg"]] if params.get("turn_deg") is not None else AXIAL_PUSH_TURNS_DEG))]
     com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
     long_local = params.get("long_axis")
-    rest = axial_rest(rest)  # the axial program's upright identity placement
+    rest = axial_rest(rest, axial_settled(params))  # the axial program's upright identity placement (i7-axialrest: or its settled v2 rest)
     out = []
     for yaw in _yaws(params):
         T = object_frame(rest.quat_xyzw, rest.h_root, yaw)
@@ -345,6 +475,139 @@ def build_axial_push(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: D
     return out
 
 
+#: i7-brace (owner 3.4): the world_vertical tilt grid (deg) a wall_brace entry's clear range is tested over (the task draws |delta| U(15, 45))
+WALL_CLEAR_DELTAS_DEG = tuple(float(v) for v in range(5, 50, 5))
+#: the synthetic wall spot of the wall_brace rule frame: the wall plane x = 0 facing -x (the robot stands at x < 0 facing +x), the HINGE (the
+#: centre of mass) at z 0 - a map / the validator adds the hinge height above the floor (``T_rule_object`` z + height, as a slab entry's
+#: support z 0 + the support height)
+WALL_RULE_SPOT = {"point": (0.0, 0.0, 0.0), "normal": (-1.0, 0.0, 0.0), "hang_z": 0.0, "wall_protrusion_m": 0.0}
+#: the tilt the wall_brace load's pushed corner is read at (deg; the middle of the task's |delta| range 15-25, A8)
+WALL_LOAD_DELTA_DEG = 20.0
+
+
+def pieces_com(pieces: Sequence[np.ndarray]) -> Optional[List[float]]:
+    """The volume-weighted centre of mass of the object's convex collision pieces (each piece's convex hull; uniform density - what PhysX
+    gives a single-link object), None when no piece has a volume."""
+    import trimesh
+
+    acc, vol = np.zeros(3), 0.0
+    for P in pieces or []:
+        P = np.asarray(P, dtype=float).reshape(-1, 3)
+        if len(P) < 4:
+            continue
+        try:
+            h = trimesh.Trimesh(vertices=P).convex_hull
+        except Exception:  # noqa: BLE001 - a degenerate piece has no volume
+            continue
+        v = float(h.volume)
+        if v > 1e-12:
+            acc += v * np.asarray(h.center_mass, dtype=float)
+            vol += v
+    return None if vol <= 0 else [round(float(x), 6) for x in acc / vol]
+
+
+def wall_tangent(n: th.Tensor, p: th.Tensor, C_: th.Tensor, sign: float) -> th.Tensor:
+    """The unit direction a point ``p`` of the hung target moves in when the leveling push turns it on past level (the leveling turn is -delta
+    about the wall normal ``n`` through the hinge ``C_``: angular velocity -sign(delta) n)."""
+    v = -float(sign) * th.cross(n, p - C_, dim=0)
+    return v / max(float(th.linalg.norm(v)), 1e-9)
+
+
+def build_wall_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any], pieces: Optional[Sequence[np.ndarray]] = None) -> List[Dict[str, Any]]:
+    """i7-brace (owner 3.4): the world_vertical BRACE entries - AlignmentWall's own candidates (``WallGeometry.contacts_for``: the
+    ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns`` braces on the LEVEL (goal) pose, the stop at the
+    goal edge) at the synthetic wall spot :data:`WALL_RULE_SPOT`, keyed by the TILT SIGN (which end is high: the brace side), each recording
+    the start range it stays clear for - ``goal.clear_delta_min_deg`` .. ``clear_delta_max_deg``, the longest contiguous run of
+    :data:`WALL_CLEAR_DELTAS_DEG` at which the task's ``brace_clear`` (2 cm from the tilted hull) holds (``clear_deltas_deg``: every clear
+    grid tilt; the stop at the goal edge clears the tilted hull from some |delta| on). The entry is in the object frame at the level pose
+    (``T_rule_object``: the hinge at z 0, the wall plane x = 0); ``wall`` = the hang facts (the braced point B and its approach, the wall normal,
+    the hinge, the BRACE ARM - the task's ``brace_arm`` of that tilt sign - and the push arm); ``load`` = the leveling push carried on past level
+    (the validator's pusher at the pushed corner ``E_push`` of the :data:`WALL_LOAD_DELTA_DEG` tilt, along the corner's tangent, 3-D in the wall
+    plane) with the braced point's own direction (``brace_direction``: B's motion past level, what the brace stops). The extras are the
+    sampler's brace record's (``placed_at: goal``, ``contact_face: finger_side``, ``pose_class`` = the brace kind: the oracle's
+    ``BraceContact.kind``). Needs the reviewed frame ``params["front_axis"]`` / ``["up_axis"]`` (as the task: no default);
+    ``params["com_local"]`` (the hinge; default the hull centroid - ``build_job`` passes the pieces' volume centroid); the task's generation
+    knobs (``wall_contact_tilt_deg``, ``brace_kinds``, ``brace_offset_m``, ``brace_clearance_m``, ...) from ``knobs``."""
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2.tasks import alignment_wall as AW
+
+    if not params.get("front_axis") or not params.get("up_axis"):
+        raise ValueError("wall_brace: the reviewed frame (params front_axis / up_axis) is required (AlignmentWall: missing_frame)")
+    front, side, up = AW.frame_axes(params["front_axis"], params["up_axis"])
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    g = AW.WallGeometry.standalone(hull, front, side, up, com_local, [th.as_tensor(P, dtype=th.float32) for P in (pieces or [])], params=knobs)
+    spot = {k: (th.tensor(v, dtype=th.float32) if isinstance(v, tuple) else v) for k, v in WALL_RULE_SPOT.items()}
+    deltas = sorted(float(v) for v in (params.get("clear_deltas_deg") or WALL_CLEAR_DELTAS_DEG))
+    _, w_side, h = g.dims()
+    back, thick = g.depth_extents()
+    out = []
+    for sign in (1.0, -1.0):
+        geos = [g.contacts_for(spot, sign * math.radians(d)) for d in deltas]
+        ref = geos[0]
+        if ref.get("no_corner"):
+            continue  # the task pushes the middle of the end: no brace (push-only)
+        T_l = CPZ._mat(ref["pose_level"])
+        Ti = np.linalg.inv(T_l)
+        n = ref["normal"]
+        C_ = ref["C"]
+        # the pushed corner (a material point: read at the load tilt, carried to the level pose) and its tangent past level
+        g_load = g.contacts_for(spot, sign * math.radians(float(params.get("load_delta_deg", WALL_LOAD_DELTA_DEG))))
+        Tt = CPZ._mat(g_load["pose_tilted"])
+        E_obj = np.linalg.inv(Tt)[:3, :3] @ g_load["E_push"].double().numpy() + np.linalg.inv(Tt)[:3, 3]
+        E_l = th.tensor(T_l[:3, :3] @ E_obj + T_l[:3, 3], dtype=th.float32)
+        v_E = wall_tangent(n, E_l, C_, sign)
+        seen = set()
+        for i, b in enumerate(ref["braces"]):
+            # the brace poses live on the level pose: the same at every tilt of this sign (checked)
+            same = all(bool(th.allclose(G_["braces"][i]["pose"][0], b["pose"][0], atol=1e-5)) for G_ in geos if len(G_["braces"]) > i)
+            # the start range: the grid tilts at which the task's brace_clear holds - the longest contiguous run (the stop at the goal edge
+            # clears the tilted hull more the farther it is tilted: a small target's stop is clear from some |delta| on, not from 5 deg)
+            clear = [bool(g.brace_clear(G_, b)) for G_ in geos]
+            ok = [d for d, c in zip(deltas, clear) if c]
+            runs: List[List[float]] = []
+            for k, (d, c) in enumerate(zip(deltas, clear)):
+                if c and k > 0 and clear[k - 1]:
+                    runs[-1].append(d)
+                elif c:
+                    runs.append([d])
+            if not runs or not same:
+                continue
+            run = max(runs, key=lambda r: (len(r), -r[0]))
+            t_min, t_max = run[0], run[-1]
+            cls = f"{'+' if sign > 0 else '-'}tilt_{b['kind']}_{b['wrist']}"
+            while cls in seen:
+                cls += "#"
+            seen.add(cls)
+            e = CPZ.contact_entry("brace", cls, "wall_brace", "brace", T_l, b["pose"], b["pre"],
+                                  {"kind": b["kind"], "wrist": b["wrist"], "tilt_deg": b["tilt_deg"], "face_m": b["face_m"], "pose_class": b["kind"],
+                                   "placed_at": "goal", "contact_face": "finger_side"},
+                                  face_rule="AlignmentWall.contacts_for's brace on the level pose (the stop at the goal edge), in the wall plane",
+                                  object_height=h)
+            Bo = Ti[:3, :3] @ b["B"].double().numpy() + Ti[:3, 3]
+            ao = Ti[:3, :3] @ b["a"].double().numpy()
+            # the leveling push turns the target by -delta about n: past level it carries B on along -sign x n x (B - C)
+            v = wall_tangent(n, b["B"], C_, sign)
+            e["yaw_deg"] = 0.0
+            e["goal"] = {"tilt_sign": sign, "clear_delta_min_deg": t_min, "clear_delta_max_deg": t_max, "clear_deltas_deg": ok, "deltas_deg": deltas}
+            e["wall"] = {"B_object": [round(float(x), 6) for x in Bo], "approach_object": [round(float(x), 6) for x in ao],
+                         "normal_object": [round(float(x), 6) for x in (Ti[:3, :3] @ n.double().numpy())],
+                         "hinge_object": [round(float(x), 6) for x in com_local.tolist()], "brace_arm": ref["brace_arm"], "push_arm": ref["push"]["arm"],
+                         "rule_spot": {k: (list(v) if isinstance(v, tuple) else v) for k, v in WALL_RULE_SPOT.items()},
+                         "back_off_wall_m": round(float(g.wall_offset(spot)), 6), "back_from_com_m": round(back, 6), "thickness_m": round(thick, 6),
+                         # the hinge resistance's extents (AlignmentWall.hinge_resistance: width along the wall x height) and the stop's gap
+                         "extents_perp_m": [round(float(w_side), 6), round(float(h), 6)], "brace_offset_m": float(g.param("brace_offset_m", 0.005))}
+            r_E = float(th.linalg.norm(E_l - C_))
+            r_B = float(th.linalg.norm(b["B"] - C_))
+            e["load"] = {"frame": "object", "kind": "wall_rotation", "direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v_E.double().numpy())],
+                         "point_object": [round(float(x), 6) for x in E_obj], "brace_point_object": [round(float(x), 6) for x in Bo],
+                         "brace_direction": [round(float(x), 6) for x in (Ti[:3, :3] @ v.double().numpy())], "r_push_m": round(r_E, 6), "r_brace_m": round(r_B, 6),
+                         "what": "the leveling push carried on past level: the pusher drives the pushed corner along its tangent about the COM hinge, "
+                                 "turning the braced point into the brace"}
+            out.append(_redigest(e))
+    return out
+
+
 def _obj_pose(Ti: np.ndarray, pose) -> Dict[str, List[float]]:
     from ispatialgym.sampling.v2 import contact_poses as CPZ
 
@@ -371,7 +634,8 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
                   "missing": "iors_large_nextto's face points (the push lanes) are sampler logic; the hand poses are shared (base_push_hand_poses)"},
     "wall_push": {"kind": "push", "arm_role": "work", "builder": None, "scope": "world_vertical (library only)",
                   "missing": "the wall layout (hinge corner, E_low, the arc) is alignment_wall sampler logic; the pose is shared (wall_contact_pose)"},
-    "wall_brace": {"kind": "brace", "arm_role": "brace", "builder": None, "scope": "world_vertical (library only)", "missing": "as wall_push"},
+    "wall_brace": {"kind": "brace", "arm_role": "brace", "builder": build_wall_brace, "needs_pieces": True,
+                   "scope": "alignment-world_vertical 01-05: the brace holding the hung target at its level goal (i7-brace, owner 3.4)"},
 }
 
 
@@ -444,6 +708,18 @@ def resolved_knobs(family: str, knobs: Dict[str, Any], subtask: Optional[str]) -
     return {k: v for k, v in out.items() if v is not None}
 
 
+def _settled_switch_on() -> bool:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.axial_settled_rest_on()
+
+
+def _upright(rest) -> bool:
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+
+    return CPZ.axial_rest_upright(np.asarray(rest.quat_xyzw, dtype=float))
+
+
 def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, Any]]:
     """The push / brace libraries (``{kind: library}``) of one job: ``{"id", category / model / scale / entry, "families": [...],
     "generation": {knobs of the alias family}, "subtask", "params": {family: {stroke_m, yaws, turn_deg, long_axis, com_local}}}``."""
@@ -464,8 +740,18 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
             raise NotImplementedError(f"family {fam}: {spec['missing']}")
         knobs = dict(job.get("generation") or {})
         params = dict((job.get("params") or {}).get(fam) or {}, subtask=job.get("subtask"))
+        if fam in ("axial_push", "axial_brace") and _settled_switch_on() and not _upright(rest):
+            # i7-axialrest: the library's identity carries the switch only where it changes the build - a TILTED rest (refused without the
+            # switch); an upright rest builds today's identity-rest library under the switch too (owner 2026-11-08 item 3), its identity unchanged
+            params["settled_rest"] = True
+        if spec.get("needs_pieces") and params.get("com_local") is None:
+            # i7-brace: the hinge at the pieces' volume centroid (the task hinges the target at its PhysX COM), else the hull centroid
+            com = pieces_com(_pieces(geom))
+            if com is not None:
+                params["com_local"] = com
+                params["com_rule"] = "the collision pieces' volume centroid (pieces_com)"
         t0 = time.time()
-        entries = spec["builder"](pts, rest, knobs, params)
+        entries = (spec["builder"](pts, rest, knobs, params, pieces=_pieces(geom)) if spec.get("needs_pieces") else spec["builder"](pts, rest, knobs, params))
         lib_k = out.setdefault(spec["kind"], {"schema": LIB_SCHEMA, "kind": spec["kind"], "object": obj, "families": {}, "entries": [], "created": S.now()})
         lib_k["families"][fam] = {"arm_role": spec["arm_role"], "scope": spec["scope"], "knobs": resolved_knobs(fam, knobs, job.get("subtask") or TOUCHING_SUBTASK),
                                   "params": {k: v for k, v in params.items() if k != "subtask"}, "frame": "rule frame: +x the robot's forward, +y its left; support z 0",
@@ -476,6 +762,15 @@ def build_job(job: Dict[str, Any], glib: Optional[str]) -> Dict[str, Dict[str, A
         # the validation setup of the alias family (the support height the trials stand the object at; not part of the library's identity)
         lib_k["validate"] = dict(job.get("validate") or {})
         lib_k["digest"] = _library_digest(lib_k)
+    return out
+
+
+def _pieces(geom) -> List[np.ndarray]:
+    """The object's collision pieces' vertices (root frame) when the geometry carries them (the wall contacts' material cut)."""
+    out = []
+    for p in getattr(geom, "pieces", None) or []:
+        v = getattr(p, "vertices", p)
+        out.append(np.asarray(v, dtype=float).reshape(-1, 3))
     return out
 
 

@@ -324,6 +324,96 @@ def support_hull_fallback_min_m() -> float:
     return float(v) if v else HULL_FALLBACK_MIN_CLEARANCE_M
 
 
+#: i7-camhull 2026-11-08 (owner_20261108g item 1, an APPROVED shared-gate change behind this switch; the default is the owner's after the
+#: A/B - DEFAULT ON since the lead's decision #5 of 2026-11-08, owner away): the side_9 two-step of :data:`SUPPORT_HULL_FALLBACK_ENV` for the WRIST CAMERA against the POLICED support in the general pick
+#: check. ``orient.camera_clear`` (the camera's padded spheres keep ``orient.CAMERA_MARGIN`` = 5 mm from the world at a grasp
+#: configuration, its support and the contacted object present) stays the screen; a NARROW failure - the camera's spheres clear at that
+#: margin less the model's 2 mm sphere buffer, and clear at the full margin with the policed supports out of the world (the touch is
+#: theirs alone) - is judged by the camera's exact hull against the policed supports' registered planes with at least
+#: :func:`support_hull_fallback_min_m` (0.5 mm) of real clearance, by the same reusable check (``contact_policy.hull_fallback``,
+#: :meth:`IKChecker._hull_fallback`). The policed supports are those the support policy polices at that very configuration
+#: (:meth:`IKChecker._note_policed`, recorded by :meth:`IKChecker.exact`); a configuration without one keeps today's verdict. Neither the
+#: support policy's own sphere stage (:data:`SUPPORT_HULL_FALLBACK_ENV`) nor FingerTouch (i7-ft2's ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS``)
+#: is touched: this is the separate 5 mm camera rule, so no verdict is judged by two fallbacks. The camera's support-top screen
+#: (``tabletop.wrist_camera_clearance`` < 5 mm) has its own switch (:data:`CAMERA_TOP_HULL_FALLBACK_ENV`, default off). ``0`` off (today's rule before the flip) / ``shadow`` (judged and counted, the verdict unchanged) / ``1`` on (the default); kit
+#: counters ``camera_policy.hull_fallback_{checked, passed, shadow_pass, failed.<why>}``, one ``CAMERA_HULL_FALLBACK`` line per judgement.
+CAMERA_HULL_FALLBACK_ENV = "ISPATIALGYM_CAMERA_HULL_FALLBACK"
+CAMERA_HULL_FALLBACK_DEFAULT = "1"  # lead decision 2026-11-08 (owner away, delegated; lead_decisions_while_away #5) after the A/B; "0" = the former rule
+#: version of the camera rule's measurement (the cache identity under ``1``)
+CAMERA_HULL_FALLBACK_VERSION = 1
+
+
+def camera_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`CAMERA_HULL_FALLBACK_ENV`; unset = :data:`CAMERA_HULL_FALLBACK_DEFAULT`)."""
+    v = (os.environ.get(CAMERA_HULL_FALLBACK_ENV, "") or CAMERA_HULL_FALLBACK_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
+#: i7-t03 2026-11-08 (owner request item 2, shared gate APPROVED: switch -> count -> default after the owner sees the count): the pieces a
+#: support split keeps in the world (the side board a book leans on, the walls, the board above; ``support_split.Plan``) are FINGER-ONLY
+#: contact - the finger collision shapes (``hand_geometry.role_links(arm)["finger"]``) may TOUCH them (clearance >= 0 on the fingers' exact
+#: hulls, never judged on the padded spheres) but not penetrate; every other part keeps the obstacle rule (its spheres clear at margin 0);
+#: the policed plane keeps its 2 mm and FingerTouch is unchanged. ``1`` on / ``shadow`` (judge and count, verdict unchanged) / ``0`` off.
+SPLIT_FINGER_TOUCH_ENV = "ISPATIALGYM_SPLIT_FINGER_TOUCH"
+#: i7-t03 2026-11-08 (owner request item 3: the side_9 rule of i7-plateqtf2, ``_hull_fallback`` / :data:`HULL_FALLBACK_MIN_CLEARANCE_M`,
+#: extended to (a) the split-off pieces and (b) the exact-IK witness at the pre-grasp / grasp): when the padded spheres fail NARROWLY - only
+#: the hand's rigid links (palm, wrist camera, wrist), each less than the model's sphere buffer (``contact_policy.MODEL_SPHERE_BUFFER_M``)
+#: deep - those links are judged by their EXACT hulls against the obstacle's convex pieces with :func:`support_hull_fallback_min_m` of real
+#: clearance; arm / torso / base keep their spheres. ``1`` on / ``shadow`` / ``0`` off (default).
+WITNESS_HULL_FALLBACK_ENV = "ISPATIALGYM_WITNESS_HULL_FALLBACK"
+#: version of the two rules' measurement (the exact-IK cache scope while either is on)
+CONTACT_REJUDGE_VERSION = 1
+
+
+def _tri_mode(env: str) -> str:
+    v = os.environ.get(env, "").strip().lower()
+    if v in ("", "0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
+#: i7-camhull 2026-11-08 (lead decision #6, owner away: build behind a SEPARATE default-off switch; the default stays the owner's): the same
+#: two-step for the wrist camera's SUPPORT-TOP screen - ``tabletop.wrist_camera_clearance`` (the camera's 3 padded spheres modelled in the eef
+#: frame) must keep ``tabletop.TWIN_CAMERA_CLEARANCE_M`` = 5 mm above the grasp's support top. A NARROW refusal (those spheres still >= 5 mm
+#: less the model's 2 mm buffer above it) passes when the camera's exact hull clears that plane by :func:`support_hull_fallback_min_m`
+#: (0.5 mm; ``contact_policy.hull_fallback``, :meth:`IKChecker.camera_top_fallback`). Callers: ``tabletop.pick_twin`` and
+#: ``tabletop.camera_top_clear`` (attachment / iors_small / disembedding picks). ``0`` off (the default) / ``shadow`` (judged and counted,
+#: the verdict unchanged) / ``1`` on; counters ``camera_policy.top_screen.{checked, passed, shadow_pass, failed.<why>}``, one
+#: ``CAMERA_TOP_SCREEN`` line per judgement.
+CAMERA_TOP_HULL_FALLBACK_ENV = "ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK"
+CAMERA_TOP_HULL_FALLBACK_DEFAULT = "0"
+
+
+def camera_top_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`CAMERA_TOP_HULL_FALLBACK_ENV`; unset = :data:`CAMERA_TOP_HULL_FALLBACK_DEFAULT`)."""
+    v = (os.environ.get(CAMERA_TOP_HULL_FALLBACK_ENV, "") or CAMERA_TOP_HULL_FALLBACK_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
+def _q_key(q: Any) -> Tuple[float, ...]:
+    """A configuration's identity for :meth:`IKChecker._note_policed` (every joint, 1e-5 rad / m)."""
+    return tuple(round(float(v), 5) for v in G.t(q).reshape(-1).tolist())
+
+
+def split_finger_touch_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` of :data:`SPLIT_FINGER_TOUCH_ENV` (default off)."""
+    return _tri_mode(SPLIT_FINGER_TOUCH_ENV)
+
+
+def witness_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` of :data:`WITNESS_HULL_FALLBACK_ENV` (default off)."""
+    return _tri_mode(WITNESS_HULL_FALLBACK_ENV)
+
+
+def contact_rejudge_on() -> bool:
+    """Either i7-t03 contact rule (items 2 / 3) on or in shadow: :meth:`IKChecker.contact_rejudge` runs."""
+    return split_finger_touch_mode() != "off" or witness_hull_fallback_mode() != "off"
+
+
 def registered_supports_only() -> bool:
     """of-v2maps 2026-11-07 (owner prompt "supports with protrusions": what counts as the support plane, the policy unchanged): the support
     policy polices only the supports whose plane the sampler REGISTERED (``IKChecker.support_plane_z``: a map hit's measured top, a tray floor,
@@ -444,6 +534,25 @@ FINGER_TOUCH_RULE_ENV = "ISPATIALGYM_FINGER_TOUCH_RULE"
 FINGER_TOUCH_RULES = ("spheres", "geometry")
 #: version of the geometry rule's measurement (part of the cache scope under "geometry")
 FINGER_TOUCH_GEOMETRY_VERSION = 1
+
+#: i7-ft2 2026-11-08 (owner decision 7.1: "apply your two-step to the FingerTouch path"): the geometry rule's non-finger stage judges the
+#: hand's rigid links (palm, wrist camera + mount, wrist: the links with exact hulls) as the support policy's hull fallback does
+#: (i7-plateqtf2, ``contact_policy.hull_fallback``): the padded spheres stay the screen; a NARROW sphere failure (only hand links, each sphere
+#: less than the model's 2 mm buffer deep, only into the touched support) passes when their exact hulls clear the touched support by
+#: :func:`support_hull_fallback_min_m` (0.5 mm, side_9's); a configuration whose spheres PASS must also have those hulls clear of it by the
+#: policy's ``hand_support_margin_m`` (the spec's P1 §3: hulls AND spheres). ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = ``1`` on (the
+#: default since the A/B ft2hh_sh / ft2hh_on of 2026-11-08) / ``shadow`` (judged and counted, verdict unchanged) / ``0`` off; kit counters
+#: ``finger_touch.hand_hulls.*``.
+FINGER_TOUCH_HAND_HULLS_ENV = "ISPATIALGYM_FINGER_TOUCH_HAND_HULLS"
+FINGER_TOUCH_HAND_HULLS_DEFAULT = "1"  # i7-ft2: owner 7.1 decided to apply it; flipped after the A/B (separate commit)
+
+
+def finger_touch_hand_hulls_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`FINGER_TOUCH_HAND_HULLS_ENV`; unset = :data:`FINGER_TOUCH_HAND_HULLS_DEFAULT`)."""
+    v = (os.environ.get(FINGER_TOUCH_HAND_HULLS_ENV, "") or FINGER_TOUCH_HAND_HULLS_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
 
 
 #: i7-fingertouch A/B (2026-11-07, owner part B item 2): ``=1`` judges every configuration the active rule judges under the OTHER rule too
@@ -581,6 +690,15 @@ def finger_touch_params(value: Any) -> Optional[Dict[str, Any]]:
     return out
 
 
+#: i7-t03 round 7 (LEAD DECISION #37; log only, DEFAULT OFF): :meth:`IKChecker.track_chain`'s "end configuration collides" verdict logs
+#: ``TRACKED_END_BLAME`` with :meth:`IKChecker._collision_blame` (the colliding object or self-collision pair); verdicts unchanged
+TRACKED_END_BLAME_ENV = "ISPATIALGYM_TRACKED_END_BLAME"
+
+
+def tracked_end_blame_on() -> bool:
+    return os.environ.get(TRACKED_END_BLAME_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 @dataclass
 class IKResult:
     ok: bool
@@ -641,6 +759,17 @@ class IKChecker:
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
         self.last_track_stall: Optional[Dict[str, Any]] = None  # where the last ``track_chain`` stalled (``continue_chain`` callers' partial rule)
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
+        #: i7-camhull (:data:`CAMERA_HULL_FALLBACK_ENV`): (arm, :func:`_q_key`) -> the supports the policy polices at that exact-IK result
+        self._policed_at: Dict[Tuple[str, Tuple[float, ...]], List[Any]] = {}
+        # under 1 (the default since the flip) the identity stays: a cached verdict written under the former rule (a persisted failure memo, a
+        # start-draw cell) must not satisfy this one; shadow / off keep the former keys; never an exact-IK key
+        if camera_hull_fallback_mode() == "on":
+            self.cache_scope["camera_hull_fallback"] = [round(support_hull_fallback_min_m(), 5), CAMERA_HULL_FALLBACK_VERSION]
+        if camera_top_hull_fallback_mode() == "on":  # i7-camhull (the support-top screen): only when it changes verdicts; never an exact-IK key
+            self.cache_scope["camera_top_hull_fallback"] = [round(support_hull_fallback_min_m(), 5), CAMERA_HULL_FALLBACK_VERSION]
+        m2, m3 = split_finger_touch_mode(), witness_hull_fallback_mode()
+        if "on" in (m2, m3):  # i7-t03: another verdict - never shared with the rules off (shadow changes no verdict: the keys stay)
+            self.cache_scope["contact_rejudge"] = [m2, m3, round(support_hull_fallback_min_m(), 5), CONTACT_REJUDGE_VERSION]
 
     def _holding(self, arm: str) -> bool:
         """``arm`` has an object attached in the planner (``navigation.attached`` / ``R1ProCuRobo.attach_object``: a place, carry or release
@@ -791,7 +920,8 @@ class IKChecker:
                 return out
         return out
 
-    def _hull_fallback(self, q: th.Tensor, arm: str, others: Sequence[str], supports: Sequence[Any], floors: set) -> Dict[str, Any]:
+    def _hull_fallback(self, q: th.Tensor, arm: str, others: Sequence[str], supports: Sequence[Any], floors: set, margin: Optional[float] = None,
+                       roles: Optional[Sequence[str]] = None, prefix: str = "support_policy.hull_fallback", mode: Optional[str] = None) -> Dict[str, Any]:
         """The hull fallback of the sphere stage (:data:`SUPPORT_HULL_FALLBACK_ENV`, i7-plateqtf2 owner item 1), called inside the policy's
         ignore context after the spheres of ``others`` failed: ``{"ok", "why", "hull_min_m", "links"}``. Narrow = every link but the hand's
         rigid links clear at the policy's sphere margin, the hand's rigid links clear at that margin less the model's sphere buffer, and
@@ -799,11 +929,17 @@ class IKChecker:
         their exact hulls (``contact_policy.HandChecker``: vertices + face samples) clear of every policed support's plane by
         :func:`support_hull_fallback_min_m`. A floor support (rule 5) or a support without a plane never takes the fallback. Kit counters
         ``support_policy.hull_fallback_passed`` / ``.hull_fallback_shadow_pass`` / ``.hull_fallback_failed.<why>``. The check itself is the
-        reusable ``contact_policy.hull_fallback`` (the links that failed, the geometry, the threshold)."""
+        reusable ``contact_policy.hull_fallback`` (the links that failed, the geometry, the threshold). i7-camhull (owner_20261108g item 1,
+        :meth:`camera_hull_fallback`): the same check for another sphere rule - ``margin`` (default the policy's sphere margin), the hull
+        ``roles`` judged (default ``contact_policy.HULL_FALLBACK_ROLES``), the counters' ``prefix`` and the switch ``mode`` (default
+        :func:`support_hull_fallback_mode`); the defaults are the support policy's, unchanged."""
         from ispatialgym.grasping import contact_policy as CP
         from ispatialgym.oracle import r1pro_model as M
 
         thr = support_hull_fallback_min_m()
+        mode = support_hull_fallback_mode() if mode is None else mode
+        margin = float(CP.DEFAULT.sphere_support_margin_m) if margin is None else float(margin)
+        roles = tuple(CP.HULL_FALLBACK_ROLES if roles is None else roles)
         if any(getattr(sp, "name", None) in floors for sp in supports):
             out: Dict[str, Any] = {"ok": False, "why": "floor", "hull_min_m": None, "min_m": thr}
         else:
@@ -818,15 +954,112 @@ class IKChecker:
             T[:3, :3] = _quat_mat(G.t(eef[1]).float())
             T[:3, 3] = G.t(eef[0]).float()
             fq = float(getattr(self, "_policy_opening", None) or float(G.t(q)[self.kit.robot.gripper_control_idx[arm]].float().mean()))
-            out = CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(q, list(links), m)[0]), list(others), CP.DEFAULT.hand_rigid_links(arm), hc, T,
-                                   geometry if len(geometry) == len(tops) else [], threshold=thr, finger_q=(fq, fq),
-                                   margin=float(CP.DEFAULT.sphere_support_margin_m), geometry_out=lambda: self.ignoring(list(supports)))
+
+            def check(geom, gout):
+                return CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(q, list(links), m)[0]), list(others), CP.DEFAULT.hand_rigid_links(arm), hc, T,
+                                        geom, threshold=thr, finger_q=(fq, fq), margin=margin, geometry_out=gout, roles=roles)
+
+            planes_ok = len(geometry) == len(tops)
+            out = check(geometry if planes_ok else [], lambda: self.ignoring(list(supports)))
+            mode3 = witness_hull_fallback_mode()
+            if out["why"] == "other_obstacle" and planes_ok and mode3 != "off" and SS.split_on():
+                # i7-t03 2026-11-08 (owner item 3a, ISPATIALGYM_WITNESS_HULL_FALLBACK, default off): the hand failed on the pieces the support
+                # split keeps (the policed support's walls / side board) - the same check with the WHOLE support out of the sphere world and
+                # those pieces' convex hulls added to the geometry
+                kept = [(sp, SS.plan_for(self, sp, count=False)) for sp in supports]
+                kept = [(sp, pl) for sp, pl in kept if pl is not None and pl.kept and not pl.clips]
+                kept_geoms = [self._pieces_geometry(sp, frozenset(p for p, _ in SS._pieces(sp)) - pl.off) for sp, pl in kept]
+                if kept and all(g is not None for g in kept_geoms):
+                    out3 = check(geometry + kept_geoms, lambda: self.ignoring(list(supports), split=False))
+                    out["split_pieces"] = {"why": out3["why"], "hull_min_m": out3["hull_min_m"]}
+                    if out3["ok"]:
+                        if mode3 == "on":
+                            self._count("witness.hull_fallback_passed")
+                            out = dict(out3, split_pieces=True)
+                        else:
+                            self._count("witness.hull_fallback_shadow_pass")
+                    else:
+                        self._count(f"witness.hull_fallback_failed.{out3['why']}")
             if out["why"] == "no_geometry":
                 out["why"] = "no_plane"
         if not out["ok"]:
-            self._count(f"support_policy.hull_fallback_failed.{out['why']}")
+            self._count(f"{prefix}_failed.{out['why']}")
             return out
-        self._count("support_policy.hull_fallback_shadow_pass" if support_hull_fallback_mode() == "shadow" else "support_policy.hull_fallback_passed")
+        self._count(f"{prefix}_shadow_pass" if mode == "shadow" else f"{prefix}_passed")
+        return out
+
+    # -- i7-camhull 2026-11-08 (owner_20261108g item 1): the wrist camera's 5 mm rule against the policed support ------------------------
+
+    def _note_policed(self, q: Optional[th.Tensor], arm: str, ignore_for_last: Sequence[Any], approached: Optional[Sequence[Any]], last_pose: Pose) -> None:
+        """Remember the supports the support policy polices at an exact-IK result ``q`` (its last pose's ignore set less the approached
+        objects, registered planes only: :func:`policed_supports`), for :meth:`camera_hull_fallback`. Nothing with
+        :data:`CAMERA_HULL_FALLBACK_ENV` off, the policy off / out of scope (a held object) or no policed support."""
+        if q is None or not ignore_for_last or camera_hull_fallback_mode() == "off" or not support_policy_on() \
+                or (support_policy_scope() == "grasp" and self._holding(arm)):
+            return
+        appr = approached if approached is not None else self.approached_objects(last_pose)
+        sup = policed_supports(list(ignore_for_last), appr, planes=dict(getattr(self, "support_plane_z", None) or {}))
+        if not sup:
+            return
+        d = self.__dict__.setdefault("_policed_at", {})
+        if len(d) > 4096:
+            d.clear()
+        d[(arm, _q_key(q))] = list(sup)
+
+    def camera_hull_fallback(self, q: th.Tensor, arm: str, margin: float, mode: Optional[str] = None) -> Dict[str, Any]:
+        """:data:`CAMERA_HULL_FALLBACK_ENV`: ``orient.camera_clear``'s spheres failed at ``q`` (the wrist camera within ``margin`` of the
+        world). The policed supports of that exact-IK result (:meth:`_note_policed`; none: ``no_policed_support``, today's verdict) judged by
+        :meth:`_hull_fallback` for the camera link alone: narrow = the camera's spheres clear at ``margin`` less the model's sphere buffer and
+        at ``margin`` with those supports out of the world; then the camera's exact hull (role ``wrist_camera``) clear of their registered
+        planes by :func:`support_hull_fallback_min_m`. ``{"ok", "why", "hull_min_m", "min_m"}``; counters ``camera_policy.hull_fallback_*``
+        and one ``CAMERA_HULL_FALLBACK`` line."""
+        import json as _json
+
+        mode = camera_hull_fallback_mode() if mode is None else mode
+        self._count("camera_policy.hull_fallback_checked")
+        sup = (getattr(self, "_policed_at", None) or {}).get((arm, _q_key(q)))
+        if not sup:
+            self._count("camera_policy.hull_fallback_failed.no_policed_support")
+            out: Dict[str, Any] = {"ok": False, "why": "no_policed_support", "hull_min_m": None, "min_m": support_hull_fallback_min_m()}
+        else:
+            out = self._hull_fallback(q, arm, [f"{arm}_realsense_link"], sup, floor_support_names(self), margin=float(margin), roles=("wrist_camera",),
+                                      prefix="camera_policy.hull_fallback", mode=mode)
+        hm = out.get("hull_min_m")
+        log.info("CAMERA_HULL_FALLBACK %s", _json.dumps({"mode": mode, "arm": arm, "ok": bool(out["ok"]), "why": out["why"],
+                                                         "hull_min_mm": None if hm is None else round(1000 * float(hm), 2),
+                                                         "min_mm": round(1000 * float(out["min_m"]), 2), "margin_mm": round(1000 * float(margin), 2),
+                                                         "supports": [getattr(sp, "name", "?") for sp in (sup or [])]}))
+        return out
+
+    def camera_top_fallback(self, eef: Pose, plane_z: float, arm: str, clearance: float, margin: float, mode: Optional[str] = None) -> Dict[str, Any]:
+        """:data:`CAMERA_TOP_HULL_FALLBACK_ENV`: the camera's support-top screen (``tabletop.wrist_camera_clearance`` = ``clearance`` <
+        ``margin`` above the plane ``plane_z`` at the eef pose ``eef``) refused. Narrow = ``clearance`` >= ``margin`` less the model's sphere
+        buffer; then the camera's exact hull (role ``wrist_camera``) clear of that plane by :func:`support_hull_fallback_min_m`
+        (``contact_policy.hull_fallback``). ``{"ok", "why", "hull_min_m", "min_m"}`` - ``ok`` is the rule's judgement (the caller applies it
+        only under ``1``). Counters ``camera_policy.top_screen.{checked, passed, shadow_pass, failed.<why>}``, one ``CAMERA_TOP_SCREEN`` line."""
+        import json as _json
+
+        from ispatialgym.grasping import contact_policy as CP
+
+        mode = camera_top_hull_fallback_mode() if mode is None else mode
+        self._count("camera_policy.top_screen.checked")
+        hc = getattr(self, "_hand_checker", None)
+        if hc is None or hc.arm != arm:
+            hc = self._hand_checker = CP.HandChecker(arm, CP.DEFAULT)
+        T = th.eye(4)
+        T[:3, :3] = _quat_mat(G.t(eef[1]).float())
+        T[:3, 3] = G.t(eef[0]).float()
+        out = CP.hull_fallback(lambda links, m: float(clearance) >= float(m) - 1e-9, [f"{arm}_realsense_link"], CP.DEFAULT.hand_rigid_links(arm), hc, T,
+                               [CP.Support.plane(float(plane_z), name="support_top")], threshold=support_hull_fallback_min_m(), margin=float(margin),
+                               roles=("wrist_camera",))
+        if out["ok"]:
+            self._count("camera_policy.top_screen.shadow_pass" if mode == "shadow" else "camera_policy.top_screen.passed")
+        else:
+            self._count(f"camera_policy.top_screen.failed.{out['why']}")
+        hm = out.get("hull_min_m")
+        log.info("CAMERA_TOP_SCREEN %s", _json.dumps({"mode": mode, "arm": arm, "would_pass": bool(out["ok"]), "why": out["why"],
+                                                      "spheres_mm": round(1000 * float(clearance), 2),
+                                                      "hull_min_mm": None if hm is None else round(1000 * float(hm), 2)}))
         return out
 
     @contextmanager
@@ -852,6 +1085,8 @@ class IKChecker:
 
             self.cache_scope["finger_touch"] = ["geometry", round(CP.DEFAULT.finger_support_max_penetration_m, 4), round(CP.DEFAULT.sphere_support_margin_m, 4),
                                                 bool(touch.preshape), FINGER_TOUCH_GEOMETRY_VERSION]
+            if finger_touch_hand_hulls_mode() == "on":  # i7-ft2: only when it changes verdicts (shadow / off keep the key)
+                self.cache_scope["finger_touch"] += ["hand_hulls", round(support_hull_fallback_min_m(), 5), round(CP.DEFAULT.hand_support_margin_m, 5)]
         else:
             self.cache_scope["finger_touch"] = [round(touch.margin_m, 4), round(touch.max_penetration_m, 4), bool(touch.preshape)]
 
@@ -895,7 +1130,22 @@ class IKChecker:
         Wherever the sampler ignores a support - grasp chains, the approach tail, places, lifts, releases, the program check - whether or
         not the contact policy is on. ``split=False``: every object whole (diagnostics that ask "with these objects out of the world")."""
         resolver = (lambda o: SS.plan_for(self, o)) if (split and SS.split_on()) else None
-        return _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
+        ctx = _Ignoring(self.kit, list(objs), ground=ground, ground_meshes=ground_meshes, split=resolver)
+        if not contact_rejudge_on():
+            return ctx
+        return self._tracked_ignoring(ctx, list(objs), resolver is not None)
+
+    @contextmanager
+    def _tracked_ignoring(self, ctx: Any, objs: List[Any], split: bool):
+        """i7-t03: :meth:`ignoring` that records its objects while active (``_ignore_stack``: what :meth:`contact_rejudge` reads when a
+        witness is judged inside the context). Used only while an i7-t03 contact rule is on."""
+        stack = self.__dict__.setdefault("_ignore_stack", [])
+        with ctx:
+            stack.append((objs, split))
+            try:
+                yield ctx
+            finally:
+                stack.pop()
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -921,7 +1171,11 @@ class IKChecker:
             return False
         if float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0]))) > self.WITNESS_POS_TOL or G.quat_angle(eef[1], G.t(pose[1])) > self.WITNESS_ANG_TOL:
             return False
-        return bool(self.kit.collision_free(q, margin=0.0)[0])
+        if bool(self.kit.collision_free(q, margin=0.0)[0]):
+            return True
+        # i7-t03 2026-11-08 (items 2 / 3, default off): a witness that collides only through the fingers touching a split-off piece or the
+        # hand's rigid links narrowly inside the sphere buffer is judged by the exact hulls
+        return bool(contact_rejudge_on() and bool(self.contact_rejudge(q, arm, None, where="witness")[0]))
 
     def collision_free_at(self, q: th.Tensor, pose: Pose, arm: str, ignore: Sequence[Any] = ()) -> bool:
         """``q`` (a configuration ``exact`` returned) reaches ``pose`` and is collision-free in the CURRENT world with
@@ -1207,6 +1461,7 @@ class IKChecker:
                         for p, q_v in zip(poses, verified):
                             self.solutions[(arm, self._pose_key(p))] = q_v.clone()
                         log.debug("exact IK cache hit verified (%d poses, arm %s)", len(poses), arm)
+                        self._note_policed(verified[-1], arm, ignore_for_last, approached, poses[-1])  # i7-camhull (switch on / shadow only)
                         return IKResult(True, verified[-1], "cache", len(poses))
                 log.debug("exact IK cache entry not verified in the current world (%d chains): solving", len(chains))
         q = None
@@ -1286,6 +1541,8 @@ class IKChecker:
                             q = self._solve_exact(p, q_alt, arm)
                             if q is not None:
                                 break
+                    if q is None and contact_rejudge_on():
+                        q = self._solve_rejudged(p, q_near, arm)  # i7-t03 items 2 / 3 (default off)
                 if q is None:
                     why = f"exact IK failed at pose {i + 1} of {n}"
                     break
@@ -1332,6 +1589,8 @@ class IKChecker:
                 self._last_policy_fail = {"q": q.clone(), "ev": ev_p, "n": len(poses), "pose": poses[-1]}
                 q, why = None, f"support_policy: {why_p}"
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
+        if res.ok:
+            self._note_policed(q, arm, ignore_for_last, approached, poses[-1])  # i7-camhull (switch on / shadow only)
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
             chain = [None if x is None else x.tolist() for x in qs]
             entry = {"ok": True, "q": q.tolist(), "qs": chain}
@@ -1354,6 +1613,8 @@ class IKChecker:
                 out["rooms"] = list(self.cache_scope["full_rooms"])  # the full world's key (its scope's rooms are the rooms it loads)
         else:
             out = {k: v for k, v in self.cache_scope.items() if k != "full_rooms"}
+        out.pop("camera_hull_fallback", None)  # i7-camhull: an exact-IK witness does not depend on the camera rules (checked after it)
+        out.pop("camera_top_hull_fallback", None)
         return with_policy_scope(out)
 
 
@@ -1733,6 +1994,12 @@ class IKChecker:
             ign = list(ignore_mid) + list(extra)
             with self.ignoring(ign):
                 free = self.kit.collision_free(traj[idxs], margin=0.0)
+            if not bool(free.all()) and contact_rejudge_on():  # i7-t03 items 2 / 3 (default off)
+                hit = [j for j, f in enumerate(free.tolist()) if not f]
+                rj = self.contact_rejudge(traj[[idxs[j] for j in hit]], arm, ign, where="track")
+                free = free.clone()
+                for j, ok_j in zip(hit, rj.tolist()):
+                    free[j] = bool(ok_j)
             present = [o for o in touch if all(o is not x for x in ign)]
             if not bool(free.all()) and present:
                 hit = [j for j, f in enumerate(free.tolist()) if not f]
@@ -1751,6 +2018,8 @@ class IKChecker:
         ign = list(ignore_mid) + list(ignore_end)
         with self.ignoring(ign):
             end_free = bool(self.kit.collision_free(traj[-1], margin=0.0)[0])
+        if not end_free and contact_rejudge_on():  # i7-t03 items 2 / 3 (default off)
+            end_free = bool(self.contact_rejudge(traj[-1:], arm, ign, where="track")[0])
         present = [o for o in touch if all(o is not x for x in ign)]
         if not end_free and present:
             # the program check's grasp approach is 3 segments: the first two end with the support in the world
@@ -1952,7 +2221,9 @@ class IKChecker:
 
         (a) the whole body collision-free at margin 0 with ``touch`` removed too (every other object, self-collision) - as the sphere rule;
         (b) the contact policy's sphere stage: every link but ``arm``'s finger links clear of the world WITH ``touch`` at
-            ``CP.DEFAULT.sphere_support_margin_m`` (the palm, camera, wrist, arm, torso, base against the support);
+            ``CP.DEFAULT.sphere_support_margin_m`` (the palm, camera, wrist, arm, torso, base against the support); i7-ft2 (owner 7.1,
+            :data:`FINGER_TOUCH_HAND_HULLS_ENV` on): the hand's rigid links also by their exact hulls - a narrow sphere failure passes on
+            the hull fallback, a sphere pass needs the hulls clear (:meth:`_finger_touch_hand_hulls`);
         (c) the contact policy's finger rule: the finger collision HULLS (``HandChecker``; at the oracle's pre-shape when
             ``FingerTouch.preshape``, else the configuration's opening) at most ``CP.DEFAULT.finger_support_max_penetration_m`` (2 mm) into
             every touched support (:func:`finger_hull_clearance` >= -0.002 m), measured by :meth:`_touch_geometry`: the support's
@@ -1974,19 +2245,41 @@ class IKChecker:
         count = (lambda *a: None) if quiet else self._count
         count("finger_touch.geometry.checked", n)
         with self.ignoring(list(ignored) + list(touch)):
-            ok = self.kit.collision_free(qs, margin=0.0).clone()
-        n_body = int((~ok).sum())
+            body = self.kit.collision_free(qs, margin=0.0).clone().to(th.bool).cpu()
+        n_body = int((~body).sum())
         with self.ignoring(list(ignored)):
-            ok &= self.kit.links_clear(qs, others, pol.sphere_support_margin_m)
-        n_links = int((~ok).sum()) - n_body
+            sph = self.kit.links_clear(qs, others, pol.sphere_support_margin_m).clone().to(th.bool).cpu()
         allow = float(pol.finger_support_max_penetration_m)
         opening = ft.opening() if ft.preshape else None
         grip = self.kit.robot.gripper_control_idx[arm]
         geoms = [self._touch_geometry(sp) for sp in touch]
+        # i7-ft2 (owner 7.1): the hand's rigid links by their exact hulls - the fallback on a narrow sphere failure, the spec's hull check on a pass
+        mode = finger_touch_hand_hulls_mode()
+        links_new = sph.clone()
+        hh_notes: List[Dict[str, Any]] = []
+        if mode != "off":
+            hc_h = self._touch_hand_checker(arm)
+            for i in th.nonzero(body).flatten().tolist():
+                fq = float(opening) if opening is not None else float(qs[i, grip].float().mean())
+                hh = self._finger_touch_hand_hulls(qs[i], arm, ignored, touch, others, geoms, hc_h, fq, bool(sph[i]), count)
+                links_new[i] = bool(hh["ok"])
+                if bool(hh["ok"]) != bool(sph[i]):
+                    hh_notes.append(hh)
+        ok = body & (links_new if mode == "on" else sph)
+        n_links = int((body & ~(links_new if mode == "on" else sph)).sum())
+        cand = body & (sph | links_new)  # the fingers are judged wherever either variant of the non-finger stage passes (the counts below)
+        fing = th.zeros(n, dtype=th.bool)
         deepest, refused, unmeasured = 0.0, [], 0
-        idx = th.nonzero(ok).flatten().tolist()
+        idx = th.nonzero(cand).flatten().tolist()
         hc = self._touch_hand_checker(arm) if idx else None
         for i in idx:
+            if not bool(ok[i]):  # judged only for the counts (the other variant's verdict): no refusal record
+                g_ok = all(g is not None for g, _ in geoms)
+                if g_ok:
+                    fq = float(opening) if opening is not None else float(qs[i, grip].float().mean())
+                    T = self._eef_matrix(qs[i], arm)
+                    fing[i] = min(finger_hull_clearance(hc, T, g, (fq, fq)) for g, _ in geoms) >= -allow - 1e-9
+                continue
             if any(g is None for g, _ in geoms):
                 ok[i] = False
                 unmeasured += 1
@@ -1998,16 +2291,69 @@ class IKChecker:
                 ok[i] = False
                 refused.append(-cl)
             else:
+                fing[i] = True
                 deepest = max(deepest, -cl)
         for key, v in (("rejected_body", n_body), ("rejected_non_finger_link", n_links), ("rejected_finger_penetration", len(refused)),
                        ("rejected_unmeasured", unmeasured), ("passed", int(ok.sum()))):
             if v:
                 count(f"finger_touch.geometry.{key}", v)
+        if mode != "off":
+            # the configurations / collision group whose final verdict the hand hulls change (both directions; shadow: what "on" would do)
+            old, new = body & sph & fing, body & links_new & fing
+            to_pass, to_fail = int((new & ~old).sum()), int((old & ~new).sum())
+            for key, v in (("verdict_to_pass", to_pass), ("verdict_to_fail", to_fail)):
+                if v:
+                    count(f"finger_touch.hand_hulls.{key}", v)
+            if bool(old.all()) != bool(new.all()):
+                count(f"finger_touch.hand_hulls.decision_to_{'pass' if bool(new.all()) else 'fail'}")
+                if not quiet:
+                    first = hh_notes[0] if hh_notes else {}
+                    log.info("approach finger-support touch hand hulls (%s): the group %s (%d of %d configurations to pass, %d to fail); first: %s, hand hull "
+                             "clearance %s mm (needs %s mm); %s vs %s", mode, "passes" if bool(new.all()) else "is refused", to_pass, n, to_fail,
+                             first.get("what", "-"), first.get("hull_mm", "-"), first.get("min_mm", "-"), arm,
+                             [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)])
         if refused and not quiet:
             log.info("approach finger-support touch refused: max penetration %.2f mm (rule geometry: finger hulls, cap %.1f mm; %s fingers vs %s; "
                      "%d of %d configurations)", 1000 * max(refused), 1000 * allow, arm,
                      [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)], len(refused), n)
         return ok, round(1000.0 * max(0.0, deepest), 2)
+
+    def _finger_touch_hand_hulls(self, q: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any], others: Sequence[str],
+                                 geoms: Sequence[Tuple[Any, str]], hc: Any, fq: float, spheres_ok: bool, count: Callable[..., None]) -> Dict[str, Any]:
+        """i7-ft2 (owner 7.1, :data:`FINGER_TOUCH_HAND_HULLS_ENV`): the non-finger stage of one configuration ``q`` (its body free) with the
+        hand's rigid links by their exact hulls against the touched supports' geometry (:meth:`_touch_geometry`: the registered plane or the
+        support's convex pieces). Spheres failed -> the reusable ``contact_policy.hull_fallback`` (i7-plateqtf2's check: narrow = only hand
+        links, each less than the sphere buffer deep, only into ``touch``; then the hulls >= :func:`support_hull_fallback_min_m`), queried in
+        the world the failure was found in (``ignored`` out, ``touch`` in); spheres passed -> ``contact_policy.hull_clearance_min`` >= the
+        policy's ``hand_support_margin_m`` (P1 §3). ``{"ok", "what", "why", "hull_mm", "min_mm"}``; an unmeasured support keeps the sphere
+        verdict. Counters ``finger_touch.hand_hulls.{fallback_checked, fallback_passed, fallback_failed.<why>, spec_checked, spec_rejected,
+        unmeasured}``."""
+        from ispatialgym.grasping import contact_policy as CP
+
+        pol = CP.DEFAULT
+        geometry = [g for g, _ in geoms]
+        if not geometry or any(g is None for g in geometry):
+            count("finger_touch.hand_hulls.unmeasured")
+            return {"ok": bool(spheres_ok), "what": "unmeasured", "why": "unmeasured", "hull_mm": None, "min_mm": None}
+        T = self._eef_matrix(q, arm)
+        if spheres_ok:
+            count("finger_touch.hand_hulls.spec_checked")
+            worst = CP.hull_clearance_min(hc, T, geometry, (fq, fq))
+            ok = worst >= float(pol.hand_support_margin_m) - 1e-9
+            if not ok:
+                count("finger_touch.hand_hulls.spec_rejected")
+            return {"ok": ok, "what": "spheres pass, hand hull" + ("" if ok else " into the support"), "why": "" if ok else "hull_clearance",
+                    "hull_mm": round(1000 * worst, 2), "min_mm": round(1000 * float(pol.hand_support_margin_m), 2)}
+        count("finger_touch.hand_hulls.fallback_checked")
+        qq = G.t(q).reshape(1, -1)
+        with self.ignoring(list(ignored)):
+            fb = CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(qq, list(links), m)[0]), list(others), pol.hand_rigid_links(arm), hc, T,
+                                  geometry, threshold=support_hull_fallback_min_m(), finger_q=(fq, fq), margin=float(pol.sphere_support_margin_m),
+                                  geometry_out=lambda: self.ignoring(list(touch)))
+        count("finger_touch.hand_hulls.fallback_passed" if fb["ok"] else f"finger_touch.hand_hulls.fallback_failed.{fb['why']}")
+        hm = fb.get("hull_min_m")
+        return {"ok": bool(fb["ok"]), "what": "narrow sphere failure, hand hull fallback " + ("passes" if fb["ok"] else f"fails ({fb['why']})"),
+                "why": fb["why"], "hull_mm": None if hm is None else round(1000 * float(hm), 2), "min_mm": round(1000 * float(fb["min_m"]), 2)}
 
     def _touch_hand_checker(self, arm: str) -> Any:
         """The contact policy's ``HandChecker`` for ``arm`` (shared with :meth:`support_policy_eval`: ``_hand_checker``)."""
@@ -2093,6 +2439,198 @@ class IKChecker:
         except Exception:  # noqa: BLE001 - a backend without the sphere-to-link map: the rule cannot separate the fingers
             return []
         return [l for l in links if l not in set(M.FINGER_LINKS[arm])]
+
+    # -- i7-t03 2026-11-08 (owner items 2 / 3): split-off pieces as finger-only contact, the hull fallback of the witness --------------
+
+    def _active_ignores(self) -> Tuple[List[Any], List[Any]]:
+        """``(split, whole)``: the objects of the active :meth:`ignoring` contexts that ignore with the support split (a registered support
+        keeps its pieces above the plane in the world) and those ignored whole (``split=False``)."""
+        sp, wh = [], []
+        for objs, split in self.__dict__.get("_ignore_stack", []):
+            (sp if split else wh).extend(objs)
+        return sp, wh
+
+    def _registered_objects(self) -> List[Any]:
+        """The scene / spawned objects the support split registered (``support_split.registered_names``) - the supports a hand can meet
+        whole at a pre-grasp."""
+        names = SS.registered_names(self)
+        if not names:
+            return []
+        world = getattr(self.kit, "world", None)
+        cands = list(getattr(world, "spawned", {}).values()) if world is not None else []
+        cands += list(getattr(getattr(world, "scene", None), "objects", []) or [])
+        out, seen = [], set()
+        for o in cands:
+            n = getattr(o, "name", None)
+            if n in names and n not in seen:
+                seen.add(n)
+                out.append(o)
+        return out
+
+    def _pieces_geometry(self, sp: Any, only: Optional[Any] = None) -> Optional[ConvexPieces]:
+        """:class:`ConvexPieces` of ``sp``'s collision pieces (``only``: those prim paths), cached per support, its pose and the piece set;
+        None when a piece cannot be read."""
+        try:
+            p, q = sp.get_position_orientation()
+            root = tuple(round(float(v), 4) for v in list(G.t(p).tolist()) + list(G.t(q).tolist()))
+        except Exception:  # noqa: BLE001
+            root = None
+        key = (getattr(sp, "name", id(sp)), root, None if only is None else tuple(sorted(only)))
+        cache = self.__dict__.setdefault("_contact_geometry_cache", {})
+        if key not in cache:
+            verts = self._support_pieces_world(sp, only)
+            geom = ConvexPieces.from_vertices(verts, name=str(getattr(sp, "name", "obstacle"))) if verts else None
+            cache[key] = geom if (geom is not None and geom.halfspaces) else None
+        return cache[key]
+
+    def contact_rejudge(self, qs: th.Tensor, arm: str, ignored: Optional[Sequence[Any]] = None, where: str = "witness") -> th.Tensor:
+        """i7-t03 2026-11-08 (owner items 2 / 3; :data:`SPLIT_FINGER_TOUCH_ENV`, :data:`WITNESS_HULL_FALLBACK_ENV`, both default off): ``(K,)``
+        bool - configurations ``qs`` that FAIL ``collision_free(margin=0)`` with ``ignored`` out of the world (None: the active
+        :meth:`ignoring` contexts, a witness judged inside one) re-judged by the exact hulls against the obstacles the two rules cover - the
+        pieces a support split keeps (the ignored registered supports' ``Plan`` with kept pieces; a plan with clipped straddlers is not
+        judged) and the registered supports in the world whole (item 3b: the pre-grasp's bookcase):
+
+        (a) the whole body collision-free at margin 0 with those obstacles out of the world (the failure is theirs alone);
+        (b) every link but the hand (the fingers and the rigid hand links) clear at margin 0 - today's obstacle rule;
+        (c) the hand's rigid links (palm, wrist camera, wrist): clear at margin 0, else (item 3) clear at margin 0 less the model's sphere
+            buffer (NARROW) and their exact hulls at least :func:`support_hull_fallback_min_m` from every obstacle's convex pieces;
+        (d) the fingers: clear at margin 0, else (item 2) clear of everything but the split-off pieces at margin 0 and their exact hulls at
+            clearance >= 0 from those pieces (touch, no penetration) - never judged on the spheres.
+
+        A rule in ``shadow`` judges and counts but its passes stay failures. Counters ``support_split.finger_touch_allowed`` /
+        ``.finger_touch_shadow_pass`` / ``.finger_touch_failed.<why>``, ``witness.hull_fallback_passed`` / ``.hull_fallback_shadow_pass`` /
+        ``.hull_fallback_failed.<why>``, ``contact_rejudge.<where>.checked`` / ``.passed`` / ``.rejected.<why>``."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.oracle import r1pro_model as M
+
+        qs = G.t(qs)
+        if qs.dim() == 1:
+            qs = qs.unsqueeze(0)
+        n = int(qs.shape[0])
+        out = th.zeros(n, dtype=th.bool)
+        m2, m3 = split_finger_touch_mode(), witness_hull_fallback_mode()
+        if n == 0 or (m2 == "off" and m3 == "off"):
+            return out
+        self._count(f"contact_rejudge.{where}.checked", n)
+        if ignored is None:
+            ign_split, ign_whole = self._active_ignores()
+            base_ign: List[Any] = []
+        else:
+            ign_split, ign_whole, base_ign = list(ignored), [], list(ignored)
+
+        def is_in(o, xs):
+            return any(o is x for x in xs)
+
+        kept: List[Tuple[Any, Any]] = []
+        for o in ign_split:
+            if is_in(o, ign_whole) or is_in(o, [k for k, _ in kept]):
+                continue
+            plan = SS.plan_for(self, o, count=False) if SS.split_on() else None
+            if plan is not None and plan.kept:
+                kept.append((o, plan))
+        whole = [o for o in self._registered_objects() if not is_in(o, ign_split) and not is_in(o, ign_whole)]
+
+        def reject(why: str) -> th.Tensor:
+            self._count(f"contact_rejudge.{where}.rejected.{why}", n)
+            return out
+
+        if not kept and not whole:
+            return reject("no_obstacle")
+        if any(plan.clips for _, plan in kept):
+            return reject("clipped_straddler")
+        g_kept = [self._pieces_geometry(o, frozenset(p for p, _ in SS._pieces(o)) - plan.off) for o, plan in kept]
+        g_whole = [self._pieces_geometry(o) for o in whole]
+        if any(g is None for g in g_kept + g_whole):
+            return reject("unmeasured")
+        objs = [o for o, _ in kept] + whole
+        fingers = list(M.FINGER_LINKS[arm])
+        rigid = list(CP.DEFAULT.hand_rigid_links(arm))
+        rest = [l for l in self._non_finger_links(arm) if l not in set(rigid)]
+        if not rest:
+            return reject("no_link_map")
+        buf = float(CP.MODEL_SPHERE_BUFFER_M)
+        thr = float(support_hull_fallback_min_m())
+        with self.ignoring(base_ign), self.ignoring(objs, split=False):
+            body = self.kit.collision_free(qs, margin=0.0).clone()
+        with self.ignoring(base_ign):
+            rest_ok = self.kit.links_clear(qs, rest, 0.0)
+            rig0 = self.kit.links_clear(qs, rigid, 0.0)
+            rig_narrow = self.kit.links_clear(qs, rigid, -buf)
+            fin0 = self.kit.links_clear(qs, fingers, 0.0)
+        with self.ignoring(base_ign), self.ignoring([o for o, _ in kept], split=False):
+            fin_rest = self.kit.links_clear(qs, fingers, 0.0)
+        grip = self.kit.robot.gripper_control_idx[arm]
+        hc = self._touch_hand_checker(arm)
+        for i in range(n):
+            if not bool(body[i]):
+                self._count(f"contact_rejudge.{where}.rejected.other_collision")
+                continue
+            if not bool(rest_ok[i]):
+                self._count(f"contact_rejudge.{where}.rejected.non_hand_link")
+                continue
+            T = self._eef_matrix(qs[i], arm)
+            fq = float(qs[i, grip].float().mean())
+            hand_fb, finger_fb, verdict = False, False, True
+            if not bool(rig0[i]):
+                if m3 == "off":
+                    self._count(f"contact_rejudge.{where}.rejected.hand_link")
+                    continue
+                why = None
+                if not bool(rig_narrow[i]):
+                    why = "deeper_than_buffer"
+                else:
+                    hmin = CP.hull_clearance_min(hc, T, g_kept + g_whole, (fq, fq))  # i7-plateqtf2's reusable check (1f368d64)
+                    if hmin < thr - 1e-9:
+                        why = "hull_clearance"
+                if why is not None:
+                    self._count(f"witness.hull_fallback_failed.{why}")
+                    continue
+                hand_fb = True
+                verdict = verdict and m3 == "on"
+            if not bool(fin0[i]):
+                why = None
+                if m2 == "off":
+                    why = "off"
+                elif not kept:
+                    why = "not_split_piece"
+                elif not bool(fin_rest[i]):
+                    why = "other_obstacle"
+                else:
+                    fmin = min(float(th.as_tensor(hc.clearance(T, g, (fq, fq))["finger"]).reshape(-1)[0]) for g in g_kept)
+                    if fmin < -1e-9:
+                        why = "penetration"
+                if why is not None:
+                    self._count(f"support_split.finger_touch_failed.{why}")
+                    continue
+                finger_fb = True
+                verdict = verdict and m2 == "on"
+            if hand_fb:
+                self._count("witness.hull_fallback_passed" if m3 == "on" else "witness.hull_fallback_shadow_pass")
+            if finger_fb:
+                self._count("support_split.finger_touch_allowed" if m2 == "on" else "support_split.finger_touch_shadow_pass")
+            if verdict:
+                out[i] = True
+                self._count(f"contact_rejudge.{where}.passed")
+        return out
+
+    def _solve_rejudged(self, pose: Pose, q_seed: th.Tensor, arm: str) -> Optional[th.Tensor]:
+        """i7-t03 (items 2 / 3): the pose solved with the obstacles :meth:`contact_rejudge` covers out of the world (the split-off pieces of
+        the active ignore contexts, the registered supports present whole), the solution kept when it collides only as those rules allow -
+        how the support policy treats its plane (solved without it, then judged). None otherwise. Counter ``contact_rejudge.solve.tried``."""
+        ign_split, ign_whole = self._active_ignores()
+        objs = [o for o in ign_split if not any(o is w for w in ign_whole)
+                and getattr(SS.plan_for(self, o, count=False) if SS.split_on() else None, "kept", 0)]
+        objs += [o for o in self._registered_objects() if not any(o is x for x in ign_split + ign_whole)]
+        if not objs:
+            return None
+        self._count("contact_rejudge.solve.tried")
+        with self.ignoring(objs, split=False):
+            q = self._solve_exact(pose, q_seed, arm)
+        if q is None:
+            return None
+        if bool(self.kit.collision_free(q, margin=0.0)[0]) or bool(self.contact_rejudge(q, arm, None, where="solve")[0]):
+            return q
+        return None
 
     #: the oracle's ``Motions._densify`` resolution of a tracked eef chain (``MotionsConfig.cartesian_step`` / ``cartesian_rot_step``)
     TRACK_STEP_M = 0.01
@@ -2292,6 +2830,11 @@ class IKChecker:
                           f"{d0 * 1000:.0f} mm from the start{', in the start band' if j0 in near else ''}; {self._collision_blame(traj[j0], list(ignore) + (list(ignore_start) if j0 in near else []))})")
         with self.ignoring(list(ignore) + list(ignore_end)):
             if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
+                if tracked_end_blame_on():  # i7-t03 round 7 (log only, default off): name what the end configuration collides with
+                    try:
+                        log.info("TRACKED_END_BLAME arm %s: %s", arm, self._collision_blame(traj[-1], list(ignore) + list(ignore_end)))
+                    except Exception as e:  # noqa: BLE001
+                        log.info("TRACKED_END_BLAME error %r", e)
                 return None, "approach_untrackable: the tracked chain's end configuration collides"
         if clear_links and clear_margin > 0.0:
             # ``clear_links`` (the arm links, not the hand) keep ``clear_margin`` from the world along the whole chain: the oracle's QA
@@ -2302,6 +2845,7 @@ class IKChecker:
             if not bool(clear.all()):
                 bad = [i for i, c in enumerate(clear.tolist()) if not c]
                 return None, f"arm_proximity: {len(bad)}/{len(clear)} tracked configurations put an arm link within {clear_margin * 1000:.0f} mm of the world (first at dense pose {bad[0]})"
+        self.last_track_traj = traj  # i7-overpath 2026-11-08: the tracked configurations of the last passing chain (the recorded transit's source)
         return traj[-1].clone(), "ok" + finished
 
     def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any], margin: float = 0.0) -> str:

@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -328,6 +329,47 @@ def other_arm(arm: str) -> str:
     return "left" if arm == "right" else "right"
 
 
+def wall_brace_map_on() -> bool:
+    """i7-brace (owner 3.4): the brace candidates of a stance come from the ``wall_brace`` contact map (the wall-frame reach map of the
+    validated library entries: :func:`wall_brace_class` feasible at the stance, recorded clear range covering the drawn |delta|) instead of
+    the reach volume; the exact two-arm check is unchanged. Needs the contact maps (``tabletop.contact_maps_on``: v2only + a maps root);
+    a missing map keeps the reach-volume rule (kit ``wall_brace_map.miss``). DEFAULT ON since 2026-11-08 (owner decisions 20261108h 5w.2:
+    the wall maps staged in ``$OFH/v2maps_int1_brace34w``); ``ISPATIALGYM_WALL_BRACE_MAP=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_WALL_BRACE_MAP", "1") == "1"
+
+
+#: the wall_brace map's height tolerance (m: the hinge height above the floor vs the map's)
+WALL_BRACE_MAP_H_TOL_M = 0.03
+
+
+def wall_brace_class(brace: Dict[str, Any], delta: float) -> str:
+    """The ``wall_brace`` library class of a live brace candidate (``contact_library.build_wall_brace``): tilt sign, kind, wrist."""
+    return f"{'+' if delta > 0 else '-'}tilt_{brace['kind']}_{brace.get('wrist', 'n+')}"
+
+
+def wall_map_feasible(cm, stance: Stance, root_world, delta: float) -> Dict[str, Any]:
+    """The wall_brace map at ``stance`` for the target hung at its level pose (root ``root_world``): the stand-off of the map row = the root's
+    distance ahead of the base minus the map's root-to-wall offset (the protruding patch and the hinge's COM are in the root's position),
+    the root's lateral in the base frame, the stance's trunk; the classes of the drawn tilt sign, then those whose recorded clear range
+    (``goal.clear_delta_min_deg`` .. ``clear_delta_max_deg``) covers |delta|. ``{"ok", "classes", "all_sign", "cover_dropped", "d_eff", "look"}``."""
+    xy = stance.world_to_base(th.as_tensor(root_world, dtype=th.float32)[:2])
+    x_off = float(cm.cells[0, 0]) - float(cm.meta["edge_distances"][0])
+    d_eff = float(xy[0]) - x_off
+    sign = 1.0 if delta > 0 else -1.0
+    look = cm.lookup(d_eff, float(stance.translate), float(stance.tilt), [float(v) for v in xy.tolist()], 0.0,
+                     keep=lambda row: float((row.get("goal") or {}).get("tilt_sign") or 0.0) == sign)
+    rows = {r["class"]: r for r in cm.class_rows(0) if r}
+    d_abs = abs(math.degrees(delta))
+    feas = list(look.get("feasible") or []) if look.get("ok") else []
+    def covers(c):
+        g = rows[c].get("goal") or {}
+        return float(g.get("clear_delta_min_deg") or 0.0) - 1e-6 <= d_abs <= float(g.get("clear_delta_max_deg") or 0.0) + 1e-6
+
+    cover = [c for c in feas if covers(c)]
+    return {"ok": bool(cover), "classes": cover, "all_sign": feas, "cover_dropped": len(feas) - len(cover), "d_eff": round(d_eff, 4),
+            "look": {k: look.get(k) for k in ("why", "cell", "edge_distance", "trunk")}}
+
+
 def half_turn_equivalence(front) -> List[float]:
     """The ``symmetric_180`` orientation equivalence: a half turn about the object's front axis (xyzw)."""
     q = C.quat_from_axis_angle(front, math.pi)
@@ -339,131 +381,22 @@ def half_turn_equivalence(front) -> List[float]:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-@register(*SUBTASKS)
-class AlignmentWall(SamplerV2):
-    """World vertical: the wall-hung target is pushed back to its upright goal."""
+class WallGeometry:
+    """i7-brace 2026-11-08 (owner 3.4): the world_vertical target's hang / contact geometry - moved VERBATIM out of :class:`AlignmentWall`
+    (which inherits it) so the ``wall_brace`` contact library builds its entries with the task's ONE implementation
+    (:meth:`contacts_for`: the push and the ``brace_candidate_order`` / ``brace_point`` / ``wall_contact_pose`` / ``wall_brace_turns``
+    brace candidates; :meth:`brace_clear`). Needs ``hull``, ``pieces``, ``front`` / ``side`` / ``up``, ``com_local`` and ``param(key,
+    default)``; :meth:`standalone` makes one without a scene (the library builder)."""
 
-    #: the target's collision pieces in its root frame (``SimWorld.local_collision_pieces``); None: unknown, the contacts keep
-    #: the hull's projected extremes
-    pieces: Optional[List[th.Tensor]] = None
-
-    def __init__(self, ctx):
-        super().__init__(ctx)
-        if self.gp.bddl is None:
-            self.definition_id = V1_DEFINITION_ID[self.subtask]
-        self.wall_role = "support" if "support" in self.gp.roles else ("wall" if "wall" in self.gp.roles else "support")
-        self.hinge: Optional[Hinge] = None
-        self.hull: Optional[th.Tensor] = None
-        self.com_local = th.zeros(3)
-        self.front = self.side = self.up = None
-        self.frame: Dict[str, Optional[str]] = {}
-        self.spots: List[Dict[str, Any]] = []
-        self.spot: Optional[Dict[str, Any]] = None
-        self.step1: Dict[int, List[Stance]] = {}
-
-    # ------------------------------------------------------------------ parameters
-
-    def v1_role_variants(self) -> Dict[str, str]:
-        return {"wall": "support"} if self.wall_role == "support" else {}
-
-    def param(self, key: str, default=None, v1_key: Optional[str] = None):
-        v = self.gp.gen(key)
-        if v is None and v1_key is not None:
-            v = self.gp.gen(v1_key)
-        return default if v is None else v
-
-    def target_param(self, key: str, default=None):
-        """``generation.<key>`` per target: a value, or a dict keyed ``<category>/<model>`` / ``<category>`` / ``default``."""
-        v = self.param(key, default)
-        if isinstance(v, dict):
-            c = self.choice.models["target"]
-            v = v.get(f"{c.category}/{c.model}", v.get(c.category, v.get("default", default)))
-        return v
-
-    def hang_height(self) -> float:
-        return float(self.param("hang_height_m", 1.45, "height"))
-
-    def deviation_range(self) -> Tuple[float, float]:
-        """§5.5 δ = sign·U(lo, hi). Owner decision A8 (2026‑09‑16): |δ| ≤ ``max_deviation_deg`` (25°) until the two-stroke
-        push for larger tilts exists (TODO, D list) — a wider customs range is capped here and the applied range is
-        recorded in ``template_facts.deviation_range_applied_deg``."""
-        lo, hi = (float(v) for v in self.param("deviation_range_deg", [15.0, 25.0]))
-        cap = float(self.param("max_deviation_deg", MAX_DEVIATION_DEG))
-        hi_applied = min(hi, cap)
-        lo_applied = min(lo, hi_applied)
-        self.template_facts["deviation_range_applied_deg"] = [lo_applied, hi_applied]
-        if hi_applied < hi:
-            self.template_facts["deviation_range_customs_deg"] = [lo, hi]
-        return math.radians(lo_applied), math.radians(hi_applied)
-
-    def stance_posture(self) -> Tuple[str, float]:
-        """A6: the arm posture the two-arm manipulation stance records and drives in with (``generation.
-        stance_arm_posture``, default ``tucked`` — hanging arms clear a wall 0.5 m ahead where untucked / ready hands do
-        not) and its gripper opening (closed pads: the oracle closes the grippers before a push / brace)."""
-        return str(self.param("stance_arm_posture", "tucked")), float(C.FINGER_CLOSED)
-
-    def symmetric_180(self) -> bool:
-        return bool(self.target_param("symmetric_180", False))
-
-    def reviewed_frame(self) -> Dict[str, str]:
-        """§5.5 frame of the target from the variant: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
-        ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
-        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — a variant without the keys
-        for the spawned model is ``Reject("missing_frame")`` (re-ground the variant)."""
-        c = self.choice.models["target"]
-        front, up = self.target_param("front_axis"), self.target_param("up_axis")
-        missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
-        if missing:
-            raise Reject("missing_frame", f"{self.gp.variant}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
-                                          f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
-        return {"front_axis": str(front), "up_axis": str(up)}
-
-    # ------------------------------------------------------------------ roles
-
-    def bind_scene_roles(self):
-        self.bind_floor_v2()  # the wall is bound in prepare_bindings (it needs the spawned target's extents)
-
-    @property
-    def target(self):
-        return self.obj("target")
-
-    @property
-    def tname(self) -> str:
-        return self.bindings.one("target").name
-
-    @property
-    def wall(self):
-        return self.obj(self.wall_role)
-
-    def support_objects(self) -> List[Any]:
-        return [self.wall] if self.bindings.has(self.wall_role) else []
-
-    # ------------------------------------------------------------------ target geometry
-
-    def com_world(self, obj=None, pose: Optional[G.Pose] = None) -> th.Tensor:
-        if pose is None:
-            p, q = (obj or self.target).get_position_orientation()
-            pose = (p.float(), q.float())
-        return pose[0] + G.rotate(pose[1], self.com_local)
-
-    def _com_local(self, obj) -> th.Tensor:
-        try:
-            total, acc = 0.0, th.zeros(3)
-            rp, rq = obj.get_position_orientation()
-            for link in obj.links.values():
-                m = float(link.mass)
-                if m <= 0:
-                    continue
-                lp, lq = link.get_position_orientation()
-                acc += m * (lp.float() + G.rotate(lq.float(), G.t(link.center_of_mass)))
-                total += m
-            if total > 0:
-                return G.rotate(G.qinv(rq.float()), acc / total - rp.float())
-        except Exception:  # noqa: BLE001
-            pass
-        lo, hi = obj.aabb
-        rp, rq = obj.get_position_orientation()
-        return G.rotate(G.qinv(rq.float()), (lo + hi) / 2 - rp.float())
+    @classmethod
+    def standalone(cls, hull: th.Tensor, front: th.Tensor, side: th.Tensor, up: th.Tensor, com_local: th.Tensor, pieces: Optional[Sequence[th.Tensor]] = None,
+                   params: Optional[Dict[str, Any]] = None) -> "WallGeometry":
+        g = cls.__new__(cls)
+        g.hull, g.front, g.side, g.up, g.com_local = th.as_tensor(hull, dtype=th.float32), front, side, up, th.as_tensor(com_local, dtype=th.float32)
+        g.pieces = list(pieces or [])
+        prm = dict(params or {})
+        g.param = lambda key, default=None, v1_key=None: prm.get(key, default)
+        return g
 
     def dims(self, hull: Optional[th.Tensor] = None) -> Tuple[float, float, float]:
         """(thickness along front, width along the wall, height along up) of the canonical hull."""
@@ -643,6 +576,133 @@ class AlignmentWall(SamplerV2):
                 return False
         return True
 
+
+@register(*SUBTASKS)
+class AlignmentWall(SamplerV2, WallGeometry):
+    """World vertical: the wall-hung target is pushed back to its upright goal."""
+
+    #: the target's collision pieces in its root frame (``SimWorld.local_collision_pieces``); None: unknown, the contacts keep
+    #: the hull's projected extremes
+    pieces: Optional[List[th.Tensor]] = None
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        if self.gp.bddl is None:
+            self.definition_id = V1_DEFINITION_ID[self.subtask]
+        self.wall_role = "support" if "support" in self.gp.roles else ("wall" if "wall" in self.gp.roles else "support")
+        self.hinge: Optional[Hinge] = None
+        self.hull: Optional[th.Tensor] = None
+        self.com_local = th.zeros(3)
+        self.front = self.side = self.up = None
+        self.frame: Dict[str, Optional[str]] = {}
+        self.spots: List[Dict[str, Any]] = []
+        self.spot: Optional[Dict[str, Any]] = None
+        self.step1: Dict[int, List[Stance]] = {}
+
+    # ------------------------------------------------------------------ parameters
+
+    def v1_role_variants(self) -> Dict[str, str]:
+        return {"wall": "support"} if self.wall_role == "support" else {}
+
+    def param(self, key: str, default=None, v1_key: Optional[str] = None):
+        v = self.gp.gen(key)
+        if v is None and v1_key is not None:
+            v = self.gp.gen(v1_key)
+        return default if v is None else v
+
+    def target_param(self, key: str, default=None):
+        """``generation.<key>`` per target: a value, or a dict keyed ``<category>/<model>`` / ``<category>`` / ``default``."""
+        v = self.param(key, default)
+        if isinstance(v, dict):
+            c = self.choice.models["target"]
+            v = v.get(f"{c.category}/{c.model}", v.get(c.category, v.get("default", default)))
+        return v
+
+    def hang_height(self) -> float:
+        return float(self.param("hang_height_m", 1.45, "height"))
+
+    def deviation_range(self) -> Tuple[float, float]:
+        """§5.5 δ = sign·U(lo, hi). Owner decision A8 (2026‑09‑16): |δ| ≤ ``max_deviation_deg`` (25°) until the two-stroke
+        push for larger tilts exists (TODO, D list) — a wider customs range is capped here and the applied range is
+        recorded in ``template_facts.deviation_range_applied_deg``."""
+        lo, hi = (float(v) for v in self.param("deviation_range_deg", [15.0, 25.0]))
+        cap = float(self.param("max_deviation_deg", MAX_DEVIATION_DEG))
+        hi_applied = min(hi, cap)
+        lo_applied = min(lo, hi_applied)
+        self.template_facts["deviation_range_applied_deg"] = [lo_applied, hi_applied]
+        if hi_applied < hi:
+            self.template_facts["deviation_range_customs_deg"] = [lo, hi]
+        return math.radians(lo_applied), math.radians(hi_applied)
+
+    def stance_posture(self) -> Tuple[str, float]:
+        """A6: the arm posture the two-arm manipulation stance records and drives in with (``generation.
+        stance_arm_posture``, default ``tucked`` — hanging arms clear a wall 0.5 m ahead where untucked / ready hands do
+        not) and its gripper opening (closed pads: the oracle closes the grippers before a push / brace)."""
+        return str(self.param("stance_arm_posture", "tucked")), float(C.FINGER_CLOSED)
+
+    def symmetric_180(self) -> bool:
+        return bool(self.target_param("symmetric_180", False))
+
+    def reviewed_frame(self) -> Dict[str, str]:
+        """§5.5 frame of the target from the variant: ``generation.front_axis`` / ``up_axis``, per model (dict form) as
+        ``ground_isg`` writes the reviewed icl ``frame_*`` columns. **Never defaulted** (owner 2026‑09‑16 22:55: the
+        painting-shaped default +x / +z hung the license plate table-flat, run 0916‑212037) — a variant without the keys
+        for the spawned model is ``Reject("missing_frame")`` (re-ground the variant)."""
+        c = self.choice.models["target"]
+        front, up = self.target_param("front_axis"), self.target_param("up_axis")
+        missing = [k for k, v in (("front_axis", front), ("up_axis", up)) if v is None]
+        if missing:
+            raise Reject("missing_frame", f"{self.gp.variant}: generation.{' / '.join(missing)} carries no entry for {c.category}/{c.model} "
+                                          f"(the reviewed icl frame is written per model by ground_isg; the sampler does not default a frame)")
+        return {"front_axis": str(front), "up_axis": str(up)}
+
+    # ------------------------------------------------------------------ roles
+
+    def bind_scene_roles(self):
+        self.bind_floor_v2()  # the wall is bound in prepare_bindings (it needs the spawned target's extents)
+
+    @property
+    def target(self):
+        return self.obj("target")
+
+    @property
+    def tname(self) -> str:
+        return self.bindings.one("target").name
+
+    @property
+    def wall(self):
+        return self.obj(self.wall_role)
+
+    def support_objects(self) -> List[Any]:
+        return [self.wall] if self.bindings.has(self.wall_role) else []
+
+    # ------------------------------------------------------------------ target geometry
+
+    def com_world(self, obj=None, pose: Optional[G.Pose] = None) -> th.Tensor:
+        if pose is None:
+            p, q = (obj or self.target).get_position_orientation()
+            pose = (p.float(), q.float())
+        return pose[0] + G.rotate(pose[1], self.com_local)
+
+    def _com_local(self, obj) -> th.Tensor:
+        try:
+            total, acc = 0.0, th.zeros(3)
+            rp, rq = obj.get_position_orientation()
+            for link in obj.links.values():
+                m = float(link.mass)
+                if m <= 0:
+                    continue
+                lp, lq = link.get_position_orientation()
+                acc += m * (lp.float() + G.rotate(lq.float(), G.t(link.center_of_mass)))
+                total += m
+            if total > 0:
+                return G.rotate(G.qinv(rq.float()), acc / total - rp.float())
+        except Exception:  # noqa: BLE001
+            pass
+        lo, hi = obj.aabb
+        rp, rq = obj.get_position_orientation()
+        return G.rotate(G.qinv(rq.float()), (lo + hi) / 2 - rp.float())
+
     def contact_specs(self, geo: Dict[str, Any]) -> Tuple[P0.ContactSpec, List[Tuple[Dict[str, Any], P0.ContactSpec]]]:
         push = geo["push"]
 
@@ -668,6 +728,9 @@ class AlignmentWall(SamplerV2):
         push_only = bool(geo.get("no_corner"))
         if not braces and not push_only:
             return []
+        # i7-brace (owner 3.4, ISPATIALGYM_WALL_BRACE_MAP): the wall_brace map picks each stance's brace candidates (counted per instance screen)
+        wmap = self._wall_brace_map(geo) if (wall_brace_map_on() and braces and not push_only) else None
+        count = stats is not None and wmap is not None
         reach: List[Tuple[Stance, List[Dict[str, Any]]]] = []
         n_push = 0
         kinds_ok: Dict[str, int] = {}
@@ -676,6 +739,22 @@ class AlignmentWall(SamplerV2):
                 continue
             n_push += 1
             ok = [b for b, sp in braces if sp.volume_ok(rv, st, bz)]
+            if wmap is not None:
+                wf = wall_map_feasible(wmap, st, geo["pose_level"][0], geo["delta"])
+                live = ok
+                ok = [b for b, _sp in braces if wall_brace_class(b, geo["delta"]) in set(wf["classes"])]
+                st.extras["brace_classes"] = [wall_brace_class(b, geo["delta"]) for b in ok]
+                st.extras["wall_brace_map"] = {"d_eff": wf["d_eff"], "n_classes": len(wf["classes"]), "cover_dropped": wf["cover_dropped"]}
+                if count:
+                    self._wcount("wall_brace_map.stances")
+                    self._wcount("wall_brace_map.stance_feasible" if ok else "wall_brace_map.stance_none")
+                    self._wcount("wall_brace_map.reach_volume_kept" if live else "wall_brace_map.reach_volume_none")
+                    if ok and not live:
+                        self._wcount("wall_brace_map.map_only")
+                    if live and not ok:
+                        self._wcount("wall_brace_map.reach_only")
+                    if wf["cover_dropped"]:
+                        self._wcount("wall_brace_map.cover_dropped", wf["cover_dropped"])
             for b in ok:
                 kinds_ok[b["kind"]] = kinds_ok.get(b["kind"], 0) + 1
             if ok or push_only:
@@ -981,14 +1060,16 @@ class AlignmentWall(SamplerV2):
         for pool in pools:
             for _ in range(min(len(pool), 8)):
                 i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers,
-                                                clearance_ignore=[self.target])
+                                                clearance_ignore=[self.target], memory_arm=arms[0])  # i7-memory2: the pick hook on the draw
                 kinds = pool[i].extras.get("brace_kinds", [])
+                classes = pool[i].extras.get("brace_classes")  # i7-brace: the wall_brace map's classes (switch on)
                 pool.pop(i)
                 if manip is None:
                     errors.append("drawn tilt fails the re-check")
                     continue
                 try:
-                    self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds])
+                    self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds
+                                                                and (classes is None or wall_brace_class(b, delta) in classes)])
                 except Reject as e:
                     errors.append(f"{e.reason}: {e}")
                     self.sidecar.stances.pop("manipulation", None)
@@ -1003,6 +1084,10 @@ class AlignmentWall(SamplerV2):
         if not done:
             raise Reject("push_unreachable", f"{len(survivors)} Phase-2 survivors (δ {math.degrees(delta):+.1f}°, {stats}), none passes step 5 / step 6: " + "; ".join(errors[-4:]))
         manip = self.sidecar.stance("manipulation")
+        wmap_acted = wall_brace_map_on() and any("brace_classes" in st.extras for st in survivors)
+        if wmap_acted:
+            b_rec = self.sidecar.contacts.get("brace")
+            self._wcount("wall_brace_map.written_brace" if b_rec is not None else "wall_brace_map.written_push_only")
         d = Draft()
         d.object_poses[tname] = pose_t
         d.goal_poses[tname] = geo["pose_level"]
@@ -1024,6 +1109,9 @@ class AlignmentWall(SamplerV2):
                           "scale": self.choice.models["target"].scale, "phase2": stats,
                           "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip), "symmetric_180": self.symmetric_180(),
                           "frame": dict(self.template_facts.get("frame") or {}),
+                          **({"wall_brace_map": {"map": getattr(self._wall_brace_map(geo), "path", None),
+                                                 "brace_class": None if brace is None else wall_brace_class({"kind": brace.brace_kind, "wrist": (brace.extras or {}).get("wrist")}, delta)}}
+                             if wmap_acted else {}),
                           "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),
                                    "back_from_com_m": self.depth_extents()[0], "thickness_m": self.depth_extents()[1]}})
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), deviation_deg=math.degrees(delta),
@@ -1184,6 +1272,60 @@ class AlignmentWall(SamplerV2):
         self.sidecar.add_contact(ContactRecord("brace", brace_arm, b["pre"], b["pose"], direction=b["a"], brace_kind=b["kind"], object=tname,
                                                extras={"contact_face": "finger_side", "placed_at": "goal", "wrist": b.get("wrist"), **_orient_extra(dec_b)}))
         self.sidecar.waypoint_policy = "push arc: screening at δ/2, exact at init and goal; brace: exact pre / approach / contact; wall-present margin-0 re-check of every contact configuration"
+
+    # ------------------------------------------------------------------ i7-brace (owner 3.4): the wall_brace map
+
+    def _wcount(self, key: str, n: int = 1) -> None:
+        st = getattr(getattr(self, "kit", None), "stats", None)
+        if isinstance(st, dict):
+            st[key] = st.get(key, 0) + int(n)
+
+    def _wall_brace_map(self, geo: Dict[str, Any]):
+        """The ``wall_brace`` contact map of the target (its model id's map directories under the maps root, ``contact_maps.ContactMap.find_near``)
+        for this tilt sign's brace arm at the hinge's height above the floor (within :data:`WALL_BRACE_MAP_H_TOL_M`), the contact policy and the
+        robot; cached per (arm, height). None on a miss (one ``MAP_REQUEST`` line, kit ``wall_brace_map.miss``: the reach-volume rule stays)."""
+        from ispatialgym.grasping import contact_policy as CP
+        from ispatialgym.grasping import schema as GS
+        from ispatialgym.sampling import contact_maps as CMAP
+        from ispatialgym.sampling import reach_maps as RMAP
+        from ispatialgym.sampling.v2 import tabletop as TT
+
+        if not TT.contact_maps_on():
+            return None
+        arm = geo["brace_arm"]
+        try:
+            h = float(geo["C"][2]) - float(self.obj("floor").aabb[1][2])
+        except Exception:  # noqa: BLE001
+            h = float(geo["C"][2])
+        cache = self.__dict__.setdefault("_wall_brace_maps", {})
+        ck = (arm, round(h, 3))
+        if ck in cache:
+            return cache[ck]
+        mc = self.choice.models["target"]
+        mid = GS.model_id(mc.category, mc.model, list(mc.scale) if mc.scale else None)
+        root = TT.map_sampling_root()
+        cands = [d for d in sorted(os.listdir(root)) if d == mid or d.startswith(mid + "__")] if root and os.path.isdir(root) else []
+        cm = None
+        for entry in cands:
+            cm = CMAP.ContactMap.find_near(root, "wall_brace", entry, h, WALL_BRACE_MAP_H_TOL_M, arm=arm, policy_key=CP.DEFAULT.key(arm),
+                                           robot=RMAP.robot_digest(), config_require=TT._map_config_require())
+            if cm is not None:
+                break
+        if cm is None:
+            TT.map_request(self, kind="wall_brace", role="target", object=f"{mc.category}/{mc.model}", entry=cands[0] if cands else mid, h=round(h, 4), arm=arm,
+                           support=str(self._spot_wall_name()), scene=str(getattr(self.world, "scene_model", "")))
+            self._wcount("wall_brace_map.miss")
+        else:
+            log.info("wall_brace map hit (%s arm) at h %.4f: %s", arm, h, cm.path)
+            self._wcount("wall_brace_map.hit")
+        cache[ck] = cm
+        return cm
+
+    def _spot_wall_name(self) -> str:
+        try:
+            return self.bindings.one(self.wall_role).name
+        except Exception:  # noqa: BLE001
+            return ""
 
     # ------------------------------------------------------------------ pipeline hooks (§5.5 Phase 3)
 

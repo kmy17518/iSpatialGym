@@ -159,8 +159,8 @@ def test_decay_and_reset():
     assert mem.weights({"snapshot": "trunk_new", "spec": "s1", "keys": "k1"}) == pytest.approx([0.512, 0.64, 0.8])  # a new snapshot ages all
     assert mem.weights({"snapshot": "trunk_c", "spec": "s2", "keys": "k1"}) == [0.0, 0.0, 0.0]  # customs changed: reset
     assert mem.weights({"snapshot": "trunk_c", "spec": "s1", "keys": "k2"}) == [0.0, 0.0, 0.0]  # entry / map keys changed: reset
-    mem.th = AM.Thresholds(customs_change=0.5)
-    assert mem.weights({"snapshot": "trunk_c", "spec": "s2", "keys": "k1"}) == pytest.approx([0.32, 0.4, 0.5])
+    mem.th = AM.Thresholds(customs_change=0.5)  # i7-memory2: a carried-over demo is discounted once (flat), not also by its age
+    assert mem.weights({"snapshot": "trunk_c", "spec": "s2", "keys": "k1"}) == pytest.approx([0.5, 0.5, 0.5])
     # reset evidence does not count towards min_n either
     mem = AM.AliasMemory("a", inside_large_01_rows(), th)
     mem.weights({"snapshot": "trunk_a", "spec": "s_other", "keys": "k1"})
@@ -277,11 +277,11 @@ def test_eval_generation_never_uses_memory(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------------------------------------------------------- record / shards / versions
 
-def _fake_job(root, tag, alias, idx, ok, stage_action=None, translate=0.25, ftype="robot_wobble"):
+def _fake_job(root, tag, alias, idx, ok, stage_action=None, translate=0.25, ftype="robot_wobble", mode=None):
     d = root / "out" / tag / alias / f"g{idx}"
     (d / "inst").mkdir(parents=True)
     (d / "demo").mkdir()
-    (d / "job.env").write_text(f"ALIAS=var\nALIAS_KEY={alias}\nISGE_CODE=/c/trunk_x\n")
+    (d / "job.env").write_text(f"ALIAS=var\nALIAS_KEY={alias}\nISGE_CODE=/c/trunk_x\n" + (f"{AM.ENV_MODE}={mode}\n" if mode else ""))
     (d / "jobid").write_text(f"{idx}\n")
     (d / "job.txt").write_text("ISGF_END 1\n")
     (d / "inst" / "task_custom_lists.json").write_text(json.dumps({"var": {"roles": {}}}))
@@ -358,3 +358,217 @@ def test_sampling_key_matches_recorded_key_and_provenance_round_trips():
     assert {k: place[k] for k in cfg} == cfg
     parsed = OS.Stance.from_dict(block, "stances.placement")
     assert parsed.extra["alias_memory"]["version"] == "v0003"
+
+
+# ------------------------------------------------------------------------------------------------------------- i7-memory2: modes, stores, pick hook
+
+def test_owner_thresholds_are_the_code_defaults():
+    th = AM.Thresholds()
+    assert (th.min_n, th.p_worse, th.max_mean, th.floor, th.snapshot_decay) == (3, 0.95, 0.35, 0.05, 0.8)  # owner 2.1
+    assert (th.customs_change, th.keys_change, th.seed_weight, th.weight_floor, th.mode) == (0.0, 0.0, 0.0, 0.0, "production")
+    v = AM.Thresholds.for_mode("validation")
+    assert (v.min_n, v.p_worse, v.max_mean, v.floor, v.snapshot_decay) == (3, 0.95, 0.35, 0.05, 0.8)
+    assert v.customs_change == v.keys_change == v.seed_weight == v.weight_floor == pytest.approx(1.0 / 3.0) and v.mode == "validation"
+    assert AM.Thresholds.for_mode("production") == th
+    with pytest.raises(ValueError):
+        AM.Thresholds.for_mode("other")
+
+
+def _rows_ctx(spec="s1", keys="k1", snap="trunk_a", seed=None):
+    rs = inside_large_01_rows()
+    for r in rs:
+        r["ctx"] = {"snapshot": snap, "spec": spec, "keys": keys}
+        if seed:
+            r["seed"] = seed
+    return rs
+
+
+def test_production_starts_empty_and_resets(tmp_path):
+    root = tmp_path / "root"
+    _fake_job(root, "t1", "al_01", 1, False, "place", translate=0.5)                       # a job from before the modes
+    _fake_job(root, "t1", "al_01", 2, False, "place", translate=0.5, mode="validation")
+    v = AM.aggregate(str(root), mode="production", gpu=False)
+    assert os.path.dirname(v) == str(root / "alias_memory_production")
+    meta = json.load(open(os.path.join(v, "meta.json")))
+    assert meta["n_rows"] == 0 and meta["mode"] == "production" and meta["seed"] is None  # starts EMPTY: no history, no validation demo
+    _fake_job(root, "t2", "al_01", 3, False, "place", translate=0.5, mode="production")
+    v = AM.aggregate(str(root), mode="production", gpu=False)
+    rows = AM.load_version(v, "al_01").rows
+    assert [r["index"] for r in rows] == [3] and rows[0]["mode"] == "production"
+    # production resets on a customs or keys change (the 0 / 3 evidence counts nothing there)
+    mem = AM.AliasMemory("a", _rows_ctx(), AM.Thresholds())
+    assert all(w == 0.0 for w in mem.weights({"snapshot": "trunk_b", "spec": "s2", "keys": "k1"}))
+    assert all(w == 0.0 for w in mem.weights({"snapshot": "trunk_b", "spec": "s1", "keys": "k2"}))
+    assert mem.decide("place", P(tr=0.5), max_level=AM.PLACE_HOOK_LEVELS) is None
+
+
+def test_validation_seeds_and_carries_over_at_reduced_weight(tmp_path):
+    w = AM.VALIDATION_WEIGHT
+    th = AM.Thresholds.for_mode("validation")
+    # carried over a customs / keys change: flat w (not also aged)
+    mem = AM.AliasMemory("a", _rows_ctx(snap="trunk_a"), th, snap_order=["trunk_a", "trunk_b", "trunk_c"])
+    assert mem.weights({"snapshot": "trunk_new", "spec": "s2", "keys": "k1"}) == pytest.approx([w] * 8)
+    assert mem.weights({"snapshot": "trunk_new", "spec": "s1", "keys": "k2"}) == pytest.approx([w] * 8)
+    # the run's own context: decays per newer snapshot, never below w
+    assert mem.weights({"snapshot": "trunk_b", "spec": "s1", "keys": "k1"}) == pytest.approx([0.8] * 8)
+    assert mem.weights({"snapshot": "trunk_new", "spec": "s1", "keys": "k1"}) == pytest.approx([max(0.8 ** 3, w)] * 8)
+    mem = AM.AliasMemory("a", _rows_ctx(snap="trunk_a"), th, snap_order=["trunk_a"] + [f"trunk_{i}" for i in range(8)])
+    assert mem.weights({"snapshot": "trunk_7", "spec": "s1", "keys": "k1"}) == pytest.approx([w] * 8)
+    # seeded demos: w whatever their context
+    mem = AM.AliasMemory("a", _rows_ctx(seed="seed:x/v0003"), th)
+    assert mem.weights({"snapshot": "trunk_a", "spec": "s1", "keys": "k1"}) == pytest.approx([w] * 8)
+    # the owner's case: inside_large_01's 0 / 3 at 0.85 m / 0.50, seeded, at a NEW snapshot under the changed customs and keys -
+    # flagged in validation (mean 1 / (2 + 3 w) = 1 / 3 <= 0.35), the healthy 0.25 not; production would not see it at all
+    rs = _rows_ctx(spec="s_old", keys="k_old", seed="seed:x/v0003")
+    rs += [dict(row(ok=True, place=P(tr=0.25, so=0.65), t=f"2026-11-06T1{i % 10}", ctx={"snapshot": "trunk_a", "spec": "s_old", "keys": "k_old"}),
+                seed="seed:x/v0003") for i in range(30)]  # the alias's healthy rest (inside_large_01: ~40 successes)
+    new = {"snapshot": "trunk_new", "spec": "s_now", "keys": "k_now"}
+    mem = AM.AliasMemory("a", rs, th)
+    mem.weights(new)
+    bad, good = mem.decide("place", P(tr=0.5), max_level=2), mem.decide("place", P(tr=0.25), max_level=2)
+    assert bad.down and bad.mean == pytest.approx(1.0 / 3.0, abs=1e-6) and not good.down
+    prod = AM.AliasMemory("a", [dict(r, seed=None) for r in rs], AM.Thresholds())
+    prod.weights(new)
+    assert prod.decide("place", P(tr=0.5), max_level=2) is None
+    # a weight below 0.286 would not flag it (the reason w is 1/3, not less)
+    low = AM.AliasMemory("a", rs, AM.Thresholds(seed_weight=0.25, customs_change=0.25, keys_change=0.25, weight_floor=0.25, mode="validation"))
+    low.weights(new)
+    assert not low.decide("place", P(tr=0.5), max_level=2).down
+
+
+def _seed_version(tmp_path):
+    rs = _rows_ctx()
+    for i, r in enumerate(rs):
+        r.update({"job": f"/seed/job{i}", "inst": f"i{i}", "alias": "al_01"})
+    return AM.write_version(str(tmp_path / "seedroot"), rs, AM.Thresholds(), batch="replay")
+
+
+def test_stores_are_separate(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    seed = _seed_version(tmp_path)
+    _fake_job(root, "t1", "al_01", 1, True)                       # before the modes: validation only (as seed "legacy")
+    _fake_job(root, "t1", "al_01", 2, True, mode="validation")
+    _fake_job(root, "t1", "al_01", 3, True, mode="production")
+    vv = AM.aggregate(str(root), mode="validation", seed=str(tmp_path / "seedroot"), gpu=False)
+    vp = AM.aggregate(str(root), mode="production", gpu=False)
+    assert os.path.dirname(vv) == str(root / "alias_memory_validation") and os.path.dirname(vp) == str(root / "alias_memory_production")
+    rv = AM.load_version(vv, "al_01").rows
+    rp = AM.load_version(vp, "al_01").rows
+    assert sorted(r.get("index") for r in rv if not str(r.get("seed", "")).startswith("seed:")) == [1, 2]
+    assert sum(1 for r in rv if str(r.get("seed", "")).startswith("seed:")) == 8 and {r.get("seed") for r in rv if r.get("index") == 1} == {"legacy"}
+    assert [r["index"] for r in rp] == [3]
+    mv = json.load(open(os.path.join(vv, "meta.json")))
+    assert mv["mode"] == "validation" and mv["seed"] == os.path.abspath(seed) and mv["n_seeded"] == 9
+    assert json.load(open(root / "alias_memory_validation" / "seed.json"))["seed"] == os.path.abspath(seed)
+    assert json.load(open(root / "alias_memory_production" / "thresholds.json"))["mode"] == "production"
+    # a store's thresholds file belongs to its mode: aggregating the other mode into it is refused
+    with pytest.raises(SystemExit):
+        AM.aggregate(str(root), mem_root=str(root / "alias_memory_production"), mode="validation", gpu=False)
+    with pytest.raises(SystemExit):
+        AM.aggregate(str(root), mem_root=str(root / "alias_memory_validation"), mode="production", gpu=False)
+    # the sampler refuses a version of the other mode's store, and a legacy one (pre-mode aggregation of every demo into <root>/alias_memory)
+    legacy = AM.write_version(str(root / "alias_memory"), AM.collect_rows(str(root)), AM.Thresholds(), batch="old")
+    meta = json.load(open(os.path.join(legacy, "meta.json")))
+    meta.pop("mode")
+    json.dump(meta, open(os.path.join(legacy, "meta.json"), "w"))
+    assert AM.version_mode(legacy) == "legacy"
+    monkeypatch.setenv(AM.ENV_ALIAS, "al_01")
+    monkeypatch.setenv("ISGE_CODE", "/x/trunk_a")
+    AM.enable_for_split("train")
+    try:
+        for path, mode, ok in ((vv, "production", False), (vp, "validation", False), (vv, "validation", True), (vp, "production", True),
+                               (legacy, "production", False), (legacy, "validation", False)):
+            AM._LOADED.clear()
+            AM._MISMATCH.clear()
+            monkeypatch.setenv(AM.ENV_PATH, path)
+            monkeypatch.setenv(AM.ENV_MODE, mode)
+            s = _Sampler()
+            assert (AM.memory_for(s) is not None) == ok
+            assert bool(s.kit.stats.get("alias_memory.mode_mismatch")) == (not ok)
+    finally:
+        AM.enable_for_split(None)
+        AM._LOADED.clear()
+        AM._MISMATCH.clear()
+
+
+def test_thresholds_read_from_the_file(tmp_path):
+    root = tmp_path / "root"
+    _fake_job(root, "t1", "al_01", 1, True, mode="production")
+    store = root / "alias_memory_production"
+    store.mkdir(parents=True)
+    (store / "thresholds.json").write_text(json.dumps({"min_n": 5, "p_worse": 0.9, "floor": 0.1}))
+    v = AM.aggregate(str(root), gpu=False)
+    mem = AM.load_version(v, "al_01")
+    assert (mem.th.min_n, mem.th.p_worse, mem.th.floor, mem.th.max_mean) == (5, 0.9, 0.1, 0.35)  # the file wins, the rest default
+    # no file yet: written with the mode's defaults (the file the memory reads from then on)
+    v2 = AM.aggregate(str(root), mode="validation", seed=_seed_version(tmp_path), gpu=False)
+    f = json.load(open(root / "alias_memory_validation" / "thresholds.json"))
+    assert f == json.loads(json.dumps(AM.dataclasses.asdict(AM.Thresholds.for_mode("validation"))))
+    assert AM.load_version(v2, "al_01").th == AM.Thresholds.for_mode("validation")
+
+
+class _St:
+    def __init__(self, tr, ti=-0.53, so=0.35, arms=("right",)):
+        self.translate, self.tilt, self.stand_off, self.arms, self.extras = tr, ti, so, list(arms), {}
+
+
+def _pick_rows():
+    rs = [row(ok=True, pick=K(tr=0.0, ti=-0.61, so=0.35), t=f"2026-11-07T0{i}") for i in range(6)]
+    rs += [row(ok=False, stage="pick", ftype="robot_wobble", pick=K(tr=0.25, ti=-0.53, so=0.35), t=f"2026-11-07T1{i}") for i in range(4)]
+    return rs
+
+
+def test_pick_hook_reorders_but_never_blocks():
+    mem = _mem(_pick_rows())
+    stances = [_St(0.25), _St(0.0, -0.61), _St(0.25), _St(0.0, -0.61), _St(0.5, -0.45)]
+    d = mem.decide("pick", AM.pick_cfg("right", stances[0]), max_level=AM.PICK_HOOK_LEVELS)
+    assert d.down and d.key == ("right", 0.25, -0.53, 0.35)
+    deferred = kept = 0
+    for seed in range(300):
+        s = _Sampler()
+        AM._LOADED.clear()
+        new, prov = AM.reorder(s, "pick", [2, 0, 1, 4, 3], [AM.pick_cfg("right", st) for st in stances], np.random.default_rng(seed),
+                               max_level=AM.PICK_HOOK_LEVELS, mem=mem)
+        assert sorted(new) == [0, 1, 2, 3, 4]  # never removed
+        back = [k for k in new if prov.get(k, {}).get("deferred")]  # 4 (trunk 0.50): no evidence, no provenance
+        assert new == [k for k in [2, 0, 1, 4, 3] if k not in back] + back and set(back) <= {0, 2}
+        st = s.kit.stats
+        assert st["alias_memory.pick.flagged"] == 2 and st["alias_memory.pick.reordered"] == len(back) and st["alias_memory.pick.explored"] == 2 - len(back)
+        deferred += bool(back)
+        kept += not back
+    assert deferred > 200 and kept > 0  # mostly deferred; a Thompson draw (never below the floor) keeps the flagged bin in place now and then
+
+
+def test_reorder_pick_wrapper_and_off(monkeypatch):
+    stances = [_St(0.25), _St(0.0, -0.61)]
+    rng = np.random.default_rng(3)
+    st0 = json.dumps(rng.bit_generator.state, sort_keys=True)
+    monkeypatch.delenv(AM.ENV_PATH, raising=False)
+    AM.enable_for_split("train")
+    try:
+        s = _Sampler()
+        assert AM.reorder_pick(s, np.array([1, 0]), stances, lambda st: "right", rng) == [1, 0]  # memory off: the order as given
+        assert not s.kit.stats and all("alias_memory_pick" not in st.extras for st in stances)
+        mem = _mem(_pick_rows())
+        monkeypatch.setattr(AM, "memory_for", lambda sampler: mem)
+        n_back = 0
+        for _ in range(50):
+            new = AM.reorder_pick(s, [0, 1], stances, lambda st: "right", np.random.default_rng(_))
+            assert sorted(new) == [0, 1]
+            n_back += new == [1, 0]
+        assert n_back > 30
+        assert stances[0].extras["alias_memory_pick"]["down"] and not stances[1].extras["alias_memory_pick"]["down"]
+        assert json.dumps(rng.bit_generator.state, sort_keys=True) == st0
+    finally:
+        AM.enable_for_split(None)
+
+
+def test_pick_provenance_recorded(tmp_path):
+    root = tmp_path / "root"
+    d = _fake_job(root, "t1", "al_01", 1, True, mode="validation")
+    sc = next((d / "inst").glob("*.oracle.json"))
+    j = json.loads(sc.read_text())
+    j["stances"]["manipulation"]["alias_memory_pick"] = {"version": "v0001", "down": True, "deferred": False}
+    sc.write_text(json.dumps(j))
+    r = AM.demo_rows(str(d))[0]
+    assert r["sampled_with_pick"]["version"] == "v0001" and r["mode"] == "validation"

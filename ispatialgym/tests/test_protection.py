@@ -173,3 +173,92 @@ def test_transit_label_exempts_the_hand_holding_a_press_on_the_object():
             assert ctx["protection"][0]["hold_exempt"]["object"] == "target_carton_cdmmwy_0"
         else:
             assert "hold_exempt" not in labels[0] and "hold_exempt" not in ctx["protection"][0]
+
+
+def _brace_mon(monkeypatch, switch):
+    """A Monitors stub in the right arm's push (pre_contact transit) with the left brace's ``brace_allowed`` pair on the carton."""
+    from collections import Counter
+
+    from ispatialgym.oracle import qa as Q
+
+    if switch is None:
+        monkeypatch.delenv(Q.BRACE_PROTECT_SWITCH, raising=False)
+    else:
+        monkeypatch.setenv(Q.BRACE_PROTECT_SWITCH, switch)
+    robot = SimpleNamespace(prim_path="/World/scene_0/robot_r1")
+    carton = _obj("target_carton_cdmmwy_0", "carton", "cdmmwy")
+    registry = {carton.prim_path: carton}
+    mon = Q.Monitors.__new__(Q.Monitors)
+    events = []
+    mon.cfg, mon.robot = Q.QAConfig(), robot
+    mon.scene = SimpleNamespace(idx=0, object_registry=lambda key, path, default=None: registry.get(path, default))
+    mon.stats = SimpleNamespace(record=lambda v: None, event=events.append)
+    left = ["left_gripper_finger_link1", "left_gripper_finger_link2", "left_gripper_link"]
+    for k, v in {"collision_events": [], "_prim_cache": {}, "_contact_failed": False, "action": SimpleNamespace(name="push"), "action_index": 2, "attempt": 0,
+                 "manipulation": True, "intended": set(), "exempt_links": {"right_gripper_finger_link1"}, "held": [], "arms": ("right",), "action_steps": 0,
+                 "episode_steps": 0, "epilogue": False, "forbidden": set(), "watch": [], "watch_hits": [], "allowed": [(set(left), carton.name)], "transit": None,
+                 "protect_events": [], "_pairs_step": None, "_pairs": set()}.items():
+        setattr(mon, k, v)
+    mon._contact_streak, mon.collisions_by_object = Counter(), Counter()
+    pairs = {"now": set()}
+    mon._contact_api = SimpleNamespace(get_contact_pairs=lambda idx, query, other, current_only=False: set(pairs["now"]))
+    mon.begin_transit([("carton.n.02_1", carton)], {"task": "close_02", "action": "push", "index": 2, "leg": "pre_contact"})
+    return mon, pairs, robot, carton, events
+
+
+def test_brace_allowed_pair_is_allowed_in_the_protected_check_during_the_other_arms_move(monkeypatch):
+    """Owner 5r.2: the brace finger coming into contact with the braced carton after the span opened (300006: step 409 of the right
+    push's pre_contact) is allowed with the switch on - the pair brace_allowed lists, during the other arm's move."""
+    for switch in ("1", None):  # on, and the default
+        mon, pairs, robot, carton, events = _brace_mon(monkeypatch, switch)
+        pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link")}
+        mon.episode_steps = 1
+        assert mon._check_protected() is None and events == ["protect_brace_allowed"]
+    mon.episode_steps = 2
+    assert mon._check_protected() is None and events == ["protect_brace_allowed"]  # counted once per pair and span
+
+
+def test_brace_allowed_rule_leaves_unlisted_pairs_failing(monkeypatch):
+    """An unlisted pair still fails: the moving arm's finger on the carton, a brace-arm link outside brace_allowed (the wrist), and the
+    brace fingers on another protected object; the brace arm's own move (its pairs then belong to the moving arm) gets no exemption."""
+    from ispatialgym.oracle import qa as Q
+
+    mon, pairs, robot, carton, _ = _brace_mon(monkeypatch, "1")
+    for link in ("right_gripper_finger_link2", "left_arm_link6"):
+        mon.begin_transit([("carton.n.02_1", carton)], {"leg": "pre_contact"})
+        pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link"), (f"{robot.prim_path}/{link}", f"{carton.prim_path}/base_link")}
+        mon.episode_steps += 1  # the contact pairs are read once per step
+        v = mon._check_protected()
+        assert v is not None and v.category == "protected_contact" and v.details["link"] == link
+    saucer = _obj("partner_saucer_mgbeah_0", "saucer", "mgbeah")
+    reg = {carton.prim_path: carton, saucer.prim_path: saucer}
+    mon.scene = SimpleNamespace(idx=0, object_registry=lambda key, path, default=None: reg.get(path, default))
+    pairs["now"] = set()
+    mon.begin_transit([("carton.n.02_1", carton), ("saucer.n.02_1", saucer)], {"leg": "pre_contact"})
+    pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{saucer.prim_path}/base_link")}
+    mon.episode_steps += 1
+    v = mon._check_protected()
+    assert v is not None and v.details["object"] == saucer.name
+    mon.arms = ("left",)  # the brace arm moving itself (its retreat): its listed pair is not the other arm's move
+    pairs["now"] = set()
+    mon.begin_transit([("carton.n.02_1", carton)], {"leg": "retreat"})
+    pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link")}
+    mon.episode_steps += 1
+    v = mon._check_protected()
+    assert v is not None and v.details["link"] == "left_gripper_finger_link1"
+    assert mon._brace_protect_allowed() == [] and Q.BRACE_PROTECT_SWITCH == "ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED"
+
+
+def test_brace_allowed_rule_changes_nothing_without_an_active_brace_or_with_the_switch_off(monkeypatch):
+    """No active brace (begin_action's allowed empty) or the switch off ("0"): the brace finger's new contact is a verdict, as before."""
+    from ispatialgym.oracle import qa as Q
+
+    assert Q.BRACE_PROTECT_DEFAULT == "1"  # default on since the lead's decision 8 (2026-11-08)
+    for switch, allowed in (("1", []), (None, []), ("0", None)):
+        mon, pairs, robot, carton, events = _brace_mon(monkeypatch, switch)
+        if allowed is not None:
+            mon.allowed = allowed
+        pairs["now"] = {(f"{robot.prim_path}/left_gripper_finger_link1", f"{carton.prim_path}/base_link")}
+        mon.episode_steps += 1  # the contact pairs are read once per step
+        v = mon._check_protected()
+        assert v is not None and v.category == "protected_contact" and v.details["link"] == "left_gripper_finger_link1" and events == []

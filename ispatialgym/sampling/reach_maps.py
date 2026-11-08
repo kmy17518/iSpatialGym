@@ -102,6 +102,15 @@ STATUS = {"unevaluated": 0, "feasible": 1, "off_support": 2, "reach_bound": 3, "
 STATUS_NAME = {v: k for k, v in STATUS.items()}
 
 
+def _split_finger_touch_mode() -> str:
+    """i7-t03 2026-11-08 (owner item 2): ``ISPATIALGYM_SPLIT_FINGER_TOUCH`` (``sampling.v2.ik.SPLIT_FINGER_TOUCH_ENV``, read here without
+    importing the sampler) - ``"on"`` / ``"shadow"`` / ``"off"`` (default)."""
+    v = os.environ.get("ISPATIALGYM_SPLIT_FINGER_TOUCH", "").strip().lower()
+    if v in ("", "0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
 @dataclass
 class MapConfig:
     arm: str = "right"
@@ -153,11 +162,16 @@ class MapConfig:
     # i7-interior 2026-11-07: an interior PLACE map's rule (``interior_place.place_rule``: the stable rest's release as stance C's exact place
     # checks it); None for every other map (left out of key(): their keys stay - the former interior maps included)
     interior_place: Optional[Dict[str, Any]] = None
+    # i7-axialrest 5y fix (lead decision 2026-11-08, owner away): a contact map's IK acceptance keeps the LIVE joint-limit margin (rad; every
+    # chain configuration's arm joints at least this far from their limits, as ``IKChecker.JOINT_LIMIT_MARGIN`` / ``away_from_limits`` keep
+    # live). None = the former acceptance (cuRobo's success alone); left out of key() while None (the maps built before keep their keys).
+    # Set by ``contact_maps.contact_config`` for the axial_brace kind under ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN=1 only
+    joint_margin_rad: Optional[float] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place", "joint_margin_rad"):
             if d.get(k) is None:
                 d.pop(k)
         return d
@@ -919,6 +933,18 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
         ok, worst = CP.sphere_support_ok(sph, ln, sb_, cfg.arm, policy, ground_contact_links=ground_links, floor_support=floor)
         if obs_:
             ok_o, worst_o = CP.spheres_clear(sph, ln, obs_)
+            mode2 = _split_finger_touch_mode()
+            if mode2 != "off":
+                # i7-t03 2026-11-08 (owner item 2, ISPATIALGYM_SPLIT_FINGER_TOUCH, default off): the normal obstacles of an interior map are the
+                # synthetic world's split-off pieces - the fingers meet them only through their exact hulls (hand_check's check_obstacles,
+                # clearance >= 0), never through their padded spheres; every other link keeps the sphere rule. Counted per map (sphere_hits).
+                ok_f, worst_f = CP.spheres_clear(sph, ln, obs_, skip_links=list(H.role_links(cfg.arm)["finger"]))
+                gain = ok_f.to(ok_o.device) & ~ok_o
+                if bool(gain.any()):
+                    k = "finger_touch_allowed" if mode2 == "on" else "finger_touch_shadow_pass"
+                    sphere_hits[k] = sphere_hits.get(k, 0) + int(gain.sum())
+                if mode2 == "on":
+                    ok_o, worst_o = ok_f, worst_f
             if pid is not None:
                 for w, o, wo in zip(worst, ok_o.tolist(), worst_o):
                     if w or not o:
@@ -1211,6 +1237,11 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                          "x_min_m": cfg.x_min_m, "y_half_m": cfg.y_half_m, "x_max_m": cfg.x_max_m, "ground_contact_links": ground_links,
                          "finger_allowance_m": policy.floor_finger_max_penetration_m, "fingers": cfg.floor_fingers,
                          "trunks": "reach_bands.trunk_grid(0.0): TRANSLATES x (TILTS + LOW_TOP_TILT) + GROUND_TRUNKS"}
+    if meta.get("interior") is not None and _split_finger_touch_mode() == "on":
+        # i7-t03 2026-11-08 (owner item 2, default off): a map built with the fingers' sphere stage off against the obstacles is another
+        # map - its key differs (map_key), so no job reads it in place of the rule-off map (a reader pinning the rule is not written yet)
+        meta["split_finger_touch"] = 1
+        meta["finger_touch_allowed_configs"] = int(sphere_hits.get("finger_touch_allowed", 0))
     meta["key"] = map_key(meta)
     return meta, arrays
 
@@ -1244,6 +1275,8 @@ def map_key(meta: Dict[str, Any]) -> str:
         ident["lean"] = (meta.get("lean") or {}).get("digest")
     if meta.get("overhang") is not None:  # i7-overhang 2026-11-07: an overhang map's rest identity and its edge offset (other keys stay)
         ident["overhang"] = {k: meta["overhang"].get(k) for k in ("digest", "edge_along_m", "yaw_rad")}
+    if meta.get("split_finger_touch"):  # i7-t03 2026-11-08 (item 2, default off): built with the fingers judged by hulls only (other keys stay)
+        ident["split_finger_touch"] = meta["split_finger_touch"]
     return hashlib.sha1(json.dumps(ident, sort_keys=True).encode()).hexdigest()[:16]
 
 

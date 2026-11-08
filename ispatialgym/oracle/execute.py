@@ -1949,6 +1949,10 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     g_extra = getattr(getattr(action, "grasp", None), "extra", None)
+    if isinstance(g_extra, dict) and isinstance(g_extra.get("handover"), dict) and g_extra["handover"].get("role") == "hold":
+        # i7-cork (the hand-over): the object is in the other hand in the air - no support under it, nothing to lift the grasp off
+        ctx["grasp_support_lift"] = {"applied": False, "reason": "a hand-over grasp: the object is held in the air by the other hand"}
+        return targets
     if isinstance(g_extra, dict) and g_extra.get("pick_overhang"):
         # the overhang pick (owner 2026-10-13 ~03:15 item 4): the object was pushed past its support's edge so that the finger below it
         # stands in free space - lifting the grasp would only take the pads off the rim
@@ -2198,6 +2202,101 @@ def transit_preshape_held(motions: Motions, arm: str) -> Optional[float]:
     return float(q_m) if held else None
 
 
+def _overhang_grasp(action: Grasp) -> bool:
+    """The grasp of an overhang pick (``grasps[k].pick_overhang``: after the push toward the support edge)."""
+    return isinstance(getattr(getattr(action, "grasp", None), "extra", None), dict) and action.grasp.extra.get("pick_overhang") is not None
+
+
+class TransitClearance:
+    """i7-overpath 2026-11-08 (diagnostic, the overhang pick's grasp only): the smallest clearance of the moving arm's collision spheres to
+    the grasped object's box along the EXECUTED transit to the pre-grasp - the configurations sampled every ``every`` control steps of
+    whatever moved the arm (the recorded overpath or the planned transit), measured after the leg (``protection.sphere_box_clearance``).
+    ``ctx["transit_book_clearance"]``: ``{"min_m", "n", "at"}`` (``at`` = the sample's fraction of the leg)."""
+
+    def __init__(self, motions: Motions, state, action: Grasp, arm: str, every: int = 2):
+        self.motions, self.arm, self.every = motions, arm, max(1, int(every))
+        try:
+            self.obj = state.object(action.object)
+        except Exception:  # noqa: BLE001
+            self.obj = None
+        self.qs: List[th.Tensor] = []
+        self.k = 0
+
+    def sampled(self, gen):
+        while True:
+            try:
+                x = next(gen)
+            except StopIteration as e:
+                return e.value
+            self.k += 1
+            if self.k % self.every == 1 or self.every == 1:
+                try:
+                    self.qs.append(C.as_tensor(self.motions.backend.q_full()).reshape(-1).float().clone())
+                except Exception:  # noqa: BLE001 - a diagnostic
+                    pass
+            yield x
+
+    def report(self) -> Dict[str, Any]:
+        from ispatialgym.oracle import protection as PROT
+
+        fn = getattr(getattr(self.motions, "backend", None), "robot_spheres_world", None)
+        box = PROT.object_box(self.obj) if self.obj is not None else None
+        if fn is None or box is None or not self.qs:
+            return {"min_m": None, "n": len(self.qs)}
+        try:
+            spheres, links = fn(th.stack(self.qs), f"{self.arm}_arm")
+            mask = PROT.moving_sphere_mask(links, [self.arm])
+            val, _ = PROT.sphere_box_clearance(spheres[:, mask], box)
+        except Exception as e:  # noqa: BLE001 - a diagnostic
+            return {"min_m": None, "n": len(self.qs), "error": repr(e)[:160]}
+        k = int(th.argmin(val))
+        return {"min_m": round(float(val[k]), 4), "n": len(self.qs), "at": round(k / max(1, len(self.qs) - 1), 3),
+                "start_m": round(float(val[0]), 4), "end_m": round(float(val[-1]), 4)}
+
+
+def follow_overpath(action: Grasp, motions: Motions, targets, ctx, arm: str) -> Generator[th.Tensor, None, bool]:
+    """i7-overpath 2026-11-08 (owner 3(a)): the overhang pick's recorded transit over the book (``Grasp.overpath``,
+    :mod:`ispatialgym.oracle.overpath`): the arm follows the recorded joint waypoints from where the escape (and the drive to the grasp
+    stance) left it to the pre-grasp - ``Motions.recorded_joint_path`` (checked against the world and the protected objects) streamed by
+    ``execute_joint_trajectory`` - instead of planning that transit. True when it ran; False when its run-time check refuses it (nothing
+    moved: the planned transit runs as before). ``ctx["overpath"]``: the record's facts, the check, ``followed``, the tracking error
+    (``joint_err_rad`` to the last waypoint, ``pre_grasp_err_m`` of the eef to the live pre-grasp)."""
+    from ispatialgym.oracle import overpath as OPATH
+
+    rec = action.overpath
+    note: Dict[str, Any] = {"waypoints": len(rec.get("q") or []), "clearance_m": rec.get("clearance_m"), "sampler_min_book_clearance_m": rec.get("min_book_clearance_m"),
+                            "start": rec.get("start"), "followed": False}
+    ctx["overpath"] = note
+    fn = getattr(motions, "recorded_joint_path", None)
+    if fn is None:
+        note["fallback"] = "no recorded-path support in this Motions"
+        return False
+    try:
+        qs = OPATH.parse(rec)
+    except ValueError as e:
+        note["fallback"] = str(e)
+        return False
+    traj, chk = fn(arm, qs)
+    note.update({k: v for k, v in chk.items() if k != "what"})
+    if traj is None:
+        note["fallback"] = chk.get("why")
+        log.warning("grasp(%s): the recorded overpath is refused at run time (%s): the planned transit instead", arm, chk.get("why"))
+        return False
+    log.info("grasp(%s): following the recorded overpath over %s (%d waypoints, %d steps, start %.3f rad off the record)", arm, action.object,
+             len(qs), int(chk.get("n_steps", 0)), float(chk.get("start_gap_rad", 0.0)))
+    yield from motions.execute_joint_trajectory(traj, arms=[arm])
+    try:
+        idx = motions.robot.arm_control_idx[arm]
+        q_after = C.as_tensor(motions.q_full()).reshape(-1).float()
+        note["joint_err_rad"] = round(float((q_after[idx] - qs[-1]).abs().max()), 4)
+        note["pre_grasp_err_m"] = round(float(th.linalg.norm(as_world_pose(motions.eef_pose(arm))[0].float() - as_world_pose(targets["pre_grasp"])[0].float())), 4)
+    except Exception as e:  # noqa: BLE001 - a diagnostic
+        note["tracking_error"] = repr(e)[:160]
+    note["followed"] = True
+    ctx["pre_grasp_transit"] = "recorded overpath"
+    return True
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     targets = lift_grasp_off_support(action, motions, state, targets, ctx, _cfg(ctx))
@@ -2256,11 +2355,23 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     pre_touch = [o for o in may_touch_objects(state, action, pre_grasp=True).values() if all(o is not s for s in ignored_supports)]
     if pre_touch:
         ctx["plan_ignored"] = list(ctx["plan_ignored"]) + [getattr(o, "name", str(o)) for o in pre_touch]
-    with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
-        if action.repose is not None:
-            yield from repose_arm(action, motions, ctx)
-        yield from _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
-        yield from _into_witness_posture(motions, targets, ctx, arm)
+    clearance = TransitClearance(motions, state, action, arm) if _overhang_grasp(action) else None  # i7-overpath diagnostic
+    try:
+        with _transit(ctx, motions, state, action, "pre_grasp", target=action.object):
+            if action.repose is not None:
+                yield from repose_arm(action, motions, ctx)
+            followed = False
+            if getattr(action, "overpath", None) is not None:
+                # i7-overpath 2026-11-08 (owner 3(a)): the overhang pick's transit over the book follows the sampler's recorded joint path
+                leg = follow_overpath(action, motions, targets, ctx, arm)
+                followed = yield from (clearance.sampled(leg) if clearance is not None else leg)
+            if not followed:
+                leg = _grasp_transit(action, motions, state, targets, ctx, arm, list(ignored_supports) + pre_touch, ignore_links)
+                yield from (clearance.sampled(leg) if clearance is not None else leg)
+            yield from _into_witness_posture(motions, targets, ctx, arm)
+    finally:
+        if clearance is not None:
+            ctx["transit_book_clearance"] = clearance.report()
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
@@ -2328,6 +2439,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)
+    other = "left" if arm == "right" else "right"
+    if ((getattr(motions.backend, "_attached", None) or {}).get(other) or {}).get("obj") is obj:
+        # i7-cork (the hand-over, owner decision 2026-11-08 4.2 (i)): the object the other hand still holds now rides in this hand too - the
+        # planner keeps it on ONE arm: off the giving arm (its release retreat follows), onto this one
+        motions.backend.detach_object(other)
+        ctx["handover_from"] = other
     motions.backend.attach_object(arm, obj)
     ctx["attached"] = obj.name
 
@@ -2654,6 +2771,63 @@ def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry
     return "legs", chosen["legs"]
 
 
+#: i7-framing (owner decision 2026-11-08 5.1, the owner's torso suggestion; default off): ``1`` = the place's protective via-above of the carry
+#: is made by the TORSO when the sampler recorded ``grasps[].carry_torso`` (``IORSSmall.carry_torso_lift``, the same switch name)
+CARRY_TORSO_LIFT_ENV = "ISPATIALGYM_CARRY_TORSO_LIFT"
+#: i7-framing 5d.3: the middle option records the torso lift in its near band, so it executes it too (DEFAULT ON since 5s.1, ``0`` = off;
+#: must match ``program_check.carry_band_on``)
+CARRY_BAND_ENV = "ISPATIALGYM_CARRY_BAND"
+
+
+def _carry_torso_record(action: Place, ctx: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    """``(translate, tilt)`` of the held object's ``grasps[].carry_torso`` when ``ISPATIALGYM_CARRY_TORSO_LIFT=1`` or
+    ``ISPATIALGYM_CARRY_BAND`` (DEFAULT on, owner 5s.1) is on, else None."""
+    on = ("1", "on", "true", "yes")
+    if (os.environ.get(CARRY_TORSO_LIFT_ENV, "") or "0").strip().lower() not in on and (os.environ.get(CARRY_BAND_ENV, "") or "1").strip().lower() not in on:
+        return None
+    sc = ctx.get("sidecar")
+    g = next((g for g in (getattr(sc, "grasps", None) or []) if g.object == action.object and getattr(g, "arm", None) in (None, action.arm)), None)
+    rec = (getattr(g, "extra", None) or {}).get("carry_torso") if g is not None else None
+    if not isinstance(rec, dict) or rec.get("translate") is None or rec.get("tilt") is None:
+        return None
+    return float(rec["translate"]), float(rec["tilt"])
+
+
+def _carry_torso_lift(action: Place, motions: Motions, state, targets, ctx: Dict[str, Any], cfg: "ExecuteConfig", arm: str, on, carry, torso: Tuple[float, float],
+                      err: SkillError) -> Iterator[th.Tensor]:
+    """i7-framing (owner 2026-11-08 5.1): the protective via-above of the carry made by the torso. (1) ``trunk_to(carry_torso)`` with the
+    arm joints held - the hand (and the object) rise with ``torso_link4``, the head camera with them, so the fingertips keep their image
+    position; (2) the recorded straight carry ``carry`` moved rigidly with the torso (``Mt`` = torso_link4 after ∘ before⁻¹), tracked
+    as usual (finish: ``arm_to`` its end with the pre-place witness's arm joints at the carry trunk); (3) ``trunk_to`` back to the
+    stance's trunk with the arm held - the hand lands on the pre-place. The sampler checked the leg (tracked exact IK, framing) and
+    the two trunk sweeps (whole body, the object attached)."""
+    link = motions.robot.links["torso_link4"]
+    t0, k0 = float(motions.trunk.translate), float(motions.trunk.tilt)
+    pa, qa = link.get_position_orientation()
+    A = (pa.float(), qa.float())
+    yield from motions.trunk_to(translate=torso[0], tilt=torso[1])
+    pb, qb = link.get_position_orientation()
+    Mt = C.compose((pb.float(), qb.float()), C.invert(A))
+    legs = [tuple(C.compose(Mt, as_world_pose(w))) for w in carry]
+    P = getattr(motions, "_protect", None)
+    if P is not None:
+        P["along"] = "log"  # as the via-above: the displaced leg is executed, a remaining near pass is logged, the run-time check stays
+    wq = _witness(ctx, "pre_place")
+    if wq is not None:
+        wq = C.as_tensor(wq).clone().float().reshape(-1)
+        wq[[C.JOINT_INDEX[n] for n in M.TORSO_JOINTS]] = C.torso_q(torso[0], torso[1], C.TORSO_JOINT_LIMITS)
+    finish = _free_leg_finish(state, legs[-1], wq, on, cfg)
+    yield from motions.arm_along(arm, legs, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    yield from motions.trunk_to(translate=t0, tilt=k0)
+    here = as_world_pose(state.eef_pose(arm))
+    miss = float(th.linalg.norm(here[0].float() - as_world_pose(targets["pre_place"])[0].float()))
+    ctx["carry_leg"] = {"kind": "straight via torso lift", "carry_torso": [round(torso[0], 4), round(torso[1], 4)], "from": [round(t0, 4), round(k0, 4)],
+                        "rise_m": round(float(pb[2] - pa[2]), 3), "waypoints": len(legs), "pre_place_miss_m": round(miss, 4),
+                        "finish": finish.info if finish.used else None, "protected": err.details.get("protected")}
+    log.info("place(%s): the protective carry by the torso: trunk (%.2f, %.2f) -> (%.2f, %.2f), torso_link4 +%.3f m, back; %.1f mm from the pre-place",
+             action.object, t0, k0, torso[0], torso[1], float(pb[2] - pa[2]), 1000 * miss)
+
+
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
@@ -2725,17 +2899,23 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             except SkillError as e:
                 if e.details.get("stage") != "protected":
                     raise
-                here = as_world_pose(state.eef_pose(arm))
-                pre_p, pre_q = as_world_pose(targets["pre_place"])
-                z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
-                legs = [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q), (pre_p, pre_q)]
-                P = getattr(motions, "_protect", None)
-                if P is not None:
-                    P["along"] = "log"  # the via-above leg is executed; a remaining near pass is logged, the run-time check stays
-                finish2 = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
-                yield from motions.arm_along(arm, legs, finish=finish2, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-                ctx["carry_leg"] = {"kind": "straight via above", "lift_m": round(z_top - max(float(here[0][2]), float(pre_p[2])), 3), "finish": finish2.info if finish2.used else None,
-                                    "protected": e.details.get("protected")}
+                torso = _carry_torso_record(action, ctx)
+                if torso is not None:
+                    # i7-framing (owner 2026-11-08 5.1; ISPATIALGYM_CARRY_TORSO_LIFT=1 and the sampler's grasps[].carry_torso): the protective
+                    # rise made by the TORSO, arm joints held (the arm's rise took the fingertips out of the head camera's frame)
+                    yield from _carry_torso_lift(action, motions, state, targets, ctx, cfg, arm, on, carry, torso, e)
+                else:
+                    here = as_world_pose(state.eef_pose(arm))
+                    pre_p, pre_q = as_world_pose(targets["pre_place"])
+                    z_top = max(float(here[0][2]), float(pre_p[2])) + float(motions.cfg.protect_above_m)
+                    legs = [(th.tensor([float(here[0][0]), float(here[0][1]), z_top]), here[1]), (th.tensor([float(pre_p[0]), float(pre_p[1]), z_top]), pre_q), (pre_p, pre_q)]
+                    P = getattr(motions, "_protect", None)
+                    if P is not None:
+                        P["along"] = "log"  # the via-above leg is executed; a remaining near pass is logged, the run-time check stays
+                    finish2 = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
+                    yield from motions.arm_along(arm, legs, finish=finish2, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+                    ctx["carry_leg"] = {"kind": "straight via above", "lift_m": round(z_top - max(float(here[0][2]), float(pre_p[2])), 3), "finish": finish2.info if finish2.used else None,
+                                        "protected": e.details.get("protected")}
     else:
         with _transit(ctx, motions, state, action, "carry"):
             yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)

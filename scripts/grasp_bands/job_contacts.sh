@@ -54,11 +54,16 @@ if [[ " $STAGES " == *" replay "* ]]; then
   echo "GC_STAGE replay rc=$rc s=$(( $(date +%s) - t0 ))"
 fi
 if [[ " $STAGES " == *" validate "* ]]; then
+  # i7-brace (owner 3.4): GC_VALIDATE_ARMS="left right" runs one validation per arm (a wall_brace library: each entry its own brace arm;
+  # log validate_<i>_<kind>_<arm>.log); unset = one run at the kind's default arm (the log name as before)
   for KIND in ${GC_KINDS:-push brace}; do
-    t0=$(date +%s)
-    python -u -m ispatialgym.grasping.validate_contacts --root $ROOT --kind $KIND --glib $GLIB --jobs $M --shard $I/$N ${GC_VALIDATE_ARGS:-} >> $ROOT/logs/validate_${I}_$KIND.log 2>&1
-    rc=$?; grep -q "GB_CONTACT_VALIDATE_DONE" $ROOT/logs/validate_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
-    echo "GC_STAGE validate kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
+    for ARM in ${GC_VALIDATE_ARMS:-default}; do
+      t0=$(date +%s)
+      if [ "$ARM" = default ]; then AARG=""; VLOG=$ROOT/logs/validate_${I}_$KIND.log; else AARG="--arm $ARM"; VLOG=$ROOT/logs/validate_${I}_${KIND}_$ARM.log; fi
+      python -u -m ispatialgym.grasping.validate_contacts --root $ROOT --kind $KIND --glib $GLIB --jobs $M --shard $I/$N $AARG ${GC_VALIDATE_ARGS:-} >> $VLOG 2>&1
+      rc=$?; grep -q "GB_CONTACT_VALIDATE_DONE" $VLOG || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
+      echo "GC_STAGE validate kind=$KIND arm=$ARM rc=$rc s=$(( $(date +%s) - t0 ))"
+    done
   done
 fi
 if [[ " $STAGES " == *" maps "* ]]; then
@@ -81,12 +86,16 @@ if '--only' in a:
 print(' '.join(j['id'] for j in CL._jobs(sys.argv[1], only or None, sys.argv[2])))" $M $I/$N "${GC_VALIDATE_ARGS:-}")
     MSEL="--only ${MIDS:-__none__}"
   fi
+  # i7-brace: GC_MAP_ARMS="left right" = one process per arm (a wall_brace map per brace arm; log maps_<i>_<kind>_<arm>.log)
   for KIND in ${GC_MAP_KINDS:-touch_push touch_brace push_blade axial_brace}; do
-    t0=$(date +%s)
-    python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT $MSEL --verdicts ${GC_MAP_VERDICTS:-valid} \
-      ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} ${GC_MAP_OVERLAY:+--overlay-root $GC_MAP_OVERLAY} >> $ROOT/logs/maps_${I}_$KIND.log 2>&1
-    rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $ROOT/logs/maps_${I}_$KIND.log || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
-    echo "GC_STAGE maps kind=$KIND rc=$rc s=$(( $(date +%s) - t0 ))"
+    for MARM in ${GC_MAP_ARMS:-default}; do
+      t0=$(date +%s)
+      if [ "$MARM" = default ]; then MAARG=""; MLOG=$ROOT/logs/maps_${I}_$KIND.log; else MAARG="--arm $MARM"; MLOG=$ROOT/logs/maps_${I}_${KIND}_$MARM.log; fi
+      python -u -m ispatialgym.sampling.contact_maps compute --root $ROOT --kind $KIND --out $MOUT $MSEL --verdicts ${GC_MAP_VERDICTS:-valid} $MAARG \
+        ${GC_MAP_HEIGHTS:+--heights $GC_MAP_HEIGHTS} ${GC_MAP_OVERLAY:+--overlay-root $GC_MAP_OVERLAY} >> $MLOG 2>&1
+      rc=$?; grep -q "GB_CONTACT_MAPS_DONE" $MLOG || rc=${rc/#0/1}; [ $RC = 0 ] && RC=$rc
+      echo "GC_STAGE maps kind=$KIND arm=$MARM rc=$rc s=$(( $(date +%s) - t0 ))"
+    done
   done
 fi
 echo "GC_JOB_DONE shard $I rc=$RC end $(date +%s)"

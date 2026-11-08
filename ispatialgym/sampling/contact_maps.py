@@ -6,8 +6,9 @@ the partner gap and the task goal) - over a lattice of object positions in the r
 :mod:`reach_maps` (the R1Pro alone, cuRobo; the support a synthetic slab at the anchor height, or the floor plane). Kinds
 (:data:`KINDS`): ``touch_push`` (right arm, the touching targets), ``touch_brace`` (left arm, the touching partners), ``push_blade``
 (right arm, the axial blade push), ``axial_brace`` (left arm, the axial stop brace: the object ROOT at its GOAL pose), ``floor_push``
-(right arm, on the floor plane: the push-under blade families when their library exists). No maps for the base push, world_vertical or
-articulation_large.
+(right arm, on the floor plane: the push-under blade families when their library exists), ``wall_brace`` (i7-brace, owner 3.4: the world_vertical
+brace in the WALL frame - per stand-off d_e the wall plane at x = d_e, the hung target's root row in front of it, the hinge at the map height;
+each arm's entries their own map). No maps for the base push or articulation_large.
 
 Axes: per edge distance x trunk (``reach_bands.trunk_grid(h)``) a status (:data:`STATUS`) per (cell = the object ROOT xy in the map frame -
 the base on the floor, +x ahead -, yaw slot = the library's object yaw relative to the stance (``yaw_deg``: the start yaw, the goal yaw of
@@ -53,13 +54,40 @@ KINDS: Dict[str, Dict[str, Any]] = {
     "push_blade": {"lib_kind": "push", "families": ("axial_push",), "arm": "right", "plane": "slab", "frame": "start"},
     "axial_brace": {"lib_kind": "brace", "families": ("axial_brace",), "arm": "left", "plane": "slab", "frame": "goal"},
     "floor_push": {"lib_kind": "push", "families": ("floor_blade", "floor_flat", "floor_pitched"), "arm": "right", "plane": "floor", "frame": "start"},
+    # i7-brace (owner 3.4): the world_vertical brace in the WALL frame - the base square to the wall at the stand-off d_e (the wall plane at
+    # x = d_e facing -x), the cell = the hung target's ROOT at its level (goal) pose (x = d_e + the rule frame's root x, y lateral), the hinge
+    # at the map height above the floor; arm None = per entry (``wall.brace_arm``: one map per arm, :func:`select_entries`)
+    "wall_brace": {"lib_kind": "brace", "families": ("wall_brace",), "arm": None, "plane": "wall", "frame": "goal"},
 }
+#: i7-brace: the wall map's stand-offs (prompt0's Phase 2 d lattice: D_RANGE_DEFAULT 0.35-0.90 every D_STEP 0.05), the lateral lattice
+#: (LAMBDA_STEP 0.05 over the task's lateral_range +-0.40 plus the root's offset from the hinge), the idle arm's posture (the task's A6
+#: ``stance_arm_posture``: tucked), the wall box (thickness, width, height from the floor)
+WALL_EDGE_DISTANCES = tuple(round(0.35 + 0.05 * k, 2) for k in range(12))
+WALL_LATTICE_M = 0.05
+WALL_Y_HALF_M = 0.60
+WALL_POSTURES = ("tucked",)
+WALL_BOX_M = (0.10, 3.2, 2.6)
 #: the reach-map status codes plus a (yaw, class) the library has no entry for
 STATUS = dict(RM.STATUS, no_entry=12)
 STATUS_NAME = {v: k for k, v in STATUS.items()}
 #: the entry fields that are not its pose content (the validator's verdict, the screen, the stored digest)
 NON_POSE_FIELDS = ("validation", "digest", "sampler_screen")
 DEFAULT_VERDICTS = ("valid",)
+#: i7-axialrest 5y fix (lead decision 2026-11-08, owner away): the live exact IK's joint-limit margin (``IKChecker.JOINT_LIMIT_MARGIN``, rad) a
+#: map's IK acceptance keeps under :func:`joint_margin_on` (axial_brace only); a problem whose chain IK succeeds only closer to a limit has the
+#: status ``ik_margin`` (:data:`STATUS_IK_MARGIN`, written into a map's ``status_codes`` only when the margin is on)
+LIVE_JOINT_LIMIT_MARGIN = 0.05
+STATUS_IK_MARGIN = 13
+STATUS_NAME[STATUS_IK_MARGIN] = "ik_margin"
+#: the kinds the joint-margin switch applies to (the lead's decision: axial_brace only)
+JOINT_MARGIN_KINDS = ("axial_brace",)
+
+
+def joint_margin_on() -> bool:
+    """i7-axialrest 5y fix (default OFF): the axial_brace map builder accepts a chain IK solution only with the live 0.05 rad joint-limit
+    margin on every arm joint at every chain configuration (``MapConfig.joint_margin_rad``: in the map identity only when on).
+    ``ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_MAP_JOINT_MARGIN", "0") == "1"
 
 
 # ------------------------------------------------------------------------------------------------ the pose set (pure)
@@ -73,9 +101,9 @@ def entry_pose_digest(entry: Dict[str, Any]) -> str:
     return CPZ.digest({k: v for k, v in entry.items() if k not in NON_POSE_FIELDS})
 
 
-def select_entries(lib_k: Dict[str, Any], kind: str, verdicts: Optional[Sequence[str]] = DEFAULT_VERDICTS) -> List[Dict[str, Any]]:
+def select_entries(lib_k: Dict[str, Any], kind: str, verdicts: Optional[Sequence[str]] = DEFAULT_VERDICTS, arm: Optional[str] = None) -> List[Dict[str, Any]]:
     """The library entries a ``kind`` map is built from: the kind's families, with a validation verdict in ``verdicts`` (None: every entry,
-    validated or not)."""
+    validated or not); a per-entry-arm kind (``arm`` None in :data:`KINDS`: wall_brace) the entries of ``arm``'s brace only (``wall.brace_arm``)."""
     spec = KINDS[kind]
     if lib_k.get("kind") != spec["lib_kind"]:
         raise ValueError(f"a {kind} map reads a {spec['lib_kind']} library, not {lib_k.get('kind')!r}")
@@ -84,6 +112,8 @@ def select_entries(lib_k: Dict[str, Any], kind: str, verdicts: Optional[Sequence
         if e.get("family") not in spec["families"]:
             continue
         if verdicts is not None and (e.get("validation") or {}).get("verdict") not in verdicts:
+            continue
+        if spec["arm"] is None and arm is not None and str((e.get("wall") or {}).get("brace_arm")) != arm:
             continue
         out.append(e)
     return out
@@ -117,6 +147,12 @@ def class_row(entry: Dict[str, Any]) -> Dict[str, Any]:
            "pose_digest": entry_pose_digest(entry), "verdict": (entry.get("validation") or {}).get("verdict")}
     if entry.get("goal"):
         row["goal"] = {k: entry["goal"].get(k) for k in ("yaw_goal_deg", "turn_rad", "end_sign", "spin")}
+        for k in ("clear_turn_max_deg", "opposite_end", "tilt_sign", "clear_delta_min_deg", "clear_delta_max_deg"):  # i7-brace (owner 3.4): only when the entry has them
+            if entry["goal"].get(k) is not None:
+                row["goal"][k] = entry["goal"][k]
+    if entry.get("wall"):  # i7-brace: the wall brace's kind / wrist / arm (the sampler's brace identity)
+        row["wall"] = {"kind": (entry.get("extras") or {}).get("kind"), "wrist": (entry.get("extras") or {}).get("wrist"),
+                       "brace_arm": entry["wall"].get("brace_arm")}
     return row
 
 
@@ -216,9 +252,46 @@ def reach_back(entry: Dict[str, Any], pts_obj: np.ndarray) -> float:
 
 
 def contact_config(kind: str, **kw) -> RM.MapConfig:
-    """The map configuration of a kind: the arm of the kind, the floor plane's lattice for ``floor_push`` (``reach_maps.floor_config``)."""
-    kw.setdefault("arm", KINDS[kind]["arm"])
+    """The map configuration of a kind: the arm of the kind, the floor plane's lattice for ``floor_push`` (``reach_maps.floor_config``), the
+    wall map's stand-offs / lateral lattice / idle posture for ``wall_brace`` (:func:`wall_config`)."""
+    if KINDS[kind]["arm"] is not None:
+        kw.setdefault("arm", KINDS[kind]["arm"])
+    if kind in JOINT_MARGIN_KINDS and joint_margin_on():
+        kw.setdefault("joint_margin_rad", LIVE_JOINT_LIMIT_MARGIN)
+    if KINDS[kind]["plane"] == "wall":
+        return wall_config(**kw)
     return RM.floor_config(**kw) if KINDS[kind]["plane"] == "floor" else RM.MapConfig(**kw)
+
+
+def wall_config(**kw) -> RM.MapConfig:
+    """i7-brace: the wall map's configuration (:data:`WALL_EDGE_DISTANCES`, :data:`WALL_LATTICE_M`, :data:`WALL_Y_HALF_M`,
+    :data:`WALL_POSTURES`; one yaw slot); ``lattice_m`` / ``seeds`` / ``arm`` from the caller."""
+    kw = dict(kw)
+    kw.pop("lattice_m", None)  # the lateral lattice is the stance lattice's
+    cfg = {"edge_distances": WALL_EDGE_DISTANCES, "lattice_m": WALL_LATTICE_M, "y_half_m": WALL_Y_HALF_M, "postures": WALL_POSTURES, "n_yaws": 1,
+           "x_min_m": 0.0, "x_max_m": max(WALL_EDGE_DISTANCES), **kw}
+    return RM.MapConfig(**cfg)
+
+
+def wall_root_x(entry: Dict[str, Any]) -> float:
+    """The hung target's root x relative to the wall plane (rule frame: the wall at x = 0, the root in front of it, x < 0)."""
+    return float(S.pose_of(entry["T_rule_object"])[0, 3])
+
+
+def wall_cells(cfg: RM.MapConfig, root_x: float) -> Tuple[np.ndarray, np.ndarray]:
+    """``(cells (C, 2), d_e index (C,))`` of a wall map: per stand-off d_e the root at x = d_e + ``root_x`` (the wall at x = d_e), laterals
+    ``-y_half_m .. y_half_m`` every ``lattice_m``."""
+    ys = np.round(np.arange(-cfg.y_half_m, cfg.y_half_m + 1e-9, cfg.lattice_m), 6)
+    cells = np.concatenate([np.stack([np.full(len(ys), float(d) + float(root_x)), ys], 1) for d in cfg.edge_distances])
+    idx = np.concatenate([np.full(len(ys), k, dtype=np.int64) for k in range(len(cfg.edge_distances))])
+    return cells, idx
+
+
+def wall_support(d_e: float) -> CP.Support:
+    """The wall of a wall map at stand-off ``d_e``: a box :data:`WALL_BOX_M` behind the plane x = d_e (the base at the origin facing it), from the
+    floor up."""
+    sx, sy, sz = WALL_BOX_M
+    return CP.Support.box([float(d_e) + 0.5 * sx, 0.0, 0.5 * sz], [0.5 * sx, 0.5 * sy, 0.5 * sz], name="wall")
 
 
 def identity_meta(lib_k: Dict[str, Any], kind: str, height: float, cfg: RM.MapConfig, policy: CP.ContactPolicy, entries: Sequence[Dict[str, Any]],
@@ -249,6 +322,26 @@ def overlay_entries(lib_k: Dict[str, Any], kind: str, height: float, cfg: RM.Map
     return out, {"lineage": lin, "version": int(v), "root": overlay["root"], "joined": joined, "n_confirmed": len(conf)}
 
 
+def arm_limit_margin_fn(world, entry, arm: str):
+    """``f(q (..., dof)) -> (...)``: the smallest distance of the ``arm``'s joints among the IK entry's active joints to their limits (rad) - the
+    live check's ``IKChecker.joint_limit_margin`` (the robot's limits of ``arm_control_idx[arm]``) on the map's IK solutions."""
+    names = list(entry.rsc.joint_names)
+    arm_idx = {int(i) for i in th.as_tensor(world.robot.arm_control_idx[arm]).flatten().tolist()}
+    cols = [j for j, n in enumerate(names) if int(world.jidx[n]) in arm_idx]
+    if not cols:
+        raise ValueError(f"the {arm} arm's joints are not among the IK entry's active joints {names}")
+    ridx = [int(world.jidx[names[j]]) for j in cols]
+    lo = th.as_tensor(world.robot.joint_lower_limits, dtype=th.float32)[ridx]
+    hi = th.as_tensor(world.robot.joint_upper_limits, dtype=th.float32)[ridx]
+
+    def f(q: th.Tensor) -> th.Tensor:
+        qa = q[..., cols].float()
+        lo_, hi_ = lo.to(qa.device), hi.to(qa.device)
+        return th.minimum(qa - lo_, hi_ - qa).min(dim=-1).values
+
+    return f
+
+
 def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, height: float, anchor: Dict[str, Any], geom, *,
                         cfg: Optional[RM.MapConfig] = None, policy: CP.ContactPolicy = CP.DEFAULT,
                         verdicts: Optional[Sequence[str]] = DEFAULT_VERDICTS, overlay: Optional[Dict[str, Any]] = None
@@ -261,19 +354,26 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
     cfg = cfg or world.cfg
     spec = KINDS[kind]
     floor = spec["plane"] == "floor"
+    wall = spec["plane"] == "wall"
     plane_kind = "floor" if floor else "tabletop"
-    if cfg.arm != spec["arm"]:
+    if spec["arm"] is not None and cfg.arm != spec["arm"]:
         raise ValueError(f"a {kind} map is the {spec['arm']} arm's (config arm {cfg.arm})")
     t_all = time.time()
     tim: Dict[str, float] = {}
     dev = world.dev
-    entries = select_entries(lib_k, kind, verdicts)
+    entries = select_entries(lib_k, kind, verdicts, arm=cfg.arm)
     if not entries:
         raise ValueError(f"{(lib_k.get('object') or {}).get('entry')}: no {kind} entry with a verdict in {verdicts}")
     entries, ov_meta = overlay_entries(lib_k, kind, height, cfg, policy, entries, verdicts, overlay)
     yaws, classes, grid = axes(entries)
     pset = pose_set(kind, entries, verdicts)
-    cells = RM.lattice(cfg)
+    if wall:  # i7-brace: per stand-off the root's row in front of the wall (one target pose per library: its level pose)
+        rxs = {round(wall_root_x(e), 6) for e in entries}
+        if len(rxs) != 1:
+            raise ValueError(f"a wall_brace map's entries hang at one level pose (root x {sorted(rxs)})")
+        cells, cell_de = wall_cells(cfg, rxs.pop())
+    else:
+        cells, cell_de = RM.lattice(cfg), None
     nC, nY, nG = len(cells), len(yaws), len(classes)
     pr = problems(grid, cells, height)
     N, K = len(pr["index"]), pr["K"]
@@ -304,8 +404,12 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
         paths.append(CP.approach_path(chain[:, 1], chain[:, 2], policy.approach_step_m * 2))
     hand_ok: Dict[float, th.Tensor] = {}
     onsup: Dict[float, th.Tensor] = {}
-    for d_e in cfg.edge_distances:
-        sb = RM.map_support(plane_kind, height, d_e, cfg)
+    def support_at(d_e):
+        return wall_support(d_e) if wall else RM.map_support(plane_kind, height, d_e, cfg)
+
+    cde = None if cell_de is None else th.as_tensor(cell_de, device=dev)[ci]
+    for k_de, d_e in enumerate(cfg.edge_distances):
+        sb = support_at(d_e)
         ok = th.ones(N, dtype=th.bool, device=dev)
         for k in range(K):
             ok &= hand_ok_at(chain[:, k], sb)
@@ -315,7 +419,8 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
             for p in paths[1]:
                 ok &= hand_ok_at(p, sb) | ~has_stroke
         hand_ok[d_e] = ok
-        onsup[d_e] = th.ones(N, dtype=th.bool, device=dev) if floor else (cx + rb_n) >= d_e
+        # a wall map: the problems of this stand-off's row only (the target hangs against the wall at d_e)
+        onsup[d_e] = (cde == k_de) if wall else (th.ones(N, dtype=th.bool, device=dev) if floor else (cx + rb_n) >= d_e)
     del paths
     tim["hand_policy_s"] = round(time.time() - t0, 3)
     # -- the arm-vs-object planes of the object at each problem's pose
@@ -324,10 +429,16 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
     To_t = th.as_tensor(pr["To"], dtype=th.float32, device=dev)
     hand_links = set(policy.finger_links(cfg.arm)) | set(policy.hand_rigid_links(cfg.arm))
     entry_ik = world.entry()
+    # i7-axialrest 5y fix: the live joint-limit margin on every chain configuration (None: cuRobo's success alone, the former acceptance)
+    jm = getattr(cfg, "joint_margin_rad", None)
+    margin_of = arm_limit_margin_fn(world, entry_ik, cfg.arm) if jm is not None else None
+    n_margin_lost = 0
     links = world.link_of_sphere()
     arm_mask = th.tensor([(l not in hand_links) and bool(l) and l.startswith(f"{cfg.arm}_arm") for l in links], device=dev)
     arrays: Dict[str, np.ndarray] = {"cells": cells.astype(np.float32), "yaws": np.radians(np.asarray(yaws, dtype=np.float32)),
                                      "present": np.zeros((nY, nG), dtype=bool)}
+    if cell_de is not None:
+        arrays["cell_de"] = cell_de.astype(np.int16)
     for (y, g) in grid:
         arrays["present"][y, g] = True
     meta_trunks: List[Dict[str, Any]] = []
@@ -347,12 +458,18 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
         key = f"t{tr:.2f}_k{ti:+.1f}"
         rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
         posture, q_lock = None, None
+        de_free: Dict[float, bool] = {}
         for p in cfg.postures:
             q = world.q_config(tr, ti, p)
             if bool(world.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", margin=0.0)[0]):
                 continue
             sph, ln = world.backend.robot_spheres_world(q.unsqueeze(0))
-            if all(bool(spheres_ok(sph, ln, RM.map_support(plane_kind, height, d_e, cfg))[0][0]) for d_e in cfg.edge_distances):
+            free = {d_e: bool(spheres_ok(sph, ln, support_at(d_e))[0][0]) for d_e in cfg.edge_distances}
+            if wall and any(free.values()):
+                # i7-brace: per stand-off (the wall close ahead blocks a posture at the small d_e only): ineligible where it collides
+                posture, q_lock, de_free = p, q, free
+                break
+            if all(free.values()):
                 posture, q_lock = p, q
                 break
         rec["posture"] = posture
@@ -379,6 +496,13 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
         why = th.full((idx.numel(),), STATUS["ik_pre"], dtype=th.uint8, device=dev)
         succ, q0 = RM._solve(world, entry_ik, chain[idx, 0], q_lock)
         n_ik += int(idx.numel())
+        if margin_of is not None:
+            # a seed counts only when its solution keeps the live margin; a pre with IK only nearer a limit is ik_margin
+            succ_m = succ & (margin_of(q0) >= float(jm))
+            lost = succ.any(dim=1) & ~succ_m.any(dim=1)
+            why[lost] = STATUS_IK_MARGIN
+            n_margin_lost += int(lost.sum())
+            succ = succ_m
         first = th.argmax(succ.int(), dim=1)
         alive &= succ.any(dim=1)
         qs.append(q0[th.arange(idx.numel(), device=dev), first])
@@ -389,12 +513,20 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
                 need = n_chain[idx[sel]] > k
                 s2, q2 = RM._solve(world, entry_ik, chain[idx[sel], k], q_lock, seed_active=qs[-1][sel])
                 n_ik += int(sel.numel())
+                lost2 = None
+                if margin_of is not None:
+                    s2_m = s2 & (margin_of(q2) >= float(jm))
+                    lost2 = s2.any(dim=1) & ~s2_m.any(dim=1)
+                    s2 = s2_m
                 f2 = th.argmax(s2.int(), dim=1)
                 q2 = q2[th.arange(sel.numel(), device=dev), f2]
                 ok2 = s2.any(dim=1)
                 jump = (q2 - qs[-1][sel]).abs().max(dim=1).values > cfg.branch_max_rad
                 fail = need & (~ok2 | jump)
                 why[sel[fail & ~ok2]] = STATUS["ik_grasp"]
+                if lost2 is not None:
+                    why[sel[fail & ~ok2 & lost2]] = STATUS_IK_MARGIN
+                    n_margin_lost += int((fail & ~ok2 & lost2).sum())
                 why[sel[fail & ok2 & jump]] = STATUS["branch_jump"]
                 alive[sel[fail]] = False
                 qk[sel] = th.where(need.unsqueeze(1), q2, qs[-1][sel])
@@ -404,7 +536,7 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
         # (not the hand) clear of the object at the contact
         sel = th.nonzero(alive).flatten()
         for d_e in cfg.edge_distances:
-            sb = RM.map_support(plane_kind, height, d_e, cfg)
+            sb = support_at(d_e)
             good = th.ones(sel.numel(), dtype=th.bool, device=dev)
             w = th.where(alive, th.full_like(why, STATUS["feasible"]), why)
             if sel.numel():
@@ -434,13 +566,18 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
             vals[~onsup[d_e]] = STATUS["off_support"]
             here = hand_ok[d_e][idx] & onsup[d_e][idx]
             vals[idx] = th.where(here, w, vals[idx])
+            if de_free and not de_free.get(d_e, True):
+                vals[onsup[d_e]] = STATUS["trunk_ineligible"]
             arrays[f"s{d_e:.2f}_{key}"] = put(vals)
             rec.setdefault("n_feasible", {})[f"{d_e:.2f}"] = int((vals == STATUS["feasible"]).sum())
         meta_trunks.append(rec)
     tim.update(ik_s=round(t_ik, 2), ik_problems=n_ik, total_s=round(time.time() - t_all, 2))
+    if margin_of is not None:
+        tim["ik_margin_lost"] = n_margin_lost
     obj = dict(lib_k.get("object") or {})
     meta = {"schema": SCHEMA, "kind": kind, "arm": cfg.arm, "plane": spec["plane"], "frame": "base_link on the floor: +x ahead, +y left, z up from the floor",
-            "cell": f"the object ROOT xy at its {spec['frame']} pose", "object": obj, "rest_id": obj.get("rest_id"),
+            "cell": f"the object ROOT xy at its {spec['frame']} pose" + (" hung at the wall x = d_e (its d_e row: arrays cell_de), the hinge at the height" if wall else ""),
+            "object": obj, "rest_id": obj.get("rest_id"),
             "entry_rest_quat_xyzw": entry_rest_quat(entries[0]),
             "library": {"digest": lib_k.get("digest"), "validate": lib_k.get("validate"), "families": sorted(lib_k.get("families") or {}),
                         # the builders' params (an axial library's long_axis: the side its +end classes push) - the consumer checks its own axis
@@ -452,7 +589,8 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
             "edge_distances": list(cfg.edge_distances), "config": cfg.key(), "policy_key": policy.key(cfg.arm), "robot": RM.robot_digest(),
             "pose_set": pset, "classes": [class_row(grid[(y, g)]) if (y, g) in grid else None for y in range(nY) for g in range(nG)],
             "chain": "the executed pre -> contact (+ a straight push's end / an arc's mid and end): IK seeded along the chain, branch <= branch_max_rad",
-            "trunks": meta_trunks, "status_codes": STATUS, "timing": tim, "created": S.now()}
+            "trunks": meta_trunks, "status_codes": STATUS if margin_of is None else dict(STATUS, ik_margin=STATUS_IK_MARGIN), "timing": tim,
+            "created": S.now()}
     if ov_meta is not None:
         meta["overlay"] = ov_meta
     meta["key"] = map_key(meta)
@@ -506,6 +644,10 @@ def yaw_of(quat_xyzw, rest_quat_xyzw) -> float:
     """The object's yaw about z: ``R = Rz(yaw) R_rest`` (the library's yaw slot convention, ``contact_library.object_frame``)."""
     R = S.quat_to_mat(np.asarray(quat_xyzw, dtype=float)) @ S.quat_to_mat(np.asarray(rest_quat_xyzw, dtype=float)).T
     return math.atan2(R[1, 0], R[0, 0])
+
+
+#: i7-axialrest 5y fix: a stance tilt within this of a built map tilt reads that column alone under the intersection read (rad)
+TILT_SNAP_RAD = 0.005
 
 
 class ContactMap:
@@ -569,6 +711,27 @@ class ContactMap:
             return cm
         return None
 
+    @staticmethod
+    def find_near(maps_root: str, kind: str, entry: str, height: float, tol: float, **kw) -> Optional["ContactMap"]:
+        """i7-brace: :meth:`find` at the ``kind`` map heights of ``entry`` within ``tol`` of ``height``, the nearest first (a wall map's height
+        is the hinge's above the floor - no support anchor covers it)."""
+        d = os.path.join(maps_root, entry)
+        hs = []
+        for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            if fn.startswith(f"cmap__{kind}__") and fn.endswith(".json"):
+                try:
+                    hs.append(float(fn[:-5].rsplit("__", 2)[1][1:]))  # cmap__<kind>__<category>__<model>__h<h>__<key>.json
+                except (IndexError, ValueError):
+                    continue
+        for h in sorted(set(hs), key=lambda v: abs(v - float(height))):
+            if abs(h - float(height)) > tol:
+                break
+            cm = ContactMap.find(maps_root, kind, entry, h, **kw)
+            if cm is not None:
+                cm.lookup_how = {"how": "near", "asked_h": round(float(height), 4), "map_h": h, "tol": tol}
+                return cm
+        return None
+
     def trunks(self) -> List[Tuple[float, float]]:
         return [(t["translate"], t["tilt"]) for t in self.meta["trunks"] if t.get("eligible")]
 
@@ -576,6 +739,24 @@ class ContactMap:
         """The map trunk of the stance's: the same translate (2 cm), the nearest tilt."""
         ts = [t for t in self.trunks() if abs(t[0] - float(translate)) <= 0.02]
         return min(ts, key=lambda t: abs(t[1] - float(tilt))) if ts else None
+
+    def bracketing_trunks(self, translate: float, tilt: float, snap: float = TILT_SNAP_RAD
+                          ) -> Tuple[Optional[Tuple[float, float]], Optional[Tuple[float, float]], str]:
+        """i7-axialrest 5y fix: ``(nearest, other, how)`` - the eligible map trunks of the stance's translate (2 cm) around its ``tilt``:
+        ``how`` = ``"built"`` (within ``snap`` of a built tilt: ``other`` None), ``"between"`` (``nearest`` and ``other`` bracket the tilt),
+        ``"outside"`` (beyond the eligible tilts: ``other`` None), ``"none"`` (no eligible trunk at the translate)."""
+        ts = sorted((t for t in self.trunks() if abs(t[0] - float(translate)) <= 0.02), key=lambda t: t[1])
+        if not ts:
+            return None, None, "none"
+        near = min(ts, key=lambda t: abs(t[1] - float(tilt)))
+        if abs(near[1] - float(tilt)) <= snap:
+            return near, None, "built"
+        lo = [t for t in ts if t[1] < float(tilt)]
+        hi = [t for t in ts if t[1] > float(tilt)]
+        if not lo or not hi:
+            return near, None, "outside"
+        a, b = lo[-1], hi[0]
+        return near, (b if near == a else a), "between"
 
     def status(self, edge_distance: float, translate: float, tilt: float) -> np.ndarray:
         d = min(self.meta["edge_distances"], key=lambda v: abs(v - edge_distance))
@@ -586,17 +767,24 @@ class ContactMap:
         return self.meta["classes"][yaw_index * nG:(yaw_index + 1) * nG]
 
     def lookup(self, stand_off: float, translate: float, tilt: float, root_xy_base, yaw_rel: float, *, keep=None, tol: float = 0.06,
-               yaw_tol: Optional[float] = None) -> Dict[str, Any]:
+               yaw_tol: Optional[float] = None, tilt_read: str = "nearest") -> Dict[str, Any]:
         """The map at a stance (``stand_off`` = the nearest edge distance, the trunk: :meth:`nearest_trunk`) for the object's root at
         ``root_xy_base`` (base frame) turned ``yaw_rel`` from the stance: the nearest cell (within ``tol``), the nearest yaw slot (within
         ``yaw_tol``, default half the slot spacing), the classes there (``keep(row)`` filters them: e.g. the spin of an axial push) that are
-        feasible. ``{"ok", "why", "cell", "yaw_slot_deg", "yaw_err_deg", "feasible": [classes], "trunk", "edge_distance"}``."""
+        feasible. ``{"ok", "why", "cell", "yaw_slot_deg", "yaw_err_deg", "feasible": [classes], "trunk", "edge_distance"}``.
+        ``tilt_read="intersection"`` (i7-axialrest 5y fix, the sampler's ``ISPATIALGYM_AXIAL_BRACE_TILT_INTERSECT``): a stance tilt more than
+        :data:`TILT_SNAP_RAD` from every built tilt and between two eligible ones reads a class as feasible only when it is feasible in BOTH
+        bracketing columns (the nearest tilt alone otherwise); the result adds ``tilt_read`` = {"how", "trunks", "nearest_feasible",
+        "dropped"} (the classes the nearest column alone would have called feasible that the other column refuses)."""
         out: Dict[str, Any] = {"ok": False, "map": self.path, "kind": self.meta["kind"]}
         tk = self.nearest_trunk(translate, tilt)
         if tk is None:
             return dict(out, why=f"no eligible map trunk at translate {translate:.2f}")
         xy = np.asarray(root_xy_base, dtype=float)[:2]
         dist = np.linalg.norm(self.cells.astype(float) - xy[None], axis=1)
+        if "cell_de" in self.arrays:  # i7-brace: a wall map - the cells of the stand-off's own row (the wall at that d_e)
+            k_de = int(np.argmin([abs(v - float(stand_off)) for v in self.meta["edge_distances"]]))
+            dist = np.where(self.arrays["cell_de"].astype(int) == k_de, dist, np.inf)
         c = int(np.argmin(dist))
         if dist[c] > tol:
             return dict(out, why=f"root {np.round(xy, 3).tolist()} off the lattice (nearest cell {dist[c]:.3f} m)", trunk=list(tk))
@@ -611,7 +799,23 @@ class ContactMap:
         d_e = min(self.meta["edge_distances"], key=lambda v: abs(v - float(stand_off)))
         st = self.status(d_e, tk[0], tk[1])[c, y]
         rows = self.class_rows(y)
-        feas = [self.classes[g] for g in range(len(self.classes)) if st[g] == STATUS["feasible"] and rows[g] is not None and (keep is None or keep(rows[g]))]
+
+        def feasible_of(st_):
+            return [self.classes[g] for g in range(len(self.classes)) if st_[g] == STATUS["feasible"] and rows[g] is not None and (keep is None or keep(rows[g]))]
+
+        feas = feasible_of(st)
+        if tilt_read == "intersection":
+            near, other, how = self.bracketing_trunks(translate, tilt)
+            rec: Dict[str, Any] = {"how": how, "trunks": [list(tk)] + ([list(other)] if other is not None else []), "nearest_feasible": list(feas), "dropped": []}
+            if how == "between" and other is not None:
+                st_o = self.status(d_e, other[0], other[1])[c, y]
+                both = (st == STATUS["feasible"]) & (st_o == STATUS["feasible"])
+                st = np.where(both, st, np.where(st != STATUS["feasible"], st, st_o))
+                feas = feasible_of(st)
+                rec["dropped"] = [g for g in rec["nearest_feasible"] if g not in feas]
+            out["tilt_read"] = rec
+        elif tilt_read != "nearest":
+            raise ValueError(f"tilt_read {tilt_read!r} is not 'nearest' or 'intersection'")
         out.update(edge_distance=d_e, feasible=feas)
         if not feas:
             return dict(out, why=f"no feasible class at the cell / yaw slot ({int((st == STATUS['feasible']).sum())} before the class filter)")
@@ -648,9 +852,12 @@ def _compute_cli(a) -> None:
             f.write(json.dumps(dict(rec, t=round(time.time(), 1))) + "\n")
 
     todo = []
+    # i7-brace: a per-entry-arm kind maps each arm's entries - one arm per process with --arm (the second arm's cuRobo IK in the same
+    # process ran out of GPU memory on a 24 GB titanrtx: 20.6 GB held after the first, run 7)
+    arms = [None] if spec["arm"] is not None else ([a.arm] if getattr(a, "arm", None) else ["left", "right"])
     for eid in ids:
         lib_k = CL.load_library(CL.library_path(a.root, spec["lib_kind"], eid))
-        if not select_entries(lib_k, a.kind, verdicts):
+        if not any(select_entries(lib_k, a.kind, verdicts, arm=arm) for arm in arms):
             log({"id": eid, "kind": a.kind, "ok": True, "skipped": f"no {a.kind} entry with a verdict in {verdicts}"})
             continue
         hs = [float(h) for h in a.heights] if a.heights else ([RM.FLOOR_HEIGHT] if spec["plane"] == "floor" else
@@ -662,9 +869,18 @@ def _compute_cli(a) -> None:
     if not todo:
         print("GB_CONTACT_MAPS_DONE", flush=True)
         return
-    cfg = contact_config(a.kind, lattice_m=a.lattice, seeds=a.seeds)
-    world = RM.SynthWorld(cfg)
-    for eid, lib_k, hs in todo:
+    cfg0 = contact_config(a.kind, lattice_m=a.lattice, seeds=a.seeds, **({} if spec["arm"] is not None else {"arm": "left"}))
+    world = RM.SynthWorld(cfg0)
+    import dataclasses
+
+    for eid, lib_k, hs, arm in [(e, l, h, arm) for arm in arms for e, l, h in todo]:
+        cfg = cfg0 if arm is None else dataclasses.replace(cfg0, arm=arm)
+        if arm is not None and world.cfg.arm != arm:  # the synthetic world's IK entry / shoulder cache are the config arm's
+            world.cfg = cfg
+            world._shoulder = {}
+        if arm is not None and not select_entries(lib_k, a.kind, verdicts, arm=arm):
+            log({"id": eid, "kind": a.kind, "arm": arm, "ok": True, "skipped": f"no {a.kind} entry of the {arm} arm with a verdict in {verdicts}"})
+            continue
         geom = OG.load(lib_k["object"]["source"])
         for h in hs:
             t0 = time.time()
@@ -673,7 +889,7 @@ def _compute_cli(a) -> None:
                 meta, arrays = compute_contact_map(world, lib_k, a.kind, h, anchor, geom, cfg=cfg, verdicts=verdicts,
                                                    overlay={"root": a.overlay_root, "version": a.overlay_version} if a.overlay_root else None)
                 p = save(a.out, meta, arrays)
-                log({"id": eid, "kind": a.kind, "h": h, "ok": True, "path": p, "s": round(time.time() - t0, 1), "n_entries": meta["pose_set"]["n_entries"],
+                log({"id": eid, "kind": a.kind, "arm": cfg.arm, "h": h, "ok": True, "path": p, "s": round(time.time() - t0, 1), "n_entries": meta["pose_set"]["n_entries"],
                      "overlay": {k: (meta.get("overlay") or {}).get(k) for k in ("lineage", "version", "n_confirmed")} if meta.get("overlay") else None,
                      "n_joined": len((meta.get("overlay") or {}).get("joined") or []),
                      "n_feasible": sum(sum(t.get("n_feasible", {}).values()) for t in meta["trunks"])})
@@ -698,6 +914,8 @@ def main(argv=None):
     c.add_argument("--overlay-root", default=None, help="owner A6: the merged contact overlay root (<root>/<lineage key>/v<N>.json): the entries a "
                    "real oracle success confirmed join the validated ones; the version enters the map identity")
     c.add_argument("--overlay-version", type=int, default=None, help="the overlay version (default the latest)")
+    c.add_argument("--arm", default=None, choices=["left", "right"], help="i7-brace: a per-entry-arm kind (wall_brace): this arm's map only "
+                   "(default both, in one process)")
     i = sub.add_parser("info", help="a contact map's summary")
     i.add_argument("map")
     a = ap.parse_args(argv)

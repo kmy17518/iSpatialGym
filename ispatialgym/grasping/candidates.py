@@ -132,8 +132,10 @@ class CandidateConfig:
     # legacy_grasps: the step-4 legacy grasps ({"name", "position", "quat_xyzw"}: the eef in the canonical object frame).
     agent_proposals: Tuple[Dict[str, Any], ...] = ()
     legacy_grasps: Tuple[Dict[str, Any], ...] = ()
-    # i7-attachfix 2026-11-08 (owner direction item 1, cap xxqyrt): OPT-IN candidate switches (default off = the behaviour before; part
-    # of the entry identity when on - schema.CANDIDATE_SWITCHES). Measured on the cap (a 52.3 mm x 11.2 mm cup resting open side down,
+    # i7-attachfix 2026-11-08 (owner direction item 1, cap xxqyrt): candidate switches, part of the entry identity when on
+    # (schema.CANDIDATE_SWITCHES). OWNER DECISION 4.1, ADOPTED 2026-11-08 (i7-attachdef: default True for new builds after the count on
+    # the campaign library, attachdef_20261108/count; False = the behaviour before, which every entry generated without the fields reads
+    # as - schema.candidate_switches). Measured on the cap (a 52.3 mm x 11.2 mm cup resting open side down,
     # walls 3 mm): the Isaac sampler asks ``multiple_hits=True`` and takes the furthest hit within the aperture, but the embree
     # intersector returns ONLY the first hit, so every antipodal pair spans one wall / disc / piece-cut thickness (4000 samples: 100 %
     # of the pad centres inside a collision piece, widths 0.1-18 mm) and no pinch across the diameter was ever proposed; the width /
@@ -141,12 +143,31 @@ class CandidateConfig:
     # outer_pinch: the sampler gets every hit along its ray (repeated first-hit casts), and the pinch width / antipodal cone / the
     # blade check's pinched points are measured from OUTSIDE along the closing axis (rays from +-aperture/2 toward the pad centre: the
     # surfaces the closing pads meet). Identical for a convex single-piece object.
-    outer_pinch: bool = False
+    outer_pinch: bool = True
     # attach_face_retreat: an attachment_free top grasp's support retreat also clears the attachment rule's face gap (the fingers
     # ``ATTACH_FACE_GAP_M`` inside the male's mating face) when that face rests on the support - before, the retreat stopped the fingers
     # 1 mm below the support (the support policy's allowance) and the rule then dropped every retreated grasp at face_gap -1.0 mm (cap
     # xxqyrt: 27 of 27 rule drops). The rule itself is unchanged.
-    attach_face_retreat: bool = False
+    attach_face_retreat: bool = True
+    # i7-attachdef 2026-11-08 (OWNER DECISION 5.1, an approved gate change; ADOPTED: default True for new builds after the count on the
+    # campaign library, attachdef_20261108/count_pre4; False = outer_pinch as in i7-attachfix, which every entry built without the field reads
+    # as; part of the entry identity when on - schema.CANDIDATE_SWITCHES): with outer_pinch, the pinch the pads close on is judged at the oracle's PRE-SHAPE
+    # opening (:func:`preshape_pad_half` = :func:`oracle_preshape_q`: pinch width / 2 + MotionsConfig.gripper_preshape_margin, as
+    # execute.execute_grasp pre-shapes before the descent), not from the fully open pads (+-aperture / 2 = +-44.45 mm). Measured from the
+    # fully open pads, a rim / wall / handle pinch whose line meets another surface within 44 mm (a cup's far wall, a spoon bowl) was
+    # measured across it and dropped (teacup wopjex 5 -> 1, tablespoon yxxfdj 5 -> 1, beer glass mxsliu 2 -> 1 physics-valid) - pads the
+    # oracle pre-shapes to the pinch never sweep that far. :class:`PreshapeOuter`: the self-consistent pinch nearest the pad centre.
+    # The PROPOSALS too: with every hit the Isaac sampler pairs a point with the furthest hit, so no thin pinch is proposed; with this
+    # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape; and the policy
+    # geometry check judges each candidate at its own pre-shape, not the selected batch's widest (CP.check_grasp_geometry per-pose open_q).
+    outer_pinch_preshape: bool = True
+    # i7-cork 2026-11-08 (owner decision 4.2 (i), the cork's hand-over): OPT-IN (default None = off, the behaviour before; recorded in the
+    # library and in the entry identity when set). ``(lo, hi)`` in m, either None = unbounded: every finger hull vertex (both fingers at the
+    # grasp's oracle pre-shape, as the attachment rule measures them) projected on the OBJECT frame's +z axis lies within [lo, hi] - the
+    # hand-over holds a 34.5 mm cork with both hands at once, the right hand's pinch on the male end (hi < 0), the left hand's on the wide
+    # end (lo > 0), so the two hands' fingers stay apart (scripts/grasp_bands/cork_handover_geom.py: >= 3 mm between the hands for axial
+    # fingertip pinches)
+    finger_axis_window_m: Optional[Tuple[Optional[float], Optional[float]]] = None
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -269,6 +290,89 @@ def outer_hits(union, c, y, half: float):
     return dp + dm, cp, cm, dp, dm
 
 
+class PreshapeOuter:
+    """i7-attachdef (``CandidateConfig.outer_pinch_preshape``, owner 5.1): the pinch two pads meet when the oracle pre-shapes them to it.
+    Along the closing line ``c + t y`` every surface within ``PAD_OPEN_HALF`` of the pad centre (:func:`all_ray_hits`, both ways) is a
+    boundary; an OUTER boundary has material on the pad-centre side and free space beyond (the exact convex pieces, :func:`_inside_any`).
+    A pinch ``(p, m)`` (an outer boundary each side) of width ``w = p + m`` holds when the pads at the pre-shape opening
+    ``h = preshape_pad_half(w)`` (the oracle's pre-shape, in the sweep's pad-face convention) start beyond it and meet it first: ``p, m <= h``
+    and no other boundary in ``(p, h]`` / ``(m, h]``. The holding pinch of smallest width is kept (none: NaN, the pose is dropped). For a
+    pad centre inside one wall this is the wall (the pad-centre measure); for a centre in a cavity, the outer surfaces across it (the cap's
+    diameter pinch, as outer_pinch); unlike the fully-open measure it never spans a surface the pre-shaped pads do not reach."""
+
+    EPS = 2e-4
+
+    def __init__(self, pieces):
+        """``pieces``: the collision pieces (trimesh). A convex piece is tested by its face planes; a non-convex one (a whole-object hull,
+        e.g. hardback bqvvvx's single piece) by ``Trimesh.contains`` (the face planes of a non-convex mesh do not bound its inside)."""
+        self.planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in pieces if pc.is_convex]
+        self.solids = [pc for pc in pieces if not pc.is_convex]
+
+    def inside(self, P: np.ndarray) -> np.ndarray:
+        out = _inside_any(P, self.planes) if self.planes else np.zeros(len(P), dtype=bool)
+        for pc in self.solids:
+            if len(P):
+                out |= pc.contains(P)
+        return out
+
+    def hits(self, union, c, y):
+        """``(width, cos_plus, cos_minus, d_plus, d_minus)`` as :func:`outer_hits`."""
+        n = len(c)
+        width, cp, cm = np.full(n, np.nan), np.zeros(n), np.zeros(n)
+        dp, dm = np.full(n, np.inf), np.full(n, np.inf)
+        if n == 0:
+            return width, cp, cm, dp, dm
+        H = PAD_OPEN_HALF
+        start = c + y * (H + 1e-3)
+        loc, ridx, tri = all_ray_hits(union.ray, start, -y, max_hits=48)
+        if len(ridx) == 0:
+            return width, cp, cm, dp, dm
+        t = np.einsum("ij,ij->i", loc - c[ridx], y[ridx])
+        keep = np.abs(t) <= H
+        loc, ridx, tri, t = loc[keep], ridx[keep], tri[keep], t[keep]
+        side = np.sign(t)
+        side[side == 0] = 1.0
+        out_dir = y[ridx] * side[:, None]  # away from the pad centre on that side
+        inner = self.inside(loc - out_dir * self.EPS)
+        outer = ~self.inside(loc + out_dir * self.EPS)
+        is_outer = inner & outer
+        cos = np.abs(np.einsum("ij,ij->i", union.face_normals[tri], y[ridx]))
+        d = np.abs(t)
+        order = np.lexsort((d, ridx))
+        ridx, d, is_outer, cos, side = ridx[order], d[order], is_outer[order], cos[order], side[order]
+        bounds = np.searchsorted(ridx, np.arange(n + 1))
+        for i in range(n):
+            a, b = bounds[i], bounds[i + 1]
+            if a == b:
+                continue
+            di, oi, ci, si = d[a:b], is_outer[a:b], cos[a:b], side[a:b]
+            P, M = di[si > 0], di[si < 0]  # every boundary per side (ascending distance)
+            Po = [(di[k], ci[k]) for k in range(len(di)) if si[k] > 0 and oi[k]]
+            Mo = [(di[k], ci[k]) for k in range(len(di)) if si[k] < 0 and oi[k]]
+            best = None
+            for p, cpk in Po:
+                for m, cmk in Mo:
+                    w = p + m
+                    h = float(preshape_pad_half(np.array([w]))[0])
+                    if p > h + 1e-9 or m > h + 1e-9:
+                        continue
+                    if ((P > p + 1e-9) & (P <= h)).any() or ((M > m + 1e-9) & (M <= h)).any():
+                        continue  # the pre-shaped pad meets another surface first (or starts inside material)
+                    if best is None or w < best[0]:
+                        best = (w, p, m, cpk, cmk)
+            if best is not None:
+                width[i], dp[i], dm[i], cp[i], cm[i] = best
+        return width, cp, cm, dp, dm
+
+
+def _outer(union, c, y, outer_half):
+    """outer_pinch's measure: from +-``outer_half`` (a float: the fully open pads, :func:`outer_hits`) or at the pre-shape
+    (:class:`PreshapeOuter`)."""
+    if isinstance(outer_half, PreshapeOuter):
+        return outer_half.hits(union, c, y)
+    return outer_hits(union, c, y, float(outer_half))
+
+
 def contact_features(union, T, cz, outer_half: Optional[float] = None):
     """Pad centre, pinch width, antipodal cosine and coverage of poses ``T`` with the contact ``cz`` along the approach. Default: rays
     from the pad centre outward (the first surface each way); ``outer_half`` (``CandidateConfig.outer_pinch``): from ``+-outer_half``
@@ -277,7 +381,7 @@ def contact_features(union, T, cz, outer_half: Optional[float] = None):
     c = T[:, :3, 3] + T[:, :3, 2] * cz
     y, x = T[:, :3, 1], T[:, :3, 0]
     if outer_half is not None:
-        width, cp, cm, _, _ = outer_hits(union, c, y, float(outer_half))
+        width, cp, cm, _, _ = _outer(union, c, y, outer_half)
     else:
         dp, cp = hits(union, c, y)
         dm, cm = hits(union, c, -y)
@@ -287,7 +391,7 @@ def contact_features(union, T, cz, outer_half: Optional[float] = None):
     for off in (-0.01, -0.005, 0.005, 0.01):
         o = c + x * off
         if outer_half is not None:
-            w2 = outer_hits(union, o, y, float(outer_half))[0]
+            w2 = _outer(union, o, y, outer_half)[0]
         else:
             d1, _ = hits(union, o, y)
             d2, _ = hits(union, o, -y)
@@ -914,10 +1018,20 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         T_all = np.zeros((0, 4, 4))  # i7-ladder: given poses only (no mode, no sampled family) - nothing reads the samples
     else:
         su = _isaac_sampler()
-        T_all = np.array(su.sample_antipodal(_MeshProxy(union, all_hits=cfg.outer_pinch), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
-                                             gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
-                                             gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
-                                             orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
+
+        def _sample(all_hits):
+            return np.array(su.sample_antipodal(_MeshProxy(union, all_hits=all_hits), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
+                                                gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
+                                                gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
+                                                orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed)).reshape(-1, 4, 4)
+
+        T_all = _sample(cfg.outer_pinch)
+        if cfg.outer_pinch and cfg.outer_pinch_preshape:
+            # i7-attachdef (owner 5.1): with every hit the Isaac sampler pairs a surface point with the FURTHEST hit within the aperture
+            # (sampler_utils: "the furthest intersection point"), so a thin rim / wall / handle pinch is never PROPOSED; the first-hit
+            # proposals (the pinch the pre-shaped pads close on - the sampling before outer_pinch, same seed) are added, and every
+            # proposal is then judged at the pre-shape (PreshapeOuter). Proposals only: no gate changes.
+            T_all = np.concatenate([T_all, _sample(False)], axis=0)
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
     # i7-overhang 2026-11-07: an entry used at an interior goal - the accessible region (access_region.py) and the goal's boards in the rest frame
     from ispatialgym.grasping import access_region as AR
@@ -960,6 +1074,8 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
     ax_x, ax_y, _ = plate_axis(union)
     piece_planes = [(pc.face_normals, np.einsum("ij,ij->i", pc.face_normals, pc.triangles[:, 0])) for pc in geom.pieces] if cfg.sweep_from_preshape else None
     oh = 0.5 * cfg.aperture_m if cfg.outer_pinch else None  # i7-attachfix: the pinch measured from outside (CandidateConfig.outer_pinch)
+    if cfg.outer_pinch and cfg.outer_pinch_preshape:  # i7-attachdef (owner 5.1): ... judged at the oracle's pre-shape opening
+        oh = PreshapeOuter(geom.pieces)
     # i7-attachfix (attach_face_retreat): the attachment rule's mating frames, known before the support step so a top grasp's retreat
     # also clears the rule's face gap where the mating face rests on the support
     face_mates: List[Tuple[np.ndarray, float]] = []
@@ -1193,6 +1309,49 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             feats["stem_t"], feats["pinch_across"] = t, across
             L["n_flower"] = int(len(T))
             dump.gate(pool, "flower_stem_top", L["n_sweep"], len(T))
+        if cfg.finger_axis_window_m is not None and len(T):
+            # i7-cork: the fingers within the window along the object's own +z axis (CandidateConfig.finger_axis_window_m)
+            lo_w, hi_w = (None if v is None else float(v) for v in cfg.finger_axis_window_m)
+            z_obj = np.asarray(R[:3, 2], dtype=float)
+            fz_lo, fz_hi = np.full(len(T), np.inf), np.full(len(T), -np.inf)
+            win_retreat = np.zeros(len(T))
+            T = T.copy()
+            for i in range(len(T)):
+                P, _ = hc.geom.points(("finger",), (float(pre_q[i]), float(pre_q[i])))
+                zz = (P @ T[i, :3, :3].T + T[i, :3, 3]) @ z_obj
+                lo_i, hi_i = float(zz.min()), float(zz.max())
+                if mode == "top":
+                    # a top grasp backs off along its approach until the fingers are inside the window, the pinch point kept on the object:
+                    # the contact then sits closer to the fingertips (cz + r <= tip_max_m, the generation's own retreat bound)
+                    a_z = float(T[i, :3, 2] @ z_obj)  # how far the fingers move along the object's +z per metre of approach
+                    need = 0.0
+                    if hi_w is not None and hi_i > hi_w and a_z > 1e-3:
+                        need = max(need, (hi_i - hi_w) / a_z)
+                    if lo_w is not None and lo_i < lo_w and a_z < -1e-3:
+                        need = max(need, (lo_w - lo_i) / -a_z)
+                    if need > 0.0 and float(cz[i]) + need <= cfg.tip_max_m:
+                        T[i, :3, 3] = T[i, :3, 3] - need * T[i, :3, 2]
+                        lo_i, hi_i = lo_i - need * a_z, hi_i - need * a_z
+                        win_retreat[i] = need
+                fz_lo[i], fz_hi[i] = lo_i, hi_i
+            cz = cz + win_retreat
+            real = real + win_retreat if mode == "top" else real
+            if "shift_m" in feats:
+                feats["shift_m"] = feats["shift_m"] + win_retreat
+            feats["window_retreat_m"] = win_retreat
+            keep = np.ones(len(T), dtype=bool)
+            if lo_w is not None:
+                keep &= fz_lo >= lo_w
+            if hi_w is not None:
+                keep &= fz_hi <= hi_w
+            if dump.on:
+                dump.gate(pool, "finger_axis_window", len(T), int(keep.sum()), np.where(~keep)[0],
+                          {**_where(T, cz), "finger_z_lo_mm": fz_lo * 1000, "finger_z_hi_mm": fz_hi * 1000, "retreat_mm": win_retreat * 1000},
+                          records=[{"window_m": [lo_w, hi_w]}])
+            T, score, cz, pre_q, real = T[keep], score[keep], cz[keep], pre_q[keep], real[keep]
+            feats = {k: v[keep] for k, v in feats.items()}
+            feats["finger_z_lo_m"], feats["finger_z_hi_m"] = fz_lo[keep], fz_hi[keep]
+            L["n_finger_axis_window"] = int(len(T))
         if region is not None and len(T):
             # i7-overhang 2026-11-07 (owner: an entry used at an interior goal): only the goal's accessible region, ranked by board clearance
             ok_r, clr, cnt = AR.evaluate(T, cz, union.vertices, region_boxes, region, arm)
@@ -1211,7 +1370,11 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         # 7) the full policy geometry: pre-grasp, approach, closing sweep (fingers from the pre-shape to the contact opening)
         Ts = T[sel]
         contact_q = np.clip(0.5 * feats["width"][sel] + pad_face_offset(arm), 0.0, FINGER_OPEN)  # joint value at the pads' first touch
-        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=float(np.max(pre_q[sel])), obstacles=obstacles)
+        # i7-attachdef (owner 5.1, outer_pinch_preshape): each candidate judged at its OWN pre-shape (check_grasp_geometry takes one opening
+        # per pose) - the batch's max pre-shape judged a thin pinch selected with wide ones (the first-hit proposals next to the all-hit
+        # ones) fully open: tablespoon yxxfdj's 8-16 mm top pinches failed finger_penetration at the 37-48 mm pinches' opening
+        open_q = pre_q[sel] if (cfg.outer_pinch and cfg.outer_pinch_preshape) else float(np.max(pre_q[sel]))
+        geo = CP.check_grasp_geometry(hc, th.as_tensor(Ts, dtype=th.float32), support, contact_q, open_q=open_q, obstacles=obstacles)
         appr = _approach_object_clear(clear_fn, Ts, pre_q[sel], cfg) if cfg.approach_obj_check else np.ones(len(sel), dtype=bool)
         cz_real = (CONTACT_Z + (real if mode == "top" else 0.0)) * np.ones(len(T))  # the pads' real contact offset (the eef's real retreat)
         blade_kw = {"contact_z": cz_real[sel].reshape(-1, 1)} if cfg.blade_contact_at_retreat else {}  # OWNER DECISION switch (default on since i7-switches)
@@ -1402,7 +1565,7 @@ def finger_blades_clear(geom: OG.ObjectGeometry, hc: CP.HandChecker, T, pre_q, c
     c = Tn[:, :3, 3] + Tn[:, :3, 2] * contact_z
     y = Tn[:, :3, 1]
     if outer_half is not None:  # i7-attachfix (outer_pinch): the pinched points are the outer surfaces the pads close on
-        _, _, _, dp, dm = outer_hits(geom.union, c, y, float(outer_half))
+        _, _, _, dp, dm = _outer(geom.union, c, y, outer_half)
     else:
         dp, _ = hits(geom.union, c, y)
         dm, _ = hits(geom.union, c, -y)

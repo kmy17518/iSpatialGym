@@ -215,7 +215,8 @@ def test_core_off_is_identical_on_counts(monkeypatch):
 
 
 def test_repeat_outcome_counters(monkeypatch):
-    s = SimpleNamespace(START_DRAW_FAMILY=True, kit=SimpleNamespace(stats={}), template_meta={}, instance_seeds=[1])
+    # integration-2 (merge with i7-attachdef): check_instance_filter also counts the withheld summary (PUBLISH_AFTER_SCREENS)
+    s = SimpleNamespace(START_DRAW_FAMILY=True, kit=SimpleNamespace(stats={}), template_meta={}, instance_seeds=[1], _count_withheld=lambda: None)
     s.instance_filter = lambda p: None
     monkeypatch.setenv("ISPATIALGYM_START_DRAW", "1")
     CORE.SamplerV2.check_instance_filter(s, "/nonexistent-tro_state.json")
@@ -285,7 +286,7 @@ def test_attachment(fake_tt, monkeypatch):
 def test_block_design(fake_tt, monkeypatch):
     s = _base(BD.BlockDesign, band_spec=None, left_bands=None, edge_frame=None, init_stance=None, manip_candidates=[], edge=0.03,
               _start_margins={"kind": "block_design", "edge": 0.03, "H_max": 0.03})
-    s._init_with_room_for_flips = lambda init: init
+    s._init_with_room_for_flips = lambda init, rng=None: init
     s._manip_lateral_shifts = lambda init: [0.0]
     s._flips_expected = lambda: False
     _check_off(s, monkeypatch)

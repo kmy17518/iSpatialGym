@@ -64,7 +64,8 @@ def _sampler(surfaces=None):
     return s, top
 
 
-def test_edge_frames_keep_the_edges_the_support_row_names():
+def test_edge_frames_keep_the_edges_the_support_row_names(monkeypatch):
+    monkeypatch.setenv("ISPATIALGYM_ALL_EDGES", "0")  # the restriction itself (ALL_EDGES is on by default)
     every = ["+u", "+v", "-u", "-v"]
     s, top = _sampler()
     assert sorted(e.name for e, _ in TT.edge_frames(s, top)) == every and TT.row_edges(s, top) == []
@@ -79,9 +80,10 @@ def test_edge_frames_keep_the_edges_the_support_row_names():
     assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]
 
 
-def test_generation_init_edges_keeps_the_named_edges_after_the_support_row():
+def test_generation_init_edges_keeps_the_named_edges_after_the_support_row(monkeypatch):
     """oracle-fix 2026-11-06 (block_design#01: the fast flow's fixed template seed stood every job at the -v end, 0 of 311 attempts
     written): ``generation.init_edges`` narrows Phase 1a's edges in every order; unset / empty keeps today's list."""
+    monkeypatch.setenv("ISPATIALGYM_ALL_EDGES", "0")  # the restriction itself (ALL_EDGES is on by default)
     import numpy as np
 
     every = ["+u", "+v", "-u", "-v"]
@@ -98,3 +100,31 @@ def test_generation_init_edges_keeps_the_named_edges_after_the_support_row():
     s, top = _sampler([{"name": "bar_udatjt_0", "top_z": 1.05, "edges": ["+u", "-v"]}])
     s.gen = lambda key, default=None: {"init_edges": ["-v", "+v"]}.get(key, default)
     assert [e.name for e, _ in TT.edge_frames(s, top)] == ["-v"]
+
+
+def test_all_edges_switch_ignores_the_row_edges_and_init_edges(monkeypatch):
+    """i7-startdraw 5o (owner 2026-11-08): ``ISPATIALGYM_ALL_EDGES=1`` offers every edge of the top whatever the support row's ``edges`` and
+    ``generation.init_edges`` say (counted per restriction ignored); an interior's open sides still apply; on by default, 0 = the lists."""
+    import numpy as np
+
+    every = ["+u", "+v", "-u", "-v"]
+    s, top = _sampler([{"name": "bar_udatjt_0", "top_z": 1.05, "edges": ["+u"]}])
+    s.gen = lambda key, default=None: {"init_edges": ["-v"]}.get(key, default)
+    s.kit = NS(stats={})
+    monkeypatch.setenv("ISPATIALGYM_ALL_EDGES", "0")
+    assert not TT.all_edges_on() and [e.name for e, _ in TT.edge_frames(s, top)] == []  # +u by the row, then -v by the knob: none
+    assert s.kit.stats == {}
+    monkeypatch.delenv("ISPATIALGYM_ALL_EDGES", raising=False)  # default on (lead decision 12)
+    assert TT.all_edges_on()
+    monkeypatch.setenv("ISPATIALGYM_ALL_EDGES", "1")
+    assert TT.all_edges_on()
+    for seed in range(4):
+        assert sorted(e.name for e, _ in TT.edge_frames(s, top, rng=np.random.default_rng(seed))) == every
+    assert s.kit.stats == {"start_edges.row_ignored": 4, "start_edges.gen_ignored": 4}
+    # nothing to ignore: no counter
+    s2, top2 = _sampler()
+    s2.kit = NS(stats={})
+    assert sorted(e.name for e, _ in TT.edge_frames(s2, top2)) == every and s2.kit.stats == {}
+    # an interior surface's open sides are geometry: kept
+    top.open_edges = ["-v", "+v"]
+    assert sorted(e.name for e, _ in TT.edge_frames(s, top)) == ["+v", "-v"]

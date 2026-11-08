@@ -108,6 +108,62 @@ def _kit_count(s: Any, key: str) -> None:
         st[key] = st.get(key, 0) + 1
 
 
+#: i7-attachdef 2026-11-08 (lead decision: a sampler-only bug fix, default OFF until the owner decides): the collector's queue
+#: (``run_isg.queue_ready``) takes an instance as ready once its TRO, its summary and the template meta exist, and the summary was written
+#: BEFORE the post-write screens (``check_instance_filter``, ``check_goal_occlusion``) - a collector polling in that window claimed an attempt
+#: the screen then rejected (campaign: disembedding_04 / 09 ran a goal-occluded layout and wrote its goal override into the TRO the sampler
+#: re-sampled over it; 2 mental_rotation episodes hit FileNotFoundError). With ``ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=1`` the summary is
+#: written as ``<iid>.summary.json.pending`` and renamed (atomic) to ``<iid>.summary.json`` only after every post-write screen passed; a
+#: rejected attempt's files are removed with it, so it is never claimable. Counters (SAMPLING_REPORT) ``publish_after_screens.{published,withheld}``.
+#: DEFAULT ON since the owner's decision 2026-11-08 (5j; ad_race disembedding_09: published 4, withheld 2, 4 / 4 ok); ``=0`` (or
+#: ``ISPATIALGYM_FAST=0``) restores the summary written in place before the screens.
+#: integration-2 2026-11-08 (lead decision #18, the owner away; a bug in the decided default, the default stays on): the pending summary
+#: lives in the ``.pending`` sub-directory of ``instances/`` under its final name (``instances/.pending/<iid>.summary.json``), not as
+#: ``<iid>.summary.json.pending`` - the suffix pushed long instance ids over the 255-character file-name limit (disembedding_07:
+#: 262 > 255, OSError Errno 36 at its first written instance; the in-place name is 254). Every reader globs ``instances/*.summary.json``
+#: (non-recursive) or opens ``<iid>.summary.json`` by name, so a pending summary is never read; :func:`publish_instance` renames it into
+#: ``instances/`` (``os.replace``, same filesystem: atomic).
+SUMMARY_SUFFIX = ".summary.json"
+PENDING_SUFFIX = ".pending"  # the old pending name's suffix (removed with a rejected attempt; no longer written)
+PENDING_DIR = ".pending"
+
+
+def publish_after_screens() -> bool:
+    return fast_on("PUBLISH_AFTER_SCREENS", default=True)
+
+
+def instance_summary_path(tro_path: str, pending: Optional[bool] = None) -> str:
+    """The summary file of the instance whose TRO is ``tro_path``: while the switch holds it back, the same name in the ``.pending``
+    sub-directory next to it (:data:`PENDING_DIR`; the caller writing it creates the directory)."""
+    base = tro_path[: -len("-tro_state.json")] + SUMMARY_SUFFIX if tro_path.endswith("-tro_state.json") else tro_path + SUMMARY_SUFFIX
+    if publish_after_screens() if pending is None else pending:
+        return os.path.join(os.path.dirname(base), PENDING_DIR, os.path.basename(base))
+    return base
+
+
+def remove_instance_files(tro_path: str) -> List[str]:
+    """A rejected attempt's files: the TRO, the sidecar, the summary (published or pending; also a pending summary of the old name).
+    Returns the removed paths."""
+    out = []
+    old_pending = instance_summary_path(tro_path, False) + PENDING_SUFFIX
+    for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), instance_summary_path(tro_path, False), instance_summary_path(tro_path, True),
+              old_pending):
+        if os.path.exists(p):
+            os.remove(p)
+            out.append(p)
+    return out
+
+
+def publish_instance(tro_path: str) -> bool:
+    """After the post-write screens: the pending summary -> the summary the queue reads (``os.replace``: atomic on one filesystem).
+    False when there was nothing pending (the switch off: the summary was written in place)."""
+    pend = instance_summary_path(tro_path, True)
+    if not os.path.exists(pend):
+        return False
+    os.replace(pend, instance_summary_path(tro_path, False))
+    return True
+
+
 class TemplateExhausted(Reject):
     """A rejection after which no attempt of the template can succeed (IORS small once every start-region candidate failed its
     init -> manipulation travel deterministically): ``run_instances`` counts it like any rejection and ends the template's attempts
@@ -1086,7 +1142,14 @@ class SamplerV2(TaskSampler):
         checks attach and pose in the hand; ``(None, arm, None)`` when nothing is carried."""
         if not carried:
             return None, arm or "right", None
-        g = self.sidecar.grasp_of(carried)
+        g = self.sidecar.grasp_of(carried, arm=arm)  # i7-cork: the record of the carrying arm when an object has two (the hand-over)
+        if arm is None and g is not None:
+            # i7-cork: an object with two records (the hand-over) is carried by the arm the task recorded (record_carry_arm_q) - only when that
+            # arm has a record of the object (a single record, or a stale entry of another draft: as before)
+            rec_arm = (self.__dict__.get("_carry_arm_of") or {}).get(carried)
+            g2 = self.sidecar.grasp_of(carried, arm=rec_arm) if rec_arm else None
+            if g2 is not None and g2.arm == rec_arm:
+                g = g2
         obj = self.objects.get(carried)
         if g is None or g.eef_in_object is None:
             log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.variant, carried)
@@ -1122,12 +1185,27 @@ class SamplerV2(TaskSampler):
         (``tabletop.phase2_split_cone``): then the records of the pair are replaced by the transition when both stances share the edge
         lateral, else by the move along the edge of :meth:`record_edge_travel`, and ``to.extras["init_travel"]`` records the move.
         Returns the (arrival) transition."""
-        if "_position" not in to.extras:
+        shift = "stance_shift" in to.extras  # i7-t03 2026-11-08 (item 1): a manipulation stance moved along the edge at the shelf's fixed start
+        if frm.extras.get("free_start") and frm.edge is None:
+            # i7-t03 round 2 (a): a free-floor start (iors_large.free_floor_stance) drives to the edge stance as IORSLarge's stance A does -
+            # the §3.7 path to the drive-back pose and the §3.8 transition (prompt0.connect); the shelf back-off replaces the arrival later
+            from ispatialgym.sampling.v2 import prompt0 as P0
+
+            self.drop_travel_records(frm.name, to.name)
+            _path, tr = P0.connect(self, frm, to, path_max_m=float(self.gen("stance_path_max_m", 3.0)))
+            return tr
+        if "_position" not in to.extras and not shift:
             return self.record_transition(frm, to)
         self.drop_travel_records(frm.name, to.name)
         lateral = float(th.dot(to.base_xy - frm.base_xy, frm.tangent))
         path, dep = None, None
         if abs(lateral) < 0.02:
+            tr = self.record_transition(frm, to)
+        elif shift:
+            # the owner's motion rule (2026-10-13, disembedding's carried leg): heading kept, forward / backward / sideways only - the
+            # axis-aligned edge slide (NAV.plan_axis_leg) at the first drive-back of generation.stance_shift_back_offs_m that clears
+            back = [float(v) for v in (self.gen("stance_shift_back_offs_m", None) or (0.0, 0.1, 0.2))]
+            path = self.record_path(frm, to, axis_leg=back)
             tr = self.record_transition(frm, to)
         else:
             path, dep, tr = self.record_edge_travel(frm, to)
@@ -1197,7 +1275,7 @@ class SamplerV2(TaskSampler):
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
                     arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None,
                     edge_slide: bool = False, edge_slide_back_m: float = 0.0, axis_leg: Optional[Sequence[float]] = None,
-                    arrive_straight_m: float = 0.0) -> PathRecord:
+                    arrive_straight_m: float = 0.0, heading_offset: float = 0.0, global_extra_erosion_m: float = 0.0) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
         drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
@@ -1208,7 +1286,9 @@ class SamplerV2(TaskSampler):
         slide alone (``NAV.plan_axis_leg``: the heading kept, forward / backward and lateral moves only), no grid planner;
         ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local map; ``arrive_straight_m`` (oracle-fix 2026-11-06,
         ``NAV.plan_path``): the grid path ends that far behind ``to`` along its axis and drives straight in; ``Reject(no_path |
-        path_collision | path_too_long | place_leg_collision | place_leg_heading)``."""
+        path_collision | path_too_long | place_leg_collision | place_leg_heading)``. ``heading_offset`` (i7-goalmaps, ``NAV.plan_path``; default 0):
+        the intermediate waypoints' yaw relative to the travel heading (pi / 2 = sideways); ``global_extra_erosion_m`` (i7-goalmaps, ``NAV.plan_path``;
+        default 0): the global path on the eroded map eroded this much more."""
         keep_off = self.path_keep_off_footprints()
         blocked = list(blocked) + list(self.path_blocked()) + list(keep_off)
         carried = carried or to.carried or frm.carried
@@ -1253,7 +1333,9 @@ class SamplerV2(TaskSampler):
                                   probe_face_travel=is_carried and style != "face_travel", **({"global_blocked": keep_off} if keep_off else {}),
                                   **({"face_travel_cfgs": ft_cfgs} if ft_cfgs else {}),
                                   **({"face_travel_max_extra_rotation_deg": float(ft_rot)} if ft_rot is not None else {}),
-                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}))
+                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}),
+                                  **({"heading_offset": float(heading_offset)} if heading_offset else {}),
+                                  **({"global_extra_erosion_m": float(global_extra_erosion_m)} if global_extra_erosion_m else {}))
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)
@@ -1352,7 +1434,9 @@ class SamplerV2(TaskSampler):
         if not getattr(self.world, "cameras", True):
             # train-fast SAMPLER_CAMERAS (2026-10-31): this world has no head camera; the pixel screens of this instance are still to run
             summary["visibility"] = "pending"
-        with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
+        summary_path = instance_summary_path(path)
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)  # integration-2: the pending summary's sub-directory
+        with open(summary_path, "w") as f:  # i7-attachdef: pending until the post-write screens pass (switch)
             json.dump(_jsonable(summary), f, indent=2)
         if start_per_attempt(self):
             self.template_meta["start_per_attempt"] = True  # no template-level start: each instance carries its own (TRO, sidecar)
@@ -1448,12 +1532,16 @@ class SamplerV2(TaskSampler):
             _kit_count(self, "start_draw.repeat_rejected" if why else "start_draw.repeat_passed")
         if not why:
             return
-        for p in (tro_path, tro_path.replace("-tro_state.json", ".oracle.json"), tro_path.replace("-tro_state.json", ".summary.json")):
-            if os.path.exists(p):
-                os.remove(p)
+        remove_instance_files(tro_path)
+        self._count_withheld()
         if not self.instance_seeds:
             self.template_meta.pop("stances", None)
         raise Reject("repeats_eval", str(why))
+
+    def _count_withheld(self) -> None:
+        """i7-attachdef: a post-write rejection the switch kept from the queue (its summary was still pending)."""
+        if publish_after_screens():
+            self.counters["publish_after_screens.withheld"] = self.counters.get("publish_after_screens.withheld", 0) + 1
 
     def check_goal_occlusion(self, draft: Draft, tro_path: str) -> None:
         """Pre-generation goal-image occlusion (``ispatialgym.eval.goal_occlusion``): the goal state as the goal check
@@ -1520,12 +1608,10 @@ class SamplerV2(TaskSampler):
             self.kit.sync_world()
             self.configure_targets(draft)
         draft.summary["goal_occlusion"] = rep
-        summary_path = tro_path.replace("-tro_state.json", ".summary.json")
-        sidecar_path = tro_path.replace("-tro_state.json", ".oracle.json")
+        summary_path = instance_summary_path(tro_path)
         if rep["occluded"]:
-            for p in (tro_path, sidecar_path, summary_path):
-                if os.path.exists(p):
-                    os.remove(p)
+            remove_instance_files(tro_path)
+            self._count_withheld()
             if not self.instance_seeds:
                 self.template_meta.pop("stances", None)
             self.counters["goal_occluded"] = self.counters.get("goal_occluded", 0) + 1
@@ -1720,6 +1806,8 @@ class SamplerV2(TaskSampler):
                     self.check_goal_occlusion(draft, path)
                     self.constraints_write_back(draft, self.instance_id(index))
                     clock.mark("goal_occlusion")
+                    if publish_instance(path):  # i7-attachdef: only now can a collector claim it (ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS)
+                        self.counters["publish_after_screens.published"] = self.counters.get("publish_after_screens.published", 0) + 1
                     self.instance_seeds.append(seed)
                     written.append(path)
                     # run_isg loads an instance through the template meta; demos replay instances while the rest of the
