@@ -2385,6 +2385,47 @@ the approach tail: finger_penetration) - not the goal side (cancelled). i7_fridg
 55 / 80, goal_in_band 48, collision-free 18: ready 14 / tucked 4; before 0, legacy 8-9); attempts rejected target_placement by the B -> C
 carry leg path_collision and the C exact place IK (joint2 near its limit) - the legacy run's own rejection (fix2 27 / 36).
 
+#### Owner decisions 6.1-6.3 on the interior goals (branch i7-interior2, 2026-11-08)
+
+- **6.1 sink pick (inside_large_03).** The oracle pre-shapes to pinch width / 2 + the margin before the descent; since 11-06 the support
+  policy measures the fingers there (`tabletop.policy_opening_of`) - but only in `tabletop.grasp_at_pose`. IORS large's picks judged the
+  fingers fully open (0.05 m): the plate luhkiz lip pinches (mode "top", widths 4-8 mm: pre-shape ~0.012-0.014 m per finger) failed
+  `support policy on the approach tail` (finger_penetration on bar_egwapq_0) at every one of 249 C tries in i7_sink2. a7f2acb0 wraps the
+  main pick at B, the segment-fallback regrasp, the overhang grasp and their twins (`pick_twin`) in `_policy_opening` (the existing switch
+  `ISPATIALGYM_SUPPORT_POLICY_OPENING=q` turns it off; counters `pick_preshape.<B | segment_fallback | overhang>[.q]`). Plus the overhang
+  FALLBACK of this pick (IORSSmall's, `v2/overhang_fallback.py`): without an alias `pick_overhang_push`, a direct pick failing for a
+  support-policy class (`overhang_fallback.reason_class`) takes IORSLarge's own `_overhang_pick` with the overhang defaults in fallback
+  mode; any grasp mode (the plate's grasps are "top": a side-only filter would never trigger); switch `ISPATIALGYM_LARGE_OVERHANG_FALLBACK`,
+  default ON since c7fcb37a (owner 6.1); counters `large_overhang_fallback.trigger.<class>` / `.mode.<mode>` / `.found` / `.failed`.
+- **6.2 stance-C cap with a map.** `ISPATIALGYM_INSIDE_MAP_CAP` (default ON since c7fcb37a): the survivors of a map-view band are capped per
+  base pose by reach margin as without a band (`generation.inside_map_trunks`, default `NO_BAND_TRUNKS` 3; every base pose keeps its best;
+  `placement_stats.map_cap` before / after / bases, counters `inside_map_cap.kept` / `.dropped`). Legacy bands are not capped.
+- **6.3 fridge carry / place (inside_large_02).** i7_fridge4 finished 16 att / 4 written / 2 ok (0.96 GPU-h per success). C-try rejections
+  (i7_fridge4 / legacy fix2): B -> C path / transition 158 / 529, the place IK's joint2 near its limit 58 / 189 - the legacy mix. The path
+  collision is the BASE turning in place beside the init table (fix1 PATH_BLAME: base_link + wheels vs breakfast_table_xftrki_0, ~0.08 m
+  from B), not the carried jar. The demo failures (2 / 2): navigate[4], the idle right gripper (ready) against fridge_petcxr_0. Every earlier
+  successful fridge demo (fix1 / fix2, 5 / 5) carried STRAIGHTENED (straighten_then_navigate, travel tilt 0; right arm, C so 0.55, trunk
+  (0.95, -0.3), goal 0.871 m ahead); i7_fridge4's demos driven at the leaning grasp trunk (tilt -0.16 / -0.19) 1 / 3 ok, the straightened one 1 / 1.
+  No demo failed at the place (release 0.03 + lift, finger clearance 0.080 m, no tilt). Switch `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` (default off):
+  the inside carry only straightened (counters `inside_carry_straight.rejected` / `.straight`); A/B below.
+- **Commits** a7f2acb0 (the code, switches off), c7fcb37a (defaults on: 6.1 overhang fallback, 6.2 cap); snapshot trunk_c7fcb37a; suite =
+  base (cf1f5d2d on this host: 23 failed + 3 errors, the same set).
+- **Validation** (`--grasps v2only` N 4, `$OFH/v2maps_int1`):
+
+| run | alias | switch | att | written | ok | GPU-h / success | s / attempt |
+|---|---|---|---|---|---|---|---|
+| i7_sink2 (before) | inside_large_03 | - | 3 | 0 | - | - (3.0 GPU-h) | 3000 (budget) |
+| i7i2_sink | inside_large_03 | defaults | 6 | 4 | 4 | 0.32 | 688 |
+| i7_fridge4 (before, uncapped) | inside_large_02 | - | 16 | 4 | 2 | 0.96 | 406 |
+| i7i2_fridgeA + A2 | inside_large_02 | defaults | 27 + 13 | 4 + 4 | 3 + 3 | 0.62 / 0.31 | 229 / 229 |
+| i7i2_fridgeB + B2 | inside_large_02 | + CARRY_STRAIGHT | 19 + 6 | 4 + 4 | 4 + 4 | 0.34 / 0.135 | 232 / 239 |
+
+  Counters: sink `pick_preshape.B` 163 (fingers 0.0141 m, pre-shaped), the overhang fallback 0 triggers on the sink (3 on the fridge,
+  non_finger_link side grasps, 0 found); map cap fridge 17 -> 10, sink 26 -> 9 survivors, base poses 4 -> 4 / 3 -> 3. Where 6.3 acted: the
+  leaning grasp-trunk drives 1 / 4 ok over the v2 runs (each failure navigate[4], the idle right gripper on the fridge), straight carries
+  15 / 16 (one robot_wobble); B rejected the leaning drive (`inside_carry_straight.rejected` 224 / 47) and wrote straight carries only.
+  Open: the default of `ISPATIALGYM_INSIDE_CARRY_STRAIGHT` (owner).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
