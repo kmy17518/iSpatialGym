@@ -54,6 +54,21 @@ from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 
+def board_grid_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_GRID=1`` (default off): when no position of
+    ``generation.board_base_xy_candidates`` works, the board is searched on a grid of (base depth, lateral) positions of the manipulation
+    stance (:meth:`BlockDesign._board_grid`), nearest to the list's first position at the stand-off it was set for (0.35) first; the
+    same tests, the CPU ones (on the top, cells kept, the repeated-colour flip set) before the exact place probe, at most
+    ``generation.board_grid_max_probes`` probes per candidate. Off: the list alone."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_GRID", "0") == "1"
+
+
+#: BD_BOARD_GRID: base depths / laterals (m) of the board grid, and the stand-off the customs positions were set for
+BOARD_GRID_DEPTHS = tuple(round(0.45 + 0.03 * i, 2) for i in range(8))  # 0.45 .. 0.66
+BOARD_GRID_LATERALS = tuple(round(-0.22 + 0.04 * i, 2) for i in range(8))  # -0.22 .. +0.06
+BOARD_LIST_STAND_OFF = 0.35
+
+
 def board_early_on() -> bool:
     """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY=1`` (default off): the puzzle board's CPU checks
     (on the top, cells kept, the repeated-colour flip set) run before the init -> manipulation travel and before the exact place probe,
@@ -514,6 +529,23 @@ class BlockDesign(SamplerV2):
     def _board_positions(self) -> List[Tuple[float, float]]:
         """``generation.board_base_xy_candidates``: the board centre's (base depth, lateral) at the manipulation stance, in order."""
         return [(float(d), float(l)) for d, l in (self.gen("board_base_xy_candidates", None) or BOARD_BASE_XY)]
+
+    def _board_grid(self, manip: Stance) -> List[Tuple[float, float]]:
+        """BD_BOARD_GRID: the grid positions not in the list, nearest first to the list's first position on the top at ``manip`` (else to
+        the list's first position moved by the stance's stand-off beyond ``BOARD_LIST_STAND_OFF``: the same distance from the edge); ties
+        to the robot's right first (bd_diag2: from the tall 0.95 trunk the place probe passes only right of the base, near the edge)."""
+        positions = self._board_positions()
+        listed = {(round(d, 3), round(l, 3)) for d, l in positions}
+        ref = None
+        if self.top is not None:
+            right, toward, _ = self._table_axes(manip)
+            half = 0.5 * float(self._board_geometry()["plate_m"])
+            ref = next(((d, l) for d, l in positions if self._board_on_top(manip, d, l, half, right, -toward)), None)
+        if ref is None:
+            so = float(manip.stand_off) if manip.stand_off is not None else BOARD_LIST_STAND_OFF
+            ref = (positions[0][0] + so - BOARD_LIST_STAND_OFF, positions[0][1])
+        grid = [(d, l) for d in BOARD_GRID_DEPTHS for l in BOARD_GRID_LATERALS if (round(d, 3), round(l, 3)) not in listed]
+        return sorted(grid, key=lambda p: (round((p[0] - ref[0]) ** 2 + (p[1] - ref[1]) ** 2, 6), p[1], p[0]))
 
     def _board_on_top(self, manip: Stance, depth: float, lateral: float, half: float, right: th.Tensor, far: th.Tensor) -> bool:
         """:meth:`_place_board`'s off-the-top test: the four plate corners of the table-aligned board centred ``depth`` ahead of
@@ -2587,24 +2619,46 @@ class BlockDesign(SamplerV2):
         why: List[str] = []
         k_diag = getattr(self, "_bd_k", -1)
         BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
-        for depth, lateral in self._board_positions():
+        positions = [(d, l, False) for d, l in self._board_positions()]
+        if board_grid_on():
+            positions += [(d, l, True) for d, l in self._board_grid(manip)]
+        grid_why: Dict[str, int] = {}
+        grid_probes, grid_max = 0, int(self.gen("board_grid_max_probes", 12))
+        for depth, lateral, on_grid in positions:
+            if on_grid and not grid_why.get("_started"):
+                grid_why["_started"] = 1
+                self._kc("bd_board.grid_searched")
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
             xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
             if BDD.level():
                 log.info("BD_DIAG board k %d %s %s: %s", k_diag, tag, BDD._st(manip), BDD.corners(self, manip, depth, lateral, half, right, far))
+            def fail(text: str, short: str) -> None:
+                if on_grid:
+                    grid_why[short] = grid_why.get(short, 0) + 1
+                else:
+                    why.append(f"{tag}: {text}")
+
             if not self._board_on_top(manip, depth, lateral, half, right, far):
-                why.append(f"{tag}: off the top")
+                fail("off the top", "off the top")
                 continue
             kept = list(cells or [])
             if cells is not None:
                 kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
                 n_elig = sum(1 for c in kept if flip_eligible is not None and flip_eligible(c))
                 if len(kept) < n_blocks or n_elig < n_flip_needed:
-                    why.append(f"{tag}: {len(kept)} cells clear ({n_elig} flip-eligible)")
+                    fail(f"{len(kept)} cells clear ({n_elig} flip-eligible)", "cells")
                     continue
             pose = (th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + 0.001]), q)
-            early = board_early_on()
-            if early and layout_ok is not None and cells is not None and not layout_ok(kept):
+            early = board_early_on() or on_grid
+            if on_grid and layout_ok is not None and cells is not None and not layout_ok(kept):
+                fail("", "no flip set")
+                continue
+            if on_grid:
+                if grid_probes >= grid_max:
+                    fail("", "probe cap")
+                    continue
+                grid_probes += 1
+            if early and not on_grid and layout_ok is not None and cells is not None and not layout_ok(kept):
                 # BD_BOARD_EARLY: the CPU flip-set test before the exact probe (the same verdict, the probe's IK saved)
                 self._kc("bd_board.layout_before_probe")
                 why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
@@ -2614,7 +2668,7 @@ class BlockDesign(SamplerV2):
             memo = self.__dict__.setdefault("_bd_probe_memo", {})
             if early and memo.get(memo_key) is False:
                 self._kc("bd_board.probe_memo_hit")
-                why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
+                fail("no pitched place reaches the pockets' release aims from the manipulation stance", "no pitched place")
                 continue
             # (c) the place probe: the cube's centre at the release aim, its bottom release_above over the pocket floor
             self._teleport({name: pose})
@@ -2626,16 +2680,23 @@ class BlockDesign(SamplerV2):
                 self._kc("bd_board.probe_run")
                 memo[memo_key] = bool(probe_ok)
             if not probe_ok:
-                why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
+                fail("no pitched place reaches the pockets' release aims from the manipulation stance", "no pitched place")
                 continue
             if layout_ok is not None and cells is not None and not layout_ok(kept):
-                why.append(f"{tag}: {len(kept)} cells clear, no cell set of them lets every repeated-colour block flip")
+                fail(f"{len(kept)} cells clear, no cell set of them lets every repeated-colour block flip", "no flip set")
                 continue
+            if on_grid:
+                self._kc("bd_board.grid_placed")
+                log.info("%s: BD_BOARD_GRID: the board at a grid position (%.2f, %+.2f) of the stance at stand-off %s (%d grid probes; list: %s)", self.gp.variant,
+                         float(depth), float(lateral), manip.stand_off, grid_probes, "; ".join(why))
             log.info("%s: puzzle board %s at base (%.2f, %+.2f): pitch %.1f mm, seat %.1f mm, rim %.0f mm over the floor, release bias %.1f mm; %d cells clear (%s)",
                      self.gp.variant, name, float(depth), float(lateral), float(geo["pocket_pitch_m"]) * 1000, float(geo["seat_inner_m"]) * 1000,
                      float(geo["rim_top_above_floor_m"]) * 1000, float(self.gen("board_release_bias_m", 0.0035)) * 1000, len(kept), "; ".join(why) or "first candidate")
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
+        if grid_why.pop("_started", None):
+            self._kc("bd_board.grid_failed")
+            why.append("grid " + ", ".join(f"{k} {v}" for k, v in sorted(grid_why.items())))
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works: " + "; ".join(why))
 
     def _kc(self, key: str, n: int = 1) -> None:
@@ -2665,8 +2726,18 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         why: List[str] = []
-        for depth, lateral in self._board_positions():
+        positions = list(self._board_positions()) + (self._board_grid(manip) if board_grid_on() else [])
+        n_list = len(self._board_positions())
+        for i, (depth, lateral) in enumerate(positions):
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
+            if i == n_list:
+                why.append(f"grid {len(positions) - n_list} positions: none passes")
+            if i >= n_list:
+                if (self._board_on_top(manip, depth, lateral, half, right, far) and self._board_cpu_ok(manip, init, depth, lateral, cells, half_b, n, n_flip,
+                                                                                                       flip_mode, primary_dir, img_score, slot_faces)):
+                    self._kc("bd_board.precheck_pass")
+                    return
+                continue
             if not self._board_on_top(manip, depth, lateral, half, right, far):
                 why.append(f"{tag}: off the top")
                 continue
@@ -2683,6 +2754,16 @@ class BlockDesign(SamplerV2):
             return
         self._kc("bd_board.precheck_reject")
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works (precheck): " + "; ".join(why))
+
+    def _board_cpu_ok(self, manip, init, depth, lateral, cells, half_b, n, n_flip, flip_mode, primary_dir, img_score, slot_faces) -> bool:
+        """The precheck's cells-kept + flip-set test of one board position (the grid positions of BD_BOARD_GRID)."""
+        right, toward, _ = self._table_axes(manip)
+        xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+        kept = [c for c in cells if abs(float(th.dot(c - xy, right))) > half_b or abs(float(th.dot(c - xy, toward))) > half_b]
+        n_elig = sum(1 for c in kept if flip_mode and self._flip_cell_ok(c, manip, init, primary_dir))
+        if len(kept) < n or n_elig < n_flip:
+            return False
+        return not flip_mode or self._has_flip_set(kept, n, img_score, slot_faces, manip, init, primary_dir, True)
 
     def _board_probe(self, manip: Stance, pose: TT.Pose, right: th.Tensor, toward: th.Tensor, table_yaw: float, support=None,
                      detail: Optional[List[str]] = None, ignore: Sequence[Any] = ()) -> bool:

@@ -289,3 +289,45 @@ def test_board_precheck_rejects_before_the_travel(monkeypatch):
     s0.extras["focus_info"] = {"cells": [s0.base_to_world(th.tensor(c)) for c in REGION_11]}
     s._board_precheck(init, s0, faces)
     assert s.kit.stats["bd_board.precheck_pass"] == 1
+
+
+# bd_diag2 (2026-11-08, v2only, trunk_6cc832b5): candidate 12's region cells (stand-off 0.45, shift +0.35, trunk 0.95 / 0)
+REGION_12 = [(0.67, -0.16), (0.75, -0.08), (0.75, -0.24), (0.59, -0.08), (0.59, -0.24), (0.67, -0.32), (0.67, 0.00), (0.51, -0.16)]
+
+
+def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_GRID=1: at stand-off 0.45 the list's first three positions are off the top and its last two leave candidate
+    12's cells no flip set; the grid (nearest to the first position at the same distance from the edge first) is searched with the CPU
+    tests before each probe, the probes capped by board_grid_max_probes. Off: the list's verdict."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+
+    def reach(poses, st, arm, **kw):  # the tall trunk's reach in bd_diag2: the hand right of -0.08 and nearer than 0.57 only
+        probes.append(st)
+        b = [st.world_to_base(th.as_tensor(p[0])[:2]) for p in poses]
+        return SimpleNamespace(ok=all(float(v[1]) <= -0.08 and float(v[0]) <= 0.57 for v in b))
+
+    s.ikc = SimpleNamespace(exact=reach)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_GRID", raising=False)
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY", raising=False)
+    with pytest.raises(Reject) as off:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert "(0.46, -0.02): off the top" in str(off.value) and "grid" not in str(off.value)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_GRID", "1")
+    probes.clear()
+    _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    b = manip.world_to_base(pose[0][:2])
+    pos = (round(float(b[0]), 2), round(float(b[1]), 2))
+    assert pos not in [tuple(p) for p in BOARD_XY] and s.kit.stats["bd_board.grid_placed"] == 1
+    assert layout_ok(kept) and s._board_on_top(manip, pos[0], pos[1], _half(s), right, -toward)
+    assert pos == (0.51, -0.1)  # bd_diag2: the one position candidates 12 / 15 pass (layout + probe from the 0.95 trunk)
+    # the grid is ordered by the distance to the list's first position on the top, (0.52, -0.06); none on the top: (0.46 + 0.10, -0.02)
+    g = s._board_grid(manip)
+    assert g[:2] == [(0.51, -0.06), (0.54, -0.06)] and (0.51, -0.1) in g[:5] and len(g) == len(BD.BOARD_GRID_DEPTHS) * len(BD.BOARD_GRID_LATERALS)
+    s.top, g_top = None, s.top
+    assert s._board_grid(manip)[0] == (0.57, -0.02)
+    s.top = g_top
+    s.spec.generation["board_grid_max_probes"] = 0
+    with pytest.raises(Reject) as capped:
+        s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    assert "grid" in str(capped.value) and "probe cap" in str(capped.value)
