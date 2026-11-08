@@ -615,8 +615,9 @@ def axial_load_geometry(entry: Dict[str, Any], T_obj: np.ndarray, hinge_xy) -> D
     """i7-brace 5w.3 FIX: the axial brace load on the COM hinge (``hinge_xy``: the hinge anchor, world) at the braced pose ``T_obj``:
     ``B`` the BRACED end (``load.point_object``: the end the brace stands at, arriving along ``load.direction``), the turn sense ``spin``
     (+1 = about +z, the sense that carries ``B`` along ``load.direction``; the library's ``goal.spin``), ``P`` the PUSHED end (the oracle's
-    push: ``B`` itself, or for an opposite-end entry - the brace at the far end - ``B`` reflected through the hinge), ``t`` the pushed end's
-    arc tangent in the turn sense (horizontal unit), ``r_B`` / ``r_P`` their radii about the hinge."""
+    push): ``B``'s distance along the long axis through the hinge (square to ``load.direction``), on that axis - or for an opposite-end
+    entry (the brace at the far end) the same distance on the other side; ``t`` the pushed end's arc tangent in the turn sense (horizontal
+    unit, = +-``load.direction``), ``r_B`` / ``r_P`` their radii about the hinge."""
     load = entry.get("load") or {}
     goal = entry.get("goal") or {}
     R, tr = T_obj[:3, :3], T_obj[:3, 3]
@@ -630,9 +631,14 @@ def axial_load_geometry(entry: Dict[str, Any], T_obj: np.ndarray, hinge_xy) -> D
     cz = float(rB[0] * d[1] - rB[1] * d[0])
     spin = float(goal.get("spin") or (1.0 if cz >= 0 else -1.0))
     opp = bool(goal.get("opposite_end"))
-    P = B.copy()
-    if opp:
-        P[:2] = 2.0 * H[:2] - B[:2]
+    # the pushed end ON THE LONG AXIS through the hinge (the axis square to the arriving direction d): the library's end point carries its
+    # builder's centre (the hull VERTEX mean - 6.8 cm off the centre line on jhaltj, whose PhysX COM / hinge is at the root), and a line
+    # from that point along its own tangent left the book through the END face, which the arc only slides along (run F v1, jhaltj s1:
+    # contact at 0.30 rad, 44 / 44 never turned). On the axis the tangent is +-d and the pusher meets the long side beside the end.
+    a = np.array([-d[1], d[0], 0.0])
+    s_end = float(rB @ a)
+    P = H + a * (-s_end if opp else s_end)
+    P[2] = B[2]
     rP = P - H
     rP[2] = 0.0
     r_P = float(np.linalg.norm(rP))

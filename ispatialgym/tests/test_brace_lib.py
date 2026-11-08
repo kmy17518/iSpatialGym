@@ -638,3 +638,20 @@ def test_a_touching_load_that_never_moved_the_partner_is_not_loaded():
     assert ok["reasons"] == [] and ok["verdict"] == "valid"  # the input untouched
     j = VC.brace_load_reached(ok, True, 3.0)
     assert j["verdict"] == "valid" and j["reasons"] == []
+
+
+def test_the_pushed_end_lies_on_the_long_axis_through_the_hinge():
+    """F v1 (jhaltj s1): the library's end point is 6.8 cm off the centre line (its builder's vertex-mean centre); the line from it along
+    its own tangent left the book through the END face and the arc slid along it (contact at 0.30 rad, never turned). On the axis the
+    pusher meets the long side beside the end, square to the arriving direction."""
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull(0.305, 0.219, 0.008)
+    e = _axial_entry([0.1223, 0.0676, 0.0], [0.0, 1.0, 0.0], 1.0)
+    _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["pushed_point"][:2] == [0.1223, 0.0] and np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4)
+    assert abs(f["face_along_m"] + 0.1095) < 1e-6 and f["tangent_vs_load_dir"] > 0.999  # the long side y = -0.1095
+    e = _axial_entry([-0.1223, 0.0676, 0.0], [0.0, -1.0, 0.0], 1.0, opposite=True)
+    _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["pushed_point"][:2] == [0.1223, 0.0] and np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4)
