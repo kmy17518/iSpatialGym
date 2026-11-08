@@ -2530,9 +2530,22 @@ without asking."
   merged here (it would bring i7-brace's wall_brace work along).
 - Suite on 38ee02e8: 23 failed + 3 errors, the same set as with the base d72185da's files. 38ee02e8 moves test_contact_library's
   lying-rest refusal to the switch-off setting (`=0`).
-- **Confirm run** `i7ar_def` (trunk_38ee02e8, svl titanrtx, v2only N 4, indices 310000-310003 as i7ar_on, root
-  `$OFH/v2maps_int1_axialrest`, alias memory v0027 pinned, no settled-rest env, both brace switches explicit): see DECISIONS
-  "i7-axialrest CONFIRM".
+- **Confirm run** `i7ar_def`: trunk_38ee02e8, svl titanrtx, v2only N 4, indices 310000-310003 as i7ar_on, root
+  `$OFH/v2maps_int1_axialrest`, alias memory v0027 pinned, no settled-rest env, both brace switches explicit (DECISIONS "i7-axialrest
+  CONFIRM").
+
+| alias | att / wr / ok | GPU-h per success | vs |
+|---|---|---|---|
+| axial_05 | 20 / 4 / 3 | 0.10 | i7ar_on 30 / 4 / 2 |
+| axial_01 | 11 / 4 / 2 | 0.17 | all 4 draws identical to i7ar_off (11 / 4 / 2) |
+| axial_03 | 6 / 4 / 4 | 0.048 | all 4 draws identical to i7ar_off (6 / 4 / 4) |
+| axial_04 | 12 / 4 / 2 | 0.095 | 2 draws identical to i7ar_off; 2 diverge at a run-to-run program_check IK-branch verdict |
+| all | 49 / 16 / 11 | 0.093 | i7ar_on 0.090, i7ar_off 0.083 |
+
+  - The upright placements are back at the off arm's push heights (no 3 mm lower drop).
+  - axial_05 310001 succeeded at a 0.445 rad turn: full error 0.0027 against a 0.050 tolerance. The upright goal would have failed it on
+    the 0.087 tilt, so this is the first success the goal frame decides.
+  - The brace still failed in all 4 axial_05 demos (`brace_ik_failed`), as diagnosed below.
 
 **axial_05's brace never landing: CPU diagnosis (no fix made).** Script `$OFH/axialrest_20261108/brace05.py` rebuilds the sampler's
 brace candidates of the 4 written i7ar_on demos and reads the axial_brace map at the goal cell.
