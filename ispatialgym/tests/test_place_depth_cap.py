@@ -244,3 +244,82 @@ def test_phase2_keep_pairs_draws_within_the_cap(monkeypatch):
     assert keep(cands) == cands[1:] and stats["place_depth_cap.phase2_removed"] == 1
     monkeypatch.setenv(IS.PLACE_DEPTH_CAP_ENV, "0")
     assert me._pdc_keep_pairs() is None  # the cap off: no cut
+
+
+# ------------------------------------------------------------------------------------------------ touching_04 follow-ups, round 2 (owner 5r.1)
+
+
+def _a1_me(monkeypatch, mode, rows, place_ok):
+    monkeypatch.setattr(TT, "contact_maps_on", lambda: True)
+    if mode is None:
+        monkeypatch.delenv(IS.TOUCH_A1_SCREEN_ENV, raising=False)
+    else:
+        monkeypatch.setenv(IS.TOUCH_A1_SCREEN_ENV, mode)
+    stats, probes = {}, []
+
+    def why(st, t_place, grasp):
+        probes.append(st)
+        return None if place_ok(st) else "descent: exact IK failed at pose 1 of 2"
+
+    me = SimpleNamespace(shelf_start=None, shelf_tip=lambda: False, gen=lambda k, d=None: d, kit=SimpleNamespace(stats=stats),
+                         place_pose_for=lambda t, p, m: "place", push_stance_candidates=lambda *a, **k: (rows, {}), place_infeasible_why=why,
+                         _a1_screen_shadow=False)
+    return me, stats, probes
+
+
+def test_a1_screen_rejects_when_no_a1_push_stance_places(monkeypatch):
+    """The goal check's contact_unreachable at the draw: A1's stances (map + collision) must hold one from which the box's place passes."""
+    screen = IS.IORSSmall._touch_a1_screen
+    manip = SimpleNamespace(name="manipulation", translate=0.25, tilt=-0.53, stand_off=0.45)
+    a, b = SimpleNamespace(name="push", stand_off=0.35), SimpleNamespace(name="push", stand_off=0.30)
+    me, stats, probes = _a1_me(monkeypatch, "1", [(-0.08, a, {}), (-0.12, b, {})], place_ok=lambda st: False)
+    with pytest.raises(Reject) as e:
+        screen(me, manip, None, "t", "p", 2)
+    assert e.value.reason == "contact_unreachable" and probes == [a, b] and stats["touch_a1_screen.rejected"] == 1 and "-0.08 s0.35" in str(e.value)
+    # one stance places: passed (stops at the first); the manipulation-stance entry (None) probes the manipulation stance
+    me, stats, probes = _a1_me(monkeypatch, "1", [(-0.08, a, {}), (-0.12, None, {})], place_ok=lambda st: st is manip)
+    screen(me, manip, None, "t", "p", 2)
+    assert probes == [a, manip] and stats["touch_a1_screen.passed"] == 1 and "touch_a1_screen.rejected" not in stats
+    # shadow: counted, nothing rejected
+    me, stats, _ = _a1_me(monkeypatch, "shadow", [(-0.08, a, {})], place_ok=lambda st: False)
+    screen(me, manip, None, "t", "p", 2)
+    assert stats["touch_a1_screen.shadow_would_reject"] == 1 and me._a1_screen_shadow
+    # uncertain: no A1 stance (the goal check falls back to the laterals); the shelf layout / tip release: nothing
+    me, stats, probes = _a1_me(monkeypatch, "1", [], place_ok=lambda st: False)
+    screen(me, manip, None, "t", "p", 2)
+    assert stats == {"touch_a1_screen.uncertain": 1} and not probes
+    me, stats, probes = _a1_me(monkeypatch, "1", [(-0.08, a, {})], place_ok=lambda st: False)
+    me.shelf_tip = lambda: True
+    screen(me, manip, None, "t", "p", 2)
+    assert stats == {} and not probes
+    # the switch defaults off
+    _a1_me(monkeypatch, None, [], place_ok=lambda st: False)
+    assert IS.touch_a1_screen_mode() == "off"
+
+
+def test_built_tilts_scan_the_maps_trunk_tilts(monkeypatch):
+    """The touching Phase 2 on the touch_push map's built tilts (eligible trunks at the translate, within the torso limit) instead of the
+    continuous scan; off / no map / not touching: the scan."""
+    pm = SimpleNamespace(trunks=lambda: [(0.0, 0.0), (0.0, -0.3), (0.0, -0.6), (0.0, -0.9), (0.25, 0.0), (0.25, -0.3), (0.25, -0.6), (0.25, -0.9)])
+    maps = {"pm": pm}
+    monkeypatch.setattr(TT, "contact_maps_on", lambda: True)
+    monkeypatch.setattr(TT, "contact_map", lambda s, kind, role, top, **kw: maps["pm"])
+    stats = {}
+    me = SimpleNamespace(relation="touching", shelf_start=None, shelf_pose=None, top=None, kit=SimpleNamespace(stats=stats))
+    for name in ("_built_tilts_map", "phase2_built_tilts"):
+        setattr(me, name, getattr(IS.IORSSmall, name).__get__(me))
+    fk = SimpleNamespace(tilt_limit=lambda tr: -0.7 if tr > 0.1 else -1.8)
+    monkeypatch.delenv(IS.TOUCH_BUILT_TILTS_ENV, raising=False)
+    assert me.phase2_built_tilts(0.25, -0.7) is None
+    assert TT.phase2_tilts(me, fk, 0.25, 7) == TT.tilt_scan(fk, 0.25, 7)
+    monkeypatch.setenv(IS.TOUCH_BUILT_TILTS_ENV, "1")
+    assert TT.phase2_tilts(me, fk, 0.25, 7) == [0.0, -0.3, -0.6]  # -0.9 beyond the limit at 0.25
+    assert TT.phase2_tilts(me, fk, 0.0, 7) == [0.0, -0.3, -0.6, -0.9]
+    assert TT.phase2_tilts(me, fk, 0.5, 7) == TT.tilt_scan(fk, 0.5, 7) and stats["touch_built_tilts.none_at_translate"] == 1
+    assert stats["touch_built_tilts.scans"] == 2
+    maps["pm"] = None
+    assert TT.phase2_tilts(me, fk, 0.25, 7) == TT.tilt_scan(fk, 0.25, 7) and stats["touch_built_tilts.no_map"] >= 1
+    maps["pm"] = pm
+    me.relation = "ontop"
+    assert me.phase2_built_tilts(0.25, -0.7) is None
+    assert TT.phase2_tilts(SimpleNamespace(), fk, 0.25, 7) == TT.tilt_scan(fk, 0.25, 7)  # a sampler without the hook

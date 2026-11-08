@@ -243,6 +243,17 @@ PLACE_DEPTH_CAP_BASIS_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_BASIS"
 #: failed at or before the goal check)
 TOUCH_LIFT_SCREEN_ENV = "ISPATIALGYM_TOUCH_LIFT_SCREEN"
 TOUCH_LIFT_SCREEN_DEFAULT = "1"
+#: owner 5r.1 touching_04 follow-up (2026-11-08): the goal check's contact_unreachable screened at the draw against the push map - the goal
+#: check's own A1 push stances (:meth:`IORSSmall.push_stance_candidates`: touch_push map + whole-body collision, the same call and inputs) must
+#: hold one stance from which the carried box's place passes (:meth:`IORSSmall.place_infeasible_why`, the goal check's own "place:" verdict);
+#: when none does, the goal check rejects contact_unreachable ~130 s later, after the draft. "0" off (default), "shadow" (counted, nothing
+#: rejected), "1" on. Only where the goal check is certain to use those stances (A1 non-empty; not the shelf layout / tip release)
+TOUCH_A1_SCREEN_ENV = "ISPATIALGYM_TOUCH_A1_SCREEN"
+#: owner 5r.1 touching_04 follow-up (2026-11-08): "1" = the touching Phase 2 scans the trunk tilts the touch_push map is built at (its
+#: eligible trunks at each translate, within the torso limit) instead of ``tabletop.tilt_scan``'s continuous samples, so the manipulation
+#: and push stances (same trunk) read built map columns, not the nearest / inherited ones (c2's place-screen and A1 failures sat at
+#: (0.25, -0.53) and (0.0, -0.61)). Only with a touch_push map; enters the start-per-attempt cell cache key when on. Default "0"
+TOUCH_BUILT_TILTS_ENV = "ISPATIALGYM_TOUCH_BUILT_TILTS"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -279,6 +290,15 @@ def place_depth_cap_basis() -> str:
 def touch_lift_screen_mode() -> str:
     v = (os.environ.get(TOUCH_LIFT_SCREEN_ENV) or TOUCH_LIFT_SCREEN_DEFAULT).strip().lower()
     return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
+
+
+def touch_a1_screen_mode() -> str:
+    v = (os.environ.get(TOUCH_A1_SCREEN_ENV) or "0").strip().lower()
+    return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
+
+
+def touch_built_tilts_on() -> bool:
+    return (os.environ.get(TOUCH_BUILT_TILTS_ENV) or "0").strip() == "1"
 
 
 def place_depth_cap_mode() -> str:
@@ -1872,6 +1892,8 @@ class IORSSmall(SamplerV2):
                 "cell": {"index": int(i), "n": int(n_cells), "width_m": float(cell_m), "lateral": float(lateral)}}
         if shelf_draw_on(self):
             payload["shelf_poses"] = "per_attempt"
+        if self._built_tilts_map() is not None:  # the cell's Phase 2 on the map's built tilts (only when on: keys unchanged off)
+            payload["phase2_built_tilts"] = True
         if self._pdc_keep_pairs() is not None:  # follow-up (c): the cell's Phase 2 is cut to the cap (only when on: keys unchanged off)
             payload["place_depth_cap_draw"] = {"basis": place_depth_cap_basis(), "stand_offs": self.push_stance_stand_offs(init_trunk)}
         return payload
@@ -2143,6 +2165,9 @@ class IORSSmall(SamplerV2):
         if getattr(self, "_lift_screen_shadow", False):  # the previous attempt was drafted past a would-be lift rejection and not rejected
             log.info("TOUCH_LIFT_SCREEN shadow outcome: written")
         self._lift_screen_shadow = False
+        if getattr(self, "_a1_screen_shadow", False):  # the same for the A1 place screen's shadow
+            log.info("TOUCH_A1_SCREEN shadow outcome: written")
+        self._a1_screen_shadow = False
         cands, pdc = self.place_depth_cap_filter(cands)
         order = rng.permutation(len(cands))
         if os.environ.get("ISPATIALGYM_STANCE_FRAME_AIM", "") == "1" and self.shelf_pose is None and self.relation != "touching" and cands:
@@ -2301,6 +2326,9 @@ class IORSSmall(SamplerV2):
                 if getattr(self, "_lift_screen_shadow", False):  # follow-up (a) shadow: this candidate died later in the draw
                     log.info("TOUCH_LIFT_SCREEN shadow outcome: candidate [%s] %s", e.reason, str(e)[:160])
                     self._lift_screen_shadow = False
+                if getattr(self, "_a1_screen_shadow", False):
+                    log.info("TOUCH_A1_SCREEN shadow outcome: candidate [%s] %s", e.reason, str(e)[:160])
+                    self._a1_screen_shadow = False
                 if pdc_wr:
                     TT._count(self, f"place_depth_cap.shadow.candidate.{e.reason}")
                 errors.append(f"candidate {int(k)}: {e}")
@@ -2421,7 +2449,46 @@ class IORSSmall(SamplerV2):
                     raise Reject("contact_unreachable", f"push screening at the draw (candidate {int(k)}, trunk {manip.translate}, {manip.tilt:.2f}): {why}")
         if self.relation == "touching" and touch_lift_screen_mode() != "off":
             self._touch_lift_screen(manip, grasp, t_pose, p_pose, int(k))
+        if self.relation == "touching" and touch_a1_screen_mode() != "off":
+            self._touch_a1_screen(manip, grasp, t_pose, p_pose, int(k))
         return p_pose
+
+    def _touch_a1_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
+        """Follow-up :data:`TOUCH_A1_SCREEN_ENV`: the goal check's push stance search (:meth:`touching_push_stance`) at the draw, as far as it
+        is certain - its plan is A1's map-feasible, collision-free stances (the same :meth:`push_stance_candidates` call, first
+        ``push_stance_max_exact``), and a stance passes only when the box's place from it passes (:meth:`place_infeasible_why`). No stance
+        placing = the goal check's contact_unreachable, made here before the draft (~1-2 s per stance instead of ~130 s). No A1 stance (the
+        goal check then falls back to the laterals at the manipulation stand-off), the shelf layout or the tip release: not screened
+        (``touch_a1_screen.uncertain``). Kit ``touch_a1_screen.checked`` / ``.passed`` / ``.rejected`` / ``.shadow_would_reject``,
+        ``.place_checks``."""
+        if self.shelf_start is not None or self.shelf_tip() or not TT.contact_maps_on():
+            return
+        t_place = self.place_pose_for(t_pose, p_pose, manip)
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        rows, _f = self.push_stance_candidates(manip, t_place, laterals, p_pose=p_pose)
+        rows = rows[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]
+        if not rows:
+            TT._count(self, "touch_a1_screen.uncertain")
+            return
+        TT._count(self, "touch_a1_screen.checked")
+        whys = []
+        for lat, cand, _x in rows:
+            probe = cand if cand is not None else manip
+            TT._count(self, "touch_a1_screen.place_checks")
+            why = self.place_infeasible_why(probe, t_place, grasp)
+            if why is None:
+                TT._count(self, "touch_a1_screen.passed")
+                return
+            so = getattr(probe, "stand_off", None)
+            whys.append(f"{lat:+.2f}{f' s{float(so):.2f}' if so is not None else ''}: {why}")
+        msg = f"no A1 push stance places the box (screened at the draw, candidate {k}, trunk {manip.translate}, {manip.tilt:.2f}): {'; '.join(whys)}"
+        if touch_a1_screen_mode() == "shadow":
+            TT._count(self, "touch_a1_screen.shadow_would_reject")
+            self._a1_screen_shadow = True
+            log.info("TOUCH_A1_SCREEN shadow would reject candidate %d: %s", k, msg[:400])
+            return
+        TT._count(self, "touch_a1_screen.rejected")
+        raise Reject("contact_unreachable", msg)
 
     def _touch_lift_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
         """Follow-up (a) (:data:`TOUCH_LIFT_SCREEN_ENV`): the goal check's carried-drive lift test (:meth:`_record_push_stance`: the box
@@ -4964,6 +5031,32 @@ class IORSSmall(SamplerV2):
                 return True, round(math.degrees(y), 1)
         return False, None
 
+    def _built_tilts_map(self):
+        """The touch_push map :meth:`phase2_built_tilts` reads, or None where the switch does not act (off, not touching, the shelf layout,
+        no contact maps or no map: kit ``touch_built_tilts.no_map``)."""
+        if not (touch_built_tilts_on() and getattr(self, "relation", None) == "touching" and getattr(self, "shelf_start", None) is None
+                and getattr(self, "shelf_pose", None) is None and TT.contact_maps_on()):
+            return None
+        pm = TT.contact_map(self, "touch_push", "target", self.top)
+        if pm is None:
+            TT._count(self, "touch_built_tilts.no_map")
+        return pm
+
+    def phase2_built_tilts(self, translate: float, limit: float) -> Optional[List[float]]:
+        """Follow-up :data:`TOUCH_BUILT_TILTS_ENV` (``tabletop.phase2_tilts``' hook): the tilts of the touch_push map's eligible trunks at
+        ``translate`` (2 cm, as ``ContactMap.nearest_trunk``) within the torso limit ``limit``, 0 first; None (the continuous scan) when off,
+        not touching / the shelf layout, without the contact maps or the map, or no built tilt there."""
+        pm = self._built_tilts_map()
+        if pm is None:
+            return None
+        tilts = sorted({round(float(ti), 4) for tr, ti in pm.trunks() if abs(float(tr) - float(translate)) <= 0.02 and float(ti) >= float(limit) - 1e-6},
+                       reverse=True)
+        if not tilts:
+            TT._count(self, "touch_built_tilts.none_at_translate")
+            return None
+        TT._count(self, "touch_built_tilts.scans")
+        return tilts
+
     def _pdc_keep_pairs(self):
         """Follow-up (c) (:data:`PLACE_DEPTH_CAP_DRAW_ENV`, with the cap on): Phase 2's ``keep_pairs`` - the (stance, position) pairs whose
         focus lies within the cap (:meth:`place_depth_caps`); None when off or the cap does not apply (no map: every pair kept)."""
@@ -5015,6 +5108,9 @@ class IORSSmall(SamplerV2):
         if getattr(self, "_lift_screen_shadow", False):
             log.info("TOUCH_LIFT_SCREEN shadow outcome: [%s] %s", err.reason, str(err)[:160])
             self._lift_screen_shadow = False
+        if getattr(self, "_a1_screen_shadow", False):
+            log.info("TOUCH_A1_SCREEN shadow outcome: [%s] %s", err.reason, str(err)[:160])
+            self._a1_screen_shadow = False
         super().on_reject(err)
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
