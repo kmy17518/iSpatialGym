@@ -2418,10 +2418,24 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
     (`create_hinge` at the PhysX COM about the wall normal, parented to the wall, `AlignmentWall.hinge_resistance` of the variant); the
     probe and the whole-robot contact policy against the wall. Each entry is validated by ITS brace arm (`wall_arm_entries`; job_contacts
     `GC_VALIDATE_ARMS="left right"`); the stance relation `wall_brace` from 26 braced demos (contact 0.73-0.86 m ahead, 0.05-0.30 m to the
-    brace arm's side, mirrored for the right arm). The oracle's own Brace runs (closed fist, touch stop, back-off), then the load:
-    `wall_pusher_path` meets the pushed corner on its tangent and drives on so far that the braced point would travel the stop gap + 1 cm
-    unbraced; `judge_wall_brace` = clean oracle run, the braced point along its load <= `brace_hold_max_m`, the hinge axis not twisted off
-    the wall normal, the hand within `brace_eef_drift_m`, no non-finger link loading the wall; `judge_wall_standing` = valid before the load.
+    brace arm's side, mirrored for the right arm). The oracle's own Brace runs (closed fist, touch stop, back-off), then the LOAD (the
+    leveling push carried on past level): the pusher's 3 cm face meets the pushed corner square to its tangent and is carried along the
+    corner's ARC about the hinge; the sweep is stopped `brace_press_m` (at the braced point) after the target first turns 2 mrad past level
+    (`wall_load_stop`, the contact measured on the SIGNED turn) - the touching / axial calibration (the object driven 1 cm past first
+    contact); the target is woken every step (the sleep assist sleeps it while the brace stands). `judge_wall_standing` = valid BEFORE the
+    load (the oracle reached its stop, no non-finger wall load); `judge_wall_brace` = after it: clean oracle run, the braced point along its
+    load direction <= `brace_hold_max_m` (`not_held`) and >= 1 mm (`not_loaded`), the brace fingers pressed the target >= 1 N
+    (`not_braced`), it travelled at most the stop's gap + the hand's own displacement + 4 mm (`slipped_past`), the hinge axis not twisted
+    (`topple`), the hand within `brace_eef_drift_m` (`hand_pushed`), no non-finger link loading the wall. The load took seven runs to make
+    exact (DECISIONS "WALL VALIDATION RUN 1..7"): the material by distance to the corner line missed thick targets (vacuous passes), the
+    8 cm face pushed the edge, the sleeping target ignored the pusher, a straight path and the contact offsets over-turned it, an unsigned
+    turn mistook a backward settle for the contact.
+  - *Validation* (run 7, `$OFH/brace_20261108/wall/libs`, trunk_45612c00; valid BEFORE the load / AFTER it): painting dacihj 34 / 31 of
+    36, signpost vvjtkv 23 / 15 of 24 (the s+25/+ and s-25/- fists let the target slide past), license_plate naclac 34 / 10 of 36,
+    paper_towel_dispenser jacqxv 36 / 5 of 36 (its braced point goes past the fist: not_braced / slipped_past), wall_clock 0 entries
+    (push-only) - 132 entries, 127 / 61. The maps (01154b97, one arm per process: the second arm in one process ran out of GPU memory)
+    from the 61 valid entries: 8 maps (4 objects x 2 arms), staged in `$OFH/v2maps_int1_brace34w` (= v2maps_int1_brace34b + the
+    wall_brace maps; found by the model-id directory, no glib entry / legacy key needed).
   - *Maps* (`contact_maps` kind `wall_brace`): per stand-off d_e 0.35-0.90 (prompt0's Phase-2 d lattice) the wall box at x = d_e and the
     hung root's row in front of it (`cell_de`), laterals every 0.05 m over +-0.60, the tucked idle arm, trunk eligibility per d_e, one map
     per brace arm, valid entries only; `ContactMap.find_near` (the hinge height, no support anchor); the lookup stays in the stand-off's row.
