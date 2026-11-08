@@ -2653,7 +2653,26 @@ keep their stances' yaws), the offset nearer C's yaw first (`sideways_offsets`);
 The object held across the heading then lies along the way. The same swept check judges it (object attached, carry arms, yaw-lag
 envelope); the record is the recorded style, whose waypoint yaws the oracle tracks blended per segment as `stride_poses` models (no oracle
 change). Kit `carry_path.sideways_tried` / `sideways_used`; tests in test_carry_centred.py. Arm gm_t02_side_on (18384880, trunk_0c24c2c6).
-The 3-arm table (OFF gm_t02_umb2 / CENTRED gm_t02_cc_on / SIDEWAYS gm_t02_side_on) is appended to DECISIONS by `umbrella_r2/final_cc.sh`.
+**Sideways result: no help.** gm_t02_side_on (sideways only) used it 0 times in 492 tries; the PATH_BLAME run with centred + sideways
+(gm_t02_side_blame) shows why: the collisions sit at the path start, where the yaw blends from B's heading toward the sideways one (base
+(-0.9, 1.2), yaw 1.0-1.3): the umbrella against walls_oqrbxo_0 10, the mirror 3; the base itself against the mirror 2. B stands in the tight
+spot between the wall, hall_tree_daxzaw_0 and the mirror, and the turn needs room there. The switch stays off and is not proposed. Both
+runs were cancelled early; I also cancelled the first centred arm (gm_t02_cc_on) too early - it had 12 carries in 3 attempts, 9 at centred
+poses, against 5 carries in gm_t02_umb2's 12 attempts - so it was re-run as gm_t02_cc_on2.
+
+**Third switch (c2071b3e, `ISPATIALGYM_CARRY_WIDE_PATH`, default off).** The centred carries' remaining collisions sit 20-30 % along the
+path at (-0.6..-0.8, 1.4..1.5), heading north past the mirror: the shortest global path hugs it. With the switch, after every variant of
+today collides the global path is planned again on the eroded map eroded 0.15 / 0.30 m more (`NAV.plan_path(global_extra_erosion_m=)`,
+`NAV.erode_more`: square kernel at the map's resolution; the ends snapped within 20 + the extra cells). The same swept check judges it. Kit
+`carry_path.wide_tried` / `wide_used`. The extra variants never replace the plain variant's error (`carried_path` restructured; off = unchanged).
+
+| arm (root umb2, N 4 v2only, svl titanrtx) | tag / job | snapshot |
+|---|---|---|
+| OFF | gm_t02_umb2 / 18383997 | trunk_1af21ad3 |
+| CENTRED | gm_t02_cc_on2 / 18384993 | trunk_0c24c2c6 |
+| CENTRED + WIDE | gm_t02_wide_on / 18385113 | trunk_c2071b3e |
+
+The table is appended to DECISIONS by `umbrella_r2/final_cc.sh` (job 18385122).
 
 ## Limitations / not done
 
