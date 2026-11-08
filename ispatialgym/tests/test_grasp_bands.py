@@ -121,7 +121,10 @@ def test_inventory_rows_dedup_floor_datum_and_interior_planes():
     assert all(len(s.rows) >= 1 for s in tops)
     assert not rep["missing_inventory"]
     inter = [s for s in surfaces if s.surface.startswith("interior@")]
-    assert inter and all(s.status == "unmeasured_interior" and s.precision == 1e-2 for s in inter)
+    assert all(s.status == "unmeasured_interior" and s.precision == 1e-2 for s in inter)
+    # i7-goalmaps 2026-11-08 (the floor datum fix): the 7 interior planes of candidates.csv were the countertop / shelf bindings (0.81 -
+    # 1.22 m) seen against tops measured from a cabinet top; measured from the floor they lie within 3 cm of those tops and name them
+    assert not inter
     bt = [s for s in tops if s.support == "breakfast_table_rhjoby_0"][0]
     assert bt.key == "0.8126" and bt.floor_z == 0.0
     assert HA.key(0.81260000001) == "0.8126" and HA.key(0.8125) != HA.key(0.8126)

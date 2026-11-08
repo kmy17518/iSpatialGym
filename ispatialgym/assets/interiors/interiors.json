@@ -733,6 +733,42 @@
     "job": "$OFH/t03specs_20261108/measure.sh otw072m (trunk_ee781f49, interiors measure --scene house_double_floor_upper, slurm 18380827 (bay -0.19; bay +0.19: 18380826))",
     "bay": "one spec per board (spec_for_support: support + height): the NARROWER of the two bays (measure --lateral -0.19: width 0.3034, centre_y -0.1756); the other bay (--lateral +0.19) measured width 0.3112, depth 0.2792, centre_y 0.1829 - a lean rest's compartment follows the cell (its lean-side wall), so only the far wall's distance differs (7.4-7.8 mm closer here). Without --lateral the rays start inside the 5 cm divider at the raster's centre: walls / back not found, width 0.66 (both bays), open back (otw039c, slurm 18380828)."
    }
+  },
+  "hall_tree_upkvgr_0@0.5809": {
+   "height_m": 0.5809,
+   "depth_m": 0.799,
+   "width_m": 1.4,
+   "headroom_m": 1.505,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 1.44,
+   "board_setback_m": 0.3047,
+   "back_thickness_m": 0.02,
+   "centre_y_m": 0.0,
+   "open_sides": [
+    "front"
+   ],
+   "edge_distances": [
+    0.1,
+    0.2,
+    0.3
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "supports": [
+    [
+     "house_double_floor_lower",
+     "hall_tree_upkvgr_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_double_floor_lower/hall_tree_upkvgr_0 raster edge +u at 0.5809 (requested 0.580 +- 0.03), 1342 board cells, open edges ['+u', '-v'], front plane 0.3147 m out (static AABB overhang), wall rays None / 0.7048103213310242, back ray 0.474355548620224, moved links [], wall rim None vs headroom 1.5050 (open top False)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span",
+    "for": "touching_large_02 (inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor, touching_place surface): the umbrella ziqzqo's goal board (customs inside_surface_z_m 0.58, stance side +x, inside_stand_offs_m 0.1/0.2/0.3); i7-goalmaps 2026-11-08, slurm 18379979 on trunk_fcddc495"
+   }
   }
  }
 }

@@ -51,6 +51,30 @@ HEADROOM_TOL_M = 0.02
 #: ``SimWorld.support_interior`` measures a cell's headroom from 5 mm above the board (its up-ray start): board top to the underside above
 #: = the raster's headroom + this
 RASTER_HEADROOM_OFFSET_M = 0.005
+#: i7-goalmaps 2026-11-08 (owner decision 5c.2; DEFAULT ON since owner decision 5q.1): ``ISPATIALGYM_INTERIOR_FRONT_SIDE`` - "front + side"
+#: is its own open-sides case of :func:`live_mismatch`: two ADJACENT open raster edges (``+u`` / ``-v``: the front and one side,
+#: hall_tree_upkvgr_0's alcove board) leave the back closed; only an OPPOSITE pair (``+u`` / ``-u``) is an open front and back.
+#: ``=0``: any two open edges = front + back (the rule before). A lookup-side switch: no spec digest, map key or map changes with it.
+FRONT_SIDE_ENV = "ISPATIALGYM_INTERIOR_FRONT_SIDE"
+
+
+def front_side_on() -> bool:
+    return os.environ.get(FRONT_SIDE_ENV, "1").strip().lower() not in ("0", "off", "false", "no")
+
+
+def open_sides_case(edges: Sequence[str], front_side: Optional[bool] = None) -> str:
+    """The live raster's open-sides case: "front" (one open edge: a back panel), "front_back" (an open back), or - with the front-side
+    switch (:func:`front_side_on` when ``front_side`` is None) - "front_side" (two adjacent open edges: the back closed)."""
+    oe = [str(e) for e in edges]
+    if len(oe) < 2:
+        return "front"
+    fs = front_side_on() if front_side is None else bool(front_side)
+    if not fs:
+        return "front_back"
+    opp = {"+u": "-u", "-u": "+u", "+v": "-v", "-v": "+v"}
+    return "front_back" if any(opp.get(e) in oe for e in oe) else "front_side"
+
+
 GEOMETRY_FIELDS = ("height_m", "depth_m", "width_m", "headroom_m", "board_thickness_m", "top_thickness_m", "wall_thickness_m", "long_m",
                    "board_setback_m", "back_thickness_m", "centre_y_m")
 #: a spec's joint values match the live support's within this (rad / m)
@@ -294,7 +318,8 @@ def live_mismatch(spec: InteriorSpec, top: Any, floor_z: float = 0.0, joints: Op
         except Exception:  # noqa: BLE001 - a raster stand-in without tensors: the height check only
             pass
     oe = getattr(top, "open_edges", None)
-    if oe is not None and len(list(oe)) and (len(list(oe)) >= 2) != (spec.back_thickness_m is None):
+    # i7-goalmaps (owner 5c.2): with ISPATIALGYM_INTERIOR_FRONT_SIDE two adjacent open edges are front + side (a back panel), not front + back
+    if oe is not None and len(list(oe)) and (open_sides_case(list(oe)) == "front_back") != (spec.back_thickness_m is None):
         return f"open sides {list(oe)} vs spec {spec.name} {spec.open_sides}"
     return None
 

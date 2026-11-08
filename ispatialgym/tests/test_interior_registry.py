@@ -8,12 +8,17 @@ INT1_INTERIOR_DIGESTS = {
     "drop_in_sink_lkklqs_0@basin": "bdb7f8c6f92e",  # the open-top basin (v2maps_i7sink2)
     "bookcase_jaysra_0@0.9472": "9d713ac87564",  # inside_large_01's bay (i7-overhang)
 }
+#: i7-goalmaps 2026-11-08 (owner decision 1: goal-surface maps of the IORS large predicates): measured specs of goal surfaces not (yet) in
+#: v2maps_int1 - the hall tree's alcove board of touching_large_02 (interiors.measure, slurm 18379979)
+GOAL_INTERIOR_DIGESTS = {
+    "hall_tree_upkvgr_0@0.5809": "d6947c534b88",
+}
 
 
 def test_registry_digests_equal_the_consolidated_roots_interior_maps(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
     reg = IN.load_registry()
-    for name, digest in INT1_INTERIOR_DIGESTS.items():
+    for name, digest in {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS}.items():
         assert name in reg, name
         assert reg[name].digest() == digest, (name, reg[name].digest(), digest)
 
@@ -49,3 +54,91 @@ def test_every_touching_03_board_has_a_spec(monkeypatch):
         assert IN.spec_for_support(scene, support, h, registry=reg).name == name
     otw = reg["bookcase_otwukr_1@0.3888"]
     assert otw.back_thickness_m is not None and otw.open_sides == ["front"] and 0.29 < otw.width_m < 0.32  # one bay, its back panel
+
+def test_the_hall_tree_board_is_found_at_the_touching_goal_height(monkeypatch):
+    """i7-goalmaps: the spec serves touching_large_02's lookup (house_double_floor_lower / hall_tree_upkvgr_0 at the live 0.5809 m); its
+    raster has a back panel and two open edges (front +u, side -v)."""
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    sp = IN.spec_for_support("house_double_floor_lower", "hall_tree_upkvgr_0", 0.5809)
+    assert sp is not None and sp.name == "hall_tree_upkvgr_0@0.5809" and sp.back_thickness_m is not None
+    assert tuple(sp.edge_distances) == (0.1, 0.2, 0.3) and abs(sp.board_setback_m - 0.3047) < 1e-9
+
+
+#: i7-goalmaps 2026-11-08 (owner decision 5c.2): the specs the front-side switch must leave unchanged - this registry's plus the ones
+#: i7-ft2 (awvzkn) and i7-t03specs (opryhp / otwukr_1) measured on their branches (digests of those branches' registries)
+# integration-2 (merge of i7-goalmaps after i7-t03specs): + the touching_03 bookcases now in this registry (T03_INTERIOR_DIGESTS)
+ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e", **T03_INTERIOR_DIGESTS}
+
+
+class _Raster:
+    def __init__(self, z, edges):
+        self.z, self.headroom, self.mask, self.open_edges = z, None, None, list(edges)
+
+
+def test_the_front_side_switch_changes_no_digest(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    for on in ("0", "1"):
+        monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+        reg = IN.load_registry()
+        for name, digest in ALL_KNOWN_DIGESTS.items():
+            assert reg[name].digest() == digest, (on, name, reg[name].digest(), digest)
+
+
+def test_front_plus_side_is_its_own_case_only_with_the_switch(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    reg = IN.load_registry()
+    ht = reg["hall_tree_upkvgr_0@0.5809"]
+    monkeypatch.setenv(IN.FRONT_SIDE_ENV, "0")  # off: the rule before - two open edges = front + back
+    assert IN.open_sides_case(["+u", "-v"]) == "front_back"
+    assert "open sides" in IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"]))
+    monkeypatch.setenv(IN.FRONT_SIDE_ENV, "1")
+    assert IN.open_sides_case(["+u", "-v"]) == "front_side" and IN.open_sides_case(["+u", "-u"]) == "front_back"
+    assert IN.open_sides_case(["+u", "-u", "+v"]) == "front_back" and IN.open_sides_case(["+u"]) == "front"
+    assert IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"])) is None
+    # the measured rasters of the other specs give the same verdict with the switch on and off
+    for name, edges in (("bookcase_jaysra_0@0.9472", ["+u", "-u"]), ("drop_in_sink_lkklqs_0@basin", ["+u", "-u", "+v", "-v"]),
+                        ("fridge_petcxr_0@0.7064/j_left_door2.3", ["+u"])):
+        sp = reg[name]
+        verdicts = []
+        for on in ("0", "1"):
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+            verdicts.append(IN.live_mismatch(sp, _Raster(sp.height_m, edges), joints=dict(sp.joint_values) or None))
+        assert verdicts[0] == verdicts[1] is None, (name, verdicts)
+
+
+def test_the_front_side_switch_is_on_by_default(monkeypatch):
+    """owner decision 5q.1: ISPATIALGYM_INTERIOR_FRONT_SIDE is the default; ``=0`` restores the rule before."""
+    monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)
+    assert IN.front_side_on() and IN.open_sides_case(["+u", "-v"]) == "front_side"
+    ht = IN.load_registry()["hall_tree_upkvgr_0@0.5809"]
+    assert IN.live_mismatch(ht, _Raster(0.5809, ["+u", "-v"])) is None
+    for off in ("0", "off", "false"):
+        monkeypatch.setenv(IN.FRONT_SIDE_ENV, off)
+        assert not IN.front_side_on()
+
+
+def test_every_registry_spec_keeps_its_digest_and_verdict_on_and_off(monkeypatch):
+    """5q.1: EVERY spec of the registry (not only a listed subset) has a known digest, unchanged with the switch on / off / unset, and the
+    live-raster verdict for its own open sides (one open edge for a back panel, an opposite pair for an open back) is the same either way;
+    only the hall tree's adjacent pair (front + side) changes verdict."""
+    monkeypatch.delenv("ISPATIALGYM_INTERIORS", raising=False)
+    names = None
+    for on in (None, "0", "1"):
+        if on is None:
+            monkeypatch.delenv(IN.FRONT_SIDE_ENV, raising=False)
+        else:
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+        reg = IN.load_registry()
+        names = set(reg) if names is None else names
+        assert set(reg) == names
+        for name, sp in reg.items():
+            assert name in ALL_KNOWN_DIGESTS, f"a registry spec without a recorded digest: {name} ({sp.digest()})"
+            assert sp.digest() == ALL_KNOWN_DIGESTS[name], (on, name, sp.digest())
+    reg = IN.load_registry()
+    for name, sp in reg.items():
+        edges = ["+u"] if sp.back_thickness_m is not None else ["+u", "-u"]
+        verdicts = []
+        for on in ("0", "1"):
+            monkeypatch.setenv(IN.FRONT_SIDE_ENV, on)
+            verdicts.append(IN.live_mismatch(sp, _Raster(sp.height_m, edges), joints=dict(sp.joint_values) or None))
+        assert verdicts[0] == verdicts[1] is None, (name, verdicts)

@@ -689,6 +689,71 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
     return yaw0 + math.asin(-y_off / dist)
 
 
+#: i7-goalmaps 2026-11-08 (lead decision, touching_large_02's umbrella carry): opt-in ``ISPATIALGYM_CARRY_CENTRED=1`` (default off) - the carry
+#: pose candidates of :meth:`IORSLarge.carry_poses_at_b` start with :data:`CARRY_CENTRED_POSES`: the hand in front of the body, its lateral
+#: chosen so that the CARRIED OBJECT's centre (its hull's bounding-box centre) lies on the base's centre line. The beside-the-body poses
+#: (CARRY_POSES, the hand 0.35-0.45 m to the arm's side) hold a long object held across the heading (the umbrella, 0.82 m, released along
+#: the hall tree's board) out to ~0.85 m on that side: gm_t02_umb2 / umb2s + PATH_BLAME, every carry with the hand >= 0.3 m to the side
+#: failed its B -> C path (~800 of 800; the umbrella or the gripper against standing_mirror_wwkuuf_0 / the walls), the hand within 0.1 m of
+#: the centre line passed 8 of 15. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
+#: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
+#: / carry_pose.centred_used.
+CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_SIDEWAYS=1`` (default off) - when the carried B -> C path
+#: collides at every variant tried today (straight arrival, plain; local then global), it is planned again with the base driving SIDEWAYS
+#: (``NAV.plan_path`` heading_offset +-pi / 2, the R1Pro base is holonomic): the object, held across the robot's heading because the release
+#: needs it there (the umbrella along the hall tree's board, across the robot facing the board), then lies along the way. The offset whose
+#: sideways yaw on the straight B -> C line is nearer C's yaw is tried first. The same swept check (the object attached, the carry arms,
+#: the yaw-lag envelope) judges it; the record is "recorded" style with the sideways yaws, which the oracle tracks as recorded. Kit counters
+#: carry_path.sideways_tried / carry_path.sideways_used.
+CARRY_SIDEWAYS_ENV = "ISPATIALGYM_CARRY_SIDEWAYS"
+
+
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_WIDE_PATH=1`` (default off) - after the carried B -> C path
+#: collides at every variant of today, the GLOBAL path is planned again on the eroded traversability map eroded further by each of
+#: :data:`CARRY_WIDE_PATH_EROSIONS_M` (``NAV.plan_path`` global_extra_erosion_m, a square kernel like the map's own erosion): the shortest path
+#: no longer hugs the obstacles, so an object held across the heading (the umbrella reaches ~0.4 m beyond the base's sides) passes them -
+#: the centred umbrella carries of gm_t02_cc_on collided 20-30 % along the path, base at (-0.6..-0.8, 1.4..1.5) heading north past
+#: standing_mirror_wwkuuf_0. The same swept check judges the path. Kit carry_path.wide_tried / wide_used.
+CARRY_WIDE_PATH_ENV = "ISPATIALGYM_CARRY_WIDE_PATH"
+CARRY_WIDE_PATH_EROSIONS_M: Tuple[float, ...] = (0.15, 0.30)
+
+
+def carry_wide_path_on() -> bool:
+    return os.environ.get(CARRY_WIDE_PATH_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def carry_sideways_on() -> bool:
+    return os.environ.get(CARRY_SIDEWAYS_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def sideways_offsets(from_xy: Sequence[float], to_xy: Sequence[float], to_yaw: float) -> List[float]:
+    """+-pi / 2, the one whose sideways yaw on the straight line ``from_xy`` -> ``to_xy`` lies nearer ``to_yaw`` first."""
+    h = math.atan2(float(to_xy[1]) - float(from_xy[1]), float(to_xy[0]) - float(from_xy[0]))
+    offs = [math.pi / 2, -math.pi / 2]
+    return sorted(offs, key=lambda o: abs((h + o - float(to_yaw) + math.pi) % (2.0 * math.pi) - math.pi))
+#: (ahead, raise above the lift) of the centred carry poses, tried in this order (0.45-0.55 m ahead: nearer folds the elbow, 0920-071230)
+CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
+
+
+def carry_centred_on() -> bool:
+    return os.environ.get(CARRY_CENTRED_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def centred_hand_lateral(eef: Any, eef_in_object: Any, hull_local: Optional[th.Tensor], left: th.Tensor) -> float:
+    """The hand's lateral offset (along ``left``, the base's +y) that puts the carried object's centre on the base's centre line: minus the
+    lateral of (object hull's bounding-box centre - eef position), the object posed from the eef by the grasp (``eef_in_object`` =
+    T_obj->eef). Without a hull: the object's root."""
+    obj = G.compose((G.t(eef[0]).float(), G.t(eef[1]).float()), G.invert((G.t(eef_in_object[0]).float(), G.t(eef_in_object[1]).float())))
+    if hull_local is not None and len(hull_local):
+        pts = G.local_points_world(hull_local.float(), obj)
+        centre = 0.5 * (pts.min(dim=0).values + pts.max(dim=0).values)
+    else:
+        centre = G.t(obj[0]).float()
+    d = (centre[:2] - G.t(eef[0]).float()[:2])
+    return -float(d @ G.t(left).float()[:2])
+
+
 def carry_poses_for(poses: Sequence[Sequence[Any]], arm: str) -> List[Tuple[float, Optional[float], float]]:
     """``CARRY_POSES`` / ``generation.carry_poses`` (ahead, lateral, raise) for ``arm``: the lateral beside the body on the arm's side
     (the right arm's -0.35..-0.45 m positive for the left arm); None (= the lift's lateral) kept."""
@@ -3284,32 +3349,62 @@ class IORSLarge(SamplerV2):
         # the straightened base's wheels touched bed_rrcvaq_1 0.37 m away on the same turn)
         arrive = float(self.gp.gen("carry_arrive_straight_m") or 0.0)
         variants = ([{"arrive_straight_m": arrive}] if arrive > 0.0 else []) + [{}]
+        k_plain = len(variants) - 1
+        if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
+            variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
+        if carry_wide_path_on():  # i7-goalmaps (lead decision): a global path kept farther from obstacles (CARRY_WIDE_PATH_ENV)
+            variants += [{"global_extra_erosion_m": w} for w in CARRY_WIDE_PATH_EROSIONS_M]
         chosen: Dict[str, Any] = {}
 
         def carried_path(redo=None, **kw):
             """The carried path B -> C: per variant (straight arrival first) the local path, then the eroded global one on a path_collision (the
             local shortest path hugs the partner's corner with the object out front, 0920-100543); a straight arrival that finds no path at all
-            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition)."""
-            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)]
+            gives way to the plain one. ``redo`` re-records what a failed try dropped (the departure transition). i7-goalmaps: the opt-in EXTRA
+            variants after the plain one (CARRY_SIDEWAYS_ENV, CARRY_WIDE_PATH_ENV) are tried after the plain one's path_collision; whatever they
+            fail with, the plain one's error is what the leg raises."""
+            tries = [(k, v, force) for k, v in enumerate(variants) for force in (False, True)
+                     if not (force is False and "global_extra_erosion_m" in v)]  # a wide-path variant is global only
             i = 0
+            plain_err: Optional[Reject] = None
             while True:
                 k, v, force = tries[i]
-                plain = k == len(variants) - 1
+                plain = k >= k_plain
+                extra = k > k_plain
+                if "heading_offset" in v:
+                    TT._count(self, "carry_path.sideways_tried")
+                if "global_extra_erosion_m" in v:
+                    TT._count(self, "carry_path.wide_tried")
                 try:
                     p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
                     chosen.clear()
                     chosen.update(v)
+                    if "heading_offset" in v:
+                        TT._count(self, "carry_path.sideways_used")
+                        log.info("%s: B -> C carry: SIDEWAYS path (heading offset %+.2f rad, %s) %.2f m", self.gp.variant, float(v["heading_offset"]),
+                                 "global" if force else "local", p.length_m)
+                    if "global_extra_erosion_m" in v:
+                        TT._count(self, "carry_path.wide_used")
+                        log.info("%s: B -> C carry: WIDE path (the global map eroded %.2f m more) %.2f m", self.gp.variant, float(v["global_extra_erosion_m"]),
+                                 p.length_m)
                     return p
                 except Reject as e:
-                    if plain and e.reason != "path_collision":
-                        raise
-                    if not plain:
-                        log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
-                                 str(e)[:600])
-                    # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
-                    i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
-                    if i >= len(tries):
-                        raise
+                    if extra:
+                        log.info("%s: B -> C carry: extra variant %s %s: %s: %s", self.gp.variant, v, "global" if force else "local", e.reason, str(e)[:300])
+                        i += 1
+                        if i >= len(tries):
+                            raise plain_err if plain_err is not None else e
+                    else:
+                        if plain and e.reason != "path_collision":
+                            raise
+                        if plain:
+                            plain_err = e
+                        if not plain:
+                            log.info("%s: B -> C carry: the straight arrival (%.2f m) %s: %s: %s", self.gp.variant, arrive, "global" if force else "local", e.reason,
+                                     str(e)[:600])
+                        # the next try: the global path after a local collision, else the next variant (a straight arrival without any path skips its global try)
+                        i = i + 1 if e.reason == "path_collision" else next(j for j, t in enumerate(tries) if t[0] == k + 1)
+                        if i >= len(tries):
+                            raise
                     self._drop_leg_records(place.name)
                     if redo is not None:
                         redo()
@@ -3331,7 +3426,7 @@ class IORSLarge(SamplerV2):
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
                                 "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors,
-                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0), "heading_offset": chosen.get("heading_offset", 0.0)}
                 return path
             except Reject as e:
                 self._drop_leg_records(place.name)
@@ -3346,7 +3441,8 @@ class IORSLarge(SamplerV2):
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
-                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0),
+                            "heading_offset": chosen.get("heading_offset", 0.0)}
             return path
         except Reject as e:
             self._drop_leg_records(place.name)
@@ -3382,7 +3478,12 @@ class IORSLarge(SamplerV2):
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
-        for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm):
+        cands = [(ahead, lat, raise_m, False) for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm)]
+        if carry_centred_on():  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
+            lat_c = centred_hand_lateral(lift, eef_in_object, self.hull, left)
+            cands = [(a, lat_c, r, True) for a, r in CARRY_CENTRED_POSES] + cands
+        self._carry_centred_n = 0
+        for ahead, lat, raise_m, centred in cands:
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
@@ -3405,6 +3506,9 @@ class IORSLarge(SamplerV2):
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
+            if centred:
+                self._carry_centred_n += 1
+                TT._count(self, "carry_pose.centred_offered")
         log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.variant, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
@@ -5254,9 +5358,12 @@ class IORSLarge(SamplerV2):
                     grasp.carry_height = h
                     # carry pose candidates (beside the body first), the plain lift configuration last
                     options: List[Tuple[str, Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]]] = []
+                    self._carry_centred_n = 0
                     if str(self.gp.gen("carry_pose", "on")) != "off":
                         options += [(f"carry pose {[round(float(v), 2) for v in P0.to_base_frame(cp[0][0], manip.base_pose2d, P0.base_z(self)).tolist()]}", cp)
                                     for cp in self.carry_poses_at_b(pick_st, eef, h, target, g.pose)]
+                    n_centred = int(getattr(self, "_carry_centred_n", 0) or 0)  # the first n options are centred carry poses (CARRY_CENTRED_ENV)
+                    options = [(("centred " + lb) if i < n_centred else lb, cp) for i, (lb, cp) in enumerate(options)]
                     options.append(("lift configuration", None))
                     for label, cp in options:
                         if cp is not None:
@@ -5287,6 +5394,8 @@ class IORSLarge(SamplerV2):
                                 self.record_carry_arm_q(tname, arm, None)
                                 continue
                         log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                        if label.startswith("centred "):
+                            TT._count(self, "carry_pose.centred_used")
                         break
                     if path_bc is not None:
                         break

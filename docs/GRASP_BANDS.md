@@ -3757,6 +3757,275 @@ completed first run). att / written / ok, GPU-h per success:
   in both arms. The default removes every brace rejection at the program check; success at N 4 is within noise (12 vs 13; the failed demos
   - 03 310003 plan_failed, 01 310003 not_reached - are not the attempts where it acted).
 
+## Goal-surface reach maps for the IORS large predicates (branch i7-goalmaps, 2026-11-08)
+
+**Owner decision** (2026-11-08, verbatim prompt `tmp/outputs/prompt_goalmaps_axialrest_overpath.md` section 1; `$OFH/DECISIONS.md`
+"OWNER DECISIONS (verbatim prompt ...)"): change the height-anchor rule so the reach maps cover every goal surface an IORS large predicate
+needs - the partner (goal-surface) rows become surfaces of their target model with the same measurement rules (inventory top, floor datum,
+canonical key, 10 mm window); the existing anchors and keys stay; only new anchors; build the missing goal maps, stage them in a COPY of
+`$OFH/v2maps_int1`, validate N 4 v2only. No height union (a map at one height serving another).
+
+### Audit (before the code change)
+
+**What the goal side reads, per predicate** (the sampler, `--grasps v2only`; `iors_large*.py`):
+
+| predicate (large) | goal side | map kind it reads | surface (height) | role row |
+|---|---|---|---|---|
+| ontop | carry + place on the partner's top (stance C, `IORSLarge._placement_candidates_at`: `band("tabletop", partner)` -> `v2_band` -> `tabletop.map_bands` at `band_top(partner)` = the live place top) | **tabletop** (anchor height) | the partner's top, live `top.z - world.floor_z` (1e-4) | `partner` rows (candidates.csv ontop_large_scale; representatives.csv ontop_large_scale#NN) |
+| inside | carry + place into the partner's compartment (`InsideMode.inside_band` -> `tabletop.interior_map_bands`; PLACE rule `inside_place_rule`, or a lean goal rest) | **interior** (registry spec, no anchor axis) | the registry spec's board / basin (`assets/interiors/interiors.json`, measured 1e-4) | `partner` rows (representatives.csv inside_large_scale#NN) |
+| touching, `touching_place` "surface" | as inside, on the partner's board (`SurfaceTouchingMode` = InsideMode) | **interior** | the spec at the variant's `inside_surface_z_m` | `partner` rows (representatives.csv touching_large_scale#NN) |
+| touching (floor push, default) | drop on the floor + floor push to the face (`TouchingMode`, push-under machinery: exact IK from C) | none (exact) | the floor | - |
+| under (push-under, `under_mode` "push") | drop beside the partner + floor push under it (`push_under_candidates`: exact IK from C; no `band()` call) | none (exact) | the floor under the partner | - |
+| nextto | the base pushes the target (no grasp) | none (exact) | the floor | - |
+
+The init side (stances A / B) reads the init support's tabletop map or the floor map (h 0) - not part of this decision.
+
+**Per alias** (the 15 IORS large aliases; MAP_REQUEST lines over `$OFH/out/*/inter_object_relation_satisfaction-*large*/*/sample.log`
++ the dry pass below; "int1" = `$OFH/v2maps_int1`):
+
+| alias | goal kind | goal surface (height) | role row | int1 today |
+|---|---|---|---|---|
+| ontop_large_01 | tabletop | house_single_floor/countertop_fjkase_0 top, live 0.9158 (inventory top.z 0.9157) | candidates.csv:2719 partner; representatives ontop#01 partner representative | **MISSING** (soap_dispenser__zwudcz__s1 has floor maps only; anchors 0.8874 [0.8801, 0.8974] / 0.9275 [0.9175, 0.93055]; MAP_REQUEST tabletop h 0.9158 in i7_floor, i7_floorfix, int1_1) |
+| ontop_large_02 | tabletop | house_double_floor_upper/desk_iotfzl_0 top 0.7351 | candidates.csv:2735 / 2765; reps ontop#02 representative | covered (mouse__pljjtu__s1 h0.7351 r / l) |
+| ontop_large_03 | tabletop | hotel_suite_large/bed_kddswt_0 top, live 0.5145 (inventory 0.5083) | candidates.csv:2742 / 2770; reps ontop#03 representative | covered (pillow__mltefs__s1__tabletop_level_pinch h0.5145 r / l; the anchor came from the init bed kddswt_1) |
+| inside_large_01 | interior (lean goal rest) | bookcase_jaysra_0@0.9472 | reps inside#01 representative | covered (hand-built lean maps, both arms) |
+| inside_large_02 | interior (PLACE) | fridge_petcxr_0@0.7064/j_left_door2.3 | reps inside#02 representative | covered (hand-built, `interior_place.py`) |
+| inside_large_03 | interior (PLACE) | drop_in_sink_lkklqs_0@basin 0.7751 | reps inside#03 heldout | covered (hand-built) |
+| inside_large_03 sinkcounter / sinkbar (template variants) | interior + tabletop | drop_in_sink_awvzkn_0@basin 0.7316; bar_udatjt_0 top 1.0505 (plate luhkiz) | reps inside#03 representative / support | in progress (i7-ft2) |
+| touching_large_02 | interior (PLACE, `touching_place` surface) | house_double_floor_lower/hall_tree_upkvgr_0 board 0.5809 (customs `inside_surface_z_m` 0.58: collision hull c13 top 0.581) | reps touching#02 heldout | **MISSING** - no interior spec (MAP_REQUEST interior h 0.5809 "no interior spec ... in assets/interiors/interiors.json", i7diag_floor) |
+| touching_large_01 / 03 | none (floor push) | floor | - | n/a |
+| under_large_01 / 02 / 03 | none (push-under) | floor under bed_rrcvaq_0 / desk_mdhelw_0 / desk_mdhelw_1 | - | n/a |
+| nextto_large_01 / 02 / 03 | none (base push) | floor | - | n/a |
+
+**Facts from the forked session, checked:**
+
+- `height_anchors.py:105` reads only `role == "support"` rows, `model_surfaces` (:240) the surfaces of the target's subtasks - correct.
+- "Its height never became an anchor for the target" - not for the reason given. In `candidates.csv` ontop_large_scale lists 149 support
+  rows, countertop_fjkase_0 among them, so the rule already puts that top among soap_dispenser zwudcz's surfaces - but at **0.4180**, not
+  0.9157: the floor datum takes countertop_kelzer_0's `under_clearance.floor_z` 0.4977 (the cabinet top under the counter, not a floor)
+  as a floor level of house_single_floor, and every support top there whose AABB bottom lies above 0.4777 (15 tops: the 5 countertops and
+  10 shelves) is measured from it (`$GBH/anchors.json` has 0.4180 / 0.4298 / 0.3898 for the countertops). Changing the datum changes those 15 existing
+  surface heights (owner question, not done).
+- The campaign's anchors are not the rule's output: `v2maps_int1/anchors.json` holds 22 `measured_live` anchors (the sampler's live
+  `top.z - world.floor_z`: `jobs/v2build/build_anchors.py`, `anchors_i7.py`, then one anchor per MAP_REQUEST via `build_int1.py anchor` /
+  `stage_plate.py`). They list the INIT supports of the aliases (and the hand-added goal heights 0.7671, 0.8874); the goal tops were
+  never listed - the actual blind spot for ontop_large_01.
+- `representatives.csv` (the per-alias table) names the instance in `name`, the model id in `model`: the rule reads `model` as the
+  instance, so all 270 of its support rows are "missing inventory" and its partner rows were never readable.
+- The 10 mm window: 0.9158 is 11.7 mm below 0.9275 and outside its range [0.9175, 0.93055] - uncovered by design (correct).
+- The expanding map (map_tilt) fills tilts / yaws inside a map at one height only - correct (`reach_maps` / `map_tilt` have no height axis).
+
+**Dry pass over the role tables** (every ontop_large_scale partner row of both tables, inventory `top.z` with a floor 0, looked up in the
+int1 anchors): 35 partner surfaces; covered exactly / approx: the beds rrcvaq / gxfipj / ivdnny / kddswt, desks bhkhxo / iotfzl / mdhelw /
+xhjsub / aduafr / pfsjbc, countertops ikwqer / sjxber / kelker / kelzer / zkhelh; uncovered: countertop_fjkase_0 0.9157 (ontop_large_01),
+and the heldout / candidate-only partners of no alias (desk_nbpuns 0.5494, desk_uqcmzf 0.7168, the sofas 0.3991-0.7079, beds klcjcy /
+siuxgz / tjfzsb 0.448-0.473, bed_zrumze 0.6156, countertop_tpuwys 1.0792 (Rs_int) / 1.3830). Interior goals have no inventory: their
+heights come from the registry (the hall tree has none).
+
+**Missing goal maps of the aliases:** (1) ontop_large_01 - soap_dispenser__zwudcz__s1, countertop_fjkase_0 top, h 0.9158, tabletop, r + l;
+(2) touching_large_02 - umbrella__ziqzqo__s1, hall_tree_upkvgr_0 board, h 0.5809, interior PLACE (rule drop 0.005, pre approach) - needs
+an interior spec first (no inventory / registry measurement). In progress elsewhere: inside_large_03's awvzkn / bar variants (i7-ft2).
+
+### The anchor rule change (912c12d1)
+
+`height_anchors.GOAL_PLANES` names, per IORS large subtask, the plane its goal side reads a map at (ontop "top", inside "interior",
+under / nextto / touching None). For a "top" goal the `partner` rows of both role tables (`representatives.csv` by its `name` column)
+become surfaces, after the support rows, with the support rows' rules: the inventory `top.z` (`supports/<name>.json`, else
+`partners/<name>.json`), the floor datum, the `%.4f` key, the 10 mm window. A goal row on a surface a support row already measured adds
+its row and `Surface.goal_subtasks` only (no new anchor, key unchanged); the support surfaces' height / key / status / `subtasks` are
+unchanged. `model_surfaces` (one table or several) returns the supports and the goal surfaces of the target's subtasks; `workload` lists
+the goal surfaces. Default on (the decision is the rule change; it is an offline tool - nothing at run time reads it);
+`goal_surfaces=False` / `--no-goal-surfaces` = the former set. On the repo tables (candidates + representatives): 44 partner rows, 16 new
+surfaces, 15 new anchors (93 -> 108), 0 without an inventory top; the 93 former anchors keep their keys and resolve exactly to themselves.
+Tests `ispatialgym/tests/test_goal_anchors.py` (3): a partner goal surface becomes an anchor of its target (both schemas, off = former
+set); the real tables' former surfaces / anchors / keys are identical; an uncovered height stays uncovered (no union; the int1 live set
++ 0.9158: 0.9158 exact, 0.9050 uncovered, every former live anchor exact).
+
+Not changed (owner question): the floor datum (countertop_kelzer_0's `under_clearance.floor_z` 0.4977 measures 15 house_single_floor
+tops - countertop_fjkase_0 0.4180 instead of 0.9157 - so the rule alone does not give ontop_large_01's height; the campaign anchors
+are the live heights anyway), and the representatives.csv SUPPORT rows (still read by `model`, i.e. skipped: reading them adds
+surfaces beyond this decision).
+
+**Staged root** `$OFH/v2maps_goalmaps` (`$OFH/goalmaps_20261108/stage_anchors.py`): `cp -a v2maps_int1` + anchor **0.9158**
+(house_single_floor/countertop_fjkase_0/top, `measured_live` = the MAP_REQUEST h, as every int1 anchor), midpoint rule: 0.9158
+[0.9058, 0.92165], 0.9275 [0.9175, 0.93055] -> [0.92165, 0.93055] (no live query in (0.9175, 0.92165] in `$OFH/out`; the inventory has
+no top there); the old file `anchors.json.4_before_goalmaps`; log `STAGED_goalmaps.txt`. v2maps_int1 untouched.
+
+**touching_large_02 (the hall tree) - spec registered, maps not built: owner decision.** The existing measure CLI (`interiors measure`,
+slurm 18379979, trunk_fcddc495) measures hall_tree_upkvgr_0's board at 0.5809 (1342 board cells, depth 0.799, board setback 0.3047 =
+the canopy's static-AABB overhang 0.3147 as the front plane, headroom 1.505, back ray 0.474 -> a back panel, one side wall found
+(0.705) the other not, open edges ['+u', '-v'], digest d6947c534b88); registered as `hall_tree_upkvgr_0@0.5809` in
+`assets/interiors/interiors.json` (19186e48, the digest test extended; lead request). The live lookup then misses one step later:
+probe gm_t02_before (trunk_19186e48, v2maps_goalmaps, slurm 18380485): "the live interior is not hall_tree_upkvgr_0@0.5809: open sides
+['+u', '-v'] vs spec ['front']" - `interiors.live_mismatch` reads two open raster edges as an open front AND back (`back_thickness_m`
+None), and this board has a back and an open SIDE. It runs before the map lookup, so a map built on this spec would never be read: no
+map built. Options: (a) the open-sides rule tells an open side from an open back (a rule every interior lookup shares), (b) register the
+board without its back panel (misstates the geometry).
+
+**Validation, ontop_large_01** (N 4 v2only, trunk_912c12d1, alias memory off, svl titanrtx; missing_map 1 -> 0):
+
+| arm | root | att / written / ok | GPU-h (per success) | notes |
+|---|---|---|---|---|
+| gm_before | v2maps_int1 | 0 / 0 / 0 | 0.11 | setup no_init_surface: MAP_REQUEST tabletop h 0.9158 |
+| gm_after | v2maps_goalmaps | 14 / 4 / 3 | 1.85 (0.62) | goal map h0.9158 hit (r / l); rejections target_placement 7, program_check_failed 1, approach_untrackable 1, place_unreachable 1; 1 demo robot_touching_itself |
+
+### Owner decisions 2026-11-08 (5c.1 / 5c.2, `owner_20261108e_goal_framing.md` items 1 and 2)
+
+**1. The floor datum: fixed (ce7b75d4, on by default as the rule's bug fix).** A partner's `under_clearance.floor_z` is a floor level
+only when the partner stands on it (within `FLOOR_STAND_TOL_M` 0.05 m of its AABB bottom); countertop_kelzer_0's 0.4977 (its AABB
+bottom 0.8514: the raycast stopped on the cabinet inside the counter) is no longer one - the only floor level dropped in the
+inventory (the office levels 0.0045 / -0.0032 stay: their partners stand on them). `real_floors=False` = the former rule. Change list
+(repo tables, before anything was rebuilt): 15 house_single_floor tops get their true heights - countertop_fjkase_0 0.4180 -> 0.9157,
+ikwqer / sjxber 0.4298 -> 0.9275, kelker / kelzer 0.3898 -> 0.8875, shelf_amyper_2 / 7 0.3149 -> 0.8126, amyper_3 / 8 0.7248 ->
+1.2225, amyper_4 / 9 1.1346 -> 1.6323, amyper_5 / 10 1.5445 -> 2.0422, shelf_fjozhc_0 0.5657 -> 1.0634, shelf_pfusrd_0 1.3314 ->
+1.8291; the 7 customs interior bindings of those supports (0.81 / 0.89 / 0.92 / 0.93 / 1.22) now lie within 3 cm of their true top and
+name it (no interior surface left in candidates.csv: `test_grasp_bands` updated); every other surface height unchanged. Anchors 108 ->
+102 (dropped 0.3149 0.3898 0.4180 0.4298 0.5657 0.7248 0.81 0.89 0.92 0.93 1.1346 1.22 1.3314 1.5445; new 0.8875 0.9157 0.9275 1.0634
+1.2225 1.6323 1.8291 2.0422). Who reads them: no staged or integrated root - none of the 43 `$OFH/v2maps_*` / 11 shiyuc roots' anchors.json
+holds a dropped key, and no map anywhere (`$OFH/v2maps_*/maps`, `$GBH/out/*/maps`) is keyed at one; only `$GBH/anchors.json` (the
+read-only grasp-bands record, no map at those keys) lists them. So nothing was rebuilt; the campaign anchors are live heights (the
+staged 0.9158 agrees with the rule's 0.9157 within 1e-4, served exactly / within the window). Tests (test_goal_anchors.py): kelzer's
+cabinet top is not a floor level, a real raised floor still is; exactly the 15 tops change, to their inventory top above floor 0;
+every other height unchanged.
+
+**2. The hall tree: "front + side" as its own open-sides case (a083123a, `ISPATIALGYM_INTERIOR_FRONT_SIDE`, default off).**
+`interiors.open_sides_case`: one open raster edge = "front" (a back panel); with the switch two ADJACENT open edges (+u / -v) =
+"front_side" (the back closed), any OPPOSITE pair = "front_back"; off = any two edges are front + back (today). `live_mismatch` uses
+it; kit counter `interior_open_sides.front_side` at the lookup it served. A lookup-side switch: no digest / map key / map changes.
+Digest check (switch off and on, identical): fridge 0b539d8a83ab, sink lkklqs bdb7f8c6f92e, kmuacd b58d4e5c790e, jaysra 9d713ac87564,
+hall tree d6947c534b88, and the other branches' specs from their registries: awvzkn (i7-ft2) 4571693d44c4, opryhp_0@0.3722 (i7-t03specs)
+b8577f909128, otwukr_1@0.3888 41a3fa72d143, otwukr_1@0.7204 71e59f596aa4. Of the measured rasters only the hall tree's is two
+adjacent edges (fridge / t03 bookcases one edge, jaysra +u/-u, lkklqs four, awvzkn none): the switch changes no other verdict (kmuacd
+is hand-authored, no measured edges). test_interior_registry.py: the digests on / off, the case table, the hall tree served only
+with the switch. Maps: umbrella__ziqzqo__s1 interior PLACE maps in hall_tree_upkvgr_0@0.5809 (the variant's rule: pre approach, drop
+0.005, no tilts; trunk_a083123a, 18381078 / 18381079), staged in v2maps_goalmaps; touching_large_02 N 4 v2only switch on / off
+(chain_t02.sh 18381085). Maps 5130b76f (r) / 9c3a3a02 (l), ~440 s each, check_int1 ERRORS 0.
+
+| arm (touching_large_02, trunk_a083123a, v2maps_goalmaps) | att / written / ok | GPU-h | notes |
+|---|---|---|---|
+| gm_t02_off (switch off) | 0 / 0 / 0 | 0.10 | setup missing_map: "open sides ['+u', '-v'] vs spec ['front']" |
+| gm_t02_on (switch on) | 60 / 0 / 0 | 1.73 | map hit (`interior_open_sides.front_side` 1); 60 target_placement: 59 "F_init (4-12) ∩ F_goal (0)" at the board's front goal cells (x -0.9), 25 also a failed carry leg, 9 B no_transition |
+
+missing_map is gone with the switch; the next blocker is the exact place at stance C with the umbrella's single library grasp (top_2)
+at the board's goal yaw - not in this decision.
+
+### Owner decisions 2026-11-08 (5q.1 / 5q.2, `prompt_decisions_20261108c`)
+
+**5q.1 - the front-side switch is the default (1af21ad3, its own commit).** `interiors.front_side_on()` reads
+`ISPATIALGYM_INTERIOR_FRONT_SIDE` as on unless it is `0` / `off` / `false` / `no`. Digest check over EVERY spec of the repo registry, the
+switch unset / 0 / 1: fridge 0b539d8a83ab, sink lkklqs bdb7f8c6f92e, jaysra 9d713ac87564, kmuacd b58d4e5c790e, hall tree d6947c534b88 -
+identical. test_interior_registry.py now requires a recorded digest for every registry spec (a spec added without one fails), checks the
+digests unset / 0 / 1 and each spec's own open-sides verdict on / off, and the default on. Snapshot trunk_1af21ad3.
+
+**5q.2 - why F_goal was empty in gm_t02_on (diagnosis from its log and the staged maps, no new code).** `SurfaceTouchingMode.release_feasible`
+screens only the F_init yaws whose CARRIED yaw (init yaw + the base-yaw change B -> C) lies within half a screening step (11.25 deg) of
+one of the board's axes, and whose footprint then fits the board (90 / 270 deg only: `fit_per_yaw {0: 0, 90: 268, 180: 0, 270: 279}`).
+
+| per (C, yaw) entry, 3392 C tries / 28111 entries | entries | share |
+|---|---|---|
+| not alignable (carried yaw > 11.25 deg from every axis) | 21201 | 75.4 % |
+| aligned ACROSS the board (0 / 180 deg): `footprint_off_board` | 6069 | 21.6 % |
+| aligned along the board -> screening IK | 841 | 3.0 % (573 pass; -90 deg 240 / 384 fail, -270 deg 28 / 457) |
+
+Per C: F_goal empty at 2871 of 3392 (85 %): 2608 (77 %) had no yaw to screen at all (the release-yaw constraint), 263 (8 %) lost their
+screened yaw in the IK screen (IK + collision together). The camera is not part of F_goal (stance C's frame filter comes first). F_init's
+size decides: <= 10 yaws -> 56 of 2402 C's with an F_goal, >= 11 -> 465 of 990. **Map vs exact: no disagreement** - the interior PLACE
+maps hold the object yaw (8 base-frame yaws x 10 grasp members): only 90 / 270 (along the board) are feasible (r 96 / 164 cells, l 106 /
+149; all other yaws off_support), as the exact rule. The map is yaw-blind only in the stance-C lookup (any feasible (yaw, grasp) admits a
+cell); the exact check needs the carried yaw, i.e. a pick at B with the shaft across B's heading, which the one-grasp F_init rarely holds.
+The 521 C's with an F_goal then failed later: 288 B -> C carry path (the 0.82 m umbrella collides near (-0.65, 1.35) / (-0.85, 1.20)),
+186 B exact IK, 14 the A -> B drive passes the target, ~30 C attached place IK (joint limits), 5 branch swing. Round 1's entry
+(roles_all_20261102): 12 top candidates within 6 cm of the shaft centre, 10 reps -> 1 valid (top_2); 6 of 7 top reps `no_placement` in
+the validator (the square slab = footprint radius 0.41 + 0.20 m, the base 0.30 m from its edge: the shaft centre 0.91 m ahead).
+
+The IK part was split by a STANCE_BLAME run (gm_t02_blame, N 1, the round-1 root, trunk_1af21ad3 with the front-side DEFAULT and no env switch:
+interior map hit, missing_map 0): every blamed release (release yaws -90 / -270, top_2) is "not reached with collisions off", 32-333 mm short
+or joint 2 at its limit - reach, not collision.
+
+**5q.2 - ladder round 2 for umbrella__ziqzqo__s1** (as the gym shoe's; record `$OFH/goalmaps_20261108/umbrella_r2`: prep.py, plan.json,
+submit_glib.sh, submit_maps.sh, stage.py, chain.sh). trunk_1af21ad3 (candidate switches on by default) + gate_dump, geometry copied, the job
+of manifest_settle25 + legacy_key umbrella__ziqzqo__t. L2v = L2 with one per-entry validator change, `slab_half_m` 0.20 -> 0.05 (the slab
+still covers the footprint radius + 5 cm; every physics gate unchanged) - an arm added because round 1 lost its top reps to no_placement.
+
+| level | candidates / geometry-ok | trials | physics-valid | losses |
+|---|---|---|---|---|
+| round 1 (roles_all_20261102) | 15 / 10 reps | 10 | 1 (top_2) | 6 no_placement, 3 finger_penetration |
+| L2 (24000 x 24, 20 reps, cone 45) | 40 / 33 | 20 | 2 (top_2, top_23) | 17 no_placement, 1 palm_contact |
+| L3 (48000 x 48, 30 reps, cone 60) | 56 / 41 | 25 | 1 (top_25) | 20 no_placement, 3 palm_contact, 1 grasp_off_target |
+| L2v (L2 + slab_half_m 0.05) | 40 / 33 | 6 | 6 (max_valid: top_0 / 2 / 9 / 10 / 14 / 19) | none |
+
+The L2v grasps tilt 14-33 deg toward +-x (along the shaft) and +-y (across). Maps (trunk_1af21ad3, floor h 0 and interior PLACE in
+hall_tree_upkvgr_0@0.5809 with the round-1 rule): floor cells per yaw 31-39 (round 1) -> 47-57 (L2) -> 61-67 (L2v) of 72-73; interior
+cells (any yaw) r / l 174 / 166 -> 203 / 202 (L2) -> 234 / 227 (L2v), still only at yaws 90 / 270. Staged roots (copies of
+v2maps_goalmaps, round-1 entry and maps in `_superseded_ladder_r1`, check_int1 ERRORS 0): **`$OFH/v2maps_goalmaps_umb2`** (L2v, the
+primary) and `$OFH/v2maps_goalmaps_umb2s` (L2, the standard validator). L2v's validator change is per entry; the owner confirms it.
+
+**touching_large_02 on the new roots** (N 4 v2only, trunk_1af21ad3, memory off: gm_t02_umb2 18383997 on umb2, gm_t02_umb2s 18383999 on
+umb2s; the final numbers are appended to DECISIONS by `umbrella_r2/final.sh`). Interim: the F_goal blocker is gone - F_goal > 0 at 294 / 308
+C's (umb2) and 432 / 474 (umb2s), against 521 / 3392 in gm_t02_on. 0 written so far: the C tries end at the B -> C carry path (145 of 227 /
+225 of 332) and the B exact IK (89 / 91). The carry blame (gm_t02_umb2_pathblame, `ISPATIALGYM_PATH_BLAME=1`): of 30 blamed collisions 18
+are the carried umbrella against standing_mirror_wwkuuf_0 (removing the mirror alone frees them), 7 walls_oqrbxo_0, 5 walls_owxeej_0, around
+(-0.87, 1.15..1.26) beside the hall tree - the next blocker, outside 5q.2.
+
+**Lead decisions (owner away), 2026-11-08.** (1) L2v's per-entry `slab_half_m` 0.05 is accepted provisionally for umbrella__ziqzqo__s1 only;
+umb2 stays the primary root unless umb2s does as well. (2) The carry past the mirror is this branch's.
+
+**The carry past standing_mirror_wwkuuf_0 (diagnosis).** Per C the planner tries lifts 0.12 / 0.25 m (0.25: no IK from B in ~100 tries),
+per lift the CARRY_POSES that pass B's camera frame and IK (the hand 0.30-0.50 m to the holding arm's side), then the lift configuration;
+per option the travel trunks (0.5, 0) and (2.0, 0) with the local then the eroded global path, then the drive at B's trunk. PATH_BLAME
+(34 blamed): the global path just north of B, base at (-0.82..-0.94, 1.10..1.26) heading 1.0-1.2 rad and (-0.67..-0.70, 1.50..1.54);
+the mirror 25 (the umbrella 11, the holding gripper 13, 1 right), walls_oqrbxo_0 8 (the umbrella), walls_owxeej_0 2 (init -> B leg). The
+release needs the shaft along the board, i.e. ACROSS the robot's heading at C, and the carried yaw is fixed relative to the base: the 0.82
+m umbrella is carried across the heading, and with the hand 0.3-0.5 m to the left it reaches ~0.85 m left of the base.
+
+| hand lateral at the carry pose (umb2 + umb2s + pathblame) | carries ok | failed |
+|---|---|---|
+| >= 0.3 m (CARRY_POSES beside the body) | 0 | ~730 (path_collision) |
+| 0.2 m | 0 | 6 |
+| lift configuration | 10 | 126 |
+| within 0.1 m of the centre line | 8 | 7 |
+
+**The fix (6ac7931a, `ISPATIALGYM_CARRY_CENTRED`, default off; sampler-side, no oracle or gate change).** `carry_poses_at_b` first tries
+`CARRY_CENTRED_POSES` (0.45-0.55 m ahead, raise 0.05-0.20 m) with the hand's lateral chosen so that the carried object's hull centre lies
+on the base's centre line (`centred_hand_lateral`); the existing checks judge them (B's camera frame, exact IK attached, the in-hand line,
+the carried path). Kit counters `carry_pose.centred_offered` / `centred_used`; test_carry_centred.py. A/B on touching_large_02 N 4 v2only,
+root v2maps_goalmaps_umb2, trunk_6ac7931a, svl titanrtx: gm_t02_cc_on (18384743); the OFF arm is gm_t02_umb2 (same root, both switches off).
+
+**Second switch (0c24c2c6, `ISPATIALGYM_CARRY_SIDEWAYS`, default off).** gm_t02_cc_on's first C's offered the centred poses (hand lateral
+-0.01) and still collided at the same spot, so centring alone does not clear it. With the switch, a carried B -> C path that collides in
+every variant of today (straight arrival / plain, local then global) is planned again with the holonomic base driving sideways:
+`NAV.plan_path(heading_offset=+-pi/2)` (`NAV.fill_yaws`: each intermediate waypoint's yaw = its segment's heading + the offset, the end poses
+keep their stances' yaws), the offset nearer C's yaw first (`sideways_offsets`); `record_path` passes it through (default 0 = unchanged).
+The object held across the heading then lies along the way. The same swept check judges it (object attached, carry arms, yaw-lag
+envelope); the record is the recorded style, whose waypoint yaws the oracle tracks blended per segment as `stride_poses` models (no oracle
+change). Kit `carry_path.sideways_tried` / `sideways_used`; tests in test_carry_centred.py. Arm gm_t02_side_on (18384880, trunk_0c24c2c6).
+**Sideways result: no help.** gm_t02_side_on (sideways only) used it 0 times in 492 tries; the PATH_BLAME run with centred + sideways
+(gm_t02_side_blame) shows why: the collisions sit at the path start, where the yaw blends from B's heading toward the sideways one (base
+(-0.9, 1.2), yaw 1.0-1.3): the umbrella against walls_oqrbxo_0 10, the mirror 3; the base itself against the mirror 2. B stands in the tight
+spot between the wall, hall_tree_daxzaw_0 and the mirror, and the turn needs room there. The switch stays off and is not proposed. Both
+runs were cancelled early; I also cancelled the first centred arm (gm_t02_cc_on) too early - it had 12 carries in 3 attempts, 9 at centred
+poses, against 5 carries in gm_t02_umb2's 12 attempts - so it was re-run as gm_t02_cc_on2.
+
+**Third switch (c2071b3e, `ISPATIALGYM_CARRY_WIDE_PATH`, default off).** The centred carries' remaining collisions sit 20-30 % along the
+path at (-0.6..-0.8, 1.4..1.5), heading north past the mirror: the shortest global path hugs it. With the switch, after every variant of
+today collides the global path is planned again on the eroded map eroded 0.15 / 0.30 m more (`NAV.plan_path(global_extra_erosion_m=)`,
+`NAV.erode_more`: square kernel at the map's resolution; the ends snapped within 20 + the extra cells). The same swept check judges it. Kit
+`carry_path.wide_tried` / `wide_used`. The extra variants never replace the plain variant's error (`carried_path` restructured; off = unchanged).
+
+| arm (root umb2, N 4 v2only, svl titanrtx) | tag / job | snapshot |
+|---|---|---|
+| OFF | gm_t02_umb2 / 18383997 | trunk_1af21ad3 |
+| CENTRED | gm_t02_cc_on2 / 18384993 | trunk_0c24c2c6 |
+| CENTRED + WIDE | gm_t02_wide_on / 18385113 | trunk_c2071b3e |
+
+The table is appended to DECISIONS by `umbrella_r2/final_cc.sh` (job 18385122).
+
+Interim (runs still going): attempts / successful B -> C carries / carry legs failed per attempt - OFF 23 / 5 / 14.6, CENTRED 3 / 1 / 14.3
+(the cancelled first centred run 3 / 12 / 12.7), CENTRED + WIDE 4 / 24 / 2.5 (21 of the 24 on a WIDE path, mostly at 0.30 m; 20 at a centred
+pose). 0 written in every arm so far: after a carry the C tries end at B's exact pick IK, `C: pre-place branch off the tracked carry` and C's
+attached place IK - the next blockers, outside the carry. umb2 vs umb2s: 23 att / 5 carries vs 30 / 15, both 0 written - umb2 stays primary
+until the final numbers.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
