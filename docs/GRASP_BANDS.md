@@ -1420,6 +1420,7 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 15 | i7-plateqtf2 (93072af3; hull fallback on, IORSSmall overhang fallback, pre-place framing, pinned map overlay on) | 543d6d1a |
 | 16 | i7-artic (603ad557; prefix maps from own-arm segments, v2only articulation_small) | 61d52902 |
 | 17 | i7-contactfu (ec81e006; owner part A; map_tilt.py kept once, the single brace switch kept) | 76a4a4e4 |
+| 18 | i7-interior (d67158a7; interior PLACE map rule for stable rests, in the identity) | d9dd4565 |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1459,6 +1460,11 @@ Later layers:
   a pre-identity male key.
 - plate qtfzeq = the merged entry of v2maps_i7pq (27 valid; replaced entry in `_superseded_merged`).
 - 30 per_d_e merged maps of v2maps_i7unblock, only for entries int1 still holds unchanged (`_superseded_trunkelig`).
+- i7-interior:
+  - plate luhkiz (bar 0.8874 tabletop maps and sink-basin maps) from v2maps_i7sink2, with anchor 0.8874;
+  - the jar's fridge place maps from v2maps_i7fridge4;
+  - `v2maps_int1/interiors.json`, an ISPATIALGYM_INTERIORS overlay holding the fridge spec (door per piece) and the sink spec those maps were
+    built with. Jobs on this root must pass it, or the code registry must carry the specs.
 - Contact maps (16), from three roots:
   - v2maps_icb_on: the touch_brace maps built with full-open on (ntbrtz, dkhgxn, gkpmii), plus the touch_push maps;
   - v2maps_i7contact2: the axial h maps (qgvsnb, injrgc, tfovwy), with the pushed-end / spin fix;
@@ -1475,13 +1481,14 @@ Later layers:
 - The count found 58 maps that gain (trunk, d_e) columns: 52 tabletop, 4 interior and 2 overhang.
 - All 58 were rebuilt with per_d_e and merged by i7-unblock's rule: the former arrays are kept and the new columns added. Cells grew by
   +24109 over 116707.
-- 56 are staged. The cork's 2 maps wait for its running attachment_03 jobs.
+- 60 maps are staged in all, including the cork's 2 and plate luhkiz's 0.8874 pair.
+- plate luhkiz's sink non-place maps were rebuilt but gain no cell, so they are not staged.
 - i7-unblock deferred 8 maps:
   - the bqvvvx lean_right / overhang maps are merged;
   - the old right-validated bqvvvx lean_left maps are superseded by the valleft maps, which are merged;
   - the acbrnv lean_left_20 maps (touching_03) are not in v2maps_int1.
 
-`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_76a4a4e4: 75 entries, 128 maps, 8 attach maps, 16 contact maps and 12 prefix maps, 0 key mismatches, 50 links resolving,
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_d9dd4565: 76 entries, 138 maps, 8 attach, 16 contact, 12 prefix and 12 interior maps (specs match), 0 key mismatches, 51 links,
 21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
 **Validation** (`--grasps v2only` N 4, affected aliases only; `tab_i.py -a int1_1 .. int1_5`; DECISIONS "integration RESULTS").
