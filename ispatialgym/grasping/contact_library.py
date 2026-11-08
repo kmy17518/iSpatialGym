@@ -227,6 +227,8 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
     under 4 cm) and the pads on it (closing v / h, pad centre 5 mm outside the goal face), each clear of the target's sweep from its init
     pose. The entries are in the object frame AT THE GOAL POSE (the brace holds the object there while the push completes); ``load`` = the
     direction the end arrives in (``d_stop``, rule frame) and the end's point (goal object frame)."""
+    if params.get("clear_turns"):
+        return build_axial_brace_clear_turns(pts_obj, rest, knobs, params)
     from ispatialgym.robot import conventions as C
     from ispatialgym.sampling.v2 import contact_poses as CPZ
     from ispatialgym.sampling.v2 import tabletop as TT
@@ -273,6 +275,104 @@ def build_axial_brace(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: 
                                  "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ end_goal.double().numpy() + Ti[:3, 3])],
                                  "what": "the right arm's axial push brings the end into the stop at the goal"}
                     out.append(_redigest(e))
+    return out
+
+
+
+#: i7-brace (owner 3.4): the turn grid (deg) a clear-turn axial brace entry is tested over (the axial deviation range is 20-70 deg)
+AXIAL_CLEAR_TURNS_DEG = tuple(float(v) for v in range(5, 95, 5))
+
+
+def clear_turn_max(hull: th.Tensor, com_local: th.Tensor, goal_pose, spin: float, disc: Dict[str, Any], turns_deg: Sequence[float] = AXIAL_CLEAR_TURNS_DEG) -> float:
+    """The largest turn (deg, of ``turns_deg``) up to which the brace's sweep disc stays clear (``tabletop.blade_sweep_clear`` - the sampler's own
+    test - at EVERY grid turn up to it): the object rotated back from ``goal_pose`` by ``spin x turn`` about its fixed centre of mass. 0 when
+    the smallest turn already fails."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    com = goal_pose[0] + C.quat_rotate(goal_pose[1], com_local)
+    yaw_goal = math.atan2(float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[1]), float(C.quat_rotate(goal_pose[1], th.tensor([1.0, 0.0, 0.0]))[0]))
+    best = 0.0
+    for t in sorted(float(v) for v in turns_deg):
+        d_goal = spin * math.radians(t)
+        q0 = C.quat_from_yaw(yaw_goal - d_goal)
+        pose_init = (com - C.quat_rotate(q0, com_local), q0)
+        ok, _gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, disc["xy"], float(disc["radius"]), float(disc["clearance"]))
+        if not ok:
+            break
+        best = t
+    return best
+
+
+def build_axial_brace_clear_turns(pts_obj: np.ndarray, rest, knobs: Dict[str, Any], params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """i7-brace (owner 3.4, library param ``clear_turns``; default off): the axial stop brace entries at the GOAL pose keyed by pushed end x
+    spin (not turn size), each recording the START RANGE it stays clear for - ``goal.clear_turn_max_deg``, the largest turn of
+    :data:`AXIAL_CLEAR_TURNS_DEG` at which the sampler's sweep test (``blade_sweep_clear``) holds at every grid turn up to it - instead of one
+    45 deg build: the candidates of ``axial_brace_candidates`` without its sweep filter (``sweep_check=False``) and, after them, the
+    OPPOSITE-END candidates (``axial_opposite_brace_candidates``: the far end's face, resisting the same turn; classes ``<end><spin>spin_opp_*``).
+    A candidate clear at no grid turn is left out. The candidate poses at the goal do not depend on the turn (the stop face and d_stop are
+    the pushed end's at the goal); ``load`` is the arriving end's (the far end's for an opposite entry)."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import contact_poses as CPZ
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    r0 = axial_rest(rest)
+    hull = th.as_tensor(pts_obj, dtype=th.float32)
+    turns = [float(v) for v in (params.get("clear_turns_deg") or AXIAL_CLEAR_TURNS_DEG)]
+    ref = math.radians(min(turns))  # the reference init pose of the candidate generator (the poses at the goal do not depend on it)
+    com_local = th.tensor(params.get("com_local") if params.get("com_local") is not None else pts_obj.mean(axis=0).tolist(), dtype=th.float32)
+    long_local = th.tensor(_axial_long(pts_obj, params), dtype=th.float32)
+    proj = (hull - com_local) @ long_local
+    h = float(pts_obj[:, 2].max() - pts_obj[:, 2].min())
+    z_push, face_z, z_brace = CPZ.axial_push_height(0.0, h), (0.0, h), TT.contact_height(0.0, h)
+    out = []
+    for yaw_goal in _yaws(params):
+        for end_sign in (1.0, -1.0):
+            half_len = float(proj.max() if end_sign > 0 else -proj.min()) - AXIAL_END_INSET_M
+            opp_half = float(-proj.min() if end_sign > 0 else proj.max()) - AXIAL_END_INSET_M
+            for spin in (1.0, -1.0):
+                d_goal = spin * ref
+                q0 = C.quat_from_yaw(yaw_goal - d_goal)
+                pose_init = (th.tensor([0.0, 0.0, float(r0.h_root)]), q0)
+                com = pose_init[0] + C.quat_rotate(q0, com_local)
+                end = com + C.quat_rotate(q0, long_local) * end_sign * half_len
+                opp_end = com - C.quat_rotate(q0, long_local) * end_sign * opp_half
+                goal_pose, stop_pts, d_stop = CPZ.axial_stop_geometry(hull, com_local, pose_init, end, com, spin, yaw_goal, z_brace)
+                T_goal = CPZ._mat(goal_pose)
+                Ti = np.linalg.inv(T_goal)
+                skips: Dict[str, int] = {}
+                seen = set()
+                gens = [(False, CPZ.axial_brace_candidates(CPZ.MAP_FRAME, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push, face_z=face_z,
+                                                           height=h, skips=skips, sweep_check=False))]
+                if params.get("opposite_end", True):
+                    gens.append((True, CPZ.axial_opposite_brace_candidates(CPZ.MAP_FRAME, hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace,
+                                                                           d_goal, z_push=z_push, face_z=face_z, height=h, skips=skips, sweep_check=False)))
+                for opp, gen in gens:
+                    for pre, contact, kind, extras in gen:
+                        disc = extras.pop("sweep_disc")
+                        t_max = clear_turn_max(hull, com_local, goal_pose, spin, disc, turns)
+                        if t_max <= 0.0:
+                            skips["never_clear"] = skips.get("never_clear", 0) + 1
+                            continue
+                        cls = f"{'+' if end_sign > 0 else '-'}end{'+' if spin > 0 else '-'}spin_{kind}@f{int(extras.get('stop_face_fraction', 0))}"
+                        while cls in seen:
+                            cls += "#"
+                        seen.add(cls)
+                        pitch = float(str(extras["pose_class"])[len("blade_"):]) if str(extras.get("pose_class", "")).startswith("blade_") else 0.0
+                        e = CPZ.contact_entry("brace", cls, "axial_brace", "brace", T_goal, contact, pre, dict(extras, kind=kind),
+                                              face_rule=("the far end's face the far end arrives at (opposite d_stop)" if opp else
+                                                         "the goal hull's stop face the pushed end arrives at (d_stop)") + ", at 3/4 of the height; the blade at the push height",
+                                              support_z=0.0, object_height=h, pitch_deg=pitch)
+                        e["yaw_deg"] = round(math.degrees(yaw_goal), 4)
+                        e["goal"] = {"yaw_goal_deg": round(math.degrees(yaw_goal), 4), "turn_rad": round(spin * math.radians(t_max), 6), "end_sign": end_sign,
+                                     "spin": spin, "clear_turn_max_deg": t_max, "opposite_end": bool(opp), "skips": dict(skips)}
+                        a_end = opp_end if opp else end
+                        a_d = th.tensor(extras["opp_d_stop"]) if opp else d_stop
+                        a_goal = C.quat_rotate(goal_pose[1], C.quat_rotate(C.qinv(q0), a_end - pose_init[0])) + goal_pose[0]
+                        e["load"] = {"frame": "rule", "direction": [round(float(v), 6) for v in a_d.tolist()],
+                                     "point_object": [round(float(v), 6) for v in (Ti[:3, :3] @ a_goal.double().numpy() + Ti[:3, 3])],
+                                     "what": "the right arm's axial push brings the " + ("far end into its stop" if opp else "end into the stop") + " at the goal"}
+                        out.append(_redigest(e))
     return out
 
 
