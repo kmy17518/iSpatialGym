@@ -219,6 +219,8 @@ _IORS_RELATION_WORDS = {"ontop": "on", "under": "under", "under_small": "on", "i
 #: board of an interior shelf and the partner against the other; the hand that carried the target pushes it toward the partner
 #: (the left hand rightward for a partner on the right board) and nothing braces the partner
 TOUCHING_SHELF_LAYOUT = "upright_shelf"
+#: the stance the shelf tip release's backed-off retreat ends at (i7-t03 owner 5p.1; sampler ``iors_small.RETREAT_STANCE``)
+SHELF_RETREAT_STANCE = "retreat"
 
 
 def _pack_stage_actions(sc: Sidecar, brace, pushes, base_yaw: float) -> List[Action]:
@@ -1214,10 +1216,20 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
         # settled from and tips onto the partner - the nextto chain (pick, carry, place, retreat), no push and no brace
         if sc.contacts is not None and (sc.contacts.push is not None or sc.contacts.brace is not None):
             raise SidecarError("touching (shelf tip release): no push / brace contact is recorded")
-        if "push" in sc.stances:  # the second base pose the place is made from (the book carried there in hand)
+        place_st = "push" if "push" in sc.stances else "manipulation"
+        backed = SHELF_RETREAT_STANCE in sc.stances and sc.transition(place_st, SHELF_RETREAT_STANCE) is not None
+        if "push" in sc.stances or backed:
             grasp, lift = _pick(g)
-            return (_travel(sc, "init", "manipulation") + [grasp, lift] + _travel(sc, "manipulation", "push", carried=g.object)
-                    + _place_and_retreat(g, "support", _IORS_RELATION_WORDS["touching"]))
+            carry = _travel(sc, "manipulation", "push", carried=g.object) if place_st == "push" else []
+            if backed:
+                # i7-t03 owner 5p.1 (sampler ISPATIALGYM_SHELF_RETREAT_BACKOFF; approved oracle change): the place's own 10 cm lift-off, then the
+                # base drives back along its axis with the arm frozen (the recorded transition into ``retreat``) instead of the arm's last 5 cm
+                place = Place(kind="support", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on,
+                              relation=_IORS_RELATION_WORDS["touching"])
+                tail = [place] + _travel(sc, place_st, SHELF_RETREAT_STANCE)
+            else:
+                tail = _place_and_retreat(g, "support", _IORS_RELATION_WORDS["touching"])
+            return _travel(sc, "init", "manipulation") + [grasp, lift] + carry + tail
         return program_iors_small(sc, "nextto")
     push = _push_contact(sc)
     brace = sc.contacts.brace if sc.contacts is not None else None

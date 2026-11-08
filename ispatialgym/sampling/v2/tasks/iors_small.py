@@ -129,6 +129,22 @@ def shelf_span_rule_on() -> bool:
     return os.environ.get(SHELF_SPAN_RULE_ENV, "").strip().lower() in ("1", "on", "true")
 
 
+#: i7-t03 2026-11-08 (owner 5p.1, an approved oracle change, DEFAULT OFF): the shelf tip release's clear pose (15 cm back along the approach:
+#: the place's 10 cm release lift-off + the 5 cm retreat) is out of the arm's reach from the release stance (diagnostic 0: it fails with the
+#: shelf and the partner removed). When it fails, the base backs off instead of the arm: the place's own end (10 cm back) from the release
+#: stance, then a backward drive of RETREAT_LITTLE_M along the stance's axis with the arms frozen there (the shelf back-off rule's drive-back,
+#: ``navigation.path_collision_free`` strides) - recorded as the stance ``retreat`` + the transition into it, which the oracle program drives
+#: in place of the final 5 cm retreat (``programs.program_iors_touching``). Kit ``shelf_retreat.backoff_passed`` / ``.backoff_failed.<why>``
+#: / ``.recorded``
+SHELF_RETREAT_BACKOFF_ENV = "ISPATIALGYM_SHELF_RETREAT_BACKOFF"
+#: the stance the backed-off retreat ends at (``sidecar.stances``; the oracle's program reads it)
+RETREAT_STANCE = "retreat"
+
+
+def shelf_retreat_backoff_on() -> bool:
+    return os.environ.get(SHELF_RETREAT_BACKOFF_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 def shortest_arc(u: th.Tensor, v: th.Tensor) -> th.Tensor:
     """The smallest rotation (xyzw) taking unit vector ``u`` onto ``v``."""
     u = G.t(u).float() / float(th.linalg.norm(G.t(u).float()))
@@ -4891,9 +4907,9 @@ class IORSSmall(SamplerV2):
                 idx = self.kit.robot.arm_control_idx
                 arm_q = {"right": r.q[idx["right"]].clone(), "left": r.q[idx["left"]].clone()}
         if self.relation == "touching":
-            r = self.ikc.exact([IK.pre_pose(grasp.place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st_place, grasp.arm, ignore_for_last=self.support_objects() + [tgt], cache=False)
-            if not r.ok:
-                return f"place retreat clear pose: {r.reason}"
+            why_clear, _code = self.release_clear_why(st_place, grasp.place, grasp.arm)
+            if why_clear is not None:
+                return f"place retreat clear pose: {why_clear}"
         if push is not None:
             # the push stance got its carried object after ``check_stances_with_objects``: the drive's sweep covers its pose
             why = self.recheck_carried_travel(self.bindings.one("target").name, arm_q=arm_q, stances=False)
@@ -5110,11 +5126,11 @@ class IORSSmall(SamplerV2):
             # the oracle's place ends 10 cm back along the approach (release + lift-off) and its retreat goes 5 cm further: the
             # pose 15 cm back from the place, fingers open, the released box ignored, must have a configuration (the program
             # check's 'retreat: exact IK failed / joint 6-7 at the limit (stance push)' on 6/16 attempts of 0918-175907)
-            clear = IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)
-            r_clear = self.ikc.exact([clear], st_place, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
-            if not r_clear.ok:
-                raise Reject(r_clear.code or "place_unreachable", f"place retreat clear pose ({(RETREAT_DIST_M + RETREAT_LITTLE_M) * 100:.0f} cm back along the "
-                                                                 f"approach) from the {st_place.name} stance: {r_clear.reason}")
+            # owner 5p.1 (ISPATIALGYM_SHELF_RETREAT_BACKOFF, the shelf tip release): or the place's end + the base backing off (recorded here)
+            why_clear, code_clear = self.release_clear_why(st_place, place, grasp.arm, record=True)
+            if why_clear is not None:
+                raise Reject(code_clear or "place_unreachable", f"place retreat clear pose ({(RETREAT_DIST_M + RETREAT_LITTLE_M) * 100:.0f} cm back along the "
+                                                               f"approach) from the {st_place.name} stance: {why_clear}")
         # the lift (oracle ``Lift``): grasp pose raised by carry_height with the object attached, support ignored (the
         # object leaves it); the pre-place is where the carry ends, so the lift end must be IK-feasible too
         lift_end = PC.lift_end_pose(grasp)
@@ -5292,9 +5308,72 @@ class IORSSmall(SamplerV2):
                                approached=place_approached(self, inside=False))
         if not r.ok:
             return f"descent: {r.reason}"
-        r2 = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
-        if not r2.ok:
-            return f"clear pose: {r2.reason}"
+        why, _code = self.release_clear_why(st, place, grasp.arm)
+        if why is not None:
+            return f"clear pose: {why}"
+        return None
+
+    def release_clear_why(self, st: Stance, place: G.Pose, arm: str, record: bool = False) -> Tuple[Optional[str], Optional[str]]:
+        """The release clear pose from ``st``: the hand ``RETREAT_DIST_M + RETREAT_LITTLE_M`` (15 cm) back along the approach from ``place``,
+        fingers open, the released target and the supports ignored - ``(None, None)`` when its exact IK passes, else ``(why, code)``. 5p.1
+        (:data:`SHELF_RETREAT_BACKOFF_ENV`, the shelf tip release only): when it fails, :meth:`_retreat_backoff_why` (the place's end + the
+        base backing off) may pass instead; ``record`` (the goal check's final release) records that retreat stance and transition."""
+        r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+        if record:
+            self._drop_retreat_record()
+        if r.ok:
+            return None, None
+        if not (shelf_retreat_backoff_on() and self.shelf_tip()):
+            return r.reason, r.code
+        why = self._retreat_backoff_why(st, place, arm, record)
+        if why is None:
+            return None, None
+        return f"{r.reason}; base back-off: {why}", r.code
+
+    def _drop_retreat_record(self) -> None:
+        self.sidecar.stances.pop(RETREAT_STANCE, None)
+        self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if t.to != RETREAT_STANCE]
+
+    def _retreat_backoff_why(self, st: Stance, place: G.Pose, arm: str, record: bool) -> Optional[str]:
+        """5p.1: the shelf tip release's retreat with the base backing off - (1) the place's end, ``RETREAT_DIST_M`` back along the approach
+        (where the oracle's place leaves the open hand), exact IK from ``st``; (2) the drive-back ``st`` -> ``st`` at stand-off +
+        ``RETREAT_LITTLE_M`` (strides of ``navigation.STRIDE_M``) whole-body collision-free at ``st``'s trunk with both arms frozen at that
+        configuration and the fingers open, the released target ignored (the program check sweeps it again with the book at its release
+        pose). The hand ends where the 15 cm clear pose is. ``record``: stance :data:`RETREAT_STANCE` + the transition into it (``arms_q``,
+        ``retreat_backoff_m``). None when it passes, else why."""
+        from ispatialgym.sampling.v2 import navigation as NAV
+        from ispatialgym.sampling.v2.stances import Transition
+
+        r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+        if not r.ok or r.q is None:
+            TT._count(self, "shelf_retreat.backoff_failed.place_end")
+            return f"the place's end ({RETREAT_DIST_M * 100:.0f} cm back): {r.reason}"
+        if st.edge is None or st.stand_off is None:
+            TT._count(self, "shelf_retreat.backoff_failed.no_edge")
+            return "the release stance has no edge frame to back off along"
+        idx = self.kit.robot.arm_control_idx
+        q_arms = {a: G.t(r.q)[idx[a]].clone() for a in ("right", "left")}
+        back = st.shifted(stand_off=float(st.stand_off) + RETREAT_LITTLE_M, name=RETREAT_STANCE)
+        trunk = (float(st.translate), float(st.tilt))
+        drive = NAV.stride_poses([tuple(float(v) for v in st.base_pose2d), tuple(float(v) for v in back.base_pose2d)], NAV.STRIDE_M)
+        with self.ikc.ignoring([self.obj("target")]):
+            ok, bad = NAV.path_collision_free(self.kit, drive, trunk, "untucked", margin=0.01, q_arms=q_arms, fingers=float(C.FINGER_OPEN))
+        if not ok:
+            TT._count(self, "shelf_retreat.backoff_failed.drive")
+            return f"the {RETREAT_LITTLE_M * 100:.0f} cm drive-back with the arms frozen collides at stride {bad}/{len(drive)}"
+        TT._count(self, "shelf_retreat.backoff_passed")
+        if record:
+            back.arms, back.idle_posture = st.arms, st.idle_posture
+            back.extras = {k: v for k, v in (st.extras or {}).items() if not str(k).startswith("_")}
+            back.extras["retreat_backoff"] = {"from": st.name, "drive_m": RETREAT_LITTLE_M, "rule": "owner 5p.1: the base backs off instead of the arm's last 5 cm"}
+            self.sidecar.add_stance(back)
+            tr = Transition(st.name, RETREAT_STANCE, float(back.stand_off), trunk_from=trunk, trunk_to=trunk, n_samples=0)
+            tr.extras["arms_q"] = {a: [round(float(v), 5) for v in q.tolist()] for a, q in q_arms.items()}
+            tr.extras["retreat_backoff_m"] = RETREAT_LITTLE_M
+            self.sidecar.add_transition(tr)
+            TT._count(self, "shelf_retreat.recorded")
+            log.info("%s: shelf retreat back-off - the %s arm stops at the place's end, the base drives back %.2f m (%s -> %s, s %.2f -> %.2f)",
+                     self.gp.variant, arm, RETREAT_LITTLE_M, st.name, RETREAT_STANCE, float(st.stand_off), float(back.stand_off))
         return None
 
     def _push_stance_diag(self, lat: float, st: Stance, is_manip: bool, t_place_pose: G.Pose) -> Dict[str, Any]:

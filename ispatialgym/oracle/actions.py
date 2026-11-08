@@ -640,6 +640,9 @@ class Transition(Action):
             fine = f"back off{with_obj} and straighten the trunk before driving to {_dest(self.transition.to)}"
             numbers = f"drive back{with_obj} to {self.transition.stand_off:.2f} m stand-off, set trunk translate {tt:.2f} / tilt {kt:.2f} (from {t0:.2f} / {k0:.2f})"
             return fine, numbers
+        if self.transition.to == "retreat" and (getattr(self.transition, "extra", None) or {}).get("retreat_backoff_m") is not None:
+            # i7-t03 owner 5p.1: the shelf tip release's retreat by the base (the arm frozen at the place's end, the trunk unchanged)
+            return "back away from the shelf", f"drive back to {self.transition.stand_off:.2f} m stand-off with the arm held, trunk unchanged"
         fine = f"back off{with_obj}, set the trunk for {purpose} and move in to {_dest(self.transition.to)}"
         t1, k1 = self.stance_to.trunk
         s = self.stance_to.stand_off
