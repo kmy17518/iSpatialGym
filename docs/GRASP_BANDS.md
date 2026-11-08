@@ -2468,6 +2468,25 @@ touching_02 0.045 -> 0.16; GPU-h per success 1.22 -> 0.61 / 0.15 -> 0.20 (demo s
   touch_push map's eligible trunk tilts at each translate within the torso limit instead of `tilt_scan`'s 7 continuous samples (at translate
   0.25: 0, -0.266, -0.533, ...; at 0: 0, -0.305, -0.611, ...), so the manipulation and push stances read built columns; in the SPA cell key
   when on; kit `touch_built_tilts.*`.
+- RUNS (trunk_b4b4e9aa, cluster svl titanrtx, v2only on v2maps_int1, memory off; `contact3_20261108/submit_r1.sh`, tabulate `tab_r1.py`).
+  Suite: 23 failed + 3 errors = base 1697372a's exact set, +5 new tests pass. 5r.2: 300006 re-collected (c3_tp1's sampled instance) with
+  the rule on = SUCCESS (carton 0.9 mm, qa {}; the rule acted once, left_gripper_finger_link1 on the carton at step 409 of the right push's
+  pre_contact), =0 control = protected_contact as before; close_02 fresh N 4 at 300006-300009 (c3_qa_on) 4 att / 4 wr / 4 ok, 0.55 GPU-h
+  (0.138 per success; c3_tp1 before: 4 / 4 / 3, 0.167); the rule acted only in 300006. 5r.1 rerun with both defaults on (c3_r1_base,
+  320300-320303): touching_02 56 att / 4 wr / 3 ok, 0.58 GPU-h (0.19 per success; lift screen rejected 47 candidates at the draw, goal-check
+  lift_unreachable 3); touching_04 46 / 4 / 1, 1.33 GPU-h (lift screen 7 at the draw, goal-check lift_unreachable 1; the largest late cost
+  is now goal-check contact_unreachable, 8 x 139 s). touching_04 follow-ups vs that base (same snapshot / indices): built tilts
+  (c3_r1_tilts) 55 / 4 / 1, 1.34 GPU-h - the switch acted (4725 scans; candidates at (0.25, -0.6) / (0.0, -0.6) / (0.5, -0.3)) but the
+  same failures moved with it: place screening from the push stance 23 at (0.25, -0.60) (base 22 at (0.25, -0.53)), goal-check
+  contact_unreachable 11 (base 8) - the cause is the exact place IK from the push stance at that translate / deep tilt, not the unbuilt
+  column: NOT recommended. A1 screen (c3_r1_a1s) 46 / 4 / 2, 0.99 GPU-h (0.50 per success): checked 22, passed 16, rejected 6-7 at the
+  draw (48 place checks, ~1-2 s each); goal-check contact_unreachable 8 -> 5 (the 5 left: 3 "no class" at the one A1 stance (-0.08,
+  s0.30) - the map says feasible, the exact push fails on hand overlap -15 mm / IK; 2 where a placing stance exists but not the one whose
+  push passes). Note: the a1s / a1sh arms read the SPA cells base cached (same key), so their sampling is cheaper; judge on the counters.
+  A1 screen shadow (c3_r1_a1sh) 46 / 4 / 2, 1.08 GPU-h: 3 would-be rejections, all 3 attempts died contact_unreachable in the goal check
+  (0 passed it); goal-check contact_unreachable 9 (on: 5). Recommendation (owner decides): the A1 screen default on (moves ~130 s
+  rejections to the draw, rejects nothing that passes); the built tilts stay off. Demo failures (all arms): gripper_out_of_fov,
+  plan_failed, symbolic_only (the push turn below), not switch-related.
 - symbolic_only diagnosis (diagnosis only; `$OFH/contact3_20261108/sym_diag`: sym_scan.py, rows.json, SUMMARY.txt): over 87 touching_04
   demos with a push (40 tags) 38 failed symbolic_only, every one on the spray bottle's ORIENTATION, turned during the push: median |dyaw|
   8.8 deg (failures) vs 0.8 (successes), limit 5.7. It turns while it slides (0 -> 45 mm in 0.4-0.6 s), before it reaches the detergent
