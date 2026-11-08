@@ -2401,9 +2401,9 @@ attempts for running jobs because `job_stats.json` is only written at the end.
 | under_large_01 (sandal, bed) | int1_1 | 5 / 4 / 3 | 0.27 | none (1 robot_wobble) | - |
 | under_large_02 (briefcase, desk) | int1_1 | 6 / 4 / 0 | - (3.22 GPU-h) | oracle push-under: not_reached / symbolic_only, briefcase 0.11-0.23 m short and turned | none |
 | under_large_03 (trash can, desk) | i7_floorfix (+ i7diag_floor) | 19 / 3 / 1 | 3.24 | oracle push: ashcan turned 0.34-0.66 rad | none |
-| ontop_large_01 (soap dispenser, countertop) | int1_1 | 0 / 0 / 0 | - | missing_map tabletop h 0.9158 at countertop_fjkase_0: no anchor covers it, no tabletop map | none |
+| ontop_large_01 (soap dispenser, countertop) | int1_1 | 0 / 0 / 0 | - | missing_map tabletop h 0.9158 at countertop_fjkase_0 (entry soap_dispenser__zwudcz__s1, plane top): no anchor covers it, no tabletop map | i7-goalmaps |
 | ontop_large_02 | i7_floorfix (+ i7diag_floor) | 24 / 4 / 4 | 0.94 | low yield: approach_untrackable 13 | none |
-| touching_large_02 (umbrella, hall tree) | i7diag_floor | 0 / 0 / 0 | - | missing_map interior: no registry spec of hall_tree_upkvgr_0 at 0.5809 (the surface place) | none |
+| touching_large_02 (umbrella, hall tree) | i7diag_floor | 0 / 0 / 0 | - | missing_map interior h 0.5809 at hall_tree_upkvgr_0 (entry umbrella__ziqzqo__s1): no registry spec of the board (the surface place) | i7-goalmaps if it covers interior goals, else none |
 
 **B. touching_04.** int1_7 had 156 target_placement rejections: touching_04 94, touching_02 25, touching_01 22, axial_04 11, axial_01 and
 axial_03 2 each. In touching_04 the candidates fail on the place depth. The start draw puts the spray bottle 0.56 / 0.64 m deep from the
