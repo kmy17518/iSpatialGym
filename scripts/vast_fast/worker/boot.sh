@@ -94,6 +94,12 @@ mkdir -p /work/data
 $S5 cp "$REPLAY_S3/secrets/omnigibson.key" /work/data/omnigibson.key > /dev/null 2>&1 || self_destroy "key fetch failed"
 chmod 600 /work/data/omnigibson.key
 xargs -a /work/boot_list.txt -P 8 -L 1 bash -c 'fetch "$0" "$1"' || self_destroy "bundle fetch failed"
+# phase 1b (parallel): the cache bases, once the cluster says the bundle set is complete (bundle/boot_ready; boot_lists.sh)
+for i in $(seq 1 80); do $S5 ls "$ISG_S3/bundle/boot_ready" > /dev/null 2>&1 && break; [ $i = 1 ] && log "waiting for bundle/boot_ready"; sleep 30; done
+$S5 ls "$ISG_S3/bundle/boot_ready" > /dev/null 2>&1 || self_destroy "bundle/boot_ready never appeared"
+if $S5 cp "$ISG_S3/bundle/boot_list1b.txt" /work/boot_list1b.txt > /dev/null 2>&1; then
+  xargs -a /work/boot_list1b.txt -P 8 -L 1 bash -c 'fetch "$0" "$1"' || self_destroy "bundle fetch failed (1b)"
+fi
 # then, in order, what overrides phase 1 (the env delta over the replay env parts, the cache deltas over their bases)
 if $S5 cp "$ISG_S3/bundle/boot_list2.txt" /work/boot_list2.txt > /dev/null 2>&1; then
   while read -r url dest; do [ -n "$url" ] && { fetch "$url" "$dest" || self_destroy "bundle fetch failed ($url)"; }; done < /work/boot_list2.txt
