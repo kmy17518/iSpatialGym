@@ -699,6 +699,25 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
 #: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
 #: / carry_pose.centred_used.
 CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
+#: i7-goalmaps 2026-11-08 (lead decision, the same carry): opt-in ``ISPATIALGYM_CARRY_SIDEWAYS=1`` (default off) - when the carried B -> C path
+#: collides at every variant tried today (straight arrival, plain; local then global), it is planned again with the base driving SIDEWAYS
+#: (``NAV.plan_path`` heading_offset +-pi / 2, the R1Pro base is holonomic): the object, held across the robot's heading because the release
+#: needs it there (the umbrella along the hall tree's board, across the robot facing the board), then lies along the way. The offset whose
+#: sideways yaw on the straight B -> C line is nearer C's yaw is tried first. The same swept check (the object attached, the carry arms,
+#: the yaw-lag envelope) judges it; the record is "recorded" style with the sideways yaws, which the oracle tracks as recorded. Kit counters
+#: carry_path.sideways_tried / carry_path.sideways_used.
+CARRY_SIDEWAYS_ENV = "ISPATIALGYM_CARRY_SIDEWAYS"
+
+
+def carry_sideways_on() -> bool:
+    return os.environ.get(CARRY_SIDEWAYS_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def sideways_offsets(from_xy: Sequence[float], to_xy: Sequence[float], to_yaw: float) -> List[float]:
+    """+-pi / 2, the one whose sideways yaw on the straight line ``from_xy`` -> ``to_xy`` lies nearer ``to_yaw`` first."""
+    h = math.atan2(float(to_xy[1]) - float(from_xy[1]), float(to_xy[0]) - float(from_xy[0]))
+    offs = [math.pi / 2, -math.pi / 2]
+    return sorted(offs, key=lambda o: abs((h + o - float(to_yaw) + math.pi) % (2.0 * math.pi) - math.pi))
 #: (ahead, raise above the lift) of the centred carry poses, tried in this order (0.45-0.55 m ahead: nearer folds the elbow, 0920-071230)
 CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
 
@@ -3316,6 +3335,9 @@ class IORSLarge(SamplerV2):
         # the straightened base's wheels touched bed_rrcvaq_1 0.37 m away on the same turn)
         arrive = float(self.gp.gen("carry_arrive_straight_m") or 0.0)
         variants = ([{"arrive_straight_m": arrive}] if arrive > 0.0 else []) + [{}]
+        k_plain = len(variants) - 1
+        if carry_sideways_on():  # i7-goalmaps (lead decision): the sideways drive after every variant of today (CARRY_SIDEWAYS_ENV)
+            variants += [{"heading_offset": o} for o in sideways_offsets(manip.base_xy.tolist(), place.base_xy.tolist(), float(place.yaw))]
         chosen: Dict[str, Any] = {}
 
         def carried_path(redo=None, **kw):
@@ -3326,11 +3348,17 @@ class IORSLarge(SamplerV2):
             i = 0
             while True:
                 k, v, force = tries[i]
-                plain = k == len(variants) - 1
+                plain = k >= k_plain
+                if "heading_offset" in v:
+                    TT._count(self, "carry_path.sideways_tried")
                 try:
                     p = self.record_path(manip, place, carried=tname, arm=arm, max_length_m=max_len, force_global=force, **kw, **v)
                     chosen.clear()
                     chosen.update(v)
+                    if "heading_offset" in v:
+                        TT._count(self, "carry_path.sideways_used")
+                        log.info("%s: B -> C carry: SIDEWAYS path (heading offset %+.2f rad, %s) %.2f m", self.gp.variant, float(v["heading_offset"]),
+                                 "global" if force else "local", p.length_m)
                     return p
                 except Reject as e:
                     if plain and e.reason != "path_collision":
@@ -3363,7 +3391,7 @@ class IORSLarge(SamplerV2):
                          path.length_m)
                 self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
                                 "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors,
-                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                                "arrive_straight_m": chosen.get("arrive_straight_m", 0.0), "heading_offset": chosen.get("heading_offset", 0.0)}
                 return path
             except Reject as e:
                 self._drop_leg_records(place.name)
@@ -3378,7 +3406,8 @@ class IORSLarge(SamplerV2):
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
             self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
-                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0)}
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors, "arrive_straight_m": chosen.get("arrive_straight_m", 0.0),
+                            "heading_offset": chosen.get("heading_offset", 0.0)}
             return path
         except Reject as e:
             self._drop_leg_records(place.name)

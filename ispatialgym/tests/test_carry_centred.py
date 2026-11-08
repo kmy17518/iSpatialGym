@@ -44,3 +44,32 @@ def test_without_a_hull_the_root_is_centred():
     grasp = (th.tensor([0.0, 0.1, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))  # the root 0.1 m to the eef's right
     lat = IL.centred_hand_lateral(eef, grasp, None, th.tensor([0.0, 1.0]))
     assert abs(lat - 0.1) < 1e-5, lat
+
+
+# ---------------------------------------------------------------------------------------------- the sideways carried drive (CARRY_SIDEWAYS)
+
+
+def test_the_sideways_switch_is_off_by_default(monkeypatch):
+    monkeypatch.delenv(IL.CARRY_SIDEWAYS_ENV, raising=False)
+    assert not IL.carry_sideways_on()
+    monkeypatch.setenv(IL.CARRY_SIDEWAYS_ENV, "1")
+    assert IL.carry_sideways_on()
+
+
+def test_fill_yaws_heads_along_the_segments_and_the_offset_turns_them():
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    nan = float("nan")
+    wps = [(0.0, 0.0, 0.3), (0.0, 1.0, nan), (1.0, 1.0, nan), (1.0, 1.0, math.pi)]
+    plain = NAV.fill_yaws(wps)
+    assert plain[0][2] == 0.3 and abs(plain[1][2] - 0.0) < 1e-9 and plain[2][2] == plain[1][2] and plain[3][2] == math.pi
+    side = NAV.fill_yaws(wps, math.pi / 2)
+    assert abs(side[1][2] - math.pi / 2) < 1e-9 and side[0][2] == 0.3 and side[3][2] == math.pi  # the end poses keep their yaws
+    side_r = NAV.fill_yaws([(0.0, 0.0, 0.0), (0.0, 0.0, nan), (0.0, 1.0, nan), (0.0, 2.0, 0.0)], -math.pi / 2)
+    assert abs(side_r[2][2] - 0.0) < 1e-9  # heading +pi/2 (north) - pi/2
+
+
+def test_the_sideways_offset_nearer_the_place_yaw_comes_first():
+    # driving north (heading +pi/2) to a stance facing -x (yaw pi): +pi/2 gives yaw pi (no turn at the end), -pi/2 gives 0
+    assert IL.sideways_offsets((0.0, 0.0), (0.0, 2.0), math.pi) == [math.pi / 2, -math.pi / 2]
+    assert IL.sideways_offsets((0.0, 0.0), (0.0, 2.0), 0.0) == [-math.pi / 2, math.pi / 2]

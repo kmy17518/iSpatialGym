@@ -1121,7 +1121,7 @@ class SamplerV2(TaskSampler):
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
                     arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None,
                     edge_slide: bool = False, edge_slide_back_m: float = 0.0, axis_leg: Optional[Sequence[float]] = None,
-                    arrive_straight_m: float = 0.0) -> PathRecord:
+                    arrive_straight_m: float = 0.0, heading_offset: float = 0.0) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
         drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
@@ -1132,7 +1132,8 @@ class SamplerV2(TaskSampler):
         slide alone (``NAV.plan_axis_leg``: the heading kept, forward / backward and lateral moves only), no grid planner;
         ``blocked`` (+ :meth:`path_blocked`) = footprints kept off the local map; ``arrive_straight_m`` (oracle-fix 2026-11-06,
         ``NAV.plan_path``): the grid path ends that far behind ``to`` along its axis and drives straight in; ``Reject(no_path |
-        path_collision | path_too_long | place_leg_collision | place_leg_heading)``."""
+        path_collision | path_too_long | place_leg_collision | place_leg_heading)``. ``heading_offset`` (i7-goalmaps, ``NAV.plan_path``; default 0):
+        the intermediate waypoints' yaw relative to the travel heading (pi / 2 = sideways)."""
         keep_off = self.path_keep_off_footprints()
         blocked = list(blocked) + list(self.path_blocked()) + list(keep_off)
         carried = carried or to.carried or frm.carried
@@ -1177,7 +1178,8 @@ class SamplerV2(TaskSampler):
                                   probe_face_travel=is_carried and style != "face_travel", **({"global_blocked": keep_off} if keep_off else {}),
                                   **({"face_travel_cfgs": ft_cfgs} if ft_cfgs else {}),
                                   **({"face_travel_max_extra_rotation_deg": float(ft_rot)} if ft_rot is not None else {}),
-                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}))
+                                  **({"arrive_straight_m": float(arrive_straight_m)} if arrive_straight_m else {}),
+                                  **({"heading_offset": float(heading_offset)} if heading_offset else {}))
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

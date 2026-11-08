@@ -825,13 +825,31 @@ def plan_axis_leg(kit: "RobotKit", stance_from: Stance, stance_to: Stance, back_
                                                  f"is collision-free ({'; '.join(errors)})"[:1500])
 
 
+def fill_yaws(waypoints: Sequence[Sequence[float]], heading_offset: float = 0.0) -> List[Tuple[float, float, float]]:
+    """The yaws of the intermediate (nan-yaw) waypoints: the heading of the following segment (+ ``heading_offset``, wrapped; i7-goalmaps
+    2026-11-08: pi / 2 = sideways); a zero-length segment keeps the previous yaw; given yaws stay."""
+    filled: List[Tuple[float, float, float]] = []
+    for i, w in enumerate(waypoints):
+        yaw = w[2]
+        if yaw != yaw:  # nan
+            nxt = waypoints[min(i + 1, len(waypoints) - 1)]
+            if nxt[0] != w[0] or nxt[1] != w[1]:
+                yaw = math.atan2(nxt[1] - w[1], nxt[0] - w[0])
+                if heading_offset:
+                    yaw = (yaw + float(heading_offset) + math.pi) % (2.0 * math.pi) - math.pi
+            else:
+                yaw = filled[-1][2]
+        filled.append((float(w[0]), float(w[1]), float(yaw)))
+    return filled
+
+
 def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
               margin: float = 0.01, edge_slide: bool = False, edge_slide_back_m: float = 0.0, style: str = "recorded",
               probe_face_travel: bool = False, global_blocked: Sequence[Any] = (), face_travel_cfgs: Sequence[Dict[str, float]] = (), arrive_straight_m: float = 0.0,
-              face_travel_max_extra_rotation_deg: Optional[float] = None) -> PathRecord:
+              face_travel_max_extra_rotation_deg: Optional[float] = None, heading_offset: float = 0.0) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
@@ -856,8 +874,14 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     decides (a straight 10 cm back-up as face_travel spins 180 deg twice; on 104 IORS-large records face_travel everywhere drove
     544 s / 11899 deg against recorded 431 s / 7496 deg, the rule at 10 deg 403 s / 6894 deg). ``probe_face_travel``
     (carried legs that stay recorded): the schedule is checked at 1 cm, logged and tallied in
-    :data:`FACE_TRAVEL_CARRIED_PROBE`, never used."""
+    :data:`FACE_TRAVEL_CARRIED_PROBE`, never used.
+    ``heading_offset`` (i7-goalmaps 2026-11-08, the caller's opt-in ``ISPATIALGYM_CARRY_SIDEWAYS``; default 0 = unchanged): the intermediate
+    waypoints' yaw = the following segment's heading + this (pi / 2: the holonomic base drives sideways, a long object held across the
+    heading then lies along the way); the end poses keep their stances' yaws. The style is then "recorded" (the face_travel schedule turns
+    the body to the heading): the oracle tracks the recorded waypoint yaws, each blended along its segment, as the swept check models."""
     trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
+    if heading_offset and style == "face_travel":
+        style = "recorded"
     if arm_q is None:
         from ispatialgym.sampling.v2.ik import stance_arm_vectors
 
@@ -914,14 +938,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         cells = simplify_path(cells, free_g)
         pts = [_to_world(kit, c) for c in cells]
         waypoints = [tuple(stance_from.base_pose2d)] + [(float(p[0]), float(p[1]), float("nan")) for p in pts] + tail + [tuple(stance_to.base_pose2d)]
-    # yaws of the intermediate waypoints: heading of the following segment
-    filled: List[Tuple[float, float, float]] = []
-    for i, w in enumerate(waypoints):
-        yaw = w[2]
-        if yaw != yaw:  # nan
-            nxt = waypoints[min(i + 1, len(waypoints) - 1)]
-            yaw = math.atan2(nxt[1] - w[1], nxt[0] - w[0]) if (nxt[0] != w[0] or nxt[1] != w[1]) else filled[-1][2]
-        filled.append((float(w[0]), float(w[1]), float(yaw)))
+    filled = fill_yaws(waypoints, heading_offset)
     length = path_length(filled)
     if max_length_m is not None and length > max_length_m:
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
