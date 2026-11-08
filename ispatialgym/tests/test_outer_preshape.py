@@ -107,3 +107,34 @@ def test_the_switch_is_off_by_default_and_enters_the_identity_only_when_on():
     assert S.candidate_switches({})["outer_pinch_preshape"] is False
     assert isinstance(CA.CandidateConfig().outer_pinch_preshape, bool)
     assert "outer_pinch_preshape" in asdict(CA.CandidateConfig())
+
+
+def test_with_the_switch_the_first_hit_proposals_join_the_all_hit_ones(tmp_path, monkeypatch):
+    """With every hit the Isaac sampler pairs each point with the FURTHEST hit (no thin pinch is proposed): the switch adds the first-hit
+    proposals (same seed) and judges every proposal at the pre-shape. Without the switch one sampling, as before."""
+    from dataclasses import asdict
+
+    from ispatialgym.grasping import object_geometry as OG
+    from ispatialgym.tests.test_glib_padsweep import _ring, _wall_pinch
+
+    from ispatialgym.grasping import candidates as CA
+
+    g = _ring()
+    monkeypatch.setattr(OG, "load", lambda model_dir: g)
+    calls = []
+
+    class _Sampler:
+        @staticmethod
+        def sample_antipodal(mesh, *a, **k):
+            calls.append(bool(mesh.ray.all_hits))
+            return [_wall_pinch(0.0, 0.3)] if not mesh.ray.all_hits else [_wall_pinch(0.0, 0.0)]
+
+    monkeypatch.setattr(CA, "_isaac_sampler", lambda: _Sampler)
+    job = {"category": "tape", "model": "ring", "scale": [1, 1, 1], "constraint": "tabletop", "rest_hint_wxyz": None, "id": "tape__ring__s1"}
+    for pre, want in ((False, [True]), (True, [True, False])):
+        calls.clear()
+        d = tmp_path / str(pre)
+        d.mkdir()
+        cfg = CA.CandidateConfig(**{**asdict(CA.CandidateConfig()), "outer_pinch": True, "outer_pinch_preshape": pre, "topk": 4})
+        out = CA.generate(job, str(d), cfg=cfg, densify=())
+        assert calls == want and out["log"]["n_sampled"] == len(want)

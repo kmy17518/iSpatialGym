@@ -156,6 +156,8 @@ class CandidateConfig:
     # fully open pads, a rim / wall / handle pinch whose line meets another surface within 44 mm (a cup's far wall, a spoon bowl) was
     # measured across it and dropped (teacup wopjex 5 -> 1, tablespoon yxxfdj 5 -> 1, beer glass mxsliu 2 -> 1 physics-valid) - pads the
     # oracle pre-shapes to the pinch never sweep that far. :class:`PreshapeOuter`: the self-consistent pinch nearest the pad centre.
+    # The PROPOSALS too: with every hit the Isaac sampler pairs a point with the furthest hit, so no thin pinch is proposed; with this
+    # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape.
     outer_pinch_preshape: bool = False
 
 
@@ -1007,10 +1009,20 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
         T_all = np.zeros((0, 4, 4))  # i7-ladder: given poses only (no mode, no sampled family) - nothing reads the samples
     else:
         su = _isaac_sampler()
-        T_all = np.array(su.sample_antipodal(_MeshProxy(union, all_hits=cfg.outer_pinch), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
-                                             gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
-                                             gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
-                                             orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed))
+
+        def _sample(all_hits):
+            return np.array(su.sample_antipodal(_MeshProxy(union, all_hits=all_hits), num_candidates=cfg.n_candidates, num_orientations=cfg.n_orientations,
+                                                gripper_maximum_aperture=cfg.aperture_m, gripper_standoff_fingertips=CONTACT_Z,
+                                                gripper_approach_direction=np.array([0, 0, 1.0]), grasp_align_axis=np.array([0, 1.0, 0]),
+                                                orientation_sample_axis=np.array([0, 1.0, 0]), random_seed=cfg.seed)).reshape(-1, 4, 4)
+
+        T_all = _sample(cfg.outer_pinch)
+        if cfg.outer_pinch and cfg.outer_pinch_preshape:
+            # i7-attachdef (owner 5.1): with every hit the Isaac sampler pairs a surface point with the FURTHEST hit within the aperture
+            # (sampler_utils: "the furthest intersection point"), so a thin rim / wall / handle pinch is never PROPOSED; the first-hit
+            # proposals (the pinch the pre-shaped pads close on - the sampling before outer_pinch, same seed) are added, and every
+            # proposal is then judged at the pre-shape (PreshapeOuter). Proposals only: no gate changes.
+            T_all = np.concatenate([T_all, _sample(False)], axis=0)
     log: Dict[str, Any] = {"n_sampled": int(len(T_all)), "z_min": round(z_min, 5), "size": round(size, 4)}
     # i7-overhang 2026-11-07: an entry used at an interior goal - the accessible region (access_region.py) and the goal's boards in the rest frame
     from ispatialgym.grasping import access_region as AR
