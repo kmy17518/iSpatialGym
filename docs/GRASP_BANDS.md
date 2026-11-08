@@ -1418,6 +1418,8 @@ decided at a merge. Record: `$OFH/int1_20261108`, `$OFH/DECISIONS.md` ("integrat
 | 13 | i7-contactbrace (3d5cd9bb = i7-contact + i7-braceopen; one switch ISPATIALGYM_BRACE_FULL_OPEN, default on) | 0f8e95c0 |
 | 14 | i7-attachfix (9681dac8; collector attach restore, witness FK check, opt-in outer_pinch / attach_face_retreat) | 6e5c6cba |
 | 15 | i7-plateqtf2 (93072af3; hull fallback on, IORSSmall overhang fallback, pre-place framing, pinned map overlay on) | 543d6d1a |
+| 16 | i7-artic (603ad557; prefix maps from own-arm segments, v2only articulation_small) | 61d52902 |
+| 17 | i7-contactfu (ec81e006; owner part A; map_tilt.py kept once, the single brace switch kept) | 76a4a4e4 |
 
 **Kept once.**
 - The switch-state identity: 884279fd (i7-switches) and its cherry-pick 33e72d92 (i7-attach) are identical patches. The merged
@@ -1464,10 +1466,22 @@ Later layers:
 
   The gkpmii v2 export is added to glib. The check also reads the contact maps, including the touch_brace knob at the run's default.
 
-**Open:** the per_d_e count and merge for the 46 former-rule maps of the 23 entries int1 replaced, plus the 8 interior / overhang maps
-i7-unblock deferred.
+- Articulation prefix maps (12) in `maps/_articulation`: right-arm maps from artic_prefix_20261107b, left-arm maps from
+  artic_prefix_20261107c.
+- i7-contactfu's validated-entry contact maps: touch_push x3 and the axial maps of qgvsnb / injrgc / tfovwy. The touch_brace maps stay the
+  ON builds.
 
-`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_0f8e95c0: 75 entries, 128 maps, 8 attach maps and 16 contact maps, 0 key mismatches, 50 links resolving,
+**per_d_e count and merge** (`int1_20261108/trunkelig`):
+- The count found 58 maps that gain (trunk, d_e) columns: 52 tabletop, 4 interior and 2 overhang.
+- All 58 were rebuilt with per_d_e and merged by i7-unblock's rule: the former arrays are kept and the new columns added. Cells grew by
+  +24109 over 116707.
+- 56 are staged. The cork's 2 maps wait for its running attachment_03 jobs.
+- i7-unblock deferred 8 maps:
+  - the bqvvvx lean_right / overhang maps are merged;
+  - the old right-validated bqvvvx lean_left maps are superseded by the valleft maps, which are merged;
+  - the acbrnv lean_left_20 maps (touching_03) are not in v2maps_int1.
+
+`jobs/v2build/check_int1.py` checks the root as the sampler reads it. On trunk_76a4a4e4: 75 entries, 128 maps, 8 attach maps, 16 contact maps and 12 prefix maps, 0 key mismatches, 50 links resolving,
 21 anchors (+0.6791, +0.7671) by the midpoint rule, 0 errors.
 
 **Validation** (`--grasps v2only` N 4, affected aliases only; `tab_i.py -a int1_1 .. int1_5`; DECISIONS "integration RESULTS").
