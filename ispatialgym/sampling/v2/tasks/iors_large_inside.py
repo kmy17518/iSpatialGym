@@ -115,6 +115,20 @@ INSIDE_MAP_CAP_ENV = "ISPATIALGYM_INSIDE_MAP_CAP"
 INSIDE_MAP_CAP_DEFAULT = "1"  # default on (owner 6.2, 2026-11-08); "0" off
 
 
+#: i7-interior2 2026-11-08 (owner item 2, the fridge's place joint-2 limit): stance C with the goal on the WORKING ARM's side - the base laterals
+#: also at the other end of the side's run (a narrow opening has the one lateral -half_run: the fridge's -0.035) and the goal cell nearest
+#: a point :data:`INSIDE_ARM_SIDE_AIM_M` to the arm's side of the base (``inside_goal_lateral_m``'s rule) unless the alias sets that key.
+#: The place's arm joint 2 (shoulder adduction: right upper limit +0.1745 rad, left lower -0.1745) stood at its limit (median 3 mrad with
+#: collisions off) in 268 place IKs of the fridge runs - the goal ~0.025 m from the base's centre line, the right arm reaching inward.
+#: Switch ``ISPATIALGYM_INSIDE_ARM_SIDE`` (default off); kit counters ``inside_arm_side.lateral_added`` / ``.aimed``.
+INSIDE_ARM_SIDE_ENV = "ISPATIALGYM_INSIDE_ARM_SIDE"
+INSIDE_ARM_SIDE_AIM_M = 0.17
+
+
+def inside_arm_side_on() -> bool:
+    return os.environ.get(INSIDE_ARM_SIDE_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
 def inside_map_cap_on() -> bool:
     return os.environ.get(INSIDE_MAP_CAP_ENV, INSIDE_MAP_CAP_DEFAULT).strip().lower() in ("1", "on", "true", "yes")
 #: ``generation.inside_stance_postures``: the arm postures stance C's collision check tries in order (the goal-side band's ``trunk_config``
@@ -924,6 +938,13 @@ class InsideMode:
             trunks = [(float(t), float(k)) for t, k in self.gp.gen("inside_trunks")]
         half_run = edge.length / 2 - (half + 0.10)
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
+        arm_side = inside_arm_side_on()
+        if arm_side and half_run > 0:
+            # i7-interior2 (owner item 2): the run's other end too (INSIDE_ARM_SIDE_ENV)
+            side_l = round(half_run if arm == "right" else -half_run, 6)  # the base to the arm's far side: the goal toward the arm's shoulder
+            if all(abs(side_l - v) > 1e-6 for v in laterals):
+                laterals = laterals + [side_l]
+                TT._count(self, "inside_arm_side.lateral_added")
         goal_cells = self.place["cells"]
         z_mid = float(self.place["z"]) + height / 2
         lattice = float(rb.meta.get("lattice", RB.LATTICE)) if rb is not None else RB.LATTICE
@@ -960,6 +981,9 @@ class InsideMode:
                     # working arm's side of the base (in front of its shoulder; straight ahead of the base the standing book's pre-place put the forearm
                     # across the chest: right_arm_link4/5 x torso_link4 13-27 mm, joint2 at its limit)
                     lat_g = float(self.gp.gen("inside_goal_lateral_m", 0.0) or 0.0)
+                    if arm_side and not lat_g:
+                        lat_g = INSIDE_ARM_SIDE_AIM_M  # i7-interior2 (owner item 2): the goal cell toward the working arm's shoulder
+                        TT._count(self, "inside_arm_side.aimed")
                     aim = xy
                     if lat_g:
                         yaw_b = float(st.base_pose2d[2])

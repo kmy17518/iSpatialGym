@@ -84,3 +84,25 @@ def test_the_map_cap_keeps_every_base_pose():
     kept = best_per_base(sts, 3)
     assert len(kept) == 12 and {st.base_pose2d for st in kept} == {st.base_pose2d for st in sts}
     assert all(st.extras["reach_margin_m"] >= 0.2 for st in kept)  # the most reach margin per base pose
+
+
+def test_the_arm_side_switch_and_the_camera_blame_are_opt_in(monkeypatch):
+    """i7-interior2 owner items 2 / 3: ISPATIALGYM_INSIDE_ARM_SIDE (the fridge's place joint-2 limit) and ISPATIALGYM_CAMERA_BLAME (the sink
+    pick's wrist-camera diagnostic) are off unless set; the blame only reports (camera_clear's verdict is unchanged)."""
+    from ispatialgym.sampling.v2 import orient as O
+    from ispatialgym.sampling.v2.tasks import iors_large_inside as LI
+
+    monkeypatch.delenv(LI.INSIDE_ARM_SIDE_ENV, raising=False)
+    assert not LI.inside_arm_side_on()
+    monkeypatch.setenv(LI.INSIDE_ARM_SIDE_ENV, "1")
+    assert LI.inside_arm_side_on() and LI.INSIDE_ARM_SIDE_AIM_M > 0
+    calls = []
+    kit = SimpleNamespace(links_clear=lambda q, links, m: calls.append(m) or th.tensor([m <= 0.0]), stats={},
+                          fk=lambda links, q: {links[0]: (th.tensor([0.5, 0.0, 0.9]), th.tensor([0.0, 0.0, 0.0, 1.0]))}, world=None)
+    ikc = SimpleNamespace(kit=kit)
+    monkeypatch.delenv(O.CAMERA_BLAME_ENV, raising=False)
+    assert O.camera_clear(ikc, th.zeros(28), "right") is False and calls == [O.CAMERA_MARGIN]
+    monkeypatch.setenv(O.CAMERA_BLAME_ENV, "1")
+    calls.clear()
+    assert O.camera_clear(ikc, th.zeros(28), "right") is False  # the verdict stays
+    assert kit.stats.get("camera_blame.clear_at.+0mm") == 1 and kit.stats.get("camera_blame.none") == 1

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -136,10 +137,68 @@ def camera_clear(ikc, q: th.Tensor, arm: str, margin: float = CAMERA_MARGIN) -> 
     if fn is None:
         return True
     try:
-        return bool(fn(C.as_tensor(q).float(), [f"{arm}_realsense_link"], float(margin))[0])
+        ok = bool(fn(C.as_tensor(q).float(), [f"{arm}_realsense_link"], float(margin))[0])
     except Exception as e:  # noqa: BLE001 - a kit without the camera link in its sphere model checks nothing
         log.debug("camera_clear: %r", e)
         return True
+    if not ok and os.environ.get(CAMERA_BLAME_ENV):
+        camera_blame(ikc, q, arm, margin)
+    return ok
+
+
+#: i7-interior2 2026-11-08 (owner item 3, the sink pick): opt-in diagnostics of a failing :func:`camera_clear` - nothing is decided by it
+CAMERA_BLAME_ENV = "ISPATIALGYM_CAMERA_BLAME"
+#: the margins probed for the camera's clearance (m; the spheres carry the model's buffer)
+CAMERA_BLAME_MARGINS = (0.004, 0.003, 0.002, 0.001, 0.0, -0.002, -0.005, -0.01)
+
+
+def camera_blame(ikc, q: th.Tensor, arm: str, margin: float) -> Optional[Dict[str, Any]]:
+    """Opt-in (``ISPATIALGYM_CAMERA_BLAME``): why the wrist camera is within ``margin`` of the world at ``q`` - the largest probed margin
+    it clears (:data:`CAMERA_BLAME_MARGINS`: the spheres' clearance band), and the world objects within 0.4 m of the camera whose removal
+    ALONE clears it (``ikc.ignoring``). One ``CAMERA_BLAME`` line; kit counters ``camera_blame.<object>`` / ``camera_blame.clear_at.<mm>``."""
+    import json as _json
+    import math as _math
+
+    link = f"{arm}_realsense_link"
+    out: Dict[str, Any] = {"arm": arm, "margin_m": float(margin)}
+    try:
+        qf = C.as_tensor(q).float()
+        cam = ikc.kit.fk([link], qf)[link][0]
+        out["camera_xyz"] = [round(float(v), 4) for v in cam]
+        clear_at = None
+        for m in CAMERA_BLAME_MARGINS:
+            if bool(ikc.kit.links_clear(qf, [link], float(m))[0]):
+                clear_at = m
+                break
+        out["clear_at_m"] = clear_at
+        objs = []
+        for o in list(getattr(getattr(getattr(ikc.kit, "world", None), "scene", None), "objects", None) or []):
+            try:
+                lo, hi = o.aabb
+            except Exception:  # noqa: BLE001
+                continue
+            d = _math.sqrt(sum(max(float(lo[i]) - float(cam[i]), 0.0, float(cam[i]) - float(hi[i])) ** 2 for i in range(3)))
+            if d < 0.4 and "floor" not in o.name and "ceiling" not in o.name and "wall" not in o.name:
+                objs.append((d, o))
+        objs.sort(key=lambda t: t[0])
+        out["near"] = [(o.name, round(d, 3)) for d, o in objs[:8]]
+        freeing = []
+        for d, o in objs[:8]:
+            with ikc.ignoring([o]):
+                if bool(ikc.kit.links_clear(qf, [link], float(margin))[0]):
+                    freeing.append(o.name)
+        out["freed_by_removing_alone"] = freeing
+        st = getattr(ikc.kit, "stats", None)
+        if isinstance(st, dict):
+            for n in freeing or ["none"]:
+                k = f"camera_blame.{n}"
+                st[k] = st.get(k, 0) + 1
+            k = "camera_blame.clear_at." + ("none" if clear_at is None else f"{clear_at * 1000:+.0f}mm")
+            st[k] = st.get(k, 0) + 1
+    except Exception as e:  # noqa: BLE001 - diagnostics only
+        out["error"] = repr(e)[:200]
+    log.info("CAMERA_BLAME %s", _json.dumps(out))
+    return out
 
 
 def prefer(a: Scored, b: Scored) -> int:
