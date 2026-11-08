@@ -362,3 +362,61 @@ def test_board_search_puts_the_board_feasible_candidates_first(monkeypatch):
     n = len(calls)
     assert [s._board_feasible(k, init) for k in (0, 1)] == [False, True] and len(calls) == n  # kept
     assert probes == [] and "bd_board.precheck_reject" not in s.kit.stats
+
+
+def test_board_table_positions_hold_at_every_stand_off(monkeypatch):
+    """ISPATIALGYM_BD_BOARD_TABLE=1 (owner 5m): the listed positions are the table's (inset from the edge = base depth - 0.35, the lateral
+    the centre line's), so at stand-off 0.45 they stand 0.10 m deeper from the base and stay on the top (base-relative, the first three
+    were off it); per stance only the positions on the top and inside the depth window are kept, then the table lattice (SEARCH on),
+    nearest first to the first kept listed position. Off: the base list unchanged."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "0")
+    plan_off = s._board_plan(manip)
+    assert [(d, l) for d, l, g in plan_off if not g] == [tuple(p) for p in BOARD_XY] and s.kit.stats == {}
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    plan = s._board_plan(manip)
+    listed = [(d, l) for d, l, g in plan if not g]
+    # (0.60, +0.05) -> 0.70: beyond the 0.66 window; the others 0.10 deeper, all on the top
+    assert listed == [(0.56, -0.02), (0.54, -0.1), (0.58, 0.04), (0.62, -0.06)]
+    assert all(s._board_on_top(manip, d, l, _half(s), right, -toward) for d, l, _g in plan)
+    lattice = [(d, l) for d, l, g in plan if g]
+    assert lattice and all(0.40 - 1e-6 <= d <= 0.66 + 1e-6 for d, _l in lattice) and not set(lattice) & set(listed)
+    ref = listed[0]
+    dist = [round((d - ref[0]) ** 2 + (l - ref[1]) ** 2, 6) for d, l in lattice]
+    assert dist == sorted(dist)
+    assert s.kit.stats["bd_board.table_plans"] == 1 and s.kit.stats["bd_board.table_listed"] == 4 and s.kit.stats["bd_board.table_listed_out_of_window"] == 1
+    # stand-off 0.35: the table positions are the base list (its own stand-off)
+    m35 = manip.shifted(stand_off=0.35)
+    assert [(d, l) for d, l, g in s._board_plan(m35) if not g] == [tuple(p) for p in BOARD_XY]
+    # SEARCH off: the listed table positions only
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    assert all(not g for _d, _l, g in s._board_plan(manip))
+    # the window and the listed positions are generation knobs
+    s.spec.generation.update({"board_table_xy_candidates": [[0.08, -0.10]], "board_table_depth_window_m": [0.40, 0.52]})
+    assert [(d, l) for d, l, _g in s._board_plan(manip)] == []
+    s.spec.generation["board_table_depth_window_m"] = [0.40, 0.56]
+    assert [(d, l) for d, l, _g in s._board_plan(manip)] == [(0.53, -0.1)]
+
+
+def test_board_table_places_the_board_where_the_base_list_is_off_the_top(monkeypatch):
+    """BD_BOARD_TABLE on candidate 12's stance (stand-off 0.45, the tall trunk's reach of bd_diag2: right of -0.08, nearer than 0.57):
+    the base list is off the top / leaves no flip set and BD_BOARD_SEARCH's grid finds (0.51, -0.10); the table's listed (0.54, -0.10)
+    (= the list's (0.44, -0.10) at its own distance from the edge) is placed from the list, without the grid, and the flip-room fit
+    keeps a listed position at every stand-off."""
+    s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
+
+    def reach(poses, st, arm, **kw):
+        probes.append(st)
+        b = [st.world_to_base(th.as_tensor(p[0])[:2]) for p in poses]
+        return SimpleNamespace(ok=all(float(v[1]) <= -0.08 and float(v[0]) <= 0.57 for v in b))
+
+    s.ikc = SimpleNamespace(exact=reach)
+    cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "1")
+    _, pose, kept = s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
+    b = manip.world_to_base(pose[0][:2])
+    pos = (round(float(b[0]), 2), round(float(b[1]), 2))
+    assert layout_ok(kept) and s._board_on_top(manip, pos[0], pos[1], _half(s), right, -toward)
+    assert pos == (0.54, -0.1) and s.kit.stats["bd_board.table_listed_placed"] == 1 and "bd_board.grid_placed" not in s.kit.stats
+    fit = s._board_fit(init, 0.35, _half(s))
+    assert all(fit.values()) and set(fit) == {f"{so:.2f}" for so in TT.STAND_OFFS}

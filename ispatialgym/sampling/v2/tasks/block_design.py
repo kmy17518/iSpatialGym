@@ -71,6 +71,25 @@ BOARD_GRID_LATERALS = tuple(round(-0.22 + 0.04 * i, 2) for i in range(8))  # -0.
 BOARD_LIST_STAND_OFF = 0.35
 
 
+def board_table_on() -> bool:
+    """i7-blockdesign 2026-11-08 (owner 5m "Board positions"), ``ISPATIALGYM_BD_BOARD_TABLE=1`` (default off), board variants only: the
+    board positions are defined relative to the TABLE and filtered per candidate stance (:meth:`BlockDesign._board_table_plan`), instead
+    of the hand-set base-relative ``generation.board_base_xy_candidates`` (tuned at stand-off ``BOARD_LIST_STAND_OFF``; at 0.45 the near
+    ones fall off the top) and BD_BOARD_SEARCH's base-relative grid. A position is (inset of the board centre from the working edge,
+    lateral from the stance's centre line): the depth is the table's (it holds at every stand-off), the lateral the robot's (the right
+    arm's reach and the flip approaches are set by the centre line, ``_board_position_note``). The listed positions
+    (``generation.board_table_xy_candidates``, else the base list at the stand-off it was set for) come first, then, with
+    BD_BOARD_SEARCH, the table lattice (``BOARD_TABLE_INSETS`` x ``BOARD_GRID_LATERALS``); per stance only those on the top and with
+    the board centre in the base-depth reach window ``generation.board_table_depth_window_m`` are kept. Off: the list (+ the grid)."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_TABLE", "0") == "1"
+
+
+#: BD_BOARD_TABLE: the table lattice's board-centre insets from the working edge (m; on the top from half plate + 1 cm = 0.055) and the
+#: base-depth window of the board centre a stance keeps (the list's nearest 0.44 at stand-off 0.35 .. BD_BOARD_SEARCH's farthest 0.66)
+BOARD_TABLE_INSETS = tuple(round(0.06 + 0.03 * i, 2) for i in range(9))  # 0.06 .. 0.30
+BOARD_TABLE_DEPTH_WINDOW = (0.40, 0.66)
+
+
 def board_early_on() -> bool:
     """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY`` (default on, owner 5m.2; ``0`` = off): the puzzle board's CPU checks
     (on the top, cells kept, the repeated-colour flip set) run before the init -> manipulation travel and before the exact place probe,
@@ -549,6 +568,68 @@ class BlockDesign(SamplerV2):
         grid = [(d, l) for d in BOARD_GRID_DEPTHS for l in BOARD_GRID_LATERALS if (round(d, 3), round(l, 3)) not in listed]
         return sorted(grid, key=lambda p: (round((p[0] - ref[0]) ** 2 + (p[1] - ref[1]) ** 2, 6), p[1], p[0]))
 
+    def _board_table_positions(self) -> List[Tuple[float, float]]:
+        """BD_BOARD_TABLE: the listed board positions as (inset from the working edge, lateral from the centre line), in order:
+        ``generation.board_table_xy_candidates``, else ``board_base_xy_candidates`` at the stand-off they were set for (inset = base depth
+        - ``BOARD_LIST_STAND_OFF``; the edge overhang of the same table cancels)."""
+        tab = self.gen("board_table_xy_candidates", None)
+        if tab:
+            return [(float(e), float(l)) for e, l in tab]
+        return [(round(d - BOARD_LIST_STAND_OFF, 3), l) for d, l in self._board_positions()]
+
+    def _board_table_plan(self, manip: Stance) -> Tuple[List[Tuple[float, float, bool]], Dict[str, int]]:
+        """BD_BOARD_TABLE: the board positions (base depth, lateral, searched) at ``manip``: the listed table positions at the stance's
+        stand-off (base depth = inset + stand-off), then with BD_BOARD_SEARCH the table lattice (base depth = inset + the base's distance
+        to the edge) not listed, nearest first to the first kept listed position (ties to the robot's right), each kept only when the
+        board lies on the top and its centre's base depth is inside ``generation.board_table_depth_window_m``. Returns the plan and the
+        counts (listed / lattice: kept, off the top, out of the window)."""
+        so = float(manip.stand_off) if manip.stand_off is not None else BOARD_LIST_STAND_OFF
+        to_edge = float(manip.edge_depth) if manip.edge is not None else so
+        lo, hi = (float(v) for v in (self.gen("board_table_depth_window_m", None) or BOARD_TABLE_DEPTH_WINDOW))
+        on_top = None
+        if self.top is not None:
+            right, toward, _ = self._table_axes(manip)
+            half = 0.5 * float(self._board_geometry()["plate_m"])
+            on_top = lambda d, l: self._board_on_top(manip, d, l, half, right, -toward)  # noqa: E731
+        n = {"listed": 0, "listed_off_top": 0, "listed_out_of_window": 0, "lattice": 0, "lattice_off_top": 0, "lattice_out_of_window": 0}
+
+        def keep(d: float, l: float, kind: str) -> bool:
+            if not (lo - 1e-6 <= d <= hi + 1e-6):
+                n[kind + "_out_of_window"] += 1
+                return False
+            if on_top is not None and not on_top(d, l):
+                n[kind + "_off_top"] += 1
+                return False
+            n[kind] += 1
+            return True
+
+        listed = [(round(so + e, 3), round(l, 3)) for e, l in self._board_table_positions()]
+        plan = [(d, l, False) for d, l in listed if keep(d, l, "listed")]
+        if board_search_on():
+            ref = (plan[0][0], plan[0][1]) if plan else listed[0]
+            seen = {(d, l) for d, l in listed}
+            lattice = [(round(to_edge + e, 3), round(l, 3)) for e in BOARD_TABLE_INSETS for l in BOARD_GRID_LATERALS]
+            lattice = sorted({p for p in lattice if p not in seen}, key=lambda p: (round((p[0] - ref[0]) ** 2 + (p[1] - ref[1]) ** 2, 6), p[1], p[0]))
+            plan += [(d, l, True) for d, l in lattice if keep(d, l, "lattice")]
+        return plan, n
+
+    def _board_plan(self, manip: Stance, count: bool = True) -> List[Tuple[float, float, bool]]:
+        """The board positions (base depth, lateral, searched) :meth:`_place_board` and :meth:`_board_precheck` try at ``manip``, in order;
+        ``searched`` ones get the CPU tests before each place probe and the probe cap (``generation.board_grid_max_probes``). Default: the
+        list, then BD_BOARD_SEARCH's grid; BD_BOARD_TABLE: :meth:`_board_table_plan` (kit counters ``bd_board.table_*`` when ``count``)."""
+        if not board_table_on():
+            plan = [(d, l, False) for d, l in self._board_positions()]
+            if board_search_on():
+                plan += [(d, l, True) for d, l in self._board_grid(manip)]
+            return plan
+        plan, n = self._board_table_plan(manip)
+        if count:
+            self._kc("bd_board.table_plans")
+            for k, v in n.items():
+                if v:
+                    self._kc("bd_board.table_" + k, v)
+        return plan
+
     def _board_on_top(self, manip: Stance, depth: float, lateral: float, half: float, right: th.Tensor, far: th.Tensor) -> bool:
         """:meth:`_place_board`'s off-the-top test: the four plate corners of the table-aligned board centred ``depth`` ahead of
         and ``lateral`` left of ``manip``'s base lie on free cells of the top (1 cm margin)."""
@@ -565,6 +646,9 @@ class BlockDesign(SamplerV2):
             st = manip.shifted(stand_off=float(so)) if manip is not None else None
             if st is None or not self.kit.trav_free(st.base_xy):
                 out[f"{float(so):.2f}"] = []
+                continue
+            if board_table_on():  # BD_BOARD_TABLE: the listed table positions this stand-off keeps (on the top, in the depth window)
+                out[f"{float(so):.2f}"] = [f"({d:.2f}, {l:+.2f})" for d, l, searched in self._board_table_plan(st)[0] if not searched]
                 continue
             right, toward, _ = self._table_axes(st)
             out[f"{float(so):.2f}"] = [f"({d:.2f}, {l:+.2f})" for d, l in self._board_positions() if self._board_on_top(st, d, l, half, right, -toward)]
@@ -2629,9 +2713,8 @@ class BlockDesign(SamplerV2):
         why: List[str] = []
         k_diag = getattr(self, "_bd_k", -1)
         BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
-        positions = [(d, l, False) for d, l in self._board_positions()]
-        if board_search_on():
-            positions += [(d, l, True) for d, l in self._board_grid(manip)]
+        positions = self._board_plan(manip)
+        table = board_table_on()
         grid_why: Dict[str, int] = {}
         grid_probes, grid_max = 0, int(self.gen("board_grid_max_probes", 12))
         for depth, lateral, on_grid in positions:
@@ -2695,7 +2778,9 @@ class BlockDesign(SamplerV2):
             if layout_ok is not None and cells is not None and not layout_ok(kept):
                 fail(f"{len(kept)} cells clear, no cell set of them lets every repeated-colour block flip", "no flip set")
                 continue
-            if on_grid:
+            if table:
+                self._kc("bd_board.table_lattice_placed" if on_grid else "bd_board.table_listed_placed")
+            elif on_grid:
                 self._kc("bd_board.grid_placed")
                 log.info("%s: BD_BOARD_SEARCH: the board at a grid position (%.2f, %+.2f) of the stance at stand-off %s (%d grid probes; list: %s)", self.gp.variant,
                          float(depth), float(lateral), manip.stand_off, grid_probes, "; ".join(why))
@@ -2704,6 +2789,9 @@ class BlockDesign(SamplerV2):
                      float(geo["rim_top_above_floor_m"]) * 1000, float(self.gen("board_release_bias_m", 0.0035)) * 1000, len(kept), "; ".join(why) or "first candidate")
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
+        if table:
+            self._kc("bd_board.table_failed")
+            why.append(f"table positions at stand-off {manip.stand_off}: {sum(1 for p in positions if not p[2])} listed, {sum(1 for p in positions if p[2])} lattice kept")
         if grid_why.pop("_started", None):
             self._kc("bd_board.grid_failed")
             why.append("grid " + ", ".join(f"{k} {v}" for k, v in sorted(grid_why.items())))
@@ -2738,8 +2826,9 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         why: List[str] = []
-        positions = list(self._board_positions()) + (self._board_grid(manip) if board_search_on() else [])
-        n_list = len(self._board_positions())
+        plan = self._board_plan(manip, count=False)  # the plan's counters come from _place_board
+        positions = [(d, l) for d, l, _searched in plan]
+        n_list = sum(1 for p in plan if not p[2])  # the plan puts the listed positions first
         for i, (depth, lateral) in enumerate(positions):
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
             if i == n_list:
