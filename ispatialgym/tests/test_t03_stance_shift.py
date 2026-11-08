@@ -282,6 +282,33 @@ def test_leaned_board_touch_at_the_lift(monkeypatch, x_min, robot_clear, ok, why
         assert s.kit.stats == {f"shelf_lift.leaned_board_touch_refused.{why}": 1}
 
 
+@pytest.mark.parametrize("cls,why", [([-5e-5, 0.0, 0.01], None), ([-2e-4, 0.0, 0.01], "penetration_start"), ([0.0, -1e-5, 0.01], "penetration"),
+                                     ([-5e-5, 0.01, -1e-6], "penetration"), ([0.0, 0.0], None), ([], "penetration")])
+def test_lift_touch_clearance_rule(cls, why):
+    """(d) touch-rule fix: pose 0 (the resting lean) may read down to -0.1 mm; every later pose keeps >= 0."""
+    assert IS.lift_touch_clearance_why(cls) == why
+
+
+@pytest.mark.parametrize("xs,robot_clear,ok,stats", [
+    ([-5e-5, 0.004, 0.01], True, True, {"shelf_lift.leaned_board_touch_allowed": 1, "shelf_lift.leaned_board_start_contact_allowed": 1}),  # 0.05 mm at pose 0
+    ([-2e-4, 0.004, 0.01], True, False, {"shelf_lift.leaned_board_touch_refused.penetration_start": 1}),  # 0.2 mm at pose 0
+    ([0.0, -1e-5, 0.01], True, False, {"shelf_lift.leaned_board_touch_refused.penetration": 1}),  # below 0 at pose 1
+    ([-5e-5, -5e-5, 0.01], True, False, {"shelf_lift.leaned_board_touch_refused.penetration": 1}),  # the resting depth kept at pose 1
+    ([0.0, 0.0, 0.01, -1e-6], True, False, {"shelf_lift.leaned_board_touch_refused.penetration": 1}),  # below 0 at a later pose
+    ([-5e-5, 0.004, 0.01], False, False, {"shelf_lift.leaned_board_touch_refused.robot_link": 1}),  # robot links: today's rule
+])
+def test_leaned_board_start_contact_at_the_lift(monkeypatch, xs, robot_clear, ok, stats):
+    s, gr = _touch_sampler(monkeypatch, 0.0, robot_clear)
+    q = th.tensor([0.0, 0.0, 0.0, 1.0])
+    monkeypatch.setattr(IS, "lift_object_poses", lambda g, end, eio, n=10: [(th.tensor([x, 0.0, 0.84 + 0.004 * k]), q) for k, x in enumerate(xs)])
+    fail = SimpleNamespace(ok=False, q=None)
+    passing = SimpleNamespace(ok=True, q=th.zeros(28))
+    seq = iter([fail, passing])
+    r = s.lift_with_touch(gr, lambda: next(seq))
+    assert bool(r.ok) is ok
+    assert s.kit.stats == stats
+
+
 def test_leaned_board_touch_switch_off_is_today(monkeypatch):
     s, gr = _touch_sampler(monkeypatch, 0.0)
     monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, "0")
