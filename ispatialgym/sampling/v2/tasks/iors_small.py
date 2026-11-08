@@ -4453,8 +4453,8 @@ class IORSSmall(SamplerV2):
         t_now = self.obj("target").get_position_orientation()
         self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp}, objects={"pre-grasp": ("target", (t_now[0].float(), t_now[1].float()))})
         self.require_in_frame(cam_place, {"pre-place": pre_place, "place": place})
-        if PC.carry_frame_check_on():
-            # i7-framing (owner 2026-11-08 5.1): the lifted carry (the oracle's protective via-above) framed by the fingertip rule
+        if PC.carry_frame_check_on() or PC.carry_torso_lift_on() or PC.carry_band_on():
+            # i7-framing (owner 2026-11-08 5.1 / 5d): the lifted carry (the oracle's protective via-above) framed by the fingertip rule
             self.carry_frame_check(draft, grasp, manip, st_place, lift_end, pre_place, r_lift)
         if self.shelf_tip():
             grasp.extras["place_kind"] = SHELF_TIP_PLACE_KIND  # the program: pick, carry, place (the book tips onto the partner), retreat
@@ -4964,16 +4964,36 @@ class IORSSmall(SamplerV2):
         return float(PC.fingertip_frame_margin(self.kit.world.camera_model, cam, pose)["margin_px"])
 
     def carry_frame_check(self, draft: Draft, grasp: GraspRecord, manip: Stance, st_place: Stance, lift_end: G.Pose, pre_place: G.Pose, r_lift) -> None:
-        """i7-framing (owner decision 2026-11-08 5.1, ``ISPATIALGYM_CARRY_FRAME_CHECK=1``): the fingertips must stay framed (the pre-place's
-        rule, ``program_check.fingertip_frame_margin``) along the oracle's protective via-above of the carry too (``PC.via_above_carry_poses``:
-        rise to max(lift end, pre-place) + 0.12 m, across, down) - the carry the oracle takes when the straight leg passes a protected object
-        (under_small_03 300150: gripper_out_of_fov there, the straight carry framed). When only that arm lift leaves the frame (the straight
-        carry passes) and ``ISPATIALGYM_CARRY_TORSO_LIFT=1``: :meth:`carry_torso_lift` (the torso makes the rise instead - the hand's image
-        position does not change with the trunk) is recorded as ``grasps[].carry_torso``; otherwise ``Reject("gripper_not_in_frame")``.
-        Kit ``framing.carry.checked`` / ``.failed`` / ``.torso_lift_used`` (+ ``.skipped_drive``, ``.torso_lift_failed.<why>``)."""
+        """i7-framing: the fingertips along the oracle's protective via-above of the carry (``PC.via_above_carry_poses``: rise to max(lift end,
+        pre-place) + 0.12 m, across, down - taken when the straight leg passes a protected object; under_small_03 300150: gripper_out_of_fov
+        there, the straight carry framed), judged by the pre-place's fingertip rule. Three switches (all default off; owner 2026-11-08):
+
+        - ``ISPATIALGYM_CARRY_FRAME_CHECK=1`` (5.1, not a default - 5d.1): out of frame -> ``Reject("gripper_not_in_frame")``, unless the
+          torso lift (below) rescues it;
+        - ``ISPATIALGYM_CARRY_TORSO_LIFT=1`` (5.1 / 5d.2): where only the arm lift leaves the frame (the straight carry framed),
+          :meth:`carry_torso_lift` is recorded as ``grasps[].carry_torso`` (the oracle executes it on the via-above); alone it never rejects;
+        - ``ISPATIALGYM_CARRY_BAND=1`` (5d.3, the middle option): the straight carry's NOMINAL protect margin (:meth:`carry_nominal_margin`,
+          ``carry_margin.carry_protect_margin``) picks the band - ``above`` (the lift almost surely does not fire): no check; ``below``
+          (it almost surely fires): the check, out of frame -> reject; ``near``: the torso lift when possible (it costs nothing when the
+          lift does not fire and keeps the frame when it does), else the check.
+
+        Kit ``framing.carry.checked`` / ``.failed`` / ``.skipped_drive`` / ``.torso_lift_used`` / ``.torso_lift_failed.<why>`` /
+        ``.accepted_out`` (torso-only mode, nothing rescued) and ``framing.carry.band.{below,near,above}`` / ``.band.rejected`` /
+        ``.band.torso_lift_used``."""
         if st_place is not manip:
             TT._count(self, "framing.carry.skipped_drive")  # the place is made from another base pose (a carried drive first): not modelled
             return
+        check = PC.carry_frame_check_on()
+        band = None
+        rec: Dict[str, Any] = {}
+        if PC.carry_band_on() and not check:
+            m = self.carry_nominal_margin(grasp, lift_end, pre_place)
+            band = PC.carry_band(m.get("margin_m"))
+            TT._count(self, f"framing.carry.band.{band}")
+            rec["band"] = dict(m, band=band)
+            draft.summary["carry_frame"] = dict(rec)
+            if band == "above":
+                return
         TT._count(self, "framing.carry.checked")
         model, cam = self.kit.world.camera_model, self.camera_pose_at(manip)
         out = PC.first_out_of_frame(model, cam, PC.via_above_carry_poses(lift_end, pre_place))
@@ -4981,20 +5001,54 @@ class IORSSmall(SamplerV2):
             return
         TT._count(self, "framing.carry.failed")
         straight = PC.first_out_of_frame(model, cam, {"straight": list(C.line_waypoints(lift_end, pre_place, PC.CARRY_FRAME_LEG_WAYPOINTS, endpoints=True))})
-        rec: Dict[str, Any] = {"via_above_out": out, "straight_out": straight, "torso_lift": None}
-        if straight is None and PC.carry_torso_lift_on():
+        rec.update({"via_above_out": out, "straight_out": straight, "torso_lift": None})
+        if straight is None and (PC.carry_torso_lift_on() or band == "near"):
             ch, why = self.carry_torso_lift(grasp, manip, lift_end, pre_place, r_lift)
             rec["torso_lift"] = ch if ch is not None else {"failed": why}
             if ch is not None:
                 TT._count(self, "framing.carry.torso_lift_used")
+                if band is not None:
+                    TT._count(self, "framing.carry.band.torso_lift_used")
                 grasp.extras["carry_torso"] = ch
                 draft.summary["carry_frame"] = rec
                 return
             TT._count(self, f"framing.carry.torso_lift_failed.{why}")
         draft.summary["carry_frame"] = rec
-        raise Reject("gripper_not_in_frame", f"lifted carry (the oracle's protective via-above, +{PC.ORACLE_PROTECT_ABOVE_M:.2f} m): fingertip (+2 cm slack) outside "
+        if not check and band is None:
+            TT._count(self, "framing.carry.accepted_out")  # torso-only mode: nothing rescued, nothing rejected (the rule as before)
+            return
+        if band is not None:
+            TT._count(self, "framing.carry.band.rejected")
+        raise Reject("gripper_not_in_frame", f"lifted carry (the oracle's protective via-above, +{PC.ORACLE_PROTECT_ABOVE_M:.2f} m"
+                                             f"{'' if band is None else ', band ' + band}): fingertip (+2 cm slack) outside "
                                              f"the manipulation image at {out['key']} {out['index'] + 1}/{out['n']} (u {out['u']}, v {out['v']}, depth {out['depth_m']} m)"
                                              f"{'' if straight is None else '; the straight carry too'}")
+
+    def carry_nominal_margin(self, grasp: GraspRecord, lift_end: G.Pose, pre_place: G.Pose) -> Dict[str, Any]:
+        """i7-framing 5d.3: the straight carry's nominal protect margin (``carry_margin.carry_protect_margin``) - the carried target's
+        base-aligned collision box (``oracle.protection.object_box``, in its object frame) attached by ``eef_in_object``, the hand box,
+        against the partner's base-aligned box (IORS small's protected goal object; the target is in the hand), along lift end ->
+        [the recorded carry vias] -> pre-place."""
+        import numpy as np
+
+        from ispatialgym.oracle import protection as PROT
+        from ispatialgym.sampling.v2 import carry_margin as CMg
+
+        tgt, par = self.obj("target"), self.obj("partner")
+        tb, pb = PROT.object_box(tgt), PROT.object_box(par)
+        if tb is None or pb is None or grasp.eef_in_object is None:
+            return {"margin_m": float("inf"), "why": "no box"}
+        tp, tq = tgt.get_position_orientation()
+        R_obj = CMg.quat_to_mat(G.t(tq).float().tolist())
+        c_local = R_obj.T @ (np.asarray(G.t(tb[0]).float().tolist()) - np.asarray(G.t(tp).float().tolist()))
+        obj_box = (c_local, np.asarray(G.t(tb[2]).float().tolist()))
+        par_box = (np.asarray(G.t(pb[0]).float().tolist()), np.asarray(G.t(pb[1]).float().tolist()), np.asarray(G.t(pb[2]).float().tolist()))
+        vias = [v for v in (getattr(grasp, "carry", None) or []) if v is not None] if isinstance(getattr(grasp, "carry", None), (list, tuple)) else []
+
+        def pl(p):
+            return [float(v) for v in G.t(p[0]).reshape(-1)], [float(v) for v in G.t(p[1]).reshape(-1)]
+        eio = pl(grasp.eef_in_object)
+        return CMg.carry_protect_margin([pl(lift_end)] + [pl(v) for v in vias] + [pl(pre_place)], eio, obj_box, [par_box])
 
     def carry_torso_lift(self, grasp: GraspRecord, manip: Stance, lift_end: G.Pose, pre_place: G.Pose, r_lift) -> Tuple[Optional[Dict[str, Any]], str]:
         """i7-framing (owner 2026-11-08 5.1, the owner's torso suggestion; ``ISPATIALGYM_CARRY_TORSO_LIFT=1``): the carry's protective rise made

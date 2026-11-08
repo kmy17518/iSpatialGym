@@ -2657,11 +2657,15 @@ def _carry_online(action, motions: Motions, state, arm: str, targets, ctx, carry
 #: i7-framing (owner decision 2026-11-08 5.1, the owner's torso suggestion; default off): ``1`` = the place's protective via-above of the carry
 #: is made by the TORSO when the sampler recorded ``grasps[].carry_torso`` (``IORSSmall.carry_torso_lift``, the same switch name)
 CARRY_TORSO_LIFT_ENV = "ISPATIALGYM_CARRY_TORSO_LIFT"
+#: i7-framing 5d.3: the middle option records the torso lift in its near band, so it executes it too
+CARRY_BAND_ENV = "ISPATIALGYM_CARRY_BAND"
 
 
 def _carry_torso_record(action: Place, ctx: Dict[str, Any]) -> Optional[Tuple[float, float]]:
-    """``(translate, tilt)`` of the held object's ``grasps[].carry_torso`` when ``ISPATIALGYM_CARRY_TORSO_LIFT=1``, else None."""
-    if (os.environ.get(CARRY_TORSO_LIFT_ENV, "") or "0").strip().lower() not in ("1", "on", "true", "yes"):
+    """``(translate, tilt)`` of the held object's ``grasps[].carry_torso`` when ``ISPATIALGYM_CARRY_TORSO_LIFT=1`` or
+    ``ISPATIALGYM_CARRY_BAND=1``, else None."""
+    on = ("1", "on", "true", "yes")
+    if (os.environ.get(CARRY_TORSO_LIFT_ENV, "") or "0").strip().lower() not in on and (os.environ.get(CARRY_BAND_ENV, "") or "0").strip().lower() not in on:
         return None
     sc = ctx.get("sidecar")
     g = next((g for g in (getattr(sc, "grasps", None) or []) if g.object == action.object and getattr(g, "arm", None) in (None, action.arm)), None)

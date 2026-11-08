@@ -145,3 +145,91 @@ def test_oracle_reads_carry_torso_only_with_its_switch(monkeypatch):
     assert EX._carry_torso_record(act, ctx) == (0.5, -0.19)
     g.extra = {}
     assert EX._carry_torso_record(act, ctx) is None
+
+
+# ------------------------------------------------------------------ 5d.3: the middle option (ISPATIALGYM_CARRY_BAND)
+
+def _carry_fake(margin_m, torso=None):
+    """A sampler stand-in for IORSSmall.carry_frame_check at 300150's stance (the via-above out of frame, the straight carry framed)."""
+
+    cam = _head_cam(US03_STANCE["translate"], US03_STANCE["tilt"])
+    s = SimpleNamespace(kit=SimpleNamespace(world=SimpleNamespace(camera_model=HEAD), stats={}), camera_pose_at=lambda st: cam,
+                        carry_nominal_margin=lambda g, a, b: {"margin_m": margin_m},
+                        carry_torso_lift=lambda *a: (torso, "") if torso is not None else (None, "no_trunk"))
+    s.carry_frame_check = IS.IORSSmall.carry_frame_check.__get__(s)
+    st = SimpleNamespace()
+    return s, st, SimpleNamespace(summary={}), SimpleNamespace(extras={})
+
+
+def _clear_switches(monkeypatch):
+    for env in (PC.CARRY_FRAME_CHECK_ENV, PC.CARRY_TORSO_LIFT_ENV, PC.CARRY_BAND_ENV):
+        monkeypatch.delenv(env, raising=False)
+
+
+def test_band_switch_off_is_today(monkeypatch):
+    _clear_switches(monkeypatch)
+    assert not PC.carry_band_on() and not PC.carry_frame_check_on() and not PC.carry_torso_lift_on()
+
+
+def test_band_edges():
+    assert PC.carry_band(None) == "above" and PC.carry_band(float("inf")) == "above"
+    assert PC.carry_band(PC.CARRY_BAND_ABOVE_M + 0.001) == "above"
+    assert PC.carry_band(PC.CARRY_BAND_BELOW_M - 0.001) == "below"
+    assert PC.carry_band(0.5 * (PC.CARRY_BAND_BELOW_M + PC.CARRY_BAND_ABOVE_M)) == "near"
+
+
+def test_band_far_above_is_never_rejected(monkeypatch):
+    _clear_switches(monkeypatch)
+    monkeypatch.setenv(PC.CARRY_BAND_ENV, "1")
+    s, st, draft, g = _carry_fake(PC.CARRY_BAND_ABOVE_M + 0.05)
+    s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)  # out of frame, but the lift will not fire: no check
+    assert s.kit.stats == {"framing.carry.band.above": 1}
+
+
+def test_band_far_below_out_of_frame_is_rejected(monkeypatch):
+    _clear_switches(monkeypatch)
+    monkeypatch.setenv(PC.CARRY_BAND_ENV, "1")
+    s, st, draft, g = _carry_fake(PC.CARRY_BAND_BELOW_M - 0.01, torso={"translate": 0.5, "tilt": -0.19})
+    with pytest.raises(Reject) as e:  # below: the check, no torso rescue
+        s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
+    assert "band below" in str(e.value) and s.kit.stats["framing.carry.band.rejected"] == 1 and "carry_torso" not in g.extras
+
+
+def test_band_near_takes_the_torso_lift_else_the_check(monkeypatch):
+    _clear_switches(monkeypatch)
+    monkeypatch.setenv(PC.CARRY_BAND_ENV, "1")
+    mid = 0.5 * (PC.CARRY_BAND_BELOW_M + PC.CARRY_BAND_ABOVE_M)
+    s, st, draft, g = _carry_fake(mid, torso={"translate": 0.5, "tilt": -0.19})
+    s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
+    assert g.extras["carry_torso"]["translate"] == 0.5 and s.kit.stats["framing.carry.band.torso_lift_used"] == 1
+    s, st, draft, g = _carry_fake(mid, torso=None)
+    with pytest.raises(Reject):
+        s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
+    assert s.kit.stats["framing.carry.torso_lift_failed.no_trunk"] == 1 and s.kit.stats["framing.carry.band.rejected"] == 1
+
+
+def test_torso_only_mode_never_rejects(monkeypatch):
+    _clear_switches(monkeypatch)
+    monkeypatch.setenv(PC.CARRY_TORSO_LIFT_ENV, "1")
+    s, st, draft, g = _carry_fake(None, torso=None)
+    s.carry_frame_check(draft, g, st, st, US03_LIFT, US03_PRE, None)
+    assert s.kit.stats["framing.carry.accepted_out"] == 1 and "framing.carry.band.above" not in s.kit.stats
+
+
+def test_carry_margin_constants_and_geometry():
+    import numpy as np
+
+    from ispatialgym.oracle import protection as PROT
+    from ispatialgym.sampling.v2 import carry_margin as CMg
+
+    assert CMg.INFLATION_M == PROT.INFLATION_M and CMg.ENDPOINT_SLACK_M == PROT.ENDPOINT_SLACK_M
+    down = [1.0, 0.0, 0.0, 0.0]  # x y z w: the approach axis down
+    eio = ([0.0, 0.0, 0.05], [1.0, 0.0, 0.0, 0.0])
+    obj = (np.zeros(3), np.array([0.05, 0.05, 0.01]))
+    box = CMg.world_box(([0.5, 0.0, 0.0], [0, 0, 0, 1]), (np.zeros(3), np.array([0.05, 0.05, 0.05])))
+    high = CMg.carry_protect_margin([([0.0, 0.0, 0.5], down), ([1.0, 0.0, 0.5], down)], eio, obj, [box])
+    low = CMg.carry_protect_margin([([0.0, 0.0, 0.25], down), ([1.0, 0.0, 0.25], down)], eio, obj, [box])  # the hand box passes 2 cm off
+    assert high["margin_m"] > 0.0 and low["margin_m"] < high["margin_m"]
+    through = CMg.carry_protect_margin([([0.0, 0.0, 0.08], down), ([1.0, 0.0, 0.08], down)], eio, obj, [box])  # the object (eef - 5 cm) at 3 cm
+    assert through["margin_m"] < 0.0 and through["interior_min_m"] < 0.0  # passes through the box: the oracle fires
+    assert CMg.carry_protect_margin([([0.0, 0.0, 0.15], down), ([1.0, 0.0, 0.15], down)], eio, obj, [])["margin_m"] == float("inf")
