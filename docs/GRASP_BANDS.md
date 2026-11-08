@@ -2402,13 +2402,35 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   pushed end / spin at the goal root - reach, not the sweep), 3 `brace_ik_failed` (axial_04 magazine, 21.7-21.9 deg: the blades fail the
   left arm's IK at the pre or meet the goal-posed target within 3 mm; all side pads sweep-skipped). The sweep test is monotone in the turn
   on synthetic boxes (a pad clear at 45 deg is clear below it), so the failures at <= 45 deg are reach / goal-pose collisions.
-- **3.4 world_vertical `wall_brace`** (library done, validator / map / sampler not yet): `alignment_wall.WallGeometry` = the task's hang /
-  contact geometry moved verbatim out of `AlignmentWall` (which inherits it: the live brace choice unchanged, test); `contact_library.
-  build_wall_brace` (family `wall_brace`) builds the task's own braces on the level pose at the synthetic spot `WALL_RULE_SPOT`, keyed by
-  the tilt sign, with `goal.clear_delta_max_deg` (the task's `brace_clear` at every grid tilt 5..45 deg up to it) and `load` (the leveling
-  turn past level about the wall normal through the COM hinge). Still to do: a wall world in the validator (a fixed kinematic wall slab,
-  the object on the COM hinge), the wall-frame map kind (base relative to the hinge point and the wall normal), the default-off sampler
-  switch, N 4 on world_vertical 01-05.
+- **3.4 world_vertical `wall_brace`**: `alignment_wall.WallGeometry` = the task's hang / contact geometry moved verbatim out of
+  `AlignmentWall` (which inherits it: the live brace choice unchanged, test).
+  - *Library* (`contact_library.build_wall_brace`, family `wall_brace`): the task's own braces on the level (goal) pose at the synthetic
+    spot `WALL_RULE_SPOT` (wall plane x = 0 facing -x, the HINGE at z 0: a map / the validator add the hinge height), keyed by the tilt
+    sign; the hinge at the collision pieces' volume centroid (`pieces_com`); per entry the task's brace arm / push arm (`wall.brace_arm`:
+    + tilt and - tilt brace with opposite arms), the oracle record's extras (`pose_class` = the kind, `placed_at: goal`, `contact_face`);
+    `goal.clear_delta_min_deg .. clear_delta_max_deg` = the longest contiguous run of grid tilts (5..45 deg) where the task's `brace_clear`
+    holds (148f9fb5: the stop at the goal edge clears the tilted hull more the farther the target is tilted - a small target's brace is
+    clear from 10-20 deg on; the run from 5 deg dropped every license_plate entry); `load` = the leveling push carried on past level (the
+    pushed corner of the 20 deg tilt, its tangent about the COM hinge, 3-D in the wall plane) with the braced point's own direction.
+  - *Validator* (`validate_contacts`): `KitContactWorld`'s wall = a KINEMATIC box (`PUSHER_KINEMATIC`, as the pusher fix; category `walls`
+    so the oracle's `SimState.contact_supports` gives it to the planner as the target's support, as a scene wall); `hang()` replaces the
+    settle: the slab out of reach, the target at its level pose with the hinge at `validate.support_z` (1.45 m), on the task's hinge
+    (`create_hinge` at the PhysX COM about the wall normal, parented to the wall, `AlignmentWall.hinge_resistance` of the variant); the
+    probe and the whole-robot contact policy against the wall. Each entry is validated by ITS brace arm (`wall_arm_entries`; job_contacts
+    `GC_VALIDATE_ARMS="left right"`); the stance relation `wall_brace` from 26 braced demos (contact 0.73-0.86 m ahead, 0.05-0.30 m to the
+    brace arm's side, mirrored for the right arm). The oracle's own Brace runs (closed fist, touch stop, back-off), then the load:
+    `wall_pusher_path` meets the pushed corner on its tangent and drives on so far that the braced point would travel the stop gap + 1 cm
+    unbraced; `judge_wall_brace` = clean oracle run, the braced point along its load <= `brace_hold_max_m`, the hinge axis not twisted off
+    the wall normal, the hand within `brace_eef_drift_m`, no non-finger link loading the wall; `judge_wall_standing` = valid before the load.
+  - *Maps* (`contact_maps` kind `wall_brace`): per stand-off d_e 0.35-0.90 (prompt0's Phase-2 d lattice) the wall box at x = d_e and the
+    hung root's row in front of it (`cell_de`), laterals every 0.05 m over +-0.60, the tucked idle arm, trunk eligibility per d_e, one map
+    per brace arm, valid entries only; `ContactMap.find_near` (the hinge height, no support anchor); the lookup stays in the stand-off's row.
+  - *Sampler* (`ISPATIALGYM_WALL_BRACE_MAP=1`, default OFF): at each stance with push reach the map (brace arm of the drawn tilt sign, at
+    the hinge height) gives the feasible classes (tilt sign + kind + wrist) whose clear range covers |delta| - they replace the reach
+    volume's brace candidates; the stand-off of the row is read from the hung root's position (the patch protrusion and the COM included);
+    the exact two-arm check is unchanged; a missing map keeps the reach-volume rule. Kit `wall_brace_map.hit / miss / stances /
+    stance_feasible / stance_none / reach_volume_kept / reach_volume_none / map_only / reach_only / cover_dropped / written_brace /
+    written_push_only`.
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
@@ -2420,9 +2442,13 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE` read `1` when unset (`=0` turns either off). The axial brace maps the integration root reads are
   the brace34b maps - the clear-turn library plus the opposite-end entries validated as their own group, staged in
   **`$OFH/v2maps_int1_brace34b`: the root to fold into the integration**. Confirmation run: axial_01 / 03 / 04, N 4 v2only on that
-  snapshot and root, no switch in the environment (tag `i7_brace_def`; numbers in DECISIONS).
+  snapshot and root, no switch in the environment: `i7_brace_def` (trunk_59f7967b) 40 att / 12 wr / 10 ok, 0.067 GPU-h per
+  success, brace present 4 / 12 (i7_brace34b with the env switches: 53 / 11 / 10, 4 / 11).
 - **Owner 2026-11-08 (item 5): board_game qgvsnb** - the 14 of 104 blade braces that hold the real load are accepted; board_game mostly
-  runs push-only; no other brace type is searched. Their coverage (per pushed end x spin x turn, from the maps) is in DECISIONS.
+  runs push-only; no other brace type is searched. Coverage from the staged map (`brace_20261108/bgcov.py`; % of (cell, yaw slot, d_e,
+  trunk) problems with a feasible covering class): the 14 current-end entries 3-4 classes / 5.0 % (spin +) and 3.7 % (spin -) for turns
+  20-45 deg, 1-2 classes / 1.5-2.8 % for 50-70 deg (only the yaw 0 / 180 slots' entries clear past 45); with the 14 opposite-end ones
+  7.7 / 6.2 % and 4.4 / 3.1 %.
 
 ## Limitations / not done
 
