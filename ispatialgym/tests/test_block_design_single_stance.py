@@ -126,6 +126,7 @@ def _instance_sampler(gen, reasons):
     s.init_stance = _stance("init")
     s.manip_candidates = [cand, cand.with_trunk(0.75, -0.3)]
     s._flips_expected = lambda: False
+    s._has_board = lambda: False  # no puzzle board: BD_BOARD_EARLY / SEARCH (default on since 5m.2) act on board variants only
     s.sidecar = SimpleNamespace(reset_instance=lambda: None, add_stance=lambda st: None)
     s.world = SimpleNamespace(spawned={}, park=lambda o, i: None)
     s.kit = SimpleNamespace(sync_world=lambda: None)

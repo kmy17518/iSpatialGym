@@ -55,14 +55,14 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 
 
 def board_search_on() -> bool:
-    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_SEARCH=1`` (default off), the board variant only:
+    """i7-blockdesign 2026-11-08 (owner 3, the fix), ``ISPATIALGYM_BD_BOARD_SEARCH`` (default on, owner 5m.2), the board variant only:
     (1) the manipulation candidates on whose region some board position passes the CPU tests (on the top, cells kept, the repeated-colour
     flip set; the list, then the grid) are tried first, in score order, the others after (:meth:`BlockDesign._board_feasible`) - today
     the 6 tried were all at stand-off 0.45 where the list's near positions are off the top, the stand-off 0.35 ones ranked 7+;
     (2) when no position of ``generation.board_base_xy_candidates`` works, a grid of (base depth, lateral) positions
     (:meth:`BlockDesign._board_grid`), the CPU tests before each exact place probe, at most ``generation.board_grid_max_probes`` probes
-    per candidate. Off: the score order and the list alone."""
-    return os.environ.get("ISPATIALGYM_BD_BOARD_SEARCH", "0") == "1"
+    per candidate. Default ON since 2026-11-08 (owner 5m.2); ``0``: the score order and the list alone."""
+    return os.environ.get("ISPATIALGYM_BD_BOARD_SEARCH", "1") == "1"
 
 
 #: BD_BOARD_SEARCH: base depths / laterals (m) of the board grid, and the stand-off the customs positions were set for
@@ -72,10 +72,10 @@ BOARD_LIST_STAND_OFF = 0.35
 
 
 def board_early_on() -> bool:
-    """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY=1`` (default off): the puzzle board's CPU checks
+    """i7-blockdesign 2026-11-08 (owner 3, "faster"), ``ISPATIALGYM_BD_BOARD_EARLY`` (default on, owner 5m.2; ``0`` = off): the puzzle board's CPU checks
     (on the top, cells kept, the repeated-colour flip set) run before the init -> manipulation travel and before the exact place probe,
     and the probe's verdict per (stance, board pose) is kept for the process (the template's stances repeat every attempt)."""
-    return os.environ.get("ISPATIALGYM_BD_BOARD_EARLY", "0") == "1"
+    return os.environ.get("ISPATIALGYM_BD_BOARD_EARLY", "1") == "1"
 
 SUBTASK = "configuration_matching-block_design"
 DEFAULT_FACES = {"+z": "red", "-z": "blue", "+x": "white", "-x": "yellow", "+y": "blue|yellow", "-y": "red|white"}

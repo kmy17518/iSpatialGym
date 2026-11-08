@@ -203,10 +203,13 @@ def test_flip_set_needs_two_flip_cells_with_a_clear_approach_side():
     assert s._flip_plan(sorted(blocked, key=img_score), img_score, faces, manip, init, "right", True) is None
 
 
-def test_board_placement_keeps_a_flip_set():
+def test_board_placement_keeps_a_flip_set(monkeypatch):
     """``_place_board`` takes the first position that also leaves a cell set the layout accepts: at stand-off 0.35 every position is
     on the top; (0.46, -0.02) passes the count of flip cells but leaves candidate 11's cells no set, (0.44, -0.10) keeps one. Without
-    the test the first position is kept, as before; when no position keeps a set the board is not placed."""
+    the test the first position is kept, as before; when no position keeps a set the board is not placed. BD_BOARD_EARLY / SEARCH off
+    (the probe order before them); the defaults (on, 5m.2): the same positions, the first one's probe saved by the layout test."""
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
     s, init, manip, img_score, faces = _layout_scene(stand_off=0.35)
     cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
     probes = []
@@ -231,6 +234,11 @@ def test_board_placement_keeps_a_flip_set():
     with pytest.raises(Reject) as e:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=lambda kept: False)
     assert e.value.reason == "board_placement" and "no cell set of them lets every repeated-colour block flip" in str(e.value)
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY")
+    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_SEARCH")
+    s.kit = SimpleNamespace(trav_free=lambda xy: True, stats={})
+    probes.clear()
+    assert placed_at(layout_ok=layout_ok) == ((0.44, -0.10), 6) and len(probes) == n_probe and s.kit.stats["bd_board.layout_before_probe"] == 1
 
 
 def _early_scene(monkeypatch, stand_off=0.35):
@@ -253,7 +261,8 @@ def test_board_early_runs_the_layout_before_the_probe_and_keeps_the_probe_verdic
     a failed probe's verdict is kept per (stance, board pose) - the next attempt's identical stance runs no IK; off: unchanged."""
     s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch)
     cells = [manip.base_to_world(th.tensor(c)) for c in REGION_11]
-    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")  # the list alone (the grid is BD_BOARD_SEARCH's test)
     with pytest.raises(Reject) as off:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
     n_off = len(probes)
@@ -308,8 +317,8 @@ def test_board_grid_finds_a_position_the_list_misses(monkeypatch):
 
     s.ikc = SimpleNamespace(exact=reach)
     cells = [manip.base_to_world(th.tensor(c)) for c in REGION_12]
-    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_SEARCH", raising=False)
-    monkeypatch.delenv("ISPATIALGYM_BD_BOARD_EARLY", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_SEARCH", "0")
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_EARLY", "0")
     with pytest.raises(Reject) as off:
         s._place_board(manip, right, toward, yaw, list(cells), eligible, 4, None, layout_ok=layout_ok)
     assert "(0.46, -0.02): off the top" in str(off.value) and "grid" not in str(off.value)
