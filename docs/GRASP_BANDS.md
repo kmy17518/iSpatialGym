@@ -3116,6 +3116,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 15 | i7-ft2 (72ebd8a4; carries i7-interior2 eec4ca60, i7-camhull 9e697ac1) | 9b87ede1 | DEFAULT FINGER_TOUCH_HAND_HULLS (owner 7.1), awvzkn sink spec; interior2's owner 6.1-6.3 defaults; registry = union of every spec |
 | 16 | i7-camhull (e939ade6) | 540478e0 | DEFAULT CAMERA_HULL_FALLBACK (lead #5); CAMERA_TOP_HULL_FALLBACK off |
 | 17 | i7-contact3 final (ac2a682d) | 22ae887d | adds only PUSH_LINE_COM (4822246b, lead #9, default off) + docs |
+| 18 | i7-interior2 (3749f69b) | 02ccd615 | INSIDE_ARM_SIDE + stance-C map cap for relation inside only, INSIDE_ARM_SIDE DEFAULT for inside (owner 5i.1 / 5t), opt-in joint_margin_rad; the margin maps not folded (lead #22) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
