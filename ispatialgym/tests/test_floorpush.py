@@ -194,3 +194,31 @@ def test_push_under_annotation_names_the_open_hand():
                            extra={"kind": "push_under", "partner": "desk.n.01_1", **extra})
         fine, numbers = Push(contact=c, base_yaw=0.0).annotate(SimpleNamespace(language=lang))
         assert f"with the {word} right hand" in fine and f"with the {word} right hand" in numbers
+
+
+
+def _turned_box(yaw_deg: float = 20.0) -> th.Tensor:
+    """The briefcase-like box (0.33 x 0.12 x 0.27) turned ``yaw_deg`` about its root: pushed along +x, its back is a corner and a slanted face."""
+    b = PP._box(0.33, 0.12, 0.27)
+    c, s_ = math.cos(math.radians(yaw_deg)), math.sin(math.radians(yaw_deg))
+    return th.stack([c * b[:, 0] - s_ * b[:, 1], s_ * b[:, 0] + c * b[:, 1], b[:, 2]], dim=1)
+
+
+def test_open_palm_test_sees_the_spread_fingers_and_the_empty_middle(monkeypatch):
+    hull = _turned_box(35.0)
+    rear = float(-(hull[:, 0]).min())
+    fc = IL.pitched_open_contact(hull, (1.0, 0.0), 0.074, 0.086)
+    assert fc["off_m"] < rear - 0.005  # the first fingertip meets the slanted face ahead of the rearmost corner
+    q = dict(TT.pitched_hand_quats(60.0, (1.0, 0.0)))["lateral"]
+    so, rise, _ = TT.pitched_tip_offsets(60.0, q, IL.PUSH_UNDER_CLEARANCE_M)
+    eef = th.tensor([-(fc["off_m"] + so), 0.0, 0.08 + rise])
+    closed_gap, _ = IL.pitched_palm_gap(hull, (1.0, 0.0), eef, q)
+    open_gap, part = IL.pitched_palm_gap(hull, (1.0, 0.0), eef, q, open_finger_m=fc["fingers_m"])
+    # the closed-sphere test reads the corner beside the hand (before the fix every open turn read 'the face reaches the finger', fp_open
+    # under_02 2026-11-08); the open hand's spheres meet only the back within their own lateral extent
+    assert closed_gap < 0.0 <= open_gap
+    monkeypatch.setenv(IL.FLOORPUSH_OPEN_ENV, "1")
+    s = _s()
+    s.hull = hull
+    ch = PP._push(s)
+    assert ch["record"]["floorpush"]["variant"] == "open" and ch["half_extent_m"] == pytest.approx(fc["off_m"], abs=1e-6)

@@ -660,21 +660,33 @@ def push_stroke_plan(distance_m: float, stroke_m: float, n_max: int = PUSH_STROK
     return {"n": n, "ends_m": [round(float(distance_m) * k / n, 5) for k in range(1, n + 1)], **{k: round(float(v), 5) for k, v in knobs.items()}}
 
 
-def pitched_palm_gap(pts: th.Tensor, direction_xy, eef_pos, eef_quat) -> Tuple[float, str]:
+def pitched_palm_gap(pts: th.Tensor, direction_xy, eef_pos, eef_quat, open_finger_m: Optional[float] = None) -> Tuple[float, str]:
     """The pitched hand's palm test (owner 2026-10-12 ~20:55 item C): the smallest gap along the push between a sphere of the hand
     (``tabletop.hand_spheres_eef``: gripper body, knuckles, wrist camera, closed fingers) and the object's back at that sphere's height -
     the rearmost of the posed hull ``pts`` (N, 3; the object's root at the origin, heights from its lowest point) within the sphere's
     height band, cross-sections counted (:func:`band_back_offset`) - for the eef pose ``eef_pos`` (relative to the root, z above the object's
     bottom) / ``eef_quat``; and the part it belongs to. The hand leaning away from a vertical face keeps every sphere behind it; a face that
     leans back over the fingertips meets the knuckles or the camera first. A sphere above or below the object is clear. ``(gap, part)``;
-    negative: that part reaches the object."""
+    negative: that part reaches the object. ``open_finger_m`` (i7-floorpush (a), the open hand): each finger's spheres moved that far out
+    along the closing axis (the per-finger joint), and every sphere meets only the object's back within its own lateral extent across the
+    push (the open hand's middle is empty: a rounded end face recedes beside its rearmost point)."""
     d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1]), 0.0], dtype=th.float32)
     d = d / th.linalg.norm(d)
+    n = th.stack([-d[1], d[0]])
     p, R = G.t(eef_pos).float(), C.quat_to_mat(G.t(eef_quat)).float()
     best: Tuple[float, str] = (math.inf, "")
     for part, c, r in TT.hand_spheres_eef():
-        w = p + R @ th.as_tensor(c, dtype=th.float32)
-        back = band_back_offset(pts, d[:2], float(w[2]) - float(r), float(w[2]) + float(r), section=True)
+        c = th.as_tensor(c, dtype=th.float32).clone()
+        if open_finger_m is not None and part == "finger":
+            c[1] = c[1] + math.copysign(float(open_finger_m), float(c[1]))
+        w = p + R @ c
+        if open_finger_m is not None:
+            xy = band_section_xy(pts, float(w[2]) - float(r), float(w[2]) + float(r))
+            lat = xy @ n
+            xy = xy[(lat >= float(w[:2] @ n) - float(r)) & (lat <= float(w[:2] @ n) + float(r))]
+            back = float(-(xy @ d[:2]).min()) if len(xy) else None
+        else:
+            back = band_back_offset(pts, d[:2], float(w[2]) - float(r), float(w[2]) + float(r), section=True)
         if back is None:
             continue
         gap = -back - (float(w @ d) + float(r))
@@ -2043,7 +2055,8 @@ class IORSLarge(SamplerV2):
                     why.append(f"pitch {pitch:.0f} {label}: nothing of the target within the fingertips' band {band[0]:.3f}-{band[1]:.3f} m"
                                + (" (open fingertips)" if open_hand else ""))
                     continue
-                gap, part = pitched_palm_gap(pts, d2, th.tensor([-float(d2[0]) * (off + standoff), -float(d2[1]) * (off + standoff), tip + rise]), q)
+                gap, part = pitched_palm_gap(pts, d2, th.tensor([-float(d2[0]) * (off + standoff), -float(d2[1]) * (off + standoff), tip + rise]), q,
+                                             open_finger_m=None if fc is None else float(fc["fingers_m"]))
                 if gap < 0.0:
                     why.append(f"pitch {pitch:.0f} {label}: the face reaches the {part} ({gap:+.3f} m)")
                     continue
@@ -2052,7 +2065,7 @@ class IORSLarge(SamplerV2):
                 facts = {"wrist_turn": label, "pitch_deg": float(pitch), "fingertip_z_m": float(tip), "push_height_m": float(tip + rise), "half_extent_m": float(off),
                          "standoff_m": float(standoff), "contact_height_m": float(band[1]), "fingertip_band_m": [float(band[0]), float(band[1])],
                          "palm_gap_m": float(gap) if math.isfinite(gap) else None, "palm_part": part or None, "hand_low_m": float(tip - drop),
-                         "fingers": float(fc["fingers_m"]) if fc is not None else C.FINGER_CLOSED, "open": fc}
+                         **({"fingers": float(fc["fingers_m"]), "open": fc} if fc is not None else {})}
                 props.append(O.Proposal(f"pitch {pitch:.0f} {label}{' open' if fc is not None else ''}", len(props), facts, chain))
             if not props:
                 continue
