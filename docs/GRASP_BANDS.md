@@ -2505,6 +2505,40 @@ before any carry: the finger on the saucepot), inside_04 band 1 robot_wobble, un
 fired only in under_small_03 (as the replay's history says: 0 in the other four aliases); the torso carry executed twice (both demos
 ok, the hand back within 1.4 mm of the pre-place in the first run). Defaults unchanged; the owner decides.
 
+### i7-framing 5s (owner decisions 2026-11-08c): the middle band skips, ISPATIALGYM_CARRY_BAND the default
+
+The owner's decisions: **5s.1** `ISPATIALGYM_CARRY_BAND` becomes the default, with one change to its middle band (+2 to +9 mm): use the
+torso lift when possible, otherwise SKIP the check, do not reject (the lift fires in ~5 % of that band's carries, 22 of 410); only
+far-below carries (< +2 mm, 15 % fired) are rejected when they leave the frame. Commit the band change, re-run the replay numbers, then
+the default commit. **5s.2** the standalone `ISPATIALGYM_CARRY_TORSO_LIFT` stays off (nothing done).
+
+**The band change** (40e38218): `IORSSmall.carry_frame_check`, band `near`, the lifted carry out of frame and no torso lift (`no_trunk`
+/ `frame` / `leg_ik` / `sweep_collision` / `no_lift_q`, or the straight carry itself out of frame): accepted, kit
+`framing.carry.band.near_skipped` + `.near_skipped.<why>`, summary `carry_frame.near_skipped`. `below` and `above` unchanged.
+
+**The replay** (`$OFH/framing_20261108/band_table_5s1.py` -> `band_table_5s1.out`; the inputs, margin and torso proxy of
+`band_table.py`): of the 100 out-of-frame carries **4 rejected** (5d.3: 20) = **3 good demos** (5d.3: 14) + **300150** (under_small_03,
+margin +1.5 mm, band below: still caught); near 31 = 15 torso lift + 16 skipped (11 good, 5 other failures; none of the 16 had its lift
+fire); above 65 skipped (unchanged).
+
+**The default** (5a9c191e, its own commit): `program_check.carry_band_on` and `execute._carry_torso_record` read
+`ISPATIALGYM_CARRY_BAND` with default `1` (`0` = the rule before: the lifted carry not looked at, no recorded torso lift executed). The
+torso-only mode (5d.2) is now `CARRY_TORSO_LIFT=1` with `CARRY_BAND=0`. Tests: the band is the default and `0` turns it off; near
+without a torso lift skips; the oracle executes the band's torso lift by default. Suite: 23 failed + 3 errors = the base set (the 40e38218
+run had 5 more, test_split_cone's FileNotFoundError on the stray `tabletop__s__t__apple-x__k.json`; they pass alone).
+
+**Confirmation** (trunk_5a9c191e, shiyuc, titanrtx, v2only N 4 on the round-2 staged root, alias memory off, no extra env = the default;
+the same base indices as round 2; `$OFH/framing_20261108/round3_tab.txt`). att / written / ok, GPU-h per success:
+
+| alias | round 2 band (5d.3) | default (5s.1) |
+|---|---|---|
+| under_small_03 (620000) | 8 / 4 / 4, 0.176; below 1 / near 2 / above 1, torso used 1 (executed, ok), rejected 0 | 21 / 3 / 3, 0.215; below 1 / near 2 / above 1, torso used 1 (executed, ok), lift fired 2, rejected 1 (below: 620002 attempt 7, cross 8/8 out of frame) |
+| inside_04 (620100) | 42 / 4 / 3, 0.349; near 3, rejected 2 (no_trunk) | 32 / 4 / 4, 0.192; above 4 / near 2, **near_skipped 2 (no_trunk), rejected 0**; lift fired 0 |
+
+inside_04's 2 near-band rejections are gone (the same two no_trunk cases now skipped). Out-of-frame demo failures 0 in both.
+under_small_03's 620002 wrote nothing (15 attempts: target_placement 17 - grasp / place reach - and the one below-band reject); the
+near band did not act there (near_skipped 0), so the 8 -> 21 attempts are N 4 sampling variance, not the change.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
