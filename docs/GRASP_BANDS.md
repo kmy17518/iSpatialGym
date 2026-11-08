@@ -2040,8 +2040,29 @@ no random number drawn). It runs over the pick (manipulation) stance candidates 
   - `.reordered`: moved to the end;
   - `.explored`: kept in place by the draw / floor;
   - besides `.no_down`, `.down_bins`, `.deferred`, `.kept_down`, `alias_memory.mode.<mode>` and `alias_memory.mode_mismatch`.
-- Not covered: the other tabletop families (attachment, block design, alignment, disembedding, articulation large / hybrid) keep
-  their order.
+- Extended to every family with a pick-stance choice (lead decision 2026-11-08 on 2.3; bedf8e2e):
+  - attachment, block design, alignment axial, disembedding: `reorder_pick` at their manipulation candidate ordering, after the
+    family's own score or permutation and before its cut to the first 6;
+  - articulation large and alignment wall (world vertical): `prompt0.draw_manipulation(memory_arm=...)`. The uniform Phase-2 draw
+    leaves out the survivors this call defers (`pick_draw_pool`). With only flagged survivors left it draws among them as before;
+    memory off or nothing flagged gives the same draw.
+  - A drawn stance is keyed by its grid trunk: the sidecar's `grid_tilt`, the choice the hook makes. The drawn tilt itself is
+    continuous.
+  - articulation hybrid: no stance choice of its own. The hybrid follow plans from articulation large's drawn stance.
+  - The hook sits at the candidate ordering only, not at the start-base draw (i7-startdraw).
+- Replay of the same 2,375 demos with rows recomputed from the job dirs (`$OFH/memory2_20261108/families`, CPU 18379422): the
+  new families have pick evidence but no flagged bin in either mode:
+  - attachment 87 attributed demos / 8 failed;
+  - alignment axial 78 / 32, spread over 22 trunk bins;
+  - disembedding 138 / 12;
+  - articulation large 52 / 5;
+  - world vertical 33 / 0.
+  - The totals are unchanged: production 10 later flagged / 9 failed, validation 10 / 8.
+- Block design has no demo in `$OFH/out`: every attempt rejects at `target_placement`.
+  - GPU check `i7_mem2_bd` (block_design_01, v2only, validation, trunk_bedf8e2e, slurm 18379435): 60 attempts, 0 written (all
+    `target_placement`), 0.46 GPU-h.
+  - The hook site runs: `alias_memory.no_alias_file` 60, `mode.validation` 60, no error.
+  - The memory learns only from written demos, so the block-design hook stays inert until its sampler writes one.
 
 **Replay outputs:** `$OFH/memory2_20261108` (`replay_production`, `replay_validation`), from CPU job 18377645 on trunk_52621543.
 
