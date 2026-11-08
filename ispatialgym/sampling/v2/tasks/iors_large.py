@@ -689,6 +689,38 @@ def offset_yaw(yaw0: float, y_off: float, dist: float) -> float:
     return yaw0 + math.asin(-y_off / dist)
 
 
+#: i7-goalmaps 2026-11-08 (lead decision, touching_large_02's umbrella carry): opt-in ``ISPATIALGYM_CARRY_CENTRED=1`` (default off) - the carry
+#: pose candidates of :meth:`IORSLarge.carry_poses_at_b` start with :data:`CARRY_CENTRED_POSES`: the hand in front of the body, its lateral
+#: chosen so that the CARRIED OBJECT's centre (its hull's bounding-box centre) lies on the base's centre line. The beside-the-body poses
+#: (CARRY_POSES, the hand 0.35-0.45 m to the arm's side) hold a long object held across the heading (the umbrella, 0.82 m, released along
+#: the hall tree's board) out to ~0.85 m on that side: gm_t02_umb2 / umb2s + PATH_BLAME, every carry with the hand >= 0.3 m to the side
+#: failed its B -> C path (~800 of 800; the umbrella or the gripper against standing_mirror_wwkuuf_0 / the walls), the hand within 0.1 m of
+#: the centre line passed 8 of 11. The same exact checks judge them (the head camera frame from B, the exact IK with the object attached,
+#: the in-hand line from the lift, the carried path); only the order and the extra candidates change. Kit counters carry_pose.centred_offered
+#: / carry_pose.centred_used.
+CARRY_CENTRED_ENV = "ISPATIALGYM_CARRY_CENTRED"
+#: (ahead, raise above the lift) of the centred carry poses, tried in this order (0.45-0.55 m ahead: nearer folds the elbow, 0920-071230)
+CARRY_CENTRED_POSES: Tuple[Tuple[float, float], ...] = ((0.50, 0.10), (0.45, 0.15), (0.55, 0.05), (0.50, 0.20))
+
+
+def carry_centred_on() -> bool:
+    return os.environ.get(CARRY_CENTRED_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
+def centred_hand_lateral(eef: Any, eef_in_object: Any, hull_local: Optional[th.Tensor], left: th.Tensor) -> float:
+    """The hand's lateral offset (along ``left``, the base's +y) that puts the carried object's centre on the base's centre line: minus the
+    lateral of (object hull's bounding-box centre - eef position), the object posed from the eef by the grasp (``eef_in_object`` =
+    T_obj->eef). Without a hull: the object's root."""
+    obj = G.compose((G.t(eef[0]).float(), G.t(eef[1]).float()), G.invert((G.t(eef_in_object[0]).float(), G.t(eef_in_object[1]).float())))
+    if hull_local is not None and len(hull_local):
+        pts = G.local_points_world(hull_local.float(), obj)
+        centre = 0.5 * (pts.min(dim=0).values + pts.max(dim=0).values)
+    else:
+        centre = G.t(obj[0]).float()
+    d = (centre[:2] - G.t(eef[0]).float()[:2])
+    return -float(d @ G.t(left).float()[:2])
+
+
 def carry_poses_for(poses: Sequence[Sequence[Any]], arm: str) -> List[Tuple[float, Optional[float], float]]:
     """``CARRY_POSES`` / ``generation.carry_poses`` (ahead, lateral, raise) for ``arm``: the lateral beside the body on the arm's side
     (the right arm's -0.35..-0.45 m positive for the left arm); None (= the lift's lateral) kept."""
@@ -3382,7 +3414,12 @@ class IORSLarge(SamplerV2):
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
         why: List[str] = []
-        for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm):
+        cands = [(ahead, lat, raise_m, False) for ahead, lat, raise_m in carry_poses_for(self.gp.gen("carry_poses") or self.CARRY_POSES, arm)]
+        if carry_centred_on():  # i7-goalmaps (lead decision): the object centred on the body's centre line first (CARRY_CENTRED_ENV)
+            lat_c = centred_hand_lateral(lift, eef_in_object, self.hull, left)
+            cands = [(a, lat_c, r, True) for a, r in CARRY_CENTRED_POSES] + cands
+        self._carry_centred_n = 0
+        for ahead, lat, raise_m, centred in cands:
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
@@ -3405,6 +3442,9 @@ class IORSLarge(SamplerV2):
                 why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx[arm]].clone()))
+            if centred:
+                self._carry_centred_n += 1
+                TT._count(self, "carry_pose.centred_offered")
         log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.variant, carry_height,
                  [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
@@ -5249,9 +5289,12 @@ class IORSLarge(SamplerV2):
                     grasp.carry_height = h
                     # carry pose candidates (beside the body first), the plain lift configuration last
                     options: List[Tuple[str, Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]]] = []
+                    self._carry_centred_n = 0
                     if str(self.gp.gen("carry_pose", "on")) != "off":
                         options += [(f"carry pose {[round(float(v), 2) for v in P0.to_base_frame(cp[0][0], manip.base_pose2d, P0.base_z(self)).tolist()]}", cp)
                                     for cp in self.carry_poses_at_b(pick_st, eef, h, target, g.pose)]
+                    n_centred = int(getattr(self, "_carry_centred_n", 0) or 0)  # the first n options are centred carry poses (CARRY_CENTRED_ENV)
+                    options = [(("centred " + lb) if i < n_centred else lb, cp) for i, (lb, cp) in enumerate(options)]
                     options.append(("lift configuration", None))
                     for label, cp in options:
                         if cp is not None:
@@ -5282,6 +5325,8 @@ class IORSLarge(SamplerV2):
                                 self.record_carry_arm_q(tname, arm, None)
                                 continue
                         log.info("%s: carry with lift %.2f m at the %s%s", self.gp.variant, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                        if label.startswith("centred "):
+                            TT._count(self, "carry_pose.centred_used")
                         break
                     if path_bc is not None:
                         break
