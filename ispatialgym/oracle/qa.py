@@ -656,8 +656,17 @@ class Monitors:
         tr = self.transit
         lab = tr.get("label") or {}
         hx = tr.get("hold_exempt")
+        braced = self._brace_protect_allowed()
         for own_link, name in sorted(self._protected_pairs() - tr["exempt"]):
             if hx is not None and own_link in hx[0] and name == hx[1]:
+                continue
+            if braced and any(own_link in links and name == obj for links, obj in braced):
+                # owner 5r.2: the active brace's own finger / object pair (brace_allowed) during the other arm's move
+                if (own_link, name) not in tr.setdefault("brace_allowed_seen", set()):
+                    tr["brace_allowed_seen"].add((own_link, name))
+                    self.stats.event("protect_brace_allowed")
+                    log.info("PROTECT run-check: %s on the braced %s allowed during the %s (brace_allowed, %s; step %d)", own_link, name,
+                             lab.get("leg") or "transit", BRACE_PROTECT_SWITCH, self.episode_steps)
                 continue
             ev = {"check": "run", "kind": "contact", "task": lab.get("task"), "action": lab.get("action"), "index": lab.get("index"), "leg": lab.get("leg"),
                   "object": name, "link": own_link, "step": self.episode_steps}
@@ -680,6 +689,23 @@ class Monitors:
                 log.warning("PROTECT run-check fired: task=%s action=%s[%s] leg=%s object=%s moved %.1f mm during the transit (step %d)", ev["task"], ev["action"], ev["index"], ev["leg"], o.name, d * 1000, self.episode_steps)
                 return self._verdict("protected_moved", f"the protected {o.name} moved {d * 1000:.1f} mm during the {lab.get('leg') or 'transit'}", object=o.name, moved_m=d, leg=lab.get("leg"))
         return None
+
+    def _brace_protect_allowed(self) -> List[Tuple[set, str]]:
+        """Owner 5r.2 (2026-11-08, an oracle QA rule; :data:`BRACE_PROTECT_SWITCH`, default off): the ``allowed`` pairs of the running action -
+        ``Executor.brace_allowed_pairs``, the active braces' finger / gripper links on the object each braces, set by ``begin_action`` only while
+        a brace's span contains the action - count as allowed in the protected-contact run-check, limited to the pairs of a brace arm that is not
+        moving in this action (the other arm's move). Nothing else changes: no active brace = no pairs; every other pair keeps its rule; the
+        movement check is unchanged. Off: ``[]``."""
+        if os.environ.get(BRACE_PROTECT_SWITCH, "") != "1":
+            return []
+        allowed = getattr(self, "allowed", None) or []
+        if not allowed:
+            return []
+        moving = set()
+        for arm in getattr(self, "arms", ()) or ():
+            moving.update(M.FINGER_LINKS[arm])
+            moving.add(M.GRIPPER_LINK[arm])
+        return [(set(links) - moving, obj) for links, obj in allowed if set(links) - moving]
 
     def _check_collision(self) -> Optional[Verdict]:
         robot_prefix = self.robot.prim_path + "/"
@@ -1135,6 +1161,9 @@ class RootWatch:
 #: cuRobo spheres >= 16.8 mm apart, the pair not in r1pro.yaml's disabled_collision_pairs) - a collision-mesh artifact, not a fold
 ELBOW_GRAZE_PAIRS: Tuple[Tuple[str, str], ...] = tuple(tuple(sorted((f"{arm}_arm_link3", f"{arm}_arm_link5"))) for arm in ("left", "right"))
 SELF_EXCLUDE_SWITCH = "ISPATIALGYM_QA_SELF_EXCLUDE_ELBOW"
+#: owner 5r.2 (2026-11-08, i7-contact3; close_02 300006): "1" = while a brace is active, the finger / object pairs its ``brace_allowed`` lists
+#: count as allowed in the protected-contact run-check during the other arm's move (:meth:`Monitors._brace_protect_allowed`); default off
+BRACE_PROTECT_SWITCH = "ISPATIALGYM_QA_BRACE_PROTECT_ALLOWED"
 
 
 def self_excluded_pairs() -> List[Tuple[str, str]]:
