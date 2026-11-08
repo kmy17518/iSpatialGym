@@ -2411,6 +2411,47 @@ open_decisions_20261108" and "LEAD ROUTING"). Each implemented item is documente
 | 8.1 | the two decrypted B1K USDs in the lead's scratchpad deleted | - |
 | 9.x | touching_03 (i7-t03): not yet answered; switches stay off, branch unmerged | - |
 
+## Floor pushes under the desk: under_large_02 / 03 (branch `i7-floorpush`, 2026-11-08; owner decision item 5)
+
+Owner decision 2026-11-08 (verbatim in the lead's scratchpad `owner_20261108f.md`, item 5; DECISIONS "OWNER DECISIONS on
+open_decisions_20261108b"): diagnose the pitched floor push first (CPU, from the existing demos), then the approved oracle push-program
+variants (a) open gripper, (b) both grippers, (c) strokes of at most 0.05 / 0.10 m with re-aim, (d) a lower contact height - each behind
+its own switch, limited to these floor-push aliases, an N 4 v2only A/B per variant vs today on the same indices and backend; defaults
+after the owner sees it. Record: `$OFH/DECISIONS.md` "(i7-floorpush)" lines, `$OFH/floorpush_20261108/`.
+
+### Diagnosis (the 15 demos with a push: int1_1, i7_floor, i7_floorfix, i7diag_floor)
+
+- **The hand**: `push_under_hand` pitched_far, pitch 60, wrist turn "lateral" (closing axis across the push, the two closed fingers side by
+  side, ~17 mm wide), finger joints 0 through the push, fingertips 0.080 m up, contact (band top) 0.086 m. Centre of mass 0.114 m (the
+  briefcase lwbctq: 0.27 m tall on its 0.12 x 0.33 m edge, pushed along its long axis onto the 0.12 m end face) / 0.139 m (the round
+  ashcan jlawet): the contact is already below the centre of mass.
+- **Push line vs centre of mass**: at the first object motion the hand is -10.5..+4.0 mm (briefcase) / +0.3..+6.9 mm (can) lateral of
+  the object's centre (the record has a `mid`, so the oracle's `push_recentre` never runs).
+- **Where the rotation starts**: at contact, in the first 1-2 cm, growing with the travel (an unstable point push). Briefcase failures:
+  yaw 2-9 deg after 2 cm, 4-11 after 5 cm, 8-19 after 10 cm (the ok demo 0.6 / 1.2 / 2.1); the hand slides along the end face to its corner
+  and passes the briefcase (the hand ends 0.115-0.141 m farther along), the residual 0.108-0.132 m exceeds the re-push cap (0.10 m): the 5
+  not_reached. One briefcase toppled at the corner. Ashcan: the position is reached (<= 3 mm) but the yaw grows to 19-41 deg (ok 6):
+  symbolic_only under `pose_reached`'s full orientation (0.15 rad) - while `placed_orientation` already treats the push-under yaw as free
+  and the can is round (an owner question; not changed).
+- **protected_contact** (under_03, 2 of 4 on the integration tip): the transit from the drop's retreat round the can to the push's
+  pre-contact, planned with the can left out (its witness within 10 mm of the can's box), via-above failed, `right_arm_link7` touches the
+  can at its side. Not the push; none of (a)-(d) changes it.
+- **(b) kinematic pre-check** (CPU, URDF FK with joint limits, no collisions; 13 right-arm stances C): the other hand's pitched pose
+  0.05-0.12 m beside the push line is missed by 0.27-0.54 m - the push lane sits 0.25-0.31 m to the push arm's side.
+
+### The switches (b46be8a3; default off, acting only on the pitched hand of the under relation)
+
+| switch | variant | what it changes | fall-back | counters / record |
+|---|---|---|---|---|
+| `ISPATIALGYM_FLOORPUSH_OPEN=1` | (a) | the lateral turns with the gripper open: both fingertips across the back (`pitched_open_contact`: gap 60 % of the band's width, <= 8 cm); IK, pinned check, goal check, program check and oracle at that opening (`push_contact_form` two_point, `fingers_opening_m`); one stroke | today's closed chain | `floorpush.open.chain / unsolved`; `contacts.push.floorpush.variant` |
+| `ISPATIALGYM_FLOORPUSH_BOTH=1` | (b) | probes the other arm's chain 0.06 / 0.09 / 0.12 m beside (exact IK from stance C); no two-hand oracle push is built | always one hand | `floorpush.both.probe / feasible / infeasible`; `floorpush.both` |
+| `ISPATIALGYM_FLOORPUSH_STROKE_M=<m>` | (c) | the existing strokes (`execute._push_strokes`) for the pitched hand: hold, measure, back off 3 cm, re-aim <= 3 cm at the root line + 0.15 m/rad x yaw beyond 2 deg (`ISPATIALGYM_FLOORPUSH_YAW_GAIN`), <= 8 strokes (`_STROKES_MAX`); the hand's `face_half_m` / `contact_strips_m` | - | `floorpush.strokes.recorded`; `strokes` |
+| `ISPATIALGYM_FLOORPUSH_TIP_M=<m>` | (d) | the fingertips this high (0.05: contact ~0.056 m) | today's 0.08 m | `floorpush.low_tip.chain / unsolved` |
+
+### A/B (fp_today / fp_open / fp_s05 / fp_s10 / fp_tip / fp_both; trunk_b46be8a3, N 4 v2only, index 350000, svl titanrtx)
+
+Results: see the "(i7-floorpush) C A/B" line in DECISIONS (filled when the runs end).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
