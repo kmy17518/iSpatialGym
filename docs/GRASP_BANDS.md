@@ -2415,6 +2415,18 @@ was drafted. With the cap on, target_placement drops from 45 to 7 and each remov
 all their candidates, and written stays 4 / 4 (0.56 vs 0.66 GPU-h per success). Proposed fix, within 3.6's scope and for i7-contact3:
 limit the drawn start / place depth to the cap, instead of only filtering on it.
 
+What the cap explains (shadow arm, kit counters joined per attempt, `scripts/oracle_fix/diag_t04_pdc_att.py`): 30 of 45 target_placement
+attempts tried only over-cap candidates. Of 155 candidates tried, 123 were over the cap (all failed) and 32 under it. Applied to int1_7,
+that is about 2/3 of its 94 target_placement attempts. The remainder, as seen in the on arm (7 attempts):
+
+- the place from the push stance fails exact IK, all at trunk (0.25, -0.53);
+- the A1 gate finds no collision-free push stance, all at trunk (0.0, -0.61).
+
+Both are stance tilts the maps are not built at, so the inherited columns and the cap's reach are optimistic there. The largest remaining
+cost is outside target_placement: lift_unreachable (7-9 per run, 74-303 s each). Each is the 0.31 m carry lift for the drive to the push
+stance, which is only checked in goal_check. Proposed, none implemented: screen that lift at the draw; put the cap and the gate on the
+same basis, or keep touching trunks on built tilts; draw the depth within the cap.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
