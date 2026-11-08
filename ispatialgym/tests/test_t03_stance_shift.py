@@ -6,6 +6,8 @@ stance. Simulator-free."""
 import math
 from types import SimpleNamespace
 
+import numpy as np
+
 import pytest
 import torch as th
 
@@ -141,3 +143,163 @@ def test_failures_the_base_cannot_change_are_not_shifted(monkeypatch):
     assert IS.shelf_need_of(Reject("no_transition", "init -> manipulation: no s_T")) is None
     assert IS.shelf_need_of(Reject("no_transition", "shelf back-off: no s_T >= 0.75")) == "transit"
     assert IS.reach_branch(3.52) == "flipped" and IS.reach_branch(1.48) == "near" and IS.reach_branch(None) == "-"
+
+
+# ----------------------------------------------------------------------------------------------- round 2 (owner 2026-11-08): (a) / (b) / (d)
+
+def test_round2_switches_default_off(monkeypatch):
+    for env in (IS.SHELF_FREE_START_ENV, IS.SHELF_JOINT_STANCE_ENV, IS.SHELF_LIFT_STRAIGHTEN_ENV):
+        monkeypatch.delenv(env, raising=False)
+    assert not IS.shelf_free_start_on() and not IS.shelf_joint_stance_on() and not IS.shelf_lift_straighten_on()
+
+
+def test_free_start_keeps_an_edge_stance_that_frames_both_books(monkeypatch):
+    s = _sampler()
+    s.shelf_partner_pose = BOOK
+    s.books_in_frame = lambda st, cam=None: True
+    init = _cand(-0.465)
+    assert s.shelf_free_start(np.random.default_rng(0), init) is init and s.kit.stats == {"free_start.edge_ok": 1}
+
+
+def test_free_start_falls_back_to_the_free_floor_draw(monkeypatch):
+    from ispatialgym.sampling.v2.tasks import iors_large as IL
+
+    s = _sampler()
+    s.shelf_partner_pose = BOOK
+    s.books_in_frame = lambda st, cam=None: getattr(st, "name", "") == "free"
+    seen = {}
+
+    def fake(s_, c_xy, focus, view_ok, rng, cfg=None, what=""):
+        st = Stance("free", (0.0, 1.0, -1.57), 0.25, 0.0, 1.2)
+        seen["view"] = view_ok(st, None)
+        st.extras["free_start"] = True
+        return st
+
+    monkeypatch.setattr(IL, "free_floor_stance", fake)
+    st = s.shelf_free_start(np.random.default_rng(0), _cand(-0.065))
+    assert st.name == "init" and st.extras["free_start"] and seen["view"] and s.kit.stats == {"free_start.used": 1}
+    monkeypatch.setattr(IL, "free_floor_stance", lambda *a, **k: (_ for _ in ()).throw(Reject("no_stance", "none")))
+    init = _cand(-0.065)
+    assert s.shelf_free_start(np.random.default_rng(0), init) is init and s.kit.stats["free_start.failed.no_stance"] == 1
+
+
+@pytest.mark.parametrize("release_ok,want", [(True, "both_passed"), (False, "grasp_only")])
+def test_joint_stance_prefers_grasp_and_release(monkeypatch, release_ok, want):
+    monkeypatch.setenv(IS.SHELF_JOINT_STANCE_ENV, "1")
+    monkeypatch.delenv(IS.SHELF_STANCE_SHIFT_ENV, raising=False)
+    s = _sampler()
+    s.shelf_release_why = lambda st, g: None if release_ok else "clear pose: exact IK failed"
+    s.sidecar = SimpleNamespace(transitions=[])
+    cand = _cand(-0.465)
+    g = SimpleNamespace(extras={})
+    st, g1 = s.shelf_fixed_start(None, cand, cand, "left", lambda m, again=False: g)
+    assert st is cand and g1 is g and s.kit.stats == {f"stance_shift.{want}": 1}
+
+
+def test_joint_stance_takes_a_shifted_stance_that_does_both(monkeypatch):
+    monkeypatch.setenv(IS.SHELF_JOINT_STANCE_ENV, "1")
+    monkeypatch.setenv(IS.SHELF_STANCE_SHIFT_ENV, "1")
+    s = _sampler()
+    cand = _cand(-0.465)
+    s.shelf_release_why = lambda st, g: None if st is not cand else "clear pose: exact IK failed"
+    s.sidecar = SimpleNamespace(transitions=[])
+    st, g1 = s.shelf_fixed_start(SimpleNamespace(name="init"), cand, cand, "left",
+                                 lambda m, again=False: SimpleNamespace(grasp_name="g", extras={"shelf_transit": {"reach_rad": 1.4}}))
+    assert st is not cand and st.extras["stance_shift"]["release"] == "ok" and s.kit.stats["stance_shift.both_passed"] == 1
+
+
+def test_shortest_arc_straightens_a_lean():
+    lean = 0.35  # 20 deg about the edge's depth axis
+    q = th.tensor([math.sin(lean / 2), 0.0, 0.0, math.cos(lean / 2)])
+    from ispatialgym.sampling import geometry as G
+
+    up = G.rotate(q, th.tensor([0.0, 0.0, 1.0]))
+    t = IS.shortest_arc(up, th.tensor([0.0, 0.0, 1.0]))
+    assert float(th.linalg.norm(G.rotate(t, up) - th.tensor([0.0, 0.0, 1.0]))) < 1e-5
+    assert 2 * math.acos(float(t[3])) == pytest.approx(lean, abs=1e-5)
+
+
+def test_straightened_lift_path_stays_inside_the_headroom():
+    from ispatialgym.sampling import geometry as G
+
+    hull = th.tensor([[x, y, z] for x in (-0.02, 0.02) for y in (-0.08, 0.08) for z in (0.0, 0.22)])  # a 22 cm book, origin at its bottom
+    lean = 0.35
+    q_lean = th.tensor([math.sin(lean / 2), 0.0, 0.0, math.cos(lean / 2)])
+    eio = (th.tensor([0.0, 0.0, 0.15]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    obj0 = (th.tensor([0.0, 0.0, 0.84]), q_lean)
+    grasp_pose = G.compose(obj0, eio)
+    turn = IS.shortest_arc(G.rotate(q_lean, th.tensor([0.0, 0.0, 1.0])), th.tensor([0.0, 0.0, 1.0]))
+    end = (G.t(grasp_pose[0]) + th.tensor([0.0, 0.0, 0.04]), G.qmul(turn, G.t(grasp_pose[1])))
+    poses = IS.lift_object_poses(grasp_pose, end, eio)
+    up_end = G.rotate(G.t(poses[-1][1]), th.tensor([0.0, 0.0, 1.0]))
+    assert float(up_end[2]) == pytest.approx(1.0, abs=1e-4)  # upright at the end
+    top = max(float(G.local_points_world(hull, p)[:, 2].max()) for p in poses)
+    assert IS.lift_headroom_m(hull, poses, top + 0.01) == pytest.approx(0.01, abs=1e-6)
+    assert IS.lift_headroom_m(hull, poses, top - 0.01) < 0  # a lower board above: the turn is refused (shelf_lift.no_headroom)
+
+
+def _touch_sampler(monkeypatch, book_x_min, robot_clear=True):
+    from ispatialgym.sampling.v2 import support_split as SS
+
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, "1")
+    s = _sampler()
+    sup = SimpleNamespace(name="bookcase_kmuacd_0")
+    s.obj = lambda role: sup
+    monkeypatch.setattr(SS, "_pieces", lambda o: [("/board", object())])
+    hull = th.tensor([[x, y, z] for x in (0.0, 0.03) for y in (-0.08, 0.08) for z in (0.0, 0.22)])
+    s.hull = {"target": hull}
+    s.support_objects = lambda: []
+    calls = {"n": 0, "ign": []}
+
+    @__import__("contextlib").contextmanager
+    def ignoring(objs, split=True):
+        calls["ign"].append([getattr(o, "name", "") for o in objs])
+        yield
+
+    class Plane:
+        def sdf(self, p):
+            return th.as_tensor(p)[..., 0] - 0.0  # the board is x <= 0: distance = x
+
+    s.ikc = SimpleNamespace(ignoring=ignoring, _pieces_geometry=lambda sp, only=None: Plane(), _non_finger_links=lambda arm: ["left_arm_link5", "attached_object_left_eef_link"])
+    s.kit.links_clear = lambda q, links, m: th.tensor([robot_clear])
+    eio = (th.tensor([0.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    gr = SimpleNamespace(arm="left", grasp=(th.tensor([book_x_min, 0.0, 0.84]), th.tensor([0.0, 0.0, 0.0, 1.0])), carry_height=0.04, eef_in_object=eio,
+                         extras={"lift_leaned_piece": "/board"})
+    return s, gr
+
+
+@pytest.mark.parametrize("x_min,robot_clear,ok,why", [(0.0, True, True, None), (-0.002, True, False, "penetration"), (0.0, False, False, "robot_link")])
+def test_leaned_board_touch_at_the_lift(monkeypatch, x_min, robot_clear, ok, why):
+    s, gr = _touch_sampler(monkeypatch, x_min, robot_clear)
+    fail = SimpleNamespace(ok=False, q=None)
+    passing = SimpleNamespace(ok=True, q=th.zeros(28))
+    seq = iter([fail, passing])
+    r = s.lift_with_touch(gr, lambda: next(seq))
+    assert bool(r.ok) is ok
+    if ok:
+        assert s.kit.stats == {"shelf_lift.leaned_board_touch_allowed": 1}
+    else:
+        assert s.kit.stats == {f"shelf_lift.leaned_board_touch_refused.{why}": 1}
+
+
+def test_leaned_board_touch_switch_off_is_today(monkeypatch):
+    s, gr = _touch_sampler(monkeypatch, 0.0)
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, "0")
+    fail = SimpleNamespace(ok=False, q=None)
+    assert s.lift_with_touch(gr, lambda: fail) is fail and s.kit.stats == {}
+
+
+def test_oracle_lift_turn_and_the_sampler_lift_end_agree():
+    from ispatialgym.oracle import actions as A
+    from ispatialgym.oracle.sidecar import Pose
+    from ispatialgym.sampling.v2 import program_check as PC
+
+    turn = [math.sin(0.175), 0.0, 0.0, math.cos(0.175)]
+    start = Pose([0.1, 0.2, 0.9], [0.0, 0.0, 0.0, 1.0])
+    lift = A.Lift(arm="left", object="book", carry_height=0.04, after=None, away=[0.03, 0.0, 0.0], turn=turn)
+    _, end = lift._segment(None, SimpleNamespace(eef_pose=lambda arm: start))
+    g = SimpleNamespace(grasp=(start.position, start.orientation), carry_height=0.04, extras={"lift_away": [0.03, 0.0, 0.0], "lift_turn": turn})
+    p, q = PC.lift_end_pose(g)
+    assert end.position == pytest.approx([0.13, 0.2, 0.94]) and list(p) == pytest.approx(end.position, abs=1e-6)
+    assert list(q) == pytest.approx(end.orientation, abs=1e-6)
+    assert A.Lift(arm="left", object="book", carry_height=0.04, after=None)._segment(None, SimpleNamespace(eef_pose=lambda arm: start))[1].orientation == [0.0, 0.0, 0.0, 1.0]

@@ -159,7 +159,8 @@ def _brace_contact(sc: Sidecar):
 def _pick(g: GraspRecord) -> Tuple[Grasp, Lift]:
     grasp = Grasp(kind="library", arm=g.arm, object=g.object, grasp=g, touches=g.may_touch[0])
     # oracle-fix 2026-11-04 round 4: ``grasps[i].lift_away`` (the shelf tip release lifts the book away from the side board it leans on)
-    return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp, away=g.extra.get("lift_away"))
+    # i7-t03 round 2 (d): ``grasps[i].lift_turn`` (the straightening lift of the shelf tip release; approved oracle change)
+    return grasp, Lift(arm=g.arm, object=g.object, carry_height=g.carry_height, after=grasp, away=g.extra.get("lift_away"), turn=g.extra.get("lift_turn"))
 
 
 #: ``contacts.push_pick``: the push before an overhang pick (owner 2026-10-13 ~03:15 item 4; sampler ``iors_large._overhang_pick``)

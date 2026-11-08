@@ -83,6 +83,93 @@ SHELF_STANCE_SCAN_MAX = 6
 SHELF_FLIPPED_REACH_RAD = 2.5
 
 
+#: i7-t03 round 2 2026-11-08 (owner (a), DEFAULT OFF): the shelf layout's start falls back to IORSLarge's free-floor start
+#: (``iors_large.free_floor_stance``, ``generation.free_start``) when the edge init stance does not frame the target AND the partner
+SHELF_FREE_START_ENV = "ISPATIALGYM_SHELF_FREE_START"
+
+
+#: i7-t03 round 2 2026-11-08 (owner (b), DEFAULT OFF): every fixed-start stance the base-shift search judges (the candidate, the computed
+#: stance, the scan) is judged on the grasp AND the tip release at the drafted goal (``place_infeasible_why``); a stance passing both is
+#: taken first (no carried drive), a grasp-only stance is the fallback. Needs ``ISPATIALGYM_SHELF_STANCE_SHIFT=1`` for the shifted stances.
+SHELF_JOINT_STANCE_ENV = "ISPATIALGYM_SHELF_JOINT_STANCE"
+
+
+def shelf_joint_stance_on() -> bool:
+    return os.environ.get(SHELF_JOINT_STANCE_ENV, "").strip().lower() in ("1", "on", "true")
+
+
+#: i7-t03 round 2 2026-11-08 (owner (d), APPROVED oracle + contact-rule change, DEFAULT OFF): the shelf tip release's lift turns the leaning
+#: book upright while it rises (``grasps[i].lift_turn``, the oracle's ``Lift.turn``; the sampler's lift end via ``program_check.lift_end_pose``)
+#: when the upright book stays under the board above, and at the lift ONLY the attached book may touch the side board it leaned on (clearance
+#: >= 0 on its hull, never penetrate); every robot link keeps the obstacle rule
+SHELF_LIFT_STRAIGHTEN_ENV = "ISPATIALGYM_SHELF_LIFT_STRAIGHTEN"
+#: the leaned-on board is the split-kept piece within this of the book at its start (m)
+LEANED_BOARD_MAX_GAP_M = 0.005
+#: the upright book's top keeps this below the board above along the lift (m)
+LIFT_HEADROOM_MARGIN_M = 0.005
+
+
+def shelf_lift_straighten_on() -> bool:
+    return os.environ.get(SHELF_LIFT_STRAIGHTEN_ENV, "").strip().lower() in ("1", "on", "true")
+
+
+def shortest_arc(u: th.Tensor, v: th.Tensor) -> th.Tensor:
+    """The smallest rotation (xyzw) taking unit vector ``u`` onto ``v``."""
+    u = G.t(u).float() / float(th.linalg.norm(G.t(u).float()))
+    v = G.t(v).float() / float(th.linalg.norm(G.t(v).float()))
+    c = float(th.dot(u, v))
+    if c > 1.0 - 1e-9:
+        return th.tensor([0.0, 0.0, 0.0, 1.0])
+    axis = th.linalg.cross(u, v)
+    if float(th.linalg.norm(axis)) < 1e-9:  # opposite: any perpendicular axis
+        axis = th.linalg.cross(u, th.tensor([1.0, 0.0, 0.0]) if abs(float(u[0])) < 0.9 else th.tensor([0.0, 1.0, 0.0]))
+    axis = axis / float(th.linalg.norm(axis))
+    ang = math.acos(max(-1.0, min(1.0, c)))
+    return th.cat([axis * math.sin(ang / 2), th.tensor([math.cos(ang / 2)])])
+
+
+def _slerp(q0: th.Tensor, q1: th.Tensor, a: float) -> th.Tensor:
+    """Spherical interpolation of xyzw quaternions (the shorter arc)."""
+    d = float(th.dot(q0, q1))
+    if d < 0.0:
+        q1, d = -q1, -d
+    if d > 0.9995:
+        q = q0 + a * (q1 - q0)
+        return q / float(th.linalg.norm(q))
+    th0 = math.acos(d)
+    return (math.sin((1 - a) * th0) * q0 + math.sin(a * th0) * q1) / math.sin(th0)
+
+
+def lift_object_poses(grasp_pose: G.Pose, lift_end: G.Pose, eef_in_object: G.Pose, n: int = 10) -> List[G.Pose]:
+    """The held object's poses along a lift (the eef lerped / slerped from ``grasp_pose`` to ``lift_end``, the object = eef o T_obj->eef^-1)."""
+    inv = G.invert((G.t(eef_in_object[0]).float(), G.t(eef_in_object[1]).float()))
+    p0, p1 = G.t(grasp_pose[0]).float(), G.t(lift_end[0]).float()
+    q0, q1 = G.t(grasp_pose[1]).float(), G.t(lift_end[1]).float()
+    out = []
+    for k in range(n + 1):
+        a = k / n
+        out.append(G.compose((p0 + a * (p1 - p0), _slerp(q0, q1, a)), inv))
+    return out
+
+
+def lift_headroom_m(hull_local: th.Tensor, poses: Sequence[G.Pose], ceiling_z: float) -> float:
+    """The smallest distance (m) from the held object's top to ``ceiling_z`` over ``poses`` (negative: above it)."""
+    return min(float(ceiling_z) - float(G.local_points_world(hull_local, (G.t(p[0]).float(), G.t(p[1]).float()))[:, 2].max()) for p in poses)
+
+
+class _PieceShim:
+    """One collision piece of an object as an ignorable object (``IKChecker.ignoring`` switches off its prim path; no split plan)."""
+
+    def __init__(self, name: str, prim: str, cm: Any):
+        self.name = name
+        self.links = {"piece": type("L", (), {"collision_meshes": {prim: cm}})()}
+
+
+def shelf_free_start_on() -> bool:
+    """``ISPATIALGYM_SHELF_FREE_START`` = "1" (i7-t03 round 2 item (a); default off)."""
+    return os.environ.get(SHELF_FREE_START_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 def shelf_stance_shift_on() -> bool:
     """``ISPATIALGYM_SHELF_STANCE_SHIFT`` = "1" (i7-t03 item 1; default off)."""
     return os.environ.get(SHELF_STANCE_SHIFT_ENV, "").strip().lower() in ("1", "on", "true")
@@ -2105,6 +2192,8 @@ class IORSSmall(SamplerV2):
         d = Draft()
         self._stance_shift_budget = {"scan": 0, "seen": set()}  # i7-t03 item 1: the scan's per-attempt budget
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
+        if shelf_free_start_on() and self.shelf_pose is not None:  # i7-t03 round 2 (a): the free-floor start as the edge stance's fallback
+            self.init_stance = self.shelf_free_start(rng, self.init_stance)
         init = self.init_stance
         self.sidecar.add_stance(init)
         cam_init = self.camera_pose_at(init)
@@ -2177,8 +2266,8 @@ class IORSSmall(SamplerV2):
                 if self.shelf_pose is not None:
                     t_pose = self.shelf_pose
 
-                    def fixed_start(m: Stance, _manip=manip, _pre_open=pre_open, _per_grasp=per_grasp, _default=default) -> GraspRecord:
-                        if m is not _manip:  # i7-t03 item 1: a shifted stance travels from init itself (the candidate's travel is recorded above)
+                    def fixed_start(m: Stance, _manip=manip, _pre_open=pre_open, _per_grasp=per_grasp, _default=default, again: bool = False) -> GraspRecord:
+                        if m is not _manip or again:  # i7-t03 item 1: a shifted stance travels from init itself (the candidate's travel is recorded above)
                             self.sidecar.transitions.clear()
                             self.record_stance_travel(init, m)
                         # oracle-fix 2026-11-05 (speed, opt-in generation.shelf_transit_per_grasp): the transit check judges each grasp that passes
@@ -3239,6 +3328,140 @@ class IORSSmall(SamplerV2):
 
     # ------------------------------------------------------------------ the stance shift at the fixed start (i7-t03 2026-11-08, item 1)
 
+    # ------------------------------------------------------------------ the straightening lift (i7-t03 round 2 (d))
+
+    def _kept_pieces(self) -> List[Tuple[str, Any, Any]]:
+        """``[(prim, cm, ConvexPieces)]`` of the shelf support's pieces its split keeps in the world (the side boards, walls, the board above)."""
+        from ispatialgym.sampling.v2 import support_split as SS
+
+        sup = self.support
+        plan = SS.plan_for(self.ikc, sup, count=False) if SS.split_on() else None
+        if plan is None or not plan.kept:
+            return []
+        out = []
+        for prim, cm in SS._pieces(sup):
+            if prim in plan.off:
+                continue
+            g = self.ikc._pieces_geometry(sup, frozenset([prim]))
+            if g is not None:
+                out.append((prim, cm, g))
+        return out
+
+    def shelf_lift_plan(self, grasp: GraspRecord) -> Dict[str, Any]:
+        """(d): ``grasps.lift_turn`` (the upright turn of the leaning book) when the upright book stays under the board above along the lift
+        (:func:`lift_headroom_m` >= :data:`LIFT_HEADROOM_MARGIN_M`), and ``grasps.lift_leaned_piece`` = the split-kept piece the book leans on
+        (within :data:`LEANED_BOARD_MAX_GAP_M` of its start hull). Kit ``shelf_lift.straightened`` / ``.no_headroom``. The facts."""
+        facts: Dict[str, Any] = {}
+        pieces = self._kept_pieces()
+        t0 = (G.t(self.shelf_pose[0]).float(), G.t(self.shelf_pose[1]).float())
+        hull_w = self.world.hull_at(self.hull["target"], t0)
+        top0 = float(hull_w[:, 2].max())
+        lo_xy, hi_xy = hull_w[:, :2].min(dim=0).values, hull_w[:, :2].max(dim=0).values
+        ceiling, leaned = math.inf, None
+        for prim, _cm, geom in pieces:
+            for lo, hi in geom.boxes:
+                if float(lo[2]) > top0 - 0.02 and bool((lo[:2] < hi_xy).all()) and bool((hi[:2] > lo_xy).all()):
+                    ceiling = min(ceiling, float(lo[2]))
+            d = float(geom.sdf(hull_w).min())
+            if d <= LEANED_BOARD_MAX_GAP_M and (leaned is None or d < leaned[1]):
+                leaned = (prim, d)
+        up = G.rotate(t0[1], self.up_vector())
+        turn = shortest_arc(up, th.tensor([0.0, 0.0, 1.0]))
+        g2 = type("G2", (), {})()
+        g2.grasp, g2.carry_height = grasp.grasp, grasp.carry_height
+        g2.extras = dict(grasp.extras, lift_turn=[float(v) for v in turn])
+        end = PC.lift_end_pose(g2)
+        poses = lift_object_poses(grasp.grasp, end, grasp.eef_in_object)
+        head = lift_headroom_m(self.hull["target"], poses, ceiling) if math.isfinite(ceiling) else math.inf
+        facts.update(turn_deg=round(math.degrees(2 * math.acos(min(1.0, abs(float(turn[3]))))), 2), ceiling_z=None if not math.isfinite(ceiling) else round(ceiling, 4),
+                     headroom_m=None if not math.isfinite(head) else round(head, 4), leaned_piece=None if leaned is None else leaned[0].rsplit("/", 2)[-2:],
+                     leaned_gap_m=None if leaned is None else round(leaned[1], 4))
+        if head >= LIFT_HEADROOM_MARGIN_M:
+            grasp.extras["lift_turn"] = [round(float(v), 6) for v in turn]
+            TT._count(self, "shelf_lift.straightened")
+        else:
+            TT._count(self, "shelf_lift.no_headroom")
+        if leaned is not None:
+            grasp.extras["lift_leaned_piece"] = leaned[0]
+        return facts
+
+    def lift_touch_ignores(self, g: Any) -> List[Any]:
+        """(d): the leaned-on board as an ignorable piece for the lift (the program check's lift; :meth:`lift_with_touch`), [] otherwise."""
+        ex = getattr(g, "extras", None)
+        if ex is None:
+            ex = getattr(g, "extra", None)
+        prim = (ex or {}).get("lift_leaned_piece") if isinstance(ex, dict) else None
+        if not prim or not shelf_lift_straighten_on():
+            return []
+        from ispatialgym.sampling.v2 import support_split as SS
+
+        cm = dict(SS._pieces(self.support)).get(prim)
+        return [] if cm is None else [_PieceShim(f"{self.support.name}:leaned_board", prim, cm)]
+
+    def lift_with_touch(self, grasp: GraspRecord, check) -> Any:
+        """(d): ``check()`` (the lift test, object attached) as today; when it fails and the switch is on, once more with the leaned-on board out of
+        the world, kept only when the attached book's hull stays at clearance >= 0 from that board along the lift and every robot link is clear
+        of it at margin 0 at the lift's end configuration. Kit ``shelf_lift.leaned_board_touch_allowed`` / ``.leaned_board_touch_refused.<why>``."""
+        r = check()
+        shim = self.lift_touch_ignores(grasp)
+        if getattr(r, "ok", False) or not shim:
+            return r
+        with self.ikc.ignoring(shim, split=False):
+            r2 = check()
+        if not r2.ok or r2.q is None:
+            TT._count(self, "shelf_lift.leaned_board_touch_refused.ik")
+            return r
+        geom = self.ikc._pieces_geometry(self.support, frozenset([grasp.extras["lift_leaned_piece"]]))
+        poses = lift_object_poses(grasp.grasp, PC.lift_end_pose(grasp), grasp.eef_in_object)
+        cl = min(float(geom.sdf(G.local_points_world(self.hull["target"], (G.t(p[0]).float(), G.t(p[1]).float()))).min()) for p in poses) if geom else -1.0
+        if cl < -1e-9:
+            TT._count(self, "shelf_lift.leaned_board_touch_refused.penetration")
+            return r
+        links = [ln for ln in self.ikc._non_finger_links(grasp.arm) if "attached" not in ln]
+        from ispatialgym.oracle import r1pro_model as M
+
+        links += list(M.FINGER_LINKS[grasp.arm])
+        with self.ikc.ignoring(self.support_objects()):
+            ok_links = bool(self.kit.links_clear(r2.q, links, 0.0)[0])
+        if not ok_links:
+            TT._count(self, "shelf_lift.leaned_board_touch_refused.robot_link")
+            return r
+        TT._count(self, "shelf_lift.leaned_board_touch_allowed")
+        return r2
+
+    def books_in_frame(self, st: Stance, cam: Optional[G.Pose] = None) -> bool:
+        """The shelf books at their start poses - the target AND the partner - fully in ``st``'s head-camera image (5 %), the test the
+        segment draw applies to the init image (``TT.in_frame`` of the hull corners)."""
+        cam = self.camera_pose_at(st) if cam is None else cam
+        return all(TT.in_frame(self, cam, TT.hull_corners_world(self.hull[role], pose))
+                   for role, pose in (("target", self.shelf_pose), ("partner", self.shelf_partner_pose)) if pose is not None)
+
+    def shelf_free_start(self, rng: np.random.Generator, init: Stance) -> Stance:
+        """i7-t03 round 2 item (a) (:data:`SHELF_FREE_START_ENV`, default off): the edge init stance when it frames both books (counter
+        ``free_start.edge_ok``), else IORSLarge's free-floor start (``iors_large.free_floor_stance``: 0.6-2.5 m from the target, facing it,
+        ``generation.free_start``) with the same frame test - the target AND the partner in the start image - as the FALLBACK (counters
+        ``free_start.used`` / ``.failed.<why>``; the edge stance stays when none is found). The manipulation candidates are the edge
+        cell's; the drive to the grasp stance is the path + the shelf back-off arrival (``core.record_stance_travel``)."""
+        if self.shelf_pose is None or self.shelf_partner_pose is None:
+            return init
+        if self.books_in_frame(init):
+            TT._count(self, "free_start.edge_ok")
+            return init
+        from ispatialgym.sampling.v2.tasks.iors_large import free_floor_stance
+
+        t_xy = G.t(self.shelf_pose[0])[:2].float()
+        focus = 0.5 * (G.t(self.shelf_pose[0]).float() + G.t(self.shelf_partner_pose[0]).float())
+        try:
+            st = free_floor_stance(self, t_xy, focus, lambda st_, cam: self.books_in_frame(st_, cam), rng, what="the partner")
+        except Reject as e:
+            TT._count(self, "free_start.failed.no_stance")
+            log.info("%s: free start (shelf): %s - the edge init stance stays", self.gp.variant, e)
+            return init
+        TT._count(self, "free_start.used")
+        st.name = "init"
+        st.extras["free_start_from_edge_lateral_m"] = round(float(init.lateral), 4)
+        return st
+
     def shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
         """``[(label, stance, shift_m), ...]`` the stance shift tries for the manipulation candidate ``cand`` (its trunk, the working ``arm``):
         the COMPUTED stance first - ``cand`` moved along the edge so the fixed start's book lies at ``generation.shelf_stance_book_lateral_m``
@@ -3308,20 +3531,63 @@ class IORSSmall(SamplerV2):
         st.extras["axis_angle"] = ang
         return st, ""
 
+    def shelf_release_why(self, st: Stance, grasp: GraspRecord) -> Optional[str]:
+        """i7-t03 round 2 (b): the tip release from ``st`` at the DRAFTED goal - ``goal_pose`` of the fixed start poses (the AABB-contact lean
+        the goal check settles from; it depends on the stance only through the edge frame) - by the goal check's own place test
+        (``place_infeasible_why``: pre-place -> place descent with the book attached, then the clear pose). None = it passes."""
+        prev = self.sidecar.stances.get("manipulation")
+        side = getattr(self, "goal_side", None)
+        self.sidecar.stances["manipulation"] = st
+        try:
+            goal = self.goal_pose(self.shelf_pose, self.shelf_partner_pose)
+        except Reject as e:
+            return f"goal: [{e.reason}] {e}"
+        finally:
+            if prev is None:
+                self.sidecar.stances.pop("manipulation", None)
+            else:
+                self.sidecar.stances["manipulation"] = prev
+            self.goal_side = side
+        return self.place_infeasible_why(st, (G.t(goal[0]).float(), G.t(goal[1]).float()), grasp)
+
+    def _joint_ok(self, st: Stance, grasp: GraspRecord) -> bool:
+        why = self.shelf_release_why(st, grasp)
+        grasp.extras["joint_release"] = "ok" if why is None else why[:160]
+        return why is None
+
     def shelf_fixed_start(self, init: Stance, cand: Stance, manip: Stance, arm: str, try_fn) -> Tuple[Stance, GraspRecord]:
         """The fixed start's checks at ``manip`` (``try_fn(stance) -> GraspRecord``: the init -> manipulation travel, ``grasp_at_pose`` with
         every grasp and twin, the transit check, the back-off - :meth:`sample_instance`'s own; ``Reject`` on failure). With the stance shift on
         (:data:`SHELF_STANCE_SHIFT_ENV`, i7-t03 item 1) a failure the base position can change (:func:`shelf_need_of`) tries the stances of
         :meth:`shelf_stance_shift` (the same ``try_fn``); a candidate that passes is never shifted. Returns ``(stance, grasp)``."""
+        joint = shelf_joint_stance_on() and self.shelf_pose is not None
         try:
-            return manip, try_fn(manip)
+            g0 = try_fn(manip)
         except Reject as e:
             need = shelf_need_of(e)
             if not shelf_stance_shift_on() or self.shelf_pose is None or need is None:
                 raise
             return self.shelf_stance_shift(init, cand, manip, arm, e, need, try_fn)
+        if not joint:
+            return manip, g0
+        if self._joint_ok(manip, g0):  # i7-t03 round 2 (b): the candidate grasps AND releases - no carried drive
+            TT._count(self, "stance_shift.both_passed")
+            return manip, g0
+        if not shelf_stance_shift_on():
+            TT._count(self, "stance_shift.grasp_only")
+            return manip, g0
+        # the candidate grasps but does not release: a shifted stance that does both, else the candidate (its travel recorded again)
+        try:
+            st, g1 = self.shelf_stance_shift(init, cand, manip, arm, Reject("grasp_unreachable", "release: " + str(g0.extras.get("joint_release"))), "release",
+                                             try_fn, require_both=True)
+            return st, g1
+        except Reject:
+            TT._count(self, "stance_shift.grasp_only")
+            self.sidecar.transitions.clear()
+            return manip, try_fn(manip, again=True)
 
-    def shelf_stance_shift(self, init: Stance, cand: Stance, manip: Stance, arm: str, err: Reject, need: str, try_fn) -> Tuple[Stance, GraspRecord]:
+    def shelf_stance_shift(self, init: Stance, cand: Stance, manip: Stance, arm: str, err: Reject, need: str, try_fn,
+                           require_both: bool = False) -> Tuple[Stance, GraspRecord]:
         """i7-t03 item 1: the shifted stances of :meth:`shelf_shift_stances` in order - the computed stance, then the scan (at most
         ``generation.shelf_stance_scan_max`` scan stances per attempt, :data:`SHELF_STANCE_SCAN_MAX`; a stance tried earlier in the attempt is
         not tried again) - each through :meth:`shelf_stance_ok` and ``try_fn`` (the same exact checks as ``manip``); the first that passes is
@@ -3334,6 +3600,7 @@ class IORSSmall(SamplerV2):
         budget = self.__dict__.setdefault("_stance_shift_budget", {"scan": 0, "seen": set()})
         scan_max = int(self.gen("shelf_stance_scan_max", SHELF_STANCE_SCAN_MAX) or 0)
         tried: List[str] = []
+        fallback = None  # (b): the first grasp-only stance
         for label, st, shift in self.shelf_shift_stances(cand, arm):
             key = (tuple(round(float(v), 3) for v in st.base_pose2d), round(float(st.translate), 3), round(float(st.tilt), 3), arm)
             if key in budget["seen"]:
@@ -3360,6 +3627,22 @@ class IORSSmall(SamplerV2):
                 self.drop_travel_records(init.name, st_ok.name)
                 tried.append(f"{label} {shift:+.2f}/{float(st_ok.stand_off or 0.0):.2f}: [{e2.reason}] {str(e2)[:90]}")
                 continue
+            if shelf_joint_stance_on():  # i7-t03 round 2 (b): a stance that grasps AND releases first; a grasp-only one is the fallback
+                if self._joint_ok(st_ok, grasp):
+                    TT._count(self, "stance_shift.both_passed")
+                    st_ok.extras["stance_shift"]["release"] = "ok"
+                else:
+                    st_ok.extras["stance_shift"]["release"] = grasp.extras.get("joint_release")
+                    if require_both:
+                        TT._count(self, "stance_shift.rejected.release")
+                        self.drop_travel_records(init.name, st_ok.name)
+                        tried.append(f"{label} {shift:+.2f}: release {str(grasp.extras.get('joint_release'))[:80]}")
+                        continue
+                    if fallback is None:
+                        fallback = (st_ok, grasp, label, shift)
+                    self.drop_travel_records(init.name, st_ok.name)
+                    tried.append(f"{label} {shift:+.2f}: grasp only")
+                    continue
             facts = grasp.extras.get("shelf_transit") or {}
             reach1 = facts.get("reach_rad")
             st_ok.extras["stance_shift"].update(reach_after_rad=reach1, branch_after=reach_branch(reach1), grasp=grasp.grasp_name)
@@ -3370,6 +3653,14 @@ class IORSSmall(SamplerV2):
                      "-" if reach0 is None else f"{reach0:.2f}", reach_branch(reach0), "-" if reach1 is None else f"{float(reach1):.2f}", reach_branch(reach1),
                      f"; tried before: {'; '.join(tried)}" if tried else "")
             return st_ok, grasp
+        if fallback is not None:  # (b): no stance grasps AND releases - the first grasp-only stance (its travel and checks again)
+            st_f, _g, label, shift = fallback
+            TT._count(self, "stance_shift.grasp_only")
+            self.sidecar.transitions.clear()
+            grasp = try_fn(st_f, again=True)
+            TT._count(self, f"stance_shift.{label}_passed")
+            TT._count(self, f"stance_shift.offset.{shift:+.2f}")
+            return st_f, grasp
         log.info("%s: stance shift (need %s) found no stance for candidate at lateral %+.3f: %s", self.gp.variant, need, float(cand.lateral), "; ".join(tried) or "none left")
         raise err
 
@@ -4510,6 +4801,8 @@ class IORSSmall(SamplerV2):
                     # side board it leans on (t03tip2b: the carried drive's first swept pose, attached book + left gripper on bookcase_opryhp_0)
                     away = self.shelf_push_direction(manip) * float(self.gen("shelf_lift_away_m", 0.03))
                     grasp.extras["lift_away"] = [round(float(v), 4) for v in away]
+                    if shelf_lift_straighten_on():  # i7-t03 round 2 (d): the straightening lift + the leaned-board touch at the lift
+                        draft.summary["shelf_lift"] = self.shelf_lift_plan(grasp)
                     # the release where the goal check's settle started (the drafted goal: the AABB-contact lean); that settle tipped the
                     # book onto the partner, so the oracle's release does the same and nothing pushes
                     place_pos, goal_quat = G.t(draft.goal_poses[tname][0]).float(), G.t(draft.goal_poses[tname][1]).float()
@@ -4617,7 +4910,8 @@ class IORSSmall(SamplerV2):
         lift_end = PC.lift_end_pose(grasp)
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             # tracked from the grasp configuration (one IK branch along the lift), support ignored throughout
-            r_lift = self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(), cache=False, approached=[])
+            r_lift = self.lift_with_touch(grasp, lambda: self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(),
+                                                                                cache=False, approached=[]))
         if not r_lift.ok:
             raise Reject(r_lift.code or "lift_unreachable", f"lift ({grasp.carry_height:.2f} m above the grasp) fails with the object attached: {r_lift.reason}")
         cam = self.camera_pose_at(manip)
@@ -5055,7 +5349,7 @@ class IORSSmall(SamplerV2):
         # it), not the stance's untucked arms - the box posed in the untucked hand stands inside the table (0918-165104)
         lift_end = PC.lift_end_pose(grasp)
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-            r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+            r_lift = self.lift_with_touch(grasp, lambda: self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False))
         if not r_lift.ok or r_lift.q is None:
             # owner 2026-10-12 item 7d: swept with the untucked hand instead, the box stood inside the table and the lift failure read
             # as path_collision (touching#02 c2_k0 attempt 7)

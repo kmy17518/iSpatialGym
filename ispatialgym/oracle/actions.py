@@ -801,6 +801,16 @@ class Grasp(Action):
         return fine, numbers
 
 
+def _quat_mul_xyzw(a: Sequence[float], b: Sequence[float]) -> List[float]:
+    """Hamilton product a * b of xyzw quaternions, normalised (i7-t03 round 2: ``Lift.turn``)."""
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    q = [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw,
+         aw * bw - ax * bx - ay * by - az * bz]
+    n = math.sqrt(sum(v * v for v in q)) or 1.0
+    return [v / n for v in q]
+
+
 @dataclass(kw_only=True)
 class Lift(Action):
     """Lift the grasped object straight up by ``carry_height`` (``grasps[i].carry_height`` / the block's), object
@@ -818,6 +828,9 @@ class Lift(Action):
     #: oracle-fix 2026-11-04 round 4 (``grasps[i].lift_away``, touching#03's shelf tip release): a world offset (m) added to the lift's end - the book
     #: leaning on a side board is lifted away from it; None = straight up
     away: Optional[Sequence[float]] = None
+    #: i7-t03 round 2 (owner decision (d), APPROVED oracle change): a world rotation (xyzw) applied to the hand over the lift - the leaning book on the
+    #: shelf is turned upright while it rises (``grasps[i].lift_turn``); the waypoints interpolate it (``line_waypoints`` on poses). None = kept
+    turn: Optional[Sequence[float]] = None
     TARGET_KEYS = ("lift",)
 
     def __post_init__(self):
@@ -842,7 +855,10 @@ class Lift(Action):
         if start is None:
             raise SidecarError(f"lift: the preceding action {self.after.name} leaves no eef pose")
         dx, dy, dz = (float(v) for v in (self.away or (0.0, 0.0, 0.0)))
-        return start, start.translated([dx, dy, self.carry_height + dz])
+        end = start.translated([dx, dy, self.carry_height + dz])
+        if self.turn:
+            end = type(end)(list(end.position), _quat_mul_xyzw([float(v) for v in self.turn], list(end.orientation)))
+        return start, end
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -854,6 +870,8 @@ class Lift(Action):
 
     def annotate(self, sidecar):
         obj = sidecar.language.phrase(self.object)
+        if self.turn:
+            return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} up and straighten it"
         if self.away:
             return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} up and {_cm(math.hypot(float(self.away[0]), float(self.away[1])))} away from the board"
         return f"lift {obj}", f"lift {obj} {_cm(self.carry_height)} straight up"

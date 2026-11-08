@@ -668,7 +668,23 @@ def lift_end_pose(g, carry_height: Optional[float] = None):
     away = lift_away(g)
     if away is not None:
         end = end + away
-    return end, th.as_tensor(g.grasp[1], dtype=th.float32)
+    quat = th.as_tensor(g.grasp[1], dtype=th.float32)
+    turn = lift_turn(g)
+    if turn is not None:  # i7-t03 round 2 (d): the straightening lift turns the hand (and the book) by this world rotation
+        from ispatialgym.sampling import geometry as G
+
+        quat = G.qmul(turn, quat)
+    return end, quat
+
+
+def lift_turn(g) -> Optional[th.Tensor]:
+    """The grasp record's ``lift_turn`` (world rotation xyzw; i7-t03 round 2 (d), touching_03's straightening lift, the oracle's ``Lift.turn``):
+    applied to the hand over the lift so the leaning book ends upright. None when the record has none."""
+    ex = getattr(g, "extras", None)
+    if ex is None:
+        ex = getattr(g, "extra", None)
+    v = (ex or {}).get("lift_turn") if isinstance(ex, dict) else None
+    return None if v is None else th.as_tensor([float(x) for x in v], dtype=th.float32)
 
 
 def subtask_blocks(subtask: str) -> Tuple[str, ...]:
@@ -2775,6 +2791,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                     else:
                         ign_all, ign_end = list(ignore_all) + list(approached or []), list(ignore_last)
                         ign_start = list(ignore_last) + list(ignore_all) + _start_contacts(action, sampler, name, key)
+                        if name == "lift" and callable(getattr(sampler, "lift_touch_ignores", None)):
+                            # i7-t03 round 2 (d): the board the lifted book leaned on (its touch allowance, checked by the sampler's lift test)
+                            ign_all = ign_all + list(sampler.lift_touch_ignores(g))
                     # a FLOOR-class lift (the grasp's support is the floor: IORS large-scale's floor init) keeps the ground slab off along
                     # the whole leg - the carried object's coarse sphere fit reaches below its mesh into the slab for the first
                     # centimetres (shampoo dispenser 0925-171050); the floor mesh is already in the ignore set
