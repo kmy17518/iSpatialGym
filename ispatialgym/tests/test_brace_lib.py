@@ -331,7 +331,7 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     face0 = float((path[0] - E) @ d) + 0.5 * cfg.brace_pusher_size_m[2]
     assert abs(face0 + cfg.brace_pusher_gap_m) < 1e-3
     lever = e["load"]["r_push_m"] / e["load"]["r_brace_m"]
-    assert abs(float((path[-1] - path[0]) @ d) - (cfg.brace_pusher_gap_m + (0.005 + cfg.brace_press_m) * lever)) < 1e-5
+    assert abs(float((path[-1] - path[0]) @ d) - (cfg.brace_pusher_gap_m + cfg.brace_press_m * lever)) < 1e-5
     # the judge: the target turned past level by an angle about the hinge -> the braced point moved along its load direction
     n_w = T0[:3, :3] @ np.asarray(e["wall"]["normal_object"])
     H = T0[:3, :3] @ np.asarray(e["wall"]["hinge_object"]) + T0[:3, 3]

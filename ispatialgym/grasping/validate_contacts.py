@@ -584,8 +584,8 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres per control step, the pusher's xyzw quaternion, facts)``. The leveling
     push carried on past level: the pusher meets the PUSHED corner (``load.point_object``) on the line along the corner's tangent
     (``load.direction``, 3-D in the wall plane - not flattened as :func:`pusher_path`), starting ``brace_pusher_gap_m`` before the hull points
-    it meets, and drives on so far that the braced point (``load.brace_point_object``) would travel the
-    stop's gap (``wall.brace_offset_m``) + ``brace_press_m`` with no brace (the lever ratio r_push / r_brace about the hinge; at most
+    it meets, and drives on so far that the braced point (``load.brace_point_object``) would travel
+    ``brace_press_m`` with no brace (the touching / axial calibration; the lever ratio r_push / r_brace about the hinge; at most
     ``wall_pusher_travel_max_m`` past the gap), at ``brace_pusher_speed_m_s``. The material it meets: the hull points within the box's half-width
     ACROSS the line in the wall plane (any offset along the normal: the corner is on the mid-plane, the hull's vertices off it); none raises
     (no load placed: the trial errors, never a vacuous pass). The box travels along its
@@ -614,8 +614,10 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     half = 0.5 * float(cfg.brace_pusher_size_m[2])
     start = P + d * (face - cfg.brace_pusher_gap_m - half)
     r_E, r_B = float(load.get("r_push_m") or 0.0), float(load.get("r_brace_m") or 0.0)
-    gap_b = float((entry.get("wall") or {}).get("brace_offset_m", 0.005))
-    past = min((gap_b + cfg.brace_press_m) * (r_E / max(r_B, 0.05) if r_E > 0 else 1.0), cfg.wall_pusher_travel_max_m)
+    # the touching / axial calibration: the loaded object travels brace_press_m past its first contact (the brace's gap - the stop offset /
+    # the touch stop's back-off - taken out of it, the hand pressed by the rest): here the BRACED point's unbraced travel = brace_press_m
+    # (2026-11-08 run 2 drove it the 5 mm offset + 1 cm: the hand yields as far as it is driven - 1.9 cm drift, hand_pushed)
+    past = min(cfg.brace_press_m * (r_E / max(r_B, 0.05) if r_E > 0 else 1.0), cfg.wall_pusher_travel_max_m)
     travel = cfg.brace_pusher_gap_m + past
     k = max(1, int(math.ceil(travel / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
     q = S.mat_to_quat(np.stack([np.cross(y, d), y, d], axis=1))  # local x = the wall normal, y = across the travel in the plane, z = the travel
