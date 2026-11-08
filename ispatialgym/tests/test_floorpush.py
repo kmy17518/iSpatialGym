@@ -29,6 +29,7 @@ ENVS = (IL.FLOORPUSH_OPEN_ENV, IL.FLOORPUSH_BOTH_ENV, IL.FLOORPUSH_STROKE_ENV, I
 def _clean_env(monkeypatch):
     for k in ENVS:
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv(IL.FLOORPUSH_STROKE_ENV, "off")  # the variants one at a time (the stroke's default is tested on its own)
 
 
 def _s(**gen):
@@ -42,14 +43,18 @@ def _cylinder(r: float = 0.112, h: float = 0.27, n: int = 48) -> th.Tensor:
 
 
 def test_switches_parse():
-    assert IL.floorpush_switches({}) == {}
+    off = {IL.FLOORPUSH_STROKE_ENV: "off"}
+    assert IL.floorpush_switches(off) == {} and IL.floorpush_switches({IL.FLOORPUSH_STROKE_ENV: "0"}) == {}
+    # the stroke's default (2026-11-08): 0.10 m strokes with no switch set
+    assert IL.floorpush_switches({}) == {"stroke_m": IL.FLOORPUSH_STROKE_DEFAULT_M, "yaw_gain": IL.FLOORPUSH_YAW_GAIN_M_PER_RAD,
+                                         "strokes_max": IL.FLOORPUSH_STROKES_MAX} and IL.FLOORPUSH_STROKE_DEFAULT_M == 0.10
     fp = IL.floorpush_switches({IL.FLOORPUSH_OPEN_ENV: "1", IL.FLOORPUSH_BOTH_ENV: "0", IL.FLOORPUSH_STROKE_ENV: "0.05", IL.FLOORPUSH_TIP_ENV: "0.05"})
     assert fp == {"open": True, "stroke_m": 0.05, "tip_m": 0.05, "yaw_gain": IL.FLOORPUSH_YAW_GAIN_M_PER_RAD, "strokes_max": IL.FLOORPUSH_STROKES_MAX}
     assert IL.floorpush_switches({IL.FLOORPUSH_STROKE_ENV: "0.1", "ISPATIALGYM_FLOORPUSH_YAW_GAIN": "0", "ISPATIALGYM_FLOORPUSH_STROKES_MAX": "3"}) == {
         "stroke_m": 0.1, "yaw_gain": 0.0, "strokes_max": 3}
     for bad in ("0", "-0.05", "nan"):
         with pytest.raises(ValueError):
-            IL.floorpush_switches({IL.FLOORPUSH_TIP_ENV: bad})
+            IL.floorpush_switches({**off, IL.FLOORPUSH_TIP_ENV: bad})
 
 
 def test_switches_act_only_on_the_pitched_under_push(monkeypatch):
@@ -222,3 +227,12 @@ def test_open_palm_test_sees_the_spread_fingers_and_the_empty_middle(monkeypatch
     s.hull = hull
     ch = PP._push(s)
     assert ch["record"]["floorpush"]["variant"] == "open" and ch["half_extent_m"] == pytest.approx(fc["off_m"], abs=1e-6)
+
+
+def test_strokes_are_the_default_for_the_pitched_push_only(monkeypatch):
+    monkeypatch.delenv(IL.FLOORPUSH_STROKE_ENV)
+    plan = _s().push_strokes_record(0.311)["strokes"]
+    assert plan["n"] == 4 and plan["yaw_gain_m_per_rad"] == pytest.approx(IL.FLOORPUSH_YAW_GAIN_M_PER_RAD)
+    ch = PP._push(_s())
+    assert ch["record"]["floorpush"]["stroke_m"] == 0.10 and "face_half_m" in ch["record"]
+    assert PP._sampler().push_strokes_record(0.311) == {}  # the blade (under_large_01) keeps its generation key

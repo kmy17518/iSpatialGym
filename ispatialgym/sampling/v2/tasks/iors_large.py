@@ -285,6 +285,8 @@ FLOORPUSH_BOTH_ENV = "ISPATIALGYM_FLOORPUSH_BOTH"
 #: (c) ``ISPATIALGYM_FLOORPUSH_STROKE_M=<m>``: the push in strokes of at most this length, re-measured and re-aimed between them
 #: (``execute._push_strokes``; the yaw term :data:`FLOORPUSH_YAW_GAIN_M_PER_RAD`, at most :data:`FLOORPUSH_STROKES_MAX` strokes)
 FLOORPUSH_STROKE_ENV = "ISPATIALGYM_FLOORPUSH_STROKE_M"
+#: (c) the default stroke (2026-11-08, lead decision #41 on the A/B): ``ISPATIALGYM_FLOORPUSH_STROKE_M=off`` restores one stroke
+FLOORPUSH_STROKE_DEFAULT_M = 0.10
 #: (d) ``ISPATIALGYM_FLOORPUSH_TIP_M=<m>``: the fingertips this high above the floor (today ``push_far_tip_m`` 0.08), today's height after it
 FLOORPUSH_TIP_ENV = "ISPATIALGYM_FLOORPUSH_TIP_M"
 #: (c) the re-aim's yaw term (m of contact offset per rad of yaw, toward the side that turns the object back; ``ISPATIALGYM_FLOORPUSH_YAW_GAIN``)
@@ -298,7 +300,7 @@ _ON = ("1", "true", "yes", "on")
 
 def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """The i7-floorpush switches set in ``env`` (default ``os.environ``): ``open`` / ``both`` (bool), ``stroke_m`` / ``tip_m`` (m), with the
-    knobs ``yaw_gain`` / ``strokes_max`` when ``stroke_m`` is set; ``{}`` with none set. ``ValueError`` for a length that is not positive."""
+    knobs ``yaw_gain`` / ``strokes_max`` when ``stroke_m`` is set; ``stroke_m`` defaults to :data:`FLOORPUSH_STROKE_DEFAULT_M` (``off`` = none). ``ValueError`` for a length that is not positive."""
     env = os.environ if env is None else env
     out: Dict[str, Any] = {}
     for key, name in (("open", FLOORPUSH_OPEN_ENV), ("both", FLOORPUSH_BOTH_ENV)):
@@ -306,6 +308,12 @@ def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
             out[key] = True
     for key, name in (("stroke_m", FLOORPUSH_STROKE_ENV), ("tip_m", FLOORPUSH_TIP_ENV)):
         v = str(env.get(name, "") or "").strip()
+        if key == "stroke_m":
+            # DEFAULT since 2026-11-08 (lead decision #41 on the i7-floorpush A/B: under_large_03 0 -> 2 ok, the yaw 12-24 -> 1-5 deg on the
+            # same instances): 0.10 m strokes unless the switch says otherwise; "off" / "0" = today's single stroke
+            if v.lower() in ("off", "0", "none", "false", "no"):
+                continue
+            v = v or str(FLOORPUSH_STROKE_DEFAULT_M)
         if v:
             f = float(v)
             if not (math.isfinite(f) and f > 0.0):
