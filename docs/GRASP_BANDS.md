@@ -2505,14 +2505,16 @@ surfaces beyond this decision).
 [0.9058, 0.92165], 0.9275 [0.9175, 0.93055] -> [0.92165, 0.93055] (no live query in (0.9175, 0.92165] in `$OFH/out`; the inventory has
 no top there); the old file `anchors.json.4_before_goalmaps`; log `STAGED_goalmaps.txt`. v2maps_int1 untouched.
 
-**touching_large_02 (the hall tree) - not built, owner decision.** The existing measure CLI (`interiors measure`, slurm 18379979,
-trunk_fcddc495; output `$OFH/goalmaps_20261108/interiors_upkvgr.json`, NOT in the registry) measures hall_tree_upkvgr_0's board at
-0.5809 (1342 board cells, depth 0.799, board setback 0.3047 = the canopy's static-AABB overhang 0.3147 as the front plane, headroom
-1.505, back ray 0.474 -> a back panel, one side wall found (0.705) the other not, open edges ['+u', '-v'], digest d6947c534b88). The
-consumer's `interiors.live_mismatch` reads two open raster edges as "open front AND back" (`back_thickness_m` None) - this spec has a
-back and an open SIDE, so every lookup would miss ("open sides") and a map built on it would never be read. Options: (a) the
-open-sides rule tells an open side from an open back (a rule shared by every interior lookup), (b) register the board without its back
-panel (misstates the geometry). Not done either way.
+**touching_large_02 (the hall tree) - spec registered, maps not built: owner decision.** The existing measure CLI (`interiors measure`,
+slurm 18379979, trunk_fcddc495) measures hall_tree_upkvgr_0's board at 0.5809 (1342 board cells, depth 0.799, board setback 0.3047 =
+the canopy's static-AABB overhang 0.3147 as the front plane, headroom 1.505, back ray 0.474 -> a back panel, one side wall found
+(0.705) the other not, open edges ['+u', '-v'], digest d6947c534b88); registered as `hall_tree_upkvgr_0@0.5809` in
+`assets/interiors/interiors.json` (19186e48, the digest test extended; lead request). The live lookup then misses one step later:
+probe gm_t02_before (trunk_19186e48, v2maps_goalmaps, slurm 18380485): "the live interior is not hall_tree_upkvgr_0@0.5809: open sides
+['+u', '-v'] vs spec ['front']" - `interiors.live_mismatch` reads two open raster edges as an open front AND back (`back_thickness_m`
+None), and this board has a back and an open SIDE. It runs before the map lookup, so a map built on this spec would never be read: no
+map built. Options: (a) the open-sides rule tells an open side from an open back (a rule every interior lookup shares), (b) register the
+board without its back panel (misstates the geometry).
 
 ## Limitations / not done
 
