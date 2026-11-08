@@ -2810,6 +2810,8 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
 **Validation** (`--grasps v2only` N 4 on v2maps_int2, overlay default, memory off as the branches ran; `tab_i.py -a <tag>`):
 - int2_1 (trunk_1b5e5525): touching_03, the only alias whose v2only behaviour merges 1-5 change (the lean entry is now in the root).
   Memory2's defaults change nothing in a memory-off run (production store empty, the pick hook inert).
+  Result: 320 attempts / 0 written, 0.70 GPU-h, as its branches' runs (i7_lean3 320 / 0, 0.69 GPU-h); interior map hits from v2maps_int2;
+  rejections target_placement 154, no_free_edge 129, goal_check path_collision 21 (i7_lean3 148 / 129 / 31). No regression.
 
 ## Limitations / not done
 
