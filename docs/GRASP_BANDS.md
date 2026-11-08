@@ -2064,7 +2064,9 @@ reach after 1.26-1.40 rad, near), but every attempt it let through then failed -
 start lateral stays 0.35-0.40 m from the bay; the shift moves only the manipulation stance) and 42 at the goal check (push drive 21, lift
 with the book attached 20, place 1; i7_lean3 without the shift: 43). Items 2 / 3 are inert under v2only for the bookcase: its interior
 registration's split plan has CLIPPED straddlers, which `contact_rejudge` does not judge. The shadow count over the 13 other split aliases
-(i7t03_cnt4, N 4, 128 attempts): 0 passes for either rule. Arms b / c: see DECISIONS "i7-t03 RESULTS".
+(i7t03_cnt4, N 4, 128 attempts): 0 passes for either rule. Legacy arms: a 320 / 0 (1.79 GPU-h); b (item 1) 320 / 0 (4.00 GPU-h; shift
+passed 31 computed + 37 scan; 11 then 'partner not in the init image'); c (1 + 2 + 3) 320 / 0 (4.26 GPU-h; witness.hull_fallback_passed 1546,
+support_split.finger_touch_allowed 0). No arm wrote a demo; the base shift fixes the manipulation stance, not the alias.
 
 **Open (owner).** The start lateral (a bay-centred init draw, the separate switch item 1 names); the attached book against the side board it
 leans on (support split) at the lift; the carried drive to the push stance; the computed stance colliding at the candidate's own trunk
