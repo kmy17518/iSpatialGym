@@ -1463,8 +1463,9 @@ Later layers:
 - i7-interior:
   - plate luhkiz (bar 0.8874 tabletop maps and sink-basin maps) from v2maps_i7sink2, with anchor 0.8874;
   - the jar's fridge place maps from v2maps_i7fridge4;
-  - `v2maps_int1/interiors.json`, an ISPATIALGYM_INTERIORS overlay holding the fridge spec (door per piece) and the sink spec those maps were
-    built with. Jobs on this root must pass it, or the code registry must carry the specs.
+  - the fridge spec (door per piece) and the sink spec those maps were built with are now in the code registry
+    (`assets/interiors/interiors.json`; lead decision, fcddc495), so no job needs ISPATIALGYM_INTERIORS. test_interior_registry.py pins their
+    digests. The earlier overlay moved to `_superseded_registry/`.
 - Contact maps (16), from three roots:
   - v2maps_icb_on: the touch_brace maps built with full-open on (ntbrtz, dkhgxn, gkpmii), plus the touch_push maps;
   - v2maps_i7contact2: the axial h maps (qgvsnb, injrgc, tfovwy), with the pushed-end / spin fix;
