@@ -3115,6 +3115,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 14 | i7-startdraw (8e2de681) | f2468042 | DEFAULTS START_DRAW (owner 3.5), floor init redraws stance A only, ALL_EDGES (lead #12); BD_FLIP_ROOM_DRAW off; old blockdesign resolved toward a2f89901; the attachment start search factored with cork's hand-over view, `_start_args` per route |
 | 15 | i7-ft2 (72ebd8a4; carries i7-interior2 eec4ca60, i7-camhull 9e697ac1) | 9b87ede1 | DEFAULT FINGER_TOUCH_HAND_HULLS (owner 7.1), awvzkn sink spec; interior2's owner 6.1-6.3 defaults; registry = union of every spec |
 | 16 | i7-camhull (e939ade6) | 540478e0 | DEFAULT CAMERA_HULL_FALLBACK (lead #5); CAMERA_TOP_HULL_FALLBACK off |
+| 17 | i7-contact3 final (ac2a682d) | 22ae887d | adds only PUSH_LINE_COM (4822246b, lead #9, default off) + docs |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
