@@ -7,8 +7,8 @@ A reach map is computed at an ACTUAL support-surface height above the floor, nev
    ``top.z``: the median of the most populated 2 cm height bin of the support's hits, recorded to 1e-4 m) and its interior placement
    planes (shelves / boards: ``bindings.support_surfaces`` of the customs whose ``top_z`` is more than ``SURFACE_MATCH_TOL`` below the
    top - authored to 1e-2 m, status ``unmeasured_interior``: flagged for measurement, never replaced by the furniture's top);
-2. floor datum: the nearest known floor level of the scene (0 and the partners' ``under_clearance.floor_z``) at or below the support's
-   AABB bottom (+2 cm); heights are ``top - floor``;
+2. floor datum: the nearest known floor level of the scene (0 and the partners' ``under_clearance.floor_z`` - only a floor the partner
+   stands on, :data:`FLOOR_STAND_TOL_M`: i7-goalmaps fix) at or below the support's AABB bottom (+2 cm); heights are ``top - floor``;
 3. canonical keys: the height at its recorded precision (``"%.4f"`` for the inventory) - distinct measured heights stay distinct, the
    same recorded height of two supports shares one key. Two measurements of one surface that disagree beyond their precision are
    listed in ``conflicts``;
@@ -97,15 +97,28 @@ class Surface:
         return key(self.height, self.precision)
 
 
-def _floor_levels(scene: str, inventory: str) -> List[float]:
+#: i7-goalmaps 2026-11-08 (owner decision 5c.1, the floor datum bug): a partner's ``under_clearance.floor_z`` is a floor level only when the
+#: partner stands on it - within this of the partner's AABB bottom. The raycast under a counter can stop on the cabinet inside it
+#: (countertop_kelzer_0: 0.4977 m, its AABB bottom 0.8514 m), which measured 15 house_single_floor tops from a cabinet top.
+FLOOR_STAND_TOL_M = 0.05
+
+
+def _floor_levels(scene: str, inventory: str, real_floors: bool = True) -> List[float]:
+    """The scene's floor levels: 0 and the partners' ``under_clearance.floor_z`` - with ``real_floors`` (default; the bug fix) only those
+    the partner stands on (:data:`FLOOR_STAND_TOL_M` of its AABB bottom); ``real_floors=False``: every one (the former rule)."""
     lv = {0.0}
     for f in glob.glob(os.path.join(inventory, scene, "partners", "*.json")):
         try:
-            z = json.load(open(f)).get("under_clearance", {}).get("floor_z")
+            d = json.load(open(f))
+            z = (d.get("under_clearance") or {}).get("floor_z")
+            bottom = float(d["aabb_world"]["min"][2]) if real_floors else None
         except Exception:  # noqa: BLE001
-            z = None
-        if z is not None:
-            lv.add(round(float(z), 4))
+            z, bottom = None, None
+        if z is None:
+            continue
+        if real_floors and (bottom is None or abs(float(z) - bottom) > FLOOR_STAND_TOL_M):
+            continue
+        lv.add(round(float(z), 4))
     return sorted(lv)
 
 
@@ -181,7 +194,7 @@ def _customs_surfaces(path: str) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
 
 
 def build_surfaces(tables: Sequence[str], inventory: str = INVENTORY, customs: str = CUSTOMS,
-                   goal_surfaces: bool = True) -> Tuple[List[Surface], Dict[str, Any]]:
+                   goal_surfaces: bool = True, real_floors: bool = True) -> Tuple[List[Surface], Dict[str, Any]]:
     """The measured surfaces of the support rows (+ with ``goal_surfaces`` the goal-surface partner rows, :func:`_goal_rows`, after them:
     a goal row never changes a support surface's height, key or ``subtasks``) and the report."""
     rows = _support_rows(tables)
@@ -198,7 +211,7 @@ def build_surfaces(tables: Sequence[str], inventory: str = INVENTORY, customs: s
             continue
         s = json.load(open(inv))
         if scene not in levels_cache:
-            levels_cache[scene] = _floor_levels(scene, inventory)
+            levels_cache[scene] = _floor_levels(scene, inventory, real_floors)
         fz, fsrc = _floor_datum(levels_cache[scene], float(s["aabb_world"]["min"][2]))
         top = float(s["top"]["z"])
         sid = f"{scene}/{name}/top"
@@ -240,7 +253,7 @@ def build_surfaces(tables: Sequence[str], inventory: str = INVENTORY, customs: s
             goal_missing.append({"scene": scene, "partner": name, "row": r.get("subtask"), "table": r["_table"], "why": "no top in the inventory"})
             continue
         if scene not in levels_cache:
-            levels_cache[scene] = _floor_levels(scene, inventory)
+            levels_cache[scene] = _floor_levels(scene, inventory, real_floors)
         fz, fsrc = _floor_datum(levels_cache[scene], float(s["aabb_world"]["min"][2]))
         top = float(s["top"]["z"])
         sid = f"{scene}/{name}/top"

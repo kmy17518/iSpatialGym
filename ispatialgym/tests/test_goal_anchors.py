@@ -125,3 +125,45 @@ def test_an_uncovered_height_stays_uncovered(tmp_path):
     for h in live:  # every former live anchor still resolves to itself
         a, k = B1.lookup(h)
         assert k == "exact" and abs(a["height"] - h) < 1e-12
+
+
+# ------------------------------------------------------------------------------------------------ the floor datum (owner decision 5c.1)
+
+def test_a_floor_level_is_a_floor_a_partner_stands_on(tmp_path):
+    inv = str(tmp_path / "inv")
+    # a counter whose under-raycast stopped on the cabinet inside it (kelzer: floor_z 0.4977, AABB bottom 0.8514) - not a floor;
+    # a partner on a raised floor 0.30 (its AABB bottom 0.29) - a floor
+    for scene, name, fz, bottom in (("S", "counter_k", 0.4977, 0.8514), ("S2", "bed_raised", 0.30, 0.29), ("S", "bed_0", 0.0, -0.01)):
+        d = os.path.join(inv, scene, "partners")
+        os.makedirs(d, exist_ok=True)
+        json.dump({"aabb_world": {"min": [0, 0, bottom], "max": [1, 1, bottom + 0.5]}, "top": {"z": bottom + 0.5}, "under_clearance": {"floor_z": fz}},
+                  open(os.path.join(d, f"{name}.json"), "w"))
+    assert HA._floor_levels("S", inv) == [0.0] and HA._floor_levels("S2", inv) == [0.0, 0.3]
+    assert HA._floor_levels("S", inv, real_floors=False) == [0.0, 0.4977]
+    _inv(inv, "S", "supports", "counter_top", 0.9157, 0.8778)  # measured from 0 now (0.4180 before)
+    _inv(inv, "S2", "supports", "dais_table", 1.00, 0.31)  # on the raised floor (another scene): 0.70 either way
+    _inv(inv, "S", "supports", "desk", 0.75, 0.02)
+    rows = [{"subtask": "x", "role": "support", "category": "c", "model": m, "scene": sc, "rank": "4"}
+            for sc, m in (("S", "counter_top"), ("S2", "dais_table"), ("S", "desk"))]
+    t = _table(tmp_path / "c.csv", rows, ["subtask", "role", "category", "model", "scene", "rank", "top_z"])
+    new = {s.support: s.key for s in HA.build_surfaces([t], inventory=inv, customs=str(tmp_path / "none.json"))[0]}
+    old = {s.support: s.key for s in HA.build_surfaces([t], inventory=inv, customs=str(tmp_path / "none.json"), real_floors=False)[0]}
+    assert new == {"counter_top": "0.9157", "dais_table": "0.7000", "desk": "0.7500"}
+    assert old == {"counter_top": "0.4180", "dais_table": "0.7000", "desk": "0.7500"}
+
+
+def test_the_datum_fix_changes_exactly_the_15_house_single_floor_tops():
+    old, _ = HA.build_surfaces([CAND, REPS], goal_surfaces=False, real_floors=False)
+    new, _ = HA.build_surfaces([CAND, REPS], goal_surfaces=False)
+    ob, nb = {s.id: s for s in old}, {s.id: s for s in new}
+    assert 0.4977 not in HA._floor_levels("house_single_floor", HA.INVENTORY)
+    changed = {i for i in ob if i in nb and ob[i].height != nb[i].height}
+    assert len(changed) == 15 and all(i.startswith("house_single_floor/") and i.endswith("/top") for i in changed)
+    for i in changed:  # the true height: the inventory top above the scene floor 0
+        top = json.load(open(os.path.join(HA.INVENTORY, "house_single_floor", "supports", f"{nb[i].support}.json")))["top"]["z"]
+        assert nb[i].floor_z == 0.0 and nb[i].height == round(top, 4) and abs(ob[i].height - (top - 0.4977)) < 1e-3
+    assert nb["house_single_floor/countertop_fjkase_0/top"].key == "0.9157"
+    for i in ob:  # every other surface height unchanged; the only ones gone: the bindings that now name their top
+        if i not in changed:
+            assert (i in nb and nb[i].height == ob[i].height) or (ob[i].surface.startswith("interior@") and ob[i].id.startswith("house_single_floor/"))
+    assert set(nb) <= set(ob)
