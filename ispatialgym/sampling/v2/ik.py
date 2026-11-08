@@ -619,6 +619,15 @@ def finger_touch_params(value: Any) -> Optional[Dict[str, Any]]:
     return out
 
 
+#: i7-t03 round 7 (LEAD DECISION #37; log only, DEFAULT OFF): :meth:`IKChecker.track_chain`'s "end configuration collides" verdict logs
+#: ``TRACKED_END_BLAME`` with :meth:`IKChecker._collision_blame` (the colliding object or self-collision pair); verdicts unchanged
+TRACKED_END_BLAME_ENV = "ISPATIALGYM_TRACKED_END_BLAME"
+
+
+def tracked_end_blame_on() -> bool:
+    return os.environ.get(TRACKED_END_BLAME_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 @dataclass
 class IKResult:
     ok: bool
@@ -2577,6 +2586,11 @@ class IKChecker:
                           f"{d0 * 1000:.0f} mm from the start{', in the start band' if j0 in near else ''}; {self._collision_blame(traj[j0], list(ignore) + (list(ignore_start) if j0 in near else []))})")
         with self.ignoring(list(ignore) + list(ignore_end)):
             if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
+                if tracked_end_blame_on():  # i7-t03 round 7 (log only, default off): name what the end configuration collides with
+                    try:
+                        log.info("TRACKED_END_BLAME arm %s: %s", arm, self._collision_blame(traj[-1], list(ignore) + list(ignore_end)))
+                    except Exception as e:  # noqa: BLE001
+                        log.info("TRACKED_END_BLAME error %r", e)
                 return None, "approach_untrackable: the tracked chain's end configuration collides"
         if clear_links and clear_margin > 0.0:
             # ``clear_links`` (the arm links, not the hand) keep ``clear_margin`` from the world along the whole chain: the oracle's QA
