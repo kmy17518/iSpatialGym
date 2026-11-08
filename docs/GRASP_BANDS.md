@@ -2436,14 +2436,18 @@ attach_found, place_unreachable, rest_stable, rest_unstable, drafted}`.
 |---|---|---|---|---|---|---|
 | current route, brace_search false (`i7cork_base`, `_r2`) | 15 + 47 | 1 + 23 | 4 + 4 | 4 + 4 | 0.155, 0.175 | none |
 | lying90 (`i7cork_ly`, `_r2`) | 27 + 18 | 0 + 0 | 4 + 4 | 3 + 1 | 0.282, 0.610 | grasp: arm link5 on the desk; grasp approach joint jump 0.23 rad; attach: witness / plan branch 1.9-3.8 rad after the turn (x2) |
-| handover (`i7cork_ho4`; first demo: a recollect of `i7cork_ho2` 620300) | see DECISIONS | - | - | 1 / 1 first demo | - | - |
+| handover (`i7cork_ho6`, trunk_44a7fc7c) | 16 | 0 | 4 | 4 | 0.314 | none (+ 3 / 3 recollected demos of the earlier hand-over runs ho2 / ho3 / ho4) |
 
 - brace_search false alone makes the current route's demos clean (8 / 8; before 3 / 4 and 2 / 3 with the brace finger's
   protected_contact); its rest rejections stay placement-dependent (1 / 15 and 23 / 47).
 - lying90 removes the rest rejections (0 / 45; the route's kit: rest_stable 15 / 15) but its in-hand 90 deg turn costs: carry_failed 44 of
   61 carries checked, and 4 of 8 demos fail in the oracle (the IK branch of the attach after the turn, the low grasp next to the desk).
-- The hand-over runs end to end in the oracle: the first demo (1008 steps) - right grasp / lift / carry to the hand-over / LEFT grasp
-  of the held cork / right release / left carry / attach / retreat.
+- The hand-over runs end to end in the oracle: 7 / 7 demos (1008-1232 steps) - right grasp / lift / carry to the hand-over / LEFT grasp
+  of the held cork / right release / [axis-leg drive] / left carry / attach / retreat; no rest rejection (wide end down). Its sampler
+  rejections are program-check failures of chains searched with the partner parked (the right carry to the hand-over, the pick, the left
+  pre-grasp: 10 of 16 attempts); 8e2ff5ef re-checks those chains with the partner at each attach cell (replicate `i7cork_ho_r2`).
+- The hand-over cost ~3x the current route's GPU-h per success here (0.314 vs 0.155 / 0.175), mostly the 300-360 s hand-over search per
+  attempt; the current route's own cost is now low because brace_search false removed its demo failures.
 
 ## Limitations / not done
 
