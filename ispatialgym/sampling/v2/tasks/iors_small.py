@@ -215,9 +215,11 @@ PUSH_STANCE_STAND_OFFS_M = (0.15, 0.20, 0.25, 0.30, 0.35, 0.45, 0.55)
 PUSH_STANCE_MAX_EXACT = 8
 #: owner 3.6 (2026-11-08, i7-contact3): the touching place depth capped by the touch_push map's reach (:meth:`IORSSmall.place_depth_caps`) -
 #: "0" off, "shadow" (the cap computed and counted, no candidate removed: sampling as with it off), "1" on (a manipulation candidate whose
-#: target - placed at its start depth - no collision-free push stance's map reaches leaves the attempt's draws)
+#: target - placed at its start depth - no collision-free push stance's map reaches leaves the attempt's draws). Default "1" since the
+#: 2026-11-08 A/B (the owner decided the rule, 3.6): of the would-be removals that reached a push test none was reachable (touching_02 85 / 85,
+#: touching_04 58 / 58), none was written; on vs shadow 0.33 vs 0.53 GPU-h per success
 PLACE_DEPTH_CAP_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP"
-PLACE_DEPTH_CAP_DEFAULT = "0"
+PLACE_DEPTH_CAP_DEFAULT = "1"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)

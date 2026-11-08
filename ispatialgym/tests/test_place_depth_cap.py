@@ -69,8 +69,8 @@ def _me(monkeypatch, pm, free=lambda st: True, mode="1"):
 
 def test_mode_parsing(monkeypatch):
     monkeypatch.delenv(IS.PLACE_DEPTH_CAP_ENV, raising=False)
-    assert IS.place_depth_cap_mode() == "off" and IS.PLACE_DEPTH_CAP_DEFAULT == "0"
-    for v, m in (("0", "off"), ("", "off"), ("shadow", "shadow"), ("1", "on"), ("on", "on")):
+    assert IS.place_depth_cap_mode() == "on" and IS.PLACE_DEPTH_CAP_DEFAULT == "1"  # the default since the 2026-11-08 A/B
+    for v, m in (("0", "off"), ("", "on"), ("shadow", "shadow"), ("1", "on"), ("on", "on")):
         monkeypatch.setenv(IS.PLACE_DEPTH_CAP_ENV, v)
         assert IS.place_depth_cap_mode() == m
 
