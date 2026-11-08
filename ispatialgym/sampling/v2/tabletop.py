@@ -1120,7 +1120,7 @@ PIPELINE_VARIANTS = {"tabletop": "tabletop", "t": "tabletop", "insert": "insert"
 
 
 #: i7-tray 2026-11-08 (owner decision item 3, option b; disembedding_10's fork turned 12-14 deg in the hand at the close): with
-#: ``ISPATIALGYM_GRASP_TURN_FILTER`` on (default OFF) the sampler skips a v2 library row whose recorded in-hand turn at the close (the
+#: ``ISPATIALGYM_GRASP_TURN_FILTER`` on (DEFAULT since the owner decision 2026-11-08 5u.1; ``0`` / off = measured only, the pick before) the sampler skips a v2 library row whose recorded in-hand turn at the close (the
 #: slab validator's ``achieved.off_target_rad``, ``validation.json``) exceeds the orientation tolerance of the task using it (the isg-v2
 #: profile: ``small`` 0.10 / ``large`` 0.15 rad, the customs ``evaluation.tolerances.pose.orientation`` override first; a ``micro`` target's
 #: tolerance depends on the instance and a task without a pose target has none: unchanged). No library gate changes, nothing is rebuilt.
@@ -1129,7 +1129,8 @@ TURN_FILTER_SWITCH = "ISPATIALGYM_GRASP_TURN_FILTER"
 
 
 def turn_filter_on() -> bool:
-    return os.environ.get(TURN_FILTER_SWITCH, "0").strip().lower() in ("1", "on", "true", "yes")
+    """On by default (owner decision 2026-11-08 5u.1: A/B disembedding_10 off 12 / 4 / 0, on 14 / 4 / 4); ``0`` / off / false / no turns it off."""
+    return os.environ.get(TURN_FILTER_SWITCH, "1").strip().lower() not in ("0", "off", "false", "no")
 
 
 def grasp_turn_tolerance(variant: str) -> Optional[float]:

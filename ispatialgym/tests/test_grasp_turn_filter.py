@@ -52,7 +52,7 @@ def test_a_row_under_the_tolerance_stays_and_one_over_it_is_skipped(lib, monkeyp
 
 
 def test_switch_off_measures_only(lib, monkeypatch):
-    monkeypatch.delenv(TT.TURN_FILTER_SWITCH, raising=False)
+    monkeypatch.setenv(TT.TURN_FILTER_SWITCH, "0")
     s = _sampler(FORK)
     assert [g.name for g in TT.filter_by_turn(s, list(ROWS), lib, "k")] == ["top_2", "top_7", "top_9"]
     assert s.kit.stats == {"grasp.off_target_would_filter": 1}
@@ -78,3 +78,11 @@ def test_unmeasured_rows_stay(tmp_path, monkeypatch):
     lib = _lib(tmp_path, {"top_7": 0.233})
     kept = TT.filter_by_turn(_sampler(FORK), [SimpleNamespace(name="top_7"), SimpleNamespace(name="top_3")], lib, "k")
     assert [g.name for g in kept] == ["top_3"]
+
+
+def test_the_filter_is_on_by_default(lib, monkeypatch):
+    """Owner decision 2026-11-08 5u.1: the switch unset = on."""
+    monkeypatch.delenv(TT.TURN_FILTER_SWITCH, raising=False)
+    assert TT.turn_filter_on()
+    s = _sampler(FORK)
+    assert [g.name for g in TT.filter_by_turn(s, list(ROWS), lib, "k")] == ["top_2", "top_9"]
