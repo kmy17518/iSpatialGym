@@ -2553,7 +2553,15 @@ adjacent edges (fridge / t03 bookcases one edge, jaysra +u/-u, lkklqs four, awvz
 is hand-authored, no measured edges). test_interior_registry.py: the digests on / off, the case table, the hall tree served only
 with the switch. Maps: umbrella__ziqzqo__s1 interior PLACE maps in hall_tree_upkvgr_0@0.5809 (the variant's rule: pre approach, drop
 0.005, no tilts; trunk_a083123a, 18381078 / 18381079), staged in v2maps_goalmaps; touching_large_02 N 4 v2only switch on / off
-(chain_t02.sh 18381085).
+(chain_t02.sh 18381085). Maps 5130b76f (r) / 9c3a3a02 (l), ~440 s each, check_int1 ERRORS 0.
+
+| arm (touching_large_02, trunk_a083123a, v2maps_goalmaps) | att / written / ok | GPU-h | notes |
+|---|---|---|---|
+| gm_t02_off (switch off) | 0 / 0 / 0 | 0.10 | setup missing_map: "open sides ['+u', '-v'] vs spec ['front']" |
+| gm_t02_on (switch on) | 60 / 0 / 0 | 1.73 | map hit (`interior_open_sides.front_side` 1); 60 target_placement: 59 "F_init (4-12) ∩ F_goal (0)" at the board's front goal cells (x -0.9), 25 also a failed carry leg, 9 B no_transition |
+
+missing_map is gone with the switch; the next blocker is the exact place at stance C with the umbrella's single library grasp (top_2)
+at the board's goal yaw - not in this decision.
 
 ## Limitations / not done
 
