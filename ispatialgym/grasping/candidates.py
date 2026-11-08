@@ -1205,10 +1205,31 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             lo_w, hi_w = (None if v is None else float(v) for v in cfg.finger_axis_window_m)
             z_obj = np.asarray(R[:3, 2], dtype=float)
             fz_lo, fz_hi = np.full(len(T), np.inf), np.full(len(T), -np.inf)
+            win_retreat = np.zeros(len(T))
+            T = T.copy()
             for i in range(len(T)):
                 P, _ = hc.geom.points(("finger",), (float(pre_q[i]), float(pre_q[i])))
                 zz = (P @ T[i, :3, :3].T + T[i, :3, 3]) @ z_obj
-                fz_lo[i], fz_hi[i] = float(zz.min()), float(zz.max())
+                lo_i, hi_i = float(zz.min()), float(zz.max())
+                if mode == "top":
+                    # a top grasp backs off along its approach until the fingers are inside the window, the pinch point kept on the object:
+                    # the contact then sits closer to the fingertips (cz + r <= tip_max_m, the generation's own retreat bound)
+                    a_z = float(T[i, :3, 2] @ z_obj)  # how far the fingers move along the object's +z per metre of approach
+                    need = 0.0
+                    if hi_w is not None and hi_i > hi_w and a_z > 1e-3:
+                        need = max(need, (hi_i - hi_w) / a_z)
+                    if lo_w is not None and lo_i < lo_w and a_z < -1e-3:
+                        need = max(need, (lo_w - lo_i) / -a_z)
+                    if need > 0.0 and float(cz[i]) + need <= cfg.tip_max_m:
+                        T[i, :3, 3] = T[i, :3, 3] - need * T[i, :3, 2]
+                        lo_i, hi_i = lo_i - need * a_z, hi_i - need * a_z
+                        win_retreat[i] = need
+                fz_lo[i], fz_hi[i] = lo_i, hi_i
+            cz = cz + win_retreat
+            real = real + win_retreat if mode == "top" else real
+            if "shift_m" in feats:
+                feats["shift_m"] = feats["shift_m"] + win_retreat
+            feats["window_retreat_m"] = win_retreat
             keep = np.ones(len(T), dtype=bool)
             if lo_w is not None:
                 keep &= fz_lo >= lo_w
@@ -1216,7 +1237,7 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
                 keep &= fz_hi <= hi_w
             if dump.on:
                 dump.gate(pool, "finger_axis_window", len(T), int(keep.sum()), np.where(~keep)[0],
-                          {**_where(T, cz), "finger_z_lo_mm": fz_lo * 1000, "finger_z_hi_mm": fz_hi * 1000},
+                          {**_where(T, cz), "finger_z_lo_mm": fz_lo * 1000, "finger_z_hi_mm": fz_hi * 1000, "retreat_mm": win_retreat * 1000},
                           records=[{"window_m": [lo_w, hi_w]}])
             T, score, cz, pre_q, real = T[keep], score[keep], cz[keep], pre_q[keep], real[keep]
             feats = {k: v[keep] for k, v in feats.items()}
