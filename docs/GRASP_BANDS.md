@@ -2172,6 +2172,71 @@ The owner's BRACE OPENING rule (2026-11-07): an open brace opens fully (0.05 per
   (`$OFH/contactbrace_20261108/libs_on/maps`, staged in `$OFH/v2maps_icb_on`). Not exercised by any alias: the pack brace (no block_4
   pack-tail alias) and the carton-v4 wide stop (every alias `blade_down`).
 
+## touching_03: the base at the manipulation stance, split-off pieces, the narrow sphere buffer (branch `i7-t03`, 2026-11-08)
+
+Owner request 2026-11-08 04:45 (`tmp/outputs/prompt_t03_base_nudge.md`, DECISIONS "i7-t03"); all three behind DEFAULT-OFF switches until the
+owner decides (any default change is the owner's). Record `$OFH/t03_20261108` (per-attempt parser `parse_t03.py`, `tab_lat.py`).
+
+**Diagnosis (logs of fix1_t03nr, fix2_t03init, ft_sph, ft_geo, i7_lean3).** Every written touching_03 demo (7, all legacy) had the book
+0.185-0.200 m LEFT of the base (left arm, stand-off 0.55, trunk (0.25, 0), 0.687 m forward). The far-branch transit rejects (2.2-3.9 rad)
+happen only on the right-board layouts (never a demo, fix2 included); on bay -0.37 left the grasp passes at start laterals -0.465 / -0.415 /
+-0.315 and almost never at -0.265 .. -0.065 (2 of 185 draws), so the uniform lateral draw wastes most of the layout. Since the support split,
+the attempts that pass the draw die later: the lift with the book attached (the book starts against the side board the split keeps), the
+settled-pose approach against a split-kept piece, and the carried drive to the push stance.
+
+**Item 1 - the stance shift (`ISPATIALGYM_SHELF_STANCE_SHIFT=1`, sampler only, `IORSSmall.shelf_fixed_start`).** When the shelf's fixed
+start fails the grasp or the transit / back-off check at a manipulation candidate (`shelf_need_of`), the base moves along the edge: first the
+COMPUTED stance - the book at `generation.shelf_stance_book_lateral_m` (0.19, `SHELF_STANCE_BOOK_LATERAL_M`, the right arm mirrored) from the
+robot's centre line, as `push_stance_for` places the push contact, same stand-off and trunk - then the scan (`shelf_stance_scan_shifts_m`
+(0, +-0.05, +-0.10) around it x `tabletop.STAND_OFFS`, the computed lateral first; at most `shelf_stance_scan_max` = 6 scan stances per
+attempt, a stance never tried twice). Every stance: free floor, whole-body collision with the working arm and the other arm idle
+(`stance_for_arm`), the work camera's Phase-2 rule at the book (`_shelf_camera_rule`), then the same `fixed_start` as the candidate
+(travel, `grasp_at_pose` with every grasp and twin, the transit reach <= 1.6 rad from that stance's backed-off pose, the back-off) and
+everything downstream. The travel init -> shifted stance is the axis-aligned leg (`core.record_stance_travel`, `NAV.plan_axis_leg`: heading
+kept, forward / backward / sideways only, `generation.stance_shift_back_offs_m`). A candidate that passes is never shifted. Kit
+`stance_shift.need.<grasp|transit>`, `.computed_tried / _passed`, `.scan_tried / _passed`, `.rejected.<floor|collision|camera|check>`,
+`.offset.<m>`; the stance's `extras.stance_shift` (offset, need, reach before / after, near / flipped branch); one INFO line per shift.
+
+**Item 2 - split-off pieces as finger-only contact (`ISPATIALGYM_SPLIT_FINGER_TOUCH` = 1 / shadow / 0).** `IKChecker.contact_rejudge`:
+a configuration that collides with the support split's kept pieces (the side board, walls, board above) passes when (a) it is free with them
+out of the world, (b) every link but the hand clears at margin 0 (today's rule), (c) the palm / wrist camera / wrist clear at margin 0, and
+(d) the fingers clear everything else at margin 0 and their EXACT hulls touch the pieces at clearance >= 0 (`HandChecker.clearance`
+against `ConvexPieces` of the kept pieces) - never judged on the spheres. The policed plane (2 mm) and FingerTouch are unchanged. Call sites:
+`IKChecker.track_segment` (every approach / chain configuration and its end), `_witness_ok` (exact-IK witnesses, cache verification,
+`collision_free_at`; the active ignore sets tracked by `ignoring` while a rule is on), `exact` (a pose the solver misses is solved once
+more with those pieces out and kept only when `contact_rejudge` passes: `_solve_rejudged`) - so the grasp chains, approach, settle
+validation, lift / place / program check all see it. Map builder: `reach_maps.compute_map`'s interior sphere stage skips the finger spheres
+against the normal obstacles (their hulls stay judged by `check_with_obstacles`, >= 0); a map built so carries `split_finger_touch` in its
+key. Grasp validators (`candidates.py`, `access_region.py`) already judge the fingers by hulls >= 0 against obstacles: unchanged. Kit
+`support_split.finger_touch_allowed` / `_shadow_pass` / `_failed.<why>`.
+
+**Item 3 - the narrow sphere buffer (`ISPATIALGYM_WITNESS_HULL_FALLBACK` = 1 / shadow / 0).** i7-plateqtf2's side_9 rule (3a2ce4ec,
+cherry-picked as c75a1096: `MODEL_SPHERE_BUFFER_M`, `support_hull_fallback_min_m` 0.5 mm, `IKChecker._hull_fallback`) reused: (a) in
+`_hull_fallback`, a hand that fails only on the policed support's split-kept pieces is judged by the same hulls against them; (b) in
+`contact_rejudge`, the hand's rigid links failing narrowly (clear at margin 0 less the 2 mm buffer) against the split-kept pieces or a
+registered support standing whole in the world (the pre-grasp) pass when their hulls clear by >= 0.5 mm; arm / torso / base keep their
+spheres. Kit `witness.hull_fallback_passed` / `_shadow_pass` / `_failed.<why>`. With either rule on (not shadow) the exact-IK cache scope
+carries `contact_rejudge`.
+
+Tests: `tests/test_t03_stance_shift.py`, `tests/test_t03_contact_rules.py`.
+
+Code: c75a1096 (cherry-pick of i7-plateqtf2 3a2ce4ec), 5299165c (item 1), 6440b551 (items 2 / 3), 982cdcdf (cherry-pick of i7-plateqtf2
+1f368d64, `contact_policy.hull_fallback`, with item 3a routed through it; NOT 6a6731ca: the side_9 switch stays default 0 here), 6f744f76
+(test). Suite vs base 7fbe45cc: the same 23 failed + 3 errors.
+
+**Results (A/B trunk_6440b551, legacy, N 4, instances 300100-300103; v2only trunk_6f744f76 on the staged lean root).** a (all off) 320 att /
+0 written; v (v2only, 1 + 2 + 3) 320 / 0: the computed stance passed 169 / 426 and the scan 156 / 794 (offsets -0.40 / -0.35 / -0.15 m;
+reach after 1.26-1.40 rad, near), but every attempt it let through then failed - 52 "partner not in the init image" (the INIT view: the
+start lateral stays 0.35-0.40 m from the bay; the shift moves only the manipulation stance) and 42 at the goal check (push drive 21, lift
+with the book attached 20, place 1; i7_lean3 without the shift: 43). Items 2 / 3 are inert under v2only for the bookcase: its interior
+registration's split plan has CLIPPED straddlers, which `contact_rejudge` does not judge. The shadow count over the 13 other split aliases
+(i7t03_cnt4, N 4, 128 attempts): 0 passes for either rule. Legacy arms: a 320 / 0 (1.79 GPU-h); b (item 1) 320 / 0 (4.00 GPU-h; shift
+passed 31 computed + 37 scan; 11 then 'partner not in the init image'); c (1 + 2 + 3) 320 / 0 (4.26 GPU-h; witness.hull_fallback_passed 1546,
+support_split.finger_touch_allowed 0). No arm wrote a demo; the base shift fixes the manipulation stance, not the alias.
+
+**Open (owner).** The start lateral (a bay-centred init draw, the separate switch item 1 names); the attached book against the side board it
+leans on (support split) at the lift; the carried drive to the push stance; the computed stance colliding at the candidate's own trunk
+(`stance_shift.rejected.collision`); clipped straddlers in `contact_rejudge`; any default change.
 ### i7-attachfix (2026-11-08): the attachment aliases diagnosed with numbers (owner direction 2026-11-08 02:20)
 
 Branch i7-attachfix from of-v2maps 386ab2b4; record `$OFH/attachfix_20261108`. Run diagnosed: i7_attswept (trunk_54439eee, 62 att / 16
@@ -2696,6 +2761,136 @@ the start base alone: a draw with lateral > ~0.29 is within 0.25 m of an eval st
 eval start's 0.25 m window first; a CPU test at the draw, the rejection after Phase 2 saved); (b) accept the 44 %; (c) the existing
 rules stay and nothing else moves the start (the other edges fail free-floor collision and the edge-length margin, both real).
 
+### touching_03 round 2 (owner 2026-11-08, `prompt_t03_round2.md`; branch `i7-t03`, all switches DEFAULT OFF)
+
+Merged of-v2maps cf1f5d2d first (98c2e9b4; the integration's support hull fallback default kept; i7-t03's round-1 switches stay off).
+
+**Diagnostic 0** (copies of trunk_98c2e9b4 with `t03_20261108/patch_drive_diag.py`, log only): the failing carried drives to the release
+stance drove 0.14-0.25 m while the free gap between the lifted book and the partner was 0.11-0.12 m; every drive first collided at
+s = 0.12-0.14 m, the ATTACHED BOOK + left finger 2 against the PARTNER book. The release's clear pose (15 cm back along the horizontal
+approach: 0.38 m in front of the base) fails the IK with the support and the partner removed - a reach limit, not a collision bug.
+
+- **(a) `ISPATIALGYM_SHELF_FREE_START`** (d510403d, 832fad79, fix 67a1ab4a): `IORSSmall.shelf_free_start` - the edge init stance when it
+  frames the target AND the partner, else `iors_large.free_floor_stance` (factored out of `IORSLarge.free_start_stance`, behaviour unchanged)
+  with that test; the drive to the edge stance = `prompt0.connect` + the shelf back-off arrival (`core.record_stance_travel`). A travel
+  failure from a free start no longer drops the candidate (67a1ab4a). Called once at the top of `sample_instance`; `_spa_redraw_start_cached`
+  is untouched (i7-startdraw). Kit `free_start.edge_ok / .used / .failed.*`.
+- **(b) `ISPATIALGYM_SHELF_JOINT_STANCE`**: `shelf_fixed_start` / `shelf_stance_shift` judge each stance on the fixed-start grasp AND the tip
+  release at the drafted goal (`shelf_release_why`: `place_infeasible_why` at `goal_pose` of the start poses); both first, grasp-only the
+  fallback. Kit `stance_shift.both_passed / .grasp_only / .rejected.release`.
+- **(c) `ISPATIALGYM_SHELF_RELEASE_IN_GAP`** (2f815f1b): the release stances = the manipulation stance, then drives toward the partner of
+  0.25-1.0 x (free gap - `carry_path_margin_m`). Kit `shelf_release.drive_in_gap / .no_stance / .no_room`.
+- **(d) `ISPATIALGYM_SHELF_LIFT_STRAIGHTEN`** (approved oracle + contact-rule change): `grasps.lift_turn` (the upright turn, refused when the
+  upright book would reach the board above: `shelf_lift.straightened / .no_headroom`), oracle `Lift.turn`, `program_check.lift_end_pose`;
+  `grasps.lift_leaned_piece`: at the lift only, the attached book may touch the board it leaned on (hull >= 0), every robot link clear of it
+  (`lift_with_touch`; the program check's lift ignores that piece). Kit `shelf_lift.leaned_board_touch_allowed / _refused.*`.
+
+A/B (legacy, N 4, 300100-103, kmuacd template only): a (trunk_2f815f1b) 320 att / 0 written, 1.79 GPU-h; b / c / d rerun on
+trunk_67a1ab4a after the candidate-drop fix (i7t03r3_*), v2only i7t03r3_v with d's switches - numbers in DECISIONS "i7-t03 ROUND 2".
+
+#### Round 2 results (2026-11-08; DECISIONS "i7-t03 ROUND 2 RESULTS" parts 1 / 2; `t03_20261108/tab_t03.py` + `tab_t03_extra.py`)
+
+| arm | att | written | ok | GPU-h | where the switches acted |
+|---|---|---|---|---|---|
+| a all off (trunk_2f815f1b) | 320 | 0 | 0 | 1.79 | - |
+| b (a) free start | 320 | 0 | 0 | 1.47 | free_start.used 76 / edge_ok 107 |
+| c (a)+(b)+(c) | 320 | 0 | 0 | 2.69 | free_start.used 76; stance_shift.both_passed 13 / grasp_only 2; shelf_release.* 0 |
+| d c+(d) | 133 | 0 | 0 | 1.49 | CRASH at the first goal_check pass; shelf_lift.* 0 |
+| v v2only, d's switches | 9 | 0 | 0 | 0.13 | CRASH at the first goal_check pass |
+
+- Layouts (a / b / c): bay +0.00 right 63, bay -0.37 left 64, bay -0.37 right 56 attempts, 0 written. The per-attempt draw is the same in
+  every arm.
+- Start stage: no_free_edge 137 in a / b / c (+u stance_collision 69, -u free floor 68). The free start does not change it, because the
+  edge draw rejects before the fallback is asked. not_in_frame 0 at attempt level.
+- (a): the fixed-start grasp rejections fall from 167 to 124-128, but 40 attempts now fail as no_path init -> manipulation (the free start
+  disconnected on the eroded map).
+- (b): 13 stances passed both the grasp and the release. Still, every attempt that reached goal_check in c died at the LIFT (4, vs 2 in
+  a), before the release. So (c)'s in-gap drive never acted: carried drive 0 (a 2).
+- (d) bug (832fad79): `shelf_lift_plan` calls `up_vector()`, and `IORSSmall.up_axis()` returns None for every relation except inside.
+  On touching_03 this gives `ValueError: None is not a model axis`. The lift needs the book's standing axis for touching. Until that is
+  fixed, d and v have no numbers.
+- touching_03 still writes no demo. All switches stay default OFF.
+
+#### (d) fix and the owner's decisions c (2026-11-08; DECISIONS "i7-t03 ROUND 2 (d) FIX" / "i7-t03 DECISIONS C")
+
+- **(d) fix, b6da685d.** `shelf_lift_plan` takes the book's standing axis from the new `IORSSmall.shelf_standing_axis`, which is local
+  to the shelf lift; `up_axis()` stays inside-only. The axis is the signed model axis most aligned with world +z (the rule
+  `upright_shelf_facts` reads the lean from), applied to the v2 lean entry's upright base (`lean_base_wxyz`), else to the template's
+  rest. For acbrnv both give -x. It is used only within 40 deg of vertical at the attempt's start.
+  - Without an axis, or on any error in the plan, the lift is today's: no turn and no leaned-board touch. Kit
+    `shelf_lift.fallback_no_axis.<why>` / `.fallback_error`.
+  - Reruns: i7t03r4_d / _v on trunk_b6da685d (numbers in DECISIONS).
+- **Merge** of i7-t03specs c4a6956a (0dcfa115): the opryhp_0 / otwukr_1 interior specs, the measure `--lateral` option and their tests.
+- **5k.1, the computed shelf-width rule** (`ISPATIALGYM_SHELF_SPAN_RULE`, default off; 830e7837).
+  - Required free span = the carried book's extent along the edge at the drawn lean (its thickness upright when (d) is on) + the
+    open jaw's excess over the pinch, both sides: pre-shape opening `w + 2 x 10 mm` (else 0.10 m) + 2 x 12 mm fingers - `w`.
+  - acbrnv: 0.148 m leaning 19.6 deg and 0.075 m upright, against otwukr's 0.09-0.10 and kmuacd's 0.128 at 20 / 20.
+  - It is checked per attempt at the drawn leans, and at the template stage at the most favourable drawable leans. Kit
+    `shelf_span.passed` / `.rejected` / `.template_rejected`.
+- **5p.2, every candidate's trunk in the stance shift** (under `ISPATIALGYM_SHELF_JOINT_STANCE`; 830e7837).
+  - Each shifted base position is tried at the candidate's trunk, then at the other trunks of the attempt's candidates.
+  - The scan budget counts only the stances that reach the exact checks. Kit `stance_shift.trunk.other_tried` / `.other_passed`.
+- **(c) tests.** 2f815f1b had one test (the drive fractions). Added `lifted_book_gap` and the plan built from it.
+- **5p.1, the retreat by the base** (`ISPATIALGYM_SHELF_RETREAT_BACKOFF`, default off; approved oracle change; 36e67650).
+  - Applies to the shelf tip release, when its 15 cm clear pose fails.
+  - The sampler checks the place's own end (10 cm back) by exact IK, then a 5 cm drive-back along the stance axis with both arms frozen
+    there and the fingers open (the strides of `navigation.path_collision_free`).
+  - It records stance `retreat` plus the transition into it. The oracle's shelf tip program then runs place -> that transition, instead
+    of place -> the 5 cm arm retreat.
+  - Kit `shelf_retreat.backoff_passed` / `.backoff_failed.<place_end|drive|no_edge>` / `.recorded`.
+
+#### Round 5 results (2026-11-08; DECISIONS "i7-t03 r5 ..." lines, "i7-t03 r5 RESULTS")
+
+Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 3165 passed), N 4, memory off. `$OFH/t03_20261108`:
+`sub_r5.sh` (+ a slot gate and an `otw` case), `loop_r5.sh`, `after_T7.sh`, `mk_registry.py`, `parse_lift_diag.py`.
+
+| arm (tag) | grasps / support | switches | att / wr / ok | GPU-h |
+|---|---|---|---|---|
+| c (i7t03r3_c) | legacy, kmuacd | FREE_START + JOINT_STANCE + RELEASE_IN_GAP + STANCE_SHIFT | 320 / 0 / 0 | 2.69 |
+| d (i7t03r4_d) | legacy, kmuacd | c + LIFT_STRAIGHTEN | 320 / 0 / 0 | 2.88 |
+| v (i7t03r4_v) | v2only lean root, kmuacd | d | 320 / 0 / 0 | 1.19 |
+| e (i7t03r5_e) | legacy, kmuacd | d + SPAN_RULE + RETREAT_BACKOFF | 320 / 0 / 0 | 3.41 |
+| T6 off (i7t03r5_T6off) | v2only, opryhp_0 T6 | none | 320 / 0 / 0 | 1.92 |
+| T6 on (i7t03r5_T6on) | v2only, opryhp_0 T6 | LIFT_STRAIGHTEN | 320 / 0 / 0 | 1.96 |
+| T7 (i7t03r5_T7) | v2only, otwukr_1 T7 | e's | 36 / 4 / **2** | 0.26 (0.128 per success) |
+| T8 (i7t03r5_T8) | v2only, otwukr_1 T8 | e's | 28 / 4 / 0 | 0.30 |
+
+- **d.** The rejections are c's exactly. (d) acts 4 times, and all 4 are refused as penetration: the lift is reached 4 times in 320.
+  The blockers come earlier: no_free_edge 137, the fixed-start grasp 123, init -> manipulation 40.
+- **e.** The rejections are c's / d's: target_placement 169 (fixed-start grasp 123, init -> manipulation 40, transit 6), no_free_edge
+  137, approach_untrackable 10, lift 3, place 1.
+  - The new switches act but clear nothing. shelf_span.passed 183 (0 rejected on kmuacd). The 5p.1 back-off was tried 7 times and
+    failed at place_end all 7 (never recorded). 5p.2 tried other trunks 234 times with 0 passing. (d) straightened 4, refused 3.
+  - On legacy kmuacd, the blockers sit before the lift.
+- **T6 (d) off / on.** With (d) on, lift_unreachable goes 152 -> 0 and ik_joint_limit 26 -> 0 (straightened 222, touch allowed
+  181, refused 0).
+  - But repeats_eval rises 32 -> 158. Every one repeats the template's single eval instance `__0000`: opryhp T6 draws one
+    layout, so a goal-passing attempt is the eval instance again.
+  - gripper_not_in_frame rises 1 -> 53.
+- **T7 / T8 templates.** With SPAN_RULE + (d), both otwukr templates pass the shelf_width setup that stopped i7-t03specs (drawn free
+  spans 0.110-0.125 m). T7 wrote 4 in 9 attempts, T8 4 in 5. Registered in `reg_T7` / `reg_T8` + `registry_T7` / `_T8.tsv`, which
+  are the trunk touching_03 row with the template fields swapped.
+- **T7 / T8 N 4.** The first touching_03 successes are T7 300401 and 300402: grasp, lift + straighten, place, retreat.
+  - 5 of the 6 demo failures are the same self-contact, "left_arm_link5 touches torso_link2": T8 x4 at the 5 cm arm retreat after the
+    place, and T7 300400 at the place itself (the instance that recorded the 5p.1 back-off).
+  - T7 300403 failed on arm_stutter during the grasp.
+  - The sampler checks the 15 cm clear pose by exact IK. It is not yet diagnosed whether that check misses this pair or the executed
+    path leaves the checked one.
+- **Lift refusal diagnosis** (i7t03r5_diag = the v settings on a log-only copy of trunk_b6da685d; it reproduces v exactly, 53 refusals).
+  - All 53 are identical. The piece is `kmuacd__base_link__collision__6`, the leaned-on side board. It is convex: hull volume =
+    mesh volume = 0.005155 m3 (11 vertices, 18 faces, watertight), so its hull does not swallow the book.
+  - One book hull vertex is involved, (-0.1108, -0.0826, -0.0156) in the book frame: the top-end cover corner. It is less than 0.05 mm
+    deep, at mesh distance 0, at lift pose 0 only (the grasp pose = the book's resting lean). The mid and last lift poses are 0.01 m clear.
+  - So the refusal is the book's own resting contact at the start pose, refused by the rule's `cl < -1e-9`; the lift does not
+    enter the board.
+  - Exempting the start pose, or a tolerance, is a contact-rule change for the owner (not made).
+- **Still blocking.**
+  - otwukr: the left_arm_link5 / torso_link2 self-contact at the retreat and place (next: diagnose the check against the execution).
+  - kmuacd: before the lift (start edge 137, fixed-start grasp 123, init -> manipulation 40), plus on the v2 path the start-pose
+    contact refusals (53).
+  - opryhp T6: the single drawn layout (repeats_eval 158) and the camera (53).
+- **For the owner.** The touch rule's start-pose contact; whether otwukr T7 / T8 become touching_03's templates; the defaults of
+  the t03 switches. All stay off; no code changed in round 5.
 
 ## Owner decisions on the open list (2026-11-08)
 

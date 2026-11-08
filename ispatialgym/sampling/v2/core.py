@@ -1162,12 +1162,27 @@ class SamplerV2(TaskSampler):
         (``tabletop.phase2_split_cone``): then the records of the pair are replaced by the transition when both stances share the edge
         lateral, else by the move along the edge of :meth:`record_edge_travel`, and ``to.extras["init_travel"]`` records the move.
         Returns the (arrival) transition."""
-        if "_position" not in to.extras:
+        shift = "stance_shift" in to.extras  # i7-t03 2026-11-08 (item 1): a manipulation stance moved along the edge at the shelf's fixed start
+        if frm.extras.get("free_start") and frm.edge is None:
+            # i7-t03 round 2 (a): a free-floor start (iors_large.free_floor_stance) drives to the edge stance as IORSLarge's stance A does -
+            # the §3.7 path to the drive-back pose and the §3.8 transition (prompt0.connect); the shelf back-off replaces the arrival later
+            from ispatialgym.sampling.v2 import prompt0 as P0
+
+            self.drop_travel_records(frm.name, to.name)
+            _path, tr = P0.connect(self, frm, to, path_max_m=float(self.gen("stance_path_max_m", 3.0)))
+            return tr
+        if "_position" not in to.extras and not shift:
             return self.record_transition(frm, to)
         self.drop_travel_records(frm.name, to.name)
         lateral = float(th.dot(to.base_xy - frm.base_xy, frm.tangent))
         path, dep = None, None
         if abs(lateral) < 0.02:
+            tr = self.record_transition(frm, to)
+        elif shift:
+            # the owner's motion rule (2026-10-13, disembedding's carried leg): heading kept, forward / backward / sideways only - the
+            # axis-aligned edge slide (NAV.plan_axis_leg) at the first drive-back of generation.stance_shift_back_offs_m that clears
+            back = [float(v) for v in (self.gen("stance_shift_back_offs_m", None) or (0.0, 0.1, 0.2))]
+            path = self.record_path(frm, to, axis_leg=back)
             tr = self.record_transition(frm, to)
         else:
             path, dep, tr = self.record_edge_travel(frm, to)
