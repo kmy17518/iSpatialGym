@@ -26,6 +26,7 @@ the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) an
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -529,6 +530,14 @@ class AlignmentAxial(SamplerV2):
                             def eval_brace(p):
                                 res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", list(p.chain), ignore_work_last=[support, target],
                                                             ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN), q_first_brace=p.q_first)
+                                if not res_b.ok and axial_brace_probe_on():
+                                    self._brace_probe(manip, p, res_b, [p_pre, p_goal], support, target)
+                                if res_b.ok and axial_brace_pre_policy_on():
+                                    # i7-axialrest (owner 5v.2): the brace's pre as the program check polices it - a refusal is this candidate's
+                                    # failure (the next candidate, none left -> push-only), not a program_check_failed attempt
+                                    why_pol = self._brace_pre_policy(manip, p, target)
+                                    if why_pol:
+                                        res_b = TT._ik().IKResult(False, None, why_pol)
                                 if not res_b.ok:
                                     brace_fails.append(f"{p.label}: {res_b.reason}")
                                 return bool(res_b.ok), res_b, None, str(res_b.reason)
@@ -541,6 +550,9 @@ class AlignmentAxial(SamplerV2):
                                 brace_pre, brace, kind, extras = b_chosen.proposal.payload
                                 brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal",
                                                                         **({"orient": dec_brace} if len([o for o in dec_brace["options"] if o["source"] == "ik"]) > 1 else {})})
+                            if any("brace pre_policy:" in f for f in brace_fails):
+                                # i7-axialrest 5v.2: where the switch acted - the attempt went on push-only, or with a later candidate's brace
+                                TT._count(self, "axial_brace.pre_policy.push_only" if b_chosen is None else "axial_brace.pre_policy.other_brace")
                         finally:
                             target.set_position_orientation(*pose)
                             target.keep_still()
@@ -843,6 +855,116 @@ class AlignmentAxial(SamplerV2):
                                                            face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips,
                                                            rest_quat=getattr(self, "rest_quat", None))
 
+    def _brace_pre_policy(self, manip: Stance, p, target) -> str:
+        """i7-axialrest (owner 2026-11-08 5v.2, :func:`axial_brace_pre_policy_on`): the brace candidate ``p``'s PRE pose checked the way the
+        program check checks the brace action's single ``pre`` target (``program_check.check_action_targets``): a fresh exact IK of the left
+        arm from the stance's configuration (no seed, no locked arm: the brace runs before the push), the gripper at the record's
+        ``tabletop.brace_fingers`` (closed for a stop brace), the braced target + the supports in the pose's ignore set and the target
+        approached - ``IKChecker.exact`` then applies the shared support policy to its solution, as there. Returns the refusal
+        (``"brace pre_policy: pre: support_policy: ..."``) or ``""``. An IK failure for another reason is counted, never refused (the
+        sampler's own brace chain passed; the decision is about the support policy only). The solver's remembered solutions are restored
+        afterwards, so the brace chain's witnesses stay the recorded ones."""
+        extras = (p.payload[3] if isinstance(p.payload, (tuple, list)) and len(p.payload) > 3 else None) or {}
+        sups = [o for o in self.support_objects() if o is not target]
+        saved = dict(self.ikc.solutions)
+        TT._count(self, "axial_brace.pre_policy.checked")
+        try:
+            r = self.ikc.exact([p.chain[0]], manip, "left", ignore_for_last=[target] + sups + [target], cache=False, fingers=TT.brace_fingers(extras),
+                               approached=[target])
+        finally:
+            self.ikc.solutions.clear()
+            self.ikc.solutions.update(saved)
+        if r.ok:
+            TT._count(self, "axial_brace.pre_policy.passed")
+            return ""
+        why = str(r.reason)
+        if why.startswith("support_policy"):
+            TT._count(self, "axial_brace.pre_policy.refused")
+            TT._count(self, f"axial_brace.pre_policy.refused.{p.label}")
+            log.info("%s: axial brace %s refused at sampling: pre: %s (the program check's support policy)", self.gp.variant, p.label, why[:200])
+            return f"brace pre_policy: pre: {why}"
+        TT._count(self, "axial_brace.pre_policy.other_fail")
+        log.info("%s: axial brace %s: the program check's pre call failed for another reason (%s) - not refused", self.gp.variant, p.label, why[:200])
+        return ""
+
+    def _brace_probe(self, manip: Stance, p, res_live, work_poses: List[TT.Pose], support, target) -> None:
+        """i7-axialrest 5v.1 (owner 2026-11-08, DIAGNOSIS ONLY, :func:`axial_brace_probe_on`): a brace candidate that failed live
+        (``tabletop.brace_second_arm``: the right arm locked at its push goal, the target at its goal pose checked at
+        ``BRACE_TARGET_MARGIN``) re-checked with one cause removed at a time, logged as one ``AXIAL_BRACE_PROBE {json}`` line:
+        ``again`` (the live call repeated: the solver's reproducibility), ``margin_0`` / ``margin_1`` / ``margin_2`` (the target check at
+        0 / 1 / 2 mm), ``no_target`` (no target check), ``no_right`` (the right arm at the stance posture instead of its push goal, the target
+        check at 3 mm), ``no_right_no_target`` (both removed), ``empty`` (the right arm at the stance posture, every spawned object out:
+        the arm's kinematics + the robot itself). Where ``no_right`` solves: ``blame`` = what that configuration hits with the right arm
+        put back at its push goal (``IKChecker._collision_blame``). The verdict is unchanged; the remembered solutions are restored."""
+        ikc, kit = self.ikc, self.kit
+        saved = dict(ikc.solutions)
+        chain = list(p.chain)
+        idx_l = kit.robot.arm_control_idx["left"]
+        idx_r = kit.robot.arm_control_idx["right"]
+        spawned = list(getattr(getattr(kit, "world", None), "spawned", {}).values())
+        out: Dict[str, Any] = {"variant": self.gp.variant, "label": p.label, "live": str(res_live.reason)[:200]}
+
+        def live(margin):
+            r = TT.brace_second_arm(self, manip, "right", work_poses, "left", chain, ignore_work_last=[support, target], ignore_brace_last=[support],
+                                    brace_only_check=None if margin is None else ([support], margin), q_first_brace=p.q_first)
+            return "ok" if r.ok else str(r.reason)[:200]
+
+        def no_right(margin, empty=False):
+            """-> (verdict, {"pre": q, "contact": q} of the solved chain or None)"""
+            q0 = ikc.q_locked(manip)
+            q_f = None
+            if p.q_first is not None:
+                q_f = q0.clone()
+                q_f[idx_l] = TT._t(p.q_first)[idx_l]
+            ign = [support, target] + (spawned if empty else [])
+            with ikc.ignoring(ign):
+                r2 = ikc.exact(chain, manip, "left", [], q_seed=q0, cache=False, q_first=q_f)
+            if not r2.ok:
+                return f"brace: {r2.reason}"[:200], None
+            qs = {"pre": ikc.solutions.get(("left", ikc._pose_key(chain[0]))), "contact": r2.q}
+            with ikc.ignoring(ign):
+                if not bool(kit.collision_free(r2.q, margin=0.01)[0]):
+                    return "combined configuration collides", qs
+            if margin is not None:
+                q_b = ikc.q_locked(manip)
+                q_b[idx_l] = r2.q[idx_l]
+                with ikc.ignoring([support] + ([o for o in spawned if o is not target] if empty else [])):
+                    if not bool(kit.collision_free(q_b, margin=float(margin))[0]):
+                        return f"intersects the target at its goal pose (margin {float(margin) * 1000:.0f} mm)", qs
+            return "ok", qs
+
+        try:
+            m3 = TT.BRACE_TARGET_MARGIN
+            out["again"] = live(m3)
+            out["margin_0"] = live(0.0)
+            if out["margin_0"] == "ok" and out["again"] != "ok":
+                out["margin_1"] = live(0.001)
+                out["margin_2"] = live(0.002)
+            out["no_target"] = live(None)
+            out["no_right"], q_nr = no_right(m3)
+            out["no_right_no_target"], q_nrt = no_right(None)
+            out["empty"], _ = no_right(None, empty=True)
+            q_any = q_nr if q_nr is not None else q_nrt
+            if q_any is not None:
+                r1 = ikc.exact(list(work_poses), manip, "right", [support, target], cache=False)
+                if r1.ok:
+                    for nm, q_l in q_any.items():
+                        if q_l is None:
+                            continue
+                        q_c = TT._t(q_l).clone()
+                        q_c[idx_r] = r1.q[idx_r]
+                        out[f"blame_{nm}"] = ikc._collision_blame(q_c, [support, target], margin=0.0)[:240]
+                else:
+                    out["blame_pre"] = f"push goal not re-solved: {r1.reason}"[:200]
+            for k in ("again", "margin_0", "no_target", "no_right", "no_right_no_target", "empty"):
+                TT._count(self, f"axial_brace.probe.{k}.{'ok' if out.get(k) == 'ok' else 'fail'}")
+        except Exception as e:  # noqa: BLE001 - a diagnostic never fails the attempt
+            out["error"] = repr(e)[:200]
+        finally:
+            ikc.solutions.clear()
+            ikc.solutions.update(saved)
+        log.info("AXIAL_BRACE_PROBE %s", json.dumps(out, sort_keys=True))
+
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
         that end along the long axis are considered (the face at the pushed end)."""
@@ -991,6 +1113,21 @@ def axial_brace_opposite_on() -> bool:
     """i7-brace (owner 3.4; default OFF): the sampler also tries the OPPOSITE-END stop brace (the far end's face, resisting the same turn) after
     the current candidates. ``ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1``."""
     return os.environ.get("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", "0") == "1"
+
+
+def axial_brace_pre_policy_on() -> bool:
+    """i7-axialrest (owner 2026-11-08 5v.2; default OFF): the sampler checks each stop-brace candidate's PRE pose with the program check's
+    own call (``AlignmentAxial._brace_pre_policy``: the shared support policy on a fresh exact IK of the pre) - a brace the policy refuses is a
+    failed candidate (the next one is tried; none left = push-only, the brace is optional) instead of an attempt the program check rejects
+    ``pre: support_policy: ...``. ``ISPATIALGYM_AXIAL_BRACE_PRE_POLICY=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PRE_POLICY", "0") == "1"
+
+
+def axial_brace_probe_on() -> bool:
+    """i7-axialrest 5v.1 (owner 2026-11-08; DIAGNOSIS ONLY, default off): every brace candidate that fails at sampling is re-checked with the
+    locked push arm / the target margin removed one at a time (``AlignmentAxial._brace_probe``: ``AXIAL_BRACE_PROBE`` log lines, kit counters
+    ``axial_brace.probe.*``); the verdicts are unchanged. ``ISPATIALGYM_AXIAL_BRACE_PROBE=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_PROBE", "0") == "1"
 
 
 def _icl_frame(category: str, model: str):
