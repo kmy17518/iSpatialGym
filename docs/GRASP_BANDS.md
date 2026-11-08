@@ -2643,8 +2643,17 @@ m umbrella is carried across the heading, and with the hand 0.3-0.5 m to the lef
 `CARRY_CENTRED_POSES` (0.45-0.55 m ahead, raise 0.05-0.20 m) with the hand's lateral chosen so that the carried object's hull centre lies
 on the base's centre line (`centred_hand_lateral`); the existing checks judge them (B's camera frame, exact IK attached, the in-hand line,
 the carried path). Kit counters `carry_pose.centred_offered` / `centred_used`; test_carry_centred.py. A/B on touching_large_02 N 4 v2only,
-root v2maps_goalmaps_umb2, trunk_6ac7931a, svl titanrtx: gm_t02_cc_on (18384743) / gm_t02_cc_off (18384745); final numbers appended to
-DECISIONS by `umbrella_r2/final_cc.sh`.
+root v2maps_goalmaps_umb2, trunk_6ac7931a, svl titanrtx: gm_t02_cc_on (18384743); the OFF arm is gm_t02_umb2 (same root, both switches off).
+
+**Second switch (0c24c2c6, `ISPATIALGYM_CARRY_SIDEWAYS`, default off).** gm_t02_cc_on's first C's offered the centred poses (hand lateral
+-0.01) and still collided at the same spot, so centring alone does not clear it. With the switch, a carried B -> C path that collides in
+every variant of today (straight arrival / plain, local then global) is planned again with the holonomic base driving sideways:
+`NAV.plan_path(heading_offset=+-pi/2)` (`NAV.fill_yaws`: each intermediate waypoint's yaw = its segment's heading + the offset, the end poses
+keep their stances' yaws), the offset nearer C's yaw first (`sideways_offsets`); `record_path` passes it through (default 0 = unchanged).
+The object held across the heading then lies along the way. The same swept check judges it (object attached, carry arms, yaw-lag
+envelope); the record is the recorded style, whose waypoint yaws the oracle tracks blended per segment as `stride_poses` models (no oracle
+change). Kit `carry_path.sideways_tried` / `sideways_used`; tests in test_carry_centred.py. Arm gm_t02_side_on (18384880, trunk_0c24c2c6).
+The 3-arm table (OFF gm_t02_umb2 / CENTRED gm_t02_cc_on / SIDEWAYS gm_t02_side_on) is appended to DECISIONS by `umbrella_r2/final_cc.sh`.
 
 ## Limitations / not done
 
