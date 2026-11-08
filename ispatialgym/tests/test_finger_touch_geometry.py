@@ -26,6 +26,13 @@ COUNTER = "bar_udatjt_0"
 SHALLOW, DEEP = 0.0180, 0.0195
 
 
+@pytest.fixture(autouse=True)
+def _finger_stage_only(monkeypatch):
+    """These tests are the geometry rule's FINGER stage: the hand-hull two-step (i7-ft2, default on since 2026-11-08) is off here - the fake
+    hands report the finger only; test_finger_touch_hand_hulls covers the two-step."""
+    monkeypatch.setenv(IK.FINGER_TOUCH_HAND_HULLS_ENV, "0")
+
+
 class _FakeHands:
     """``HandChecker`` stand-in: the lower finger's hull bottom = the eef z + the sphere bottom at the opening - ``hull_below``; its
     ``clearance`` = the support's ``sdf`` there (role "finger" only)."""

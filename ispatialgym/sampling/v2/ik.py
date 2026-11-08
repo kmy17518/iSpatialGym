@@ -450,10 +450,11 @@ FINGER_TOUCH_GEOMETRY_VERSION = 1
 #: (i7-plateqtf2, ``contact_policy.hull_fallback``): the padded spheres stay the screen; a NARROW sphere failure (only hand links, each sphere
 #: less than the model's 2 mm buffer deep, only into the touched support) passes when their exact hulls clear the touched support by
 #: :func:`support_hull_fallback_min_m` (0.5 mm, side_9's); a configuration whose spheres PASS must also have those hulls clear of it by the
-#: policy's ``hand_support_margin_m`` (the spec's P1 §3: hulls AND spheres). ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = ``0`` off (the
-#: default until the A/B) / ``shadow`` (judged and counted, verdict unchanged) / ``1`` on; kit counters ``finger_touch.hand_hulls.*``.
+#: policy's ``hand_support_margin_m`` (the spec's P1 §3: hulls AND spheres). ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = ``1`` on (the
+#: default since the A/B ft2hh_sh / ft2hh_on of 2026-11-08) / ``shadow`` (judged and counted, verdict unchanged) / ``0`` off; kit counters
+#: ``finger_touch.hand_hulls.*``.
 FINGER_TOUCH_HAND_HULLS_ENV = "ISPATIALGYM_FINGER_TOUCH_HAND_HULLS"
-FINGER_TOUCH_HAND_HULLS_DEFAULT = "0"
+FINGER_TOUCH_HAND_HULLS_DEFAULT = "1"  # i7-ft2: owner 7.1 decided to apply it; flipped after the A/B (separate commit)
 
 
 def finger_touch_hand_hulls_mode() -> str:

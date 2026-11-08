@@ -1,7 +1,7 @@
 """i7-ft2 2026-11-08 (owner decision 7.1): the FingerTouch geometry rule judges the hand's rigid links (palm / wrist camera / wrist) as the
 support policy's hull fallback does (``contact_policy.hull_fallback``, i7-plateqtf2): the padded spheres are the screen, a NARROW sphere
 failure passes on the exact hulls with 0.5 mm of real clearance, and a sphere pass also needs the hulls clear (P1 §3).
-``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = 0 (default) / shadow / 1.
+``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = 0 / shadow / 1 (the default since the A/B).
 
 The toy kit is test_finger_touch_geometry's (one configuration 4 cm before the grasp, fully open: it collides with the counter); a fake
 ``HandChecker`` reports fixed hull clearances per role.
@@ -51,11 +51,13 @@ def _judge(monkeypatch, mode, palm_sphere_depth, palm_hull, arm_bottom=0.09):
     return bool(ok[0]), kit.stats, ikc
 
 
-def test_default_off_keeps_the_sphere_verdict(monkeypatch):
-    ok, st, ikc = _judge(monkeypatch, None, 0.001, 0.001)
+def test_off_keeps_the_sphere_verdict_and_the_default_is_on(monkeypatch):
+    ok, st, ikc = _judge(monkeypatch, "0", 0.001, 0.001)
     assert IK.finger_touch_hand_hulls_mode() == "off" and not ok
     assert not any(k.startswith("finger_touch.hand_hulls") for k in st)
     assert "hand_hulls" not in ikc.cache_scope["finger_touch"]
+    ok, st, ikc = _judge(monkeypatch, None, 0.001, 0.001)  # unset: the default since the A/B (owner 7.1)
+    assert IK.finger_touch_hand_hulls_mode() == "on" and ok and "hand_hulls" in ikc.cache_scope["finger_touch"]
 
 
 def test_narrow_sphere_failure_passes_on_the_hull(monkeypatch, caplog):
@@ -100,7 +102,7 @@ def test_shadow_counts_without_changing_the_verdict(monkeypatch):
     assert ok and st["finger_touch.hand_hulls.verdict_to_fail"] == 1
 
 
-@pytest.mark.parametrize("v,want", [("", "off"), ("0", "off"), ("off", "off"), ("1", "on"), ("on", "on"), ("shadow", "shadow")])
+@pytest.mark.parametrize("v,want", [("", "on"), ("0", "off"), ("off", "off"), ("1", "on"), ("on", "on"), ("shadow", "shadow")])
 def test_mode_values(monkeypatch, v, want):
     monkeypatch.setenv(IK.FINGER_TOUCH_HAND_HULLS_ENV, v)
     assert IK.finger_touch_hand_hulls_mode() == want
