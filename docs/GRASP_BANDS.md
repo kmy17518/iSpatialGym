@@ -3392,6 +3392,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 24 | i7-t03 round 6 (63bde7f9; code d4f6975a) | 2a760c8d | the (d) pose-0 touch-rule fix behind SHELF_LIFT_STRAIGHTEN (off) |
 | 25 | i7-stancememo (76bf33b5; lead #38) | 0ab12366 | DEFAULTS ATTEMPT_CAP (lead #33), START_DRAW_A_REDRAWS 8 (lead #36); STANCE_MEMO / FLOOR_REDRAW off |
 | 26 | i7-t03 round 7 (37bd1888; lead #37) | 7c40cc28 | T03_PAIR_MESH, SHELF_PREGRASP_FRAME, SHELF_RELEASE_TRACKED, TRACKED_END_BLAME, all off |
+| 27 | i7-brace up to 43472364 (lead #40) | 14bfa044 | the axial brace load geometry behind GC_BRACE_LOAD_GEOM (off; validator only); the 9 braceload maps layered |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3419,6 +3420,8 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 - ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
   (`int2_20261108/rebuild_ft2b.sh`, same inputs): sink 36,985 feasible cells (= ft2's round b), bar 1.0505 r / l; layers ft2b_sink / ft2b_bar.
+- braceload (with merge 27, lead #40): the 6 axial_brace + 3 touch_brace maps re-validated under the load geometry fix, layered into int2
+  (not a root swap) after the running touching jobs ended; check_int2 ERRORS 0.
 - brace33_touch / brace34w (with merge 21): the touch_brace maps of gkpmii / dkhgxn / ntbrtz re-validated under the pusher fix, and the 8
   world_vertical wall_brace maps.
 
