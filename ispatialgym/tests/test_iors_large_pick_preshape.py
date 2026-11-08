@@ -87,12 +87,14 @@ def test_the_map_cap_keeps_every_base_pose():
 
 
 def test_the_arm_side_switch_and_the_camera_blame_are_opt_in(monkeypatch):
-    """i7-interior2 owner items 2 / 3: ISPATIALGYM_INSIDE_ARM_SIDE (the fridge's place joint-2 limit) and ISPATIALGYM_CAMERA_BLAME (the sink
-    pick's wrist-camera diagnostic) are off unless set; the blame only reports (camera_clear's verdict is unchanged)."""
+    """i7-interior2 owner items 2 / 3: ISPATIALGYM_INSIDE_ARM_SIDE (the fridge's place joint-2 limit; default on since the owner's 5t) and
+    ISPATIALGYM_CAMERA_BLAME (the sink pick's wrist-camera diagnostic, off unless set); the blame only reports (camera_clear's verdict is unchanged)."""
     from ispatialgym.sampling.v2 import orient as O
     from ispatialgym.sampling.v2.tasks import iors_large_inside as LI
 
     monkeypatch.delenv(LI.INSIDE_ARM_SIDE_ENV, raising=False)
+    assert LI.inside_arm_side_on()  # default on since the owner's 5t (relation "inside" only)
+    monkeypatch.setenv(LI.INSIDE_ARM_SIDE_ENV, "0")
     assert not LI.inside_arm_side_on()
     monkeypatch.setenv(LI.INSIDE_ARM_SIDE_ENV, "1")
     assert LI.inside_arm_side_on() and LI.INSIDE_ARM_SIDE_AIM_M > 0
