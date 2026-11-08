@@ -344,6 +344,10 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     B = T0[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T0[:3, 3]
     still = VC.judge_wall_brace(e, T0, T0, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None})
     assert still["reasons"] == ["not_loaded"]  # no motion at all: the load never acted - not a pass
+    T1 = _turn_about(n_w, 0.01 if float(np.cross(n_w, B - H) @ vB) > 0 else -0.01, H) @ T0
+    ok = VC.judge_wall_brace(e, T0, T1, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None}, finger_N=12.0)
+    past = VC.judge_wall_brace(e, T0, T1, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None}, finger_N=0.0)
+    assert ok["verdict"] == "valid" and past["reasons"] == ["not_braced"]  # moved past a fist it never touched: not a brace
     for ang in (0.02, -0.02):
         T1 = _turn_about(n_w, ang, H) @ T0
         mv = float((T1[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T1[:3, 3] - B) @ vB)

@@ -168,6 +168,8 @@ class ContactValidateConfig:
     wall_hang_drift_max_rad: float = 0.01
     #: the braced point must move at least this far under the load (else ``not_loaded``: the pusher never reached the target)
     wall_loaded_min_m: float = 0.001
+    #: the brace fingers must press the target at least this hard during the load (else ``not_braced``: it went past the fist)
+    wall_braced_min_N: float = 1.0
     wall_pusher_travel_max_m: float = 0.06
 
 
@@ -636,10 +638,11 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
 
 
 def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarray, T_eef0: np.ndarray, T_eef1: np.ndarray, cfg: ContactValidateConfig,
-                     run: Dict[str, Any], other_N: float = 0.0) -> Dict[str, Any]:
+                     run: Dict[str, Any], other_N: float = 0.0, finger_N: Optional[float] = None) -> Dict[str, Any]:
     """The wall brace acceptance (i7-brace, owner 3.4; ``*0`` the brace standing, ``*1`` after the load): the oracle's brace ran to its end
     with a clean postcondition; under the load the BRACED point moved along its own load direction (``load.brace_direction``: past level)
-    by <= ``brace_hold_max_m`` (``not_held``) and >= ``wall_loaded_min_m`` (``not_loaded``: no load reached it), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
+    by <= ``brace_hold_max_m`` (``not_held``) and >= ``wall_loaded_min_m`` (``not_loaded``: no load reached it), the brace fingers pressed the target >= ``wall_braced_min_N`` during it (``not_braced``: the
+    braced point went past the fist), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
     (``topple``: off its hinge), the brace hand stayed within ``brace_eef_drift_m`` (``hand_pushed``), and no non-finger robot link loaded the
     wall beyond ``non_finger_contact_N``. Measures: the turn about the wall normal (rad, + past level) and the braced point's motion."""
     load = entry.get("load") or {}
@@ -669,6 +672,8 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
         reasons.append("not_held")
     if moved < cfg.wall_loaded_min_m:
         reasons.append("not_loaded")  # the load never reached the target (the stop's gap alone is >= 1 mm): no verdict on the brace
+    if finger_N is not None and finger_N < cfg.wall_braced_min_N:
+        reasons.append("not_braced")  # the braced point went past and never met the fist (2026-11-08 run 3: the 25 deg wrists, 0.1 mm drift)
     if twist > cfg.topple_tilt_rad:
         reasons.append("topple")
     if drift > cfg.brace_eef_drift_m:
@@ -677,6 +682,7 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
         reasons.append("non_finger_contact")
     return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
             "measures": {"brace_point_moved_m": round(moved, 5), "turn_past_level_rad": round(turn, 5), "hinge_axis_twist_rad": round(twist, 5),
+                         "finger_obj_N": None if finger_N is None else round(float(finger_N), 3),
                          "eef_drift_m": round(drift, 5), "other_wall_N": round(float(other_N), 4)}}
 
 
@@ -1185,13 +1191,15 @@ class KitContactWorld:
         self.tw.probe.take()  # the restore's own contact samples are not the trial's
         return rec, sa
 
-    def _stepper(self, obj, sim, arm, sa, series, trace):
+    def _stepper(self, obj, sim, arm, sa, series, trace, finger_series: Optional[List[float]] = None):
         k = [0]
 
         def step(a):
             f = self.tw.step(a, sa, k[0])  # the world's probe (TabletopWorld.load), the sleep assist
             k[0] += 1
             series.append(float(f.get("other_slab", 0.0) or 0.0))
+            if finger_series is not None:  # i7-brace: the acting arm's fingers on the object (the wall brace's load reaching the fist)
+                finger_series.append(float(f.get("finger_obj", 0.0) or 0.0))
             if trace is not None:
                 trace(_T(obj.get_position_orientation()), _T(sim.eef_pose(arm)), f)
             return f
@@ -1262,7 +1270,8 @@ class KitContactWorld:
         w = _entry_world(entry, T_start)
         trace = TrialTrace(T_start, _T(w["contact"]))
         trace.rec.update(eef_start=_pose7(_T(sim.eef_pose(arm))), restore=rec, hinge=None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"})
-        step = self._stepper(obj, sim, arm, sa, series, trace)
+        fingers: List[float] = []
+        step = self._stepper(obj, sim, arm, sa, series, trace, fingers)
         self._hold(motions, step, self.vcfg.init_hold_steps)
         act = entry_action(entry, _T(obj.get_position_orientation()), obj.name, arm)
         try:
@@ -1298,7 +1307,8 @@ class KitContactWorld:
         T1, Te1 = _T(obj.get_position_orientation()), _T(sim.eef_pose(arm))
         self._hinge_off(hinge, obj)
         if wall_entry(entry):
-            out = judge_wall_brace(entry, T0, T1, Te0, Te1, self.cfg, run, max(series[n_pre:]) if len(series) > n_pre else 0.0)
+            out = judge_wall_brace(entry, T0, T1, Te0, Te1, self.cfg, run, max(series[n_pre:]) if len(series) > n_pre else 0.0,
+                                   finger_N=max(fingers[n_pre:]) if len(fingers) > n_pre else 0.0)
             out["pre_load"] = pre_load
             return dict(out, schema=TRIAL_SCHEMA, restore=rec, base=plan.get("base"), trunk=plan.get("trunk"), run=run, debug=trace.end(T1, Te1),
                         hinge=None if hinge is None else {k: v for k, v in hinge.items() if k != "hinge"}, wall_s=round(time.time() - t0, 3))
