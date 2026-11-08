@@ -162,11 +162,12 @@ class ContactValidateConfig:
     brace_hold_max_m: float = 0.012
     brace_eef_drift_m: float = 0.01
     # i7-brace (owner 3.4): the wall world (WALL_FAMILIES) - the kinematic wall box (thickness along its normal, width, height from the floor),
-    # the hang's settle steps on the hinge and the drift it may show, the pusher line's radius (the hull points it meets)
+    # the hang's settle steps on the hinge and the drift it may show
     wall_size_m: Tuple[float, float, float] = (0.10, 3.0, 2.6)
     wall_hang_steps: int = 20
     wall_hang_drift_max_rad: float = 0.01
-    wall_pusher_line_r_m: float = 0.02
+    #: the braced point must move at least this far under the load (else ``not_loaded``: the pusher never reached the target)
+    wall_loaded_min_m: float = 0.001
     wall_pusher_travel_max_m: float = 0.06
 
 
@@ -583,10 +584,12 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     """The wall brace load's pusher (i7-brace, owner 3.4): ``(centres per control step, the pusher's xyzw quaternion, facts)``. The leveling
     push carried on past level: the pusher meets the PUSHED corner (``load.point_object``) on the line along the corner's tangent
     (``load.direction``, 3-D in the wall plane - not flattened as :func:`pusher_path`), starting ``brace_pusher_gap_m`` before the hull points
-    within ``wall_pusher_line_r_m`` of that line, and drives on so far that the braced point (``load.brace_point_object``) would travel the
+    it meets, and drives on so far that the braced point (``load.brace_point_object``) would travel the
     stop's gap (``wall.brace_offset_m``) + ``brace_press_m`` with no brace (the lever ratio r_push / r_brace about the hinge; at most
-    ``wall_pusher_travel_max_m`` past the gap), at ``brace_pusher_speed_m_s``. The box's thin axis (local y) along the travel, local z along the
-    wall normal."""
+    ``wall_pusher_travel_max_m`` past the gap), at ``brace_pusher_speed_m_s``. The material it meets: the hull points within the box's half-width
+    ACROSS the line in the wall plane (any offset along the normal: the corner is on the mid-plane, the hull's vertices off it); none raises
+    (no load placed: the trial errors, never a vacuous pass). The box travels along its
+    local z, its 3 cm side across the line in the wall plane (the push fist's width), its 8 cm side along the wall normal."""
     load = entry.get("load") or {}
     R, t = T_obj[:3, :3], T_obj[:3, 3]
     d = _unit(R @ np.asarray(load["direction"], dtype=float))
@@ -595,23 +598,29 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     pts = pts_obj @ R.T + t
     rel = pts - P
     along = rel @ d
-    perp = np.linalg.norm(rel - along[:, None] * d[None], axis=1)
-    near = perp <= cfg.wall_pusher_line_r_m
+    y = _unit(np.cross(d, n))
+    # the box's face sweeps along d with its 3 cm side across the line (y) and its 8 cm side along the wall normal: it meets the hull edges that
+    # run along the normal (the corner lies on the mid-thickness plane, the hull's VERTICES half the thickness off it) - the points within its
+    # half-width across the line count, whatever their offset along the normal (2026-11-08 run: a distance-to-the-line test found no vertex
+    # within 2 cm of a 4.1 cm signpost's / a 14.5 cm dispenser's corner line, the fallback took points 5-16 cm away and the pusher never
+    # touched them - vacuous "valid" verdicts)
+    r_line = 0.5 * float(cfg.brace_pusher_size_m[0]) + 0.005
+    near = np.abs(rel @ y) <= r_line
     if not near.any():
-        near = perp <= float(np.sort(perp)[min(7, len(perp) - 1)])
+        raise ValueError(f"wall load: no hull point within {r_line:.3f} m across the pushed corner's line (no load can be placed)")
     face = float(along[near].min())
-    half = 0.5 * float(cfg.brace_pusher_size_m[0])  # the box's thin axis (the pusher's scale is (sy, sx, sz): local y = sx)
+    # the box travels along its local z (``brace_pusher_size_m`` = (y, x, z) scale (0.08, 0.03, 0.05): 5 cm along the travel, 3 cm across it in
+    # the wall plane - the push fist's width, so it acts at the corner, not along the edge - and 8 cm along the wall normal)
+    half = 0.5 * float(cfg.brace_pusher_size_m[2])
     start = P + d * (face - cfg.brace_pusher_gap_m - half)
     r_E, r_B = float(load.get("r_push_m") or 0.0), float(load.get("r_brace_m") or 0.0)
     gap_b = float((entry.get("wall") or {}).get("brace_offset_m", 0.005))
     past = min((gap_b + cfg.brace_press_m) * (r_E / max(r_B, 0.05) if r_E > 0 else 1.0), cfg.wall_pusher_travel_max_m)
     travel = cfg.brace_pusher_gap_m + past
     k = max(1, int(math.ceil(travel / max(cfg.brace_pusher_speed_m_s * dt, 1e-6))))
-    x = _unit(np.cross(d, n))
-    z = np.cross(x, d)
-    q = S.mat_to_quat(np.stack([x, d, z], axis=1))
+    q = S.mat_to_quat(np.stack([np.cross(y, d), y, d], axis=1))  # local x = the wall normal, y = across the travel in the plane, z = the travel
     facts = {"start": [round(float(v), 4) for v in start], "direction": [round(float(v), 4) for v in d], "face_along_m": round(face, 5),
-             "travel_m": round(travel, 5), "past_contact_m": round(past, 5), "n_line_points": int(near.sum())}
+             "travel_m": round(travel, 5), "past_contact_m": round(past, 5), "n_line_points": int(near.sum()), "line_r_m": round(r_line, 4)}
     return [start + d * travel * i / k for i in range(k + 1)], np.asarray(q, dtype=float), facts
 
 
@@ -619,7 +628,7 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
                      run: Dict[str, Any], other_N: float = 0.0) -> Dict[str, Any]:
     """The wall brace acceptance (i7-brace, owner 3.4; ``*0`` the brace standing, ``*1`` after the load): the oracle's brace ran to its end
     with a clean postcondition; under the load the BRACED point moved along its own load direction (``load.brace_direction``: past level)
-    by <= ``brace_hold_max_m`` (``not_held``), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
+    by <= ``brace_hold_max_m`` (``not_held``) and >= ``wall_loaded_min_m`` (``not_loaded``: no load reached it), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
     (``topple``: off its hinge), the brace hand stayed within ``brace_eef_drift_m`` (``hand_pushed``), and no non-finger robot link loaded the
     wall beyond ``non_finger_contact_N``. Measures: the turn about the wall normal (rad, + past level) and the braced point's motion."""
     load = entry.get("load") or {}
@@ -647,6 +656,8 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
         reasons.append(f"oracle:{run['postcondition']}")
     if moved > cfg.brace_hold_max_m:
         reasons.append("not_held")
+    if moved < cfg.wall_loaded_min_m:
+        reasons.append("not_loaded")  # the load never reached the target (the stop's gap alone is >= 1 mm): no verdict on the brace
     if twist > cfg.topple_tilt_rad:
         reasons.append("topple")
     if drift > cfg.brace_eef_drift_m:

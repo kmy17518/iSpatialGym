@@ -324,10 +324,11 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     path, q, facts = VC.wall_pusher_path(e, T0, hull, cfg, 1.0 / 30.0)
     d = np.asarray(facts["direction"])
     R = np.array(__import__("ispatialgym.grasping.schema", fromlist=["quat_to_mat"]).quat_to_mat(q))
-    assert np.allclose(R[:, 1], d, atol=1e-4)  # the thin axis along the travel
+    assert np.allclose(R[:, 2], d, atol=1e-4)  # the box travels along its local z, its 3 cm side across the line in the wall plane
+    assert abs(float(R[:, 1] @ (T0[:3, :3] @ np.asarray(e["wall"]["normal_object"])))) < 1e-4
     E = T0[:3, :3] @ np.asarray(e["load"]["point_object"]) + T0[:3, 3]
     # the pusher's face starts brace_pusher_gap_m before the corner (the corner is the material's extreme along d at its line)
-    face0 = float((path[0] - E) @ d) + 0.5 * cfg.brace_pusher_size_m[0]
+    face0 = float((path[0] - E) @ d) + 0.5 * cfg.brace_pusher_size_m[2]
     assert abs(face0 + cfg.brace_pusher_gap_m) < 1e-3
     lever = e["load"]["r_push_m"] / e["load"]["r_brace_m"]
     assert abs(float((path[-1] - path[0]) @ d) - (cfg.brace_pusher_gap_m + (0.005 + cfg.brace_press_m) * lever)) < 1e-5
@@ -336,6 +337,8 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     H = T0[:3, :3] @ np.asarray(e["wall"]["hinge_object"]) + T0[:3, 3]
     vB = T0[:3, :3] @ np.asarray(e["load"]["brace_direction"])
     B = T0[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T0[:3, 3]
+    still = VC.judge_wall_brace(e, T0, T0, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None})
+    assert still["reasons"] == ["not_loaded"]  # no motion at all: the load never acted - not a pass
     for ang in (0.02, -0.02):
         T1 = _turn_about(n_w, ang, H) @ T0
         mv = float((T1[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T1[:3, 3] - B) @ vB)
@@ -348,6 +351,12 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     out = VC.judge_wall_brace(e, T0, big, np.eye(4), Te, cfg, {"completed": True, "postcondition": None}, other_N=1.0)
     assert set(out["reasons"]) == {"not_held", "hand_pushed", "non_finger_contact"}
     assert VC.judge_wall_standing({"completed": True, "postcondition": "x"}, cfg)["reasons"] == ["oracle:x"]
+    # a corner whose line meets no hull point raises (no vacuous load); a thick target's faces are found across its half-thickness
+    with pytest.raises(ValueError):
+        VC.wall_pusher_path(dict(e, load=dict(e["load"], point_object=[0.0, 5.0, 5.0])), T0, hull, cfg, 1.0 / 30.0)
+    thick = hull * np.array([4.0, 1.0, 1.0])  # 12 cm thick: the corner's faces 6 cm off its mid-plane line
+    _p, _q, f2 = VC.wall_pusher_path(dict(e, wall=dict(e["wall"], thickness_m=0.12)), T0, thick, cfg, 1.0 / 30.0)
+    assert f2["n_line_points"] >= 2 and abs(f2["face_along_m"]) < 0.01  # the corner's own edge, not points far along the line
 
 
 def test_the_wall_map_cells_are_one_row_per_stand_off_and_the_lookup_stays_in_its_row():
