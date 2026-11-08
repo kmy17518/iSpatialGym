@@ -2436,6 +2436,18 @@ rejection sequence, 0 written in both: every attempt target_placement / board_pl
 (0.44, -0.10), (0.48, 0.04); "no pitched place reaches the pockets' release aims" at (0.52, -0.06), (0.60, 0.05)) - a pre-existing blocker
 of block_design_01 under v2only on the integration trunk, unrelated to the pack removal.
 
+**Touching follow-ups (lead 2026-11-08, from i7-diag's touching_04 diagnosis; all default OFF, the owner decides).**
+(a) `ISPATIALGYM_TOUCH_LIFT_SCREEN` (shadow / 1): the goal check's carried-drive lift test (box over the partner's top) at the draw, only where
+the goal check is certain to make it (carry rule partner, or auto with every A1 push stance a real second base pose whose drive passes
+within `carry_clearance_m` of the partner). (b) `ISPATIALGYM_PLACE_DEPTH_CAP_BASIS=a1`: the cap's verdict = A1's own push stance test at the
+focus. (c) `ISPATIALGYM_PLACE_DEPTH_CAP_REDRAW=1` (start re-drawn while all candidates are beyond the cap) and `ISPATIALGYM_PLACE_DEPTH_CAP_DRAW=1`
+(Phase 2's pairs cut to the cap, `keep_pairs`; in the SPA cell key when on). A/B (cluster, v2only N 4, 320200-320203, cap on): (a) goal_check
+lift_unreachable touching_04 6 -> 2 (118 s each), touching_02 12 -> 5 (~30 s), 46 candidates screened at the draw; in shadow all 18 would-be
+rejections failed at or before goal_check (0 passed it). (b) verdicts equal to the map basis in 805 / 808 candidates; the A1 failures at
+trunk (0.0, -0.61) fail at the partner-drawn place, the (0.25, -0.53) place-screen failures are exact IK: no gain, not recommended. (c)
+redraw: no effect (no start cell under the cap). DRAW: all-removed attempts 47 -> 0, written per attempt touching_04 0.044 -> 0.11,
+touching_02 0.045 -> 0.16; GPU-h per success 1.22 -> 0.61 / 0.15 -> 0.20 (demo success N 4 noise).
+
 **3.7 pack brace removed.** The block design packing tail (wide pack brace + pushes: `block_design._pack_tail / _pack_stage /
 _pack_pushes / _pack_face_half / _pack_posture_variants`, `pack_brace_opening`, `PACK_BRACE_END_MARGIN_M`), the oracle's
 `_pack_stage_actions` (a sidecar that still carries `pack` is refused: SidecarError), the program check's pack push handling
