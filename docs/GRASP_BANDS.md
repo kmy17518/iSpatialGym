@@ -2581,6 +2581,49 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
 - **For the owner.** The touch rule's start-pose contact; whether otwukr T7 / T8 become touching_03's templates; the defaults of
   the t03 switches. All stay off; no code changed in round 5.
 
+#### Round 6 (2026-11-08; LEAD DECISIONS 26 / 27 while the owner is away; DECISIONS "i7-t03 r6 ...")
+
+- **(d) touch-rule fix (d4f6975a, behind `ISPATIALGYM_SHELF_LIFT_STRAIGHTEN`, default off).**
+  - `lift_with_touch` now judges the attached book's hull clearance to the leaned-on board per lift pose
+    (`lift_touch_clearance_why`). Pose 0 is the grasp pose, i.e. the book's resting lean; there the hull may read down to
+    -0.1 mm (`LIFT_START_CONTACT_TOL_M`). Every later pose keeps clearance >= 0, and every robot link keeps today's rule.
+  - Kit: `shelf_lift.leaned_board_start_contact_allowed` (allowed although pose 0 reads < 0);
+    `.leaned_board_touch_refused.penetration` (a later pose < 0) / `.penetration_start` (pose 0 deeper than 0.1 mm) / `.ik` /
+    `.robot_link`. Log line `SHELF_LIFT_TOUCH refused <why> cl0 .. cl_rest ..`.
+  - Tests: 0.05 mm at pose 0 passes; 0.2 mm at pose 0 fails; below 0 at pose 1 or later fails; a robot link is refused as today.
+  - Rerun (`t03_20261108/sub_r6.sh` = `sub_r4.sh` on trunk_d4f6975a, 300100-103, svl titanrtx).
+  - **Arm v** (v2only, lean root `v2maps_t03`, d's switches): 298 att / 1 written / 1 ok, 1.17 GPU-h. That is the first touching_03
+    success on kmuacd (300100); r4_v was 320 / 0 / 0, 1.19 GPU-h.
+    - Where the fix acted: the lift refusals went from 53 to 0. `straightened` 61, `leaned_board_touch_allowed` 48, and all 48 are
+      `leaned_board_start_contact_allowed`: every allowed lift had the resting contact at pose 0, and none read below 0 later.
+    - Past the lift, attempts now die at the camera (gripper_not_in_frame 35, "pre-grasp fingertip outside the manipulation image"),
+      the release search (place_unreachable 13) and the retreat after the place (approach_untrackable 12, "the tracked chain's end
+      configuration collides").
+    - Before the lift nothing changed: no_free_edge 128, target_placement 109.
+    - Caveat: trunk_d4f6975a also carries r5's 5p.2 stance shift (830e7837), so the r4 / r6 difference is not only the touch rule.
+      The lift counters are the touch rule's alone.
+  - **Arm d** (legacy kmuacd, d's switches): still running at hand-back (i7t03r6_d 18386426). At 131 attempts: 0 written;
+    target_placement 74, no_free_edge 54, approach_untrackable 3. No attempt had reached the lift, as in r4_d (4 lifts in 320), so on
+    the legacy path the blockers stay before the lift, where the touch fix cannot act. Final numbers: `tab_i.py -a i7t03r6_d`,
+    `tab_t03.py i7t03r4_d i7t03r6_d`.
+- **otwukr self-contact diagnosis (CPU only, no fix; `t03_20261108/selfc_r6/`).**
+  - Method: FK of the r1pro URDF; the simulator's collision meshes (the r1pro.usda convex pieces); the sampler's cuRobo spheres.
+    Checked configurations are each demo's `ik_witnesses`, executed ones are `demo.hdf5` joint positions.
+  - The pair left_arm_link5 / torso_link2 is in no ignore list, so the sampler checks it - on spheres that miss the contact.
+    The touching part is `left_arm_link5_col_3`, the wrist end of link5 (z -0.02 .. -0.19 in the link frame). 46 of its 60
+    vertices lie outside every link5-7 sphere, by up to 10 mm, and up to 57 mm outside link5's own spheres, which end at z -0.14.
+    It touches torso_link2's front face.
+  - T8 (all 4): the 15 cm clear pose that `release_clear` checks (= the action-5 retreat target) has mesh clearance -0.4 / +2.2 /
+    -0.6 / +0.2 mm, while the spheres read +5.3 / +16.0 / +9.6 / +11.3 mm (link6's; link5's own +21 .. +38 mm). Executed, the
+    arm reaches -0.7 .. 0.0 mm at the contact step.
+  - T7 300400: the place's 10 cm retreat witness is 15.6 mm into the torso by mesh, +4.7 mm by spheres; executed -0.3 mm at the
+    contact step (inside the place action).
+  - The successful T7 300401 / 300402 retreat witnesses are +56 / +17 mm by mesh.
+  - So the executed path does not leave the checked one: the arm runs toward the checked witness and touches as it nears it. The
+    sphere model passes configurations whose real meshes touch. A fix (a sphere for link5's wrist end, or a mesh check of this
+    pair on the release witnesses) changes the shared robot collision model or a shared check, so it is for the owner.
+- **Left to the owner:** otwukr T7 / T8 as touching_03's templates, the eval index, the t03 switch defaults.
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
