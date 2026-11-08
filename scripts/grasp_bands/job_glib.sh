@@ -21,6 +21,8 @@
 # python -m ispatialgym.grasping.lean manifest), logs glib_lean_<shard>.log; GB_KIND=interior + GB_INTERIOR=<registry name or spec json>
 # (ispatialgym/assets/interiors/interiors.json) = the interior maps of the lean entries at the spec's board height (no anchors / heights):
 #   GB_STAGES="lean maps" GB_KIND=interior GB_INTERIOR=bookcase_kmuacd_0@0.8354 GB_ARMS="right left" GB_INCLUDE_DERIVED=0 GB_MANIFEST=<lean jobs.json> ...
+# i7-interior 2026-11-07: GB_INTERIOR_PLACE='{"pre": "outward", "drop_m": 0.03}' (interior_place.place_rule fields; the variant's place) = interior
+# PLACE maps of the stable rests - the map stance C's goal side reads under v2only (iors_large_inside.inside_place_rule)
 # a STABLE rest in a compartment (the fridge jar, inside_large_scale_02): GB_INTERIOR=<registry.json>::<name> (the interiors measure CLI's file;
 # the spec carries its stand-offs, joints and open-door box), GB_MANIFEST = the stable entry's job
 # i7-overhang 2026-11-07: GB_STAGES token "overhang" = the manifest's OVERHANG jobs end to end (grasping.pipeline overhang: export, the settle
@@ -81,6 +83,8 @@ if [[ " $STAGES " == *" maps "* ]]; then
     HEIGHTS=()   # the floor kind: h 0, no anchor axis
   elif [ "$KIND" = interior ]; then
     HEIGHTS=(--interior ${GB_INTERIOR:?GB_KIND=interior needs GB_INTERIOR})   # the interior kind: the spec's board height, no anchors
+    # i7-interior 2026-11-07: GB_INTERIOR_PLACE=<json place rule> = interior PLACE maps of the stable rests (the goal side of iors_large_inside)
+    [ -n "${GB_INTERIOR_PLACE:-}" ] && HEIGHTS+=(--interior-place "$GB_INTERIOR_PLACE")
   else
     HEIGHTS=(--anchors ${GB_ANCHORS:-$GBH/anchors.json} --heights ${GB_HEIGHTS:-0.4230 0.8126 1.0505} "${BYID[@]}")
   fi

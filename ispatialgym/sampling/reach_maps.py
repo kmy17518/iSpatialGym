@@ -150,11 +150,14 @@ class MapConfig:
     # i7-overhang 2026-11-07: an overhang map's rest identity (``grasping.overhang.OverhangSpec.digest``); None for every other kind (left out
     # of key(): their keys stay)
     overhang: Optional[str] = None
+    # i7-interior 2026-11-07: an interior PLACE map's rule (``interior_place.place_rule``: the stable rest's release as stance C's exact place
+    # checks it); None for every other map (left out of key(): their keys stay - the former interior maps included)
+    interior_place: Optional[Dict[str, Any]] = None
 
     def key(self) -> Dict[str, Any]:
         d = asdict(self)
         d.pop("batch")  # does not change results
-        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang"):
+        for k in ("x_min_m", "floor_fingers", "trunk_eligibility", "interior", "overhang", "interior_place"):
             if d.get(k) is None:
                 d.pop(k)
         return d
@@ -291,15 +294,24 @@ def floor_config(**kw) -> MapConfig:
     return MapConfig(**kw)
 
 
-def interior_config(spec, rest_kind: str = "lean", **kw) -> MapConfig:
+def interior_config(spec, rest_kind: str = "lean", place: Optional[Dict[str, Any]] = None, **kw) -> MapConfig:
     """i7-lean 2026-11-07: the :class:`MapConfig` of an interior map of compartment ``spec`` (``interiors.InteriorSpec``) at a ``rest_kind``
     rest: the spec's stand-offs (``edge_distances``), one object yaw at a LEAN rest (measured against its board; a stable rest keeps the
     yaw axis), the lattice from the nearest front plane to the farthest board back, the spec's digest; ``kw`` sets the other fields (arm,
-    lattice, seeds, edge distances, ...)."""
+    lattice, seeds, edge distances, ...). i7-interior 2026-11-07: ``place`` (``interior_place.place_rule``; a STABLE rest only) = an
+    interior PLACE map - the rule in the config, its lattice over the compartment's span at every lateral (``place_config_fields``)."""
     kw = dict(kw)
     d_es = tuple(kw.pop("edge_distances", tuple(spec.edge_distances)))
     cfg = {"n_yaws": 1 if rest_kind == "lean" else MapConfig.n_yaws, "edge_distances": d_es, "x_max_m": round(max(d_es) + float(spec.depth_m), 4),
            "interior": spec.digest(), **kw}
+    if place is not None:
+        from ispatialgym.sampling import interior_place as IP
+
+        if rest_kind != "stable":
+            raise ValueError(f"an interior place map is computed at a stable rest (got a {rest_kind} rest)")
+        rule = IP.parse_rule(place)
+        cfg.update(IP.place_config_fields(spec, rule, d_es))
+        cfg["interior_place"] = rule
     return MapConfig(**cfg)
 
 
@@ -764,6 +776,13 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
                 raise ValueError(f"rest {rest_id!r}: a lean rest record without its side / board face")
     elif interior is not None or cfg.interior is not None:
         raise ValueError(f"interior is an interior map's field (kind {kind!r})")
+    if cfg.interior_place is not None:
+        # i7-interior 2026-11-07: an interior PLACE map (a stable rest in a fixed compartment, judged as stance C's exact place) - its own module
+        if not interior_kind or lean_placed:
+            raise ValueError(f"interior_place is an interior map's field at a stable rest (kind {kind!r}, rest kind {r_kind!r})")
+        from ispatialgym.sampling import interior_place as IP
+
+        return IP.compute_place_map(world, lib, rest_id, height, anchor, geom, cfg, policy, interior)
     # i7-overhang 2026-11-07: an overhang map - the rest's geometry fixes the yaw and the cells' x per edge distance
     overhang_kind = kind == "overhang"
     ov_geo: Dict[str, Any] = {}
@@ -1196,6 +1215,12 @@ def compute_map(world: SynthWorld, lib: S.ModelLibrary, rest_id: str, height: fl
     return meta, arrays
 
 
+def _place_covers(have, want) -> Optional[str]:
+    from ispatialgym.sampling import interior_place as IP
+
+    return IP.covers(have, want)
+
+
 @functools.lru_cache(maxsize=1)
 def robot_digest() -> str:
     from ispatialgym.oracle import r1pro_model as M
@@ -1250,7 +1275,7 @@ class ReachMap:
     @staticmethod
     def find(maps_root: str, lib: S.ModelLibrary, height: float, *, rest_id: str, arm: str = "right", policy_key: Optional[str] = None,
              anchors=None, kind: str = "tabletop", robot: Optional[str] = None, config_require: Optional[Dict[str, Any]] = None,
-             interior=None) -> Optional["ReachMap"]:
+             interior=None, interior_place: Optional[Dict[str, Any]] = None) -> Optional["ReachMap"]:
         """The map of this library entry / rest / arm at the anchor that covers ``height`` (``height_anchors.AnchorSet.lookup``: exact,
         or within the anchor's clipped range); None when uncovered or when no compatible map exists - never a band, never a map of other
         metadata (object identity, rest, policy, schema are all checked). ``kind="floor"`` (i7-floor 2026-11-07): ``height`` 0.0 and
@@ -1259,7 +1284,9 @@ class ReachMap:
         ``kind="interior"`` (i7-lean 2026-11-07): ``interior`` (an ``interiors.InteriorSpec`` or its digest) is required and must be the map's
         compartment (meta ``interior.digest``), the rest a LEAN rest of the entry whose lean identity is the map's (meta ``lean.digest``);
         no other kind serves a lean rest, and an interior map never serves another kind. ``kind="overhang"`` (i7-overhang 2026-11-07): the rest
-        an OVERHANG rest of the entry whose overhang identity is the map's (meta ``overhang.digest``); no other kind serves an overhang rest."""
+        an OVERHANG rest of the entry whose overhang identity is the map's (meta ``overhang.digest``); no other kind serves an overhang rest.
+        i7-interior 2026-11-07: ``interior_place`` (an ``interior_place.place_rule``) - only a PLACE map whose rule covers it
+        (``interior_place.covers``); without it only a map without a place rule (the lean / former interior maps' lookups stay as they were)."""
         want_plane = PLANE_OF_KIND.get(kind, "slab")
         want_interior = None
         if kind == "interior":
@@ -1301,6 +1328,8 @@ class ReachMap:
                 continue
             if (m.get("overhang") or {}).get("digest") != want_overhang:  # i7-overhang: the overhang rest's identity (None for any other)
                 continue
+            if kind == "interior" and _place_covers((m.get("config") or {}).get("interior_place"), interior_place) is not None:
+                continue  # i7-interior: a place lookup reads a place map of its rule; a lean / former lookup none
             if policy_key is not None and m.get("policy_key") != policy_key:
                 continue
             if robot is not None and m.get("robot") != robot:  # of-v2maps 2026-11-07 (P2 §11): a map of another robot model does not serve
@@ -2189,7 +2218,7 @@ def _bench(args):
 
 
 def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[str] = None, trunk_eligibility: Optional[str] = TRUNK_ELIGIBILITY_DEFAULT,
-                      interior: Optional[str] = None, overhang: Optional[str] = None) -> bool:
+                      interior: Optional[str] = None, overhang: Optional[str] = None, interior_place: Optional[Dict[str, Any]] = None) -> bool:
     """``--skip-existing``: the map ``path`` (``.json``) is this run's arm and kind (an unreadable file does not count); a floor run's map also
     its finger rule (``floor_fingers``; i7-floorfix 2026-11-07: a floor map of the former rule does not stand in for the new one), and its
     trunk eligibility rule (i7-unblock 2026-11-07: ``trunk_eligibility``, None = "all_d_e"; a map of the former rule does not stand in for
@@ -2204,6 +2233,8 @@ def _map_meta_matches(path: str, arm: str, kind: str, floor_fingers: Optional[st
     if config_value(m, "trunk_eligibility") != (trunk_eligibility or "all_d_e"):
         return False
     if kind == "interior" and (m.get("interior") or {}).get("digest") != interior:  # i7-lean: another compartment does not count
+        return False
+    if kind == "interior" and (m.get("config") or {}).get("interior_place") != interior_place:  # i7-interior: another place rule does not count
         return False
     if kind == "overhang" and (m.get("overhang") or {}).get("digest") != overhang:  # i7-overhang: another overhang rest does not count
         return False
@@ -2235,6 +2266,8 @@ def main(argv=None):
                         "interior: the lean entries inside --interior's compartment (at its board height; no anchors); "
                         "overhang: the overhang entries on a slab whose near edge lies under them (anchors / heights as tabletop)")
     c.add_argument("--interior", default=None, help="--kind interior: an interiors.json name (ispatialgym/assets/interiors) or a spec json file")
+    c.add_argument("--interior-place", default=None, help="--kind interior, a STABLE rest: the place rule (JSON, interior_place.place_rule) - an interior "
+                        "PLACE map as stance C's exact place checks it (i7-interior); default none = the former interior map")
     c.add_argument("--skip-existing", action="store_true", help="skip (job, height) pairs whose map file exists already")
     c.add_argument("--include-derived", action="store_true", help="also every library entry of --glib that is not a manifest job (the measured-rest retries)")
     c.add_argument("--arm", default="right", choices=["right", "left"])
@@ -2372,12 +2405,14 @@ def _compute_cli(a):
             if a.kind == "overhang":  # i7-overhang: the rest's own config (its digest, one yaw, the edge distances, the lateral lattice)
                 cfg_r = overhang_config(r, **{k: v for k, v in kw.items() if k != "lattice_m"})
             else:
-                cfg_r = interior_config(spec, rest_kind=getattr(r, "kind", "stable"), **kw) if interior_kind else cfg
+                rk = getattr(r, "kind", "stable")
+                place = getattr(a, "interior_place", None) if rk == "stable" else None  # i7-interior: the place rule (stable rests only)
+                cfg_r = interior_config(spec, rest_kind=rk, place=place, **kw) if interior_kind else cfg
             for anc in anchors_j:
                 # of-v2maps 2026-11-06: an existing map counts only for this run's arm and kind (the file name's key hashes the arm, the glob
                 # did not: a left-arm run after the right-arm one into the same root computed nothing)
                 if a.skip_existing and any(_map_meta_matches(p, cfg_r.arm, a.kind, cfg_r.floor_fingers, cfg_r.trunk_eligibility, cfg_r.interior,
-                                                             cfg_r.overhang)
+                                                             cfg_r.overhang, cfg_r.interior_place)
                                            for p in glob.glob(os.path.join(a.out, j["id"], f"map__*__h{float(anc['height']):.4f}__*.json"))):
                     continue
                 try:

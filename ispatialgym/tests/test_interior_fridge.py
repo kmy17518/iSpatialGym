@@ -19,6 +19,7 @@ import torch as th
 from ispatialgym.grasping import contact_policy as CP
 from ispatialgym.grasping import schema as S
 from ispatialgym.sampling import grasp_library as GL
+from ispatialgym.sampling import interior_place as IP
 from ispatialgym.sampling import interiors as IN
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling import reach_maps as RM
@@ -170,8 +171,12 @@ def test_a_stable_rest_inside_the_fridge_in_the_fake_world(fake):
 # ------------------------------------------------------------------------------------------------------------------ identity + find
 
 
-def _meta(lib, sp, *, arm="right", rest_id="r0"):
-    cfg = RM.interior_config(sp, rest_kind="stable", arm=arm)
+#: i7-interior 2026-11-07: the place rule of the goal side's lookup (inside_large_02: the outward pre-place, drop 0.03)
+PLACE = IP.place_rule(pre="outward", drop_m=0.03)
+
+
+def _meta(lib, sp, *, arm="right", rest_id="r0", place=None):
+    cfg = RM.interior_config(sp, rest_kind="stable", arm=arm, place=place)
     m = {"schema": RM.SCHEMA, "kind": "interior", "plane": "interior", "arm": arm, "object_key": lib.identity_key(), "rest_id": rest_id,
          "height": {"value": sp.height_m, "anchor_key": "interior"}, "edge_distances": list(cfg.edge_distances), "config": cfg.key(),
          "policy_key": CP.DEFAULT.key(arm), "robot": RM.robot_digest(), "brace": None, "object": {"category": "jar_of_spaghetti_sauce", "model": "exmsmm"},
@@ -230,8 +235,10 @@ def jar(tmp_path, monkeypatch):
     GL._v2_index.cache_clear()
     lib = GL.v2_entry(JAR_KEY)
     assert lib is not None
-    path = _write(str(maps / os.path.basename(d)), _meta(lib, _fridge()))
-    yield SimpleNamespace(lib=lib, path=path)
+    # i7-interior: the goal side reads the PLACE map of its rule; a former interior map (the whole robot at the rest pose) beside it never serves
+    former = _write(str(maps / os.path.basename(d)), _meta(lib, _fridge()))
+    path = _write(str(maps / os.path.basename(d)), _meta(lib, _fridge(), place=PLACE))
+    yield SimpleNamespace(lib=lib, path=path, former=former)
     GL._v2_index.cache_clear()
 
 
@@ -240,6 +247,9 @@ def _inside(joints=None):
 
     class Stand:
         inside_band = IL.InsideMode.inside_band
+
+        def inside_place_rule(self):
+            return dict(PLACE)
 
     s = Stand()
     s.choice = SimpleNamespace(models={"target": SimpleNamespace(category="jar_of_spaghetti_sauce", model="exmsmm", scale=None)})
@@ -274,6 +284,25 @@ def test_inside_band_reads_the_fridge_map_under_v2_only(jar, monkeypatch, caplog
     reqs = [json.loads(r.getMessage().split(" ", 1)[1]) for r in caplog.records if r.getMessage().startswith("MAP_REQUEST")]
     assert [(r["kind"], r["arm"]) for r in reqs] == [("interior", "left"), ("interior", "right")]
     assert reqs[0]["joints"] == DOOR and reqs[0]["interior"] == _fridge().name and reqs[0]["entry"] == os.path.basename(os.path.dirname(jar.lib.path))
+    assert reqs[0]["interior_place"] == PLACE and rb.meta["interior_place"] == PLACE
+
+
+def test_inside_band_never_reads_a_former_interior_map_or_another_place_rule(jar, monkeypatch, caplog):
+    """i7-interior: the former interior map (whole robot, rest pose, one posture / lateral) is stricter than stance C's exact place - it
+    never serves the goal side; nor does a place map of another rule (the sink's approach pre-place / tilts for the fridge's outward one)."""
+    monkeypatch.setattr(RB.ReachBands, "load", staticmethod(lambda *a, **k: (_ for _ in ()).throw(AssertionError("legacy"))))
+    os.rename(jar.path, jar.path + ".off")
+    os.rename(jar.path[:-5] + ".npz", jar.path[:-5] + ".npz.off")
+    with pytest.raises(Reject) as e:
+        _inside().inside_band("right")
+    assert e.value.reason == "missing_map" and "under the place rule" in str(e.value)
+    other = _write(os.path.dirname(jar.path), _meta(jar.lib, _fridge(), place=IP.place_rule(pre="approach", drop_m=0.03, tilts_deg=[30, 45])))
+    with pytest.raises(Reject):
+        _inside().inside_band("right")
+    os.remove(other)
+    os.remove(other[:-5] + ".npz")
+    tilted = _write(os.path.dirname(jar.path), _meta(jar.lib, _fridge(), place=IP.place_rule(pre="outward", drop_m=0.03, tilts_deg=[30])))
+    assert _inside().inside_band("right").meta["map_path"] == tilted  # a place map with more tilts covers the level-only rule
 
 
 def test_inside_band_off_v2_only_keeps_the_legacy_path(jar, monkeypatch):
