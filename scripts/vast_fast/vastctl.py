@@ -373,7 +373,7 @@ def sync_back(s3, st):
     jid = str(st["id"])
     tmp = os.path.join(VJ, "results", jid)
     os.makedirs(tmp, exist_ok=True)
-    have = r2_list(s3, f"out/{jid}/")
+    have = [n for n in r2_list(s3, f"out/{jid}/") if n in ("jobdir.tar.zst", "slurm.log", "cache_new.tar.zst")]
     for name in have:
         s5("cp", f"{JOB_S3}/out/{jid}/{name}", os.path.join(tmp, name))
     jd = st["job_dir"]

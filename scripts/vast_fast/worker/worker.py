@@ -228,6 +228,15 @@ def job_env(spec, cpus):
     return env, start
 
 
+def live_logs(jid, jd, logp, p):
+    """While the job runs: its job.txt and slurm log -> out/<id>/live/ every 5 min (progress for the coordinator / agents)."""
+    while p.poll() is None:
+        time.sleep(300)
+        for f, name in ((os.path.join(jd, "job.txt"), "job.txt"), (logp, "slurm.log")):
+            if os.path.exists(f):
+                s5("cp", f, f"{S3}/out/{jid}/live/{name}", check=False, timeout=300)
+
+
 def run_job(spec, replay_s3):
     jid = str(spec["id"])
     jd = spec["job_dir"]
@@ -263,6 +272,7 @@ def run_job(spec, replay_s3):
             # slurm's time limit: SIGTERM at the limit, SIGKILL 30 s later (KillWait); the job's EXIT trap runs on TERM
             p = subprocess.Popen(["taskset", "-c", cpus_str, "bash", spec["script"], jd], stdout=out, stderr=subprocess.STDOUT, env=env,
                                  cwd=spec.get("cwd") if os.path.isdir(spec.get("cwd") or "") else "/", start_new_session=True)
+            threading.Thread(target=live_logs, args=(jid, jd, logp, p), daemon=True).start()
             try:
                 rc = p.wait(timeout=int(spec["time_s"]))
             except subprocess.TimeoutExpired:
