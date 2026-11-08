@@ -5197,6 +5197,119 @@ Arm b counters:
 **Default: the owner's call** (P1 removed the grasp's plan_failed and the sub-3 cm transits in this N 8, at ~4.8x GPU-h per success; the
 live fallback plans in arm b also succeeded, so N 8 cannot separate the two).
 
+## Stance memo, floor redraw and the attempt cap (branch `i7-stancememo`, owner decisions 2026-11-08 5x.1 / 5x.3 / 5x.4)
+
+Owner decisions (verbatim in the lead's `owner_20261108i.md`; record `$OFH/DECISIONS.md`, "i7-stancememo" lines, runs in
+`$OFH/stancememo_20261108`). Branch from of-v2maps 93229922 with i7-startdraw merged at its last default commit 1ba40aae (db50e839), so
+every arm draws the robot's start per attempt (IORS large floor: stance A per attempt around the template's c_t and stance-B pool).
+
+### 5x.1 verification (i7-diag item 2)
+
+On i7diag_floor (fcddc495, before the start draw) under_large_03 instance 330003 took 15 attempts, 9 rejected in the B / C search
+(1,142-2,221 s each). Every B try of attempts 3 / 5 / 8 / 9 / 11 failed on the A -> B leg (`init -> manipulation` path_collision at swept
+pose 10-35 of ~400, 17 cm from the template's fixed stance A): that repeat depends on stance A, which the start draw now redraws per
+attempt. The repeats that do not depend on A remain: the C tries of a B (in attempts 6 / 8 / 9 / 12 / 13, 11-34 C keys each, nearly all
+exhausted in an earlier attempt, mostly by pairs dead at B's exact IK or "no push chain"), and ontop_large_02's C skipped for a failed
+carry leg. The audit's 1,385 s per written demo is therefore an upper bound for the code before the start draw.
+
+### The switches (memo / redraw default off; the cap default on since decision #33)
+
+| switch | commit | what |
+|---|---|---|
+| `ISPATIALGYM_STANCE_MEMO=1` (a) | c280fab6 | per-INSTANCE memo of failing stance B / C of an IORS large floor init (`ispatialgym/sampling/v2/stance_memo.py`). A B that failed is dropped from the pre-screen's random draw; a C that failed at that B is skipped and does not use up one of the `n_try` tries. A failure that depends on stance A (the A -> B leg, the A -> B drive past the placed target) is keyed with A's pose; the others with B (and C) and A's trunk translate (the carry's travel trunk). Cleared when the sampler moves to the next instance and on a redraw. Every 4th hit (`ISPATIALGYM_STANCE_MEMO_RECHECK`) is searched fresh. |
+| `ISPATIALGYM_FLOOR_REDRAW=1` (b) | c280fab6 | after 2 attempts on one floor start failed in the B / C search, the next attempt redraws the floor start with `try_surface("floor")` and all its checks (free floor anchor within the geodesic, stances B collision-free and seeing c_t, stance A framing the target and the partner region, the A -> B leg, the stance-C existence test; the attempt's eval-repeat checks as always). A redraw that finds none keeps the start (`redraw.failed.<reason>`); the next instance starts on the template's start again. |
+| `ISPATIALGYM_ATTEMPT_CAP` (DEFAULT ON since the lead's decision #33, own commit; `=0` = no cap) | 1a68082b | the per-attempt cap max(300 s, 5 x the alias's median written attempt) from `ispatialgym/sampling/v2/attempt_cap_medians.tsv` (the audit's primary set, `scripts/oracle_fix/time_cap_count.py table`); armed while the attempt samples (the start draw / redraw exempt), checked at the kit's IK and collision queries and the samplers' deadline checks; a cut attempt is `Reject("time_cap")`. The fixed budgets stay as ceilings. |
+
+Kit counters: `memo.recorded.<b|c>`, `memo.skipped.<b|c>.<reason>`, `memo.recheck.<b|c>`, `memo.would_have_passed.<b|c>` (must be ~0),
+`memo.recheck_failed.<b|c>`, `memo.cleared.<instance|redraw>`; `redraw.search_fail`, `redraw.fired`, `redraw.failed.<reason>`,
+`redraw.template_restored`, with (b) off `redraw.would_fire` and the log-only `redraw.third_attempt_would_have_succeeded.<written|search>` /
+`redraw.third_attempt_failed.<search|start>`; `time_cap.armed`, `time_cap.cut`, `time_cap.cut_at.<where>`. Tests:
+`test_stance_memo.py` (per instance, a redraw clears it, off = today), `test_attempt_cap.py`.
+
+### 5x.3 count on the logs (CPU, before any run)
+
+`time_cap_count.py count` on the audit's `attempts_r4.jsonl`, primary set (2,571 attempts): the cap would cut 18 attempts (their search
+passes the cap), 1 of them written (under_large_01 300019/3, 2,158 s against a cap of 1,858 s), 17,168 s past the cap; all 17 cut
+rejected attempts were on instances a later attempt wrote. under_large_03 (cap 650 s) 8 / 6,939 s; articulation_open_small_02 (cap 341 s)
+3 / 6,528 s; under_large_01 3 / 3,445 s; four aliases 1 each. With every round-4 run as the median pool the cap would cut 172 attempts, 20
+written (12 in inside_large_03, whose camera-hull / blame runs are slower), so the table uses the primary set.
+
+### Runs
+
+trunk_1a68082b, v2maps_int2, v2only N 4, alias memory off, base index 347000 (one ledger per arm), svl titanrtx, at most 4 at a time.
+5x.1: sm_off / sm_a / sm_ab on under_large_03 and ontop_large_02. 5x.3: cap_on on under_large_03 (off arm = sm_off), cap_off / cap_on on
+articulation_open_small_02 and inside_large_01 (control). Suite at 1a68082b: 23 F + 3 E, the base set at db50e839.
+
+### Results (attempts / written / ok, GPU-h)
+
+| alias | off | (a) memo | (a)+(b) memo + redraw | where the switches acted |
+|---|---|---|---|---|
+| under_large_03 | 25 / 4 / 0, 2.12 | 39 / 2 / 0, 2.67 | 25 / 4 / 0, 1.88 | 0 / 2 / 0 search failures; 0 memo skips; no redraw |
+| ontop_large_02 | 24 / 3 / 2, 2.61 | 11 / 4 / 4, 1.43 | 11 / 4 / 4, 1.37 | 5 / 1 / 1 search failures; 5 B skips, 0 C skips, 0 re-checks; no redraw |
+
+- With the start draw on, the repeated B / C search that the audit measured is mostly gone. under_large_03's off arm had no search failure
+  at all (9 of 21 on i7diag_floor).
+- The memo acted only on ontop_large_02, in 5 B draws. A (B, C) key never repeats, because B is drawn at random from 256. The ontop
+  difference comes from the off arm's instance 347002: 15 attempts, all post-sample failures. That is N 4 noise, not the memo.
+- No re-check fell due, because no instance had 4 hits: `memo.would_have_passed` is unmeasured.
+- The redraw never fired, so the (a) and (b) arms are identical on ontop_large_02. In the off arm one instance reached 2 search
+  failures, and its 3rd attempt failed the search too.
+- no_floor_cell 0 and time_budget 0 in every arm.
+- For i7-startdraw: the per-attempt stance A draw fails `no_stance` in under 1 s on most under_large_03 attempts (17-24 of 25-39). These
+  rejections use up the 15 attempts per instance.
+- Bug fixed in 42392e51: a B failing "target not in the init image" depends on stance A's camera. It is now keyed with A.
+
+| alias (cap) | cap off | cap on | cut |
+|---|---|---|---|
+| articulation_open_small_02 (341 s) | 14 / 3 / 1, 2.74 GPU-h, sampling 8,279 s | 24 / 4 / 2, 1.49 GPU-h (0.75 / success), 4,907 s | 8 (time_cap) |
+| under_large_03 (650 s) | 25 / 4 / 0, 2.12, 7,080 s | 30 / 4 / 0, 0.98, 2,992 s | 3 |
+| inside_large_01, control (666 s) | 5 / 4 / 2, 0.59 | 10 / 4 / 3, 0.89 (0.30 / success in both) | 1 |
+
+Every instance was written in both arms of every alias.
+
+**5x.4**, re-measured on the (a)+(b) arm:
+- ontop_large_02 approach_untrackable: 2 of 11 attempts (off: 8 of 24), 364 s per written demo. In both, the carry chain at C goes into
+  another IK branch.
+- under_large_03 gripper_not_in_frame: 3 of 25 attempts (the same 3 as off), 549 s per written demo. Two of them are the pre-place
+  fingertip at the right image edge; one of them spent 2,022 s, mostly in the search.
+- Both still warrant an early check, at the point where the search can move on to the next C. Proposed, not implemented:
+  - ontop_large_02: an A/B of the existing opt-in `generation.carry_track_oracle`;
+  - under_large_03: the 5 % projection of the pre-place fingertip at C's acceptance, and of the grasp eef at B's.
+
+
+### r2: the cap default, and the start draw's stance A redrawn within the attempt (lead decisions #33-36, 2026-11-08)
+
+- #33: `ISPATIALGYM_ATTEMPT_CAP` is the default (69d70a41, in its own commit); `=0` = no cap.
+- #34: `ISPATIALGYM_STANCE_MEMO` / `ISPATIALGYM_FLOOR_REDRAW` stay off, in the code.
+- #35: 5x.4 is deferred to the owner.
+- #36: the start draw's `no_stance` (a bug of the i7-startdraw default, merged here at 1ba40aae).
+
+**Diagnosis.**
+- `run_instances` charges every start-draw rejection (0.3-0.9 s) as one of the instance's 15 attempts. sm_a lost two under_large_03
+  instances this way: each ran out of its 15 attempts after 8-9 `no_stance`.
+- Why stance A fails: new per-bearing counters (r2_sd1, under_large_03) split the failed bearings as follows:
+  - 78 % off the eroded free floor or the task rooms;
+  - 19 % with no straight trunk seeing the target and the partner region;
+  - 1 % colliding.
+- The 0.6-1.5 m ring around the template's c_t (beside a cubicle desk) is mostly not free floor, so one draw of 30 bearings finds A with
+  p ~ 1/3.
+
+**Fix (b2a51679).**
+- `ISPATIALGYM_START_DRAW_A_REDRAWS` (default 8; `0` = the single draw): up to 8 more draws of stance A and its A -> B leg inside the
+  attempt's start draw.
+- Kit counters `start_draw.redraws`, `start_draw.redraw.<reason>`, `start_draw.no_stance_final`, `stance_a.reject.<floor|frame|body|sweep>`.
+
+**A/B** (trunk_b2a51679, cap on in both arms, v2maps_int2, v2only N 4, svl titanrtx):
+
+| alias | single draw (r2_sd1) | + 8 redraws (r2_sd9) | counters |
+|---|---|---|---|
+| under_large_03 | 30 / 4 / 1, 0.99 GPU-h, 19 no_stance attempts | 17 / 4 / 0, 1.30 GPU-h, 1 no_stance | 27 redraws (24 no_stance, 3 no_transition), 1 no_stance_final |
+| ontop_large_02 (control) | 26 / 3 / 3, 2.10 GPU-h, 5 start rejections, 1 instance lost | 11 / 4 / 4, 0.96 GPU-h, 0 | 1 redraw |
+
+- Start-draw attempts charged: 24 -> 1. Instances lost: 1 -> 0.
+- GPU-h per success over both aliases: 0.77 -> 0.57, inside the ~15-point N 4 noise. under_large_03's ok count is held back by the
+  oracle push.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

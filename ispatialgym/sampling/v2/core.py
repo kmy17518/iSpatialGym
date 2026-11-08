@@ -44,6 +44,7 @@ import omnigibson as og  # noqa: E402
 
 from ispatialgym.fastflags import fast_on  # noqa: E402  (train-fast switches, 2026-10-31: ISPATIALGYM_FAST_<NAME>, default on, =0 off)
 from ispatialgym.sampling import instance_separation as SEP  # noqa: E402  (pure python: the early repeat filter's record)
+from ispatialgym.sampling import attempt_cap as AC  # noqa: E402  (pure python: i7-stancememo 5x.3, the adaptive per-attempt cap)
 
 from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
@@ -403,6 +404,27 @@ class SamplerV2(TaskSampler):
     def sample_instance(self, rng: np.random.Generator) -> Draft:  # hook
         raise NotImplementedError
 
+    def attempt_cap(self) -> Tuple[Optional[float], str]:
+        """i7-stancememo (owner 2026-11-08, 5x.3): this job's per-attempt cap (:mod:`ispatialgym.sampling.attempt_cap`): max(300 s, 5 x the
+        alias's median written attempt) (``ISPATIALGYM_ATTEMPT_CAP``, default on since decision #33), (None, "off") with ``=0``; logged once, ``time_cap.armed`` per
+        attempt with a cap."""
+        if "_attempt_cap" not in self.__dict__:
+            self._attempt_cap = AC.cap_for()
+            if self._attempt_cap[1] != "off":
+                log.info("%s: ATTEMPT_CAP: %s (%s)", self.gp.variant, "none" if self._attempt_cap[0] is None else f"{self._attempt_cap[0]:.0f} s per attempt",
+                         self._attempt_cap[1])
+        if self._attempt_cap[0] is not None:
+            _kit_count(self, "time_cap.armed")
+        return self._attempt_cap
+
+    def attempt_begin(self, index: int, attempt: int) -> None:  # hook
+        """i7-stancememo (5x.1): called by :meth:`run_instances` before each attempt (before the reset) with the instance index and the
+        attempt number; the task modules that keep per-instance state across attempts (IORS large's floor stance memo) scope it here."""
+
+    def attempt_end(self, index: int, attempt: int, outcome: str, phase: str, reason: Optional[str]) -> None:  # hook
+        """i7-stancememo (5x.1): called by :meth:`run_instances` after each attempt: ``outcome`` "written" / "rejected", the ``phase`` it
+        ended in and the rejection's reason (None when written)."""
+
     def spa_redraw_start(self, rng: np.random.Generator) -> None:  # hook (start_per_attempt)
         """This attempt's own start drawn from the attempt's ``rng`` (:func:`start_per_attempt`): the task modules whose
         ``sample_template`` fixes the start for the template override it; the others draw the start per attempt already."""
@@ -414,7 +436,8 @@ class SamplerV2(TaskSampler):
         active = start_draw_active(self)
         t_spa = time.time()
         try:
-            self.spa_redraw_start(rng)
+            with AC.suspended():  # i7-stancememo 5x.3: the start draw restores its state only on a Reject - never cut inside it
+                self.spa_redraw_start(rng)
         except Reject as e:
             if active:
                 _kit_count(self, f"start_draw.rejected.{e.reason}")
@@ -1709,6 +1732,7 @@ class SamplerV2(TaskSampler):
                 # train-fast STAGE_TIMING (2026-10-31): seconds and kit counters per stage, logged after every attempt (success or rejection)
                 clock = _StageClock(self.kit)
                 phase = "reset"
+                self.attempt_begin(index, attempt)  # i7-stancememo: per-instance state of the task module (its counters in this attempt's kit line)
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
                                                              context=f"{self.gp.variant}: instance {index} attempt {attempt}")
@@ -1727,7 +1751,16 @@ class SamplerV2(TaskSampler):
                     self.ikc.attempt = attempt  # ``IKChecker.LIMIT_RETRY_RANDOM_FROM_ATTEMPT``: attempt 0 solves without the random re-solves
                     clock.mark("reset")
                     phase = "sample"
-                    draft = self.sample(rng)
+                    cap_s, cap_why = self.attempt_cap()
+                    AC.begin(t0, cap_s)  # i7-stancememo 5x.3 (ISPATIALGYM_ATTEMPT_CAP): the cap runs while the attempt samples
+                    try:
+                        draft = self.sample(rng)
+                    except AC.AttemptCapStop as stop:
+                        _kit_count(self, "time_cap.cut")
+                        _kit_count(self, f"time_cap.cut_at.{stop.where.split(':')[0].split(' ')[0]}")
+                        raise Reject("time_cap", f"{stop} (ISPATIALGYM_ATTEMPT_CAP: {cap_why})", cap_s=round(stop.cap_s, 1), at=stop.where[:200]) from None
+                    finally:
+                        AC.end()
                     clock.mark("sample")
                     t_sample = time.time() - t0
                     phase = "instance_filter"
@@ -1781,6 +1814,7 @@ class SamplerV2(TaskSampler):
                     # template is still being sampled
                     self.write_template_meta()
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.variant, index, attempt, time.time() - t0)
+                    self.attempt_end(index, attempt, "written", phase, None)
                     self.log_attempt_stages(index, attempt, clock)
                     ok = True
                     break
@@ -1790,6 +1824,7 @@ class SamplerV2(TaskSampler):
                     log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
+                    self.attempt_end(index, attempt, "rejected", phase, e.reason)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if isinstance(e, TemplateExhausted) and not start_per_attempt(self):

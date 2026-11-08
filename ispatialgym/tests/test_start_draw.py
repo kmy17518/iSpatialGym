@@ -386,6 +386,44 @@ def test_iors_large_floor_and_reject(fake_tt, monkeypatch):
     with pytest.raises(Reject):
         s.spa_draw(np.random.default_rng(0))
     assert s.surface["init"] is before["init"] and s.kit.stats["start_draw.rejected.no_stance"] == 1  # the last good surface kept
+    assert s.kit.stats["start_draw.redraws"] == 8 and s.kit.stats["start_draw.no_stance_final"] == 1  # i7-stancememo r2: 1 + 8 draws
+
+
+def test_iors_large_floor_stance_a_redrawn_within_the_attempt(fake_tt, monkeypatch):
+    """i7-stancememo r2 (lead decision #36): a stance-A draw (or its A -> B leg) that finds none is redrawn up to
+    ISPATIALGYM_START_DRAW_A_REDRAWS (default 8) times within the attempt; =0 is the single draw (d50cb1b9)."""
+    import contextlib
+
+    s = _iors_large("floor")
+    c_t = th.tensor([0.5, 2.0])
+    b = Stance("manipulation", (0.5, 1.6, math.pi / 2), 0.5, 0.0)
+    s.surface.update({"c_t": c_t, "manip": [b], "z": 0.0, "edge": None})
+    s.ikc.ignoring = lambda objs: contextlib.nullcontext()
+    s.obj = lambda role: "floor"
+    s.sidecar = SimpleNamespace(transitions=[], paths=[])
+    calls = {"a": 0, "leg": 0}
+
+    def stance_a(ct, rng, height, like=None):
+        calls["a"] += 1
+        if calls["a"] <= 2:
+            raise Reject("no_stance", "floor init: no stance A sees the target at c_t and the partner")
+        return Stance("init", (float(ct[0]) + 1.0, float(ct[1]), math.pi), 0.0, 0.0)
+
+    def leg(a, m):
+        calls["leg"] += 1
+        if calls["leg"] == 1:
+            raise Reject("no_transition", "init -> manipulation: path_collision")
+
+    s.floor_stance_a, s.record_leg_a_b = stance_a, leg
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW", "1")
+    s.spa_draw(np.random.default_rng(0))
+    assert calls == {"a": 4, "leg": 2} and s.surface["init"].name == "init"
+    assert s.kit.stats["start_draw.redraws"] == 3 and s.kit.stats["start_draw.redraw.no_stance"] == 2 and s.kit.stats["start_draw.redraw.no_transition"] == 1
+    monkeypatch.setenv("ISPATIALGYM_START_DRAW_A_REDRAWS", "0")  # the single draw
+    calls.update(a=0, leg=0)
+    with pytest.raises(Reject):
+        s.spa_draw(np.random.default_rng(1))
+    assert calls["a"] == 1 and "start_draw.no_stance_final" not in s.kit.stats
 
 
 def test_iors_small_sample_draws_under_the_switch(monkeypatch):
