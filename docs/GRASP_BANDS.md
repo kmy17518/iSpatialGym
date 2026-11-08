@@ -3194,6 +3194,204 @@ axial_05 (+ axial_01/03/04 as the regression check). Default after I see it."
   only the support policy (it would have caught axial_03 310002/0); (c) the brace itself: 67 of 87 candidates have no IK in the empty
   world, so the map / live brace pose mismatch, not the two-arm check, is what keeps axial_05's brace from landing.
 
+### i7-attachdef (2026-11-08): the cap fixes as the default (owner 4.1) and the past-demo audit (owner 4.4)
+
+Owner decisions 2026-11-08 (tmp/outputs/owner_answers_20261108.md, verbatim): **4.1 "Make the cap fixes the default"**; **4.4 "approve
+an audit (CPU, from the demo metadata), and re-collect any affected instances"**. Branch `i7-attachdef` (from of-v2maps cf1f5d2d), record
+`$OFH/attachdef_20261108`. Process as for the plate switches (count first, then the default in its own commit, rebuild only what moves,
+stage in a copy, validate the aliases that read the changed entries).
+
+**4.1 Count** (candidates only, CPU, trunk_fcddc495; `count/count_table.md`): all 56 non-floating entries of v2maps_int1 (the 20 floating
+entries read neither switch: GraspGen poses, the width at the pad centre, no attachment rule), each with its RECORDED config (a candidate
+switch it lacks = off, as built) and the two switches per arm: off / outer (outer_pinch) / face (attach_face_retreat, attachment_free only -
+elsewhere it is structurally inert) / on. The arm matching the recorded state reproduces every recorded candidates.json (56 / 56: counts,
+poses, shifts, verdicts, representatives). 22 move with both on (candidates / geometry-ok / reps off -> on):
+
+| entry | off -> on | | entry | off -> on |
+|---|---|---|---|---|
+| cap xxqyrt (already on in int1) | 0/0/0 -> 12/12/10 | | garlic xotobt | 12/8/5 -> 12/5/5 |
+| beaker jdijek | 13/8/4 -> 24/20/5 | | sandal chgcrm | 13/13/10 -> 13/10/10 |
+| beer glass mxsliu | 19/18/3 -> 24/21/3 | | tablespoon yxxfdj | 12/9/6 -> 12/3/2 |
+| detergent gkpmii | 18/14/10 -> 19/15/10 | | teacup wopjex | 14/6/5 -> 20/4/4 |
+| tape kavsnx | 96/19/15 -> 89/79/30 | | lid tnwisp (face) | 13/4/4 -> 13/3/3 |
+| cork ncxgpe (face) | 35/34/5 -> 55/46/6 | | plate luhkiz | 77/18/17 -> 81/18/17 (poses) |
+| gym shoe kmcbym | 24/18/18 -> 26/23/20 | | salt shaker fonexa | poses only (4 swapped) |
+| jigsaw isgefa | 36/31/17 -> 39/36/30 | | steak lcebsq | 14/11/9 -> 15/11/10 |
+| pencil case otcmih | 15/4/3 -> 16/13/8 | | trash can jlawet | poses only (1) |
+| plate qtfzeq | 46/31/30 -> 48/33/32 | | skateboard jljqtt / webcam fabztm | poses only |
+| skateboard acmbvb | 22/22/10 -> 24/23/10 | | | |
+
+outer_pinch moves every hollow / multi-piece / non-convex entry (the diameter pinch the first-hit ray never proposed; the width and the
+antipodal cone measured from outside); attach_face_retreat moves only the cork, the lid tnwisp and the cap. 34 entries do not move.
+
+**Default** 044715ef: `CandidateConfig.outer_pinch = attach_face_retreat = True` (identity: an entry built before reads both off and keeps
+its key; a new build records them on). Tests test_attachfix / test_glib_switches.
+
+**Rebuild** (trunk_044715ef; `build/plan.json`, `submit_rebuild.sh`): the 21 moved entries other than the cap, each with its recorded
+config + both switches, its densify passes and validation overrides, its maps as it had them in v2maps_int1 (tabletop at its anchor keys and
+arms - per_d_e, the current default -, floor, the sink interior + interior PLACE maps of plate luhkiz with the recorded rule, the attach
+maps box + swept of the lid tnwisp / cork; the gkpmii touch_brace contact map reads a contact library, not the grasp entry: carried).
+Physics-valid old -> new: up - tape 12 -> 28, pencil case 1 -> 5, plate qtfzeq 27 -> 29, garlic 3 -> 4, cork 2 -> 3; DOWN - teacup 5 -> 1,
+tablespoon yxxfdj 5 -> 1, beer glass 2 -> 1, plate luhkiz 9 -> 8; equal on 12 (most capped at max_valid 6). No entry lost all its valid
+grasps. Staged `attachdef_20261108/v2maps_ad` (cp -a v2maps_int1 + the 21 entries and maps; old -> `_superseded_attachdef`, legacy_keys
+carried in each library.json, links.json records the layer, AD.txt); check_int1.py on it: 76 entries, 136 maps, 0 object-key mismatches,
+0 errors. NOTE: plate qtfzeq's map overlay release (map_overlay r1: ce1af987a8df9d69 / b2f36adb26c194ad) is pinned to the int1 map keys;
+the rebuilt maps have new keys, so the overlay does not apply to them.
+
+**Validation** (v2only N 4, A/B on the same snapshot trunk_044715ef and the same pinned outcome memory v0001, no aggregation between
+arms; tags `ad_int1` = v2maps_int1, `ad_v` = v2maps_ad; `submit_val.sh`; where the switch acted = the written instances' grasp on the
+rebuilt entry, kept (a pose of the int1 entry's valid grasps) or NEW; `val_acts.py`). Written / ok A -> B (B's grasps):
+disembedding_01 jigsaw 4/0 -> 4/2 (1 new); disembedding_05 beaker 4/3 -> 4/4 (3 new); disembedding_07 tape 4/4 -> 4/4 (3 new);
+disembedding_08 pencil case 4/4 -> 4/4 (3 new); nextto_03 tablespoon 4/4 -> 4/4 (4 new: its one valid grasp, 18 att vs 13);
+nextto_04 gym shoe 4/2 -> 4/4 (2 new); under_small_02 beer glass 4/4 -> 4/4 (2 new); nextto_02 salt shaker 3/3 -> 3/3 (kept);
+ontop_small_02 steak 4/2 -> 4/4 (kept); inside_04 garlic 4/4 -> 4/1 (1 new; the 3 failures plan_failed at the grasp's protected-object
+re-plan past the saucepot); **under_small_01 teacup 4/3 -> 0 written in 60 attempts** (44 place_unreachable: its one valid grasp is
+side_7, an 85 mm diameter pinch; int1 had 5 rim pinches 5-9 mm); **attachment_01 lid tnwisp 4/4 (0.40 GPU-h) -> 0 written after 1.5
+GPU-h** (target_placement: path_collision at the attach swept pose, robot links on the teapot at the attach pose; attach_face_retreat moved
+both valid grasps 5-6 mm up the lid, 23-24 -> 28-29 mm). Running at the report (`tab_i.py -a ad_v` / `-a ad_int1`): attachment_01 B,
+under_small_03 B (2/2 so far), inside_large_03 A and B, under_large_01 A / B, under_large_03 A / B.
+
+**Cause of the teacup / tablespoon / beer-glass losses** (diagnosis, not changed): outer_pinch measures the width from +-aperture/2
+(44.45 mm, the FULLY open pads) inward (`outer_hits`), so a rim / wall / handle pinch whose closing line meets another surface within 44 mm
+(the cup's far wall, the spoon bowl) is measured across it and dropped - while the oracle pre-shapes to the pinch width / 2 + margin and
+never sweeps that far. The cap needed the all-hits sampling (the diameter pinch the first-hit ray never proposed); the measurement from the
+fully open pads is what removes the thin pinches (teacup 5 -> 1, tablespoon 5 -> 1, beer glass 2 -> 1 valid). A fix (measure from the
+pre-shape opening, as sweep_from_preshape does for the sweep) changes a gate: owner decision.
+
+**4.4 Audit** (CPU, metadata only; `audit/audit.md`): every written demo under $OFH/out (2619 with a meta.json, every tag and family): its
+collector process (results.jsonl pid / host / job, ordered by finish time), whether an earlier episode of the same process joined (before
+the fix the attach rule's join list was per process: an episode joined iff its meta.attach_joins grew), and the measured start offset of
+every TRO object (meta.start_state vs the TRO root pose). 81 demos ran after a joined episode in the same collector; **52 are affected**
+(> 5 mm / 0.05 rad at the start; all attachment aliases, all on code before the fix, each the instance after a joined episode, offsets 40-549
+mm): attachment_01 27 (3 successes), _02 2, _03 4, _04 19 (4 successes) over 15 tags. The 29 others after a join started at their TRO pose
+(<= 0.8 mm): 18 on the fixed code, 11 on the old code - 10 of them the THIRD episode of a process (the offset hits the episode right after
+the join: the deferred un-filter runs inside that restore) and one (the cork, 03 / 300021, i7_attswept) right after a join yet at 0.0 mm. 6 demos off their TRO without a join are a different
+matter, not this bug (disembedding_04 / 09 i7t03_cnt4 80-443 mm, disembedding_08 pencil 0.6-0.8 mm / 0.16-0.22 rad, two mental_rotation
+error episodes): reported, not touched.
+
+**Re-collect** (submit_fast recollect, collector-only, trunk_fcddc495 = the integration tip with the fix, the same instance indices, K 2;
+`recollect_affected.py`): 52 / 52 collected, every one at its TRO pose (max start offset 0.01 mm, tro_pose_check 0 mismatches); successes
+7 -> 45 (attachment_01 3 -> 27 / 27, _02 0 -> 1 / 2, _03 0 -> 3 / 4, _04 4 -> 14 / 19), 34 jobs, 7.1 GPU-h = 0.16 GPU-h / success. Two lost to
+the node (a collector segfault at start, a numba / cffi mismatch) were rerun (`__ad2_`). The 7 affected successes had a GROUP goal override
+(prep_recollect keeps no previous slot poses, so it skips them): only their lid was off, the partner at its TRO pose, so they were
+re-collected from the source's overridden TRO (goal = the lid seated on the partner where it stood; recorded in `<job>/unskipped/README`).
+The 52 affected demos are not deleted: moved to `$OFH/out/_superseded_attachdef_20261108/<tag>/<alias>/<group>/demo/<iid>`, each source group
+keeps `SUPERSEDED_attachdef.txt`; ledger `audit/superseded.tsv`.
+
+### i7-attachdef follow-ups (2026-11-08): the pre-shape measure (owner 5.1), the int1 teacup / lid kept (5.2), the start offsets (a sampler race), the qtfzeq overlay
+
+Owner decisions 2026-11-08 (DECISIONS "OWNER DECISIONS (i7-attachdef follow-ups)"): **5.1 APPROVED gate change** - outer_pinch measures
+the pinch width at the oracle's PRE-SHAPE opening (pinch width / 2 + margin) instead of the fully open pads (+-44.45 mm), the same "judge
+at the pre-shape" rule as the IORS large picks; count, rebuild, validate. **5.2 APPROVED meanwhile** - keep the int1 teacup wopjex and lid
+tnwisp entries (switches off) in the staged root, as plate luhkiz, so under_small_01 and attachment_01 keep writing. **NEW** - diagnose the
+six start offsets the 4.4 audit found without a join. Lead: the offsets' fix (below) approved as a sampler-only bug fix, default off; the
+qtfzeq map overlay re-pinned to the rebuilt maps. **Owner 5j (2026-11-08, later): the race fix is the DEFAULT** ("Make
+ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS the default, in a separate commit on i7-attachdef").
+
+**5.2** (done first): the int1 teacup wopjex / lid tnwisp entries and their maps moved back from `glib|maps/_superseded_attachdef` into
+`attachdef_20261108/v2maps_ad` (the 4.1 rebuilds -> `glib|maps/_held_attachdef_rebuild`; AD.txt); check_int1 76 entries, 138 maps, ERRORS 0.
+v2only N 4 (`ad_v52`, trunk_044715ef, memory v0001, no aggregation): under_small_01 7 att / 4 written / 4 ok, 0.35 GPU-h (ad_v: 60 / 0 / 0);
+attachment_01 7 / 4 / 4, 0.48 GPU-h (ad_v: 0 written at 1.88 GPU-h).
+
+**5.1 code** (each switch off reproduces the build before; identity only when on):
+- 71b4d1fc `CandidateConfig.outer_pinch_preshape` (candidates.PreshapeOuter): every surface on the closing line within the open aperture
+  (all ray hits) classified as an OUTER boundary (material on the pad-centre side, free beyond); a pinch (p, m) holds when the pads at
+  h = preshape_pad_half(p + m) (= oracle_preshape_q: width / 2 + gripper_preshape_margin, the pad sweep's definition) start beyond it and
+  meet it first; the holding pinch of smallest width is kept. contact_features / finger_blades_clear / the symmetry width read it.
+- 599fdad9 a non-convex collision piece is judged by containment (Trimesh.contains): the face planes bound only a convex piece - the first
+  count dropped every candidate of the three hardback lean / overhang entries (12/12/7 -> 0). The pad sweep's `_inside_any` has the same
+  convex assumption: reported, not changed.
+- dbd8f4bd the first-hit proposals are added: the measure alone moved no thin pinch (count_pre: teacup 20/4/4 -> 21/5/5, tablespoon, garlic,
+  lid unmoved), because the all-hits Isaac sampler pairs each surface point with the FURTHEST hit, so a rim / wall / handle pinch is never
+  PROPOSED under outer_pinch. Proposals only (same seed), no gate.
+- d1ad9cb4 each candidate's policy geometry at its own pre-shape: check_grasp_geometry was called with the batch's widest pre-shape, so the
+  8-16 mm spoon pinches were judged ~29 mm per finger open (finger_penetration).
+- 7ac55021 the default (its own commit, owner 5.1). Tests test_outer_preshape, test_glib_switches.
+
+**5.1 count** (`count_pre4`, candidates only, CPU, trunk_d1ad9cb4; arm "on" = the 4.1 defaults reproduces the 4.1 count 56 / 56): 19 of
+the 56 non-floating entries move (candidates / geometry-ok / reps, on -> pre): tablespoon yxxfdj 12/3/2 -> 12/9/7, garlic xotobt 12/5/5 ->
+12/12/9, teacup wopjex 20/4/4 -> 21/6/6, hard candy vwegtt 28/9/9 -> 28/28/20, brussels sprouts mbkrxe 23/8/8 -> 23/22/10, tape kavsnx
+89/79/30 -> 108/83/30, cork ncxgpe 55/46/6 -> 55/46/12, gym shoe 26/23/20 -> 27/24/20, qtfzeq 48/33/32 -> 48/34/33, storage box 38/35/11 ->
+38/35/12, light bulb 24/20/10 -> 24/22/10, jigsaw 39/36/30 -> 39/37/27; poses / per-pose records only: beaker, bottle of milk, pencil case,
+plate luhkiz, sandal, skateboard acmbvb, trout. Unmoved: lid tnwisp 13/3/3 (its 4.1 loss is attach_face_retreat's, not the measure's), beer
+glass 24/21/3, the hardback entries, 34 others.
+
+**5.1 rebuild** (`build2/`, trunk_7ac55021: glib array 18381544 19 / 19, maps array 18381545 22 / 22; each entry with its recorded config +
+the three switches on, its densify / validation overrides and its maps as in v2maps_ad - tabletop per_d_e, floor sandal / storage box, the
+luhkiz sink interior + interior PLACE maps, the cork attach box + swept). Physics-valid, v2maps_ad -> build2 (poses kept): brussels 4 -> 6
+(1), cork 3 -> 7 (3), garlic 4 -> 6 (3), hard candy 5 -> 6 (1), tablespoon yxxfdj 1 -> 5 (1), tape 28 -> 29 (26), luhkiz 8 -> 9 (8), qtfzeq
+29 -> 30 (29), storage box 11 -> 12 (9); same count, other poses: milk 6 (5 kept), gym shoe 6 (3), jigsaw 6 (2), sandal 6 (4); identical
+valid poses: beaker 4, light bulb 6, pencil case 5, acmbvb 1, trout 0 (0 before). **Teacup wopjex: the rebuild has 4 physics-valid grasps,
+the int1 build (kept by 5.2) 5 -> the int1 teacup stays** (stage_ad2's rule: replace only when at least as many). The lid tnwisp was not
+rebuilt (unmoved by the measure): the int1 lid stays. STAGED `attachdef_20261108/v2maps_ad2` (`stage_ad2.py`: cp -a v2maps_ad + the 18
+entries and their maps; old -> `glib|maps/_superseded_attachdef2`, legacy_keys / links carried, AD.txt, staged2.json). **check_int1** on it:
+76 entries, 138 maps, 0 object-key mismatches, attach 8 / contact 16 / prefix 12 / interior 12 maps without error, 51 links, 0 unresolved,
+ERRORS 0.
+
+**qtfzeq's map overlay re-pinned** (lead; `carry_overlay.py`, `overlay_carry.json`): the overlay release r2 named the int1 map keys
+(right ce1af987a8df9d69 v2, left b2f36adb26c194ad v2), so it never applied to a rebuilt qtfzeq map (ad_v's under_small_03 33 att / 2 written).
+Cell records (stand-off | translate | tilt # cell) are base-relative reach facts of the map view: carried as they are. Yaw pairs name a grasp:
+carried under the rebuilt name when the grasp's pose (T_object_eef, 0.1 mm / 1e-3) is in the rebuilt entry, dropped otherwise. Right ->
+52df23ebc0086132 v1: 94 / 94 cells, 116 / 118 yaw pairs; left -> dafc858126a2111b v1: 53 / 53 cells, 37 / 39 yaw pairs; 26 of the 27 int1
+grasp names mapped (rim_straddle_11 is not in the rebuild: the 4 dropped pairs). New release `$OFH/map_overlay` **r3** = r2 + the two new
+keys (every r2 key at its r2 version: nothing changes for a map r2 named).
+
+**5.1 validation** (v2only N 4, tag `ad_v51`, trunk_7ac55021 - the build's snapshot, the runtime of ad_int1 / ad_v / ad_v52, race switch
+off -, `attachdef_20261108/v2maps_ad2`, overlay release r3, memory v0001 no aggregation, base index 300000, <= 4 GPUs via `loop_v51.sh`;
+where it acted = the written instances' grasp on a rebuilt entry, NEW (only with the pre-shape measure) or kept (a valid pose of the v2maps_ad
+entry), `val_acts51.py`). The 13 aliases whose entries' valid grasps changed; before = ad_int1 | ad_v (same snapshot), else the latest int1
+run. att / written / ok, GPU-h:
+
+| alias (entry) | ad_v51 | grasps | before |
+|---|---|---|---|
+| nextto_03 (tablespoon yxxfdj) | 11 / 4 / 4, 0.26 | 4 new | 13 / 4 / 4, 0.39 \| 18 / 4 / 4, 0.33 |
+| nextto_04 (gym shoe) | 28 / 4 / 4, 0.36 | 4 new | 17 / 4 / 2, 0.26 \| 20 / 4 / 4, 0.38 |
+| inside_01 (brussels sprouts) | 12 / 4 / 4, 0.46 | 3 new | int1_5 7 / 4 / 3, 0.31 |
+| inside_02 (hard candy) | 39 / 4 / 4, 0.51 | 3 new | int1_1 26 / 4 / 4, 0.38 |
+| disembedding_07 (tape) | 7 / 4 / 4, 0.38 | 1 new | 8 / 4 / 4, 0.36 \| 8 / 4 / 4, 0.38 |
+| disembedding_01 (jigsaw) | 15 / 4 / 0, 0.74 | 3 new | 19 / 4 / 0, 0.66 \| 6 / 4 / 2, 0.52 |
+| under_small_03 (plate qtfzeq) | 21 / 4 / 3, 1.03 | kept | 11 / 4 / 3, 0.64 \| 33 / 2 / 2, 1.41 |
+| disembedding_04 (bottle of milk) | 8 / 4 / 4, 0.40 | kept | i7t03_cnt4 7 / 4 / 4, 0.31 |
+| inside_04 (garlic) | 40 / 4 / 2, 0.95 | kept | 43 / 4 / 4, 0.90 \| 39 / 4 / 1, 1.15 |
+| attachment_03 (cork) | 17 / 4 / 4, 1.21 | kept | int1_5 39 / 3 / 2, 2.34 |
+| touching_large_03 (storage box) | 4 / 4 / 4, 0.32 | kept | int1_1 5 / 4 / 4, 0.26 |
+| under_large_01 (sandal) | 6 / 4 / 3, 1.96 | kept | 5 / 4 / 0, 2.17 \| 8 / 4 / 3, 3.54 |
+| inside_large_03 (plate luhkiz, sink) | 0 written at 1.86 GPU-h (cancelled: 2 attempts, each the 3000 s time_budget at the F draw) | - | 0 written at 1.9 \| 1.4 GPU-h (cancelled) |
+
+Where the pre-shape measure acted (the thin pinches back: tablespoon, gym shoe, brussels sprouts, hard candy, tape, jigsaw) every alias
+wrote 4 / 4 with the new grasps; all but the jigsaw succeeded 4 / 4 (disembedding_01 fails as before it: failed_grasp, symbolic_only x2,
+pause - not a grasp-selection loss). Elsewhere the written grasps are kept poses and the differences are N 4 variance. The qtfzeq run reads
+the carried overlay (kit `map_tilt.by_map.52df23eb / dafc8581`; cells invalidated in the run 6, vs 37 in ad_v where the rebuilt maps had no
+overlay). Not rerun: under_small_01 (the int1 teacup kept = ad_v52's entry: 7 / 4 / 4, 0.35), disembedding_05 beaker / _08 pencil case (the
+same valid poses as v2maps_ad), light bulb / acmbvb / trout (no alias reads them). inside_large_03 never wrote on this snapshot in any arm (the sink
+stance is i7-interior2's: i7i2_sinkdiag3 wrote 4 / 4 there): the luhkiz rebuild (8 -> 9 valid) is untested by a demo. Total ad_v51: 12
+finished jobs, 208 att / 48 written / 40 ok, 10.45 GPU-h = 0.26 GPU-h per success (+ 1.86 GPU-h for the cancelled sink job).
+
+**Start offsets without a join = a SAMPLER RACE** (diagnosed; not a run_isg reload bug): `write_instance` wrote the TRO, the sidecar and
+the SUMMARY - the collector queue's ready marker (`run_isg.queue_ready`) - BEFORE the post-write screens (`check_instance_filter`,
+`check_goal_occlusion`). A collector polling in that window claimed an attempt the screen then rejected; the sampler re-sampled the same
+index over the files, so the collector either ran the rejected layout and wrote its goal override into the NEW TRO (disembedding_04 300213
+/ _09 300211, goal-occluded 52-69 %: the 80-443 mm offsets) or found the files gone (FileNotFoundError: the two mental_rotation errors).
+disembedding_08 int1_1 300006 / i7_split 600006 ran an instance_filter-rejected layout (a repeat of an eval instance): the pencil's
+0.16-0.22 rad "roll" was this, not the restore settle. Count from the logs (`audit/race_count.json`): 1021 instance_filter + 38
+goal_occlusion post-write rejections campaign-wide; 7 claims the fix would have prevented (6 episodes ran a rejected attempt + 1
+FileNotFoundError, survey1 disembedding_07 300001). The disembedding_04 / 09 / 08 (int1_1) demos moved to
+`out/_superseded_attachdef_20261108` (their TROs carry the old episode's goal override: not re-collectable); i7_split 600006 lives in
+shiyuc's root (recorded, not moved).
+
+**Fix** 9bbbba7a (lead decision; sampler only, behind a switch): `ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=1` writes
+`<iid>.summary.json.pending` and `os.replace`s it after every screen passed; a rejected attempt's files (the pending summary too) are removed;
+kit counters `publish_after_screens.published` / `.withheld`. Off: the summary in place as before. Test test_publish_after_screens (a
+rejected attempt is never claimable, an accepted one exactly once, off unchanged). Demonstration `ad_race` (18381927, disembedding_09 N 4 - the alias with the most goal_occlusion rejections -,
+trunk_9bbbba7a, v2maps_int1, memory v0001 / no aggregation, switch on): 11 att / 4 written / 4 ok, 0.43 GPU-h = 0.11 per success (i7t03_cnt4
+20 / 4 / 3, 0.51; survey1 7 / 4 / 4, 0.29); **publish_after_screens.published 4, .withheld 2** (= instance 300006's two goal-occluded
+attempts, target 62 % / 65 % hidden); 4 claims = the 4 published instances, 0 pending files left.
+
+**Default** (owner decision 2026-11-08, 5j): 917f7232, its own commit - `fast_on("PUBLISH_AFTER_SCREENS", default=True)`;
+`ISPATIALGYM_FAST_PUBLISH_AFTER_SCREENS=0` (or `ISPATIALGYM_FAST=0`) restores the summary written before the screens. Test: on by default;
+the off test sets =0. Suite: 23 failed + 3 errors, the same ids as 9bbbba7a. Snapshot trunk_917f7232. A run submitted on an earlier
+snapshot keeps it (the 5.1 validation below ran on trunk_7ac55021, switch off, as its A arms).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

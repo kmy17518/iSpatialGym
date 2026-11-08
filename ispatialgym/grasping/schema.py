@@ -78,7 +78,8 @@ class IncompatibleRecord(ValueError):
 
 
 #: i7-switches 2026-11-07: the candidate-generation switches that are part of an entry's identity (module docstring)
-CANDIDATE_SWITCHES = ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape", "outer_pinch", "attach_face_retreat")
+CANDIDATE_SWITCHES = ("blade_contact_at_retreat", "retreat_shift_exact", "sweep_from_preshape", "outer_pinch", "attach_face_retreat",
+                      "outer_pinch_preshape")  # i7-attachdef: outer_pinch judged at the pre-shape (owner 5.1)
 #: the switches of 884279fd: in the identity as a pair whenever either is on (as they were); a later switch enters only when on, so every
 #: key written before it existed is unchanged (i7-padsweep 2026-11-07: sweep_from_preshape)
 _IDENTITY_PAIR = ("blade_contact_at_retreat", "retreat_shift_exact")
