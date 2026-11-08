@@ -178,3 +178,29 @@ def test_an_open_door_is_boxed_per_collision_piece(monkeypatch):
     assert sorted(round(v, 3) for v in panel[2]) == [0.02, 0.22, 0.95] and sorted(round(v, 3) for v in bin_[2]) == [0.05, 0.105, 0.17]
     one = IN.measure(w, fr, 0.77, name="f", scene="s", z_margin=0.03, moved_links=["left_door"], door_boxes="link")
     assert [b[0] for b in one.extra_boxes] == ["door_left_door"] and one.extra_boxes[0][2][0] > 0.12 and sp.source["door_boxes"] == "pieces"
+
+
+def test_a_two_bay_board_is_measured_in_the_bay_at_the_lateral():
+    """i7-t03specs 2026-11-08: bookcase_otwukr_1's boards span two bays (0.303 / 0.3105 m) either side of a 5 cm divider at the raster's
+    lateral centre: from the centre the wall rays start inside the divider (no hit) and the width falls back to the whole raster; with
+    ``lateral_m`` the rays start in the bay at that offset (the robot's left facing inward = -y here: the robot stands at -x)."""
+    z0 = BOARD_Z
+    c = "/World/two_bay/base_link"
+    boxes = [(c, [0.0, -0.3845, z0 - 0.05], [0.30, 0.3845, z0]),            # the board (both bays)
+             (c, [0.0, -0.3845, z0 + 0.28], [0.30, 0.3845, z0 + 0.33]),     # the board above
+             (c, [0.0, 0.3327, z0], [0.30, 0.3845, z0 + 0.28]), (c, [0.0, -0.3845, z0], [0.30, -0.3327, z0 + 0.28]),  # side walls
+             (c, [0.0, -0.0222, z0], [0.30, 0.0296, z0 + 0.28]),            # the divider
+             (c, [0.288, -0.3845, z0], [0.30, 0.3845, z0 + 0.28])]          # the back
+    case = _support("two_bay", boxes)
+    r = _raster(0.0, 0.288, -0.3327, 0.3327, 0.275)
+    r.open_edges = ["-u"]
+    w = Scene(boxes, r, [case])
+    whole = IN.measure(w, case, 0.77, name="w", scene="s", z_margin=0.03)
+    assert whole.width_m == pytest.approx(0.66, abs=0.011)  # the fallback: the raster's span (both bays and the divider as one compartment)
+    # the edge "-u" (outward -x): inward +x, tangent (compartment_frame: [-n_y, n_x]) = +y
+    left = IN.measure(w, case, 0.77, name="l", scene="s", z_margin=0.03, lateral_m=0.19)
+    right = IN.measure(w, case, 0.77, name="r", scene="s", z_margin=0.03, lateral_m=-0.19)
+    assert left.width_m == pytest.approx(0.3327 - 0.0296, abs=1e-4) and left.centre_y_m == pytest.approx(0.5 * (0.3327 + 0.0296), abs=1e-4)
+    assert right.width_m == pytest.approx(0.3327 - 0.0222, abs=1e-4) and right.centre_y_m == pytest.approx(-0.5 * (0.3327 + 0.0222), abs=1e-4)
+    assert left.back_thickness_m is not None and left.depth_m == pytest.approx(0.298, abs=0.011) and "lateral +0.190" in left.source["measured"]
+    assert whole.digest() != left.digest() and "lateral" not in whole.source["measured"]  # the default is unchanged
