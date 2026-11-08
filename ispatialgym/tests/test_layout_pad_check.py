@@ -76,3 +76,16 @@ def test_rows_on_the_frame_vs_clear_rows(parts):
     for n in ("top_8", "old_top_3"):
         assert cl[n][0] > -0.002, (n, cl[n])
     assert min(cl["top_5"][0], cl["top_10"][0]) < -0.002, cl
+
+
+def test_mode_values(monkeypatch):
+    for v, want in (("0", "off"), ("1", "all"), ("all", "all"), ("heavy", "heavy"), ("bogus", "off")):
+        monkeypatch.setenv(D.LAYOUT_PAD_SWITCH, v)
+        assert D.layout_pad_mode() == want
+
+
+def test_per_part_clearance_separates_the_frame_from_the_light_inner_part(parts):
+    per = D.layout_pad_clearances(ROWS, parts)
+    # top_5 stands on the frame (heavy: 173 g vs the target's 29 g); top_8 / the old top_3 on none
+    assert per["top_5"]["isgefb"] < -0.002
+    assert all(d > -0.002 for d in per["top_8"].values()) and all(d > -0.002 for d in per["old_top_3"].values())

@@ -118,8 +118,17 @@ FIXED_LAYOUT_RELEASE_GAP_M = 0.0005
 LAYOUT_PAD_SWITCH = "ISPATIALGYM_LAYOUT_PAD_CHECK"
 
 
+def layout_pad_mode() -> str:
+    """``off`` (default), ``all`` (1 / on: every layout part) or ``heavy`` (only the parts at least as heavy as the target - the frame:
+    A2b's "the grasp may displace the parts" kept for the light inner pieces the pads push aside)."""
+    v = os.environ.get(LAYOUT_PAD_SWITCH, "0").strip().lower()
+    if v in ("1", "on", "true", "yes", "all"):
+        return "all"
+    return "heavy" if v == "heavy" else "off"
+
+
 def layout_pad_on() -> bool:
-    return os.environ.get(LAYOUT_PAD_SWITCH, "0").strip().lower() in ("1", "on", "true", "yes")
+    return layout_pad_mode() != "off"
 
 
 class HullObstacle:
@@ -151,28 +160,31 @@ def pose_mat(pose) -> np.ndarray:
     return m
 
 
-def layout_pad_clearance(grasps: Sequence[Any], parts: Dict[str, List[HullObstacle]], arm: str = "right") -> Dict[str, Tuple[float, Optional[str]]]:
-    """``{row name: (smallest finger clearance (m) along the approach, the part it is to)}`` of each library row of ``grasps`` (eef in the
-    target frame, ``g.pose``) against ``parts`` (part name -> its convex pieces in the TARGET's frame), the fingers at the oracle's
-    pre-shape opening (``tabletop.policy_opening_of``; fully open without a width) on the pre-grasp (``conventions.PRE_DIST`` back along
-    the eef +z) -> grasp line at the policy's ``approach_step_m``."""
+def layout_pad_clearances(grasps: Sequence[Any], parts: Dict[str, List[HullObstacle]], arm: str = "right") -> Dict[str, Dict[str, float]]:
+    """``{row name: {part: smallest finger clearance (m) along the approach}}`` of each library row of ``grasps`` (eef in the target frame,
+    ``g.pose``) against ``parts`` (part name -> its convex pieces in the TARGET's frame), the fingers at the oracle's pre-shape opening
+    (``tabletop.policy_opening_of``; fully open without a width) on the pre-grasp (``conventions.PRE_DIST`` back along the eef +z) ->
+    grasp line at the policy's ``approach_step_m``."""
     from ispatialgym.grasping import contact_policy as CP
 
     hc = CP.HandChecker(arm)
-    out: Dict[str, Tuple[float, Optional[str]]] = {}
+    out: Dict[str, Dict[str, float]] = {}
     for g in grasps:
         o = TT.policy_opening_of(g)
         o = 0.5 * float(C.GRIPPER_OPEN_M) if o is None else float(o)
         Tg = th.as_tensor(pose_mat(g.pose), dtype=th.float32)
         path = CP.approach_path(CP.pre_pose_mat(Tg), Tg, float(hc.policy.approach_step_m)).reshape(-1, 4, 4)
-        best, who = float("inf"), None
-        for pname, pieces in parts.items():
-            if not pieces:
-                continue
-            d = float(hc.obstacle_clearance(path, pieces, finger_q=(o, o))["finger"].min())
-            if d < best:
-                best, who = d, pname
-        out[str(getattr(g, "name", ""))] = (best, who)
+        out[str(getattr(g, "name", ""))] = {pname: float(hc.obstacle_clearance(path, pieces, finger_q=(o, o))["finger"].min())
+                                            for pname, pieces in parts.items() if pieces}
+    return out
+
+
+def layout_pad_clearance(grasps: Sequence[Any], parts: Dict[str, List[HullObstacle]], arm: str = "right") -> Dict[str, Tuple[float, Optional[str]]]:
+    """``{row name: (smallest finger clearance (m) to any part, that part)}`` (:func:`layout_pad_clearances`)."""
+    out = {}
+    for n, per in layout_pad_clearances(grasps, parts, arm).items():
+        who = min(per, key=per.get) if per else None
+        out[n] = (per[who] if who is not None else float("inf"), who)
     return out
 
 
@@ -599,8 +611,9 @@ class Disembedding(SamplerV2):
     def _layout_pad_screen(self, poses: Dict[str, Any]) -> None:
         """i7-tray 2026-11-08: the layout pad check (``LAYOUT_PAD_SWITCH``) once per template - per library row the fingers' clearance to
         the layout's parts (:func:`layout_pad_clearance`) at the layout's relative poses ``poses``; a row whose fingers go deeper than the
-        policy's ``finger_support_max_penetration_m`` into a part would stand on it. Counters ``layout_pad.rows`` / ``.stand_on`` /
-        ``.stand_on.<model>`` and ``.dropped`` (switch on); one INFO line with every row's clearance. Switch off: measured only."""
+        policy's ``finger_support_max_penetration_m`` into a part would stand on it; ``all`` drops such rows, ``heavy`` only those standing
+        on a part at least as heavy as the target. Counters ``layout_pad.rows`` / ``.stand_on`` / ``.stand_on.<model>`` / ``.stand_on_heavy``
+        and ``.dropped``; one INFO line with every row's clearance per part. Switch off: measured only."""
         if getattr(self, "_pad_screened", False) or self.layout is None:
             return
         self._pad_screened = True
@@ -609,27 +622,35 @@ class Disembedding(SamplerV2):
         try:
             tpose = poses[self.tname]
             parts = {n: self._part_pieces_in(n, p, tpose) for n, p in poses.items() if n != self.tname}
-            cl = layout_pad_clearance(self.grasps, parts, self.segment_arms[0] if self.segment_arms else "right")
+            per = layout_pad_clearances(self.grasps, parts, self.segment_arms[0] if self.segment_arms else "right")
+            t_mass = float(getattr(self.obj("target"), "mass", 0.0) or 0.0)
+            heavy = {n for n in parts if float(getattr(self.objects[n], "mass", 0.0) or 0.0) >= t_mass > 0.0}
         except Exception as e:  # noqa: BLE001 - a measurement failure keeps the pick as before
             log.info("%s: LAYOUT_PAD check unavailable (%r): the pick keeps every row", self.gp.variant, e)
             TT._count(self, "layout_pad.unavailable")
             return
         allow = float(CP.DEFAULT.finger_support_max_penetration_m)
         model_of = {b.name: b.model for b in self.bindings.many("distractors")}
-        bad = {n for n, (d, _) in cl.items() if d < -allow - 1e-9}
-        TT._countn(self, "layout_pad.rows", len(cl))
-        for n in sorted(bad):
+        on_parts = {n: sorted(p for p, d in per[n].items() if d < -allow - 1e-9) for n in per}
+        bad_all = {n for n, ps in on_parts.items() if ps}
+        bad_heavy = {n for n, ps in on_parts.items() if any(p in heavy for p in ps)}
+        TT._countn(self, "layout_pad.rows", len(per))
+        for n in sorted(bad_all):
             TT._count(self, "layout_pad.stand_on")
-            TT._count(self, f"layout_pad.stand_on.{model_of.get(cl[n][1], cl[n][1])}")
-        on = layout_pad_on()
+            for p in on_parts[n]:
+                TT._count(self, f"layout_pad.stand_on.{model_of.get(p, p)}")
+        TT._countn(self, "layout_pad.stand_on_heavy", len(bad_heavy))
+        mode = layout_pad_mode()
+        bad = bad_all if mode == "all" else (bad_heavy if mode == "heavy" else set())
         kept = [g for g in self.grasps if str(getattr(g, "name", "")) not in bad]
-        log.info("%s: LAYOUT_PAD (%s) finger clearance to the layout parts at the pre-shape along the approach: %s -> %d of %d rows %s",
-                 self.gp.variant, "on" if on else "off: measured only",
-                 ", ".join(f"{n} {d * 1000:+.1f} mm ({model_of.get(w, w)})" for n, (d, w) in cl.items()), len(kept) if on else len(self.grasps),
-                 len(self.grasps), "kept" if on else "drawn (nothing dropped)")
-        if on and bad:
+        fmt = lambda n: " ".join(f"{model_of.get(p, p)} {d * 1000:+.1f}" for p, d in per[n].items())  # noqa: E731
+        log.info("%s: LAYOUT_PAD (%s) finger clearance (mm) to the layout parts at the pre-shape along the approach: %s; heavy parts (>= the "
+                 "target's %.3f kg) %s -> %d of %d rows %s", self.gp.variant, mode if mode != "off" else "off: measured only",
+                 "; ".join(f"{n} [{fmt(n)}]" for n in per), t_mass, sorted(model_of.get(p, p) for p in heavy), len(kept), len(self.grasps),
+                 "kept" if mode != "off" else "drawn (nothing dropped)")
+        if bad:
             if not kept:
-                raise Reject("grasp_unreachable", f"layout pad check: every row's fingers stand on a layout part ({sorted(bad)})")
+                raise Reject("grasp_unreachable", f"layout pad check ({mode}): every row's fingers stand on a layout part ({sorted(bad)})")
             TT._countn(self, "layout_pad.dropped", len(bad))
             self._pad_kept = kept
 
