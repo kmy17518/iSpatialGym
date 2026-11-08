@@ -2602,44 +2602,13 @@ class IORSLarge(SamplerV2):
         start pose anywhere on free floor (eroded map, the task rooms) ``distance_range_m`` from the target's cell ``c_xy`` on its support
         (top at ``z_top``), facing it, from which the target (its hull at rest on the top) and the partner's goal region
         (:meth:`goal_region_visible`, the edge stance's test) are in the head-camera frame - straight torso, the most upright translate
-        that sees both (:meth:`floor_stance_a`'s rule), collision-free with a free trunk sweep."""
-        cfg = self.gp.gen("free_start")
-        cfg = dict(cfg) if isinstance(cfg, dict) else {}
-        d_lo, d_hi = (float(v) for v in cfg.get("distance_range_m", [0.6, 2.5]))
-        tries = int(cfg.get("tries", 120))
+        that sees both (:meth:`floor_stance_a`'s rule), collision-free with a free trunk sweep. The draw is :func:`free_floor_stance`
+        (i7-t03 2026-11-08: shared with IORSSmall's shelf start, behaviour unchanged)."""
         c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
         focus = th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + height / 2])
         pts = G.local_points_world(self.hull, (th.tensor([float(c_xy[0]), float(c_xy[1]), float(z_top) + self.world.bottom_offset(self.hull, self.rest)]), self.rest))
-        stats = {"floor": 0, "view": 0, "body": 0, "sweep": 0}
-        for k in range(tries):
-            bearing = float(rng.uniform(-math.pi, math.pi))
-            dist = float(rng.uniform(d_lo, d_hi))
-            xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
-            if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
-                stats["floor"] += 1
-                continue
-            yaw = math.atan2(float(c_xy[1] - xy[1]), float(c_xy[0] - xy[0]))
-            cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), float(t), 0.0, dist) for t in RB.TRANSLATES]
-            cams = P0.camera_poses(self, cands)
-            feas = [(st, P0.axis_angle(self, cam, focus)) for st, cam in zip(cands, cams)
-                    if P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy)]
-            if not feas:
-                stats["view"] += 1
-                continue
-            free = P0.body_free(self, [st for st, _ in feas])
-            feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
-            if not feas:
-                stats["body"] += 1
-                continue
-            if not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
-                stats["sweep"] += 1
-                continue
-            st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
-            st.extras.update({"bearing_deg": round(math.degrees(bearing), 1), "distance": round(dist, 3), "tries": k + 1, "free_start": True})
-            log.info("%s: free start: stance A at %s (%.2f m from the target cell, trunk (%.2f, 0)) after %d draws %s", self.gp.variant,
-                     [round(float(v), 2) for v in st.base_pose2d], dist, st.translate, k + 1, stats)
-            return st
-        raise Reject("no_stance", f"free start: no stance A {d_lo:.1f}-{d_hi:.1f} m from the target sees it and the goal region ({tries} draws: {stats})")
+        return free_floor_stance(self, c_xy, focus, lambda st, cam: P0.in_frame(self, cam, pts) and self.goal_region_visible(st, from_xy=c_xy), rng,
+                                 what="the goal region")
 
     # ------------------------------------------------------------------ stance C (placement)
 
@@ -5623,3 +5592,48 @@ class IORSLarge(SamplerV2):
         from ispatialgym.sampling.v2.tasks import iors_large_nextto as M
 
         return M.NextToMode
+
+
+def free_floor_stance(s, c_xy: th.Tensor, focus: th.Tensor, view_ok, rng: np.random.Generator, cfg: Optional[Dict[str, Any]] = None,
+                      what: str = "the goal region") -> Stance:
+    """The free-floor start draw of :meth:`IORSLarge.free_start_stance` (oracle-fix 2026-11-04; factored out by i7-t03 2026-11-08 so
+    IORSSmall's shelf start reuses it): up to ``tries`` draws of a base position on free floor (eroded map, the task rooms)
+    ``distance_range_m`` from ``c_xy`` (``cfg``, default ``s.gp.gen("free_start")``: 0.6-2.5 m, 120 tries), facing it, at every
+    ``reach_bands.TRANSLATES`` translate with a straight torso; a candidate survives ``view_ok(stance, head camera)`` (the caller's frame
+    test), the body check and a free trunk sweep; the most upright translate, then the smallest axis angle to ``focus``. A Stance named
+    ``"init"`` (``extras.free_start``), else ``Reject("no_stance")`` with the per-test counts."""
+    cfg = cfg if cfg is not None else s.gp.gen("free_start")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    d_lo, d_hi = (float(v) for v in cfg.get("distance_range_m", [0.6, 2.5]))
+    tries = int(cfg.get("tries", 120))
+    c_xy = th.as_tensor([float(c_xy[0]), float(c_xy[1])])
+    stats = {"floor": 0, "view": 0, "body": 0, "sweep": 0}
+    for k in range(tries):
+        bearing = float(rng.uniform(-math.pi, math.pi))
+        dist = float(rng.uniform(d_lo, d_hi))
+        xy = c_xy + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
+        if not s.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(s, xy):
+            stats["floor"] += 1
+            continue
+        yaw = math.atan2(float(c_xy[1] - xy[1]), float(c_xy[0] - xy[0]))
+        cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), float(t), 0.0, dist) for t in RB.TRANSLATES]
+        cams = P0.camera_poses(s, cands)
+        feas = [(st, P0.axis_angle(s, cam, focus)) for st, cam in zip(cands, cams) if view_ok(st, cam)]
+        if not feas:
+            stats["view"] += 1
+            continue
+        free = P0.body_free(s, [st for st, _ in feas])
+        feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
+        if not feas:
+            stats["body"] += 1
+            continue
+        if not P0.trunk_sweep_free(s, (float(xy[0]), float(xy[1]), yaw)):
+            stats["sweep"] += 1
+            continue
+        st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
+        st.extras.update({"bearing_deg": round(math.degrees(bearing), 1), "distance": round(dist, 3), "tries": k + 1, "free_start": True})
+        log.info("%s: free start: stance A at %s (%.2f m from the target cell, trunk (%.2f, 0)) after %d draws %s", s.gp.variant,
+                 [round(float(v), 2) for v in st.base_pose2d], dist, st.translate, k + 1, stats)
+        return st
+    raise Reject("no_stance", f"free start: no stance A {d_lo:.1f}-{d_hi:.1f} m from the target sees it and {what} ({tries} draws: {stats})")
+

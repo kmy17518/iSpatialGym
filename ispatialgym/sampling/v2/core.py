@@ -1047,6 +1047,14 @@ class SamplerV2(TaskSampler):
         lateral, else by the move along the edge of :meth:`record_edge_travel`, and ``to.extras["init_travel"]`` records the move.
         Returns the (arrival) transition."""
         shift = "stance_shift" in to.extras  # i7-t03 2026-11-08 (item 1): a manipulation stance moved along the edge at the shelf's fixed start
+        if frm.extras.get("free_start") and frm.edge is None:
+            # i7-t03 round 2 (a): a free-floor start (iors_large.free_floor_stance) drives to the edge stance as IORSLarge's stance A does -
+            # the §3.7 path to the drive-back pose and the §3.8 transition (prompt0.connect); the shelf back-off replaces the arrival later
+            from ispatialgym.sampling.v2 import prompt0 as P0
+
+            self.drop_travel_records(frm.name, to.name)
+            _path, tr = P0.connect(self, frm, to, path_max_m=float(self.gen("stance_path_max_m", 3.0)))
+            return tr
         if "_position" not in to.extras and not shift:
             return self.record_transition(frm, to)
         self.drop_travel_records(frm.name, to.name)
