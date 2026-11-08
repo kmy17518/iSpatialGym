@@ -238,8 +238,11 @@ PLACE_DEPTH_CAP_DRAW_DEFAULT = "1"
 PLACE_DEPTH_CAP_BASIS_ENV = "ISPATIALGYM_PLACE_DEPTH_CAP_BASIS"
 #: follow-up (a) (lead-approved, sampler-only): the carried drive's lift (the box over the partner's top, ``carry_clears`` auto) screened at
 #: the draw - the goal check's own test, made where it is certain the goal check makes it (every A1 push stance is a real second base pose
-#: whose drive passes over the partner): "0" off (default), "shadow" (computed and counted, nothing rejected), "1" on
+#: whose drive passes over the partner): "0" off, "shadow" (computed and counted, nothing rejected), "1" on. Default "1" since the owner's
+#: 5r.1 (2026-11-08; A/B c3_fu_a: goal_check lift_unreachable touching_04 6 -> 2, touching_02 12 -> 5; in shadow all 18 would-be rejections
+#: failed at or before the goal check)
 TOUCH_LIFT_SCREEN_ENV = "ISPATIALGYM_TOUCH_LIFT_SCREEN"
+TOUCH_LIFT_SCREEN_DEFAULT = "1"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -274,7 +277,7 @@ def place_depth_cap_basis() -> str:
 
 
 def touch_lift_screen_mode() -> str:
-    v = (os.environ.get(TOUCH_LIFT_SCREEN_ENV) or "0").strip().lower()
+    v = (os.environ.get(TOUCH_LIFT_SCREEN_ENV) or TOUCH_LIFT_SCREEN_DEFAULT).strip().lower()
     return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
 
 

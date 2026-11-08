@@ -138,10 +138,13 @@ def test_filter_all_removed_rejects_and_no_map_keeps(monkeypatch):
 # ------------------------------------------------------------------------------------------------ touching_04 follow-ups (lead 2026-11-08)
 
 
-def test_follow_up_switches_default_off(monkeypatch):
+def test_follow_up_switch_defaults(monkeypatch):
     for env in (IS.PLACE_DEPTH_CAP_REDRAW_ENV, IS.PLACE_DEPTH_CAP_BASIS_ENV, IS.TOUCH_LIFT_SCREEN_ENV):
         monkeypatch.delenv(env, raising=False)
-    assert not IS.place_depth_cap_redraw_on() and IS.place_depth_cap_basis() == "map" and IS.touch_lift_screen_mode() == "off"
+    assert not IS.place_depth_cap_redraw_on() and IS.place_depth_cap_basis() == "map"
+    assert IS.touch_lift_screen_mode() == "on" and IS.TOUCH_LIFT_SCREEN_DEFAULT == "1"  # the default since the owner's 5r.1 (2026-11-08)
+    monkeypatch.setenv(IS.TOUCH_LIFT_SCREEN_ENV, "0")
+    assert IS.touch_lift_screen_mode() == "off"
     monkeypatch.setenv(IS.PLACE_DEPTH_CAP_BASIS_ENV, "a1")
     monkeypatch.setenv(IS.TOUCH_LIFT_SCREEN_ENV, "shadow")
     assert IS.place_depth_cap_basis() == "a1" and IS.touch_lift_screen_mode() == "shadow"
