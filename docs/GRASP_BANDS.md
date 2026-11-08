@@ -2410,7 +2410,12 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   the object on the COM hinge), the wall-frame map kind (base relative to the hinge point and the wall normal), the default-off sampler
   switch, N 4 on world_vertical 01-05.
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
-  validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`, 18378110).
+  validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
+- **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
+  axial_01 / 03 / 04 56 / 12 / 12 (brace 0 / 12); i7_brace34 (clear-turn maps, opposite not validated) 42 / 12 / 11, brace 0 / 12;
+  i7_brace34b (+ the validated opposite entries, `v2maps_int1_brace34b`, TURN_COVER=1 OPPOSITE=1) 53 / 11 / 10, 0.070 GPU-h per success,
+  BRACE PRESENT 4 / 11 (axial_03 3 / 4, axial_01 1 / 4, axial_04 0 / 3), every brace an opposite-end blade (`opp_blade_30`), braced demos
+  3 / 4 ok; kit axial_brace.paired 25 / opposite_tried 19 / opposite_used 10.
 
 ## Limitations / not done
 
