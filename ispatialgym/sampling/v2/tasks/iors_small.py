@@ -152,6 +152,32 @@ def shelf_retreat_backoff_on() -> bool:
     return os.environ.get(SHELF_RETREAT_BACKOFF_ENV, "").strip().lower() in ("1", "on", "true")
 
 
+#: i7-t03 round 7 (LEAD DECISION #37, owner away; DEFAULT OFF): the shelf tip's fixed-start grasp is judged at the shelf stance with the goal
+#: check's own frame rule (:meth:`IORSSmall.require_in_frame` on the pre-grasp + grasp at that stance's camera, same 5 % margin) - a stance
+#: whose pre-grasp fingertip leaves the image is a stance-shift need ("frame") instead of a goal-check reject after the lift (i7t03r6_v: 35
+#: x "pre-grasp fingertip outside the manipulation image", all at stand-off 0.45). Kit ``shelf_pregrasp_frame.checked / .passed / .refused``
+SHELF_PREGRASP_FRAME_ENV = "ISPATIALGYM_SHELF_PREGRASP_FRAME"
+#: i7-t03 round 7 (LEAD DECISION #37; DEFAULT OFF, the shelf tip release only): ``release_clear_why`` checks the retreat TRACKED from the place
+#: configuration (place -> 10 cm -> 15 cm back along the approach, one branch, as the program check runs the oracle's legs) instead of a fresh
+#: 32-seed solve of the 15 cm pose (i7t03r6_v: 12 x program_check "retreat: the tracked chain's end configuration collides" after a fresh
+#: solve passed). Kit ``shelf_release_tracked.checked / .passed / .failed``
+SHELF_RELEASE_TRACKED_ENV = "ISPATIALGYM_SHELF_RELEASE_TRACKED"
+
+
+def _pair_mesh_on() -> bool:
+    from ispatialgym.sampling.v2 import pair_mesh as PM
+
+    return PM.pair_mesh_on()
+
+
+def shelf_pregrasp_frame_on() -> bool:
+    return os.environ.get(SHELF_PREGRASP_FRAME_ENV, "").strip().lower() in ("1", "on", "true")
+
+
+def shelf_release_tracked_on() -> bool:
+    return os.environ.get(SHELF_RELEASE_TRACKED_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 def shortest_arc(u: th.Tensor, v: th.Tensor) -> th.Tensor:
     """The smallest rotation (xyzw) taking unit vector ``u`` onto ``v``."""
     u = G.t(u).float() / float(th.linalg.norm(G.t(u).float()))
@@ -250,7 +276,13 @@ def shelf_need_of(err: Reject) -> Optional[str]:
         return "transit"
     if err.reason == "grasp_unreachable":
         return "grasp"
+    if err.reason == "gripper_not_in_frame" and msg.startswith(SHELF_PREGRASP_FRAME_TAG):
+        return "frame"
     return None
+
+
+#: the message prefix of the round-7 shelf-stance frame reject (:data:`SHELF_PREGRASP_FRAME_ENV`)
+SHELF_PREGRASP_FRAME_TAG = "shelf stance frame:"
 
 
 def reach_branch(reach: Optional[float]) -> str:
@@ -2485,6 +2517,8 @@ class IORSSmall(SamplerV2):
                         why_transit = self.shelf_transit_why(m, g, _default, _pre_open) if (self.gen("shelf_transit_check") and not _per_grasp) else None
                         if why_transit is not None:
                             raise Reject("grasp_unreachable", why_transit)
+                        if shelf_pregrasp_frame_on() and self.shelf_tip():
+                            self.shelf_pregrasp_frame_check(m, g)
                         if self.shelf_backoff_m() > 0.0:
                             # oracle-fix 2026-11-06 (owner feedback on the touching#03 demo, opt-in generation.shelf_backoff_transit_m): the arrival
                             # transition recorded again backed off, the arm carried to the pre-grasp inside it (:meth:`record_shelf_backoff`)
@@ -4032,6 +4066,19 @@ class IORSSmall(SamplerV2):
         grasp.extras["joint_release"] = "ok" if why is None else why[:160]
         return why is None
 
+    def shelf_pregrasp_frame_check(self, st: Stance, grasp: GraspRecord) -> None:
+        """Round 7 (:data:`SHELF_PREGRASP_FRAME_ENV`): the goal check's frame test of the pre-grasp and grasp (:meth:`require_in_frame`, the
+        customs' ``grasp_frame_rule``, 5 % margin) at ``st``'s camera, when the fixed start's grasp is chosen there. Raises
+        ``Reject("gripper_not_in_frame", SHELF_PREGRASP_FRAME_TAG ...)`` (:func:`shelf_need_of` -> ``"frame"``: the stance shift tries the other
+        base positions / stand-offs)."""
+        TT._count(self, "shelf_pregrasp_frame.checked")
+        try:
+            self.require_in_frame(self.camera_pose_at(st), {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp})
+        except Reject as e:
+            TT._count(self, "shelf_pregrasp_frame.refused")
+            raise Reject("gripper_not_in_frame", f"{SHELF_PREGRASP_FRAME_TAG} {str(e).split('] ', 1)[-1]} at stand-off {float(st.stand_off or 0.0):.2f}")
+        TT._count(self, "shelf_pregrasp_frame.passed")
+
     def shelf_fixed_start(self, init: Stance, cand: Stance, manip: Stance, arm: str, try_fn) -> Tuple[Stance, GraspRecord]:
         """The fixed start's checks at ``manip`` (``try_fn(stance) -> GraspRecord``: the init -> manipulation travel, ``grasp_at_pose`` with
         every grasp and twin, the transit check, the back-off - :meth:`sample_instance`'s own; ``Reject`` on failure). With the stance shift on
@@ -5392,7 +5439,7 @@ class IORSSmall(SamplerV2):
             # pose 15 cm back from the place, fingers open, the released box ignored, must have a configuration (the program
             # check's 'retreat: exact IK failed / joint 6-7 at the limit (stance push)' on 6/16 attempts of 0918-175907)
             # owner 5p.1 (ISPATIALGYM_SHELF_RETREAT_BACKOFF, the shelf tip release): or the place's end + the base backing off (recorded here)
-            why_clear, code_clear = self.release_clear_why(st_place, place, grasp.arm, record=True)
+            why_clear, code_clear = self.release_clear_why(st_place, place, grasp.arm, record=True, q_place=getattr(res, "q", None))
             if why_clear is not None:
                 raise Reject(code_clear or "place_unreachable", f"place retreat clear pose ({(RETREAT_DIST_M + RETREAT_LITTLE_M) * 100:.0f} cm back along the "
                                                                f"approach) from the {st_place.name} stance: {why_clear}")
@@ -5589,33 +5636,72 @@ class IORSSmall(SamplerV2):
                                approached=place_approached(self, inside=False))
         if not r.ok:
             return f"descent: {r.reason}"
-        why, _code = self.release_clear_why(st, place, grasp.arm)
+        why, _code = self.release_clear_why(st, place, grasp.arm, q_place=r.q)
         if why is not None:
             return f"clear pose: {why}"
         return None
 
-    def release_clear_why(self, st: Stance, place: G.Pose, arm: str, record: bool = False) -> Tuple[Optional[str], Optional[str]]:
+    def release_clear_why(self, st: Stance, place: G.Pose, arm: str, record: bool = False, q_place: Optional[th.Tensor] = None) -> Tuple[Optional[str], Optional[str]]:
         """The release clear pose from ``st``: the hand ``RETREAT_DIST_M + RETREAT_LITTLE_M`` (15 cm) back along the approach from ``place``,
         fingers open, the released target and the supports ignored - ``(None, None)`` when its exact IK passes, else ``(why, code)``. 5p.1
         (:data:`SHELF_RETREAT_BACKOFF_ENV`, the shelf tip release only): when it fails, :meth:`_retreat_backoff_why` (the place's end + the
         base backing off) may pass instead; ``record`` (the goal check's final release) records that retreat stance and transition."""
-        r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+        tracked = shelf_release_tracked_on() and self.shelf_tip()
+        if tracked:
+            r = self.release_tracked(st, place, arm, [RETREAT_DIST_M, RETREAT_DIST_M + RETREAT_LITTLE_M], q_place)
+        else:
+            r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
         if record:
             self._drop_retreat_record()
+        if r.ok and r.q is not None and _pair_mesh_on():
+            touch = self.pair_mesh_why(r.q, arm, "clear")
+            if touch is not None:
+                r = IK.IKResult(False, None, f"self mesh contact at the clear pose: {touch}", 1)
         if r.ok:
             return None, None
         if not (shelf_retreat_backoff_on() and self.shelf_tip()):
-            return r.reason, r.code
-        why = self._retreat_backoff_why(st, place, arm, record)
+            return r.reason, getattr(r, "code", None)
+        why = self._retreat_backoff_why(st, place, arm, record, q_place=q_place)
         if why is None:
             return None, None
-        return f"{r.reason}; base back-off: {why}", r.code
+        return f"{r.reason}; base back-off: {why}", getattr(r, "code", None)
+
+    def release_tracked(self, st: Stance, place: G.Pose, arm: str, backs: Sequence[float], q_place: Optional[th.Tensor] = None) -> Any:
+        """Round 7 (:data:`SHELF_RELEASE_TRACKED_ENV`): the retreat from the place configuration ``q_place`` (else the place solved afresh)
+        through the poses ``backs`` (m back along the approach) as ONE tracked chain (``ikc.exact`` over [place, *backs], the supports and the
+        released target out of the world throughout) - the branch the program check and the oracle follow. Kit ``shelf_release_tracked.*``."""
+        TT._count(self, "shelf_release_tracked.checked")
+        ign = self.support_objects() + [self.obj("target")]
+        with self.ikc.ignoring(ign):
+            r = self.ikc.exact([place] + [IK.pre_pose(place, float(b)) for b in backs], st, arm, ignore_for_last=ign, cache=False, approached=[],
+                               q_first=None if q_place is None else G.t(q_place))
+        TT._count(self, "shelf_release_tracked." + ("passed" if r.ok else "failed"))
+        return r
+
+    def pair_mesh_why(self, q: th.Tensor, arm: str, where: str) -> Optional[str]:
+        """Round 7 (``pair_mesh.PAIR_MESH_ENV``): the ``{arm}_arm_link5`` / ``torso_link2`` collision-mesh clearance at ``q`` (the sphere model
+        misses it); None when off or clear, else why. Kit ``pair_mesh.checked.<where>`` / ``.refused.<where>``."""
+        from ispatialgym.sampling.v2 import pair_mesh as PM
+
+        if not PM.pair_mesh_on():
+            return None
+        TT._count(self, f"pair_mesh.checked.{where}")
+        try:
+            why = PM.pair_touch_why(G.t(q).tolist(), arm)
+        except Exception as e:  # noqa: BLE001
+            TT._count(self, f"pair_mesh.error.{where}")
+            log.warning("pair mesh check failed (%r); not judged", e)
+            return None
+        if why is not None:
+            TT._count(self, f"pair_mesh.refused.{where}")
+            log.info("%s: PAIR_MESH refused at the %s: %s", self.gp.variant, where, why)
+        return why
 
     def _drop_retreat_record(self) -> None:
         self.sidecar.stances.pop(RETREAT_STANCE, None)
         self.sidecar.transitions[:] = [t for t in self.sidecar.transitions if t.to != RETREAT_STANCE]
 
-    def _retreat_backoff_why(self, st: Stance, place: G.Pose, arm: str, record: bool) -> Optional[str]:
+    def _retreat_backoff_why(self, st: Stance, place: G.Pose, arm: str, record: bool, q_place: Optional[th.Tensor] = None) -> Optional[str]:
         """5p.1: the shelf tip release's retreat with the base backing off - (1) the place's end, ``RETREAT_DIST_M`` back along the approach
         (where the oracle's place leaves the open hand), exact IK from ``st``; (2) the drive-back ``st`` -> ``st`` at stand-off +
         ``RETREAT_LITTLE_M`` (strides of ``navigation.STRIDE_M``) whole-body collision-free at ``st``'s trunk with both arms frozen at that
@@ -5625,10 +5711,17 @@ class IORSSmall(SamplerV2):
         from ispatialgym.sampling.v2 import navigation as NAV
         from ispatialgym.sampling.v2.stances import Transition
 
-        r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+        if shelf_release_tracked_on():
+            r = self.release_tracked(st, place, arm, [RETREAT_DIST_M], q_place)
+        else:
+            r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
         if not r.ok or r.q is None:
             TT._count(self, "shelf_retreat.backoff_failed.place_end")
             return f"the place's end ({RETREAT_DIST_M * 100:.0f} cm back): {r.reason}"
+        touch = self.pair_mesh_why(r.q, arm, "place_end") if _pair_mesh_on() else None
+        if touch is not None:
+            TT._count(self, "shelf_retreat.backoff_failed.place_end")
+            return f"the place's end ({RETREAT_DIST_M * 100:.0f} cm back): {touch}"
         if st.edge is None or st.stand_off is None:
             TT._count(self, "shelf_retreat.backoff_failed.no_edge")
             return "the release stance has no edge frame to back off along"

@@ -3164,6 +3164,13 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                                   "n_waypoints": len(poses)}
                 if key in chain_notes:
                     witnesses[key]["chain"] = chain_notes[key]
+                if name == "retreat" or (name == "place" and str(key) == "retreat"):
+                    # i7-t03 round 7 (ISPATIALGYM_T03_PAIR_MESH, default off): the arm_link5 / torso_link2 collision-mesh check the sphere model
+                    # misses, at the retreat witnesses (the sampler's own hook; None when off or for samplers without it)
+                    pm = getattr(sampler, "pair_mesh_why", None)
+                    touch = pm(q_pol, arm, f"program_{name}") if callable(pm) else None
+                    if touch is not None:
+                        raise Reject("self_mesh_contact", f"{key}: {touch} ({where})", action=name)
                 if len(poses) == 1:
                     single_q[key] = q_pol.clone()
                 else:
