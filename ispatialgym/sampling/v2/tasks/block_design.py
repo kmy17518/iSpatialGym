@@ -32,7 +32,7 @@ import json
 import logging
 import math
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -45,6 +45,7 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import tabletop as TT
+from ispatialgym.sampling.v2.tasks import block_design_diag as BDD
 from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_from_sidecar, pose_to_sidecar
@@ -665,6 +666,7 @@ class BlockDesign(SamplerV2):
             return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * abs(lat - GRID_LATERAL_PREFERRED) + 0.5 * trunk_pen + shift_pen + elig_pen
 
         order.sort(key=score)
+        BDD.candidates(self, order, {k: score(k) for k in order} if BDD.level() else None)
         if self._flips_expected():
             log.info("%s: %d manipulation candidates; flip cells per candidate (first 12 by score): %s", self.gp.variant, len(order),
                      ", ".join(f"{k}:{self._n_flip_cells(self.manip_candidates[k], init)}/{len(self.manip_candidates[k].extras.get('focus_info', {}).get('cells', []))}"
@@ -685,6 +687,7 @@ class BlockDesign(SamplerV2):
             for o in self.world.spawned.values():
                 self.world.park(o, list(self.world.spawned).index(o.name))
             self.kit.sync_world()
+            self._bd_k = int(k)
             try:
                 return self._sample_with(rng, init, manip, int(k))
             except Reject as e:
@@ -2614,9 +2617,13 @@ class BlockDesign(SamplerV2):
         n_flip_needed = self._n_flips() if self._flips_expected() else 0
         board_obj = self.objects[name]
         why: List[str] = []
+        k_diag = getattr(self, "_bd_k", -1)
+        BDD.sweep(self, k_diag, manip, right, toward, table_yaw, cells, flip_eligible, n_blocks, support, layout_ok, name, q, half, half_b)
         for depth, lateral in self._board_positions():
             tag = f"({float(depth):.2f}, {float(lateral):+.2f})"
             xy = manip.base_xy + manip.forward * float(depth) + manip.left * float(lateral)
+            if BDD.level():
+                log.info("BD_DIAG board k %d %s %s: %s", k_diag, tag, BDD._st(manip), BDD.corners(self, manip, depth, lateral, half, right, far))
             if not self._board_on_top(manip, depth, lateral, half, right, far):
                 why.append(f"{tag}: off the top")
                 continue
@@ -2630,30 +2637,10 @@ class BlockDesign(SamplerV2):
             pose = (th.tensor([float(xy[0]), float(xy[1]), float(self.top.z) + 0.001]), q)
             # (c) the place probe: the cube's centre at the release aim, its bottom release_above over the pocket floor
             self._teleport({name: pose})
-            _goals, aims, floor_z = self._board_slot_targets(pose, right, toward)
-            z_c = floor_z + self._release_above() + 0.5 * self.edge
-            probe_ok = True
-            for si in (0, len(aims) - 1):
-                sl = aims[si]
-                c_place = (th.tensor([float(sl[0]), float(sl[1]), z_c]), C.quat_from_yaw(table_yaw))
-                found = False
-                for pair in ("x", "y"):
-                    for tilt in (30.0, 45.0, 0.0):
-                        try:
-                            g = C.cube_grasp(c_place, pair, tilt, table_yaw, edge=self.edge)
-                        except ValueError:
-                            continue
-                        if not g.downward:
-                            continue
-                        r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
-                        if r.ok:
-                            found = True
-                            break
-                    if found:
-                        break
-                if not found:
-                    probe_ok = False
-                    break
+            if BDD.level() and cells is not None and layout_ok is not None:
+                BDD.layout(self, k_diag, tag, kept, manip, self.init_stance, self._flip_directions()[0])
+            BDD.probe(self, k_diag, tag, manip, pose, right, toward, table_yaw, support, board_obj)
+            probe_ok = self._board_probe(manip, pose, right, toward, table_yaw, support)
             if not probe_ok:
                 why.append(f"{tag}: no pitched place reaches the pockets' release aims from the manipulation stance")
                 continue
@@ -2666,6 +2653,42 @@ class BlockDesign(SamplerV2):
             return name, pose, kept
         self.world.park(board_obj, list(self.objects).index(name))
         raise Reject("board_placement", "no board position of generation.board_base_xy_candidates works: " + "; ".join(why))
+
+    def _board_probe(self, manip: Stance, pose: TT.Pose, right: th.Tensor, toward: th.Tensor, table_yaw: float, support=None,
+                     detail: Optional[List[str]] = None, ignore: Sequence[Any] = ()) -> bool:
+        """:meth:`_place_board`'s place probe (c) with the board already at ``pose``: a pitched top-down pinch (pairs x / y, tilts 30 /
+        45 / 0) releasing the cube at the biased release aim of the far-left and the near-right pocket, the exact IK of pre-place +
+        place from ``manip`` (the support ignored at the place). ``detail`` (diagnostics) collects every try's verdict; ``ignore``
+        (diagnostics) leaves those objects out of the world for the whole probe."""
+        _goals, aims, floor_z = self._board_slot_targets(pose, right, toward)
+        z_c = floor_z + self._release_above() + 0.5 * self.edge
+        for si in (0, len(aims) - 1):
+            sl = aims[si]
+            c_place = (th.tensor([float(sl[0]), float(sl[1]), z_c]), C.quat_from_yaw(table_yaw))
+            found = False
+            for pair in ("x", "y"):
+                for tilt in (30.0, 45.0, 0.0):
+                    try:
+                        g = C.cube_grasp(c_place, pair, tilt, table_yaw, edge=self.edge)
+                    except ValueError:
+                        continue
+                    if not g.downward:
+                        continue
+                    if ignore:
+                        with self.ikc.ignoring(list(ignore)):
+                            r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
+                    else:
+                        r = self.ikc.exact([C.pre_pose(g.eef), g.eef], manip, "right", ignore_for_last=[support] if support is not None else [], cache=False)
+                    if detail is not None:
+                        detail.append(f"s{si}/{pair}/t{tilt:.0f}:{'ok' if r.ok else (r.reason or 'fail')[:90]}")
+                    if r.ok:
+                        found = True
+                        break
+                if found:
+                    break
+            if not found:
+                return False
+        return True
 
     def _bddl_names(self, objs: List[Any]) -> List[str]:
         """bddl instance names of sim objects (``self.objects`` inverted)."""
