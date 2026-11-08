@@ -2328,6 +2328,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)
+    other = "left" if arm == "right" else "right"
+    if ((getattr(motions.backend, "_attached", None) or {}).get(other) or {}).get("obj") is obj:
+        # i7-cork (the hand-over, owner decision 2026-11-08 4.2 (i)): the object the other hand still holds now rides in this hand too - the
+        # planner keeps it on ONE arm: off the giving arm (its release retreat follows), onto this one
+        motions.backend.detach_object(other)
+        ctx["handover_from"] = other
     motions.backend.attach_object(arm, obj)
     ctx["attached"] = obj.name
 

@@ -1229,11 +1229,19 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
                             dep = None
                         if dep is not None:
                             report.setdefault("departure_arms", []).append(dep)
+                # i7-cork: the hand-over (the other hand's grasp of the carried male, the giver's release retreat) - the male posed at its
+                # recorded hand-over pose in the world, both hands' chains with it ignored, the other hand locked (_Tracker.handover_phase)
+                ho_phase = tracker.handover_phase(action)
+                if ho_phase == "grasp":
+                    tracker.before_handover_grasp(action, sampler)
                 try:
                     targets = action.targets(sc, state)
                 except Exception as e:
                     raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
                 stance_name, carried = tracker.before(action)
+                carried_arm = tracker.carrying_arm()
+                if ho_phase is not None:
+                    carried, carried_arm = None, None
                 locked = tracker.locked_arms(action)
                 # block design (owner 2026-09-19): the acting arm's IK is seeded from where the previous action left it - the lift
                 # tracked from the grasp witness, the reorient from the lift's end, the carry / place from the reorient's end - as
@@ -1260,16 +1268,20 @@ def run(variant: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = N
 
                 # of-v2maps 2026-11-07 (v2open2: 'approach: support_policy: finger_penetration' 21 / 20 / 6 program-check rejections): a grasp
                 # action's approach and grasp are policed at the oracle's pre-shape of its recorded grasp (tabletop.record_policy_opening)
-                with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None):
+                ho_ignore = sampler.ikc.ignoring([sampler.objects[action.object]]) if ho_phase is not None and getattr(action, "object", None) in sampler.objects else nullcontext()
+                with TT.record_policy_opening(sampler, getattr(action, "grasp", None) if name == "grasp" else None), ho_ignore:
                     n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj,
                                                         q_seed_prev=q_prev, q_end_prev=q_end_prev,
                                                         held_since_init=tracker.carried is not None and tracker.carried_arm is None,
-                                                        locked_fingers=tracker.locked_fingers(action))
+                                                        locked_fingers=tracker.locked_fingers(action), carried_arm=carried_arm)
                 end_q = witnesses.pop("__arm_end_q__", None)
                 partial_leg = witnesses.pop("__partial__", None)
                 repose_note = witnesses.pop("__repose__", None)
+                giver = tracker.handover_giver
                 tracker.after(action, witnesses, sampler)
                 tracker.note_arm_end(action, end_q)
+                if ho_phase is not None:
+                    tracker.after_handover(action, ho_phase, giver, witnesses, sampler)
                 _carry_joint_state(action)
                 entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
                          "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
@@ -1391,6 +1403,58 @@ class _Tracker:
         self.stance_obj: Optional[Stance] = None
         #: sim objects moved by :meth:`advance_block` (name -> init (pos, quat)), restored by :meth:`restore_moved`
         self.moved: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        #: i7-cork: the arm that handed the carried object over (until its release retreat)
+        self.handover_giver: Optional[str] = None
+
+    # -- i7-cork: the hand-over (owner decision 2026-11-08 4.2 (i)) -------------------------------------------------------------------
+    def handover_phase(self, action) -> Optional[str]:
+        """``"grasp"``: a grasp of the object the OTHER arm carries (the hand-over); ``"release"``: the giving arm's retreat after it;
+        None otherwise."""
+        name = getattr(action, "name", "")
+        arms = list(getattr(action, "arms", ()) or [])
+        if name == "grasp" and arms and self.carried is not None and getattr(action, "object", None) == self.carried \
+                and self.carried_arm is not None and self.carried_arm != arms[0]:
+            return "grasp"
+        if name == "retreat" and arms and self.handover_giver is not None and arms[0] == self.handover_giver:
+            return "release"
+        return None
+
+    def before_handover_grasp(self, action, sampler) -> None:
+        """The sim object at its recorded hand-over pose (``grasps[*].handover.object_pose``; restored by :meth:`restore_moved`) and the
+        giving arm locked at the configuration its last action left it in (its carry to the hand-over)."""
+        g = getattr(action, "grasp", None)
+        ex = getattr(g, "extra", None) if isinstance(getattr(g, "extra", None), dict) else (getattr(g, "extras", None) or {})
+        pose = ((ex or {}).get("handover") or {}).get("object_pose")
+        name = getattr(action, "object", None)
+        if sampler is not None and pose and name in getattr(sampler, "objects", {}):
+            obj = sampler.objects[name]
+            if name not in self.moved:
+                p0, q0 = obj.get_position_orientation()
+                self.moved[name] = (p0.clone(), q0.clone())
+            obj.set_position_orientation(th.tensor([float(v) for v in pose[0]]), th.tensor([float(v) for v in pose[1]]))
+            obj.keep_still()
+            _sync(sampler.kit, [obj])
+        giver = self.carried_arm
+        q_end = self.arm_end_q.get(giver) if giver else None
+        if sampler is not None and giver and q_end is not None:
+            self.arm_q[giver] = q_end[sampler.kit.robot.arm_control_idx[giver]].clone()
+        self.handover_giver = giver
+
+    def after_handover(self, action, phase: str, giver: Optional[str], witnesses: Optional[Dict[str, Any]], sampler) -> None:
+        """After the hand-over grasp: the giver unlocked, the taker locked at its grasp witness for the giver's release retreat; after that
+        retreat: the taker unlocked (it carries the object from there)."""
+        arms = list(getattr(action, "arms", ()) or [])
+        if phase == "grasp":
+            if giver:
+                self.arm_q.pop(giver, None)
+                self.handover_giver = giver
+            w = (witnesses or {}).get("grasp")
+            if arms and sampler is not None and w is not None and w.get("q") is not None:
+                self.arm_q[arms[0]] = th.tensor(w["q"], dtype=th.float32)[sampler.kit.robot.arm_control_idx[arms[0]]].clone()
+        elif phase == "release":
+            if self.carried_arm:
+                self.arm_q.pop(self.carried_arm, None)
+            self.handover_giver = None
 
     def advance_block(self, action, sampler) -> None:
         """Block design (owner 2026-09-19): after the intermediate ``Place`` of a flip-in-place block (``table_flip.place``) the
@@ -2389,6 +2453,15 @@ def _pick_overhang_push(action) -> bool:
     return getattr(action, "name", "") == "push" and str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang"
 
 
+def _is_handover(sidecar) -> bool:
+    """i7-cork: a hand-over sidecar (``grasps[*].attach_route == "handover"``; the sampler's draft records ``extras``, the F6 sidecar ``extra``)."""
+    for g in getattr(sidecar, "grasps", None) or []:
+        ex = getattr(g, "extras", None) if isinstance(getattr(g, "extras", None), dict) else getattr(g, "extra", None)
+        if isinstance(ex, dict) and ex.get("attach_route") == "handover":
+            return True
+    return False
+
+
 def _world_advances(sidecar, action) -> bool:
     """Whether the check's world changes AFTER ``action`` (``_Tracker.after`` / ``run._carry_joint_state``), so later actions' targets
     are not the static ones: a place while block records exist (``advance_block``), a push while a packing tail exists (``advance_push``),
@@ -2397,6 +2470,8 @@ def _world_advances(sidecar, action) -> bool:
     name = getattr(action, "name", "")
     if name in ("base_push", "base_follow"):
         return True
+    if name == "lift" and _is_handover(sidecar):
+        return True  # i7-cork: the hand-over poses the male in the air before the other hand's grasp (_Tracker.before_targets)
     if name == "place":
         return bool(getattr(sidecar, "blocks", None))
     if name == "push":
@@ -2482,7 +2557,8 @@ def _early_frame_gate(sidecar: SidecarDraft, sc, sampler, actions: Sequence[Any]
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
                          locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None,
                          q_seed_prev: Optional[th.Tensor] = None, q_end_prev: Optional[th.Tensor] = None,
-                         held_since_init: bool = False, locked_fingers: Optional[Dict[str, float]] = None) -> Tuple[int, Dict[str, Any]]:
+                         held_since_init: bool = False, locked_fingers: Optional[Dict[str, float]] = None,
+                         carried_arm: Optional[str] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -2517,7 +2593,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         stance_name = f"{stance_name} -> {stance_obj.name} {[round(float(v), 3) for v in stance_obj.base_pose2d]}"
     locked = {a: q for a, q in (locked_arms or {}).items() if a != arm}
     carried_obj = sampler.objects.get(carried) if carried else None
-    g = sidecar.grasp_of(carried) if carried else None
+    # i7-cork: ``carried_arm`` (the tracker's carrying arm) picks the record of that hand when the object has two (the hand-over)
+    g = sidecar.grasp_of(carried, arm=carried_arm) if carried else None
     eef_in_object = g.eef_in_object if g is not None else None
     if g is None and carried_obj is not None:
         # a block (``blocks[]`` carries no grasps[] record): the cube grasp's eef in the block frame from the record's pick and
