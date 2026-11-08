@@ -61,11 +61,12 @@ def test_hull_obstacle_sdf_inside_outside():
     assert d[0] == pytest.approx(-0.5, abs=1e-6) and d[1] == pytest.approx(1.0, abs=1e-6) and d[2] == pytest.approx(-0.1, abs=1e-6)
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_all(monkeypatch):
+    # owner decision 2026-11-08 item 4: ``all`` is the default for fixed layouts; 0 restores the former pick
     monkeypatch.delenv(D.LAYOUT_PAD_SWITCH, raising=False)
+    assert D.layout_pad_on() and D.layout_pad_mode() == "all"
+    monkeypatch.setenv(D.LAYOUT_PAD_SWITCH, "0")
     assert not D.layout_pad_on()
-    monkeypatch.setenv(D.LAYOUT_PAD_SWITCH, "1")
-    assert D.layout_pad_on()
 
 
 def test_rows_on_the_frame_vs_clear_rows(parts):
@@ -79,7 +80,7 @@ def test_rows_on_the_frame_vs_clear_rows(parts):
 
 
 def test_mode_values(monkeypatch):
-    for v, want in (("0", "off"), ("1", "all"), ("all", "all"), ("heavy", "heavy"), ("bogus", "off")):
+    for v, want in (("0", "off"), ("off", "off"), ("1", "all"), ("all", "all"), ("heavy", "heavy"), ("bogus", "all")):
         monkeypatch.setenv(D.LAYOUT_PAD_SWITCH, v)
         assert D.layout_pad_mode() == want
 

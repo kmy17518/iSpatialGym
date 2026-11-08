@@ -106,7 +106,8 @@ RELEASE_ABOVE_SURFACE = 0.01
 #: apart and its physics check settled them from 0.5 mm (embedded_figure/README.txt, 2026-10-11); ``generation.fixed_layout.
 #: release_gap_m`` overrides
 FIXED_LAYOUT_RELEASE_GAP_M = 0.0005
-#: i7-tray 2026-11-08 (owner 1.1, disembedding_01 4/4 -> 0/4): ``ISPATIALGYM_LAYOUT_PAD_CHECK`` (default OFF = the pick as before). The
+#: i7-tray 2026-11-08 (owner 1.1, disembedding_01 4/4 -> 0/4): ``ISPATIALGYM_LAYOUT_PAD_CHECK`` (default ``all`` since the owner decision
+#: 2026-11-08 item 4; ``0`` = the pick as before; it acts on fixed layouts only). The
 #: pick ignores the fixed-layout parts for every pose (A2b ``pick_world``) and the library validated the target alone on a slab, so a
 #: grasp whose pre-shaped fingers descend onto a neighbouring part (the embedded figure's frame, 0.3 mm from the target) passes the draw
 #: and the oracle's approach stops on the part (``approach_support_stop``, 13-22 mm short). On: the library's finger rule - the hand
@@ -119,12 +120,13 @@ LAYOUT_PAD_SWITCH = "ISPATIALGYM_LAYOUT_PAD_CHECK"
 
 
 def layout_pad_mode() -> str:
-    """``off`` (default), ``all`` (1 / on: every layout part) or ``heavy`` (only the parts at least as heavy as the target - the frame:
-    A2b's "the grasp may displace the parts" kept for the light inner pieces the pads push aside)."""
-    v = os.environ.get(LAYOUT_PAD_SWITCH, "0").strip().lower()
-    if v in ("1", "on", "true", "yes", "all"):
-        return "all"
-    return "heavy" if v == "heavy" else "off"
+    """``all`` (DEFAULT since 2026-11-08, owner decision item 4; 1 / on: every layout part), ``heavy`` (only the parts at least as heavy as
+    the target - the frame: A2b's "the grasp may displace the parts" kept for the light inner pieces the pads push aside) or ``off``
+    (0 / off / false / no: the pick before i7-tray)."""
+    v = os.environ.get(LAYOUT_PAD_SWITCH, "all").strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "heavy" if v == "heavy" else "all"
 
 
 def layout_pad_on() -> bool:
