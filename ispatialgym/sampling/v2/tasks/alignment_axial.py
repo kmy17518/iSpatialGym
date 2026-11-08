@@ -360,6 +360,10 @@ class AlignmentAxial(SamplerV2):
             d = spin * th.cross(z_axis, r_xy, dim=0)
             motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pts, d_stop))
         motions.sort(key=lambda m: float(th.dot(m[6][:2], manip.inward)))
+
+        def other_end(e_):
+            return next(m[0] for m in motions if m[0] is not e_)
+
         paired = TT.contact_maps_on() and self._draw_paired(chosen)
         if TT.contact_maps_on():
             # owner A5 (2026-11-08): the end whose push AND stop brace fit on the maps (the same pushed end in both) first
@@ -434,7 +438,8 @@ class AlignmentAxial(SamplerV2):
                                     brace_fails.append(f"{p.label}: {res_b.reason}")
                                 return bool(res_b.ok), res_b, None, str(res_b.reason)
 
-                            b_chosen, dec_brace, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal),
+                            b_chosen, dec_brace, _b_fails = O.choose_first(self.ikc, "left", self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal,
+                                                                                                                         opposite=(other_end(e), spin, yaw_goal)),
                                                                           key=lambda c: c[1], label=lambda c: c[2], chain=lambda c: [c[0], c[1]], evaluate=eval_brace,
                                                                           q_start=self.ikc.q_locked(manip), stage="axial brace")
                             if b_chosen is not None:
@@ -476,7 +481,10 @@ class AlignmentAxial(SamplerV2):
         annotate_height_extra(self.sidecar.add_contact(push_rec), self)
         if brace_found is not None:
             brace_pre, brace, brace_kind, brace_extras = brace_found
-            annotate_height_extra(self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
+            b_dir = th.tensor(brace_extras["brace_direction"], dtype=th.float32) if brace_extras.get("opposite_end") else -d_stop  # i7-brace: the far end's stop
+            if brace_extras.get("opposite_end"):
+                TT._count(self, "axial_brace.opposite_used")
+            annotate_height_extra(self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=b_dir, brace_kind="stop_edge", object=tname,
                                                     extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()})), self)
             manip.contacts = ["push", "brace"]
             manip.arms = ["right", "left"]
@@ -651,8 +659,15 @@ class AlignmentAxial(SamplerV2):
             return (a is not None and math.copysign(1.0, float(a)) == spin and (t_near is None or abs(abs(float(a)) - t_near) < 1e-4)
                     and same_end(r, e_push))
 
+        cover = axial_brace_turn_cover_on()
+        turn_deg = math.degrees(abs(float(turn)))
+
         def keep_brace(r):
             _e, s_r = CMAP.axial_end_spin(r)
+            if cover:  # i7-brace (owner 3.4): only the entries clear for the drawn turn (clear-turn libraries; others carry no range)
+                t_max = (r.get("goal") or {}).get("clear_turn_max_deg")
+                if t_max is not None and float(t_max) + 1e-6 < turn_deg:
+                    return False
             return (s_r is None or s_r == spin) and same_end(r, e_brace)
 
         w = TT.contact_map_check(pm, manip, pose, keep=keep_push)
@@ -705,7 +720,8 @@ class AlignmentAxial(SamplerV2):
         blade_standoff``). None when the face reaches the palm section."""
         return CPZ.axial_blade_geometry(self._push_height(), self._face_z_range(), pitch, clearance, side=side)  # i7-contact: the shared rule
 
-    def _brace_candidates(self, manip: Stance, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init: TT.Pose, com: th.Tensor, d_goal: float):
+    def _brace_candidates(self, manip: Stance, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init: TT.Pose, com: th.Tensor, d_goal: float,
+                          opposite: Optional[Tuple[th.Tensor, float, float]] = None):
         """The stop brace's poses of the closed left gripper at the stop face (``contact_poses.axial_brace_candidates``, the rule the brace
         library shares): the pads on the face (closing ``_v`` / ``_h``, the left band's passing classes first) and the top-down blade beside it,
         each clear of the target's sweep from the init pose to the goal; thin targets (< 4 cm) get the blade first. Yields ``(pre, contact,
@@ -715,6 +731,14 @@ class AlignmentAxial(SamplerV2):
         yield from CPZ.axial_brace_candidates(manip, self.hull, stop_pts, d_stop, passing, pose_init, com, d_goal, z_push=self._push_height(),
                                               face_z=self._face_z_range(), height=self.extents["height"], stop_clearance=STOP_CLEARANCE,
                                               thin_height=THIN_TARGET_HEIGHT, skips=self._blade_skips)
+        if opposite is not None and axial_brace_opposite_on():
+            # i7-brace (owner 3.4, ISPATIALGYM_AXIAL_BRACE_OPPOSITE): the opposite-end brace after the current candidates (the far end's face,
+            # resisting the same turn; the record's direction = extras brace_direction)
+            opp_end, spin, yaw_goal = opposite
+            TT._count(self, "axial_brace.opposite_tried")
+            yield from CPZ.axial_opposite_brace_candidates(manip, self.hull, self.com_local, pose_init, opp_end, com, spin, yaw_goal,
+                                                           TT.contact_height(self.top.z, self.extents["height"]), d_goal, z_push=self._push_height(),
+                                                           face_z=self._face_z_range(), height=self.extents["height"], skips=self._blade_skips)
 
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
@@ -830,6 +854,18 @@ class AlignmentAxial(SamplerV2):
         return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
                  "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
                  "brace": "stop_edge", "hard": False}]
+
+
+def axial_brace_turn_cover_on() -> bool:
+    """i7-brace (owner 3.4; default OFF): the axial_brace map lookup keeps only the entries whose recorded start range
+    (``goal.clear_turn_max_deg``, the clear-turn library build) covers the drawn turn. ``ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "0") == "1"
+
+
+def axial_brace_opposite_on() -> bool:
+    """i7-brace (owner 3.4; default OFF): the sampler also tries the OPPOSITE-END stop brace (the far end's face, resisting the same turn) after
+    the current candidates. ``ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", "0") == "1"
 
 
 def _icl_frame(category: str, model: str):

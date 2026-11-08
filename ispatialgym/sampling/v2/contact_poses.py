@@ -1278,17 +1278,26 @@ def axial_stop_geometry(hull: th.Tensor, com_local: th.Tensor, pose, end: th.Ten
 
 def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init, com: th.Tensor,
                            d_goal: float, *, z_push: float, face_z: Tuple[float, float], height: float, stop_clearance: float = AXIAL_STOP_CLEARANCE_M,
-                           thin_height: float = AXIAL_THIN_TARGET_HEIGHT_M, skips: Optional[Dict[str, int]] = None):
+                           thin_height: float = AXIAL_THIN_TARGET_HEIGHT_M, skips: Optional[Dict[str, int]] = None, sweep_check: bool = True):
     """The axial stop brace's poses of the closed left gripper at the stop face (``AlignmentAxial._brace_candidates``; ``stop_pts`` on the goal
     hull, the pushed end's corner side first), in the order to try: the contact classes with the pads on the face (approach -d_stop into the
     face, pad centre ``stop_clearance`` outside it; closing vertical ``_v`` then horizontal ``_h``, either wrist turn; the classes in
     ``passing`` first) and the top-down blade beside the stop face (straight down / pitched toward ``manip.forward``, either wrist turn;
     :func:`axial_blade_geometry` at the push height ``z_push``), each clear of the target's sweep from ``pose_init`` to the goal
     (``tabletop.blade_sweep_clear``); a target under ``thin_height`` tries the blade first (a side contact at 3/4 of its height puts the wrist
-    on the table). ``skips`` counts the sweep / palm skips. Yields ``(pre, contact, kind, extras)``."""
+    on the table). ``skips`` counts the sweep / palm skips. Yields ``(pre, contact, kind, extras)``. ``sweep_check=False`` (i7-brace, owner
+    3.4: the library's largest-clear-turn build): no candidate is skipped for the sweep; each carries the disc the sweep test uses
+    (``extras["sweep_disc"]``: xy, radius, clearance) so the caller runs :func:`tabletop.blade_sweep_clear` itself at every turn."""
     skips = {} if skips is None else skips
     z_axis = th.tensor([0.0, 0.0, 1.0])
     a = -d_stop  # into the stop face
+
+    def swept(xy, radius):
+        if not sweep_check:
+            return True, None, {"sweep_disc": {"xy": [round(float(xy[0]), 6), round(float(xy[1]), 6)], "radius": round(float(radius), 6),
+                                               "clearance": float(stop_clearance)}}
+        ok, gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, xy, radius, stop_clearance)
+        return ok, gap, {}
     side_h = C.unit(th.cross(z_axis, d_stop, dim=0))
     contact_classes = []
     for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
@@ -1302,7 +1311,7 @@ def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_
         for i, stop_pt in enumerate(stop_pts):
             point = stop_pt + d_stop * stop_clearance  # pad centre 5 mm outside the goal face
             # the pads' footprint (a finger's width across, a finger's thickness deep) must be clear of the sweep too
-            ok, gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, (point + d_stop * r_side)[:2], r_side, stop_clearance)
+            ok, gap, disc = swept((point + d_stop * r_side)[:2], r_side)
             if not ok:
                 skips["sweep"] = skips.get("sweep", 0) + 1
                 continue
@@ -1310,7 +1319,7 @@ def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_
                 for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
                     brace = C.contact_eef(point, a, c_sign * c_axis)
                     yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": stop_clearance, "pose_class": name,
-                                                                                           "stop_face_fraction": i, "sweep_min_gap_m": gap}
+                                                                                           "stop_face_fraction": i, "sweep_min_gap_m": gap, **disc}
 
     def blades():
         for pitch in TT.approach_pitch_order(None):
@@ -1323,7 +1332,7 @@ def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_
             for i, stop_pt in enumerate(stop_pts):
                 origin = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * standoff
                 # the blade must not meet the rotating target before the goal (the face rising through it, a corner)
-                ok, gap = TT.blade_sweep_clear(hull, pose_init, com[:2], d_goal, origin[:2], max(half, r_side), stop_clearance)
+                ok, gap, disc = swept(origin[:2], max(half, r_side))
                 if not ok:
                     skips["sweep"] = skips.get("sweep", 0) + 1
                     continue
@@ -1331,11 +1340,25 @@ def axial_brace_candidates(manip, hull: th.Tensor, stop_pts: List[th.Tensor], d_
                     brace = (origin, C.eef_quat(a_vec, c_sign * d_stop))
                     yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
                         "blade_half_thickness_m": half, "stop_clearance_m": stop_clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
-                        "sweep_min_gap_m": gap, "pose_class": f"blade_{pitch:.0f}", "stop_face_fraction": i}
+                        "sweep_min_gap_m": gap, "pose_class": f"blade_{pitch:.0f}", "stop_face_fraction": i, **disc}
 
     order = (blades, side_contacts) if height < thin_height else (side_contacts, blades)
     for gen in order:
         yield from gen()
+
+
+def axial_opposite_brace_candidates(manip, hull: th.Tensor, com_local: th.Tensor, pose_init, opp_end: th.Tensor, com: th.Tensor, spin: float,
+                                    yaw_goal: float, z_brace: float, d_goal: float, *, z_push: float, face_z: Tuple[float, float], height: float,
+                                    skips: Optional[Dict[str, int]] = None, sweep_check: bool = True):
+    """i7-brace (owner 3.4): the OPPOSITE-END stop brace - the analog of world_vertical's ``above_low``: the pads / blade on the FAR end's face
+    the far end arrives at (:func:`axial_stop_geometry` of ``opp_end``, the same spin: its ``d_stop`` points opposite the pushed end's), resisting
+    the same turn. The candidates of :func:`axial_brace_candidates` there, kinds prefixed ``opp_``, extras ``opposite_end`` and
+    ``brace_direction`` (= -its d_stop: the brace record's direction) and ``opp_d_stop``. Tried after the current candidates."""
+    _goal, stop_pts, d_stop = axial_stop_geometry(hull, com_local, pose_init, opp_end, com, spin, yaw_goal, z_brace)
+    for pre, contact, kind, extras in axial_brace_candidates(manip, hull, stop_pts, d_stop, None, pose_init, com, d_goal, z_push=z_push, face_z=face_z,
+                                                             height=height, skips=skips, sweep_check=sweep_check):
+        yield pre, contact, f"opp_{kind}", dict(extras, opposite_end=True, brace_direction=[round(float(v), 6) for v in (-d_stop).tolist()],
+                                                opp_d_stop=[round(float(v), 6) for v in d_stop.tolist()])
 
 
 def axial_push_chain(side_pt: th.Tensor, d: th.Tensor, half: float, approach: th.Tensor, closing: th.Tensor, c_sign: float, centre: th.Tensor,
