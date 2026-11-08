@@ -445,6 +445,24 @@ FINGER_TOUCH_RULES = ("spheres", "geometry")
 #: version of the geometry rule's measurement (part of the cache scope under "geometry")
 FINGER_TOUCH_GEOMETRY_VERSION = 1
 
+#: i7-ft2 2026-11-08 (owner decision 7.1: "apply your two-step to the FingerTouch path"): the geometry rule's non-finger stage judges the
+#: hand's rigid links (palm, wrist camera + mount, wrist: the links with exact hulls) as the support policy's hull fallback does
+#: (i7-plateqtf2, ``contact_policy.hull_fallback``): the padded spheres stay the screen; a NARROW sphere failure (only hand links, each sphere
+#: less than the model's 2 mm buffer deep, only into the touched support) passes when their exact hulls clear the touched support by
+#: :func:`support_hull_fallback_min_m` (0.5 mm, side_9's); a configuration whose spheres PASS must also have those hulls clear of it by the
+#: policy's ``hand_support_margin_m`` (the spec's P1 §3: hulls AND spheres). ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS`` = ``0`` off (the
+#: default until the A/B) / ``shadow`` (judged and counted, verdict unchanged) / ``1`` on; kit counters ``finger_touch.hand_hulls.*``.
+FINGER_TOUCH_HAND_HULLS_ENV = "ISPATIALGYM_FINGER_TOUCH_HAND_HULLS"
+FINGER_TOUCH_HAND_HULLS_DEFAULT = "0"
+
+
+def finger_touch_hand_hulls_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`FINGER_TOUCH_HAND_HULLS_ENV`; unset = :data:`FINGER_TOUCH_HAND_HULLS_DEFAULT`)."""
+    v = (os.environ.get(FINGER_TOUCH_HAND_HULLS_ENV, "") or FINGER_TOUCH_HAND_HULLS_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
 
 #: i7-fingertouch A/B (2026-11-07, owner part B item 2): ``=1`` judges every configuration the active rule judges under the OTHER rule too
 #: (no verdict changes: the active rule decides) and counts where they disagree - kit counters ``finger_touch.shadow.checked`` /
@@ -852,6 +870,8 @@ class IKChecker:
 
             self.cache_scope["finger_touch"] = ["geometry", round(CP.DEFAULT.finger_support_max_penetration_m, 4), round(CP.DEFAULT.sphere_support_margin_m, 4),
                                                 bool(touch.preshape), FINGER_TOUCH_GEOMETRY_VERSION]
+            if finger_touch_hand_hulls_mode() == "on":  # i7-ft2: only when it changes verdicts (shadow / off keep the key)
+                self.cache_scope["finger_touch"] += ["hand_hulls", round(support_hull_fallback_min_m(), 5), round(CP.DEFAULT.hand_support_margin_m, 5)]
         else:
             self.cache_scope["finger_touch"] = [round(touch.margin_m, 4), round(touch.max_penetration_m, 4), bool(touch.preshape)]
 
@@ -1952,7 +1972,9 @@ class IKChecker:
 
         (a) the whole body collision-free at margin 0 with ``touch`` removed too (every other object, self-collision) - as the sphere rule;
         (b) the contact policy's sphere stage: every link but ``arm``'s finger links clear of the world WITH ``touch`` at
-            ``CP.DEFAULT.sphere_support_margin_m`` (the palm, camera, wrist, arm, torso, base against the support);
+            ``CP.DEFAULT.sphere_support_margin_m`` (the palm, camera, wrist, arm, torso, base against the support); i7-ft2 (owner 7.1,
+            :data:`FINGER_TOUCH_HAND_HULLS_ENV` on): the hand's rigid links also by their exact hulls - a narrow sphere failure passes on
+            the hull fallback, a sphere pass needs the hulls clear (:meth:`_finger_touch_hand_hulls`);
         (c) the contact policy's finger rule: the finger collision HULLS (``HandChecker``; at the oracle's pre-shape when
             ``FingerTouch.preshape``, else the configuration's opening) at most ``CP.DEFAULT.finger_support_max_penetration_m`` (2 mm) into
             every touched support (:func:`finger_hull_clearance` >= -0.002 m), measured by :meth:`_touch_geometry`: the support's
@@ -1974,19 +1996,41 @@ class IKChecker:
         count = (lambda *a: None) if quiet else self._count
         count("finger_touch.geometry.checked", n)
         with self.ignoring(list(ignored) + list(touch)):
-            ok = self.kit.collision_free(qs, margin=0.0).clone()
-        n_body = int((~ok).sum())
+            body = self.kit.collision_free(qs, margin=0.0).clone().to(th.bool).cpu()
+        n_body = int((~body).sum())
         with self.ignoring(list(ignored)):
-            ok &= self.kit.links_clear(qs, others, pol.sphere_support_margin_m)
-        n_links = int((~ok).sum()) - n_body
+            sph = self.kit.links_clear(qs, others, pol.sphere_support_margin_m).clone().to(th.bool).cpu()
         allow = float(pol.finger_support_max_penetration_m)
         opening = ft.opening() if ft.preshape else None
         grip = self.kit.robot.gripper_control_idx[arm]
         geoms = [self._touch_geometry(sp) for sp in touch]
+        # i7-ft2 (owner 7.1): the hand's rigid links by their exact hulls - the fallback on a narrow sphere failure, the spec's hull check on a pass
+        mode = finger_touch_hand_hulls_mode()
+        links_new = sph.clone()
+        hh_notes: List[Dict[str, Any]] = []
+        if mode != "off":
+            hc_h = self._touch_hand_checker(arm)
+            for i in th.nonzero(body).flatten().tolist():
+                fq = float(opening) if opening is not None else float(qs[i, grip].float().mean())
+                hh = self._finger_touch_hand_hulls(qs[i], arm, ignored, touch, others, geoms, hc_h, fq, bool(sph[i]), count)
+                links_new[i] = bool(hh["ok"])
+                if bool(hh["ok"]) != bool(sph[i]):
+                    hh_notes.append(hh)
+        ok = body & (links_new if mode == "on" else sph)
+        n_links = int((body & ~(links_new if mode == "on" else sph)).sum())
+        cand = body & (sph | links_new)  # the fingers are judged wherever either variant of the non-finger stage passes (the counts below)
+        fing = th.zeros(n, dtype=th.bool)
         deepest, refused, unmeasured = 0.0, [], 0
-        idx = th.nonzero(ok).flatten().tolist()
+        idx = th.nonzero(cand).flatten().tolist()
         hc = self._touch_hand_checker(arm) if idx else None
         for i in idx:
+            if not bool(ok[i]):  # judged only for the counts (the other variant's verdict): no refusal record
+                g_ok = all(g is not None for g, _ in geoms)
+                if g_ok:
+                    fq = float(opening) if opening is not None else float(qs[i, grip].float().mean())
+                    T = self._eef_matrix(qs[i], arm)
+                    fing[i] = min(finger_hull_clearance(hc, T, g, (fq, fq)) for g, _ in geoms) >= -allow - 1e-9
+                continue
             if any(g is None for g, _ in geoms):
                 ok[i] = False
                 unmeasured += 1
@@ -1998,16 +2042,69 @@ class IKChecker:
                 ok[i] = False
                 refused.append(-cl)
             else:
+                fing[i] = True
                 deepest = max(deepest, -cl)
         for key, v in (("rejected_body", n_body), ("rejected_non_finger_link", n_links), ("rejected_finger_penetration", len(refused)),
                        ("rejected_unmeasured", unmeasured), ("passed", int(ok.sum()))):
             if v:
                 count(f"finger_touch.geometry.{key}", v)
+        if mode != "off":
+            # the configurations / collision group whose final verdict the hand hulls change (both directions; shadow: what "on" would do)
+            old, new = body & sph & fing, body & links_new & fing
+            to_pass, to_fail = int((new & ~old).sum()), int((old & ~new).sum())
+            for key, v in (("verdict_to_pass", to_pass), ("verdict_to_fail", to_fail)):
+                if v:
+                    count(f"finger_touch.hand_hulls.{key}", v)
+            if bool(old.all()) != bool(new.all()):
+                count(f"finger_touch.hand_hulls.decision_to_{'pass' if bool(new.all()) else 'fail'}")
+                if not quiet:
+                    first = hh_notes[0] if hh_notes else {}
+                    log.info("approach finger-support touch hand hulls (%s): the group %s (%d of %d configurations to pass, %d to fail); first: %s, hand hull "
+                             "clearance %s mm (needs %s mm); %s vs %s", mode, "passes" if bool(new.all()) else "is refused", to_pass, n, to_fail,
+                             first.get("what", "-"), first.get("hull_mm", "-"), first.get("min_mm", "-"), arm,
+                             [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)])
         if refused and not quiet:
             log.info("approach finger-support touch refused: max penetration %.2f mm (rule geometry: finger hulls, cap %.1f mm; %s fingers vs %s; "
                      "%d of %d configurations)", 1000 * max(refused), 1000 * allow, arm,
                      [f"{getattr(sp, 'name', str(sp))} ({d})" for sp, (_, d) in zip(touch, geoms)], len(refused), n)
         return ok, round(1000.0 * max(0.0, deepest), 2)
+
+    def _finger_touch_hand_hulls(self, q: th.Tensor, arm: str, ignored: Sequence[Any], touch: Sequence[Any], others: Sequence[str],
+                                 geoms: Sequence[Tuple[Any, str]], hc: Any, fq: float, spheres_ok: bool, count: Callable[..., None]) -> Dict[str, Any]:
+        """i7-ft2 (owner 7.1, :data:`FINGER_TOUCH_HAND_HULLS_ENV`): the non-finger stage of one configuration ``q`` (its body free) with the
+        hand's rigid links by their exact hulls against the touched supports' geometry (:meth:`_touch_geometry`: the registered plane or the
+        support's convex pieces). Spheres failed -> the reusable ``contact_policy.hull_fallback`` (i7-plateqtf2's check: narrow = only hand
+        links, each less than the sphere buffer deep, only into ``touch``; then the hulls >= :func:`support_hull_fallback_min_m`), queried in
+        the world the failure was found in (``ignored`` out, ``touch`` in); spheres passed -> ``contact_policy.hull_clearance_min`` >= the
+        policy's ``hand_support_margin_m`` (P1 §3). ``{"ok", "what", "why", "hull_mm", "min_mm"}``; an unmeasured support keeps the sphere
+        verdict. Counters ``finger_touch.hand_hulls.{fallback_checked, fallback_passed, fallback_failed.<why>, spec_checked, spec_rejected,
+        unmeasured}``."""
+        from ispatialgym.grasping import contact_policy as CP
+
+        pol = CP.DEFAULT
+        geometry = [g for g, _ in geoms]
+        if not geometry or any(g is None for g in geometry):
+            count("finger_touch.hand_hulls.unmeasured")
+            return {"ok": bool(spheres_ok), "what": "unmeasured", "why": "unmeasured", "hull_mm": None, "min_mm": None}
+        T = self._eef_matrix(q, arm)
+        if spheres_ok:
+            count("finger_touch.hand_hulls.spec_checked")
+            worst = CP.hull_clearance_min(hc, T, geometry, (fq, fq))
+            ok = worst >= float(pol.hand_support_margin_m) - 1e-9
+            if not ok:
+                count("finger_touch.hand_hulls.spec_rejected")
+            return {"ok": ok, "what": "spheres pass, hand hull" + ("" if ok else " into the support"), "why": "" if ok else "hull_clearance",
+                    "hull_mm": round(1000 * worst, 2), "min_mm": round(1000 * float(pol.hand_support_margin_m), 2)}
+        count("finger_touch.hand_hulls.fallback_checked")
+        qq = G.t(q).reshape(1, -1)
+        with self.ignoring(list(ignored)):
+            fb = CP.hull_fallback(lambda links, m: bool(self.kit.links_clear(qq, list(links), m)[0]), list(others), pol.hand_rigid_links(arm), hc, T,
+                                  geometry, threshold=support_hull_fallback_min_m(), finger_q=(fq, fq), margin=float(pol.sphere_support_margin_m),
+                                  geometry_out=lambda: self.ignoring(list(touch)))
+        count("finger_touch.hand_hulls.fallback_passed" if fb["ok"] else f"finger_touch.hand_hulls.fallback_failed.{fb['why']}")
+        hm = fb.get("hull_min_m")
+        return {"ok": bool(fb["ok"]), "what": "narrow sphere failure, hand hull fallback " + ("passes" if fb["ok"] else f"fails ({fb['why']})"),
+                "why": fb["why"], "hull_mm": None if hm is None else round(1000 * float(hm), 2), "min_mm": round(1000 * float(fb["min_m"]), 2)}
 
     def _touch_hand_checker(self, arm: str) -> Any:
         """The contact policy's ``HandChecker`` for ``arm`` (shared with :meth:`support_policy_eval`: ``_hand_checker``)."""
