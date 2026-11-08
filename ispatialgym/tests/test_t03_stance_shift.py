@@ -439,3 +439,98 @@ def test_lift_straighten_off_is_today(monkeypatch):
     assert list(q) == pytest.approx(list(gr.grasp[1]), abs=1e-7)
     gr.extras["lift_leaned_piece"] = "/World/bookcase/board"
     assert s.lift_touch_ignores(gr) == []
+
+
+# -- owner 5k.1 (2026-11-08): the shelf-width rule computed from the jaw and the carried book (ISPATIALGYM_SHELF_SPAN_RULE, default off) -----
+
+def _span_sampler(monkeypatch, straighten="0", preshape=True):
+    from ispatialgym.sampling import geometry as G
+
+    monkeypatch.setenv(IS.SHELF_LIFT_STRAIGHTEN_ENV, straighten)
+    s = _sampler(gen={"approach_finger_support_touch": {"preshape": preshape}, "shelf_free_span_min_m": 0.12})
+    s.edge = EDGE
+    s.hull = {"target": BOOK_HULL}
+    s.rest = {"target": BOOK[1]}
+    s.grasp_key = "hardback__acbrnv__bu"
+    s.grasps = [SimpleNamespace(meta={"width": 0.0312})]
+    s.world = SimpleNamespace(hull_at=lambda h, pose: G.local_points_world(h, (G.t(pose[0]).float(), G.t(pose[1]).float())))
+    return s
+
+
+def test_span_rule_default_off_keeps_the_fixed_minimum(monkeypatch):
+    monkeypatch.delenv(IS.SHELF_SPAN_RULE_ENV, raising=False)
+    s = _span_sampler(monkeypatch)
+    assert not IS.shelf_span_rule_on() and s.shelf_span_min(BOOK) == 0.12
+
+
+@pytest.mark.parametrize("straighten,carried,want", [("0", "lean", 0.104 + 0.044), ("1", "upright", 0.031 + 0.044)])
+def test_span_required_is_the_carried_extent_plus_the_open_jaw(monkeypatch, straighten, carried, want):
+    """acbrnv at the touching_03 start (19.6 deg): its extent along the edge 0.223 sin + 0.031 cos = 0.104 m leaning, its 3.1 cm thickness
+    upright (the straightening lift); the pre-shaped jaw (pinch 31.2 mm + 2 x 10 mm) plus both 12 mm fingers exceeds the pinch by 44 mm."""
+    monkeypatch.setenv(IS.SHELF_SPAN_RULE_ENV, "1")
+    s = _span_sampler(monkeypatch, straighten)
+    req, f = s.shelf_span_required(BOOK)
+    assert f["carried"] == carried and f["jaw_excess_m"] == pytest.approx(0.044, abs=1e-4) and req == pytest.approx(want, abs=2e-3)
+    assert s.shelf_span_min(BOOK) == pytest.approx(req)
+
+
+def test_span_required_at_the_drawn_lean(monkeypatch):
+    """The requirement follows the lean the attempt drew: 11 deg needs ~3 cm less than 20 deg; without the pre-shape the jaw opens fully."""
+    from ispatialgym.sampling import geometry as G
+
+    monkeypatch.setenv(IS.SHELF_SPAN_RULE_ENV, "1")
+    s = _span_sampler(monkeypatch)
+    up = G.qmul(IS.shortest_arc(G.rotate(BOOK[1], th.tensor([-1.0, 0.0, 0.0])), th.tensor([0.0, 0.0, 1.0])), BOOK[1])
+
+    def leaned(deg):  # the upright book turned about the edge's inward axis (-y)
+        a = math.radians(deg)
+        return (BOOK[0], G.qmul(th.tensor([0.0, -math.sin(a / 2), 0.0, math.cos(a / 2)]), up))
+
+    r11, r20 = s.shelf_span_required(leaned(11.0))[0], s.shelf_span_required(leaned(20.0))[0]
+    assert r20 - r11 == pytest.approx(0.223 * (math.sin(math.radians(20)) - math.sin(math.radians(11))) + 0.031 * (math.cos(math.radians(20)) - math.cos(math.radians(11))), abs=2e-3)
+    s2 = _span_sampler(monkeypatch, preshape=False)
+    assert s2.shelf_span_required(leaned(20.0))[1]["jaw_excess_m"] == pytest.approx(0.10 + 0.024 - 0.0312, abs=1e-4)
+
+
+# -- owner 5p.2: the stance shift tries every candidate's trunk (under (b)'s ISPATIALGYM_SHELF_JOINT_STANCE) ---------------------------------
+
+@pytest.mark.parametrize("joint", ["0", "1"])
+def test_stance_shift_tries_every_candidates_trunk(monkeypatch, joint):
+    monkeypatch.setenv(IS.SHELF_JOINT_STANCE_ENV, joint)
+    s = _sampler()
+    cand = _cand(-0.065)
+    other = _cand(-0.2).with_trunk(0.5, -0.6)
+    same = _cand(-0.3)  # the candidate's own trunk again: not repeated
+    s.manip_candidates = [cand, other, same]
+    out = s.shelf_shift_stances(cand, "left")
+    trunks = [(round(st.translate, 3), round(st.tilt, 3)) for _l, st, _sh in out]
+    assert out[0][0] == "computed" and trunks[0] == (0.25, 0.0)
+    if joint == "1":
+        assert trunks[1] == (0.5, -0.6) and out[1][0] == "scan" and out[1][1].extras["stance_shift_trunk"] == [0.5, -0.6]
+        assert out[1][1].base_pose2d == out[0][1].base_pose2d and len(out) == 2 * len(set((round(st.base_pose2d[0], 4), round(st.base_pose2d[1], 4)) for _l, st, _sh in out))
+    else:
+        assert set(trunks) == {(0.25, 0.0)}
+
+
+# -- (c) 2f815f1b: the free gap the carried drive may use ---------------------------------------------------------------------------------
+
+def test_lifted_book_gap_measures_the_book_at_the_lift_end_to_the_partner(monkeypatch):
+    """(c)'s room: the partner's near face minus the lifted book's far face along the push direction, the book at ``lift_end_pose`` (the lift's
+    away move included); the drive plan then uses fractions of that less the carried path margin."""
+    from ispatialgym.sampling import geometry as G
+
+    s = _sampler()
+    s.shelf_start = {"lean_side": 1.0}  # target on the left board: push toward -x (EDGE tangent +x)
+    cube = th.tensor([[x, y, z] for x in (-0.02, 0.02) for y in (-0.05, 0.05) for z in (0.0, 0.2)])
+    s.hull = {"target": cube, "partner": cube}
+    s.world = SimpleNamespace(hull_at=lambda h, pose: G.local_points_world(h, (G.t(pose[0]).float(), G.t(pose[1]).float())))
+    s.obj = lambda role: SimpleNamespace(get_position_orientation=lambda: (th.tensor([-0.30, 0.0, 0.84]), th.tensor([0.0, 0.0, 0.0, 1.0])))
+    eio = (th.tensor([0.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    gr = SimpleNamespace(grasp=(th.tensor([0.0, 0.0, 0.84]), th.tensor([0.0, 0.0, 0.0, 1.0])), carry_height=0.04, eef_in_object=eio,
+                         extras={"lift_away": [-0.03, 0.0, 0.0]})
+    gap = s.lifted_book_gap(_cand(-0.465), gr)
+    assert gap == pytest.approx(0.30 - 0.04 - 0.03, abs=1e-5)  # centres 0.30 apart, two 2 cm half thicknesses, the 3 cm away move
+    s.lifted_book_gap = lambda manip, grasp: gap
+    s.shelf_push_arm = lambda: "left"
+    plan = s.shelf_release_in_gap_plan(_cand(-0.465), gr)
+    assert [round(d, 4) for d, _st in plan] == [round(f * (gap - 0.01), 4) for f in IS.SHELF_RELEASE_DRIVE_FRACTIONS]

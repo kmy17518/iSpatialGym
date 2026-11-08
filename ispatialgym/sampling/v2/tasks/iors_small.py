@@ -116,6 +116,19 @@ def shelf_lift_straighten_on() -> bool:
     return os.environ.get(SHELF_LIFT_STRAIGHTEN_ENV, "").strip().lower() in ("1", "on", "true")
 
 
+#: i7-t03 2026-11-08 (owner 5k.1, DEFAULT OFF): the shelf layout's free span between the two leaning books is judged against a COMPUTED
+#: requirement instead of the fixed ``generation.shelf_free_span_min_m`` (0.12 in the customs, fitted to kmuacd's 0.342 m cube; code default
+#: 0.15): the carried book's extent along the edge (at the lean the attempt drew; upright = its thickness when the straightening lift (d) is
+#: on) plus the open jaw's excess over the pinch on both sides (the oracle's pre-shape opening + both fingers' thickness - the pinch width).
+#: Checked per attempt at the drawn leans (:meth:`IORSSmall.draw_shelf_layout`) and at the template stage at the most favourable drawable
+#: leans (a template no draw can pass still stops there). Kit ``shelf_span.passed`` / ``.rejected`` (+ ``.template_rejected``)
+SHELF_SPAN_RULE_ENV = "ISPATIALGYM_SHELF_SPAN_RULE"
+
+
+def shelf_span_rule_on() -> bool:
+    return os.environ.get(SHELF_SPAN_RULE_ENV, "").strip().lower() in ("1", "on", "true")
+
+
 def shortest_arc(u: th.Tensor, v: th.Tensor) -> th.Tensor:
     """The smallest rotation (xyzw) taking unit vector ``u`` onto ``v``."""
     u = G.t(u).float() / float(th.linalg.norm(G.t(u).float()))
@@ -993,7 +1006,7 @@ class IORSSmall(SamplerV2):
             merge_shelf_pose_facts(self.shelf_start, facts)
             self.shelf_start.update({"partner": pfacts, "free_span_m": round(free, 4)})
             self.template_facts["shelf_start"] = self.shelf_start
-            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+            if not shelf_span_rule_on() and free < float(self.gen("shelf_free_span_min_m", 0.15)):
                 raise Reject("shelf_width", f"{self.support.name}: {free:.2f} m between the two leaning books (< {float(self.gen('shelf_free_span_min_m', 0.15)):.2f})")
             if self.shelf_start_draw() is not None:
                 # oracle-fix 2026-11-06 (generation.shelf_start_draw): the template's start (the key's lean and side, its compartment) is what
@@ -1001,6 +1014,8 @@ class IORSSmall(SamplerV2):
                 self._shelf_template = {k: self.shelf_start.get(k) for k in ("key", "lean_side", "lean_deg", "context")}
                 self._shelf_rest0 = {"target": self.rest["target"].clone(), "partner": self.rest["partner"].clone()}
                 self.template_facts["shelf_start_draw"] = self.shelf_draw_facts()
+            if shelf_span_rule_on():  # 5k.1: the computed requirement at the most favourable drawable leans
+                self.shelf_template_span_check()
         # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm when
         # it has no role besides the segment and the target is free; its band is its own or the default arm's mirrored
         phase2_band: Dict[str, Any] = {}
@@ -1977,7 +1992,7 @@ class IORSSmall(SamplerV2):
             t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - edge.mid) @ edge.tangent
             p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - edge.mid) @ edge.tangent
             free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
-            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+            if free < self.shelf_span_min(self.shelf_pose):
                 return rejected("shelf_width", f"{free:.2f} m between the two leaning books on edge {edge.name}")
         if self.shelf_start is not None:
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
@@ -2163,7 +2178,7 @@ class IORSSmall(SamplerV2):
             t_lat = (self.world.hull_at(self.hull["target"], self.shelf_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
             p_lat = (self.world.hull_at(self.hull["partner"], self.shelf_partner_pose)[:, :2] - self.edge.mid) @ self.edge.tangent
             free = float(t_lat.min() - p_lat.max()) if side > 0 else float(p_lat.min() - t_lat.max())
-            if free < float(self.gen("shelf_free_span_min_m", 0.15)):
+            if free < self.shelf_span_min(self.shelf_pose):
                 raise Reject("shelf_width", f"start_per_attempt: {free:.2f} m between the two leaning books on edge {self.edge.name}")
         if self.shelf_start is not None:
             phase2_band = {"bands": self.band_of_arm(self.segment_arms[0])}
@@ -3317,7 +3332,15 @@ class IORSSmall(SamplerV2):
                 t_pose, tf = TT.shelf_lean_pose(self, self.hull["target"], rest_t, self.top, self.edge, self.support, side, spine_behind=spine, lateral0=bay)
                 p_pose, pf = TT.shelf_lean_pose(self, self.hull["partner"], rest_p, self.top, self.edge, self.support, -side, spine_behind=spine, lateral0=bay)
                 free = shelf_free_span(self.world.hull_at(self.hull["target"], t_pose), self.world.hull_at(self.hull["partner"], p_pose), self.edge, side)
-                if free < span_min:
+                span_facts = None
+                if shelf_span_rule_on():  # 5k.1: the requirement at this attempt's drawn leans
+                    req, span_facts = self.shelf_span_required(t_pose)
+                    if free < req:
+                        TT._count(self, "shelf_span.rejected")
+                        raise Reject("shelf_width", f"{self.support.name}: {free:.3f} m between the two leaning books (< {req:.3f} required: carried "
+                                                    f"{span_facts['carried']} {span_facts['carried_extent_m']:.3f} + jaw {span_facts['jaw_excess_m']:.3f})")
+                    TT._count(self, "shelf_span.passed")
+                elif free < span_min:
                     raise Reject("shelf_width", f"{self.support.name}: {free:.3f} m between the two leaning books (< {span_min:.2f})")
             except Reject as e:
                 if e.reason not in SHELF_DRAW_REJECTS:
@@ -3330,6 +3353,8 @@ class IORSSmall(SamplerV2):
                      "bay_m": round(bay, 4), "spine_behind_edge_m": round(float(self.gen("shelf_spine_behind_edge_m", TT.SHELF_SPINE_BEHIND_EDGE_M) if spine is None else spine), 4)}
             merge_shelf_pose_facts(start, tf)
             start.update({"partner": pf, "free_span_m": round(free, 4)})
+            if span_facts is not None:
+                start["span_rule"] = span_facts
             self.shelf_start = start
             self.rest["target"], self.rest["partner"] = rest_t, rest_p
             self.shelf_pose, self.shelf_partner_pose = t_pose, p_pose
@@ -3363,7 +3388,7 @@ class IORSSmall(SamplerV2):
                 out.append((prim, cm, g))
         return out
 
-    def shelf_standing_axis(self) -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
+    def shelf_standing_axis(self, pose: Optional[G.Pose] = None) -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
         """(d) fix 2026-11-08 (touching has no ``generation.target_up_axis``: :meth:`up_axis` is inside-only and stays so): the book's
         standing (bottom -> top) axis as a signed model axis (+-e_i), the rule ``tabletop.upright_shelf_facts`` reads the shelf start's lean
         from (the local axis most aligned with world +z, ``grasping.lean.up_axis_local``) applied to the v2 lean entry's upright base
@@ -3389,7 +3414,7 @@ class IORSSmall(SamplerV2):
             if ax is None:
                 return None, {"why": "no_rest"}
             v = th.as_tensor(np.asarray(ax, dtype=np.float64), dtype=th.float32)
-            up_w = G.rotate(G.t(self.shelf_pose[1]).float(), v)
+            up_w = G.rotate(G.t((self.shelf_pose if pose is None else pose)[1]).float(), v)
             tilt = math.degrees(math.acos(max(-1.0, min(1.0, float(up_w[2])))))
             facts.update(axis=[int(round(float(x))) for x in v], axis_source=src, start_tilt_deg=round(tilt, 2))
             if not math.isfinite(tilt) or tilt > SHELF_LIFT_AXIS_MAX_TILT_DEG:
@@ -3400,6 +3425,64 @@ class IORSSmall(SamplerV2):
             log.warning("shelf_standing_axis: %s: %r", getattr(getattr(self, "gp", None), "variant", "?"), e)
             facts.update(why="error", error=repr(e)[:200])
             return None, facts
+
+    def shelf_span_required(self, t_pose: G.Pose) -> Tuple[float, Dict[str, Any]]:
+        """5k.1 (:data:`SHELF_SPAN_RULE_ENV`): the free span (m) the shelf layout needs with the target at ``t_pose`` - the carried book's
+        extent along the edge tangent (its hull at ``t_pose``: the drawn lean; with the straightening lift on, the book turned upright on
+        :meth:`shelf_standing_axis` - its extent at the lean when no axis is read) + the open jaw's excess over the pinch, both sides:
+        ``opening + 2 FINGER_THICKNESS - w`` (``opening`` = the oracle's pre-shape ``w + 2 ORACLE_PRESHAPE_MARGIN_M`` under
+        ``approach_finger_support_touch.preshape``, else ``GRIPPER_OPEN_M``; ``w`` = the narrowest library pinch, else the hull's thinnest
+        extent). ``(required, facts)``."""
+        tan = G.t(self.edge.tangent).float()[:2]
+        pose = (G.t(t_pose[0]).float(), G.t(t_pose[1]).float())
+
+        def extent(q: th.Tensor) -> float:
+            lat = self.world.hull_at(self.hull["target"], (pose[0], q))[:, :2] @ tan
+            return float(lat.max() - lat.min())
+
+        carried, how = extent(pose[1]), "lean"
+        if shelf_lift_straighten_on():
+            axis, _ = self.shelf_standing_axis(pose)
+            if axis is not None:
+                q_up = G.qmul(shortest_arc(G.rotate(pose[1], axis), th.tensor([0.0, 0.0, 1.0])), pose[1])
+                carried, how = extent(q_up), "upright"
+        ws = [w for w in (TT.grasp_pinch_width(g) for g in (getattr(self, "grasps", None) or [])) if w is not None and w > 0]
+        ext = self.hull["target"].max(dim=0).values - self.hull["target"].min(dim=0).values
+        w = min(ws) if ws else float(ext.min())
+        p_touch = IK.finger_touch_params(self.gen("approach_finger_support_touch"))
+        opening = min(float(C.GRIPPER_OPEN_M), w + 2.0 * IK.ORACLE_PRESHAPE_MARGIN_M) if (p_touch and p_touch.get("preshape")) else float(C.GRIPPER_OPEN_M)
+        excess = max(0.0, opening + 2.0 * FINGER_THICKNESS - w)
+        req = carried + excess
+        return req, {"required_m": round(req, 4), "carried_extent_m": round(carried, 4), "carried": how, "jaw_excess_m": round(excess, 4),
+                     "opening_m": round(opening, 4), "pinch_m": round(w, 4)}
+
+    def shelf_span_min(self, t_pose: G.Pose) -> float:
+        """The free span the layout needs with the target at ``t_pose``: :meth:`shelf_span_required` with the 5k.1 switch, else
+        ``generation.shelf_free_span_min_m`` (default 0.15)."""
+        return self.shelf_span_required(t_pose)[0] if shelf_span_rule_on() else float(self.gen("shelf_free_span_min_m", 0.15))
+
+    def shelf_template_span_check(self) -> None:
+        """5k.1 at the template stage (switch on): the free span at the most favourable leans an attempt can draw (the target's lowest drawn
+        lean - a v2 lean rest keeps its own - and the partner's lowest) against :meth:`shelf_span_required` there; ``Reject("shelf_width")``
+        only when no draw can pass. Without ``shelf_start_draw``: the template's own leans. Facts ``template_facts["shelf_span"]``."""
+        side = float(self.shelf_start["lean_side"])
+        spec = self.shelf_start_draw()
+        t_pose, p_pose = self.shelf_pose, self.shelf_partner_pose
+        lean = None
+        if spec is not None and spec.get("lean_deg"):
+            lo = float(spec["lean_deg"][0])
+            lean_t = float(self._shelf_template["lean_deg"]) if TT.lean_rest_side(getattr(self, "grasp_key", None)) is not None else lo
+            rest_t, rest_p = self.shelf_rests(side, lean_t, lo)
+            t_pose, _ = TT.shelf_lean_pose(self, self.hull["target"], rest_t, self.top, self.edge, self.support, side)
+            p_pose, _ = TT.shelf_lean_pose(self, self.hull["partner"], rest_p, self.top, self.edge, self.support, -side)
+            lean = [round(lean_t, 2), round(lo, 2)]
+        free = shelf_free_span(self.world.hull_at(self.hull["target"], t_pose), self.world.hull_at(self.hull["partner"], p_pose), self.edge, side)
+        req, rf = self.shelf_span_required(t_pose)
+        self.template_facts["shelf_span"] = {"free_span_m": round(free, 4), "leans_deg": lean, **rf}
+        if free < req:
+            TT._count(self, "shelf_span.template_rejected")
+            raise Reject("shelf_width", f"{self.support.name}: {free:.3f} m between the two leaning books at the most favourable drawable leans {lean} "
+                                        f"(< {req:.3f} required: carried {rf['carried']} {rf['carried_extent_m']:.3f} + jaw {rf['jaw_excess_m']:.3f})")
 
     def shelf_lift_plan(self, grasp: GraspRecord) -> Dict[str, Any]:
         """(d): ``grasps.lift_turn`` (the upright turn of the leaning book) when the upright book stays under the board above along the lift
@@ -3570,7 +3653,10 @@ class IORSSmall(SamplerV2):
         (:data:`SHELF_STANCE_BOOK_LATERAL_M`; mirrored for the right arm) from the robot's centre line, as ``push_stance_for`` places the push
         contact, same stand-off and trunk - then the scan: ``generation.shelf_stance_scan_shifts_m`` (relative to the computed lateral) x
         ``tabletop.STAND_OFFS`` (``cand``'s stand-off first), the computed stance not repeated. ``shift_m`` = the move along the edge from
-        ``cand`` (m, + = the robot's left). Pure geometry: nothing is checked here (:meth:`shelf_stance_ok`)."""
+        ``cand`` (m, + = the robot's left). Pure geometry: nothing is checked here (:meth:`shelf_stance_ok`).
+        i7-t03 2026-11-08 (owner 5p.2, under (b)'s :data:`SHELF_JOINT_STANCE_ENV`): every base position is tried at ``cand``'s trunk first, then
+        at the other trunks of the attempt's manipulation candidates (``manip_candidates``, distinct (translate, tilt), their order) - the
+        computed position's other trunks before the scan; only ``cand``'s trunk at the computed position is labelled ``computed``."""
         if self.shelf_pose is None or cand.edge is None:
             return []
         want = float(self.gen("shelf_stance_book_lateral_m", SHELF_STANCE_BOOK_LATERAL_M) or SHELF_STANCE_BOOK_LATERAL_M)
@@ -3580,6 +3666,13 @@ class IORSSmall(SamplerV2):
         so0 = float(cand.stand_off if cand.stand_off is not None else TT.STAND_OFF)
         sos = [so0] + [float(v) for v in TT.STAND_OFFS if abs(float(v) - so0) > 1e-6]
         shifts = [float(v) for v in (self.gen("shelf_stance_scan_shifts_m") or SHELF_STANCE_SCAN_SHIFTS_M)]
+        own = (round(float(cand.translate), 4), round(float(cand.tilt), 4))
+        trunks = [own]
+        if shelf_joint_stance_on():  # 5p.2: the trunk set of every candidate
+            for c in getattr(self, "manip_candidates", None) or []:
+                tk = (round(float(c.translate), 4), round(float(c.tilt), 4))
+                if tk not in trunks:
+                    trunks.append(tk)
         out: List[Tuple[str, Stance, float]] = []
         seen = set()
         for sh in [0.0] + shifts:
@@ -3588,8 +3681,12 @@ class IORSSmall(SamplerV2):
                 if key in seen:
                     continue
                 seen.add(key)
-                st = cand.shifted(stand_off=so, lateral=float(cand.lateral) + dlat + sh, name="manipulation")
-                out.append(("computed" if not out else "scan", st, round(dlat + sh, 4)))
+                for tk in trunks:
+                    st = cand.shifted(stand_off=so, lateral=float(cand.lateral) + dlat + sh, name="manipulation")
+                    if tk != own:
+                        st = st.with_trunk(tk[0], tk[1], "manipulation")
+                        st.extras["stance_shift_trunk"] = [tk[0], tk[1]]
+                    out.append(("computed" if not out else "scan", st, round(dlat + sh, 4)))
         return out
 
     def _shelf_camera_rule(self, cand: Stance) -> Tuple[float, Any]:
@@ -3707,13 +3804,19 @@ class IORSSmall(SamplerV2):
             key = (tuple(round(float(v), 3) for v in st.base_pose2d), round(float(st.translate), 3), round(float(st.tilt), 3), arm)
             if key in budget["seen"]:
                 continue
+            joint = shelf_joint_stance_on()  # 5p.2: the budget counts the stances that reach the exact checks (the trunk set adds cheap rejects)
             if label == "scan" and budget["scan"] >= scan_max:
                 break
             budget["seen"].add(key)
-            if label == "scan":
+            if label == "scan" and not joint:
                 budget["scan"] += 1
             TT._count(self, f"stance_shift.{label}_tried")
+            other_trunk = st.extras.get("stance_shift_trunk")
+            if other_trunk is not None:
+                TT._count(self, "stance_shift.trunk.other_tried")
             st.extras.update(cand.extras)
+            if other_trunk is not None:
+                st.extras["stance_shift_trunk"] = other_trunk
             st.extras.pop("_position", None)  # the shifted stance's travel is the axis-aligned leg (core.record_stance_travel)
             st.extras["stance_shift"] = {"label": label, "shift_m": round(float(shift), 4), "stand_off": round(float(st.stand_off or 0.0), 3), "need": need,
                                          "from_lateral": round(float(cand.lateral), 4), "reach_before_rad": reach0, "branch_before": reach_branch(reach0)}
@@ -3722,6 +3825,8 @@ class IORSSmall(SamplerV2):
                 TT._count(self, f"stance_shift.rejected.{why}")
                 tried.append(f"{label} {shift:+.2f}/{float(st.stand_off or 0.0):.2f}: {why}")
                 continue
+            if label == "scan" and joint:
+                budget["scan"] += 1
             try:
                 grasp = try_fn(st_ok)
             except Reject as e2:
@@ -3747,7 +3852,10 @@ class IORSSmall(SamplerV2):
                     continue
             facts = grasp.extras.get("shelf_transit") or {}
             reach1 = facts.get("reach_rad")
-            st_ok.extras["stance_shift"].update(reach_after_rad=reach1, branch_after=reach_branch(reach1), grasp=grasp.grasp_name)
+            st_ok.extras["stance_shift"].update(reach_after_rad=reach1, branch_after=reach_branch(reach1), grasp=grasp.grasp_name,
+                                                trunk=[round(float(st_ok.translate), 3), round(float(st_ok.tilt), 3)], own_trunk=other_trunk is None)
+            if other_trunk is not None:
+                TT._count(self, "stance_shift.trunk.other_passed")
             TT._count(self, f"stance_shift.{label}_passed")
             TT._count(self, f"stance_shift.offset.{shift:+.2f}")
             log.info("%s: stance shift (%s, need %s): base moved %+.3f m along the edge at stand-off %.2f (book lateral %+.3f), grasp %s; reach %s (%s) -> %s (%s)%s",
