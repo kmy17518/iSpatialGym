@@ -17,6 +17,7 @@ from ispatialgym.sampling.v2.tasks import iors_large as IL
 
 B1 = (1.0, 2.0, 0.5, 0.95, -1.2)
 B2 = (1.5, 2.0, 0.5, 0.95, -0.9)
+B3 = (1.5, 2.5, 0.5, 0.95, -0.9)
 A1 = (0.0, 0.0, 0.0, 0.0, 0.0)
 A2 = (0.3, -0.4, 0.1, 0.0, 0.0)
 C1 = (3.0, 1.0, 1.57, 0.95, -1.2)
@@ -80,6 +81,8 @@ def test_a_dependent_failures_match_only_their_stance_a(env):
     m.b_failed(B2, A1, "grasp_unreachable", "C ...: no (yaw, grasp) of F (41) passes", a_dep=True)  # a draw met the A -> B drive
     assert m.lookup_b(B1, A1)[0] is not None and m.lookup_b(B1, A2) == (None, False)
     assert m.lookup_b(B2, A1)[0] is not None and m.lookup_b(B2, A2) == (None, False)
+    m.b_failed(B3, A1, "not_in_frame", "[not_in_frame] target not in the init image (5 %)")  # stance A's camera
+    assert m.lookup_b(B3, A1)[0] is not None and m.lookup_b(B3, A2) == (None, False)
     ck = m.c_key(B1, C1, "right", 0.0)
     m.c_failed(ck, "C (d 0.90 ...): no (yaw, grasp) of F (36) passes the exact IK at B and C — {'B: the A -> B drive passes the placed target': 8}", A1)
     assert m.lookup_c(ck, A1)[0] is not None and m.lookup_c(ck, A2) == (None, False)

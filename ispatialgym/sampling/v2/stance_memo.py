@@ -37,7 +37,7 @@ C_CLASSES = (("no push chain", "push_chain"), ("push chain unreachable", "push_c
              ("drop trunk", "drop_trunk"), ("yaw lock", "yaw_lock"), ("drop -> push", "drop_push_transition"), ("B -> pick", "pick_transition"),
              ("c_skip_dead_b", "dead_at_b"))
 #: B failure reasons that depend on stance A (keyed with A's pose)
-A_DEPENDENT = ("init -> manipulation", "A -> B drive passes")
+A_DEPENDENT = ("init -> manipulation", "A -> B drive passes", "not in the init image")  # the last: stance A's camera (sm_a 2026-11-08)
 #: rejections that end the attempt, not the stance: never recorded
 ATTEMPT_STOPS = ("time_budget", "time_cap")
 
