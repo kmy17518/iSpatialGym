@@ -80,9 +80,18 @@ def on(policy, monkeypatch):
     monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, "1")
 
 
-def test_off_by_default_is_today(policy, monkeypatch):
+def test_on_by_default(policy, monkeypatch):
+    """Lead decision 2026-11-08 #5 (owner away): the default after the A/B."""
     monkeypatch.delenv(IK.CAMERA_HULL_FALLBACK_ENV, raising=False)
-    assert IK.camera_hull_fallback_mode() == "off" and IK.CAMERA_HULL_FALLBACK_DEFAULT == "0"
+    assert IK.camera_hull_fallback_mode() == "on" and IK.CAMERA_HULL_FALLBACK_DEFAULT == "1"
+    chk, _ = _checker({CAM: 0.0035}, {"wrist_camera": 0.0008})
+    _picked(chk)
+    assert O.camera_clear(chk, Q, "right") is True
+
+
+def test_switch_off_is_today(policy, monkeypatch):
+    monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, "0")
+    assert IK.camera_hull_fallback_mode() == "off"
     chk, st = _checker({CAM: 0.0035}, {"wrist_camera": 0.003})
     _picked(chk)
     assert chk.__dict__.get("_policed_at", {}) == {}  # nothing recorded with the switch off
@@ -165,19 +174,61 @@ def test_a_passing_camera_and_the_other_rules_are_unchanged(on, monkeypatch):
     assert ev["ok"] and chk.kit.stats == {"support_policy.hull_fallback_passed": 1}
 
 
-def test_the_support_top_screen_is_counted_never_changed(policy, monkeypatch):
-    eef = (th.tensor([0.5, 0.5, 0.8874 + 0.10]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    cam = TT.wrist_camera_clearance(eef, 0.8874)
-    plane = 0.8874 + 0.10 - 0.076 - 0.018 - 0.004  # the camera's spheres 4 mm above the top: refused by the 5 mm screen, narrow
-    assert TT.wrist_camera_clearance(eef, plane) == pytest.approx(0.004, abs=1e-6) and cam > TT.TWIN_CAMERA_CLEARANCE_M
-    for mode in ("0", "shadow", "1"):
-        monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, mode)
-        chk, _ = _checker({}, {"wrist_camera": 0.0008})
-        s = SimpleNamespace(ikc=chk, kit=chk.kit)
-        assert TT.camera_top_clear(s, eef, 0.8874, "right") is True
-        assert TT.camera_top_clear(s, eef, plane, "right") is False  # the verdict in every mode
-        want = {} if mode == "0" else {"camera_policy.top_screen.checked": 1, "camera_policy.top_screen.would_pass": 1}
-        assert chk.kit.stats == want
+EEF = (th.tensor([0.5, 0.5, 0.8874 + 0.10]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+
+
+def _top(mm):
+    """The plane under EEF where the camera's modelled spheres stand ``mm`` above it."""
+    return 0.8874 + 0.10 - 0.076 - 0.018 - mm / 1000.0
+
+
+def _top_case(monkeypatch, mode, hull):
+    if mode is None:
+        monkeypatch.delenv(IK.CAMERA_TOP_HULL_FALLBACK_ENV, raising=False)
+    else:
+        monkeypatch.setenv(IK.CAMERA_TOP_HULL_FALLBACK_ENV, mode)
+    chk, _ = _checker({}, {"wrist_camera": hull})
+    return chk, SimpleNamespace(ikc=chk, kit=chk.kit)
+
+
+def test_the_support_top_screen_switch_is_separate_and_off_by_default(policy, monkeypatch):
+    """i7-camhull (lead decision #6): the support-top screen's two-step has its own switch, off by default = today's screen."""
+    assert TT.wrist_camera_clearance(EEF, _top(4)) == pytest.approx(0.004, abs=1e-6)
+    monkeypatch.setenv(IK.CAMERA_HULL_FALLBACK_ENV, "1")  # the world rule's switch does not reach the top screen
+    chk, s = _top_case(monkeypatch, None, 0.0008)
+    assert IK.camera_top_hull_fallback_mode() == "off" and IK.CAMERA_TOP_HULL_FALLBACK_DEFAULT == "0"
+    assert TT.camera_top_clear(s, EEF, _top(10), "right") is True
+    assert TT.camera_top_clear(s, EEF, _top(4), "right") is False and chk.kit.stats == {}
+    chk, s = _top_case(monkeypatch, "0", 0.0008)
+    assert TT.camera_top_clear(s, EEF, _top(4), "right") is False and chk.kit.stats == {}
+
+
+def test_a_narrow_top_refusal_with_a_clear_hull_passes(policy, monkeypatch):
+    chk, s = _top_case(monkeypatch, "1", 0.0008)  # the spheres 4 mm above the top (>= 5 - 2), the camera hull 0.8 mm
+    assert TT.camera_top_clear(s, EEF, _top(4), "right") is True
+    assert chk.kit.stats == {"camera_policy.top_screen.checked": 1, "camera_policy.top_screen.passed": 1}
+
+
+@pytest.mark.parametrize("mm,hull,why", [(4.0, 0.0003, "hull_clearance"), (4.0, -0.0001, "hull_clearance"), (2.5, 0.004, "deeper_than_buffer")])
+def test_a_top_refusal_not_narrow_or_not_clear_stays(policy, monkeypatch, mm, hull, why):
+    chk, s = _top_case(monkeypatch, "1", hull)
+    assert TT.camera_top_clear(s, EEF, _top(mm), "right") is False
+    assert chk.kit.stats == {"camera_policy.top_screen.checked": 1, f"camera_policy.top_screen.failed.{why}": 1}
+
+
+def test_the_top_screen_shadow_counts_only(policy, monkeypatch):
+    chk, s = _top_case(monkeypatch, "shadow", 0.0008)
+    assert TT.camera_top_clear(s, EEF, _top(4), "right") is False
+    assert chk.kit.stats == {"camera_policy.top_screen.checked": 1, "camera_policy.top_screen.shadow_pass": 1}
+
+
+def test_the_top_screen_cache_identity_only_when_on(policy, monkeypatch):
+    kit = SimpleNamespace(stats={})
+    monkeypatch.setenv(IK.CAMERA_TOP_HULL_FALLBACK_ENV, "shadow")
+    assert "camera_top_hull_fallback" not in IK.IKChecker(kit).cache_scope
+    monkeypatch.setenv(IK.CAMERA_TOP_HULL_FALLBACK_ENV, "1")
+    chk = IK.IKChecker(kit)
+    assert "camera_top_hull_fallback" in chk.cache_scope and "camera_top_hull_fallback" not in chk.exact_cache_scope()
 
 
 def test_the_cache_identity_only_when_on(policy, monkeypatch):

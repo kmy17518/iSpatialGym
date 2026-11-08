@@ -4514,7 +4514,26 @@ The owner approved this shared-gate change behind a switch. The default stays th
   | under_small_03 | on | 29 / 4 / 4 | 1.07 (0.27) | 12 passed |
 
   The arm with the switch on had 0 refusals and 0 demo failures. The success gain is within N 4 noise. The counters show the rule acts only
-  on narrow camera-vs-support gaps whose hulls clear by 3.5 mm or more. The default stays off: the owner decides.
+  on narrow camera-vs-support gaps whose hulls clear by 3.5 mm or more.
+- **Default ON (548fbbfb).** The lead decided this on 2026-11-08 (#5, with the owner away and the decision delegated); the commit is its
+  own. `0` restores the former rule. Under `1` the cache identity stays, so verdicts cached under the old rule are not read as the new
+  rule's.
+- **Support-top screen (178c9df6, `ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK`, separate, default OFF; lead decision #6).** The same two-step
+  for `tabletop.wrist_camera_clearance` < 5 mm: the modelled spheres must still be at least 3 mm above the top, and the camera hull at
+  least 0.5 mm above it. It applies in `pick_twin` and in `camera_top_clear` (attachment / iors_small / disembedding). Counters are
+  `camera_policy.top_screen.*`. Count: under_small_03 24 of 41 would pass (hull 2.33-2.98 mm). nextto_02's 59 are all deeper than the
+  buffer (1107 times +2 mm in the logs); touching_04 / touching_01 have a few narrow ones in old logs.
+- **Support-top A/B** (world rule on in both arms, N 4, indices 335000-3):
+
+  | alias | shadow | on | GPU-h shadow / on |
+  |---|---|---|---|
+  | under_small_03 | 29 / 4 / 4 | 29 / 4 / 4 | 1.08 / 1.10 |
+  | touching_04 | 48 / 4 / 0 | 48 / 4 / 1 | 1.37 / 1.39 |
+
+  - under_small_03: the rule passed 12 refusals, and every one was then refused by the world camera rule (deeper than the buffer against
+    the same table). Nothing downstream changed.
+  - touching_04: 0 support-top refusals; its demo failures are oracle ones.
+  - Recommendation: keep it off. The default is the owner's.
 
 ## Limitations / not done
 

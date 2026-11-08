@@ -325,7 +325,7 @@ def support_hull_fallback_min_m() -> float:
 
 
 #: i7-camhull 2026-11-08 (owner_20261108g item 1, an APPROVED shared-gate change behind this switch; the default is the owner's after the
-#: A/B): the side_9 two-step of :data:`SUPPORT_HULL_FALLBACK_ENV` for the WRIST CAMERA against the POLICED support in the general pick
+#: A/B - DEFAULT ON since the lead's decision #5 of 2026-11-08, owner away): the side_9 two-step of :data:`SUPPORT_HULL_FALLBACK_ENV` for the WRIST CAMERA against the POLICED support in the general pick
 #: check. ``orient.camera_clear`` (the camera's padded spheres keep ``orient.CAMERA_MARGIN`` = 5 mm from the world at a grasp
 #: configuration, its support and the contacted object present) stays the screen; a NARROW failure - the camera's spheres clear at that
 #: margin less the model's 2 mm sphere buffer, and clear at the full margin with the policed supports out of the world (the touch is
@@ -335,11 +335,10 @@ def support_hull_fallback_min_m() -> float:
 #: (:meth:`IKChecker._note_policed`, recorded by :meth:`IKChecker.exact`); a configuration without one keeps today's verdict. Neither the
 #: support policy's own sphere stage (:data:`SUPPORT_HULL_FALLBACK_ENV`) nor FingerTouch (i7-ft2's ``ISPATIALGYM_FINGER_TOUCH_HAND_HULLS``)
 #: is touched: this is the separate 5 mm camera rule, so no verdict is judged by two fallbacks. The camera's support-top screen
-#: (``tabletop.wrist_camera_clearance`` < 5 mm) is only COUNTED by the same two-step (``camera_policy.top_screen.*``: what the rule would do
-#: there; its verdict never changes). ``0`` off (the default) / ``shadow`` (judged and counted, the verdict unchanged) / ``1`` on; kit
+#: (``tabletop.wrist_camera_clearance`` < 5 mm) has its own switch (:data:`CAMERA_TOP_HULL_FALLBACK_ENV`, default off). ``0`` off (today's rule before the flip) / ``shadow`` (judged and counted, the verdict unchanged) / ``1`` on (the default); kit
 #: counters ``camera_policy.hull_fallback_{checked, passed, shadow_pass, failed.<why>}``, one ``CAMERA_HULL_FALLBACK`` line per judgement.
 CAMERA_HULL_FALLBACK_ENV = "ISPATIALGYM_CAMERA_HULL_FALLBACK"
-CAMERA_HULL_FALLBACK_DEFAULT = "0"
+CAMERA_HULL_FALLBACK_DEFAULT = "1"  # lead decision 2026-11-08 (owner away, delegated; lead_decisions_while_away #5) after the A/B; "0" = the former rule
 #: version of the camera rule's measurement (the cache identity under ``1``)
 CAMERA_HULL_FALLBACK_VERSION = 1
 
@@ -347,6 +346,26 @@ CAMERA_HULL_FALLBACK_VERSION = 1
 def camera_hull_fallback_mode() -> str:
     """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`CAMERA_HULL_FALLBACK_ENV`; unset = :data:`CAMERA_HULL_FALLBACK_DEFAULT`)."""
     v = (os.environ.get(CAMERA_HULL_FALLBACK_ENV, "") or CAMERA_HULL_FALLBACK_DEFAULT).strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "shadow" if v == "shadow" else "on"
+
+
+#: i7-camhull 2026-11-08 (lead decision #6, owner away: build behind a SEPARATE default-off switch; the default stays the owner's): the same
+#: two-step for the wrist camera's SUPPORT-TOP screen - ``tabletop.wrist_camera_clearance`` (the camera's 3 padded spheres modelled in the eef
+#: frame) must keep ``tabletop.TWIN_CAMERA_CLEARANCE_M`` = 5 mm above the grasp's support top. A NARROW refusal (those spheres still >= 5 mm
+#: less the model's 2 mm buffer above it) passes when the camera's exact hull clears that plane by :func:`support_hull_fallback_min_m`
+#: (0.5 mm; ``contact_policy.hull_fallback``, :meth:`IKChecker.camera_top_fallback`). Callers: ``tabletop.pick_twin`` and
+#: ``tabletop.camera_top_clear`` (attachment / iors_small / disembedding picks). ``0`` off (the default) / ``shadow`` (judged and counted,
+#: the verdict unchanged) / ``1`` on; counters ``camera_policy.top_screen.{checked, passed, shadow_pass, failed.<why>}``, one
+#: ``CAMERA_TOP_SCREEN`` line per judgement.
+CAMERA_TOP_HULL_FALLBACK_ENV = "ISPATIALGYM_CAMERA_TOP_HULL_FALLBACK"
+CAMERA_TOP_HULL_FALLBACK_DEFAULT = "0"
+
+
+def camera_top_hull_fallback_mode() -> str:
+    """``"on"`` / ``"shadow"`` / ``"off"`` (:data:`CAMERA_TOP_HULL_FALLBACK_ENV`; unset = :data:`CAMERA_TOP_HULL_FALLBACK_DEFAULT`)."""
+    v = (os.environ.get(CAMERA_TOP_HULL_FALLBACK_ENV, "") or CAMERA_TOP_HULL_FALLBACK_DEFAULT).strip().lower()
     if v in ("0", "off", "false", "no"):
         return "off"
     return "shadow" if v == "shadow" else "on"
@@ -695,8 +714,12 @@ class IKChecker:
         self.finger_touch: Optional[FingerTouch] = None  # :meth:`set_finger_touch` (``generation.approach_finger_support_touch``)
         #: i7-camhull (:data:`CAMERA_HULL_FALLBACK_ENV`): (arm, :func:`_q_key`) -> the supports the policy polices at that exact-IK result
         self._policed_at: Dict[Tuple[str, Tuple[float, ...]], List[Any]] = {}
-        if camera_hull_fallback_mode() == "on":  # only when it changes verdicts (shadow / off keep every key); not an exact-IK key
+        # under 1 (the default since the flip) the identity stays: a cached verdict written under the former rule (a persisted failure memo, a
+        # start-draw cell) must not satisfy this one; shadow / off keep the former keys; never an exact-IK key
+        if camera_hull_fallback_mode() == "on":
             self.cache_scope["camera_hull_fallback"] = [round(support_hull_fallback_min_m(), 5), CAMERA_HULL_FALLBACK_VERSION]
+        if camera_top_hull_fallback_mode() == "on":  # i7-camhull (the support-top screen): only when it changes verdicts; never an exact-IK key
+            self.cache_scope["camera_top_hull_fallback"] = [round(support_hull_fallback_min_m(), 5), CAMERA_HULL_FALLBACK_VERSION]
 
     def _holding(self, arm: str) -> bool:
         """``arm`` has an object attached in the planner (``navigation.attached`` / ``R1ProCuRobo.attach_object``: a place, carry or release
@@ -935,14 +958,17 @@ class IKChecker:
                                                          "supports": [getattr(sp, "name", "?") for sp in (sup or [])]}))
         return out
 
-    def camera_top_fallback(self, eef: Pose, plane_z: float, arm: str, clearance: float, margin: float) -> Dict[str, Any]:
-        """:data:`CAMERA_HULL_FALLBACK_ENV` (COUNT ONLY - the caller's verdict never changes): what the two-step would decide where the
-        camera's support-top screen (``tabletop.wrist_camera_clearance`` = ``clearance`` < ``margin`` above the plane ``plane_z`` at the eef
-        pose ``eef``) refused - narrow = ``clearance`` >= ``margin`` less the model's sphere buffer, then the camera's exact hull clear of
-        that plane by :func:`support_hull_fallback_min_m` (``contact_policy.hull_fallback``). Counters ``camera_policy.top_screen.
-        {checked, would_pass, failed.<why>}`` and one ``CAMERA_TOP_SCREEN`` line."""
+    def camera_top_fallback(self, eef: Pose, plane_z: float, arm: str, clearance: float, margin: float, mode: Optional[str] = None) -> Dict[str, Any]:
+        """:data:`CAMERA_TOP_HULL_FALLBACK_ENV`: the camera's support-top screen (``tabletop.wrist_camera_clearance`` = ``clearance`` <
+        ``margin`` above the plane ``plane_z`` at the eef pose ``eef``) refused. Narrow = ``clearance`` >= ``margin`` less the model's sphere
+        buffer; then the camera's exact hull (role ``wrist_camera``) clear of that plane by :func:`support_hull_fallback_min_m`
+        (``contact_policy.hull_fallback``). ``{"ok", "why", "hull_min_m", "min_m"}`` - ``ok`` is the rule's judgement (the caller applies it
+        only under ``1``). Counters ``camera_policy.top_screen.{checked, passed, shadow_pass, failed.<why>}``, one ``CAMERA_TOP_SCREEN`` line."""
+        import json as _json
+
         from ispatialgym.grasping import contact_policy as CP
 
+        mode = camera_top_hull_fallback_mode() if mode is None else mode
         self._count("camera_policy.top_screen.checked")
         hc = getattr(self, "_hand_checker", None)
         if hc is None or hc.arm != arm:
@@ -953,10 +979,14 @@ class IKChecker:
         out = CP.hull_fallback(lambda links, m: float(clearance) >= float(m) - 1e-9, [f"{arm}_realsense_link"], CP.DEFAULT.hand_rigid_links(arm), hc, T,
                                [CP.Support.plane(float(plane_z), name="support_top")], threshold=support_hull_fallback_min_m(), margin=float(margin),
                                roles=("wrist_camera",))
-        self._count("camera_policy.top_screen.would_pass" if out["ok"] else f"camera_policy.top_screen.failed.{out['why']}")
+        if out["ok"]:
+            self._count("camera_policy.top_screen.shadow_pass" if mode == "shadow" else "camera_policy.top_screen.passed")
+        else:
+            self._count(f"camera_policy.top_screen.failed.{out['why']}")
         hm = out.get("hull_min_m")
-        log.info("CAMERA_TOP_SCREEN {\"arm\": \"%s\", \"would_pass\": %s, \"why\": \"%s\", \"spheres_mm\": %.2f, \"hull_min_mm\": %s}", arm,
-                 "true" if out["ok"] else "false", out["why"], 1000 * float(clearance), "null" if hm is None else f"{1000 * float(hm):.2f}")
+        log.info("CAMERA_TOP_SCREEN %s", _json.dumps({"mode": mode, "arm": arm, "would_pass": bool(out["ok"]), "why": out["why"],
+                                                      "spheres_mm": round(1000 * float(clearance), 2),
+                                                      "hull_min_mm": None if hm is None else round(1000 * float(hm), 2)}))
         return out
 
     @contextmanager
@@ -1489,7 +1519,8 @@ class IKChecker:
                 out["rooms"] = list(self.cache_scope["full_rooms"])  # the full world's key (its scope's rooms are the rooms it loads)
         else:
             out = {k: v for k, v in self.cache_scope.items() if k != "full_rooms"}
-        out.pop("camera_hull_fallback", None)  # i7-camhull: an exact-IK witness does not depend on the camera rule (checked after it)
+        out.pop("camera_hull_fallback", None)  # i7-camhull: an exact-IK witness does not depend on the camera rules (checked after it)
+        out.pop("camera_top_hull_fallback", None)
         return with_policy_scope(out)
 
 
