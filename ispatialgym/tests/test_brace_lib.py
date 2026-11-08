@@ -146,12 +146,23 @@ def test_the_turn_cover_switch_filters_the_brace_classes(monkeypatch):
     ax.axial_maps = lambda: AX.AlignmentAxial.axial_maps(ax)
     ax._map_end_sign = lambda cm, e: AX.AlignmentAxial._map_end_sign(ax, cm, e)
     pose = (th.tensor([0.6, 0.0, 0.8]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-    monkeypatch.delenv("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "0")
     AX.AlignmentAxial.map_joint_placement(ax, None, pose, pose, 1.0, math.radians(30.0), end_sign=1.0)
     assert seen[-1] == ("axial_brace", ["+end+spin_v@f0", "+end+spin_opp_v@f0"])  # off: as before
     monkeypatch.setenv("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "1")
     AX.AlignmentAxial.map_joint_placement(ax, None, pose, pose, 1.0, math.radians(30.0), end_sign=1.0)
     assert seen[-1] == ("axial_brace", ["+end+spin_opp_v@f0"])  # the 20 deg entry does not cover a 30 deg turn
+
+
+def test_the_axial_brace_switches_are_on_by_default(monkeypatch):
+    """owner answers 20261108b item 4: TURN_COVER and OPPOSITE default ON; =0 turns each off."""
+    from ispatialgym.sampling.v2.tasks import alignment_axial as AX
+
+    for k, f in (("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", AX.axial_brace_turn_cover_on), ("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", AX.axial_brace_opposite_on)):
+        monkeypatch.delenv(k, raising=False)
+        assert f()
+        monkeypatch.setenv(k, "0")
+        assert not f()
 
 
 def test_the_opposite_end_entries_are_their_own_stratification_group():

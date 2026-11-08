@@ -857,15 +857,16 @@ class AlignmentAxial(SamplerV2):
 
 
 def axial_brace_turn_cover_on() -> bool:
-    """i7-brace (owner 3.4; default OFF): the axial_brace map lookup keeps only the entries whose recorded start range
-    (``goal.clear_turn_max_deg``, the clear-turn library build) covers the drawn turn. ``ISPATIALGYM_AXIAL_BRACE_TURN_COVER=1``."""
-    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "0") == "1"
+    """i7-brace (owner 3.4): the axial_brace map lookup keeps only the entries whose recorded start range (``goal.clear_turn_max_deg``, the
+    clear-turn library build) covers the drawn turn. DEFAULT ON since 2026-11-08 (owner answers 20261108b item 4: the brace34b maps -
+    the clear-turn library + the opposite-end entries validated as their own group - are the axial brace maps); ``=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_TURN_COVER", "1") == "1"
 
 
 def axial_brace_opposite_on() -> bool:
-    """i7-brace (owner 3.4; default OFF): the sampler also tries the OPPOSITE-END stop brace (the far end's face, resisting the same turn) after
-    the current candidates. ``ISPATIALGYM_AXIAL_BRACE_OPPOSITE=1``."""
-    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", "0") == "1"
+    """i7-brace (owner 3.4): the sampler also tries the OPPOSITE-END stop brace (the far end's face, resisting the same turn) after the current
+    candidates. DEFAULT ON since 2026-11-08 (owner answers 20261108b item 4); ``ISPATIALGYM_AXIAL_BRACE_OPPOSITE=0`` turns it off."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_OPPOSITE", "1") == "1"
 
 
 def _icl_frame(category: str, model: str):

@@ -2416,6 +2416,13 @@ carry leg path_collision and the C exact place IK (joint2 near its limit) - the 
   i7_brace34b (+ the validated opposite entries, `v2maps_int1_brace34b`, TURN_COVER=1 OPPOSITE=1) 53 / 11 / 10, 0.070 GPU-h per success,
   BRACE PRESENT 4 / 11 (axial_03 3 / 4, axial_01 1 / 4, axial_04 0 / 3), every brace an opposite-end blade (`opp_blade_30`), braced demos
   3 / 4 ok; kit axial_brace.paired 25 / opposite_tried 19 / opposite_used 10.
+- **Owner 2026-11-08 (answers 20261108b item 4): the axial brace switches DEFAULT ON** (separate commit): `ISPATIALGYM_AXIAL_BRACE_TURN_COVER`
+  and `ISPATIALGYM_AXIAL_BRACE_OPPOSITE` read `1` when unset (`=0` turns either off). The axial brace maps the integration root reads are
+  the brace34b maps - the clear-turn library plus the opposite-end entries validated as their own group, staged in
+  **`$OFH/v2maps_int1_brace34b`: the root to fold into the integration**. Confirmation run: axial_01 / 03 / 04, N 4 v2only on that
+  snapshot and root, no switch in the environment (tag `i7_brace_def`; numbers in DECISIONS).
+- **Owner 2026-11-08 (item 5): board_game qgvsnb** - the 14 of 104 blade braces that hold the real load are accepted; board_game mostly
+  runs push-only; no other brace type is searched. Their coverage (per pushed end x spin x turn, from the maps) is in DECISIONS.
 
 ## Limitations / not done
 
