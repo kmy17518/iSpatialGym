@@ -1496,24 +1496,26 @@ class KitContactWorld:
                      sa_wakes=list((sa.wakes.get(name) or []) if sa is not None else []))
         return facts
 
-    def probe_wake(self, obj, entry, plan, state, rest, arm, cond: str, speed: float, presleep_steps: int = 150) -> Dict[str, Any]:
+    def probe_wake(self, obj, entry, plan, state, rest, arm, cond: str, speed: float, presleep_steps: int = 150, press_m: float = 0.015) -> Dict[str, Any]:
         """i7-brace 5w.3(b) PROBE (diagnosis only; ``validate_contacts probe``): does the REAL ARM's first contact wake a sleeping partner?
-        The rest restored, the robot at the entry's pre-contact (still), the partner put to sleep, then the oracle's own brace (closed fist,
-        approach - every Cartesian leg at ``speed`` m/s -, the 2 mm touch stop, the back-off); no load. ``cond``:
-        ``assist`` the sleep assist (30 steps / 1 mm / 3 mrad, wake radius 5 cm) sleeps it while the hand waits; ``native`` no assist - PhysX's
-        own sleep at the 0.005 threshold (the assist never wakes a body it did not sleep); ``awake`` no assist and the partner woken at every
-        step (the control); ``tp_pose`` / ``tp_state`` / ``tp_state_newsa``: assist-slept, then teleported in place (``set_position_orientation``
-        of its own pose: a TRO object state load) / the scene state restored (``TabletopWorld.restore``: the rest snapshot, as a reset), the
-        last with a NEW sleep assist (a new episode's: it did not sleep the body). Per step: asleep, the object's speeds, the eef's distance to
-        the object's box and speed. Returns the timeline facts (the first asleep / wake / motion steps, who woke it, the speeds after contact)."""
+        The rest restored, the robot at the entry's pre-contact (still) until the partner sleeps, then the hand PRESSED straight along the
+        entry's approach from the pre-contact to ``press_m`` past the contact pose at ``speed`` m/s (``Motions.arm_along``: the oracle's
+        own Cartesian tracking; the oracle's brace stops short of the face by design, so it never touches a still partner). ``cond``:
+        ``native`` no assist (PhysX's own sleep at the 0.005 threshold); ``assist`` the sleep assist running (it sleeps the partner only if
+        PhysX did not first; it proactively wakes only a body IT slept); ``assist_marked`` as ``assist`` with the sleep booked as the
+        assist's (the proactive wake armed: a moving eef >= 0.3 mm/step within 5 cm of the box); ``awake`` no assist, woken every step (the
+        control); ``tp_pose`` / ``tp_state`` / ``tp_state_newsa`` asleep and booked, then teleported in place (``set_position_orientation`` of
+        its own pose: a TRO object state load) / the scene state restored (``TabletopWorld.restore``, the robot set back), the last with a
+        NEW sleep assist (a new episode's: the sleep not booked). Per step: asleep, speeds, eef distance to the object's box / speed, finger
+        load. Returns the timeline facts: who woke it (assist / physx / never), the steps of wake / touch / first motion, speeds after it."""
         th_ = self.tw.th
         from ispatialgym.oracle import sleep_assist as SAM
+        from ispatialgym.sampling.v2 import contact_poses as CPZ
 
         rec, sa = self._start(obj, entry, plan, state, rest)
         if cond in ("native", "awake"):
             sa = None
         motions, sim = self._motions_state(obj)
-        motions.cfg.cartesian_speed = float(speed)
         series: List[float] = []
         rows: List[Dict[str, Any]] = []
 
@@ -1522,32 +1524,41 @@ class KitContactWorld:
             gap = th_.maximum(th_.maximum(lo - pe, pe - hi), th_.zeros(3))
             return float(th_.linalg.norm(gap))
 
-        base = self._stepper(obj, sim, arm, sa, series, None)
+        cur = {"base": self._stepper(obj, sim, arm, sa, series, None), "sa": sa}
         eprev = [None]
 
         def step(a):
             if cond == "awake":
                 obj.wake()
-            f = base(a)
+            f = cur["base"](a)
             pe = th_.as_tensor(self.tw.robot.get_eef_position(arm)).detach().clone()
             sp = float(th_.linalg.norm(pe - eprev[0])) if eprev[0] is not None else 0.0
             eprev[0] = pe
             p = obj.get_position_orientation()[0]
+            s_ = cur["sa"]
             rows.append({"k": len(rows), "asleep": _asleep(obj), "v": float(th_.linalg.norm(obj.get_linear_velocity())),
                          "w": float(th_.linalg.norm(obj.get_angular_velocity())), "p": [float(x) for x in p.tolist()],
                          "eef_box_m": box_dist(pe), "eef_speed_mm": sp * 1000.0, "finger_N": float(f.get("finger_obj", 0.0) or 0.0),
-                         "sa_wakes": len((sa.wakes.get(obj.name) or [])) if sa is not None else 0,
-                         "sa_sleeps": len((sa.sleeps.get(obj.name) or [])) if sa is not None else 0})
+                         "sa_wakes": len((s_.wakes.get(obj.name) or [])) if s_ is not None else 0,
+                         "sa_sleeps": len((s_.sleeps.get(obj.name) or [])) if s_ is not None else 0})
             return f
 
-        # the partner falls asleep while the hand waits at the pre-contact (the hand still: the assist's wake radius tests MOVING end effectors)
         k_asleep = None
         for _ in range(int(presleep_steps)):
             self._hold(motions, step, 1)
             if cond != "awake" and rows[-1]["asleep"]:
                 k_asleep = rows[-1]["k"]
                 break
+        slept_by = None if k_asleep is None else ("assist" if rows[-1]["sa_sleeps"] > 0 else "physx")
+
+        def book(s_):  # the sleep booked as the assist's own (its proactive wake armed)
+            if s_ is not None and k_asleep is not None:
+                s_.slept[obj.name] = True
+                s_.sleeps.setdefault(obj.name, []).append(len(rows))
+
         tp = {}
+        if cond in ("assist_marked", "tp_pose", "tp_state"):
+            book(cur["sa"])
         if cond.startswith("tp_") and k_asleep is not None:
             if cond == "tp_pose":
                 p, q = obj.get_position_orientation()
@@ -1559,36 +1570,44 @@ class KitContactWorld:
                 self.tw.robot.set_joint_positions(q)
                 self.tw.robot.keep_still()
                 if cond == "tp_state_newsa":
-                    sa = SAM.SleepAssist(self.tw.robot, {obj.name: obj}, "gc_new")
-                    base = self._stepper(obj, sim, arm, sa, series, None)
+                    cur["sa"] = SAM.SleepAssist(self.tw.robot, {obj.name: obj}, "gc_new")
+                    cur["base"] = self._stepper(obj, sim, arm, cur["sa"], series, None)
             tp = {"asleep_after_teleport": _asleep(obj)}
         k0 = len(rows)
         p0 = np.asarray(rows[-1]["p"]) if rows else None
-        act = entry_action(entry, _T(obj.get_position_orientation()), obj.name, arm)
+        w = CPZ.entry_world(entry, _T(obj.get_position_orientation()))
+        cpos, cq = w["contact"]
+        To = _T(obj.get_position_orientation())
+        app = To[:3, :3] @ np.asarray(entry.get("approach") or [0.0, 0.0, -1.0], dtype=float)
+        app = app / max(float(np.linalg.norm(app)), 1e-12)
+        target = (cpos + th_.tensor(app * float(press_m), dtype=th_.float32), cq)
         err = None
         try:
-            run = run_oracle(act, motions, sim, step, self.cfg.max_steps, variant=self.variant)
+            for a in motions.arm_along(arm, [target], speed=float(speed), converge=False):
+                step(a)
+            self._hold(motions, step, 30)
         except Exception as ex:  # noqa: BLE001
-            run, err = {}, repr(ex)[:300]
+            err = repr(ex)[:300]
         tl = rows[k0:]
         mv = next((r["k"] for r in tl if p0 is not None and float(np.linalg.norm(np.asarray(r["p"]) - p0)) > 0.0005), None)
         woke = next((r["k"] for r in tl if r["asleep"] is False), None) if k_asleep is not None else None
-        sa_w = next((r["k"] for r in tl if r["sa_wakes"] > (rows[k0 - 1]["sa_wakes"] if k0 else 0)), None)
+        sa_w0 = rows[k0 - 1]["sa_wakes"] if k0 else 0
+        sa_w = next((r["k"] for r in tl if r["sa_wakes"] > sa_w0), None)
         touch = next((r["k"] for r in tl if r["finger_N"] > 0.05), None)
         after = [r for r in rows if mv is not None and mv <= r["k"] < mv + 15]
-        vmax = max((r["v"] for r in after), default=None)
-        wmax = max((r["w"] for r in after), default=None)
-        e_sp = next((r["eef_speed_mm"] for r in rows if mv is not None and r["k"] == mv - 1), None)
-        asleep_while_touched = sum(1 for r in tl if r["asleep"] and r["finger_N"] > 0.05)
-        return {"cond": cond, "speed_m_s": speed, "restore": rec, "presleep_asleep_k": k_asleep, **tp, "oracle_start_k": k0,
-                "sa_wake_k": sa_w, "first_awake_k": woke, "first_touch_k": touch, "first_motion_k": mv, "asleep_steps_touched": asleep_while_touched,
+        e_sp = [r["eef_speed_mm"] for r in tl[5:] if touch is None or r["k"] < touch]
+        return {"cond": cond, "speed_m_s": speed, "restore": rec, "presleep_asleep_k": k_asleep, "slept_by": slept_by, **tp, "press_start_k": k0,
+                "sa_wake_k": sa_w, "first_awake_k": woke, "first_touch_k": touch, "first_motion_k": mv,
+                "asleep_steps_touched": sum(1 for r in tl if r["asleep"] and r["finger_N"] > 0.05),
+                "touch_N_max_while_asleep": max((r["finger_N"] for r in tl if r["asleep"]), default=0.0),
                 "woken_by": None if k_asleep is None else ("assist" if sa_w is not None and (woke is None or sa_w <= woke) else ("physx" if woke is not None else "never")),
                 "eef_box_m_at_wake": next((round(r["eef_box_m"], 4) for r in tl if woke is not None and r["k"] == woke), None),
-                "eef_box_m_at_motion": next((round(r["eef_box_m"], 4) for r in tl if mv is not None and r["k"] == mv), None),
-                "eef_speed_mm_before_motion": None if e_sp is None else round(e_sp, 4),
-                "obj_v_max_after_motion": None if vmax is None else round(vmax, 4), "obj_w_max_after_motion": None if wmax is None else round(wmax, 4),
+                "eef_box_m_at_touch": next((round(r["eef_box_m"], 4) for r in tl if touch is not None and r["k"] == touch), None),
+                "eef_speed_mm_approach_med": round(float(np.median(e_sp)), 4) if e_sp else None,
+                "obj_v_max_after_motion": None if not after else round(max(r["v"] for r in after), 4),
+                "obj_w_max_after_motion": None if not after else round(max(r["w"] for r in after), 4),
                 "moved_total_m": round(float(np.linalg.norm(np.asarray(rows[-1]["p"]) - p0)), 5) if p0 is not None else None,
-                "run": {k: run.get(k) for k in ("steps", "completed", "postcondition")}, "error": err, "steps": len(rows)}
+                "error": err, "steps": len(rows)}
 
     def replay(self, sit: Dict[str, Any], obj, geom) -> Dict[str, Any]:
         """A recorded demo's situation (:func:`replay_situation`) rebuilt: the slab at the recorded support height, the object settled at
@@ -2132,7 +2151,7 @@ def replay_cli(argv) -> None:
 
 def probe_cli(argv) -> None:
     """i7-brace 5w.3(b) (owner 20261108h, diagnosis only): ``validate_contacts probe --root R --glib G --jobs J --only ID.. --per-object K
-    --conds assist native awake tp_pose tp_state tp_state_newsa --speeds 0.003 0.01 0.1 --out OUT.jsonl``: for the first K VALID brace
+    --conds native assist assist_marked awake tp_pose tp_state tp_state_newsa --speeds 0.003 0.01 0.1 --out OUT.jsonl``: for the first K VALID brace
     entries of each library, :meth:`KitContactWorld.probe_wake` per condition x approach speed; one JSON line per probe. The libraries are
     read, never written."""
     import json as _json
