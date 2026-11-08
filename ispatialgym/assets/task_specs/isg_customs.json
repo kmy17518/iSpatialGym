@@ -16477,7 +16477,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "_brace_search_note": "owner 2026-11-08 (open_decisions_20261108 4.3, i7-cork): attachment_03 (cork ncxgpe -> wine_bottle inkqch, desk) brace_search false = the one-arm attach (no partner brace: the bracing left finger pushed the bottle 4.6-5.1 mm and touched it after the 4 mm back-off, i7-attachfix 2c)"
   },
   "constraints": []
  },

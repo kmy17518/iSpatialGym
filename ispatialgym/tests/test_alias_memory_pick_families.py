@@ -90,7 +90,9 @@ def check_family(monkeypatch, fn, make, arm="right"):
 def test_attachment(monkeypatch):
     from ispatialgym.sampling.v2.tasks.attachment import Attachment
 
-    check_family(monkeypatch, Attachment.sample_instance,
+    # integration-2 (merge of i7-cork): sample_instance dispatches the attempt over the attach routes; the route's own draw
+    # (_sample_instance_route) holds the pick hook (no route state = sample_instance calls it directly)
+    check_family(monkeypatch, getattr(Attachment, "_sample_instance_route", Attachment.sample_instance),
                  lambda: stub(_candidate_rejects={}, _candidate_order=lambda rng, rej: [int(k) for k in rng.permutation(4)]))
 
 

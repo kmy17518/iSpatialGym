@@ -1053,7 +1053,14 @@ class SamplerV2(TaskSampler):
         checks attach and pose in the hand; ``(None, arm, None)`` when nothing is carried."""
         if not carried:
             return None, arm or "right", None
-        g = self.sidecar.grasp_of(carried)
+        g = self.sidecar.grasp_of(carried, arm=arm)  # i7-cork: the record of the carrying arm when an object has two (the hand-over)
+        if arm is None and g is not None:
+            # i7-cork: an object with two records (the hand-over) is carried by the arm the task recorded (record_carry_arm_q) - only when that
+            # arm has a record of the object (a single record, or a stale entry of another draft: as before)
+            rec_arm = (self.__dict__.get("_carry_arm_of") or {}).get(carried)
+            g2 = self.sidecar.grasp_of(carried, arm=rec_arm) if rec_arm else None
+            if g2 is not None and g2.arm == rec_arm:
+                g = g2
         obj = self.objects.get(carried)
         if g is None or g.eef_in_object is None:
             log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.variant, carried)

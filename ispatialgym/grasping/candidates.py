@@ -161,6 +161,13 @@ class CandidateConfig:
     # switch the first-hit proposals (same seed) join them (_generate) - proposals only, every one judged at the pre-shape; and the policy
     # geometry check judges each candidate at its own pre-shape, not the selected batch's widest (CP.check_grasp_geometry per-pose open_q).
     outer_pinch_preshape: bool = True
+    # i7-cork 2026-11-08 (owner decision 4.2 (i), the cork's hand-over): OPT-IN (default None = off, the behaviour before; recorded in the
+    # library and in the entry identity when set). ``(lo, hi)`` in m, either None = unbounded: every finger hull vertex (both fingers at the
+    # grasp's oracle pre-shape, as the attachment rule measures them) projected on the OBJECT frame's +z axis lies within [lo, hi] - the
+    # hand-over holds a 34.5 mm cork with both hands at once, the right hand's pinch on the male end (hi < 0), the left hand's on the wide
+    # end (lo > 0), so the two hands' fingers stay apart (scripts/grasp_bands/cork_handover_geom.py: >= 3 mm between the hands for axial
+    # fingertip pinches)
+    finger_axis_window_m: Optional[Tuple[Optional[float], Optional[float]]] = None
 
 
 FLOWER_WINDOW = {"lily": (0.55, 0.85, 0.70)}
@@ -1302,6 +1309,49 @@ def _generate(job: Dict[str, Any], model_dir: str, cfg: CandidateConfig, policy:
             feats["stem_t"], feats["pinch_across"] = t, across
             L["n_flower"] = int(len(T))
             dump.gate(pool, "flower_stem_top", L["n_sweep"], len(T))
+        if cfg.finger_axis_window_m is not None and len(T):
+            # i7-cork: the fingers within the window along the object's own +z axis (CandidateConfig.finger_axis_window_m)
+            lo_w, hi_w = (None if v is None else float(v) for v in cfg.finger_axis_window_m)
+            z_obj = np.asarray(R[:3, 2], dtype=float)
+            fz_lo, fz_hi = np.full(len(T), np.inf), np.full(len(T), -np.inf)
+            win_retreat = np.zeros(len(T))
+            T = T.copy()
+            for i in range(len(T)):
+                P, _ = hc.geom.points(("finger",), (float(pre_q[i]), float(pre_q[i])))
+                zz = (P @ T[i, :3, :3].T + T[i, :3, 3]) @ z_obj
+                lo_i, hi_i = float(zz.min()), float(zz.max())
+                if mode == "top":
+                    # a top grasp backs off along its approach until the fingers are inside the window, the pinch point kept on the object:
+                    # the contact then sits closer to the fingertips (cz + r <= tip_max_m, the generation's own retreat bound)
+                    a_z = float(T[i, :3, 2] @ z_obj)  # how far the fingers move along the object's +z per metre of approach
+                    need = 0.0
+                    if hi_w is not None and hi_i > hi_w and a_z > 1e-3:
+                        need = max(need, (hi_i - hi_w) / a_z)
+                    if lo_w is not None and lo_i < lo_w and a_z < -1e-3:
+                        need = max(need, (lo_w - lo_i) / -a_z)
+                    if need > 0.0 and float(cz[i]) + need <= cfg.tip_max_m:
+                        T[i, :3, 3] = T[i, :3, 3] - need * T[i, :3, 2]
+                        lo_i, hi_i = lo_i - need * a_z, hi_i - need * a_z
+                        win_retreat[i] = need
+                fz_lo[i], fz_hi[i] = lo_i, hi_i
+            cz = cz + win_retreat
+            real = real + win_retreat if mode == "top" else real
+            if "shift_m" in feats:
+                feats["shift_m"] = feats["shift_m"] + win_retreat
+            feats["window_retreat_m"] = win_retreat
+            keep = np.ones(len(T), dtype=bool)
+            if lo_w is not None:
+                keep &= fz_lo >= lo_w
+            if hi_w is not None:
+                keep &= fz_hi <= hi_w
+            if dump.on:
+                dump.gate(pool, "finger_axis_window", len(T), int(keep.sum()), np.where(~keep)[0],
+                          {**_where(T, cz), "finger_z_lo_mm": fz_lo * 1000, "finger_z_hi_mm": fz_hi * 1000, "retreat_mm": win_retreat * 1000},
+                          records=[{"window_m": [lo_w, hi_w]}])
+            T, score, cz, pre_q, real = T[keep], score[keep], cz[keep], pre_q[keep], real[keep]
+            feats = {k: v[keep] for k, v in feats.items()}
+            feats["finger_z_lo_m"], feats["finger_z_hi_m"] = fz_lo[keep], fz_hi[keep]
+            L["n_finger_axis_window"] = int(len(T))
         if region is not None and len(T):
             # i7-overhang 2026-11-07 (owner: an entry used at an interior goal): only the goal's accessible region, ranked by board clearance
             ok_r, clr, cnt = AR.evaluate(T, cz, union.vertices, region_boxes, region, arm)

@@ -470,6 +470,8 @@ class ModelLibrary:
             out["attach_axis"] = ax
         if self.floating:
             out["constraint"] = FLOATING
+        if self.data.get("finger_axis_window_m") is not None:  # i7-cork: the hand-over entries' finger window (entries without it as before)
+            out["finger_axis_window_m"] = [None if v is None else round(float(v), 6) for v in self.data["finger_axis_window_m"]]
         return out
 
     def identity_key(self) -> str:

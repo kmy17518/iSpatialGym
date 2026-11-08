@@ -637,11 +637,16 @@ class SidecarDraft:
             raise KeyError(f"sidecar has no stance {name!r}; have {sorted(self.stances)}")
         return self.stances[name]
 
-    def grasp_of(self, obj: str) -> Optional[GraspRecord]:
+    def grasp_of(self, obj: str, arm: Optional[str] = None) -> Optional[GraspRecord]:
+        """The grasp record of ``obj``: the first one; with ``arm`` the first one of that arm when there is one (i7-cork: the hand-over
+        records two pinches of the male, the right hand's pick and the left hand's hold), else the first one as before."""
+        first = None
         for g in self.grasps:
             if g.object == obj:
-                return g
-        return None
+                if arm is None or g.arm == arm:
+                    return g
+                first = first or g
+        return first
 
     # -- serialisation ------------------------------------------------------------------------------------------
     def to_dict(self) -> Dict[str, Any]:

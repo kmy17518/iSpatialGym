@@ -956,6 +956,57 @@ def _carried_lift_pose(sc: Sidecar, g: GraspRecord, frm: str, to: str) -> Pose:
     return Pose(pos, quat)
 
 
+#: i7-cork: the attachment routes a sidecar may record (``grasps[0].attach_route``; absent = the current route)
+ATTACH_ROUTES = ("lying90", "handover")
+
+
+def attach_route_of(sc: Sidecar) -> Optional[str]:
+    """``grasps[0].attach_route`` (None when absent); an unknown route is a :class:`SidecarError`."""
+    g = sc.grasps[0] if sc.grasps else None
+    route = g.extra.get("attach_route") if g is not None and isinstance(g.extra, dict) else None
+    if route is not None and route not in ATTACH_ROUTES:
+        raise SidecarError(f"grasps[0].attach_route {route!r}: unknown route ({' | '.join(ATTACH_ROUTES)})")
+    return route
+
+
+def program_attachment_handover(sc: Sidecar) -> List[Action]:
+    """The hand-over route (i7-cork, owner decision 2026-11-08 4.2 (i)): the male rests wide end down. init → manipulation stance →
+    the giving hand grasps its narrow (mating) end (``grasps[0]``) → lift → carry it in hand to the hand-over pose (``grasps[0].waypoints``,
+    the wide end toward the other hand) → the taking hand grasps the wide end there (``grasps[1]``, at the object's live pose ∘ its
+    ``eef_in_object``: the mating side stays free) → the giving hand releases and backs off → [the base drives to the place stance with the
+    object in the taking hand, heading kept, forward / backward or sideways only: ``_travel(axis_leg=True)``] → the taking hand carries it to
+    the pre-attach (``grasps[1].waypoints``) → attach (``grasps[1].place`` / ``pre_place`` / ``place_on``) → retreat. No brace."""
+    if len(sc.grasps) != 2:
+        raise SidecarError(f"attachment hand-over: expected two grasp records (pick, hold), got {len(sc.grasps)}")
+    gr, gl = sc.grasps
+    if gr.object != gl.object:
+        raise SidecarError(f"attachment hand-over: the two grasps hold different objects ({gr.object!r}, {gl.object!r})")
+    if gr.arm == gl.arm:
+        raise SidecarError("attachment hand-over: the hold must be made by the other hand")
+    for g, needs in ((gr, ("pre_grasp", "carry_height", "waypoints")), (gl, ("grasp", "waypoints", "pre_place", "place", "place_on"))):
+        for attr in needs:
+            if getattr(g, attr) is None:
+                raise SidecarError(f"attachment hand-over: grasps[{sc.grasps.index(g)}].{attr} is required")
+    if sc.contacts is not None and sc.contacts.brace is not None:
+        raise SidecarError("attachment hand-over: no brace (both hands are busy with the male)")
+    work = _attach_stance(sc, gl)
+    grasp_r, lift_r = _pick(gr)
+    to_handover = Reorient(mode="slerp", arm=gr.arm, object=gr.object, after=lift_r, waypoints=gr.waypoints)
+    take = Grasp(kind="library", arm=gl.arm, object=gl.object, grasp=gl, touches=gl.may_touch[0])
+    release = Retreat(arm=gr.arm, object=gr.object, after=to_handover, release=True)
+    actions = _travel(sc, "init", "manipulation") + [grasp_r, lift_r, to_handover, take, release]
+    if work != "manipulation":
+        travel = _travel(sc, "manipulation", work, carried=gl.object, axis_leg=True)
+        if not travel:
+            raise SidecarError(f"attachment hand-over: the attach stance {work!r} is reached by neither a recorded path nor a transition")
+        actions += travel
+        reorient = Reorient(mode="slerp", arm=gl.arm, object=gl.object, start_pose=_carried_lift_pose(sc, gl, "manipulation", work), waypoints=gl.waypoints)
+    else:
+        reorient = Reorient(mode="slerp", arm=gl.arm, object=gl.object, after=take, waypoints=gl.waypoints)
+    place = Place(kind="attach", arm=gl.arm, object=gl.object, place=gl.place, pre_place=gl.pre_place, on=gl.place_on)
+    return actions + [reorient, place, Retreat(arm=gl.arm, object=gl.object, after=place, distance=RETREAT_LITTLE)]
+
+
 def program_attachment(sc: Sidecar) -> List[Action]:
     """init → manipulation stance → grasp the target → lift → [the recorded second base pose: navigate / transition to the
     ``attach`` stance with the male part in hand] → reorient_in_hand toward the attach orientation while moving to the
@@ -970,7 +1021,13 @@ def program_attachment(sc: Sidecar) -> List[Action]:
     waypoints from the carried lift ``grasps[0].lift``); the oracle drives the recorded move with the held object in
     the collision world and the arms frozen at their joints (no re-planning of the stance) and reorients / braces /
     attaches from there. Only when the joint placement has no cell after that is the instance brace-less
-    (``summary.brace: none``): one-arm attach, no brace leg."""
+    (``summary.brace: none``): one-arm attach, no brace leg.
+
+    i7-cork (owner decision 2026-11-08 4.2): ``grasps[0].attach_route`` = the route the sampler planned (absent: this sequence).
+    ``lying90``: the male rested on its side - the same sequence, the recorded SLERP carry is its 90 deg in-hand turn."""
+    route = attach_route_of(sc)
+    if route == "handover":
+        return program_attachment_handover(sc)
     g = _single_grasp(sc, "pre_grasp", "carry_height", "waypoints", "pre_place", "place", "place_on")
     brace = sc.contacts.brace if sc.contacts is not None else None
     if brace is not None:

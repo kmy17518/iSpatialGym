@@ -3392,6 +3392,164 @@ attempts, target 62 % / 65 % hidden); 4 claims = the 4 published instances, 0 pe
 the off test sets =0. Suite: 23 failed + 3 errors, the same ids as 9bbbba7a. Snapshot trunk_917f7232. A run submitted on an earlier
 snapshot keeps it (the 5.1 validation below ran on trunk_7ac55021, switch off, as its A arms).
 
+### i7-cork (2026-11-08): the cork's two routes (owner decisions 4.2 / 4.3 / 4.5)
+
+Branch i7-cork from of-v2maps cf1f5d2d. Records: `$OFH/cork_20261108` (probes, first builds), shiyuc `$SY/isg/cork_20261108` (builds,
+ledgers), staged root `$SY/v2/v2maps_int1_cork` (`cp` of v2maps_int1 + the three entries below, `CORK_STAGE.txt`).
+
+**Owner decisions implemented.** 4.3: attachment_03's customs `brace_search: false` (22a13e67). 4.5: the overhang fallback is not wired
+for the cork. 4.2: two routes, each behind its own default-off switch; the program reads the route the sampler recorded
+(`grasps[0].attach_route`).
+
+**Diagnosis.**
+- Rest survey (`scripts/grasp_bands/cork_rest_probe.py`, the sampler's nudge: 2 deg about world x / y, +1 mm, 300 steps, 3 deg):
+
+  | rest | validator slab | desk mdhelw (B1K, random xy) |
+  |---|---|---|
+  | male end down (r0, today) | 12 / 12 | 1 / 16 (median 15.7 deg, max 109) |
+  | wide end down | 12 / 12 | 16 / 16 (max 0.35 deg) |
+  | lying | 11 / 12 | 16 / 16 on x (the sampler's axis), 13 / 16 on y (an 11 deg roll) |
+
+  The tapered end's 6.5 mm ring is stable on a flat box, not on the desk's collision surface.
+- No hand-over primitive existed; the attachment program's tracked SLERP carry is route ii's 90 deg turn as it is; route i is built
+  from Grasp / Lift / Reorient / Retreat(release) per arm.
+- Hand-over geometry (`cork_handover_geom.py`, both hands' exact hulls on the 34.5 mm cork): axial fingertip pinches from both ends
+  3.8-17.2 mm apart; a side pinch of either hand meets the other hand.
+
+**Route ii, lying + 90 deg turn (`ISG_ATTACH_LYING90=1`).** The male's grasps / rest come from the v2 entry serving `<key>__lying90`
+(`cork__ncxgpe__s1__attachment_free__raf10b6`: designated at the measured lying rest, attachment_free / seat axis, L3 config, 3 of 7
+physics-valid; tabletop maps r / l at 0.7853, attach maps box + swept, right arm). Everything else is the attachment sampler and program
+as they are. Kit `attach_route.lying90.{pick, attach_found, carry_checked, carry_failed, rest_stable, rest_unstable, drafted}`.
+
+**Route i, hand-over (`ISG_ATTACH_HANDOVER=1`).** Two new entries (opt-in `CandidateConfig.finger_axis_window_m`: every finger vertex
+within a window along the object's +z, a top grasp backed off along its approach into it; recorded in the library and the identity):
+`cork__ncxgpe__s1__rd4d4f5` (`<key>__handover_pick`: wide end down, tabletop, fingers z <= -3 mm = the narrow end, 6 valid, right map) and
+`cork__ncxgpe__s1__attachment_free__r428115` (`<key>__handover_hold`: r0, attachment_free, fingers z >= +3 mm = the wide end, 6 valid,
+left-arm attach maps). Sampler (`_sample_with_handover`): the right pick; the hand-over search (male centre 0.52-0.60 m ahead, +-6 cm,
+22-30 cm above the top, its axis along the robot's left, 8 turns; both eef poses in the stance image, the two hands' exact hulls >= 3 mm
+apart, the right carry tracked with the male attached, the left [pre-grasp, grasp] with the right locked, the combined whole-body check,
+the right's release retreat with the left locked); place stances = the grasp stance, then lateral / stand-off shifts (heading and trunk
+kept, the path recorded as an axis leg); the left attach from the hold entry's left attach map, its carry tracked from the hold
+configuration. Program `program_attachment_handover`: pick -> lift -> carry to the hand-over -> the left grasps -> the right releases
+and backs off -> [axis-leg drive] -> the left carries to the pre-attach -> attach -> retreat. Program check: the hand-over phases (the
+male posed at its recorded hand-over pose, both hands' chains with it ignored, the other hand locked); `grasp_of(obj, arm=)` picks the
+carrying hand's record. Executor: the planner attachment moves to the taking hand; the hand-over grasp is not lifted off a support.
+Kit `attach_route.handover.{pick, handover_carry_checked, handover_found, handover_unreachable, carry_checked, carry_failed,
+attach_found, place_unreachable, rest_stable, rest_unstable, drafted}`.
+
+**Validation** (`--grasps v2only`, the staged root, alias memory off, N 4; shiyuc root `$SY/isgf_root`, base index 620300, replicate 620400):
+
+| arm (tag) | attempts | rest rejects | written | ok | GPU-h / success | demo failures |
+|---|---|---|---|---|---|---|
+| current route, brace_search false (`i7cork_base`, `_r2`) | 15 + 47 | 1 + 23 | 4 + 4 | 4 + 4 | 0.155, 0.175 | none |
+| lying90 (`i7cork_ly`, `_r2`) | 27 + 18 | 0 + 0 | 4 + 4 | 3 + 1 | 0.282, 0.610 | grasp: arm link5 on the desk; grasp approach joint jump 0.23 rad; attach: witness / plan branch 1.9-3.8 rad after the turn (x2) |
+| handover (`i7cork_ho6`, trunk_44a7fc7c) | 16 | 0 | 4 | 4 | 0.314 | none (+ 3 / 3 recollected demos of the earlier hand-over runs ho2 / ho3 / ho4) |
+| handover replicate (`i7cork_ho_r2`, trunk_8e2ff5ef: chains re-checked with the partner) | 9 | 0 | 4 | 3 | 0.312 | symbolic_only x1 (joined, the geometric pose outside the tolerance) |
+
+- brace_search false alone makes the current route's demos clean (8 / 8; before 3 / 4 and 2 / 3 with the brace finger's
+  protected_contact); its rest rejections stay placement-dependent (1 / 15 and 23 / 47).
+- lying90 removes the rest rejections (0 / 45; the route's kit: rest_stable 15 / 15) but its in-hand 90 deg turn costs: carry_failed 44 of
+  61 carries checked, and 4 of 8 demos fail in the oracle (the IK branch of the attach after the turn, the low grasp next to the desk).
+- The hand-over runs end to end in the oracle: 7 / 7 demos (1008-1232 steps) - right grasp / lift / carry to the hand-over / LEFT grasp
+  of the held cork / right release / [axis-leg drive] / left carry / attach / retreat; no rest rejection (wide end down). Its sampler
+  rejections are program-check failures of chains searched with the partner parked (the right carry to the hand-over, the pick, the left
+  pre-grasp: 10 of 16 attempts); 8e2ff5ef re-checks those chains with the partner at each attach cell (replicate `i7cork_ho_r2`: program-check rejections 10 / 16 -> 1 / 9).
+- The hand-over cost ~3x the current route's GPU-h per success here (0.314 vs 0.155 / 0.175), mostly the 300-360 s hand-over search per
+  attempt; the current route's own cost is now low because brace_search false removed its demo failures.
+
+### i7-cork round 2 (2026-11-08): fallback routes, the early rest test, the lying carry (owner decisions 5n.1-5n.3)
+
+Branch i7-cork (from 2a25609b). Snapshots trunk_d693e45f, trunk_d0a5bb6f. Runs: shiyuc root `$SY/isgf_root`, staged v2 root
+`$SY/v2/v2maps_int1_cork`, v2only, alias memory off, map overlay r3, N 4. Tabulator: `$OFH/cork_20261108/cork2_tab.py <tag>` (sample.log /
+sidecars: rejections by phase, EARLY_REST, EARLY_REST_VS_LATE, CARRY_CHECK turns, fallback routes, demos).
+
+**Owner decisions implemented** (each behind its own default-off switch; no default flipped):
+- 5n.2 `ISG_ATTACH_EARLY_REST` = `0` (default) / `shadow` / `1` (18eedb22): the existing nudge test (`_nudge_tilts`, factored out of
+  `check_rest_stability`, unchanged) run on the male right after `phase3_target` draws its rest: the male placed with gravity on, settled
+  as `settle_and_validate` settles it (`settle_steps` + the tremble window), the 2 deg / 300 step / 3 deg nudge, the world restored.
+  `shadow` compares it with the late test (kit `early_rest.vs_late.*`) and repeats the late nudge on the same settled state
+  (`early_rest.late_repeat.*`, d0a5bb6f); `1` ends the attempt at the draw (`rest_unstable`, counter `rest_unstable_early`). ~12 s per test.
+- 5n.1 `ISG_ATTACH_FALLBACK=1` (d693e45f): the current route primary; when its drawn rest fails the nudge test (the early test, run as
+  the route decision), the same attempt goes on with lying90, then with the hand-over (also after any sampling-stage rejection of
+  lying90); each route's template (grasps, rest, bands / maps, stances) built once in `sample_template`; each route gets the attempt budget
+  afresh; kit / counters `attach_fallback.{used.<route>, <route>.rest_unstable, <route>.rejected.<reason>, exhausted}`,
+  `summary.attach_fallback`.
+- 5n.3 `ISG_LYING90_MIN_TURN=1` (5fdf3ad8, ladder d0a5bb6f): on the lying route each partner cell is offered the yaw whose attach makes the
+  carry's in-hand turn smallest (`min_turn_yaw`, closed form, +-15 deg jitter) and 30 deg offsets around it; the batched screen keeps per cell
+  the smallest-turn yaw it reaches, the exact checks take cells by that turn. Carry diagnostics on every route (no decision): `CARRY_CHECK`
+  (turn, outcome), kit `carry_turn.<route>.<ok|failed>.<lt100|lt140|ge140>`, `ATTACH_BRANCH_GAP` (carry end vs the attach witness).
+
+**5n.2 check: the early test is not faithful to the late one on this cork - not enabled.**
+
+| shadow run | compared | agree stable | agree unstable | early unstable / late STABLE | early stable / late unstable |
+|---|---|---|---|---|---|
+| `i7cork2_cur` (base 620500) | 34 | 1 | 25 | 3 | 5 |
+| `i7cork2_cur_r` (base 620600) | 15 | 2 | 9 | 3 | 1 |
+
+- 6 of 49 attempts the late test passes would be rejected early, and 5 of the 7 written instances (all 7 demos ok) had an early
+  "unstable" (tilts 3.3-84 deg) - the condition "rejects nothing that passes today" fails.
+- The cause is the test, not the timing: the late nudge repeated on the very same settled state disagrees with itself 2 / 15
+  (0.00 -> 85.3 deg, 0.00 -> 21.0 deg); early-vs-late agreement 37 / 49 (0.76) is barely above two independent draws at the ~80 %
+  unstable rate (0.68). The male-end-down cork on the desk is a coin flip per nudge; no early threshold separates the classes (agreeing
+  unstables at 3.4-6.5 deg, disagreeing at 8.3-84 deg).
+- On the current route the late rest rejections now cost 52-61 s per attempt (brace_search false), not 189 s; the early test costs ~12 s.
+
+**5n.1 A/B (N 4):**
+
+| arm | tag | att | written | ok | GPU-h | GPU-h / success | rejections |
+|---|---|---|---|---|---|---|---|
+| current route alone (+ early shadow) | `i7cork2_cur` (620500) | 59 | 3 | 3 | 0.82 | 0.272 | rest_unstable 30, target_placement 23 (instance 620503 out of its 32 attempts) |
+| current route alone (+ early shadow) | `i7cork2_cur_r` (620600) | 25 | 4 | 4 | 0.65 | 0.164 | rest_unstable 10, target_placement 9 |
+| fallback (+ min-turn ladder) | `i7cork2_fb2` (620500) | 20 | 4 | 3 | 1.30 | 0.433 | target_placement 12, rest_unstable 1 (late), program check 3 |
+
+- fb2 counters (per attempt): the current route's rest failed the early test in 8 of 20 attempts; lying90 then drafted 2 and was
+  rejected 6x (target_placement); the hand-over drafted 3 and was rejected 3x; 3 attempts exhausted all routes; 3 current-route drafts.
+  Written: current 1, lying90 1, hand-over 2; demos ok 3 / 4 (the hand-over 620501 symbolic_only).
+- More written per attempt (0.20 vs 0.05 / 0.16) but each fallback attempt runs lying90's and the hand-over's searches (sample wall
+  3779 s vs 2896 s; rejected-attempt seconds 1968 vs 1705 for a third of the attempts): the GPU-h per success is worse than the current
+  route alone. Its trigger is the coin-flip nudge above (it switches away from current-route draws the late test would pass).
+  Recommendation: keep the switch off; the current route alone stays the production route.
+
+**5n.3 diagnosis: why the lying carry fails.** The carry check is `waypoints_ok([lift] + SLERP to the pre-attach, track_dense)`. Its
+failures (61 checks in i7cork_ly / _r2, 44 failed; 35 / 30 in i7cork2_ly) fall in two classes:
+1. **The lift itself has no IK** ("first waypoint fails the exact IK"): 20 of 37 in i7cork_ly, 20 of 30 in i7cork2_ly, 12 of 23 in
+   lymt2 - every one at a second base pose (stance `attach`; 3 at manipulation in lymt2), the SAME lift (eef 0.81-0.86 m base-forward,
+   z_top + 0.08) failed once per partner cell in one attempt. At a second base pose the lift is `grasp + carry + base shift` (the eef at the
+   same base-frame pose) while the stance's trunk differs; for a lying cork grasped at the reach limit that pose is out of reach at the
+   new trunk. It does not depend on the partner cell (only the support is ignored; the partner sits >= 8 cm away), so one attempt spends
+   ~20 identical failures. Not the in-hand turn.
+2. **The turn** (screening IK of the mid waypoints, `approach_untrackable` of the tracked chain): the lying route's goal turn about the
+   vertical insertion axis follows the partner's yaw, drawn uniformly, so the recorded turns were 124.9-179.0 deg (8 instances i7cork_ly /
+   _r2; 127-150 in i7cork2_ly) where the route's own turn is the 90 deg tilt. i7cork2_ly carry outcomes by turn: 100-140 deg 2 ok / 9
+   failed, >= 140 deg 3 ok / 21 failed. The demo failures of i7cork_ly_r2 sat at the largest turns (162.8-179.0: 3 plan_failed).
+
+**5n.3 fix A/B** (`i7cork2_ly` LYING90 vs `i7cork2_lymt2` LYING90 + MIN_TURN ladder, base 620500): turns moved down (lymt2 drafted
+89.6-119.3 deg; checks < 100 deg: 2 ok / 4 failed, 100-140: 5 / 12, >= 140: 0 / 7) - the min-turn attach itself is mostly out of reach
+from the stance (the first, single-yaw version `i7cork2_lymt`: 0 written in 23 attempts, the pairs failing the screen; cancelled). Excluding
+the lift class, carry checks ok 7 / 18 (lymt2) vs 5 / 15 (ly). Yield: ly 24 att / 4 written / 4 ok, 0.160 GPU-h per success; lymt2
+32 / 4 / 2 ok (2 symbolic_only: the cork joined but the bottle carried 34-42 cm off its place after the attach), 0.487. **The turn fix does
+not help on its own**: the lying route's carry failures are dominated by the second-base lift (class 1) and the min-turn attach
+orientations are hard to reach; the switch stays off. Note i7cork2_ly's own demos were 4 / 4 (i7cork_ly / _r2: 4 / 8).
+
+**5n.3 attach configuration after the turn (diagnose only, shared code; owner to decide):**
+- i7cork_ly_r2 620402 / 620403 (turns 172 / 163 deg): after the reorient the arm stood with right_arm_joint5 AT its lower limit (0.004-0.006
+  rad) and joint2 at its upper limit; the in-hand slip (2.1-2.5 deg) made the oracle re-aim the pre-place, which the differential IK could
+  not reach from the limits; the insertion stalled (waypoint 6/8 or 8/12) and the finish toward the recorded attach witness was refused
+  (3.14-3.81 rad away: "pre-pose and end-pose witnesses in different IK branches").
+- In the sampler the attach witness is the exact IK of [pre-attach, attach] solved fresh (`ikc.exact`), and the carry is tracked from a fresh
+  IK solution of the lift (`waypoints_ok` without `q_first`): neither is continued from the other, and no joint-limit margin is asked at the
+  carry's end. `ATTACH_BRANCH_GAP` (carry end vs attach witness, max arm joint): current route drafts 0.19-3.25 rad (11 of 26 > 0.6 in
+  i7cork2_cur, all its demos ok), lying 0.49-2.76 - the gap alone does not predict the failure; the limit at the carry's end does.
+- The low grasp on the desk (i7cork_ly 620301): the oracle's straight joint ramp to the lying cork's pre-grasp (trajopt failed with the
+  supports present) cleared the planner world at 10 mm but right_arm_link5 touched the desk for 2 steps; the sampler checks the grasp
+  configurations (non-finger links vs the support with the policy's sphere margin), not the swept arm on the way in.
+- Fix proposals (each touches every attachment alias - not done): (a) solve [pre-attach, attach] from the carry's tracked end (`q_first`)
+  and reject when it leaves that branch; (b) a joint-limit margin on the carry's end configuration; (c) at a second base pose, the lift
+  check once per stance (or the lift from the frozen arm's FK at the new trunk, as the oracle executes it) instead of once per partner cell.
+
+**Defaults / decisions needed:** none flipped. EARLY_REST, FALLBACK and MIN_TURN stay off. The full suite (23 failed) fails identically with
+the base attachment module (all 23 in unrelated modules: ground_isg, support_candidates, ag_release_hook, v2_core ...).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

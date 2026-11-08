@@ -1949,6 +1949,10 @@ def lift_grasp_off_support(action: Grasp, motions: Optional[Motions], state, tar
     if action.kind != "library" or targets.get("grasp") is None:
         return targets
     g_extra = getattr(getattr(action, "grasp", None), "extra", None)
+    if isinstance(g_extra, dict) and isinstance(g_extra.get("handover"), dict) and g_extra["handover"].get("role") == "hold":
+        # i7-cork (the hand-over): the object is in the other hand in the air - no support under it, nothing to lift the grasp off
+        ctx["grasp_support_lift"] = {"applied": False, "reason": "a hand-over grasp: the object is held in the air by the other hand"}
+        return targets
     if isinstance(g_extra, dict) and g_extra.get("pick_overhang"):
         # the overhang pick (owner 2026-10-13 ~03:15 item 4): the object was pushed past its support's edge so that the finger below it
         # stands in free space - lifting the grasp would only take the pads off the rim
@@ -2328,6 +2332,12 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)
+    other = "left" if arm == "right" else "right"
+    if ((getattr(motions.backend, "_attached", None) or {}).get(other) or {}).get("obj") is obj:
+        # i7-cork (the hand-over, owner decision 2026-11-08 4.2 (i)): the object the other hand still holds now rides in this hand too - the
+        # planner keeps it on ONE arm: off the giving arm (its release retreat follows), onto this one
+        motions.backend.detach_object(other)
+        ctx["handover_from"] = other
     motions.backend.attach_object(arm, obj)
     ctx["attached"] = obj.name
 
