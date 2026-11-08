@@ -183,6 +183,10 @@ def config_keys(sidecar: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Opti
             place["edge"] = (st.get(pn) or {}).get("edge")
     pn = "pick" if "pick" in st else "manipulation"
     pick = stance_key(arm, st.get(pn), pn)
+    if pick is not None and (st.get(pn) or {}).get("grid_tilt") is not None:
+        # i7-memory2: a stance drawn by prompt0.draw_manipulation (articulation large, alignment wall) is chosen at its grid trunk and
+        # drawn at a continuous tilt inside the grid tilt's band - the pick bin is the choice the hook makes (the grid tilt)
+        pick["tilt"] = q(st[pn]["grid_tilt"], 0.01)
     if pick is not None:
         pick["family"] = grasp_family(g.get("grasp_name"))
         pick["grasp_key"] = g.get("grasp_key")
@@ -812,6 +816,24 @@ def reorder_pick(sampler, order: Sequence[int], stances: Sequence[Any], arm_of, 
         if isinstance(ex, dict):
             ex["alias_memory_pick"] = p
     return new
+
+
+def pick_draw_pool(sampler, pool: Sequence[int], stances: Sequence[Any], arm: Optional[str], rng) -> List[int]:
+    """i7-memory2 (owner 2.3): the pick hook for a UNIFORM draw (prompt0.draw_manipulation): ``pool`` (indices into ``stances``) without
+    the candidates :func:`reorder_pick` defers this call - all of ``pool`` (same order) when it would defer every one, when the memory is
+    off or nothing is flagged (no random number drawn then: the caller's draw is unchanged)."""
+    pool = [int(k) for k in pool]
+    new, prov = reorder(sampler, "pick", pool, [pick_cfg(arm, stances[k]) if k in set(pool) else None for k in range(len(stances))], rng,
+                        max_level=PICK_HOOK_LEVELS)
+    for k, p in prov.items():
+        ex = getattr(stances[int(k)], "extras", None)
+        if isinstance(ex, dict):
+            ex["alias_memory_pick"] = p
+    front = [k for k in new if not (prov.get(k) or {}).get("deferred")]
+    if not front or len(front) == len(pool):
+        return pool
+    keep = set(front)
+    return [k for k in pool if k in keep]
 
 
 def place_cfg(arm: Optional[str], stance) -> Dict[str, Any]:

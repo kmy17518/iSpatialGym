@@ -50,6 +50,7 @@ import torch as th
 
 from ispatialgym import REPO_ROOT
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling.constraints import apply_mass
 from ispatialgym.sampling.sim_utils import Reject
@@ -955,7 +956,11 @@ class Disembedding(SamplerV2):
         dnames = [b.name for b in self.bindings.many("distractors")]
         init = self.init_stance
         errors = []
-        for k in rng.permutation(len(self.manip_candidates))[:6]:
+        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: self.segment_arms[0], rng)
+        for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, [self.segment_arms[0]]

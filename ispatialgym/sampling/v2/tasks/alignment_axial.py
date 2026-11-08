@@ -35,6 +35,7 @@ import numpy as np
 import torch as th
 
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import contact_maps as CMAP
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import support_rules as SR
@@ -279,6 +280,9 @@ class AlignmentAxial(SamplerV2):
             lo, hi = TT.union_extent(self.bands)[1], TT.union_extent(self.left_bands)[0]
             mid = 0.5 * (min(lo, hi) + max(lo, hi))
             order.sort(key=lambda k: abs(self.manip_candidates[k].local(self.manip_candidates[k].focus[:2])[1] - mid))
+        # i7-memory2 (owner 2026-11-08 2.3): the outcome memory's PICK hook on the manipulation stance candidates (alias_memory.reorder_pick: a
+        # flagged (arm x trunk[, stand-off]) bin's candidates move to the end unless a Thompson draw keeps them; off / nothing flagged = unchanged)
+        order = AM.reorder_pick(self, order, self.manip_candidates, lambda st: "right", rng)
         plan: List[Tuple[int, Any]] = [(int(k), None) for k in order[:6]]
         self._a5_scan = None
         if TT.contact_maps_on():
