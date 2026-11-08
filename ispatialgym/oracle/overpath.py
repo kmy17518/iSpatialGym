@@ -45,6 +45,11 @@ WAYPOINT_SPACING_RAD = 0.05
 STEP_RAD = 0.02
 #: the oracle / program check follow the record only when the arm starts within this of its first configuration (largest arm joint)
 START_GAP_MAX_RAD = 0.35
+#: the seeded exact-IK path (when the oracle-tolerance tracking stalls): waypoints this far apart, the largest joint change between two
+#: consecutive solutions (a larger one is a branch flip: rejected)
+IK_STEP_M = 0.02
+IK_STEP_RAD = 0.1
+IK_JUMP_MAX_RAD = 0.3
 #: a rise shorter than this is skipped (the start is already above the across height)
 MIN_LEG_M = 0.01
 

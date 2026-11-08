@@ -117,6 +117,11 @@ class _ToyKit:
         qs = th.as_tensor(qs).reshape(-1, 28)
         return ~self.collide(qs)
 
+    def ik(self, pose, q_seed, arm="right"):
+        q = th.as_tensor(q_seed).clone().float().reshape(-1)
+        q[0:3] = th.as_tensor(pose[0]).float()
+        return q
+
 
 class _ToyIKC:
     ORACLE_SOFT_POS_TOL, ORACLE_SOFT_ROT_TOL, ORACLE_DIFF_IK_MAX_ITERS = 0.01, 0.03, 100
@@ -131,6 +136,8 @@ class _ToyIKC:
 
     def track_chain(self, q_from, legs, arm, **kw):
         self.calls.append([p.tolist() for p, _ in legs])
+        if getattr(self, "stall", False):
+            return None, "approach_untrackable: chain tracking (65 dense poses): differential IK did not converge at waypoint 9/65 at_lower=['right_arm_joint4']"
         pts = [legs[0][0], legs[-1][0]] if self.shortcut else [p for p, _ in legs]
         rows = []
         for a, b in zip(pts[:-1], pts[1:]):
@@ -144,6 +151,9 @@ class _ToyIKC:
         rows.append(r)
         self.last_track_traj = th.stack(rows)
         return rows[-1].clone(), "ok"
+
+    def reaches(self, q, pose, arm):
+        return float(th.linalg.norm(th.as_tensor(q).reshape(-1)[0:3] - th.as_tensor(pose[0]).float())) <= 0.005
 
     def continue_chain(self, q, poses, arm, **kw):
         return IKResult(True, q, "tracked continuation", len(poses))
@@ -160,6 +170,7 @@ def _toy_sampler(shortcut=False):
 
 def _plan(s, q_start, book_pose, pre_pos):
     s._overpath_start = lambda st, gst, arm, chain, settled: (q_start, "escape", "")
+    s._overpath_configs = lambda *a: IL.IORSLarge._overpath_configs(s, *a)
     pre = (th.tensor(pre_pos), th.tensor([0.0, 0.0, 0.0, 1.0]))
     st = SimpleNamespace(name="manipulation")
     return IL.IORSLarge._overpath_plan(s, st, st, "right", {}, book_pose, pre, pre)
@@ -186,6 +197,26 @@ def test_overpath_clears_the_book_by_its_margin():
     val, _ = PROT.sphere_box_clearance(_ToyKit._spheres(dense)[0][:, :1], OP.box_of(book, _hb_hull()))
     assert float(val[1:-1].min()) >= OP.BOOK_MARGIN_M - 1e-4
     assert th.allclose(qs[-1][0:3], th.tensor([0.0, -0.16, 0.79]), atol=1e-4)  # it ends at the pre-grasp
+
+
+def test_overpath_falls_back_to_seeded_ik_when_the_tracking_stalls():
+    """i7op_b (first run): the oracle-tolerance tracking from the escape's end stalled with the elbow at its limit; the exact IK of every
+    ~2 cm waypoint seeded at the previous solution takes over (kit overpath.track_stalled), the checks unchanged."""
+    book = (th.tensor([0.0, 0.0, 0.7671 + 0.0153]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    q0 = th.zeros(28)
+    q0[0:3] = th.tensor([0.0, 0.20, 0.93])
+    s = _toy_sampler()
+    s.ikc.stall = True
+    rec, key, why = _plan(s, q0, book, [0.0, -0.16, 0.79])
+    assert rec is not None, (key, why)
+    assert rec["source"] == "seeded IK" and s.kit.stats.get("overpath.track_stalled") == len([1]) and rec["min_book_clearance_m"] >= OP.BOOK_MARGIN_M
+    assert th.allclose(OP.parse(rec)[-1][0:3], th.tensor([0.0, -0.16, 0.79]), atol=1e-4)
+    # a branch flip of the seeded IK is a rejection
+    s2 = _toy_sampler()
+    s2.ikc.stall = True
+    s2.kit.ik = lambda pose, q_seed, arm="right": th.full((28,), 2.0)
+    rec, key, why = _plan(s2, q0, book, [0.0, -0.16, 0.79])
+    assert rec is None and key == "jump" and "joint jump" in why
 
 
 def test_overpath_rejects_a_path_through_the_book():

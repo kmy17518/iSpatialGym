@@ -4669,12 +4669,11 @@ class IORSLarge(SamplerV2):
         last = ("track", "no clearance tried")
         for c in OPATH.CLEARANCES_M:
             legs = OPATH.leg_poses(G.t(p0[0]).float(), G.t(p0[1]).float(), G.t(pre[0]).float(), G.t(pre[1]).float(), top + float(c))
-            q_end, why_t = self.ikc.track_chain(q0, legs, arm, ignore=[self.target], max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS)
-            if q_end is None:
-                last = ("jump" if "joint jump" in str(why_t) else ("collision" if "collide" in str(why_t) else "track"), str(why_t)[:300])
+            traj, src, why_t = self._overpath_configs(q0, legs, arm, pre)
+            if traj is None:
+                last = ("jump" if "jump" in str(why_t) else ("collision" if "collide" in str(why_t) else "track"), str(why_t)[:400])
                 tried.append(f"{c:.2f}: {last[0]}")
                 continue
-            traj = G.t(getattr(self.ikc, "last_track_traj", None)).float()
             keep = OPATH.subsample(traj[:, idx])
             qs = traj[keep]
             dense = OPATH.densify(qs[0], list(qs[1:]))
@@ -4701,7 +4700,7 @@ class IORSLarge(SamplerV2):
                 continue
             step = float((traj[1:, idx] - traj[:-1, idx]).abs().max()) if len(traj) > 1 else 0.0
             eef_pts = [self.kit.fk([frame], q)[frame][0] for q in qs]
-            rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], eef_pts, clearance_m=float(c), book_top_z=round(top, 4),
+            rec = OPATH.record(arm, grasp_st.name, start, [q[idx] for q in qs], eef_pts, clearance_m=float(c), book_top_z=round(top, 4), source=src,
                                z_across=round(top + float(c), 4), min_book_clearance_m=round(float(val[1:-1].min()) if len(val) > 2 else float(val.min()), 4),
                                start_book_clearance_m=round(float(val[0]), 4), end_book_clearance_m=round(float(val[-1]), 4), margin_m=OPATH.BOOK_MARGIN_M,
                                max_step_rad=round(step, 4), n_tracked=int(len(traj)), n_waypoints=int(len(qs)), n_dense=int(len(dense)),
@@ -4712,6 +4711,51 @@ class IORSLarge(SamplerV2):
                      rec["min_book_clearance_m"], step, f" (lower clearances: {tried})" if tried else "")
             return rec, "", ""
         return None, last[0], f"{last[1]} (clearances tried: {tried})"
+
+    def _overpath_configs(self, q0: th.Tensor, legs: Sequence[G.Pose], arm: str, pre: G.Pose) -> Tuple[Optional[th.Tensor], str, str]:
+        """The configurations of the transit's legs from ``q0`` (the target out of the world, the desk / scene in): first tracked as the
+        oracle tracks a Cartesian leg (``track_chain`` at the oracle's soft tolerances, no step above 0.2 rad); when that stalls (the escape
+        leaves the elbow at its limit: hb i7op_b 'right_arm_joint4 at_lower'), the exact IK of every waypoint ~2 cm / 0.1 rad apart seeded
+        at the previous solution, no joint jump above :data:`overpath.IK_JUMP_MAX_RAD` (a branch flip). The last configuration reaches the
+        pre-grasp within the IK acceptance (polished by its IK when the tracking ended within the soft tolerance). ``(traj (T, 28) with
+        ``q0`` first, source, "")`` or ``(None, "", why)``."""
+        idx = self.kit.robot.arm_control_idx[arm]
+        q_end, why_t = self.ikc.track_chain(q0, legs, arm, ignore=[self.target], soft_pos_tol=self.ikc.ORACLE_SOFT_POS_TOL, soft_rot_tol=self.ikc.ORACLE_SOFT_ROT_TOL,
+                                            max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS)
+        traj, src = None, ""
+        if q_end is not None:
+            traj, src = G.t(getattr(self.ikc, "last_track_traj")).float().clone(), "tracked"
+            if not th.allclose(traj[0], G.t(q0).float(), atol=1e-6):
+                traj = th.cat([G.t(q0).float().reshape(1, -1), traj], dim=0)
+        else:
+            TT._count(self, "overpath.track_stalled")
+            wps: List[G.Pose] = []
+            for a, b in zip(legs[:-1], legs[1:]):
+                n = max(1, int(math.ceil(max(float(th.linalg.norm(G.t(b[0]) - G.t(a[0]))) / OPATH.IK_STEP_M, float(G.quat_angle(G.t(a[1]), G.t(b[1]))) / OPATH.IK_STEP_RAD))))
+                wps.extend(tuple(w) for w in C.line_waypoints(a, b, n))
+            rows = [G.t(q0).float().clone()]
+            with self.ikc.ignoring([self.target]):
+                for k, w in enumerate(wps):
+                    q_k = self.kit.ik(w, rows[-1], arm=arm)
+                    if q_k is None:
+                        return None, "", f"track: {why_t[:200]}; seeded IK: no solution at waypoint {k + 1}/{len(wps)}"
+                    q_k = G.t(q_k).float().reshape(-1)
+                    jump = float((q_k[idx] - rows[-1][idx]).abs().max())
+                    if jump > OPATH.IK_JUMP_MAX_RAD:
+                        return None, "", f"track: {why_t[:200]}; seeded IK: joint jump {jump:.2f} rad at waypoint {k + 1}/{len(wps)} (> {OPATH.IK_JUMP_MAX_RAD:.2f})"
+                    r = rows[-1].clone()
+                    r[idx] = q_k[idx]
+                    rows.append(r)
+            traj, src = th.stack(rows), "seeded IK"
+        if not self.ikc.reaches(traj[-1], pre, arm):
+            with self.ikc.ignoring([self.target]):
+                q_p = self.kit.ik(pre, traj[-1], arm=arm)
+            if q_p is None or float((G.t(q_p).float().reshape(-1)[idx] - traj[-1][idx]).abs().max()) > OPATH.IK_JUMP_MAX_RAD:
+                return None, "", f"the path ends {src} off the pre-grasp and its IK from there jumps / fails"
+            r = traj[-1].clone()
+            r[idx] = G.t(q_p).float().reshape(-1)[idx]
+            traj = th.cat([traj, r.reshape(1, -1)], dim=0)
+        return traj, src, ""
 
     def overpath_record(self, ov: Dict[str, Any], grasp: GraspRecord) -> None:
         """``grasps[0].overpath`` (i7-overpath): the transit :meth:`_overpath_plan` planned for the overhang pick ``ov`` when the switch is
