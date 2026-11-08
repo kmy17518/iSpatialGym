@@ -1574,6 +1574,58 @@ class Motions:
         return StraightPlan(success=True, q_traj=ramp, dt=self.dt, status="straight", plan_time=dt_check,
                             diagnostics={"straight": True, "n": n, "margin_m": margin, "step_rad": step_rad})
 
+    def recorded_joint_path(self, arm: str, qs: Sequence[Any], what: str = "overpath") -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
+        """i7-overpath 2026-11-08 (owner 3(a), :mod:`ispatialgym.oracle.overpath`): the joint path from where ``arm`` is through the recorded
+        arm joints ``qs`` (the first is where the sampler planned from: the arm must start within ``overpath.START_GAP_MAX_RAD`` of it and
+        goes straight on to the second), the trunk and the other arm held - :func:`overpath.densify` (one cosine profile, <= 0.02 rad per
+        step) - checked as the straight ramp is (:meth:`_straight_plan`): every configuration after the start clear of the collision world
+        (margin 0, the world synced with nothing ignored, the relaxed static pairs) and of the protected objects (:meth:`_protect_violations`,
+        inside the transit's protect context). Returns ``((T, 28) trajectory, note)`` or ``(None, note)`` with ``note["why"]``; nothing moves."""
+        from ispatialgym.oracle import overpath as OPATH
+
+        arms = (arm,)
+        emb = self._emb_for(arms)
+        note: Dict[str, Any] = {"what": what}
+        try:
+            self.backend.update_world(ignore_objects=[])
+            q_now = C.as_tensor(self.backend.q_full()).reshape(-1).float()
+            idx = th.as_tensor(self.robot.arm_control_idx[arm]).reshape(-1).long()
+            rec = [C.as_tensor(q).reshape(-1).float() for q in qs]
+            gap = float((q_now[idx] - rec[0]).abs().max())
+            note["start_gap_rad"] = round(gap, 4)
+            if gap > OPATH.START_GAP_MAX_RAD:
+                note["why"] = f"the arm stands {gap:.2f} rad from the recorded start (> {OPATH.START_GAP_MAX_RAD:.2f})"
+                return None, note
+            rows = []
+            for q in rec[1:]:
+                r = q_now.clone()
+                r[idx] = q
+                rows.append(r)
+            traj = OPATH.densify(q_now, rows, OPATH.STEP_RAD)
+            n = len(traj) - 1
+            note["n_steps"] = n
+            if n > self.cfg.trajectory_max_steps:
+                note["why"] = f"{n} steps exceed the budget {self.cfg.trajectory_max_steps}"
+                return None, note
+            check = getattr(self.backend, "check_collision", None)
+            if check is not None:
+                relax = getattr(self.backend, "static_links_relaxed", None)
+                with (relax(emb, q_now, arms) if relax is not None else nullcontext([])):
+                    hit = th.as_tensor(check(traj, emb_name=emb, sync_world=False)).reshape(-1).bool().cpu()
+                if bool(hit[1:].any()):
+                    k = int(th.nonzero(hit[1:]).reshape(-1)[0]) + 1
+                    note["why"] = f"configuration {k}/{n} penetrates an obstacle"
+                    return None, note
+            if self._protect is not None:
+                viol = self._protect_violations(list(arms), traj, emb)
+                if viol:
+                    note["why"] = f"passes {viol[0].get('object')} at {viol[0].get('clearance_m')} m (threshold {viol[0].get('threshold_m')} m)"
+                    return None, note
+        except Exception as e:  # noqa: BLE001 - the recorded path is the program's; a failed check falls back to the planned transit
+            note["why"] = f"check failed ({e!r})"
+            return None, note
+        return traj, note
+
     def _straight_via(self, emb: str, arms: Sequence[str], q_start: th.Tensor, q_goal: th.Tensor, relax, what: str) -> Optional[StraightPlan]:
         """2026-10-31 train-fast (``ISPATIALGYM_FAST_STRAIGHT_ARM_VIA``, on by default with STRAIGHT_ARM): when the direct ramp to the goal is
         not clear, two checked straight legs through an arm posture (``cfg.witness_via_postures``: ready, untucked - the postures

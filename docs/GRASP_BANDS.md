@@ -5070,6 +5070,85 @@ memory OFF, TURN_COVER=1 + OPPOSITE=1, map overlay r3; `i7ar_5yf_off` root v2map
   20-45 deg, 1-2 classes / 1.5-2.8 % for 50-70 deg (only the yaw 0 / 180 slots' entries clear past 45); with the 14 opposite-end ones
   7.7 / 6.2 % and 4.4 / 3.1 %.
 
+## inside_large_01: the recorded transit over the book and the spine guard (branch `i7-overpath`, 2026-11-08)
+
+Owner decisions 3(a) / 3(b) of `prompt_goalmaps_axialrest_overpath.md`; record `$OFH/DECISIONS.md` ("i7-overpath" lines). Branch from of-v2maps
+93229922, not pushed. **No default flipped.**
+
+| commit | what |
+|---|---|
+| e4443d14 | (a) `ISPATIALGYM_OVERHANG_OVERPATH` (default off): `IORSLarge._overpath_plan` plans the transit escape end -> rise -> across -> pre-grasp, records `grasps[0].overpath` (isg-overpath/1); `Grasp.overpath`; the oracle follows it (`execute.follow_overpath` -> `Motions.recorded_joint_path`), the program check replays it; diagnostic `transit_book_clearance` on every overhang grasp (both arms). (b) the spine guard `generation.overhang_required_side` / `overhang_pinch_edge_max_m` (kit `overhang.side_rejected[.entry/.grasp]`) |
+| 06de48d9 | the guard ON in inside_large_01's customs (-y, 0.03 m); replay of the int1_1 / int1_3 / i7_po draws: 3 entries, 2064 drawn grasps, 0 rejections |
+| b911cd3d | tracking at the oracle's soft tolerances, else the seeded exact IK of every ~2 cm / 0.1 rad waypoint (jump <= 0.3 rad) |
+| 09f97815 | (CORRECTION) memo key + `overpath.MEMO_VERSION` "overpath/2"; the turn push -> pre-grasp placed by schedule (`over_pre`, `at_start`, `slerp`, tried in order; kit `overpath.orient.<s>.planned/.rejected`); every rejection names the leg, waypoint, z, distance from the base, turn done, joint nearest its limit and whether any IK branch reaches the waypoint; `ISPATIALGYM_OVERPATH_TRY_ALL=1` logs `OVERPATH_DIAG` |
+
+**Arm b is not valid yet.** i7op2_b (trunk_b911cd3d) was cancelled: the persisted overhang fail memo replayed 28 failures of the buggy
+first run under the same key (fixed by the memo version), and the fresh picks planned 0 paths.
+
+**Diagnosis (i7op3_diag, trunk_09f97815, i7_po indices 300101-4, every schedule tried):** 9 picks reached the transit, 0 of 27
+pick x schedule planned. The turn is 126-139 deg; the escape leaves the hand at z 0.941 (above book top 0.797 + 0.08, so the across leg runs
+at the escape height), 0.59-0.80 m from the base, with joint4 or joint7 0.000-0.009 rad from a limit. Every failing waypoint is reached by
+NO IK branch: `over_pre` loses the push orientation after 8-47 % of the across leg; `at_start` loses the turn after 17-46 deg, and where it
+completes (3 picks) the pre-grasp orientation is on another branch (jump 2.9 rad, joint1 / joint3); `slerp` after 11-69 deg. The push and
+the pre-grasp configurations lie on different IK branches, so no Cartesian transit exists; a joint-space move is needed (lead / owner
+question: record the oracle's own planner's transit with the book protected, or a checked joint interpolation via above the pre-grasp).
+
+**Arm a (guard on, path off; i7op2_a, trunk_b911cd3d, v2only, v2maps_int1, memory off, svl titanrtx, 331000-3 + 331100-3):** 14 attempts,
+8 written, 6 / 8 demos ok, 1.42 GPU-h = 0.237 GPU-h per success. Grasp failures: 331100 plan_failed at grasp[5] (no lift: link6-zed self
+collision; no plan to the point above), 331102 execution at grasp[4] (joints off 0.622 rad); 331000 recovered on its 2nd attempt after the
+via-above "still passes the book at 9.6 mm". Executed transit's minimum clearance to the book (`transit_book_clearance`): 6.1 mm (331000),
+others 27.7-67.5 mm. Place: all 6 grasped books placed. `overhang.side_rejected` 0 (checked: 2 entries, 126 grasps). 21 picks came from the
+persisted memo of the cancelled i7op_a (same customs, same key: deterministic failures of the same code).
+
+**Suite** at 09f97815 vs 93229922: base 23 failed + 3 errors; head the same 26 plus 5 `test_split_cone` tests, which fail only in the full
+run on the missing untracked stray `runlogs/.../tabletop__s__t__apple-x__k.json` (moved out per the rules) and pass alone (11 / 11).
+
+### P1: the oracle's own planner records the transit (owner 2026-11-08 item 4, commit a55eea8a)
+
+The owner's decision on the open question above: the sampler runs the oracle's own motion planner from the escape's end to the pre-grasp
+and records that joint trajectory. It **replaces the Cartesian attempt under the same switch** `ISPATIALGYM_OVERHANG_OVERPATH` (default off;
+`overpath.design()` "planner"; `ISPATIALGYM_OVERPATH_DESIGN=cartesian` keeps the 0 / 27 legs as a diagnostic). Fail-memo key version
+`overpath/3`: no Cartesian failure applies.
+
+- `sampling/v2/overpath_planner.py`: an oracle `Motions` on the sampler's cuRobo backend whose state is a joint vector
+  (`execute_joint_trajectory` records instead of simulating). The transit is the oracle's live code path for this grasp:
+  `Motions.protecting` (the book, inflated by `BOOK_MARGIN_M` 0.03) around `transit_dip_gate` around `execute.reach_pre_pose` ->
+  `Motions.arm_to(pose=pre-grasp, q_hint=witness)`. That covers the straight ramp, the ramp via a posture, the joint plans and their
+  retries, the pose fallback, the plan via a posture, and the protect gate's via-above and re-plans. `MotionsConfig` is set as `run_isg`
+  sets it (PLAN_LADDER). Not replicated: the supports-ignored fallbacks, and the oracle backend's 2 trajopt seeds (the sampler's backend
+  keeps 4).
+- `IORSLarge._overpath_plan_planner`: puts the book at its settled post-push pose in the scene, with the desk and the scene as obstacles.
+  The witness is the exact IK of the pre-grasp at the grasp stance, retried with the book ignored when that fails. It plans up to 2
+  rounds. `_overpath_verify` re-checks the recorded waypoints as the oracle runs them: margin-0 collisions with the book present, the
+  arm's spheres >= 3 cm from the book box, the end at the pre-grasp, and the approach tracked. The record (isg-overpath/1, design
+  "planner") is followed by the existing `follow_overpath` / `recorded_joint_path`; a run-time refusal falls back to today's live plan.
+  `check_overpath` replays it in the program check.
+- Kit: `overpath.planned`, `.rejected.<reason>`, `.planner.rounds`, `.planner.branch.<b>`, `.planner.failed.<stage>`, `.planner_s`.
+  Oracle notes: `overpath.{followed, fallback, joint_err_rad, pre_grasp_err_m}` and `transit_book_clearance`.
+- Tests (`test_overhang_overpath.py`, 27): switch off = today; a recorded path clears the book by the margin (the real Motions ladder on a
+  toy backend: the 7.8 mm plan -> via-above); a failed re-check is re-planned or rejected; the program expands with the record; the
+  program check replays it. Suite a55eea8a vs 442c7eaf: base 23 failed + 3 errors, head the same plus 2 `inspect.getsource` tests
+  disturbed by an edit during the run (they pass alone).
+
+**A/B** (inside_large_01, svl titanrtx, v2only, v2maps_int1, memory off, overlay r2, 331000-3 + 331100-3; `$OFH/jobs/i7op_p1/p1_tab.py`):
+
+| arm | tag / trunk | att / written / ok | GPU-h (per success) | plan_failed at the grasp | executed transit's min book clearance |
+|---|---|---|---|---|---|
+| a: guard on, path off | i7op2_a / b911cd3d | 14 / 8 / 6 | 1.42 (0.237) | 2 attempts in 2 demos, 1 demo failed | 0.6 cm (331000), others 2.8-6.8 cm |
+| b: guard on, P1 on | i7op4_b / a55eea8a | 33 / 8 / 8 | 9.04 (1.130) | 0 | 3.3-6.7 cm (followed: 3.3-5.2) |
+
+Arm b counters:
+
+- Sampler: planned 83, rejected 54 (plan 39, witness 8, book 6, collision 1), planner rounds 190 (failed trajopt 57, protected 20).
+  Branches: straight_via 63, straight 20, via_above 8, via_posture 2, protect_replan 1, trajopt 1. Recorded 12, re-planned 20.
+  23969 s of planner time; sample walls 8527 / 23715 s vs 1475 / 2804.
+- Oracle: **followed 4 / 8** (joint error 0.000 rad; the pre-grasp 2.2-3.4 cm off, because the live book drifted, and the approach closed
+  it). **Refused 4 / 8**, all ok on the live plan: start gap 0.45 / 2.62 / 0.36 rad (> 0.35), and one record that passed the live book at
+  11.5 mm.
+
+**Default: the owner's call** (P1 removed the grasp's plan_failed and the sub-3 cm transits in this N 8, at ~4.8x GPU-h per success; the
+live fallback plans in arm b also succeeded, so N 8 cannot separate the two).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

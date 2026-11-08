@@ -450,3 +450,57 @@ def revolution_about_z(equivalences: Any) -> bool:
         return any(isinstance(e, str) and e.strip().lower() == "zinf" for e in equivalences)
     except TypeError:
         return False
+
+
+# ---------------------------------------------------------------------------------------------------- i7-overpath 2026-11-08 (owner 3(b))
+#: the spine guard (opt-in ``generation.overhang_required_side`` + ``overhang_pinch_edge_max_m``): the v2 overhang entry's side and every
+#: drawn grasp's pinch must be the named face of the object (inside_large_01: the hardback's spine, -y; the shelf place rolls about the
+#: spine's outward normal and releases it outward, ``inside_spine_out``) - the legacy spine-only filter ``generation.grasp_rows`` is skipped
+#: under v2 (``IORSLarge._prepare_bindings``), so a +y entry in the root would be drawn and pinch the page block
+SIDES = ("+x", "-x", "+y", "-y")
+#: the pinch (``T_object_eef``'s position) may lie this far inside the face (the six bqvvvx overhang grasps: 1.08-1.69 cm) ...
+PINCH_EDGE_MAX_M = 0.03
+#: ... and this far outside it (the eef point between the pads never lies outside a pinched face)
+PINCH_EDGE_OUT_M = 0.005
+
+
+def side_axis(side: Any) -> Tuple[int, float]:
+    """``"-y"`` -> (1, -1.0): the object-frame axis index and the sign of the named face's outward normal; ``ValueError`` otherwise."""
+    s = str(side).strip().lower()
+    if s not in SIDES:
+        raise ValueError(f"overhang side {side!r}: expected one of {SIDES}")
+    return "xyz".index(s[1]), (1.0 if s[0] == "+" else -1.0)
+
+
+def pinch_depth(eef_pos_obj, hull_obj, side: Any) -> float:
+    """How far inside the named face of the object (its local hull's extreme along the face's outward normal) the grasp's eef point
+    (``T_object_eef``'s position, object frame) lies: > 0 inside, < 0 outside."""
+    i, sign = side_axis(side)
+    h = th.as_tensor(hull_obj, dtype=th.float32).reshape(-1, 3)
+    face = float(h[:, i].max()) if sign > 0 else float(h[:, i].min())
+    p = float(th.as_tensor(eef_pos_obj, dtype=th.float32).reshape(-1)[i])
+    return (face - p) if sign > 0 else (p - face)
+
+
+def spine_entry_why(required: Any, entry_side: Any) -> Optional[str]:
+    """None when the v2 overhang entry's side is ``required``; else why (the attempt is rejected)."""
+    i, s = side_axis(required)
+    if entry_side is None:
+        return f"the v2 overhang entry records no side (required {required})"
+    try:
+        j, t = side_axis(entry_side)
+    except ValueError:
+        return f"the v2 overhang entry's side {entry_side!r} is not a face name (required {required})"
+    if (i, s) != (j, t):
+        return f"the v2 overhang entry's side {entry_side} is not the required {required} (generation.overhang_required_side)"
+    return None
+
+
+def spine_grasp_why(required: Any, grasp_name: Any, eef_pos_obj, hull_obj, max_m: float = PINCH_EDGE_MAX_M, out_m: float = PINCH_EDGE_OUT_M) -> Optional[str]:
+    """None when the grasp pinches the ``required`` face: its eef point within ``[-out_m, max_m]`` of that face (:func:`pinch_depth`);
+    else why (the attempt is rejected)."""
+    d = pinch_depth(eef_pos_obj, hull_obj, required)
+    if -float(out_m) <= d <= float(max_m):
+        return None
+    return (f"grasp {grasp_name}: its pinch lies {d * 100:.1f} cm inside the {required} face (allowed {-float(out_m) * 100:.1f}..{float(max_m) * 100:.1f} cm; "
+            f"generation.overhang_required_side / overhang_pinch_edge_max_m)")
