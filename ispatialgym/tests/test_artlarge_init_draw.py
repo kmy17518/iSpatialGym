@@ -16,9 +16,9 @@ from ispatialgym.sampling.v2.stances import Stance
 AL = pytest.importorskip("ispatialgym.sampling.v2.tasks.articulation_large")
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", raising=False)
-    assert AL.init_draw_on() is False
+    assert AL.init_draw_on() is True
     monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1")
     assert AL.init_draw_on() is True
     monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "0")
@@ -61,7 +61,7 @@ def _st(x):
 
 
 def test_connect_init_off_raises_as_today(monkeypatch):
-    monkeypatch.delenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "0")
     s, _ = _sampler([_st(2.0)])
 
     def connect(_s, init, manip, path_max):

@@ -83,13 +83,14 @@ INIT_ALT_MAX = 12
 
 
 def init_draw_on() -> bool:
-    """i7-artlarge (2026-11-08, owner mandate "fix ... the slow low yield aliases"; DEFAULT OFF): ``ISPATIALGYM_ARTLARGE_INIT_DRAW=1`` draws the
+    """i7-artlarge (2026-11-08, owner mandate "fix ... the slow low yield aliases"): ``ISPATIALGYM_ARTLARGE_INIT_DRAW`` draws the
     init (start) stance of the large articulation sampler from the whole Phase-1 feasible set (every bearing of the 5 deg lattice in
     +-beta_max, every d of the scan, each with Phase 1's own checks: free floor in the task rooms, the whole target in frame, body and
     trunk sweep collision-free) instead of the NEAREST feasible d on one random bearing, the starts near an eval instance's start
     (REPEAT_POS_M / REPEAT_ANG_DEG) last; and step 6 tries up to INIT_ALT_MAX other candidates of that order when the drawn start
-    has no path / transition to the manipulation stance (the start does not enter steps 1-5 or the follow). Unset / 0: today's draw."""
-    return os.environ.get("ISPATIALGYM_ARTLARGE_INIT_DRAW", "0") == "1"
+    has no path / transition to the manipulation stance (the start does not enter steps 1-5 or the follow). DEFAULT ON since the A/B
+    (lead #44 under the owner's mandate; $OFH/artlarge_20261108): unset = on; ``ISPATIALGYM_ARTLARGE_INIT_DRAW=0`` = the nearest-d draw."""
+    return os.environ.get("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1") != "0"
 
 
 def start_near(pose2d: Sequence[float], starts: Sequence[Sequence[float]], pos_m: float = 0.25, ang_deg: float = 15.0) -> bool:
