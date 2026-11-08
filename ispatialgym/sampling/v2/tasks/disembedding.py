@@ -43,7 +43,7 @@ import json
 import logging
 import math
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -107,6 +107,90 @@ RELEASE_ABOVE_SURFACE = 0.01
 #: apart and its physics check settled them from 0.5 mm (embedded_figure/README.txt, 2026-10-11); ``generation.fixed_layout.
 #: release_gap_m`` overrides
 FIXED_LAYOUT_RELEASE_GAP_M = 0.0005
+#: i7-tray 2026-11-08 (owner 1.1, disembedding_01 4/4 -> 0/4): ``ISPATIALGYM_LAYOUT_PAD_CHECK`` (default ``all`` since the owner decision
+#: 2026-11-08 item 4; ``0`` = the pick as before; it acts on fixed layouts only). The
+#: pick ignores the fixed-layout parts for every pose (A2b ``pick_world``) and the library validated the target alone on a slab, so a
+#: grasp whose pre-shaped fingers descend onto a neighbouring part (the embedded figure's frame, 0.3 mm from the target) passes the draw
+#: and the oracle's approach stops on the part (``approach_support_stop``, 13-22 mm short). On: the library's finger rule - the hand
+#: hulls (``contact_policy.HandChecker``) at the oracle's pre-shape opening (``tabletop.policy_opening_of``) along the pre-grasp ->
+#: grasp line, a finger at most ``finger_support_max_penetration_m`` into an obstacle - is applied to the layout's parts (their convex
+#: collision pieces at the layout's relative poses) and the rows whose fingers stand on a part leave the pick. The layout is rigid, so
+#: the verdict is per row (its finger-swapped twin has the same footprint). Counters ``layout_pad.*`` (measured with the switch off
+#: too; nothing leaves the pick then).
+LAYOUT_PAD_SWITCH = "ISPATIALGYM_LAYOUT_PAD_CHECK"
+
+
+def layout_pad_mode() -> str:
+    """``all`` (DEFAULT since 2026-11-08, owner decision item 4; 1 / on: every layout part), ``heavy`` (only the parts at least as heavy as
+    the target - the frame: A2b's "the grasp may displace the parts" kept for the light inner pieces the pads push aside) or ``off``
+    (0 / off / false / no: the pick before i7-tray)."""
+    v = os.environ.get(LAYOUT_PAD_SWITCH, "all").strip().lower()
+    if v in ("0", "off", "false", "no"):
+        return "off"
+    return "heavy" if v == "heavy" else "all"
+
+
+def layout_pad_on() -> bool:
+    return layout_pad_mode() != "off"
+
+
+class HullObstacle:
+    """A convex piece as an obstacle for ``contact_policy.HandChecker.clearance`` (the ``Support.sdf`` interface): the signed distance
+    is the largest of the hull's face-plane distances (exact inside - the penetration depth - and a lower bound outside)."""
+
+    kind = "hull"
+
+    def __init__(self, equations: np.ndarray, name: str = "piece"):
+        self.eq = th.as_tensor(np.asarray(equations, dtype=np.float64), dtype=th.float32)
+        self.name = name
+
+    @staticmethod
+    def of_points(pts: np.ndarray, name: str = "piece") -> "HullObstacle":
+        from scipy.spatial import ConvexHull
+
+        return HullObstacle(ConvexHull(np.asarray(pts, dtype=np.float64)).equations, name)
+
+    def sdf(self, p: th.Tensor) -> th.Tensor:
+        eq = self.eq.to(device=p.device, dtype=p.dtype)
+        return (p @ eq[:, :3].T + eq[:, 3]).max(dim=-1).values
+
+
+def pose_mat(pose) -> np.ndarray:
+    """4x4 of a ``(position, quaternion xyzw)`` pose."""
+    m = np.eye(4)
+    m[:3, :3] = SS.quat_mat(pose[1])
+    m[:3, 3] = SS._np(pose[0]).ravel()[:3]
+    return m
+
+
+def layout_pad_clearances(grasps: Sequence[Any], parts: Dict[str, List[HullObstacle]], arm: str = "right") -> Dict[str, Dict[str, float]]:
+    """``{row name: {part: smallest finger clearance (m) along the approach}}`` of each library row of ``grasps`` (eef in the target frame,
+    ``g.pose``) against ``parts`` (part name -> its convex pieces in the TARGET's frame), the fingers at the oracle's pre-shape opening
+    (``tabletop.policy_opening_of``; fully open without a width) on the pre-grasp (``conventions.PRE_DIST`` back along the eef +z) ->
+    grasp line at the policy's ``approach_step_m``."""
+    from ispatialgym.grasping import contact_policy as CP
+
+    hc = CP.HandChecker(arm)
+    out: Dict[str, Dict[str, float]] = {}
+    for g in grasps:
+        o = TT.policy_opening_of(g)
+        o = 0.5 * float(C.GRIPPER_OPEN_M) if o is None else float(o)
+        Tg = th.as_tensor(pose_mat(g.pose), dtype=th.float32)
+        path = CP.approach_path(CP.pre_pose_mat(Tg), Tg, float(hc.policy.approach_step_m)).reshape(-1, 4, 4)
+        out[str(getattr(g, "name", ""))] = {pname: float(hc.obstacle_clearance(path, pieces, finger_q=(o, o))["finger"].min())
+                                            for pname, pieces in parts.items() if pieces}
+    return out
+
+
+def layout_pad_clearance(grasps: Sequence[Any], parts: Dict[str, List[HullObstacle]], arm: str = "right") -> Dict[str, Tuple[float, Optional[str]]]:
+    """``{row name: (smallest finger clearance (m) to any part, that part)}`` (:func:`layout_pad_clearances`)."""
+    out = {}
+    for n, per in layout_pad_clearances(grasps, parts, arm).items():
+        who = min(per, key=per.get) if per else None
+        out[n] = (per[who] if who is not None else float("inf"), who)
+    return out
+
+
 #: a model already lies / stands in its canonical orientation when its vertical extent is within this fraction of the wanted one
 POSE_EXTENT_TOL = 0.05
 #: standing: the two end slices (this fraction of the length each) compared to put the wider end down (a bottle on its base)
@@ -433,6 +517,7 @@ class Disembedding(SamplerV2):
         self.height: Dict[str, float] = {}
         self.grasps: List[Any] = []
         self.grasp_key: Optional[str] = None
+        self._pad_kept: Optional[List[Any]] = None  # i7-tray: the pick's rows after the layout pad check (``pick_grasps``)
         self.edge: Optional[EdgeFrame] = None
         self.init_stance: Optional[Stance] = None
         self.manip_candidates: List[Stance] = []
@@ -504,6 +589,75 @@ class Disembedding(SamplerV2):
         approach and grasp, its feasible set F included (``grasps[].may_touch.pre_grasp``); nothing changes for a pool draw. Every pick
         check of a fixed layout runs inside it: F's cache key does not record the context."""
         return self.ikc.ignoring(self.layout_parts())
+
+    @property
+    def pick_grasps(self) -> List[Any]:
+        """The rows the target's pick draws from: ``self.grasps``, without the rows whose fingers stand on a layout part when
+        ``ISPATIALGYM_LAYOUT_PAD_CHECK`` is on (:meth:`_layout_pad_screen`, i7-tray 2026-11-08)."""
+        kept = getattr(self, "_pad_kept", None)  # a sampler built without __init__ (tests) has none
+        return kept if kept is not None else self.grasps
+
+    def _part_pieces_in(self, name: str, pose, target_pose) -> List[HullObstacle]:
+        """The convex collision pieces of the layout part ``name`` at the layout pose ``pose``, in the frame of the target at
+        ``target_pose`` (the part's pieces read off its body wherever it is, relative to its root)."""
+        o = self.objects[name]
+        backend = getattr(getattr(getattr(self, "ikc", None), "kit", None), "backend", None) or getattr(getattr(self, "kit", None), "backend", None)
+        root = SS._root(o)
+        if backend is None or root is None:
+            return []
+        T_rel = np.linalg.inv(pose_mat(target_pose)) @ pose_mat(pose)
+        out = []
+        for path, cm in SS._pieces(o):
+            v, _f, (pp, Rp) = SS.piece_geometry(backend, cm)
+            loc = SS.to_local(root, v @ Rp.T + pp)
+            out.append(HullObstacle.of_points(loc @ T_rel[:3, :3].T + T_rel[:3, 3], f"{name}/{path.rsplit('/', 1)[-1]}"))
+        return out
+
+    def _layout_pad_screen(self, poses: Dict[str, Any]) -> None:
+        """i7-tray 2026-11-08: the layout pad check (``LAYOUT_PAD_SWITCH``) once per template - per library row the fingers' clearance to
+        the layout's parts (:func:`layout_pad_clearance`) at the layout's relative poses ``poses``; a row whose fingers go deeper than the
+        policy's ``finger_support_max_penetration_m`` into a part would stand on it; ``all`` drops such rows, ``heavy`` only those standing
+        on a part at least as heavy as the target. Counters ``layout_pad.rows`` / ``.stand_on`` / ``.stand_on.<model>`` / ``.stand_on_heavy``
+        and ``.dropped``; one INFO line with every row's clearance per part. Switch off: measured only."""
+        if getattr(self, "_pad_screened", False) or self.layout is None:
+            return
+        self._pad_screened = True
+        from ispatialgym.grasping import contact_policy as CP
+
+        try:
+            tpose = poses[self.tname]
+            parts = {n: self._part_pieces_in(n, p, tpose) for n, p in poses.items() if n != self.tname}
+            per = layout_pad_clearances(self.grasps, parts, self.segment_arms[0] if self.segment_arms else "right")
+            t_mass = float(getattr(self.obj("target"), "mass", 0.0) or 0.0)
+            heavy = {n for n in parts if float(getattr(self.objects[n], "mass", 0.0) or 0.0) >= t_mass > 0.0}
+        except Exception as e:  # noqa: BLE001 - a measurement failure keeps the pick as before
+            log.info("%s: LAYOUT_PAD check unavailable (%r): the pick keeps every row", self.gp.variant, e)
+            TT._count(self, "layout_pad.unavailable")
+            return
+        allow = float(CP.DEFAULT.finger_support_max_penetration_m)
+        model_of = {b.name: b.model for b in self.bindings.many("distractors")}
+        on_parts = {n: sorted(p for p, d in per[n].items() if d < -allow - 1e-9) for n in per}
+        bad_all = {n for n, ps in on_parts.items() if ps}
+        bad_heavy = {n for n, ps in on_parts.items() if any(p in heavy for p in ps)}
+        TT._countn(self, "layout_pad.rows", len(per))
+        for n in sorted(bad_all):
+            TT._count(self, "layout_pad.stand_on")
+            for p in on_parts[n]:
+                TT._count(self, f"layout_pad.stand_on.{model_of.get(p, p)}")
+        TT._countn(self, "layout_pad.stand_on_heavy", len(bad_heavy))
+        mode = layout_pad_mode()
+        bad = bad_all if mode == "all" else (bad_heavy if mode == "heavy" else set())
+        kept = [g for g in self.grasps if str(getattr(g, "name", "")) not in bad]
+        fmt = lambda n: " ".join(f"{model_of.get(p, p)} {d * 1000:+.1f}" for p, d in per[n].items())  # noqa: E731
+        log.info("%s: LAYOUT_PAD (%s) finger clearance (mm) to the layout parts at the pre-shape along the approach: %s; heavy parts (>= the "
+                 "target's %.3f kg) %s -> %d of %d rows %s", self.gp.variant, mode if mode != "off" else "off: measured only",
+                 "; ".join(f"{n} [{fmt(n)}]" for n in per), t_mass, sorted(model_of.get(p, p) for p in heavy), len(kept), len(self.grasps),
+                 "kept" if mode != "off" else "drawn (nothing dropped)")
+        if bad:
+            if not kept:
+                raise Reject("grasp_unreachable", f"layout pad check ({mode}): every row's fingers stand on a layout part ({sorted(bad)})")
+            TT._countn(self, "layout_pad.dropped", len(bad))
+            self._pad_kept = kept
 
     def spawn_roles(self):
         # owner decision 2026-09-16 4b: the source tray spawns at ``roles.source.scale`` (D1 writes 1.25; until it lands the
@@ -905,7 +1059,7 @@ class Disembedding(SamplerV2):
             st = manip if (a == arms[0] and (not manip.working_arms or manip.working_arms == [a])) else TT.stance_for_arm(self, manip, a)
             if st is None:
                 continue
-            F = self.ikc.feasible_sets([th.zeros(2)], yaws, self.grasps, lambda cell, yaw: target_poses[yaw], st, a, self.grasp_ignore_list(), cache=False)
+            F = self.ikc.feasible_sets([th.zeros(2)], yaws, self.pick_grasps, lambda cell, yaw: target_poses[yaw], st, a, self.grasp_ignore_list(), cache=False)
             for yaw, _ in F.get(0, []):
                 n[yaw] += 1
         return n
@@ -930,6 +1084,8 @@ class Disembedding(SamplerV2):
             except Reject:
                 continue
             options[yaw] = (s_pose, src_w, poses, fig_yaw)
+        if options:
+            self._layout_pad_screen(next(iter(options.values()))[2])  # i7-tray: once per template (the layout is rigid)
         targets = {yaw: o[2][tname] for yaw, o in options.items()}
         with self.pick_world():
             pairs = self._layout_yaw_screen(manip, arms_here, targets)
@@ -942,7 +1098,7 @@ class Disembedding(SamplerV2):
             with self.pick_world(), SS.whole_ignoring(self.ikc, self.support_objects()):  # i7-split: the supports out WHOLE (reach alone)
                 reach = self._layout_yaw_screen(manip, arms_here, targets)
             raise Reject("grasp_unreachable", f"no layout yaw keeps a reachable grasp at the focus {[round(float(v), 3) for v in manip.focus[:2].tolist()]} "
-                                              f"(0 of {len(options)} yaws x {len(self.grasps)} grasps, arms {arms_here}; with every object ignored "
+                                              f"(0 of {len(options)} yaws x {len(self.pick_grasps)} grasps, arms {arms_here}; with every object ignored "
                                               f"{sum(1 for v in reach.values() if v)} yaws keep one: {'not ' if any(reach.values()) else ''}reach alone)")
         errors = []
         for i in rng.permutation(len(kept)):
@@ -953,7 +1109,7 @@ class Disembedding(SamplerV2):
             self._place_layout(poses)
             try:
                 with self.pick_world():
-                    t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
+                    t_pose, grasp = TT.phase3_target(self, manip, rng, self.pick_grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
                                                      support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")),
                                                      scale_key=self.choice.models["target"].scale, bands=self.bands, arms=arms_here,
                                                      arm_bands=self.arm_bands or None, fixed=(poses[tname][0][:2], fig_yaw))
@@ -1044,7 +1200,7 @@ class Disembedding(SamplerV2):
                 if not others:
                     raise
                 with self.pick_world():
-                    g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.grasps, others[0], ignore_for_grasp=self.grasp_ignore_list(),
+                    g2 = TT.segment_fallback_grasp(self, manip, t_pose, grasp, self.pick_grasps, others[0], ignore_for_grasp=self.grasp_ignore_list(),
                                                    scale_key=self.choice.models["target"].scale, support_z=src_w.z, why=f"[{e.reason}] {e}")
                 if g2 is None:
                     raise

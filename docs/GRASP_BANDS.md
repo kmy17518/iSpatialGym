@@ -4580,6 +4580,95 @@ The owner approved this shared-gate change behind a switch. The default stays th
   - touching_04: 0 support-top refusals; its demo failures are oracle ones.
   - Recommendation: keep it off. The default is the owner's.
 
+### i7-tray (2026-11-08, owner 1.1): disembedding_01 / _10 diagnosed; the layout pad check; gym shoe round 2
+
+Owner 1.1 (verbatim intent): diagnose the tray failure first - the library validates each grasp on an open slab with no tray walls, so the
+new grasps the defaults admit may be ones the walls block; the gym shoe switches-on rebuild (0 valid) runs its ladder round 2.
+
+**The walls are not the cause.** Hand clearance (exported PhysX hand hulls; conservative wall boxes = the ring between uekqey's bbox and its
+inner floor, floor -> rim top +15 mm) over every executed demo (i7_split / i7_split0 old builds, i7t03_cnt4 / int1_1 new builds), min over
+pre-grasp -> grasp at the pre-shape opening: fingers >= 67 mm, palm >= 54 mm, wrist / camera >= 57 mm - new and old alike. The sampler's
+exact IK has kept the tray walls as obstacles since i7-split (source tray: 10 protrusion pieces), and `support_split.protrusion_hits` = 0 on
+every attempt of both aliases in all four runs. No failed demo touched a tray.
+
+**disembedding_10 (tablefork pqrtkc): in-hand rotation at the close.** The rebuilt entry (switches) draws top_5 / top_7; in all 8 executed
+demos (int1_1, i7t03_cnt4) the fork turns 12.1-14.4 deg in the hand during the close and is placed 12.2-14.7 deg off (tolerance 0.1 rad =
+5.7 deg) -> symbolic_only. The SLAB validator measured the same rotation (`achieved.off_target_rad`: top_5 0.212, top_7 0.233, top_1 0.216,
+top_4 0.140; top_2 0.005, top_9 0.015) and admits it: `on_target_rot_rad` = 0.2618 (15 deg). The old entry's rows (top_9 / 10 / 11:
+0.002-0.029 rad) turned 0.1-1.7 deg in the tray. Not the tray, a validator gate looser than the task's pose tolerance - owner decision
+(asked through the lead): over v2maps_int1, 10 of 280 measured valid rows (7 entries) exceed 0.1 rad.
+
+**disembedding_01 (jigsaw isgefa, the embedded figure): the fingers stand on the figure's other parts.** The pick ignores the fixed-layout
+parts for every pose (A2b `pick_world`) and the library validates the piece alone, so a row whose pre-shaped fingers descend onto the frame
+(isgefb, 0.3 mm from the target) passes the draw and the oracle's approach stops on it (`approach_support_stop` on isgefb + isgefd, 13-22 mm
+short: int1_1 3 of 4). Finger clearance to the parts along the approach at the pre-shape (16 mm per finger), per row (the layout is rigid):
+rebuilt entry top_5 / top_10 -6.0 mm (frame + isgefd), top_1 / top_4 -6.0 mm (isgefd only, a 0.5 g inner part the pads push aside),
+top_8 +1.3 / top_12 +2.3 mm (clear); the old rows top_2 / top_3 (the 4/4 builds) +3.6 / +0.5 mm. Twins equal their rows. Secondary: the
+top_4~r180 / top_5~r180 releases turn the piece 10-20 deg (old top_3~r180: 1-7 deg, one of 8 failed).
+
+**The layout pad check** (`ISPATIALGYM_LAYOUT_PAD_CHECK` = `all` (1) | `heavy`, default OFF; 2a4e64d7, 147070fe, 0ca22d83): the library's
+finger rule (`HandChecker` hulls at the oracle's pre-shape opening on the pre-grasp -> grasp line, at most `finger_support_max_penetration_m`
+= 2 mm into an obstacle) applied to the layout parts' convex collision pieces; rows that stand on a part (`all`), or on a part at least as
+heavy as the target (`heavy`: the frame only), leave the pick (layout screen, `phase3_target`, segment fallback). Counters
+`layout_pad.rows / .stand_on[.<model>] / .stand_on_heavy / .dropped / .unavailable`, measured with the switch off. Jigsaw: `all` keeps
+top_8 / top_12, `heavy` keeps top_1 / top_4 / top_8 / top_12. Tests: `test_layout_pad_check.py`; suite = base.
+
+A/B disembedding_01 (v2only, v2maps_int1, 2 x N 4 per arm, same base index):
+
+| arm | att / written / ok | GPU-h (per success) | stand-on events | rows drawn |
+|---|---|---|---|---|
+| off (i7tray_off) | 41 / 7 / 2 | 1.58 (0.79) | 5 | top_10~r180 x2 (failed_grasp), top_5~r180, top_4 x3, top_8~r180 |
+| all (i7tray_on) | 96 / 4 / 3 | 1.34 (0.45) | 0 | top_12 x4 (1 arm_stutter) |
+| heavy (i7tray_heavy) | 47 / 7 / 1 | 1.23 (1.23) | 0 | top_4 x7 (5 symbolic_only) |
+
+Second finding from the A/B: top_4 (both twins) RELEASES push the piece 23-29 mm and turn it 6.7-11.5 deg (6 of 8 top_4 places fail); top_8 /
+top_12 places land 0.7-3.3 deg / 1.5-4 mm off. `all` pays in reach (most attempts `grasp_unreachable`, reach alone). No default flipped:
+owner questions - flip `all` for fixed layouts (narrows A2b), or rebuild the jigsaw entry with the figure in the validator; and for the fork
+(a) `on_target_rot_rad` 0.2618 -> 0.1 rad (10 of 280 measured valid rows in 7 entries flip), (b) a sampler filter by the recorded
+`off_target_rad` where a pose tolerance applies, or (c) an oracle place corrected by the measured in-hand rotation.
+
+**Gym shoe kmcbym (owner 1.1 part 2): round 2 is already the integration entry.** Switches-on round 1 = 0 valid (i7-switches); round 2 (L2
+retry levels, switches on) was rebuilt with the pad sweep at the integration (count 24/18/18) = 6 valid (top_1/2/5/6/7/8), maps 0.3471 r + l,
+`legacy_key` gym_shoe__kmcbym__t, staged in v2maps_int1. Its consumer nextto_04: int1_1 18 att / 4 / 4 (top_6, top_7); re-run on trunk_fcddc495
+(i7tray_gs) 22 / 4 / 3 (1 robot_touching_itself, left arm link3 / link5), 0.27 GPU-h.
+
+### i7-tray round 2 (owner decisions 2026-11-08 items 3 and 4)
+
+**Item 3, the in-hand turn filter** (`ISPATIALGYM_GRASP_TURN_FILTER`, default OFF; 609eb39f). `tabletop.library_grasps` (disembedding,
+attachment, IORS small / large) skips a v2 row whose recorded turn at the close (the slab validator's `achieved.off_target_rad`,
+`validation.json`) exceeds the orientation tolerance of the grasped target in the task using it: the isg-v2 profile, `small` 0.10 /
+`large` 0.15 rad, the customs `evaluation.tolerances.pose.orientation` override first (nextto_01: 0.95); `micro` (instance-dependent) and
+targets without a profile rule are unchanged. No library gate change, no rebuild. Counters `grasp.off_target_filtered[.<entry>.<task>]`
+(on) and `grasp.off_target_would_filter` (off). Every row filtered -> `Reject("grasps_off_target")`. Count over the 83 eval aliases
+(`tray_20261108/turn_count.txt`): 8 rows in 6 aliases - disembedding_10 tablefork 4 of 6 (top_1 0.216, top_4 0.140, top_5 0.212, top_7 0.233
+rad; top_2 / top_9 kept), disembedding_07 tape rim_straddle_21, inside_01 brussels sprouts top_8, nextto_02 salt shaker side_2, nextto_03
+tablespoon top_2; none emptied (under_large_01's sandal top_1 0.140 < its large 0.15). Tests `test_grasp_turn_filter.py`.
+A/B disembedding_10 (v2only, v2maps_int1, N 4 each, svl, trunk_48fe31cc, same base index; template counters off
+`grasp.off_target_would_filter` 4, on `grasp.off_target_filtered.tablefork__pqrtkc__s1.disembedding` 4): OFF i7tray_turn_off 12 att / 4 written
+/ 0 ok (top_7 x4, placed 11.1-16.3 deg off, symbolic_only), 0.36 GPU-h; ON i7tray_turn_on 14 / 4 / 4 (top_9 x4, placed 1.1-1.8 deg off),
+0.36 GPU-h = 0.09 GPU-h per success. The default is the owner's decision.
+
+**Item 4a: `ISPATIALGYM_LAYOUT_PAD_CHECK=all` is the DEFAULT for fixed layouts** (48fe31cc; `0` restores the former pick).
+
+**Item 4b: top_4's release, diagnosed from the demos** (`tray_20261108/release.py`, `release_summary.txt`, `open_sweep.py`; 31 jigsaw places).
+- Controller / AG: the R1Pro grippers are `MultiFingerGripperController` in smooth mode, the release command is +1 (fully open, 0.05 m per
+  finger; `release_check.gripper_command` 1.0 on every place). The AG weld does NOT go at +1: the fork's pad-clear release
+  (`ag_release_on_pad_clear`, cap 0.2 s) kept it 8 physics steps (0.067 s, 2 control steps; 4 steps on 2 places) on every place, released
+  `pads_clear` with the pads at 31-34 mm per finger.
+- The push: the fingers open 6 -> 14 -> 23 -> 32 -> 41 -> 49 -> 50 mm per control step; nothing moves while welded; from the detach step
+  ONE pad stays at 0.0 mm from the piece and drives it 22-28 mm along the closing axis (turning it -12.2..+9.8 deg) until the fingers are
+  fully open, 3 control steps, all before the retreat (the retreat moves nothing). top_4's two pads open evenly (<= 2.4 mm apart at the detach).
+- Not the goal tray: the piece is released 0.0 +- 0.1 mm above the goal floor; the fingers stay 3.8-5.9 mm above it; goal-wall clearance
+  (conservative boxes) >= 31 mm on every top_4 place (the clean top_12 / top_8 places come within -5 mm of the conservative rim band).
+- Cause = top_4's geometry: it pinches bar side_G with one pad inside the figure's own slot; swept open, that pad meets the parallel bar
+  side_E at 24.3 mm per finger (prediction: 25.7 mm of push; measured 22-28). Same for top_1 (side_E at 22.2), top_5 (side_G at 20.1;
+  measured 34-35 mm) and top_10 (side_G at 23.8). top_8 pinches side_C with no other bar in reach (0.3 mm push); top_12 meets side_E only at
+  42.5 mm (1-5 mm push). The library checks the closing sweep from the pre-shape, never the release opening.
+- Fix proposal (oracle change - asked): release to the descent's pre-shape opening (pinch width / 2 + 10 mm = 16 mm per finger, the
+  opening the pad sweep validated) and retreat, fully open only once clear - top_4's pad stops 8 mm short of side_E, top_5's 4 mm, the old
+  top_2 / top_3 1.4-1.8 mm. Alternative (library gate): a release sweep in the validator. With the pad-check default, the jigsaw no longer
+  draws these rows.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
