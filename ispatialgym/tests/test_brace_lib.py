@@ -268,6 +268,14 @@ def S_pose(e):
     return S.pose_of(e["T_rule_object"])
 
 
+def test_hull_edge_points_cover_the_edges_between_vertices():
+    box = np.array([[x, y, z] for x in (0.0, 0.2) for y in (0.0, 0.1) for z in (0.0, 0.4)])
+    P = VC.hull_edge_points(box, per_edge=4)
+    assert len(P) > 8 and np.isclose(P.min(axis=0), 0).all() and np.isclose(P.max(axis=0), [0.2, 0.1, 0.4]).all()
+    on_edge = P[(np.isclose(P[:, 1], 0.0)) & (np.isclose(P[:, 2], 0.0))]  # the edge x in (0, 0.2) at y = z = 0
+    assert np.isclose(sorted(on_edge[:, 0]), [0.0, 0.04, 0.08, 0.12, 0.16, 0.2]).all()
+
+
 def test_pieces_com_is_the_volume_centroid():
     box = np.array([[x, y, z] for x in (0.0, 0.2) for y in (0.0, 0.1) for z in (0.0, 0.4)])
     tip = box[:4] + np.array([1.0, 0, 0])  # 4 points: too few for a volume -> ignored? (a degenerate tetra counts 0)
@@ -348,6 +356,12 @@ def test_the_wall_pusher_meets_the_pushed_corner_and_the_judge_reads_the_braced_
     ok = VC.judge_wall_brace(e, T0, T1, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None}, finger_N=12.0)
     past = VC.judge_wall_brace(e, T0, T1, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None}, finger_N=0.0)
     assert ok["verdict"] == "valid" and past["reasons"] == ["not_braced"]  # moved past a fist it never touched: not a brace
+    T2 = _turn_about(n_w, 0.03 if float(np.cross(n_w, B - H) @ vB) > 0 else -0.03, H) @ T0  # ~1.1 cm at the braced point, the hand unmoved
+    slid = VC.judge_wall_brace(e, T0, T2, np.eye(4), np.eye(4), cfg, {"completed": True, "postcondition": None}, finger_N=30.0)
+    assert slid["reasons"] == ["slipped_past"]
+    Te = np.eye(4)
+    Te[2, 3] = 0.006  # the same travel with the hand pushed 6 mm: the stop's gap + the hand explain it
+    assert VC.judge_wall_brace(e, T0, T2, np.eye(4), Te, cfg, {"completed": True, "postcondition": None}, finger_N=30.0)["verdict"] == "valid"
     for ang in (0.02, -0.02):
         T1 = _turn_about(n_w, ang, H) @ T0
         mv = float((T1[:3, :3] @ np.asarray(e["load"]["brace_point_object"]) + T1[:3, 3] - B) @ vB)

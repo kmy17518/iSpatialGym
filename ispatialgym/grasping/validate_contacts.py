@@ -170,6 +170,8 @@ class ContactValidateConfig:
     wall_loaded_min_m: float = 0.001
     #: the brace fingers must press the target at least this hard during the load (else ``not_braced``: it went past the fist)
     wall_braced_min_N: float = 1.0
+    #: the braced point may travel at most the stop's gap (``wall.brace_offset_m``) + the hand's own displacement + this (``slipped_past``)
+    wall_slip_m: float = 0.004
     wall_pusher_travel_max_m: float = 0.06
 
 
@@ -581,6 +583,27 @@ def _unit(v) -> np.ndarray:
     return v / max(float(np.linalg.norm(v)), 1e-12)
 
 
+def hull_edge_points(pts: np.ndarray, per_edge: int = 24) -> np.ndarray:
+    """The convex hull's vertices plus ``per_edge`` points along each of its edges: the first contact of a flat face sweeping the hull lies on an
+    edge between vertices (2026-11-08 run 4: a box-like hull had only its two corner vertices within the pusher's width, the bottom edge
+    between them stood up to 7 mm in front of the face plane - the load over-turned the target by 0.02 rad)."""
+    from scipy.spatial import ConvexHull
+
+    P = np.asarray(pts, dtype=float).reshape(-1, 3)
+    try:
+        hull = ConvexHull(P)
+    except Exception:  # noqa: BLE001 - degenerate (flat) point sets: the vertices alone
+        return P
+    edges = set()
+    for tri in hull.simplices:
+        for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+            edges.add((min(a, b), max(a, b)))
+    E = np.array(sorted(edges), dtype=int)
+    w = np.linspace(0.0, 1.0, int(per_edge) + 2)[1:-1]
+    seg = P[E[:, 0]][:, None, :] * (1.0 - w)[None, :, None] + P[E[:, 1]][:, None, :] * w[None, :, None]
+    return np.concatenate([P[hull.vertices], seg.reshape(-1, 3)])
+
+
 def _rot(axis: np.ndarray, ang: float) -> np.ndarray:
     k = _unit(axis)
     K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
@@ -606,11 +629,11 @@ def wall_pusher_path(entry: Dict[str, Any], T_obj: np.ndarray, pts_obj: np.ndarr
     P = R @ np.asarray(load["point_object"], dtype=float) + t
     n = _unit(R @ np.asarray(wall.get("normal_object") or [1.0, 0.0, 0.0], dtype=float))
     H = R @ np.asarray(wall.get("hinge_object") or [0.0, 0.0, 0.0], dtype=float) + t
-    pts = pts_obj @ R.T + t
+    pts = hull_edge_points(pts_obj) @ R.T + t
     rel = pts - P
     along = rel @ d
     y = _unit(np.cross(d, n))
-    r_line = 0.5 * float(cfg.brace_pusher_size_m[0]) + 0.005
+    r_line = 0.5 * float(cfg.brace_pusher_size_m[0]) + 0.002
     near = np.abs(rel @ y) <= r_line
     if not near.any():
         raise ValueError(f"wall load: no hull point within {r_line:.3f} m across the pushed corner's line (no load can be placed)")
@@ -642,7 +665,8 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
     """The wall brace acceptance (i7-brace, owner 3.4; ``*0`` the brace standing, ``*1`` after the load): the oracle's brace ran to its end
     with a clean postcondition; under the load the BRACED point moved along its own load direction (``load.brace_direction``: past level)
     by <= ``brace_hold_max_m`` (``not_held``) and >= ``wall_loaded_min_m`` (``not_loaded``: no load reached it), the brace fingers pressed the target >= ``wall_braced_min_N`` during it (``not_braced``: the
-    braced point went past the fist), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
+    braced point went past the fist), it travelled at most the stop's gap + the hand's displacement + ``wall_slip_m`` (``slipped_past``: it
+    slid past the fist), the hinge axis did not turn off the wall normal by more than ``topple_tilt_rad``
     (``topple``: off its hinge), the brace hand stayed within ``brace_eef_drift_m`` (``hand_pushed``), and no non-finger robot link loaded the
     wall beyond ``non_finger_contact_N``. Measures: the turn about the wall normal (rad, + past level) and the braced point's motion."""
     load = entry.get("load") or {}
@@ -672,6 +696,10 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
         reasons.append("not_held")
     if moved < cfg.wall_loaded_min_m:
         reasons.append("not_loaded")  # the load never reached the target (the stop's gap alone is >= 1 mm): no verdict on the brace
+    gap_b = float(wall.get("brace_offset_m", 0.005))
+    slip = moved - drift - gap_b
+    if slip > cfg.wall_slip_m:
+        reasons.append("slipped_past")  # the braced point went farther than the stop's gap + the hand's own displacement: it slid past the fist
     if finger_N is not None and finger_N < cfg.wall_braced_min_N:
         reasons.append("not_braced")  # the braced point went past and never met the fist (2026-11-08 run 3: the 25 deg wrists, 0.1 mm drift)
     if twist > cfg.topple_tilt_rad:
@@ -682,7 +710,7 @@ def judge_wall_brace(entry: Dict[str, Any], T_obj0: np.ndarray, T_obj1: np.ndarr
         reasons.append("non_finger_contact")
     return {"verdict": "invalid" if reasons else "valid", "reasons": reasons,
             "measures": {"brace_point_moved_m": round(moved, 5), "turn_past_level_rad": round(turn, 5), "hinge_axis_twist_rad": round(twist, 5),
-                         "finger_obj_N": None if finger_N is None else round(float(finger_N), 3),
+                         "finger_obj_N": None if finger_N is None else round(float(finger_N), 3), "slip_m": round(slip, 5),
                          "eef_drift_m": round(drift, 5), "other_wall_N": round(float(other_N), 4)}}
 
 
