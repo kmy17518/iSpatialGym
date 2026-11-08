@@ -402,7 +402,7 @@ def test_board_table_places_the_board_where_the_base_list_is_off_the_top(monkeyp
     """BD_BOARD_TABLE on candidate 12's stance (stand-off 0.45, the tall trunk's reach of bd_diag2: right of -0.08, nearer than 0.57):
     the base list is off the top / leaves no flip set and BD_BOARD_SEARCH's grid finds (0.51, -0.10); the table's listed (0.54, -0.10)
     (= the list's (0.44, -0.10) at its own distance from the edge) is placed from the list, without the grid, and the flip-room fit
-    keeps a listed position at every stand-off."""
+    is unchanged (the base list decides the init's move)."""
     s, init, manip, faces, probes, (right, toward, yaw), eligible, layout_ok = _early_scene(monkeypatch, stand_off=0.45)
 
     def reach(poses, st, arm, **kw):
@@ -418,5 +418,6 @@ def test_board_table_places_the_board_where_the_base_list_is_off_the_top(monkeyp
     pos = (round(float(b[0]), 2), round(float(b[1]), 2))
     assert layout_ok(kept) and s._board_on_top(manip, pos[0], pos[1], _half(s), right, -toward)
     assert pos == (0.54, -0.1) and s.kit.stats["bd_board.table_listed_placed"] == 1 and "bd_board.grid_placed" not in s.kit.stats
-    fit = s._board_fit(init, 0.35, _half(s))
-    assert all(fit.values()) and set(fit) == {f"{so:.2f}" for so in TT.STAND_OFFS}
+    fit_on = s._board_fit(init, 0.35, _half(s))
+    monkeypatch.setenv("ISPATIALGYM_BD_BOARD_TABLE", "0")
+    assert s._board_fit(init, 0.35, _half(s)) == fit_on

@@ -80,7 +80,8 @@ def board_table_on() -> bool:
     arm's reach and the flip approaches are set by the centre line, ``_board_position_note``). The listed positions
     (``generation.board_table_xy_candidates``, else the base list at the stand-off it was set for) come first, then, with
     BD_BOARD_SEARCH, the table lattice (``BOARD_TABLE_INSETS`` x ``BOARD_GRID_LATERALS``); per stance only those on the top and with
-    the board centre in the base-depth reach window ``generation.board_table_depth_window_m`` are kept. Off: the list (+ the grid)."""
+    the board centre in the base-depth reach window ``generation.board_table_depth_window_m`` are kept. Off: the list (+ the grid).
+    The init's flip-room move (:meth:`BlockDesign._board_fit`) keeps the base list either way (5o.1, i7-startdraw, owns that range)."""
     return os.environ.get("ISPATIALGYM_BD_BOARD_TABLE", "0") == "1"
 
 
@@ -582,7 +583,10 @@ class BlockDesign(SamplerV2):
         stand-off (base depth = inset + stand-off), then with BD_BOARD_SEARCH the table lattice (base depth = inset + the base's distance
         to the edge) not listed, nearest first to the first kept listed position (ties to the robot's right), each kept only when the
         board lies on the top and its centre's base depth is inside ``generation.board_table_depth_window_m``. Returns the plan and the
-        counts (listed / lattice: kept, off the top, out of the window)."""
+        counts (listed / lattice: kept, off the top, out of the window). Not used by :meth:`_board_fit` (the flip-room move keeps the base
+        list): bdv_table (trunk_f1fc4ac1) let the table positions decide the move, the minimum move (init 0.35 -> 0.20) then fit every
+        stand-off, the manipulation stances stood at the range's end, 3 of 24 candidates were board-feasible and 120 / 120 attempts
+        were rejected (board_placement) - against the base list's move to 0.07 (27 candidates, 10 feasible)."""
         so = float(manip.stand_off) if manip.stand_off is not None else BOARD_LIST_STAND_OFF
         to_edge = float(manip.edge_depth) if manip.edge is not None else so
         lo, hi = (float(v) for v in (self.gen("board_table_depth_window_m", None) or BOARD_TABLE_DEPTH_WINDOW))
@@ -616,7 +620,8 @@ class BlockDesign(SamplerV2):
     def _board_plan(self, manip: Stance, count: bool = True) -> List[Tuple[float, float, bool]]:
         """The board positions (base depth, lateral, searched) :meth:`_place_board` and :meth:`_board_precheck` try at ``manip``, in order;
         ``searched`` ones get the CPU tests before each place probe and the probe cap (``generation.board_grid_max_probes``). Default: the
-        list, then BD_BOARD_SEARCH's grid; BD_BOARD_TABLE: :meth:`_board_table_plan` (kit counters ``bd_board.table_*`` when ``count``)."""
+        list, then BD_BOARD_SEARCH's grid; BD_BOARD_TABLE: :meth:`_board_table_plan` (kit counters ``bd_board.table_*`` when ``count``).
+        Not :meth:`_board_fit`'s positions (the flip-room move keeps the base list)."""
         if not board_table_on():
             plan = [(d, l, False) for d, l in self._board_positions()]
             if board_search_on():
@@ -646,9 +651,6 @@ class BlockDesign(SamplerV2):
             st = manip.shifted(stand_off=float(so)) if manip is not None else None
             if st is None or not self.kit.trav_free(st.base_xy):
                 out[f"{float(so):.2f}"] = []
-                continue
-            if board_table_on():  # BD_BOARD_TABLE: the listed table positions this stand-off keeps (on the top, in the depth window)
-                out[f"{float(so):.2f}"] = [f"({d:.2f}, {l:+.2f})" for d, l, searched in self._board_table_plan(st)[0] if not searched]
                 continue
             right, toward, _ = self._table_axes(st)
             out[f"{float(so):.2f}"] = [f"({d:.2f}, {l:+.2f})" for d, l in self._board_positions() if self._board_on_top(st, d, l, half, right, -toward)]
