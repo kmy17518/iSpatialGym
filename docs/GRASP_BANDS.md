@@ -2538,7 +2538,44 @@ written (12 in inside_large_03, whose camera-hull / blame runs are slower), so t
 
 trunk_1a68082b, v2maps_int2, v2only N 4, alias memory off, base index 347000 (one ledger per arm), svl titanrtx, at most 4 at a time.
 5x.1: sm_off / sm_a / sm_ab on under_large_03 and ontop_large_02. 5x.3: cap_on on under_large_03 (off arm = sm_off), cap_off / cap_on on
-articulation_open_small_02 and inside_large_01 (control). Results: see the DECISIONS lines.
+articulation_open_small_02 and inside_large_01 (control). Suite at 1a68082b: 23 F + 3 E, the base set at db50e839.
+
+### Results (attempts / written / ok, GPU-h)
+
+| alias | off | (a) memo | (a)+(b) memo + redraw | where the switches acted |
+|---|---|---|---|---|
+| under_large_03 | 25 / 4 / 0, 2.12 | 39 / 2 / 0, 2.67 | 25 / 4 / 0, 1.88 | 0 / 2 / 0 search failures; 0 memo skips; no redraw |
+| ontop_large_02 | 24 / 3 / 2, 2.61 | 11 / 4 / 4, 1.43 | 11 / 4 / 4, 1.37 | 5 / 1 / 1 search failures; 5 B skips, 0 C skips, 0 re-checks; no redraw |
+
+- With the start draw on, the repeated B / C search that the audit measured is mostly gone. under_large_03's off arm had no search failure
+  at all (9 of 21 on i7diag_floor).
+- The memo acted only on ontop_large_02, in 5 B draws. A (B, C) key never repeats, because B is drawn at random from 256. The ontop
+  difference comes from the off arm's instance 347002: 15 attempts, all post-sample failures. That is N 4 noise, not the memo.
+- No re-check fell due, because no instance had 4 hits: `memo.would_have_passed` is unmeasured.
+- The redraw never fired, so the (a) and (b) arms are identical on ontop_large_02. In the off arm one instance reached 2 search
+  failures, and its 3rd attempt failed the search too.
+- no_floor_cell 0 and time_budget 0 in every arm.
+- For i7-startdraw: the per-attempt stance A draw fails `no_stance` in under 1 s on most under_large_03 attempts (17-24 of 25-39). These
+  rejections use up the 15 attempts per instance.
+- Bug fixed in 42392e51: a B failing "target not in the init image" depends on stance A's camera. It is now keyed with A.
+
+| alias (cap) | cap off | cap on | cut |
+|---|---|---|---|
+| articulation_open_small_02 (341 s) | 14 / 3 / 1, 2.74 GPU-h, sampling 8,279 s | 24 / 4 / 2, 1.49 GPU-h (0.75 / success), 4,907 s | 8 (time_cap) |
+| under_large_03 (650 s) | 25 / 4 / 0, 2.12, 7,080 s | 30 / 4 / 0, 0.98, 2,992 s | 3 |
+| inside_large_01, control (666 s) | 5 / 4 / 2, 0.59 | 10 / 4 / 3, 0.89 (0.30 / success in both) | 1 |
+
+Every instance was written in both arms of every alias.
+
+**5x.4**, re-measured on the (a)+(b) arm:
+- ontop_large_02 approach_untrackable: 2 of 11 attempts (off: 8 of 24), 364 s per written demo. In both, the carry chain at C goes into
+  another IK branch.
+- under_large_03 gripper_not_in_frame: 3 of 25 attempts (the same 3 as off), 549 s per written demo. Two of them are the pre-place
+  fingertip at the right image edge; one of them spent 2,022 s, mostly in the search.
+- Both still warrant an early check, at the point where the search can move on to the next C. Proposed, not implemented:
+  - ontop_large_02: an A/B of the existing opt-in `generation.carry_track_oracle`;
+  - under_large_03: the 5 % projection of the pre-place fingertip at C's acceptance, and of the grasp eef at B's.
+
 
 ## Limitations / not done
 
