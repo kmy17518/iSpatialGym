@@ -2800,8 +2800,8 @@ class BraceRecord(ContactRecord):
 #: :data:`BRACE_FULL_OPENING_M` per finger - and narrower only when the braced face cannot take the full spread. Behind this switch
 #: until the owner's A/B: "0" (the default) = every builder's opening of before 2026-11-07, "1" = the rule (:func:`brace_opening`).
 #: i7-contactbrace 2026-11-08: the ONE definition of the switch - the touching wide stop (``contact_poses.brace_wide_spreads``: the full-open
-#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``), the pack brace (``block_design.pack_brace_opening``)
-#: and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
+#: spread first), the push-close / carton-v4 stops (``articulation_small.wide_stop_layout``) (the block design pack brace was removed with the
+#: packing tail, owner 2026-11-08 3.7) and the contact library's identity (``contact_library.resolved_knobs``: ``brace_full_open``) all read :func:`brace_full_open`
 BRACE_FULL_OPEN_ENV = "ISPATIALGYM_BRACE_FULL_OPEN"
 BRACE_FULL_OPENING_M = float(C.FINGER_OPEN)
 #: a wide stop on a face (articulation_small's push-close / carton-v4 stops): each pad face this far inside the braced face's end -
