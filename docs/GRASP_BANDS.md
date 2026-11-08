@@ -2534,7 +2534,7 @@ block_design_01 (where `generation.init_edges` acts), all four arms on the merge
 | bd5o_base | defaults (init_edges +v, the flip-room move) | 4 / 4 / 3, 0.96 (0.32) | +v 4 (0.067 every one: 1 start) | none (1 demo symbolic_only) | - |
 | bd5o_e | ALL_EDGES | 4 / 4 / 3, 1.07 (0.36) | -v 3 (0.127) / +v 1 (0.067): 2 starts | none (1 demo symbolic_only) | gen_ignored 5 |
 | bd5o_ef | ALL_EDGES + BD_FLIP_ROOM_DRAW | 6 / 4 / 3, 1.60 (0.53) | -v 4 (0.10-0.124) / +v 2 (0.044-0.064) | program_check_failed 2 (repose misses the pre-grasp, instance 300501 at -v 0.114 / 0.124; the move's -v 0.127 wrote at attempt 0 in bd5o_e) | gen_ignored 7, flip_room_draw.drawn 7 (admissible -v [0.044, 0.124] 9 laterals, +v [0.044, 0.064] 3) |
-| bd5o_eft | + BD_BOARD_TABLE (i7-blockdesign's switch) | INTERIM at 2 h 57 (job 18383614 still running): 13 att / 3 wr | +v 0.054-0.184 / -v 0.064-0.197 (admissible [0.044, 0.197] 17-18 laterals) | target_placement (board_placement) 5, settle_validate no_transition 3, repose_unplannable 1, approach_untrackable 1 | - |
+| bd5o_eft | + BD_BOARD_TABLE (i7-blockdesign's switch) | 17 / 3 / 3, 3.46 (1.15); the sampler hit its time limit, 300503 unwritten | -v 10 (0.06-0.20) / +v 8 (0.05-0.18), 3 starts (admissible [0.044, 0.197] 17-18 laterals) | target_placement (board_placement) 8, settle_validate no_transition 4, repose_unplannable 1, approach_untrackable 1 | - |
 
 Written attempts: base all attempt 0 (390-882 s), e all attempt 0 (420-1111 s), ef attempts 0 / 2 / 0 / 0. ±u (the 2.90 m sides) were
 offered but never reached a draw (the first passing edge is kept; +u collided once). Every arm's demo failure (1 symbolic_only) is in the
