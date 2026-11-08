@@ -347,6 +347,14 @@ class SamplerV2(TaskSampler):
     def sample_instance(self, rng: np.random.Generator) -> Draft:  # hook
         raise NotImplementedError
 
+    def attempt_begin(self, index: int, attempt: int) -> None:  # hook
+        """i7-stancememo (5x.1): called by :meth:`run_instances` before each attempt (before the reset) with the instance index and the
+        attempt number; the task modules that keep per-instance state across attempts (IORS large's floor stance memo) scope it here."""
+
+    def attempt_end(self, index: int, attempt: int, outcome: str, phase: str, reason: Optional[str]) -> None:  # hook
+        """i7-stancememo (5x.1): called by :meth:`run_instances` after each attempt: ``outcome`` "written" / "rejected", the ``phase`` it
+        ended in and the rejection's reason (None when written)."""
+
     def spa_redraw_start(self, rng: np.random.Generator) -> None:  # hook (start_per_attempt)
         """This attempt's own start drawn from the attempt's ``rng`` (:func:`start_per_attempt`): the task modules whose
         ``sample_template`` fixes the start for the template override it; the others draw the start per attempt already."""
@@ -1623,6 +1631,7 @@ class SamplerV2(TaskSampler):
                 # train-fast STAGE_TIMING (2026-10-31): seconds and kit counters per stage, logged after every attempt (success or rejection)
                 clock = _StageClock(self.kit)
                 phase = "reset"
+                self.attempt_begin(index, attempt)  # i7-stancememo: per-instance state of the task module (its counters in this attempt's kit line)
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
                                                              context=f"{self.gp.variant}: instance {index} attempt {attempt}")
@@ -1693,6 +1702,7 @@ class SamplerV2(TaskSampler):
                     # template is still being sampled
                     self.write_template_meta()
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.variant, index, attempt, time.time() - t0)
+                    self.attempt_end(index, attempt, "written", phase, None)
                     self.log_attempt_stages(index, attempt, clock)
                     ok = True
                     break
@@ -1702,6 +1712,7 @@ class SamplerV2(TaskSampler):
                     log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
+                    self.attempt_end(index, attempt, "rejected", phase, e.reason)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if isinstance(e, TemplateExhausted) and not start_per_attempt(self):

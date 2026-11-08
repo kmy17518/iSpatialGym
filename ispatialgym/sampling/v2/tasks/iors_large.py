@@ -154,6 +154,7 @@ from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang as OH
 from ispatialgym.sampling.grasp_library import MEMBER_SEP as GL_MEMBER_SEP
 from ispatialgym.sampling.v2 import prompt0 as P0
+from ispatialgym.sampling.v2 import stance_memo as SM
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register, start_draw_active, start_facts
 from ispatialgym.robot import conventions as C
@@ -879,7 +880,16 @@ class IORSLarge(SamplerV2):
         draft.summary["partner_joints"] = {"object": partner.name, "init": {n: round(v, 4) for n, v in joints.items()}, "requested": named}
 
     def sample(self, rng: np.random.Generator) -> Draft:
-        draft = super().sample(rng)
+        m = self._sm()
+        if m is not None:
+            self._sm_maybe_redraw(m)
+        self._sm_in_search, self._sm_search_failed, self._sm_b = False, None, None
+        try:
+            draft = super().sample(rng)
+        except BaseException as e:
+            if self._sm_in_search:  # i7-stancememo: the rejection left the B / C search (not the start draw)
+                self._sm_search_failed = str(getattr(e, "reason", None) or type(e).__name__)
+            raise
         if getattr(self, "partner_joints", None):
             draft.object_joints[self.pname] = th.tensor([self.partner_joints[n] for n in self.partner.joints], dtype=th.float32)
         return draft
@@ -3171,6 +3181,110 @@ class IORSLarge(SamplerV2):
 
     # ------------------------------------------------------------------ template
 
+    # ------------------------------------------------------------------ i7-stancememo (owner 2026-11-08 5x.1): floor stance memo + redraw
+
+    def _sm(self) -> Optional[SM.StanceMemo]:
+        """The floor init's per-instance stance memo (:mod:`stance_memo`), or None: both switches off, or not a floor init."""
+        if not SM.active() or (getattr(self, "surface", None) or {}).get("kind") != "floor":
+            return None
+        m = self.__dict__.get("_stance_memo")
+        if m is None:
+            m = self._stance_memo = SM.StanceMemo(lambda k: TT._count(self, k))
+        return m
+
+    def attempt_begin(self, index: int, attempt: int) -> None:
+        """Scope the memo to the instance: a new instance starts with an empty memo, on the TEMPLATE's floor start (a start redrawn by
+        ``ISPATIALGYM_FLOOR_REDRAW`` belongs to the instance that drew it)."""
+        super().attempt_begin(index, attempt)
+        self._sm_attempt = (int(index), int(attempt))
+        m = self._sm()
+        if m is None:
+            return
+        if "_sm_template_surface" not in self.__dict__:
+            self._sm_template_surface = dict(self.surface)
+        if m.instance is not None and m.instance != int(index) and m.start_id > 0:
+            self.surface = dict(self._sm_template_surface)
+            TT._count(self, "redraw.template_restored")
+            log.info("%s: FLOOR_REDRAW: instance %d starts on the template's floor start again (c_t %s)", self.gp.variant, int(index),
+                     [round(float(v), 3) for v in self.surface["c_t"].tolist()])
+        m.enter_instance(index)
+
+    def attempt_end(self, index: int, attempt: int, outcome: str, phase: str, reason: Optional[str]) -> None:
+        """Count the B / C search failures on the current floor start (the redraw rule); with the redraw off, log what the attempt after
+        the n-th failure did (``redraw.third_attempt_*``, log only: to judge the count of 2)."""
+        super().attempt_end(index, attempt, outcome, phase, reason)
+        m = self._sm()
+        if m is None or m.instance != int(index):
+            return
+        failed = getattr(self, "_sm_search_failed", None)
+        n = SM.redraw_after()
+        if m.pending_third:
+            m.pending_third = False
+            what = ("redraw.third_attempt_would_have_succeeded.written" if outcome == "written" else
+                    "redraw.third_attempt_failed.search" if failed is not None else
+                    "redraw.third_attempt_failed.start" if phase == "sample" else "redraw.third_attempt_would_have_succeeded.search")
+            TT._count(self, what)
+            log.info("%s: FLOOR_REDRAW (off, log only): instance %d attempt %d on a floor start with %d B / C search failures: %s (%s, %s)",
+                     self.gp.variant, int(index), int(attempt), m.search_fails, what.split(".", 1)[1], phase, reason)
+        if failed is None:
+            return
+        m.search_fails += 1
+        TT._count(self, "redraw.search_fail")
+        if not n and m.search_fails == 2:
+            m.pending_third = True
+            TT._count(self, "redraw.would_fire")
+
+    def _sm_maybe_redraw(self, m: SM.StanceMemo) -> None:
+        """``ISPATIALGYM_FLOOR_REDRAW`` (5x.1 b): after n B / C search failures on this floor start, redraw it through the floor-init draw
+        and all its checks (:meth:`try_surface` "floor": a free floor anchor c_t within the geodesic, stances B collision-free and seeing
+        c_t, stance A with the target and the partner region in frame, collision-free, the A -> B leg; the stance-C existence test) from a
+        stream derived from the attempt; the memo is cleared. A draw that finds none keeps the old start (``redraw.failed.<reason>``) and
+        counts again from 0."""
+        n = SM.redraw_after()
+        if not n or m.search_fails < n:
+            return
+        index, attempt = getattr(self, "_sm_attempt", (0, 0))
+        keep = self.surface
+        old = [round(float(v), 3) for v in keep["c_t"].tolist()]
+        t0 = time.time()
+        try:
+            self.try_surface("floor", None, np.random.default_rng([int(self.ctx.base_seed), int(index), int(attempt), 5]))
+        except Reject as e:
+            self.surface = keep
+            m.search_fails = 0
+            TT._count(self, f"redraw.failed.{e.reason}")
+            log.info("%s: FLOOR_REDRAW: instance %d attempt %d: no new floor start (%s: %s) after %.1fs; the old start (c_t %s) kept", self.gp.variant,
+                     int(index), int(attempt), e.reason, str(e)[:300], time.time() - t0, old)
+            return
+        except BaseException:
+            self.surface = keep
+            raise
+        n_fail = m.search_fails
+        m.new_start()
+        TT._count(self, "redraw.fired")
+        log.info("%s: FLOOR_REDRAW: instance %d attempt %d: the floor start redrawn after %d B / C search failures in %.1fs: c_t %s -> %s, %d stance-B "
+                 "candidates, stance A %s (start %d of the instance; the memo cleared)", self.gp.variant, int(index), int(attempt), n_fail, time.time() - t0, old,
+                 [round(float(v), 3) for v in self.surface["c_t"].tolist()], len(self.surface["manip"]),
+                 [round(float(v), 3) for v in self.surface["init"].base_pose2d], m.start_id)
+
+    def _sm_draw_b(self, m: Optional[SM.StanceMemo], b_pool: List[Stance], rng: np.random.Generator, init: Stance) -> Optional[Stance]:
+        """The next random stance-B candidate of the pool (the pre-screen's draw); with the memo, the B candidates it holds as failing
+        under this stance A are dropped (not screened) but the k-th hit, which is searched again (re-check). None: the pool is empty."""
+        while b_pool:
+            b = b_pool.pop(int(rng.integers(len(b_pool))))
+            if m is None or not SM.memo_on():
+                return b
+            e, recheck = m.lookup_b(SM.stance_key(b), SM.stance_key(init))
+            if e is None:
+                return b
+            if recheck:
+                self._sm_recheck_b.add(SM.stance_key(b))
+                return b
+            self._sm_skipped_b += 1
+            log.info("%s: STANCE_MEMO: B (%.2f, %.2f) at (%.3f, %.3f) skipped - %s in an earlier attempt of this instance: %s", self.gp.variant,
+                     b.translate, b.tilt, float(b.base_pose2d[0]), float(b.base_pose2d[1]), e["reason"], e["text"][:200])
+        return None
+
     def sample_template(self):
         self.template_facts.update({"relation": self.relation, "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "band_union_extent": None if self.surface.get("band") is None else list(self.surface["band"].union_extent())})
@@ -3551,6 +3665,9 @@ class IORSLarge(SamplerV2):
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init: Stance = self.surface["init"]
+        self._sm_in_search = True  # i7-stancememo: a rejection from here on is the B / C search's
+        sm = self._sm() if SM.memo_on() else None
+        self._sm_recheck_b, self._sm_skipped_b, self._sm_b = set(), 0, None
         self.sidecar.add_stance(init)
         kind = self.surface["kind"]
         b_pool = list(self.surface["manip"])
@@ -3575,8 +3692,9 @@ class IORSLarge(SamplerV2):
         def _screen(n: int) -> None:
             for i_b in range(min(n, len(b_pool))):
                 self._check_deadline(f"F_init pre-screen of B candidate {len(pre) + 1}")
-                kb = int(rng.integers(len(b_pool)))
-                b_grid = b_pool.pop(kb)
+                b_grid = self._sm_draw_b(sm, b_pool, rng, init)  # i7-stancememo: without the memo exactly the former draw
+                if b_grid is None:
+                    break
                 manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
                 manip.focus = b_grid.focus
                 fxy = focus_xy if focus_xy is not None else manip.focus[:2]
@@ -3687,10 +3805,15 @@ class IORSLarge(SamplerV2):
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s%s", self.gp.variant, len(pre), len(yaws), [t[0] for t in pre],
                  "" if len(offered) < 2 else f" (per arm {[{a: len(F) for a, (_, F) in t[3].items()} for t in pre]})")
         n_couple = int(self.num("b_candidates_max", 6))
+        if sm is not None and self._sm_skipped_b:
+            errors.append(f"stance memo: {self._sm_skipped_b} B candidates of the pool skipped (failed in earlier attempts of this instance)")
+        a_key = SM.stance_key(init)
         for i_b, (n_f, manip, F_init, by_arm) in enumerate(pre[:n_couple]):
             self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
+            b_key = self._sm_b = SM.stance_key(manip)
+            self._sm_b_adep = False
             try:
                 if not F_init:
                     raise Reject("grasp_unreachable", "empty feasible set F_init at B's focus cell")
@@ -3705,11 +3828,18 @@ class IORSLarge(SamplerV2):
                                                                               **({"fallback": fallback} if fallback is not None else {})},
                                   "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
                                   "legs": {"A_B": leg_ab, "B_C": getattr(self, "_leg_bc", None)}})
+                if sm is not None and b_key in self._sm_recheck_b:
+                    sm.b_passed(b_key, a_key)  # a re-checked B of the memo coupled (must stay ~0)
+                self._sm_in_search = False
                 return d
             except Reject as e:
                 if e.reason == "time_budget":
                     raise  # the attempt is over, not this B candidate
                 errors.append(f"B candidate: {e.reason}: {e}")
+                if sm is not None:
+                    if b_key in self._sm_recheck_b:
+                        sm.recheck_failed("b")
+                    sm.b_failed(b_key, a_key, e.reason, str(e), a_dep=bool(getattr(self, "_sm_b_adep", False)))
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.stances.pop("placement", None)
                 self.sidecar.stances.pop("push", None)
@@ -4827,12 +4957,32 @@ class IORSLarge(SamplerV2):
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
         skip_dead_b = bool(self.gp.gen("c_skip_dead_b", False))  # oracle-fix 2026-11-06 (speed): see _c_dead_at_b
         n_dead_b = 0
-        for i_c, kc in enumerate(order[:n_try]):
+        # i7-stancememo (5x.1 a): the C candidates that failed at this B in an earlier attempt of the instance are skipped and do not use up
+        # one of the n_try tries; every C try that ends without a draft is recorded (sm_cur: its key, re-check flag, errors before it)
+        sm_b, sm_cur, n_tried = getattr(self, "_sm_b", None), None, 0
+        sm = self._sm() if SM.memo_on() and sm_b is not None else None  # the B key: set by sample_instance's B loop (not the touching modes')
+        sm_a = SM.stance_key(init)
+        for i_c, kc in enumerate(order if sm is not None else order[:n_try]):
+            if sm is not None:
+                if sm_cur is not None:
+                    self._sm_c_close(sm, sm_cur, errors, sm_a)
+                    sm_cur = None
+                if n_tried >= n_try:
+                    break
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
             F_live = [yg for yg in F_init if pair_key(yg[0], yg[1], yaw_step) not in deferred] if deferred else F_init
             if not F_live:
                 errors.append(f"every pair of the {arm} arm's F_init ({len(F_init)}) at B went to another arm's grasp")
                 break
+            if sm is not None:
+                ck = sm.c_key(sm_b, SM.stance_key(c_pool[int(kc)]), arm, float(init.translate))
+                hit, recheck = sm.lookup_c(ck, sm_a)
+                if hit is not None and not recheck:
+                    errors.append(f"C (d {c_pool[int(kc)].stand_off or 0.0:.2f} λ {c_pool[int(kc)].lateral or 0.0:+.2f}): skipped - stance memo: {hit['reason']} "
+                                  f"in an earlier attempt of this instance")
+                    continue
+                sm_cur = (ck, recheck, len(errors))
+                n_tried += 1
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
             place.focus, place.arms = c_pool[int(kc)].focus, [arm]
             place.extras = dict(c_pool[int(kc)].extras)
@@ -5138,6 +5288,7 @@ class IORSLarge(SamplerV2):
                     if seg.leg_ok[lk]:
                         # the A -> B drive was swept before the target had a pose (parked): a draw on the drive's corridor is dropped
                         fails["B: the A -> B drive passes the placed target"] = fails.get("B: the A -> B drive passes the placed target", 0) + 1
+                        self._sm_b_adep = True  # i7-stancememo: this B's (and C's) failure depends on stance A
                         log.info("%s: %s", self.gp.variant, seg.leg_ok[lk])
                         continue
                 elif seg.leg_ok[lk]:
@@ -5439,11 +5590,23 @@ class IORSLarge(SamplerV2):
                         TT._count(self, "stance_c.extended_used")
                         log.info("%s: stance C trunk-first order: trunk (%.2f, %.2f) d %.2f coupled at rank %d, after the less extended candidates (least "
                                  "translate %.2f) failed", self.gp.variant, place.translate, place.tilt, place.stand_off or 0.0, i_c, least_translate)
+                if sm is not None and sm_cur is not None and sm_cur[1]:
+                    sm.c_passed(sm_cur[0], sm_a)  # a re-checked C of the memo coupled (must stay ~0)
                 return d
             errors.append(f"C (d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f})): no (yaw, grasp) of F ({len(F)}) passes the exact IK at B and C — {fails}")
             log.info("%s: C try exhausted (d %.2f λ %+.2f edge %s, push trunk %s): %s", self.gp.variant, place.stand_off or 0.0, place.lateral, place.extras.get("edge"),
                      None if push_st is None else (push_st.translate, round(push_st.tilt, 2)), fails)
+        if sm is not None and sm_cur is not None:
+            self._sm_c_close(sm, sm_cur, errors, sm_a)
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
+
+    def _sm_c_close(self, sm: SM.StanceMemo, cur: Tuple[Any, bool, int], errors: List[str], a: Tuple[float, ...]) -> None:
+        """i7-stancememo: the C try ``cur`` (key, re-check flag, errors before it) ended without a draft - recorded with its reason
+        (under stance A ``a`` only when a draw at this B met the A -> B drive past the placed target)."""
+        key, recheck, mark = cur
+        if recheck:
+            sm.recheck_failed("c")
+        sm.c_failed(key, " | ".join(errors[mark:]) or "no draft", a, a_dep=bool(getattr(self, "_sm_b_adep", False)))
 
     # ------------------------------------------------------------------ push-under: the floor mesh and the deep trunks
 
