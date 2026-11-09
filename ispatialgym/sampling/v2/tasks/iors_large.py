@@ -4284,14 +4284,16 @@ class IORSLarge(SamplerV2):
                     if redo is not None:
                         redo()
 
-        trunk_b = (float(manip.translate), float(manip.tilt))
-        trunk_c = (float(place.translate), float(place.tilt))
+        cf_mode = carry_floor_mode()  # i7-ul03 (CARRY_FLOOR_CLEARANCE_ENV): off = the leg exactly as before
+        trunk_b = (float(manip.translate), float(manip.tilt)) if cf_mode != "off" else None
+        trunk_c = (float(place.translate), float(place.tilt)) if cf_mode != "off" else None
         for tt in self.travel_trunks(init, manip):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
                 continue  # B already straight: the plain leg below is the same thing
             try:
                 # i7-ul03: the held object's hull over the floor through the departure (B -> travel trunk) and the arrival (travel -> C) sweeps
-                self.carry_floor_gate(manip, tname, [("dep", manip.base_pose2d, trunk_b, tuple(tt)), ("arr", place.base_pose2d, tuple(tt), trunk_c)])
+                if cf_mode != "off":
+                    self.carry_floor_gate(manip, tname, [("dep", manip.base_pose2d, trunk_b, tuple(tt)), ("arr", place.base_pose2d, tuple(tt), trunk_c)])
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
                 start = NAV.departure_pose(manip, dep.stand_off)
                 drive_q = self.carry_drive_arms(place, tname, arm)
@@ -4321,7 +4323,8 @@ class IORSLarge(SamplerV2):
             raise Reject("no_transition", f"inside carry straightened only ({INSIDE_CARRY_STRAIGHT_ENV}): no travel trunk admits straighten-then-navigate "
                                           f"and B's trunk ({manip.translate:.2f}, {manip.tilt:.2f}) leans; " + "; ".join(errors)[:900])
         try:
-            self.carry_floor_gate(manip, tname, [("arr", place.base_pose2d, trunk_b, trunk_c)])  # i7-ul03: the arrival sweep from B's trunk
+            if cf_mode != "off":  # i7-ul03: the arrival sweep from B's trunk
+                self.carry_floor_gate(manip, tname, [("arr", place.base_pose2d, trunk_b, trunk_c)])
             path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.variant, "; ".join(errors),
@@ -7189,7 +7192,7 @@ class IORSLarge(SamplerV2):
         cf = getattr(self, "_cf_last", None)
         if cf is not None and carry_floor_mode() != "off":  # i7-ul03: the final draft's carry floor clearance (calibration against the demo)
             log.info("%s: CARRY_FLOOR final: min %.4f m (%s) per leg %s trunks %s", self.gp.variant, cf["min_m"], cf["leg"], cf["per_leg"], cf["trunks"])
-        rec = self._ef_rec_final()
+        rec = self._ef_rec_final() if large_early_frame_mode() != "off" else None
         try:
             with self._floor_relaxed():
                 rep = super().program_check(draft)
@@ -7293,7 +7296,7 @@ class IORSLarge(SamplerV2):
         # attempts past the push re-solve rejected here, the box bottom at v 1000-1046 of the 1026 limit, the fingertip at v 930-985). i7-ul03: the
         # rule lives in grasp_frame_verdict, which the draws' early frame check (LARGE_EARLY_FRAME_ENV) calls as well
         ok_f, why_f = self.grasp_frame_verdict(st_b, grasp.grasp)
-        rec_f = self._ef_rec_final()
+        rec_f = self._ef_rec_final() if large_early_frame_mode() != "off" else None
         if rec_f is not None:
             self._ef_agree("grasp_box", rec_f.get("box"), ok_f)
         if not ok_f:
