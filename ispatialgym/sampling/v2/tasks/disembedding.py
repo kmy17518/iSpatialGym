@@ -71,9 +71,11 @@ def disemb_pos_redraws() -> int:
     and tries that position's work stances only; disembedding_10 after the start-draw speed fix lost 30-38 attempts per job to
     target_placement (an empty feasible set F of 8 yaws x the 2 turn-filtered fork grasps at the drawn position), each attempt paying the
     ~70 s start draw again. ``ISPATIALGYM_DISEMB_POS_REDRAWS=N`` redraws the position (without replacement, from the drawn start's pool)
-    up to N times within the attempt; 0 (default) = the single position. Kit ``pos_redraw.redrawn / passed / passed_after_k / exhausted``."""
+    up to N times within the attempt; 0 = the single position. DEFAULT 8 since 2026-11-09 (i7-yield2 r3 A/B: disembedding_10 40/4/3 0.307 ->
+    7/4/4 0.116 GPU-h per success, control disembedding_02 13/4/4 0.113 -> 5/4/4 0.098). Kit ``pos_redraw.redrawn / passed /
+    passed_after_k / exhausted``."""
     try:
-        return max(0, int(os.environ.get("ISPATIALGYM_DISEMB_POS_REDRAWS", "0")))
+        return max(0, int(os.environ.get("ISPATIALGYM_DISEMB_POS_REDRAWS", "8")))
     except ValueError:
         return 0
 
