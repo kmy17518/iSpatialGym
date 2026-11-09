@@ -166,3 +166,46 @@ def test_the_paths_that_do_not_join_move_nothing(monkeypatch):
         a = PRED.attach_if_aligned(child, parent, equivalences=ZINF)
         assert not a["attached"] and a["reason"] == why and not child.moves and not joints and "fix" not in a
         json.dumps(a)
+
+
+def test_the_snap_preread_switch_seats_the_part_when_one_bodys_links_read_stale(monkeypatch):
+    """the female link alone stale after the filter (the partner's meta link read where it stood at the last play): off moves the part by the
+    stale offset; on seats it on the live seat."""
+    shift = th.tensor([0.08, -0.09, 0.0], dtype=th.float64)
+    out = {}
+    for on in (False, True):
+        child, parent, _joints = _rule(monkeypatch)
+
+        def stale_filter(c, p, f, parent=parent):
+            link = parent.links["F"]
+            fresh = link.get_position_orientation
+            link.get_position_orientation = (lambda fresh=fresh: (fresh()[0] + shift, fresh()[1]))
+            return True
+        monkeypatch.setattr(PRED, "set_pair_collision_filter", stale_filter)
+        if on:
+            monkeypatch.setenv(PRED.SNAP_PREREAD_ENV, "1")
+        else:
+            monkeypatch.delenv(PRED.SNAP_PREREAD_ENV, raising=False)
+        a = PRED.attach_if_aligned(child, parent, equivalences=ZINF)
+        assert a["attached"] and a["snap"]["preread"]["female_m"] == pytest.approx(float(th.linalg.norm(shift)), abs=1e-6)
+        out[on] = child.p.clone()
+    p_ref, _q_ref = _seated(37.0)
+    assert float(th.linalg.norm(out[True] - p_ref)) < 1e-6
+    assert float(th.linalg.norm(out[False] - (p_ref + shift))) < 1e-5
+
+
+def test_the_snap_preread_default_is_off():
+    assert PRED.SNAP_PREREAD_DEFAULT == "0"
+
+
+def test_fresh_reads_record_no_stale_read_and_the_same_seat(monkeypatch):
+    """reads that do not move across the filter: both arms seat the part identically, ``preread.stale`` False (the switch does not act)."""
+    seats = []
+    for on in (False, True):
+        child, _parent, _joints = _rule(monkeypatch)
+        (monkeypatch.setenv if on else (lambda k, v: monkeypatch.delenv(k, raising=False)))(PRED.SNAP_PREREAD_ENV, "1")
+        a = PRED.attach_if_aligned(child, _parent, equivalences=ZINF)
+        pr = a["snap"]["preread"]
+        assert not pr["stale"] and pr["stale_m"] == 0.0 and pr["used"] == ("before_filter" if on else "after_filter")
+        seats.append(child.p.clone())
+    assert float(th.linalg.norm(seats[0] - seats[1])) < 1e-12
