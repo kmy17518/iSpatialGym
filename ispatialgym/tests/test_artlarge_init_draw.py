@@ -75,6 +75,7 @@ def test_connect_init_off_raises_as_today(monkeypatch):
 
 def test_connect_init_tries_alternatives(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1")
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "0")
     s, added = _sampler([_st(2.0), _st(3.0), _st(4.0)])
     tried = []
 
@@ -92,6 +93,7 @@ def test_connect_init_tries_alternatives(monkeypatch):
 
 def test_connect_init_other_reasons_and_exhaustion(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1")
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "0")
     s, _ = _sampler([_st(2.0)])
     monkeypatch.setattr(AL.P0, "connect", lambda *_a: (_ for _ in ()).throw(Reject("handle_unreachable", "x")))
     with pytest.raises(Reject) as e:
@@ -121,11 +123,11 @@ def _st_t(x, translate, tilt=0.0):
     return Stance("init", (x, 0.0, 0.0), translate, tilt)
 
 
-def test_alt_skip_default_off(monkeypatch):
+def test_alt_skip_default_on(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", raising=False)
-    assert AL.alt_skip_on() is False
-    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1")
     assert AL.alt_skip_on() is True
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "0")
+    assert AL.alt_skip_on() is False
 
 
 def test_alt_skip_no_transition_skips_other_trunks(monkeypatch):

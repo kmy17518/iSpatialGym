@@ -94,12 +94,13 @@ def init_draw_on() -> bool:
 
 
 def alt_skip_on() -> bool:
-    """i7-artlarge r2 (lead #51, a speed fix; DEFAULT OFF): ``ISPATIALGYM_ARTLARGE_ALT_SKIP=1`` - step 6's other init candidates
+    """i7-artlarge r2 (lead #51, a speed fix): ``ISPATIALGYM_ARTLARGE_ALT_SKIP`` - step 6's other init candidates
     (:meth:`ArticulationLarge._connect_init`) skip every start whose trunk differs from the manipulation stance's once a start of such a
     trunk was rejected ``no_transition``: :func:`prompt0.connect` raises it only when every transition stand-off fails the drive-back
     floor test, the trunk sweep or the drive-in, all at the manipulation stance with the arriving arms, none of which reads the start
-    (the start's trunk only decides whether the sweep runs at all). Kit counter ``artlarge_init.alt_skipped_no_transition``."""
-    return os.environ.get("ISPATIALGYM_ARTLARGE_ALT_SKIP", "0") == "1"
+    (the start's trunk only decides whether the sweep runs at all). Kit counter ``artlarge_init.alt_skipped_no_transition``. DEFAULT ON
+    since the r2 A/B (identical instances and demos, 12 connect tries saved on open_large_03): ``=0`` tries every alternative."""
+    return os.environ.get("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1") != "0"
 
 
 def same_trunk(a: Stance, b: Stance) -> bool:
