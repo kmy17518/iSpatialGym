@@ -5831,6 +5831,52 @@ A/B (trunk_183810f4, svl titanrtx, v2maps_int2, v2only N 4, memory off; =8 for o
 - `ISPATIALGYM_DISEMB_POS_REDRAWS` DEFAULT 8 (f1d75450, own commit; reach: every disembedding alias with the split cone). Handed to the
   integration agent.
 
+## The pick transit gate (branch `i7-startdraw2`, lead decision #49, 2026-11-08)
+
+Lead #49: inside_large_01 under the start draw (int2_8, trunk_6b7fcd6d, 331000 + 331100) 18 att / 8 written / 3 ok against i7op2_a's
+14 / 8 / 6 from the fixed start; under_large_01 int2_7 two 3000 s time_budget attempts after drawn laterals +0.22 / +0.24.
+
+Diagnosis (CPU, the 16 inside_large_01 demos' collector logs and summaries):
+- The drawn start is not where the oracle fails: `navigate` + `transition` from the drawn start executed in all 16 demos, and no
+  sampler check of the start is skipped or cached from the fixed start (the overhang failure memo is keyed by B's pose).
+- Every failure is at the OVERHANG PICK's transit at stance B: escape (after the push and its retreat) -> pre-grasp over the book. With
+  OVERPATH off the sampler checks the push chain, the escape and the grasp witnesses, never this joint-space move; the oracle plans it
+  live: its straight ramps penetrate desk_bhkhxo_0 (collision mesh 28) or the book, then trajopt + the PROTECT re-plans fail (plan_failed,
+  failed_grasp) or `_grasp_transit` falls back to planning with the supports IGNORED, whose ramp then hits the desk (collision:
+  right_realsense_link / right_arm_link7 vs desk).
+- The same sequence occurs from the fixed start (i7op2_a: supports-ignored fallback 4, PROTECT 7; int2_8: 5 / 5). What the draw changes:
+  B spreads over y 13.44-14.09 (fixed: 13.89 in all 8 instances), i.e. more B / book layouts in which the unjudged transit fails.
+- under_large_01: no transit mismatch - the time budget is spent in the C coupling search (C candidate 12 / 32 of 72 of the F_goal set)
+  after drawn laterals +0.22 / +0.24; its demo failures are at C / the place (push pause, not_reached, a 0.4 rad joint jump at the place).
+
+Fix (81b14d36, switch `ISPATIALGYM_PICK_TRANSIT_GATE`, default off): the sampler judges the transit the oracle will run. For every overhang
+pick (OVERPATH off), `IORSLarge._pick_transit_gate` runs the oracle's own transit ladder kinematically (`overpath_planner.plan_transit`,
+new `straight_only`: every trajopt call answered as failed) from where the escape leaves the hand (`_overpath_start`), the book at its
+settled post-push pose and protected at the oracle's inflation, the desk and scene present, the witness = the pre-grasp's exact IK; then
+`_overpath_verify` re-checks the path. The pick is kept only when a checked straight ramp (direct, or via the ready / untucked posture)
+carries the move - the ramp the oracle takes first, with no planning; else it is rejected (`pick_transit_gate.rejected.<key>`) and the
+attempt tries the next pick / B. The draw stays (owner 3.5). Kit `pick_transit_gate.passed / .rejected.<key> / .branch.<b> / .ms`; the
+overhang failure memo key carries the switch (`transit_gate_v1`). Tests: ispatialgym/tests/test_pick_transit_gate.py.
+
+20bb8790: the gate's q_hint is the pick's RECORDED pre-grasp witness (`ikc.solutions` of the [pre-grasp, grasp] chain - what the sidecar
+carries and the oracle plans to), a fresh IK only without one; `summary.pick_overhang.transit_gate` records the predicted ramp.
+
+A/B ($OFH/startdraw2_20261108; --grasps v2only, v2maps_int2, titanrtx, N 4 per base index, memory off; tab_i.py / join.py):
+
+| arm | inside_large_01 (331000 + 331100) att / wr / ok, GPU-h | live grasp transit after the push (8 demos) |
+|---|---|---|
+| tsd2_off (trunk_81b14d36, gate off) | 20 / 8 / 6, 1.22 (0.203 / ok) | straight 2, trajopt 5 (PROTECT 4), supports-ignored fallback in 1 (robot_touching_itself); plan_failed 1 |
+| tsd2_on (81b14d36, fresh-IK witness) | 29 / 8 / 7, 2.13 (0.304 / ok) | predicted straight in 8 / 8, live straight 2 / 8; supports-ignored in 1 (execution) |
+| tsd3_on (trunk_20bb8790, recorded witness) | 40 / 8 / 7, 1.88 (0.269 / ok) | predicted via-posture 5 -> live straight 5 / 5; predicted direct 3 -> live trajopt 3 / 3 (all ok); supports-ignored 0; failed_grasp 1 (after a straight transit) |
+
+For comparison: int2_8 (drawn starts, no gate) 18 / 8 / 3, i7op2_a (fixed start) 14 / 8 / 6. Gate counters tsd3_on: passed 31 (straight
+15, straight_via 16), rejected 48 (all no_straight), witness recorded 79 / fresh 0, 464 s of checks over both jobs. The gate never ran
+on the controls (no overhang pick): under_large_01 300022 off 7 / 4 / 0 vs on 11 / 4 / 1, ontop_large_02 300500 off 22 / 4 / 4 vs on
+32 / 3 / 3 - noise of identical code. Residual mismatch: a predicted DIRECT ramp from the escape is not what the live oracle finds
+(it plans) - the transit's start differs (the live arm after the push / retreat vs the sampler's escape replay; i7-overpath measured
+0.36-2.62 rad start gaps); the via-posture predictions match. Default ON (lead #49 step 4: the switch acts, no regression; the
+supports-ignored transit is gone in 8 / 8); `ISPATIALGYM_PICK_TRANSIT_GATE=0` = off. Cost: +30 % GPU-h per success on this alias.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

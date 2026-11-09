@@ -68,10 +68,22 @@ class _KinematicBackend:
         return self._real.solve_ik(emb, targets, q_seed=self._owner._q.clone() if q_seed is None else q_seed, **kw)
 
     def plan_pose(self, emb, targets, q_start=None, **kw):
+        if getattr(self._owner, "straight_only", False):
+            return _no_plan("plan_pose")
         return self._real.plan_pose(emb, targets, q_start=self._owner._q.clone() if q_start is None else q_start, **kw)
 
     def plan_joint(self, emb, q_goal, q_start=None, **kw):
+        if getattr(self._owner, "straight_only", False):
+            return _no_plan("plan_joint")
         return self._real.plan_joint(emb, q_goal, q_start=self._owner._q.clone() if q_start is None else q_start, **kw)
+
+
+def _no_plan(what: str):
+    """i7-startdraw2 (``straight_only``): a trajectory-optimisation call answered as failed - only the oracle's checked straight ramps
+    (direct / via a posture) and its Cartesian legs carry the transit."""
+    from ispatialgym.oracle.curobo_planner import PlanResult
+
+    return PlanResult(success=False, status=f"straight_only: {what} not run", diagnostics={"straight_only": True})
 
 
 def _motions_cls():
@@ -154,9 +166,12 @@ def _motions_cls():
     return PlanOnlyMotions
 
 
-def plan_only_motions(robot, backend, q0, cfg=None):
-    """A :class:`PlanOnlyMotions` (an oracle ``Motions`` on ``backend``, its state ``q0``) - see the module docstring."""
-    return _motions_cls()(robot, backend, q0, cfg=cfg if cfg is not None else oracle_motions_config())
+def plan_only_motions(robot, backend, q0, cfg=None, straight_only: bool = False):
+    """A :class:`PlanOnlyMotions` (an oracle ``Motions`` on ``backend``, its state ``q0``) - see the module docstring. ``straight_only``
+    (i7-startdraw2): every trajopt call fails at once, so the ladder carries the transit only by its checked straight ramps."""
+    mot = _motions_cls()(robot, backend, q0, cfg=cfg if cfg is not None else oracle_motions_config())
+    mot.straight_only = bool(straight_only)
+    return mot
 
 
 def _drain(gen) -> Any:
@@ -190,17 +205,19 @@ def branch_of(motions, ctx: Dict[str, Any], dip: Optional[Dict[str, Any]]) -> st
 
 
 def plan_transit(kit, arm: str, q0: th.Tensor, pre, q_hint: Optional[th.Tensor], supports: Sequence[Any], protected: Sequence[Tuple[str, Any]],
-                 approach: Sequence[Any] = (), inflation: Optional[float] = None) -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
+                 approach: Sequence[Any] = (), inflation: Optional[float] = None, straight_only: bool = False) -> Tuple[Optional[th.Tensor], Dict[str, Any]]:
     """The oracle's live transit to the pre-grasp ``pre`` (``execute._grasp_transit``, supports present) planned from ``q0`` (28-D: the
     escape's end at the grasp stance) on the sampler kit's backend: ``protected`` (``[(name, scene object)]``, the book) inflated by
     ``inflation``, ``supports`` (the desk) present as obstacles, ``approach`` the grasp's approach (the dip gate's check), ``q_hint`` the
     pre-grasp witness. Returns ``(trajectory (T, 28) from q0, note)`` - the concatenated streamed segments - or ``(None, note)`` with
-    ``note["why"]``. ``note``: ``branch`` (:func:`branch_of`), ``plan_s``, ``segments``, ``protect_events``, ``dip``, ``pre_grasp_transit``."""
+    ``note["why"]``. ``note``: ``branch`` (:func:`branch_of`), ``plan_s``, ``segments``, ``protect_events``, ``dip``, ``pre_grasp_transit``.
+    ``straight_only`` (i7-startdraw2, the pick transit gate): no trajectory optimisation - the transit the oracle takes WITHOUT planning
+    (the checked straight ramp to the witness, or via the ready / untucked posture), or None."""
     from ispatialgym.oracle import execute as E
     from ispatialgym.oracle.motions import SkillError
 
     t0 = time.time()
-    mot = plan_only_motions(kit.robot, kit.backend, q0)
+    mot = plan_only_motions(kit.robot, kit.backend, q0, straight_only=straight_only)
     ctx: Dict[str, Any] = {}
     note: Dict[str, Any] = {}
     dip_rec: Optional[Dict[str, Any]] = None
