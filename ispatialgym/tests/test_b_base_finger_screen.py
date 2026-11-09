@@ -91,3 +91,15 @@ def test_shadow_keeps_every_pair_and_scores_the_b_outcome(monkeypatch):
     s._base_finger_shadow_outcome(_St(), "left", 0.0, _G("a"), ok=False)
     s._base_finger_shadow_outcome(_St(), "left", 0.3927, _G("b"), ok=True)  # not predicted: not scored
     assert s.kit.stats["b_base_finger_screen.shadow_confirmed"] == 1 and "b_base_finger_screen.shadow_false" not in s.kit.stats
+
+
+def test_only_touching_large_02_turns_the_screen_on_in_the_customs():
+    import json
+    import os
+
+    from ispatialgym import REPO_ROOT
+
+    d = json.load(open(os.path.join(REPO_ROOT, "ispatialgym", "assets", "task_specs", "isg_customs.json")))
+    setters = sorted(k for k, v in d.items() if isinstance(v, dict) and "b_base_finger_screen" in (v.get("generation") or {}))
+    assert setters == ["inter_object_relation_satisfaction-touching_large_scale-umbrella-hall_tree-floor"], setters
+    assert IL.b_base_finger_mode(_GP(d[setters[0]]["generation"])) == "on"
