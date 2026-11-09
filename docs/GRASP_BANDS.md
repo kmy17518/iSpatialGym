@@ -5767,6 +5767,34 @@ Runs (trunk_46ed7e5b = A / B defaults on, svl titanrtx):
 
 disembedding_10 now loses its attempts to `target_placement` (empty F at the drawn position), not to the start draw.
 
+### r3: disembedding_10's target_placement after the start-draw speed fix (lead decision #66, `ISPATIALGYM_DISEMB_POS_REDRAWS`)
+
+- After i7-stancememo's vectorized SupportTop (333 -> 85 s per attempt) disembedding_10 still wrote 2-4 of 4 in 40-43 attempts: 30-38
+  target_placement rejections per job (r3_new / r3c_rule0 / r3c_rule2).
+- Sub-reason (CPU, sample logs): ~90 % `[grasp_unreachable] empty feasible set F at the focus (8 yaws x 2 grasps)` - Phase 3's (yaw, grasp)
+  screen at the target's start position, the 2 grasps being the fork's top_2 / top_9 left by GRASP_TURN_FILTER; place_unreachable /
+  place_leg_collision / no_placement_stance a handful. Not the init -> manipulation leg, not the transit, not the place map.
+- Dependence on the drawn start: per work stance the drawn starts pass 3-9 % (r3_new 5 / 163, r3c 10 / 140, int2_7 6 / 69) vs 11-22 % from the
+  fixed start (i7tray_turn_on 4 / 36, turn_off 5 / 26, int1_1 5 / 23); per attempt the share lost is alike (75-88 % vs 71 %). The drawn start
+  costs ~70 s of the ~85 s attempt (fixed: 25 s median), and the split cone (generation.phase2_split_cone, default on) draws ONE start position
+  per attempt and tries only its 0-6 work stances - a position with an empty F throws the whole drawn start away.
+- Fix 7642b66f / 183810f4: `ISPATIALGYM_DISEMB_POS_REDRAWS=N` (default 0) - when every work stance of the drawn position fails
+  (target_placement), the position is redrawn without replacement from the drawn start's pool, up to N times, keeping the start; other
+  rejections pass through; no split cone = unchanged. Kit `pos_redraw.redrawn / passed / passed_after_k / exhausted`. (The accepted start
+  is then drawn uniformly rather than weighted by how many feasible positions it has.)
+
+A/B (trunk_183810f4, svl titanrtx, v2maps_int2, v2only N 4, memory off; =8 for on):
+
+| arm | job | att / written / ok | GPU-h | per success | counters |
+|---|---|---|---|---|---|
+| disembedding_10 300018 OFF | 18394779 | 40 / 4 / 3 | 0.92 | 0.307 | target_placement 30, no_stance 2, repeats_eval 2, place_unreachable 2; 1 demo plan_failed |
+| disembedding_10 300018 ON | 18394780 | 7 / 4 / 4 | 0.46 | 0.116 | pos_redraw redrawn 19, passed 3 (after 1 / 2 / 5+), exhausted 1; target_placement 1 |
+| control disembedding_02 349100 OFF | 18394782 | 13 / 4 / 4 | 0.45 | 0.113 | approach_untrackable 6, target_placement 3 |
+| control disembedding_02 349100 ON | 18395101 | 5 / 4 / 4 | 0.39 | 0.098 | redrawn 6, passed 3; approach_untrackable 1 (the first on job 18394781 died at Kit startup on svl10, infra) |
+
+- `ISPATIALGYM_DISEMB_POS_REDRAWS` DEFAULT 8 (f1d75450, own commit; reach: every disembedding alias with the split cone). Handed to the
+  integration agent.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
