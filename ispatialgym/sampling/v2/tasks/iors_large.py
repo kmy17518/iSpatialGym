@@ -281,6 +281,60 @@ SCENE_INVENTORY_ROOT = os.path.join(REPO_ROOT, "runlogs", "scene_inventory_20260
 STAND_OFFS = (0.35, 0.45, 0.55)
 
 
+def chain_memo_mode() -> str:
+    """Lead #70c: ``ISPATIALGYM_CHAIN_MEMO`` = off (default) / shadow / on (IORSLarge._push_chain_quantized)."""
+    v = os.environ.get("ISPATIALGYM_CHAIN_MEMO", "off").strip().lower()
+    return v if v in ("shadow", "on") else "off"
+
+
+CHAIN_MEMO_QUANTUM = 1e-4
+
+
+def _qz(vals, q: float = CHAIN_MEMO_QUANTUM) -> Tuple[int, ...]:
+    return tuple(int(round(float(v) / q)) for v in vals)
+
+
+def chain_memo_key(place, quat, drop_xy, goal_xy, d2, arm: str, hand: str) -> Tuple[Any, ...]:
+    """The quantized key of a push chain: the push stance's base pose (1e-4 m / rad) and trunk, the object quaternion (components to 1e-4,
+    sign made canonical), the drop / goal cells and the push direction (1e-4), the arm and the hand."""
+    qv = [float(v) for v in G.t(quat).reshape(-1).tolist()]
+    if qv[-1] < 0 or (qv[-1] == 0 and next((v for v in qv if v != 0), 0) < 0):
+        qv = [-v for v in qv]
+    return (_qz(place.base_pose2d), round(float(place.translate), 4), round(float(place.tilt), 4), str(arm), str(hand), _qz(qv),
+            _qz(G.t(drop_xy).reshape(-1).tolist()[:2]), _qz(G.t(goal_xy).reshape(-1).tolist()[:2]), _qz(G.t(d2).reshape(-1).tolist()[:2]))
+
+
+def chain_gap(a: Optional[Dict[str, Any]], b: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Shadow comparison of two chain results: feasibility, the largest start / goal position gap (mm) and orientation gap (mrad), the
+    pitch, the hand's form (wrist turn, push_contact_form) and contact (contact height, fingertip z, contact offset)."""
+    if (a is None) != (b is None):
+        return {"feasible": True}
+    if a is None:
+        return {}
+    out: Dict[str, Any] = {"pos_mm": 0.0, "rot_mrad": 0.0}
+    for k in ("pre", "start", "mid", "goal"):
+        pa, pb = a.get(k), b.get(k)
+        if pa is None or pb is None:
+            continue
+        try:
+            out["pos_mm"] = max(out["pos_mm"], 1000.0 * float(th.linalg.norm(G.t(pa[0]).reshape(-1)[:3] - G.t(pb[0]).reshape(-1)[:3])))
+            dq = float(th.clamp(th.abs(th.dot(G.t(pa[1], th.float64).reshape(-1), G.t(pb[1], th.float64).reshape(-1))), max=1.0))
+            out["rot_mrad"] = max(out["rot_mrad"], 1000.0 * 2.0 * math.acos(dq))
+        except (TypeError, IndexError, RuntimeError, ValueError):
+            out["pose_unreadable"] = True
+    out["pos_mm"], out["rot_mrad"] = round(out["pos_mm"], 3), round(out["rot_mrad"], 3)
+    if abs(float(a.get("pitch_deg", 0.0)) - float(b.get("pitch_deg", 0.0))) > 1e-6:
+        out["pitch"] = True
+    ra, rb = a.get("record") or {}, b.get("record") or {}
+    if any(ra.get(k) != rb.get(k) for k in ("wrist_turn", "push_contact_form", "push_hand")):
+        out["form"] = True
+    for k in ("contact_height_m", "fingertip_z_m", "half_extent_m"):
+        va, vb = (a.get(k, ra.get(k)), b.get(k, rb.get(k)))
+        if va is not None and vb is not None and abs(float(va) - float(vb)) > 1e-4:
+            out["contact"] = True
+    return out
+
+
 def start_draw_a_redraws() -> int:
     """i7-stancememo r2 (lead decision #36): the extra draws of the floor init's stance A (and its A -> B leg) within one attempt's start
     draw, ``ISPATIALGYM_START_DRAW_A_REDRAWS`` (default 8; 0 = one draw, the behaviour of i7-startdraw d50cb1b9)."""
@@ -1986,6 +2040,9 @@ class IORSLarge(SamplerV2):
         ``ISPATIALGYM_PUSH_CHAIN_MEMO=1`` turns it on.
         Kit ``push_chain.solved`` / ``push_chain.memo_hit``."""
         memo = self.__dict__.get("_push_chain_memo")  # set by ``sample`` (an attempt): outside one, every call solves
+        qmode = chain_memo_mode()
+        if memo is not None and qmode != "off":
+            return self._push_chain_quantized(qmode, memo, place, quat, drop_xy, goal_xy, d2)
         if memo is None or os.environ.get("ISPATIALGYM_PUSH_CHAIN_MEMO", "0") != "1":
             return self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
         key = (tuple(float(v) for v in place.base_pose2d), float(place.translate), float(place.tilt), str(self.seg_arm), str(self.push_hand),
@@ -1996,6 +2053,32 @@ class IORSLarge(SamplerV2):
             return copy.deepcopy(memo[key])
         out = self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
         TT._count(self, "push_chain.solved")
+        memo[key] = copy.deepcopy(out)
+        return out
+
+    def _push_chain_quantized(self, mode: str, memo: Dict[Any, Any], place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
+        """Lead #70c (``ISPATIALGYM_CHAIN_MEMO`` = off / shadow / on, default off): the per-attempt chain memo on a QUANTIZED key
+        (:func:`chain_memo_key`: the push stance's base pose and the drop / goal cells / push direction to 1e-4 m, the object quaternion's
+        components to 1e-4, the trunk, the arm, the hand). ``on``: a hit returns a deep copy of the first result of that key (results may
+        differ from a fresh solve within the quantum). ``shadow``: the key and the would-hits are counted but every call solves; on each
+        would-hit the fresh result is compared with the stored one (:func:`chain_gap`: start / goal mm and mrad, pitch, the hand's form and
+        contact, feasibility) and logged. Kit ``chain_memo.hit`` / ``.miss`` / ``.shadow_mismatch`` (+ ``.shadow_mismatch.<what>``)."""
+        key = chain_memo_key(place, quat, drop_xy, goal_xy, d2, self.seg_arm, self.push_hand)
+        if key in memo:
+            TT._count(self, "chain_memo.hit")
+            if mode == "on":
+                return copy.deepcopy(memo[key])
+            fresh = self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
+            gap = chain_gap(memo[key], fresh)
+            bad = [k for k in ("feasible", "form", "contact", "pitch") if gap.get(k)] + (["pose"] if gap.get("pos_mm", 0.0) >= 1.0 or gap.get("rot_mrad", 0.0) >= 1.0 else [])
+            for k in bad:
+                TT._count(self, f"chain_memo.shadow_mismatch.{k}")
+            if bad:
+                TT._count(self, "chain_memo.shadow_mismatch")
+            log.info("%s: CHAIN_MEMO shadow would-hit: %s %s", self.gp.variant, "MISMATCH " + ",".join(bad) if bad else "match", gap)
+            return fresh
+        TT._count(self, "chain_memo.miss")
+        out = self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
         memo[key] = copy.deepcopy(out)
         return out
 

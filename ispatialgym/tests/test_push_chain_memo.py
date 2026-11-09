@@ -12,6 +12,7 @@ from ispatialgym.sampling.v2.tasks import iors_large as IL
 def _s():
     s = IL.IORSLarge.__new__(IL.IORSLarge)
     s.kit = SimpleNamespace(stats={})
+    s.gp = SimpleNamespace(variant="stub")
     s.seg_arm = "right"
     s.__class__ = type("IL", (IL.IORSLarge,), {"push_hand": "pitched"})
     calls = []
@@ -65,3 +66,60 @@ def test_memo_off_and_per_attempt(monkeypatch):
     s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
     s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
     assert len(calls) == 6
+
+
+def _pose(x, yaw=0.0):
+    import math
+    return (th.tensor([x, 0.0, 0.1]), th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)], dtype=th.float64))
+
+
+def test_quantized_memo_off_shadow_on(monkeypatch):
+    """Lead #70c: ISPATIALGYM_CHAIN_MEMO off (default) / shadow (counts and compares, every call solves) / on (a key hit returns the stored
+    chain). The key is quantized to 1e-4: inputs 1e-6 apart share it."""
+    monkeypatch.delenv("ISPATIALGYM_PUSH_CHAIN_MEMO", raising=False)
+    calls = []
+
+    def make():
+        s, _ = _s()
+        x = {"v": 0.5}
+
+        def solve(place, quat, drop_xy, goal_xy, d2):
+            calls.append(1)
+            x["v"] += 0.0004  # each fresh solve 0.4 mm further: the shadow sees the gap
+            return {"pre": _pose(x["v"]), "start": _pose(x["v"]), "mid": _pose(x["v"]), "goal": _pose(x["v"] + 0.3), "pitch_deg": 60.0,
+                    "record": {"wrist_turn": "lateral", "contact_height_m": 0.086}}
+        s._push_under_chain_solve = solve
+        return s
+
+    st = Stance("push", (1.0, 2.0, 0.5), 2.0, 0.0)
+    q1 = th.tensor([0.0, 0.0, 0.3, 0.9539392])
+    q2 = q1 + th.tensor([0.0, 0.0, 1e-6, 0.0])  # the same quantum
+    args = (th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
+    assert IL.chain_memo_mode() == "off"
+    s = make()
+    s._push_under_chain(st, q1, *args)
+    s._push_under_chain(st, q2, *args)
+    assert len(calls) == 2 and not any(k.startswith("chain_memo") for k in s.kit.stats)
+    calls.clear()
+    monkeypatch.setenv("ISPATIALGYM_CHAIN_MEMO", "shadow")
+    s = make()
+    a = s._push_under_chain(st, q1, *args)
+    b = s._push_under_chain(st, q2, *args)
+    assert len(calls) == 2 and float(b["start"][0][0]) != float(a["start"][0][0])  # shadow: the fresh result
+    assert s.kit.stats["chain_memo.hit"] == 1 and s.kit.stats["chain_memo.miss"] == 1 and "chain_memo.shadow_mismatch" not in s.kit.stats  # 0.4 mm
+    calls.clear()
+    monkeypatch.setenv("ISPATIALGYM_CHAIN_MEMO", "on")
+    s = make()
+    a = s._push_under_chain(st, q1, *args)
+    b = s._push_under_chain(st, q2, *args)
+    assert len(calls) == 1 and float(b["start"][0][0]) == float(a["start"][0][0]) and b is not a
+    s._push_under_chain(st, q1 + th.tensor([0.0, 0.0, 2e-4, 0.0]), *args)  # another quantum
+    assert len(calls) == 2
+
+
+def test_chain_gap_flags():
+    a = {"start": _pose(0.5), "goal": _pose(0.8), "pitch_deg": 60.0, "record": {"wrist_turn": "lateral", "contact_height_m": 0.086}}
+    b = {"start": _pose(0.502, 0.002), "goal": _pose(0.8), "pitch_deg": 65.0, "record": {"wrist_turn": "plane", "contact_height_m": 0.087}}
+    g = IL.chain_gap(a, b)
+    assert abs(g["pos_mm"] - 2.0) < 1e-3 and abs(g["rot_mrad"] - 2.0) < 1e-2 and g["pitch"] and g["form"] and g["contact"]
+    assert IL.chain_gap(a, None) == {"feasible": True} and IL.chain_gap(None, None) == {}
