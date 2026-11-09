@@ -25,6 +25,13 @@ from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
+
+@pytest.fixture(autouse=True)
+def _pre_backoff_pipeline(monkeypatch):
+    """i7-startdraw2 r3: ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF defaults on; these tests pin the overhang pick's retreat as it was replayed before
+    (the back-off's own tests: test_overhang_escape_backoff.py)."""
+    monkeypatch.setenv("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "0")
+
 SUBTASK = "inter_object_relation_satisfaction-inside_large_scale"
 FIXTURE = os.path.join(os.path.dirname(__file__), "data", "sidecars", f"{SUBTASK}.json")
 #: plate__luhkiz__ts grasp_5 (runlogs/grasp_library_20260905/cands): eef in the plate frame
