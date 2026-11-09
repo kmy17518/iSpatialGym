@@ -78,7 +78,9 @@ def grip_wait_no_pause() -> bool:
     closing command; at most ``gripper_steps`` each) are emitted as settle steps, which the QA pause rule and the monitors' stalled rule do
     not count - a closure that grips nothing then ends in the executor's ``failed_grasp`` (retried) instead of a hard [pause] (the wait of
     60 + 5 still steps outlasted the pause limit of 50: int2_* 3 of 5 pauses, $OFH/out 34 of 68). A stall anywhere else still pauses.
-    ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=1`` (default off). Each exempted wait is recorded as a ``close_wait_exempt`` release event."""
+    ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=1`` (default off). Each
+    exempted wait is recorded: ``close_wait_exempt_steps`` on the closure's ``contact_hold`` release event, else a ``close_wait_exempt``
+    release event {steps, held}."""
     return os.environ.get("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "0") == "1"
 
 Pose = Tuple[th.Tensor, th.Tensor]
@@ -771,7 +773,7 @@ class Motions:
                         self.release_events[-1]["attached_after_steps"] = i + 1
                         self.release_events[-1]["fingers_at_attach_m"] = [round(float(v), 4) for v in self.robot.get_joint_positions()[idx].float().tolist()]
                         if exempted:
-                            self.release_events.append({"arm": arm, "event": "close_wait_exempt", "steps": exempted, "held": True})
+                            self.release_events[-1]["close_wait_exempt_steps"] = exempted
                         yield from self.hold(5)
                         return
                 log.info("gripper(%s): both pads on the object but no assisted grasp within %d steps at the contact hold %.1f mm; closing fully", arm, steps, contact_hold * 1000)
@@ -806,7 +808,11 @@ class Motions:
                 if still_exit and n_still >= STILL_EXIT_STEPS:
                     break
         if exempted:
-            self.release_events.append({"arm": arm, "event": "close_wait_exempt", "steps": exempted, "held": self.held_object(arm) is not None})
+            if contact_hold is not None and self.release_events and self.release_events[-1].get("event") == "contact_hold":
+                self.release_events[-1]["close_wait_exempt_steps"] = exempted  # this closure's contact hold (its fallback full close)
+                self.release_events[-1]["held_after_wait"] = self.held_object(arm) is not None
+            else:
+                self.release_events.append({"arm": arm, "event": "close_wait_exempt", "steps": exempted, "held": self.held_object(arm) is not None})
         yield from self.hold(5)
 
     # ------------------------------------------------------------------ trunk

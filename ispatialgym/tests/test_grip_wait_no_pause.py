@@ -1,6 +1,6 @@
 """i7-yield2 r2 (lead decision #65): the gripper close wait (60 + 5 still steps) outlasted the QA pause limit (50), so a closure that grips
 nothing ended in a hard [pause] instead of the executor's retried failed_grasp (int2_7 disembedding_10 300019 / 300020, disembedding_01
-300021). ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=1`` emits the close-wait steps as settle steps (not counted by the pause / stalled rules)."""
+300021). ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE`` (default on since r2; =0 off) emits the close-wait steps as settle steps (not counted by the pause / stalled rules)."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -66,8 +66,10 @@ def _run(m, **kw):
     return m
 
 
-def test_off_the_close_wait_counts_as_pause_steps(monkeypatch):
+def test_default_on_and_off_restores_the_counted_wait(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", raising=False)
+    assert MO.grip_wait_no_pause() is False
+    monkeypatch.setenv("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "0")
     m = _run(_motions(), rate=0.00225)
     ramp = 7  # 15 mm -> 0 at 2.25 mm per step
     assert m.flags[:ramp] == [False] * ramp
@@ -89,7 +91,7 @@ def test_on_the_contact_hold_wait_is_exempt_too_and_attach_ends_it(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "1")
     m = _run(_motions(pads_touch=True, attach_after=12), rate=0.00225)
     ev = [e["event"] for e in m.release_events]
-    assert ev == ["contact_hold", "close_wait_exempt"] and m.release_events[-1]["held"] is True
+    assert ev == ["contact_hold"] and m.release_events[-1]["close_wait_exempt_steps"] >= 1  # recorded on the closure's contact hold
     assert m.flags[0] is False and all(m.flags[1:])
 
 
