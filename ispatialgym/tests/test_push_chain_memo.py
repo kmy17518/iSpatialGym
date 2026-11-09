@@ -21,6 +21,7 @@ def _s():
         return None if float(quat[2]) > 0.9 else {"pitch_deg": 60.0, "start": [th.tensor([1.0, 2.0, 0.1])], "q": float(quat[2])}
 
     s._push_under_chain_solve = solve
+    s._push_chain_memo = {}  # what IORSLarge.sample sets at every attempt (no memo outside an attempt)
     return s, calls
 
 
@@ -60,3 +61,7 @@ def test_memo_off_and_per_attempt(monkeypatch):
     assert len(calls) == 4
     import inspect
     assert "self._push_chain_memo = {}" in inspect.getsource(IL.IORSLarge.sample)
+    del s._push_chain_memo  # outside an attempt: no memo
+    s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
+    s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
+    assert len(calls) == 6
