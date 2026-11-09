@@ -5930,6 +5930,60 @@ The screen dropped 105 of 15814 checked pairs. In shadow, all 44 predicted pairs
 0), so it removes nothing that passes. The off arm reproduces gm_t02_wide_on (46 / 1 / 1, 3.39). **e8065680:**
 `generation.b_base_finger_screen` true in touching_large_02's customs only (a test pins it); `ISPATIALGYM_B_BASE_FINGER_SCREEN` overrides.
 
+## under_large_02's 3600 s attempts: push chains solved for draws already dead at B (branch `i7-ul02`, 2026-11-09)
+
+**Diagnosis** (int2_14 360000, job 18393295, trunk_f5b89921). So far there have been 11 attempts and 3 written instances. 7 of the 11 attempts
+ended `[time_budget]` at 3602-3616 s. All 7 ended in the sample stage, inside `IORSLarge._couple`'s push-under C loop. A budget attempt
+spends 0.2-1.6 s on the start draw and 32-134 s on the B grasp IK. Most of the rest goes to 400-565 pitched floor-push chains at 6.4-9 s each
+(ik_path 2.2-2.5 ks, ik 0.6-0.8 ks and collision 0.15-0.2 ks of the 3.6 ks). Settle, goal, program, trajopt and replay are never reached.
+The loop has a bound (36 C x 8 draws per B, 2-6 B per attempt), but each C try costs about 28 s, so the attempt deadline stops it first.
+
+**Cause.** The draw loop solves the push chain for each (C, yaw bucket) before it looks up the draw's grasp side at B. The grasp side does
+not depend on C and is cached per B (`b_ik_cache`), so a pair that already failed at B gets its chain solved again at every C. The loop's own
+comment says "failed B pairs are cached and skipped, so 8 draws cost little", which does not hold for push-under. In the budget attempts,
+110-270 of the 219-373 draw-time chains were followed only by the cached failure 'B: [pre-grasp, grasp] exact IK (cached)'. The pre-screen
+also chooses its 2 chain yaws from every F_init yaw, including yaws whose pairs are all dead at B.
+
+**Not a regression.** The pattern and the 6-9 s per chain are the same in int1_1, fp_today, fp_s10, fp_def, fpr2_base and i7_floorfix,
+which had 0-5 attempts at or near the budget per run. int2_14 is the first int2 run of this alias. The chain-first order dates from
+f8abfeec (2026-09-20). `generation.c_skip_dead_b` (01ad8d8c) skips only a C whose every pair is dead, and only for 3 other aliases. The
+briefcase lying flat (#72) is left to the owner. That geometry is why B pairs fail; the order is why the failures are expensive.
+
+**Switch** `ISPATIALGYM_PUSH_CHAIN_LIVE_B=1` (57138ac3, default off), with two parts:
+- (a) A push-under draw whose B key is cached as failed is skipped before its chain is solved. It is counted as today's 'B ... (cached)'.
+- (b) The pre-screen ranks only the yaws that still have a live B pair (`live_yaws_at_b`). When no yaw is live, the C is skipped (memo
+  class `dead_at_b`).
+
+No rng draw moves. Kit counters: `push_chain_live_b.draw_skipped` (a chain saved), `.draw_skipped_cached`, `.prescreen_dropped_yaws`,
+`.c_skipped`. Tests: `test_push_chain_live_b.py`.
+
+**A/B** (trunk_57138ac3, under_large_02 at 360000, v2maps_int2, v2only N 4, alias memory off, one ledger and one empty
+`ISGF_SAMPLING_CACHE` per arm, both arms on svl18 titanrtx). Interim at 08:20, 5.3 h into both jobs; the jobs keep running. Where the switch
+acted, the matched attempts had the same instance, the same attempt and the same outcome:
+
+| attempt | OFF | ON (switch counters) |
+|---|---|---|
+| 360000 a0 | 3125 s target_placement, 527 chains | 2473 s target_placement, 404 chains (draw_skipped 100, dropped yaws 216) |
+| 360000 a1 | 1341 s program_check_failed, 192 chains | 590 s program_check_failed, 51 chains (dropped yaws 175) |
+| 360001 a1 | 3532 s target_placement, 574 chains | 1994 s target_placement, 251 chains (draw_skipped 201, dropped yaws 516) |
+| 360000 a2 (no action) | 344 s written | 361 s written |
+
+The arms diverge from 360001 a2 onward. So far:
+- OFF: 7 attempts, 2 written, 0 ok (demos plan_failed and arm_stutter); 2600 s per attempt.
+- ON: 9 attempts, 2 written, 1 ok (demos success and symbolic_only); 2093 s per attempt.
+- Both arms still have attempts that hit the 3600 s budget: OFF 3, ON 3. On one of them the switch skipped 227 chains, and 755 were still
+  solved.
+
+The switch is a pure speed-up where it acts, but it does not end the budget attempts. Those attempts still solve 500-750 live chains for C
+candidates whose draws then fail at the place IK, the B->C path or a fresh B IK.
+
+**Attribution arm** `ul02_lb_sd0` (`ISPATIALGYM_START_DRAW=0`, switch off) replays fp_def (82c96a3b) attempt for attempt. 360000 was written
+at a0 in 137 s (fp_def 134 s). 360001 a0 failed goal_tipped at 3110 s (fp_def 3250 s). 360002 a0 failed approach_untrackable at 2042 s
+(fp_def 2012 s). The arm finished at 11 attempts / 4 written / 0 ok in 3.82 GPU-h, against int2_14's 13 / 4 / 1 in 8.89 GPU-h. The sampling
+cost gap between int2_14 and fp_def therefore comes from the per-attempt start draw default (f2468042, default 1ba40aae). It does not come
+from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
+symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
