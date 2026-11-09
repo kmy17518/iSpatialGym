@@ -6004,6 +6004,56 @@ ones, so there is no framing screen at the draw.
   - control disembedding_10: 7 / 4 / 4.
 - Default 1.5 since 4f14b3f7; `=0` = the unbounded doubling.
 
+## Two slow nextto aliases: the push line off the mass centre and the side grasps (branch `i7-nextto`, lead round 4, 2026-11-09)
+
+Runs: svl titanrtx, v2maps_int2, v2only N 4, memory off, own ledgers, each arm its own empty `ISGF_SAMPLING_CACHE`
+(`$OFH/i7_nextto/cache/<tag>`). Tables: `$OFH/i7_nextto/tools/ab.py <tag>`.
+
+### nextto_large_01 (swivel chair pushed next to a desk): the turned chair
+
+- **Failure.** int2_10's two failed demos (300002 / 300003) were symbolic_only: NextTo held, but the chair turned 8.8 / 9.4 deg in the
+  two-hand base push, outside the evaluator's 0.15 rad (8.6 deg) orientation tolerance.
+- **Root cause (sampler geometry).** The chair's annotated -y push pairs (`runlogs/contacts_20261103/swivel_chair__iiihwn.json`,
+  midpoints 9.4-11.4 cm along x) put the push line 11.4-11.9 cm from the chair's mass centre. The PhysX mass centre lies 5 mm from the
+  root. Over every recorded push, the turn follows the offset: 0.4-0.7 cm -> 0.2-0.6 deg, 5.4-5.9 cm -> 3.5-3.6 deg, 11.4-11.9 cm
+  -> 8.3-9.4 deg. The oracle's realign threshold (`realign_turn_rad` 0.26 rad = 15 deg) is above the tolerance and never fired.
+- **Not world reuse:** survey1 ran the same instances, reused worlds too, and passed 300002 at 8.3 deg.
+- **Switch.** `ISPATIALGYM_BASE_PUSH_COM_CAP_M` (iors_large_nextto) drops any one-hand spot or two-hand pair whose push line passes
+  farther than the cap from the target's mass centre. The stance search goes on with the face's other spots and the other faces.
+  - The chosen offset is always recorded in `summary.nextto.push_com_offset_m`.
+  - Kit counters: `push_com_cap.checked / .rejected / .passed.<one|two>`.
+- **A/B** at 300000 (trunk_234df7f1):
+  - off: 8 / 4 / 4, 0.084 GPU-h per ok. 300002 / 300003 passed by 2 mrad (0.148 rad); on viscam the same instances failed.
+  - on (0.06 m): 4 / 4 / 4, 0.053 GPU-h per ok. 28 of 93 pairs refused; orientation errors 0.024 / 0.0025 rad.
+- **Where it acts.** Of 41 recorded base pushes, only nextto_large_01's -y pairs exceed 6 cm (nextto_large_02 max 1.4 cm, _03 0,
+  touching_large_01 0.1 cm). Control on the default: nextto_large_02 300100, 6 / 4 / 3, cap checked 24 / refused 0.
+- **DEFAULT 0.06 m** since 4bf0d9b1; `0` = off.
+
+### nextto_02 (salt shaker next to the pepper shaker): the side grasps never place
+
+- **Profile** (off arm, 41 attempts, 1,948 s):
+  - grasp search (`cand_grasp`): 887 s in 175 searches (45 %);
+  - segment draw: 99 s, of which the place screening's exact IK took 79 s in 94 calls;
+  - start-cell travel: 16 s; partner draw: 7 s.
+  - Of the 113 segment draws, 3 were written. The logged candidate deaths: place screening exact IK 54, empty F 29, release sweep 8.
+- **Geometry.** Every place-screening failure is a side grasp (86 side vs 4 top). Every written instance holds a top grasp: off 3 / 3;
+  int1_1 + int2_10b 7 / 7. The nextto gap rule (>= g_NT + extra) moves every place 13-16 cm from the init, and the side grasps do not
+  reach it.
+- **The audit's idea is already the order.** The release sweep runs inside `goal_pose`, at the place frame check, before the place IK. It
+  runs after the grasp search because it needs the grasp. Its 918 s in ch_sh was whole-attempt time; the sweep itself is geometry.
+- **`ISPATIALGYM_PLACE_PARTNER_RETRY`** (redraw the partner up to K times with the same grasp after a partner-dependent rejection):
+  46 / 2 / 2, 0.372 GPU-h per ok. It armed 107 times and rescued 0: the gap interval stays 0.15-0.19 m. **Stays off.**
+- **`ISPATIALGYM_NEXTTO_TOP_FIRST`** (each grasp tier's top-down grasps first, approach within 45 deg of down at rest; the rest after):
+  14 / 4 / 4, 0.097 GPU-h per ok, against off 41 / 3 / 3, 0.229. The top tier was taken 7 times and gave all 4 written instances.
+  Kit counters: `top_first.top / .rest / .no_top`.
+  - Control nextto_04 300137: all its grasps are top-down (top 69, rest 0), and both arms ran the same 26 attempts to 4 / 4 / 4.
+    The switch changes nothing there. nextto_01 / 03 use only `top_*` grasps in their logs.
+  - **DEFAULT on** since 2554fe07; `0` = off.
+- nextto_02 still writes about 1 instance in 3-4 attempts, from empty F and side-only foci; that part is hard geometry.
+- The per-instance `MAX_ATTEMPTS` 15 is a job setting and is not changed here (int2_10b's W was 300120 using all 15 attempts).
+- **Measurement only** (all IORS small): kit timers `cand_travel / cand_grasp / cand_segment / cand_partner / cand_place_ik`, and a
+  `PLACE_SCREEN_FAIL` log line (grasp, place distance from init, partner gap / yaw, sweep remedy).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
