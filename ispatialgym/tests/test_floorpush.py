@@ -283,9 +283,10 @@ def test_push_transit_via_a_standoff_with_the_target_present(monkeypatch, stando
     calls, motions = _transit_world(monkeypatch, standoff_ok)
     pre = SC.Pose(position=[1.0, 0.0, 0.15], orientation=[0.0, 0.0, 0.0, 1.0])
     cfg = EX.ExecuteConfig()
-    assert cfg.push_transit_standoff_m == 0.0  # default off
-    cfg = EX.replace(cfg, push_transit_standoff_m=0.10)
-    ctx = {"push_direction": [1.0, 0.0, 0.0], "plan_ignored": ["can"]}
+    assert cfg.push_transit_standoff_m is None  # the default: by kind
+    assert EX.push_transit_standoff_dist(cfg, "push_under") == 0.10 and EX.push_transit_standoff_dist(cfg, "push_touching") == 0.10
+    assert EX.push_transit_standoff_dist(cfg, "push") == 0.0 and EX.push_transit_standoff_dist(EX.replace(cfg, push_transit_standoff_m=0.0), "push_under") == 0.0
+    ctx = {"push_direction": [1.0, 0.0, 0.0], "plan_ignored": ["can"], "push_kind": "push_under"}
     list(EX.reach_push_pre(motions, None, "right", pre, [], ["can"], None, ctx, cfg))
     if standoff_ok:
         assert calls == [("plan", [0.95, 0.0, 0.25], []), ("along", [1.0, 0.0, 0.15])]  # 10 cm up, 5 cm back, the can present; then down
@@ -296,6 +297,16 @@ def test_push_transit_via_a_standoff_with_the_target_present(monkeypatch, stando
 
 
 def test_transit_standoff_env(monkeypatch):
-    for v, want in (("", 0.0), ("0", 0.0), ("off", 0.0), ("1", 0.10), ("0.12", 0.12), ("x", 0.0)):
+    for v, want in (("0", 0.0), ("off", 0.0), ("1", 0.10), ("0.12", 0.12), ("x", 0.0)):
         monkeypatch.setenv("ISPATIALGYM_PUSH_TRANSIT_STANDOFF", v)
         assert EX._transit_standoff_env() == pytest.approx(want)
+    monkeypatch.setenv("ISPATIALGYM_PUSH_TRANSIT_STANDOFF", "")
+    assert EX._transit_standoff_env() is None
+
+
+def test_transit_standoff_off_for_a_table_push_by_default(monkeypatch):
+    calls, motions = _transit_world(monkeypatch)
+    pre = SC.Pose(position=[1.0, 0.0, 0.15], orientation=[0.0, 0.0, 0.0, 1.0])
+    ctx = {"push_direction": [1.0, 0.0, 0.0], "plan_ignored": ["box"], "push_kind": "push"}
+    list(EX.reach_push_pre(motions, None, "right", pre, [], ["box"], None, ctx, EX.ExecuteConfig()))
+    assert calls == [("plan", [1.0, 0.0, 0.15], ["box"])] and ctx["push_transit"]["target"] == "left out"  # as before for a table push
