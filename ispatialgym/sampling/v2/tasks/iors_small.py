@@ -506,6 +506,27 @@ TOUCH_BUILT_TILTS_ENV = "ISPATIALGYM_TOUCH_BUILT_TILTS"
 #: its place instead of its footprint centre (contact_poses.push_line_t0). An oracle push change (the recorded push poses); the touch_push
 #: maps / library keep the footprint line. Default "0"
 PUSH_LINE_COM_ENV = "ISPATIALGYM_PUSH_LINE_COM"
+#: i7-nextto 2026-11-09 (lead round 4, nextto_02's place screening): K > 0 = when the segment draw of a candidate whose grasp already passed
+#: dies on a rejection the partner pose decides - the release sweep (:meth:`IORSSmall.avoid_release_sweep`), the place / pre-place frame
+#: test, the init-image test of the partner, or the place screening's exact IK - the partner is drawn again (fresh :meth:`place_partner`
+#: draw, every rule unchanged) up to K more times with the same grasp, before the candidate is given up (int2_10b nextto_02: 50 of the
+#: logged candidate deaths were the place screening's exact IK, each after a full grasp search). Only for the relations of
+#: :data:`PLACE_PARTNER_RETRY_RELATIONS_ENV` (default "nextto"). Default "0" (off). Kit ``place_retry.armed`` / ``.retried.<reason>`` /
+#: ``.rescued`` / ``.exhausted``
+#: i7-nextto 2026-11-09 (round 2): "1" = nextto's grasp tiers are each split into the top-down grasps (approach within 45 deg of straight
+#: down at the target's rest pose) first and the other grasps after them, so F is searched over the top grasps and only when they have no
+#: feasible (yaw, grasp) at the focus over the rest (the flush / inclined tiers keep their order). Every rule unchanged; which grasp a
+#: candidate takes changes. Measured on nextto_02 (salt shaker): every written instance of int1_1 / int2_10b (7 / 7) holds a top grasp,
+#: and every place-screening failure of i7nx_n02_off / _on (20 / 20, 74 / 74) a side grasp. "0" = off. DEFAULT "1" since the i7-nextto
+#: A/B (2026-11-09, nextto_02 300119 N 4, svl titanrtx, per-arm empty caches: off 41 / 3 / 3 0.229 GPU-h per ok, on 14 / 4 / 4 0.097, the top
+#: tier taken 7 times; control nextto_04 300137: every grasp top-down, the same 26 attempts / 4 / 4 in both arms). Kit ``top_first.top`` /
+#: ``.rest`` (the tier the grasp came from), ``.no_top`` (a tier without a top grasp)
+NEXTTO_TOP_FIRST_ENV = "ISPATIALGYM_NEXTTO_TOP_FIRST"
+NEXTTO_TOP_FIRST_DEFAULT = "1"
+PLACE_PARTNER_RETRY_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY"
+PLACE_PARTNER_RETRY_RELATIONS_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY_RELATIONS"
+#: the segment-draw rejections a fresh partner pose can change (the place screening's own codes are marked by ``_place_screen_reject``)
+PLACE_PARTNER_RETRY_REASONS = ("release_sweep", "gripper_not_in_frame", "not_in_frame")
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -555,6 +576,45 @@ def push_line_com_on() -> bool:
 
 def touch_built_tilts_on() -> bool:
     return (os.environ.get(TOUCH_BUILT_TILTS_ENV) or "0").strip() == "1"
+
+
+def nextto_top_first_on() -> bool:
+    return (os.environ.get(NEXTTO_TOP_FIRST_ENV) or NEXTTO_TOP_FIRST_DEFAULT).strip() == "1"
+
+
+def top_down_grasp(eef_in_object, rest_quat, cos_max: float = -math.sqrt(0.5)) -> bool:
+    """The grasp's approach axis (eef z) points within 45 deg of straight down when the target rests at ``rest_quat``; False when the
+    pose cannot be read."""
+    try:
+        a_obj = C.quat_to_mat(G.t(eef_in_object[1]).float())[:, 2]
+        a_world = G.rotate(G.t(rest_quat).float(), a_obj)
+    except Exception:  # noqa: BLE001 - an unreadable grasp pose is not a top grasp
+        return False
+    return float(a_world[2]) <= cos_max
+
+
+def place_partner_retries(relation: Optional[str]) -> int:
+    """:data:`PLACE_PARTNER_RETRY_ENV` for ``relation`` (0 = off, also for a relation outside :data:`PLACE_PARTNER_RETRY_RELATIONS_ENV`)."""
+    try:
+        k = int((os.environ.get(PLACE_PARTNER_RETRY_ENV) or "0").strip())
+    except ValueError:
+        return 0
+    rels = {r.strip() for r in (os.environ.get(PLACE_PARTNER_RETRY_RELATIONS_ENV) or "nextto").split(",") if r.strip()}
+    return max(0, k) if relation in rels else 0
+
+
+@contextmanager
+def phase_timer(s, name: str):
+    """i7-nextto 2026-11-09 (measurement only): the wall time of one candidate phase into the kit counters ``<name>_calls`` / ``<name>_s``
+    (the attempt's kit line prints them as ``<name> N calls Xs``)."""
+    t0 = time.time()
+    try:
+        yield
+    finally:
+        st = getattr(getattr(s, "kit", None), "stats", None)
+        if isinstance(st, dict):
+            st[name + "_calls"] = st.get(name + "_calls", 0) + 1
+            st[name + "_s"] = st.get(name + "_s", 0.0) + (time.time() - t0)
 
 
 def place_depth_cap_mode() -> str:
@@ -1285,6 +1345,24 @@ class IORSSmall(SamplerV2):
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
+        kinds: List[Optional[str]] = [None] * len(tiers)
+        if self.relation == "nextto" and nextto_top_first_on():
+            # i7-nextto (ISPATIALGYM_NEXTTO_TOP_FIRST): each tier's top-down grasps first, its other grasps after them
+            split, kinds = [], []
+            for gs in tiers:
+                top = [g for g in gs if top_down_grasp(getattr(g, "pose", None), (getattr(self, "rest", None) or {}).get("target"))]
+                rest = [g for g in gs if not any(g is t for t in top)]
+                if not top:
+                    TT._count(self, "top_first.no_top")
+                if not getattr(self, "_top_first_logged", False):
+                    log.info("%s: NEXTTO_TOP_FIRST top %s, then %s", self.gp.variant, [getattr(g, "name", g) for g in top], [getattr(g, "name", g) for g in rest])
+                    self._top_first_logged = True
+                for kind, sub in (("top", top), ("rest", rest)):
+                    if sub:
+                        split.append(sub)
+                        kinds.append(kind)
+            tiers = split or tiers
+            kinds = kinds if split else [None] * len(tiers)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
         if self.pair_goal_align() is not None:
             yaws = self.pair_target_yaws(manip)
@@ -1299,8 +1377,10 @@ class IORSSmall(SamplerV2):
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
                                                  top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
                                                  arm_bands=getattr(self, "arm_bands", None) or None, **yaw_kw)
-                if i > 0:
+                if i > 0 and kinds[i] is None:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.variant, grasp.grasp_name)
+                if kinds[i] is not None:
+                    TT._count(self, f"top_first.{kinds[i]}")
                 return t_pose, grasp
             except Reject as e:
                 last = e
@@ -2492,7 +2572,8 @@ class IORSSmall(SamplerV2):
                 # §4.5 step 5: transition init -> manipulation
                 self.sidecar.transitions.clear()
                 try:
-                    self.record_stance_travel(init, manip)
+                    with phase_timer(self, "cand_travel"):  # i7-nextto: measurement only
+                        self.record_stance_travel(init, manip)
                 except Reject as e:
                     if travel_failure_deterministic(e, self.world) and not init.extras.get("free_start"):
                         # i7-t03 round 2 (a): a travel from a FREE-FLOOR start (drawn per attempt) says nothing about the candidate - it is not
@@ -2536,7 +2617,8 @@ class IORSSmall(SamplerV2):
                             self._fixed_start_memo_persisted(memo_key, str(e)[:300])
                         raise
                 else:
-                    t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
+                    with phase_timer(self, "cand_grasp"):  # i7-nextto: measurement only
+                        t_pose, grasp = self.phase3_two_tier(manip, rng, arms=arms_here)
                 if grasp.arm != default:
                     self.sidecar.transitions.clear()
                     self.record_stance_travel(init, manip)  # the other arm idles now
@@ -2544,11 +2626,32 @@ class IORSSmall(SamplerV2):
                 # the segment's later contacts; when they fail with the chosen arm, the whole segment is retried with the other arm if
                 # its grasp passed too (owner 2026-09-27: the fallback spans the segment)
                 tried: List[str] = []
+                retries = place_partner_retries(self.relation)  # i7-nextto (ISPATIALGYM_PLACE_PARTNER_RETRY, default 0 = off)
+                retried = 0
                 while True:
+                    summary0 = {kk: (list(vv) if isinstance(vv, list) else vv) for kk, vv in d.summary.items()} if retries else None
                     try:
-                        p_pose = self._segment_draw(rng, d, int(k), t_pose, grasp, manip, cam_init, pname)
+                        with phase_timer(self, "cand_segment"):  # i7-nextto: measurement only
+                            p_pose = self._segment_draw(rng, d, int(k), t_pose, grasp, manip, cam_init, pname)
+                        if retried:
+                            TT._count(self, "place_retry.rescued")
                         break
                     except Reject as e:
+                        if retries and (e.reason in PLACE_PARTNER_RETRY_REASONS or getattr(self, "_place_screen_reject", False)):
+                            # i7-nextto: the grasp passed and a partner-dependent check failed - a fresh partner draw with the same grasp first
+                            # (the records of the failed segment draw undone as the caller below undoes them)
+                            if not retried:
+                                TT._count(self, "place_retry.armed")
+                            if retried < retries:
+                                retried += 1
+                                TT._count(self, f"place_retry.retried.{'place_screen' if getattr(self, '_place_screen_reject', False) else e.reason}")
+                                self.sidecar.stances.pop("manipulation", None)
+                                self.sidecar.grasps.clear()
+                                OF.drop_records(self)
+                                d.summary.clear()
+                                d.summary.update(summary0)
+                                continue
+                            TT._count(self, "place_retry.exhausted")
                         tried.append(grasp.arm)
                         others = [a for a in TT.fallback_arms(grasp) if a not in tried]
                         if not others:
@@ -2566,6 +2669,7 @@ class IORSSmall(SamplerV2):
                         if self.shelf_pose is not None and self.shelf_backoff_m() > 0.0:
                             self.record_shelf_backoff(manip, grasp, grasp.arm, pre_open)  # oracle-fix 2026-11-06: the other arm's transit backed off too
                         self.apply_height_extra_to_grasp(grasp, t_pose, manip)
+                        retried = 0  # i7-nextto: the other arm's segment gets its own partner retries
                 # carry height (4A, :meth:`carry_rule`): the target (bottom at the table at init) clears the partner's top by carry_clearance_m on
                 # the way; touching only the table (set down beside the partner; "auto": raised by the push stance when its drive passes over it)
                 carry_rule = self.carry_rule()
@@ -2619,6 +2723,7 @@ class IORSSmall(SamplerV2):
     def _segment_draw(self, rng: np.random.Generator, d: Draft, k: int, t_pose: G.Pose, grasp: GraspRecord, manip: Stance, cam_init: G.Pose, pname: str) -> G.Pose:
         """The draw's checks of the segment after its grasp, with the grasp's arm: §4.6 step 2 (the partner in that arm's band), step 4
         (frame), the place in the manipulation image and the place screening. Records the stance and the grasp; returns the partner pose."""
+        self._place_screen_reject = False  # i7-nextto: set when the place screening's exact IK rejects (PLACE_PARTNER_RETRY)
         # §4.6 step 2: partner on the attempt's side (A1) at a gap of the start region's interval
         frame_score = None
         if os.environ.get("ISPATIALGYM_FRAME_RANK", "") == "1" and self.relation != "touching":
@@ -2649,7 +2754,8 @@ class IORSSmall(SamplerV2):
                 self.counters["map_release." + ("none" if n is None else ("hit" if n else "miss"))] = self.counters.get(
                     "map_release." + ("none" if n is None else ("hit" if n else "miss")), 0) + 1
                 return (1e4 if n else 0.0) + (float(_fs(pp)) if _fs is not None else 0.0)
-        p_pose = self.place_partner(rng, t_pose, manip, cam_init, frame_score=frame_score)
+        with phase_timer(self, "cand_partner"):  # i7-nextto: measurement only
+            p_pose = self.place_partner(rng, t_pose, manip, cam_init, frame_score=frame_score)
         if frame_score is not None and isinstance(self.partner_draw, dict) and self.partner_draw.get("frame_rank"):
             d.summary.setdefault("frame_rank", []).append(self.partner_draw["frame_rank"])
         if self.edge_aligned():
@@ -2707,10 +2813,20 @@ class IORSSmall(SamplerV2):
             ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
             # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
             st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
-            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object), phase_timer(self, "cand_place_ik"):
                 res_place = self.ikc.exact([self.pre_place_of(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
                                            scale_key=self.choice.models["target"].scale, cache=False, approached=place_approached(self))
             if not res_place.ok:
+                self._place_screen_reject = True
+                try:  # i7-nextto (facts only): where the failed place lies relative to the target's init pose and the stance
+                    dxy = G.t(obj_at_place[0])[:2] - G.t(t_pose[0])[:2]
+                    p_dep, p_lat = st_place.local(obj_at_place[0])
+                    log.info("PLACE_SCREEN_FAIL candidate %d arm %s grasp %s code %s: place %.3f m from the init (depth %+.3f lat %+.3f in the stance), "
+                             "partner gap %s yaw %s, release sweep %s", int(k), grasp.arm, getattr(grasp, "grasp_name", None), res_place.code,
+                             float(th.linalg.norm(dxy)), float(p_dep), float(p_lat), (self.partner_draw or {}).get("gap_m"), (self.partner_draw or {}).get("yaw_deg"),
+                             (self.release_sweep or {}).get("remedy"))
+                except Exception:  # noqa: BLE001 - a diagnostic never fails the draw
+                    pass
                 raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
                                                                     f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
             if self.relation == "touching" and os.environ.get("ISPATIALGYM_TOUCHING_PUSH_SCREEN", "") == "1" and self.shelf_start is None:

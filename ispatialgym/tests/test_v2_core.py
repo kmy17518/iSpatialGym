@@ -792,6 +792,52 @@ def test_open_jaw_footprint_clearance_and_release_opening():
     assert cls.open_jaw_clearance(None, (place[0], q_turned), pencil) > 0
 
 
+
+def test_place_partner_retry_switch_and_phase_timer(monkeypatch):
+    """i7-nextto 2026-11-09: ISPATIALGYM_PLACE_PARTNER_RETRY = K partner redraws for the relations of ..._RELATIONS (default nextto), 0 /
+    unset / unreadable = off; the phase timer adds ``<name>_calls`` / ``<name>_s`` to the kit counters."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_small as M
+
+    monkeypatch.delenv(M.PLACE_PARTNER_RETRY_ENV, raising=False)
+    monkeypatch.delenv(M.PLACE_PARTNER_RETRY_RELATIONS_ENV, raising=False)
+    assert M.place_partner_retries("nextto") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_ENV, "3")
+    assert M.place_partner_retries("nextto") == 3 and M.place_partner_retries("under") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_RELATIONS_ENV, "nextto,under")
+    assert M.place_partner_retries("under") == 3 and M.place_partner_retries("touching") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_ENV, "x")
+    assert M.place_partner_retries("nextto") == 0
+    s = SimpleNamespace(kit=SimpleNamespace(stats={}))
+    for _ in range(2):
+        with M.phase_timer(s, "cand_grasp"):
+            pass
+    assert s.kit.stats["cand_grasp_calls"] == 2 and s.kit.stats["cand_grasp_s"] >= 0.0
+    with M.phase_timer(SimpleNamespace(), "cand_grasp"):  # no kit: nothing counted, nothing raised
+        pass
+
+
+def test_nextto_top_first_grasp_kind(monkeypatch):
+    """i7-nextto: a grasp is top-down when its approach (eef z) points within 45 deg of straight down at the target's rest pose."""
+    import math as _m
+
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2.tasks import iors_small as M
+
+    ident = th.tensor([0.0, 0.0, 0.0, 1.0])
+    down = (th.zeros(3), C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0])))
+    side = (th.zeros(3), C.eef_quat(th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 1.0, 0.0])))
+    assert M.top_down_grasp(down, ident) and not M.top_down_grasp(side, ident)
+    flip = th.tensor([1.0, 0.0, 0.0, 0.0])  # the target resting upside down (180 deg about x): its "down" grasp approaches upward
+    assert not M.top_down_grasp(down, flip)
+    tilt = th.tensor([0.0, _m.sin(_m.radians(30) / 2), 0.0, _m.cos(_m.radians(30) / 2)])
+    assert M.top_down_grasp(down, tilt)
+    monkeypatch.delenv(M.NEXTTO_TOP_FIRST_ENV, raising=False)
+    assert M.nextto_top_first_on()  # default on since the i7-nextto A/B
+    monkeypatch.setenv(M.NEXTTO_TOP_FIRST_ENV, "0")
+    assert not M.nextto_top_first_on()
+
 def test_robust_under_ontop_wrapper_branches(monkeypatch):
     """D-007 option A: OmniGibson's verdict, then the contact-patch rays, then the geometric branch; the branch is logged."""
     import omnigibson.utils.bddl_utils as BU
