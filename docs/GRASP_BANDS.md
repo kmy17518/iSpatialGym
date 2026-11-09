@@ -5378,6 +5378,62 @@ Every instance was written in both arms of every alias.
 - GPU-h per success over both aliases: 0.77 -> 0.57, inside the ~15-point N 4 noise. under_large_03's ok count is held back by the
   oracle push.
 
+## articulation_open / close_large_03: the init (start) stance from the whole Phase-1 set (branch `i7-artlarge`, lead #44, 2026-11-08)
+
+The two cabinet aliases (bottom_cabinet_rvunhj_0, door j_link_2, bar handle j_link_2#C, in the corridor between two cubicle rows of
+office_cubicles_right; left arm, hybrid / sequential follow) wrote 0 instances in every fast run (survey1, fix2, i_nopol, i_legwv,
+v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2).
+
+**Diagnosis (CPU, from the i7_pol / fix2 / survey1 logs).**
+- `repeats_eval` was EVERY attempt that passed the sample (open 31 / 31, close 38 / 38 in i7_pol). The goals cannot separate an instance
+  from the eval pair: open draws q_goal from S = [0.283, 0.393] and the eval goals are 0.388 / 0.280 (tolerance 0.05); close ends at
+  lower + 0.03 (eval 0.043 / 0.034); the articulation record measures no start state. So only the start base can, and Phase 1
+  (`prompt0.phase1_init_pose`) takes the NEAREST feasible d on a random bearing: every passing start sat 0.02-0.19 m and < 15 deg from the
+  eval starts (9.53, -6.58, 176 deg) / (9.57, -6.66, 172 deg), which were drawn the same way.
+- `handle_unreachable` is the attempt-level label of the stance loop. Pinch -1 never has an exact IK (25 / 15); pinch +1 failed at
+  step 6, the init -> manipulation path (open: path_collision 26, no_transition 4; close: path_collision 16), plus
+  hybrid_follow_infeasible 7 / 11. The path collisions were at the init itself (the far starts at x 10.62-10.66: the nearest-first d lands
+  right behind an obstacle edge) or a few strides out. Phase 2 (1 survivor per bar offset), IK limits and the camera are not the cause.
+
+**Fix 23733307, `ISPATIALGYM_ARTLARGE_INIT_DRAW` (default off in that commit, on since d867724e).**
+- The init is drawn from the whole Phase-1 feasible set: 5 deg bearings in +-beta_max x the d scan, each judged by Phase 1's own checks
+  in its order (free floor in the task rooms, the whole target in frame, body collision-free, trunk sweep), memoized per q_init.
+  The camera-frame rule is unchanged.
+- Starts within 0.25 m / 15 deg of an eval start go last (the repeat rule's start half); the rest in random order.
+- Step 6 tries up to 12 further candidates of that order when the drawn start has no path / transition (the start enters neither
+  steps 1-5 nor the follow); the sidecar's init is the one that connects.
+- Kit counters `artlarge_init.{drawn, drawn_away, drawn_near_eval, empty_set, connect_first, alt_tried, alt_connected,
+  alt_exhausted}`; one "ARTLARGE_INIT_DRAW: init set ..." line per q_init with the per-stage counts.
+- Measured set (al_on logs): open 110 feasible of 697 lattice cells (24 near an eval start), x 9.52-11.18 along the corridor; close
+  98-100 (19-21 near).
+
+**A/B** (trunk_23733307, N 4, svl titanrtx, base index 352000 / control 352100 in both arms, v2only on v2maps_int2,
+`ISPATIALGYM_PATH_BLAME=1` in both arms, log only; tags al_off / al_on; GPU-h = sacct elapsed):
+
+| alias | off (`=0`) att / wr / ok, GPU-h | on (`=1`) att / wr / ok, GPU-h | where the switch acted |
+|---|---|---|---|
+| open_large_03 | 60 / 0 / 0, 1.97 (repeats_eval 23, handle_unreachable 35) | 12 / 4 / 2, 0.70 (handle_unreachable 8) | drawn 12 (all away from the eval starts), alt_tried 164, alt_connected 4 (2 written), alt_exhausted 11 |
+| close_large_03 | 45 / 2 / 0, 1.26 (repeats_eval 25, time_cap 9, no_manipulation_stance 5, no_stance 4; demos: collision 2) | 4 / 4 / 4, 0.18 | drawn 4 (away), connect_first 4 |
+| close_large_02 (control, dishwasher) | 12 / 4 / 4, 0.22 (repeats_eval 8) | 7 / 4 / 4, 0.28 (program_check 1, ik_joint_limit 1, handle_unreachable 1) | drawn 7 (away), connect_first 6 |
+
+- The integration tip's own run int2_10 (open, l40s, switch absent) repeated the old result: 60 / 0 / 0 (repeats_eval 31,
+  handle_unreachable 27).
+- Written starts with the switch: open 0.4-0.5 m from the eval starts (x 9.86-10.01), close 0.5-1.4 m (d 1.35-2.3). The control's
+  repeats_eval went 8 -> 0; its ok count is unchanged.
+- **DEFAULT ON** in d867724e (own commit; lead #44 under the owner's mandate). `=0` restores the nearest-d draw. The path is reached by
+  every ArticulationLarge variant (door / dishwasher / bottom_cabinet open and close, bottom_cabinet_push): articulation_open / close
+  _large_01..03. The full suite has the base failure set (23 F + 3 E in the lambda env) at 23733307 and d867724e, +7 passes.
+
+**Still open.**
+- open_large_03 demos: 2 of 4 fail `robot_touching_itself` (left_arm_link3 touches left_arm_link5) in the grasp, after the
+  STRAIGHT_ARM ramp to the recorded witness. Both have a near-upright manipulation tilt (-0.007 / -0.010); the two successes have
+  -0.29 / -0.08, and the cabgeo eval demos -0.08..-0.39. The step-5 grasp witness has no self-clearance (the follow's IK keeps 20 mm).
+  A fix there is a shared gate (owner).
+- open's remaining step-6 rejections are mostly no_transition (the trunk sweep at s_T with the arriving arms), which does not depend
+  on the start: the alternatives cannot help and cost tries (164). A refinement would skip them when the drive-in or sweep fails.
+- hybrid_follow_infeasible (sequential follow) is unchanged.
+
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
