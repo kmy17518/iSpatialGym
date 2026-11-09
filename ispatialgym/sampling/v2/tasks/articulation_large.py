@@ -93,6 +93,21 @@ def init_draw_on() -> bool:
     return os.environ.get("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1") != "0"
 
 
+def alt_skip_on() -> bool:
+    """i7-artlarge r2 (lead #51, a speed fix): ``ISPATIALGYM_ARTLARGE_ALT_SKIP`` - step 6's other init candidates
+    (:meth:`ArticulationLarge._connect_init`) skip every start whose trunk differs from the manipulation stance's once a start of such a
+    trunk was rejected ``no_transition``: :func:`prompt0.connect` raises it only when every transition stand-off fails the drive-back
+    floor test, the trunk sweep or the drive-in, all at the manipulation stance with the arriving arms, none of which reads the start
+    (the start's trunk only decides whether the sweep runs at all). Kit counter ``artlarge_init.alt_skipped_no_transition``. DEFAULT ON
+    since the r2 A/B (identical instances and demos, 12 connect tries saved on open_large_03): ``=0`` tries every alternative."""
+    return os.environ.get("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1") != "0"
+
+
+def same_trunk(a: Stance, b: Stance) -> bool:
+    """:func:`prompt0.connect`'s ``same_trunk``: the two stances' (translate, tilt) agree within 1e-6."""
+    return abs(float(a.translate) - float(b.translate)) < 1e-6 and abs(float(a.tilt) - float(b.tilt)) < 1e-6
+
+
 def start_near(pose2d: Sequence[float], starts: Sequence[Sequence[float]], pos_m: float = 0.25, ang_deg: float = 15.0) -> bool:
     """``pose2d`` (x, y, yaw) is within ``pos_m`` and ``ang_deg`` of one of ``starts`` (the repeat rule's start-base half)."""
     x, y, yaw = (float(v) for v in pose2d[:3])
@@ -1605,13 +1620,22 @@ class ArticulationLarge(SamplerV2):
             if not alts or e.reason not in ("path_collision", "no_path", "path_too_long", "no_transition"):
                 raise
             first = e
+        # i7-artlarge r2 (ISPATIALGYM_ARTLARGE_ALT_SKIP): a no_transition is start-independent for every start whose trunk differs from the
+        # manipulation stance's - connect() then checks only the trunk sweep / drive-in at the drive-back pose with the arriving arms
+        skip_on = alt_skip_on()
+        trans_dead = skip_on and first.reason == "no_transition" and not same_trunk(init, manip)
         for k, alt in enumerate(alts):
+            if trans_dead and not same_trunk(alt, manip):
+                _kit_count(self, "artlarge_init.alt_skipped_no_transition")
+                continue
             _kit_count(self, "artlarge_init.alt_tried")
             try:
                 P0.connect(self, alt, manip, path_max_m)
             except Reject as e:
                 if e.reason not in ("path_collision", "no_path", "path_too_long", "no_transition"):
                     raise
+                if skip_on and e.reason == "no_transition" and not same_trunk(alt, manip):
+                    trans_dead = True
                 continue
             _kit_count(self, "artlarge_init.alt_connected")
             self.sidecar.add_stance(alt)
