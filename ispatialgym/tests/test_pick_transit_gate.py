@@ -23,9 +23,11 @@ def _gate(s, q_start, pre_pos):
     st = type("St", (), {"name": "manipulation"})()
     return s._pick_transit_gate(st, st, "right", {}, BOOK_P1, pre, pre)
 
-def test_switch_default_off_and_memo_key(monkeypatch):
+def test_switch_default_on_and_memo_key(monkeypatch):
     monkeypatch.delenv(ENV, raising=False)
     monkeypatch.delenv(OP.ENV, raising=False)
+    assert IL.pick_transit_gate_on()  # default on since the A/B (lead #49 step 4)
+    monkeypatch.setenv(ENV, "0")
     assert not IL.pick_transit_gate_on()
     gen = {"overhang_fail_memo": True}
     s = type("S", (), {})()

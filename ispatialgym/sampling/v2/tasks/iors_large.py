@@ -214,8 +214,9 @@ class _PosedObject:
 def pick_transit_gate_on() -> bool:
     """i7-startdraw2 2026-11-08 (lead decision #49): ``ISPATIALGYM_PICK_TRANSIT_GATE=1`` - an overhang pick is kept only when the oracle's own
     transit ladder carries the escape -> pre-grasp move by a checked straight ramp (:meth:`IORSLarge._pick_transit_gate`); with
-    ``ISPATIALGYM_OVERHANG_OVERPATH`` on, the recorded planner transit decides instead. Default off."""
-    return os.environ.get("ISPATIALGYM_PICK_TRANSIT_GATE", "0") == "1"
+    ``ISPATIALGYM_OVERHANG_OVERPATH`` on, the recorded planner transit decides instead. DEFAULT ON since the A/B (lead #49 step 4;
+    $OFH/startdraw2_20261108); ``=0`` = no gate (the former behaviour)."""
+    return os.environ.get("ISPATIALGYM_PICK_TRANSIT_GATE", "1") != "0"
 
 
 # ---------------------------------------------------------------------------------------------------- i7-overpath 2026-11-08 (owner 3(b))

@@ -25,6 +25,14 @@ from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance
 
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 
+
+@pytest.fixture(autouse=True)
+def _no_pick_transit_gate(monkeypatch):
+    """i7-startdraw2: the pick transit gate defaults on; these tests pin the overhang pick without it (its own tests:
+    test_pick_transit_gate.py)."""
+    monkeypatch.setenv("ISPATIALGYM_PICK_TRANSIT_GATE", "0")
+
+
 SUBTASK = "inter_object_relation_satisfaction-inside_large_scale"
 FIXTURE = os.path.join(os.path.dirname(__file__), "data", "sidecars", f"{SUBTASK}.json")
 #: plate__luhkiz__ts grasp_5 (runlogs/grasp_library_20260905/cands): eef in the plate frame

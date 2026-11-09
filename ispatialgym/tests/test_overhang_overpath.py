@@ -27,6 +27,14 @@ from ispatialgym.sampling.v2.ik import IKResult
 IL = pytest.importorskip("ispatialgym.sampling.v2.tasks.iors_large")
 from ispatialgym.tests.test_iors_large_overhang import _sidecar_with_pick_push  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _no_pick_transit_gate(monkeypatch):
+    """i7-startdraw2: the pick transit gate defaults on; these tests pin the overhang pick without it (its own tests:
+    test_pick_transit_gate.py)."""
+    monkeypatch.setenv("ISPATIALGYM_PICK_TRANSIT_GATE", "0")
+
+
 CUSTOMS = os.path.join(os.path.dirname(__file__), "..", "assets", "task_specs", "isg_customs.json")
 ALIAS_VARIANT = "inter_object_relation_satisfaction-inside_large_scale-hardback-bookcase-desk"
 #: hardback bqvvvx: its collision box (geometry.json coll_bbox) and the six v2 overhang grasps' T_object_eef positions (entry
