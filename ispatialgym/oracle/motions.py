@@ -60,6 +60,37 @@ from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
 
+#: i7-artlarge r3 (lead #54; DEFAULT ON since #57): the transit dip gate's Cartesian replacement leg (``Motions._cartesian_transit``) is refused when
+#: the arm's link3 / link5 collision-MESH clearance (``sampling.v2.pair_mesh``, the r1pro.usda convex pieces) falls to this or below on
+#: the leg - the differential IK folds the elbow into the upper arm where cuRobo's spheres read clear (open_large_03 352001 / 352003:
+#: robot_touching_itself at -0.2 / +0.1 mm); the plan then streams as before
+DIP_LEG_SELF_MESH_ENV = "ISPATIALGYM_DIP_LEG_SELF_MESH"
+DIP_LEG_SELF_MESH_MARGIN_M = 0.005
+
+
+def dip_leg_self_mesh_on() -> bool:
+    """DEFAULT ON since lead decision #57 (owner mandate; the int2 count refuses exactly the 2 failing legs of 8): ``=0`` restores."""
+    return os.environ.get(DIP_LEG_SELF_MESH_ENV, "1") != "0"
+
+
+def dip_leg_self_mesh_why(arm: str, q_traj: Any, arm_idx: Any = None, margin: float = DIP_LEG_SELF_MESH_MARGIN_M, stride: int = 2) -> Optional[str]:
+    """None when every ``stride``-th configuration of ``q_traj`` (and the last) keeps ``{arm}_arm_link3`` / ``{arm}_arm_link5`` more than
+    ``margin`` apart by their collision meshes, else why. ``q_traj``: (T, 28) full configurations (ALL_JOINTS order)."""
+    from ispatialgym.sampling.v2 import pair_mesh as PM
+
+    q = C.as_tensor(q_traj)
+    q = q.reshape(-1, q.shape[-1])
+    ks = list(range(0, len(q), max(1, int(stride))))
+    if ks and ks[-1] != len(q) - 1:
+        ks.append(len(q) - 1)
+    links = (f"{arm}_arm_link3", f"{arm}_arm_link5")
+    for k in ks:
+        cl, _ = PM.pair_clearance(q[k].tolist(), arm, links)
+        if cl <= margin:
+            return f"{links[0]} / {links[1]} mesh clearance {cl * 1000:+.1f} mm at waypoint {k}/{len(q)} (<= {margin * 1000:.0f} mm; cuRobo's spheres miss it)"
+    return None
+
+
 
 # train85 (owner 2026-10-14 ~22:00): the oracle's waits end once nothing moves any more, so a demo carries no long standstill
 # (thresholds of reconcile83's generation.oracle_still_exit). ISPATIALGYM_ORACLE_STILL_EXIT=1 turns it on; unset, nothing changes.
@@ -496,6 +527,8 @@ class Motions:
         self.witness_via_posture_events: List[Dict[str, Any]] = []
         # the dipping-transit gate of a grasp transit (first-demo v3.0 F5, ``transit_dip_gate``): the active context, None outside it
         self._dip: Optional[Dict[str, Any]] = None
+        #: i7-artlarge r3: Cartesian dip legs refused by DIP_LEG_SELF_MESH
+        self.dip_leg_self_mesh_refused = 0
         # 2026-10-31 train-fast (STRAIGHT_ARM): how often ``arm_to`` took a checked straight ramp instead of a trajopt plan, and why
         # not (recorded in meta.fast.straight_arm / result.straight_arm)
         self.straight_arm_stats: Dict[str, Any] = {"straight_arm_ok": 0, "straight_arm_fallback": 0, "waypoints": 0, "check_s": 0.0, "fallback_why": {}}
@@ -833,6 +866,16 @@ class Motions:
 
     # ------------------------------------------------------------------ joint trajectory streaming
 
+    def _diag_trace_on(self) -> bool:
+        """i7-artlarge r3 (lead #54, DIAGNOSIS ONLY, log-only): ``ISPATIALGYM_DIAG_ARM_TRACE=1`` logs every streamed arm trajectory (the
+        commanded arm joints, the measured joints and the arm links' current contacts every few steps) and arm_to's plan source; no
+        behaviour changes."""
+        return os.environ.get("ISPATIALGYM_DIAG_ARM_TRACE", "0") == "1"
+
+    def _diag_q(self, q: Any, arms: Sequence[str]) -> List[List[float]]:
+        q = C.as_tensor(q).reshape(-1)
+        return [[round(float(v), 3) for v in q[self.robot.arm_control_idx[a]].tolist()] for a in arms if a in self.robot.arm_control_idx]
+
     def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None, loaded: bool = False,
                                  converge: bool = True) -> Iterator[th.Tensor]:
         """Stream a ``(T, 28)`` joint trajectory (one waypoint per control step) for the given groups, then hold the
@@ -843,12 +886,22 @@ class Motions:
         q_traj = C.as_tensor(q_traj)
         if len(q_traj) > self.cfg.trajectory_max_steps:
             raise SkillError("timeout", f"trajectory of {len(q_traj)} steps exceeds the budget {self.cfg.trajectory_max_steps}")
+        n_in = len(q_traj)
         if oracle_still_exit():
             q_traj = self._trim_still_waypoints(q_traj, arms, trunk)
         self.state.stop_base()
-        for q in q_traj:
+        diag = self._diag_trace_on()
+        if diag:
+            log.info("DIAG_ARM_TRACE stream arms %s trunk %s: %d waypoints (%d before the still trim); first %s last %s; measured now %s", list(arms), trunk,
+                     len(q_traj), n_in, self._diag_q(q_traj[0], arms), self._diag_q(q_traj[-1], arms),
+                     self._diag_q(self.robot.get_joint_positions(), arms))
+        for k, q in enumerate(q_traj):
             self.state.set_from_q(q, arms=arms, trunk=trunk)
             yield self._emit()
+            if diag and (k % 4 == 0 or k == len(q_traj) - 1):
+                cont = self._jam_contacts([a for a in arms if a in M.ARMS])
+                log.info("DIAG_ARM_TRACE step %d/%d cmd %s meas %s%s", k, len(q_traj), self._diag_q(q, arms), self._diag_q(self.robot.get_joint_positions(), arms),
+                         f" contacts {cont}" if cont else "")
         if converge:
             yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
             if not loaded:
@@ -1298,6 +1351,11 @@ class Motions:
                             (q_traj, self._leg_steps(poses, q_traj))]
                 adjust = {"rad": round(gap0, 3), "hand_mm": round(moved * 1000, 1)}
             full = th.cat([seg[0] for seg in segments])
+            why_mesh = dip_leg_self_mesh_why(arm, full, self.robot.arm_control_idx[arm]) if dip_leg_self_mesh_on() else None
+            if why_mesh:
+                self.dip_leg_self_mesh_refused += 1
+                whys.append(f"{direction}: {why_mesh}")
+                continue
             if self._protect is not None:
                 viol = self._protect_violations([arm], full, f"{arm}_arm", self._protect)
                 if viol:
@@ -1360,8 +1418,14 @@ class Motions:
             tried.append(f"{name}: {why}")
             if segments is None:
                 continue
+            # i7-artlarge r3: the decision is logged BEFORE the leg streams (logged only after it, a failure inside the leg left the log
+            # reading as if the straight ramp of the plan had run: open_large_03 352001 / 352003)
+            log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end -> streaming the %s Cartesian leg instead of the plan (%s)", arm,
+                     dip[0] * 100, name, "; ".join(tried))
+            rec.update({"leg": name, "tried": list(tried), "streaming": True})
             for q_traj, steps in segments:
                 yield from self.execute_joint_trajectory(self._retime(q_traj, steps), arms=[arm])
+            rec.pop("streaming", None)
             rec.update({"fired": True, "leg": name, "tried": tried,
                         "why": f"the plan dipped {dip[0] * 100:.1f} cm below its lower end: replaced by the {name} Cartesian leg"})
             log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end -> %s Cartesian leg instead (%s)", arm, dip[0] * 100, name, "; ".join(tried))
@@ -1755,8 +1819,15 @@ class Motions:
                         log.info("arm_to(%s): IK of the recorded pose lies %.2f rad from the witness (> %.2f): keeping the witness", arm, jump, self.cfg.witness_refine_max_jump)
             # 2026-10-31 train-fast (STRAIGHT_ARM): a checked straight joint-space ramp to the witness first; None = today's ladder
             res = self._straight_plan(emb, arms, q_start, q_goal, relax, "witness")
+            src = "straight"
             if res is None:
                 res = self._straight_via(emb, arms, q_start, q_goal, relax, "witness")  # STRAIGHT_ARM_VIA: two checked legs through a posture
+                src = "straight_via"
+            if res is None:
+                src = "trajopt"
+            if self._diag_trace_on():
+                log.info("DIAG_ARM_TRACE arm_to(%s, witness): source %s; q_start (backend) %s, measured %s, q_goal %s, witness %s", arm, src,
+                         self._diag_q(q_start, [arm]), self._diag_q(self.robot.get_joint_positions(), [arm]), self._diag_q(q_goal, [arm]), self._diag_q(q28, [arm]))
             if res is None:
                 if relax is not None:
                     with relax(emb, q_start, arms) as relaxed:
