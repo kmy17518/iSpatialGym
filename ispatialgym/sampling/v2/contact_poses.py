@@ -515,6 +515,33 @@ def push_line_t0(sec: "HullSections", t_hull_w: th.Tensor, z0: float, side2: th.
     return t0, {"push_line": {"through": "com", "offset_from_footprint_m": round(t0 - t_fp, 4)}}
 
 
+#: i7-symonly 2026-11-09 (``iors_small.PUSH_TIP_CAP_ENV``): the touching push's contact height capped at this multiple of the target's
+#: leading half-depth (its footprint centre to the footprint's leading edge along the push) - a pushed body slides at F = mu m g and tips
+#: about its leading bottom edge once F h > m g x_lead, i.e. above h = x_lead / mu (2 x_lead at PhysX's default 0.5); the push starts at
+#: ~0.15 m/s, so the cap is lower. Fitted on 144 touching_04 demos (the spray bottle, x_lead ~4.25 cm -> 6.4 cm): pushes at 5-6 cm ended
+#: ok 33 / symbolic_only 8 / not_settled 1, at 7-13 cm ok 31 / symbolic_only 50 / not_settled 10 (the bottle tilted 11-22 deg and turned)
+PUSH_TIP_HEIGHT_RATIO = 1.5
+
+
+def push_tip_height_cap(t_hull_w: th.Tensor, z0: float, direction: th.Tensor, line_xy: Optional[th.Tensor] = None,
+                        ratio: float = PUSH_TIP_HEIGHT_RATIO) -> Dict[str, float]:
+    """``{"cap_m", "x_lead_m", "floor_m"}``: the highest contact (m above the target's bottom ``z0``) a push along ``direction`` makes without
+    tipping the target (:data:`PUSH_TIP_HEIGHT_RATIO`) - ``ratio`` x its leading half-depth: the footprint (the hull's cut
+    :data:`PUSH_SWEEP_BASE_CUT_M` above the bottom, the whole hull's xy where the cut misses) from its area centroid (or ``line_xy``, the push
+    line's point) to its farthest point along the push - never below the lowest fingertip push (``PUSH_SWEEP_MIN_HEIGHT_M["tip_h"]``, the
+    ``floor_m``: the cap removes only contacts above the lowest the fingertips reach)."""
+    d = G.t(direction).float()[:2]
+    d2 = d / max(float(th.linalg.norm(d)), 1e-9)
+    sec = HullSections(t_hull_w)
+    poly = sec.cut(float(z0) + PUSH_SWEEP_BASE_CUT_M)
+    if len(poly) < 3:
+        poly = G.convex_hull_2d(G.t(t_hull_w)[:, :2].float())
+    centre = G.t(line_xy)[:2].float() if line_xy is not None else polygon_centroid(poly)
+    x_lead = float(((G.t(poly).float() - centre[None]) @ d2).max())
+    floor = float(PUSH_SWEEP_MIN_HEIGHT_M["tip_h"])
+    return {"cap_m": round(max(float(ratio) * x_lead, floor), 4), "x_lead_m": round(x_lead, 4), "floor_m": floor}
+
+
 def swept_push_candidates(gs, manip: Stance, t_hull_w: th.Tensor, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor,
                           line_xy: Optional[th.Tensor] = None):
     """:meth:`push_height_sweep_on` (touching#04: every class at mid height failed, so the palm-clear raised blade pushed the 27 cm

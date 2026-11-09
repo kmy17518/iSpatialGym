@@ -394,3 +394,54 @@ def test_push_line_com_switch_and_the_samplers_line_point(monkeypatch):
     assert th.allclose(xy, th.tensor([1.0, 2.01]), atol=1e-5)  # +1 cm along the root x, the root turned 90 deg
     me.push_line_xy(t_pose)
     assert calls == ["target_x"] and stats["push_line_com.used"] == 2
+
+
+def test_push_tip_height_cap_is_the_ratio_times_the_leading_half_depth_with_the_tip_floor():
+    """i7-symonly (ISPATIALGYM_PUSH_TIP_CAP): the cap is ``ratio`` x the footprint's leading half-depth along the push (a box: half its
+    extent along the push), never below the lowest fingertip push (5 cm); the spray bottle's ~4.25 cm gives 6.4 cm at the default 1.5."""
+    from ispatialgym.tests import test_iors_small_lift as LIFT
+
+    d2 = CS.D[:2] / th.linalg.norm(CS.D[:2])
+    for box, yaw in ((LIFT._box(0.0905, 0.085, 0.273), 0.0), (LIFT._box(0.0905, 0.085, 0.273), math.pi / 2), (LIFT._box(0.1567, 0.0427, 0.2182), 0.0)):
+        hull_w = G.local_points_world(box, CS._yawed(CS.PLACE, yaw))
+        z0 = float(hull_w[:, 2].min())
+        proj = hull_w[:, :2].float() @ d2
+        half = 0.5 * float(proj.max() - proj.min())
+        out = CPZ.push_tip_height_cap(hull_w, z0, CS.D)
+        assert out["x_lead_m"] == pytest.approx(half, abs=2e-3)
+        assert out["cap_m"] == pytest.approx(max(CPZ.PUSH_TIP_HEIGHT_RATIO * half, CPZ.PUSH_SWEEP_MIN_HEIGHT_M["tip_h"]), abs=3e-3)
+        assert out["cap_m"] >= CPZ.PUSH_SWEEP_MIN_HEIGHT_M["tip_h"]
+        assert CPZ.push_tip_height_cap(hull_w, z0, CS.D, ratio=3.0)["cap_m"] == pytest.approx(max(3.0 * half, 0.05), abs=6e-3)
+    # the swept classes of a tall target keep the low contacts only once capped
+    gs = CPZ.PoseGen({"push_height_sweep": True}, subtask=CS.TOUCHING)
+    hull_w = G.local_points_world(LIFT._box(0.0905, 0.085, 0.273), CS._yawed(CS.PLACE, 0.0))
+    face_z = (float(hull_w[:, 2].min()), float(hull_w[:, 2].max()))
+    cands = list(CPZ.touching_push_candidates(gs, CPZ.MAP_FRAME, CPZ.push_face_point(hull_w, CS.D), face_z, CS.D, t_hull_w=hull_w))
+    cap = CPZ.push_tip_height_cap(hull_w, face_z[0], CS.D)["cap_m"]
+    hs = [float(e["contact_height_m"]) for _k, _p, e in cands if e.get("contact_height_m") is not None]
+    assert min(hs) <= cap < max(hs)
+
+
+def test_push_tip_cap_switch_filters_and_counts(monkeypatch):
+    """The sampler side: default off; the map keep reads the label's height; the exact stream skips (and counts) the contacts above the cap."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_small as IS
+
+    monkeypatch.delenv(IS.PUSH_TIP_CAP_ENV, raising=False)
+    assert IS.PUSH_TIP_CAP_DEFAULT == "0" and IS.push_tip_cap_mode() == "off"
+    for v, mode in (("1", "on"), ("shadow", "shadow"), ("0", "off")):
+        monkeypatch.setenv(IS.PUSH_TIP_CAP_ENV, v)
+        assert IS.push_tip_cap_mode() == mode
+    keep = IS._tip_keep(0.064)
+    assert keep({"class": "push_tip_h-@5.0cm"}) and keep({"class": "push_tip_v-@6.2cm"}) and not keep({"class": "push_tip_h-@7.0cm"})
+    assert keep({"class": "push_blade_0_high"}) and keep(None)
+    stats = {}
+    me = SimpleNamespace(kit=SimpleNamespace(stats=stats))
+    stream = [("a", None, {"contact_height_m": 0.05}), ("b", None, {"contact_height_m": 0.08}), ("c", None, {}), ("d", None, {"contact_height_m": 0.064})]
+    kept = [k for k, _p, _e in IS.IORSSmall._tip_capped(me, iter(stream), 0.064)]
+    assert kept == ["a", "c", "d"] and stats["push_tip_cap.dropped"] == 1
+    # off: no cap computed
+    monkeypatch.setenv(IS.PUSH_TIP_CAP_ENV, "0")
+    me.push_height_sweep_on = lambda: True
+    assert IS.IORSSmall.push_tip_cap(me, (th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])), 0.0, CS.D) is None
