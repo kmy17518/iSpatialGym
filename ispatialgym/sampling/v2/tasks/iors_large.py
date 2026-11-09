@@ -130,6 +130,7 @@ legacy band and no legacy grasp.
 from __future__ import annotations
 
 import contextlib
+import copy
 import json
 import logging
 import math
@@ -1183,6 +1184,7 @@ class IORSLarge(SamplerV2):
         if m is not None:
             self._sm_maybe_redraw(m)
         self._sm_in_search, self._sm_search_failed, self._sm_b = False, None, None
+        self._push_chain_memo = {}  # i7-stancememo r4: the exact-input push chain memo is per attempt (every mode samples through here)
         try:
             draft = super().sample(rng)
         except BaseException as e:
@@ -1976,6 +1978,27 @@ class IORSLarge(SamplerV2):
         return None if v is None else float(v)
 
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
+        """:meth:`_push_under_chain_solve` with an exact-input memo per attempt (i7-stancememo r4, lead decision #70): the chain depends on
+        the push stance, the object's orientation, the drop / goal cells, the push direction and the segment arm only, and ``_couple`` asked
+        for the same inputs again per grasp draw of a C (one under_large_03 attempt: 85 chain solves, 43 distinct results, 6.9 s each).
+        The key is the inputs' exact float values (a jittered yaw is another key); a hit returns a deep copy of the stored result (None
+        too). ``sample`` clears the memo per attempt. ``ISPATIALGYM_PUSH_CHAIN_MEMO=0`` = solve every call (the former path).
+        Kit ``push_chain.solved`` / ``push_chain.memo_hit``."""
+        if os.environ.get("ISPATIALGYM_PUSH_CHAIN_MEMO", "1") == "0":
+            return self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
+        memo = self.__dict__.setdefault("_push_chain_memo", {})
+        key = (tuple(float(v) for v in place.base_pose2d), float(place.translate), float(place.tilt), str(self.seg_arm), str(self.push_hand),
+               tuple(float(v) for v in G.t(quat).reshape(-1).tolist()), tuple(float(v) for v in G.t(drop_xy).reshape(-1).tolist()[:2]),
+               tuple(float(v) for v in G.t(goal_xy).reshape(-1).tolist()[:2]), tuple(float(v) for v in G.t(d2).reshape(-1).tolist()[:2]))
+        if key in memo:
+            TT._count(self, "push_chain.memo_hit")
+            return copy.deepcopy(memo[key])
+        out = self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
+        TT._count(self, "push_chain.solved")
+        memo[key] = copy.deepcopy(out)
+        return out
+
+    def _push_under_chain_solve(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
         """The straight floor-level push from the drop position to the goal cell, exact IK from stance C (closed gripper,
         floor and target ignored, partner present): blade behind the target along the push direction (stand-off from
         ``tabletop.blade_standoff`` over the target's face height), approach pitched toward the push direction (0 / 30 /
