@@ -191,6 +191,23 @@ def large_overhang_fallback_on() -> bool:
     return os.environ.get(LARGE_OVERHANG_FALLBACK_ENV, "1").strip().lower() in ("1", "on", "true", "yes")
 
 
+#: i7-ul02 2026-11-09 (speed, default OFF): the push-under C loop solves a floor push chain (exact IK of the 4-pose chain + its dense
+#: tracking, ~5-9 s on a TITAN RTX) per (C, yaw bucket) BEFORE it looks up the grasp side of the draw at B - which does not depend on C and
+#: is cached for the B (``b_ik_cache``). Under_large_02 (briefcase, int2_14 360000-360002): 7 of 11 attempts ran into the 3600 s budget in
+#: the C loop, ~450 chains each; about half of the draw-time chains were solved for a draw that then ended at 'B: [pre-grasp, grasp]
+#: exact IK (cached)', and the pre-screen's two best yaws are ranked over every F_init yaw whether or not a pair at it is still alive at B.
+#: With ``ISPATIALGYM_PUSH_CHAIN_LIVE_B=1`` (a) a draw whose B key already failed is skipped before its chain (the draw ended there anyway)
+#: and (b) the pre-screen ranks only the yaws that still hold a live B pair (:func:`live_yaws_at_b`; none -> the C is skipped, as
+#: ``generation.c_skip_dead_b`` would). Kit counters ``push_chain_live_b.draw_skipped`` (a chain solve saved) / ``.draw_skipped_cached``
+#: (the chain was already solved) / ``.prescreen_dropped_yaws`` / ``.c_skipped``.
+PUSH_CHAIN_LIVE_B_ENV = "ISPATIALGYM_PUSH_CHAIN_LIVE_B"
+
+
+def push_chain_live_b_on() -> bool:
+    # default OFF (i7-ul02 2026-11-09); "1" on
+    return os.environ.get(PUSH_CHAIN_LIVE_B_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+
+
 def count_pick_preshape(s, g, where: str) -> None:
     """i7-interior2 (owner 6.1): one kit counter per IORS large pick whose support policy measures the fingers at the grasp's pre-shape
     (``tabletop.policy_opening_of``: pinch width / 2 + the preshape margin) - ``pick_preshape.<where>`` - or at the configuration's
@@ -888,6 +905,25 @@ def dead_at_b(F_live: Sequence[Tuple[float, Any]], b_ik_cache: Dict[Any, Any], y
         if bk not in b_ik_cache or b_ik_cache[bk] is not None:
             return False
     return n > 0
+
+
+def b_key(yaw0: float, grasp: Any, yaw_step: float, y_end=None) -> Tuple[Any, Any]:
+    """The C draw loop's B key of the pair (``yaw0``, ``grasp``): yaw bucket (or the aligned init yaw ``y_end``), grasp name."""
+    return (int(round(float(yaw0) / yaw_step)) if y_end is None else round(float(y_end), 4), getattr(grasp, "name", str(grasp)))
+
+
+def live_yaws_at_b(F_live: Sequence[Tuple[float, Any]], b_ik_cache: Dict[Any, Any], yaw_step: float, end_aligned=lambda yaw0: None) -> set:
+    """i7-ul02 (``ISPATIALGYM_PUSH_CHAIN_LIVE_B``): the yaws of ``F_live`` that hold at least one pair a draw can still take - its B key
+    (:func:`b_key`) not yet failed in ``b_ik_cache`` and ``end_aligned`` not False (:func:`dead_at_b`'s rule per yaw)."""
+    out = set()
+    for yaw0, g in F_live:
+        y_end = end_aligned(float(yaw0))
+        if y_end is False:
+            continue
+        bk = b_key(yaw0, g, yaw_step, y_end)
+        if bk not in b_ik_cache or b_ik_cache[bk] is not None:
+            out.add(float(yaw0))
+    return out
 
 
 def union_feasible(F_by_arm: Dict[str, Sequence[Tuple[float, Any]]], yaw_step: float = math.pi / 8) -> List[Tuple[float, Any]]:
@@ -6096,6 +6132,7 @@ class IORSLarge(SamplerV2):
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
         skip_dead_b = bool(self.gp.gen("c_skip_dead_b", False))  # oracle-fix 2026-11-06 (speed): see _c_dead_at_b
+        live_b = bool(self.push_under) and push_chain_live_b_on()  # i7-ul02 (speed, default off): see PUSH_CHAIN_LIVE_B_ENV
         n_dead_b = 0
         # i7-stancememo (5x.1 a): the C candidates that failed at this B in an earlier attempt of the instance are skipped and do not use up
         # one of the n_try tries; every C try that ends without a draft is recorded (sm_cur: its key, re-check flag, errors before it)
@@ -6215,8 +6252,20 @@ class IORSLarge(SamplerV2):
                 if yaws and not yaws_c:
                     errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): the push-under yaw lock {self.push_yaw_lock()} keeps none of the {len(yaws)} yaws")
                     continue
+                yaws_p = yaws_c
+                if live_b:
+                    # i7-ul02 (b): the pre-screen's best yaws among those a draw can still take at B (the B side does not depend on C)
+                    live = live_yaws_at_b(F_live, b_ik_cache, yaw_step, lambda y0: self.end_aligned_init_yaw(y0, d_yaw))
+                    yaws_p = [y for y in yaws_c if y in live]
+                    if len(yaws_p) < len(yaws_c):
+                        TT._countn(self, "push_chain_live_b.prescreen_dropped_yaws", len(yaws_c) - len(yaws_p))
+                    if not yaws_p:
+                        TT._count(self, "push_chain_live_b.c_skipped")
+                        errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): skipped - every F_init pair at its {len(yaws_c)} push "
+                                      f"yaws failed its exact IK at B (PUSH_CHAIN_LIVE_B)")
+                        continue
                 pst0 = push_st if push_st is not None else place
-                best = sorted(yaws_c, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
+                best = sorted(yaws_p, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
                 found = False
                 for y in best:
                     ck = (int(kc), int(round(y / yaw_step)))
@@ -6296,6 +6345,12 @@ class IORSLarge(SamplerV2):
                     # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
                     # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
                     ck = (int(kc), int(round(yaw0 / yaw_step))) if y_end is None else (int(kc), "aligned", round(y_init, 4))
+                    if live_b and b_ik_cache.get(b_key(yaw0, g, yaw_step, y_end), True) is None:
+                        # i7-ul02 (a): this pair's grasp already failed at B (cached for the B, not C-dependent) - the draw ends at the
+                        # cached B failure below whatever the chain; skip it before solving the chain
+                        TT._count(self, "push_chain_live_b.draw_skipped" + ("_cached" if ck in chain_cache else ""))
+                        fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
+                        continue
                     if ck not in chain_cache:
                         q_chain = G.qmul(G.quat_from_yaw(y_init + d_yaw), self.rest)
                         chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, q_chain, cd, gc, place.extras["push_dir"])
