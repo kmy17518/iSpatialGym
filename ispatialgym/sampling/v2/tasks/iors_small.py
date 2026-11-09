@@ -583,9 +583,13 @@ def nextto_top_first_on() -> bool:
 
 
 def top_down_grasp(eef_in_object, rest_quat, cos_max: float = -math.sqrt(0.5)) -> bool:
-    """The grasp's approach axis (eef z) points within 45 deg of straight down when the target rests at ``rest_quat``."""
-    a_obj = C.quat_to_mat(G.t(eef_in_object[1]).float())[:, 2]
-    a_world = G.rotate(G.t(rest_quat).float(), a_obj)
+    """The grasp's approach axis (eef z) points within 45 deg of straight down when the target rests at ``rest_quat``; False when the
+    pose cannot be read."""
+    try:
+        a_obj = C.quat_to_mat(G.t(eef_in_object[1]).float())[:, 2]
+        a_world = G.rotate(G.t(rest_quat).float(), a_obj)
+    except Exception:  # noqa: BLE001 - an unreadable grasp pose is not a top grasp
+        return False
     return float(a_world[2]) <= cos_max
 
 
@@ -1346,12 +1350,12 @@ class IORSSmall(SamplerV2):
             # i7-nextto (ISPATIALGYM_NEXTTO_TOP_FIRST): each tier's top-down grasps first, its other grasps after them
             split, kinds = [], []
             for gs in tiers:
-                top = [g for g in gs if top_down_grasp(g.pose, self.rest["target"])]
+                top = [g for g in gs if top_down_grasp(getattr(g, "pose", None), (getattr(self, "rest", None) or {}).get("target"))]
                 rest = [g for g in gs if not any(g is t for t in top)]
                 if not top:
                     TT._count(self, "top_first.no_top")
                 if not getattr(self, "_top_first_logged", False):
-                    log.info("%s: NEXTTO_TOP_FIRST top %s, then %s", self.gp.variant, [g.name for g in top], [g.name for g in rest])
+                    log.info("%s: NEXTTO_TOP_FIRST top %s, then %s", self.gp.variant, [getattr(g, "name", g) for g in top], [getattr(g, "name", g) for g in rest])
                     self._top_first_logged = True
                 for kind, sub in (("top", top), ("rest", rest)):
                     if sub:
