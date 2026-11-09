@@ -5434,7 +5434,7 @@ v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2)
 | close_large_02 (control) | 5 / 4 / 4, 601 s | 5 / 4 / 4, 601 s (not reached) |
 
 - The instances and demos are identical. The skip only removes connect tries; it is the default since 397048b2. The suite has the base
-  failure set at b20703b9.
+  failure set at b20703b9 and 397048b2.
 - open_large_03 on the int2 defaults: 9 / 4 / 3 (one robot_touching_itself), against 60 / 0 / 0 before the init draw.
 
 ## Limitations / not done
