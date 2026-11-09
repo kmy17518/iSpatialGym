@@ -409,7 +409,7 @@ def test_push_path_on_one_floor_object():
 
 def test_base_push_com_cap(monkeypatch):
     """i7-nextto 2026-11-09 (ISPATIALGYM_BASE_PUSH_COM_CAP_M): the push line's distance from the target's mass centre (its root frame turned
-    and moved to the init pose); a spot / pair farther than the cap is refused and counted; unset = off (nothing counted)."""
+    and moved to the init pose); a spot / pair farther than the cap is refused and counted; "0" = off (nothing counted); unset = 0.06."""
     from types import SimpleNamespace
 
     s = SimpleNamespace(target_com_local=lambda: th.tensor([0.1, 0.0, 0.3]), kit=SimpleNamespace(stats={}))
@@ -419,6 +419,8 @@ def test_base_push_com_cap(monkeypatch):
     assert NT.push_line_com_offset(SimpleNamespace(), yaw90, th.zeros(3), th.tensor([1.0, 0.0])) is None
     stats: dict = {}
     monkeypatch.delenv(NT.PUSH_COM_CAP_ENV, raising=False)
+    assert NT.push_com_cap() == pytest.approx(0.06)
+    monkeypatch.setenv(NT.PUSH_COM_CAP_ENV, "0")
     assert NT.push_com_cap() is None and not NT._com_cap_rejects(s, 0.2, stats, "two") and not s.kit.stats and not stats
     monkeypatch.setenv(NT.PUSH_COM_CAP_ENV, "0.06")
     assert NT.push_com_cap() == pytest.approx(0.06)

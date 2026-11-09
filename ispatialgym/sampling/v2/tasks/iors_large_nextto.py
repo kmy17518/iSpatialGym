@@ -149,15 +149,18 @@ DEFAULTS: Dict[str, Any] = {
 #: centre (``IORSLarge.target_com_local``: PhysX link COMs, mass-weighted) is not used; the stance search goes on with the face's other
 #: spots and the other faces. The swivel chair's annotated -y pairs sit 9-11 cm off its root line and turn the chair 8.3-9.4 deg in the
 #: push (the evaluator's orientation tolerance is 0.15 rad = 8.6 deg): int2_10 / survey1 300002 / 300003; the +x pairs at 0.4 cm turn
-#: it 0.2 deg, the +y pair at 5.4 cm 3.6 deg. Unset / 0 = off (default). The offset of the chosen push is recorded either way
-#: (``summary.nextto.push_com_offset_m``). Kit ``push_com_cap.checked`` / ``.rejected`` / ``.passed``
+#: it 0.2 deg, the +y pair at 5.4 cm 3.6 deg. "0" = off. DEFAULT 0.06 since the i7-nextto A/B (2026-11-09, nextto_large_01 300000 N 4,
+#: svl titanrtx, per-arm empty caches: off 8 / 4 / 4 0.084 GPU-h per ok with 300002 / 300003 at 0.148 rad of the 0.15 tolerance, on 4 / 4 / 4
+#: 0.053, errors 0.024 / 0.0025 rad, 28 pairs refused; over all 41 recorded base pushes only nextto_large_01's -y pairs exceed it). The offset
+#: of the chosen push is recorded either way (``summary.nextto.push_com_offset_m``). Kit ``push_com_cap.checked`` / ``.rejected`` / ``.passed``
 PUSH_COM_CAP_ENV = "ISPATIALGYM_BASE_PUSH_COM_CAP_M"
+PUSH_COM_CAP_DEFAULT = "0.06"
 
 
 def push_com_cap() -> Optional[float]:
-    """:data:`PUSH_COM_CAP_ENV` in metres, None when unset / 0 / unreadable."""
+    """:data:`PUSH_COM_CAP_ENV` in metres (unset: :data:`PUSH_COM_CAP_DEFAULT`), None when 0 / unreadable."""
     try:
-        v = float((os.environ.get(PUSH_COM_CAP_ENV) or "0").strip())
+        v = float((os.environ.get(PUSH_COM_CAP_ENV) or PUSH_COM_CAP_DEFAULT).strip())
     except ValueError:
         return None
     return v if v > 0.0 and math.isfinite(v) else None
