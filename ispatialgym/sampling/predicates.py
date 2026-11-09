@@ -132,10 +132,13 @@ JOIN_MODES = ("in_place", "snap", "set_value")
 #: distance read 8-49 cm where the alignment check had just read ~1 cm, 22 of them ended symbolic_only (the group pose 8-16 cm off, the
 #: layout seated; the 5w.3 "kick cluster at the attachment place"), the other 193: 0 symbolic_only. "1" dumps every object of every scene
 #: for the restart (the registries' dump filters lifted for that dump, then restored; the recording's changed-only memory untouched);
-#: "0" (default) dumps through the filters as before. Either way the join record's ``snap.preread`` holds the move of the snap's reads
+#: "0" dumps through the filters as before. Either way the join record's ``snap.preread`` holds the move of the snap's reads
 #: across the filter (male link, female link, the part's root; ``stale`` > :data:`SNAP_PREREAD_STALE_M`) - the count of where it acts.
 PAIR_FILTER_FULL_DUMP_ENV = "ISPATIALGYM_PAIR_FILTER_FULL_DUMP"
-PAIR_FILTER_FULL_DUMP_DEFAULT = "0"
+#: default "1" since the i7-symonly A/B (lead flip rule; trunk_c0ecaa80, attachment_02 321000 + 321100, N 8 per arm, svl titanrtx): off
+#: 16 att / 8 wr / 6 ok, 0.155 GPU-h per ok, 4 joins whose bodies moved across the restart (2 symbolic_only: the bottle 0.26 / 0.22 m
+#: off); on 16 / 8 / 8, 0.115, 0 moved. Without a dump filter set (the sampler) the full dump is the same dump.
+PAIR_FILTER_FULL_DUMP_DEFAULT = "1"
 #: a snap read moved more than this across the filter counts as stale (``snap.preread.stale``)
 SNAP_PREREAD_STALE_M = 0.001
 #: this process's snap joins (``joins``), those whose reads moved across the filter (``stale``), the filter restarts with the full dump
@@ -572,7 +575,7 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
 
 
 def pair_filter_full_dump_on() -> bool:
-    """:data:`PAIR_FILTER_FULL_DUMP_ENV` is "1": the pair filter's physics restart dumps every object (default "0": through the dump filters)."""
+    """:data:`PAIR_FILTER_FULL_DUMP_ENV` is "1" (default): the pair filter's physics restart dumps every object ("0": through the dump filters)."""
     return (os.environ.get(PAIR_FILTER_FULL_DUMP_ENV) or PAIR_FILTER_FULL_DUMP_DEFAULT).strip() == "1"
 
 

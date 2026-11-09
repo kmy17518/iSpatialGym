@@ -216,9 +216,9 @@ def test_full_dump_state_lifts_every_registry_filter_for_the_dump_only():
     assert [r._dump_filter for r in regs] == before and sim.dump_state() == [["cap"], []]
 
 
-def test_the_pair_filter_full_dump_default_is_off(monkeypatch):
-    assert PRED.PAIR_FILTER_FULL_DUMP_DEFAULT == "0"
+def test_the_pair_filter_full_dump_default_is_on(monkeypatch):
+    assert PRED.PAIR_FILTER_FULL_DUMP_DEFAULT == "1"
     monkeypatch.delenv(PRED.PAIR_FILTER_FULL_DUMP_ENV, raising=False)
-    assert not PRED.pair_filter_full_dump_on()
-    monkeypatch.setenv(PRED.PAIR_FILTER_FULL_DUMP_ENV, "1")
     assert PRED.pair_filter_full_dump_on()
+    monkeypatch.setenv(PRED.PAIR_FILTER_FULL_DUMP_ENV, "0")
+    assert not PRED.pair_filter_full_dump_on()
