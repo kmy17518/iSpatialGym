@@ -833,6 +833,16 @@ class Motions:
 
     # ------------------------------------------------------------------ joint trajectory streaming
 
+    def _diag_trace_on(self) -> bool:
+        """i7-artlarge r3 (lead #54, DIAGNOSIS ONLY, log-only): ``ISPATIALGYM_DIAG_ARM_TRACE=1`` logs every streamed arm trajectory (the
+        commanded arm joints, the measured joints and the arm links' current contacts every few steps) and arm_to's plan source; no
+        behaviour changes."""
+        return os.environ.get("ISPATIALGYM_DIAG_ARM_TRACE", "0") == "1"
+
+    def _diag_q(self, q: Any, arms: Sequence[str]) -> List[List[float]]:
+        q = C.as_tensor(q).reshape(-1)
+        return [[round(float(v), 3) for v in q[self.robot.arm_control_idx[a]].tolist()] for a in arms if a in self.robot.arm_control_idx]
+
     def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None, loaded: bool = False,
                                  converge: bool = True) -> Iterator[th.Tensor]:
         """Stream a ``(T, 28)`` joint trajectory (one waypoint per control step) for the given groups, then hold the
@@ -843,12 +853,22 @@ class Motions:
         q_traj = C.as_tensor(q_traj)
         if len(q_traj) > self.cfg.trajectory_max_steps:
             raise SkillError("timeout", f"trajectory of {len(q_traj)} steps exceeds the budget {self.cfg.trajectory_max_steps}")
+        n_in = len(q_traj)
         if oracle_still_exit():
             q_traj = self._trim_still_waypoints(q_traj, arms, trunk)
         self.state.stop_base()
-        for q in q_traj:
+        diag = self._diag_trace_on()
+        if diag:
+            log.info("DIAG_ARM_TRACE stream arms %s trunk %s: %d waypoints (%d before the still trim); first %s last %s; measured now %s", list(arms), trunk,
+                     len(q_traj), n_in, self._diag_q(q_traj[0], arms), self._diag_q(q_traj[-1], arms),
+                     self._diag_q(self.robot.get_joint_positions(), arms))
+        for k, q in enumerate(q_traj):
             self.state.set_from_q(q, arms=arms, trunk=trunk)
             yield self._emit()
+            if diag and (k % 4 == 0 or k == len(q_traj) - 1):
+                cont = self._jam_contacts([a for a in arms if a in M.ARMS])
+                log.info("DIAG_ARM_TRACE step %d/%d cmd %s meas %s%s", k, len(q_traj), self._diag_q(q, arms), self._diag_q(self.robot.get_joint_positions(), arms),
+                         f" contacts {cont}" if cont else "")
         if converge:
             yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
             if not loaded:
@@ -1755,8 +1775,15 @@ class Motions:
                         log.info("arm_to(%s): IK of the recorded pose lies %.2f rad from the witness (> %.2f): keeping the witness", arm, jump, self.cfg.witness_refine_max_jump)
             # 2026-10-31 train-fast (STRAIGHT_ARM): a checked straight joint-space ramp to the witness first; None = today's ladder
             res = self._straight_plan(emb, arms, q_start, q_goal, relax, "witness")
+            src = "straight"
             if res is None:
                 res = self._straight_via(emb, arms, q_start, q_goal, relax, "witness")  # STRAIGHT_ARM_VIA: two checked legs through a posture
+                src = "straight_via"
+            if res is None:
+                src = "trajopt"
+            if self._diag_trace_on():
+                log.info("DIAG_ARM_TRACE arm_to(%s, witness): source %s; q_start (backend) %s, measured %s, q_goal %s, witness %s", arm, src,
+                         self._diag_q(q_start, [arm]), self._diag_q(self.robot.get_joint_positions(), [arm]), self._diag_q(q_goal, [arm]), self._diag_q(q28, [arm]))
             if res is None:
                 if relax is not None:
                     with relax(emb, q_start, arms) as relaxed:
