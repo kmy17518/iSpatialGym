@@ -3459,6 +3459,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 28 | i7-artlarge up to a93d696c (lead #50) | 795f1ece | DEFAULT ARTLARGE_INIT_DRAW (the large articulation start from the whole Phase-1 set) |
 | 29 | i7-artlarge up to 31c7c011 (lead #53) | 58431d18 | DEFAULT ARTLARGE_ALT_SKIP (speed, identical results) |
 | 30 | i7-t03 up to 54800b01 (lead #56) | 0153ed46 | per-family switch defaults: the 9 t03 switches DEFAULT ON for touching_03 only (lead #39) |
+| 31 | i7-artlarge r3 (087586fb; lead #54 / #57) | 3413d60a | DEFAULT DIP_LEG_SELF_MESH (all aliases: the dip gate's replacement leg refused at 5 mm link3 / link5 mesh clearance); DIAG_ARM_TRACE off |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3514,6 +3515,7 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
   (ad_race 11/4/4).
 - int2_4 disembedding_07 crashed at its first written instance (OSError Errno 36: `<iid>.summary.json.pending` = 261 characters) - fixed in
   339fc2bd; int2_6 reruns disembedding_07 / _09 on it.
+- int2_12 (trunk_0153ed46): touching_03 300100 48 / 4 / 4 on v2maps_int2 (the t03 defaults; before 320 / 0 / 0).
 - int2_7 (trunk_540478e0, after int2_5): the startdraw set at 300500, under_large_01 (floor watch), camhull's inside_large_03 / under_small_03
   at 335000, the sinkbreakfast variant at 300700.
 - int2_5 (trunk_cd38c3d1, after the goalmaps check): touching_02 / 04 and close_02 at i7-contact3's indices, axial_05 / 01 / 03 / 04 (i7ar_pd
