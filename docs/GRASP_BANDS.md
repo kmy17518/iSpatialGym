@@ -3467,6 +3467,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 36 | i7-goalmaps up to 4bc9b600 (lead #67) | 470a83ca | touching_large_02 customs: carry_centred / carry_wide_path (lead #42); the root's umbrella entry unchanged (round 1, not umb2) |
 | 37 | i7-yield2 r3 up to 183810f4 (lead #66) | 73faa60d | DISEMB_POS_REDRAWS switch (off at this merge) |
 | 38 | i7-yield2 r3 default (d94c2394; lead #69) | f1bb8e24 | DEFAULT DISEMB_POS_REDRAWS 8 (disembedding redraws the start position when every work stance fails) |
+| 39 | i7-startdraw2 up to 5a5a7212 (lead #71) | 14e7d1d7 | PICK_TRANSIT_GATE (off; IORSLarge overhang picks only); NOT its default-on commit 984544ac |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
