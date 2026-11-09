@@ -6004,6 +6004,46 @@ ones, so there is no framing screen at the draw.
   - control disembedding_10: 7 / 4 / 4.
 - Default 1.5 since 4f14b3f7; `=0` = the unbounded doubling.
 
+## symbolic_only demos: attachment_02 and touching_04 (branch `i7-symonly`, 2026-11-09)
+
+Record `$OFH/symonly_20261109` (joins.py, sym_scan.py, tipcount.py, abstat.py, submit_ab*.sh); DECISIONS lines "i7-symonly".
+
+### attachment_02: the pair filter's physics restart under the recording's dump filter
+- Every failed demo had the layout seated (1e-5 m) and the group POSE 8-16 cm off: at the attach join (i7r4_det 321000, step 726) cap
+  AND bottle jumped 122 mm and the bottle turned 1.25 rad in one step.
+- `predicates.set_pair_collision_filter` restarts the physics (dump, stop, play, load). While a demo records, the registry's dump filter
+  (`Executor.enable_recording_filter`: awake objects; changed-only under RECORD_CHANGED_ONLY) leaves sleeping / unchanged bodies out of the
+  dump; `stop` resets them to their pre-play pose and `load_state` skips them. The snap then seats the cap from there and the joint drags
+  the pair (r1 on-arm 321002: the sleeping bottle 2.12 m away, at instance 321000's pose).
+- Count (every joined demo under `$OFH/out`): 26 of 219 show the move (attachment_02 16, _04 8, _03 2) -> 22 symbolic_only; the other 193 ->
+  0 symbolic_only. The 5w.3 "kick cluster at the attachment place" is this set (18 / 18 events) - not the sleep assist (owner-reserved,
+  untouched).
+- `ISPATIALGYM_PAIR_FILTER_FULL_DUMP` (c0ecaa80; DEFAULT ON 17211644): the restart dumps with every registry's filter lifted. The join
+  record's `snap.preread` records each snap read's move across the filter (stale = where it acts). `ISPATIALGYM_SNAP_PREREAD` (0fd0fe20:
+  snap from the pre-filter reads) was wrong - the moved bodies are real - and is removed.
+
+| arm (trunk_c0ecaa80, 321000 + 321100) | att / wr / ok | GPU-h | GPU-h / ok | joins moved across the restart | symbolic_only |
+|---|---|---|---|---|---|
+| FULL_DUMP=0 (sym_att2_off) | 16 / 8 / 6 | 0.93 | 0.155 | 4 | 2 |
+| FULL_DUMP=1 (sym_att2_on) | 16 / 8 / 8 | 0.92 | 0.115 | 0 | 0 |
+
+r1 (trunk_c33959de, 321000): off 7 / 4 / 4 (0.119), SNAP_PREREAD=1 7 / 4 / 3 (0.149, 321002 not_settled) -> SNAP_PREREAD rejected.
+
+### touching_04: the push tips the spray bottle
+- int2_10 (23 / 4 / 2) had no symbolic_only demo (pause + not_settled). Over 144 recorded touching_04 pushes: 49 of 58 symbolic_only = the
+  bottle's yaw during the push > 5.7 deg. Chosen contact 5-6 cm: ok 33 / symbolic_only 8 / not_settled 1; 7-13 cm: ok 31 / 50 / 10 (tilt
+  11-22 deg). Its touch_push map holds only 5 / 6 / 6.2 cm classes; the exact choice falls through to higher contacts.
+- `ISPATIALGYM_PUSH_TIP_CAP` (c33959de, default OFF): the swept push's contact capped at `push_tip_height_ratio` (1.5) x the footprint's
+  leading half-depth (floor 5 cm) in the exact choice and the push-stance map lookups. Offline it acts on touching_04 only.
+
+| arm (trunk_c33959de, 320300) | att / wr / ok | GPU-h | GPU-h / ok | push heights | demo failures |
+|---|---|---|---|---|---|
+| TIP_CAP=0 (sym_t04_off) | 23 / 4 / 3 | 0.91 | 0.303 | 5, 5, 8, 11.2 cm | plan_failed 1 |
+| TIP_CAP=1 (sym_t04_on) | 74 / 4 / 3 | 1.44 | 0.479 | 5, 5, 5, 5 cm | protected_contact 1 |
+
+The cap acted (checked 957, candidates dropped 4709, map lookups lost 1093) and every push went at 5 cm, but ok is equal and GPU-h per ok
+worse (the dropped draws die later in the goal check): NOT flipped. A cheaper form would screen the capped push at the draw.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
