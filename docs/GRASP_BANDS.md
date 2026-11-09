@@ -2450,7 +2450,19 @@ after the owner sees it. Record: `$OFH/DECISIONS.md` "(i7-floorpush)" lines, `$O
 
 ### A/B (fp_today / fp_open / fp_s05 / fp_s10 / fp_tip / fp_both; trunk_b46be8a3, N 4 v2only, index 350000, svl titanrtx)
 
-Results: see the "(i7-floorpush) C A/B" line in DECISIONS (filled when the runs end).
+| arm | under_02 att / wr / ok, GPU-h/ok | under_03 att / wr / ok, GPU-h/ok | pushed demos' yaw (median) |
+|---|---|---|---|
+| today | 9 / 4 / 1, 5.32 | 28 / 3 / 0, - | 9.3 / 18.4 deg |
+| (c) s05 | 9 / 4 / 0, - | 28 / 3 / 2, 1.67 | 3.9 / 2.8 |
+| (c) s10 | 9 / 4 / 1, 5.18 | 28 / 3 / 2, 1.57 | 3.0 / 2.7 |
+| (a) open (55d28864) | 12 / 4 / 0, - | 20 / 1 / 0, - | 6.1 / - |
+| (d) tip 0.05 | 17 / 4 / 0 (low chain 48 / 1107 solved, never written) | 26 / 4 / 1, 6.11 (0 / 784) | = today |
+| (b) both | 11 / 4 / 0 (probe 0 feasible / 1166) | 26 / 4 / 1, 2.73 (0 / 516) | = today |
+
+**Default (82c96a3b, lead decision #41)**: the pitched push in 0.10 m strokes (`ISPATIALGYM_FLOORPUSH_STROKE_M=off` restores one stroke);
+(a), (b), (d) stay off. On the default (fp_def, index 360000): under_01 11 / 4 / 3, 0.95 GPU-h / ok (the blade, not affected); under_02
+12 / 4 / 1, 4.50; under_03 11 / 4 / 3, 0.18 (every push ok). Remaining under_02 failure: the briefcase topples (tilt 84-93 deg) once its yaw
+reaches 8-22 deg within a stroke and the hand meets the end face's corner; next fix (decision needed): a lying rest or a broadside push.
 
 ## Limitations / not done
 
