@@ -168,44 +168,57 @@ def test_the_paths_that_do_not_join_move_nothing(monkeypatch):
         json.dumps(a)
 
 
-def test_the_snap_preread_switch_seats_the_part_when_one_bodys_links_read_stale(monkeypatch):
-    """the female link alone stale after the filter (the partner's meta link read where it stood at the last play): off moves the part by the
-    stale offset; on seats it on the live seat."""
+
+def test_the_join_record_names_a_read_that_moved_across_the_filter(monkeypatch):
+    """i7-symonly: the snap uses the reads made after the filter (where the bodies are); ``snap.preread`` records how far each moved
+    from the reads before it - here the partner's female link 12 cm (a body the restart left at another pose), stale."""
     shift = th.tensor([0.08, -0.09, 0.0], dtype=th.float64)
-    out = {}
-    for on in (False, True):
-        child, parent, _joints = _rule(monkeypatch)
+    child, parent, _joints = _rule(monkeypatch)
 
-        def stale_filter(c, p, f, parent=parent):
-            link = parent.links["F"]
-            fresh = link.get_position_orientation
-            link.get_position_orientation = (lambda fresh=fresh: (fresh()[0] + shift, fresh()[1]))
-            return True
-        monkeypatch.setattr(PRED, "set_pair_collision_filter", stale_filter)
-        if on:
-            monkeypatch.setenv(PRED.SNAP_PREREAD_ENV, "1")
-        else:
-            monkeypatch.delenv(PRED.SNAP_PREREAD_ENV, raising=False)
-        a = PRED.attach_if_aligned(child, parent, equivalences=ZINF)
-        assert a["attached"] and a["snap"]["preread"]["female_m"] == pytest.approx(float(th.linalg.norm(shift)), abs=1e-6)
-        out[on] = child.p.clone()
+    def moved_filter(c, p, f):
+        link = parent.links["F"]
+        fresh = link.get_position_orientation
+        link.get_position_orientation = (lambda fresh=fresh: (fresh()[0] + shift, fresh()[1]))
+        return True
+    monkeypatch.setattr(PRED, "set_pair_collision_filter", moved_filter)
+    a = PRED.attach_if_aligned(child, parent, equivalences=ZINF)
+    pr = a["snap"]["preread"]
+    assert a["attached"] and pr["stale"] and pr["female_m"] == pytest.approx(float(th.linalg.norm(shift)), abs=1e-6) and pr["male_m"] == 0.0
     p_ref, _q_ref = _seated(37.0)
-    assert float(th.linalg.norm(out[True] - p_ref)) < 1e-6
-    assert float(th.linalg.norm(out[False] - (p_ref + shift))) < 1e-5
+    assert float(th.linalg.norm(child.p - (p_ref + shift))) < 1e-5  # seated on the seat where it now is
+    json.dumps(PRED.JOINS)
 
 
-def test_the_snap_preread_default_is_off():
-    assert PRED.SNAP_PREREAD_DEFAULT == "0"
+def test_fresh_reads_record_no_stale_read(monkeypatch):
+    child, parent, _joints = _rule(monkeypatch)
+    a = PRED.attach_if_aligned(child, parent, equivalences=ZINF)
+    assert not a["snap"]["preread"]["stale"] and a["snap"]["preread"]["stale_m"] == 0.0
 
 
-def test_fresh_reads_record_no_stale_read_and_the_same_seat(monkeypatch):
-    """reads that do not move across the filter: both arms seat the part identically, ``preread.stale`` False (the switch does not act)."""
-    seats = []
-    for on in (False, True):
-        child, _parent, _joints = _rule(monkeypatch)
-        (monkeypatch.setenv if on else (lambda k, v: monkeypatch.delenv(k, raising=False)))(PRED.SNAP_PREREAD_ENV, "1")
-        a = PRED.attach_if_aligned(child, _parent, equivalences=ZINF)
-        pr = a["snap"]["preread"]
-        assert not pr["stale"] and pr["stale_m"] == 0.0 and pr["used"] == ("before_filter" if on else "after_filter")
-        seats.append(child.p.clone())
-    assert float(th.linalg.norm(seats[0] - seats[1])) < 1e-12
+def test_full_dump_state_lifts_every_registry_filter_for_the_dump_only():
+    """PAIR_FILTER_FULL_DUMP: the dump sees every object (the recording's active-only filter lifted), the filters are restored after."""
+    class Reg:
+        def __init__(self, objs):
+            self.objs, self._dump_filter = objs, (lambda obj: obj["awake"])
+
+        def set_dump_filter(self, f):
+            self._dump_filter = f
+
+        def dump(self):
+            return [o["name"] for o in self.objs if self._dump_filter(o)]
+
+    regs = [Reg([{"name": "cap", "awake": True}, {"name": "bottle", "awake": False}]), Reg([{"name": "bowl", "awake": False}])]
+    before = [r._dump_filter for r in regs]
+    sim = SimpleNamespace(scenes=[SimpleNamespace(object_registry=r) for r in regs])
+    sim.dump_state = lambda: [r.dump() for r in regs]
+    assert sim.dump_state() == [["cap"], []]
+    assert PRED.full_dump_state(sim) == [["cap", "bottle"], ["bowl"]]
+    assert [r._dump_filter for r in regs] == before and sim.dump_state() == [["cap"], []]
+
+
+def test_the_pair_filter_full_dump_default_is_off(monkeypatch):
+    assert PRED.PAIR_FILTER_FULL_DUMP_DEFAULT == "0"
+    monkeypatch.delenv(PRED.PAIR_FILTER_FULL_DUMP_ENV, raising=False)
+    assert not PRED.pair_filter_full_dump_on()
+    monkeypatch.setenv(PRED.PAIR_FILTER_FULL_DUMP_ENV, "1")
+    assert PRED.pair_filter_full_dump_on()

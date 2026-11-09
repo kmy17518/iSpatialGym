@@ -123,22 +123,24 @@ JOIN_ANGLE_MAX_RAD = 0.10
 JOIN_VERTICAL_MIN_M = -0.004
 JOIN_VERTICAL_MAX_M = 0.023
 JOIN_MODES = ("in_place", "snap", "set_value")
-#: i7-symonly 2026-11-09 (attachment_02 symbolic_only): the ``snap`` join reads its inputs (the male / female link poses, the part's root)
-#: BEFORE the pair's collision filter, whose physics restart (dump, stop, play, load the state) leaves the meta links' poses stale for the
-#: reads right after it - in 26 of the 219 demos with a join under $OFH/out (attachment_02 16, _04 8, _03 2) the snap's male-to-female
-#: distance read 8-49 cm where the alignment check had just read ~1 cm (the same stale value in different instances and jobs, e.g. 0.384345 m
-#: six times), the part was teleported by it, the joint pulled the partner after it (attachment_02 321000: the bottle 12 cm across the
-#: table and turned 1.25 rad in one step) and 22 of those 26 demos ended symbolic_only (the group's pose 8-16 cm off, the layout seated);
-#: the other 193 demos: 0 symbolic_only. "0" (default) reads after the filter as before; "1" reads before
-#: it (the state the filter dumps and reloads: the same physical state). Either way the join record's ``snap.preread`` holds the move of
-#: each read across the filter (``stale_m``) - the count of where the switch acts.
-SNAP_PREREAD_ENV = "ISPATIALGYM_SNAP_PREREAD"
-SNAP_PREREAD_DEFAULT = "0"
-#: a read moved more than this across the filter counts as stale (``preread.stale``)
+#: i7-symonly 2026-11-09 (attachment_02 symbolic_only): :func:`set_pair_collision_filter` restarts the physics (dump, stop, play, load the
+#: state). While a demo records, the registry's dump filter (``Executor.enable_recording_filter``: awake objects only; changed-only under
+#: RECORD_CHANGED_ONLY) leaves the sleeping / unchanged bodies out of that dump; ``stop`` resets them to their pre-play USD pose and the load
+#: skips them, so they stay there: sym_att_on 321002 (trunk_c33959de) the sleeping bottle was 2.12 m away after the filter - at instance
+#: 321000's bottle pose -, sym_att_off 321000 the resting cap 0.35 m back on its start pose. The snap then seats the part from there and the
+#: joint drags the pair: in 26 of the 219 demos with a join under $OFH/out (attachment_02 16, _04 8, _03 2) the snap's male-to-female
+#: distance read 8-49 cm where the alignment check had just read ~1 cm, 22 of them ended symbolic_only (the group pose 8-16 cm off, the
+#: layout seated; the 5w.3 "kick cluster at the attachment place"), the other 193: 0 symbolic_only. "1" dumps every object of every scene
+#: for the restart (the registries' dump filters lifted for that dump, then restored; the recording's changed-only memory untouched);
+#: "0" (default) dumps through the filters as before. Either way the join record's ``snap.preread`` holds the move of the snap's reads
+#: across the filter (male link, female link, the part's root; ``stale`` > :data:`SNAP_PREREAD_STALE_M`) - the count of where it acts.
+PAIR_FILTER_FULL_DUMP_ENV = "ISPATIALGYM_PAIR_FILTER_FULL_DUMP"
+PAIR_FILTER_FULL_DUMP_DEFAULT = "0"
+#: a snap read moved more than this across the filter counts as stale (``snap.preread.stale``)
 SNAP_PREREAD_STALE_M = 0.001
-#: this process's snap joins with a pre-filter read (``joins``), those whose reads moved across the filter (``stale``: where the switch acts)
-#: and those that used the pre-filter reads (``used``); a stale read also logs ``SNAP_PREREAD``
-SNAP_PREREAD_COUNTS: Dict[str, int] = {"joins": 0, "stale": 0, "used": 0}
+#: this process's snap joins (``joins``), those whose reads moved across the filter (``stale``), the filter restarts with the full dump
+#: (``full_dumps``); a stale read also logs ``SNAP_PREREAD``
+SNAP_PREREAD_COUNTS: Dict[str, int] = {"joins": 0, "stale": 0, "full_dumps": 0}
 #: the snap of a part whose recorded symmetry is continuous about one axis (``zinf``: the 5° group about object z, 71 rotations)
 #: removes only its tilt and keeps its spin (:func:`symmetric_snap`): at least this many equivalences, every non-identity one
 #: about one axis (|dot| >= ``SNAP_CONTINUOUS_AXIS_DOT``); the oracle's ``_reaim_attach_targets`` uses the same count
@@ -569,9 +571,25 @@ def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, 
     return True
 
 
-def snap_preread_on() -> bool:
-    """:data:`SNAP_PREREAD_ENV` is "1": the snap's inputs are read before the pair's collision filter (default "0": after it)."""
-    return (os.environ.get(SNAP_PREREAD_ENV) or SNAP_PREREAD_DEFAULT).strip() == "1"
+def pair_filter_full_dump_on() -> bool:
+    """:data:`PAIR_FILTER_FULL_DUMP_ENV` is "1": the pair filter's physics restart dumps every object (default "0": through the dump filters)."""
+    return (os.environ.get(PAIR_FILTER_FULL_DUMP_ENV) or PAIR_FILTER_FULL_DUMP_DEFAULT).strip() == "1"
+
+
+def full_dump_state(sim: Any):
+    """``sim.dump_state()`` with every scene's object-registry dump filter lifted (restored after): the whole world, whatever filter a
+    recording set (:data:`PAIR_FILTER_FULL_DUMP_ENV`)."""
+    saved = []
+    for scene in list(getattr(sim, "scenes", None) or []):
+        reg = getattr(scene, "object_registry", None)
+        if reg is not None and hasattr(reg, "set_dump_filter") and hasattr(reg, "_dump_filter"):
+            saved.append((reg, reg._dump_filter))
+            reg.set_dump_filter(lambda obj: True)
+    try:
+        return sim.dump_state()
+    finally:
+        for reg, flt in saved:
+            reg.set_dump_filter(flt)
 
 
 def snap_inputs(child: Any, parent: Any, child_link: str, parent_link: str) -> Tuple[th.Tensor, ...]:
@@ -582,12 +600,12 @@ def snap_inputs(child: Any, parent: Any, child_link: str, parent_link: str) -> T
     return p_m, q_m, p_f, q_f, p_o, q_o
 
 
-def _preread_record(pre: Sequence[th.Tensor], post: Sequence[th.Tensor], used: bool) -> Dict[str, Any]:
-    """The join record's ``preread`` (:data:`SNAP_PREREAD_ENV`): which reads the snap used, how far each position read moved across the
-    filter (m: male link, female link, the part's root; ``stale_m`` the largest) and ``stale`` (> :data:`SNAP_PREREAD_STALE_M`)."""
+def _preread_record(pre: Sequence[th.Tensor], post: Sequence[th.Tensor]) -> Dict[str, Any]:
+    """The join record's ``snap.preread`` (:data:`PAIR_FILTER_FULL_DUMP_ENV`): how far each of the snap's position reads moved across the
+    pair filter (m: male link, female link, the part's root; ``stale_m`` the largest) and ``stale`` (> :data:`SNAP_PREREAD_STALE_M`)."""
     d = [float(th.linalg.norm(post[k] - pre[k])) for k in (0, 2, 4)]
-    return {"used": "before_filter" if used else "after_filter", "male_m": round(d[0], 6), "female_m": round(d[1], 6), "root_m": round(d[2], 6),
-            "stale_m": round(max(d), 6), "stale": bool(max(d) > SNAP_PREREAD_STALE_M)}
+    return {"male_m": round(d[0], 6), "female_m": round(d[1], 6), "root_m": round(d[2], 6), "stale_m": round(max(d), 6),
+            "stale": bool(max(d) > SNAP_PREREAD_STALE_M)}
 
 
 def snap_join(child: Any, parent: Any, child_link: str, parent_link: str,
@@ -595,24 +613,22 @@ def snap_join(child: Any, parent: Any, child_link: str, parent_link: str,
     """The ``snap`` join of :func:`attach_if_aligned` (the pair's collision already filtered): the child's root moved by
     :func:`symmetric_snap` (its equivalences: ``equivalences``, else the registered pair's), both objects kept still, and the
     fixed joint created at the relative pose that transform gives (:func:`snap_joint_frame`). ``pre`` (:func:`snap_inputs` read before
-    the filter, i7-symonly): with :func:`snap_preread_on` the snap uses them, else the reads made here; ``info["preread"]`` compares the
-    two either way. Returns ``(joined, info)``."""
+    the filter, i7-symonly): ``info["preread"]`` records how far the reads made here moved from them (the snap uses the reads made here:
+    they are where the bodies are). Returns ``(joined, info)``."""
     post = snap_inputs(child, parent, child_link, parent_link)
-    used = pre is not None and snap_preread_on()
-    p_m, q_m, p_f, q_f, p_o, q_o = pre if used else post
+    p_m, q_m, p_f, q_f, p_o, q_o = post
     eqs = equivalences if equivalences is not None else (attachment_context(child, parent) or {}).get("equivalences") or []
     p_fix, q_fix, info = symmetric_snap(p_m, q_m, p_f, q_f, q_o, eqs)
     if pre is not None:
-        info["preread"] = _preread_record(pre, post, used)
+        info["preread"] = _preread_record(pre, post)
         SNAP_PREREAD_COUNTS["joins"] += 1
-        SNAP_PREREAD_COUNTS["used"] += int(used)
         if info["preread"]["stale"]:
             import logging
 
             SNAP_PREREAD_COUNTS["stale"] += 1
-            logging.getLogger(__name__).info("SNAP_PREREAD %s -> %s: a read moved %.4f m across the pair filter (%s); the snap used the reads %s",
+            logging.getLogger(__name__).info("SNAP_PREREAD %s -> %s: a read moved %.4f m across the pair filter (%s); full dump %s",
                                              getattr(child, "name", child), getattr(parent, "name", parent), info["preread"]["stale_m"],
-                                             {k: info["preread"][k] for k in ("male_m", "female_m", "root_m")}, info["preread"]["used"])
+                                             {k: info["preread"][k] for k in ("male_m", "female_m", "root_m")}, pair_filter_full_dump_on())
     p_new, q_new = apply_fix(p_fix, q_fix, p_o, q_o)
     child.set_position_orientation(position=p_new.float(), orientation=q_new.float())
     child.keep_still()
@@ -759,7 +775,13 @@ def set_pair_collision_filter(child: Any, parent: Any, filtered: bool) -> bool:
     if getattr(og.sim, "_editing_usd", False):
         edit()
     elif og.sim.is_playing():
-        state = og.sim.dump_state()
+        # i7-symonly (PAIR_FILTER_FULL_DUMP_ENV): a recording's dump filter leaves sleeping / unchanged bodies out of this dump, and the
+        # stop resets them to their pre-play pose
+        if pair_filter_full_dump_on():
+            SNAP_PREREAD_COUNTS["full_dumps"] += 1
+            state = full_dump_state(og.sim)
+        else:
+            state = og.sim.dump_state()
         og.sim.stop()
         with og.sim.editing_usd():
             edit()
@@ -858,7 +880,7 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     if mode == "set_value":
         a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
     else:
-        # i7-symonly (SNAP_PREREAD_ENV): the snap's inputs read before the filter's physics restart, used when the switch is on
+        # i7-symonly (PAIR_FILTER_FULL_DUMP_ENV): the snap's inputs read before the filter's physics restart, for the record's preread
         pre = snap_inputs(child, parent, a["child_link"], a["parent_link"]) if mode == "snap" else None
         set_pair_collision_filter(child, parent, True)
         if mode == "snap":
