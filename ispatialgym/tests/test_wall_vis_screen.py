@@ -1,6 +1,6 @@
 """i7-yield2 (2026-11-08): world_vertical_04 lost 49 of 51 attempts to [too_few_visible] at settle_validate (the init view of a bare wall:
 floor, wall, target). ``ISPATIALGYM_WALL_VIS_SCREEN=1`` screens each draw (spot, delta, init stance) with the settle check's own rule at
-the drawn init view and redraws within the attempt; off, the draw is the one draw of before and nothing is rendered."""
+the drawn init view and redraws within the attempt (default on since the A/B); =0, the draw is the one draw of before and nothing is rendered."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -52,6 +52,8 @@ def init_draw(monkeypatch):
 
 def test_switch_parsing(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_WALL_VIS_SCREEN", raising=False)
+    assert AW.wall_vis_screen_draws() == 40  # default on (i7-yield2 A/B, 2026-11-08)
+    monkeypatch.setenv("ISPATIALGYM_WALL_VIS_SCREEN", "0")
     assert AW.wall_vis_screen_draws() == 0
     monkeypatch.setenv("ISPATIALGYM_WALL_VIS_SCREEN", "1")
     assert AW.wall_vis_screen_draws() == 40
@@ -60,7 +62,7 @@ def test_switch_parsing(monkeypatch):
 
 
 def test_off_draws_once_and_renders_nothing(monkeypatch, init_draw):
-    monkeypatch.delenv("ISPATIALGYM_WALL_VIS_SCREEN", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_WALL_VIS_SCREEN", "0")
     t = _task([])
     with pytest.raises(_Stop):
         t.sample_instance(np.random.default_rng(0))
@@ -76,7 +78,7 @@ def test_on_redraws_until_the_init_view_shows_enough_objects(monkeypatch, init_d
     assert len(t.drawn) == 3 and t.kit.stats == {"vis_screen.redrawn": 2, "vis_screen.passed": 1, "vis_screen.draws_3": 1}
     # the first draw is the one draw of the switch off (same rng stream)
     off = _task([])
-    monkeypatch.delenv("ISPATIALGYM_WALL_VIS_SCREEN")
+    monkeypatch.setenv("ISPATIALGYM_WALL_VIS_SCREEN", "0")
     with pytest.raises(_Stop):
         off.sample_instance(np.random.default_rng(0))
     assert t.drawn[0] == off.drawn[0]

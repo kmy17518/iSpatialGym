@@ -342,9 +342,11 @@ def wall_vis_screen_draws() -> int:
     """i7-yield2 (2026-11-08, world_vertical_04: 49 of 51 attempts rejected [too_few_visible] at settle_validate, the init view of a bare
     wall shows only the floor, the wall and the target): the draw (spot, delta, init stance) is screened at once with the settle check's
     own rule (:meth:`AlignmentWall.visible_objects` from the init camera: ``min_visible_objects`` objects of ``min_object_pixels``) and
-    redrawn within the attempt, at most this many draws; the settle check stays. ``ISPATIALGYM_WALL_VIS_SCREEN=1`` turns it on (default
-    off: 0), ``ISPATIALGYM_WALL_VIS_SCREEN_DRAWS`` (default 40) bounds the draws."""
-    if os.environ.get("ISPATIALGYM_WALL_VIS_SCREEN", "0") != "1":
+    redrawn within the attempt, at most this many draws; the settle check stays. DEFAULT ON since 2026-11-08 (i7-yield2 A/B, owner mandate
+    "speed up / make yield better the slow low yield aliases": world_vertical_04 51/2/2 0.277 -> 5/4/4 0.080 GPU-h per success, _05 33/4/4
+    0.089 -> 10/4/4 0.071, control _01 every screen passed at the first draw); ``ISPATIALGYM_WALL_VIS_SCREEN=0`` turns it off,
+    ``ISPATIALGYM_WALL_VIS_SCREEN_DRAWS`` (default 40) bounds the draws."""
+    if os.environ.get("ISPATIALGYM_WALL_VIS_SCREEN", "1") != "1":
         return 0
     return max(1, int(os.environ.get("ISPATIALGYM_WALL_VIS_SCREEN_DRAWS", "40")))
 
