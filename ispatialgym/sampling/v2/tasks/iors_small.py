@@ -513,6 +513,13 @@ PUSH_LINE_COM_ENV = "ISPATIALGYM_PUSH_LINE_COM"
 #: logged candidate deaths were the place screening's exact IK, each after a full grasp search). Only for the relations of
 #: :data:`PLACE_PARTNER_RETRY_RELATIONS_ENV` (default "nextto"). Default "0" (off). Kit ``place_retry.armed`` / ``.retried.<reason>`` /
 #: ``.rescued`` / ``.exhausted``
+#: i7-nextto 2026-11-09 (round 2): "1" = nextto's grasp tiers are each split into the top-down grasps (approach within 45 deg of straight
+#: down at the target's rest pose) first and the other grasps after them, so F is searched over the top grasps and only when they have no
+#: feasible (yaw, grasp) at the focus over the rest (the flush / inclined tiers keep their order). Every rule unchanged; which grasp a
+#: candidate takes changes. Measured on nextto_02 (salt shaker): every written instance of int1_1 / int2_10b (7 / 7) holds a top grasp,
+#: and every place-screening failure of i7nx_n02_off / _on (20 / 20, 74 / 74) a side grasp. Default "0". Kit ``top_first.top`` /
+#: ``.rest`` (the tier the grasp came from), ``.no_top`` (a tier without a top grasp)
+NEXTTO_TOP_FIRST_ENV = "ISPATIALGYM_NEXTTO_TOP_FIRST"
 PLACE_PARTNER_RETRY_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY"
 PLACE_PARTNER_RETRY_RELATIONS_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY_RELATIONS"
 #: the segment-draw rejections a fresh partner pose can change (the place screening's own codes are marked by ``_place_screen_reject``)
@@ -566,6 +573,17 @@ def push_line_com_on() -> bool:
 
 def touch_built_tilts_on() -> bool:
     return (os.environ.get(TOUCH_BUILT_TILTS_ENV) or "0").strip() == "1"
+
+
+def nextto_top_first_on() -> bool:
+    return (os.environ.get(NEXTTO_TOP_FIRST_ENV) or "0").strip() == "1"
+
+
+def top_down_grasp(eef_in_object, rest_quat, cos_max: float = -math.sqrt(0.5)) -> bool:
+    """The grasp's approach axis (eef z) points within 45 deg of straight down when the target rests at ``rest_quat``."""
+    a_obj = C.quat_to_mat(G.t(eef_in_object[1]).float())[:, 2]
+    a_world = G.rotate(G.t(rest_quat).float(), a_obj)
+    return float(a_world[2]) <= cos_max
 
 
 def place_partner_retries(relation: Optional[str]) -> int:
@@ -1320,6 +1338,24 @@ class IORSSmall(SamplerV2):
         tiers = [self.grasps_flush]
         if len(self.grasps_flush) < len(self.grasps):
             tiers.append(self.grasps)
+        kinds: List[Optional[str]] = [None] * len(tiers)
+        if self.relation == "nextto" and nextto_top_first_on():
+            # i7-nextto (ISPATIALGYM_NEXTTO_TOP_FIRST): each tier's top-down grasps first, its other grasps after them
+            split, kinds = [], []
+            for gs in tiers:
+                top = [g for g in gs if top_down_grasp(g.pose, self.rest["target"])]
+                rest = [g for g in gs if not any(g is t for t in top)]
+                if not top:
+                    TT._count(self, "top_first.no_top")
+                if not getattr(self, "_top_first_logged", False):
+                    log.info("%s: NEXTTO_TOP_FIRST top %s, then %s", self.gp.variant, [g.name for g in top], [g.name for g in rest])
+                    self._top_first_logged = True
+                for kind, sub in (("top", top), ("rest", rest)):
+                    if sub:
+                        split.append(sub)
+                        kinds.append(kind)
+            tiers = split or tiers
+            kinds = kinds if split else [None] * len(tiers)
         nb_top = self.neighbor_start_top()  # start_region_on_neighbors: the target is drawn on the neighbours' cells
         if self.pair_goal_align() is not None:
             yaws = self.pair_target_yaws(manip)
@@ -1334,8 +1370,10 @@ class IORSSmall(SamplerV2):
                 t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
                                                  top=self.top if nb_top is None else nb_top, scale_key=self.choice.models["target"].scale, arms=arms,
                                                  arm_bands=getattr(self, "arm_bands", None) or None, **yaw_kw)
-                if i > 0:
+                if i > 0 and kinds[i] is None:
                     log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.variant, grasp.grasp_name)
+                if kinds[i] is not None:
+                    TT._count(self, f"top_first.{kinds[i]}")
                 return t_pose, grasp
             except Reject as e:
                 last = e

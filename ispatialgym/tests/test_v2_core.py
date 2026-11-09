@@ -817,6 +817,27 @@ def test_place_partner_retry_switch_and_phase_timer(monkeypatch):
     with M.phase_timer(SimpleNamespace(), "cand_grasp"):  # no kit: nothing counted, nothing raised
         pass
 
+
+def test_nextto_top_first_grasp_kind(monkeypatch):
+    """i7-nextto: a grasp is top-down when its approach (eef z) points within 45 deg of straight down at the target's rest pose."""
+    import math as _m
+
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2.tasks import iors_small as M
+
+    ident = th.tensor([0.0, 0.0, 0.0, 1.0])
+    down = (th.zeros(3), C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0])))
+    side = (th.zeros(3), C.eef_quat(th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 1.0, 0.0])))
+    assert M.top_down_grasp(down, ident) and not M.top_down_grasp(side, ident)
+    flip = th.tensor([1.0, 0.0, 0.0, 0.0])  # the target resting upside down (180 deg about x): its "down" grasp approaches upward
+    assert not M.top_down_grasp(down, flip)
+    tilt = th.tensor([0.0, _m.sin(_m.radians(30) / 2), 0.0, _m.cos(_m.radians(30) / 2)])
+    assert M.top_down_grasp(down, tilt)
+    monkeypatch.delenv(M.NEXTTO_TOP_FIRST_ENV, raising=False)
+    assert not M.nextto_top_first_on()
+    monkeypatch.setenv(M.NEXTTO_TOP_FIRST_ENV, "1")
+    assert M.nextto_top_first_on()
+
 def test_robust_under_ontop_wrapper_branches(monkeypatch):
     """D-007 option A: OmniGibson's verdict, then the contact-patch rays, then the geometric branch; the branch is logged."""
     import omnigibson.utils.bddl_utils as BU
