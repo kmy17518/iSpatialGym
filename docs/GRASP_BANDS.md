@@ -2712,6 +2712,35 @@ approach_untrackable (joint jump 0.22 rad at waypoint 0), the retreat's witness 
 jump 0.21 rad. umb3 is not adopted; umb2 stays the umbrella root. Next: the narrowest B-stance fix (a base_link x finger term in the floor
 map's approach check, or no tilted top grasps at the deep-crouch trunks), not done here.
 
+### i7-goalmaps r4 (lead decision #68): the B base x hand screen
+
+**f30014ac `ISPATIALGYM_B_BASE_FINGER_SCREEN`** (default off; `shadow` = predict and count only; `generation.b_base_finger_screen` for an
+alias-scoped default). In the F_init pre-screen at a stance B, each (yaw, grasp) pair's straight approach (`IK.pre_pose` -> the grasp, 11
+points) is tested for a working-hand sphere overlapping a base_link sphere, with cuRobo's own self-collision pair list and paddings: one FK
+per arm gives the hand's spheres in the eef frame and the base_link's in its frame, so no IK is needed. A pair is dropped when the row and
+its twin both overlap. In shadow mode the B exact IK of each predicted pair is scored (`shadow_confirmed` = it failed, `shadow_false` = it
+passed). Kit `b_base_finger_screen.{checked,kept,dropped,shadow_drop,shadow_confirmed,shadow_false,no_model,no_pairs}`; tests
+test_b_base_finger_screen.py.
+
+**Where it acts (CPU count over the int2 logs):** base_link x hand self-collisions in B exact-IK failures are touching_large_02's (62 of 106
+in gm_t02_wide_on, 135 of 191 in gm_t02_r3); elsewhere under_large_02 has 1 of 14, and the other hits (inside_large_02, under_large_01,
+ontop_large_02) are init -> B transition sweeps or tracked chains, not the B pick. The default is scoped to touching_large_02.
+
+**The shoulder joint-limit B failures (diagnosis only):** joint 2 in 21 of 33 (wide_on) / 20 of 37 (r3), then joints 4-7; 0-46 mrad from
+the limit (the exact IK's witness margin: "every solution found; the approach from it would stall"), mostly at the stretched trunk (2.0, 0)
+and the deep crouch for the floor umbrella. No fix without changing the shared margin gate.
+
+**A/B and default.** touching_large_02 N 4 v2only, root umb2, trunk_f30014ac, svl titanrtx:
+
+| arm | att / written / ok | GPU-h per success | B exact-IK fails (base x hand) |
+|---|---|---|---|
+| off (shadow), gm_t02_bf_shadow | 47 / 1 / 1 | 3.25 | 97 (46) |
+| on, gm_t02_bf_on | 34 / 3 / 3 | 0.77 | 29 (0) |
+
+The screen dropped 105 of 15814 checked pairs. In shadow, all 44 predicted pairs that reached the B exact IK failed there (`shadow_false`
+0), so it removes nothing that passes. The off arm reproduces gm_t02_wide_on (46 / 1 / 1, 3.39). **e8065680:**
+`generation.b_base_finger_screen` true in touching_large_02's customs only (a test pins it); `ISPATIALGYM_B_BASE_FINGER_SCREEN` overrides.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
