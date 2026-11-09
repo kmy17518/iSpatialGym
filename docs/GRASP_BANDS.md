@@ -5470,6 +5470,9 @@ v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2)
 | nextto_03 | 4 / 4 | 4 / 4 | legs streamed |
 
 - DEFAULT stays OFF: the path is shared by every grasp transit (lead #54: stop for the count).
+- **DEFAULT ON in c421a6c0, for all aliases** (lead decision #57, under the owner's mandate, on the count and the re-demo above); `=0`
+  restores. Snapshot trunk_c421a6c0. Fresh confirmation: open_large_03 N 4 on the defaults, no env, tag al3_def (base index 352400).
+  Next validation: inside_01, nextto_03 and ontop_large_03, the other aliases whose demos ran a dip leg.
 
 ## Limitations / not done
 
