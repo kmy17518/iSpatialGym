@@ -748,6 +748,45 @@ def _switch(env: str, gp: Any, key: str) -> bool:
         return False
 
 
+#: i7-goalmaps r4 2026-11-09 (lead decision #68): ``ISPATIALGYM_B_BASE_FINGER_SCREEN`` (default off; ``shadow`` = predict and count only) - the
+#: F_init pre-screen at a stance B drops the (yaw, grasp) pairs whose straight approach (pre-grasp -> grasp) brings a sphere of the working
+#: hand into one of the robot's base_link spheres (cuRobo's self-collision pairs and paddings - what the exact approach check rejects as
+#: "self-collision (base_link x <arm>_gripper_finger_link*)"), for the row AND its twin. A geometric check without IK: the hand's spheres
+#: are rigid in the eef frame and the base_link's in the base frame. touching_large_02 (gm_t02_wide_on): 67 of 106 B exact-IK failures were
+#: this collision (tilted top grasps at the deep-crouch trunks). Kit b_base_finger_screen.{checked,dropped,kept}; shadow:
+#: .shadow_drop and, at the B exact IK of a predicted pair, .shadow_confirmed (it failed) / .shadow_false (it passed).
+B_BASE_FINGER_SCREEN_ENV = "ISPATIALGYM_B_BASE_FINGER_SCREEN"
+#: points along the approach line the screen tests (the exact check tracks it in 1 cm steps; the hand moves 10 cm)
+B_BASE_FINGER_POINTS = 11
+
+
+def b_base_finger_mode(gp: Any = None) -> str:
+    """"off" | "on" | "shadow": the env var when set, else ``generation.b_base_finger_screen`` (true / "shadow"), else off."""
+    v = os.environ.get(B_BASE_FINGER_SCREEN_ENV)
+    if v is None or v.strip() == "":
+        try:
+            v = gp.gen("b_base_finger_screen", None) if gp is not None else None
+        except Exception:  # noqa: BLE001
+            v = None
+    if v is None or v is False:
+        return "off"
+    v = str(v).strip().lower()
+    if v == "shadow":
+        return "shadow"
+    return "on" if v in ("1", "on", "true", "yes") else "off"
+
+
+def hand_base_penetration(line_pos: th.Tensor, R_e: th.Tensor, hand_local: th.Tensor, hand_r: th.Tensor, base_w: th.Tensor, base_r: th.Tensor,
+                          pairs: th.Tensor) -> th.Tensor:
+    """Worst penetration (m, > 0 = overlap) per approach of the hand's spheres with the base's along it: ``line_pos`` (P, n, 3) eef positions,
+    ``R_e`` (P, 3, 3) the eef rotation (constant along a straight approach), ``hand_local`` (H, 3) / ``hand_r`` (H,) the hand spheres in the
+    eef frame (radius + padding), ``base_w`` (B, 3) / ``base_r`` (B,) the base spheres in the world, ``pairs`` (K, 2) (hand index, base index)."""
+    hand_w = line_pos[:, :, None, :] + th.einsum("pij,hj->phi", R_e, hand_local)[:, None, :, :]  # (P, n, H, 3)
+    d = th.linalg.norm(hand_w[:, :, pairs[:, 0], :] - base_w[pairs[:, 1]][None, None], dim=-1)  # (P, n, K)
+    pen = hand_r[pairs[:, 0]][None, None] + base_r[pairs[:, 1]][None, None] - d
+    return pen.amax(dim=(1, 2))
+
+
 def carry_centred_on(gp: Any = None) -> bool:
     return _switch(CARRY_CENTRED_ENV, gp, "carry_centred")
 
@@ -3460,6 +3499,117 @@ class IORSLarge(SamplerV2):
             self._drop_leg_records(place.name)
             raise Reject(e.reason, f"{e}; straighten-then-navigate: " + "; ".join(errors))
 
+    # ------------------------------------------------------------------ i7-goalmaps r4: the base_link x hand screen at B (lead decision #68)
+
+    def _base_finger_model(self, st: Stance, arm: str) -> Optional[Dict[str, th.Tensor]]:
+        """The hand's spheres in its eef frame and the base_link's in the base_link frame (radius + cuRobo's self-collision padding), and
+        the (hand, base) sphere pairs cuRobo's self-collision checks - from one FK at ``st`` (cached per arm). None when the backend has
+        no sphere model or no such pair."""
+        cache = self.__dict__.setdefault("_bf_models", {})
+        if arm in cache:
+            return cache[arm]
+        model = None
+        try:
+            from ispatialgym.oracle import r1pro_model as M
+
+            be = self.kit.backend
+            q = self.ikc.q_locked(st)
+            fk = self.kit.fk([M.EEF_LINK[arm], "base_link"], q)
+            sph, links = be.robot_spheres_world(q)
+            sph = sph[0].float()
+            entry = be.kin_entry("whole_body")
+            scfg = entry.fk.get_self_collision_config()
+            pairs = scfg.collision_pairs.long().cpu()
+            pad = scfg.sphere_padding.float().cpu()
+            hand = [i for i, l in enumerate(links) if l and l.startswith(f"{arm}_gripper") and float(sph[i, 3]) > 0]
+            base = [i for i, l in enumerate(links) if l == "base_link" and float(sph[i, 3]) > 0]
+            hpos = {i: k for k, i in enumerate(hand)}
+            bpos = {i: k for k, i in enumerate(base)}
+            kp = []
+            for i, j in pairs.tolist():
+                if i in hpos and j in bpos:
+                    kp.append((hpos[i], bpos[j]))
+                elif j in hpos and i in bpos:
+                    kp.append((hpos[j], bpos[i]))
+            if kp:
+                pe, qe = G.t(fk[M.EEF_LINK[arm]][0]).float(), G.t(fk[M.EEF_LINK[arm]][1]).float()
+                pb, qb = G.t(fk["base_link"][0]).float(), G.t(fk["base_link"][1]).float()
+                Re, Rb = G.T.quat2mat(qe).float(), G.T.quat2mat(qb).float()
+                hi, bi = th.tensor(hand), th.tensor(base)
+                model = {"hand_local": (sph[hi, :3] - pe) @ Re, "hand_r": sph[hi, 3] + pad[hi], "base_local": (sph[bi, :3] - pb) @ Rb,
+                         "base_r": sph[bi, 3] + pad[bi], "pairs": th.tensor(kp, dtype=th.long)}
+            else:
+                TT._count(self, "b_base_finger_screen.no_pairs")
+        except Exception as e:  # noqa: BLE001 - the screen never fails the attempt: without a model it passes everything
+            log.info("%s: base-finger screen model unavailable (%r)", self.gp.variant, e)
+            TT._count(self, "b_base_finger_screen.no_model")
+        cache[arm] = model
+        return model
+
+    def _base_finger_pen(self, st: Stance, arm: str, eefs: Sequence[G.Pose]) -> Optional[th.Tensor]:
+        """The worst hand x base_link sphere penetration along each eef pose's straight approach (``IK.pre_pose`` -> the pose) from ``st``."""
+        model = self._base_finger_model(st, arm)
+        if model is None or not eefs:
+            return None
+        bkey = tuple(round(float(v), 4) for v in st.base_pose2d)
+        bcache = self.__dict__.setdefault("_bf_base", {})
+        if bkey not in bcache:
+            fk = self.kit.fk(["base_link"], self.ikc.q_locked(st))
+            pb, Rb = G.t(fk["base_link"][0]).float(), G.T.quat2mat(G.t(fk["base_link"][1]).float()).float()
+            bcache[bkey] = model["base_local"] @ Rb.T + pb
+        base_w = bcache[bkey]
+        ts = th.linspace(0.0, 1.0, B_BASE_FINGER_POINTS)
+        pos, rots = [], []
+        for eef in eefs:
+            pre = IK.pre_pose(eef)
+            p0, p1 = G.t(pre[0]).float(), G.t(eef[0]).float()
+            pos.append(p0[None] + ts[:, None] * (p1 - p0)[None])
+            rots.append(G.T.quat2mat(G.t(eef[1]).float()).float())
+        return hand_base_penetration(th.stack(pos), th.stack(rots), model["hand_local"], model["hand_r"], base_w, model["base_r"], model["pairs"])
+
+    def _base_finger_filter(self, F_a: Sequence[Tuple[float, Any]], fxy, z_init: float, st: Stance, arm: str) -> List[Tuple[float, Any]]:
+        """F_init at ``st`` without the pairs whose row AND twin approach (the twin only with ``generation.grasp_twins``) put the hand into the
+        base_link (:meth:`_base_finger_pen` > 0); shadow mode: all kept, the predicted ones remembered for the B exact IK's outcome."""
+        mode = b_base_finger_mode(self.gp)
+        twins = TT.grasp_twins_on(self)
+        eefs = []
+        for yaw, g in F_a:
+            eef = IK.grasp_pose(self.pose_on(fxy, float(yaw), z_init), g.pose)
+            eefs.append(eef)
+            if twins:
+                tw = C.twin_pose((G.t(eef[0]), G.t(eef[1])))
+                eefs.append((G.t(tw[0]), G.t(tw[1])))
+        pen = self._base_finger_pen(st, arm, eefs)
+        if pen is None:
+            return list(F_a)
+        k = 2 if twins else 1
+        hit = (pen.reshape(len(F_a), k) > 0.0).all(dim=1).tolist()
+        TT._countn(self, "b_base_finger_screen.checked", len(F_a))
+        pred = self.__dict__.setdefault("_bf_pred", {})
+        bkey = (tuple(round(float(v), 3) for v in st.base_pose2d), arm)
+        yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))
+        out = []
+        for (yaw, g), h in zip(F_a, hit):
+            if h:
+                pred[(bkey, int(round(float(yaw) / yaw_step)), getattr(g, "name", str(g)))] = True
+                TT._count(self, "b_base_finger_screen.shadow_drop" if mode == "shadow" else "b_base_finger_screen.dropped")
+                if mode == "shadow":
+                    out.append((yaw, g))
+            else:
+                TT._count(self, "b_base_finger_screen.kept")
+                out.append((yaw, g))
+        return out
+
+    def _base_finger_shadow_outcome(self, st: Stance, arm: str, yaw0: float, g: Any, ok: bool) -> None:
+        """Shadow mode: the B exact IK's verdict on a pair the screen predicted to collide (confirmed = it failed, false = it passed)."""
+        pred = getattr(self, "_bf_pred", None)
+        if not pred:
+            return
+        yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))
+        key = ((tuple(round(float(v), 3) for v in st.base_pose2d), arm), int(round(float(yaw0) / yaw_step)), getattr(g, "name", str(g)))
+        if pred.pop(key, None):
+            TT._count(self, "b_base_finger_screen.shadow_false" if ok else "b_base_finger_screen.shadow_confirmed")
+
     def carry_drive_arms(self, place: Stance, tname: str, arm: str) -> Optional[Dict[str, th.Tensor]]:
         """The arms (arm -> 7 joints) the carried drive after B's departure transition is checked with; None = :meth:`record_path`'s
         default (the departing stance's arms, the holding arm at its carry configuration). The inside mode overrides it."""
@@ -3662,6 +3812,8 @@ class IORSLarge(SamplerV2):
                         F_a = []  # i7-overhang: the direct pairs are dropped in mode only - no batched screen of them
                     else:
                         F_a = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), st, a, self.grasp_ignore_objects()).get(0, [])
+                        if F_a and b_base_finger_mode(self.gp) != "off":  # i7-goalmaps r4 (lead decision #68)
+                            F_a = self._base_finger_filter(F_a, fxy, z_init, st, a)
                     if ov_opts is not None and kind != "floor":
                         F_a = self._overhang_pairs(manip, F_a, fxy, yaws, z_init, ov_opts, arm=a, st=st)
                     by_arm[a] = (st, F_a)
@@ -5165,6 +5317,7 @@ class IORSLarge(SamplerV2):
                             why_b.append(f"overhang pick: {why_ov}")
                             log.info("%s: overhang pick fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.variant, yaw0, getattr(g, "name", g),
                                      manip.translate, manip.tilt, why_ov[:900])
+                    self._base_finger_shadow_outcome(st_of[a0], a0, yaw0, g, res is not None and res.ok)
                     if res is None or not res.ok:
                         b_ik_cache[bk] = None
                         fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
