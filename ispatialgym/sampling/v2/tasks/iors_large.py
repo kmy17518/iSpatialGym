@@ -4864,7 +4864,7 @@ class IORSLarge(SamplerV2):
                 else:
                     settled = post
                 eef, pre, res, pick = grasp
-                overpath = None
+                overpath = gate = None
                 if OPATH.on():
                     # i7-overpath 2026-11-08 (owner 3(a)): the transit over the book from the escape to this pre-grasp, planned and recorded
                     overpath, key_o, why_o = self._overpath_plan(st, grasp_st, arm, chain, settled, pre, eef)
@@ -4898,6 +4898,8 @@ class IORSLarge(SamplerV2):
                          "B" if grasp_st is st else f"B backed off to stand-off {grasp_st.stand_off:.2f} at trunk ({grasp_st.translate:.2f}, {grasp_st.tilt:.2f})")
                 if overpath is not None:
                     facts["overpath"] = {k: overpath.get(k) for k in ("design", "source", "clearance_m", "min_book_clearance_m", "max_step_rad", "start", "n_waypoints")}
+                if gate is not None:
+                    facts["transit_gate"] = dict(gate)  # i7-startdraw2: the ramp the gate predicts the oracle takes (joined with the demo's)
                 return {"arm": arm, "stance": st, "grasp_stance": grasp_st, "t_pose": t_pose, "post_pose": settled, "predicted_pose": post, "eef": eef, "pre": pre, "res": res,
                         "pick": pick, "chain": chain, "push_m": float(push), "facts": facts, "overpath": overpath}, ""
         TT._count(self, "pick_overhang.failed")
@@ -5008,16 +5010,26 @@ class IORSLarge(SamplerV2):
         p_prev = tuple(x.clone() for x in tgt.get_position_orientation())
         t0 = time.time()
         try:
+            # the oracle's q_hint is the pick's RECORDED pre-grasp witness (the [pre-grasp, grasp] chain's solution at the grasp stance, what
+            # the sidecar carries) - a fresh IK of the pre-grasp alone may land in another branch and judge another ramp (the first version of
+            # this gate: predicted straight, the live direct ramp penetrated the desk in 6 of 8 demos)
+            q_w = self.ikc.solutions.get((arm, self.ikc._pose_key(pre)))
             tgt.set_position_orientation(G.t(settled[0]).float(), G.t(settled[1]).float())
             tgt.keep_still()
             self.kit.sync_world()
-            r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
-            if not r_w.ok or r_w.q is None:
-                with self.ikc.ignoring([tgt]):  # the pick's own pre-grasp check (``_overhang_grasp``) ran with the target out of the world
-                    r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
-            if not r_w.ok or r_w.q is None:
-                return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
-            traj, note = OPP.plan_transit(self.kit, arm, q0, pre, G.t(r_w.q).float().reshape(-1), list(self.support_objects()), [(self.tname, tgt)],
+            if q_w is not None:
+                TT._count(self, "pick_transit_gate.witness.recorded")
+                q_hint = G.t(q_w).float().reshape(-1)
+            else:
+                TT._count(self, "pick_transit_gate.witness.fresh_ik")
+                r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+                if not r_w.ok or r_w.q is None:
+                    with self.ikc.ignoring([tgt]):  # the pick's own pre-grasp check (``_overhang_grasp``) ran with the target out of the world
+                        r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+                if not r_w.ok or r_w.q is None:
+                    return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
+                q_hint = G.t(r_w.q).float().reshape(-1)
+            traj, note = OPP.plan_transit(self.kit, arm, q0, pre, q_hint, list(self.support_objects()), [(self.tname, tgt)],
                                           approach=[eef], inflation=None, straight_only=True)
             if traj is None:
                 return None, "no_straight", f"from the {start}: {str(note.get('why'))[:300]}"
@@ -5026,7 +5038,7 @@ class IORSLarge(SamplerV2):
                 return None, key_v, f"{note.get('branch')}: {why_v}"
             log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)", self.gp.variant, arm, start, grasp_st.name,
                      note.get("branch"), len(traj), time.time() - t0)
-            return {"branch": str(note.get("branch")), "start": start, "n": int(len(traj))}, "", ""
+            return {"branch": str(note.get("branch")), "start": start, "n": int(len(traj)), "witness": "recorded" if q_w is not None else "fresh_ik"}, "", ""
         finally:
             TT._countn(self, "pick_transit_gate.ms", int(round(1000 * (time.time() - t0))))
             tgt.set_position_orientation(*p_prev)

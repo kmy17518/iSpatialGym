@@ -13,6 +13,9 @@ from ispatialgym.tests.test_overhang_overpath import BOOK_P1, IL, _hb_hull, _p1_
 ENV = "ISPATIALGYM_PICK_TRANSIT_GATE"
 
 def _gate(s, q_start, pre_pos):
+    if not hasattr(s.ikc, "solutions"):
+        s.ikc.solutions = {}
+    s.ikc._pose_key = lambda p: tuple(round(float(v), 4) for v in th.as_tensor(p[0]).reshape(-1).tolist())
     s._overpath_start = lambda st, gst, arm, chain, settled: (q_start, "escape", "")
     s.support_objects = lambda: []
     s._pick_transit_gate = IL.IORSLarge._pick_transit_gate.__get__(s)
@@ -77,3 +80,21 @@ def test_gate_rejects_without_a_witness(monkeypatch):
     s.ikc.exact = lambda poses, st, arm, **kw: IKResult(False, None, "ik_reach: no solution", 1)
     facts, key, why = _gate(s, _p1_q0(), [0.0, -0.16, 0.79])
     assert facts is None and key == "witness"
+
+
+def test_gate_judges_the_recorded_witness(monkeypatch):
+    """The oracle's q_hint is the pick's recorded pre-grasp witness (``ikc.solutions`` of the [pre-grasp, grasp] chain): the gate plans to
+    that configuration, a fresh IK only when none is recorded (kit pick_transit_gate.witness.recorded / .fresh_ik)."""
+    monkeypatch.setenv(ENV, "1")
+    seen = []
+    from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+    monkeypatch.setattr(OPP, "plan_transit", lambda kit, arm, q0, pre, q_hint, *a, **k: seen.append(q_hint.clone()) or (None, {"why": "stub"}))
+    s = _p1_sampler()
+    q_rec = th.full((28,), 0.123)
+    s.ikc.solutions = {("right", (0.0, -0.3, 0.9)): q_rec}
+    _gate(s, _p1_q0(), [0.0, -0.30, 0.90])
+    assert th.allclose(seen[-1], q_rec) and s.kit.stats["pick_transit_gate.witness.recorded"] == 1
+    s.ikc.solutions = {}
+    _gate(s, _p1_q0(), [0.0, -0.30, 0.90])
+    assert not th.allclose(seen[-1], q_rec) and s.kit.stats["pick_transit_gate.witness.fresh_ik"] == 1
