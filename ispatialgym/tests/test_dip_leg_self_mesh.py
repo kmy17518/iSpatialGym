@@ -9,11 +9,11 @@ from ispatialgym.oracle import motions as MO
 from ispatialgym.sampling.v2 import pair_mesh as PM
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_DIP_LEG_SELF_MESH", raising=False)
-    assert MO.dip_leg_self_mesh_on() is False
-    monkeypatch.setenv("ISPATIALGYM_DIP_LEG_SELF_MESH", "1")
     assert MO.dip_leg_self_mesh_on() is True
+    monkeypatch.setenv("ISPATIALGYM_DIP_LEG_SELF_MESH", "0")
+    assert MO.dip_leg_self_mesh_on() is False
 
 
 def test_why_refuses_at_the_margin_and_checks_the_last(monkeypatch):

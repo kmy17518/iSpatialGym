@@ -60,7 +60,7 @@ from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
 
-#: i7-artlarge r3 (lead #54; DEFAULT OFF): the transit dip gate's Cartesian replacement leg (``Motions._cartesian_transit``) is refused when
+#: i7-artlarge r3 (lead #54; DEFAULT ON since #57): the transit dip gate's Cartesian replacement leg (``Motions._cartesian_transit``) is refused when
 #: the arm's link3 / link5 collision-MESH clearance (``sampling.v2.pair_mesh``, the r1pro.usda convex pieces) falls to this or below on
 #: the leg - the differential IK folds the elbow into the upper arm where cuRobo's spheres read clear (open_large_03 352001 / 352003:
 #: robot_touching_itself at -0.2 / +0.1 mm); the plan then streams as before
@@ -69,7 +69,8 @@ DIP_LEG_SELF_MESH_MARGIN_M = 0.005
 
 
 def dip_leg_self_mesh_on() -> bool:
-    return os.environ.get(DIP_LEG_SELF_MESH_ENV, "0") == "1"
+    """DEFAULT ON since lead decision #57 (owner mandate; the int2 count refuses exactly the 2 failing legs of 8): ``=0`` restores."""
+    return os.environ.get(DIP_LEG_SELF_MESH_ENV, "1") != "0"
 
 
 def dip_leg_self_mesh_why(arm: str, q_traj: Any, arm_idx: Any = None, margin: float = DIP_LEG_SELF_MESH_MARGIN_M, stride: int = 2) -> Optional[str]:
