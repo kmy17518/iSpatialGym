@@ -216,7 +216,7 @@ def overhang_escape_backoff_on() -> bool:
     replay (:meth:`IORSLarge._overpath_start`, read by the pick transit gate and OVERPATH) starts from the pad backed off ``push_backoff_m``
     along the reversed push, as ``execute_push`` runs it before the retreat (the replay started at the push's goal: 2.0 cm deeper in every
     demo, 0.12-0.20 rad from the live retreat's end when the grasp is at the push stance). Default off."""
-    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "0") == "1"
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
 
 
 def pick_transit_gate_on() -> bool:

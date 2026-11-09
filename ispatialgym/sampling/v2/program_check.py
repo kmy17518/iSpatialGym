@@ -2606,7 +2606,7 @@ def overhang_escape_backoff_on() -> bool:
     """i7-startdraw2 (``ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF``, the same switch as ``iors_large.overhang_escape_backoff_on``): the overhang
     push's contact escape is replayed from the pad backed off ``push_backoff_m`` along the reversed push, as ``execute_push`` runs it -
     in the sampler's transit start (``_overpath_start``) and in the program check's retreat (whose end the drive's departure arm records)."""
-    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "0") == "1"
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
 
 
 def push_pick_pre_from_chain_on() -> bool:

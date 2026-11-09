@@ -40,7 +40,7 @@ def _setup(monkeypatch):
 
 
 def test_off_replays_from_the_goal(monkeypatch):
-    monkeypatch.delenv(ENV, raising=False)
+    monkeypatch.setenv(ENV, "0")
     s, st, chain, seen = _setup(monkeypatch)
     q0, start, why = IL.IORSLarge._overpath_start(s, st, st, "right", chain, (th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])))
     assert q0 is not None and "back" not in seen and float(seen["q_escape_from"][11]) == 0.5
@@ -61,6 +61,8 @@ def test_on_replays_from_the_backed_off_pad(monkeypatch):
 def test_one_switch_for_the_sampler_and_the_program_check(monkeypatch):
     """r3 (lead #73): the program check's retreat after the overhang push replays the back-off under the same switch."""
     monkeypatch.delenv(ENV, raising=False)
+    assert PCK.overhang_escape_backoff_on() and IL.overhang_escape_backoff_on()  # default on since the r3 A/B (lead #73)
+    monkeypatch.setenv(ENV, "0")
     assert not PCK.overhang_escape_backoff_on() and not IL.overhang_escape_backoff_on()
     monkeypatch.setenv(ENV, "1")
     assert PCK.overhang_escape_backoff_on() and IL.overhang_escape_backoff_on()
