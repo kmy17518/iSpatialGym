@@ -60,12 +60,13 @@ ENV_RAISE_MAX = "ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX"
 
 
 def raise_max() -> float:
-    """Lead decision #74: the largest factor the consecutive-cut raise may reach (``ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX``, e.g. 1.5); unset or 0
-    = unbounded (the doubling of a1b48793). Default OFF until its A/B: on the int2 / r4 logs the 25 under_large_03 attempts that ran past
+    """Lead decision #74: the largest factor the consecutive-cut raise may reach (``ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX``). DEFAULT 1.5 since
+    its A/B (r5, under_large_03 360000 N 4, per-arm empty caches: 1 ok in both arms, 5.19 -> 4.37 GPU-h per ok; control disembedding_10
+    4 / 4 ok); ``=0`` = unbounded (the doubling of a1b48793). Before the A/B: on the int2 / r4 logs the 25 under_large_03 attempts that ran past
     the un-raised 650 s cap wrote 4 and gave 0 ok (14,716 s), and the only alias the raise was made for (disembedding_10, 338 s against
     ~390 s drawn-start attempts before the r3 speed fix) needs <= 1.2x."""
     try:
-        v = float(os.environ.get(ENV_RAISE_MAX, "0") or 0)
+        v = float(os.environ.get(ENV_RAISE_MAX, "1.5") or 0)
     except ValueError:
         return 0.0
     return v if v >= 1.0 else 0.0
