@@ -3394,6 +3394,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 26 | i7-t03 round 7 (37bd1888; lead #37) | 7c40cc28 | T03_PAIR_MESH, SHELF_PREGRASP_FRAME, SHELF_RELEASE_TRACKED, TRACKED_END_BLAME, all off |
 | 27 | i7-brace up to 43472364 (lead #40) | 14bfa044 | the axial brace load geometry behind GC_BRACE_LOAD_GEOM (off; validator only); the 9 braceload maps layered |
 | 28 | i7-artlarge up to a93d696c (lead #50) | 795f1ece | DEFAULT ARTLARGE_INIT_DRAW (the large articulation start from the whole Phase-1 set) |
+| 29 | i7-artlarge up to 31c7c011 (lead #53) | (see git log) | DEFAULT ARTLARGE_ALT_SKIP (speed, identical results) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
