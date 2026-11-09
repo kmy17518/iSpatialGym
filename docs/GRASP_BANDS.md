@@ -5397,6 +5397,46 @@ v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2)
 - hybrid_follow_infeasible (sequential follow) is unchanged.
 
 
+### i7-artlarge r2 (lead #51): the open_large_03 self-contact, and the no_transition retries
+
+**The self-clearance margin on the grasp IK was not built: the witnesses refute it.**
+- The executor reports `left_arm_link3 touches left_arm_link5`. Measured on the simulator's collision meshes (`pair_mesh.pair_clearance`,
+  the r1pro.usda convex pieces + URDF FK, CPU) at the al_on witnesses, link3-link5 clearance at pre_grasp / approach / grasp:
+  - the two FAILED demos (352001 / 352003): 22.7 / 23.2 / 23.2 mm;
+  - the two SUCCESSFUL demos (352000 / 352002): 17.0 / 22.8 mm and 20.0 / 22.9 mm.
+  - No margin refuses the failures without refusing the successes first; 20 mm refuses exactly the two successes.
+- Cross-alias count (CPU, every int2_* written demo with a grasp witness, 144 demos, link3-link5 of the grasping arm, the minimum over its
+  pre_grasp / approach / grasp witnesses): a 20 mm margin refuses 5 demos, 4 of them SUCCESSFUL (nextto_04 8.8 mm, touching_04 11.3,
+  under_small_03 17.8, disembedding_02 19.3) and 1 failed for another reason (under_large_01, not_reached, 13.0 mm). 10 mm refuses 1
+  success; 5 mm none. The one int2 robot_touching_itself failure (inside_large_01) reads 52.9 mm at its witness.
+- Where the contact happens: the two failures' executed arm (demo.hdf5) leaves untucked at the manipulation stance and the link3-link5
+  clearance falls 21.7 -> -0.2 mm over ~70 steps on the way to the pre-grasp. The commanded arm path is not the joint-linear ramp the
+  log reports (in the successes it is exactly linear; in the failures j4 is commanded to -2.09 rad against -1.53 at the witness). The hand
+  descends 0.94 -> 0.89 m where the plan descends to 0.67 m.
+- A re-demo of the same four instances with `ISPATIALGYM_FAST_STRAIGHT_ARM=0` (trajopt; recollect al_rc_sa0) fails the same two the same
+  way. al_rc_sa1 (defaults) reproduces 2 / 4. So neither the straight-ramp shortcut nor the witness is the cause.
+- Upright trunk alone is not the cause either: cabff_open_a 0001 (tilt 0.0) and cabff_open_b 0001 (-0.016) succeeded on the 11-04
+  oracle.
+- Open: why the executed / commanded transit departs from the planned path in these two. Next step: a replay with per-step contact
+  logging. This is an oracle question for the owner.
+
+**Speed fix b20703b9, `ISPATIALGYM_ARTLARGE_ALT_SKIP` (default on since 397048b2).**
+- `prompt0.connect` raises `no_transition` only when every transition stand-off fails the drive-back floor test, the trunk sweep or
+  the drive-in. All three are checked at the manipulation stance with the arriving arms. The start enters only through `same_trunk`.
+- So after a `no_transition` from a start whose trunk differs from the manipulation stance's, step 6's alternatives skip every other
+  such start. Counter `artlarge_init.alt_skipped_no_transition`.
+
+**A/B** (trunk_b20703b9, N 4, svl titanrtx, same seeds in both arms; open 352200, control 352300):
+
+| alias | skip off (al2_skip0) | skip on (al2_skip1) |
+|---|---|---|
+| open_large_03 | 9 / 4 / 3, 1122 s (attempts 675 s); alt_tried 94 | 9 / 4 / 3, 1043 s (attempts 618 s); alt_tried 82, skipped 12 |
+| close_large_02 (control) | 5 / 4 / 4, 601 s | 5 / 4 / 4, 601 s (not reached) |
+
+- The instances and demos are identical. The skip only removes connect tries; it is the default since 397048b2. The suite has the base
+  failure set at b20703b9.
+- open_large_03 on the int2 defaults: 9 / 4 / 3 (one robot_touching_itself), against 60 / 0 / 0 before the init draw.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
