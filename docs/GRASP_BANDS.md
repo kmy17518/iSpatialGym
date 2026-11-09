@@ -5442,8 +5442,8 @@ sidecar's push chain / witnesses and the gate's PICK_TRANSIT_DIAG line, c10b7a49
    tracking (push end vs chain goal 0.05-0.08 rad already). A drive between retreat and grasp re-poses the arm to the program check's
    recorded departure configuration, which the back-off does not reach yet (331103: 0.36 rad).
 
-Gate prediction vs live (join.py): via-posture verdicts held in every run (tsd3-7: 27 / 27); direct-ramp verdicts from the escape start did
-not (tsd3-6: 0 / 9 matched; tsd7 with both fixes: 1 / 4) - the direct ramp passes desk_bhkhxo_0's mesh 28 so closely that < 0.1 rad of
+Gate prediction vs live (join.py): via-posture verdicts held in every run (tsd3-7: 24 / 24); direct-ramp verdicts from the escape start did
+not (tsd3-6: 0 / 12 matched; tsd7 with both fixes: 1 / 4) - the direct ramp passes desk_bhkhxo_0's mesh 28 so closely that < 0.1 rad of
 start difference flips it. inside_large_01 331000 + 331100 (gate on; v2maps_int2, titanrtx): tsd4_diag 42 / 8 / 7, 1.40 GPU-h (0.199 / ok);
 tsd5_chain 47 / 8 / 7, 1.33 (0.190); tsd6_backoff (back-off not yet tracked) 46 / 8 / 8, 1.17 (0.146); tsd7_both 48 / 8 / 7, 1.24 (0.176);
 off (tsd2_off) 20 / 8 / 6, 1.22 (0.203). Every switch stays default off.
