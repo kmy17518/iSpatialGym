@@ -3463,6 +3463,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 32 | i7-floorpush up to dbd8bc13 (lead #59) | f5b89921 | DEFAULT 0.10 m strokes with re-aim for the pitched floor push; the palm test fix; variant switches off |
 | 33 | i7-yield2 up to 757659dc (lead #64) | dff59cfc | DEFAULTS LIFT_PAD_SWEEP (the support lift refused when the pads miss the object), WALL_VIS_SCREEN (world_vertical draw screened by the settle visibility rule) |
 | 34 | i7-yield2 r2 (d7723c33; lead #65) | 5b4f42b3 | DEFAULT GRIP_WAIT_NO_PAUSE (the gripper close waits are not counted as a pause) |
+| 35 | i7-stancememo r3 (01bd4e3f; lead #45 / #63) | 50bb863e | SupportTop vectorized (the start-draw speed fix, identical verdicts); the attempt cap doubles after 2 consecutive cuts |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
