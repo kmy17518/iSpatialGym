@@ -5030,6 +5030,15 @@ class IORSLarge(SamplerV2):
                 if not r_w.ok or r_w.q is None:
                     return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
                 q_hint = G.t(r_w.q).float().reshape(-1)
+            if os.environ.get("ISPATIALGYM_PICK_TRANSIT_GATE_DIAG") == "1":
+                # i7-startdraw2 r2 (lead #71): the transit-start gap - the replayed start and the witness, joined offline with the demo's
+                # joint_positions at the grasp's first step and the sidecar's witness (startdraw2_20261108/gap2.py)
+                idx_d = self.kit.robot.arm_control_idx[arm]
+                log.info("%s: PICK_TRANSIT_DIAG %s", self.gp.variant, json.dumps({
+                    "arm": arm, "start": start, "stance": grasp_st.name, "q0": [round(float(v), 4) for v in G.t(q0).reshape(-1)[idx_d].tolist()],
+                    "q_hint": [round(float(v), 4) for v in q_hint[idx_d].tolist()], "witness": "recorded" if q_w is not None else "fresh_ik",
+                    "pre": [round(float(v), 4) for v in G.t(pre[0]).reshape(-1).tolist()], "settled": [round(float(v), 4) for v in G.t(settled[0]).reshape(-1).tolist()],
+                    "chain_goal_q": [round(float(v), 4) for v in ((chain.get("seed") or {}).get("chain_arm_q") or [[None]])[-1]] if (chain.get("seed") or {}).get("chain_arm_q") else None}))
             traj, note = OPP.plan_transit(self.kit, arm, q0, pre, q_hint, list(self.support_objects()), [(self.tname, tgt)],
                                           approach=[eef], inflation=None, straight_only=True)
             if traj is None:
