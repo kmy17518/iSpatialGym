@@ -5341,6 +5341,74 @@ Every instance was written in both arms of every alias.
 - GPU-h per success over both aliases: 0.77 -> 0.57, inside the ~15-point N 4 noise. under_large_03's ok count is held back by the
   oracle push.
 
+## Slow / low-yield aliases: the fork's lifted grasp and the bare-wall init view (branch `i7-yield2`, lead decision #47, 2026-11-08)
+
+Owner mandate: "Fix all the bugs and speed up / make yield better the slow low yield aliases". Two items from int2_7 (trunk_2f157bbf).
+
+### A. disembedding_10: grasp top_2 [pause] - the executor's support lift took the pads off the fork
+
+- Symptom (int2_7 300019 / 300020, drawn starts at base x 6.77 / 6.98 picked top_2): both demos `oracle_failed [pause]` in the grasp,
+  "no joint moved faster than 0.001 for 51 steps". 300018 (top_9) succeeded.
+- What the demo shows (hdf5): the arm reaches the grasp pose (eef 1.3 mm off); the ramped closure goes 15.5 -> 6.6 mm per finger
+  symmetrically, then finger 2 drives to 0 and shoves the fork 4.4-6.3 mm across the pinch (it turns 3.6-6 deg), pushing finger 1 back out
+  to 11.1-11.3 mm; no `contact_hold`, no assisted grasp. `Motions.gripper` then waits 60 steps + holds 5 with nothing moving - longer than the
+  pause limit (50), so the hard QA `pause` ends the demo before the executor's `failed_grasp` (whose retry runs the recorded, unlifted grasp).
+- Cause: not the sampler (the IK margins are fine) and not the entry (validated with zero finger-slab force): the executor's
+  `lift_grasp_off_support`. The finger envelope reaches 1.8 mm below the fork's bottom, so the grasp is lifted 5.8 mm (+ 4 mm clearance).
+  The fork's collision hulls at top_2's x (14 mm from its origin) span z 0.5-6.0 mm; the lifted pads start at 9.2 mm - **above the neck**.
+  The pad-margin rule read the AABB top 0.840 (the raised handle end), the face-slope probe at the lifted fingertip end missed (None =
+  "not judged"). top_9 the same: every lifted top_9 attempt (i7tray_turn_on x4, int2_7 300018) closed on nothing (`failed_grasp`) and
+  succeeded on the unlifted retry.
+- Survey of all 344 recorded lifts under `$OFH/out` (scratch survey_lib.py, the fork / spatula / steak / tape / dice / mouse / jigsaw /
+  spoon hulls from `v2maps_int2/glib`): the library's own pad sweep (`candidates.pad_sweep`, rays across the pinch over PAD_Z x PAD_X) at the
+  lifted pose meets no face only for the fork (top_2 x2 pause, top_9 x5, top_10 x1, top_11 x1 - all failed lifted) and the spatula of
+  under_small_04 (top_2 x1, top_3 x2 - succeeded lifted); the other 332 lifts are unchanged.
+- Fix d5ce72ef, `ISPATIALGYM_LIFT_PAD_SWEEP=1` (`ExecuteConfig.grasp_support_pad_sweep`): before a lift is applied, 24 rays (PAD_Z x PAD_X x
+  both sides, from the open pad faces across the pinch, `_pad_sweep_hits`) at the lifted pose; none on the object -> the lift is refused,
+  the recorded grasp runs. Record: `grasp_support_lift.pad_sweep {hits, rays}`. No scene queries (stubs) -> not judged.
+
+### B. world_vertical_04: too_few_visible at the init view
+
+- Symptom (int2_7 = i7_wall_def, deterministic): 51 att / 2 written / 2 ok; 49 rejections `[too_few_visible]` in settle_validate.
+- The check (`AlignmentWall.extra_checks`): >= `min_visible_objects` 5 objects (structure counted, the robot not) with >= 200 px in the
+  INIT camera view. 45 of 49: only floor + wall + target; 3: + another wall; 1: no floor. The drawn (spot, delta, init stance at d 0.5-1.5 m,
+  |beta| <= 35 deg) mostly faces a bare stretch of wall gkewle; the passing draws (spots 34, 2) see a door / an elevator door / other walls.
+  Not the thresholds and not occlusion. world_vertical_05: 21 / 33 the same.
+- Fix c0884d5f, `ISPATIALGYM_WALL_VIS_SCREEN=1` (`_DRAWS`, default 40): each draw is screened at once with the settle check's own rule
+  (`visible_at`: the robot teleported to the init stance as `RobotKit.apply` places it, one segmentation, put back) and redrawn within the
+  attempt (spot, delta and init together - the accepted distribution is the conditional one the settle check already selected; the first
+  draw equals the switch-off draw); the settle check stays. Kit: `vis_screen.passed / redrawn / draws_k / exhausted / settle_rejected`.
+
+### Runs (trunk_c0884d5f, svl titanrtx, v2maps_int2, v2only N 4, memory off; loop `$OFH/yield2_20261108/loop.sh`)
+
+| arm | job | att / written / ok | GPU-h | per success | the switch's counters |
+|---|---|---|---|---|---|
+| A recollect OFF (int2_7 disembedding_10 g300018-300021, the same 3 instances) | 18391303 | - / 3 / 2 | 0.17 | - | 300018 top_9 failed_grasp -> retry ok; 300019 top_2 [pause]; 300020 top_2 failed_grasp -> retry ok |
+| A recollect ON `LIFT_PAD_SWEEP=1` | 18391304 | - / 3 / 3 | 0.14 | - | pad_sweep hits 0 / 24 at all 3 lifts -> refused; every grasp first attempt, contact_hold |
+| B world_vertical_04 OFF 310000 | 18391305 | 51 / 2 / 2 | 0.55 | 0.277 | too_few_visible 49 (= int2_7, i7_wall_def) |
+| B world_vertical_04 ON `WALL_VIS_SCREEN=1` | 18391307 | 5 / 4 / 4 | 0.32 | 0.080 | passed 5, redrawn 29, settle_rejected 0, exhausted 0 |
+| B world_vertical_05 OFF 310000 | 18391503 | 33 / 4 / 4 | 0.36 | 0.089 | too_few_visible 21 |
+| B world_vertical_05 ON | 18391399 | 10 / 4 / 4 | 0.28 | 0.071 | passed 10, redrawn 20, settle_rejected 3 |
+| B control world_vertical_01 ON | 18391524 | 8 / 4 / 4 | 0.61 | 0.153 | passed 5 at draw 1 (= the off draws); 2 time_cap = the trunk's ATTEMPT_CAP |
+| A control under_small_04 ON 300122 (spatula) | 18391613 | 8 / 4 / 4 | 0.38 | 0.096 | sweep ran on every lift, hits 2 / 24, no refusal (as predicted) |
+
+- B: `ISPATIALGYM_WALL_VIS_SCREEN` DEFAULT ON (73e626b2, own commit; reach = world_vertical_01-05, the only subtask AlignmentWall registers).
+- The disembedding_10 N 4 arms on this trunk first ran with the ATTEMPT_CAP default: every START_DRAW attempt ended [time_cap] (cap 338 s =
+  5 x a median 67.6 s from before the start draw; the drawn start costs ~390 s per attempt) - 0 written in 4 attempts per arm, cancelled; the
+  A/B reruns with `ISPATIALGYM_ATTEMPT_CAP=0` in both arms (int2_7's conditions). The cap x start-draw interaction belongs to #45 (i7-stancememo).
+
+| A N 4 OFF disembedding_10 300018, `ATTEMPT_CAP=0` both arms | 18391614 | 22 / 1 / 1 | 2.49 | 2.49 | 300018 top_9 failed_grasp (lifted) -> unlifted retry ok |
+| A N 4 ON `LIFT_PAD_SWEEP=1` | 18391653 | 28 / 3 / 3 | 2.49 | 0.83 | refused 3 / 3 (hits 0 / 24): top_9, top_9~r180, top_2 - all first attempt ok |
+
+- The A arms sample identically (same rejections in the same order; the switch is executor-only); ON wrote 3 because its node ran the
+  same attempts faster (28 vs 22 in the 8930 s sample limit) - the sampling difference is backend speed, not the switch. Judged on the
+  switch's counter: it acted in 6 / 6 fork demos (recollect + N 4), every one a first-attempt success; OFF: 4 lifted fork demos = 1 [pause]
+  + 3 failed_grasp retries. 300019 diverged from int2_7 (goal_check place_unreachable at attempt 2 on the newer trunk), so top_2 came up once.
+- A: `ISPATIALGYM_LIFT_PAD_SWEEP` DEFAULT ON (13427662, own commit; reach: the fork and the spatula's top_2 / top_3 by the survey).
+- Still open: disembedding_10's sampling cost (START_DRAW ~390 s per attempt, 2.5 GPU-h for 1-3 instances) and the ATTEMPT_CAP x START_DRAW
+  interaction (every drawn-start attempt [time_cap] with both defaults on) belong to #45 (i7-stancememo); the pause-before-failed_grasp
+  ordering in `Motions.gripper` (60 + 5 still steps > the QA pause limit 50) is shared QA / executor behaviour, left as it is (owner's call).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
