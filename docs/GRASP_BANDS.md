@@ -5977,6 +5977,15 @@ The arms diverge from 360001 a2 onward. So far:
 The switch is a pure speed-up where it acts, but it does not end the budget attempts. Those attempts still solve 500-750 live chains for C
 candidates whose draws then fail at the place IK, the B->C path or a fresh B IK.
 
+**Final under_large_02** (2026-11-09 11:10):
+- OFF: 10 attempts / 4 written / 1 ok, 7.02 GPU-h per ok, 2482 s per attempt.
+- ON: 12 attempts / 4 written / 1 ok, 6.85 GPU-h per ok, 2017 s per attempt. Over the job the switch skipped 974 draw chains, dropped 2266
+  pre-screen yaws and skipped 35 C candidates.
+
+ON is no worse in ok and better in GPU-h per ok, which meets lead #75b's rule for the default flip. The under_large_03 pair (`ul03_lb_off`
+18401402 / `ul03_lb_on` 18401403) was still running at the owner's pause; interim: OFF 25 attempts / 1 written, ON 27 attempts / 2 written.
+The flip is not made during the pause. The resume steps are in `$OFH/DECISIONS.md` ("i7-ul02 RESULT").
+
 **Attribution arm** `ul02_lb_sd0` (`ISPATIALGYM_START_DRAW=0`, switch off) replays fp_def (82c96a3b) attempt for attempt. 360000 was written
 at a0 in 137 s (fp_def 134 s). 360001 a0 failed goal_tipped at 3110 s (fp_def 3250 s). 360002 a0 failed approach_untrackable at 2042 s
 (fp_def 2012 s). The arm finished at 11 attempts / 4 written / 0 ok in 3.82 GPU-h, against int2_14's 13 / 4 / 1 in 8.89 GPU-h. The sampling
