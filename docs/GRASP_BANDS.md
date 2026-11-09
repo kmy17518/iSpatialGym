@@ -3462,6 +3462,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 31 | i7-artlarge r3 (087586fb; lead #54 / #57) | 3413d60a | DEFAULT DIP_LEG_SELF_MESH (all aliases: the dip gate's replacement leg refused at 5 mm link3 / link5 mesh clearance); DIAG_ARM_TRACE off |
 | 32 | i7-floorpush up to dbd8bc13 (lead #59) | f5b89921 | DEFAULT 0.10 m strokes with re-aim for the pitched floor push; the palm test fix; variant switches off |
 | 33 | i7-yield2 up to 757659dc (lead #64) | dff59cfc | DEFAULTS LIFT_PAD_SWEEP (the support lift refused when the pads miss the object), WALL_VIS_SCREEN (world_vertical draw screened by the settle visibility rule) |
+| 34 | i7-yield2 r2 (d7723c33; lead #65) | 5b4f42b3 | DEFAULT GRIP_WAIT_NO_PAUSE (the gripper close waits are not counted as a pause) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
