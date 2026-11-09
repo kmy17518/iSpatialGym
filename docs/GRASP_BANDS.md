@@ -5448,6 +5448,27 @@ start difference flips it. inside_large_01 331000 + 331100 (gate on; v2maps_int2
 tsd5_chain 47 / 8 / 7, 1.33 (0.190); tsd6_backoff (back-off not yet tracked) 46 / 8 / 8, 1.17 (0.146); tsd7_both 48 / 8 / 7, 1.24 (0.176);
 off (tsd2_off) 20 / 8 / 6, 1.22 (0.203). Every switch stays default off.
 
+### r3: replay fidelity defaults, the gate's direct-ramp verdict (lead decision #73)
+
+d78cecc2: the program check's retreat after the overhang push replays the 2 cm back-off too (same switch `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF`:
+the drive's recorded departure arm is that retreat's end); the gate relies on via-posture verdicts only - no clearance had been recorded for
+the 16 direct-ramp verdicts of tsd3-7 (1 held), so no margin could be chosen: a direct-ramp verdict passes unchanged as `direct_unknown`,
+with its coarse world clearance (`facts.transit_gate.direct_clearance_m`) recorded for a later margin.
+
+Final A/B (trunk_d78cecc2, inside_large_01 331000 + 331100 = N 8 per arm, v2maps_int2, titanrtx, each arm its OWN empty sampling cache):
+
+| arm | att / wr / ok | GPU-h (per ok) | where the switches acted |
+|---|---|---|---|
+| r3_off (all off) | 18 / 8 / 2 | 1.49 (0.743) | - ; pre witness in another branch 2 / 8 |
+| r3_fix (PRE_FROM_CHAIN + ESCAPE_BACKOFF) | 17 / 8 / 4 | 1.38 (0.345) | push_pick_pre.chain 12, rewitness_skipped 12, back-off in the program check 12; flips 0 / 8 |
+| r3_all (fix + gate) | 66 / 8 / 6 | 4.89 (0.814) | gate passed 44 (via 28, direct_unknown 16), rejected 225 (no_straight 219), 1784 s of checks; back-off tracked 269 + 9 |
+| r3_ctl (ontop_large_02 300500, all) | 19 / 4 / 4 | 3.09 | none of the switches acted (no overhang pick) |
+
+Defaults per #73: the replay fixes ON (r3_fix no worse than r3_off: 4 vs 2 ok, 0.345 vs 0.743 GPU-h / ok) - 649547f9
+`ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN`, d0270504 `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF` (c95f6bb1 pins the old pipeline's tests); the gate
+stays OFF (r3_all 6 ok > 4, but 0.814 GPU-h / ok > 0.345: its 219 no_straight rejections cost ~2.4x the attempts). In r3_all the gate's
+verdicts: via 1 / 1 held, direct_unknown 7 (live: straight 1, trajopt 6).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
