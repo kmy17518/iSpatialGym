@@ -3460,6 +3460,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 29 | i7-artlarge up to 31c7c011 (lead #53) | 58431d18 | DEFAULT ARTLARGE_ALT_SKIP (speed, identical results) |
 | 30 | i7-t03 up to 54800b01 (lead #56) | 0153ed46 | per-family switch defaults: the 9 t03 switches DEFAULT ON for touching_03 only (lead #39) |
 | 31 | i7-artlarge r3 (087586fb; lead #54 / #57) | 3413d60a | DEFAULT DIP_LEG_SELF_MESH (all aliases: the dip gate's replacement leg refused at 5 mm link3 / link5 mesh clearance); DIAG_ARM_TRACE off |
+| 32 | i7-floorpush up to dbd8bc13 (lead #59) | f5b89921 | DEFAULT 0.10 m strokes with re-aim for the pitched floor push; the palm test fix; variant switches off |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
