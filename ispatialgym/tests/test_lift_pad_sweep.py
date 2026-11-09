@@ -57,11 +57,11 @@ def test_lift_kept_when_the_pads_meet_the_object_or_the_sweep_is_not_judged(monk
 
 def test_switch_off_runs_no_sweep(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_LIFT_PAD_SWEEP", raising=False)
+    assert EX.ExecuteConfig().grasp_support_pad_sweep is True  # default on (i7-yield2 A/B, 2026-11-08)
+    monkeypatch.setenv("ISPATIALGYM_LIFT_PAD_SWEEP", "0")
     assert EX.ExecuteConfig().grasp_support_pad_sweep is False
     out, targets, ctx, calls = _lift_with(monkeypatch, (0, 24), on=False)
     assert out is not targets and ctx["grasp_support_lift"]["applied"] and calls == []
-    monkeypatch.setenv("ISPATIALGYM_LIFT_PAD_SWEEP", "1")
-    assert EX.ExecuteConfig().grasp_support_pad_sweep is True
 
 
 def test_pad_sweep_hits_counts_rays_through_the_object(monkeypatch):

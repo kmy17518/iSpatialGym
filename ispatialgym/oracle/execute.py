@@ -354,8 +354,10 @@ class ExecuteConfig:
     #: neck - the AABB top the pad-margin rule reads is the raised handle end 0.84, the neck tops out at 0.830 - so top_9 closed on
     #: nothing (failed_grasp, 5 / 5 lifted attempts, retried unlifted) and top_2 closed on one edge (pause, 2 / 2 demos lost): ... unless
     #: the library's own pad sweep (``grasping.candidates.pad_sweep``: rays along the closing axis over the pad footprint PAD_Z x PAD_X)
-    #: meets no face of the object at the lifted pose - the lift is refused and the recorded grasp runs. ``ISPATIALGYM_LIFT_PAD_SWEEP=1``
-    grasp_support_pad_sweep: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_LIFT_PAD_SWEEP", "0") == "1")
+    #: meets no face of the object at the lifted pose - the lift is refused and the recorded grasp runs. DEFAULT ON since 2026-11-08 (i7-yield2
+    #: A/B: the sweep acted in 6 / 6 fork demos, all first-attempt successes, vs off 1 [pause] + 3 failed_grasp retries in 4; control
+    #: under_small_04 spatula: ran on every lift, refused none, 4 / 4); ``ISPATIALGYM_LIFT_PAD_SWEEP=0`` turns it off
+    grasp_support_pad_sweep: bool = field(default_factory=lambda: os.environ.get("ISPATIALGYM_LIFT_PAD_SWEEP", "1") == "1")
     #: ... and a support place whose object hangs lower in the hand than the recorded ``eef_in_object`` by more than this is raised by
     #: the difference, so the object meets its support instead of being driven into it (the same pinch pressed the destination tray)
     place_inhand_raise_min_m: float = 0.002
