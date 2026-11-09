@@ -2602,6 +2602,13 @@ def _where_of(action, name: str, stance_name: str, arm: str, carried: Optional[s
 _EARLY_GATE_ACTIONS = ("grasp", "place", "push", "brace", "base_push")
 
 
+def overhang_escape_backoff_on() -> bool:
+    """i7-startdraw2 (``ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF``, the same switch as ``iors_large.overhang_escape_backoff_on``): the overhang
+    push's contact escape is replayed from the pad backed off ``push_backoff_m`` along the reversed push, as ``execute_push`` runs it -
+    in the sampler's transit start (``_overpath_start``) and in the program check's retreat (whose end the drive's departure arm records)."""
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "0") == "1"
+
+
 def push_pick_pre_from_chain_on() -> bool:
     """i7-startdraw2 r2 (lead #71, the transit-start gap): ``ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN=1`` - the overhang pick's push pre-contact
     witness is the SAMPLED chain's pre-contact configuration (``contacts.push_pick.chain_arm_q[0]``, the branch the push chain, the
@@ -2892,6 +2899,24 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_from = r_.q
         from ispatialgym.oracle.actions import RETREAT_DIST
 
+        if overhang_escape_backoff_on():
+            # i7-startdraw2 r3 (lead #73): execute_push backs the pad off push_backoff_m along the reversed push (the init -> goal line) before
+            # this retreat; the escape is replayed from there, tracked from the push's end as the oracle's arm_along runs it
+            from ispatialgym.oracle.execute import CONFIG as _ECFG
+
+            back_m = float(getattr(_ECFG, "push_backoff_m", 0.0) or 0.0)
+            init_ = c_.init
+            p0 = th.as_tensor(init_.position if hasattr(init_, "position") else init_[0], dtype=th.float32).reshape(-1)[:3]
+            d_ = goal_t[0].reshape(-1)[:3] - p0
+            if back_m > 0 and float(th.linalg.norm(d_)) > 1e-6:
+                back_t = (goal_t[0].reshape(-1)[:3] - d_ / th.linalg.norm(d_) * back_m, goal_t[1])
+                r_b = sampler.ikc.continue_chain(q_from, [goal_t, back_t], arm, ignore=ign_, ignore_end=ign_, ignore_start=ign_)
+                if r_b.ok and r_b.q is not None:
+                    q_from = r_b.q
+                    src_ += f", backed off {back_m * 100:.0f} cm along the reversed push"
+                    _kit(sampler, "overhang_escape_backoff.program_check_tracked")
+                else:
+                    _kit(sampler, "overhang_escape_backoff.program_check_failed")
         status_, why_, rep_, q_end_ = replay_contact_escape(sampler, arm, q_from, obj_, sup_, ign_, float(getattr(action, "distance", None) or RETREAT_DIST),
                                                             start="the overhang push's end", escape_up_m=getattr(action, "escape_up_m", None))
         if status_ == "failed":

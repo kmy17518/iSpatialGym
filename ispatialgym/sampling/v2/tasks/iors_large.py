@@ -5072,14 +5072,36 @@ class IORSLarge(SamplerV2):
             out, key_v, why_v = self._overpath_verify(traj, arm, pre, eef, box, ignore_target=False)
             if out is None:
                 return None, key_v, f"{note.get('branch')}: {why_v}"
-            log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)", self.gp.variant, arm, start, grasp_st.name,
-                     note.get("branch"), len(traj), time.time() - t0)
-            return {"branch": str(note.get("branch")), "start": start, "n": int(len(traj)), "witness": "recorded" if q_w is not None else "fresh_ik"}, "", ""
+            branch = str(note.get("branch"))
+            facts = {"branch": branch, "start": start, "n": int(len(traj)), "witness": "recorded" if q_w is not None else "fresh_ik",
+                     # i7-startdraw2 r3 (lead #73): a via-posture verdict held in 24 / 24 demos; a direct-ramp verdict from the escape matched the live
+                     # path in 1 / 16 and no clearance was recorded to separate them - it is UNKNOWN: the pick passes, the verdict is not relied on
+                     "verdict": "via" if branch == "straight_via" else "direct_unknown"}
+            if branch != "straight_via":
+                TT._count(self, "pick_transit_gate.direct_unknown")
+                facts["direct_clearance_m"] = self._ramp_clearance(traj)  # the world clearance of the direct ramp, for a later margin choice
+            log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)%s", self.gp.variant, arm, start, grasp_st.name,
+                     branch, len(traj), time.time() - t0, f", direct ramp clearance {facts.get('direct_clearance_m')} m (unknown verdict)" if branch != "straight_via" else "")
+            return facts, "", ""
         finally:
             TT._countn(self, "pick_transit_gate.ms", int(round(1000 * (time.time() - t0))))
             tgt.set_position_orientation(*p_prev)
             tgt.keep_still()
             self.kit.sync_world()
+
+    def _ramp_clearance(self, traj: th.Tensor, margins: Sequence[float] = (0.0, 0.01, 0.02, 0.03, 0.05, 0.08)) -> Optional[float]:
+        """i7-startdraw2 r3: the largest of ``margins`` (m) at which the whole joint ramp ``traj`` is collision-free in the current world (the
+        desk, the scene, the book at its settled pose) - a coarse clearance of a direct-ramp verdict; None when it collides even at 0."""
+        best = None
+        for m in margins:
+            try:
+                hit = self.kit.backend.check_collision(traj, emb_name="whole_body", sync_world=False, margin=float(m))
+            except Exception:  # noqa: BLE001 - a diagnostic
+                return best
+            if bool(th.as_tensor(hit).reshape(-1).bool().any()):
+                break
+            best = float(m)
+        return best
 
     def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
                        ) -> Tuple[Optional[Dict[str, Any]], str, str]:

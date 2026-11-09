@@ -56,3 +56,11 @@ def test_on_replays_from_the_backed_off_pad(monkeypatch):
     assert th.allclose(back_p, th.tensor([23.73 + CONFIG.push_backoff_m, 13.80, 0.79]), atol=1e-6)  # 2 cm back against the push
     assert seen["first"] is chain["goal"]  # tracked on from where the arm is (continue_chain's first pose)
     assert float(seen["q_escape_from"][11]) == 7.0 and s.kit.stats["overhang_escape_backoff.tracked"] == 1
+
+
+def test_one_switch_for_the_sampler_and_the_program_check(monkeypatch):
+    """r3 (lead #73): the program check's retreat after the overhang push replays the back-off under the same switch."""
+    monkeypatch.delenv(ENV, raising=False)
+    assert not PCK.overhang_escape_backoff_on() and not IL.overhang_escape_backoff_on()
+    monkeypatch.setenv(ENV, "1")
+    assert PCK.overhang_escape_backoff_on() and IL.overhang_escape_backoff_on()
