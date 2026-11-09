@@ -5734,6 +5734,38 @@ Runs (trunk_46ed7e5b = A / B defaults on, svl titanrtx):
 - `ISPATIALGYM_GRIP_WAIT_NO_PAUSE` DEFAULT ON (1762edd4, own commit): every close-wait pause re-demoed became a retried failed_grasp (2 / 3 then
   succeeded); no failure in the N 4 / control runs falls inside an exempted wait. Handed to the integration agent.
 
+### r3: the start draw's speed and a robust cap (lead decisions #45, #63, 2026-11-09)
+
+**Profile** (cProfile, disembedding_10, trunk_7dbb853e): one attempt took 331 s, of which the start draw took 285 s.
+- 220 s of that went to `SupportTop.polygon_supported` -> `contains`: 343k scalar-tensor calls, with `free` recomputed 2.8M times.
+- The callers: the destination fit's 2 cm lateral support scan (190 s) and Phase 2's source-tray frame check (68 s).
+- IK took about 29 s.
+- The stance-A redraws of r2 run in the IORS large floor path only, so they cost disembedding nothing.
+
+**Fix (da01d92d).** Both methods are vectorized with the same float operations.
+- Their verdicts are bit-identical to the former loops: `test_support_top_vectorized` checks them against a verbatim copy.
+- So the drawn starts and the candidates are unchanged, and no switch is needed. Each call is ~13x faster.
+
+**#63 (a1b48793).** After two consecutive `time_cap` cuts, a job's cap doubles.
+- `ISPATIALGYM_ATTEMPT_CAP_RAISE_AFTER` defaults to 2; `0` restores the old rule. The rule is on whenever the cap is.
+- The per-alias medians were measured before the start draw: disembedding_10's 338 s cap cut every ~390 s drawn-start attempt.
+- Count over the `int2_*` logs: no alias had >= 50 % of its attempts cut. The highest were under_large_03 (32 %) and
+  articulation_open_small_02 (27 %); only disembedding_10 crossed 50 %, and only on the old code.
+
+**A/B** (svl titanrtx, cap on; att / wr / ok, seconds per attempt, GPU-h):
+
+| alias | old (trunk_7dbb853e) | new (da01d92d) |
+|---|---|---|
+| disembedding_10 | 25 / 0 / 0, 333 s, 16 time_cap, 2.49 | 43 / 2 / 2, 85 s, 0 time_cap, 1.13 (0.57 / ok) |
+| disembedding_02 | 13 / 4 / 4, 226 s, 1.00 (0.25 / ok) | 13 / 4 / 4, 124 s, 0.58 (0.15 / ok) |
+| ontop_large_02 (control) | 28 / 3 / 3, 528 s, 4.24 | 20 / 3 / 3, 524 s, 3.00 (noise) |
+
+**Raise-rule A/B** (disembedding_10 at 300018, a1b48793):
+- `=0`: 40 / 4 / 3, 0.99 GPU-h. Default: 40 / 4 / 3, 1.14 GPU-h.
+- The attempts are identical: with the speed fix nothing is cut, so the rule never acted.
+
+disembedding_10 now loses its attempts to `target_placement` (empty F at the drawn position), not to the start draw.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

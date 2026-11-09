@@ -66,3 +66,36 @@ def test_run_instances_turns_the_stop_into_a_time_cap_rejection():
     assert i_begin < i_sample < i_end
     assert 'raise Reject("time_cap"' in src and "except AC.AttemptCapStop" in src
     assert "with AC.suspended():" in inspect.getsource(CORE.SamplerV2.spa_draw)
+
+
+def _sampler(cap):
+    from types import SimpleNamespace
+
+    s = CORE.SamplerV2.__new__(CORE.SamplerV2)
+    s.kit = SimpleNamespace(stats={})
+    s.gp = SimpleNamespace(variant="stub")
+    s._attempt_cap = (cap, "table")
+    return s
+
+
+def test_two_consecutive_cuts_double_the_cap(clean):
+    """Lead decision #63: a cap from medians measured on older code (disembedding_10: 338 s against ~390 s drawn-start attempts) must not
+    cut most attempts - two consecutive time_cap cuts double the job's cap; any other outcome resets the streak; =0 keeps the old rule."""
+    s = _sampler(338.0)
+    for reason in ("time_cap", "target_placement", "time_cap"):  # not consecutive
+        s._cap_after_attempt(reason)
+    assert s.attempt_cap()[0] == 338.0
+    s._cap_after_attempt("time_cap")
+    assert s.attempt_cap()[0] == 676.0 and s.kit.stats["time_cap.raised"] == 1
+    for _ in range(2):
+        s._cap_after_attempt("time_cap")
+    assert s.attempt_cap()[0] == 1352.0
+    s._cap_after_attempt(None)  # written
+    s._cap_after_attempt("time_cap")
+    assert s.attempt_cap()[0] == 1352.0
+    clean.setenv(AC.ENV_RAISE, "0")
+    s2 = _sampler(338.0)
+    for _ in range(5):
+        s2._cap_after_attempt("time_cap")
+    assert s2.attempt_cap()[0] == 338.0 and "time_cap.raised" not in s2.kit.stats
+    assert "self._cap_after_attempt(e.reason)" in inspect.getsource(CORE.SamplerV2.run_instances)
