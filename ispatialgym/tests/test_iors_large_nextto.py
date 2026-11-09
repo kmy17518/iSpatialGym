@@ -405,3 +405,23 @@ def test_push_path_on_one_floor_object():
     assert NT.single_floor(["floors_uzsntg_0"] * 6 + ["floors_qgmjvd_0"] * 4) == "floor_change: floors_qgmjvd_0 / floors_uzsntg_0"
     assert NT.single_floor(["floors_qgmjvd_0", None]).startswith("floor_change: no floor object under 1 of 2 points")
     assert NT.DEFAULTS["push_single_floor"] is True
+
+
+def test_base_push_com_cap(monkeypatch):
+    """i7-nextto 2026-11-09 (ISPATIALGYM_BASE_PUSH_COM_CAP_M): the push line's distance from the target's mass centre (its root frame turned
+    and moved to the init pose); a spot / pair farther than the cap is refused and counted; unset = off (nothing counted)."""
+    from types import SimpleNamespace
+
+    s = SimpleNamespace(target_com_local=lambda: th.tensor([0.1, 0.0, 0.3]), kit=SimpleNamespace(stats={}))
+    yaw90 = (th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 0.0, math.sin(math.pi / 4), math.cos(math.pi / 4)]))  # COM at world (1.0, 0.1)
+    assert NT.push_line_com_offset(s, yaw90, th.tensor([1.0, -0.4, 0.45]), th.tensor([0.0, 1.0])) == pytest.approx(0.0, abs=1e-6)
+    assert NT.push_line_com_offset(s, yaw90, th.tensor([0.9, -0.4, 0.45]), th.tensor([0.0, 2.0])) == pytest.approx(0.1, abs=1e-6)
+    assert NT.push_line_com_offset(SimpleNamespace(), yaw90, th.zeros(3), th.tensor([1.0, 0.0])) is None
+    stats: dict = {}
+    monkeypatch.delenv(NT.PUSH_COM_CAP_ENV, raising=False)
+    assert NT.push_com_cap() is None and not NT._com_cap_rejects(s, 0.2, stats, "two") and not s.kit.stats and not stats
+    monkeypatch.setenv(NT.PUSH_COM_CAP_ENV, "0.06")
+    assert NT.push_com_cap() == pytest.approx(0.06)
+    assert NT._com_cap_rejects(s, 0.1, stats, "two") and stats == {"stance_com_offset": 1}
+    assert not NT._com_cap_rejects(s, 0.05, stats, "one") and not NT._com_cap_rejects(s, None, stats, "one")
+    assert s.kit.stats == {"push_com_cap.checked.two": 1, "push_com_cap.rejected.two": 1, "push_com_cap.checked.one": 1, "push_com_cap.passed.one": 1}

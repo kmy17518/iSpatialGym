@@ -144,6 +144,56 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 
+#: i7-nextto 2026-11-09 (lead round 4, nextto_large_01's symbolic_only demos): a float > 0 = a push spot (one hand) / spot pair (two hands,
+#: their midpoint) whose push line - through the spot along the push direction - passes farther than this (m) from the target's mass
+#: centre (``IORSLarge.target_com_local``: PhysX link COMs, mass-weighted) is not used; the stance search goes on with the face's other
+#: spots and the other faces. The swivel chair's annotated -y pairs sit 9-11 cm off its root line and turn the chair 8.3-9.4 deg in the
+#: push (the evaluator's orientation tolerance is 0.15 rad = 8.6 deg): int2_10 / survey1 300002 / 300003; the +x pairs at 0.4 cm turn
+#: it 0.2 deg, the +y pair at 5.4 cm 3.6 deg. Unset / 0 = off (default). The offset of the chosen push is recorded either way
+#: (``summary.nextto.push_com_offset_m``). Kit ``push_com_cap.checked`` / ``.rejected`` / ``.passed``
+PUSH_COM_CAP_ENV = "ISPATIALGYM_BASE_PUSH_COM_CAP_M"
+
+
+def push_com_cap() -> Optional[float]:
+    """:data:`PUSH_COM_CAP_ENV` in metres, None when unset / 0 / unreadable."""
+    try:
+        v = float((os.environ.get(PUSH_COM_CAP_ENV) or "0").strip())
+    except ValueError:
+        return None
+    return v if v > 0.0 and math.isfinite(v) else None
+
+
+def push_line_com_offset(s, init_pose: G.Pose, point, d2) -> Optional[float]:
+    """The distance (m, horizontal) of the target's mass centre at ``init_pose`` from the push line through ``point`` along ``d2``; None
+    when the mass centre cannot be read."""
+    try:
+        com_l = s.target_com_local()
+        com_w = G.local_points_world(th.as_tensor(com_l).float().reshape(1, 3), (G.t(init_pose[0]), G.t(init_pose[1])))[0]
+        d = th.as_tensor(d2).reshape(-1)[:2].float()
+        d = d / max(float(th.linalg.norm(d)), 1e-9)
+        v = com_w[:2] - th.as_tensor(point).reshape(-1)[:2].float()
+        return abs(float(-v[0] * d[1] + v[1] * d[0]))
+    except Exception as e:  # noqa: BLE001 - no verdict without a mass centre
+        log.debug("push line COM offset unreadable (%r)", e)
+        return None
+
+
+def _com_cap_rejects(s, off: Optional[float], stats: Dict[str, int], hands: str) -> bool:
+    """True when :data:`PUSH_COM_CAP_ENV` is set and ``off`` exceeds it (counted); False otherwise."""
+    cap = push_com_cap()
+    if cap is None or off is None:
+        return False
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    TT._count(s, f"push_com_cap.checked.{hands}")
+    if off > cap:
+        TT._count(s, f"push_com_cap.rejected.{hands}")
+        count(stats, "stance_com_offset")
+        return True
+    TT._count(s, f"push_com_cap.passed.{hands}")
+    return False
+
+
 def knob(s, key: str) -> Any:
     """``generation.<key>`` of the variant, else :data:`DEFAULTS`."""
     v = s.gp.gen(key) if s is not None else None
@@ -976,6 +1026,9 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
     for f in face_spots_cap(s, faces):
         p_loc = contact_local(face, f["coord"], f["t0"], f["z"])
         point = G.local_points_world(p_loc.reshape(1, 3), (root, rquat))[0]
+        com_off = push_line_com_offset(s, init_pose, point, d2)  # i7-nextto: the hand pushes at the spot along d2
+        if _com_cap_rejects(s, com_off, stats, "one"):
+            continue
         for arm in arms:
             for so in knob(s, "push_stand_offs_m"):
                 for lat in knob(s, "push_lateral_offsets_m"):
@@ -993,7 +1046,7 @@ def _push_and_stances(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Ten
                         if not P0.in_frame(s, s.camera_pose_at(st), point.reshape(1, 3)):
                             count(stats, "stance_contact_out_of_frame")
                             continue
-                        cands.append((st, {"face": f, "point": point, "arm": arm, "reach_margin": m, "two_hand_fallback": fallback}))
+                        cands.append((st, {"face": f, "point": point, "arm": arm, "reach_margin": m, "two_hand_fallback": fallback, "com_offset_m": com_off}))
     if not cands:
         raise Reject("no_push_stance", f"face {face}: no stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
     pre_m = float(knob(s, "push_pre_m"))
@@ -1020,6 +1073,9 @@ def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tenso
         points = {a: pts[side_of[a]] for a in (arm1, arm2)}
         spots = {a: pr["spots"][side_of[a]] for a in (arm1, arm2)}
         centre = 0.5 * (pts[0] + pts[1])
+        com_off = push_line_com_offset(s, init_pose, centre, d2)  # i7-nextto: the two hands push about their midpoint along d2
+        if _com_cap_rejects(s, com_off, stats, "two"):
+            continue
         for so in knob(s, "push_stand_offs_m"):
             pose2d = push_stance_pose(centre[:2], d2, float(so), 0.0)
             if not P0.base_ok(s, th.tensor(pose2d[:2])):
@@ -1035,7 +1091,7 @@ def _push_two_hands(s, rng, side: EdgeFrame, face: str, yaw: float, d2: th.Tenso
                     count(stats, "stance_contact_out_of_frame")
                     continue
                 cands.append((st, {"pair": pr, "face": spots[arm1], "point": points[arm1], "arm": arm1, "arms": [arm1, arm2], "points": points, "spots": spots,
-                                   "reach_margin": min(m.values()), "reach_margins": m}))
+                                   "reach_margin": min(m.values()), "reach_margins": m, "com_offset_m": com_off}))
     if not cands:
         raise Reject("no_push_stance", f"face {face}: no two-hand stance passes floor / reach / camera ({ {k: v for k, v in stats.items() if k.startswith('stance')} })")
     pre_m = float(knob(s, "push_pre_m"))
@@ -1300,6 +1356,8 @@ def _record(s, init: Stance, st: Stance, end: Stance, info: Dict[str, Any], chai
                            "path_length_m": {"A_B": None if path_ab is None else path_ab.length_m}}
     if "push_hands" in extras:
         d.summary["nextto"].update({"push_hands": extras["push_hands"], "hand_spacing_m": extras.get("hand_spacing_m"), "two_hand_fallback": extras.get("two_hand_fallback")})
+    off = info.get("com_offset_m")  # i7-nextto (fact): the chosen push line's distance from the target's mass centre
+    d.summary["nextto"]["push_com_offset_m"] = None if off is None else round(float(off), 4)
     if second is not None:
         d.summary["arm"]["arms"] = [arm, second["arm"]]
     d.pose_targets[tname] = full_pose_target(goal_pose[0], goal_pose[1], s.tol("position", 0.15), s.tol("orientation", 0.35))

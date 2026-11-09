@@ -792,6 +792,31 @@ def test_open_jaw_footprint_clearance_and_release_opening():
     assert cls.open_jaw_clearance(None, (place[0], q_turned), pencil) > 0
 
 
+
+def test_place_partner_retry_switch_and_phase_timer(monkeypatch):
+    """i7-nextto 2026-11-09: ISPATIALGYM_PLACE_PARTNER_RETRY = K partner redraws for the relations of ..._RELATIONS (default nextto), 0 /
+    unset / unreadable = off; the phase timer adds ``<name>_calls`` / ``<name>_s`` to the kit counters."""
+    from types import SimpleNamespace
+
+    from ispatialgym.sampling.v2.tasks import iors_small as M
+
+    monkeypatch.delenv(M.PLACE_PARTNER_RETRY_ENV, raising=False)
+    monkeypatch.delenv(M.PLACE_PARTNER_RETRY_RELATIONS_ENV, raising=False)
+    assert M.place_partner_retries("nextto") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_ENV, "3")
+    assert M.place_partner_retries("nextto") == 3 and M.place_partner_retries("under") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_RELATIONS_ENV, "nextto,under")
+    assert M.place_partner_retries("under") == 3 and M.place_partner_retries("touching") == 0
+    monkeypatch.setenv(M.PLACE_PARTNER_RETRY_ENV, "x")
+    assert M.place_partner_retries("nextto") == 0
+    s = SimpleNamespace(kit=SimpleNamespace(stats={}))
+    for _ in range(2):
+        with M.phase_timer(s, "cand_grasp"):
+            pass
+    assert s.kit.stats["cand_grasp_calls"] == 2 and s.kit.stats["cand_grasp_s"] >= 0.0
+    with M.phase_timer(SimpleNamespace(), "cand_grasp"):  # no kit: nothing counted, nothing raised
+        pass
+
 def test_robust_under_ontop_wrapper_branches(monkeypatch):
     """D-007 option A: OmniGibson's verdict, then the contact-patch rays, then the geometric branch; the branch is logged."""
     import omnigibson.utils.bddl_utils as BU
