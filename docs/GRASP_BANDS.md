@@ -2699,6 +2699,19 @@ max_valid 12): 12 of 12 trials valid, tilts 14-35 deg incl. three low-tilt grasp
 interior r / l) on trunk_f9f0829f; staged `$OFH/v2maps_goalmaps_umb3` (copy of umb2, the L2v entry in `_superseded_ladder_r2`) by
 `umbrella_r3/chain3.sh`, which then runs touching_large_02 N 4 on the new defaults (gm_t02_r3, no env switch).
 
+**(3) Result.** The carry switches act from the customs (centred / wide used from attempt 0).
+
+| run (N 4, svl titanrtx) | root | att / written / ok | GPU-h per success | B exact-IK fails / att | goal passes |
+|---|---|---|---|---|---|
+| gm_t02_wide_on (switches by env, c2071b3e) | umb2 (6 grasps) | 46 / 1 / 1 | 3.39 | 2.4 | 2 |
+| gm_t02_r3 (new defaults, f9f0829f) | umb3 (12 grasps) | 58 / 1 / 1 | 6.38 | 3.5 | 4 |
+
+More grasps did not beat the B blocker: each extra tilted grasp adds failing (B, grasp) pairs (base_link x finger self-collisions
+62 -> 135) and raises the cost per attempt (exact IK 1260 / attempt). Three of r3's four goal passes died later: the lift's
+approach_untrackable (joint jump 0.22 rad at waypoint 0), the retreat's witness FK 7.8 mm > 2 mm (program check), an approach joint
+jump 0.21 rad. umb3 is not adopted; umb2 stays the umbrella root. Next: the narrowest B-stance fix (a base_link x finger term in the floor
+map's approach check, or no tilted top grasps at the deep-crouch trunks), not done here.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
