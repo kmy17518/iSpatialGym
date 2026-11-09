@@ -2964,6 +2964,69 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
       retreat tracked from the place configuration, as the program check does (shelf tip only, not a shared gate).
 - **Left to the owner:** otwukr T7 / T8 as touching_03's templates, the eval index, the t03 switch defaults.
 
+#### Round 7 (2026-11-08; LEAD DECISION #37 while the owner is away; DECISIONS "i7-t03 r7 ..."; every switch default OFF)
+
+- **Code (37bd1888).**
+  - `ISPATIALGYM_T03_PAIR_MESH` (`sampling/v2/pair_mesh.py`): the `{arm}_arm_link5` / `torso_link2` clearance on the simulator's own
+    collision pieces, i.e. the r1pro.usda convex hulls, posed by the URDF's chain in numpy.
+    - Overlap is decided exactly (an LP); the gap is exact too (Wolfe's min-norm point, equal to SLSQP within 4e-13 m on 300 random hull
+      pairs).
+    - Margin 5 mm. Two T8 witnesses read +2.1 / +0.1 mm, yet their executed retreats touched; the successful retreats read +16.8 mm or
+      more. The sphere model is unchanged.
+    - Judged at `release_clear`'s 15 cm clear pose, at the 5p.1 place end, and at the program check's retreat witnesses (reject
+      `self_mesh_contact`). Kit `pair_mesh.checked.<where>` / `.refused.<where>`.
+  - `ISPATIALGYM_SHELF_PREGRASP_FRAME`: when the shelf stance is chosen, the goal check's own `require_in_frame` (pre-grasp + grasp, same
+    rule and 5 % margin) runs at that stance's camera. A failure becomes the stance-shift need `frame`. Kit
+    `shelf_pregrasp_frame.checked / .passed / .refused`.
+  - `ISPATIALGYM_TRACKED_END_BLAME` (log only): the tracked chain's "end configuration collides" verdict logs `TRACKED_END_BLAME`
+    with the colliding object or self-collision pair.
+  - `ISPATIALGYM_SHELF_RELEASE_TRACKED`: `release_clear` (and the 5p.1 place end) track place -> 10 cm -> 15 cm from the place
+    configuration, as the program check and the oracle do, instead of solving the 15 cm pose afresh. Kit
+    `shelf_release_tracked.checked / .passed / .failed`.
+  - Tests `test_t03_round7.py` (16). pyflakes and the suite match the base (23 failed + 3 errors, same ids).
+- **Cross-alias count of the pair (CPU).** Every recorded step of the 141 int2 written demos (28 aliases, both arms): 0 demos come
+  within 0 mm and 0 within 5 mm. The closest are nextto_04 at +45.5 mm and ontop_large_scale_03 at +48.1 mm; every other alias stays
+  50 mm or more away. So the pair touches only on touching_03's shelf retreat. The default is the owner's.
+- **A/B** (`sub_r7.sh`: r6's settings + `SHELF_RETREAT_BACKOFF` + the four switches; 300100-103, svl titanrtx; counters from
+  `tab_t03_r7.py`).
+
+  | arm | att / written / ok | GPU-h | per success | r6 (same arm) |
+  |---|---|---|---|---|
+  | v (v2only, lean root) | 48 / 4 / 4 | 0.26 | 0.064 | 298 / 1 / 1, 1.17 |
+  | d (legacy kmuacd) | 256 / 2 / 2 | 2.88 | 1.44 | 255 / 2 / 0, 2.88 |
+
+  - **Arm v.** The camera, release and retreat failures went from 35 / 13 / 12 to 0 / 3 / 1.
+    - Frame test: checked 38, passed 21, refused 17; one stance shift for the `frame` need.
+    - Tracked release: checked 44, passed 20, failed 24.
+    - 5p.1 back-off: passed 14, recorded 4. All 4 written instances retreat with the base, so the arm stops at the 10 cm place end.
+    - Pair mesh: 4 refused at the clear pose (+2.4 to +3.0 mm, inside the margin), 0 refused at the place end or the program check.
+    - Log-only blame: the one remaining retreat reject is "left_arm_link6 x torso_link2 (5 mm)", a sphere-model refusal.
+  - **Arm d.** 2 written and both succeed; r6's two demos both hit the link5 / torso_link2 contact.
+    - Pair mesh: 9 of 11 refused at the clear pose (-3.4 to +4.9 mm).
+    - Frame test: 42 checked, 14 refused. Tracked release: 38 checked, 18 failed.
+    - Before the lift nothing changed: target_placement 140, no_free_edge 108.
+  - **link6 check.** link6 never touched in execution (closest +7.4 mm). Its only retreat witnesses within 5 mm already had link5
+    below 0, so extending the mesh check to link6 would refuse nothing more. The check stays link5-only.
+
+#### Round 8: touching_03's defaults (2026-11-08; LEAD DECISION #39 under the owner's mandate "fix all the bugs and speed up / make yield better the slow low yield aliases")
+
+- **Mechanism (b4da2675, `sampling/v2/alias_switches.py`).**
+  - A switch's environment variable wins when set ("0" = off). Unset, the switch is on only for the shelf tip family
+    (`IORSSmall.shelf_tip()`, the shelf layout with `generation.shelf_tip_release`) and only for the names in `SHELF_TIP_DEFAULTS`.
+  - Only touching_03's customs entry has `shelf_tip_release`; a test pins this. touching_01 / 02 / 04 and every other IORS alias read
+    unset as off, as before.
+  - 5ee25e37 makes the test stand-ins pin these switches off unless a test sets them.
+- **One commit per flip**, in this order: e9c7acf4 FREE_START, 1d2aec35 JOINT_STANCE (with 5p.2), 3a986bad RELEASE_IN_GAP, 94782615
+  STANCE_SHIFT, 86b9700c LIFT_STRAIGHTEN, 370438e0 RETREAT_BACKOFF, ce191a3f PREGRASP_FRAME, 552b08c5 RELEASE_TRACKED, 58ec7ec2
+  T03_PAIR_MESH.
+  - pyflakes is clean on every commit, and the full suite matches the base on every commit (23 failed + 3 errors, same ids).
+  - Not turned on: `TRACKED_END_BLAME` (log only), `SPAN_RULE`, and the round-1 switches.
+- **Runs on trunk_58ec7ec2 with no `--extra-env`** (`sub_r8.sh`):
+  - **touching_03** (300100-103): 48 / 4 / 4, 0.26 GPU-h = 0.065 per success. It reproduces r7 arm v attempt for attempt, with the
+    same rejections and counters.
+  - **touching_02 control** (610100-103): 51 / 4 / 3, 0.41 GPU-h (int2_4 on the integration trunk: 89 / 3 / 3, 0.60). No line or
+    counter of any t03 switch appears; the one failed demo is plan_failed.
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on

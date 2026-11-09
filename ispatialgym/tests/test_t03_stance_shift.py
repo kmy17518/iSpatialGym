@@ -461,7 +461,7 @@ def test_lift_straighten_off_is_today(monkeypatch):
     s, gr = _lift_sampler(monkeypatch, switch="0")
     assert not IS.shelf_lift_straighten_on()
     src = inspect.getsource(IS.IORSSmall.after_goal_check)
-    assert "if shelf_lift_straighten_on():" in src and src.index("if shelf_lift_straighten_on():") < src.index("self.shelf_lift_plan(grasp)")
+    assert "if shelf_lift_straighten_on(self):" in src and src.index("if shelf_lift_straighten_on(self):") < src.index("self.shelf_lift_plan(grasp)")
     p, q = PC.lift_end_pose(gr)
     assert list(q) == pytest.approx(list(gr.grasp[1]), abs=1e-7)
     gr.extras["lift_leaned_piece"] = "/World/bookcase/board"
