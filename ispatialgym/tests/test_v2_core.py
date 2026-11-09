@@ -834,9 +834,9 @@ def test_nextto_top_first_grasp_kind(monkeypatch):
     tilt = th.tensor([0.0, _m.sin(_m.radians(30) / 2), 0.0, _m.cos(_m.radians(30) / 2)])
     assert M.top_down_grasp(down, tilt)
     monkeypatch.delenv(M.NEXTTO_TOP_FIRST_ENV, raising=False)
+    assert M.nextto_top_first_on()  # default on since the i7-nextto A/B
+    monkeypatch.setenv(M.NEXTTO_TOP_FIRST_ENV, "0")
     assert not M.nextto_top_first_on()
-    monkeypatch.setenv(M.NEXTTO_TOP_FIRST_ENV, "1")
-    assert M.nextto_top_first_on()
 
 def test_robust_under_ontop_wrapper_branches(monkeypatch):
     """D-007 option A: OmniGibson's verdict, then the contact-patch rays, then the geometric branch; the branch is logged."""

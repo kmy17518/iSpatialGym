@@ -517,9 +517,12 @@ PUSH_LINE_COM_ENV = "ISPATIALGYM_PUSH_LINE_COM"
 #: down at the target's rest pose) first and the other grasps after them, so F is searched over the top grasps and only when they have no
 #: feasible (yaw, grasp) at the focus over the rest (the flush / inclined tiers keep their order). Every rule unchanged; which grasp a
 #: candidate takes changes. Measured on nextto_02 (salt shaker): every written instance of int1_1 / int2_10b (7 / 7) holds a top grasp,
-#: and every place-screening failure of i7nx_n02_off / _on (20 / 20, 74 / 74) a side grasp. Default "0". Kit ``top_first.top`` /
+#: and every place-screening failure of i7nx_n02_off / _on (20 / 20, 74 / 74) a side grasp. "0" = off. DEFAULT "1" since the i7-nextto
+#: A/B (2026-11-09, nextto_02 300119 N 4, svl titanrtx, per-arm empty caches: off 41 / 3 / 3 0.229 GPU-h per ok, on 14 / 4 / 4 0.097, the top
+#: tier taken 7 times; control nextto_04 300137: every grasp top-down, the same 26 attempts / 4 / 4 in both arms). Kit ``top_first.top`` /
 #: ``.rest`` (the tier the grasp came from), ``.no_top`` (a tier without a top grasp)
 NEXTTO_TOP_FIRST_ENV = "ISPATIALGYM_NEXTTO_TOP_FIRST"
+NEXTTO_TOP_FIRST_DEFAULT = "1"
 PLACE_PARTNER_RETRY_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY"
 PLACE_PARTNER_RETRY_RELATIONS_ENV = "ISPATIALGYM_PLACE_PARTNER_RETRY_RELATIONS"
 #: the segment-draw rejections a fresh partner pose can change (the place screening's own codes are marked by ``_place_screen_reject``)
@@ -576,7 +579,7 @@ def touch_built_tilts_on() -> bool:
 
 
 def nextto_top_first_on() -> bool:
-    return (os.environ.get(NEXTTO_TOP_FIRST_ENV) or "0").strip() == "1"
+    return (os.environ.get(NEXTTO_TOP_FIRST_ENV) or NEXTTO_TOP_FIRST_DEFAULT).strip() == "1"
 
 
 def top_down_grasp(eef_in_object, rest_quat, cos_max: float = -math.sqrt(0.5)) -> bool:
