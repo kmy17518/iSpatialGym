@@ -5424,6 +5424,30 @@ on the controls (no overhang pick): under_large_01 300022 off 7 / 4 / 0 vs on 11
 0.36-2.62 rad start gaps); the via-posture predictions match. Default ON (lead #49 step 4: the switch acts, no regression; the
 supports-ignored transit is gone in 8 / 8); `ISPATIALGYM_PICK_TRANSIT_GATE=0` = off. Cost: +30 % GPU-h per success on this alias.
 
+### r2: the transit-start gap (lead decision #71; the gate stays default OFF, e2086624)
+
+Measured per demo (startdraw2_20261108/gap.py, gap2.py, wcmp.py, join.py: demo.hdf5 joint_positions at the annotated action steps vs the
+sidecar's push chain / witnesses and the gate's PICK_TRANSIT_DIAG line, c10b7a49). Two causes:
+1. BRANCH (a plain bug): the program check solves the overhang push's `pre` witness fresh and `_rewitness_flipped_push` (oracle-fix
+   2026-11-03) may move it to the stance posture's branch - in 11 of 48 earlier demos it lay 2.8-3.6 rad (another IK branch) from
+   `contacts.push_pick.chain_arm_q[0]` while the push waypoints' witnesses stayed the chain's; the oracle planned to it and pushed,
+   retreated and began the grasp transit in that branch (= i7-overpath's 2.62 rad gap). Fix c68cd099 + 6d809106
+   `ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN` (default off): the chain's configuration is the pre witness when it reaches the pose
+   collision-free, and the overhang push skips the posture-branch re-witness (kit `push_pick_pre.chain / .fresh / .rewitness_skipped`).
+   tsd7: chain 10, re-witness skipped 10, flips 0 / 8.
+2. BACK-OFF (a replay omission): `execute_push` backs the pad off `push_backoff_m` (2 cm) along the reversed push before the retreat; the
+   escape replay (`_overpath_start`) started at the push goal - the live push ends 2.0 cm short of the chain goal in every demo, the
+   replayed start 0.12-0.20 rad (joint 4 / 2) from the live retreat end. Fix 4670ce9c + 6d809106 `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF`
+   (default off; kit `overhang_escape_backoff.tracked / .failed`): tsd7 tracked 31, the gap 0.07-0.08 rad - the rest is the live push's own
+   tracking (push end vs chain goal 0.05-0.08 rad already). A drive between retreat and grasp re-poses the arm to the program check's
+   recorded departure configuration, which the back-off does not reach yet (331103: 0.36 rad).
+
+Gate prediction vs live (join.py): via-posture verdicts held in every run (tsd3-7: 27 / 27); direct-ramp verdicts from the escape start did
+not (tsd3-6: 0 / 9 matched; tsd7 with both fixes: 1 / 4) - the direct ramp passes desk_bhkhxo_0's mesh 28 so closely that < 0.1 rad of
+start difference flips it. inside_large_01 331000 + 331100 (gate on; v2maps_int2, titanrtx): tsd4_diag 42 / 8 / 7, 1.40 GPU-h (0.199 / ok);
+tsd5_chain 47 / 8 / 7, 1.33 (0.190); tsd6_backoff (back-off not yet tracked) 46 / 8 / 8, 1.17 (0.146); tsd7_both 48 / 8 / 7, 1.24 (0.176);
+off (tsd2_off) 20 / 8 / 6, 1.22 (0.203). Every switch stays default off.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
