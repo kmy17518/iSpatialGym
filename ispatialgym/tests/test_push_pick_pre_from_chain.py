@@ -31,8 +31,10 @@ def _action(chain=True):
     return SimpleNamespace(name="push", contact=SimpleNamespace(extra=extra))
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv(ENV, raising=False)
+    assert PC.push_pick_pre_from_chain_on()  # default on since the r3 A/B (lead #73)
+    monkeypatch.setenv(ENV, "0")
     assert not PC.push_pick_pre_from_chain_on()
     monkeypatch.setenv(ENV, "1")
     assert PC.push_pick_pre_from_chain_on() and PC._pick_overhang_push(_action())

@@ -2615,7 +2615,7 @@ def push_pick_pre_from_chain_on() -> bool:
     escape replay and every transit prediction were computed in) whenever it still reaches the pre-contact collision-free here; else the
     fresh solve as before. Off (default): the fresh solve - which landed ~3 rad away (another IK branch) in 8 of 32 inside_large_01 demos,
     so the oracle pushed, retreated and started the grasp transit in a branch no sampler check had seen."""
-    return os.environ.get("ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN", "0") == "1"
+    return os.environ.get("ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
 
 
 def _push_pick_pre_from_chain(sampler, action, stance, arm: str, pose, fingers, ignore) -> Optional[IKResult]:
