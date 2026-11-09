@@ -60,6 +60,36 @@ from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
 
+#: i7-artlarge r3 (lead #54; DEFAULT OFF): the transit dip gate's Cartesian replacement leg (``Motions._cartesian_transit``) is refused when
+#: the arm's link3 / link5 collision-MESH clearance (``sampling.v2.pair_mesh``, the r1pro.usda convex pieces) falls to this or below on
+#: the leg - the differential IK folds the elbow into the upper arm where cuRobo's spheres read clear (open_large_03 352001 / 352003:
+#: robot_touching_itself at -0.2 / +0.1 mm); the plan then streams as before
+DIP_LEG_SELF_MESH_ENV = "ISPATIALGYM_DIP_LEG_SELF_MESH"
+DIP_LEG_SELF_MESH_MARGIN_M = 0.005
+
+
+def dip_leg_self_mesh_on() -> bool:
+    return os.environ.get(DIP_LEG_SELF_MESH_ENV, "0") == "1"
+
+
+def dip_leg_self_mesh_why(arm: str, q_traj: Any, arm_idx: Any = None, margin: float = DIP_LEG_SELF_MESH_MARGIN_M, stride: int = 2) -> Optional[str]:
+    """None when every ``stride``-th configuration of ``q_traj`` (and the last) keeps ``{arm}_arm_link3`` / ``{arm}_arm_link5`` more than
+    ``margin`` apart by their collision meshes, else why. ``q_traj``: (T, 28) full configurations (ALL_JOINTS order)."""
+    from ispatialgym.sampling.v2 import pair_mesh as PM
+
+    q = C.as_tensor(q_traj)
+    q = q.reshape(-1, q.shape[-1])
+    ks = list(range(0, len(q), max(1, int(stride))))
+    if ks and ks[-1] != len(q) - 1:
+        ks.append(len(q) - 1)
+    links = (f"{arm}_arm_link3", f"{arm}_arm_link5")
+    for k in ks:
+        cl, _ = PM.pair_clearance(q[k].tolist(), arm, links)
+        if cl <= margin:
+            return f"{links[0]} / {links[1]} mesh clearance {cl * 1000:+.1f} mm at waypoint {k}/{len(q)} (<= {margin * 1000:.0f} mm; cuRobo's spheres miss it)"
+    return None
+
+
 
 # train85 (owner 2026-10-14 ~22:00): the oracle's waits end once nothing moves any more, so a demo carries no long standstill
 # (thresholds of reconcile83's generation.oracle_still_exit). ISPATIALGYM_ORACLE_STILL_EXIT=1 turns it on; unset, nothing changes.
@@ -496,6 +526,8 @@ class Motions:
         self.witness_via_posture_events: List[Dict[str, Any]] = []
         # the dipping-transit gate of a grasp transit (first-demo v3.0 F5, ``transit_dip_gate``): the active context, None outside it
         self._dip: Optional[Dict[str, Any]] = None
+        #: i7-artlarge r3: Cartesian dip legs refused by DIP_LEG_SELF_MESH
+        self.dip_leg_self_mesh_refused = 0
         # 2026-10-31 train-fast (STRAIGHT_ARM): how often ``arm_to`` took a checked straight ramp instead of a trajopt plan, and why
         # not (recorded in meta.fast.straight_arm / result.straight_arm)
         self.straight_arm_stats: Dict[str, Any] = {"straight_arm_ok": 0, "straight_arm_fallback": 0, "waypoints": 0, "check_s": 0.0, "fallback_why": {}}
@@ -1318,6 +1350,11 @@ class Motions:
                             (q_traj, self._leg_steps(poses, q_traj))]
                 adjust = {"rad": round(gap0, 3), "hand_mm": round(moved * 1000, 1)}
             full = th.cat([seg[0] for seg in segments])
+            why_mesh = dip_leg_self_mesh_why(arm, full, self.robot.arm_control_idx[arm]) if dip_leg_self_mesh_on() else None
+            if why_mesh:
+                self.dip_leg_self_mesh_refused += 1
+                whys.append(f"{direction}: {why_mesh}")
+                continue
             if self._protect is not None:
                 viol = self._protect_violations([arm], full, f"{arm}_arm", self._protect)
                 if viol:
@@ -1380,8 +1417,14 @@ class Motions:
             tried.append(f"{name}: {why}")
             if segments is None:
                 continue
+            # i7-artlarge r3: the decision is logged BEFORE the leg streams (logged only after it, a failure inside the leg left the log
+            # reading as if the straight ramp of the plan had run: open_large_03 352001 / 352003)
+            log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end -> streaming the %s Cartesian leg instead of the plan (%s)", arm,
+                     dip[0] * 100, name, "; ".join(tried))
+            rec.update({"leg": name, "tried": list(tried), "streaming": True})
             for q_traj, steps in segments:
                 yield from self.execute_joint_trajectory(self._retime(q_traj, steps), arms=[arm])
+            rec.pop("streaming", None)
             rec.update({"fired": True, "leg": name, "tried": tried,
                         "why": f"the plan dipped {dip[0] * 100:.1f} cm below its lower end: replaced by the {name} Cartesian leg"})
             log.info("arm_to(%s): the planned transit dips %.1f cm below its lower end -> %s Cartesian leg instead (%s)", arm, dip[0] * 100, name, "; ".join(tried))

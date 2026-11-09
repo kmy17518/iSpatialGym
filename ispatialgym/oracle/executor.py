@@ -2256,6 +2256,7 @@ class Executor:
             "witness_via_posture": _jsonable(list(getattr(self.motions, "witness_via_posture_events", []) or [])),
             # 2026-10-31 train-fast (STRAIGHT_ARM): straight ramps taken in place of trajopt plans, and the fall-backs by cause
             "straight_arm": _jsonable(dict(getattr(self.motions, "straight_arm_stats", None) or {})),
+            "dip_leg_self_mesh_refused": int(getattr(self.motions, "dip_leg_self_mesh_refused", 0) or 0),
             "protection": _jsonable({"protected": [getattr(o, "name", n) for n, o in self.protected_goal], "plan_checks": int(getattr(self.motions, "protect_checks", 0) or 0),
                                      "fired": list(getattr(self.motions, "protect_events", []) or []) + list(getattr(self.monitors, "protect_events", []) or [])}),
             "placed_orientation": placed_orientation,
