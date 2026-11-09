@@ -4992,7 +4992,8 @@ class IORSLarge(SamplerV2):
                 d_push = d_push / th.linalg.norm(d_push)
                 gp_, gq_ = chain["goal"]
                 back = (G.t(gp_).float() - d_push * back_m, G.t(gq_).float())
-                r_b = self.ikc.continue_chain(q_push, [back], arm, ignore=[self.target] + sup, ignore_end=[self.target] + sup, ignore_start=[self.target] + sup)
+                # continue_chain's first pose is where the arm IS (the push's goal), the leg goes on from it
+                r_b = self.ikc.continue_chain(q_push, [chain["goal"], back], arm, ignore=[self.target] + sup, ignore_end=[self.target] + sup, ignore_start=[self.target] + sup)
                 if r_b.ok and r_b.q is not None:
                     q_push = G.t(r_b.q).float().clone()
                     TT._count(self, "overhang_escape_backoff.tracked")

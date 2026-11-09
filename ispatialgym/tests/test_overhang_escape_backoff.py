@@ -24,7 +24,8 @@ def _setup(monkeypatch):
     monkeypatch.setattr(PCK, "replay_contact_escape", escape)
 
     def cont(q_start, wps, arm, **kw):
-        seen["back"] = wps[0]
+        seen["back"] = wps[-1]
+        seen["first"] = wps[0]
         q = q_start.clone()
         q[11] = 7.0
         return IKResult(True, q, "ok", 1)
@@ -53,4 +54,5 @@ def test_on_replays_from_the_backed_off_pad(monkeypatch):
 
     back_p = seen["back"][0]
     assert th.allclose(back_p, th.tensor([23.73 + CONFIG.push_backoff_m, 13.80, 0.79]), atol=1e-6)  # 2 cm back against the push
+    assert seen["first"] is chain["goal"]  # tracked on from where the arm is (continue_chain's first pose)
     assert float(seen["q_escape_from"][11]) == 7.0 and s.kit.stats["overhang_escape_backoff.tracked"] == 1

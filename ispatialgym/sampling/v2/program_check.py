@@ -3115,7 +3115,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             if not ok_r:
                                 chk = (False, why_r)
                         flipped_mode = os.environ.get("ISG_FLIPPED_PUSH_CHECK", "on").lower()
-                        if chk is None and q_ref is not None and flipped_mode not in ("off", "0", "false"):
+                        if chk is None and q_ref is not None and _pick_overhang_push(action) and push_pick_pre_from_chain_on():
+                            # i7-startdraw2 r2: the overhang push keeps the sampled chain's branch (its pre witness, the push replayed from it
+                            # above) - re-witnessing it on the stance posture's branch moved the oracle's push, retreat and grasp transit 3 rad
+                            # away from the branch the escape replay and the transit checks were computed in
+                            _kit(sampler, "push_pick_pre.rewitness_skipped")
+                        elif chk is None and q_ref is not None and flipped_mode not in ("off", "0", "false"):
                             if flipped_mode == "strict" or replay is None:
                                 chk = _flipped_push_chain_check(sampler, chain_ref, stance, arm, q_ref, ignore_last, ignore_all, fingers, approached)
                             else:
