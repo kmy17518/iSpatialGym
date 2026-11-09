@@ -1149,7 +1149,7 @@ class Disembedding(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         redraws = disemb_pos_redraws()
         if not redraws or getattr(self, "_split_cone_pools", None) is None:
-            return self._sample_position(rng)
+            return Disembedding._sample_position(self, rng)  # (the class's own: stub tests call it with a namespace)
         # i7-yield2 r3 (lead #66): the split cone's drawn start POSITION is redrawn within the attempt (without replacement, among the
         # positions of the drawn start's pool) when every work stance there fails - the drawn start (~70 s) is kept
         side = getattr(self, "region_side", None)
@@ -1159,7 +1159,7 @@ class Disembedding(SamplerV2):
         errors: List[str] = []
         for r in range(redraws + 1):
             try:
-                d = self._sample_position(rng)
+                d = Disembedding._sample_position(self, rng)
                 if r:
                     TT._count(self, "pos_redraw.passed")
                     TT._count(self, f"pos_redraw.passed_after_{min(r, 5)}{'+' if r >= 5 else ''}")

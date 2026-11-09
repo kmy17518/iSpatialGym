@@ -11,8 +11,8 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.v2.tasks import disembedding as DE
 
 
-def _task(good_keys, n_pos=5):
-    cls = next(c for c in vars(DE).values() if isinstance(c, type) and "_sample_position" in vars(c))
+def _task(good_keys, n_pos=5, monkeypatch=None):
+    cls = DE.Disembedding
     t = cls.__new__(cls)
     pool = {(i, 0): [SimpleNamespace(pos=i, k=j) for j in range(2)] for i in range(n_pos)}
     t._split_cone_pools = {None: pool}
@@ -28,8 +28,13 @@ def _task(good_keys, n_pos=5):
             return SimpleNamespace(summary={})
         raise Reject("target_placement", f"candidate {pos}: [grasp_unreachable] empty feasible set F")
 
-    t._sample_position = sample_position
+    t.position_impl = sample_position
     return t
+
+
+@pytest.fixture(autouse=True)
+def _position_stub(monkeypatch):
+    monkeypatch.setattr(DE.Disembedding, "_sample_position", lambda self, rng: self.position_impl(rng))
 
 
 def test_switch_parsing(monkeypatch):
@@ -69,7 +74,7 @@ def test_on_exhausted_and_other_rejects_pass_through(monkeypatch):
     def other(rng):
         raise Reject("goal_occluded", "x")
 
-    t._sample_position = other
+    t.position_impl = other
     with pytest.raises(Reject) as e:
         t.sample_instance(np.random.default_rng(0))
     assert e.value.reason == "goal_occluded"
