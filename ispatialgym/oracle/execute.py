@@ -113,6 +113,28 @@ class PrivilegedState(Protocol):
 ATTACH_HOVER_DEFAULT = "swept"
 
 
+#: the push kinds whose transit takes the standoff by default (lead #61, 2026-11-09: under_large_03's protected_contact, A/B fpr2)
+PUSH_TRANSIT_STANDOFF_DEFAULT_KINDS = ("push_under", "push_touching")
+PUSH_TRANSIT_STANDOFF_DEFAULT_M = 0.10
+
+
+def _transit_standoff_env() -> Optional[float]:
+    """``ExecuteConfig.push_transit_standoff_m`` from ``ISPATIALGYM_PUSH_TRANSIT_STANDOFF`` (i7-floorpush r2): "1" / "on" = 0.10 m, a positive
+    number = that many metres, "0" / "off" = 0 (off), unset = None (the default: :func:`push_transit_standoff_dist`)."""
+    v = str(os.environ.get("ISPATIALGYM_PUSH_TRANSIT_STANDOFF", "") or "").strip().lower()
+    if v == "":
+        return None
+    if v in ("0", "off", "false", "no"):
+        return 0.0
+    if v in ("1", "on", "true", "yes"):
+        return 0.10
+    try:
+        f = float(v)
+    except ValueError:
+        return 0.0
+    return f if math.isfinite(f) and f > 0.0 else 0.0
+
+
 @dataclass
 class ExecuteConfig:
     #: base at the last path waypoint / drive-in pose (m, rad)
@@ -443,6 +465,13 @@ class ExecuteConfig:
     #: ... a recorded pre-contact witness (solved by the sampler with the object left out) whose arm spheres stand closer than this to the
     #: object's box is planned with it left out at once: the planner refuses that goal only after its witness rounds and posture detours
     push_transit_witness_clear_m: float = 0.01
+    #: i7-floorpush r2 (lead decision #61, under_large_03's protected_contact: the transit round the can planned with the can left out, the
+    #: arm's link7 on it): before a push transit is planned with the pushed object left out, a standoff this far above the pre-contact and
+    #: half of it back along the push is planned to with the object PRESENT, then a straight leg down to the pre-contact; the left-out
+    #: plan only when that fails before the robot moved. ``ISPATIALGYM_PUSH_TRANSIT_STANDOFF``: "1" = 0.10 m, a number = that, "0" / "off" = off
+    #: everywhere; unset (None) = the DEFAULT since 2026-11-09 (lead #61 on the A/B): 0.10 m for the floor pushes (``push_under`` /
+    #: ``push_touching``: :data:`PUSH_TRANSIT_STANDOFF_DEFAULT_KINDS`), off for every other push
+    push_transit_standoff_m: Optional[float] = field(default_factory=lambda: _transit_standoff_env())
     #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
     #: leg (through the recorded ``grasps[k].carry`` waypoint when the sampler wrote one), differential IK with the
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
@@ -5151,8 +5180,62 @@ def reach_push_pre(motions: Motions, state, arm: str, pre, supports: Sequence[An
                 ctx["push_transit"] = {"target": "present", "why": why}
                 ctx["plan_ignored"] = [n for n in ctx.get("plan_ignored", []) if n not in names]
                 return
+        if push_transit_standoff_dist(cfg, ctx.get("push_kind")) > 0.0:
+            done = yield from _push_transit_via_standoff(motions, state, arm, pre, supports, ctx, cfg, names, why, kw)
+            if done:
+                return
         ctx["push_transit"] = {"target": "left out", "why": why}
     yield from reach_pre_pose(motions, state, arm, pre, supports, through, q_hint, ctx, cfg, **kw)
+
+
+def push_transit_standoff_dist(cfg: ExecuteConfig, kind: Optional[str]) -> float:
+    """The transit standoff (m) of a push of contact kind ``kind``: ``cfg.push_transit_standoff_m`` when the switch is set, else (the default)
+    :data:`PUSH_TRANSIT_STANDOFF_DEFAULT_M` for :data:`PUSH_TRANSIT_STANDOFF_DEFAULT_KINDS` and 0 (off) for every other push."""
+    v = cfg.push_transit_standoff_m
+    if v is not None:
+        return float(v)
+    return PUSH_TRANSIT_STANDOFF_DEFAULT_M if str(kind or "") in PUSH_TRANSIT_STANDOFF_DEFAULT_KINDS else 0.0
+
+
+def push_transit_standoff(pre, direction, dist: float) -> Tuple[th.Tensor, th.Tensor]:
+    """The standoff of :func:`_push_transit_via_standoff`: ``dist`` above the pre-contact and ``dist / 2`` back along the push ``direction``
+    (its floor-plane part), the pre-contact's orientation."""
+    p, q = as_world_pose(pre)
+    d = C.as_tensor(direction).reshape(-1)[:3].float().clone()
+    d[2] = 0.0
+    n = float(th.linalg.norm(d))
+    back = -d / n * (0.5 * float(dist)) if n > 1e-9 else th.zeros(3)
+    return p.float() + back + th.tensor([0.0, 0.0, float(dist)]), q.float()
+
+
+def _push_transit_via_standoff(motions: Motions, state, arm: str, pre, supports: Sequence[Any], ctx: Dict[str, Any], cfg: ExecuteConfig, names: Sequence[str],
+                               why: str, kw: Dict[str, Any]) -> Generator[th.Tensor, None, bool]:
+    """i7-floorpush r2 (lead decision #61): the push transit that would leave the pushed object out (``reach_push_pre``) planned to a standoff
+    (:func:`push_transit_standoff`, ``cfg.push_transit_standoff_m``) with the object PRESENT in the collision world, then a straight leg down
+    to the pre-contact (the leg's protection stays). True when done; False when the standoff plan fails before the robot moved (the caller
+    plans with the object left out, as before). ``ctx["push_transit"]`` records it."""
+    direction = ctx.get("push_direction")
+    if direction is None:
+        return False
+    dist = push_transit_standoff_dist(cfg, ctx.get("push_kind"))
+    standoff = push_transit_standoff(pre, direction, dist)
+    moved = [0]
+    try:
+        yield from _counted(reach_pre_pose(motions, state, arm, standoff, supports, [], None, ctx, cfg, **kw), moved)
+    except SkillError as e:
+        if moved[0] or e.reason != "plan_failed" or e.details.get("stage") == "protected":
+            raise
+        log.warning("push(%s): no transit to the standoff %.2f m above the pre-contact with %s present (%s) - planning with it left out", arm,
+                    dist, list(names), e.message[:160])
+        ctx["push_transit_standoff_failed"] = e.message[:160]
+        return False
+    yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    ctx["push_transit"] = {"target": "present to the standoff", "why": why, "standoff_m": dist,
+                           "standoff": [round(float(v), 4) for v in standoff[0].tolist()]}
+    ctx["plan_ignored"] = [n for n in ctx.get("plan_ignored", []) if n not in names]
+    log.info("push(%s): transit to the pre-contact via a standoff %.2f m above it with %s present, then a straight leg down (%s)", arm, dist,
+             list(names), why[:120])
+    return True
 
 
 class _RecordedPushState:
@@ -5293,6 +5376,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     arm = action.contact.arm
     obj = action.contact.object
     extra0 = getattr(action.contact, "extra", None) or {}
+    ctx["push_direction"] = [float(v) for v in C.as_tensor(targets["direction"]).reshape(-1)[:3].tolist()]  # the transit standoff's "back" (r2)
+    ctx["push_kind"] = str(extra0.get("kind") or "push")  # the transit standoff's default kinds (r2)
     pad_speed = push_speed_of(action.contact)
     if pad_speed is not None:
         ctx["push_speed_m_s"] = pad_speed  # every pad leg below (_push_leg, _push_arc_closed_loop, _speed_kw) and the base nudges' cap

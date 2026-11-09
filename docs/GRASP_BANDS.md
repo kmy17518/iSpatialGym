@@ -5878,6 +5878,27 @@ on the controls (no overhang pick): under_large_01 300022 off 7 / 4 / 0 vs on 11
 0.36-2.62 rad start gaps); the via-posture predictions match. Default ON (lead #49 step 4: the switch acts, no regression; the
 supports-ignored transit is gone in 8 / 8); `ISPATIALGYM_PICK_TRANSIT_GATE=0` = off. Cost: +30 % GPU-h per success on this alias.
 
+### r2 (lead decisions #59-#61, 2026-11-09)
+
+- **#59**: the 0.10 m strokes default went to the integration (f5b89921).
+- **#60, the briefcase topple (under_large_02)**. Physics check (PhysX default mu 0.5, contact 0.086 m; a box tips about its front edge
+  when mu x h > the half depth along the push): end push half depth 0.165 m (no tip, but yaw unstable, lever 0.165 m); broadside 0.06 m
+  (tips if mu > 0.70); lying flat (0.12 m tall, COM 0.06 m) never tips but the contact is above its COM - the pitched hand's below-COM rule
+  then wants tips <= ~0.05 m (reached on 48 of 1107 chains), and lying flat needs a 90 deg in-hand tilt plus a lying goal orientation.
+  (i) `ISPATIALGYM_FLOORPUSH_BROADSIDE=1` (249f14df, off): the push-under yaw lock `"broadside"` keeps only the yaws that push the
+  footprint's long face (long axis within 12 deg of square, aspect >= 1.5). A/B (index 370000): base 6 / 4 / 0; broadside 5 / 1 / 0 in
+  5.1 h (cancelled): 14 push chains solved vs 220, 3 of 5 attempts ran out the 3600 s budget, the one pushed briefcase toppled. Not a
+  default. (ii) not built (a carry tilt, a goal orientation and a contact-rule change).
+- **#61, the transit to the push pre-contact**. Count (int2 + floor runs): the transit leaves the pushed object out on under_large_03
+  (21 + 3; 4 protected_contact), touching_04 (2; 2), world_vertical_02 / 03, touching_01 / 02, axial_05 (0). `ISPATIALGYM_PUSH_TRANSIT_STANDOFF`
+  (249f14df): before that left-out plan, a standoff 0.10 m up and 0.05 m back is planned to with the object present, then a straight leg
+  down; the left-out plan only if that fails before moving. A/B: under_03 base 27 / 3 / 1 (370001 protected_contact) -> on 27 / 3 / 2
+  (370001 ok via the standoff); touching_04 never left its object out (no effect). **Default 39e1e27a: on for `push_under` /
+  `push_touching`**; `=0` / `off` disables it, `=1` turns it on for every push.
+- **ATTEMPT_CAP on under_large_02** (int2_14 360000 ran out the 3600 s budget): not a gap. The cap is max(300, 5 x the 1434 s median) =
+  7169 s, above the 3600 s budget, so the budget ends the attempt first. Both burns were in the sample phase the cap covers. Cutting
+  sooner is a change to the cap rule or the median.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

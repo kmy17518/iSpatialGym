@@ -110,7 +110,7 @@ def test_footprint_heel_is_the_long_axis_end_farther_from_the_root():
 
 def test_the_keys():
     assert _sampler().push_yaw_lock() is None and _sampler(push_under_yaw="none").push_yaw_lock() is None
-    assert _sampler(push_under_yaw="heel_first").push_yaw_lock() == "heel_first" and IL.PUSH_UNDER_YAW_LOCKS == ("heel_first",)
+    assert _sampler(push_under_yaw="heel_first").push_yaw_lock() == "heel_first" and IL.PUSH_UNDER_YAW_LOCKS == ("heel_first", "broadside")  # i7-floorpush r2 added the broadside lock
     with pytest.raises(IL.Reject) as e:
         _sampler(push_under_yaw="toe_first").push_yaw_lock()
     assert e.value.reason == "spec"
