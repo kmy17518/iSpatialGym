@@ -2602,6 +2602,45 @@ def _where_of(action, name: str, stance_name: str, arm: str, carried: Optional[s
 _EARLY_GATE_ACTIONS = ("grasp", "place", "push", "brace", "base_push")
 
 
+def overhang_escape_backoff_on() -> bool:
+    """i7-startdraw2 (``ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF``, the same switch as ``iors_large.overhang_escape_backoff_on``): the overhang
+    push's contact escape is replayed from the pad backed off ``push_backoff_m`` along the reversed push, as ``execute_push`` runs it -
+    in the sampler's transit start (``_overpath_start``) and in the program check's retreat (whose end the drive's departure arm records)."""
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
+
+
+def push_pick_pre_from_chain_on() -> bool:
+    """i7-startdraw2 r2 (lead #71, the transit-start gap): ``ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN=1`` - the overhang pick's push pre-contact
+    witness is the SAMPLED chain's pre-contact configuration (``contacts.push_pick.chain_arm_q[0]``, the branch the push chain, the
+    escape replay and every transit prediction were computed in) whenever it still reaches the pre-contact collision-free here; else the
+    fresh solve as before. Off (default): the fresh solve - which landed ~3 rad away (another IK branch) in 8 of 32 inside_large_01 demos,
+    so the oracle pushed, retreated and started the grasp transit in a branch no sampler check had seen."""
+    return os.environ.get("ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
+
+
+def _push_pick_pre_from_chain(sampler, action, stance, arm: str, pose, fingers, ignore) -> Optional[IKResult]:
+    """:func:`push_pick_pre_from_chain_on`: the chain's pre-contact configuration as the ``pre`` witness, or None (no chain configuration
+    recorded, or it no longer reaches the pose collision-free with ``ignore`` out). Kit ``push_pick_pre.chain`` / ``.fresh``."""
+    extra = getattr(getattr(action, "contact", None), "extra", None) or {}
+    arm_q = (extra.get("chain_arm_q") or [None])[0]
+    if arm_q is None:
+        _kit(sampler, "push_pick_pre.no_chain")
+        return None
+    q = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+    q[sampler.kit.robot.arm_control_idx[arm]] = th.as_tensor(arm_q, dtype=q.dtype)
+    if not sampler.ikc.collision_free_at(q, pose, arm, ignore=list(ignore)):
+        _kit(sampler, "push_pick_pre.fresh")
+        return None
+    _kit(sampler, "push_pick_pre.chain")
+    return IKResult(True, q, "the push chain's pre-contact configuration", 1)
+
+
+def _kit(sampler, key: str) -> None:
+    st = getattr(getattr(sampler, "kit", None), "stats", None)
+    if isinstance(st, dict):
+        st[key] = st.get(key, 0) + 1
+
+
 def _pick_overhang_push(action) -> bool:
     """``action`` is the overhang pick's push (``contacts.push_pick``, kind ``pick_overhang``)."""
     return getattr(action, "name", "") == "push" and str((getattr(getattr(action, "contact", None), "extra", None) or {}).get("kind") or "") == "pick_overhang"
@@ -2860,6 +2899,24 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             q_from = r_.q
         from ispatialgym.oracle.actions import RETREAT_DIST
 
+        if overhang_escape_backoff_on():
+            # i7-startdraw2 r3 (lead #73): execute_push backs the pad off push_backoff_m along the reversed push (the init -> goal line) before
+            # this retreat; the escape is replayed from there, tracked from the push's end as the oracle's arm_along runs it
+            from ispatialgym.oracle.execute import CONFIG as _ECFG
+
+            back_m = float(getattr(_ECFG, "push_backoff_m", 0.0) or 0.0)
+            init_ = c_.init
+            p0 = th.as_tensor(init_.position if hasattr(init_, "position") else init_[0], dtype=th.float32).reshape(-1)[:3]
+            d_ = goal_t[0].reshape(-1)[:3] - p0
+            if back_m > 0 and float(th.linalg.norm(d_)) > 1e-6:
+                back_t = (goal_t[0].reshape(-1)[:3] - d_ / th.linalg.norm(d_) * back_m, goal_t[1])
+                r_b = sampler.ikc.continue_chain(q_from, [goal_t, back_t], arm, ignore=ign_, ignore_end=ign_, ignore_start=ign_)
+                if r_b.ok and r_b.q is not None:
+                    q_from = r_b.q
+                    src_ += f", backed off {back_m * 100:.0f} cm along the reversed push"
+                    _kit(sampler, "overhang_escape_backoff.program_check_tracked")
+                else:
+                    _kit(sampler, "overhang_escape_backoff.program_check_failed")
         status_, why_, rep_, q_end_ = replay_contact_escape(sampler, arm, q_from, obj_, sup_, ign_, float(getattr(action, "distance", None) or RETREAT_DIST),
                                                             start="the overhang push's end", escape_up_m=getattr(action, "escape_up_m", None))
         if status_ == "failed":
@@ -2951,6 +3008,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 elif overpath_q is not None and key == "pre_grasp":
                     res = IKResult(True, overpath_q.clone(), "overpath end", 1)
                     chain_notes[key] = f"the recorded overpath's end, followed from {overpath_note['from']}"
+                elif key == "pre" and _pick_overhang_push(action) and push_pick_pre_from_chain_on() and (pinned := _push_pick_pre_from_chain(
+                        sampler, action, stance, arm, poses[0], fingers, ignore_last + ignore_all + list(approached or []))) is not None:
+                    res = pinned
+                    chain_notes[key] = "the sampled push chain's pre-contact configuration (contacts.push_pick.chain_arm_q[0])"
                 else:
                     # a single end pose (``grasp``, ``place``, ``contact``) is the end of its approach: the approached object is
                     # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
@@ -3079,7 +3140,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                             if not ok_r:
                                 chk = (False, why_r)
                         flipped_mode = os.environ.get("ISG_FLIPPED_PUSH_CHECK", "on").lower()
-                        if chk is None and q_ref is not None and flipped_mode not in ("off", "0", "false"):
+                        if chk is None and q_ref is not None and _pick_overhang_push(action) and push_pick_pre_from_chain_on():
+                            # i7-startdraw2 r2: the overhang push keeps the sampled chain's branch (its pre witness, the push replayed from it
+                            # above) - re-witnessing it on the stance posture's branch moved the oracle's push, retreat and grasp transit 3 rad
+                            # away from the branch the escape replay and the transit checks were computed in
+                            _kit(sampler, "push_pick_pre.rewitness_skipped")
+                        elif chk is None and q_ref is not None and flipped_mode not in ("off", "0", "false"):
                             if flipped_mode == "strict" or replay is None:
                                 chk = _flipped_push_chain_check(sampler, chain_ref, stance, arm, q_ref, ignore_last, ignore_all, fingers, approached)
                             else:

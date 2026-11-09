@@ -211,6 +211,14 @@ class _PosedObject:
         return self._pose
 
 
+def overhang_escape_backoff_on() -> bool:
+    """i7-startdraw2 r2 2026-11-09 (lead #71, the transit-start gap): ``ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF=1`` - the overhang pick's escape
+    replay (:meth:`IORSLarge._overpath_start`, read by the pick transit gate and OVERPATH) starts from the pad backed off ``push_backoff_m``
+    along the reversed push, as ``execute_push`` runs it before the retreat (the replay started at the push's goal: 2.0 cm deeper in every
+    demo, 0.12-0.20 rad from the live retreat's end when the grasp is at the push stance). Default off."""
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "1") != "0"  # DEFAULT ON (lead #73; r3 A/B: fix no worse than off)
+
+
 def pick_transit_gate_on() -> bool:
     """i7-startdraw2 2026-11-08 (lead decision #49): ``ISPATIALGYM_PICK_TRANSIT_GATE=1`` - an overhang pick is kept only when the oracle's own
     transit ladder carries the escape -> pre-grasp move by a checked straight ramp (:meth:`IORSLarge._pick_transit_gate`); with
@@ -5411,6 +5419,24 @@ class IORSLarge(SamplerV2):
                 return None, "push_end", f"the push's end pose has no IK ({r.reason})"
             q_push = G.t(r.q).float().clone()
         sup = list(self.support_objects())
+        if overhang_escape_backoff_on():
+            # i7-startdraw2 r2 (lead #71): the oracle backs the pad off ``push_backoff_m`` (2 cm) along the reversed push before its retreat
+            # (execute_push step 3); the escape is replayed from there, tracked as the oracle's arm_along runs it
+            from ispatialgym.oracle.execute import CONFIG as _ECFG
+
+            back_m = float(getattr(_ECFG, "push_backoff_m", 0.0) or 0.0)
+            d_push = G.t(chain.get("direction")).float().reshape(-1)[:3] if chain.get("direction") is not None else None
+            if back_m > 0 and d_push is not None and float(th.linalg.norm(d_push)) > 1e-6:
+                d_push = d_push / th.linalg.norm(d_push)
+                gp_, gq_ = chain["goal"]
+                back = (G.t(gp_).float() - d_push * back_m, G.t(gq_).float())
+                # continue_chain's first pose is where the arm IS (the push's goal), the leg goes on from it
+                r_b = self.ikc.continue_chain(q_push, [chain["goal"], back], arm, ignore=[self.target] + sup, ignore_end=[self.target] + sup, ignore_start=[self.target] + sup)
+                if r_b.ok and r_b.q is not None:
+                    q_push = G.t(r_b.q).float().clone()
+                    TT._count(self, "overhang_escape_backoff.tracked")
+                else:
+                    TT._count(self, "overhang_escape_backoff.failed")
         up = self.gp.gen("overhang_retreat_up_m")
         status, why_e, _, q_esc = PCK.replay_contact_escape(self, arm, q_push, _PosedObject(settled), sup, [self.target] + sup, RETREAT_DIST,
                                                             start="the overhang push's end", escape_up_m=float(up) if isinstance(up, (int, float)) and up > 0 else None)
@@ -5468,6 +5494,15 @@ class IORSLarge(SamplerV2):
                 if not r_w.ok or r_w.q is None:
                     return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
                 q_hint = G.t(r_w.q).float().reshape(-1)
+            if os.environ.get("ISPATIALGYM_PICK_TRANSIT_GATE_DIAG") == "1":
+                # i7-startdraw2 r2 (lead #71): the transit-start gap - the replayed start and the witness, joined offline with the demo's
+                # joint_positions at the grasp's first step and the sidecar's witness (startdraw2_20261108/gap2.py)
+                idx_d = self.kit.robot.arm_control_idx[arm]
+                log.info("%s: PICK_TRANSIT_DIAG %s", self.gp.variant, json.dumps({
+                    "arm": arm, "start": start, "stance": grasp_st.name, "q0": [round(float(v), 4) for v in G.t(q0).reshape(-1)[idx_d].tolist()],
+                    "q_hint": [round(float(v), 4) for v in q_hint[idx_d].tolist()], "witness": "recorded" if q_w is not None else "fresh_ik",
+                    "pre": [round(float(v), 4) for v in G.t(pre[0]).reshape(-1).tolist()], "settled": [round(float(v), 4) for v in G.t(settled[0]).reshape(-1).tolist()],
+                    "chain_goal_q": [round(float(v), 4) for v in ((chain.get("seed") or {}).get("chain_arm_q") or [[None]])[-1]] if (chain.get("seed") or {}).get("chain_arm_q") else None}))
             traj, note = OPP.plan_transit(self.kit, arm, q0, pre, q_hint, list(self.support_objects()), [(self.tname, tgt)],
                                           approach=[eef], inflation=None, straight_only=True)
             if traj is None:
@@ -5475,14 +5510,36 @@ class IORSLarge(SamplerV2):
             out, key_v, why_v = self._overpath_verify(traj, arm, pre, eef, box, ignore_target=False)
             if out is None:
                 return None, key_v, f"{note.get('branch')}: {why_v}"
-            log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)", self.gp.variant, arm, start, grasp_st.name,
-                     note.get("branch"), len(traj), time.time() - t0)
-            return {"branch": str(note.get("branch")), "start": start, "n": int(len(traj)), "witness": "recorded" if q_w is not None else "fresh_ik"}, "", ""
+            branch = str(note.get("branch"))
+            facts = {"branch": branch, "start": start, "n": int(len(traj)), "witness": "recorded" if q_w is not None else "fresh_ik",
+                     # i7-startdraw2 r3 (lead #73): a via-posture verdict held in 24 / 24 demos; a direct-ramp verdict from the escape matched the live
+                     # path in 1 / 16 and no clearance was recorded to separate them - it is UNKNOWN: the pick passes, the verdict is not relied on
+                     "verdict": "via" if branch == "straight_via" else "direct_unknown"}
+            if branch != "straight_via":
+                TT._count(self, "pick_transit_gate.direct_unknown")
+                facts["direct_clearance_m"] = self._ramp_clearance(traj)  # the world clearance of the direct ramp, for a later margin choice
+            log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)%s", self.gp.variant, arm, start, grasp_st.name,
+                     branch, len(traj), time.time() - t0, f", direct ramp clearance {facts.get('direct_clearance_m')} m (unknown verdict)" if branch != "straight_via" else "")
+            return facts, "", ""
         finally:
             TT._countn(self, "pick_transit_gate.ms", int(round(1000 * (time.time() - t0))))
             tgt.set_position_orientation(*p_prev)
             tgt.keep_still()
             self.kit.sync_world()
+
+    def _ramp_clearance(self, traj: th.Tensor, margins: Sequence[float] = (0.0, 0.01, 0.02, 0.03, 0.05, 0.08)) -> Optional[float]:
+        """i7-startdraw2 r3: the largest of ``margins`` (m) at which the whole joint ramp ``traj`` is collision-free in the current world (the
+        desk, the scene, the book at its settled pose) - a coarse clearance of a direct-ramp verdict; None when it collides even at 0."""
+        best = None
+        for m in margins:
+            try:
+                hit = self.kit.backend.check_collision(traj, emb_name="whole_body", sync_world=False, margin=float(m))
+            except Exception:  # noqa: BLE001 - a diagnostic
+                return best
+            if bool(th.as_tensor(hit).reshape(-1).bool().any()):
+                break
+            best = float(m)
+        return best
 
     def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
                        ) -> Tuple[Optional[Dict[str, Any]], str, str]:

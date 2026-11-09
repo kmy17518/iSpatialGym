@@ -19,6 +19,7 @@ def _gate(s, q_start, pre_pos):
     s._overpath_start = lambda st, gst, arm, chain, settled: (q_start, "escape", "")
     s.support_objects = lambda: []
     s._pick_transit_gate = IL.IORSLarge._pick_transit_gate.__get__(s)
+    s._ramp_clearance = IL.IORSLarge._ramp_clearance.__get__(s)
     pre = (th.tensor(pre_pos), th.tensor([0.0, 0.0, 0.0, 1.0]))
     st = type("St", (), {"name": "manipulation"})()
     return s._pick_transit_gate(st, st, "right", {}, BOOK_P1, pre, pre)
@@ -57,11 +58,13 @@ def test_gate_passes_a_clear_straight_ramp_and_rejects_what_only_trajopt_carries
     q0[0:3] = th.tensor([0.0, -0.40, 0.98])
     facts, key, why = _gate(s, q0, [0.0, -0.30, 0.90])
     assert facts is not None and facts["branch"] == "straight", (key, why)
+    # r3 (lead #73): a direct-ramp verdict is UNKNOWN - the pick passes, its ramp clearance is recorded
+    assert facts["verdict"] == "direct_unknown" and facts["direct_clearance_m"] is not None and s.kit.stats["pick_transit_gate.direct_unknown"] == 1
     assert "plan_joint" not in s.kit.backend.calls and "plan_pose" not in s.kit.backend.calls
     assert s.kit.stats.get("pick_transit_gate.ms", 0) >= 0
     s = _p1_sampler()
     facts, key, why = _gate(s, _p1_q0(), [0.0, -0.16, 0.79])  # across the book: the ramp via a posture clears it -> the oracle's straight_via
-    assert facts is not None and facts["branch"] == "straight_via" and "plan_joint" not in s.kit.backend.calls
+    assert facts is not None and facts["branch"] == "straight_via" and facts["verdict"] == "via" and "plan_joint" not in s.kit.backend.calls
     # across the book (the live 6-9 mm pass), the via-posture ramps off (in the toy the postures lift the hand clear of the book, which
     # passes - test above): the direct ramp misses the book's clearance; the toy trajopt WOULD plan it - the gate rejects
     monkeypatch.setenv("ISPATIALGYM_FAST_STRAIGHT_ARM_VIA", "0")

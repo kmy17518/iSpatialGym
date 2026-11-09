@@ -5930,6 +5930,51 @@ The screen dropped 105 of 15814 checked pairs. In shadow, all 44 predicted pairs
 0), so it removes nothing that passes. The off arm reproduces gm_t02_wide_on (46 / 1 / 1, 3.39). **e8065680:**
 `generation.b_base_finger_screen` true in touching_large_02's customs only (a test pins it); `ISPATIALGYM_B_BASE_FINGER_SCREEN` overrides.
 
+### r2: the transit-start gap (lead decision #71; the gate stays default OFF, e2086624)
+
+Measured per demo (startdraw2_20261108/gap.py, gap2.py, wcmp.py, join.py: demo.hdf5 joint_positions at the annotated action steps vs the
+sidecar's push chain / witnesses and the gate's PICK_TRANSIT_DIAG line, c10b7a49). Two causes:
+1. BRANCH (a plain bug): the program check solves the overhang push's `pre` witness fresh and `_rewitness_flipped_push` (oracle-fix
+   2026-11-03) may move it to the stance posture's branch - in 11 of 48 earlier demos it lay 2.8-3.6 rad (another IK branch) from
+   `contacts.push_pick.chain_arm_q[0]` while the push waypoints' witnesses stayed the chain's; the oracle planned to it and pushed,
+   retreated and began the grasp transit in that branch (= i7-overpath's 2.62 rad gap). Fix c68cd099 + 6d809106
+   `ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN` (default off): the chain's configuration is the pre witness when it reaches the pose
+   collision-free, and the overhang push skips the posture-branch re-witness (kit `push_pick_pre.chain / .fresh / .rewitness_skipped`).
+   tsd7: chain 10, re-witness skipped 10, flips 0 / 8.
+2. BACK-OFF (a replay omission): `execute_push` backs the pad off `push_backoff_m` (2 cm) along the reversed push before the retreat; the
+   escape replay (`_overpath_start`) started at the push goal - the live push ends 2.0 cm short of the chain goal in every demo, the
+   replayed start 0.12-0.20 rad (joint 4 / 2) from the live retreat end. Fix 4670ce9c + 6d809106 `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF`
+   (default off; kit `overhang_escape_backoff.tracked / .failed`): tsd7 tracked 31, the gap 0.07-0.08 rad - the rest is the live push's own
+   tracking (push end vs chain goal 0.05-0.08 rad already). A drive between retreat and grasp re-poses the arm to the program check's
+   recorded departure configuration, which the back-off does not reach yet (331103: 0.36 rad).
+
+Gate prediction vs live (join.py): via-posture verdicts held in every run (tsd3-7: 24 / 24); direct-ramp verdicts from the escape start did
+not (tsd3-6: 0 / 12 matched; tsd7 with both fixes: 1 / 4) - the direct ramp passes desk_bhkhxo_0's mesh 28 so closely that < 0.1 rad of
+start difference flips it. inside_large_01 331000 + 331100 (gate on; v2maps_int2, titanrtx): tsd4_diag 42 / 8 / 7, 1.40 GPU-h (0.199 / ok);
+tsd5_chain 47 / 8 / 7, 1.33 (0.190); tsd6_backoff (back-off not yet tracked) 46 / 8 / 8, 1.17 (0.146); tsd7_both 48 / 8 / 7, 1.24 (0.176);
+off (tsd2_off) 20 / 8 / 6, 1.22 (0.203). Every switch stays default off.
+
+### r3: replay fidelity defaults, the gate's direct-ramp verdict (lead decision #73)
+
+d78cecc2: the program check's retreat after the overhang push replays the 2 cm back-off too (same switch `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF`:
+the drive's recorded departure arm is that retreat's end); the gate relies on via-posture verdicts only - no clearance had been recorded for
+the 16 direct-ramp verdicts of tsd3-7 (1 held), so no margin could be chosen: a direct-ramp verdict passes unchanged as `direct_unknown`,
+with its coarse world clearance (`facts.transit_gate.direct_clearance_m`) recorded for a later margin.
+
+Final A/B (trunk_d78cecc2, inside_large_01 331000 + 331100 = N 8 per arm, v2maps_int2, titanrtx, each arm its OWN empty sampling cache):
+
+| arm | att / wr / ok | GPU-h (per ok) | where the switches acted |
+|---|---|---|---|
+| r3_off (all off) | 18 / 8 / 2 | 1.49 (0.743) | - ; pre witness in another branch 2 / 8 |
+| r3_fix (PRE_FROM_CHAIN + ESCAPE_BACKOFF) | 17 / 8 / 4 | 1.38 (0.345) | push_pick_pre.chain 12, rewitness_skipped 12, back-off in the program check 12; flips 0 / 8 |
+| r3_all (fix + gate) | 66 / 8 / 6 | 4.89 (0.814) | gate passed 44 (via 28, direct_unknown 16), rejected 225 (no_straight 219), 1784 s of checks; back-off tracked 269 + 9 |
+| r3_ctl (ontop_large_02 300500, all) | 19 / 4 / 4 | 3.09 | none of the switches acted (no overhang pick) |
+
+Defaults per #73: the replay fixes ON (r3_fix no worse than r3_off: 4 vs 2 ok, 0.345 vs 0.743 GPU-h / ok) - 649547f9
+`ISPATIALGYM_PUSH_PICK_PRE_FROM_CHAIN`, d0270504 `ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF` (c95f6bb1 pins the old pipeline's tests); the gate
+stays OFF (r3_all 6 ok > 4, but 0.814 GPU-h / ok > 0.345: its 219 no_straight rejections cost ~2.4x the attempts). In r3_all the gate's
+verdicts: via 1 / 1 held, direct_unknown 7 (live: straight 1, trajopt 6).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
