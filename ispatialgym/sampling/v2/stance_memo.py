@@ -35,7 +35,7 @@ ENV_RECHECK = "ISPATIALGYM_STANCE_MEMO_RECHECK"
 C_CLASSES = (("no push chain", "push_chain"), ("push chain unreachable", "push_chain"), ("∩ F_goal", "empty_F"), ("carry leg", "carry_leg"),
              ("no room for the carried sweep", "carry_margin"), ("no (yaw, grasp) of F", "no_pair"), ("under clearance", "under_clearance"),
              ("drop trunk", "drop_trunk"), ("yaw lock", "yaw_lock"), ("drop -> push", "drop_push_transition"), ("B -> pick", "pick_transition"),
-             ("c_skip_dead_b", "dead_at_b"))
+             ("c_skip_dead_b", "dead_at_b"), ("PUSH_CHAIN_LIVE_B", "dead_at_b"))
 #: B failure reasons that depend on stance A (keyed with A's pose)
 A_DEPENDENT = ("init -> manipulation", "A -> B drive passes", "not in the init image")  # the last: stance A's camera (sm_a 2026-11-08)
 #: rejections that end the attempt, not the stance: never recorded
