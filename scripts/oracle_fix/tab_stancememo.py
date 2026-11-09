@@ -15,7 +15,7 @@ import sys
 REJ = re.compile(r"instance (\d+) attempt (\d+) rejected in (\w+) after ([\d.]+)s: \[(\w+)\]")
 WR = re.compile(r"instance (\d+) written \(attempt (\d+), ([\d.]+)s\)")
 KIT = re.compile(r"instance (\d+) attempt (\d+) kit: (.*)$")
-CNT = re.compile(r"((?:memo|redraw|time_cap|start_draw|stance_a)\.[\w.]+) \((\d+)\)")
+CNT = re.compile(r"((?:memo|redraw|time_cap|chain_memo|push_chain)\.[\w.]+) \((\d+)\)")
 SEARCH_FAIL = ("target_placement", "time_budget", "time_cap", "grasp_unreachable", "no_placement_stance")
 
 

@@ -11,7 +11,7 @@ from ispatialgym.sampling.v2 import core as CORE
 
 @pytest.fixture(autouse=True)
 def clean(monkeypatch):
-    for k in (AC.ENV, AC.ENV_TABLE, AC.ENV_ALIAS, "ISPATIALGYM_ALIAS_MEMORY_ALIAS"):
+    for k in (AC.ENV, AC.ENV_TABLE, AC.ENV_ALIAS, AC.ENV_RAISE, AC.ENV_RAISE_MAX, "ISPATIALGYM_ALIAS_MEMORY_ALIAS"):
         monkeypatch.delenv(k, raising=False)
     AC.end()
     yield monkeypatch
@@ -79,6 +79,7 @@ def _sampler(cap):
 
 
 def test_two_consecutive_cuts_double_the_cap(clean):
+    clean.setenv(AC.ENV_RAISE_MAX, "0")  # the unbounded doubling (the default bounds it at 1.5x since lead #74)
     """Lead decision #63: a cap from medians measured on older code (disembedding_10: 338 s against ~390 s drawn-start attempts) must not
     cut most attempts - two consecutive time_cap cuts double the job's cap; any other outcome resets the streak; =0 keeps the old rule."""
     s = _sampler(338.0)
@@ -99,3 +100,23 @@ def test_two_consecutive_cuts_double_the_cap(clean):
         s2._cap_after_attempt("time_cap")
     assert s2.attempt_cap()[0] == 338.0 and "time_cap.raised" not in s2.kit.stats
     assert "self._cap_after_attempt(e.reason)" in inspect.getsource(CORE.SamplerV2.run_instances)
+
+
+def test_the_raise_bound(clean):
+    """Lead decision #74: ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX bounds the raise (default off = the doubling)."""
+    clean.setenv(AC.ENV_RAISE_MAX, "1.5")
+    s = _sampler(650.0)
+    for _ in range(2):
+        s._cap_after_attempt("time_cap")
+    assert s.attempt_cap()[0] == 975.0 and s.kit.stats["time_cap.raise_bounded"] == 1 and s.kit.stats["time_cap.raised"] == 1
+    for _ in range(4):
+        s._cap_after_attempt("time_cap")
+    assert s.attempt_cap()[0] == 975.0 and s.kit.stats["time_cap.raised"] == 1 and s.kit.stats["time_cap.raise_bounded"] == 3
+    clean.delenv(AC.ENV_RAISE_MAX)
+    assert AC.raise_max() == 1.5  # the default since the r5 A/B (lead #74)
+    clean.setenv(AC.ENV_RAISE_MAX, "0")
+    assert AC.raise_max() == 0.0
+    s2 = _sampler(650.0)
+    for _ in range(4):
+        s2._cap_after_attempt("time_cap")
+    assert s2.attempt_cap()[0] == 2600.0

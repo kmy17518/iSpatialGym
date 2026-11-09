@@ -433,8 +433,15 @@ class SamplerV2(TaskSampler):
             return
         self._cap_streak = int(self.__dict__.get("_cap_streak", 0)) + 1
         if self._cap_streak >= n:
-            self._cap_scale = 2.0 * float(self.__dict__.get("_cap_scale", 1.0))
+            prev = float(self.__dict__.get("_cap_scale", 1.0))
+            self._cap_scale = 2.0 * prev
+            top = AC.raise_max()  # lead #74 (ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX, default off): the raise bounded
+            if top and self._cap_scale > top:
+                self._cap_scale = max(prev, top)
+                _kit_count(self, "time_cap.raise_bounded")
             self._cap_streak = 0
+            if self._cap_scale == prev:
+                return
             _kit_count(self, "time_cap.raised")
             log.info("%s: ATTEMPT_CAP: %d consecutive time_cap cuts - the cap is raised to %.0f s (x%g)", self.gp.variant, n,
                      self._attempt_cap[0] * self._cap_scale, self._cap_scale)

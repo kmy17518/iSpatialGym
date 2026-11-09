@@ -5976,6 +5976,33 @@ Defaults per #73: the replay fixes ON (r3_fix no worse than r3_off: 4 vs 2 ok, 0
 stays OFF (r3_all 6 ok > 4, but 0.814 GPU-h / ok > 0.345: its 219 no_straight rejections cost ~2.4x the attempts). In r3_all the gate's
 verdicts: via 1 / 1 held, direct_unknown 7 (live: straight 1, trajopt 6).
 
+### r4: under_large_03's search, the chain memos, and the bounded cap raise (lead decisions #70, #70b, #70c, #74, 2026-11-09)
+
+**Profile** (under_large_03 360000/0 on trunk_f1bb8e24, an attempt cut at 650 s):
+- 594 s went to 86 push-under chain solves, 6.9 s each: `orient.choose` -> exact IK + `track_approach` -> cuRobo `solve_ik_path`, which
+  makes 93k per-iteration FK calls.
+- No scalar Python hot loop is left. The cost is the breadth of the push-chain search.
+
+**gripper_not_in_frame does not depend on the drawn start.** It rejects 51 % of past-search attempts with fixed starts and 49 % with drawn
+ones, so there is no framing screen at the draw.
+
+**Chain memos** (both off by default):
+- Exact-input memo (`ISPATIALGYM_PUSH_CHAIN_MEMO=1`): results are identical, but it hit once in 2,052 solves. It is not folded (#70b).
+- Quantized memo (`ISPATIALGYM_CHAIN_MEMO` = off / shadow / on, key at 1e-4):
+  - In the logs, solves whose result matched an earlier one to the mm were 46 % of sampling: an upper bound.
+  - The r6 shadow run measured the real hit rate: 1.3 % (34 / 2,564), with one mismatch (another wrist turn).
+  - The on arm: 47 / 3 / 1, 5.53 GPU-h per ok. Left off.
+- Overlap with i7-ul02's `ISPATIALGYM_PUSH_CHAIN_LIVE_B`: 0 of the would-hits.
+
+**Cap raise.**
+- On the int2_18 / r4 logs, the attempts that ran past the un-raised cap were all on under_large_03: 25 rejected and 4 written, 0 ok.
+- `ISPATIALGYM_ATTEMPT_CAP_RAISE_MAX` bounds the raise (cba474c4).
+- r5 A/B (under_large_03 360000, per-arm empty caches):
+  - unbounded: 44 / 3 / 1, 5.19 GPU-h per ok;
+  - 1.5x: 39 / 3 / 1, 4.37 GPU-h per ok (the bound acted 3 times: cap 975 s);
+  - control disembedding_10: 7 / 4 / 4.
+- Default 1.5 since 4f14b3f7; `=0` = the unbounded doubling.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
