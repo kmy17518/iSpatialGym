@@ -413,9 +413,31 @@ class SamplerV2(TaskSampler):
             if self._attempt_cap[1] != "off":
                 log.info("%s: ATTEMPT_CAP: %s (%s)", self.gp.variant, "none" if self._attempt_cap[0] is None else f"{self._attempt_cap[0]:.0f} s per attempt",
                          self._attempt_cap[1])
-        if self._attempt_cap[0] is not None:
-            _kit_count(self, "time_cap.armed")
-        return self._attempt_cap
+        if self._attempt_cap[0] is None:
+            return self._attempt_cap
+        _kit_count(self, "time_cap.armed")
+        scale = float(self.__dict__.get("_cap_scale", 1.0))
+        if scale == 1.0:
+            return self._attempt_cap
+        return self._attempt_cap[0] * scale, f"{self._attempt_cap[1]}; x{scale:g} after {AC.raise_after()} consecutive time_cap cuts"
+
+    def _cap_after_attempt(self, reason: Optional[str]) -> None:
+        """Lead decision #63 (the cap's medians predate the start draw: every disembedding_10 attempt was cut at 338 s): after
+        ``AC.raise_after()`` (default 2) CONSECUTIVE ``time_cap`` rejections the job's cap doubles (kit ``time_cap.raised``); any other
+        attempt outcome resets the streak. A stale per-alias cap therefore never cuts most of a job's attempts."""
+        n = AC.raise_after()
+        if not n or self.__dict__.get("_attempt_cap", (None,))[0] is None:
+            return
+        if reason != "time_cap":
+            self._cap_streak = 0
+            return
+        self._cap_streak = int(self.__dict__.get("_cap_streak", 0)) + 1
+        if self._cap_streak >= n:
+            self._cap_scale = 2.0 * float(self.__dict__.get("_cap_scale", 1.0))
+            self._cap_streak = 0
+            _kit_count(self, "time_cap.raised")
+            log.info("%s: ATTEMPT_CAP: %d consecutive time_cap cuts - the cap is raised to %.0f s (x%g)", self.gp.variant, n,
+                     self._attempt_cap[0] * self._cap_scale, self._cap_scale)
 
     def attempt_begin(self, index: int, attempt: int) -> None:  # hook
         """i7-stancememo (5x.1): called by :meth:`run_instances` before each attempt (before the reset) with the instance index and the
@@ -1815,6 +1837,7 @@ class SamplerV2(TaskSampler):
                     self.write_template_meta()
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.gp.variant, index, attempt, time.time() - t0)
                     self.attempt_end(index, attempt, "written", phase, None)
+                    self._cap_after_attempt(None)
                     self.log_attempt_stages(index, attempt, clock)
                     ok = True
                     break
@@ -1825,6 +1848,7 @@ class SamplerV2(TaskSampler):
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.variant, index, attempt, phase, time.time() - t0, e)
                     self.attempt_end(index, attempt, "rejected", phase, e.reason)
+                    self._cap_after_attempt(e.reason)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
                     if isinstance(e, TemplateExhausted) and not start_per_attempt(self):

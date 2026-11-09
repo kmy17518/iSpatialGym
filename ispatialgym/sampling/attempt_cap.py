@@ -44,6 +44,18 @@ _SUSPENDED = [0]
 _TABLE_CACHE: Dict[str, Dict[str, float]] = {}
 
 
+ENV_RAISE = "ISPATIALGYM_ATTEMPT_CAP_RAISE_AFTER"
+
+
+def raise_after() -> int:
+    """Lead decision #63: the number of CONSECUTIVE time_cap cuts after which a job doubles its cap (``SamplerV2._cap_after_attempt``);
+    default 2, on with the cap; 0 = never (the rule of 1a68082b)."""
+    try:
+        return max(0, int(os.environ.get(ENV_RAISE, "2")))
+    except ValueError:
+        return 2
+
+
 def on() -> bool:
     return os.environ.get(ENV, "1") not in ("", "0")
 
