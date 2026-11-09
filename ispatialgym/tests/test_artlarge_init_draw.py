@@ -112,3 +112,57 @@ def test_connect_init_first_ok_counts(monkeypatch):
     init = _st(1.0)
     assert s._connect_init(init, _st(0.0), 3.0) is init and added == []
     assert s.kit.stats == {"artlarge_init.connect_first": 1}
+
+
+# i7-artlarge r2: ISPATIALGYM_ARTLARGE_ALT_SKIP
+
+
+def _st_t(x, translate, tilt=0.0):
+    return Stance("init", (x, 0.0, 0.0), translate, tilt)
+
+
+def test_alt_skip_default_off(monkeypatch):
+    monkeypatch.delenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", raising=False)
+    assert AL.alt_skip_on() is False
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1")
+    assert AL.alt_skip_on() is True
+
+
+def test_alt_skip_no_transition_skips_other_trunks(monkeypatch):
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1")
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1")
+    manip = _st_t(0.0, 0.95, -0.2)
+    s, added = _sampler([_st_t(2.0, 0.25), _st_t(3.0, 0.95, -0.2), _st_t(4.0, 0.0)])
+    tried = []
+
+    def connect(_s, init, m, path_max):
+        tried.append(init.base_pose2d[0])
+        if init.translate != 0.95:
+            raise Reject("no_transition", "sweep")
+
+    monkeypatch.setattr(AL.P0, "connect", connect)
+    used = s._connect_init(_st_t(1.0, 0.0), manip, 3.0)
+    # the start with the manipulation trunk is still tried (connect skips the sweep there); the other trunk is not
+    assert used.base_pose2d[0] == 3.0 and tried == [1.0, 3.0]
+    assert s.kit.stats == {"artlarge_init.alt_skipped_no_transition": 1, "artlarge_init.alt_tried": 1, "artlarge_init.alt_connected": 1}
+
+
+def test_alt_skip_off_tries_all_and_path_reasons_unaffected(monkeypatch):
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1")
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "0")
+    manip = _st_t(0.0, 0.95, -0.2)
+    s, _ = _sampler([_st_t(2.0, 0.25), _st_t(3.0, 0.0)])
+    tried = []
+    monkeypatch.setattr(AL.P0, "connect", lambda _s, i, m, p: (tried.append(i.base_pose2d[0]), (_ for _ in ()).throw(Reject("no_transition", "x"))))
+    with pytest.raises(Reject):
+        s._connect_init(_st_t(1.0, 0.0), manip, 3.0)
+    assert tried == [1.0, 2.0, 3.0]
+    # skip on, but a path rejection: every alternative is tried until one turns no_transition
+    monkeypatch.setenv("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1")
+    s, _ = _sampler([_st_t(2.0, 0.25), _st_t(3.0, 0.0), _st_t(4.0, 0.5)])
+    tried.clear()
+    reasons = {1.0: "path_collision", 2.0: "path_collision", 3.0: "no_transition", 4.0: "no_transition"}
+    monkeypatch.setattr(AL.P0, "connect", lambda _s, i, m, p: (tried.append(i.base_pose2d[0]), (_ for _ in ()).throw(Reject(reasons[i.base_pose2d[0]], "x"))))
+    with pytest.raises(Reject):
+        s._connect_init(_st_t(1.0, 0.0), manip, 3.0)
+    assert tried == [1.0, 2.0, 3.0] and s.kit.stats["artlarge_init.alt_skipped_no_transition"] == 1
