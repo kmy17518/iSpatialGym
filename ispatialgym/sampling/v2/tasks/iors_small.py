@@ -48,6 +48,7 @@ from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import contact_poses as CPZ  # i7-contact 2026-11-07: the touching push / brace pose rules (shared with the contact maps)
 from ispatialgym.sampling.v2 import ik as IK
+from ispatialgym.sampling.v2 import alias_switches as _AS
 from ispatialgym.sampling.v2 import neighbors as NB
 from ispatialgym.sampling.v2 import orient as O
 from ispatialgym.sampling.v2 import overhang_fallback as OF
@@ -95,8 +96,8 @@ SHELF_FREE_START_ENV = "ISPATIALGYM_SHELF_FREE_START"
 SHELF_JOINT_STANCE_ENV = "ISPATIALGYM_SHELF_JOINT_STANCE"
 
 
-def shelf_joint_stance_on() -> bool:
-    return os.environ.get(SHELF_JOINT_STANCE_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_joint_stance_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_JOINT_STANCE_ENV, s)
 
 
 #: i7-t03 round 2 2026-11-08 (owner (d), APPROVED oracle + contact-rule change, DEFAULT OFF): the shelf tip release's lift turns the leaning
@@ -119,8 +120,8 @@ LIFT_TOUCH_CLEARANCE_TOL_M = 1e-9
 SHELF_LIFT_AXIS_MAX_TILT_DEG = 40.0
 
 
-def shelf_lift_straighten_on() -> bool:
-    return os.environ.get(SHELF_LIFT_STRAIGHTEN_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_lift_straighten_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_LIFT_STRAIGHTEN_ENV, s)
 
 
 #: i7-t03 2026-11-08 (owner 5k.1, DEFAULT OFF): the shelf layout's free span between the two leaning books is judged against a COMPUTED
@@ -148,8 +149,8 @@ SHELF_RETREAT_BACKOFF_ENV = "ISPATIALGYM_SHELF_RETREAT_BACKOFF"
 RETREAT_STANCE = "retreat"
 
 
-def shelf_retreat_backoff_on() -> bool:
-    return os.environ.get(SHELF_RETREAT_BACKOFF_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_retreat_backoff_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_RETREAT_BACKOFF_ENV, s)
 
 
 #: i7-t03 round 7 (LEAD DECISION #37, owner away; DEFAULT OFF): the shelf tip's fixed-start grasp is judged at the shelf stance with the goal
@@ -164,18 +165,18 @@ SHELF_PREGRASP_FRAME_ENV = "ISPATIALGYM_SHELF_PREGRASP_FRAME"
 SHELF_RELEASE_TRACKED_ENV = "ISPATIALGYM_SHELF_RELEASE_TRACKED"
 
 
-def _pair_mesh_on() -> bool:
+def _pair_mesh_on(s=None) -> bool:
     from ispatialgym.sampling.v2 import pair_mesh as PM
 
-    return PM.pair_mesh_on()
+    return PM.pair_mesh_on(s)
 
 
-def shelf_pregrasp_frame_on() -> bool:
-    return os.environ.get(SHELF_PREGRASP_FRAME_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_pregrasp_frame_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_PREGRASP_FRAME_ENV, s)
 
 
-def shelf_release_tracked_on() -> bool:
-    return os.environ.get(SHELF_RELEASE_TRACKED_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_release_tracked_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_RELEASE_TRACKED_ENV, s)
 
 
 def shortest_arc(u: th.Tensor, v: th.Tensor) -> th.Tensor:
@@ -250,18 +251,18 @@ SHELF_RELEASE_IN_GAP_ENV = "ISPATIALGYM_SHELF_RELEASE_IN_GAP"
 SHELF_RELEASE_DRIVE_FRACTIONS = (0.25, 0.5, 0.75, 1.0)
 
 
-def shelf_release_in_gap_on() -> bool:
-    return os.environ.get(SHELF_RELEASE_IN_GAP_ENV, "").strip().lower() in ("1", "on", "true")
+def shelf_release_in_gap_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_RELEASE_IN_GAP_ENV, s)
 
 
-def shelf_free_start_on() -> bool:
+def shelf_free_start_on(s=None) -> bool:
     """``ISPATIALGYM_SHELF_FREE_START`` = "1" (i7-t03 round 2 item (a); default off)."""
-    return os.environ.get(SHELF_FREE_START_ENV, "").strip().lower() in ("1", "on", "true")
+    return _AS.switch_on(SHELF_FREE_START_ENV, s)
 
 
-def shelf_stance_shift_on() -> bool:
+def shelf_stance_shift_on(s=None) -> bool:
     """``ISPATIALGYM_SHELF_STANCE_SHIFT`` = "1" (i7-t03 item 1; default off)."""
-    return os.environ.get(SHELF_STANCE_SHIFT_ENV, "").strip().lower() in ("1", "on", "true")
+    return _AS.switch_on(SHELF_STANCE_SHIFT_ENV, s)
 
 
 def shelf_need_of(err: Reject) -> Optional[str]:
@@ -2410,7 +2411,7 @@ class IORSSmall(SamplerV2):
         d = Draft()
         self._stance_shift_budget = {"scan": 0, "seen": set()}  # i7-t03 item 1: the scan's per-attempt budget
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
-        if shelf_free_start_on() and self.shelf_pose is not None:  # i7-t03 round 2 (a): the free-floor start as the edge stance's fallback
+        if shelf_free_start_on(self) and self.shelf_pose is not None:  # i7-t03 round 2 (a): the free-floor start as the edge stance's fallback
             self.init_stance = self.shelf_free_start(rng, self.init_stance)
         init = self.init_stance
         self.sidecar.add_stance(init)
@@ -2517,7 +2518,7 @@ class IORSSmall(SamplerV2):
                         why_transit = self.shelf_transit_why(m, g, _default, _pre_open) if (self.gen("shelf_transit_check") and not _per_grasp) else None
                         if why_transit is not None:
                             raise Reject("grasp_unreachable", why_transit)
-                        if shelf_pregrasp_frame_on() and self.shelf_tip():
+                        if shelf_pregrasp_frame_on(self) and self.shelf_tip():
                             self.shelf_pregrasp_frame_check(m, g)
                         if self.shelf_backoff_m() > 0.0:
                             # oracle-fix 2026-11-06 (owner feedback on the touching#03 demo, opt-in generation.shelf_backoff_transit_m): the arrival
@@ -3747,7 +3748,7 @@ class IORSSmall(SamplerV2):
             return float(lat.max() - lat.min())
 
         carried, how = extent(pose[1]), "lean"
-        if shelf_lift_straighten_on():
+        if shelf_lift_straighten_on(self):
             axis, _ = self.shelf_standing_axis(pose)
             if axis is not None:
                 q_up = G.qmul(shortest_arc(G.rotate(pose[1], axis), th.tensor([0.0, 0.0, 1.0])), pose[1])
@@ -3852,7 +3853,7 @@ class IORSSmall(SamplerV2):
         if ex is None:
             ex = getattr(g, "extra", None)
         prim = (ex or {}).get("lift_leaned_piece") if isinstance(ex, dict) else None
-        if not prim or not shelf_lift_straighten_on():
+        if not prim or not shelf_lift_straighten_on(self):
             return []
         from ispatialgym.sampling.v2 import support_split as SS
 
@@ -3980,7 +3981,7 @@ class IORSSmall(SamplerV2):
         shifts = [float(v) for v in (self.gen("shelf_stance_scan_shifts_m") or SHELF_STANCE_SCAN_SHIFTS_M)]
         own = (round(float(cand.translate), 4), round(float(cand.tilt), 4))
         trunks = [own]
-        if shelf_joint_stance_on():  # 5p.2: the trunk set of every candidate
+        if shelf_joint_stance_on(self):  # 5p.2: the trunk set of every candidate
             for c in getattr(self, "manip_candidates", None) or []:
                 tk = (round(float(c.translate), 4), round(float(c.tilt), 4))
                 if tk not in trunks:
@@ -4084,12 +4085,12 @@ class IORSSmall(SamplerV2):
         every grasp and twin, the transit check, the back-off - :meth:`sample_instance`'s own; ``Reject`` on failure). With the stance shift on
         (:data:`SHELF_STANCE_SHIFT_ENV`, i7-t03 item 1) a failure the base position can change (:func:`shelf_need_of`) tries the stances of
         :meth:`shelf_stance_shift` (the same ``try_fn``); a candidate that passes is never shifted. Returns ``(stance, grasp)``."""
-        joint = shelf_joint_stance_on() and self.shelf_pose is not None
+        joint = shelf_joint_stance_on(self) and self.shelf_pose is not None
         try:
             g0 = try_fn(manip)
         except Reject as e:
             need = shelf_need_of(e)
-            if not shelf_stance_shift_on() or self.shelf_pose is None or need is None:
+            if not shelf_stance_shift_on(self) or self.shelf_pose is None or need is None:
                 raise
             return self.shelf_stance_shift(init, cand, manip, arm, e, need, try_fn)
         if not joint:
@@ -4097,7 +4098,7 @@ class IORSSmall(SamplerV2):
         if self._joint_ok(manip, g0):  # i7-t03 round 2 (b): the candidate grasps AND releases - no carried drive
             TT._count(self, "stance_shift.both_passed")
             return manip, g0
-        if not shelf_stance_shift_on():
+        if not shelf_stance_shift_on(self):
             TT._count(self, "stance_shift.grasp_only")
             return manip, g0
         # the candidate grasps but does not release: a shifted stance that does both, else the candidate (its travel recorded again)
@@ -4129,7 +4130,7 @@ class IORSSmall(SamplerV2):
             key = (tuple(round(float(v), 3) for v in st.base_pose2d), round(float(st.translate), 3), round(float(st.tilt), 3), arm)
             if key in budget["seen"]:
                 continue
-            joint = shelf_joint_stance_on()  # 5p.2: the budget counts the stances that reach the exact checks (the trunk set adds cheap rejects)
+            joint = shelf_joint_stance_on(self)  # 5p.2: the budget counts the stances that reach the exact checks (the trunk set adds cheap rejects)
             if label == "scan" and budget["scan"] >= scan_max:
                 break
             budget["seen"].add(key)
@@ -4159,7 +4160,7 @@ class IORSSmall(SamplerV2):
                 self.drop_travel_records(init.name, st_ok.name)
                 tried.append(f"{label} {shift:+.2f}/{float(st_ok.stand_off or 0.0):.2f}: [{e2.reason}] {str(e2)[:90]}")
                 continue
-            if shelf_joint_stance_on():  # i7-t03 round 2 (b): a stance that grasps AND releases first; a grasp-only one is the fallback
+            if shelf_joint_stance_on(self):  # i7-t03 round 2 (b): a stance that grasps AND releases first; a grasp-only one is the fallback
                 if self._joint_ok(st_ok, grasp):
                     TT._count(self, "stance_shift.both_passed")
                     st_ok.extras["stance_shift"]["release"] = "ok"
@@ -5219,7 +5220,7 @@ class IORSSmall(SamplerV2):
             r = self.ikc.exact([IK.pre_pose(grasp.place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st_place, grasp.arm, ignore_for_last=self.support_objects() + [tgt], cache=False)
             if not r.ok:
                 # owner 5p.1 (ISPATIALGYM_SHELF_RETREAT_BACKOFF, the shelf tip release): the place's end + the base backing off may pass instead
-                why_b = self._retreat_backoff_why(st_place, grasp.place, grasp.arm, False) if (shelf_retreat_backoff_on() and self.shelf_tip()) else r.reason
+                why_b = self._retreat_backoff_why(st_place, grasp.place, grasp.arm, False) if (shelf_retreat_backoff_on(self) and self.shelf_tip()) else r.reason
                 if why_b is not None:
                     return f"place retreat clear pose: {r.reason}" + ("" if why_b == r.reason else f"; base back-off: {why_b}")
         if push is not None:
@@ -5339,7 +5340,7 @@ class IORSSmall(SamplerV2):
                     # side board it leans on (t03tip2b: the carried drive's first swept pose, attached book + left gripper on bookcase_opryhp_0)
                     away = self.shelf_push_direction(manip) * float(self.gen("shelf_lift_away_m", 0.03))
                     grasp.extras["lift_away"] = [round(float(v), 4) for v in away]
-                    if shelf_lift_straighten_on():  # i7-t03 round 2 (d): the straightening lift + the leaned-board touch at the lift
+                    if shelf_lift_straighten_on(self):  # i7-t03 round 2 (d): the straightening lift + the leaned-board touch at the lift
                         draft.summary["shelf_lift"] = self.shelf_lift_plan(grasp)
                     # the release where the goal check's settle started (the drafted goal: the AABB-contact lean); that settle tipped the
                     # book onto the partner, so the oracle's release does the same and nothing pushes
@@ -5646,20 +5647,20 @@ class IORSSmall(SamplerV2):
         fingers open, the released target and the supports ignored - ``(None, None)`` when its exact IK passes, else ``(why, code)``. 5p.1
         (:data:`SHELF_RETREAT_BACKOFF_ENV`, the shelf tip release only): when it fails, :meth:`_retreat_backoff_why` (the place's end + the
         base backing off) may pass instead; ``record`` (the goal check's final release) records that retreat stance and transition."""
-        tracked = shelf_release_tracked_on() and self.shelf_tip()
+        tracked = shelf_release_tracked_on(self) and self.shelf_tip()
         if tracked:
             r = self.release_tracked(st, place, arm, [RETREAT_DIST_M, RETREAT_DIST_M + RETREAT_LITTLE_M], q_place)
         else:
             r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
         if record:
             self._drop_retreat_record()
-        if r.ok and r.q is not None and _pair_mesh_on():
+        if r.ok and r.q is not None and _pair_mesh_on(self):
             touch = self.pair_mesh_why(r.q, arm, "clear")
             if touch is not None:
                 r = IK.IKResult(False, None, f"self mesh contact at the clear pose: {touch}", 1)
         if r.ok:
             return None, None
-        if not (shelf_retreat_backoff_on() and self.shelf_tip()):
+        if not (shelf_retreat_backoff_on(self) and self.shelf_tip()):
             return r.reason, getattr(r, "code", None)
         why = self._retreat_backoff_why(st, place, arm, record, q_place=q_place)
         if why is None:
@@ -5683,7 +5684,7 @@ class IORSSmall(SamplerV2):
         misses it); None when off or clear, else why. Kit ``pair_mesh.checked.<where>`` / ``.refused.<where>``."""
         from ispatialgym.sampling.v2 import pair_mesh as PM
 
-        if not PM.pair_mesh_on():
+        if not PM.pair_mesh_on(self):
             return None
         TT._count(self, f"pair_mesh.checked.{where}")
         try:
@@ -5711,14 +5712,14 @@ class IORSSmall(SamplerV2):
         from ispatialgym.sampling.v2 import navigation as NAV
         from ispatialgym.sampling.v2.stances import Transition
 
-        if shelf_release_tracked_on():
+        if shelf_release_tracked_on(self):
             r = self.release_tracked(st, place, arm, [RETREAT_DIST_M], q_place)
         else:
             r = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M)], st, arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
         if not r.ok or r.q is None:
             TT._count(self, "shelf_retreat.backoff_failed.place_end")
             return f"the place's end ({RETREAT_DIST_M * 100:.0f} cm back): {r.reason}"
-        touch = self.pair_mesh_why(r.q, arm, "place_end") if _pair_mesh_on() else None
+        touch = self.pair_mesh_why(r.q, arm, "place_end") if _pair_mesh_on(self) else None
         if touch is not None:
             TT._count(self, "shelf_retreat.backoff_failed.place_end")
             return f"the place's end ({RETREAT_DIST_M * 100:.0f} cm back): {touch}"
@@ -6087,7 +6088,7 @@ class IORSSmall(SamplerV2):
         tip_ok: List[Optional[Stance]] = []  # the tip release's laterals whose place passes (None = the manipulation stance itself)
         diag: List[Dict[str, Any]] = []  # i7-contact 2026-11-07: the laterals without a push class, in numbers (TOUCH_PUSH_DIAG)
         plan = [(lat, self.push_stance_for(manip, t_place_pose, lateral=lat)) for lat in laterals]  # None = the manipulation stance already puts the contact there
-        if self.shelf_tip() and shelf_release_in_gap_on():
+        if self.shelf_tip() and shelf_release_in_gap_on(self):
             # i7-t03 round 2 (c): the manipulation stance first, then drives inside the free gap (no push-inherited contact laterals)
             plan = [(0.0, None)] + [(sg_d, st_d) for sg_d, st_d in self.shelf_release_in_gap_plan(manip, grasp)]
             if len(plan) == 1:
@@ -6167,7 +6168,7 @@ class IORSSmall(SamplerV2):
                 except Reject as e:
                     whys.append(f"{float(cand.extras.get('lateral_shift_m', 0.0)):+.2f}: {e}")
                     tried.append(f"tip release drive {whys[-1][:160]}")
-            if shelf_release_in_gap_on():
+            if shelf_release_in_gap_on(self):
                 TT._count(self, "shelf_release.no_stance")
             raise Reject("path_collision", f"touching tip release: no passing lateral's stance + carried drive is clear ({'; '.join(whys)})")
         if best is not None:
@@ -6180,7 +6181,7 @@ class IORSSmall(SamplerV2):
             if manip_ok:
                 return None  # the manipulation stance itself passes: no second base pose
             if self.shelf_tip():
-                if shelf_release_in_gap_on():
+                if shelf_release_in_gap_on(self):
                     TT._count(self, "shelf_release.no_stance")
                 raise Reject("place_unreachable", f"touching tip release: the place fails from every lateral ({'; '.join(tried)})")
             log.info("TOUCH_PUSH_DIAG %s", json.dumps({"variant": self.gp.variant, "laterals": diag}, default=str))

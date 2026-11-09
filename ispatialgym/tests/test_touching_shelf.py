@@ -643,6 +643,12 @@ def _clear_sampler(monkeypatch, clear_ok=False, end_ok=True, drive_ok=True, swit
     from ispatialgym.sampling import geometry as G
 
     monkeypatch.setenv(IS.SHELF_RETREAT_BACKOFF_ENV, switch)
+    from ispatialgym.sampling.v2 import pair_mesh as PM
+    import os as _os
+
+    for env in (IS.SHELF_RELEASE_TRACKED_ENV, PM.PAIR_MESH_ENV):  # i7-t03 r8: the shelf tip family's defaults pinned off unless a test sets them
+        if not _os.environ.get(env):
+            monkeypatch.setenv(env, "0")
     s = _sampler()
     for name in ("release_clear_why", "_drop_retreat_record", "_retreat_backoff_why"):
         setattr(s, name, types.MethodType(getattr(IS.IORSSmall, name), s))

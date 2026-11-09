@@ -1178,8 +1178,9 @@ class Push(Action):
         if self.kind == "push_under":
             partner = c.extra.get("partner")
             under = f" under {sidecar.language.phrase(partner)}" if partner else ""
-            fine = f"push {obj} along the floor{under} with the closed {_hand(c.arm)}"
-            numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{under} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
+            hand = "open" if push_is_open(c) else "closed"  # i7-floorpush (a): the pitched hand's open push (a two-point blade's too)
+            fine = f"push {obj} along the floor{under} with the {hand} {_hand(c.arm)}"
+            numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{under} with the {hand} {_hand(c.arm)} from {_xyz(c.init.position)}"
             return fine, numbers
         if self.kind == "push_touching":
             partner = c.extra.get("partner")

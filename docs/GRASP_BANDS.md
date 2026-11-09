@@ -2964,6 +2964,69 @@ Runs on trunk_1fda4bd2 (suite = the base: 23 failed + 3 errors, the same ids, 31
       retreat tracked from the place configuration, as the program check does (shelf tip only, not a shared gate).
 - **Left to the owner:** otwukr T7 / T8 as touching_03's templates, the eval index, the t03 switch defaults.
 
+#### Round 7 (2026-11-08; LEAD DECISION #37 while the owner is away; DECISIONS "i7-t03 r7 ..."; every switch default OFF)
+
+- **Code (37bd1888).**
+  - `ISPATIALGYM_T03_PAIR_MESH` (`sampling/v2/pair_mesh.py`): the `{arm}_arm_link5` / `torso_link2` clearance on the simulator's own
+    collision pieces, i.e. the r1pro.usda convex hulls, posed by the URDF's chain in numpy.
+    - Overlap is decided exactly (an LP); the gap is exact too (Wolfe's min-norm point, equal to SLSQP within 4e-13 m on 300 random hull
+      pairs).
+    - Margin 5 mm. Two T8 witnesses read +2.1 / +0.1 mm, yet their executed retreats touched; the successful retreats read +16.8 mm or
+      more. The sphere model is unchanged.
+    - Judged at `release_clear`'s 15 cm clear pose, at the 5p.1 place end, and at the program check's retreat witnesses (reject
+      `self_mesh_contact`). Kit `pair_mesh.checked.<where>` / `.refused.<where>`.
+  - `ISPATIALGYM_SHELF_PREGRASP_FRAME`: when the shelf stance is chosen, the goal check's own `require_in_frame` (pre-grasp + grasp, same
+    rule and 5 % margin) runs at that stance's camera. A failure becomes the stance-shift need `frame`. Kit
+    `shelf_pregrasp_frame.checked / .passed / .refused`.
+  - `ISPATIALGYM_TRACKED_END_BLAME` (log only): the tracked chain's "end configuration collides" verdict logs `TRACKED_END_BLAME`
+    with the colliding object or self-collision pair.
+  - `ISPATIALGYM_SHELF_RELEASE_TRACKED`: `release_clear` (and the 5p.1 place end) track place -> 10 cm -> 15 cm from the place
+    configuration, as the program check and the oracle do, instead of solving the 15 cm pose afresh. Kit
+    `shelf_release_tracked.checked / .passed / .failed`.
+  - Tests `test_t03_round7.py` (16). pyflakes and the suite match the base (23 failed + 3 errors, same ids).
+- **Cross-alias count of the pair (CPU).** Every recorded step of the 141 int2 written demos (28 aliases, both arms): 0 demos come
+  within 0 mm and 0 within 5 mm. The closest are nextto_04 at +45.5 mm and ontop_large_scale_03 at +48.1 mm; every other alias stays
+  50 mm or more away. So the pair touches only on touching_03's shelf retreat. The default is the owner's.
+- **A/B** (`sub_r7.sh`: r6's settings + `SHELF_RETREAT_BACKOFF` + the four switches; 300100-103, svl titanrtx; counters from
+  `tab_t03_r7.py`).
+
+  | arm | att / written / ok | GPU-h | per success | r6 (same arm) |
+  |---|---|---|---|---|
+  | v (v2only, lean root) | 48 / 4 / 4 | 0.26 | 0.064 | 298 / 1 / 1, 1.17 |
+  | d (legacy kmuacd) | 256 / 2 / 2 | 2.88 | 1.44 | 255 / 2 / 0, 2.88 |
+
+  - **Arm v.** The camera, release and retreat failures went from 35 / 13 / 12 to 0 / 3 / 1.
+    - Frame test: checked 38, passed 21, refused 17; one stance shift for the `frame` need.
+    - Tracked release: checked 44, passed 20, failed 24.
+    - 5p.1 back-off: passed 14, recorded 4. All 4 written instances retreat with the base, so the arm stops at the 10 cm place end.
+    - Pair mesh: 4 refused at the clear pose (+2.4 to +3.0 mm, inside the margin), 0 refused at the place end or the program check.
+    - Log-only blame: the one remaining retreat reject is "left_arm_link6 x torso_link2 (5 mm)", a sphere-model refusal.
+  - **Arm d.** 2 written and both succeed; r6's two demos both hit the link5 / torso_link2 contact.
+    - Pair mesh: 9 of 11 refused at the clear pose (-3.4 to +4.9 mm).
+    - Frame test: 42 checked, 14 refused. Tracked release: 38 checked, 18 failed.
+    - Before the lift nothing changed: target_placement 140, no_free_edge 108.
+  - **link6 check.** link6 never touched in execution (closest +7.4 mm). Its only retreat witnesses within 5 mm already had link5
+    below 0, so extending the mesh check to link6 would refuse nothing more. The check stays link5-only.
+
+#### Round 8: touching_03's defaults (2026-11-08; LEAD DECISION #39 under the owner's mandate "fix all the bugs and speed up / make yield better the slow low yield aliases")
+
+- **Mechanism (b4da2675, `sampling/v2/alias_switches.py`).**
+  - A switch's environment variable wins when set ("0" = off). Unset, the switch is on only for the shelf tip family
+    (`IORSSmall.shelf_tip()`, the shelf layout with `generation.shelf_tip_release`) and only for the names in `SHELF_TIP_DEFAULTS`.
+  - Only touching_03's customs entry has `shelf_tip_release`; a test pins this. touching_01 / 02 / 04 and every other IORS alias read
+    unset as off, as before.
+  - 5ee25e37 makes the test stand-ins pin these switches off unless a test sets them.
+- **One commit per flip**, in this order: e9c7acf4 FREE_START, 1d2aec35 JOINT_STANCE (with 5p.2), 3a986bad RELEASE_IN_GAP, 94782615
+  STANCE_SHIFT, 86b9700c LIFT_STRAIGHTEN, 370438e0 RETREAT_BACKOFF, ce191a3f PREGRASP_FRAME, 552b08c5 RELEASE_TRACKED, 58ec7ec2
+  T03_PAIR_MESH.
+  - pyflakes is clean on every commit, and the full suite matches the base on every commit (23 failed + 3 errors, same ids).
+  - Not turned on: `TRACKED_END_BLAME` (log only), `SPAN_RULE`, and the round-1 switches.
+- **Runs on trunk_58ec7ec2 with no `--extra-env`** (`sub_r8.sh`):
+  - **touching_03** (300100-103): 48 / 4 / 4, 0.26 GPU-h = 0.065 per success. It reproduces r7 arm v attempt for attempt, with the
+    same rejections and counters.
+  - **touching_02 control** (610100-103): 51 / 4 / 3, 0.41 GPU-h (int2_4 on the integration trunk: 89 / 3 / 3, 0.60). No line or
+    counter of any t03 switch appears; the one failed demo is plan_failed.
+
 ## Owner decisions on the open list (2026-11-08)
 
 Verbatim answers: `tmp/outputs/owner_answers_20261108.md` (main checkout); record: `$OFH/DECISIONS.md` ("OWNER DECISIONS on
@@ -3392,6 +3455,18 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 24 | i7-t03 round 6 (63bde7f9; code d4f6975a) | 2a760c8d | the (d) pose-0 touch-rule fix behind SHELF_LIFT_STRAIGHTEN (off) |
 | 25 | i7-stancememo (76bf33b5; lead #38) | 0ab12366 | DEFAULTS ATTEMPT_CAP (lead #33), START_DRAW_A_REDRAWS 8 (lead #36); STANCE_MEMO / FLOOR_REDRAW off |
 | 26 | i7-t03 round 7 (37bd1888; lead #37) | 7c40cc28 | T03_PAIR_MESH, SHELF_PREGRASP_FRAME, SHELF_RELEASE_TRACKED, TRACKED_END_BLAME, all off |
+| 27 | i7-brace up to 43472364 (lead #40) | 14bfa044 | the axial brace load geometry behind GC_BRACE_LOAD_GEOM (off; validator only); the 9 braceload maps layered |
+| 28 | i7-artlarge up to a93d696c (lead #50) | 795f1ece | DEFAULT ARTLARGE_INIT_DRAW (the large articulation start from the whole Phase-1 set) |
+| 29 | i7-artlarge up to 31c7c011 (lead #53) | 58431d18 | DEFAULT ARTLARGE_ALT_SKIP (speed, identical results) |
+| 30 | i7-t03 up to 54800b01 (lead #56) | 0153ed46 | per-family switch defaults: the 9 t03 switches DEFAULT ON for touching_03 only (lead #39) |
+| 31 | i7-artlarge r3 (087586fb; lead #54 / #57) | 3413d60a | DEFAULT DIP_LEG_SELF_MESH (all aliases: the dip gate's replacement leg refused at 5 mm link3 / link5 mesh clearance); DIAG_ARM_TRACE off |
+| 32 | i7-floorpush up to dbd8bc13 (lead #59) | f5b89921 | DEFAULT 0.10 m strokes with re-aim for the pitched floor push; the palm test fix; variant switches off |
+| 33 | i7-yield2 up to 757659dc (lead #64) | dff59cfc | DEFAULTS LIFT_PAD_SWEEP (the support lift refused when the pads miss the object), WALL_VIS_SCREEN (world_vertical draw screened by the settle visibility rule) |
+| 34 | i7-yield2 r2 (d7723c33; lead #65) | 5b4f42b3 | DEFAULT GRIP_WAIT_NO_PAUSE (the gripper close waits are not counted as a pause) |
+| 35 | i7-stancememo r3 (01bd4e3f; lead #45 / #63) | 50bb863e | SupportTop vectorized (the start-draw speed fix, identical verdicts); the attempt cap doubles after 2 consecutive cuts |
+| 36 | i7-goalmaps up to 4bc9b600 (lead #67) | 470a83ca | touching_large_02 customs: carry_centred / carry_wide_path (lead #42); the root's umbrella entry unchanged (round 1, not umb2) |
+| 37 | i7-yield2 r3 up to 183810f4 (lead #66) | 73faa60d | DISEMB_POS_REDRAWS switch (off at this merge) |
+| 38 | i7-yield2 r3 default (d94c2394; lead #69) | f1bb8e24 | DEFAULT DISEMB_POS_REDRAWS 8 (disembedding redraws the start position when every work stance fails) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3415,10 +3490,13 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - i7-cork's staged root is not folded. Its extra cork entries serve only the default-off routes. They share the cork's model, so the sampler's
   entry lookup would see four candidates instead of one (lead: agreed, not folded). If the owner turns a route on, the entries are staged
   in `$SY/v2/v2maps_int1_cork`.
+- umb2 (lead #67b): the umbrella's ladder round-2 entry (6 valid) + its 4 maps replace the round-1 entry; check_int2 ERRORS 0.
 - goalmaps (with merge 12): ontop_large_01's countertop maps (soap dispenser h0.9158 r / l) with the anchor 0.9158, and the umbrella's hall-tree
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 - ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
   (`int2_20261108/rebuild_ft2b.sh`, same inputs): sink 36,985 feasible cells (= ft2's round b), bar 1.0505 r / l; layers ft2b_sink / ft2b_bar.
+- braceload (with merge 27, lead #40): the 6 axial_brace + 3 touch_brace maps re-validated under the load geometry fix, layered into int2
+  (not a root swap) after the running touching jobs ended; check_int2 ERRORS 0.
 - brace33_touch / brace34w (with merge 21): the touch_brace maps of gkpmii / dkhgxn / ntbrtz re-validated under the pusher fix, and the 8
   world_vertical wall_brace maps.
 
@@ -3445,6 +3523,7 @@ check_int1.py (reader side, trunk_1b5e5525): 77 entries, 146 maps, 8 attach, 16 
   (ad_race 11/4/4).
 - int2_4 disembedding_07 crashed at its first written instance (OSError Errno 36: `<iid>.summary.json.pending` = 261 characters) - fixed in
   339fc2bd; int2_6 reruns disembedding_07 / _09 on it.
+- int2_12 (trunk_0153ed46): touching_03 300100 48 / 4 / 4 on v2maps_int2 (the t03 defaults; before 320 / 0 / 0).
 - int2_7 (trunk_540478e0, after int2_5): the startdraw set at 300500, under_large_01 (floor watch), camhull's inside_large_03 / under_small_03
   at 335000, the sinkbreakfast variant at 300700.
 - int2_5 (trunk_cd38c3d1, after the goalmaps check): touching_02 / 04 and close_02 at i7-contact3's indices, axial_05 / 01 / 03 / 04 (i7ar_pd
@@ -5130,6 +5209,40 @@ memory OFF, TURN_COVER=1 + OPPOSITE=1, map overlay r3; `i7ar_5yf_off` root v2map
     - it still moves as far as an awake body and no kick was measured (object speeds within the awake control's range). In the demos 2325 first motions after an assist
     sleep came without the assist's wake (1514 with a slow hand); kicks 2.2 % vs 1.7 % after a wake. Teleports (`set_position_orientation`,
     the scene state load) wake the teleported body; Executor.restore wakes every tracked object.
+- **Lead decision 2026-11-08 (owner away) on 5w.3: the FIX** - `ISPATIALGYM_GC_BRACE_LOAD_GEOM=1` (default OFF, next to the 5w.3
+  diagnostic switches; 8ec97f10 + 1fb0fe77 + 6dcb94f8, merged with of-v2maps 68c6ffc2 in daf44408):
+  - *Axial load* (`axial_pusher_path`, `KitContactWorld._axial_load`): on the COM hinge the pusher meets the PUSHED end - the library end
+    point's distance along the long axis THROUGH THE HINGE (the library's point sits on its builder's hull-vertex-mean centre, 6.8 cm off
+    jhaltj's centre line), the far end's mirror for an opposite-end entry - square to that end's arc tangent (= +-`load.direction`), and is
+    carried along the arc about the hinge, stopped `brace_press_m` at the braced end after the MEASURED turn. The box as the wall load's:
+    8 cm upright, 3 cm across, 5 cm along the travel. The old straight load used an UNTURNED box (thickness along world y): a load along x
+    met the target with its 8 cm side (contacts 11-25 mm early), thin targets started inside it and were lifted, not turned.
+  - *Judge* (`judge_axial_brace`): the TURN, not the hinge-pinned root - `not_held` = the braced end's arc travel > `brace_hold_max_m`,
+    `not_loaded` = the pushed end never travelled 1 mm (never a pass), `not_braced` = the brace fingers never pressed 1 N during the load
+    (the wall judge's rule). Touching braces (load +y, unchanged box): `not_loaded` from the measured load point (`brace_load_reached`).
+  - *Tests* (test_brace_lib.py, 30 pass): switch off by default; box along the load; the arc / face / opposite / yaw 90 / on-axis pushed end;
+    the face never spans a short lever; no material raises; the judge never passes a missed load and reads the turn on a pinned root.
+    Suite trunk_1fb0fe77 = the of-v2maps baseline's same 21 ids.
+  - *Re-validation* (arm F = WAKE + MEASURED + GEOM, --revalidate of cp -a copies, `$OFH/brace_20261108/w53fix/F`, axial on trunk_6dcb94f8,
+    touch on trunk_1fb0fe77; table `w53fix/tab_fix.py`): valid int2-map -> F, the load reached the target (touched) in 648 / 648 trials
+    (the record: 48 / 462 valid): gkpmii 40 -> 40, dkhgxn 38 -> 37 (1 not_held), ntbrtz 32 -> 32; board_game 28 -> 107 (90 invalid ->
+    valid: the old box over-pressed them, hand_pushed), keyboard 94 -> 68 (26 not_braced), magazine 96 -> 92, jhaltj s1 44 -> 12 (32
+    not_braced: the blades beside the thin book never touch it during a 1 cm turn), jhaltj s1x1x2.5 90 -> 96, tablespoon tqqwys 48 -> 40;
+    510 -> 524. Earlier runs v1 (box unturned, pushed point off-axis: jhaltj 44 / 44 never turned) and v2 (8 cm across face spanning the
+    spoon's hinge: 29 / 48 not loaded) are in `w53fix/v1_cancelled`, `w53fix/v2_axial`. Note: the kinematic load drives the braced end
+    ~1 cm in every trial (held or not); a valid verdict means the brace hand stood (drift < 1 cm) and its fingers took the load.
+  - *Maps*: the 9 brace maps rebuilt from the F verdicts with trunk_6dcb94f8's builder (control: the recorded libraries reproduce int2's 6
+    axial keys exactly; the touch maps in int2 are int1's older builds, 889c0dbb / 8e3aee3b / b87cb752) and staged in
+    **`$OFH/v2maps_int2_braceload`** = cp -a v2maps_int2 at INT2.txt line 46 + the 9 maps (old -> maps/_superseded_braceload; log
+    BRACELOAD.txt); check_int2 ERRORS 0. v2maps_int2 untouched.
+  - *A/B* (N 4 v2only, trunk_6dcb94f8 both arms, base 350000 per-tag ledgers, alias memory off, svl titanrtx; `w53fix/ab_bl.py`):
+    int2 `i7b_bl_int2` vs staged `i7b_bl_load` (att / wr / ok, GPU-h per success): touching_01 9/4/4 0.116 vs 10/4/4 0.102; touching_02
+    46/4/4 0.127 vs 46/4/4 0.096; touching_04 26/4/1 1.021 vs 26/4/2 0.407; axial_01 14/4/4 0.076 vs 12/4/4 0.077; axial_03 4/4/3 0.067
+    both; axial_04 12/4/4 0.042 vs 26/3/3 0.070 - its replicate at 350100 is IDENTICAL in both arms (26/4/4 0.068, the same brace
+    counters; no brace in either: brace_ik_failed / no_joint_cell), so run noise. Total 111/24/20 0.133 vs 124/23/20 0.117; written brace
+    9 vs 9, landed 8 vs 9. No alias worse, touching_04 better -> ready to fold under lead #40: the three commits (switch default OFF) +
+    `$OFH/v2maps_int2_braceload`. The woken validator does not strengthen the case for the shared sleep-assist change (1 / 110 touch
+    verdicts; the axial changes are the geometry).
 - **Opposite-end validation**: the stratified quota counted the opposite entries in the current-end group (validated first), so none was
   validated; 9d2ce7e3 makes them their own group (`libs_axial_ct2`: injrgc 47, qgvsnb 14, tfovwy 48 valid opposite entries).
 - **Runs** (v2only N 4): i7_brace33 (the 3.3 maps, switches off) touching_01 27 att / 4 wr / 4 ok (brace 3 / 4), touching_02 79 / 4 / 3 (4 / 4),
@@ -5341,6 +5454,291 @@ Every instance was written in both arms of every alias.
 - GPU-h per success over both aliases: 0.77 -> 0.57, inside the ~15-point N 4 noise. under_large_03's ok count is held back by the
   oracle push.
 
+## articulation_open / close_large_03: the init (start) stance from the whole Phase-1 set (branch `i7-artlarge`, lead #44, 2026-11-08)
+
+The two cabinet aliases (bottom_cabinet_rvunhj_0, door j_link_2, bar handle j_link_2#C, in the corridor between two cubicle rows of
+office_cubicles_right; left arm, hybrid / sequential follow) wrote 0 instances in every fast run (survey1, fix2, i_nopol, i_legwv,
+v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2).
+
+**Diagnosis (CPU, from the i7_pol / fix2 / survey1 logs).**
+- `repeats_eval` was EVERY attempt that passed the sample (open 31 / 31, close 38 / 38 in i7_pol). The goals cannot separate an instance
+  from the eval pair: open draws q_goal from S = [0.283, 0.393] and the eval goals are 0.388 / 0.280 (tolerance 0.05); close ends at
+  lower + 0.03 (eval 0.043 / 0.034); the articulation record measures no start state. So only the start base can, and Phase 1
+  (`prompt0.phase1_init_pose`) takes the NEAREST feasible d on a random bearing: every passing start sat 0.02-0.19 m and < 15 deg from the
+  eval starts (9.53, -6.58, 176 deg) / (9.57, -6.66, 172 deg), which were drawn the same way.
+- `handle_unreachable` is the attempt-level label of the stance loop. Pinch -1 never has an exact IK (25 / 15); pinch +1 failed at
+  step 6, the init -> manipulation path (open: path_collision 26, no_transition 4; close: path_collision 16), plus
+  hybrid_follow_infeasible 7 / 11. The path collisions were at the init itself (the far starts at x 10.62-10.66: the nearest-first d lands
+  right behind an obstacle edge) or a few strides out. Phase 2 (1 survivor per bar offset), IK limits and the camera are not the cause.
+
+**Fix 23733307, `ISPATIALGYM_ARTLARGE_INIT_DRAW` (default off in that commit, on since d867724e).**
+- The init is drawn from the whole Phase-1 feasible set: 5 deg bearings in +-beta_max x the d scan, each judged by Phase 1's own checks
+  in its order (free floor in the task rooms, the whole target in frame, body collision-free, trunk sweep), memoized per q_init.
+  The camera-frame rule is unchanged.
+- Starts within 0.25 m / 15 deg of an eval start go last (the repeat rule's start half); the rest in random order.
+- Step 6 tries up to 12 further candidates of that order when the drawn start has no path / transition (the start enters neither
+  steps 1-5 nor the follow); the sidecar's init is the one that connects.
+- Kit counters `artlarge_init.{drawn, drawn_away, drawn_near_eval, empty_set, connect_first, alt_tried, alt_connected,
+  alt_exhausted}`; one "ARTLARGE_INIT_DRAW: init set ..." line per q_init with the per-stage counts.
+- Measured set (al_on logs): open 110 feasible of 697 lattice cells (24 near an eval start), x 9.52-11.18 along the corridor; close
+  98-100 (19-21 near).
+
+**A/B** (trunk_23733307, N 4, svl titanrtx, base index 352000 / control 352100 in both arms, v2only on v2maps_int2,
+`ISPATIALGYM_PATH_BLAME=1` in both arms, log only; tags al_off / al_on; GPU-h = sacct elapsed):
+
+| alias | off (`=0`) att / wr / ok, GPU-h | on (`=1`) att / wr / ok, GPU-h | where the switch acted |
+|---|---|---|---|
+| open_large_03 | 60 / 0 / 0, 1.97 (repeats_eval 23, handle_unreachable 35) | 12 / 4 / 2, 0.70 (handle_unreachable 8) | drawn 12 (all away from the eval starts), alt_tried 164, alt_connected 4 (2 written), alt_exhausted 11 |
+| close_large_03 | 45 / 2 / 0, 1.26 (repeats_eval 25, time_cap 9, no_manipulation_stance 5, no_stance 4; demos: collision 2) | 4 / 4 / 4, 0.18 | drawn 4 (away), connect_first 4 |
+| close_large_02 (control, dishwasher) | 12 / 4 / 4, 0.22 (repeats_eval 8) | 7 / 4 / 4, 0.28 (program_check 1, ik_joint_limit 1, handle_unreachable 1) | drawn 7 (away), connect_first 6 |
+
+- The integration tip's own run int2_10 (open, l40s, switch absent) repeated the old result: 60 / 0 / 0 (repeats_eval 31,
+  handle_unreachable 27).
+- Written starts with the switch: open 0.4-0.5 m from the eval starts (x 9.86-10.01), close 0.5-1.4 m (d 1.35-2.3). The control's
+  repeats_eval went 8 -> 0; its ok count is unchanged.
+- **DEFAULT ON** in d867724e (own commit; lead #44 under the owner's mandate). `=0` restores the nearest-d draw. The path is reached by
+  every ArticulationLarge variant (door / dishwasher / bottom_cabinet open and close, bottom_cabinet_push): articulation_open / close
+  _large_01..03. The full suite has the base failure set (23 F + 3 E in the lambda env) at 23733307 and d867724e, +7 passes.
+
+**Still open.**
+- open_large_03 demos: 2 of 4 fail `robot_touching_itself` (left_arm_link3 touches left_arm_link5) in the grasp, after the
+  STRAIGHT_ARM ramp to the recorded witness. Both have a near-upright manipulation tilt (-0.007 / -0.010); the two successes have
+  -0.29 / -0.08, and the cabgeo eval demos -0.08..-0.39. The step-5 grasp witness has no self-clearance (the follow's IK keeps 20 mm).
+  A fix there is a shared gate (owner).
+- open's remaining step-6 rejections are mostly no_transition (the trunk sweep at s_T with the arriving arms), which does not depend
+  on the start: the alternatives cannot help and cost tries (164). A refinement would skip them when the drive-in or sweep fails.
+- hybrid_follow_infeasible (sequential follow) is unchanged.
+
+
+### i7-artlarge r2 (lead #51): the open_large_03 self-contact, and the no_transition retries
+
+**The self-clearance margin on the grasp IK was not built: the witnesses refute it.**
+- The executor reports `left_arm_link3 touches left_arm_link5`. Measured on the simulator's collision meshes (`pair_mesh.pair_clearance`,
+  the r1pro.usda convex pieces + URDF FK, CPU) at the al_on witnesses, link3-link5 clearance at pre_grasp / approach / grasp:
+  - the two FAILED demos (352001 / 352003): 22.7 / 23.2 / 23.2 mm;
+  - the two SUCCESSFUL demos (352000 / 352002): 17.0 / 22.8 mm and 20.0 / 22.9 mm.
+  - No margin refuses the failures without refusing the successes first; 20 mm refuses exactly the two successes.
+- Cross-alias count (CPU, every int2_* written demo with a grasp witness, 144 demos, link3-link5 of the grasping arm, the minimum over its
+  pre_grasp / approach / grasp witnesses): a 20 mm margin refuses 5 demos, 4 of them SUCCESSFUL (nextto_04 8.8 mm, touching_04 11.3,
+  under_small_03 17.8, disembedding_02 19.3) and 1 failed for another reason (under_large_01, not_reached, 13.0 mm). 10 mm refuses 1
+  success; 5 mm none. The one int2 robot_touching_itself failure (inside_large_01) reads 52.9 mm at its witness.
+- Where the contact happens: the two failures' executed arm (demo.hdf5) leaves untucked at the manipulation stance and the link3-link5
+  clearance falls 21.7 -> -0.2 mm over ~70 steps on the way to the pre-grasp. The commanded arm path is not the joint-linear ramp the
+  log reports (in the successes it is exactly linear; in the failures j4 is commanded to -2.09 rad against -1.53 at the witness). The hand
+  descends 0.94 -> 0.89 m where the plan descends to 0.67 m.
+- A re-demo of the same four instances with `ISPATIALGYM_FAST_STRAIGHT_ARM=0` (trajopt; recollect al_rc_sa0) fails the same two the same
+  way. al_rc_sa1 (defaults) reproduces 2 / 4. So neither the straight-ramp shortcut nor the witness is the cause.
+- Upright trunk alone is not the cause either: cabff_open_a 0001 (tilt 0.0) and cabff_open_b 0001 (-0.016) succeeded on the 11-04
+  oracle.
+- Open: why the executed / commanded transit departs from the planned path in these two. Next step: a replay with per-step contact
+  logging. This is an oracle question for the owner.
+
+**Speed fix b20703b9, `ISPATIALGYM_ARTLARGE_ALT_SKIP` (default on since 397048b2).**
+- `prompt0.connect` raises `no_transition` only when every transition stand-off fails the drive-back floor test, the trunk sweep or
+  the drive-in. All three are checked at the manipulation stance with the arriving arms. The start enters only through `same_trunk`.
+- So after a `no_transition` from a start whose trunk differs from the manipulation stance's, step 6's alternatives skip every other
+  such start. Counter `artlarge_init.alt_skipped_no_transition`.
+
+**A/B** (trunk_b20703b9, N 4, svl titanrtx, same seeds in both arms; open 352200, control 352300):
+
+| alias | skip off (al2_skip0) | skip on (al2_skip1) |
+|---|---|---|
+| open_large_03 | 9 / 4 / 3, 1122 s (attempts 675 s); alt_tried 94 | 9 / 4 / 3, 1043 s (attempts 618 s); alt_tried 82, skipped 12 |
+| close_large_02 (control) | 5 / 4 / 4, 601 s | 5 / 4 / 4, 601 s (not reached) |
+
+- The instances and demos are identical. The skip only removes connect tries; it is the default since 397048b2. The suite has the base
+  failure set at b20703b9 and 397048b2.
+- open_large_03 on the int2 defaults: 9 / 4 / 3 (one robot_touching_itself), against 60 / 0 / 0 before the init draw.
+
+### i7-artlarge r3 (lead #54): the open_large_03 self-contact, found
+
+**Replay** (log-only `ISPATIALGYM_DIAG_ARM_TRACE=1`, 867681d8; re-demo al_rc_trace of the four al_on instances; same 2 / 4).
+- The witness transit's straight ramp is planned (128 waypoints, the log line the r2 analysis read).
+- The ramp's hand path dips 16-17 cm below its lower end, so the TRANSIT DIP GATE (first-demo v3.0 F5, `Motions._dip_gate`, inside every
+  grasp transit) replaces it with its straight Cartesian leg. The leg's differential-IK path (175 waypoints) folds the elbow (j4 to
+  -2.09) and the link3 / link5 meshes touch: -0.2 / +0.1 mm.
+- cuRobo's sphere self-check passes the leg. Commanded and measured agree (no controller lag, no contact before the self-touch).
+- The gate logged its decision only AFTER the leg streamed, so a failure inside the leg left the log reading as if the plan's straight
+  ramp had run: the "plan is not what executes" of r2.
+- In the two successes the gate found no qualifying leg and the straight ramp ran.
+
+**Fix 4a9e5038 (shared execution path, behind a default-OFF switch).**
+- `ISPATIALGYM_DIP_LEG_SELF_MESH=1`: a Cartesian dip leg whose `{arm}_arm_link3` / `link5` mesh clearance (pair_mesh) falls to 5 mm is
+  refused (the plan then streams as before). Executor stat `dip_leg_self_mesh_refused`.
+- Unconditional, log-only: the gate logs "streaming the ... Cartesian leg" before the leg runs.
+- The suite has the base failure set.
+
+**Count** (int2_* demos' meta `transit_dip`, CPU).
+- 8 demos ran a Cartesian dip leg: 6 succeeded (close_large_02 x2, inside_01, nextto_03 x2, ontop_large_03) and 2 failed
+  robot_touching_itself (open_large_03 352001 / 352003, int2_11).
+- The executed link3-link5 minimum over the grasp action: failures -0.2 / +0.1 mm; successes 10.9-21.7 mm. A 5 mm margin refuses
+  exactly the two failures.
+
+**Validation re-demo** (trunk_4a9e5038, switch on, same instances):
+
+| alias | before | switch on | what the switch did |
+|---|---|---|---|
+| open_large_03 | 2 / 4 | 4 / 4 | legs refused at +3.5 / +3.6 mm |
+| close_large_02 | 4 / 4 | 4 / 4 | legs streamed |
+| nextto_03 | 4 / 4 | 4 / 4 | legs streamed |
+
+- DEFAULT stays OFF: the path is shared by every grasp transit (lead #54: stop for the count).
+- **DEFAULT ON in c421a6c0, for all aliases** (lead decision #57, under the owner's mandate, on the count and the re-demo above); `=0`
+  restores. Snapshot trunk_c421a6c0. Fresh confirmation: open_large_03 N 4 on the defaults, no env, tag al3_def (base index 352400).
+  Next validation: inside_01, nextto_03 and ontop_large_03, the other aliases whose demos ran a dip leg.
+
+## Floor pushes under the desk: under_large_02 / 03 (branch `i7-floorpush`, 2026-11-08; owner decision item 5)
+
+Owner decision 2026-11-08 (verbatim in the lead's scratchpad `owner_20261108f.md`, item 5; DECISIONS "OWNER DECISIONS on
+open_decisions_20261108b"): diagnose the pitched floor push first (CPU, from the existing demos), then the approved oracle push-program
+variants (a) open gripper, (b) both grippers, (c) strokes of at most 0.05 / 0.10 m with re-aim, (d) a lower contact height - each behind
+its own switch, limited to these floor-push aliases, an N 4 v2only A/B per variant vs today on the same indices and backend; defaults
+after the owner sees it. Record: `$OFH/DECISIONS.md` "(i7-floorpush)" lines, `$OFH/floorpush_20261108/`.
+
+### Diagnosis (the 15 demos with a push: int1_1, i7_floor, i7_floorfix, i7diag_floor)
+
+- **The hand**: `push_under_hand` pitched_far, pitch 60, wrist turn "lateral" (closing axis across the push, the two closed fingers side by
+  side, ~17 mm wide), finger joints 0 through the push, fingertips 0.080 m up, contact (band top) 0.086 m. Centre of mass 0.114 m (the
+  briefcase lwbctq: 0.27 m tall on its 0.12 x 0.33 m edge, pushed along its long axis onto the 0.12 m end face) / 0.139 m (the round
+  ashcan jlawet): the contact is already below the centre of mass.
+- **Push line vs centre of mass**: at the first object motion the hand is -10.5..+4.0 mm (briefcase) / +0.3..+6.9 mm (can) lateral of
+  the object's centre (the record has a `mid`, so the oracle's `push_recentre` never runs).
+- **Where the rotation starts**: at contact, in the first 1-2 cm, growing with the travel (an unstable point push). Briefcase failures:
+  yaw 2-9 deg after 2 cm, 4-11 after 5 cm, 8-19 after 10 cm (the ok demo 0.6 / 1.2 / 2.1); the hand slides along the end face to its corner
+  and passes the briefcase (the hand ends 0.115-0.141 m farther along), the residual 0.108-0.132 m exceeds the re-push cap (0.10 m): the 5
+  not_reached. One briefcase toppled at the corner. Ashcan: the position is reached (<= 3 mm) but the yaw grows to 19-41 deg (ok 6):
+  symbolic_only under `pose_reached`'s full orientation (0.15 rad) - while `placed_orientation` already treats the push-under yaw as free
+  and the can is round (an owner question; not changed).
+- **protected_contact** (under_03, 2 of 4 on the integration tip): the transit from the drop's retreat round the can to the push's
+  pre-contact, planned with the can left out (its witness within 10 mm of the can's box), via-above failed, `right_arm_link7` touches the
+  can at its side. Not the push; none of (a)-(d) changes it.
+- **(b) kinematic pre-check** (CPU, URDF FK with joint limits, no collisions; 13 right-arm stances C): the other hand's pitched pose
+  0.05-0.12 m beside the push line is missed by 0.27-0.54 m - the push lane sits 0.25-0.31 m to the push arm's side.
+
+### The switches (b46be8a3; default off, acting only on the pitched hand of the under relation)
+
+| switch | variant | what it changes | fall-back | counters / record |
+|---|---|---|---|---|
+| `ISPATIALGYM_FLOORPUSH_OPEN=1` | (a) | the lateral turns with the gripper open: both fingertips across the back (`pitched_open_contact`: gap 60 % of the band's width, <= 8 cm); IK, pinned check, goal check, program check and oracle at that opening (`push_contact_form` two_point, `fingers_opening_m`); one stroke | today's closed chain | `floorpush.open.chain / unsolved`; `contacts.push.floorpush.variant` |
+| `ISPATIALGYM_FLOORPUSH_BOTH=1` | (b) | probes the other arm's chain 0.06 / 0.09 / 0.12 m beside (exact IK from stance C); no two-hand oracle push is built | always one hand | `floorpush.both.probe / feasible / infeasible`; `floorpush.both` |
+| `ISPATIALGYM_FLOORPUSH_STROKE_M=<m>` | (c) | the existing strokes (`execute._push_strokes`) for the pitched hand: hold, measure, back off 3 cm, re-aim <= 3 cm at the root line + 0.15 m/rad x yaw beyond 2 deg (`ISPATIALGYM_FLOORPUSH_YAW_GAIN`), <= 8 strokes (`_STROKES_MAX`); the hand's `face_half_m` / `contact_strips_m` | - | `floorpush.strokes.recorded`; `strokes` |
+| `ISPATIALGYM_FLOORPUSH_TIP_M=<m>` | (d) | the fingertips this high (0.05: contact ~0.056 m) | today's 0.08 m | `floorpush.low_tip.chain / unsolved` |
+
+### A/B (fp_today / fp_open / fp_s05 / fp_s10 / fp_tip / fp_both; trunk_b46be8a3, N 4 v2only, index 350000, svl titanrtx)
+
+| arm | under_02 att / wr / ok, GPU-h/ok | under_03 att / wr / ok, GPU-h/ok | pushed demos' yaw (median) |
+|---|---|---|---|
+| today | 9 / 4 / 1, 5.32 | 28 / 3 / 0, - | 9.3 / 18.4 deg |
+| (c) s05 | 9 / 4 / 0, - | 28 / 3 / 2, 1.67 | 3.9 / 2.8 |
+| (c) s10 | 9 / 4 / 1, 5.18 | 28 / 3 / 2, 1.57 | 3.0 / 2.7 |
+| (a) open (55d28864) | 12 / 4 / 0, - | 20 / 1 / 0, - | 6.1 / - |
+| (d) tip 0.05 | 17 / 4 / 0 (low chain 48 / 1107 solved, never written) | 26 / 4 / 1, 6.11 (0 / 784) | = today |
+| (b) both | 11 / 4 / 0 (probe 0 feasible / 1166) | 26 / 4 / 1, 2.73 (0 / 516) | = today |
+
+**Default (82c96a3b, lead decision #41)**: the pitched push in 0.10 m strokes (`ISPATIALGYM_FLOORPUSH_STROKE_M=off` restores one stroke);
+(a), (b), (d) stay off. On the default (fp_def, index 360000): under_01 11 / 4 / 3, 0.95 GPU-h / ok (the blade, not affected); under_02
+12 / 4 / 1, 4.50; under_03 11 / 4 / 3, 0.18 (every push ok). Remaining under_02 failure: the briefcase topples (tilt 84-93 deg) once its yaw
+reaches 8-22 deg within a stroke and the hand meets the end face's corner; next fix (decision needed): a lying rest or a broadside push.
+
+## Slow / low-yield aliases: the fork's lifted grasp and the bare-wall init view (branch `i7-yield2`, lead decision #47, 2026-11-08)
+
+Owner mandate: "Fix all the bugs and speed up / make yield better the slow low yield aliases". Two items from int2_7 (trunk_2f157bbf).
+
+### A. disembedding_10: grasp top_2 [pause] - the executor's support lift took the pads off the fork
+
+- Symptom (int2_7 300019 / 300020, drawn starts at base x 6.77 / 6.98 picked top_2): both demos `oracle_failed [pause]` in the grasp,
+  "no joint moved faster than 0.001 for 51 steps". 300018 (top_9) succeeded.
+- What the demo shows (hdf5): the arm reaches the grasp pose (eef 1.3 mm off); the ramped closure goes 15.5 -> 6.6 mm per finger
+  symmetrically, then finger 2 drives to 0 and shoves the fork 4.4-6.3 mm across the pinch (it turns 3.6-6 deg), pushing finger 1 back out
+  to 11.1-11.3 mm; no `contact_hold`, no assisted grasp. `Motions.gripper` then waits 60 steps + holds 5 with nothing moving - longer than the
+  pause limit (50), so the hard QA `pause` ends the demo before the executor's `failed_grasp` (whose retry runs the recorded, unlifted grasp).
+- Cause: not the sampler (the IK margins are fine) and not the entry (validated with zero finger-slab force): the executor's
+  `lift_grasp_off_support`. The finger envelope reaches 1.8 mm below the fork's bottom, so the grasp is lifted 5.8 mm (+ 4 mm clearance).
+  The fork's collision hulls at top_2's x (14 mm from its origin) span z 0.5-6.0 mm; the lifted pads start at 9.2 mm - **above the neck**.
+  The pad-margin rule read the AABB top 0.840 (the raised handle end), the face-slope probe at the lifted fingertip end missed (None =
+  "not judged"). top_9 the same: every lifted top_9 attempt (i7tray_turn_on x4, int2_7 300018) closed on nothing (`failed_grasp`) and
+  succeeded on the unlifted retry.
+- Survey of all 344 recorded lifts under `$OFH/out` (scratch survey_lib.py, the fork / spatula / steak / tape / dice / mouse / jigsaw /
+  spoon hulls from `v2maps_int2/glib`): the library's own pad sweep (`candidates.pad_sweep`, rays across the pinch over PAD_Z x PAD_X) at the
+  lifted pose meets no face only for the fork (top_2 x2 pause, top_9 x5, top_10 x1, top_11 x1 - all failed lifted) and the spatula of
+  under_small_04 (top_2 x1, top_3 x2 - succeeded lifted); the other 332 lifts are unchanged.
+- Fix d5ce72ef, `ISPATIALGYM_LIFT_PAD_SWEEP=1` (`ExecuteConfig.grasp_support_pad_sweep`): before a lift is applied, 24 rays (PAD_Z x PAD_X x
+  both sides, from the open pad faces across the pinch, `_pad_sweep_hits`) at the lifted pose; none on the object -> the lift is refused,
+  the recorded grasp runs. Record: `grasp_support_lift.pad_sweep {hits, rays}`. No scene queries (stubs) -> not judged.
+
+### B. world_vertical_04: too_few_visible at the init view
+
+- Symptom (int2_7 = i7_wall_def, deterministic): 51 att / 2 written / 2 ok; 49 rejections `[too_few_visible]` in settle_validate.
+- The check (`AlignmentWall.extra_checks`): >= `min_visible_objects` 5 objects (structure counted, the robot not) with >= 200 px in the
+  INIT camera view. 45 of 49: only floor + wall + target; 3: + another wall; 1: no floor. The drawn (spot, delta, init stance at d 0.5-1.5 m,
+  |beta| <= 35 deg) mostly faces a bare stretch of wall gkewle; the passing draws (spots 34, 2) see a door / an elevator door / other walls.
+  Not the thresholds and not occlusion. world_vertical_05: 21 / 33 the same.
+- Fix c0884d5f, `ISPATIALGYM_WALL_VIS_SCREEN=1` (`_DRAWS`, default 40): each draw is screened at once with the settle check's own rule
+  (`visible_at`: the robot teleported to the init stance as `RobotKit.apply` places it, one segmentation, put back) and redrawn within the
+  attempt (spot, delta and init together - the accepted distribution is the conditional one the settle check already selected; the first
+  draw equals the switch-off draw); the settle check stays. Kit: `vis_screen.passed / redrawn / draws_k / exhausted / settle_rejected`.
+
+### Runs (trunk_c0884d5f, svl titanrtx, v2maps_int2, v2only N 4, memory off; loop `$OFH/yield2_20261108/loop.sh`)
+
+| arm | job | att / written / ok | GPU-h | per success | the switch's counters |
+|---|---|---|---|---|---|
+| A recollect OFF (int2_7 disembedding_10 g300018-300021, the same 3 instances) | 18391303 | - / 3 / 2 | 0.17 | - | 300018 top_9 failed_grasp -> retry ok; 300019 top_2 [pause]; 300020 top_2 failed_grasp -> retry ok |
+| A recollect ON `LIFT_PAD_SWEEP=1` | 18391304 | - / 3 / 3 | 0.14 | - | pad_sweep hits 0 / 24 at all 3 lifts -> refused; every grasp first attempt, contact_hold |
+| B world_vertical_04 OFF 310000 | 18391305 | 51 / 2 / 2 | 0.55 | 0.277 | too_few_visible 49 (= int2_7, i7_wall_def) |
+| B world_vertical_04 ON `WALL_VIS_SCREEN=1` | 18391307 | 5 / 4 / 4 | 0.32 | 0.080 | passed 5, redrawn 29, settle_rejected 0, exhausted 0 |
+| B world_vertical_05 OFF 310000 | 18391503 | 33 / 4 / 4 | 0.36 | 0.089 | too_few_visible 21 |
+| B world_vertical_05 ON | 18391399 | 10 / 4 / 4 | 0.28 | 0.071 | passed 10, redrawn 20, settle_rejected 3 |
+| B control world_vertical_01 ON | 18391524 | 8 / 4 / 4 | 0.61 | 0.153 | passed 5 at draw 1 (= the off draws); 2 time_cap = the trunk's ATTEMPT_CAP |
+| A control under_small_04 ON 300122 (spatula) | 18391613 | 8 / 4 / 4 | 0.38 | 0.096 | sweep ran on every lift, hits 2 / 24, no refusal (as predicted) |
+
+- B: `ISPATIALGYM_WALL_VIS_SCREEN` DEFAULT ON (73e626b2, own commit; reach = world_vertical_01-05, the only subtask AlignmentWall registers).
+- The disembedding_10 N 4 arms on this trunk first ran with the ATTEMPT_CAP default: every START_DRAW attempt ended [time_cap] (cap 338 s =
+  5 x a median 67.6 s from before the start draw; the drawn start costs ~390 s per attempt) - 0 written in 4 attempts per arm, cancelled; the
+  A/B reruns with `ISPATIALGYM_ATTEMPT_CAP=0` in both arms (int2_7's conditions). The cap x start-draw interaction belongs to #45 (i7-stancememo).
+
+| A N 4 OFF disembedding_10 300018, `ATTEMPT_CAP=0` both arms | 18391614 | 22 / 1 / 1 | 2.49 | 2.49 | 300018 top_9 failed_grasp (lifted) -> unlifted retry ok |
+| A N 4 ON `LIFT_PAD_SWEEP=1` | 18391653 | 28 / 3 / 3 | 2.49 | 0.83 | refused 3 / 3 (hits 0 / 24): top_9, top_9~r180, top_2 - all first attempt ok |
+
+- The A arms sample identically (same rejections in the same order; the switch is executor-only); ON wrote 3 because its node ran the
+  same attempts faster (28 vs 22 in the 8930 s sample limit) - the sampling difference is backend speed, not the switch. Judged on the
+  switch's counter: it acted in 6 / 6 fork demos (recollect + N 4), every one a first-attempt success; OFF: 4 lifted fork demos = 1 [pause]
+  + 3 failed_grasp retries. 300019 diverged from int2_7 (goal_check place_unreachable at attempt 2 on the newer trunk), so top_2 came up once.
+- A: `ISPATIALGYM_LIFT_PAD_SWEEP` DEFAULT ON (13427662, own commit; reach: the fork and the spatula's top_2 / top_3 by the survey).
+- Still open: disembedding_10's sampling cost (START_DRAW ~390 s per attempt, 2.5 GPU-h for 1-3 instances) and the ATTEMPT_CAP x START_DRAW
+  interaction (every drawn-start attempt [time_cap] with both defaults on) belong to #45 (i7-stancememo); the pause-before-failed_grasp
+  ordering in `Motions.gripper` (60 + 5 still steps > the QA pause limit 50) is shared QA / executor behaviour, left as it is (owner's call).
+
+### r2: the gripper close wait vs the pause limit (lead decision #65, `ISPATIALGYM_GRIP_WAIT_NO_PAUSE`)
+
+- Two shared constants disagreed: `Motions.gripper` waits up to `gripper_steps` 60 (+ a 5-step hold) after a closing command (and up to 60
+  in the contact-hold wait), the QA pause rule fails a demo after 50 steps without motion. A closure that grips nothing therefore ended in a
+  hard [pause] - no retry - instead of the executor's `failed_grasp`, whose retry runs the recorded / unlifted grasp; whether it paused
+  depended only on whether any joint moved 3e-5 rad in the wait.
+- Count (CPU, scratch `classify_pause.py` on the demo hdf5: the gripper command reached its closing value <= 75 steps before the pause and
+  the arm commands stood still since): int2_* 5 pauses in 288 demos - 3 in the close wait (disembedding_10 x2, disembedding_01 x1 in the
+  contact-hold wait), 2 elsewhere (touching_04 pre-shape opening wait, under_large_01 push). All `$OFH/out`: 34 of 68 in the close wait
+  (under_small_01 13, under_small_04 5, disembedding_07 4, disembedding_10 4, disembedding_01 3, attachment_02 2, attachment_03 / inside_03 /
+  inside_04 1), 34 elsewhere (ontop_small_02 12, touching_04 8, touching_01 7, under_large_01 5, ...).
+- Fix 46ed7e5b: the close waits are emitted as settle steps (`_emit(settling=True)`, the path the hold / settle waits already take), which
+  neither the QA pause rule nor the monitors' stalled rule counts; the ramp, the opening waits and every other step count as before.
+  Recorded as `close_wait_exempt_steps` on the closure's `contact_hold` release event (84404e6f), else a `close_wait_exempt {steps, held}`
+  release event.
+
+Runs (trunk_46ed7e5b = A / B defaults on, svl titanrtx):
+
+| run | result | the switch |
+|---|---|---|
+| re-demo int2_7 disembedding_10 300019 / 300020 (`LIFT_PAD_SWEEP=0` to keep the lifted closure), 18393804 | 2 / 2 success | each lifted top_2 closure -> failed_grasp (no pause) -> unlifted retry ok |
+| re-demo int2_7 disembedding_01 300021, 18393806 | 0 / 1 | pause -> failed_grasp, the retry failed_grasp too (no pause) |
+| control re-demo int2_10 touching_04 320302 (pause was in the pre-shape opening wait), 18393807 | 0 / 1 plan_failed at place | grasp held; no pause |
+| control re-demo int2_7 under_large_01 300022 (pause was in the push), 18393808 | 1 / 1 | the push stall did not recur; fist close wait exempt 12 steps |
+| N 4 under_small_01 321000 OFF, 18393872 | 9 / 4 / 4, 0.19 GPU-h | - |
+| N 4 under_small_01 321000 ON, 18393886 | 9 / 4 / 3, 0.21 | 3 contact-hold waits exempt (all held); the failure: robot_wobble 1.01 deg (> 1.00) at step 300 of the transit, gripper still open - not in a wait |
+| N 4 control touching_01 300150 ON, 18393887 | 4 / 4 / 2, 0.27 | grasp waits held 4 / 4; failures at place (gripper_out_of_fov, plan_failed - both in its history), none in a wait |
+
+- `ISPATIALGYM_GRIP_WAIT_NO_PAUSE` DEFAULT ON (1762edd4, own commit): every close-wait pause re-demoed became a retried failed_grasp (2 / 3 then
+  succeeded); no failure in the N 4 / control runs falls inside an exempted wait. Handed to the integration agent.
+
 ### r3: the start draw's speed and a robust cap (lead decisions #45, #63, 2026-11-09)
 
 **Profile** (cProfile, disembedding_10, trunk_7dbb853e): one attempt took 331 s, of which the start draw took 285 s.
@@ -5372,6 +5770,66 @@ Every instance was written in both arms of every alias.
 - The attempts are identical: with the speed fix nothing is cut, so the rule never acted.
 
 disembedding_10 now loses its attempts to `target_placement` (empty F at the drawn position), not to the start draw.
+
+**Final A/B (root umb2, N 4, svl titanrtx):** OFF 60 att / 0 written / 0 ok, 5.07 GPU-h (carry legs failed 828); CENTRED 60 / 0 / 0, 5.88
+(782; 96 centred carries); CENTRED + WIDE 46 / 1 / 1, 3.39 GPU-h per success (140; 354 wide paths, 331 centred carries). umb2s (L2) 60 / 0 / 0.
+
+### Lead decision #42 (2026-11-08, owner away)
+
+**(1) f9f0829f - CARRY_CENTRED + CARRY_WIDE_PATH on for touching_large_02 only.** `generation.carry_centred` / `carry_wide_path` true in its
+customs entry; `iors_large._switch` reads the env var when it is set (so `=0` turns a switch off), else the alias's generation key, else
+off. A test pins touching_large_02 as the only customs entry setting them; other IORS large aliases reach the code with the keys absent.
+umb2 stays the umbrella root.
+
+**(2) The B blocker, `B: [pre-grasp, grasp] exact IK`** (gm_t02_wide_on, 106 failure lines, first try's reason): approach_untrackable 67,
+every one a self-collision of the robot's base_link with a gripper finger (2-4 mm) at every intermediate approach configuration - the tilted
+top grasps top_0 / top_10 (27-33 deg) at the deep-crouch B trunks (0.95, -0.9 / -1.2) and the stretched (1.75 / 2.0, 0): the floor umbrella
+close to the chassis, not the hall tree or the mirror; ik_joint_limit 33 (joint 2: reach at the floor); no solution 6. The floor map's
+approach check has no base_link x finger term. Fix: the ladder's next round - L3v (the gym shoe's L3 levels + the accepted slab_half_m 0.05,
+max_valid 12): 12 of 12 trials valid, tilts 14-35 deg incl. three low-tilt grasps (top_0 14, top_33 15, top_32 19); maps (floor r + l,
+interior r / l) on trunk_f9f0829f; staged `$OFH/v2maps_goalmaps_umb3` (copy of umb2, the L2v entry in `_superseded_ladder_r2`) by
+`umbrella_r3/chain3.sh`, which then runs touching_large_02 N 4 on the new defaults (gm_t02_r3, no env switch).
+
+**(3) Result.** The carry switches act from the customs (centred / wide used from attempt 0).
+
+| run (N 4, svl titanrtx) | root | att / written / ok | GPU-h per success | B exact-IK fails / att | goal passes |
+|---|---|---|---|---|---|
+| gm_t02_wide_on (switches by env, c2071b3e) | umb2 (6 grasps) | 46 / 1 / 1 | 3.39 | 2.4 | 2 |
+| gm_t02_r3 (new defaults, f9f0829f) | umb3 (12 grasps) | 58 / 1 / 1 | 6.38 | 3.5 | 4 |
+
+More grasps did not beat the B blocker: each extra tilted grasp adds failing (B, grasp) pairs (base_link x finger self-collisions
+62 -> 135) and raises the cost per attempt (exact IK 1260 / attempt). Three of r3's four goal passes died later: the lift's
+approach_untrackable (joint jump 0.22 rad at waypoint 0), the retreat's witness FK 7.8 mm > 2 mm (program check), an approach joint
+jump 0.21 rad. umb3 is not adopted; umb2 stays the umbrella root. Next: the narrowest B-stance fix (a base_link x finger term in the floor
+map's approach check, or no tilted top grasps at the deep-crouch trunks), not done here.
+
+### r3: disembedding_10's target_placement after the start-draw speed fix (lead decision #66, `ISPATIALGYM_DISEMB_POS_REDRAWS`)
+
+- After i7-stancememo's vectorized SupportTop (333 -> 85 s per attempt) disembedding_10 still wrote 2-4 of 4 in 40-43 attempts: 30-38
+  target_placement rejections per job (r3_new / r3c_rule0 / r3c_rule2).
+- Sub-reason (CPU, sample logs): ~90 % `[grasp_unreachable] empty feasible set F at the focus (8 yaws x 2 grasps)` - Phase 3's (yaw, grasp)
+  screen at the target's start position, the 2 grasps being the fork's top_2 / top_9 left by GRASP_TURN_FILTER; place_unreachable /
+  place_leg_collision / no_placement_stance a handful. Not the init -> manipulation leg, not the transit, not the place map.
+- Dependence on the drawn start: per work stance the drawn starts pass 3-9 % (r3_new 5 / 163, r3c 10 / 140, int2_7 6 / 69) vs 11-22 % from the
+  fixed start (i7tray_turn_on 4 / 36, turn_off 5 / 26, int1_1 5 / 23); per attempt the share lost is alike (75-88 % vs 71 %). The drawn start
+  costs ~70 s of the ~85 s attempt (fixed: 25 s median), and the split cone (generation.phase2_split_cone, default on) draws ONE start position
+  per attempt and tries only its 0-6 work stances - a position with an empty F throws the whole drawn start away.
+- Fix 7642b66f / 183810f4: `ISPATIALGYM_DISEMB_POS_REDRAWS=N` (default 0) - when every work stance of the drawn position fails
+  (target_placement), the position is redrawn without replacement from the drawn start's pool, up to N times, keeping the start; other
+  rejections pass through; no split cone = unchanged. Kit `pos_redraw.redrawn / passed / passed_after_k / exhausted`. (The accepted start
+  is then drawn uniformly rather than weighted by how many feasible positions it has.)
+
+A/B (trunk_183810f4, svl titanrtx, v2maps_int2, v2only N 4, memory off; =8 for on):
+
+| arm | job | att / written / ok | GPU-h | per success | counters |
+|---|---|---|---|---|---|
+| disembedding_10 300018 OFF | 18394779 | 40 / 4 / 3 | 0.92 | 0.307 | target_placement 30, no_stance 2, repeats_eval 2, place_unreachable 2; 1 demo plan_failed |
+| disembedding_10 300018 ON | 18394780 | 7 / 4 / 4 | 0.46 | 0.116 | pos_redraw redrawn 19, passed 3 (after 1 / 2 / 5+), exhausted 1; target_placement 1 |
+| control disembedding_02 349100 OFF | 18394782 | 13 / 4 / 4 | 0.45 | 0.113 | approach_untrackable 6, target_placement 3 |
+| control disembedding_02 349100 ON | 18395101 | 5 / 4 / 4 | 0.39 | 0.098 | redrawn 6, passed 3; approach_untrackable 1 (the first on job 18394781 died at Kit startup on svl10, infra) |
+
+- `ISPATIALGYM_DISEMB_POS_REDRAWS` DEFAULT 8 (f1d75450, own commit; reach: every disembedding alias with the split cone). Handed to the
+  integration agent.
 
 ## Limitations / not done
 

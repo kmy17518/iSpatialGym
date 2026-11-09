@@ -338,6 +338,19 @@ def wall_brace_map_on() -> bool:
     return os.environ.get("ISPATIALGYM_WALL_BRACE_MAP", "1") == "1"
 
 
+def wall_vis_screen_draws() -> int:
+    """i7-yield2 (2026-11-08, world_vertical_04: 49 of 51 attempts rejected [too_few_visible] at settle_validate, the init view of a bare
+    wall shows only the floor, the wall and the target): the draw (spot, delta, init stance) is screened at once with the settle check's
+    own rule (:meth:`AlignmentWall.visible_objects` from the init camera: ``min_visible_objects`` objects of ``min_object_pixels``) and
+    redrawn within the attempt, at most this many draws; the settle check stays. DEFAULT ON since 2026-11-08 (i7-yield2 A/B, owner mandate
+    "speed up / make yield better the slow low yield aliases": world_vertical_04 51/2/2 0.277 -> 5/4/4 0.080 GPU-h per success, _05 33/4/4
+    0.089 -> 10/4/4 0.071, control _01 every screen passed at the first draw); ``ISPATIALGYM_WALL_VIS_SCREEN=0`` turns it off,
+    ``ISPATIALGYM_WALL_VIS_SCREEN_DRAWS`` (default 40) bounds the draws."""
+    if os.environ.get("ISPATIALGYM_WALL_VIS_SCREEN", "1") != "1":
+        return 0
+    return max(1, int(os.environ.get("ISPATIALGYM_WALL_VIS_SCREEN_DRAWS", "40")))
+
+
 #: the wall_brace map's height tolerance (m: the hinge height above the floor vs the map's)
 WALL_BRACE_MAP_H_TOL_M = 0.03
 
@@ -1026,22 +1039,41 @@ class AlignmentWall(SamplerV2, WallGeometry):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         tname = self.tname
         weights = np.array([float(s["weight"]) for s in self.spots])
-        spot = self.spots[int(rng.choice(len(self.spots), p=weights / weights.sum()))]
-        lo, hi = self.deviation_range()
-        delta = float(rng.uniform(lo, hi)) * (1.0 if rng.random() < 0.5 else -1.0)
-        geo = self.contacts_for(spot, delta)
-        pose_t = geo["pose_tilted"]
-        # the target hangs at its init pose for every check of this attempt (hinge installed after apply)
-        self.target.set_position_orientation(*pose_t)
-        self.target.keep_still()
-        self.kit.sync_world()
-        face = self.face_of(spot)
         gen_p0 = dict(self.param("prompt0") or {})
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 35.0)))
         d_min, d_max = float(gen_p0.get("d_min_m", 0.5)), float(gen_p0.get("d_max_m", 1.5))
-        hull_t = geo["hull_tilted"]
-        init = P0.phase1_init_pose(self, face, beta_max, d_min, d_max, lambda: (hull_t, hull_t.mean(dim=0)), rng)
-        init.name = "init"
+        draws = wall_vis_screen_draws()
+        seen: List[str] = []
+        screen_facts: Dict[str, Any] = {}
+        for k in range(max(1, draws)):
+            spot = self.spots[int(rng.choice(len(self.spots), p=weights / weights.sum()))]
+            lo, hi = self.deviation_range()
+            delta = float(rng.uniform(lo, hi)) * (1.0 if rng.random() < 0.5 else -1.0)
+            geo = self.contacts_for(spot, delta)
+            pose_t = geo["pose_tilted"]
+            # the target hangs at its init pose for every check of this attempt (hinge installed after apply)
+            self.target.set_position_orientation(*pose_t)
+            self.target.keep_still()
+            self.kit.sync_world()
+            face = self.face_of(spot)
+            hull_t = geo["hull_tilted"]
+            init = P0.phase1_init_pose(self, face, beta_max, d_min, d_max, lambda: (hull_t, hull_t.mean(dim=0)), rng)
+            init.name = "init"
+            if not draws:
+                break
+            # i7-yield2: the settle check's visibility rule at the drawn init view, before the Phase-2 search
+            visible = self.visible_at(init)
+            if len(visible) >= int(self.param("min_visible_objects", 5)):
+                self._wcount("vis_screen.passed")
+                self._wcount(f"vis_screen.draws_{min(k + 1, 10)}{'+' if k + 1 >= 10 else ''}")
+                screen_facts = {"draws": k + 1, "visible": visible}
+                break
+            self._wcount("vis_screen.redrawn")
+            seen.append(f"spot {spot['id']}: {len(visible)}")
+        else:
+            self._wcount("vis_screen.exhausted")
+            raise Reject("too_few_visible", f"vis screen: {draws} draws, none with {self.param('min_visible_objects', 5)} objects visible at the init view "
+                                            f"(spot: count {seen[-6:]})")
         self.sidecar.add_stance(init)
         stats: Dict[str, Any] = {}
         survivors = self.screen(self.step1[spot["id"]], geo, stats)
@@ -1114,6 +1146,8 @@ class AlignmentWall(SamplerV2, WallGeometry):
                              if wmap_acted else {}),
                           "hang": {"back_off_wall_m": self.wall_offset(spot), "wall_protrusion_m": spot.get("wall_protrusion_m"),
                                    "back_from_com_m": self.depth_extents()[0], "thickness_m": self.depth_extents()[1]}})
+        if screen_facts:
+            d.summary["vis_screen"] = screen_facts
         self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), deviation_deg=math.degrees(delta),
                               push_distance_cm=100 * geo["push"]["distance"])
         self._spot = spot
@@ -1373,15 +1407,38 @@ class AlignmentWall(SamplerV2, WallGeometry):
         drift = G.quat_angle(q, draft.object_poses[tname][1])
         if drift > float(self.param("hinge_drift_max_rad", 0.03)):
             raise Reject("hinge_drift", f"object rotated {drift:.3f} rad on the hinge while settling")
-        px = self.world.visible_pixels(exclude_structure=False)
-        n_px = int(self.param("min_object_pixels", 200))
-        visible = [n for n, c in px.items() if c >= n_px and n != self.robot.name]
+        visible = self.visible_objects()
         if len(visible) < int(self.param("min_visible_objects", 5)):
+            if wall_vis_screen_draws():
+                self._wcount("vis_screen.settle_rejected")  # the draw's screen passed, the settled view did not
             raise Reject("too_few_visible", f"{len(visible)} objects visible: {visible}")
         draft.summary["visible_objects"] = visible
         cam = self.camera_pose_at(self.sidecar.stance("init"))
         if not self.frustum_ok(cam, self.hull_at((p.float(), q.float())), 0.05):
             raise Reject("not_in_frame", "the settled tilted target is not fully in the init image (5 %)")
+
+    def visible_objects(self) -> List[str]:
+        """The objects (structure included, the robot excluded) with at least ``min_object_pixels`` in the head camera's view now."""
+        px = self.world.visible_pixels(exclude_structure=False)
+        n_px = int(self.param("min_object_pixels", 200))
+        return [n for n, c in px.items() if c >= n_px and n != self.robot.name]
+
+    def visible_at(self, init: Stance) -> List[str]:
+        """:meth:`visible_objects` with the robot at the ``init`` stance (as ``RobotKit.apply`` places it for the settle check), the
+        robot then put back where it stood; the cuRobo world is not re-synced (the robot is no obstacle of it)."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        kit = self.kit
+        q0 = self.robot.get_joint_positions().clone()
+        b0 = kit.world_base_pose2d()
+        q = G.t(self.stance_q(init)).clone()
+        q[[kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
+        try:
+            self.world.teleport_robot(tuple(float(v) for v in init.base_pose2d), q)
+            return self.visible_objects()
+        finally:
+            q0[[kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
+            self.world.teleport_robot(b0, q0)
 
     def refine_targets_from_goal(self, draft: Draft):
         pass  # orientation-only target; the level orientation is exact by construction

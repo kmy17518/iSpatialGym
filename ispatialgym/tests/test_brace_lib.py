@@ -482,11 +482,11 @@ def test_the_brace_load_diagnostic_switches_are_off_by_default(monkeypatch):
     """i7-brace 5w.3 (owner 20261108h: count only): unset = today's load; a correction implies the record."""
     from ispatialgym.grasping import validate_contacts as VC
 
-    for k in ("DIAG", "WAKE", "MEASURED"):
+    for k in ("DIAG", "WAKE", "MEASURED", "GEOM"):
         monkeypatch.delenv(f"ISPATIALGYM_GC_BRACE_LOAD_{k}", raising=False)
-    assert VC.brace_load_switches() == {"diag": False, "wake": False, "measured": False}
+    assert VC.brace_load_switches() == {"diag": False, "wake": False, "measured": False, "geom": False}
     monkeypatch.setenv("ISPATIALGYM_GC_BRACE_LOAD_WAKE", "1")
-    assert VC.brace_load_switches() == {"diag": True, "wake": True, "measured": False}
+    assert VC.brace_load_switches() == {"diag": True, "wake": True, "measured": False, "geom": False}
 
 
 def test_the_measured_brace_load_stops_press_after_the_measured_contact():
@@ -504,3 +504,173 @@ def test_the_measured_brace_load_stops_press_after_the_measured_contact():
     T = np.eye(4)
     assert np.allclose(VC.brace_load_point({"load": {"point_object": [0.1, 0.0, 0.0]}}, T), [0.1, 0.0, 0.0])
     assert np.allclose(VC.brace_load_point({"load": {}}, T), [0.0, 0.0, 0.0])
+
+
+# ---- i7-brace 5w.3 FIX (lead decision, owner away): the axial load geometry / hold judge behind ISPATIALGYM_GC_BRACE_LOAD_GEOM (default off)
+
+
+def _box_hull(lx=0.30, ly=0.10, lz=0.02):
+    import itertools
+
+    return np.array([[sx * lx / 2, sy * ly / 2, sz * lz / 2] for sx, sy, sz in itertools.product((-1, 1), repeat=3)], dtype=float)
+
+
+def _axial_entry(po, d, spin, opposite=False):
+    return {"family": "axial_brace", "load": {"frame": "rule", "direction": list(d), "point_object": list(po)},
+            "goal": {"spin": spin, "end_sign": 1.0, "opposite_end": opposite}}
+
+
+def _Tyaw(yaw, z=0.0):
+    T = np.eye(4)
+    c, s = math.cos(yaw), math.sin(yaw)
+    T[:3, :3] = [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]
+    T[2, 3] = z
+    return T
+
+
+def test_the_load_geometry_switch_is_off_by_default(monkeypatch):
+    from ispatialgym.grasping import validate_contacts as VC
+
+    for k in ("DIAG", "WAKE", "MEASURED", "GEOM"):
+        monkeypatch.delenv(f"ISPATIALGYM_GC_BRACE_LOAD_{k}", raising=False)
+    assert VC.brace_load_switches() == {"diag": False, "wake": False, "measured": False, "geom": False}
+    monkeypatch.setenv("ISPATIALGYM_GC_BRACE_LOAD_GEOM", "1")
+    assert VC.brace_load_switches() == {"diag": True, "wake": False, "measured": False, "geom": True}
+
+
+def test_the_pusher_box_turns_its_thickness_along_the_load():
+    from ispatialgym.grasping import validate_contacts as VC
+    from ispatialgym.grasping import schema as SC
+
+    assert np.allclose(VC.pusher_quat_square_to(np.array([0.0, 1.0, 0.0])), [0.0, 0.0, 0.0, 1.0])
+    for d in ([1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.7071, -0.7071, 0.0]):
+        R = SC.quat_to_mat(VC.pusher_quat_square_to(np.array(d)))
+        assert np.allclose(np.asarray(R) @ [0.0, 1.0, 0.0], np.asarray(d) / np.linalg.norm(d), atol=1e-4)  # local y (the thickness) along d
+
+
+def test_the_axial_load_meets_the_pushed_end_square_to_its_arc():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull()
+    # the +x end (13 cm out) turned +z: it arrives along +y; the pusher behind its -y face, square to the arc
+    e = _axial_entry([0.13, 0.0, 0.0], [0.0, 1.0, 0.0], 1.0)
+    path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["spin_agrees_d"] and f["tangent_vs_load_dir"] > 0.99 and not f["opposite"]
+    assert abs(f["face_along_m"] + 0.05) < 1e-6  # the -y face of the pushed end, not the hull's global extreme
+    from ispatialgym.grasping import schema as SC
+
+    half = 0.5 * cfg.brace_pusher_size_m[2]
+    front0 = path[0] + SC.quat_to_mat(quats[0])[:, 2] * half  # the first step: the box's front face (local z = the travel) gap before the material
+    assert abs(math.hypot(front0[0], front0[1]) - math.hypot(0.13, 0.05)) < 1e-3
+    assert abs(math.atan2(front0[1], front0[0]) - (math.atan2(-0.05, 0.13) + f["arc_rad"][0])) < 1e-4
+    assert abs(f["arc_rad"][0] * f["r_face_m"] + cfg.brace_pusher_gap_m) < 1e-5
+    # carried along the arc about the hinge: every centre's front face at the face radius, the box turned with the tangent
+    for c, q in zip(path, quats):
+        R = SC.quat_to_mat(q)
+        assert np.allclose(R[:, 0], [0.0, 0.0, 1.0], atol=1e-6)  # 8 cm upright, 3 cm across, 5 cm along the travel
+        fr = c + R[:, 2] * half
+        assert abs(math.hypot(fr[0], fr[1]) - f["r_face_m"]) < 1e-5
+    assert f["axis"] == [0.0, 0.0, 1.0] and f["phi_press_rad"] == round(cfg.brace_press_m / 0.13, 6)
+    # the box's bottom above the target's bottom
+    assert path[0][2] - 0.5 * cfg.brace_pusher_size_m[1] > pts[:, 2].min()
+
+
+def test_the_axial_load_pushes_the_pushed_end_of_an_opposite_entry_and_turns_with_the_yaw_slot():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull()
+    # opposite entry: the brace at the far (-x) end, turned +z, so the far end arrives along -y; the PUSHED end is the +x end (moves +y)
+    e = _axial_entry([-0.13, 0.0, 0.0], [0.0, -1.0, 0.0], 1.0, opposite=True)
+    _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["opposite"] and f["pushed_point"][:2] == [0.13, 0.0] and f["braced_point"][:2] == [-0.13, 0.0]
+    assert np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4) and f["axis"] == [0.0, 0.0, 1.0]
+    # the magazine case (5w.3: yaw 90, the load along -x - the old unturned box met it with its 8 cm side): the tangent along -x, the box turned
+    e = _axial_entry([0.13, 0.0, 0.0], [-1.0, 0.0, 0.0], 1.0)
+    path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.5 * math.pi), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert np.allclose(f["tangent"], [-1.0, 0.0, 0.0], atol=1e-4) and abs(f["face_along_m"] + 0.05) < 1e-6
+    from ispatialgym.grasping import schema as SC
+
+    assert np.allclose(SC.quat_to_mat(quats[0])[:, 2], [-1.0, 0.0, 0.0], atol=0.1)  # the box's travel axis along -x (the old box: identity)
+
+
+def test_an_axial_load_with_no_material_on_its_line_raises():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    with pytest.raises(ValueError):
+        VC.axial_pusher_path(_axial_entry([0.40, 0.30, 0.0], [-0.6, 0.8, 0.0], 1.0), _Tyaw(0.0), _box_hull(), (0.0, 0.0), VC.ContactValidateConfig(), 1.0 / 30.0)
+
+
+def test_the_axial_judge_reads_the_turn_and_never_passes_a_load_that_missed():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    T0, E = _Tyaw(0.0, 0.8), np.eye(4)
+    load = {"axis": [0.0, 0.0, 1.0], "r_braced_m": 0.13, "r_face_m": 0.139}
+    run = {"completed": True}
+    # the load never turned the target (the pusher missed / pushed along the radius): not_loaded, never valid - whatever the fingers say
+    j = VC.judge_axial_brace({}, T0, T0, E, E, cfg, run, dict(load, turn_max_rad=0.0), finger_N=5.0)
+    assert j["verdict"] == "invalid" and "not_loaded" in j["reasons"]
+    j = VC.judge_axial_brace({}, T0, _Tyaw(0.002, 0.8), E, E, cfg, run, dict(load, turn_max_rad=0.002), finger_N=0.0)
+    assert j["verdict"] == "invalid" and "not_loaded" in j["reasons"]  # 0.28 mm at the face < 1 mm
+    # the hinge pins the root: the turn past the hold is not_held although the root never moved
+    T1 = _Tyaw(0.2, 0.8)
+    j = VC.judge_axial_brace({}, T0, T1, E, E, cfg, run, dict(load, turn_max_rad=0.2), finger_N=5.0)
+    assert j["measures"]["root_moved_m"] == 0.0 and "not_held" in j["reasons"] and j["verdict"] == "invalid"
+    # a held load: turned 4 mm at the braced end, the fingers pressed
+    T1 = _Tyaw(0.03, 0.8)
+    j = VC.judge_axial_brace({}, T0, T1, E, E, cfg, run, dict(load, turn_max_rad=0.03), finger_N=5.0)
+    assert j["verdict"] == "valid", j
+    assert abs(j["measures"]["braced_point_moved_m"] - 0.0039) < 1e-4
+    # turned past an untouched brace
+    j = VC.judge_axial_brace({}, T0, T1, E, E, cfg, run, dict(load, turn_max_rad=0.03), finger_N=0.1)
+    assert j["reasons"] == ["not_braced"]
+    # the turn is signed: a back-settle is not a hold failure, and the largest turn decides loaded
+    j = VC.judge_axial_brace({}, T0, _Tyaw(-0.01, 0.8), E, E, cfg, run, dict(load, turn_max_rad=0.03), finger_N=5.0)
+    assert j["verdict"] == "valid" and j["measures"]["turn_rad"] < 0
+
+
+def test_a_touching_load_that_never_moved_the_partner_is_not_loaded():
+    from ispatialgym.grasping import validate_contacts as VC
+
+    ok = {"verdict": "valid", "reasons": [], "measures": {"moved_along_load_m": 0.0002}}
+    j = VC.brace_load_reached(ok, False, 3.0)
+    assert j["verdict"] == "invalid" and j["reasons"] == ["not_loaded"] and j["measures"]["finger_obj_N"] == 3.0
+    assert ok["reasons"] == [] and ok["verdict"] == "valid"  # the input untouched
+    j = VC.brace_load_reached(ok, True, 3.0)
+    assert j["verdict"] == "valid" and j["reasons"] == []
+
+
+def test_the_pushed_end_lies_on_the_long_axis_through_the_hinge():
+    """F v1 (jhaltj s1): the library's end point is 6.8 cm off the centre line (its builder's vertex-mean centre); the line from it along
+    its own tangent left the book through the END face and the arc slid along it (contact at 0.30 rad, never turned). On the axis the
+    pusher meets the long side beside the end, square to the arriving direction."""
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull(0.305, 0.219, 0.008)
+    e = _axial_entry([0.1223, 0.0676, 0.0], [0.0, 1.0, 0.0], 1.0)
+    _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["pushed_point"][:2] == [0.1223, 0.0] and np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4)
+    assert abs(f["face_along_m"] + 0.1095) < 1e-6 and f["tangent_vs_load_dir"] > 0.999  # the long side y = -0.1095
+    e = _axial_entry([-0.1223, 0.0676, 0.0], [0.0, -1.0, 0.0], 1.0, opposite=True)
+    _p, _q, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (0.0, 0.0), cfg, 1.0 / 30.0)
+    assert f["pushed_point"][:2] == [0.1223, 0.0] and np.allclose(f["tangent"], [0.0, 1.0, 0.0], atol=1e-4)
+
+
+def test_the_axial_pusher_face_is_narrow_enough_not_to_span_a_short_lever():
+    """F v2 (tablespoon tqqwys, pushed end 2.5-3.8 cm from the hinge): an 8 cm wide face spanned the hinge (no torque, 29 / 48 never
+    loaded); the face is 3 cm across, all on the pushed end's side."""
+    from ispatialgym.grasping import validate_contacts as VC
+
+    cfg = VC.ContactValidateConfig()
+    pts = _box_hull(0.18, 0.06, 0.02)
+    e = _axial_entry([-0.032, 0.0, 0.0], [0.0, -1.0, 0.0], 1.0)
+    path, quats, f = VC.axial_pusher_path(e, _Tyaw(0.0), pts, (-0.007, 0.0), cfg, 1.0 / 30.0)
+    from ispatialgym.grasping import schema as SC
+
+    assert f["pushed_point"][:2] == [-0.032, 0.0]
+    H = np.array([-0.007, 0.0, path[0][2]])
+    for c, q in zip(path, quats):  # along the whole arc the hinge lies outside the face's 3 cm across
+        assert abs(float((H - c) @ SC.quat_to_mat(q)[:, 1])) > 0.5 * cfg.brace_pusher_size_m[0]

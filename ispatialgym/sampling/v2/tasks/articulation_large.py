@@ -29,6 +29,7 @@ the moving link's AABB against the base footprint; Phase 1 step 4 / arms-exclude
 
 from __future__ import annotations
 
+import copy
 import csv
 import json
 import logging
@@ -75,6 +76,59 @@ PINCH_WIDTH_RANGE = (0.003, 0.080)  # handle-selection pinch width (m): 3-80 mm 
 WAYPOINT_FRACTIONS = (0.25, 0.5, 0.75, 1.0)
 #: base footprint radius of the planar leaf-vs-base stand-in check (R1Pro chassis half-diagonal)
 BASE_RADIUS = 0.33
+#: i7-artlarge (ISPATIALGYM_ARTLARGE_INIT_DRAW): bearing step of the init-set lattice (deg) and the most other init candidates step 6
+#: tries after the drawn one
+INIT_SET_BETA_STEP_DEG = 5.0
+INIT_ALT_MAX = 12
+
+
+def init_draw_on() -> bool:
+    """i7-artlarge (2026-11-08, owner mandate "fix ... the slow low yield aliases"): ``ISPATIALGYM_ARTLARGE_INIT_DRAW`` draws the
+    init (start) stance of the large articulation sampler from the whole Phase-1 feasible set (every bearing of the 5 deg lattice in
+    +-beta_max, every d of the scan, each with Phase 1's own checks: free floor in the task rooms, the whole target in frame, body and
+    trunk sweep collision-free) instead of the NEAREST feasible d on one random bearing, the starts near an eval instance's start
+    (REPEAT_POS_M / REPEAT_ANG_DEG) last; and step 6 tries up to INIT_ALT_MAX other candidates of that order when the drawn start
+    has no path / transition to the manipulation stance (the start does not enter steps 1-5 or the follow). DEFAULT ON since the A/B
+    (lead #44 under the owner's mandate; $OFH/artlarge_20261108): unset = on; ``ISPATIALGYM_ARTLARGE_INIT_DRAW=0`` = the nearest-d draw."""
+    return os.environ.get("ISPATIALGYM_ARTLARGE_INIT_DRAW", "1") != "0"
+
+
+def alt_skip_on() -> bool:
+    """i7-artlarge r2 (lead #51, a speed fix): ``ISPATIALGYM_ARTLARGE_ALT_SKIP`` - step 6's other init candidates
+    (:meth:`ArticulationLarge._connect_init`) skip every start whose trunk differs from the manipulation stance's once a start of such a
+    trunk was rejected ``no_transition``: :func:`prompt0.connect` raises it only when every transition stand-off fails the drive-back
+    floor test, the trunk sweep or the drive-in, all at the manipulation stance with the arriving arms, none of which reads the start
+    (the start's trunk only decides whether the sweep runs at all). Kit counter ``artlarge_init.alt_skipped_no_transition``. DEFAULT ON
+    since the r2 A/B (identical instances and demos, 12 connect tries saved on open_large_03): ``=0`` tries every alternative."""
+    return os.environ.get("ISPATIALGYM_ARTLARGE_ALT_SKIP", "1") != "0"
+
+
+def same_trunk(a: Stance, b: Stance) -> bool:
+    """:func:`prompt0.connect`'s ``same_trunk``: the two stances' (translate, tilt) agree within 1e-6."""
+    return abs(float(a.translate) - float(b.translate)) < 1e-6 and abs(float(a.tilt) - float(b.tilt)) < 1e-6
+
+
+def start_near(pose2d: Sequence[float], starts: Sequence[Sequence[float]], pos_m: float = 0.25, ang_deg: float = 15.0) -> bool:
+    """``pose2d`` (x, y, yaw) is within ``pos_m`` and ``ang_deg`` of one of ``starts`` (the repeat rule's start-base half)."""
+    x, y, yaw = (float(v) for v in pose2d[:3])
+    for s in starts:
+        if math.hypot(x - float(s[0]), y - float(s[1])) > pos_m:
+            continue
+        gap = abs(math.degrees((yaw - float(s[2]) + math.pi) % (2.0 * math.pi) - math.pi))
+        if gap <= ang_deg:
+            return True
+    return False
+
+
+def order_init_candidates(poses: Sequence[Sequence[float]], eval_starts: Sequence[Sequence[float]], rng: np.random.Generator,
+                          pos_m: float = 0.25, ang_deg: float = 15.0) -> Tuple[List[int], int]:
+    """The draw order of the init candidates ``poses`` (indices): the ones away from every eval start in random order, then the ones near
+    an eval start (:func:`start_near`) in random order; and how many are near."""
+    far = [i for i, p in enumerate(poses) if not start_near(p, eval_starts, pos_m, ang_deg)]
+    near = [i for i, p in enumerate(poses) if start_near(p, eval_starts, pos_m, ang_deg)]
+    far = [far[int(k)] for k in rng.permutation(len(far))] if far else []
+    near = [near[int(k)] for k in rng.permutation(len(near))] if near else []
+    return far + near, len(near)
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -772,6 +826,11 @@ class ArticulationLarge(SamplerV2):
 
     #: ``generation.close_by_push`` options when the joint qualifies (:func:`close_by_push_applies`), else None
     close_by_push_cfg: Optional[Dict[str, float]] = None
+    #: i7-artlarge (ISPATIALGYM_ARTLARGE_INIT_DRAW): the init stance step 6 connected (the drawn one unless an alternative took over), the
+    #: other init candidates in draw order, and the Phase-1 feasible init set per q_init
+    _init_used: Optional[Stance] = None
+    _init_alts: Sequence[Stance] = ()
+    _init_sets: Optional[Dict[Any, List[Stance]]] = None
 
     def __init__(self, ctx):
         super().__init__(ctx)
@@ -1301,8 +1360,12 @@ class ArticulationLarge(SamplerV2):
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 20.0)))
         d_min, d_max = float(gen_p0.get("d_min_m", 0.5)), float(gen_p0.get("d_max_m", 2.5))
         init_tilts = [float(v) for v in (gen_p0.get("init_tilts") or [0.0])]  # a lean forward for a low, near init view (the open dishwasher door)
-        init = P0.phase1_init_pose(self, self.face_view, beta_max, d_min, d_max, self.target_extent, rng, tilts=init_tilts)
+        self._init_alts = []
+        init = self._draw_init_from_set(q_init, beta_max, d_min, d_max, init_tilts, rng) if init_draw_on() else None
+        if init is None:
+            init = P0.phase1_init_pose(self, self.face_view, beta_max, d_min, d_max, self.target_extent, rng, tilts=init_tilts)
         init.name = "init"
+        self._init_used = init
         self.sidecar.add_stance(init)
         # Phase 2: contact set = the h(q_init) grasp of the handle arm — one Phase 2 per grasp offset along a bar handle
         # (bar_offsets: 0, ±0.15, ±0.25 m within the bar), the survivors pooled with their offset
@@ -1418,7 +1481,7 @@ class ArticulationLarge(SamplerV2):
                     return False, f"{e.reason}: {str(e)[:120]}"
                 d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": q_init, "q_goal": q_goal_s, "required_fractions": required,
                                   "passive_from": pf, "arm": self.arm, "follow_mode": self.mode, "door_class": self.door_class, "hinge_side": self.hinge_side,
-                                  "pinch_sign": sign, "phase2": stats, "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
+                                  "pinch_sign": sign, "phase2": stats, "init_stance": P0.summarize_stance(self._init_used or init), "manipulation_stance": P0.summarize_stance(manip),
                                   **reach_info})
                 solved["draft"] = d
                 return True, ""
@@ -1440,6 +1503,148 @@ class ArticulationLarge(SamplerV2):
             if not any(reason_of(x) == reason_of(e) for x in distinct):
                 distinct.append(e)
         raise Reject("handle_unreachable", f"{len(survivors)} Phase-2 survivors, none passes step 5 / base-follow / step 6 ({len(errors)} errors): " + " | ".join(distinct[:6]))
+
+    # ------------------------------------------------------------------ i7-artlarge: the init (start) stance from the Phase-1 feasible set
+
+    def _eval_starts(self) -> List[Tuple[float, float, float]]:
+        """The start bases (x, y, yaw) of the eval instances the train run's repeat filter compares (none outside a train run)."""
+        out: List[Tuple[float, float, float]] = []
+        for rec in getattr(self.instance_filter, "pool", None) or []:
+            for p in getattr(rec, "start", None) or []:
+                if getattr(p, "name", None) == "start_base" and p.yaw is not None and len(p.p) >= 2:
+                    out.append((float(p.p[0]), float(p.p[1]), float(p.yaw)))
+        return out
+
+    def _init_set(self, q_init: float, beta_max: float, d_min: float, d_max: float, tilts: Sequence[float]) -> List[Stance]:
+        """Every Phase-1 feasible init stance on the lattice bearings (INIT_SET_BETA_STEP_DEG in +-``beta_max``) x the d scan, each judged by
+        :func:`prompt0.phase1_scan`'s checks in its order (free floor in the task rooms, the whole target in frame at a translate / tilt,
+        body collision-free, trunk sweep free; t* = :func:`prompt0.phase1_choice`) with the target at ``q_init`` (the caller posed it).
+        Memoized per (q_init, ranges, tilts): the scene is static between attempts. One log line with the per-stage counts."""
+        key = (round(float(q_init), 4), round(beta_max, 4), round(d_min, 3), round(d_max, 3), tuple(round(float(t), 3) for t in tilts))
+        if self._init_sets is None:
+            self._init_sets = {}
+        if key in self._init_sets:
+            return self._init_sets[key]
+        face = self.face_view
+        corners, centre = self.target_extent()
+        corners = P0._t(corners).reshape(-1, 3)
+        n_b = int(math.floor(2.0 * math.degrees(beta_max) / INIT_SET_BETA_STEP_DEG + 1e-9))
+        betas = [math.radians(-math.degrees(beta_max) + k * INIT_SET_BETA_STEP_DEG) for k in range(n_b + 1)] if beta_max > 0 else [0.0]
+        stats = {"positions": 0, "base_ok": 0, "in_frame": 0, "body_free": 0, "sweep_free": 0}
+        cells: List[Tuple[float, float, List[Stance]]] = []
+        for beta in betas:
+            for d in P0.d_scan(d_min, d_max):
+                stats["positions"] += 1
+                x, y, _ = P0.approach_ray_base(face, beta, d)
+                if not P0.base_ok(self, (x, y)):
+                    continue
+                stats["base_ok"] += 1
+                cells.append((beta, d, [P0.ray_stance(face, beta, d, t, float(tilt), "init") for t in P0.TRANSLATES for tilt in tilts]))
+        flat = [st for _, _, sts in cells for st in sts]
+        cams = P0.camera_poses(self, flat)
+        seen_flat = [(st, cam) for st, cam in zip(flat, cams) if P0.in_frame(self, cam, corners, P0.IN_FRAME_MARGIN)]
+        seen_ids = {id(st) for st, _ in seen_flat}
+        free = P0.body_free(self, [st for st, _ in seen_flat]) if seen_flat else th.zeros(0, dtype=th.bool)
+        free_ids = {id(st) for (st, _), f in zip(seen_flat, free.tolist()) if f}
+        cam_of = {id(st): cam for st, cam in seen_flat}
+        kept: List[Tuple[float, float, List[Stance]]] = []
+        for beta, d, sts in cells:
+            seen = [st for st in sts if id(st) in seen_ids]
+            if not seen:
+                continue
+            stats["in_frame"] += 1
+            ok = [st for st in seen if id(st) in free_ids]
+            if not ok:
+                continue
+            stats["body_free"] += 1
+            kept.append((beta, d, ok))
+        out: List[Stance] = []
+        if kept:
+            sweeps = [Stance("sweep", tuple(sts[0].base_pose2d), float(t), 0.0) for _, _, sts in kept for t in P0.SWEEP_TRANSLATES]
+            sweep_free = P0.body_free(self, sweeps, arms_excluded=True).reshape(len(kept), len(P0.SWEEP_TRANSLATES)).all(dim=1).tolist()
+            for (beta, d, ok), sf in zip(kept, sweep_free):
+                if not sf:
+                    continue
+                stats["sweep_free"] += 1
+                t_star = P0.phase1_choice([(st.translate, P0.axis_angle(self, cam_of[id(st)], centre)) for st in ok])
+                st = next(st for st in ok if abs(st.translate - t_star) < 1e-9)
+                st.extras["axis_angle_deg"] = math.degrees(P0.axis_angle(self, cam_of[id(st)], centre))
+                st.extras["target_centre"] = [round(float(v), 4) for v in P0._t(centre).tolist()]
+                st.arms = "untucked"
+                out.append(st)
+        self._init_sets[key] = out
+        xy = [st.base_pose2d for st in out]
+        log.info("%s: ARTLARGE_INIT_DRAW: init set at q_init %.3f: %d feasible of %s (bearings %d x d %.2f-%.2f)%s", self.gp.variant, q_init, len(out), stats,
+                 len(betas), d_min, d_max,
+                 "" if not xy else f"; x {min(p[0] for p in xy):.2f}..{max(p[0] for p in xy):.2f}, y {min(p[1] for p in xy):.2f}..{max(p[1] for p in xy):.2f}, "
+                 f"cells (bearing deg, d) {[(round(st.extras['bearing_deg']), round(st.stand_off, 2)) for st in out][:160]}")
+        return out
+
+    def _draw_init_from_set(self, q_init: float, beta_max: float, d_min: float, d_max: float, tilts: Sequence[float],
+                            rng: np.random.Generator) -> Optional[Stance]:
+        """ARTLARGE_INIT_DRAW: the attempt's init = the first of the feasible set in :func:`order_init_candidates` order (away from the
+        eval starts first); the next INIT_ALT_MAX kept for step 6 (:meth:`_connect_init`). None when the set is empty (today's draw then)."""
+        from ispatialgym.sampling.instance_separation import REPEAT_ANG_DEG, REPEAT_POS_M
+        from ispatialgym.sampling.v2.core import _kit_count
+
+        cands = self._init_set(q_init, beta_max, d_min, d_max, tilts)
+        if not cands:
+            _kit_count(self, "artlarge_init.empty_set")
+            return None
+        order, n_near = order_init_candidates([st.base_pose2d for st in cands], self._eval_starts(), rng, REPEAT_POS_M, REPEAT_ANG_DEG)
+        picked = [copy.deepcopy(cands[i]) for i in order[:INIT_ALT_MAX + 1]]
+        for st in picked:
+            st.name = "init"
+        near_first = n_near == len(cands)
+        _kit_count(self, "artlarge_init.drawn")
+        _kit_count(self, "artlarge_init.drawn_near_eval" if near_first else "artlarge_init.drawn_away")
+        log.info("%s: ARTLARGE_INIT_DRAW: init drawn %s (bearing %.0f deg, d %.2f, trunk %s) from %d feasible (%d near an eval start); %d alternatives",
+                 self.gp.variant, [round(float(v), 3) for v in picked[0].base_pose2d], picked[0].extras.get("bearing_deg", 0.0), picked[0].stand_off,
+                 [picked[0].translate, picked[0].tilt], len(cands), n_near, len(picked) - 1)
+        self._init_alts = picked[1:]
+        return picked[0]
+
+    def _connect_init(self, init: Stance, manip: Stance, path_max_m: float) -> Stance:
+        """Step 6 (:func:`prompt0.connect`) from ``init``; under ARTLARGE_INIT_DRAW, when it rejects with a path / transition reason, from the
+        alternatives of the attempt's draw in order (the sidecar's init stance replaced by the one that connects). Returns the init used."""
+        from ispatialgym.sampling.v2.core import _kit_count
+
+        alts = list(self._init_alts) if init_draw_on() else []
+        try:
+            P0.connect(self, init, manip, path_max_m)
+            self._init_used = init
+            if alts:
+                _kit_count(self, "artlarge_init.connect_first")
+            return init
+        except Reject as e:
+            if not alts or e.reason not in ("path_collision", "no_path", "path_too_long", "no_transition"):
+                raise
+            first = e
+        # i7-artlarge r2 (ISPATIALGYM_ARTLARGE_ALT_SKIP): a no_transition is start-independent for every start whose trunk differs from the
+        # manipulation stance's - connect() then checks only the trunk sweep / drive-in at the drive-back pose with the arriving arms
+        skip_on = alt_skip_on()
+        trans_dead = skip_on and first.reason == "no_transition" and not same_trunk(init, manip)
+        for k, alt in enumerate(alts):
+            if trans_dead and not same_trunk(alt, manip):
+                _kit_count(self, "artlarge_init.alt_skipped_no_transition")
+                continue
+            _kit_count(self, "artlarge_init.alt_tried")
+            try:
+                P0.connect(self, alt, manip, path_max_m)
+            except Reject as e:
+                if e.reason not in ("path_collision", "no_path", "path_too_long", "no_transition"):
+                    raise
+                if skip_on and e.reason == "no_transition" and not same_trunk(alt, manip):
+                    trans_dead = True
+                continue
+            _kit_count(self, "artlarge_init.alt_connected")
+            self.sidecar.add_stance(alt)
+            self._init_used = alt
+            log.info("%s: ARTLARGE_INIT_DRAW: step 6 from the drawn init failed (%s: %s); alternative %d %s connects", self.gp.variant, first.reason,
+                     str(first)[:160], k + 1, [round(float(v), 3) for v in alt.base_pose2d])
+            return alt
+        _kit_count(self, "artlarge_init.alt_exhausted")
+        raise first
 
     def passive_for(self, q_init: float, q_goal: float) -> Optional[float]:
         """The passive-continuation waypoint of a (q_init, q_goal) pair: the template's table, probed on demand for a
@@ -1858,7 +2063,7 @@ class ArticulationLarge(SamplerV2):
         # step 6: path + transition init -> manipulation
         manip.contacts = ["handle"]
         self.sidecar.add_stance(manip)
-        P0.connect(self, init, manip, float(self.gp.gen("path_max_m", P0.PATH_MAX_M)))
+        init = self._connect_init(init, manip, float(self.gp.gen("path_max_m", P0.PATH_MAX_M)))
         # sidecar articulation block (§7; F6 Articulation)
         waypoints = {"0.0": h0.to_sidecar()}
         for k in fractions:

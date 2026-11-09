@@ -29,8 +29,11 @@ PAIR_MESH_MARGIN_M = 0.005
 PAIR_LINKS = {arm: (f"{arm}_arm_link5", "torso_link2") for arm in ("left", "right")}
 
 
-def pair_mesh_on() -> bool:
-    return os.environ.get(PAIR_MESH_ENV, "").strip().lower() in ("1", "on", "true")
+def pair_mesh_on(s=None) -> bool:
+    """The environment's explicit value, else on for a sampler whose customs list it (``alias_switches``: touching_03 only)."""
+    from ispatialgym.sampling.v2 import alias_switches as AS
+
+    return AS.switch_on(PAIR_MESH_ENV, s)
 
 
 def _assets_dir() -> str:
