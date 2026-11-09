@@ -211,6 +211,13 @@ class _PosedObject:
         return self._pose
 
 
+def pick_transit_gate_on() -> bool:
+    """i7-startdraw2 2026-11-08 (lead decision #49): ``ISPATIALGYM_PICK_TRANSIT_GATE=1`` - an overhang pick is kept only when the oracle's own
+    transit ladder carries the escape -> pre-grasp move by a checked straight ramp (:meth:`IORSLarge._pick_transit_gate`); with
+    ``ISPATIALGYM_OVERHANG_OVERPATH`` on, the recorded planner transit decides instead. Default off."""
+    return os.environ.get("ISPATIALGYM_PICK_TRANSIT_GATE", "0") == "1"
+
+
 # ---------------------------------------------------------------------------------------------------- i7-overpath 2026-11-08 (owner 3(b))
 
 
@@ -4867,6 +4874,16 @@ class IORSLarge(SamplerV2):
                         why.append(f"{arm} push {push:.3f}: overpath {key_o}: {why_o}")
                         continue
                     TT._count(self, "overpath.planned")
+                elif pick_transit_gate_on():
+                    # i7-startdraw2 2026-11-08 (lead #49): only a pick whose transit over the book the oracle takes without planning
+                    gate, key_g, why_g = self._pick_transit_gate(st, grasp_st, arm, chain, settled, pre, eef)
+                    if gate is None:
+                        TT._count(self, "pick_transit_gate.rejected")
+                        TT._count(self, f"pick_transit_gate.rejected.{key_g}")
+                        why.append(f"{arm} push {push:.3f}: pick transit {key_g}: {why_g}")
+                        continue
+                    TT._count(self, "pick_transit_gate.passed")
+                    TT._count(self, f"pick_transit_gate.branch.{gate['branch']}")
                 overhang = OH.overhang_m(geo["edge_finger_m"], push, geo["extent_front_m"])
                 facts = {**geo, "arm": arm, "push_m": round(float(push), 4), "overhang_m": round(overhang, 4),
                          "com_inside_m": round(float(geo["edge_com_m"]) - float(push), 4), "settle": sfacts,
@@ -4904,7 +4921,11 @@ class IORSLarge(SamplerV2):
         # i7-overpath 2026-11-08: a pick the recorded transit rejected is another failure - the switch enters the key only when on (the
         # persisted memo is shared between the jobs of an alias: an A/B's arms must not read each other's failures)
         # i7-overpath CORRECTION 2026-11-08: + the transit's version (overpath.MEMO_VERSION): failures of an earlier path design never apply
-        return key + ("overpath",) + OPATH.memo_tag() if OPATH.on() else key
+        if OPATH.on():
+            return key + ("overpath",) + OPATH.memo_tag()
+        # i7-startdraw2: a pick the transit gate rejected is another failure - the switch enters the key only when on (the persisted memo is
+        # shared between jobs: the arms of an A/B must not read each other's failures)
+        return key + ("transit_gate_v1",) if pick_transit_gate_on() else key
 
     def _overhang_memo_persisted(self, key: Tuple[Any, ...], why: Optional[str] = None) -> Optional[str]:
         """Opt-in ``generation.overhang_fail_memo_persist`` (oracle-fix 2026-11-05, speed): the failed-pick memo of
@@ -4966,6 +4987,51 @@ class IORSLarge(SamplerV2):
             if bool(self.kit.collision_free(q0, margin=0.0)[0]):
                 return q0, "escape (kept through the drive to pick)", ""
         return self.ikc.q_locked(grasp_st, fingers=C.FINGER_OPEN).clone(), "stance posture", ""
+
+    def _pick_transit_gate(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
+                           ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """i7-startdraw2 (lead decision #49, switch ``ISPATIALGYM_PICK_TRANSIT_GATE``): the overhang pick's transit from where the escape leaves
+        the hand (:meth:`_overpath_start`) to the pre-grasp ``pre``, judged as the ORACLE will run it - its own ladder
+        (:func:`overpath_planner.plan_transit`: ``execute.reach_pre_pose`` -> ``Motions.arm_to(pose=pre, q_hint=witness)`` in the protect and
+        dip contexts, the desk and the scene present, the book at its settled post-push pose and protected at the oracle's inflation) WITHOUT
+        trajectory optimisation (``straight_only``): the checked straight ramp to the witness or via the ready / untucked posture. A pick
+        passes when that ramp carries the transit and :meth:`_overpath_verify` clears it - the oracle then takes exactly that ramp, nothing is
+        planned live; else it is rejected (the live ladder would fall to trajopt / PROTECT re-plans / the supports-ignored transit that ran
+        into the desk / the book in int2_8 and i7op2_a). Cheap (straight checks only; no record). ``(facts, "", "")`` or ``(None, reason, why)``."""
+        from ispatialgym.sampling.v2 import overpath_planner as OPP
+
+        q0, start, why0 = self._overpath_start(st, grasp_st, arm, chain, settled)
+        if q0 is None:
+            return None, start, why0
+        box = OPATH.box_of(settled, self.hull)
+        tgt = self.target
+        p_prev = tuple(x.clone() for x in tgt.get_position_orientation())
+        t0 = time.time()
+        try:
+            tgt.set_position_orientation(G.t(settled[0]).float(), G.t(settled[1]).float())
+            tgt.keep_still()
+            self.kit.sync_world()
+            r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+            if not r_w.ok or r_w.q is None:
+                with self.ikc.ignoring([tgt]):  # the pick's own pre-grasp check (``_overhang_grasp``) ran with the target out of the world
+                    r_w = self.ikc.exact([pre], grasp_st, arm, cache=False, fingers=C.FINGER_OPEN)
+            if not r_w.ok or r_w.q is None:
+                return None, "witness", f"the pre-grasp has no exact IK at stance {grasp_st.name} with the book at its settled pose ({str(r_w.reason)[:200]})"
+            traj, note = OPP.plan_transit(self.kit, arm, q0, pre, G.t(r_w.q).float().reshape(-1), list(self.support_objects()), [(self.tname, tgt)],
+                                          approach=[eef], inflation=None, straight_only=True)
+            if traj is None:
+                return None, "no_straight", f"from the {start}: {str(note.get('why'))[:300]}"
+            out, key_v, why_v = self._overpath_verify(traj, arm, pre, eef, box, ignore_target=False)
+            if out is None:
+                return None, key_v, f"{note.get('branch')}: {why_v}"
+            log.info("%s: pick transit gate passed (%s arm, from the %s at stance %s, %s, %d steps, %.2f s)", self.gp.variant, arm, start, grasp_st.name,
+                     note.get("branch"), len(traj), time.time() - t0)
+            return {"branch": str(note.get("branch")), "start": start, "n": int(len(traj))}, "", ""
+        finally:
+            TT._countn(self, "pick_transit_gate.ms", int(round(1000 * (time.time() - t0))))
+            tgt.set_position_orientation(*p_prev)
+            tgt.keep_still()
+            self.kit.sync_world()
 
     def _overpath_plan(self, st: Stance, grasp_st: Stance, arm: str, chain: Dict[str, Any], settled: G.Pose, pre: G.Pose, eef: G.Pose
                        ) -> Tuple[Optional[Dict[str, Any]], str, str]:
