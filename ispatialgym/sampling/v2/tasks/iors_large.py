@@ -4874,8 +4874,9 @@ class IORSLarge(SamplerV2):
                         why.append(f"{arm} push {push:.3f}: overpath {key_o}: {why_o}")
                         continue
                     TT._count(self, "overpath.planned")
-                elif pick_transit_gate_on():
-                    # i7-startdraw2 2026-11-08 (lead #49): only a pick whose transit over the book the oracle takes without planning
+                elif pick_transit_gate_on() and getattr(self, "_pick_transit_gate", None) is not None:
+                    # i7-startdraw2 2026-11-08 (lead #49): only a pick whose transit over the book the oracle takes without planning (IORSLarge's
+                    # own picks; IORS small's overhang fallback binds this method onto its adapter without the gate - its program differs)
                     gate, key_g, why_g = self._pick_transit_gate(st, grasp_st, arm, chain, settled, pre, eef)
                     if gate is None:
                         TT._count(self, "pick_transit_gate.rejected")
