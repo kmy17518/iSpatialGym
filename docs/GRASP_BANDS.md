@@ -3469,6 +3469,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 38 | i7-yield2 r3 default (d94c2394; lead #69) | f1bb8e24 | DEFAULT DISEMB_POS_REDRAWS 8 (disembedding redraws the start position when every work stance fails) |
 | 39 | i7-startdraw2 up to 5a5a7212 (lead #71) | 14e7d1d7 | PICK_TRANSIT_GATE (off; IORSLarge overhang picks only); NOT its default-on commit 984544ac |
 | 40 | i7-floorpush r2 (be3f42c3; lead #61) | 693ac6cb | DEFAULT the push transit via a standoff with the pushed object present (push_under / push_touching); BROADSIDE off |
+| 41 | i7-goalmaps r4 (f862cc89; lead #68) | f68ec361 | B_BASE_FINGER_SCREEN on for touching_large_02 only (customs) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
