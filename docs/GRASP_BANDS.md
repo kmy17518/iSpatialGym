@@ -3471,6 +3471,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 40 | i7-floorpush r2 (be3f42c3; lead #61) | 693ac6cb | DEFAULT the push transit via a standoff with the pushed object present (push_under / push_touching); BROADSIDE off |
 | 41 | i7-goalmaps r4 (f862cc89; lead #68) | f68ec361 | B_BASE_FINGER_SCREEN on for touching_large_02 only (customs) |
 | 42 | i7-startdraw2 up to 31100e67 (lead #73b) | bfd8ba21 | DEFAULT ON PUSH_PICK_PRE_FROM_CHAIN + OVERHANG_ESCAPE_BACKOFF; PICK_TRANSIT_GATE stays off (984544ac reverted by e2086624) |
+| 43 | i7-stancememo 6a0afbb5 (lead #74c) | a671f42b | DEFAULT ATTEMPT_CAP_RAISE_MAX 1.5; PUSH_CHAIN_MEMO + CHAIN_MEMO carried off |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
