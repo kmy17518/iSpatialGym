@@ -5409,6 +5409,37 @@ Owner mandate: "Fix all the bugs and speed up / make yield better the slow low y
   interaction (every drawn-start attempt [time_cap] with both defaults on) belong to #45 (i7-stancememo); the pause-before-failed_grasp
   ordering in `Motions.gripper` (60 + 5 still steps > the QA pause limit 50) is shared QA / executor behaviour, left as it is (owner's call).
 
+### r2: the gripper close wait vs the pause limit (lead decision #65, `ISPATIALGYM_GRIP_WAIT_NO_PAUSE`)
+
+- Two shared constants disagreed: `Motions.gripper` waits up to `gripper_steps` 60 (+ a 5-step hold) after a closing command (and up to 60
+  in the contact-hold wait), the QA pause rule fails a demo after 50 steps without motion. A closure that grips nothing therefore ended in a
+  hard [pause] - no retry - instead of the executor's `failed_grasp`, whose retry runs the recorded / unlifted grasp; whether it paused
+  depended only on whether any joint moved 3e-5 rad in the wait.
+- Count (CPU, scratch `classify_pause.py` on the demo hdf5: the gripper command reached its closing value <= 75 steps before the pause and
+  the arm commands stood still since): int2_* 5 pauses in 288 demos - 3 in the close wait (disembedding_10 x2, disembedding_01 x1 in the
+  contact-hold wait), 2 elsewhere (touching_04 pre-shape opening wait, under_large_01 push). All `$OFH/out`: 34 of 68 in the close wait
+  (under_small_01 13, under_small_04 5, disembedding_07 4, disembedding_10 4, disembedding_01 3, attachment_02 2, attachment_03 / inside_03 /
+  inside_04 1), 34 elsewhere (ontop_small_02 12, touching_04 8, touching_01 7, under_large_01 5, ...).
+- Fix 46ed7e5b: the close waits are emitted as settle steps (`_emit(settling=True)`, the path the hold / settle waits already take), which
+  neither the QA pause rule nor the monitors' stalled rule counts; the ramp, the opening waits and every other step count as before.
+  Recorded as `close_wait_exempt_steps` on the closure's `contact_hold` release event (84404e6f), else a `close_wait_exempt {steps, held}`
+  release event.
+
+Runs (trunk_46ed7e5b = A / B defaults on, svl titanrtx):
+
+| run | result | the switch |
+|---|---|---|
+| re-demo int2_7 disembedding_10 300019 / 300020 (`LIFT_PAD_SWEEP=0` to keep the lifted closure), 18393804 | 2 / 2 success | each lifted top_2 closure -> failed_grasp (no pause) -> unlifted retry ok |
+| re-demo int2_7 disembedding_01 300021, 18393806 | 0 / 1 | pause -> failed_grasp, the retry failed_grasp too (no pause) |
+| control re-demo int2_10 touching_04 320302 (pause was in the pre-shape opening wait), 18393807 | 0 / 1 plan_failed at place | grasp held; no pause |
+| control re-demo int2_7 under_large_01 300022 (pause was in the push), 18393808 | 1 / 1 | the push stall did not recur; fist close wait exempt 12 steps |
+| N 4 under_small_01 321000 OFF, 18393872 | 9 / 4 / 4, 0.19 GPU-h | - |
+| N 4 under_small_01 321000 ON, 18393886 | 9 / 4 / 3, 0.21 | 3 contact-hold waits exempt (all held); the failure: robot_wobble 1.01 deg (> 1.00) at step 300 of the transit, gripper still open - not in a wait |
+| N 4 control touching_01 300150 ON, 18393887 | 4 / 4 / 2, 0.27 | grasp waits held 4 / 4; failures at place (gripper_out_of_fov, plan_failed - both in its history), none in a wait |
+
+- `ISPATIALGYM_GRIP_WAIT_NO_PAUSE` DEFAULT ON (1762edd4, own commit): every close-wait pause re-demoed became a retried failed_grasp (2 / 3 then
+  succeeded); no failure in the N 4 / control runs falls inside an exempted wait. Handed to the integration agent.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
