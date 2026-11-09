@@ -204,8 +204,8 @@ PUSH_CHAIN_LIVE_B_ENV = "ISPATIALGYM_PUSH_CHAIN_LIVE_B"
 
 
 def push_chain_live_b_on() -> bool:
-    # default OFF (i7-ul02 2026-11-09); "1" on
-    return os.environ.get(PUSH_CHAIN_LIVE_B_ENV, "0").strip().lower() in ("1", "on", "true", "yes")
+    # default ON since lead #75e (2026-11-09: under_large_02 A/B 12/4/1 at 6.85 vs OFF 10/4/1 at 7.02 GPU-h per ok); "0" off
+    return os.environ.get(PUSH_CHAIN_LIVE_B_ENV, "1").strip().lower() not in ("0", "off", "false", "no", "")
 
 
 def count_pick_preshape(s, g, where: str) -> None:
@@ -6132,7 +6132,7 @@ class IORSLarge(SamplerV2):
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
         skip_dead_b = bool(self.gp.gen("c_skip_dead_b", False))  # oracle-fix 2026-11-06 (speed): see _c_dead_at_b
-        live_b = bool(self.push_under) and push_chain_live_b_on()  # i7-ul02 (speed, default off): see PUSH_CHAIN_LIVE_B_ENV
+        live_b = bool(self.push_under) and push_chain_live_b_on()  # i7-ul02 (speed, default on since #75e): see PUSH_CHAIN_LIVE_B_ENV
         n_dead_b = 0
         # i7-stancememo (5x.1 a): the C candidates that failed at this B in an earlier attempt of the instance are skipped and do not use up
         # one of the n_try tries; every C try that ends without a draft is recorded (sm_cur: its key, re-check flag, errors before it)

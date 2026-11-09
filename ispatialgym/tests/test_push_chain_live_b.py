@@ -1,4 +1,4 @@
-"""i7-ul02 2026-11-09 ``ISPATIALGYM_PUSH_CHAIN_LIVE_B`` (default off): the push-under C loop skips a draw whose B key already failed before
+"""i7-ul02 2026-11-09 ``ISPATIALGYM_PUSH_CHAIN_LIVE_B`` (default on since lead #75e): the push-under C loop skips a draw whose B key already failed before
 solving its push chain, and ranks the pre-screen's yaws among those that still hold a live B pair (:func:`iors_large.live_yaws_at_b`)."""
 import math
 from types import SimpleNamespace
@@ -7,9 +7,9 @@ from ispatialgym.sampling.v2 import stance_memo as SM
 from ispatialgym.sampling.v2.tasks import iors_large as IL
 
 
-def test_switch_default_off(monkeypatch):
+def test_switch_default_on(monkeypatch):
     monkeypatch.delenv(IL.PUSH_CHAIN_LIVE_B_ENV, raising=False)
-    assert not IL.push_chain_live_b_on()
+    assert IL.push_chain_live_b_on()
     for v in ("1", "on", "true"):
         monkeypatch.setenv(IL.PUSH_CHAIN_LIVE_B_ENV, v)
         assert IL.push_chain_live_b_on()
