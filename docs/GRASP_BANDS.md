@@ -5437,6 +5437,40 @@ v2only_*, i7_pol: 60 / 0 / 0 open, 60 / 0 / 0 close; one close instance in fix2)
   failure set at b20703b9 and 397048b2.
 - open_large_03 on the int2 defaults: 9 / 4 / 3 (one robot_touching_itself), against 60 / 0 / 0 before the init draw.
 
+### i7-artlarge r3 (lead #54): the open_large_03 self-contact, found
+
+**Replay** (log-only `ISPATIALGYM_DIAG_ARM_TRACE=1`, 867681d8; re-demo al_rc_trace of the four al_on instances; same 2 / 4).
+- The witness transit's straight ramp is planned (128 waypoints, the log line the r2 analysis read).
+- The ramp's hand path dips 16-17 cm below its lower end, so the TRANSIT DIP GATE (first-demo v3.0 F5, `Motions._dip_gate`, inside every
+  grasp transit) replaces it with its straight Cartesian leg. The leg's differential-IK path (175 waypoints) folds the elbow (j4 to
+  -2.09) and the link3 / link5 meshes touch: -0.2 / +0.1 mm.
+- cuRobo's sphere self-check passes the leg. Commanded and measured agree (no controller lag, no contact before the self-touch).
+- The gate logged its decision only AFTER the leg streamed, so a failure inside the leg left the log reading as if the plan's straight
+  ramp had run: the "plan is not what executes" of r2.
+- In the two successes the gate found no qualifying leg and the straight ramp ran.
+
+**Fix 4a9e5038 (shared execution path, behind a default-OFF switch).**
+- `ISPATIALGYM_DIP_LEG_SELF_MESH=1`: a Cartesian dip leg whose `{arm}_arm_link3` / `link5` mesh clearance (pair_mesh) falls to 5 mm is
+  refused (the plan then streams as before). Executor stat `dip_leg_self_mesh_refused`.
+- Unconditional, log-only: the gate logs "streaming the ... Cartesian leg" before the leg runs.
+- The suite has the base failure set.
+
+**Count** (int2_* demos' meta `transit_dip`, CPU).
+- 8 demos ran a Cartesian dip leg: 6 succeeded (close_large_02 x2, inside_01, nextto_03 x2, ontop_large_03) and 2 failed
+  robot_touching_itself (open_large_03 352001 / 352003, int2_11).
+- The executed link3-link5 minimum over the grasp action: failures -0.2 / +0.1 mm; successes 10.9-21.7 mm. A 5 mm margin refuses
+  exactly the two failures.
+
+**Validation re-demo** (trunk_4a9e5038, switch on, same instances):
+
+| alias | before | switch on | what the switch did |
+|---|---|---|---|
+| open_large_03 | 2 / 4 | 4 / 4 | legs refused at +3.5 / +3.6 mm |
+| close_large_02 | 4 / 4 | 4 / 4 | legs streamed |
+| nextto_03 | 4 / 4 | 4 / 4 | legs streamed |
+
+- DEFAULT stays OFF: the path is shared by every grasp transit (lead #54: stop for the count).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
