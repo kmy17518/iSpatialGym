@@ -3473,6 +3473,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 42 | i7-startdraw2 up to 31100e67 (lead #73b) | bfd8ba21 | DEFAULT ON PUSH_PICK_PRE_FROM_CHAIN + OVERHANG_ESCAPE_BACKOFF; PICK_TRANSIT_GATE stays off (984544ac reverted by e2086624) |
 | 43 | i7-stancememo 6a0afbb5 (lead #74c) | a671f42b | DEFAULT ATTEMPT_CAP_RAISE_MAX 1.5; PUSH_CHAIN_MEMO + CHAIN_MEMO carried off |
 | 44 | i7-nextto up to a1f26f05 (lead #78b) | 987ee5ec | DEFAULT BASE_PUSH_COM_CAP_M 0.06 + NEXTTO_TOP_FIRST 1; PLACE_PARTNER_RETRY off |
+| 45 | i7-symonly up to d233e65f (lead #78c) | bed7e4be | DEFAULT PAIR_FILTER_FULL_DUMP 1; PUSH_TIP_CAP off |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
