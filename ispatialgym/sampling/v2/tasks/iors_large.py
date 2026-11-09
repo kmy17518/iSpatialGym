@@ -206,7 +206,7 @@ PUSH_UNDER_HANDS = ("blade", "flat", "pitched_far")
 #: ``generation.push_under_yaw`` (owner 2026-10-13 ~02:55, under_large#01): default none = every carried yaw, in the
 #: :meth:`IORSLarge.push_yaw_rank` order; ``"heel_first"`` = only the yaws at which the push meets the target's heel
 #: (:func:`footprint_heel`, :meth:`IORSLarge.push_yaw_kept`)
-PUSH_UNDER_YAW_LOCKS = ("heel_first",)
+PUSH_UNDER_YAW_LOCKS = ("heel_first", "broadside")
 #: heel_first: the heel must lie at least this much farther from the root than the toe (the sandal chgcrm: 0.128 vs 0.117 m)
 PUSH_HEEL_MIN_ASYM_M = 0.005
 #: heel_first: the push's contact at least this fraction of the heel's extent behind the root (the heel's half, not the strap)
@@ -293,6 +293,12 @@ FLOORPUSH_TIP_ENV = "ISPATIALGYM_FLOORPUSH_TIP_M"
 #: and the stroke count cap (``ISPATIALGYM_FLOORPUSH_STROKES_MAX``): 0.31 m in 0.05 m strokes is 7
 FLOORPUSH_YAW_GAIN_M_PER_RAD = 0.15
 FLOORPUSH_STROKES_MAX = 8
+#: r2 (lead #60 (i)) ``ISPATIALGYM_FLOORPUSH_BROADSIDE=1``: only the carried yaws whose push meets the long face (yaw lock ``"broadside"``):
+#: the footprint's long axis within this angle of square to the push (12 deg: the 16-yaw grid's perpendicular yaws), for footprints at
+#: least this elongated (the briefcase 0.33 / 0.12; the round can keeps every yaw)
+FLOORPUSH_BROADSIDE_ENV = "ISPATIALGYM_FLOORPUSH_BROADSIDE"
+FLOORPUSH_BROADSIDE_TOL_DEG = 12.0
+FLOORPUSH_BROADSIDE_MIN_ASPECT = 1.5
 #: (b) the other hand's chain this far across the push from the push hand's (both hands on a 0.12 m briefcase end / a 0.22 m can back)
 FLOORPUSH_BOTH_OFFSETS_M = (0.06, 0.09, 0.12)
 _ON = ("1", "true", "yes", "on")
@@ -303,7 +309,7 @@ def floorpush_switches(env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     knobs ``yaw_gain`` / ``strokes_max`` when ``stroke_m`` is set; ``stroke_m`` defaults to :data:`FLOORPUSH_STROKE_DEFAULT_M` (``off`` = none). ``ValueError`` for a length that is not positive."""
     env = os.environ if env is None else env
     out: Dict[str, Any] = {}
-    for key, name in (("open", FLOORPUSH_OPEN_ENV), ("both", FLOORPUSH_BOTH_ENV)):
+    for key, name in (("open", FLOORPUSH_OPEN_ENV), ("both", FLOORPUSH_BOTH_ENV), ("broadside", FLOORPUSH_BROADSIDE_ENV)):
         if str(env.get(name, "")).strip().lower() in _ON:
             out[key] = True
     for key, name in (("stroke_m", FLOORPUSH_STROKE_ENV), ("tip_m", FLOORPUSH_TIP_ENV)):
@@ -1642,6 +1648,8 @@ class IORSLarge(SamplerV2):
     def push_yaw_lock(self) -> Optional[str]:
         """``generation.push_under_yaw`` (:data:`PUSH_UNDER_YAW_LOCKS`; default None or ``"none"`` = every carried yaw)."""
         v = self.gp.gen("push_under_yaw")
+        if v is None and self.floorpush().get("broadside"):
+            return "broadside"  # i7-floorpush r2 (lead #60 (i)): ISPATIALGYM_FLOORPUSH_BROADSIDE on the pitched push
         if v is None or str(v) == "none":
             return None
         if str(v) not in PUSH_UNDER_YAW_LOCKS:
@@ -1678,8 +1686,11 @@ class IORSLarge(SamplerV2):
         at least :data:`PUSH_HEEL_CONTACT_FRAC` of the heel's extent behind the root. The yaw order alone takes the largest offset left: at a
         B whose F_init held no heel-first yaw it pushed the sandal toe first (0.117 m, c1_k1 at 27ee9069), and fingertips above the heel's
         face (3.5 cm) meet the strap 2.7 cm behind the root."""
-        if self.push_yaw_lock() is None:
+        lock = self.push_yaw_lock()
+        if lock is None:
             return True
+        if lock == "broadside":
+            return self.push_broadside_kept(quat, d2)
         h_local, heel, _ = self.push_heel()
         h = G.local_points_world(h_local.reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
         d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
@@ -1689,6 +1700,33 @@ class IORSLarge(SamplerV2):
         if off is None:
             off = self.push_contact_offset(quat, d2)
         return off is not None and float(off) >= PUSH_HEEL_CONTACT_FRAC * heel
+
+    def push_broadside_kept(self, quat, d2) -> bool:
+        """i7-floorpush r2 (lead decision #60 (i), under_large_02's briefcase; ``ISPATIALGYM_FLOORPUSH_BROADSIDE``, lock ``"broadside"``): the push
+        along ``d2`` meets the target on its LONG face - the footprint's long axis (:func:`footprint_heel` at the rest orientation, turned by
+        ``quat``) within :data:`FLOORPUSH_BROADSIDE_TOL_DEG` of square to the push - so the depth along the push is the thin dimension. A
+        footprint whose long / short ratio is under :data:`FLOORPUSH_BROADSIDE_MIN_ASPECT` (the round can) keeps every yaw. Physics (PhysX's
+        default material mu 0.5): a 0.27 m tall briefcase on its 0.12 m edge pushed 0.086 m up tips only when mu x 0.086 > the half depth -
+        0.06 m broadside (mu > 0.70), 0.165 m on its end; the end push's yaw is unstable (lever 0.165 m), the broadside one's lever is 0.06 m."""
+        name = getattr(self.target, "name", None)
+        memo = self.__dict__.get("_broadside_axis")
+        if memo is None or memo[0] != name:
+            pts = G.local_points_world(self.hull, (th.zeros(3), G.t(self.rest)))
+            u, ahead, behind = footprint_heel(pts)
+            xy = pts[:, :2] @ th.stack([-u[1], u[0]])
+            aspect = (ahead + behind) / max(float(xy.max() - xy.min()), 1e-6)
+            u_root = th.tensor([float(u[0]), float(u[1]), 0.0])
+            # the long axis in the root frame (the yaw at C turns it with the target): undo the rest rotation
+            u_root = G.local_points_world(u_root.reshape(1, 3), (th.zeros(3), G.qinv(G.t(self.rest))))[0]
+            memo = (name, u_root, aspect)
+            self.__dict__["_broadside_axis"] = memo
+        _, u_root, aspect = memo
+        if aspect < FLOORPUSH_BROADSIDE_MIN_ASPECT:
+            return True
+        u = G.local_points_world(u_root.reshape(1, 3), (th.zeros(3), G.t(quat)))[0, :2]
+        d = th.as_tensor([float(d2[0]), float(d2[1])], dtype=th.float32)
+        cos = abs(float(u @ d)) / max(float(th.linalg.norm(u)) * float(th.linalg.norm(d)), 1e-9)
+        return cos <= math.sin(math.radians(FLOORPUSH_BROADSIDE_TOL_DEG)) + 1e-6
 
     def push_yaws_locked(self, yaws: Sequence[float], d_yaw: float, d2, offs: Dict[float, float], place: Stance) -> List[float]:
         """The init yaws of ``yaws`` (the target at ``yaw + d_yaw`` at C, ``offs`` their contact offsets) that :meth:`push_yaw_kept` keeps for the

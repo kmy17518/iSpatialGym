@@ -236,3 +236,66 @@ def test_strokes_are_the_default_for_the_pitched_push_only(monkeypatch):
     ch = PP._push(_s())
     assert ch["record"]["floorpush"]["stroke_m"] == 0.10 and "face_half_m" in ch["record"]
     assert PP._sampler().push_strokes_record(0.311) == {}  # the blade (under_large_01) keeps its generation key
+
+
+# ---------------------------------------------------------------------------------------------------------------- r2 (lead #60 / #61)
+
+
+def test_broadside_lock_keeps_only_the_long_face_yaws(monkeypatch):
+    monkeypatch.setenv(IL.FLOORPUSH_BROADSIDE_ENV, "1")
+    s = _s(hull=PP._box(0.33, 0.12, 0.27))  # the briefcase: long axis along x at the rest
+    assert s.push_yaw_lock() == "broadside" and "broadside" in IL.PUSH_UNDER_YAW_LOCKS
+    q = lambda deg: G.qmul(G.quat_from_yaw(math.radians(deg)), s.rest)  # noqa: E731
+    assert s.push_yaw_kept(q(90.0), (1.0, 0.0)) and s.push_yaw_kept(q(-90.0), (1.0, 0.0)) and s.push_yaw_kept(q(100.0), (1.0, 0.0))
+    assert not s.push_yaw_kept(q(0.0), (1.0, 0.0)) and not s.push_yaw_kept(q(22.5), (1.0, 0.0)) and not s.push_yaw_kept(q(67.5), (1.0, 0.0))
+    # broadside the contact offset is the half depth (the thin side), on the end it is the half length
+    assert s.push_contact_offset(q(90.0), (1.0, 0.0)) == pytest.approx(0.06, abs=1e-5) and s.push_contact_offset(q(0.0), (1.0, 0.0)) == pytest.approx(0.165, abs=1e-5)
+    # a round footprint keeps every yaw; the generation key wins over the switch; off without the switch
+    s2 = _s(hull=_cylinder())
+    assert s2.push_yaw_kept(q(13.0), (1.0, 0.0))
+    monkeypatch.delenv(IL.FLOORPUSH_BROADSIDE_ENV)
+    assert _s().push_yaw_lock() is None
+
+
+def _transit_world(monkeypatch, standoff_ok=True):
+    calls = []
+
+    def reach(motions, state, arm, pre, supports, through, q_hint, ctx, cfg, **kw):
+        calls.append(("plan", [round(float(v), 3) for v in EX.as_world_pose(pre)[0].tolist()], [str(o) for o in through]))
+        if not standoff_ok and not through:
+            raise EX.SkillError("plan_failed", "stub: no plan with the can present")
+        yield th.zeros(1)
+
+    monkeypatch.setattr(EX, "reach_pre_pose", reach)
+    monkeypatch.setattr(EX, "push_transit_witness_clear", lambda *a, **k: (False, "witness within 10 mm of the can's box"))
+    motions = SimpleNamespace(cfg=SimpleNamespace(diff_ik_soft_pos_tol_free=0.01))
+
+    def along(arm, wps, **kw):
+        calls.append(("along", [round(float(v), 3) for v in EX.as_world_pose(wps[0])[0].tolist()]))
+        yield th.zeros(1)
+
+    motions.arm_along = along
+    return calls, motions
+
+
+@pytest.mark.parametrize("standoff_ok", [True, False])
+def test_push_transit_via_a_standoff_with_the_target_present(monkeypatch, standoff_ok):
+    calls, motions = _transit_world(monkeypatch, standoff_ok)
+    pre = SC.Pose(position=[1.0, 0.0, 0.15], orientation=[0.0, 0.0, 0.0, 1.0])
+    cfg = EX.ExecuteConfig()
+    assert cfg.push_transit_standoff_m == 0.0  # default off
+    cfg = EX.replace(cfg, push_transit_standoff_m=0.10)
+    ctx = {"push_direction": [1.0, 0.0, 0.0], "plan_ignored": ["can"]}
+    list(EX.reach_push_pre(motions, None, "right", pre, [], ["can"], None, ctx, cfg))
+    if standoff_ok:
+        assert calls == [("plan", [0.95, 0.0, 0.25], []), ("along", [1.0, 0.0, 0.15])]  # 10 cm up, 5 cm back, the can present; then down
+        assert ctx["push_transit"]["target"] == "present to the standoff" and ctx["plan_ignored"] == []
+    else:
+        assert calls == [("plan", [0.95, 0.0, 0.25], []), ("plan", [1.0, 0.0, 0.15], ["can"])]  # the old left-out plan after it
+        assert ctx["push_transit"]["target"] == "left out" and "push_transit_standoff_failed" in ctx
+
+
+def test_transit_standoff_env(monkeypatch):
+    for v, want in (("", 0.0), ("0", 0.0), ("off", 0.0), ("1", 0.10), ("0.12", 0.12), ("x", 0.0)):
+        monkeypatch.setenv("ISPATIALGYM_PUSH_TRANSIT_STANDOFF", v)
+        assert EX._transit_standoff_env() == pytest.approx(want)
