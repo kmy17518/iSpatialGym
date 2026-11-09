@@ -506,6 +506,17 @@ TOUCH_BUILT_TILTS_ENV = "ISPATIALGYM_TOUCH_BUILT_TILTS"
 #: its place instead of its footprint centre (contact_poses.push_line_t0). An oracle push change (the recorded push poses); the touch_push
 #: maps / library keep the footprint line. Default "0"
 PUSH_LINE_COM_ENV = "ISPATIALGYM_PUSH_LINE_COM"
+#: i7-symonly 2026-11-09 (touching_04 symbolic_only: 50 of its 58 recorded symbolic_only demos and 10 of 11 not_settled pushed the spray
+#: bottle at 7-13 cm - it tilted 11-22 deg and turned past the 0.1 rad tolerance; at 5-6 cm ok 33 / symbolic_only 8 of 50): the swept
+#: touching push's contact height capped at the target's tip height (``contact_poses.push_tip_height_cap``: ``generation.
+#: push_tip_height_ratio`` x the footprint's leading half-depth along the push, never below the lowest fingertip push) - in the exact
+#: choice (:meth:`IORSSmall._touching_push_choice`: the push stance search, the goal check's push, the recorded push) and in the touch_push
+#: map lookups of the push stance candidates (the A1 screen reads the same). A draw with no low enough contact fails contact_unreachable
+#: and another is drawn. "0" off (default), "shadow" (computed and counted, nothing dropped), "1" on. Only under the push height sweep
+#: (touching tabletop). Kit ``push_tip_cap.checked`` / ``.dropped`` (candidates above the cap skipped) / ``.chosen_above`` (shadow: the
+#: chosen class is above the cap) / ``.map_lost`` (a map lookup feasible only above the cap)
+PUSH_TIP_CAP_ENV = "ISPATIALGYM_PUSH_TIP_CAP"
+PUSH_TIP_CAP_DEFAULT = "0"
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -551,6 +562,23 @@ def touch_a1_screen_mode() -> str:
 
 def push_line_com_on() -> bool:
     return (os.environ.get(PUSH_LINE_COM_ENV) or "0").strip() == "1"
+
+
+def _tip_keep(cap: float):
+    """A ``ContactMap.lookup`` ``keep`` for :data:`PUSH_TIP_CAP_ENV`: a class row whose label carries a contact height
+    (``push_tip_h-@5.0cm``) at most ``cap`` m; a row without one is kept."""
+    import re
+
+    def keep(row) -> bool:
+        m = re.search(r"@([0-9.]+)cm", str((row or {}).get("class") or ""))
+        return m is None or float(m.group(1)) / 100.0 <= cap + 1e-6
+    return keep
+
+
+def push_tip_cap_mode() -> str:
+    """``"off"`` / ``"shadow"`` / ``"on"`` from :data:`PUSH_TIP_CAP_ENV` (unset or empty: :data:`PUSH_TIP_CAP_DEFAULT`)."""
+    v = (os.environ.get(PUSH_TIP_CAP_ENV) or PUSH_TIP_CAP_DEFAULT).strip().lower()
+    return "on" if v in ("1", "on") else ("shadow" if v == "shadow" else "off")
 
 
 def touch_built_tilts_on() -> bool:
@@ -5835,12 +5863,23 @@ class IORSSmall(SamplerV2):
         so_m = float(manip.stand_off) if manip.stand_off is not None else 0.0
         rows: List[Tuple[Tuple[int, int, float], float, Optional[Stance], Dict[str, Any]]] = []
         n_all = n_map = 0
+        # i7-symonly (PUSH_TIP_CAP_ENV): the map's classes above the target's tip height do not count (on) / are counted (shadow)
+        tip_keep, tip_mode = None, push_tip_cap_mode()
+        if tip_mode != "off" and self.push_height_sweep_on():
+            t_hull = self.world.hull_at(self.hull["target"], t_place_pose)
+            tip = self.push_tip_cap(t_place_pose, float(t_hull[:, 2].min()), th.tensor([float(manip.tangent[0]), float(manip.tangent[1]), 0.0]),
+                                    hull_w=t_hull, line_xy=self.push_line_xy(t_place_pose))
+            tip_keep = _tip_keep(float(tip["cap_m"])) if tip is not None else None
         for li, lat in enumerate(laterals):
             for so in self.push_stance_stand_offs(manip):
                 cand = self.push_stance_for(manip, t_place_pose, lateral=lat, stand_off=so)
                 probe = cand if cand is not None else manip
                 n_all += 1
-                w = TT.contact_map_check(pm, probe, t_place_pose)
+                w = TT.contact_map_check(pm, probe, t_place_pose, keep=tip_keep if tip_mode == "on" else None)
+                if tip_keep is not None:
+                    other = TT.contact_map_check(pm, probe, t_place_pose, keep=None if tip_mode == "on" else tip_keep)
+                    if (other["ok"] if tip_mode == "on" else w["ok"]) and not (w["ok"] if tip_mode == "on" else other["ok"]):
+                        TT._count(self, "push_tip_cap.map_lost")
                 if not w["ok"]:
                     continue
                 n_map += 1
@@ -6653,6 +6692,10 @@ class IORSSmall(SamplerV2):
             lo, hi = (None if v is None else float(v) for v in height_range)
             cands = (c for c in cands if c[2].get("contact_height_m") is None
                      or ((lo is None or float(c[2]["contact_height_m"]) >= lo - 1e-6) and (hi is None or float(c[2]["contact_height_m"]) <= hi + 1e-6)))
+        # i7-symonly (PUSH_TIP_CAP_ENV): the contacts above the target's tip height skipped (on) / counted (shadow)
+        tip = self.push_tip_cap(t_pose, float(t_face_z[0]), direction, hull_w=hull_w, line_xy=line_xy) if sweep else None
+        if tip is not None and push_tip_cap_mode() == "on":
+            cands = self._tip_capped(cands, float(tip["cap_m"]))
 
         def chain(c):
             _kind, init, extras = c
@@ -6691,8 +6734,38 @@ class IORSSmall(SamplerV2):
                 return False, r_push, None, f"retreat clear pose: {r_ret.reason}"
             return True, r_push, qs, ""
 
-        return O.choose_first(self.ikc, arm, cands, key=lambda c: c[1], label=label,
-                              chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
+        res = O.choose_first(self.ikc, arm, cands, key=lambda c: c[1], label=label,
+                             chain=chain, evaluate=evaluate, q_start=self.ikc.q_locked(st), camera_idx=[1], stage="touching push")
+        if tip is not None and res[0] is not None:
+            h = res[0].proposal.payload[2].get("contact_height_m")
+            if h is not None and float(h) > float(tip["cap_m"]) + 1e-6:
+                TT._count(self, "push_tip_cap.chosen_above")  # shadow: the class the cap would have skipped
+        return res
+
+    def push_tip_cap(self, t_pose: Optional[G.Pose], z0: float, direction: th.Tensor, hull_w: Optional[th.Tensor] = None,
+                     line_xy: Optional[th.Tensor] = None) -> Optional[Dict[str, float]]:
+        """:data:`PUSH_TIP_CAP_ENV` (i7-symonly): the target's tip height for a push along ``direction`` at ``t_pose``
+        (``contact_poses.push_tip_height_cap`` with ``generation.push_tip_height_ratio``); None when the switch is off, without a place pose
+        or outside the push height sweep. Kit ``push_tip_cap.checked``; the latest is kept in ``self._push_tip_cap_last``."""
+        if push_tip_cap_mode() == "off" or t_pose is None or not self.push_height_sweep_on():
+            return None
+        if hull_w is None:
+            hull_w = self.world.hull_at(self.hull["target"], t_pose)
+        ratio = float(TT.phase2_gen(self, "push_tip_height_ratio", CPZ.PUSH_TIP_HEIGHT_RATIO))
+        out = CPZ.push_tip_height_cap(hull_w, float(z0), direction, line_xy=line_xy, ratio=ratio)
+        TT._count(self, "push_tip_cap.checked")
+        self._push_tip_cap_last = out
+        return out
+
+    def _tip_capped(self, cands, cap: float):
+        """``cands`` without the contacts above ``cap`` (m above the target's bottom; a candidate without a height is kept); kit
+        ``push_tip_cap.dropped`` per skipped candidate the choice reached."""
+        for c in cands:
+            h = c[2].get("contact_height_m")
+            if h is not None and float(h) > cap + 1e-6:
+                TT._count(self, "push_tip_cap.dropped")
+                continue
+            yield c
 
     def _touching_brace_choice(self, st: Stance, push_chain: List[G.Pose], t_pose: G.Pose, p_pose: G.Pose, b_point: th.Tensor, face_z: Tuple[float, float],
                                direction: th.Tensor, dist: float, p_hull: th.Tensor, p_init: th.Tensor, ignore_push: Sequence[Any], ignore_brace: Sequence[Any],
