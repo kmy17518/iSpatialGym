@@ -12,7 +12,7 @@ import os
 from typing import Any, Tuple
 
 #: the switches ON by default for the shelf tip family (touching_03); each name was added in its own commit (i7-t03 r8)
-SHELF_TIP_DEFAULTS: Tuple[str, ...] = ("ISPATIALGYM_SHELF_FREE_START", "ISPATIALGYM_SHELF_JOINT_STANCE")
+SHELF_TIP_DEFAULTS: Tuple[str, ...] = ("ISPATIALGYM_SHELF_FREE_START", "ISPATIALGYM_SHELF_JOINT_STANCE", "ISPATIALGYM_SHELF_RELEASE_IN_GAP")
 
 
 def shelf_tip_family(s: Any) -> bool:
