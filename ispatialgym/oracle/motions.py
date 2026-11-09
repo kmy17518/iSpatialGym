@@ -78,10 +78,11 @@ def grip_wait_no_pause() -> bool:
     closing command; at most ``gripper_steps`` each) are emitted as settle steps, which the QA pause rule and the monitors' stalled rule do
     not count - a closure that grips nothing then ends in the executor's ``failed_grasp`` (retried) instead of a hard [pause] (the wait of
     60 + 5 still steps outlasted the pause limit of 50: int2_* 3 of 5 pauses, $OFH/out 34 of 68). A stall anywhere else still pauses.
-    ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=1`` (default off). Each
+    DEFAULT ON since 2026-11-08 (i7-yield2 r2: the 3 int2 close-wait pauses re-demoed became retried failed_grasp, 2 then succeeded; N 4
+    under_small_01 / control touching_01: no failure inside an exempted wait); ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=0`` turns it off. Each
     exempted wait is recorded: ``close_wait_exempt_steps`` on the closure's ``contact_hold`` release event, else a ``close_wait_exempt``
     release event {steps, held}."""
-    return os.environ.get("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "0") == "1"
+    return os.environ.get("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "1") == "1"
 
 Pose = Tuple[th.Tensor, th.Tensor]
 

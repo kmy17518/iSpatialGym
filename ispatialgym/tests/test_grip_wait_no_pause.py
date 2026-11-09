@@ -68,7 +68,7 @@ def _run(m, **kw):
 
 def test_default_on_and_off_restores_the_counted_wait(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", raising=False)
-    assert MO.grip_wait_no_pause() is False
+    assert MO.grip_wait_no_pause() is True  # default on (i7-yield2 r2)
     monkeypatch.setenv("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "0")
     m = _run(_motions(), rate=0.00225)
     ramp = 7  # 15 mm -> 0 at 2.25 mm per step
