@@ -211,6 +211,14 @@ class _PosedObject:
         return self._pose
 
 
+def overhang_escape_backoff_on() -> bool:
+    """i7-startdraw2 r2 2026-11-09 (lead #71, the transit-start gap): ``ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF=1`` - the overhang pick's escape
+    replay (:meth:`IORSLarge._overpath_start`, read by the pick transit gate and OVERPATH) starts from the pad backed off ``push_backoff_m``
+    along the reversed push, as ``execute_push`` runs it before the retreat (the replay started at the push's goal: 2.0 cm deeper in every
+    demo, 0.12-0.20 rad from the live retreat's end when the grasp is at the push stance). Default off."""
+    return os.environ.get("ISPATIALGYM_OVERHANG_ESCAPE_BACKOFF", "0") == "1"
+
+
 def pick_transit_gate_on() -> bool:
     """i7-startdraw2 2026-11-08 (lead decision #49): ``ISPATIALGYM_PICK_TRANSIT_GATE=1`` - an overhang pick is kept only when the oracle's own
     transit ladder carries the escape -> pre-grasp move by a checked straight ramp (:meth:`IORSLarge._pick_transit_gate`); with
@@ -4973,6 +4981,23 @@ class IORSLarge(SamplerV2):
                 return None, "push_end", f"the push's end pose has no IK ({r.reason})"
             q_push = G.t(r.q).float().clone()
         sup = list(self.support_objects())
+        if overhang_escape_backoff_on():
+            # i7-startdraw2 r2 (lead #71): the oracle backs the pad off ``push_backoff_m`` (2 cm) along the reversed push before its retreat
+            # (execute_push step 3); the escape is replayed from there, tracked as the oracle's arm_along runs it
+            from ispatialgym.oracle.execute import CONFIG as _ECFG
+
+            back_m = float(getattr(_ECFG, "push_backoff_m", 0.0) or 0.0)
+            d_push = G.t(chain.get("direction")).float().reshape(-1)[:3] if chain.get("direction") is not None else None
+            if back_m > 0 and d_push is not None and float(th.linalg.norm(d_push)) > 1e-6:
+                d_push = d_push / th.linalg.norm(d_push)
+                gp_, gq_ = chain["goal"]
+                back = (G.t(gp_).float() - d_push * back_m, G.t(gq_).float())
+                r_b = self.ikc.continue_chain(q_push, [back], arm, ignore=[self.target] + sup, ignore_end=[self.target] + sup, ignore_start=[self.target] + sup)
+                if r_b.ok and r_b.q is not None:
+                    q_push = G.t(r_b.q).float().clone()
+                    TT._count(self, "overhang_escape_backoff.tracked")
+                else:
+                    TT._count(self, "overhang_escape_backoff.failed")
         up = self.gp.gen("overhang_retreat_up_m")
         status, why_e, _, q_esc = PCK.replay_contact_escape(self, arm, q_push, _PosedObject(settled), sup, [self.target] + sup, RETREAT_DIST,
                                                             start="the overhang push's end", escape_up_m=float(up) if isinstance(up, (int, float)) and up > 0 else None)
