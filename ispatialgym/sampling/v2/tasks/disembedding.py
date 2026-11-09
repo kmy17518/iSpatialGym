@@ -65,6 +65,18 @@ from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
+
+def disemb_pos_redraws() -> int:
+    """i7-yield2 r3 (lead #66, 2026-11-09): with the split cone (generation.phase2_split_cone) each attempt draws the target's start position
+    and tries that position's work stances only; disembedding_10 after the start-draw speed fix lost 30-38 attempts per job to
+    target_placement (an empty feasible set F of 8 yaws x the 2 turn-filtered fork grasps at the drawn position), each attempt paying the
+    ~70 s start draw again. ``ISPATIALGYM_DISEMB_POS_REDRAWS=N`` redraws the position (without replacement, from the drawn start's pool)
+    up to N times within the attempt; 0 (default) = the single position. Kit ``pos_redraw.redrawn / passed / passed_after_k / exhausted``."""
+    try:
+        return max(0, int(os.environ.get("ISPATIALGYM_DISEMB_POS_REDRAWS", "0")))
+    except ValueError:
+        return 0
+
 SUBTASK = "disembedding"
 
 
@@ -1135,6 +1147,39 @@ class Disembedding(SamplerV2):
     # ------------------------------------------------------------------ instance
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        redraws = disemb_pos_redraws()
+        if not redraws or getattr(self, "_split_cone_pools", None) is None:
+            return self._sample_position(rng)
+        # i7-yield2 r3 (lead #66): the split cone's drawn start POSITION is redrawn within the attempt (without replacement, among the
+        # positions of the drawn start's pool) when every work stance there fails - the drawn start (~70 s) is kept
+        side = getattr(self, "region_side", None)
+        pool = self._split_cone_pools.get(side) or {}
+        cur = list(self.manip_candidates or [])
+        tried = {k for k, cs in pool.items() if len(cs) == len(cur) and all(a is b for a, b in zip(cs, cur))}
+        errors: List[str] = []
+        for r in range(redraws + 1):
+            try:
+                d = self._sample_position(rng)
+                if r:
+                    TT._count(self, "pos_redraw.passed")
+                    TT._count(self, f"pos_redraw.passed_after_{min(r, 5)}{'+' if r >= 5 else ''}")
+                    d.summary["pos_redraw"] = {"redraws": r}
+                return d
+            except Reject as e:
+                if e.reason != "target_placement":
+                    raise
+                errors.append(str(e)[:400])
+            left = sorted(k for k in pool if k not in tried)
+            if not left or r == redraws:
+                break
+            key = left[int(rng.integers(len(left)))]
+            tried.add(key)
+            self.manip_candidates = list(pool[key])
+            TT._count(self, "pos_redraw.redrawn")
+        TT._count(self, "pos_redraw.exhausted")
+        raise Reject("target_placement", f"{len(errors)} positions of the drawn start: " + "; ".join(errors[-2:])[:1500])
+
+    def _sample_position(self, rng: np.random.Generator) -> Draft:
         tname, sname, dname = self.tname, self.bindings.one(self.src_role).name, self.bindings.one(self.dst_role).name
         dnames = [b.name for b in self.bindings.many("distractors")]
         init = self.init_stance
