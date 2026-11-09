@@ -3465,6 +3465,8 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 34 | i7-yield2 r2 (d7723c33; lead #65) | 5b4f42b3 | DEFAULT GRIP_WAIT_NO_PAUSE (the gripper close waits are not counted as a pause) |
 | 35 | i7-stancememo r3 (01bd4e3f; lead #45 / #63) | 50bb863e | SupportTop vectorized (the start-draw speed fix, identical verdicts); the attempt cap doubles after 2 consecutive cuts |
 | 36 | i7-goalmaps up to 4bc9b600 (lead #67) | 470a83ca | touching_large_02 customs: carry_centred / carry_wide_path (lead #42); the root's umbrella entry unchanged (round 1, not umb2) |
+| 37 | i7-yield2 r3 up to 183810f4 (lead #66) | 73faa60d | DISEMB_POS_REDRAWS switch (off at this merge) |
+| 38 | i7-yield2 r3 default (d94c2394; lead #69) | f1bb8e24 | DEFAULT DISEMB_POS_REDRAWS 8 (disembedding redraws the start position when every work stance fails) |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
@@ -3488,6 +3490,7 @@ cp -a v2maps_int1, `anchors.json` / `links.json` kept as `*.before_int2`. Whatev
 - i7-cork's staged root is not folded. Its extra cork entries serve only the default-off routes. They share the cork's model, so the sampler's
   entry lookup would see four candidates instead of one (lead: agreed, not folded). If the owner turns a route on, the entries are staged
   in `$SY/v2/v2maps_int1_cork`.
+- umb2 (lead #67b): the umbrella's ladder round-2 entry (6 valid) + its 4 maps replace the round-1 entry; check_int2 ERRORS 0.
 - goalmaps (with merge 12): ontop_large_01's countertop maps (soap dispenser h0.9158 r / l) with the anchor 0.9158, and the umbrella's hall-tree
   interior PLACE maps; new files only. The umbrella's round-2 entries wait for the lead.
 - ft2b (with merge 15): its 4 luhkiz maps were keyed on int1's luhkiz entry, which ad2 replaced, so they are REBUILT against int2's entry
