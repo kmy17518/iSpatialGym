@@ -103,6 +103,18 @@ STILL_EXIT_CONVERGE_WINDOW = 10  # steps: _wait_converged stops when its error d
 def oracle_still_exit() -> bool:
     return os.environ.get("ISPATIALGYM_ORACLE_STILL_EXIT") == "1"
 
+
+def grip_wait_no_pause() -> bool:
+    """i7-yield2 r2 (lead decision #65): the steps of a gripper CLOSE wait (the contact-hold wait for the assisted grasp, the wait after the
+    closing command; at most ``gripper_steps`` each) are emitted as settle steps, which the QA pause rule and the monitors' stalled rule do
+    not count - a closure that grips nothing then ends in the executor's ``failed_grasp`` (retried) instead of a hard [pause] (the wait of
+    60 + 5 still steps outlasted the pause limit of 50: int2_* 3 of 5 pauses, $OFH/out 34 of 68). A stall anywhere else still pauses.
+    DEFAULT ON since 2026-11-08 (i7-yield2 r2: the 3 int2 close-wait pauses re-demoed became retried failed_grasp, 2 then succeeded; N 4
+    under_small_01 / control touching_01: no failure inside an exempted wait); ``ISPATIALGYM_GRIP_WAIT_NO_PAUSE=0`` turns it off. Each
+    exempted wait is recorded: ``close_wait_exempt_steps`` on the closure's ``contact_hold`` release event, else a ``close_wait_exempt``
+    release event {steps, held}."""
+    return os.environ.get("ISPATIALGYM_GRIP_WAIT_NO_PAUSE", "1") == "1"
+
 Pose = Tuple[th.Tensor, th.Tensor]
 
 #: QA categories of §6.4 a motion may raise (the executor maps everything else to ``execution``).
@@ -759,6 +771,8 @@ class Motions:
         self.gripper_intent_closed[arm] = bool(close)
         q_now = float(self.robot.get_joint_positions()[idx].float().mean())
         held_before = None if close else self.held_object(arm)
+        exempt = bool(close) and grip_wait_no_pause()
+        exempted = 0
         if close:
             contact_hold = None
             sq = self.cfg.gripper_contact_squeeze_m if squeeze is None else float(squeeze)
@@ -787,10 +801,13 @@ class Motions:
                 # command takes over (the closure then behaves as before)
                 steps = self.cfg.gripper_steps if steps is None else int(steps)
                 for i in range(steps):
-                    yield self._emit()
+                    yield self._emit(settling=exempt)
+                    exempted += int(exempt)
                     if self.held_object(arm) is not None:
                         self.release_events[-1]["attached_after_steps"] = i + 1
                         self.release_events[-1]["fingers_at_attach_m"] = [round(float(v), 4) for v in self.robot.get_joint_positions()[idx].float().tolist()]
+                        if exempted:
+                            self.release_events[-1]["close_wait_exempt_steps"] = exempted
                         yield from self.hold(5)
                         return
                 log.info("gripper(%s): both pads on the object but no assisted grasp within %d steps at the contact hold %.1f mm; closing fully", arm, steps, contact_hold * 1000)
@@ -811,7 +828,8 @@ class Motions:
         q_fingers = self.robot.get_joint_positions()[idx].float().clone() if still_exit else None
         n_still = 0
         for i in range(steps):
-            yield self._emit()
+            yield self._emit(settling=exempt)
+            exempted += int(exempt)
             if still_exit:
                 q_now_f = self.robot.get_joint_positions()[idx].float()
                 n_still = n_still + 1 if float((q_now_f - q_fingers).abs().max()) < STILL_EXIT_MOVE else 0
@@ -823,6 +841,12 @@ class Motions:
                     break
                 if still_exit and n_still >= STILL_EXIT_STEPS:
                     break
+        if exempted:
+            if contact_hold is not None and self.release_events and self.release_events[-1].get("event") == "contact_hold":
+                self.release_events[-1]["close_wait_exempt_steps"] = exempted  # this closure's contact hold (its fallback full close)
+                self.release_events[-1]["held_after_wait"] = self.held_object(arm) is not None
+            else:
+                self.release_events.append({"arm": arm, "event": "close_wait_exempt", "steps": exempted, "held": self.held_object(arm) is not None})
         yield from self.hold(5)
 
     # ------------------------------------------------------------------ trunk
