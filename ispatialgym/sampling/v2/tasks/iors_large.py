@@ -1982,10 +1982,11 @@ class IORSLarge(SamplerV2):
         the push stance, the object's orientation, the drop / goal cells, the push direction and the segment arm only, and ``_couple`` asked
         for the same inputs again per grasp draw of a C (one under_large_03 attempt: 85 chain solves, 43 distinct results, 6.9 s each).
         The key is the inputs' exact float values (a jittered yaw is another key); a hit returns a deep copy of the stored result (None
-        too). ``sample`` clears the memo per attempt. ``ISPATIALGYM_PUSH_CHAIN_MEMO=0`` = solve every call (the former path).
+        too). ``sample`` clears the memo per attempt. DEFAULT OFF (lead #70b: 1 hit in 2,052 solves on under_large_03 - identical but no speed);
+        ``ISPATIALGYM_PUSH_CHAIN_MEMO=1`` turns it on.
         Kit ``push_chain.solved`` / ``push_chain.memo_hit``."""
         memo = self.__dict__.get("_push_chain_memo")  # set by ``sample`` (an attempt): outside one, every call solves
-        if memo is None or os.environ.get("ISPATIALGYM_PUSH_CHAIN_MEMO", "1") == "0":
+        if memo is None or os.environ.get("ISPATIALGYM_PUSH_CHAIN_MEMO", "0") != "1":
             return self._push_under_chain_solve(place, quat, drop_xy, goal_xy, d2)
         key = (tuple(float(v) for v in place.base_pose2d), float(place.translate), float(place.tilt), str(self.seg_arm), str(self.push_hand),
                tuple(float(v) for v in G.t(quat).reshape(-1).tolist()), tuple(float(v) for v in G.t(drop_xy).reshape(-1).tolist()[:2]),

@@ -1,6 +1,6 @@
 """i7-stancememo r4 (lead decision #70): IORSLarge._push_under_chain memoizes the chain per attempt on the exact inputs (one under_large_03
 attempt solved 85 chains, 43 distinct). Same inputs -> the stored result (a copy); any input differing in a bit -> a solve; the memo is
-cleared per attempt; ISPATIALGYM_PUSH_CHAIN_MEMO=0 solves every call."""
+cleared per attempt; default OFF (lead #70b), ISPATIALGYM_PUSH_CHAIN_MEMO=1 turns it on."""
 from types import SimpleNamespace
 
 import torch as th
@@ -26,7 +26,7 @@ def _s():
 
 
 def test_same_inputs_return_the_stored_chain(monkeypatch):
-    monkeypatch.delenv("ISPATIALGYM_PUSH_CHAIN_MEMO", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_PUSH_CHAIN_MEMO", "1")  # default off (lead #70b)
     s, calls = _s()
     st = Stance("push", (1.0, 2.0, 0.5), 2.0, 0.0)
     q = th.tensor([0.0, 0.0, 0.3, 0.9539392])
@@ -54,7 +54,7 @@ def test_memo_off_and_per_attempt(monkeypatch):
     for _ in range(2):
         s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
     assert len(calls) == 2
-    monkeypatch.delenv("ISPATIALGYM_PUSH_CHAIN_MEMO")
+    monkeypatch.setenv("ISPATIALGYM_PUSH_CHAIN_MEMO", "1")
     s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
     s._push_chain_memo = {}  # what IORSLarge.sample does at every attempt
     s._push_under_chain(st, q, th.tensor([1.0, 1.0]), th.tensor([1.3, 1.0]), [1.0, 0.0])
