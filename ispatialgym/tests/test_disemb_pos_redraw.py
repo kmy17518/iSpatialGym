@@ -39,6 +39,8 @@ def _position_stub(monkeypatch):
 
 def test_switch_parsing(monkeypatch):
     monkeypatch.delenv("ISPATIALGYM_DISEMB_POS_REDRAWS", raising=False)
+    assert DE.disemb_pos_redraws() == 8  # default (i7-yield2 r3 A/B)
+    monkeypatch.setenv("ISPATIALGYM_DISEMB_POS_REDRAWS", "0")
     assert DE.disemb_pos_redraws() == 0
     monkeypatch.setenv("ISPATIALGYM_DISEMB_POS_REDRAWS", "8")
     assert DE.disemb_pos_redraws() == 8
@@ -47,7 +49,7 @@ def test_switch_parsing(monkeypatch):
 
 
 def test_off_tries_the_drawn_position_only(monkeypatch):
-    monkeypatch.delenv("ISPATIALGYM_DISEMB_POS_REDRAWS", raising=False)
+    monkeypatch.setenv("ISPATIALGYM_DISEMB_POS_REDRAWS", "0")
     t = _task({(3, 0)})
     with pytest.raises(Reject) as e:
         t.sample_instance(np.random.default_rng(0))
