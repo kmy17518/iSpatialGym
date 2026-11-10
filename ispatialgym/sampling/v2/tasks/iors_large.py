@@ -545,9 +545,11 @@ PUSH_GUIDE_WALL_VARIANTS = ("inter_object_relation_satisfaction-under_large_scal
 #: the target's broad face this far off the wall's face at the drop and the goal (closed by the lean)
 PUSH_GUIDE_GAP_M = 0.015
 #: the drop centre's distance outside the partner edge: ``None`` = the target's half extent + :data:`PUSH_GUIDE_DROP_FRONT_OUT_M` (its
-#: front 3 cm before the edge, the push nearly all along the wall) and 0.03 (ALONGSIDE: the front half beside the panel;
-#: ``_free_floor_cell`` keeps the centre >= 2 cm outside the partner's AABB)
-PUSH_GUIDE_DROP_OUTS_M: Tuple[Optional[float], ...] = (None, 0.03)
+#: front 3 cm before the edge, the push nearly all along the wall), a number = that (0.03: ALONGSIDE, the front half beside the panel;
+#: ``_free_floor_cell`` keeps the centre >= 2 cm outside the partner's AABB). 2026-11-10 r2: (0.03, 0.06) - the front drop (``None``,
+#: 0.195 m out for the briefcase) makes a 0.49 m push that no frontal stance's pitched hand reaches (:data:`PUSH_GUIDE_HAND_AHEAD_M`:
+#: a 0.385 m window); ug_ul02_on: its 1363 chains all failed at the pre-pose, 77 % of the arm's unsolved chains)
+PUSH_GUIDE_DROP_OUTS_M: Tuple[Optional[float], ...] = (0.03, 0.06)
 PUSH_GUIDE_DROP_FRONT_OUT_M = 0.03
 #: the hand's lateral move into the wall per metre of push travel (5.7 deg) and its aim away from the target's centre line
 PUSH_GUIDE_LEAN_M_PER_M = 0.10
@@ -570,14 +572,25 @@ PUSH_GUIDE_FACE_SPREAD_M = 0.015
 #: centre under the desk either way); the scan's heights start above the panels' recessed plinth (2-3 cm at 2 cm up)
 PUSH_GUIDE_WALL_FROM_M = 0.10
 PUSH_GUIDE_SCAN_Z0_M = 0.06
-#: the frontal stance's stand-off keeps the pitched hand's push within reach: its goal (the target's back at the goal) at most this far
-#: ahead of the base and its start (the back at the drop, 2 cm stand-off) at least that far (today's recorded pushes: 0.35-0.91 m)
-PUSH_GUIDE_HAND_AHEAD_M = (0.35, 0.90)
+#: the frontal stance's stand-off keeps the pitched hand's push within reach: its start (the target's back at the drop, 2 cm stand-off ~ the
+#: eef start) at least this far ahead of the base and its goal (the back at the goal ~ the eef goal - 1 cm) at most that far. 2026-11-10
+#: r2 (was (0.35, 0.90)): the pitched chains of r2_ul02_stand + ug_ul02_off + ug_ul02_on (eef start / goal in base): start < 0.47 m
+#: 0 / 1395 solved (every one 'exact IK failed at pose 1 of 4' - the pre-pose, back and up from the start, too near the body), 0.47-0.49
+#: 273 / 1036, 0.49-0.51 55-88 %; goal 0.89-0.91 5 / 726, >= 0.91 0 / 721 ('approach_untrackable')
+PUSH_GUIDE_HAND_AHEAD_M = (0.49, 0.875)
 
 
 def push_guide_wall_on() -> bool:
     """:data:`PUSH_GUIDE_WALL_ENV` (default off)."""
     return os.environ.get(PUSH_GUIDE_WALL_ENV, "0").strip().lower() in _ON
+
+
+def guide_push_in_reach(stand_off: float, out: float, inside: float, half: float, window: Tuple[float, float] = PUSH_GUIDE_HAND_AHEAD_M) -> bool:
+    """A frontal guide-lane stance at ``stand_off`` from the edge pushes within the pitched hand's reach (:data:`PUSH_GUIDE_HAND_AHEAD_M`):
+    the target's back at the drop (``out`` outside the edge, ``half`` its half extent along the push, the hand 2 cm behind it) at least
+    ``window[0]`` ahead of the base, its back at the goal (``inside`` the edge) at most ``window[1]``."""
+    return (float(window[0]) - 1e-9 <= float(stand_off) - float(out) - float(half) - 0.02
+            and float(stand_off) + float(inside) - float(half) <= float(window[1]) + 1e-9)
 
 
 def guide_faces_from_hits(hits: Sequence[Tuple[int, float, int, Optional[float]]], n_cells: int, corridor_m: float,
@@ -2358,6 +2371,24 @@ class IORSLarge(SamplerV2):
                     return False
         return True
 
+    def guide_endwise_pairs(self, F_live: Sequence[Tuple[float, Any]], yaws: Sequence[float], d_yaw: float, drop_xy, place: Stance, arm: str,
+                            yaw_step: float) -> List[float]:
+        """The endwise init ``yaws`` (the push-under yaw lock's at this C) with a (yaw, grasp) pair of ``F_live`` whose release at the drop
+        ``drop_xy`` passes the screening IK from ``place`` (:meth:`release_feasible` at the carried yaws ``+ d_yaw``, the same screen as the
+        C's F_goal, which reuses it from the feasible-set cache) - :data:`PUSH_GUIDE_WALL_ENV` checks this before the push chain."""
+        if not yaws:
+            return []
+        F_goal = self.release_feasible(drop_xy, [float(y) + d_yaw for y in yaws], lambda xy, quat, eio=None: self.drop_pose_at(xy, quat), place, arm,
+                                       self.place_ignores())
+        buckets = {int(round(float(y) / yaw_step)) for y in yaws}
+        F_k = intersect_feasible([yg for yg in F_live if int(round(float(yg[0]) / yaw_step)) in buckets], [(y - d_yaw, g) for y, g in F_goal], yaw_step=yaw_step)
+        hit = {int(round(float(y) / yaw_step)) for y, _ in F_k}
+        keep = [y for y in yaws if int(round(float(y) / yaw_step)) in hit]
+        log.info("%s: guide-wall endwise pairs at C (d %.2f λ %+.2f): yaws %s, released at the drop %s, with a pair of F_init %s", self.gp.variant,
+                 place.stand_off or 0.0, place.lateral or 0.0, [round(float(y), 2) for y in yaws],
+                 sorted({(round((float(y) - d_yaw) % (2 * math.pi), 2), getattr(g, "name", g)) for y, g in F_goal}), [round(float(y), 2) for y in keep])
+        return keep
+
     def guide_wall_record(self, place: Stance) -> Dict[str, Any]:
         """The push record's ``guide_wall`` for a C on a guide lane (``extras["guide_wall"]``): the lane facts + the oracle's knobs
         (``lean_m_per_m`` :data:`PUSH_GUIDE_LEAN_M_PER_M`, ``aim_away_m`` :data:`PUSH_GUIDE_AIM_AWAY_M`); ``{}`` elsewhere."""
@@ -3929,7 +3960,8 @@ class IORSLarge(SamplerV2):
                     ahead = so - out
                     if ahead < lo_ahead or ahead > hi_ahead:
                         continue
-                    if lane is not None and not (PUSH_GUIDE_HAND_AHEAD_M[0] <= ahead - half - 0.02 and so + inside_l - half <= PUSH_GUIDE_HAND_AHEAD_M[1]):
+                    if lane is not None and not guide_push_in_reach(so, out, inside_l, half):
+                        stats["guide_out_of_reach"] = stats.get("guide_out_of_reach", 0) + 1
                         continue  # the guide push's hand: its start (the back at the drop) / goal (the back at the goal) ahead of the base
                     lat_b = frontal_lane_lateral(float(lat), off, arm)
                     xy = edge.base_xy(so, lat_b)  # base beside the lane by ``off``, away from the arm's side (+tangent = the robot's left)
@@ -3955,6 +3987,8 @@ class IORSLarge(SamplerV2):
                         st.extras.update(common, drop_ahead_m=float(x_ahead), stance_kind="side", side_standoff_m=b)
                         cands.append(st)
                         stats["side_candidates"] += 1
+        if lanes_g and stats.get("guide_out_of_reach"):
+            TT._countn(self, "push_guide_wall.c_out_of_reach", int(stats["guide_out_of_reach"]))  # i7-ul02guide r2: stances the reach window drops
         self.template_facts["placement_stats"] = stats
         if not cands:
             log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.variant, partner.name, edge.name, stats)
@@ -6899,6 +6933,19 @@ class IORSLarge(SamplerV2):
                         errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): skipped - every F_init pair at its {len(yaws_c)} push "
                                       f"yaws failed its exact IK at B (PUSH_CHAIN_LIVE_B)")
                         continue
+                if push_guide_wall_on() and self.guide_wall_active():
+                    # i7-ul02guide r2: the endwise yaws need a pair of F_init that also releases at the drop BEFORE their chain is solved
+                    # (ug_ul02_on: 76 of the 166 C with a solved chain then found none - 'the push-under yaw lock endwise keeps none of
+                    # F's yaws': at the endwise carried yaws one hand orientation releases, top_2 at 0 / top_0 at pi, often not the pair
+                    # B took)
+                    keep_e = self.guide_endwise_pairs(F_live, yaws_p, d_yaw, cd, place, arm, yaw_step)
+                    if not keep_e:
+                        TT._count(self, "push_guide_wall.c_no_endwise_pair")
+                        errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral or 0.0:+.2f}): no pair of F_init at the endwise yaws "
+                                      f"{[round(y, 2) for y in yaws_p]} releases at the drop (ISPATIALGYM_PUSH_GUIDE_WALL)")
+                        continue
+                    TT._count(self, "push_guide_wall.c_endwise_pair")
+                    yaws_p = [y for y in yaws_p if y in keep_e]
                 pst0 = push_st if push_st is not None else place
                 best = sorted(yaws_p, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
                 found = False

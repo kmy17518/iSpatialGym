@@ -203,6 +203,41 @@ def test_the_push_record_carries_the_lane_and_the_oracle_knobs():
     assert EX.push_guide_wall_plan({}) is None and EX.push_guide_wall_plan({"guide_wall": {"wall_left": 0}}) is None
 
 
+def test_reach_window_keeps_only_pushes_the_pitched_hand_reaches():
+    """r2 (2026-11-10): the briefcase (half 0.165 m along the push, goal 0.265 m inside the edge) - the front drop (0.195 m out, a 0.49 m
+    push) fits no stand-off; the alongside drops do at 0.725-0.775 m (eef start >= 0.49 m, the back at the goal <= 0.875 m ahead)."""
+    half, inside = 0.165, IL.PUSH_GUIDE_WALL_FROM_M + 0.165
+    fits = lambda out: [so for so in IL.PUSH_GUIDE_STAND_OFFS if IL.guide_push_in_reach(so, out, inside, half)]  # noqa: E731
+    assert fits(0.165 + IL.PUSH_GUIDE_DROP_FRONT_OUT_M) == []
+    assert fits(0.03) == [0.725, 0.75, 0.775] and fits(0.06) == [0.75, 0.775]
+    assert all(o is not None and fits(o) for o in IL.PUSH_GUIDE_DROP_OUTS_M)
+    # the r1 window (0.35, 0.90) admitted the front drop at 0.75-0.80 m: eef start 0.36-0.41 m, never solved
+    assert [so for so in IL.PUSH_GUIDE_STAND_OFFS if IL.guide_push_in_reach(so, 0.195, inside, half, (0.35, 0.90))] == [0.75, 0.775, 0.8]
+
+
+def test_endwise_pairs_need_a_release_of_an_f_init_pair():
+    """r2: the endwise yaws are kept for the chain only with a (yaw, grasp) pair of F_init that the drop screen also releases (yaw by
+    bucket, grasp by name; the carried yaw = init + d_yaw)."""
+    s = _s()
+    step = math.pi / 8
+    g0, g2 = SimpleNamespace(name="top_0"), SimpleNamespace(name="top_2")
+    d_yaw = 1.18
+    seen = {}
+
+    def release_feasible(xy, yaws, pose, place, arm, ignore):
+        seen["yaws"] = list(yaws)
+        return [(yaws[0], g0)]  # only the first endwise yaw, with top_0
+
+    s.release_feasible = release_feasible
+    s.place_ignores = lambda: []
+    st = Stance("placement", (15.8, -13.9, math.pi / 2), 0.95, -0.6, 0.75, None, None, 0.25, None, ["right"])
+    y1, y2 = 4 * step, 12 * step
+    assert s.guide_endwise_pairs([(y1, g0), (y2, g2)], [y1, y2], d_yaw, (15.56, -13.22), st, "right", step) == [y1]
+    assert seen["yaws"] == pytest.approx([y1 + d_yaw, y2 + d_yaw])
+    assert s.guide_endwise_pairs([(y1, g2), (y2, g2)], [y1, y2], d_yaw, (15.56, -13.22), st, "right", step) == []  # B's grasp is the other one
+    assert s.guide_endwise_pairs([(y1, g0)], [], d_yaw, (15.56, -13.22), st, "right", step) == []
+
+
 # ---------------------------------------------------------------------------------------------------------------- the oracle
 
 
