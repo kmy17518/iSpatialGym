@@ -53,6 +53,8 @@ def refresh(output, host):
     own_vast_ids={str(i) for i in runtime.get('vast_instance_ids',[])}
     own_fleet=[i for i in fleet if str(i.get('id')) in own_vast_ids]
     own_vast=cluster.get('vast_campaign',{})
+    campaign_vast_observed_at=(dt.datetime.fromtimestamp(own_vast['observed_at_unix'],dt.timezone.utc).isoformat()
+                               if own_vast.get('observed_at_unix') else None)
     unknown_accounts=[a.get('account') for a in vast.get('accounts',[]) if a.get('error_type') or 'instances' not in a]
     try: vast_age=time.time()-dt.datetime.fromisoformat(vast['checked_at']).timestamp()
     except (KeyError,ValueError): vast_age=None
@@ -62,7 +64,8 @@ def refresh(output, host):
         return sum(int(i.get('num_gpus') or 0) for i in rows if i.get('actual_status')=='running')
     state={
         'updated_at':now(),'cluster_observed_at':cluster.get('checked_at'),
-        'cluster_probe_error':error,'vast_observed_at':vast.get('checked_at'),
+        'cluster_probe_error':error,'vast_observed_at':campaign_vast_observed_at,
+        'all_vast_observed_at':vast.get('checked_at'),
         'phase':runtime.get('phase','Infrastructure and contract preparation'),
         'campaign_id':'campaign_20261110','baseline':'9949b012',
         'campaign_cluster_running_gpus':gpu_count(campaign),
@@ -74,6 +77,7 @@ def refresh(output, host):
         'all_vast_running_gpus':fleet_gpus(fleet) if not unknown_accounts and vast_age is not None and vast_age < 120 else None,
         'all_vast_observation_age_seconds':vast_age,
         'scale_prebuild':cluster.get('scale_prebuild',{}),
+        'data_releases':cluster.get('data_releases',[]),
         'vast_accounts_unavailable':unknown_accounts,
         'campaign_submitted_jobs':runtime.get('jobs',[]),
         'baseline_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in baseline_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in baseline_gates),'gates':baseline_gates},
@@ -87,6 +91,8 @@ def refresh(output, host):
     atomic(output/'live.json',json.dumps(state,indent=2)+'\n')
     lines=['# Fresh dataset campaign — live state','',f"Updated: {state['updated_at']} (UTC). Cluster observed: {state['cluster_observed_at']}.",'',f"Current phase: **{state['phase']}**.",'','| GPU usage | Count |','|---|---:|',f"| This campaign: cluster running | {state['campaign_cluster_running_gpus']} |",f"| This campaign: cluster pending jobs | {state['campaign_cluster_pending_jobs']} |",f"| Other work: cluster running | {state['unrelated_cluster_running_gpus']} |",f"| This campaign: Vast running | {state['campaign_vast_running_gpus'] if state['campaign_vast_running_gpus'] is not None else 'not verified'} |",f"| All accounts: Vast running | {state['all_vast_running_gpus'] if state['all_vast_running_gpus'] is not None else 'not verified'} |",'',f"Vast observation: {state['vast_observed_at'] or 'not yet checked'}. New campaign cap: ${state['new_campaign_vast_budget_usd']}; prior campaign resources are separate.",'','| Fresh campaign result | Count |','|---|---:|']
     lines.extend([f"| Baseline canaries: demo passed | {state['baseline_validation']['demo_passed']} |",f"| Baseline canaries: open-loop passed | {state['baseline_validation']['open_loop_passed']} |"])
+    for release in state['data_releases']:
+        lines.extend([f"| Released exact-scale grasp libraries ({pathlib.Path(release['path']).name}) | {release.get('new_scale_libraries',0)} |",f"| Released exact-scale arm maps ({pathlib.Path(release['path']).name}) | {release.get('new_scale_maps',0)} |"])
     lines.extend(f"| {k.replace('_',' ')} | {v} |" for k,v in state['campaign_results'].items())
     if own_vast:
         lines.extend(['',f"Campaign Vast ledger estimate: ${own_vast.get('spend_estimate_usd',0):.2f} spent + ${own_vast.get('future_compute_commitment_usd',0):.2f} reserved compute + ${own_vast.get('transfer_reserve_usd',0):.2f} transfer/storage reserve. Provider invoice reconciliation pending. Fleet observed at Unix {own_vast.get('observed_at_unix')}."])

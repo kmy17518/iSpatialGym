@@ -32,6 +32,12 @@ class PairGoalPlan:
     deadline_at: float
     max_members: int
     sha256: str
+    scale: str = "small"
+    goal_cell: tuple | None = None
+
+    @property
+    def orientation_required(self):
+        return self.scale == "large" or self.relation != "inside"
 
     def summary(self):
         as_pose = lambda x: {"position": list(x[0]), "orientation": list(x[1])}
@@ -41,14 +47,14 @@ class PairGoalPlan:
                 "requested_release": as_pose(self.release), "relation": self.relation,
                 "target_name": self.target_name, "partner_name": self.partner_name,
                 "plan_sha256": self.sha256, "deadline_at": self.deadline_at, "max_members": self.max_members,
-                "phase": "planned_before_start", "target_orientation_required": self.relation != "inside"}
+                "phase": "planned_before_start", "target_orientation_required": self.orientation_required, "scale": self.scale}
 
     def verify_settled(self, target, partner, *, position_tol=.03, orientation_tol=.20, partner_position_tol=.005):
         dp, dq = pose_error(partner, self.partner)
         if dp > partner_position_tol or dq > orientation_tol:
             raise GoalPlanError(f"partner drifted {dp:.6f} m / {dq:.6f} rad")
         dp, dq = pose_error(target, self.goal)
-        if dp > position_tol or (self.relation != "inside" and dq > orientation_tol):
+        if dp > position_tol or (self.orientation_required and dq > orientation_tol):
             raise GoalPlanError(f"settled pair target drifted {dp:.6f} m / {dq:.6f} rad")
 
 
@@ -66,10 +72,16 @@ def vary_nextto_gap(goal, release, partner, *, gap_max, observed_gap, base_yaw, 
     return shifted(goal), shifted(release), desired
 
 
-def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at, now=None):
+def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at, now=None, scale="small"):
     now = time.time() if now is None else now
     _require(isinstance(raw, dict) and raw.get("schema") == SCHEMA, "invalid pair goal schema")
-    _require(relation in RELATIONS and raw.get("task") == f"inter_object_relation_satisfaction-{relation}_small_scale", "unsupported pair goal task")
+    _require(scale in ("small", "large") and relation in (RELATIONS if scale == "small" else ("ontop", "inside"))
+             and raw.get("task") == f"inter_object_relation_satisfaction-{relation}_{scale}_scale", "unsupported pair goal task")
+    goal_cell = raw.get("goal_cell")
+    if scale == "large":
+        _require(isinstance(goal_cell, (list, tuple)) and len(goal_cell) == 2
+                 and all(isinstance(v, (int, float)) and math.isfinite(v) for v in goal_cell), "large pair goal requires fixed cell")
+        goal_cell = tuple(float(v) for v in goal_cell)
     _require(raw.get("template_id") == template_id and raw.get("scene") == scene and raw.get("room") in rooms,
              "pair goal template/scene/room mismatch")
     for name in ("campaign_id", "group_id", "target_name", "partner_name"):
@@ -88,15 +100,15 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell)
 
 
-def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None):
+def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):
     path = os.environ.get(ENV)
     if not path:
         return None
     with open(path) as stream:
         plan = validate_pair_plan(json.load(stream), template_id=template_id, scene=scene, rooms=rooms,
-                                  relation=relation, activated_at=activated_at)
+                                  relation=relation, activated_at=activated_at, scale=scale)
     _require(expected_sha256 is None or plan.sha256 == expected_sha256, "pair goal plan changed while sampling")
     return plan

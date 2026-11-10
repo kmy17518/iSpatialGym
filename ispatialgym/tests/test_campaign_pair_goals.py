@@ -58,3 +58,45 @@ def test_inside_goal_orientation_is_unconstrained_and_metadata_goal_exact():
     assert d.pose_targets["target"]["orientation_metric"] is None
     assert d.pose_targets["target"]["position"] == list(p.goal[0])
     assert d.summary["campaign_goal_group"]["settled_goal_residual"]["position_m"] > 0
+
+
+def test_large_goal_is_pinned_to_supported_cell_before_starts(monkeypatch):
+    from dataclasses import replace
+    from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
+    p = replace(plan(), scale="large", goal_cell=(.1, .2))
+    s = SimpleNamespace(campaign_pair_plan=lambda: p, tname="target", pname="partner",
+                        partner=SimpleNamespace(get_position_orientation=lambda: p.partner),
+                        num=lambda key, default: default, tol=lambda key, default: default,
+                        place={"cells": th.tensor([[.1, .2], [.5, .6]])})
+    IORSLarge.campaign_pin_goal(s)
+    assert s.place["cells"].shape == (1, 2)
+    assert s._campaign_latest_proposal["goal_poses"]["target"][0] == list(p.goal[0])
+    s.place["cells"] = th.tensor([[2., 2.]])
+    with pytest.raises(Reject, match="supported placement region"):
+        IORSLarge.campaign_pin_goal(s)
+    monkeypatch.delenv(ENV, raising=False)
+    assert IORSLarge.campaign_pair_plan(SimpleNamespace()) is None
+
+
+def test_large_inside_keeps_orientation_and_exact_goal_after_native_settle():
+    from dataclasses import replace
+    from ispatialgym.sampling.v2.tasks.iors_large import IORSLarge
+    p = replace(plan("inside"), scale="large", goal_cell=(0., 0.))
+    s = SimpleNamespace()
+    s.campaign_verify_pair = lambda draft, **kwargs: IORSLarge.campaign_verify_pair(s, draft, **kwargs)
+    s._campaign_pair_active = p
+    s.campaign_group_remaining_s = lambda: 100
+    s.tol = s.num = lambda key, default: default
+    s.tname, s.pname = "target", "partner"
+    s.objects = {"partner": SimpleNamespace(get_position_orientation=lambda: p.partner),
+                 "target": SimpleNamespace(get_position_orientation=lambda: ((.002, 0., .8), p.goal[1]))}
+    s.target, s.partner = s.objects["target"], s.objects["partner"]
+    d = Draft()
+    d.summary["campaign_goal_group"] = p.summary()
+    d.pose_targets = {"target": {"orientation_metric": "full"}}
+    s.campaign_verify_pair(d, settled=True)
+    assert d.pose_targets["target"]["position"] == list(p.goal[0])
+    assert d.pose_targets["target"]["orientation"] == list(p.goal[1])
+    s.objects["target"].get_position_orientation = lambda: (p.goal[0], (1., 0., 0., 0.))
+    with pytest.raises(Reject, match="settled pair target drifted"):
+        s.campaign_verify_pair(d, settled=True)

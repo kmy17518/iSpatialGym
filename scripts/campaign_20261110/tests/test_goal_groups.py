@@ -179,3 +179,69 @@ def test_runtime_bddl_binding_normalizes_legacy_spelling_and_measure_but_not_goa
     import pytest
     with pytest.raises(c.ContractError, match="semantics differ"):
         g.bind_runtime_definition(template, runtime)
+
+
+def test_joint_author_uses_actual_root_target_and_all_joint_names(tmp_path):
+    job, ledger, tro_path, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    template = replace(template, task="configuration_matching-articulation_close_large_scale",
+                       objects=(replace(template.objects[0], joint="hinge"),))
+    tro = g.read_json(tro_path)
+    tro["ispatialgym"]["campaign"] = {"runtime": {"planned_goal_joints": {"apple.n.01_1": [.01, .2]},
+        "joint_names": {"apple.n.01_1": ["hinge", "passive"]}, "bound_object_poses": {"apple.n.01_1": [[0, 0, 0], [0, 0, 0, 1]]}}}
+    tro["ispatialgym"]["pose_targets"] = {"apple.n.01_1": {"position": [1, 2, 3], "orientation": [0, 0, 0, 1], "frame": "world"}}
+    c.write_json_atomic(tro_path, tro)
+    side_path = tro_path.with_name("fresh_9000000.oracle.json")
+    side = g.read_json(side_path)
+    side["tro_sha256"] = c.file_digest(tro_path)
+    c.write_json_atomic(side_path, side)
+    summary_path = tro_path.with_name("fresh_9000000.summary.json")
+    summary = g.read_json(summary_path)
+    summary.pop("goal_realised")
+    summary.update(joint="hinge", direction="close")
+    c.write_json_atomic(summary_path, summary)
+    meta_path = tro_path.parent.parent / "template_meta.json"
+    meta = g.read_json(meta_path)
+    meta["template_facts"] = {"limits": [0, 1]}
+    c.write_json_atomic(meta_path, meta)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    out = tmp_path / "groups/joint"
+    g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="joint", output=out,
+                    code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                    data_sha256=c.digest("maps"), magnitude_range=[0, .5])
+    plan = g.read_json(out / "goal_plan.json")
+    assert plan["schema"] == "isg-joint-goal-plan-v1"
+    assert plan["goal_pose"]["position"] == [1, 2, 3]
+    assert plan["goal_joints"] == {"hinge": 0, "passive": .2}
+    assert plan["fraction_range"] == [0, .5]
+
+
+def test_large_pair_author_binds_scene_partner_and_goal_cell(tmp_path):
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    partner = c.ObjectRef("table.n.02_1", "partner", "table", "p", c.digest("partner"), ready=True, readiness_source="test")
+    template = replace(template, task="inter_object_relation_satisfaction-ontop_large_scale", objects=template.objects+(partner,))
+    anchor["template_meta"]["bindings"] = [{"name": "apple.n.01_1", "role": "target"}, {"name": partner.instance, "role": "partner"}]
+    bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
+    bindings["apple.n.01_1"]["scene_object_name"] = "apple_scene"
+    bindings[partner.instance] = {"category": "table", "model": "p"}
+    anchor["bound_object_poses"] = {partner.instance: [[0, 0, .7], [0, 0, 0, 1]]}
+    anchor["summary"].update(goal_cell=[1, 2], goal_check={"settled_poses": {"apple_scene": [[1, 2, 2.99], [0, 0, 0, 1]]}})
+    out = tmp_path / "groups/large"
+    g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="large", output=out,
+                    code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                    data_sha256=c.digest("maps"), magnitude_range=[0, 1])
+    plan = g.read_json(out / "goal_plan.json")
+    assert plan["goal_cell"] == [1, 2]
+    assert plan["partner_pose"]["position"] == [0, 0, .7]
+    assert plan["goal_pose"]["position"] == [1, 2, 2.99]
+
+
+def test_alignment_buckets_use_applied_native_range_without_widening(tmp_path):
+    import pytest
+    _, _, _, template, _ = GoalGroupControllerTests().fixture(tmp_path)
+    template = replace(template, task="alignment-world_vertical")
+    bound = g.with_alignment_buckets(template, [15, 25], source={"sha256": c.digest("meta"), "field": "applied_range"})
+    assert bound.scene_setup["bucket_policy"]["edges"] == pytest.approx([15, 18.333333, 21.666667, 25])
+    assert bound.fingerprint != template.fingerprint
+    with pytest.raises(c.ContractError, match="native alignment range"):
+        g.with_alignment_buckets(template, [25, 25], source={"sha256": c.digest("meta"), "field": "applied_range"})

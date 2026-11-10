@@ -145,6 +145,7 @@ import torch as th
 from ispatialgym import REPO_ROOT
 from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import attempt_cap as AC
+from ispatialgym.sampling import campaign_pair_goals as CPG
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import object_joints as OJ
 from ispatialgym.sampling import reach_bands as RB
@@ -4655,7 +4656,87 @@ class IORSLarge(SamplerV2):
             raise Reject("time_budget", f"attempt budget of {self.num('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent ({spent:.0f} s) at {stage}",
                          stage=stage)
 
+    def campaign_pair_plan(self):
+        if not os.environ.get(CPG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CPG.load_pair_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                relation=self.relation, scale="large", activated_at=self._campaign_group_started_at,
+                expected_sha256=getattr(self, "_campaign_pair_plan_sha", None))
+            if (plan.target_name, plan.partner_name) != (self.tname, self.pname):
+                raise Reject("campaign_goal_plan", "large pair role bindings differ from template")
+            if self.relation not in ("ontop", "inside") or self.push_under:
+                raise Reject("campaign_goal_plan", "large push/nextto/touching goal adapter is pending")
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "large pair goal-group member limit reached")
+            self._campaign_pair_plan_sha = plan.sha256
+            return plan
+        except CPG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CPG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_pair_plan()
+        return None if plan is None else max(0.0, plan.deadline_at - time.time())
+
+    def campaign_pin_goal(self):
+        self._campaign_latest_proposal = None
+        self._campaign_pair_active = self.campaign_pair_plan()
+        plan = self._campaign_pair_active
+        if plan is None:
+            return
+        dp, dq = CPG.pose_error(self.partner.get_position_orientation(), plan.partner)
+        if dp > self.num("partner_moved_max_m", .005) or dq > self.tol("orientation", .20):
+            raise Reject("campaign_partner_drift", f"large partner changed before starts: {dp:.6f} m / {dq:.6f} rad")
+        # The anchor cell must still belong to this template's geometric candidate
+        # set. Install it before B starts are drawn; C can then vary around it.
+        cells = self.place["cells"]
+        if not len(cells) or float(th.linalg.norm(G.t(cells) - G.t(plan.goal_cell), dim=1).min()) > .001:
+            raise Reject("campaign_goal_cell", "fixed goal cell no longer belongs to the supported placement region")
+        self.place["cells"] = G.t([plan.goal_cell])
+        self._campaign_latest_proposal = {"group_id": plan.group_id, "start_poses": {},
+            "goal_poses": {self.tname: _jsonable(plan.goal), self.pname: _jsonable(plan.partner)}}
+
+    def campaign_verify_pair(self, draft, *, settled=False):
+        plan = getattr(self, "_campaign_pair_active", None)
+        if plan is None:
+            return
+        self.campaign_group_remaining_s()
+        partner = self.partner.get_position_orientation()
+        dp, dq = CPG.pose_error(partner, plan.partner)
+        group = draft.summary["campaign_goal_group"]
+        group["partner_residual"] = {"position_m": dp, "orientation_rad": dq}
+        if dp > self.num("partner_moved_max_m", .005) or dq > self.tol("orientation", .20):
+            raise Reject("campaign_partner_drift", f"large partner drifted {dp:.6f} m / {dq:.6f} rad")
+        if settled:
+            actual = self.target.get_position_orientation()
+            dp, dq = CPG.pose_error(actual, plan.goal)
+            group["settled_goal_residual"] = {"position_m": dp, "orientation_rad": dq}
+            try:
+                plan.verify_settled(actual, partner, position_tol=self.tol("position", .03),
+                    orientation_tol=self.tol("orientation", .20), partner_position_tol=self.num("partner_moved_max_m", .005))
+            except CPG.GoalPlanError as exc:
+                raise Reject("campaign_goal_drift", str(exc)) from exc
+        draft.goal_poses[self.tname] = tuple(G.t(v) for v in plan.release)
+        target = draft.pose_targets[self.tname]
+        target["position"], target["orientation"] = list(plan.goal[0]), list(plan.goal[1])
+        group["phase"] = "settled_goal_verified" if settled else "settled_geometry_verified"
+
+    def write_instance(self, *args, **kwargs):
+        if getattr(self, "_campaign_pair_active", None) is not None:
+            self.campaign_verify_pair(args[0])
+            args[0].summary["campaign_goal_group"]["phase"] = "settled_goal_verified"
+        result = super().write_instance(*args, **kwargs)
+        if getattr(self, "_campaign_pair_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
+        return result
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if os.environ.get(CPG.ENV):
+            self.campaign_pin_goal()
         init: Stance = self.surface["init"]
         self._sm_in_search = True  # i7-stancememo: a rejection from here on is the B / C search's
         sm = self._sm() if SM.memo_on() else None
@@ -6647,6 +6728,9 @@ class IORSLarge(SamplerV2):
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
             release_xy = cd if push else gc
             release_pose = (lambda xy, quat, eio=None: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat, eio=None: self.goal_pose_at(xy, quat, eio))
+            campaign_plan = getattr(self, "_campaign_pair_active", None)
+            if campaign_plan is not None:
+                release_pose = lambda xy, quat, eio=None: tuple(G.t(v) for v in campaign_plan.release)
             # A carried object keeps its yaw RELATIVE TO THE ROBOT (no re-grasp), so at C its world yaw is the init yaw plus
             # the base-yaw change B -> C: F_goal is screened at yaw + d_yaw and intersected with F_init by the init yaw
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
@@ -6656,7 +6740,7 @@ class IORSLarge(SamplerV2):
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
             # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
             tilts_of: Dict[Tuple[int, Any], List[float]] = {}
-            if not push:
+            if not push and campaign_plan is None:
                 F_goal, tilts_of = self.screen_release_tilts(F_goal, release_xy, yaws, d_yaw, place, arm, ignore_place, yaw_step)
             F = intersect_feasible(F_live, F_goal, yaw_step=yaw_step)
             if push:
@@ -6755,6 +6839,10 @@ class IORSLarge(SamplerV2):
                         if t_pose is None:
                             why_b.append("target footprint off the init surface")
                             continue
+                        if campaign_plan is not None:
+                            self._campaign_latest_proposal = {"group_id": campaign_plan.group_id,
+                                "start_poses": {tname: _jsonable(t_pose)}, "goal_poses": {tname: _jsonable(campaign_plan.goal)},
+                                "base_pose2d": list(init.base_pose2d), "grasp": g.name}
                         eef = IK.grasp_pose(t_pose, g.pose)
                         pre = IK.pre_pose(eef)
                         # i7-interior2 2026-11-08 (owner 6.1): the support policy measures the fingers at the grasp's pre-shape (pinch width / 2 + the
@@ -6905,6 +6993,16 @@ class IORSLarge(SamplerV2):
                         continue
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
                     goal = release_pose(release_xy, goal_quat, g.pose)
+                    if campaign_plan is not None:
+                        goal_quat = goal[1]
+                        native = self.goal_pose_at(release_xy, goal_quat, g.pose)
+                        dp, dq = CPG.pose_error(native, campaign_plan.release)
+                        if dp > float(self.ikc.WITNESS_POS_TOL) or dq > float(self.ikc.WITNESS_ANG_TOL):
+                            c_fails.append(f"fixed release differs from native geometry: {dp:.6f} m / {dq:.6f} rad")
+                            continue
+                        self._campaign_latest_proposal = {"group_id": campaign_plan.group_id,
+                            "start_poses": {tname: _jsonable(t_pose)}, "goal_poses": {tname: _jsonable(campaign_plan.goal)},
+                            "base_pose2d": list(init.base_pose2d), "grasp": g.name}
                     place_eef = IK.grasp_pose(goal, g.pose)
                     pre_place = self.pre_place_of(place_eef, place)
                     if ef_mode != "off":
@@ -7160,6 +7258,9 @@ class IORSLarge(SamplerV2):
                                      "path_length_m": {"A_B": None if path_ab is None else path_ab.length_m, "B_C": path_bc.length_m}})
                 d = Draft()
                 d.object_poses[tname] = t_pose
+                if campaign_plan is not None:
+                    d.summary["campaign_goal_group"] = campaign_plan.summary()
+                    d.summary["campaign_goal_group"]["requested_start"] = {"target": _jsonable(t_pose), "grasp": g.name}
                 d.robot_q = self.stance_q(init)
                 d.base_pose2d = tuple(init.base_pose2d)
                 d.summary.update({"goal_cell": gc, "grasp": {"key": g.key, "name": g.name, "yaw": yaw}, "placement_stance": P0.summarize_stance(place),
@@ -7282,6 +7383,8 @@ class IORSLarge(SamplerV2):
     def goal(self, draft: Draft):
         tname = self.tname
         goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft), self.release_eef_in_object())
+        if getattr(self, "_campaign_pair_active", None) is not None:
+            goal = tuple(G.t(v) for v in self._campaign_pair_active.release)
         draft.goal_poses[tname] = goal
         draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
         end = self.sidecar.stances.get("push") or self.sidecar.stance("placement")  # where the robot ends: the push stance when the drop and the push split
@@ -7294,16 +7397,22 @@ class IORSLarge(SamplerV2):
         tgt = draft.pose_targets[tname]
         tgt["position"], tgt["orientation"] = [float(v) for v in goal[0]], [float(v) for v in goal[1]]
         self.record_partner_joints(draft)
+        if getattr(self, "_campaign_pair_active", None) is not None:
+            self.campaign_verify_pair(draft)
 
     def refine_targets_from_goal(self, draft: Draft):
         super().refine_targets_from_goal(draft)
         p, _ = self.partner.get_position_orientation()
         ref = draft.summary.get("partner_position")
         if ref is None:
+            if getattr(self, "_campaign_pair_active", None) is not None:
+                self.campaign_verify_pair(draft, settled=True)
             return
         moved = float(th.linalg.norm(p.float() - th.tensor(ref, dtype=th.float32)))
         if moved > self.num("partner_moved_max_m", 0.005):
             raise Reject("goal_partner_moved", f"partner moved {moved:.3f} m at the goal")
+        if getattr(self, "_campaign_pair_active", None) is not None:
+            self.campaign_verify_pair(draft, settled=True)
 
     def after_goal_check(self, draft: Draft):
         """Place / pre-place at the settled goal pose re-checked from C with the object attached (the record kept), with the recorded

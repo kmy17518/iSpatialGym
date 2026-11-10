@@ -51,4 +51,12 @@ scale_prebuild={}
 for account,root in [('minyeong',campaign_root),('shiyuc',pathlib.Path('/vision/u/shiyuc/minyeong/campaign_20261110'))]:
     try:scale_prebuild[account]=json.loads((root/'scale_prebuild/controller.json').read_text())
     except (OSError,ValueError):pass
-print(json.dumps(dict(scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+data_releases=[]
+for path in sorted(campaign_root.glob('v2_release_*/release_manifest.json')):
+    try:
+        release=json.loads(path.read_text())
+        reader=campaign_root/'validation'/(path.parent.name+'_reader.txt')
+        if reader.exists() and 'ERRORS 0' in reader.read_text().splitlines():
+            data_releases.append({k:v for k,v in release.items() if k!='files'} | {'path':str(path.parent),'reader_errors':0})
+    except (OSError,ValueError):pass
+print(json.dumps(dict(data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))

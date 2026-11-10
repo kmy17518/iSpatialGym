@@ -46,3 +46,17 @@ class PairPlanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_large_pair_schema_rejects_missing_cell_and_preserves_inside_orientation():
+    import pytest
+    raw = PairPlanTests().fixture("inside")
+    raw["task"] = "inter_object_relation_satisfaction-inside_large_scale"
+    kw = dict(template_id="t", scene="s", rooms=["r"], relation="inside", scale="large", activated_at=999, now=1000)
+    with pytest.raises(g.GoalPlanError, match="fixed cell"):
+        g.validate_pair_plan(raw, **kw)
+    raw["goal_cell"] = [0, 0]
+    p = g.validate_pair_plan(raw, **kw)
+    assert p.orientation_required and p.goal_cell == (0., 0.)
+    with pytest.raises(g.GoalPlanError, match="target drifted"):
+        p.verify_settled((p.goal[0], [1, 0, 0, 0]), p.partner)

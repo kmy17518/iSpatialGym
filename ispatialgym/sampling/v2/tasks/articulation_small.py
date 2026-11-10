@@ -446,6 +446,9 @@ class ArticulationSmall(SamplerV2):
             raise Reject("support_small", f"{support.name}: too little free top")
         self.joint = target.joints[self.joint_name]
         self.lower, self.upper = float(self.joint.lower_limit), float(self.joint.upper_limit)
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            self.template_facts.update({"joint": self.joint_name, "joint_type": self._joint_type(),
+                                        "limits": [self.lower, self.upper], "direction": self.direction})
         self.jinfo["lower"], self.jinfo["upper"] = self.lower, self.upper
         self.jinfo.setdefault("closed_q", self.lower)
         # stable set S and the joint states (§5.3 / §5.4)

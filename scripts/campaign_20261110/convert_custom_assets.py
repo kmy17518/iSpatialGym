@@ -115,6 +115,10 @@ def main():
         # dataset name; get_dataset_path preserves absolute dataset roots.
         import torch as th
         from omnigibson.objects import DatasetObject
+        # URDFParseAndImportFile opens a stage with its own physics clock.
+        # Reset after the final import, so its 60 Hz stage cannot leak into the
+        # independent 120 Hz physical smoke scene.
+        og.clear(physics_dt=1.0/120, rendering_dt=1.0/30, sim_step_dt=1.0/30)
         env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120, "rendering_frequency": 30},
                                       "scene": {"type": "Scene"}, "robots": []})
         objects = []

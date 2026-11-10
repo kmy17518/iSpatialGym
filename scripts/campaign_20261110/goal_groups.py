@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import shlex
 import subprocess
@@ -30,6 +31,7 @@ from ispatialgym.sampling.campaign_held_goals import SCHEMA, validate_goal_plan
 from ispatialgym.sampling.campaign_surface_goals import SCHEMA as SURFACE_SCHEMA, validate_surface_plan
 from ispatialgym.sampling.campaign_tray_goals import SCHEMA as TRAY_SCHEMA, validate_tray_plan
 from ispatialgym.sampling.campaign_pair_goals import SCHEMA as PAIR_SCHEMA, RELATIONS as PAIR_RELATIONS, validate_pair_plan, vary_nextto_gap
+from ispatialgym.sampling.campaign_joint_goals import SCHEMA as JOINT_SCHEMA, validate_joint_plan
 
 
 def read_json(path):
@@ -98,14 +100,18 @@ def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: fl
     require(qa.get("enabled") is True and not qa.get("hard_triggered"), "anchor QA disabled or failed")
     require(not any(x.get("triggered") for x in (qa.get("metrics") or {}).values() if x.get("mode") == "hard"),
             "anchor has a hard QA failure")
-    planned_goals = ((tro["ispatialgym"].get("campaign") or {}).get("runtime") or {}).get("planned_goal_poses") or {}
-    require((summary.get("goal_realised") or planned_goals) and summary.get("base_pose2d"),
+    runtime = ((tro["ispatialgym"].get("campaign") or {}).get("runtime") or {})
+    planned_goals = runtime.get("planned_goal_poses") or {}
+    require((summary.get("goal_realised") or planned_goals or runtime.get("planned_goal_joints")) and summary.get("base_pose2d"),
             "anchor has no world goal/base proposal")
     tmeta = read_json(tro_path.parent.parent / "template_meta.json")
     return {"instance_id": iid, "allocation": allocation, "sources": sources, "tro": tro,
             "summary": summary, "template_meta": tmeta, "template_dir": str(tro_path.parent.parent),
             "planned_goal_poses": planned_goals,
-            "planned_start_poses": ((tro["ispatialgym"].get("campaign") or {}).get("runtime") or {}).get("planned_start_poses") or {},
+            "planned_start_poses": runtime.get("planned_start_poses") or {},
+            "bound_object_poses": runtime.get("bound_object_poses") or {},
+            "planned_goal_joints": runtime.get("planned_goal_joints") or {},
+            "joint_names": runtime.get("joint_names") or {},
             "goal_proposal_source": "fresh_sampler_goal_realised", "anchor_is_final_member": False}
 
 
@@ -160,12 +166,28 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
         "runtime_bddl_sha256": snapshots[1]["sha256"], "runtime_bddl_equivalence": proof})
 
 
+def with_alignment_buckets(template: Template, native_range_deg, *, source):
+    """Bind equal thirds of a measured/applied native range, without extending it."""
+    require(template.task.startswith("alignment-"), "alignment bucket policy requires an alignment template")
+    require(isinstance(native_range_deg, (list, tuple)) and len(native_range_deg) == 2,
+            "alignment policy requires the applied native range")
+    lo, hi = (float(v) for v in native_range_deg)
+    require(math.isfinite(lo) and math.isfinite(hi) and 0 <= lo < hi <= 180, "invalid native alignment range")
+    require(isinstance(source, dict) and source.get("field") and source.get("sha256"), "alignment range needs source provenance")
+    policy = {"metric": "actual_magnitude_deg", "unit": "degrees", "method": "equal_thirds_of_applied_native_range",
+              "edges": [lo, lo + (hi-lo)/3, lo + 2*(hi-lo)/3, hi],
+              "native_range_deg": [lo, hi], "intervals": "first_closed_then_lower_open_upper_closed", "source": source}
+    return replace(template, scene_setup={**template.scene_setup, "bucket_policy": policy})
+
+
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
-    pair_tasks = {f"inter_object_relation_satisfaction-{relation}_small_scale": relation for relation in PAIR_RELATIONS}
-    require(template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "disembedding") or template.task in pair_tasks,
+    pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
+                  for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside"))) for relation in relations}
+    joint_task = template.task.startswith("configuration_matching-articulation_")
+    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "disembedding") or template.task in pair_tasks,
             "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
@@ -181,12 +203,24 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
     if template.scene_setup.get("source_bddl_sha256"):
         template = bind_runtime_definition(template, anchor["template_dir"], runtime_metadata=tm)
+    if template.task == "alignment-world_vertical":
+        applied = tm.get("template_facts", {}).get("deviation_range_applied_deg")
+        template = with_alignment_buckets(template, applied, source={"path": str(Path(anchor["template_dir"]) / "template_meta.json"),
+            "sha256": digest(tm), "digest_kind": "canonical_json", "field": "template_facts.deviation_range_applied_deg"})
     now = time.time()
     source_goal = anchor["summary"].get("goal_realised")
     if source_goal is None:
         targets = [ref.instance for ref in template.objects if ref.role == "target"]
-        require(len(targets) == 1 and targets[0] in anchor["planned_goal_poses"], "anchor has no unambiguous target goal")
-        pose = anchor["planned_goal_poses"][targets[0]]
+        require(len(targets) == 1, "anchor has no unambiguous target goal")
+        pose = anchor["planned_goal_poses"].get(targets[0])
+        if pose is None and joint_task:
+            target = anchor["tro"]["ispatialgym"].get("pose_targets", {}).get(targets[0], {})
+            require(target.get("frame", "world") in (None, "world"), "articulation root goal must be in world coordinates")
+            if target.get("position") is not None and target.get("orientation") is not None:
+                pose = (target["position"], target["orientation"])
+            else:
+                pose = anchor.get("bound_object_poses", {}).get(targets[0])
+        require(pose is not None, "anchor lacks a world goal/root pose")
         source_goal = pose if isinstance(pose, dict) else {"position": pose[0], "orientation": pose[1]}
     plan = {"schema": SCHEMA, "campaign_id": campaign_id, "group_id": group_id, "split": template.split,
             "task": template.task, "template_id": runtime_id, "contract_template_sha256": template.fingerprint,
@@ -196,11 +230,31 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
             "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
             "anchor_sources": anchor["sources"]}
-    if template.task in pair_tasks:
+    if joint_task:
+        targets = [ref for ref in template.objects if ref.role == "target"]
+        require(len(targets) == 1 and targets[0].joint, "articulation contract lacks one target joint")
+        target, joint = targets[0].instance, targets[0].joint
+        require(anchor["summary"].get("joint") == joint, "anchor articulation joint differs from contract")
+        names = anchor.get("joint_names", {}).get(target)
+        values = anchor.get("planned_goal_joints", {}).get(target)
+        require(names and values is not None and len(names) == len(values), "anchor lacks complete joint-goal vector")
+        joints = dict(zip(names, values))
+        require(joint in joints, "target joint absent from recorded joint vector")
+        facts = tm.get("template_facts", {})
+        if anchor["summary"].get("direction") == "close":
+            limits = facts.get("limits")
+            require(limits and len(limits) == 2 and limits[0] < limits[1], "closing anchor lacks authoritative joint limits")
+            joints[joint] = float(limits[0])
+        plan.update(schema=JOINT_SCHEMA, target=target, joint=joint, goal_joints=joints, fraction_range=plan.pop("magnitude_range"))
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        validate_joint_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
+                            target=target, joint=joint, activated_at=now, now=now)
+    elif template.task in pair_tasks:
+        relation, scale = pair_tasks[template.task]
         roles = {role: [b["name"] for b in tm.get("bindings", []) if b.get("role") == role] for role in ("target", "partner")}
         require(all(len(names) == 1 for names in roles.values()), "ambiguous pair target/partner binding")
         plan["target_name"], plan["partner_name"] = roles["target"][0], roles["partner"][0]
-        partner = anchor["planned_start_poses"].get(plan["partner_name"])
+        partner = anchor["planned_start_poses"].get(plan["partner_name"]) or anchor.get("bound_object_poses", {}).get(plan["partner_name"])
         require(partner is not None, "pair anchor lacks recorded partner pose")
         settled = anchor["summary"].get("goal_check", {}).get("settled_poses", {})
         target_scene_name = bindings[plan["target_name"]].get("scene_object_name")
@@ -209,7 +263,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["release_pose"] = plan["goal_pose"]
         plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
-        if pair_tasks[template.task] == "nextto":
+        if relation == "nextto":
             summary = anchor["summary"]
             require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")
             base = summary.get("manipulation_stance", {}).get("base_pose2d")
@@ -220,11 +274,14 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             plan["goal_pose"] = {"position": changed_goal[0], "orientation": changed_goal[1]}
             plan["release_pose"] = {"position": changed_release[0], "orientation": changed_release[1]}
             plan["nextto_gap_proposal_m"] = gap
+        if scale == "large":
+            require(anchor["summary"].get("goal_cell") is not None, "large pair anchor lacks fixed goal cell")
+            plan["goal_cell"] = anchor["summary"]["goal_cell"]
         plan["schema"] = PAIR_SCHEMA
         plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
         validate_pair_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
-                           relation=pair_tasks[template.task], activated_at=now, now=now)
+                           relation=relation, scale=scale, activated_at=now, now=now)
     elif template.task == "disembedding":
         roles = {}
         for binding in tm.get("bindings", []):
