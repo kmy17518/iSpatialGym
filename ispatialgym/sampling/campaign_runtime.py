@@ -38,6 +38,7 @@ def _load(path: str):
     perturbations = Perturbations({key: ScaleState(**value) for key, value in p["scales"].items()},
                                  tuple(p.get("removed_objects", [])), p.get("lighting", {}))
     key = ValidationKey(**config["validation_key"])
+    require(key.template_sha256 == template.fingerprint, "validation key template mismatch")
     require(key.scale_sha256 == perturbations.scale_fingerprint, "validation key scale mismatch")
     require(config["split"] == template.split or (template.split == "eval_standard" and config["split"] == "train"),
             "campaign configuration split mismatch")
@@ -155,6 +156,7 @@ def annotate(sampler, tro, draft, seed):
                                  validation_key=key, goal_group_id=group.get("group_id"))
     result["ispatialgym"]["campaign"]["runtime"] = {
         "observed_scales": observed, "goal_group": group, "planned_goal_poses": _plain(draft.goal_poses),
+        "planned_start_poses": _plain(draft.object_poses),
         "augmentation": augmentation_state,
         "purpose": config.get("purpose", "candidate"),
         "adapters": {"scale": "template_scene_with_live_verification",

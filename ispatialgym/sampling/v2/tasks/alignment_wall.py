@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -43,6 +44,7 @@ import torch as th
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import support_rules as SR
+from ispatialgym.sampling import campaign_surface_goals as CSG
 from ispatialgym.sampling.constraints import HINGE_BRAKE_OMEGA_RAD_S, HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
@@ -1036,9 +1038,50 @@ class AlignmentWall(SamplerV2, WallGeometry):
 
     # ------------------------------------------------------------------ instance (§5.5)
 
+    def campaign_surface_plan(self):
+        if not os.environ.get(CSG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CSG.load_surface_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                         activated_at=self._campaign_group_started_at,
+                                         expected_sha256=getattr(self, "_campaign_surface_plan_sha", None))
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "wall goal-group member limit reached")
+            self._campaign_surface_plan_sha = plan.sha256
+            return plan
+        except CSG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CSG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_surface_plan()
+        return None if plan is None else max(0.0, plan.deadline_at - time.time())
+
+    def campaign_spots(self, plan):
+        """Select prevalidated spots whose level pose is the fixed group goal."""
+        if plan is None:
+            return self.spots
+        pos, quat = G.t(plan.position), G.t(plan.orientation)
+        matches = []
+        for spot in self.spots:
+            p, q = self.hang_pose(spot, 0.0)
+            if th.allclose(p, pos, rtol=0, atol=1e-5) and (
+                    th.allclose(q, quat, rtol=0, atol=1e-6) or th.allclose(q, -quat, rtol=0, atol=1e-6)):
+                matches.append(spot)
+        if not matches:
+            raise Reject("campaign_goal_unavailable", "fixed goal does not match any prevalidated wall spot")
+        return matches
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         tname = self.tname
-        weights = np.array([float(s["weight"]) for s in self.spots])
+        campaign_plan = self.campaign_surface_plan()
+        spots = self.campaign_spots(campaign_plan)
+        if campaign_plan is not None:
+            self._campaign_latest_proposal = None
+        weights = np.array([float(s["weight"]) for s in spots])
         gen_p0 = dict(self.param("prompt0") or {})
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 35.0)))
         d_min, d_max = float(gen_p0.get("d_min_m", 0.5)), float(gen_p0.get("d_max_m", 1.5))
@@ -1046,11 +1089,20 @@ class AlignmentWall(SamplerV2, WallGeometry):
         seen: List[str] = []
         screen_facts: Dict[str, Any] = {}
         for k in range(max(1, draws)):
-            spot = self.spots[int(rng.choice(len(self.spots), p=weights / weights.sum()))]
+            spot = spots[int(rng.choice(len(spots), p=weights / weights.sum()))]
             lo, hi = self.deviation_range()
+            if campaign_plan is not None:
+                try:
+                    lo, hi = CSG.deviation_range(campaign_plan, (lo, hi),
+                                                 fallback=k == max(1, draws) - 1 or getattr(self.ikc, "attempt", 0) >= 2)
+                except CSG.GoalPlanError as exc:
+                    raise Reject("campaign_goal_bucket", str(exc)) from exc
             delta = float(rng.uniform(lo, hi)) * (1.0 if rng.random() < 0.5 else -1.0)
             geo = self.contacts_for(spot, delta)
             pose_t = geo["pose_tilted"]
+            if campaign_plan is not None:
+                self._campaign_latest_proposal = {"start_poses": {tname: pose_t}, "goal_poses": {tname: geo["pose_level"]},
+                                                  "group_id": campaign_plan.group_id}
             # the target hangs at its init pose for every check of this attempt (hinge installed after apply)
             self.target.set_position_orientation(*pose_t)
             self.target.keep_still()
@@ -1123,6 +1175,8 @@ class AlignmentWall(SamplerV2, WallGeometry):
         d = Draft()
         d.object_poses[tname] = pose_t
         d.goal_poses[tname] = geo["pose_level"]
+        if campaign_plan is not None:
+            d.goal_poses[tname] = (G.t(campaign_plan.position), G.t(campaign_plan.orientation))
         d.robot_q = self.stance_q(init)
         d.base_pose2d = tuple(init.base_pose2d)
         d.settle_free = []
@@ -1134,6 +1188,11 @@ class AlignmentWall(SamplerV2, WallGeometry):
             eqs.append(half_turn_equivalence(self.front))
         d.pose_targets[tname] = pose_target(orientation=geo["pose_level"][1], orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.08),
                                             equivalences=eqs)
+        if campaign_plan is not None:
+            d.pose_targets[tname]["orientation"] = list(campaign_plan.orientation)
+            d.summary["campaign_goal_group"] = campaign_plan.summary()
+            d.summary["campaign_goal_group"].update({"phase": "geometry_pinned", "wall_spot_id": spot["id"],
+                                                    "requested_start": {"position": pose_t[0].tolist(), "orientation": pose_t[1].tolist()}})
         brace = self.sidecar.contacts.get("brace")
         d.summary.update({"wall": spot["wall_name"], "spot": spot["id"], "deviation_deg": math.degrees(delta), "push_arm": geo["push"]["arm"],
                           "brace_arm": brace.arm if brace is not None else None, "brace_kind": brace.brace_kind if brace is not None else None,
@@ -1416,6 +1475,12 @@ class AlignmentWall(SamplerV2, WallGeometry):
         cam = self.camera_pose_at(self.sidecar.stance("init"))
         if not self.frustum_ok(cam, self.hull_at((p.float(), q.float())), 0.05):
             raise Reject("not_in_frame", "the settled tilted target is not fully in the init image (5 %)")
+        group = draft.summary.get("campaign_goal_group")
+        if group is not None:
+            magnitude = math.degrees(float(G.quat_angle(q, G.t(group["requested_goal"]["orientation"]))))
+            if group["bucket_strict"] and not group["magnitude_range_deg"][0] <= magnitude <= group["magnitude_range_deg"][1]:
+                raise Reject("campaign_bucket_drift", "settled wall start left its strict eval deviation bucket")
+            group.update({"actual_magnitude_deg": magnitude, "phase": "settled_geometry_verified"})
 
     def visible_objects(self) -> List[str]:
         """The objects (structure included, the robot excluded) with at least ``min_object_pixels`` in the head camera's view now."""
@@ -1444,7 +1509,17 @@ class AlignmentWall(SamplerV2, WallGeometry):
         pass  # orientation-only target; the level orientation is exact by construction
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        group = draft.summary.get("campaign_goal_group")
+        if group is not None:
+            self.campaign_group_remaining_s()
+            goal = draft.goal_poses[self.tname]
+            pinned = group["requested_goal"]
+            if not (th.equal(G.t(goal[0]), G.t(pinned["position"])) and th.equal(G.t(goal[1]), G.t(pinned["orientation"]))):
+                raise Reject("campaign_goal_drift", "wall goal changed before TRO write")
+            group["phase"] = "settled_goal_verified"
         path = super().write_instance(draft, index, seed)
+        if group is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
         self._clear_hinge()
         return path
 

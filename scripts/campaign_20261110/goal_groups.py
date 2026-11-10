@@ -27,6 +27,7 @@ from scripts.campaign_20261110.contracts import (
     digest, file_digest, require, write_json_atomic,
 )
 from ispatialgym.sampling.campaign_held_goals import SCHEMA, validate_goal_plan
+from ispatialgym.sampling.campaign_surface_goals import SCHEMA as SURFACE_SCHEMA, validate_surface_plan
 
 
 def read_json(path):
@@ -95,10 +96,13 @@ def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: fl
     require(qa.get("enabled") is True and not qa.get("hard_triggered"), "anchor QA disabled or failed")
     require(not any(x.get("triggered") for x in (qa.get("metrics") or {}).values() if x.get("mode") == "hard"),
             "anchor has a hard QA failure")
-    require(summary.get("goal_realised") and summary.get("base_pose2d"), "anchor has no world goal/base proposal")
+    planned_goals = ((tro["ispatialgym"].get("campaign") or {}).get("runtime") or {}).get("planned_goal_poses") or {}
+    require((summary.get("goal_realised") or planned_goals) and summary.get("base_pose2d"),
+            "anchor has no world goal/base proposal")
     tmeta = read_json(tro_path.parent.parent / "template_meta.json")
     return {"instance_id": iid, "allocation": allocation, "sources": sources, "tro": tro,
             "summary": summary, "template_meta": tmeta, "template_dir": str(tro_path.parent.parent),
+            "planned_goal_poses": planned_goals,
             "goal_proposal_source": "fresh_sampler_goal_realised", "anchor_is_final_member": False}
 
 
@@ -120,7 +124,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
-    require(template.task in ("object_scaling", "mental_rotation"), "goal author currently supports held-object tasks")
+    require(template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical"), "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
     for ref in template.objects:
@@ -134,7 +138,12 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     declared_runtime_id = template.scene_setup.get("runtime_template_id")
     require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
     now = time.time()
-    source_goal = anchor["summary"]["goal_realised"]
+    source_goal = anchor["summary"].get("goal_realised")
+    if source_goal is None:
+        targets = [ref.instance for ref in template.objects if ref.role == "target"]
+        require(len(targets) == 1 and targets[0] in anchor["planned_goal_poses"], "anchor has no unambiguous target goal")
+        pose = anchor["planned_goal_poses"][targets[0]]
+        source_goal = pose if isinstance(pose, dict) else {"position": pose[0], "orientation": pose[1]}
     plan = {"schema": SCHEMA, "campaign_id": campaign_id, "group_id": group_id, "split": template.split,
             "task": template.task, "template_id": runtime_id, "contract_template_sha256": template.fingerprint,
             "scene": template.scene, "room": template.room,
@@ -143,7 +152,13 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
             "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
             "anchor_sources": anchor["sources"]}
-    validate_goal_plan(plan, task=template.task, template_id=runtime_id, scene=template.scene, rooms=[template.room], now=now)
+    if template.task == "alignment-world_vertical":
+        plan["schema"] = SURFACE_SCHEMA
+        plan["magnitude_range_deg"] = plan.pop("magnitude_range")
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")  # Robot starts vary within this goal group.
+        validate_surface_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
+    else:
+        validate_goal_plan(plan, task=template.task, template_id=runtime_id, scene=template.scene, rooms=[template.room], now=now)
     perturbations = Perturbations({obj.instance: ScaleState(obj.default_scale, obj.default_scale, "fixed") for obj in template.objects})
     key = ValidationKey(template.fingerprint, code_sha256, physics_sha256, data_sha256, perturbations.scale_fingerprint)
     config = {"campaign_id": campaign_id, "split": template.split, "purpose": "validation",
