@@ -6160,6 +6160,62 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## touching_03 on both boards, the other compartments, otwukr T7 / T8 (branch `i7-t03both`, owner decision A5, 2026-11-09)
+
+Owner decision A5: lean rests (+ grasps, + interior maps) for BOTH side boards, the other compartments of kmuacd_0 with left / right layouts,
+compartment and board drawn per attempt behind a default-off switch, T7 / T8 (otwukr_1) tried; the highest-yield setup is the representative,
+the others registry variants. Record `$OFH/t03both_20261109` (layer `layer/`, staged root `v2maps_t03both` = `v2maps_int2` + the layer).
+
+**Library (layer).** acbrnv lean rests, 11 / 15 / 20 deg on each board, validated with the board's working arm. Without a region every
+representative failed `no_placement:board:<arm>_gripper_finger_link1` (the finger on the board, as bqvvvx); with the accessible region of
+`bookcase_kmuacd_0@0.8354` (`access_region.py`, tag ar b9c02d) and 24000 x 24 candidates: `lean_right_15` 1 valid, `lean_right_20` 2,
+`lean_left_15__valleft` 2; 11 deg: no candidate in the region on either board. Pool: left {15, 20 (int2)}, right {15, 20}; `lean_right_15`'s
+one grasp turns 0.138 rad in the hand (> the task's 0.100: `GRASP_TURN_FILTER`), so the sampler drops it - the right board is served by
+`lean_right_20` alone. Interior maps (both arms) at kmuacd 0.8354 / 0.4486 / 0.0715 and otwukr 0.3888 / 0.7204 for the three entries, and
+`lean_left_20` at the two new kmuacd rows. Feasible cell x trunk (right / left arm, d_e 0.35-0.55): lean_right_20 1518 / 1197 (0.8354),
+617 / 249 (0.4486), 69 / 42 (0.0715); lean_left_20 706 / 689, 291 / 319, 5 / 24. The bottom row is left out of the draw.
+
+**Specs.** `bookcase_kmuacd_0@0.4486` (middle row) and `@0.0715` (bottom row) in `assets/interiors/interiors.json`, from the probe's pieces
+and `interiors measure` (`measure/km045c|km045r|km007c.json`).
+
+**Switch `ISPATIALGYM_SHELF_BOARD_DRAW` (default OFF, 24275626).** Needs `shelf_start_draw`, start_per_attempt and a template at a v2 lean
+rest. Once per template `IORSSmall.shelf_board_pool` builds every lean rest's grasp set and probes its interior maps (default + working arm)
+on each row (the template's board + `shelf_start_draw.rows`); each attempt draws (row, bay, board) among the layouts whose board has a rest
+with that row's map, then the rest uniformly (its angle). Grasps, rest, shelf template, pre-shape opening, band (cached per rest x row), and
+the row's interior surface / support-split plane / edge trunks follow; eval keeps the board opposite `partner_side`. Kit
+`shelf_board_draw.{drawn.<side>, layout.<z>_<bay>_<side>, rest.<tag>, row_switch, rest_dropped.*, row_map_missing.*}`; summary
+`shelf_start.board_draw`. Customs (95092f4f): `shelf_start_draw.rows.bookcase_kmuacd_0` = the top row's (0, left) and (+0.37, left / right),
+the middle row's three cubes x both boards; today's `layouts` unchanged. The nine touching_03 switches take the side from the push sign /
+the working arm (the stance shift mirrors `SHELF_STANCE_BOOK_LATERAL_M`, pair mesh has both arms' pairs, lift straighten reads the row's
+split-kept pieces) - nothing needed mirroring.
+
+**Integration note.** With the layer in the root, `shelf_lean_key` (switch off) draws the template's ONE left-board key among {15, 20} per
+template seed - a template may start at 15 deg.
+
+**Results (N 4 each, trunk_95092f4f, svl titanrtx, memory off, own empty sampling cache per arm; att / written / ok, GPU-h, GPU-h per ok).**
+
+| setup | tag | root | att / wr / ok | GPU-h | per ok | written layouts |
+|---|---|---|---|---|---|---|
+| kmuacd single (today) | t3b_single | int2 | 48 / 4 / 4 | 0.26 | 0.065 | 4 x (0.8354, -0.37, left, lean_left_20) |
+| kmuacd drawn (BOARD_DRAW=1) | t3b_drawn | staged | 224 / 3 / 3 | 0.75 | 0.25 | 2 x (0.8354, -0.37, left, L20), 1 x (0.4486, -0.37, left, L20) |
+| otwukr T7 (+SPAN_RULE) | t3b_T7 | int2 | 33 / 4 / 4 | 0.26 | 0.065 | left board, bays +0.19 x 3 / -0.19 x 1 |
+| otwukr T8 (+SPAN_RULE) | t3b_T8 | int2 | 28 / 4 / 4 | 0.30 | 0.075 | left board, bays -0.19 x 3 / +0.19 x 1 |
+| otwukr T7 + BOARD_DRAW | t3b_T7d | staged | 83 / 4 / 4 | 0.40 | 0.10 | left board L20, +0.19 x 3 / -0.19 x 1 |
+| otwukr T8 + BOARD_DRAW | t3b_T8d | staged | interim: 111 rejected, 1 written after ~60 min (final: DECISIONS "i7-t03both T8d FINAL") | | | left board L20, -0.19 |
+
+T7 / T8 were 36 / 4 / 2 and 28 / 4 / 0 in i7-t03 r5 (the link5 / torso_link2 self-contact at the retreat); with today's touching_03 defaults
+(T03_PAIR_MESH among them) every demo succeeds. Drawn spread (kmuacd, attempts by row x bay x board x rest, `layout_outcomes.py`): all 18
+combinations drawn (224 attempts: top row 116, middle 108; right board 119, left 105; rests L20 53, L15 52, R20 119); every right-board and
+every lean_left_15 draw was rejected before writing - `target_placement` (`no_path` init -> manipulation: the back-off arrival disconnected on
+the eroded map / its trunk sweep collides; `grasp_unreachable`: exact IK of the pre-grasp at the fixed start, 118 lines), and `no_free_edge`
+(the start cell's stance collides) - the same blockers on otwukr (T7d: right board 0 / 47, T8d right board 0 / 59 interim). The board / rest draw
+acts (kit `shelf_board_draw.*` on every attempt) and the maps serve, but outside today's layout the grasp / transit fail at the exact checks.
+
+**Decision (owner rule: the highest-yield setup is the representative).** single and T7 tie (4 / 4 ok, 0.065 GPU-h per ok; at N 4 the
+noise is ~15 points), T8 0.075; the drawn setups are 1.5-4x costlier per ok. The representative stays touching_03 = kmuacd T1 with today's
+switches (eval unchanged, no eval-index rebuild); variants registered in `scripts/trainfast/registry.tsv` (bce96fe9):
+`touching_03_t7otwukr`, `touching_03_t8otwukr` (SPAN_RULE=1) and `touching_03_drawn` (BOARD_DRAW=1). No default flipped.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
