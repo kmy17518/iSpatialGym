@@ -74,7 +74,8 @@ def merge(root, previous, inputs, destination, fingers_q=None):
     assert checked and all(arms == {'left', 'right'} for arms in coverage.values())
     for log in logs:
         copy(log, 'evidence/generic_' + sha(log)[:16] + '_' + log.name, sha(log))
-    audit = destination / 'generic_reader_audit.json'
+    token = hashlib.sha256(json.dumps(checked, sort_keys=True).encode()).hexdigest()[:16]
+    audit = destination / ('generic_reader_audit_' + token + '.json')
     assert not audit.exists()
     audit.write_text(json.dumps(dict(native_reader_errors=0, checked=checked, source_permissions_unchanged=True,
                                     task_geometry_demo_replay_still_required=True), indent=2) + '\n')
