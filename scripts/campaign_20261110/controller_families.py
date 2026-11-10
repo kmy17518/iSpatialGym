@@ -95,11 +95,15 @@ def accepted_counts(root, class_id):
     return Counter({(split, bucket): count for split, bucket, count in rows})
 
 
-def next_bucket(counts, quotas):
+def next_bucket(counts, quotas, enabled=None):
+    enabled=list(range(len(quotas))) if enabled is None else enabled
+    require(isinstance(enabled,list) and enabled and len(set(enabled))==len(enabled)
+            and all(isinstance(i,int) and not isinstance(i,bool) and 0<=i<len(quotas) for i in enabled),
+            'invalid enabled evaluation buckets')
     deficits = [max(0, target - counts.get(("eval_standard", index), 0)) for index, target in enumerate(quotas)]
-    if not any(deficits):
+    if not any(deficits[i] for i in enabled):
         return None
-    return max(range(len(deficits)), key=lambda index: (deficits[index], -index))
+    return max(enabled, key=lambda index: (deficits[index], -index))
 
 
 def slurm_status():
@@ -323,14 +327,15 @@ def advance(spec, state, cfg, root, queue, allowance, save):
     from scripts.campaign_20261110.controller_held import job_terminal
     counts = accepted_counts(root, spec["class_id"])
     state["counts"] = {split + ":" + str(bucket): n for (split, bucket), n in counts.items()}
-    bucket = next_bucket(counts, spec["eval_quotas"])
+    bucket = next_bucket(counts, spec["eval_quotas"], spec.get('enabled_buckets'))
     cycle = state.get("current")
     if cycle is None:
         if spec.get("allow_new_cycles", True) is False:
             state["status"] = "needs_family_diagnosis"
             return 0
         if bucket is None:
-            state["status"] = "evaluation_quota_complete"
+            state["status"] = ('evaluation_quota_complete' if next_bucket(counts,spec['eval_quotas']) is None
+                               else 'validated_buckets_complete_other_buckets_need_diagnosis')
             return 0
         if state.get("consecutive_failures", 0) >= cfg.get("max_consecutive_failures", 3):
             state["status"] = "needs_diagnosis"
@@ -440,6 +445,7 @@ def main():
         require(config["purpose"] == "validation" and config["template"]["class_id"] == spec["class_id"], "seed class differs")
         require(file_digest(Path(spec["anchor_snapshot"]) / ".snapshot_commit") == config["validation_key"]["code_sha256"], "seed code identity mismatch")
         require(len(spec["eval_quotas"]) == len(spec["magnitude_ranges"]), "bucket/range counts differ")
+        next_bucket({},spec['eval_quotas'],spec.get('enabled_buckets'))
     if not args.execute:
         print(json.dumps({"preflight_passed": True, "families": [s["class_id"] for s in cfg["families"]], "submissions": 0}))
         return
@@ -478,7 +484,7 @@ def main():
                         rows = [row for row in allocations(root) if row["jobid"] == str(entry["jobid"])]
                         require(len(rows) == 1 and rows[0]["key"] == spec["class_id"], "adopted anchor allocation ambiguous")
                         name = "family_auto_" + spec["class_id"].replace("-", "_") + "_0001"
-                        bucket = next_bucket(accepted_counts(root, spec["class_id"]), spec["eval_quotas"])
+                        bucket = next_bucket(accepted_counts(root, spec["class_id"]), spec["eval_quotas"], spec.get('enabled_buckets'))
                         require(bucket is not None, "adopted anchor class quota already full")
                         family.update(anchor_adopted=True, current={"name": name, "bucket": bucket, "created_at": time.time(), "anchor": {
                             "directory": spec["seed"], "status": "waiting", "allocation": rows[0]}})

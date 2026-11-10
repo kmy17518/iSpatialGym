@@ -220,10 +220,14 @@ def backend_capacity(backend, rows):
     if backend.startswith('vast_'): return 8
     user, partition = backend.split('_')
     own = [row for row in rows if row[0] == user]
-    part = [row for row in own if row[1] == partition]
+    # QoS limits span accounts, not unrelated QoS classes. CPU services consume
+    # svl job slots but never GPU TRES; viscam has no 56-job limit.
+    part = [row for row in own if (row[4] if len(row) > 4 else row[1]) == partition]
     gpus = sum(int(row[3].rsplit(':', 1)[1]) for row in part if 'gpu:' in row[3])
-    running = sum(row[2] == 'RUNNING' for row in own)
-    return max(0, min(8, (48 if partition == 'svl' else 30) - gpus, 100 - len(own), 56 - running))
+    running = sum(row[2] in ('RUNNING','COMPLETING') for row in part)
+    limits = [8, (48 if partition == 'svl' else 30) - gpus]
+    if partition == 'svl': limits.extend([100 - len(part), 56 - running])
+    return max(0, min(limits))
 
 
 def publish_owned_outputs(root):
@@ -324,9 +328,9 @@ def main():
         publish_owned_outputs(a.root)
         rows = []
         if not a.backend.startswith('vast_'):
-            query = subprocess.run(['squeue', '-r', '-u', 'minyeong,shiyuc', '-h', '-o', '%u|%P|%T|%b'],
+            query = subprocess.run(['squeue', '-r', '-u', 'minyeong,shiyuc', '-h', '-o', '%u|%P|%T|%b|%q'],
                                    capture_output=True, text=True, timeout=40, check=True)
-            rows = [line.split('|') for line in query.stdout.splitlines() if len(line.split('|')) == 4]
+            rows = [line.split('|') for line in query.stdout.splitlines() if len(line.split('|')) == 5]
         allowance = backend_capacity(a.backend, rows)
         candidates = []
         for path in (a.root / 'dispatch/ready').glob('*.json'):

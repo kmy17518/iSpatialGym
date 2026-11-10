@@ -89,6 +89,14 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(D.backend_capacity('minyeong_svl', rows), 8)
         self.assertEqual(D.backend_capacity('vast_5090', rows), 8)
 
+    def test_capacity_is_scoped_to_actual_qos_not_combined_user_jobs(self):
+        rows = [['minyeong','svl','RUNNING','N/A','svl']] * 56
+        rows += [['minyeong','viscam','RUNNING','N/A','viscam']] * 60
+        rows += [['minyeong','svl,viscam','PENDING','gres/gpu:1','viscam']] * 23
+        self.assertEqual(D.backend_capacity('minyeong_svl', rows), 0)
+        self.assertEqual(D.backend_capacity('minyeong_viscam', rows), 7)
+        self.assertEqual(D.backend_capacity('shiyuc_viscam', rows), 8)
+
     def test_shared_ledger_symlink_reconciles_exact_new_allocation(self):
         target = self.root / 'manifests/shiyuc/allocations.tsv'; target.parent.mkdir()
         target.write_text('key\tstart\tn\tcode\ttag\tjobid\tjob_dir\nobject_scaling-apple\t50000000\t3\t' + str(self.code) + '\theld_queue\t123\t' + str(self.root / 'out/shiyuc/out/held_queue/job') + '\n')

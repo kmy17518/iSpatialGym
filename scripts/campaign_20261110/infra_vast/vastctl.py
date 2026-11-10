@@ -147,6 +147,14 @@ def r2_json(s3, key):
         return None
 
 
+def read_heartbeats(s3, instance_ids=None):
+    keys = [key for key in r2_list(s3, 'hb/')
+            if key.endswith('.json') and (instance_ids is None or key[:-5] in instance_ids)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        values = pool.map(lambda key: (key[:-5], r2_json(s3, 'hb/' + key)), keys)
+        return {iid:value for iid,value in values if value}
+
+
 def r2_put(s3, key, body):
     s3.put_object(Bucket=BUCKET, Key=f"{PREFIX}/{key}", Body=body.encode() if isinstance(body, str) else body)
 
@@ -589,6 +597,10 @@ def spend():
     for e in events():
         if e["ev"] == "create" and e.get("instance"):
             created[str(e["instance"])] = e
+        elif e['ev'] == 'gpu_identity_backfill' and str(e.get('instance')) in created:
+            original = created[str(e['instance'])]
+            if e.get('offer') == original.get('offer') and e.get('machine_id') == original.get('machine_id'):
+                original['gpu_ids'] = e['gpu_ids']
         elif e["ev"] == "destroy" and e.get("ok"):
             ended.setdefault(str(e["instance"]), e["time"])
     tot = sum(float(e["dph_total"]) * (ended.get(i, now()) - e["time"]) / 3600 for i, e in created.items())
@@ -764,7 +776,8 @@ def tick(c, s3, state):
     ingest(states, C)
     inst, list_ok = my_instances(c)
     live = {str(i["id"]): i for i in inst}
-    hbs = {k[:-5]: v for k, v in ((k, r2_json(s3, f"hb/{k}")) for k in r2_list(s3, "hb/")) if v}
+    _, previously_live, _ = spend()
+    hbs = read_heartbeats(s3, set(live) | set(previously_live))
     dones = set(k[:-5] for k in r2_list(s3, "done/"))
     t = now()
     tot, live_ids, created = spend()
@@ -977,7 +990,7 @@ def status(c, s3):
     states = load_states()
     tot, live_ids, created = spend()
     inst, _ = my_instances(c)
-    hbs = {k[:-5]: v for k, v in ((k, r2_json(s3, f"hb/{k}")) for k in r2_list(s3, "hb/")) if v}
+    hbs = read_heartbeats(s3, {str(i['id']) for i in inst})
     print(f"spend ${tot:.2f} (ledger: {len(created)} created, {len(live_ids)} not destroyed)")
     for i in inst:
         hb = hbs.get(str(i["id"])) or {}
