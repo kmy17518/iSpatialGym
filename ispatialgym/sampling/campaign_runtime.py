@@ -89,6 +89,7 @@ def scene_removals(scene, stable):
 def prepare(sampler, sim):
     """Run after bindings exist, before any template geometry/visibility checks."""
     _, _, perturbations, _ = configuration()
+    verify_scales(sampler.objects, perturbations.scales)
     relevant = {obj.name for obj in sampler.objects.values()}
     moved = sampler.world.scene_variant.get("moved_objects") or {}
     parking = augmentation.verify_parking(sampler.world.scene, perturbations.removed_objects, moved, relevant)
@@ -157,6 +158,9 @@ def annotate(sampler, tro, draft, seed):
     result["ispatialgym"]["campaign"]["runtime"] = {
         "observed_scales": observed, "goal_group": group, "planned_goal_poses": _plain(draft.goal_poses),
         "planned_start_poses": _plain(draft.object_poses),
+        "planned_start_joints": _plain(draft.object_joints), "planned_goal_joints": _plain(draft.goal_joints),
+        "bound_object_poses": _plain({ref.instance: sampler.objects[ref.instance].get_position_orientation() for ref in template.objects}),
+        "joint_names": {ref.instance: list(getattr(sampler.objects[ref.instance], "joints", {})) for ref in template.objects},
         "augmentation": augmentation_state,
         "purpose": config.get("purpose", "candidate"),
         "adapters": {"scale": "template_scene_with_live_verification",
@@ -216,8 +220,8 @@ def record_failure(sampler, draft, *, index, attempt, seed, phase, error):
         "proposal_available": draft is not None or bool(proposed),
         "start_poses": _plain(draft.object_poses if draft is not None else proposed.get("start_poses")),
         "goal_poses": _plain(draft.goal_poses if draft is not None else proposed.get("goal_poses")),
-        "start_joints": _plain(draft.object_joints) if draft is not None else None,
-        "goal_joints": _plain(draft.goal_joints) if draft is not None else None,
+        "start_joints": _plain(draft.object_joints if draft is not None else proposed.get("start_joints")),
+        "goal_joints": _plain(draft.goal_joints if draft is not None else proposed.get("goal_joints")),
         "base_pose2d": _plain(draft.base_pose2d if draft is not None else proposed.get("base_pose2d")),
     }
     path = Path(sampler.ctx.out_dir) / "campaign_sampling_failures.jsonl"

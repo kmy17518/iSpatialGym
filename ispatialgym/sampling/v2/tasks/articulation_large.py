@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -44,6 +45,7 @@ import torch as th
 from ispatialgym import ASSETS_ROOT, REPO_ROOT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
+from ispatialgym.sampling import campaign_joint_goals as CJG
 from ispatialgym.sampling.grasp_library import library_root
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.articulation import scale_handle, scale_joint_info
@@ -1334,10 +1336,63 @@ class ArticulationLarge(SamplerV2):
         # (inside the joint tolerance; the demos' torso bend peaked at the follow's last step, the door pressed into its stop)
         return float(self.stable[int(rng.integers(len(self.stable)))]), self.lower + float(self.gp.gen("close_goal_margin_rad", 0.0) or 0.0)
 
+    def campaign_joint_plan(self):
+        if not os.environ.get(CJG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CJG.load_joint_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                       target=self.tname, joint=self.joint_name, activated_at=self._campaign_group_started_at,
+                                       expected_sha256=getattr(self, "_campaign_joint_plan_sha", None))
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "articulation goal-group member limit reached")
+            self._campaign_joint_plan_sha = plan.sha256
+            return plan
+        except CJG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CJG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_joint_plan()
+        return None if plan is None else max(0.0, plan.deadline_at-time.time())
+
+    def campaign_verify_articulation(self, draft):
+        plan = getattr(self, "_campaign_joint_active", None)
+        if plan is None:
+            return
+        self.campaign_group_remaining_s()
+        try:
+            tolerances = {n: data["tolerance"] for n,data in draft.articulation_targets[self.tname]["joints"].items()}
+            plan.verify_joint_change(list(self.target.joints), draft.object_joints[self.tname], draft.goal_joints[self.tname], tolerances)
+        except CJG.GoalPlanError as exc:
+            raise Reject("campaign_joint_drift", str(exc)) from exc
+        pos, quat = self.target.get_position_orientation()
+        dp = float(th.linalg.norm(G.t(pos)-G.t(plan.pose[0])))
+        dq = float(G.quat_angle(quat, G.t(plan.pose[1])))
+        if dp > self.tol("position", .03) or dq > self.tol("orientation", .20):
+            raise Reject("campaign_root_drift", f"articulation root drifted {dp:.6f} m / {dq:.6f} rad")
+        for name, value in plan.joints.items():
+            if abs(draft.articulation_targets[self.tname]["joints"][name]["position"]-value) > 1e-6:
+                raise Reject("campaign_joint_drift", f"articulation target changed: {name}")
+        draft.summary["campaign_goal_group"]["root_residual"] = {"position_m": dp, "orientation_rad": dq}
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         obj = self.target
         arm_mode = self.mode == "arm"
-        if arm_mode:  # A4: the goal is drawn per stance from the angles the arm reaches (open); close draws q_init from S
+        campaign_plan = self.campaign_joint_plan() if os.environ.get(CJG.ENV) else None
+        if campaign_plan is not None:
+            self._campaign_joint_active = campaign_plan
+            try:
+                q_init, q_goal = campaign_plan.initial(direction=self.direction, lower=self.lower, upper=self.upper,
+                                                       stable=self.stable, rng=rng)
+            except CJG.GoalPlanError as exc:
+                raise Reject("campaign_joint_bucket", str(exc)) from exc
+            self._campaign_latest_proposal = {"start_joints": {self.tname: {self.joint_name: q_init}},
+                                              "goal_joints": {self.tname: campaign_plan.joints},
+                                              "goal_poses": {self.tname: campaign_plan.pose}, "group_id": campaign_plan.group_id}
+        elif arm_mode:  # A4: the goal is drawn per stance from the angles the arm reaches (open); close draws q_init from S
             q_init = self.lower if self.direction == "open" else float(self.stable[int(rng.integers(len(self.stable)))])
             q_goal = None
         else:
@@ -1490,6 +1545,12 @@ class ArticulationLarge(SamplerV2):
             if chosen is not None:
                 d = solved["draft"]
                 d.summary["pinch_orient"] = decision
+                if campaign_plan is not None:
+                    d.summary["campaign_goal_group"] = campaign_plan.summary()
+                    d.summary["campaign_goal_group"]["requested_start"] = {
+                        "joints": {n: float(v) for n,v in zip(self.target.joints, d.object_joints[self.tname])},
+                        "grasp": {"arm": self.arm, "pinch_sign": self.pinch_sign, "bar_offset_m": self.bar_offset}}
+                    self.campaign_verify_articulation(d)
                 return d
         self.pinch_sign = 1.0
         # every distinct reason once (the last 4 alone hid the hybrid search's verdict behind the tilt re-check draws, door 0919-023637)
@@ -1853,6 +1914,12 @@ class ArticulationLarge(SamplerV2):
         if not goal_set:
             raise Reject("handle_unreachable", f"the arm reaches {self.joint_name} only up to {q_reach:.3f} (fraction {frac:.2f}) from stance {key}: no goal opens ≥ {min_open:.2f}")
         if self.direction == "open":
+            campaign_plan = getattr(self, "_campaign_joint_active", None)
+            if campaign_plan is not None:
+                wanted = campaign_plan.joints[self.joint_name]
+                if wanted > q_reach+1e-6 or (not any(abs(wanted-s) < 1e-6 for s in self.stable) and not self.holds_passively(wanted)):
+                    raise Reject("campaign_goal_unreachable", "fixed opening goal is outside this stance's reachable stable set")
+                return float(wanted), goal_set, info
             return float(goal_set[int(rng.integers(len(goal_set)))]), goal_set, info
         if q_init > q_reach + 1e-6:
             raise Reject("handle_unreachable", f"closing from {q_init:.3f} needs the arm to reach up to it; the limit from stance {key} is {q_reach:.3f}")
@@ -2200,6 +2267,15 @@ class ArticulationLarge(SamplerV2):
         q_want = float(draft.object_joints[self.tname][self.joint_index()])
         if abs(q_now - q_want) > 0.5 * self.probe_tol:
             raise Reject("articulation_drift", f"init joint drifted from {q_want:.3f} to {q_now:.3f} while settling")
+        plan = getattr(self, "_campaign_joint_active", None)
+        if plan is not None:
+            value = plan.joints[self.joint_name] if self.direction == "open" else q_now
+            fraction = (value-self.lower)/(self.upper-self.lower)
+            lo, hi = plan.fraction_range
+            if plan.split != "train" and not (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
+                raise Reject("campaign_joint_bucket", "settled articulation start/goal is outside strict eval bucket")
+            draft.summary["campaign_goal_group"]["actual_open_fraction"] = fraction
+            self.campaign_verify_articulation(draft)
 
     def refine_targets_from_goal(self, draft: Draft):
         obj = self.target
@@ -2212,6 +2288,13 @@ class ArticulationLarge(SamplerV2):
 
     def support_objects(self) -> List[Any]:
         return []
+
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        self.campaign_verify_articulation(draft)
+        path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_joint_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
+        return path
 
     def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
         manip = self.sidecar.stances.get("manipulation")

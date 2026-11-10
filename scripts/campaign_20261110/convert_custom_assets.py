@@ -11,6 +11,8 @@ import argparse
 import hashlib
 import json
 import os
+import sys
+import traceback
 from pathlib import Path
 
 
@@ -145,7 +147,17 @@ def main():
         (dataset / "campaign_readiness.json").write_text(json.dumps({"schema": "isg-project-readiness-v1",
             "build_index_sha256": sha256(index_path), "objects": reports}, indent=2, sort_keys=True) + "\n")
         print(f"CAMPAIGN_CUSTOM_READY models={len(reports)} dataset={dataset}", flush=True)
+    except BaseException as exc:
+        failure = {"status":"failed","exception":type(exc).__name__,"message":str(exc),
+                   "traceback":traceback.format_exc(),"completed_conversion_reports":reports}
+        (dataset / "campaign_conversion_failure.json").write_text(json.dumps(failure,indent=2,sort_keys=True)+"\n")
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        raise
     finally:
+        # OmniGibson shutdown can exit the process; the durable success/failure
+        # record above is authoritative, never shell return code alone.
         og.shutdown()
 
 

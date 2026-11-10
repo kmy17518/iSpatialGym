@@ -20,6 +20,8 @@ sys.path.insert(0, str(B1K / "bddl3"))
 from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render  # noqa: E402
 from ispatialgym.sampling.iddl import parse_file  # noqa: E402
 from ispatialgym.sampling.knowledge import synset_of_category  # noqa: E402
+from ispatialgym.sampling.bddl_writer import Bindings  # noqa: E402
+from ispatialgym.oracle.sidecar import subtask_of_variant  # noqa: E402
 from ispatialgym.sampling.v2.problem import GroundedProblem, SUBTASK_FAMILY  # noqa: E402
 from readiness_catalog import ReadinessCatalog  # noqa: E402
 from contracts import ObjectRef, Template, digest as record_digest, task_for_alias  # noqa: E402
@@ -60,7 +62,7 @@ def main():
         meta = record["metadata"]
         old_alias = source_alias or canonical_alias(record["row"]["alias"])
         entry = copy.deepcopy(source_customs[old_alias])
-        alias = old_alias + "-campaign20261110"
+        iddl = parse_file(str(ROOT / "ispatialgym/assets/iddl" / entry["iddl"]))
         original_scene = meta["scene"]
         original_block = entry["scenes"].get(original_scene) or next(iter(entry["scenes"].values()))
         scene = scene or original_scene
@@ -193,7 +195,20 @@ def main():
                     raise ValueError(f"no floor for {scene}/{room}")
                 for init in floors:
                     admit(role, "floors", init["model"], init)
-        iddl = parse_file(str(ROOT / "ispatialgym/assets/iddl" / entry["iddl"]))
+        # Native binding counters follow spawn order. In particular the source
+        # tray must precede destination, as in the rendered IDDL. JSON key
+        # sorting reverses these roles and silently inverts every tray predicate.
+        entry["roles"] = {r: entry["roles"][r] for r in iddl.roles if r in entry["roles"]} | {
+            r: s for r, s in entry["roles"].items() if r not in iddl.roles}
+        tokens = {}
+        for role in iddl.variant_slots:
+            group = entry["generation"].get("groups", {}).get(role)
+            tokens[role] = "_".join(f"{c}_{n}" for c, n in group["members"].items()) if group else entry["roles"][role]["category"]
+        # Private file paths provide isolation. Keep native semantic role tokens
+        # exact because some task handlers interpret them (e.g. floors).
+        alias = iddl.variant_template.format(**tokens)
+        if subtask_of_variant(alias) != iddl.subtask:
+            raise ValueError(f"invalid runtime variant {alias}")
         activity = SUBTASK_FAMILY[iddl.subtask][0]
         definition_id = 9000 + len(jobs)
         entry["definition_id"] = definition_id
@@ -238,6 +253,7 @@ def main():
     make("inter_object_relation_satisfaction-touching_02", room="dining_room_0", support="breakfast_table_rhjoby_0", support_z=0.8126)
     make("inter_object_relation_satisfaction-inside_large_scale_01", scene="house_double_floor_upper", room="bedroom_0",
          support="desk_aduafr_0", support_z=0.773, partner="bookcase_kmuacd_0",
+         remove_gen=("inside_goal_region",),
          gen_updates={"inside_surface_z_m": 0.8354, "inside_stance_side": "+y"})
     make("inter_object_relation_satisfaction-inside_large_scale_02", scene="Rs_int", room="kitchen_0",
          support="bottom_cabinet_slgzfc_1", support_z=0.874, partner="fridge_xyejdx_0",
@@ -247,11 +263,30 @@ def main():
     make("inter_object_relation_satisfaction-inside_large_scale_03", support="breakfast_table_xftrki_0", support_z=0.6789)
     make("inter_object_relation_satisfaction-ontop_large_scale_01", room="utility_room_0", partner="countertop_ikwqer_0")
     target_customs = output / "candidate_customs.json"
-    target_customs.write_text(json.dumps(definitions, indent=2, sort_keys=True) + "\n")
+    target_customs.write_text(json.dumps(definitions, indent=2) + "\n")
     for job in jobs:
         gp = GroundedProblem.load(job["alias"], str(target_customs), str(output / "bddl"))
         if gp.subtask != parse_file(str(ROOT / "ispatialgym/assets/iddl" / definitions[job["alias"]]["iddl"])).subtask:
             raise ValueError("compiled task mismatch")
+        # Replay the native category counters without starting the simulator.
+        # Scene objects bind before spawned singletons, then group members.
+        bindings = Bindings()
+        objects_by_role = {}
+        for obj in job["expected_objects"]:
+            objects_by_role.setdefault(obj["role"], []).append(obj)
+        allocated = {}
+        scene_roles = sorted(gp.scene_roles(), key=lambda r: r != "floor")
+        for role in scene_roles + gp.sampleable_roles() + gp.group_roles():
+            for index, obj in enumerate(objects_by_role.get(role, [])):
+                intended = job["bddl_instances"].get(role + ".members", [job["bddl_instances"].get(role)])[index]
+                scene_name = (obj.get("scene_init_args") or {}).get("name")
+                if intended in allocated and scene_name and allocated[intended] == scene_name:
+                    continue  # native floor/support aliases share one instance
+                actual = bindings.add(role, synset_of_category(obj["category"]))
+                if actual.name != intended:
+                    raise ValueError(f"runtime/BDDL binding mismatch {job['class_id']}/{role}: {actual.name} != {intended}")
+                allocated[intended] = scene_name
+        job["binding_order_check"] = "native Bindings allocation matches every rendered BDDL instance"
         job["customs_sha256"] = digest(target_customs)
     contracts = []
     for job in jobs:
@@ -271,6 +306,7 @@ def main():
             semantic = {"walls": "wall", "floors": "floor", "tray": "tray"}.get(obj["category"], "object")
             refs.append(ObjectRef(instance=instance, role=canonical_role, category=obj["category"], model=obj["model"],
                 asset_sha256=obj["asset_sha256"], default_scale=tuple(obj["default_scale"]), semantic_kind=semantic,
+                joint=(definitions[job["alias"]]["roles"][role].get("joint") or {}).get(obj["category"] + "/" + obj["model"]),
                 ready=True, readiness_source=obj["readiness_source"]))
             if obj["scene_init_args"]:
                 bindings[instance] = obj["scene_init_args"]["name"]
