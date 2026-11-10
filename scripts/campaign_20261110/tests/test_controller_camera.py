@@ -73,6 +73,26 @@ def test_empty_camera_job_reaches_terminal_without_claiming_nonexistent_members(
     assert record["status"] == "complete" and "last_claim" not in record
 
 
+def test_synced_vast_camera_failure_releases_pending_capacity(tmp_path, monkeypatch):
+    from scripts.campaign_20261110 import controller_held
+
+    def no_slurm_lookup(*args):
+        pytest.fail('Vast completion must use the durable worker ledger')
+    monkeypatch.setattr(controller_held, 'terminal', no_slurm_lookup)
+    job = tmp_path / 'out/failed_camera'
+    job.mkdir(parents=True)
+    record = {'allocation': {'jobid': '900000241', 'job_dir': str(job)},
+              'status': 'waiting', 'count': 12}
+    ledger = tmp_path / 'vast/state/jobs/900000241.json'
+    write_json_atomic(ledger, {'status': 'running'})
+    assert not controller.job_terminal(record['allocation'], tmp_path, {})
+    write_json_atomic(ledger, {'status': 'synced'})
+    closed = controller.job_terminal(record['allocation'], tmp_path, {})
+    refresh_production(record, None, None, None, tmp_path, tmp_path, closed=closed)
+    assert record['status'] == 'complete'
+    assert record['has_successful_reports'] is False and 'last_claim' not in record
+
+
 def test_nfs_lock_failure_keeps_successful_members_but_requires_new_runtime_gate(tmp_path, monkeypatch):
     claimed=[]
     def claim(*args):

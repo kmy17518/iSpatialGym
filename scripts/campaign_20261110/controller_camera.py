@@ -17,8 +17,9 @@ if __package__ in (None, ""):
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.controller_families import (
     allocations, perform_submit, read, reconcile, reserve_indices, run_logged, slurm_status,
-    submission_capacity, terminal,
+    submission_capacity,
 )
+from scripts.campaign_20261110.controller_held import job_terminal
 from scripts.campaign_20261110.storage import atomic_directory_lock
 
 
@@ -187,7 +188,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     require(source["key"] == template.class_id, "camera allocation class differs")
     gate = root / "validation/open_loop" / source["key"] / source["jobid"] / "gate.json"
     if not gate.exists():
-        state["status"] = "waiting_for_replay"
+        reports = report_signature(source['job_dir'])
+        successful = any(read(Path(source['job_dir']) / 'demo' / iid / 'meta.json').get('success') is True
+                         for iid, _, _ in reports)
+        state['status'] = ('validation_failed_no_successful_demo'
+                           if not successful and job_terminal(source, root, queue) else 'waiting_for_replay')
         return 0
     require(read(gate).get("success") is True, "camera replay failed")
     signature = digest(report_signature(source["job_dir"]))
@@ -228,7 +233,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             perform_submit(record, record["command"], save, rows, spec, root, "camera_auto_production", source["code"], record["count"])
             return 1
         row = record["allocation"]
-        closed = record["status"] == "complete" or (row["jobid"] not in queue and terminal(row["jobid"]))
+        closed = record["status"] == "complete" or job_terminal(row, root, queue)
         failure = refresh_production(record, gate, template, cfg, root, directory, closed=closed)
         save()
         if failure is not None:
