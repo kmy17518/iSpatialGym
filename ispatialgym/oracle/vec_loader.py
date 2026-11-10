@@ -667,6 +667,10 @@ class VecInstanceLoader:
                 continue
             staged[i] = (tro, path, rep, extras)
         if staged:
+            if any(tro.meta.raw.get("campaign") for tro, _, _, _ in staged.values()):
+                from ispatialgym.sampling.campaign_augmentation import require_shared_skybox
+
+                require_shared_skybox([tro.meta.raw.get("campaign") for tro, _, _, _ in staged.values()])
             task.finish_deferred_reset(sorted(staged))
             self._restore_probe("after_reset_step", sorted(staged))
         # phase 2: the per-slot restores (sleep threshold, hinges, attachments, grasps) and the robot's hold
@@ -678,7 +682,7 @@ class VecInstanceLoader:
                 if tro.meta.raw.get("campaign"):
                     from ispatialgym.sampling.campaign_runtime import verify_loaded
 
-                    rep["campaign_restoration"] = verify_loaded(tro.meta.raw["campaign"], physical)
+                    rep["campaign_restoration"] = verify_loaded(tro.meta.raw["campaign"], physical, scene=scene, sim=og.sim)
                 rep["rigid_sleep_threshold"] = self._apply_rigid_sleep_threshold(physical.values())
                 sl = SlotLoader(SceneView(env, i), self.robots[i], tro, physical, scene_translation(scene))
                 self.slots[i] = sl

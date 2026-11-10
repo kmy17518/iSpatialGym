@@ -167,6 +167,10 @@ def world_key(problem: GroundedProblem, scene: str, stable: Optional[dict] = Non
     for name in extra:
         if isinstance(name, str) and name in init and name not in removed:
             removed.append(name)
+    if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+        from ispatialgym.sampling.campaign_runtime import scene_removals
+
+        removed = sorted(set(removed).union(scene_removals(scene, stable)))
     return scene, tuple(sorted(rooms)), tuple(removed)
 
 

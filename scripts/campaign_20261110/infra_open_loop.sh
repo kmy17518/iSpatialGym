@@ -38,8 +38,13 @@ timeout -s INT -k 120 1800 python -m ispatialgym.oracle.run_isg --instance "${IN
 REPLAY_RC=$?
 set -e
 python3 - "$GATE_OUT" "$JOBDIR" "$SNAPSHOT" "${INPUTS[0]}" "${INPUTS[1]}" "$REPLAY_RC" <<'PY'
-import datetime,json,pathlib,sys
+import datetime,hashlib,json,pathlib,sys
 out,job,snapshot,tro,demo,rc=sys.argv[1:]
+def sha256(path):
+    h=hashlib.sha256()
+    with open(path,'rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+    return h.hexdigest()
 results=[]
 for line in (pathlib.Path(out)/'replay.log').read_text(errors='replace').splitlines():
     if line.startswith('RUN_ISG_RESULT '):
@@ -47,7 +52,7 @@ for line in (pathlib.Path(out)/'replay.log').read_text(errors='replace').splitli
         except ValueError:pass
 result=results[-1] if results else {}
 passed=int(rc)==0 and result.get('success') is True and result.get('status')=='success'
-gate={'schema':1,'validated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'validation_only':True,'source_job':job,'snapshot':snapshot,'instance':tro,'demo':demo,'replay_rc':int(rc),'replay_mode':'physics_action_open_loop','success':passed,'result':result}
+gate={'schema':1,'validated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'validation_only':True,'source_job':job,'snapshot':snapshot,'instance':tro,'demo':demo,'demo_sha256':sha256(demo),'tro_sha256':sha256(tro),'replay_meta_paths':[str(p) for p in pathlib.Path(out,'replay').rglob('meta.json')],'replay_rc':int(rc),'replay_mode':'physics_action_open_loop','success':passed,'result':result}
 (pathlib.Path(out)/'gate.json').write_text(json.dumps(gate,indent=2)+'\n')
 print(json.dumps(gate))
 sys.exit(0 if passed else 2)

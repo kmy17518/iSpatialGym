@@ -664,6 +664,26 @@ def memory_jobs(states):
 # ---------------------------------------------------------------------------------------------------------------- loop
 
 
+def rental_needs(queued, live, hbs, created, assigned_to, config, timestamp):
+    """Uncovered queued job counts, separately for every requested GPU model."""
+    needs = {}
+    for job in queued:
+        gpu = job.get("gpu") or config["default_gpu"]
+        needs[gpu] = needs.get(gpu, 0) + 1
+    for iid, instance in live.items():
+        event = created.get(iid) or {}
+        heartbeat = hbs.get(iid) or {}
+        if heartbeat.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit"):
+            continue
+        remaining = float(event.get("max_lifetime_s", 21600)) - (timestamp - float(event.get("time", timestamp)))
+        gpu = instance.get("gpu_name")
+        eligible = [job for job in queued if (job.get("gpu") or config["default_gpu"]) == gpu
+                    and job.get("avoid") != iid and remaining >= float(job.get("time_s", 0)) + 900]
+        slots = max(0, int(heartbeat.get("slots") or event.get("slots") or 1) - len(assigned_to.get(iid, [])))
+        needs[gpu] = max(0, needs.get(gpu, 0) - min(slots, len(eligible)))
+    return {gpu: count for gpu, count in needs.items() if count > 0}
+
+
 def tick(c, s3, state):
     C = cfg()
     states = load_states()
@@ -772,6 +792,7 @@ def tick(c, s3, state):
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")
         busy = bool(assigned_to.get(iid))
+        model_pending = any((job.get("gpu") or C["default_gpu"]) == i.get("gpu_name") for job in queued)
         reason = None
         if hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
             reason = f"worker {hb.get('phase')} {hb.get('detail', '')}"
@@ -783,13 +804,13 @@ def tick(c, s3, state):
             reason = "rental lifetime cap"
         elif st == "exited" and up > 300:
             reason = "container exited"
-        elif hb.get("phase") in ("ready",) and not busy and pending == 0:
+        elif hb.get("phase") in ("ready",) and not busy and not model_pending:
             idle_since = state.setdefault("idle_since", {}).setdefault(iid, t)
             if t - idle_since > C["idle_destroy_s"]:
                 reason = f"idle {(t - idle_since) / 60:.0f} min, queue empty"
         elif hb.get("phase") == "boot" and pending == 0 and not busy and t - state.get("last_pending", t) > 900:
             reason = "booting with an empty queue for 15 min"
-        if hb.get("phase") != "ready" or busy or pending:
+        if hb.get("phase") != "ready" or busy or model_pending:
             state.setdefault("idle_since", {}).pop(iid, None)
         if reason:
             if busy:
@@ -806,18 +827,17 @@ def tick(c, s3, state):
         state["last_pending"] = t
 
     # 5. rent for the queued jobs that no instance (ready or booting) will take
-    booting_slots = sum(int((created.get(iid) or {}).get("slots") or 1) for iid, i in live.items()
-                        if (hbs.get(iid) or {}).get("phase") not in ("ready", "run"))
-    need = pending - booting_slots
+    needs_by_gpu = rental_needs(queued, live, hbs, created, assigned_to, C, t)
+    need = sum(needs_by_gpu.values())
     stop = os.path.exists(os.path.join(VJ, "STOP_LAUNCH"))
     committed = sum(float(created[iid]["dph_total"]) * max(0.0, float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)
     budget_left = min(float(C["budget_usd"]),3000.0) - float(C.get("transfer_reserve_usd",300.0)) - tot - committed
     hourly = sum(float(i.get("dph_total") or 0) for i in live.values())
-    if need > 0 and not stop and len(live) < C["max_instances"] and budget_left > max(10.0, 2 * hourly):
+    if need > 0 and list_ok and not stop and len(live) < C["max_instances"] and budget_left > max(10.0, 2 * hourly):
         by_acct = {}
         for i in live.values():
             by_acct[i["_key_name"]] = by_acct.get(i["_key_name"], 0) + 1
-        gpus_needed = sorted({s.get("gpu") for s in queued})
+        gpus_needed = sorted(needs_by_gpu)
         offers = []
         for g in gpus_needed:
             offers += search(c, C, gpu=g)
@@ -826,6 +846,9 @@ def tick(c, s3, state):
         for o in offers:
             if n_new >= C["launch_per_tick"] or need <= 0 or len(live) + n_new >= C["max_instances"]:
                 break
+            offer_gpu = o.get("gpu_name")
+            if needs_by_gpu.get(offer_gpu, 0) <= 0:
+                continue
             if o.get("machine_id") in used_m:
                 continue
             reserve = float(o["dph_total"]) * float(C.get("max_worker_lifetime_s",21600)) / 3600
@@ -835,7 +858,8 @@ def tick(c, s3, state):
             if iid:
                 n_new += 1
                 budget_left -= reserve
-                need -= o["_slots"]
+                needs_by_gpu[offer_gpu] = max(0, needs_by_gpu[offer_gpu] - o["_slots"])
+                need = sum(needs_by_gpu.values())
                 used_m.add(o.get("machine_id"))
     elif need > 0 and budget_left <= max(10.0, 2 * hourly):
         log(f"BUDGET: ${tot:.2f} of ${C['budget_usd']:.0f} spent, ${hourly:.2f}/h live: no new rentals")

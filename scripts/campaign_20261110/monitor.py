@@ -40,6 +40,9 @@ def refresh(output, host):
     runtime=read_json(infra/'runtime.json',{})
     validation=cluster.get('validation',{})
     gates=list(validation.get('gates',{}).values())
+    baseline_gates=[gate for gate in gates if '/baseline_canary/' in gate.get('source_job_dir','')]
+    contract_gates=[gate for gate in gates if '/baseline_canary/' not in gate.get('source_job_dir','') and '/vast_arch_canary/' not in gate.get('source_job_dir','')]
+    vast_gates=[gate for gate in gates if '/vast_arch_canary/' in gate.get('source_job_dir','')]
     campaign_ids={str(j['job_id']) for j in runtime.get('jobs',[]) if j.get('job_id')}
     campaign_ids.update(str(g[k]) for g in gates for k in ('source_job_id','replay_job_id') if g.get(k))
     jobs=cluster.get('jobs',[])
@@ -51,6 +54,8 @@ def refresh(output, host):
     own_fleet=[i for i in fleet if str(i.get('id')) in own_vast_ids]
     own_vast=cluster.get('vast_campaign',{})
     unknown_accounts=[a.get('account') for a in vast.get('accounts',[]) if a.get('error_type') or 'instances' not in a]
+    try: vast_age=time.time()-dt.datetime.fromisoformat(vast['checked_at']).timestamp()
+    except (KeyError,ValueError): vast_age=None
     def gpu_count(rows):
         return sum(j['gpus'] for j in rows if j['state']=='RUNNING')
     def fleet_gpus(rows):
@@ -66,19 +71,25 @@ def refresh(output, host):
         'cluster_by_user':cluster.get('summary',{}),'cluster_capacity':cluster.get('capacity',{}),
         'campaign_vast_running_gpus':own_vast.get('running_gpus') if own_vast else (fleet_gpus(own_fleet) if not unknown_accounts else None),
         'campaign_vast_metrics':own_vast,
-        'all_vast_running_gpus':fleet_gpus(fleet) if not unknown_accounts else None,
+        'all_vast_running_gpus':fleet_gpus(fleet) if not unknown_accounts and vast_age is not None and vast_age < 120 else None,
+        'all_vast_observation_age_seconds':vast_age,
+        'scale_prebuild':cluster.get('scale_prebuild',{}),
         'vast_accounts_unavailable':unknown_accounts,
         'campaign_submitted_jobs':runtime.get('jobs',[]),
-        'baseline_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in gates),'open_loop_passed':sum(g.get('status')=='validated' for g in gates),'gates':gates},
+        'baseline_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in baseline_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in baseline_gates),'gates':baseline_gates},
+        'contract_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in contract_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in contract_gates),'gates':contract_gates},
+        'vast_arch_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in vast_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in vast_gates),'gates':vast_gates},
         'campaign_results':runtime.get('results',{'templates_demo_validated':0,'templates_replay_validated':0,'fresh_standard_eval_instances':0,'fresh_model_holdout_instances':0,'fresh_category_holdout_instances':0,'fresh_train_instances':0}),
         'pending':runtime.get('pending',['Freeze split/perturbation contracts','Launch fresh template demo and open-loop replay validation','Apply owner updates for five pending aliases']),
-        'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',300),
+        'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',3000),
         'automatically_stop_at_deadline':False,
     }
     atomic(output/'live.json',json.dumps(state,indent=2)+'\n')
     lines=['# Fresh dataset campaign — live state','',f"Updated: {state['updated_at']} (UTC). Cluster observed: {state['cluster_observed_at']}.",'',f"Current phase: **{state['phase']}**.",'','| GPU usage | Count |','|---|---:|',f"| This campaign: cluster running | {state['campaign_cluster_running_gpus']} |",f"| This campaign: cluster pending jobs | {state['campaign_cluster_pending_jobs']} |",f"| Other work: cluster running | {state['unrelated_cluster_running_gpus']} |",f"| This campaign: Vast running | {state['campaign_vast_running_gpus'] if state['campaign_vast_running_gpus'] is not None else 'not verified'} |",f"| All accounts: Vast running | {state['all_vast_running_gpus'] if state['all_vast_running_gpus'] is not None else 'not verified'} |",'',f"Vast observation: {state['vast_observed_at'] or 'not yet checked'}. New campaign cap: ${state['new_campaign_vast_budget_usd']}; prior campaign resources are separate.",'','| Fresh campaign result | Count |','|---|---:|']
     lines.extend([f"| Baseline canaries: demo passed | {state['baseline_validation']['demo_passed']} |",f"| Baseline canaries: open-loop passed | {state['baseline_validation']['open_loop_passed']} |"])
     lines.extend(f"| {k.replace('_',' ')} | {v} |" for k,v in state['campaign_results'].items())
+    if own_vast:
+        lines.extend(['',f"Campaign Vast ledger estimate: ${own_vast.get('spend_estimate_usd',0):.2f} spent + ${own_vast.get('future_compute_commitment_usd',0):.2f} reserved compute + ${own_vast.get('transfer_reserve_usd',0):.2f} transfer/storage reserve. Provider invoice reconciliation pending. Fleet observed at Unix {own_vast.get('observed_at_unix')}."])
     lines.extend(['','Cluster QOS limits: 48 GPUs per user on svl; 30 per user on viscam. Capacity below is a point-in-time resource estimate, not a reservation.','',f"Observed capacity: `{json.dumps(state['cluster_capacity'],sort_keys=True)}`.",'','Pending work:',''])
     lines.extend('- '+x for x in state['pending'])
     if error:lines.extend(['',f'**Refresh failed:** {error}. GPU numbers retain the prior observation; check its timestamp.'])

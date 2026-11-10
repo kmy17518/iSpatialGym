@@ -644,7 +644,8 @@ class InstanceLoader:
         if self.tro.meta.raw.get("campaign"):
             from ispatialgym.sampling.campaign_runtime import verify_loaded
 
-            self.report["campaign_restoration"] = verify_loaded(self.tro.meta.raw["campaign"], self.physical)
+            self.report["campaign_restoration"] = verify_loaded(self.tro.meta.raw["campaign"], self.physical,
+                                                                  scene=env.scene, sim=og.sim)
         # the rigid-body overrides of the task objects the TRO placed (the build's pass reaches the scene's own objects only), before
         # the constraints and the settle, as VecInstanceLoader.restore
         self.report["rigid_sleep_threshold"] = SA.apply_to_objects(self.physical.values(), self.physics_overrides)
@@ -2015,6 +2016,11 @@ def run_instance(args, tro_arg: str, shared: Optional[Dict[str, Any]] = None) ->
                 traceback.print_exc()
         if out_dir is not None:
             try:
+                _loader = locals().get("loader")
+                if _loader is not None and _loader.tro.meta.raw.get("campaign") and result.get("success") is not True:
+                    from ispatialgym.sampling.campaign_runtime import record_execution_failure
+
+                    record_execution_failure(tro_arg, out_dir, result)
                 dump_json(os.path.join(out_dir, "meta.json"), meta)
             except Exception as e:  # noqa: BLE001
                 traceback.print_exc()

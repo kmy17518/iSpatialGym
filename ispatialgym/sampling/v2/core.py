@@ -638,6 +638,10 @@ class SamplerV2(TaskSampler):
         self.compiled = self.problem.compile()
         self.template_meta["bddl_sha256"] = _sha_text(self.problem.text)
         self.build_scope()
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            from ispatialgym.sampling.campaign_runtime import prepare
+
+            prepare(self, og.sim)
         self.template_meta["timings"]["bind_spawn_s"] = time.time() - t0
         k1 = self.kit.stats_snapshot()
         self.template_meta["timings"]["bind_spawn_kit"] = self.kit.stats_delta(k0, k1)
