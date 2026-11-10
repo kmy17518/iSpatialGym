@@ -218,3 +218,26 @@ def test_lying_push_strokes(monkeypatch):
     off.num = lambda k, d: off.gp.gen(k, d)
     st0 = off.push_strokes_record(0.31)["strokes"]  # today's default strokes: 0.10 m, 3 cm re-aim
     assert st0["n"] == 4 and st0["reaim_max_m"] == 0.03
+
+
+def test_partial_tilt_release_lands_flat_where_planned(monkeypatch):
+    # lead #92d (a): released at 70 deg with its lowest edge above the floor, the briefcase falls the last 20 deg about that edge onto the lying pose
+    monkeypatch.setenv(IL.BRIEFCASE_LYING_TILT_ENV, "70, 60,x,95")
+    assert IL.briefcase_lying_tilts() == [70.0, 60.0]
+    monkeypatch.delenv(IL.BRIEFCASE_LYING_TILT_ENV)
+    assert IL.briefcase_lying_tilts() == []
+    hull = _briefcase_hull()
+    rest = G.quat_about_axis(th.tensor([0.0, 1.0, 0.0]), -math.pi / 2)
+    q_ly, facts = IL.lying_rest(hull, rest)
+    a = th.tensor(facts["tilt_axis_world"])
+    for t in (60.0, 70.0, 75.0):
+        q_r, off, shift = IL.partial_landing(hull, q_ly, a, t)
+        up_r = float(G.rotate(q_r, th.tensor([0.0, 0.0, 1.0]))[2])  # the thin axis: lying = 1, standing = 0
+        assert up_r == pytest.approx(math.sin(math.radians(t + facts["tilt_deg"] - 90.0)), abs=0.02)
+        # the root released at -off from a pivot at the origin; the rigid fall about the pivot ends at the lying orientation, the lowest point on the pivot's height
+        root_r = off
+        rot = G.quat_about_axis(a / th.linalg.norm(a), math.radians(90.0 - t))
+        root_l = G.rotate(rot, root_r)
+        pts_l = G.local_points_world(hull, (root_l, q_ly))
+        assert float(pts_l[:, 2].min()) == pytest.approx(0.0, abs=0.006)
+        assert th.allclose(root_l[:2] - root_r[:2], shift, atol=1e-5)

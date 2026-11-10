@@ -261,6 +261,48 @@ LYING_SCREEN_LOWER_M = 0.10
 #: cancelled r2_ul02_lying jobs it removed every one of 270 drops that reached it (0 passed: a horizontal-hand drop never tracks a lowering) while
 #: every lying demo landed flat from 0.22-0.25 m without one; the up-retreat check (on4 360001's failure) stays
 LYING_SCREEN_LOWER_DEFAULT = False
+#: lead #92d (owner, option (a)): the PARTIAL-TILT release of the lying briefcase - ``ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG`` (e.g. "70,60,75"; unset =
+#: the full 90 deg lying release; acts only where :attr:`IORSLarge.lying` acts): the carried briefcase is turned only this far (deg from standing
+#: toward lying) at the drop, its lowest edge :data:`LYING_PARTIAL_CLEAR_M` above the floor, and falls the rest of the way onto its large face. The
+#: hand holding the handle is then pitched instead of horizontal (the horizontal hand sits on the wrist's singular branch: its lowering never
+#: tracks, its retreat jumped). The release xy is moved so the briefcase LANDS (the remaining turn about its lowest edge, :func:`partial_landing`)
+#: at the drop cell the push chain starts from; the goal / push orientation stays the lying one. The tilts are screened in turn per C.
+BRIEFCASE_LYING_TILT_ENV = "ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG"
+LYING_PARTIAL_CLEAR_M = 0.03
+
+
+def briefcase_lying_tilts() -> List[float]:
+    """:data:`BRIEFCASE_LYING_TILT_ENV` as a list of tilts (deg, 0 < t < 90), [] when unset / malformed (the full lying release)."""
+    out: List[float] = []
+    for v in (os.environ.get(BRIEFCASE_LYING_TILT_ENV) or "").replace(";", ",").split(","):
+        try:
+            f = float(v)
+        except ValueError:
+            continue
+        if 0.0 < f < 90.0:
+            out.append(f)
+    return out
+
+
+def partial_landing(hull: th.Tensor, q_lying, axis_world, tilt_deg: float) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    """The partial-tilt release of a lying target: ``(q_release, release_offset, landing_shift)``. ``q_release`` = ``q_lying`` turned back by
+    (90 - ``tilt_deg``) about ``axis_world`` (the lying turn's horizontal axis at this yaw); ``release_offset`` = the root's position relative to the
+    released hull's lowest point (z: the root above it); ``landing_shift`` = the root's horizontal move when the target falls the remaining
+    (90 - tilt) about the pivot through that lowest point onto ``q_lying`` (rigid rotation, no slide)."""
+    a = G.t(axis_world).float()
+    a = a / max(float(th.linalg.norm(a)), 1e-9)
+    back = math.radians(90.0 - float(tilt_deg))
+    q_l = G.t(q_lying).float()
+    q_r = G.qmul(G.quat_about_axis(a, -back), q_l)
+    q_r = q_r / th.linalg.norm(q_r)
+    pts = G.local_points_world(hull, (th.zeros(3), q_r))
+    z = pts[:, 2]
+    low = pts[z <= float(z.min()) + 0.005].mean(dim=0)  # the lowest edge's centre (points within 5 mm of the lowest)
+    rel = -low  # root minus pivot, root at the origin
+    rot = G.quat_about_axis(a, back)
+    rel_l = G.rotate(rot, rel)
+    shift = (rel_l - rel)
+    return q_r, -low, th.tensor([float(shift[0]), float(shift[1])])
 
 
 def briefcase_lying_on() -> bool:
@@ -1935,9 +1977,23 @@ class IORSLarge(SamplerV2):
         return True
 
     def drop_pose_at(self, xy, quat) -> G.Pose:
-        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy`` (:meth:`drop_height`)."""
+        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy`` (:meth:`drop_height`).
+        With the lying partial tilt (``_lying_tilt``, :data:`BRIEFCASE_LYING_TILT_ENV`): ``quat`` (the lying orientation) turned back to the tilt, the
+        lowest edge :data:`LYING_PARTIAL_CLEAR_M` up, placed so that it lands at ``xy`` (:func:`partial_landing`)."""
+        t = self.__dict__.get("_lying_tilt")
+        if t is not None and getattr(self, "lying", False):
+            q_r, off, shift = partial_landing(self.hull, quat, self.lying_axis_world(quat), float(t))
+            z = self.floor_z + LYING_PARTIAL_CLEAR_M + float(off[2])
+            return th.tensor([float(xy[0]) - float(shift[0]), float(xy[1]) - float(shift[1]), z]), q_r
         z = self.floor_z + self.world.bottom_offset(self.hull, quat) + self.drop_height()
         return th.tensor([float(xy[0]), float(xy[1]), z]), quat
+
+    def lying_axis_world(self, q_lying) -> th.Tensor:
+        """The lying turn's horizontal axis at the yaw of ``q_lying``: the template's ``tilt_axis_world`` (yaw 0) turned by the yaw between
+        ``c_rest`` and ``q_lying``."""
+        a0 = th.tensor([float(v) for v in (self.template_facts.get("briefcase_lying") or {}).get("tilt_axis_world") or [0.0, 1.0, 0.0]])
+        dq = G.qmul(G.t(q_lying).float(), G.qinv(self.c_rest()))
+        return G.rotate(dq, a0)
 
     def drop_height(self) -> float:
         """The drop's bottom height above the floor: ``generation.drop_height_m`` (:data:`PUSH_UNDER_DROP_HEIGHT_M`), or with :attr:`lying` the
@@ -6663,7 +6719,17 @@ class IORSLarge(SamplerV2):
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
-            if push and self.lying:
+            if push and self.lying and briefcase_lying_tilts():
+                # i7-measure (lead #92d (a)): the partial-tilt releases in turn, the first with a feasible pair is this C's (drop_pose_at reads it)
+                for t_l in briefcase_lying_tilts():
+                    self._lying_tilt = t_l
+                    F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+                    if F_goal:
+                        TT._count(self, f"briefcase_lying.tilt.{t_l:g}")
+                        break
+                else:
+                    TT._count(self, "briefcase_lying.tilt.none")
+            elif push and self.lying:
                 # i7-measure (A2): the lying drop's heights in turn, the first with a feasible pair is this C's (drop_height reads it)
                 for h_l in self.lying_drop_heights():
                     self._lying_drop_h = h_l
@@ -7021,6 +7087,8 @@ class IORSLarge(SamplerV2):
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
                     if self.lying:
                         grasp.extras["drop_retreat_up_m"] = float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))
+                        if self.__dict__.get("_lying_tilt") is not None and briefcase_lying_tilts():
+                            grasp.extras["lying_release_tilt_deg"] = float(self._lying_tilt)
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": self.drop_height(),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
