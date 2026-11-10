@@ -32,7 +32,9 @@ def main():
     for name in ('inventory', 'defaults', 'visual-review', 'support-scene-probe', 'reservations',
                  'measurement-reservations', 'reserved-asset-hashes', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
-    p.add_argument('--relations', nargs='+', choices=['ontop', 'nextto', 'under'], default=['ontop', 'nextto'])
+    p.add_argument('--relations', nargs='+', choices=['ontop', 'nextto', 'under', 'touching'], default=['ontop', 'nextto'])
+    p.add_argument('--context-scene-probe', type=Path)
+    p.add_argument('--context-visual-review', type=Path)
     a = p.parse_args()
     require(not a.out.exists(), 'new immutable output required')
     policy, previous, hashes = [json.loads(path.read_text()) for path in (a.reservations, a.measurement_reservations, a.reserved_asset_hashes)]
@@ -46,9 +48,21 @@ def main():
         require(previous[key] == policy[key], 'category or room policy changed')
     require(support['status'] == 'private_support_geometry_and_reload_passed', 'private table proof incomplete')
     scene_path = Path(support['native_scene_path']); require(sha(scene_path) == support['native_scene_sha256'], 'private scene changed')
+    context = None
+    if 'touching' in a.relations:
+        require(a.relations == ['touching'] and a.context_scene_probe and a.context_visual_review, 'touching requires a separate reviewed context scene')
+        context, context_visual = [json.loads(path.read_text()) for path in (a.context_scene_probe, a.context_visual_review)]
+        require(context['status'] == 'private_context_geometry_and_reload_passed' and context_visual['status'] == 'passed'
+            and context_visual['context_probe_sha256'] == sha(a.context_scene_probe), 'context visual proof incomplete')
+        require(context['source_scene_sha256'] == support['native_scene_sha256'], 'context changed private support source')
+        scene_path = Path(context['native_scene_path']); require(sha(scene_path) == context['native_scene_sha256'], 'context scene changed')
     scene, room, name = support['scene'], support['room'], support['object_name']
     init = json.loads(scene_path.read_text())['objects_info']['init_info']; partner = init[name]['args']
     require(partner['scale'] == support['default_scale'], 'table scale proof differs')
+    if context:
+        measured = next(x for x in context['objects'] if x['model_key'] == 'armchair/pmrcex')
+        name = measured['name']; partner = init[name]['args']
+        require(partner['scale'] == measured['default_scale'], 'context partner scale differs')
     floor = next(x['args'] for x in init.values() if x['args'].get('category') == 'floors' and room in x['args'].get('in_rooms', []))
     rows = {x['category'] + '/' + x['model']: x for x in doc['objects']}
     source = a.inventory / 'frozen_customs_f24ea424.json'; originals = json.loads(source.read_text())
@@ -58,7 +72,7 @@ def main():
     a.out.mkdir(parents=True)
     require(len(a.relations) == len(set(a.relations)), 'duplicate requested relation')
     for relation in a.relations:
-        model_key = {'ontop': 'alarm_clock/vqwovi', 'nextto': 'armchair/pmrcex', 'under': 'shoe_box/pitwey'}[relation]
+        model_key = {'ontop': 'alarm_clock/vqwovi', 'nextto': 'armchair/pmrcex', 'under': 'shoe_box/pitwey', 'touching': 'footstool/sghekm'}[relation]
         target = rows[model_key]; require(target['ready'] and review['objects'][model_key]['status'] == 'passed', 'target visual/default evidence incomplete')
         task = 'inter_object_relation_satisfaction-' + relation + '_large_scale'; source_class = task + ('_03' if relation == 'under' else '_01')
         cls = task + '-' + target['category'] + '-' + partner['category']
@@ -105,6 +119,8 @@ def main():
                 names[rendered.instances[role]] = obj['name']
         proof = dict(defaults_sha256=sha(a.defaults), visual_review_sha256=sha(a.visual_review), source_customs_sha256=sha(source), source_class_id=source_class,
             support_scene_probe_sha256=sha(a.support_scene_probe), reservation_sha256=sha(a.reservations), native_scene_sha256=sha(scene_path), production_released=False)
+        if context:
+            proof.update(context_probe_sha256=sha(a.context_scene_probe), context_visual_review_sha256=sha(a.context_visual_review))
         entry['campaign_provenance'] = proof; definitions[alias] = entry
         template = Template('held_category__' + cls, task, cls, 'eval_category', scene, room, tuple(refs), digest(dict(entry=entry, bddl_sha256=sha(bddl))),
             {**proof, 'task_rooms': [room], 'inst_to_name': names, 'runtime_bddl_sha256': sha(bddl), 'customs_alias': alias,

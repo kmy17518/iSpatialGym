@@ -621,7 +621,8 @@ def submission_command(group_dir, *, snapshot, campaign_root, v2_root, base_inde
            "--root", str(root), "--ledger", str(root / "manifests/goal_group_allocations.tsv"), "--base-index", str(base_index),
            "--tag", "goal_groups", "--job-prefix", "isg261110_", "--grasps", "v2only", "--v2-root", str(v2_root),
            "--alias-memory", "off", "--no-memory-aggregate", "--kcollect", "2", "--sample-limit-s", str(int(budget + 1800)),
-           "--time-s", str(int(budget + 3600)), "--acct", account, "--part", partition, "--gres", gres]
+           "--time-s", str(int(budget + (7200 if plan['task'] == 'configuration_matching-block_design' else 3600))),
+           "--acct", account, "--part", partition, "--gres", gres]
     for name, value in env.items():
         cmd += ["--extra-env", f"{name}={value}"]
     return cmd

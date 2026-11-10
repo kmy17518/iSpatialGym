@@ -19,10 +19,12 @@ def main():
     p.add_argument('--ledger', default='canary_allocations.tsv')
     p.add_argument('--template-customs', action='store_true')
     p.add_argument('--bddl-root', type=Path)
+    p.add_argument('--customs-file', type=Path)
     p.add_argument('--kcollect', type=int, default=2)
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--vast-gpu', choices=['RTX 4090','RTX 5090'])
     p.add_argument('--dispatch-spool', action='store_true')
+    p.add_argument('--time-s', type=int)
     a = p.parse_args()
     root, group, snapshot = (Path(x).resolve() for x in (a.root, a.group, a.snapshot))
     assert group.is_relative_to(root) and snapshot.is_relative_to(root/'code')
@@ -32,6 +34,13 @@ def main():
     assert config['purpose'] == 'validation' and not (group/'goal_plan.json').exists()
     assert hashlib.sha256((snapshot/'.snapshot_commit').read_bytes()).hexdigest() == config['validation_key']['code_sha256']
     assert not (group/'submit.txt').exists(), 'submission already attempted; reconcile ledger first'
+    # Block design reserves 3600 s for a demo plus 420 s for shutdown. A 5400 s
+    # allocation therefore stopped its collectors before slow native sampling
+    # finished (fresh jobs 18423481 and 18423951). Preserve the sampler/oracle
+    # budgets and provide a genuine collection window after sampling instead.
+    block_design = config['template']['task'] == 'configuration_matching-block_design'
+    time_s = a.time_s if a.time_s is not None else (9000 if block_design else 5400)
+    assert time_s >= (2700 + 3600 + 420 if block_design else 2700), 'allocation cannot cover the collection window'
     env = {'TEMPLATE':source['template_dir'],'EVAL_INDEX':str(group/'empty_eval_index.json'),
            'ISPATIALGYM_CAMPAIGN_CONFIG':str(group/'campaign_config.json'),
            'ISGF_COLLECT_EXTRA':'--no-goal-override' + (' --max-steps 6000' if config['template']['task'] == 'configuration_matching-block_design' else ''),
@@ -42,6 +51,16 @@ def main():
            'ISPATIALGYM_FAST_COLLECTOR_PREBUILD':'0'}
     if a.template_customs:
         env['START_PER_ATTEMPT'] = '0'
+    if a.customs_file:
+        customs = a.customs_file.resolve()
+        assert a.template_customs and customs.is_file() and customs.is_relative_to(root), 'explicit private customs requires template mode and an owned file'
+        metadata = json.loads((Path(source['template_dir'])/'template_meta.json').read_text())
+        alias = metadata['variant']
+        assert alias == config['template']['scene_setup']['customs_alias'], 'native customs alias differs from contract'
+        assert Path(metadata['customs']).resolve() == customs, 'explicit customs differs from the native source'
+        assert alias in json.loads(customs.read_text()), 'private customs lacks the native alias'
+        env['ISG_CUSTOMS'] = str(customs)
+        env['ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256'] = hashlib.sha256(customs.read_bytes()).hexdigest()
     if a.bddl_root:
         bddl = a.bddl_root.resolve()
         assert bddl.is_dir() and bddl.is_relative_to(root) and not any(c.isspace() for c in str(bddl)), 'private BDDL must be an owned whitespace-free directory'
@@ -50,7 +69,7 @@ def main():
            '--code',str(snapshot),'--root',str(root),'--ledger',str(root/'manifests'/a.ledger),
            '--base-index',str(a.index),'--tag',a.tag,'--job-prefix','isg261110_','--grasps','v2only',
            '--v2-root',a.v2_root,'--alias-memory','off','--no-memory-aggregate','--kcollect',str(a.kcollect),
-           '--sample-limit-s','2700','--time-s','5400','--customs','template' if a.template_customs else 'trunk']
+           '--sample-limit-s','2700','--time-s',str(time_s),'--customs','template' if a.template_customs else 'trunk']
     for name, value in env.items():
         cmd.extend(['--extra-env',name+'='+value])
     if a.dispatch_spool:

@@ -61,3 +61,23 @@ def test_preview_and_wrong_owner_never_mutate_jobs(tmp_path,monkeypatch):
     assert result['original_allocation']==row['allocation'] and row['status']=='waiting'
     with pytest.raises(ContractError,match='another user'):
         migration.migrate_record(tmp_path,row,minimum_age=300,owner='other',save=lambda:None,execute=True)
+
+
+def test_controller_owned_pass_bounds_checks_and_prefers_fresh_vast_refill(tmp_path,monkeypatch):
+    monkeypatch.setattr(migration.getpass,'getuser',lambda:'owner')
+    calls=[];saved=[]
+    def perform(root,row,**kwargs):
+        calls.append(row['allocation']['jobid'])
+        row.update(status='complete',migration={'never_started':True})
+        return row['migration']
+    monkeypatch.setattr(migration,'migrate_record',perform)
+    cfg={'migrate_pending_seconds':300,'_migration_checks_remaining':1};state={}
+    row=record(tmp_path);queue={'123':['123','PENDING','owner','svl','gpu:1']}
+    migration.controller_check(tmp_path,row,state,cfg,queue,lambda:saved.append(True),family='held')
+    assert calls==['123'] and row['status']=='complete' and saved==[True]
+    assert state['next_dispatch_backends'][:2]==['vast_5090','vast_4090']
+    migration.controller_check(tmp_path,record(tmp_path),state,cfg,queue,lambda:None,family='held')
+    assert calls==['123']
+    cfg['_migration_checks_remaining']=1;queue['123'][2]='another_owner'
+    migration.controller_check(tmp_path,record(tmp_path),state,cfg,queue,lambda:None,family='held')
+    assert calls==['123']

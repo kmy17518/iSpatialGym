@@ -37,8 +37,10 @@ from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
+    from .bounded_process import run_bounded
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
+    from bounded_process import run_bounded
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -696,6 +698,56 @@ def rental_needs(queued, live, hbs, created, assigned_to, config, timestamp):
     return {gpu: count for gpu, count in needs.items() if count > 0}
 
 
+def coordinator_progress(phase, **fields):
+    path = os.path.join(VJ, "coordinator_progress.json")
+    with open(path + ".tmp", "w") as stream:
+        json.dump({"observed_at_unix": now(), "coordinator_job_id": os.environ.get("SLURM_JOB_ID"),
+                   "phase": phase, **fields}, stream, indent=2)
+    os.replace(path + ".tmp", path)
+
+
+def stage_bounded(rec, C):
+    attempt = uuid.uuid4().hex[:12]
+    base = os.path.join(VJ, "logs", f"stage_{rec['id']}_{attempt}")
+    result = base + ".json"
+    timeout = min(900, max(30, int(C.get("stage_timeout_s", 600))))
+    command = [sys.executable, os.path.abspath(__file__), "stage", rec['id'], "--output", result]
+    coordinator_progress("staging", job_id=rec['id'], log=base + ".log", timeout_seconds=timeout)
+    try:
+        run_bounded(command, base + ".log", timeout=timeout,
+                    progress=lambda elapsed: coordinator_progress("staging", job_id=rec['id'],
+                        log=base + ".log", elapsed_seconds=elapsed, timeout_seconds=timeout))
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(f"staging failed or timed out; preserved log {base}.log: {exc}") from exc
+    with open(result) as stream:
+        return json.load(stream)
+
+
+def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase):
+    n = {k: sum(1 for s in states.values() if s["status"] == k) for k in ("queued", "assigned", "synced", "failed")}
+    instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
+                         "account":SHORT.get(i.get('_key_name'),'unknown'),
+                         "worker_phase":(hbs.get(iid) or {}).get('phase'),
+                         "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
+                         "assigned_jobs":assigned_to.get(iid,[])} for iid,i in live.items()]
+    metrics = {"observed_at_unix": t, "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
+               "instances": instance_metrics,
+               "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
+               "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
+               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs']) if list_ok else None,
+               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs']) if list_ok else None,
+               "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
+               "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
+               "max_instances":C['max_instances'],
+               "dispatch_eligible_queued":len(dispatch_order(states.values(), C)),
+               "dispatch_excluded_queued":n['queued']-len(dispatch_order(states.values(), C)),
+               "spend_estimate_usd": tot, "future_compute_commitment_usd": committed, "transfer_reserve_usd": C.get("transfer_reserve_usd",300), "budget_usd": min(C["budget_usd"],3000), "hourly_usd": hourly, "queue": n}
+    mp = os.path.join(VJ, "metrics.json")
+    with open(mp + ".tmp", "w") as handle:
+        json.dump(metrics, handle, indent=2)
+    os.replace(mp + ".tmp", mp)
+
+
 def tick(c, s3, state):
     C = cfg()
     states = load_states()
@@ -762,6 +814,17 @@ def tick(c, s3, state):
             if stale and iid in live:
                 destroy(c, iid, "heartbeat stale", live[iid].get("_key_name"))
 
+    # Publish the fresh API observation before potentially slow staging. The
+    # separate progress record reports staging liveness without falsifying the
+    # timestamp of the provider observation.
+    committed_observed = sum(float(created[iid]["dph_total"]) * max(0.0,
+        float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)
+    assigned_observed = {}
+    for record in states.values():
+        if record["status"] == "assigned":
+            assigned_observed.setdefault(record["instance"], []).append(record["id"])
+    publish_metrics(C, states, live, hbs, assigned_observed, t, list_ok, tot, committed_observed,
+                    sum(float(i.get("dph_total") or 0) for i in live.values()), "dispatching")
     # 3. Prefer explicitly prioritized ready production; otherwise preserve FIFO.
     queued = dispatch_order(states.values(), C)
     assigned_to = {}
@@ -783,7 +846,7 @@ def tick(c, s3, state):
             if (s.get("gpu") and s["gpu"] != gpu) or s.get("avoid") == iid:
                 continue
             try:
-                spec = stage(s3, s, state)
+                spec = stage_bounded(s, C)
             except Exception as e:  # noqa: BLE001
                 log(f"STAGE_FAILED {s['id']}: {e!r}")
                 s.update(status="failed", error=f"stage: {e!r}")
@@ -888,25 +951,8 @@ def tick(c, s3, state):
         log(line)
         state["last_line"], state["last_line_t"] = line, t
     open(os.path.join(VJ, "status.txt"), "w").write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
-    instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
-                         "account":SHORT.get(i.get('_key_name'),'unknown'),
-                         "worker_phase":(hbs.get(iid) or {}).get('phase'),
-                         "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
-                         "assigned_jobs":assigned_to.get(iid,[])} for iid,i in live.items()]
-    metrics = {"observed_at_unix": t, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
-               "instances": instance_metrics,
-               "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
-               "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
-               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs']) if list_ok else None,
-               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs']) if list_ok else None,
-               "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
-               "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
-               "max_instances":C['max_instances'],
-               "spend_estimate_usd": tot, "future_compute_commitment_usd": committed, "transfer_reserve_usd": C.get("transfer_reserve_usd",300), "budget_usd": min(C["budget_usd"],3000), "hourly_usd": hourly, "queue": n}
-    mp = os.path.join(VJ, "metrics.json")
-    with open(mp + ".tmp", "w") as handle:
-        json.dump(metrics, handle, indent=2)
-    os.replace(mp + ".tmp", mp)
+    publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, "complete")
+    coordinator_progress("idle", queue=n)
 
 
 def status(c, s3):
@@ -938,6 +984,7 @@ def main():
     o.add_argument("--force", action="store_true")
     sg = sub.add_parser("stage")
     sg.add_argument("id")
+    sg.add_argument("--output")
     d = sub.add_parser("destroy")
     d.add_argument("instance")
     sub.add_parser("stop-all")
@@ -964,6 +1011,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 import traceback
                 log(f"TICK_FAILED {e!r}\n{traceback.format_exc()}")
+                coordinator_progress("error", error=repr(e))
             json.dump(state, open(sp + ".tmp", "w"))
             os.replace(sp + ".tmp", sp)
             time.sleep(a.every)
@@ -979,7 +1027,12 @@ def main():
     if a.cmd == "stage":
         states = load_states()
         ingest(states, cfg())
-        print(json.dumps(stage(s3, states[a.id], {}), indent=1))
+        result = stage(s3, states[a.id], {})
+        if a.output:
+            with open(a.output, "x") as stream:
+                json.dump(result, stream, indent=2)
+        else:
+            print(json.dumps(result, indent=1))
         return 0
     if a.cmd == "destroy":
         inst, _ = my_instances(c)

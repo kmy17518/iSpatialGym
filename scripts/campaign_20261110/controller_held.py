@@ -283,6 +283,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         records.append({"queue": path, "prepared": prepared, "validation_key": actual, "phase": template.split,
                         "index": submission["index"], "count": prepared["candidate_instances"], "status": "external_submission"})
     for record in records:
+        from scripts.campaign_20261110.controller_migration import controller_check
+        controller_check(root,record,state,cfg,queue,save,family='held')
         if record["status"] == "complete":
             record_runtime_failure(record, state)
             continue
@@ -375,9 +377,12 @@ def main():
     p.add_argument('--max-new-jobs-per-pass',type=int)
     p.add_argument('--dispatch-spool',action='store_true')
     p.add_argument('--dispatch-backends',help='Optional comma-separated authorized routing subset.')
+    p.add_argument('--migrate-pending-after',type=float)
     args = p.parse_args()
     cfg = read(args.config)
     original_config_hash=digest(cfg)
+    if args.migrate_pending_after is not None:
+        require(args.migrate_pending_after>=300,'pending migration requires at least five minutes');cfg['migrate_pending_seconds']=args.migrate_pending_after
     if args.dispatch_spool:cfg['dispatch_spool']=True
     if args.dispatch_backends:
         from scripts.campaign_20261110.infra_dispatch import BACKENDS
@@ -400,6 +405,8 @@ def main():
             state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
             state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
             state['operational_limits']['dispatch_backends']=cfg.get('dispatch_backends')
+            state['operational_limits']['migrate_pending_seconds']=cfg.get('migrate_pending_seconds')
+            cfg['_migration_checks_remaining']=8
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))

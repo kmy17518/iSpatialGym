@@ -22,7 +22,8 @@ def main():
     require(not a.out.exists() and a.out.resolve().is_relative_to(root / 'groups'), 'new owned group batch required')
     require(snapshot.is_relative_to(root / 'code'), 'snapshot outside campaign')
     active = active_policy(root); require(active is not None, 'committed policy missing')
-    policy_hash, policy, asset_hashes = active
+    policy_record, policy, asset_hashes = active
+    policy_hash = policy_record['policy_sha256']
     contracts = json.loads(a.contracts.read_text())
     jobs = json.loads(a.jobs.read_text())['jobs']
     templates = sorted((load_contract(row) for row in contracts['templates']), key=lambda t: (t.split != 'eval_model', t.class_id, t.template_id))
@@ -39,9 +40,12 @@ def main():
             require(len(matches) == 1, 'ambiguous candidate command source')
             job = matches[0]; argv = job['sample_argv']
             bddl_root = Path(argv[argv.index('--bddl-root') + 1]).resolve()
+            customs = Path(argv[argv.index('--customs') + 1]).resolve()
             require(bddl_root.is_relative_to(root) and bddl_root.is_dir(), 'private BDDL root not owned')
+            require(customs.is_relative_to(root) and customs.is_file(), 'private customs not owned')
             source = Path(template.scene_setup['source_template']).resolve()
             meta = json.loads((source / 'template_meta.json').read_text())
+            require(Path(meta['customs']).resolve() == customs and meta['variant'] in json.loads(customs.read_text()), 'native private customs differs')
             activity, number = meta['problem'].rsplit('-', 1)
             bddl = bddl_root / activity / ('problem' + number + '.bddl')
             require(file_digest(bddl) == template.scene_setup['runtime_bddl_sha256'], 'private runtime BDDL differs')
@@ -64,7 +68,7 @@ def main():
             command = [sys.executable, str(snapshot / 'scripts/campaign_20261110/infra_submit_validation.py'),
                 '--root', str(root), '--group', str(directory), '--snapshot', str(snapshot), '--key', bound.class_id,
                 '--tag', 'floating_annotated_r2', '--v2-root', str(a.v2_root), '--index', '${FRESH_GLOBAL_INDEX}',
-                '--template-customs', '--bddl-root', str(bddl_root)]
+                '--template-customs', '--bddl-root', str(bddl_root), '--customs-file', str(customs)]
             result.update(status='prepared_requires_fresh_index', directory=str(directory), command=command,
                 fingerprint=bound.fingerprint, config_sha256=file_digest(directory / 'campaign_config.json'),
                 validation_key=asdict(validation), runtime_bddl_sha256=file_digest(bddl), production_released=False)

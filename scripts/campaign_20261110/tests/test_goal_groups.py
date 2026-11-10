@@ -65,6 +65,28 @@ class GoalGroupControllerTests(unittest.TestCase):
             with self.assertRaises(c.ContractError):
                 g.submission_command(out, snapshot=code, campaign_root=root, v2_root=root / "maps")
 
+    def test_block_collector_can_start_after_full_sampling_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, ledger, _, template, code = self.fixture(root)
+            anchor = g.successful_anchor(job, campaign_root=root, ledger=ledger, campaign_started_at=time.time()-10)
+            out = root / 'groups/window'
+            g.prepare_group(anchor=anchor, template=template, campaign_id='new', group_id='window', output=out,
+                code_sha256=c.file_digest(code/'.snapshot_commit'), physics_sha256=c.digest('physics'),
+                data_sha256=c.digest('maps'), magnitude_range=[.05, .10])
+            # Exercise only the launch budget policy. Native block geometry and
+            # semantics have their own tests; the observed failure was no oracle
+            # start because the deadline preceded the ready-instance marker.
+            plan = g.read_json(out/'goal_plan.json')
+            plan['task'] = 'configuration_matching-block_design'
+            c.write_json_atomic(out/'goal_plan.json', plan)
+            cmd = g.submission_command(out, snapshot=code, campaign_root=root, v2_root=root/'maps')
+            sampling = int(cmd[cmd.index('--sample-limit-s')+1])
+            allocation = int(cmd[cmd.index('--time-s')+1])
+            collector_deadline = allocation - 3600 - 420
+            self.assertGreater(collector_deadline, sampling)
+            self.assertGreater(collector_deadline, 1977)  # observed ready time in 18423951
+
     def test_historical_or_unallocated_anchor_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

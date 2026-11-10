@@ -36,3 +36,5 @@ def test_known_legacy_nfs_runtime_routes_only_to_local_storage(tmp_path,monkeypa
     source.write_text('append_using_atomic_directory_lock()\n')
     spool.enqueue_record(tmp_path,record,lambda:None)
     assert calls[-1]['backends']==('shiyuc_svl',)
+    spool.enqueue_record(tmp_path,record,lambda:None,backends=('vast_4090',))
+    assert calls[-1]['backends']==('vast_4090',)

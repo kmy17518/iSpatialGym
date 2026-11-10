@@ -89,6 +89,28 @@ def migrate_record(root,record,*,minimum_age,owner,save,execute=False):
     return record['migration']
 
 
+def controller_check(root,record,state,cfg,queue,save,*,family):
+    """A bounded check inside the caller's already-owned controller state lock."""
+    age=cfg.get('migrate_pending_seconds')
+    if age is None or cfg.get('_migration_checks_remaining',0)<=0 or record.get('status')=='complete':return
+    allocation=record.get('allocation') or {};jid=allocation.get('jobid')
+    queued=queue.get(jid)
+    recovering=bool(record.get('migration_intent'))
+    if not recovering and (not queued or queued[1]!='PENDING' or queued[2]!=getpass.getuser()):return
+    now=time.time()
+    if not recovering and now-record.get('migration_last_checked',0)<60:return
+    cfg['_migration_checks_remaining']-=1;record['migration_last_checked']=now
+    try:
+        with atomic_directory_lock(root/'controllers'/(family+'_planning.lockdir')):
+            result=migrate_record(root,record,minimum_age=age,owner=getpass.getuser(),save=save,execute=True)
+        if result:
+            state['next_dispatch_backends']=['vast_5090','vast_4090','shiyuc_svl','shiyuc_viscam','minyeong_svl']
+            record.pop('migration_error',None)
+    except Exception as exc:
+        record['migration_error']={'at':time.time(),'type':type(exc).__name__,'reason':str(exc)}
+    save()
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',required=True);parser.add_argument('--state',action='append',required=True)
