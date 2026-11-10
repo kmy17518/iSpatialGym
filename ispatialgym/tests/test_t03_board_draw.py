@@ -231,3 +231,28 @@ def test_rows_are_checked_and_ignored_without_the_board_draw(monkeypatch):
         with pytest.raises(Reject) as e:
             _sampler(monkeypatch, gen=gen)  # its template capture reads the spec
         assert e.value.reason == "spec"
+
+
+def test_other_arm_draws_the_far_arm_where_its_map_serves(monkeypatch):
+    IS = _iors()
+    s, pool = _board_sampler(monkeypatch)
+    for sd, sts in pool.items():
+        for st in sts:
+            st["arms"] = {Z0: ["left", "right"] if st["key"] == KR15 else ["left"]}  # the far arm's map only for the right-board rest
+    monkeypatch.delenv(IS.SHELF_OTHER_ARM_ENV, raising=False)
+    for seed in range(40):  # off: the arm on the book's side, always
+        f = _draw(s, seed)
+        near = "left" if f["target_board"] == "left" else "right"
+        assert s.segment_arms == [near] and s.shelf_push_arm() == near and f["board_draw"]["far_arm"] is False
+    monkeypatch.setenv(IS.SHELF_OTHER_ARM_ENV, "1")
+    seen = set()
+    for seed in range(80):
+        f = _draw(s, seed)
+        arm = f["board_draw"]["arm"]
+        seen.add((f["target_board"], arm))
+        assert s.segment_arms == [arm] and s.shelf_push_arm() == arm and s.ikc.default_working_arms == [arm]
+        assert f["board_draw"]["far_arm"] == (arm != ("left" if f["target_board"] == "left" else "right"))
+        assert s.shelf_push_sign() == (-1.0 if f["target_board"] == "left" else 1.0)  # the push direction stays the board's
+        assert _draw(s, seed) == f
+    assert seen == {("left", "left"), ("right", "right"), ("right", "left")}  # no far arm on the left board: its rests have no right-arm map
+    assert s.kit.stats["shelf_board_draw.arm.right_board.left"] > 0

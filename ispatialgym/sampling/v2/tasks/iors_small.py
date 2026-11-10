@@ -302,6 +302,17 @@ def shelf_map_stance_on(s=None) -> bool:
     return _AS.switch_on(SHELF_MAP_STANCE_ENV, s)
 
 
+#: i7-t03both r4 2026-11-10 (owner item 3a, lead #94, DEFAULT OFF): with the board draw (:data:`SHELF_BOARD_DRAW_ENV`) an attempt may also work
+#: the drawn board with the arm on the FAR side of the book (the left arm on the right board): when the drawn rest's interior map serves the far
+#: arm on that row, the arm is drawn uniformly among the near and the far one. Every check runs with the drawn arm (Phase 2's band, the stance
+#: shift, the back-off, the exact checks, the place / retreat records); the push direction stays the board's. No rule changes.
+SHELF_OTHER_ARM_ENV = "ISPATIALGYM_SHELF_OTHER_ARM"
+
+
+def shelf_other_arm_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_OTHER_ARM_ENV, s)
+
+
 def shelf_need_of(err: Reject) -> Optional[str]:
     """Why a candidate's fixed start failed, for the stance shift: ``"transit"`` (the transit / back-off checks), ``"grasp"`` (no library
     grasp reaches the fixed start pose), None for anything the base position cannot change (the shift is not tried)."""
@@ -3835,6 +3846,11 @@ class IORSSmall(SamplerV2):
             states = [st for st in pool[side] if z in st["rows"]]
             st_k = states[int(rng.integers(len(states)))] if len(states) > 1 else states[0]
             self.apply_board_key(st_k, z)
+            near = "left" if side > 0 else "right"
+            arms = [a for a in (st_k.get("arms") or {}).get(z, [near]) if a == near or shelf_other_arm_on(self)] or [near]
+            arm_k = arms[int(rng.integers(len(arms)))] if len(arms) > 1 else arms[0]
+            self._shelf_arm_override = None if arm_k == near else arm_k
+            TT._count(self, f"shelf_board_draw.arm.{TT.side_name(side)}_board.{arm_k}")
             base = self._shelf_template
             drawn_key = st_k["key"]
             layouts = [(c[0], c[1]) for c in cands]
@@ -3846,13 +3862,15 @@ class IORSSmall(SamplerV2):
         else:
             k = int(rng.integers(len(layouts)))
             bay, side = layouts[k]
+            self._shelf_arm_override = None
         self.shelf_start = {"key": base["key"], "lean_side": side, "lean_deg": base["lean_deg"], "context": base.get("context")}
         self.rest["target"], self.rest["partner"] = self.shelf_rests(side, float(base["lean_deg"]), float(base["lean_deg"]))
         self.shelf_use_arm(self.shelf_push_arm())
         self.shelf_pose = self.shelf_partner_pose = None
         self._shelf_draw = {"layout": [bay, TT.side_name(side)], "n_layouts": len(layouts), "restricted": why}
         if drawn_key is not None:
-            self._shelf_draw["board_draw"] = {"grasp_key": drawn_key, "lean_deg": base["lean_deg"], "row_z": z, "n_rests": len(states)}
+            self._shelf_draw["board_draw"] = {"grasp_key": drawn_key, "lean_deg": base["lean_deg"], "row_z": z, "n_rests": len(states),
+                                              "arm": self.shelf_push_arm(), "far_arm": self.__dict__.get("_shelf_arm_override") is not None}
             self._shelf_side_layouts = [(c[0], c[1]) for c in cands if c[1] == side and c[2] == z]  # a redraw stays on the row (its top)
         else:
             self._shelf_side_layouts = [lay for lay in layouts if lay[1] == side]
@@ -3885,7 +3903,7 @@ class IORSSmall(SamplerV2):
         facts = TT.upright_shelf_facts(key, rest) or {}
         return {"key": key, "grasps": list(grasps), "grasps_flush": flush if flush else list(grasps), "rest": rest.clone(), "finger_open": op,
                 "template": {"key": key, "lean_side": facts.get("lean_side"), "lean_deg": facts.get("lean_deg"), "context": facts.get("context")},
-                "bands": {}, "rows": []}
+                "bands": {}, "rows": [], "arms": {}}
 
     def apply_board_key(self, st: Dict[str, Any], z: Optional[float] = None) -> None:
         """i7-t03both: the attempt's lean rest ``st`` (:meth:`_board_key_state`) becomes the sampler's - grasp key, grasps (both tiers), the
@@ -4154,7 +4172,7 @@ class IORSSmall(SamplerV2):
             if self.shelf_row_key(z) not in rows:
                 rows.append(self.shelf_row_key(z))
         own = {"key": self.grasp_key, "grasps": list(self.grasps), "grasps_flush": list(self.grasps_flush), "rest": self._shelf_rest0["target"].clone(),
-               "finger_open": self.__dict__.get("_shelf_finger_open_template"), "template": dict(self._shelf_template), "bands": {}, "rows": []}
+               "finger_open": self.__dict__.get("_shelf_finger_open_template"), "template": dict(self._shelf_template), "bands": {}, "rows": [], "arms": {}}
         saved = {"bands": self.bands, "arm_bands": dict(self.arm_bands or {})}
         pool: Dict[float, List[Dict[str, Any]]] = {}
         facts: Dict[str, Any] = {"keys": {}, "template_key": self.grasp_key, "rows": {}}
@@ -4178,20 +4196,35 @@ class IORSSmall(SamplerV2):
                         facts["keys"][k] = {"dropped": f"[{e.reason}] {str(e)[:200]}"}
                         continue
                     arm = "left" if float(st["template"]["lean_side"]) > 0 else "right"
+                    far = "right" if arm == "left" else "left"
                     misses = {}
+                    st.setdefault("arms", {})
                     for z in [z for z in rows if z in self._shelf_rows]:
                         try:
                             self.apply_board_key(st, z)
                             self.bands = None
                             st["bands"][z] = TT.ensure_bands(self, top=self.top)
-                            TT.arm_band(self, arm, bands=st["bands"][z])
-                            st["rows"].append(z)
                         except Reject as e:
                             st["bands"].pop(z, None)
                             self.bands = None
                             misses[str(z)] = f"[{e.reason}] {str(e)[:160]}"
                             TT._count(self, f"shelf_board_draw.row_map_missing.{e.reason}")
+                            continue
+                        ok_arms = []
+                        for a in [arm] + ([far] if shelf_other_arm_on(self) else []):  # i7-t03both r4: the far arm's map too (switch on)
+                            try:
+                                TT.arm_band(self, a, bands=st["bands"][z])
+                                ok_arms.append(a)
+                            except Reject as e:
+                                misses[f"{z}/{a}"] = f"[{e.reason}] {str(e)[:160]}"
+                                TT._count(self, f"shelf_board_draw.arm_map_missing.{a}")
+                        if ok_arms:
+                            st["arms"][z] = ok_arms
+                            st["rows"].append(z)
+                        else:
+                            st["bands"].pop(z, None)
                     facts["keys"][k] = {"side": side_name, "lean_deg": st["template"]["lean_deg"], "n_grasps": len(st["grasps"]), "arm": arm, "rows": list(st["rows"]),
+                                        "arms": {str(z): v for z, v in st.get("arms", {}).items()},
                                         "missing": misses}
                     if not st["rows"]:
                         TT._count(self, "shelf_board_draw.rest_dropped.no_row")
@@ -4202,7 +4235,7 @@ class IORSSmall(SamplerV2):
             self.arm_bands = saved["arm_bands"]
             if self.bands is None:
                 self.bands = saved["bands"]
-        facts["boards"] = {TT.side_name(sd): {st["key"]: st["rows"] for st in v} for sd, v in pool.items()}
+        facts["boards"] = {TT.side_name(sd): {st["key"]: {str(z): st.get("arms", {}).get(z) for z in st["rows"]} for st in v} for sd, v in pool.items()}
         self.template_facts["shelf_board_draw"] = facts
         log.info("%s: shelf board draw: lean rests by board (rows) %s; rows %s", self.gp.variant, facts["boards"], facts["rows"])
         return pool or None
@@ -5236,7 +5269,11 @@ class IORSSmall(SamplerV2):
 
     def shelf_push_arm(self) -> str:
         """The arm on the target's side: it grasps, places and pushes the target in the shelf layout (the left arm for a partner on
-        the right board), with the right hand's push parameters mirrored."""
+        the right board), with the right hand's push parameters mirrored. i7-t03both r4 (:data:`SHELF_OTHER_ARM_ENV`): the attempt's drawn
+        far-side arm when :meth:`draw_shelf_side` drew it."""
+        ov = self.__dict__.get("_shelf_arm_override")
+        if ov in ("left", "right"):
+            return ov
         return "left" if self.shelf_push_sign() < 0 else "right"
 
     def shelf_push_direction(self, st: Stance) -> th.Tensor:
