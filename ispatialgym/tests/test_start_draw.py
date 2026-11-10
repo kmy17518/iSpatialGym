@@ -326,6 +326,37 @@ def test_disembedding(fake_tt, monkeypatch):
     assert all(e != "e1" and lat <= 0.3 for e, lat, _ in draws)
 
 
+@pytest.mark.parametrize("campaign", [False, True])
+def test_fixed_tray_retries_native_start_when_first_camera_has_no_survivors(fake_tt, monkeypatch, campaign):
+    s = _base(DE.Disembedding, band_spec=None, bands=None, edge=None, init_stance=None, manip_candidates=[],
+        segment_arms=["right"], arm_offer_why="", arm_bands={}, hull={"source":th.zeros(4,3)}, src_role="source",
+        height={"source":.05},src_floor=SimpleNamespace(z_local=.01))
+    edge=_edges()[0]
+    monkeypatch.setattr(TT,"edge_frames",lambda *args:[(edge,_init_at(edge))])
+    monkeypatch.setattr(TT,"half_extent",lambda *args:.1)
+    seen=[]
+    native=TT.phase2_manipulation_stance
+    def phase2(*args,**kwargs):
+        seen.append(args[1].base_pose2d)
+        return [] if len(seen)==1 else native(*args,**kwargs)
+    monkeypatch.setattr(TT,"phase2_manipulation_stance",phase2)
+    s._destination_fit=lambda init,cs:cs
+    s._source_tray_in_frame=None
+    from ispatialgym.sampling.campaign_held_goals import ENV
+    if campaign:
+        monkeypatch.setenv(ENV,"/immutable/plan")
+        s.campaign_tray_plan=lambda:SimpleNamespace()
+        s.campaign_group_remaining_s=lambda:100
+    else:
+        monkeypatch.delenv(ENV,raising=False)
+    errors=[]
+    assert s._start_search(np.random.default_rng(14),{"kind":"disembedding","H_max":.1},errors) is campaign
+    assert len(seen)==(2 if campaign else 1)
+    assert len(errors)==1 and "no survivor" in errors[0]
+    if campaign:
+        assert seen[0]!=seen[1] and s.manip_candidates
+
+
 def _iors_large(kind="support"):
     s = _base(IL.IORSLarge, relation="ontop")
     s.__class__ = type("IL", (IL.IORSLarge,), {"partner": None, "target": None})

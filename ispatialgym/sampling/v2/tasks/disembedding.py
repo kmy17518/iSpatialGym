@@ -911,29 +911,38 @@ class Disembedding(SamplerV2):
                 errors.append(f"edge {edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
                 log.info("%s: %s", self.gp.variant, errors[-1])
                 continue
-            try:
-                bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
-                init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)
-                init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
-                init.name = "init"
-                # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm's
-                # band is its own or this band mirrored
-                self.segment_arms, self.arm_offer_why = TT.arm_offer(self)
-                self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
-                cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
-                                                      in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
-                                                      arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
-                                                      keep_pairs=lambda cs: self._destination_fit(init, cs))
-                if not cands:
-                    fits = [f for f in self.template_facts.get("destination_fit", []) if f["edge"] == edge.name]
-                    raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame" if not fits else
-                                 f"Phase 2: the destination tray fits beside the source tray at none of the positions ({fits[-1]['positions']} positions, "
-                                 f"{fits[-1]['candidates_before']} candidates; e.g. {(fits[-1]['examples'] or [''])[0][:300]})")
-                self.edge, self.init_stance, self.manip_candidates = edge, init, cands
-                return True
-            except Reject as e:
-                errors.append(f"edge {edge.name}: {e}")
-                log.info("%s: %s", self.gp.variant, errors[-1][:300])
+            # A fixed tray layout need not be visible from the first lateral
+            # that clears the floor. Retry native start draws, bounded by the
+            # group deadline, while retaining every phase-1/phase-2 check.
+            draws = 4 if getattr(self, "_campaign_tray_active", None) is not None else 1
+            for _ in range(draws):
+                if draws > 1:
+                    self.campaign_group_remaining_s()
+                try:
+                    bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
+                    init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)
+                    init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
+                    init.name = "init"
+                    # the arms offered for the grasp -> carry -> place -> release segment (owner 2026-09-27, first-demo v2.2): the other arm's
+                    # band is its own or this band mirrored
+                    self.segment_arms, self.arm_offer_why = TT.arm_offer(self)
+                    self.arm_bands = TT.arm_bands_for(self, self.segment_arms, bands=bands) if len(self.segment_arms) > 1 else {}
+                    cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.src_role], C.IDENTITY_QUAT), target_height=self.height[self.src_role],
+                                                          in_frame_fn=self._source_tray_in_frame, bands=bands, top=self.top, focus_z=self.top.z + self.src_floor.z_local,
+                                                          arm_bands=self.arm_bands, angle_classes_deg=TT.phase2_angle_classes(self), split_cone=TT.split_cone_opts(self),
+                                                          keep_pairs=lambda cs: self._destination_fit(init, cs))
+                    if not cands:
+                        fits = [f for f in self.template_facts.get("destination_fit", []) if f["edge"] == edge.name]
+                        raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the source tray in frame" if not fits else
+                                     f"Phase 2: the destination tray fits beside the source tray at none of the positions ({fits[-1]['positions']} positions, "
+                                     f"{fits[-1]['candidates_before']} candidates; e.g. {(fits[-1]['examples'] or [''])[0][:300]})")
+                    self.edge, self.init_stance, self.manip_candidates = edge, init, cands
+                    return True
+                except Reject as e:
+                    errors.append(f"edge {edge.name}: {e}")
+                    log.info("%s: %s", self.gp.variant, errors[-1][:300])
+                    if e.reason == "edge_too_short":
+                        break
         return False
 
     def spa_redraw_start(self, rng: np.random.Generator) -> None:
@@ -1035,8 +1044,12 @@ class Disembedding(SamplerV2):
         fixed layout's ``tray_turns``), on the top and in frame (5 %)."""
         for pose in self._source_tray_poses(stance, focus[:2]):
             if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], pose), margin=TT.SUPPORT_MARGIN):
+                if getattr(self, "_campaign_tray_active", None) is not None:
+                    TT._count(self, "campaign_tray_frame.off_support")
                 return False
             if not TT.in_frame(self, cam, TT.hull_corners_world(self.hull[self.src_role], pose), TT.IN_FRAME_MARGIN):
+                if getattr(self, "_campaign_tray_active", None) is not None:
+                    TT._count(self, "campaign_tray_frame.out_of_view")
                 return False
         return True
 
