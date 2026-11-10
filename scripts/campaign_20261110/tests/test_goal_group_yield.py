@@ -91,6 +91,31 @@ class GoalYieldTest(unittest.TestCase):
             self.assertEqual(r['observed_attempted_slots'],1);self.assertIsNone(r['attempted_instances'])
             self.assertEqual(r['completed_groups'],1)
 
+    def test_running_vast_staged_queue_uses_authored_scope_without_old_events(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);job,q,rows,write=self.fixture(root)
+            rows[0]['jobid']='900000001'
+            config=str(root/'groups/g1/campaign_config.json')
+            (job/'job.env.before_vast_caches').write_text(
+                'ISPATIALGYM_CAMPAIGN_GOAL_QUEUE='+str(q)+'\nISPATIALGYM_CAMPAIGN_CONFIG='+config)
+            (job/'job.env').write_text('ISPATIALGYM_CAMPAIGN_GOAL_QUEUE='+str(job/'campaign_inputs/queue.json')+
+                                      '\nISPATIALGYM_CAMPAIGN_CONFIG='+config)
+            # Old authored-side closure must never be imported as executed data.
+            q.with_suffix('.events.jsonl').write_text(json.dumps({'group_id':'g1','queue_sha256':file_digest(q),
+                'event':'closed','created_at':3,'written':0})+'\n')
+            write(root/'vast/state/jobs/900000001.json',{'status':'assigned'})
+            write(root/'accounting/job_gpu_time.json',{'records':[{'job_id':'900000001','state':'assigned','backend':'vast'}]})
+            with patch('scripts.campaign_20261110.goal_group_yield.snapshot_allocations',return_value=([],{},[])),patch('scripts.campaign_20261110.goal_group_yield.allocations',return_value=rows):
+                result=snapshot(root)
+                self.assertEqual(result['errors'],[])
+                self.assertEqual(result['summary']['standard_eval']['completed_groups'],0)
+                self.assertEqual(result['summary']['standard_eval']['pending_running_unstarted']['running_job_unstarted_group'],2)
+                self.assertEqual(result['jobs'][0]['queue_evidence_scope'],'authored_pending_worker_sync')
+                # A terminal missing executed queue remains an evidence failure.
+                write(root/'vast/state/jobs/900000001.json',{'status':'synced'})
+                result=snapshot(root)
+                self.assertTrue(result['errors'])
+
     def test_duplicate_successes_and_incomplete_transfer(self):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t);job,q,rows,write=self.fixture(root)

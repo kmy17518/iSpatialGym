@@ -223,9 +223,27 @@ def snapshot(root):
             plan_value = env.get('ISPATIALGYM_CAMPAIGN_GOAL_PLAN')
             if not queue_value and not plan_value: continue
             queue = None; events = []; gids = []
+            queue_scope = 'executed'
             if queue_value:
                 if not queue_path.exists(): queue_path = Path(queue_value)
-                queue = ev.read(queue_path, 'executed_queue')
+                if not queue_path.exists() and jid.startswith('900000'):
+                    # A worker publishes its rewritten job.env before rsync has
+                    # returned the staged queue. The immutable pre-cache env
+                    # names the authored queue; it proves scheduled membership,
+                    # not execution or completion. Never read its old events.
+                    state_path = root/'vast/state/jobs'/f'{jid}.json'
+                    worker = ev.read(state_path, 'vast_job_state') if state_path.exists() else {}
+                    backup = job/'job.env.before_vast_caches'
+                    if worker.get('status') in ('queued', 'staging', 'assigned') and backup.exists():
+                        ev.bytes(backup, 'pre_staging_environment_identity')
+                        prior = read_env(backup)
+                        require(prior.get('ISPATIALGYM_CAMPAIGN_CONFIG') == env.get('ISPATIALGYM_CAMPAIGN_CONFIG'),
+                                'pre-staging queue config identity differs')
+                        candidate = Path(prior.get('ISPATIALGYM_CAMPAIGN_GOAL_QUEUE', '')).resolve()
+                        require(candidate.is_relative_to(root/'queues'), 'pre-staging queue outside campaign queues')
+                        queue_path = candidate
+                        queue_scope = 'authored_pending_worker_sync'
+                queue = ev.read(queue_path, 'executed_queue' if queue_scope == 'executed' else 'authored_queue_waiting_sync')
                 require(queue['campaign_id'] == CAMPAIGN, 'queue campaign differs')
                 qconfig = ev.read(queue['config_path'], 'queue_config')
                 require(ev.sources[str(Path(queue['config_path']).resolve())]['sha256'] == queue['config_sha256'], 'queue config hash mismatch')
@@ -236,7 +254,7 @@ def snapshot(root):
                     require(plan['campaign_id'] == CAMPAIGN and plan['split'] == qconfig['split'], 'queued plan scope differs')
                     gids.append(plan['group_id'])
                 ep = queue_path.with_suffix('.events.jsonl')
-                if ep.exists():
+                if queue_scope == 'executed' and ep.exists():
                     events = ev.lines(ep, 'queue_events')
                     for event in events:
                         require(event['queue_sha256'] == ev.sources[str(queue_path.resolve())]['sha256'], 'queue event hash mismatch')
@@ -254,6 +272,7 @@ def snapshot(root):
             j = {'job_id': jid, 'group_ids': gids, 'job_dir': str(job), 'runtime_revision': Path(row['code']).name.removeprefix('trunk_'),
                 'backend': a.get('backend', 'vast' if jid.startswith('900000') else 'slurm'), 'state': state or 'unavailable',
                 'terminal': terminal, 'allocated_gpu_seconds': a.get('allocated_gpu_seconds'),
+                'queue_evidence_scope': queue_scope,
                 'missing_time_components': a.get('missing_time_components', []), 'activated_groups': [],
                 'unassigned_failure_rows': 0, 'sampling_rejections': Counter(), 'validation': gate_states.get(jid, [])}
             jobs.append(j)
