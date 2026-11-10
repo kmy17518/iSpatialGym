@@ -153,6 +153,38 @@ def validation_reasons(root, catalog):
     return reasons,sources,errors
 
 
+def pipeline_reasons(root, catalog):
+    """Attach hash-verified preparation evidence without promoting any counts."""
+    root=Path(root).resolve();path=root/'manifests/pipeline_status.json'
+    reasons=defaultdict(list);sources=[];errors=[];verified={}
+    if not path.exists():return reasons,sources,errors
+    try:
+        data,source=observed_json(path,'pipeline_status');sources.append(source)
+        require(data.get('schema')=='isg-campaign-pipeline-status-v1' and data.get('campaign_id')=='campaign_20261110',
+                'pipeline observation belongs to another schema or campaign')
+        tasks={q.task for q in task_quotas()}
+        for ordinal,row in enumerate(data['rows']):
+            try:
+                task,class_id,split=row['task'],row['class_id'],row['split']
+                require(task in tasks and split in SPLITS,'unknown pipeline task or split')
+                require(split=='eval_category' or catalog.get(class_id)==task,'pipeline class differs from standard inventory')
+                require(row.get('reason') and row.get('stage') and row.get('evidence'),'pipeline observation lacks evidence')
+                for item in row['evidence']:
+                    evidence=Path(item['path']).resolve()
+                    require(evidence.is_relative_to(root) and evidence.is_file(),'pipeline evidence outside campaign or unavailable')
+                    if evidence not in verified:
+                        verified[evidence]=source_record(evidence,'pipeline_evidence');sources.append(verified[evidence])
+                    require(verified[evidence]['sha256']==item['sha256'],'pipeline evidence changed after observation')
+                reasons[(task,class_id)].append({'source_kind':'pipeline_observation','split':split,
+                    'status':row['stage'],'reason':row['reason'],'observed_at':epoch(row.get('observed_at'),source['mtime']),
+                    'state_source':str(path),'evidence':row['evidence']})
+            except (ValueError,KeyError,TypeError,OSError) as exc:
+                errors.append({'source':str(path),'row':ordinal,'error':type(exc).__name__+': '+str(exc)})
+    except (ValueError,KeyError,TypeError,OSError) as exc:
+        errors.append({'source':str(path),'error':type(exc).__name__+': '+str(exc)})
+    return reasons,sources,errors
+
+
 def _identities(row, root, cache):
     physical,conceptual=row.get("physical_template_sha256"),row.get("conceptual_template_sha256")
     if physical and conceptual:
@@ -278,9 +310,11 @@ def build(root, standards, *, database=None, observed_at=None):
     reasons,controller_sources,errors=controller_reasons(root,catalog)
     validation,validation_sources,validation_errors=validation_reasons(root,catalog)
     for key,entries in validation.items():reasons[key].extend(entries)
+    pipeline,pipeline_sources,pipeline_errors=pipeline_reasons(root,catalog)
+    for key,entries in pipeline.items():reasons[key].extend(entries)
     return summarize(rows,catalog,root=root,observed_at=now,reasons=reasons,
-        sources=[*sources,source_record(standards,'complete_standard_inventory'),*controller_sources,*validation_sources],
-        errors=errors+validation_errors)
+        sources=[*sources,source_record(standards,'complete_standard_inventory'),*controller_sources,*validation_sources,*pipeline_sources],
+        errors=errors+validation_errors+pipeline_errors)
 
 
 def publish(report, output):

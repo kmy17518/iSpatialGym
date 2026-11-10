@@ -66,6 +66,27 @@ def test_family_reasons_without_unversioned_config_and_split_separation(tmp_path
     assert len(report['unassigned_reason_evidence'])==1
 
 
+def test_pipeline_reasons_require_owned_unchanged_evidence_and_never_add_counts(tmp_path):
+    standards=tmp_path/'standards.json';catalog(standards);classes=de.standard_catalog(standards)
+    proof=tmp_path/'native_report.json';c.write_json_atomic(proof,{'positive_library':False})
+    status=tmp_path/'manifests/pipeline_status.json'
+    row={'task':'object_scaling','class_id':'object_scaling-apple','split':'eval_model',
+         'stage':'native_library_blocked','reason':'No native candidates survived unload stability',
+         'observed_at':900,'evidence':[{'path':str(proof),'sha256':c.file_digest(proof)}]}
+    c.write_json_atomic(status,{'schema':'isg-campaign-pipeline-status-v1','campaign_id':'campaign_20261110','rows':[row]})
+    reasons,sources,errors=de.pipeline_reasons(tmp_path,classes)
+    report=de.summarize([],classes,root=tmp_path,observed_at=1000,reasons=reasons)
+    observed=next(r for r in report['classes'] if r['class_id']=='object_scaling-apple' and r['split']=='eval_model')
+    assert observed['reason']==row['reason'] and not errors and report['accepted_total']==0
+    c.write_json_atomic(proof,{'positive_library':True})
+    reasons,_,errors=de.pipeline_reasons(tmp_path,classes)
+    assert not reasons and 'changed after observation' in errors[0]['error']
+    row['evidence']=[{'path':'/etc/passwd','sha256':'0'*64}]
+    c.write_json_atomic(status,{'schema':'isg-campaign-pipeline-status-v1','campaign_id':'campaign_20261110','rows':[row]})
+    reasons,_,errors=de.pipeline_reasons(tmp_path,classes)
+    assert not reasons and 'outside campaign' in errors[0]['error']
+
+
 def test_history_measures_only_accepted_counts_and_rejects_regression(tmp_path):
     standards=tmp_path/'standards.json';catalog(standards);classes=de.standard_catalog(standards)
     report=de.summarize([],classes,root=tmp_path,observed_at=1000)
