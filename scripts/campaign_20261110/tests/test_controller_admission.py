@@ -63,6 +63,14 @@ def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, mon
     assert base != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {"gain": 2}})
     assert base == admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "train")
     assert base != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "eval_standard")
+    model = admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "eval_model")
+    assert model != base
+    assert model != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "eval_standard")
+    legacy = {"task": template.task, "class_id": template.class_id, "physical": admission.physical_template(template),
+              "definition": template.definition_sha256, "runtime_bddl": template.scene_setup.get("runtime_bddl_sha256"),
+              "binding_pool": template.scene_setup.get("binding_pool"), "code": c.file_digest(snapshot / ".snapshot_commit"),
+              "perturbations": {"scales": [1,1,1], "lighting": {}}}
+    assert base == c.digest(legacy)
 
 
 def test_standard_admission_preserves_default_contract_ownership_and_sibling_capacity(tmp_path, monkeypatch):

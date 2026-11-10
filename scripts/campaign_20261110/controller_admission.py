@@ -101,7 +101,7 @@ def source_proof(gate_path, *, root, started_at, campaign_id, permitted_split=No
 
 
 def admission_id(template, snapshot, perturbations, split="train"):
-    require(split in ("train", "eval_standard"), "invalid admission split")
+    require(split in ("train", "eval_standard", "eval_model"), "invalid admission split")
     identity = {"task": template.task, "class_id": template.class_id, "physical": physical_template(template),
                    "definition": template.definition_sha256, "runtime_bddl": template.scene_setup.get("runtime_bddl_sha256"),
                    "binding_pool": template.scene_setup.get("binding_pool"),
