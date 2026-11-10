@@ -28,7 +28,27 @@ import time
 
 import numpy as np
 
-HEIGHTS = [0.002 * k for k in range(1, 21)] + [0.06, 0.08, 0.10, 0.15]
+HEIGHTS = [0.002 * k for k in range(1, 21)] + [0.06, 0.08, 0.10]
+CEILING_M = 0.15
+
+
+def _components(mask):
+    """4-connected labels of a boolean raster (0 = background)."""
+    lab = np.zeros(mask.shape, dtype=int)
+    n = 0
+    for i0, j0 in zip(*np.nonzero(mask)):
+        if lab[i0, j0]:
+            continue
+        n += 1
+        stack = [(i0, j0)]
+        lab[i0, j0] = n
+        while stack:
+            i, j = stack.pop()
+            for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                if 0 <= a < mask.shape[0] and 0 <= b < mask.shape[1] and mask[a, b] and not lab[a, b]:
+                    lab[a, b] = n
+                    stack.append((a, b))
+    return lab
 
 
 def _bins_min(r, u, dr=0.002):
@@ -117,10 +137,21 @@ def main(argv=None):
         zf = float(np.median(sel))
         wall_h = np.full(len(X), np.inf)
         for h in reversed(HEIGHTS):  # lowest occupied height wins
-            hh = rays([[float(x), float(y), zf + h] for x, y in zip(X, Y)], [[float(x), float(y), zf - 0.1] for x, y in zip(X, Y)], robot_paths)
-            occ = np.array([bool(r.get("hit")) and float(r["position"][2]) > zf + 0.003 for r in hh])
+            P = [[float(x), float(y), zf + h] for x, y in zip(X, Y)]
+            hh = rays(P, [[float(x), float(y), zf - 0.1] for x, y in zip(X, Y)], robot_paths)
+            # ... or a ceiling within CEILING_M over that point (under the counter beside a drop-in basin, a lip over the wall); a faucet
+            # spout over the basin is higher
+            hu = rays(P, [[float(x), float(y), zf + CEILING_M] for x, y in zip(X, Y)], robot_paths)
+            occ = np.array([(bool(r.get("hit")) and float(r["position"][2]) > zf + 0.003) or bool(q.get("hit")) for r, q in zip(hh, hu)])
             wall_h[occ] = h
+        # the basin: the connected free region (4-neighbours at 4 mm) holding the most cells open from above onto the floor
+        open_floor = (np.abs(ztop - zf) <= 0.003).reshape(gx.shape)
         wall_h = wall_h.reshape(gx.shape)
+        lab = _components(wall_h > 0.004)
+        if lab.max() > 0:
+            counts = np.bincount(lab[open_floor & (lab > 0)].ravel(), minlength=lab.max() + 1)
+            keep = int(counts.argmax()) if counts.max() > 0 else 0
+            wall_h[(lab != keep) & (wall_h > 0.004)] = 0.004  # free cells outside the basin (inside the cabinet below) count as walls
         free = wall_h > 0.004
         bx, by = gx[~free], gy[~free]
         best = (0.0, None)
