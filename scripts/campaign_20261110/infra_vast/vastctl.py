@@ -41,16 +41,18 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
-    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
+    from .funding import read_snapshot as read_credit_snapshot, remaining_credit
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus
-    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
+    from funding import read_snapshot as read_credit_snapshot, remaining_credit
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -571,8 +573,11 @@ def launch(c, o, C, live_by_acct):
            "ISG_CPUS_PER_JOB": str(C["cpus_per_job"]), "ISG_MAX_JOBS": str(C["max_jobs_per_instance"]), "ISG_MAX_LIFETIME_S": str(C.get("max_worker_lifetime_s", 21600))}
     env['ISG_CPU_AFFINITY'] = ','.join(map(str, o.get('_reservation',{}).get('cpu_affinity',[])))
     login = f"-u {os.environ['GHCR_USERNAME']} -p {os.environ['GHCR_PULL_TOKEN']} ghcr.io"
-    order = sorted((k for k in c), key=lambda k: (live_by_acct.get(k, 0), ACCOUNTS.index(k)))  # spread over the accounts
+    order = rental_accounts(tuple(c), C, live_by_acct)
     for name in order:
+        lease_cost = float(o['dph_total']) * float(C.get('max_worker_lifetime_s',21600)) / 3600
+        if C.get('_rental_credit_remaining', {}).get(name, 0) < lease_cost:
+            continue
         try:
             r = vi.create_instance(c[name], o["id"], image=IMAGE, disk=C["disk_gb"], env=env, label=f"{LABEL}-{tag}", login=login,
                                    runtype="args", args=[], cancel_unavail=True)
@@ -595,6 +600,7 @@ def launch(c, o, C, live_by_acct):
                geo=o.get("geolocation"), reliability=o.get("reliability2"), inet_down=o.get("inet_down"))
         log(f"LAUNCHED {iid} [{SHORT[name]}] {fmt_offer(o)}")
         live_by_acct[name] = live_by_acct.get(name, 0) + 1
+        C['_rental_credit_remaining'][name] -= lease_cost
         return iid
     return None
 
@@ -893,10 +899,12 @@ def tick(c, s3, state):
     resource_blocked = duplicate_worker_gpus(live, hbs)
     if resource_blocked:
         log('RESOURCE_GUARD blocked GPU identities: ' + ','.join(sorted(resource_blocked)))
+    draining = drained_workers(live, C)
+    routing_live = {iid:worker for iid,worker in live.items() if iid not in resource_blocked | draining}
     allowed = {job['id'] for job in queued}
     for reservation in STAGER.ready():
         jid,iid=reservation['id'],reservation['instance'];s=states[jid]
-        if jid not in allowed or iid not in live or iid in resource_blocked:
+        if jid not in allowed or iid not in routing_live:
             STAGER.release(jid,'job no longer eligible or worker unavailable');continue
         i=live[iid];spec=dict(reservation['spec'])
         candidate,_=assignment_plan([s],{iid:i},hbs,created,assigned_to,t)
@@ -912,7 +920,7 @@ def tick(c, s3, state):
     reserved_to={iid:list(jobs) for iid,jobs in assigned_to.items()}
     for iid,jobs in STAGER.reservations().items():reserved_to.setdefault(iid,[]).extend(jobs)
     queued=[job for job in queued if job['status']=='queued' and job['id'] not in STAGER.active()]
-    planned,_=assignment_plan(queued,{k:v for k,v in live.items() if k not in resource_blocked},hbs,created,reserved_to,t)
+    planned,_=assignment_plan(queued,routing_live,hbs,created,reserved_to,t)
     for iid,worker,job in planned:
         if STAGER.submit(job,iid,worker,C,stage_bounded):
             queued.remove(job);reserved_to.setdefault(iid,[]).append(job['id'])
@@ -927,7 +935,9 @@ def tick(c, s3, state):
         busy = bool(reserved_to.get(iid))
         model_pending = any(gpu_matches(job, i.get('gpu_name')) for job in queued)
         reason = None
-        if hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
+        if drained_worker_finished(iid, draining, reserved_to, hb):
+            reason = 'account funding drain; no assigned/staging or heartbeat-running jobs'
+        elif hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
             reason = f"worker {hb.get('phase')} {hb.get('detail', '')}"
         elif not hb and up > C["boot_max_s"]:
             reason = f"no heartbeat after {up / 60:.0f} min ({st})"
@@ -960,13 +970,17 @@ def tick(c, s3, state):
         state["last_pending"] = t
 
     # 5. rent for the queued jobs that no instance (ready or booting) will take
-    needs_by_gpu = rental_needs(queued, {k:v for k,v in live.items() if k not in resource_blocked}, hbs, created, reserved_to, C, t)
+    needs_by_gpu = rental_needs(queued, routing_live, hbs, created, reserved_to, C, t)
     need = sum(needs_by_gpu.values())
     stop = os.path.exists(os.path.join(VJ, "STOP_LAUNCH"))
     committed = sum(float(created[iid]["dph_total"]) * max(0.0, float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)
     budget_left = min(float(C["budget_usd"]),3000.0) - float(C.get("transfer_reserve_usd",300.0)) - tot - committed
     hourly = sum(float(i.get("dph_total") or 0) for i in live.values())
     if need > 0 and list_ok and not stop and len(live) < C["max_instances"] and budget_left > max(10.0, 2 * hourly):
+        credit_snapshot = read_credit_snapshot(os.path.join(VJ,'funding_state.json'), tuple(c))
+        C['_rental_credit_remaining'] = {name:remaining_credit(credit_snapshot,name,events(),now(),
+                                                               reserve=float(C.get('funding_reserve_per_account_usd',25)))
+                                          for name in c}
         by_acct = {}
         for i in live.values():
             by_acct[i["_key_name"]] = by_acct.get(i["_key_name"], 0) + 1
@@ -993,6 +1007,10 @@ def tick(c, s3, state):
             reserve = float(o["dph_total"]) * float(C.get("max_worker_lifetime_s",21600)) / 3600
             if reserve > budget_left:
                 continue
+            if not any(C['_rental_credit_remaining'].get(name,0) >= reserve
+                       for name in rental_accounts(tuple(c),C,by_acct)):
+                market_reasons['insufficient_funded_credit'] += 1
+                continue
             iid = launch(c, o, C, by_acct)
             if iid:
                 n_new += 1
@@ -1007,6 +1025,7 @@ def tick(c, s3, state):
             json.dump({'observed_at_unix':now(), 'offers':len(offers), 'launched':n_new,
                        'remaining_demand':needs_by_gpu, 'rejections':dict(market_reasons),
                        'budget_remaining_after_commitments':budget_left,
+                       'funded_credit_remaining_by_account':{SHORT[name]:value for name,value in C['_rental_credit_remaining'].items()},
                        'max_contracts_per_machine':C.get('max_contracts_per_machine',4)}, stream, indent=2)
         os.replace(market_temporary, market_path)
     elif need > 0 and budget_left <= max(10.0, 2 * hourly):

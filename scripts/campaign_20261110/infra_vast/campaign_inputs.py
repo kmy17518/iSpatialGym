@@ -25,6 +25,21 @@ def gpu_matches(job, gpu):
     return not job.get('gpu') or gpu in job.get('compatible_gpus', [job['gpu']])
 
 
+def drained_workers(live, config):
+    accounts = set(config.get('drain_accounts', ()))
+    return {iid for iid, worker in live.items() if worker.get('_key_name') in accounts}
+
+
+def rental_accounts(accounts, config, live_by_account):
+    allowed = set(config.get('rental_accounts', accounts)) - set(config.get('drain_accounts', ()))
+    return sorted((name for name in accounts if name in allowed),
+                  key=lambda name: (live_by_account.get(name, 0), list(accounts).index(name)))
+
+
+def drained_worker_finished(instance, draining, reserved, heartbeat):
+    return instance in draining and not reserved.get(instance) and not (heartbeat.get('running') or {})
+
+
 def uncovered_jobs(queued, live, heartbeats, created, assigned_to, timestamp):
     """Booting and ready compatible workers reserve future capacity once."""
     remaining = list(queued)

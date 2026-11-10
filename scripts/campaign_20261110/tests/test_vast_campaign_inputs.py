@@ -6,9 +6,25 @@ import unittest
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
 from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs
 from scripts.campaign_20261110.infra_vast.campaign_inputs import QUEUE_SCHEMAS
+from scripts.campaign_20261110.infra_vast.campaign_inputs import drained_workers, rental_accounts, drained_worker_finished
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_account_drain_preserves_busy_workers_and_routes_new_work_to_funded_account(self):
+        config={'drain_accounts':['secondary'], 'rental_accounts':['primary']}
+        live={'one':{'_key_name':'primary','gpu_name':'RTX 4090'},
+              'two':{'_key_name':'secondary','gpu_name':'RTX 4090'}}
+        draining=drained_workers(live,config)
+        self.assertEqual(draining,{'two'})
+        self.assertEqual(rental_accounts(('primary','secondary'),config,{'primary':20}),['primary'])
+        self.assertFalse(drained_worker_finished('two',draining,{'two':['job']},{}))
+        self.assertFalse(drained_worker_finished('two',draining,{}, {'running':{'job':{}}}))
+        self.assertTrue(drained_worker_finished('two',draining,{}, {'phase':'ready'}))
+        self.assertFalse(drained_worker_finished('one',draining,{},{}))
+        jobs=[{'id':'j','gpu':'RTX 4090','time_s':1800}]
+        planned,_=assignment_plan(jobs,{k:v for k,v in live.items() if k not in draining},
+                                  {'one':{'phase':'ready','slots':1},'two':{'phase':'ready','slots':1}}, {},{},100)
+        self.assertEqual([worker for worker,_,_ in planned],['one'])
     def test_proven_gpu_substitution_uses_idle_worker_and_does_not_double_count_boot_capacity(self):
         config = {'gpus':['RTX 4090','RTX 5090'],'allow_proven_gpu_substitution':True,'vram_per_job_gb':20,'max_jobs_per_instance':1}
         jobs = [{'id':str(i),'gpu':'RTX 4090','time_s':1800,'compatible_gpus':compatible_gpus('RTX 4090',config)} for i in range(3)]
