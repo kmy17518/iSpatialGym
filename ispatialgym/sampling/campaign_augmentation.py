@@ -111,6 +111,18 @@ def _near(actual, expected):
     return math.isfinite(float(actual)) and abs(float(actual) - float(expected)) <= 1e-5 * max(1.0, abs(float(expected)))
 
 
+def lighting_difference(actual, expected):
+    """Describe restoration failures without hiding fixture-set or value drift."""
+    actual_fixtures, wanted_fixtures = actual.get("fixtures", {}), expected.get("fixtures", {})
+    shared = sorted(set(actual_fixtures) & set(wanted_fixtures))
+    return {"missing_fixtures": sorted(set(wanted_fixtures)-set(actual_fixtures)),
+            "extra_fixtures": sorted(set(actual_fixtures)-set(wanted_fixtures)),
+            "changed_fixtures": {name: {"loaded": actual_fixtures[name], "recorded": wanted_fixtures[name]}
+                                 for name in shared if actual_fixtures[name] != wanted_fixtures[name]},
+            "skybox": {"loaded": actual.get("skybox"), "recorded": expected.get("skybox")},
+            "request_matches": actual.get("request") == expected.get("request")}
+
+
 def apply_lighting(scene, sim, request, expected=None):
     """Apply from captured defaults, never multiply the previous episode's value."""
     validate_lighting(request)
@@ -136,7 +148,8 @@ def apply_lighting(scene, sim, request, expected=None):
                   "intensity": sky_default["intensity"] * factor,
                   "color": [a * b for a, b in zip(sky_default["color"], color_factors)]}}}
     if expected is not None:
-        require(canonical_json(record) == canonical_json(expected), "recorded lighting differs from loaded fixture defaults")
+        require(canonical_json(record) == canonical_json(expected),
+                "recorded lighting differs from loaded fixture defaults: " + canonical_json(lighting_difference(record, expected)))
     with sim.editing_usd():
         for name, attr in attrs.items():
             attr.Set(record["fixtures"][name]["applied"])
