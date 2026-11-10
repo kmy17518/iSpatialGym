@@ -6216,6 +6216,30 @@ noise is ~15 points), T8 0.075; the drawn setups are 1.5-4x costlier per ok. The
 switches (eval unchanged, no eval-index rebuild); variants registered in `scripts/trainfast/registry.tsv` (bce96fe9):
 `touching_03_t7otwukr`, `touching_03_t8otwukr` (SPAN_RULE=1) and `touching_03_drawn` (BOARD_DRAW=1). No default flipped.
 
+### r2: why the right board and lean_left_15 never write (lead #84b)
+
+Diagnosed with the log-only `ISPATIALGYM_SHELF_DRAW_DIAG` (`T03B_GRASP_DIAG` / `T03B_PATH_DIAG` / `T03B_SWEEP_DIAG`; `diag_sum.py`):
+
+- **Back-off / init path.** Every init -> drive-back `no_path` (60 / 76) left from a free-floor start in another connected region of the
+  eroded map (1221 cells) than the bookcase front (472): the free start never checked connectivity.
+- **Grasp.** A Phase-2 candidate's focus is any raster cell and the books are placed per attempt after it, so its map verdict does not
+  cover the book: on the right board the map's cell under the book is `ik_pre` (or the trunk is not in the map) and the pre-grasp is
+  unreachable even with the support ignored.
+- **Right board, after moving the base onto feasible map cells.** The right arm's near-branch solution of lean_right_20's grasps is the twin
+  (`side_1~r180`, the arm-mirror of lean_left_20's working `side_9`), which the map refuses (`hand_policy`) and live hits the wrist camera
+  (within 5 mm); the plain rows need the flipped shoulder (pre-grasp witness 3.3-3.9 rad from the transit start > the 1.6 rad no-swing
+  rule). Both realsense mounts sit at the same gripper-frame offset (+0.0505 m x), so the camera does not mirror with the arm. Rebuilding
+  the right rests with the left-arm validator gives the same two grasps.
+- **lean_left_15.** Map-feasible cells, but live the grasp configuration's `left_gripper_link` collides with the bookcase (35 / 36 probes).
+
+Fixes (1db387d4, both default OFF): `ISPATIALGYM_SHELF_FREE_START_CONNECTED` (the free start keeps the candidates' eroded-map region) and
+`ISPATIALGYM_SHELF_MAP_STANCE` (the map read at the book; a map-infeasible candidate skips its exact checks; the stance shift tries first
+the map stances that put the book on a feasible cell). A/B with BOARD_DRAW=1 (N 4, trunk_1db387d4): kmuacd drawn on 63 / 4 / 4, 0.44 GPU-h
+(0.11 per ok; writes on the middle row and the centre cube's left board too) vs r1 224 / 3 / 3, 0.75 (off arm of r2 still running at
+hand-back); otwukr T7d 83 / 4 / 4 -> 39 / 4 / 4 at 0.41 GPU-h both. Right board and lean_left_15: 0 writes in every arm. Not met; no default
+flipped; the representative stays kmuacd single. Unblocking the right board needs an owner decision (an arm-mirror grasp transfer for the
+right rest, physics-validated, or the right arm's flipped branch). Layer split: `layer_right`, `layer_left15`, `layer_left20rows`.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
