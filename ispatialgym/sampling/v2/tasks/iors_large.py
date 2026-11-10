@@ -239,6 +239,8 @@ LYING_NO_TIP_SAFETY = 0.75
 #: the lying drop's bottom heights above the floor, screened in turn per C (``generation.push_under_lying_drop_heights_m``): the handle is held
 #: with the hand horizontal, out of the arm's reach at the standing drop's 0.15 m (the oracle's drop then lowers it as far as the arm comes)
 LYING_DROP_HEIGHTS_M = (0.15, 0.25, 0.35)
+#: the lying drop's retreat straight up (``grasps[0].drop_retreat_up_m`` -> ``oracle.actions.Place.retreat_up_m``), the Retreat after it up too
+LYING_DROP_RETREAT_UP_M = 0.10
 
 
 def briefcase_lying_on() -> bool:
@@ -6959,6 +6961,8 @@ class IORSLarge(SamplerV2):
                 if fallback is not None:
                     grasp.extras["segment_fallback"] = fallback
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
+                    if self.lying:
+                        grasp.extras["drop_retreat_up_m"] = float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": self.drop_height(),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)

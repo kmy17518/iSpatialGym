@@ -192,3 +192,14 @@ def test_lying_drop_height_ladder(monkeypatch):
     off = _stub({"push_under_hand": "pitched_far", IL.PUSH_UNDER_GOAL_REST_KEY: IL.LYING}, monkeypatch, on=False)
     off.num, off._lying_drop_h = (lambda k, d: d), 0.35
     assert off.drop_height() == IL.PUSH_UNDER_DROP_HEIGHT_M  # switch off: the rung is never read
+
+
+def test_place_retreat_up_for_the_lying_drop():
+    from ispatialgym.oracle.actions import RETREAT_DIST, Place, Pose
+
+    pl = Pose([1.0, 2.0, 0.3], [0.0, 0.70710678, 0.0, 0.70710678])  # a horizontal hand
+    today = Place(kind="drop", arm="right", object="b", place=pl)
+    up = Place(kind="drop", arm="right", object="b", place=pl, retreat_up_m=0.10)
+    e_today, e_up = today.end_pose(None, None), up.end_pose(None, None)
+    assert abs(float(e_up.position[2]) - 0.40) < 1e-6 and abs(float(e_up.position[0]) - 1.0) < 1e-6
+    assert abs(((float(e_today.position[0]) - 1.0) ** 2 + (float(e_today.position[2]) - 0.3) ** 2) ** 0.5 - RETREAT_DIST) < 1e-5
