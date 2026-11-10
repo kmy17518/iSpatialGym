@@ -116,6 +116,7 @@ def summarize(groups, jobs):
     observed = sum(g['observed_attempted_slots'] for g in completed)
     success = sum(g['distinct_demo_successes'] for g in completed)
     complete_denominator = bool(completed) and all(g['attempt_denominator_complete'] for g in completed)
+    native_draws = sum(g['observed_native_draws'] for g in completed)
     ids = {jid for g in groups for jid in g['job_ids']}
     cohort_jobs = [j for j in jobs if j['job_id'] in ids]
     terminal_jobs = [j for j in cohort_jobs if j['terminal']]
@@ -137,7 +138,9 @@ def summarize(groups, jobs):
         'attempted_instances': observed if complete_denominator else None,
         'attempt_denominator_complete': complete_denominator,
         'successful_members_per_attempted_instance': success/observed if observed and complete_denominator else None,
-        'observed_native_draws': sum(g['observed_native_draws'] for g in completed),
+        'observed_native_draws': native_draws,
+        'native_attempted_draws': native_draws if complete_denominator else None,
+        'successful_members_per_native_draw': success/native_draws if native_draws and complete_denominator else None,
         'accepted': {s: accepted[s] for s in MODES}, 'standard_outcomes': dict(outcomes),
         'main_rejections': dict(reasons.most_common(15)),
         'gpu': {'terminal_collection_jobs': len(terminal_jobs), 'exact_slurm_jobs': len(exact_jobs),
@@ -394,6 +397,7 @@ def snapshot(root):
             'attempted':'At least one durable queue activation, native attempt/rejection or published member. Authored/unactivated groups excluded.',
             'successful':'Oracle report passes success + hard QA + restoration checks, deduplicated by requested goal/start and perturbations using acceptance fingerprints.',
             'attempt_denominator':'Historical failure/TRO union is an observed LOWER BOUND of group-slot attempts. Requested n is never used. One index may straddle groups. Exact ratios require started-attempt journals.',
+            'native_draw_denominator':'Each entered native draw is a separate attempt, including retries at the same logical member index and interrupted draws. Unique attempted slots count logical indices instead; both are reported. Exact native-draw ratios require journals for every executed job in the cohort.',
             'gpu':'Exact Slurm collection allocation time includes startup and failures. Vast per-group startup/retry attribution and shared replay/bootstrap costs are incomplete; all-backend/end-to-end rates unavailable.',
             'revision':'Executed immutable runtime snapshot, not the current checkout. Comparing revisions is observational, not a controlled effect estimate.',
             'exclusion':'Camera tasks and ungrouped baseline/template validation jobs are excluded.'},
@@ -422,6 +426,8 @@ def report_text(value):
         lines += ['',f'## {mode}', '',f"Attempted groups: {r['groups_attempted']}. States: {json.dumps(r['pending_running_unstarted'])}.",
             f"Distinct successful members: {r['distinct_successful_members']}; observed attempted group-slots: ≥{r['observed_attempted_slots']}. "
             + ('Exact started-attempt denominator available.' if r['attempt_denominator_complete'] else 'Exact historical denominator unavailable; no ratio inferred from requested counts.'),
+            f"Entered native draws including retries: {'exactly ' if r['attempt_denominator_complete'] else 'at least '}{r['observed_native_draws']}; "
+            + (f"successful members per native draw: {r['successful_members_per_native_draw']:.3%}." if r['successful_members_per_native_draw'] is not None else 'exact successful-member/native-draw ratio unavailable.'),
             f"Committed outcomes: {json.dumps(r['standard_outcomes'])}.",
             f"Slurm collection subset: {g['exact_slurm_gpu_hours']:.3f} GPU-hours including startup and failures; {g['accepted_from_exact_slurm_jobs']} accepted members; "
             +(f'{rate:.3f} accepted/GPU-hour.' if rate is not None else 'rate unavailable.'),

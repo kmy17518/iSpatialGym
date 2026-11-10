@@ -126,5 +126,18 @@ class GoalYieldTest(unittest.TestCase):
             self.assertEqual(published['summary']['standard_eval']['observed_native_draws'],1)
             self.assertNotIn('native_attempts',published['groups'][0])
 
+    def test_native_retries_are_separate_from_logical_member_slots(self):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t);job,q,rows,write=self.fixture(root,False)
+            p=job/'inst/t/campaign_attempts.jsonl';p.parent.mkdir(parents=True)
+            records=[{'event':'started','goal_group_id':'g1','attempt_id':str(i),'index':100,
+                      'attempt':i,'seed':9+i,'validation_key':{}} for i in range(3)]
+            p.write_text(''.join(json.dumps(x)+'\n' for x in records))
+            with patch('scripts.campaign_20261110.goal_group_yield.snapshot_allocations',return_value=([],{},[])),patch('scripts.campaign_20261110.goal_group_yield.allocations',return_value=rows):result=snapshot(root)
+            r=result['summary']['standard_eval']
+            self.assertEqual(r['attempted_instances'],1)
+            self.assertEqual(r['native_attempted_draws'],3)
+            self.assertEqual(r['successful_members_per_native_draw'],0)
+
 
 if __name__=='__main__':unittest.main()
