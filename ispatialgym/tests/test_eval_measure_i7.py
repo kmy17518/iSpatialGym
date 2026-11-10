@@ -204,3 +204,17 @@ def test_place_retreat_up_for_the_lying_drop():
     e_today, e_up = today.end_pose(None, None), up.end_pose(None, None)
     assert abs(float(e_up.position[2]) - 0.40) < 1e-6 and abs(float(e_up.position[0]) - 1.0) < 1e-6
     assert abs(((float(e_today.position[0]) - 1.0) ** 2 + (float(e_today.position[2]) - 0.3) ** 2) ** 0.5 - RETREAT_DIST) < 1e-5
+
+
+def test_lying_push_strokes(monkeypatch):
+    monkeypatch.setattr(IL.TT, "_count", lambda s, k: None)
+    monkeypatch.delenv(IL.FLOORPUSH_STROKE_ENV, raising=False)
+    gen = {"push_under_hand": "pitched_far", IL.PUSH_UNDER_GOAL_REST_KEY: IL.LYING}
+    s = _stub(gen, monkeypatch)
+    s.num = lambda k, d: s.gp.gen(k, d)
+    st = s.push_strokes_record(0.31)["strokes"]
+    assert st["n"] == 7 and st["reaim_max_m"] == IL.LYING_REAIM_MAX_M and st["yaw_gain_m_per_rad"] == IL.LYING_YAW_GAIN_M_PER_RAD
+    off = _stub(gen, monkeypatch, on=False)
+    off.num = lambda k, d: off.gp.gen(k, d)
+    st0 = off.push_strokes_record(0.31)["strokes"]  # today's default strokes: 0.10 m, 3 cm re-aim
+    assert st0["n"] == 4 and st0["reaim_max_m"] == 0.03

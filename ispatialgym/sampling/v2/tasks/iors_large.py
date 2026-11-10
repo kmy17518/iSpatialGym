@@ -241,6 +241,13 @@ LYING_NO_TIP_SAFETY = 0.75
 LYING_DROP_HEIGHTS_M = (0.15, 0.25, 0.35)
 #: the lying drop's retreat straight up (``grasps[0].drop_retreat_up_m`` -> ``oracle.actions.Place.retreat_up_m``), the Retreat after it up too
 LYING_DROP_RETREAT_UP_M = 0.10
+#: the lying push's strokes (``generation.push_under_lying_stroke_m`` / ``_reaim_max_m`` / ``_yaw_gain``): ms_ul02_on3 360000 pushed the lying
+#: briefcase in today's 0.10 m strokes with the 3 cm re-aim cap (sized for the standing briefcase's 0.12 m end face) - it did not tip, but
+#: it turned 6 -> 19 -> 55 -> 72 deg (symbolic_only on the yaw, position 0.049 m); lying, its back face is 0.27-0.33 m wide, so the hand can
+#: re-aim farther: 0.05 m strokes, a re-aim within 0.08 m, yaw term 0.30 m/rad
+LYING_STROKE_M = 0.05
+LYING_REAIM_MAX_M = 0.08
+LYING_YAW_GAIN_M_PER_RAD = 0.30
 
 
 def briefcase_lying_on() -> bool:
@@ -2283,8 +2290,16 @@ class IORSLarge(SamplerV2):
             return {}
         n_max = int(fp["strokes_max"]) if "stroke_m" in fp else int(self.num("push_under_strokes_max", PUSH_STROKES_MAX))
         gain = float(fp["yaw_gain"]) if "stroke_m" in fp else float(self.num("push_under_reaim_yaw_gain", 0.0))
+        reaim = float(self.num("push_under_reaim_max_m", 0.03))
+        if getattr(self, "lying", False):
+            # i7-measure (A2): the lying push's strokes (LYING_STROKE_M; the wide lying back face takes a farther re-aim)
+            v = float(self.num("push_under_lying_stroke_m", LYING_STROKE_M))
+            reaim = float(self.num("push_under_lying_reaim_max_m", LYING_REAIM_MAX_M))
+            gain = float(self.num("push_under_lying_yaw_gain", LYING_YAW_GAIN_M_PER_RAD))
+            n_max = max(n_max, int(math.ceil(float(distance_m) / float(v))) + 1)
+            TT._count(self, "briefcase_lying.strokes")
         plan = push_stroke_plan(distance_m, float(v), n_max,
-                                backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=float(self.num("push_under_reaim_max_m", 0.03)),
+                                backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=reaim,
                                 yaw_gain_m_per_rad=gain,
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
         if "stroke_m" in fp:
