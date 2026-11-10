@@ -87,45 +87,46 @@ def derive(survey: Dict[str, dict], ratio: float) -> Dict[str, dict]:
     return out
 
 
-def derive_round(survey: Dict[str, dict], ratio: float) -> Dict[str, dict]:
-    """i7-measure 2026-11-09 (owner A4, ``--rule round``): every model with a body-of-revolution tag in any of :data:`TAG_LISTS` - the
-    same tags and lists as :func:`derive`, without its long-axis rule (a round can, a plate, a bowl, a lid). The axis: the model's long axis
-    when it is one of the tagged axes (so every :func:`derive` entry keeps its axis), else the one tagged axis (the reviewed ``symmetry``
-    list's first when several); a model tagged only ``full`` is left out."""
+#: ``--rule round`` reads the ICL's reviewed ``symmetry`` column (``assets/icl/README.md``: the rotations under which geometry AND texture are
+#: identical, the review round's verdicts applied - "every orientation-evaluated target gets them as ``orientation_equivalences``"), the
+#: notion the success measure already uses wherever a customs role carries its tags. The geometry-only survey lists :func:`derive` also
+#: reads are left out: a wall clock's face (jerval: survey geom ``xinf``, ICL symmetry ``none``) or a printed marker rolls like a wheel in
+#: the fingers, but its turn is visible - not free in a success measure.
+ICL_CANDIDATES = os.path.join(REPO, "ispatialgym", "assets", "icl", "roles", "candidates.csv")
+
+
+def derive_round(icl_csv: str, ratio: float) -> Dict[str, dict]:
+    """i7-measure 2026-11-09 (owner A4, ``--rule round``): every model whose ICL ``symmetry`` (:data:`ICL_CANDIDATES`, one value per model)
+    holds a body-of-revolution tag (``xinf`` / ``yinf`` / ``zinf``), without :func:`derive`'s long-axis rule (a round can, a plate, a bowl, a
+    lid). The axis: the model's long axis (its ICL bbox) when it is a tagged one, else the one tagged axis (the first listed when several);
+    a model tagged only ``full`` is left out."""
+    import csv
+
+    tags_of: Dict[str, set] = {}
+    bbox_of: Dict[str, List[float]] = {}
+    uses_of: Dict[str, set] = {}
+    with open(icl_csv) as f:
+        for row in csv.DictReader(f):
+            key = f"{row.get('category')}/{row.get('model')}"
+            tags = [t.strip() for t in (row.get("symmetry") or "").split(",") if t.strip() and t.strip() != "none"]
+            tags_of.setdefault(key, set()).update(tags)
+            uses_of.setdefault(key, set()).add(f"{row.get('subtask')}/{row.get('role')}")
+            try:
+                bbox_of.setdefault(key, [float(row["bbox_x"]), float(row["bbox_y"]), float(row["bbox_z"])])
+            except (KeyError, TypeError, ValueError):
+                pass
     out: Dict[str, dict] = {}
-    for key, e in sorted(survey.items()):
-        cat, model = e.get("category"), e.get("model")
-        if not cat or not model:
-            continue
-        by_list: Dict[str, List[str]] = {}
-        for name in TAG_LISTS:
-            lst = e.get(name) or []
-            if isinstance(lst, list):
-                by_list[name] = [t for t in lst if isinstance(t, str) and len(t) == 4 and t[1:] == "inf" and t[0] in AXES]
-        axes = sorted({t[0] for lst in by_list.values() for t in lst})
+    for key in sorted(tags_of):
+        tags = sorted(tags_of[key])
+        axes = [t[0] for t in tags if len(t) == 4 and t[1:] == "inf" and t[0] in AXES]
         if not axes:
             continue
-        long_ax = long_axis(e.get("bbox") or [], ratio)
-        if long_ax in axes:
-            axis = long_ax
-        elif len(axes) == 1:
-            axis = axes[0]
-        else:
-            reviewed = [t[0] for t in by_list.get("symmetry", [])]
-            axis = reviewed[0] if reviewed else axes[0]
-        sources = [n for n, lst in by_list.items() if f"{axis}inf" in lst]
-        tags = sorted({t for n in sources for t in (e.get(n) or []) if isinstance(t, str) and t != "none"})
-        bb = [float(v) for v in (e.get("bbox") or [0.0, 0.0, 0.0])[:3]]
+        bb = bbox_of.get(key) or [0.0, 0.0, 0.0]
+        long_ax = long_axis(bb, ratio)
+        axis = long_ax if long_ax in axes else axes[0]
         order = sorted(bb)
-        out[f"{cat}/{model}"] = {
-            "axis": axis,
-            "ratio": round(order[2] / order[1], 3) if order[1] > 0 else None,
-            "tags": tags,
-            "sources": sources,
-            "bbox": [round(v, 5) for v in bb],
-            "uses": list(e.get("uses") or []),
-            "long_axis": long_ax == axis,
-        }
+        out[key] = {"axis": axis, "ratio": round(order[2] / order[1], 3) if order[1] > 0 else None, "tags": tags, "sources": ["icl symmetry"],
+                    "bbox": [round(v, 5) for v in bb], "uses": sorted(uses_of.get(key) or []), "long_axis": long_ax == axis}
     return out
 
 
@@ -135,6 +136,7 @@ ROUND_OUT = os.path.join(REPO, "ispatialgym", "assets", "icl", "round_axes.json"
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--survey", default=SURVEY)
+    ap.add_argument("--icl", default=ICL_CANDIDATES, help="--rule round: the ICL candidates table whose symmetry column it reads")
     ap.add_argument("--out", default=None, help=f"default {os.path.relpath(OUT, REPO)} (--rule long) / {os.path.relpath(ROUND_OUT, REPO)} (--rule round)")
     ap.add_argument("--long-ratio", type=float, default=1.5, help="largest / middle native extent for a 'long axis'")
     ap.add_argument("--rule", choices=("long", "round"), default="long",
@@ -144,12 +146,13 @@ def main() -> int:
     args.out = args.out or (ROUND_OUT if args.rule == "round" else OUT)
     with open(args.survey) as f:
         survey = json.load(f)
-    table = derive_round(survey, args.long_ratio) if args.rule == "round" else derive(survey, args.long_ratio)
+    table = derive_round(args.icl, args.long_ratio) if args.rule == "round" else derive(survey, args.long_ratio)
     if args.rule == "round":
-        rule = (f"a body-of-revolution tag (xinf / yinf / zinf) in any of {list(TAG_LISTS)} (no long-axis rule; the axis: the long axis - largest "
-                f"native extent >= {args.long_ratio} x the middle one - when tagged, else the tagged one); with ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC "
-                "the success measure (every pose_reached target of such a model: demo QA, replay, policy eval) and the placed_orientation demo "
-                "gate compare it modulo rotation about that axis - the yaw of a round object standing upright (owner 2026-11-09 A4)")
+        rule = (f"a body-of-revolution tag (xinf / yinf / zinf) in the ICL's reviewed symmetry column ({os.path.relpath(args.icl, REPO)}: geometry and "
+                f"texture identical; no long-axis rule; the axis: the long axis - largest native extent >= {args.long_ratio} x the middle one - when tagged, else "
+                "the tagged one); with ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC the success measure (every pose_reached target of such a model: demo QA, "
+                "replay, policy eval) and the placed_orientation demo gate compare it modulo rotation about that axis - the yaw of a round object "
+                "standing upright (owner 2026-11-09 A4)")
     else:
         rule = (f"a body-of-revolution tag (xinf / yinf / zinf) about the model's long axis (largest native extent >= "
                 f"{args.long_ratio} x the middle one) in any of {list(TAG_LISTS)}; the placed_orientation demo gate compares such an "
@@ -157,7 +160,7 @@ def main() -> int:
     meta = {
         "_meta": {
             "built": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "survey": os.path.relpath(args.survey, REPO),
+            "survey": os.path.relpath(args.icl if args.rule == "round" else args.survey, REPO),
             "rule": rule,
             "n_models": len(table),
             "categories": dict(sorted(collections.Counter(k.split("/")[0] for k in table).items())),

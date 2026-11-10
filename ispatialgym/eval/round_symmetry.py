@@ -10,17 +10,20 @@ modulo rotation about its long axis, and any push-under target modulo the world 
 With ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC=1`` (default OFF; it flips only in the eval-measure commit, together with A2's
 ``ISPATIALGYM_BRIEFCASE_LYING``) one symmetry notion serves both:
 
-* the table: :data:`ROUND_AXES_PATH` (``scripts/symmetry/revolution_axes.py --rule round``) - every model of the ICL symmetry survey with a
-  body-of-revolution tag (``xinf`` / ``yinf`` / ``zinf``) in the lists the QA's cylinder table reads, without its long-axis rule (433 models:
-  the 253 cylinders with the same axes, plus round cans, plates, bowls, lids, caps ...);
+* the table: :data:`ROUND_AXES_PATH` (``scripts/symmetry/revolution_axes.py --rule round``) - every model whose ICL ``symmetry`` column
+  (``assets/icl/roles/candidates.csv``: the rotations under which geometry AND texture are identical, the 2026-09-15 review applied; the
+  column the customs roles' ``orientation_equivalences`` already come from) holds a body-of-revolution tag (``xinf`` / ``yinf`` / ``zinf``):
+  166 models - round cans, plates, bowls, glasses, lids, caps, plain cylinders. The geometry-only survey lists of the QA's cylinder table
+  are not used: a wall clock's face or a printed marker turns visibly;
 * the success measure: every pose target with an orientation metric whose bound object is such a model gets the continuous symmetry about
   that object-frame axis added to its ``orientation_equivalences`` (:func:`apply_yaw_free`) - the survey's own convention for a continuous
   axis, :func:`ispatialgym.sampling.customs.equivalence_group` (72 rotations at 5 deg: a pure turn about the axis leaves at most 2.5 deg =
   0.044 rad of error), composed with the target's recorded equivalences. For an object standing on its axis that is its yaw. The TRO file is
   not changed: the equivalences are added where the targets are configured, so demo QA (``oracle.run_isg`` -> ``tasks.ispatialgym_task``),
   replay, the sampler's goal checks (``sampling.tasks.base``) and policy eval (``tasks.vec_task``) all read the same measure;
-* the QA: ``Executor.revolution_axis_of`` reads the same table (:func:`round_axis`), so ``placed_orientation`` frees exactly the rotation the
-  measure frees (a superset of the cylinder table, same axes).
+* the QA: ``Executor.revolution_axis_of`` reads the same table (:func:`round_axis`) for a model its cylinder table lacks, so
+  ``placed_orientation`` frees every rotation the measure frees (the 43 models in both tables have the same axis); it keeps freeing the
+  printed cylinders' roll in the fingers, which the measure does not.
 
 A target that already carries the rotation (a customs role tagged ``zinf``) is left as it is (``acted`` False). Kit-style counts per process:
 :data:`COUNTS` (``targets`` / ``acted`` / ``already``), one INFO line per acted target.

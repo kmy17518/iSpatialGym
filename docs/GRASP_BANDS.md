@@ -6188,12 +6188,15 @@ Kit counters: `briefcase_lying.rest` / `.release` / `.contact_cap` / `.coupled`.
 through its push-under rule (any pushed object, round or not), not through a symmetry notion. Its only symmetry notion is the cylinder table
 `assets/icl/revolution_axes.json` (the ICL symmetry survey's body-of-revolution tags about the long axis), and that table lacks the can
 (0.28 x 0.28 x 0.28: no long axis). One notion now serves both, and both read it only with the switch on:
-- the table `assets/icl/round_axes.json` (`scripts/symmetry/revolution_axes.py --rule round`): the same survey tags and lists without the
-  long-axis rule. It has 433 models: the 253 cylinders with the same axes, plus round cans, plates, bowls, lids, caps and the like;
+- the table `assets/icl/round_axes.json` (`scripts/symmetry/revolution_axes.py --rule round`): every model whose ICL `symmetry` column holds
+  a body-of-revolution tag. That column is the reviewed notion "geometry and texture identical", and the customs roles' equivalences already
+  come from it. It has 166 models: round cans, plates, bowls, glasses, lids, caps and plain cylinders. The survey's geometry-only lists, which
+  the cylinder table also reads, are left out, because a wall clock's face (jerval) or a printed marker turns visibly;
 - the measure: a pose target whose object is in the table gets the continuous rotation about that axis added to its
   `orientation_equivalences`. This is the survey's own enumeration, 72 rotations at 5 deg, so a pure turn leaves at most 0.044 rad. It is
   composed with the target's recorded equivalences. The TRO file is not changed;
-- the QA: `Executor.revolution_axis_of` reads the same table.
+- the QA: `Executor.revolution_axis_of` reads the same table for a model the cylinder table lacks. Where both tables hold a model they
+  have the same axis.
 
 Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
 

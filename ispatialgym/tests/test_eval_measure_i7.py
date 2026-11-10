@@ -24,14 +24,17 @@ def test_yaw_free_switch_default_off(monkeypatch):
     assert RS.yaw_free_on()
 
 
-def test_round_table_holds_the_can_and_every_cylinder_with_its_axis():
+def test_round_table_is_the_icl_visual_symmetry():
     from ispatialgym.oracle.executor import revolution_axes
 
     tab = RS.round_axes()
-    assert tab["trash_can/jlawet"]["axis"] == "z"
-    assert "briefcase/lwbctq" not in tab
-    for k, v in revolution_axes().items():  # the QA's cylinder table: a subset, same axes - the two notions agree
-        assert k in tab and tab[k]["axis"] == v["axis"], k
+    assert tab["trash_can/jlawet"]["axis"] == "z" and tab["plate/luhkiz"]["axis"] == "z"
+    for k in ("briefcase/lwbctq", "wall_clock/jerval", "marker/xakoic"):  # asymmetric / a visible face or print: not free
+        assert k not in tab, k
+    cyl = revolution_axes()
+    for k, v in tab.items():  # where both tables hold a model they agree on its axis (the QA frees what the measure frees)
+        if k in cyl:
+            assert cyl[k]["axis"] == v["axis"], k
 
 
 def test_with_axis_composes_and_is_idempotent():
