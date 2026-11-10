@@ -156,7 +156,8 @@ def apply_yaw_free(meta: Any, object_scope: Dict[str, Any]) -> Dict[str, Dict[st
         axis = str(entry["axis"])
         COUNTS["targets"] = COUNTS.get("targets", 0) + 1
         eqs, n_new = with_axis(list(getattr(tgt, "orientation_equivalences", None) or []), axis)
-        rec = {"model": f"{cat}/{model}", "axis": axis, "acted": n_new > 0, "n_equivalences": len(eqs)}
+        # "acted": this switch added the rotation (sticky over repeated calls - the task configures its targets more than once)
+        rec = {"model": f"{cat}/{model}", "axis": axis, "acted": n_new > 0 or bool(getattr(tgt, "_yaw_free_acted", False)), "n_equivalences": len(eqs)}
         if n_new > 0:
             tensors = [th.tensor(q, dtype=th.float32) for q in eqs]
             cur = getattr(tgt, "orientation_equivalences", None)
@@ -164,6 +165,10 @@ def apply_yaw_free(meta: Any, object_scope: Dict[str, Any]) -> Dict[str, Dict[st
                 cur[:] = tensors  # in place: a shallow copy of the target (``clone_frames.offset_targets_meta``) shares the list
             else:
                 tgt.orientation_equivalences = tensors
+            try:
+                tgt._yaw_free_acted = True
+            except Exception:  # noqa: BLE001 - a slotted target keeps no flag
+                pass
             COUNTS["acted"] = COUNTS.get("acted", 0) + 1
             log.info("SUCCESS_YAW_FREE_SYMMETRIC: %s (%s) - rotation about its %s axis free in the success measure (%d equivalences, %d new)",
                      inst, rec["model"], axis, len(eqs), n_new)

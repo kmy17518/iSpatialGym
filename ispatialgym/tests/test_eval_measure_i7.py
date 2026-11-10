@@ -70,7 +70,8 @@ def test_apply_yaw_free_frees_the_spin_only(monkeypatch):
     assert orientation_error(spun, can.orientation) > 0.6
     assert orientation_error(spun, can.orientation, can.orientation_equivalences) <= math.radians(2.5) + 1e-4
     assert orientation_error(tilted, can.orientation, can.orientation_equivalences) == pytest.approx(0.25, abs=1e-3)  # the tilt stays gated
-    assert RS.apply_yaw_free(meta, scope)["ashcan.n.01_1"]["acted"] is False  # idempotent
+    again = RS.apply_yaw_free(meta, scope)["ashcan.n.01_1"]  # idempotent: nothing added twice, the report stays "acted"
+    assert again["acted"] is True and again["n_equivalences"] == 71
 
 
 def test_entity_model_from_name():
