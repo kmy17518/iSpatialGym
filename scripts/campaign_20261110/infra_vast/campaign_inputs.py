@@ -25,6 +25,13 @@ def gpu_matches(job, gpu):
     return not job.get('gpu') or gpu in job.get('compatible_gpus', [job['gpu']])
 
 
+def worker_can_run(job, instance, worker, creation, timestamp):
+    """Require the complete requested runtime plus transfer headroom before expiry."""
+    lifetime = float(creation.get('max_lifetime_s', 21600)) - (timestamp - float(creation.get('time', timestamp)))
+    return (gpu_matches(job, worker.get('gpu_name')) and job.get('avoid') != instance
+            and lifetime >= float(job.get('time_s', 0)) + 900)
+
+
 def drained_workers(live, config):
     accounts = set(config.get('drain_accounts', ()))
     return {iid for iid, worker in live.items() if worker.get('_key_name') in accounts}
@@ -46,12 +53,10 @@ def uncovered_jobs(queued, live, heartbeats, created, assigned_to, timestamp):
     for iid, worker in live.items():
         hb, event = heartbeats.get(iid) or {}, created.get(iid) or {}
         if hb.get('phase') in ('destroyed','unusable','stopped','idle_exit'): continue
-        lifetime = float(event.get('max_lifetime_s',21600)) - (timestamp-float(event.get('time',timestamp)))
         slots = max(0,int(hb.get('slots') or event.get('slots') or 1)-len(assigned_to.get(iid,[])))
         for job in list(remaining):
             if not slots: break
-            if (gpu_matches(job,worker.get('gpu_name')) and job.get('avoid') != iid
-                    and lifetime >= float(job.get('time_s',0))+900):
+            if worker_can_run(job, iid, worker, event, timestamp):
                 remaining.remove(job);slots-=1
     return remaining
 
@@ -74,13 +79,10 @@ def assignment_plan(queued, live, heartbeats, created, assigned_to, timestamp):
             continue
         free = int(heartbeat.get('slots') or 0) - len(assigned_to.get(instance, []))
         creation = created.get(instance) or {}
-        lifetime = float(creation.get('max_lifetime_s', 21600)) - (timestamp - float(creation.get('time', timestamp)))
         for job in list(remaining):
             if free <= 0:
                 break
-            if lifetime < float(job.get('time_s', 0)) + 900:
-                continue
-            if not gpu_matches(job, worker.get('gpu_name')) or job.get('avoid') == instance:
+            if not worker_can_run(job, instance, worker, creation, timestamp):
                 continue
             planned.append((instance, worker, job))
             remaining.remove(job)

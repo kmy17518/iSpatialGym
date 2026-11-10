@@ -4,12 +4,24 @@ import tempfile
 import unittest
 
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
-from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs
+from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs, worker_can_run
 from scripts.campaign_20261110.infra_vast.campaign_inputs import QUEUE_SCHEMAS
 from scripts.campaign_20261110.infra_vast.campaign_inputs import drained_workers, rental_accounts, drained_worker_finished
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_idle_worker_is_not_retained_for_jobs_that_cannot_finish_before_lease_expiry(self):
+        worker={'gpu_name':'RTX 4090'}
+        creation={'time':0,'max_lifetime_s':21600}
+        queued={'id':'long','gpu':'RTX 4090','time_s':16200}
+        self.assertTrue(worker_can_run(queued,'warm',worker,creation,4500))
+        self.assertFalse(worker_can_run(queued,'warm',worker,creation,4501))
+        # This warm card still serves shorter tasks; it is not retired just for age.
+        self.assertTrue(worker_can_run({**queued,'time_s':1800},'warm',worker,creation,14000))
+        self.assertFalse(worker_can_run({**queued,'time_s':1800,'avoid':'warm'},'warm',worker,creation,14000))
+        self.assertEqual(uncovered_jobs([queued],{'warm':worker},{'warm':{'phase':'ready','slots':1}},
+                                        {'warm':creation},{},4501),[queued])
+
     def test_account_drain_preserves_busy_workers_and_routes_new_work_to_funded_account(self):
         config={'drain_accounts':['secondary'], 'rental_accounts':['primary']}
         live={'one':{'_key_name':'primary','gpu_name':'RTX 4090'},

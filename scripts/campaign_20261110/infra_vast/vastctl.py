@@ -41,7 +41,7 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
-    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -49,7 +49,7 @@ except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus
-    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -933,7 +933,7 @@ def tick(c, s3, state):
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")
         busy = bool(reserved_to.get(iid))
-        model_pending = any(gpu_matches(job, i.get('gpu_name')) for job in queued)
+        model_pending = any(worker_can_run(job, iid, i, created.get(iid) or {}, t) for job in queued)
         reason = None
         if drained_worker_finished(iid, draining, reserved_to, hb):
             reason = 'account funding drain; no assigned/staging or heartbeat-running jobs'
@@ -950,7 +950,7 @@ def tick(c, s3, state):
         elif hb.get("phase") in ("ready",) and not busy and not model_pending:
             idle_since = state.setdefault("idle_since", {}).setdefault(iid, t)
             if t - idle_since > C["idle_destroy_s"]:
-                reason = f"idle {(t - idle_since) / 60:.0f} min, queue empty"
+                reason = f"idle {(t - idle_since) / 60:.0f} min, no queued work fits GPU and remaining lease"
         elif hb.get("phase") == "boot" and pending == 0 and not busy and t - state.get("last_pending", t) > 900:
             reason = "booting with an empty queue for 15 min"
         if hb.get("phase") != "ready" or busy or model_pending:
