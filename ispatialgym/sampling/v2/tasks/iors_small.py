@@ -555,14 +555,15 @@ PUSH_TIP_SCREEN_DEFAULT = "0"
 #: (today only the floor push's ``ISPATIALGYM_FLOORPUSH_STROKE_M``): before each stroke the target is held still and measured, the tips
 #: re-aim where the line through its root meets its back (with a yaw term, within :data:`TOUCH_PUSH_STROKE_REAIM_MAX_M`), between strokes
 #: the hand backs off :data:`TOUCH_PUSH_STROKE_BACKOFF_M`. The record adds the tips' geometry (``face_half_m`` = FINGERTIP_LENGTH,
-#: ``blade_standoff_m`` = that + the stop clearance, ``contact_strips_m``, ``contact_band_m`` +-1 cm about the tips). Unset / "off" / "0" =
+#: ``blade_standoff_m`` = that + the stop clearance, ``contact_strips_m``, ``contact_band_m`` +-3 cm about the tips - r1's +-1 cm held too few
+#: hull vertices and the stroke fell back to the root -, ``half_extent_m`` the root's depth behind the contact). Unset / "off" / "0" =
 #: one stroke (default). Kit ``touch_push_strokes.recorded`` / ``.skipped_class``
 TOUCH_PUSH_STROKE_ENV = "ISPATIALGYM_TOUCH_PUSH_STROKE_M"
 TOUCH_PUSH_STROKE_BACKOFF_M = 0.02
 TOUCH_PUSH_STROKE_REAIM_MAX_M = 0.015
 TOUCH_PUSH_STROKE_YAW_GAIN_M_PER_RAD = 0.15
 TOUCH_PUSH_STROKES_MAX = 6
-TOUCH_PUSH_STROKE_BAND_M = (-0.01, 0.01)
+TOUCH_PUSH_STROKE_BAND_M = (-0.03, 0.03)
 #: oracle-fix 2026-11-07 (owner prompt E 3, ISPATIALGYM_FRAME_RANK): valid partner poses ranked by the place frame margin
 FRAME_RANK_K = 4
 #: A1: band cells within this depth of the target count for its reach rule (as the partner placement always cut the band)
@@ -6863,7 +6864,7 @@ class IORSSmall(SamplerV2):
                                                               **(open_fallback or {})}
         log.info("%s: touching push class %s from the %s stance%s", self.gp.variant, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         if touch_push_stroke_m() is not None:  # i7-t04push (TOUCH_PUSH_STROKE_ENV); off: today's record
-            push_extras = dict(push_extras, **self.touch_push_strokes(push_kind, push_extras, dist))
+            push_extras = dict(push_extras, **self.touch_push_strokes(push_kind, push_extras, dist, root_xy=G.t(t_pose[0])[:2], direction=direction))
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         if self.shelf_start is not None:
             push_rec.arm = self.shelf_push_arm()
@@ -6995,7 +6996,8 @@ class IORSSmall(SamplerV2):
                 TT._count(self, "push_tip_cap.chosen_above")  # shadow: the class the cap would have skipped
         return res
 
-    def touch_push_strokes(self, kind: str, extras: Dict[str, Any], dist: float) -> Dict[str, Any]:
+    def touch_push_strokes(self, kind: str, extras: Dict[str, Any], dist: float, root_xy: Optional[th.Tensor] = None,
+                           direction: Optional[th.Tensor] = None) -> Dict[str, Any]:
         """:data:`TOUCH_PUSH_STROKE_ENV` (i7-t04push): the push record's ``strokes`` plan (``iors_large.push_stroke_plan`` over the push's
         ``dist``) and the fingertips' geometry for ``execute._push_strokes``; ``{}`` when off, for the shelf layout and for a class that is not a
         closed fingertip push (``touch_push_strokes.skipped_class``)."""
@@ -7013,8 +7015,15 @@ class IORSSmall(SamplerV2):
         clearance = float(extras.get("stop_clearance_m") or CPZ.STOP_CLEARANCE)
         TT._count(self, "touch_push_strokes.recorded")
         log.info("%s: touching push %s in %d strokes of <= %.3f m over %.3f m (TOUCH_PUSH_STROKE_M)", self.gp.variant, kind, plan["n"], stroke, float(dist))
-        return {"strokes": plan, "face_half_m": round(C.FINGERTIP_LENGTH, 5), "blade_standoff_m": round(C.FINGERTIP_LENGTH + clearance, 5),
-                "contact_strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "contact_band_m": list(TOUCH_PUSH_STROKE_BAND_M)}
+        out = {"strokes": plan, "face_half_m": round(C.FINGERTIP_LENGTH, 5), "blade_standoff_m": round(C.FINGERTIP_LENGTH + clearance, 5),
+               "contact_strips_m": [[round(c, 5), round(hw, 5)] for c, hw in strips], "contact_band_m": list(TOUCH_PUSH_STROKE_BAND_M)}
+        cp = extras.get("contact_point")
+        if root_xy is not None and direction is not None and cp is not None:
+            # the stroke's fallback without the live hull in its band: the target's back = its root less this along the push
+            d2 = G.t(direction).float()[:2]
+            d2 = d2 / max(float(th.linalg.norm(d2)), 1e-9)
+            out["half_extent_m"] = round(max(0.0, float((G.t(root_xy).float()[:2] - G.t(cp).float()[:2]) @ d2)), 5)
+        return out
 
     def push_tip_cap(self, t_pose: Optional[G.Pose], z0: float, direction: th.Tensor, hull_w: Optional[th.Tensor] = None,
                      line_xy: Optional[th.Tensor] = None) -> Optional[Dict[str, float]]:

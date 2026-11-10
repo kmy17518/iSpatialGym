@@ -41,7 +41,10 @@ def test_the_stroke_record_is_a_plan_the_oracle_reads_with_the_fingertips_geomet
     assert plan is not None and plan["n"] == 3 and plan["ends_m"][-1] == pytest.approx(0.081)
     assert plan["backoff_m"] == IS.TOUCH_PUSH_STROKE_BACKOFF_M and plan["reaim_max_m"] == IS.TOUCH_PUSH_STROKE_REAIM_MAX_M
     assert rec["face_half_m"] == pytest.approx(C.FINGERTIP_LENGTH) and rec["blade_standoff_m"] == pytest.approx(C.FINGERTIP_LENGTH + 0.005)
-    assert rec["contact_strips_m"] == [[0.0, pytest.approx(0.0084, abs=1e-4)]] and rec["contact_band_m"] == [-0.01, 0.01]
+    assert rec["contact_strips_m"] == [[0.0, pytest.approx(0.0084, abs=1e-4)]] and rec["contact_band_m"] == [-0.03, 0.03]
+    h = IS.IORSSmall.touch_push_strokes(me, "push_tip_h-", {"contact_point": [1.0, 2.0, 0.9]}, 0.081, root_xy=th.tensor([1.0, 1.9575]),
+                                        direction=th.tensor([0.0, -1.0, 0.0]))
+    assert h["half_extent_m"] == pytest.approx(0.0425, abs=1e-5)
     v = IS.IORSSmall.touch_push_strokes(me, "push_tip_v-", {}, 0.05)
     assert v["contact_strips_m"][0][1] < rec["contact_strips_m"][0][1] and EX.push_stroke_plan(v)["n"] == 2
     # blades / the open hand / the shelf layout keep one stroke
