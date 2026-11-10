@@ -227,6 +227,32 @@ def prepare_from_anchor(spec, anchor_record, group_id, output, magnitude_range, 
     write_json_atomic(output / "contracts.json", {"templates": [{**config["template"], "fingerprint": config["validation_key"]["template_sha256"]}]})
 
 
+def reusable_anchor_record(spec, state, root):
+    """Reuse only a fresh physics-passed anchor, never its collected instance.
+
+    The owner's goal-reuse policy permits repeated world goals across groups;
+    prepare_from_anchor still rechecks every source artifact and authors fresh
+    starts, allocation indices, and a separate group validation contract.
+    """
+    if not spec.get('reuse_successful_anchor', False):
+        return None
+    for cycle in reversed(state.get('history', [])):
+        anchor=cycle.get('anchor') or {};row=anchor.get('allocation') or {}
+        if row.get('key')!=spec['class_id'] or row.get('code')!=spec['anchor_snapshot']:
+            continue
+        gate=read(gate_path(root,row),{})
+        if gate.get('success') is not True or gate.get('replay_mode')!='physics_action_open_loop':
+            continue
+        job=Path(row['job_dir']).resolve()
+        require(job.is_relative_to(root/'out') and Path(gate.get('source_job','')).resolve()==job,
+                'reusable anchor gate names another job')
+        record=copy.deepcopy(anchor)
+        record.update(status='waiting',reused_from_cycle=cycle['name'],
+            reuse_gate={'path':str(gate_path(root,row)),'sha256':file_digest(gate_path(root,row))})
+        return record
+    return None
+
+
 def claim(record, spec, cfg, root):
     from scripts.campaign_20261110.acceptance import audit_job
     from scripts.campaign_20261110.goal_groups import load_template_contract
@@ -266,11 +292,13 @@ def advance(spec, state, cfg, root, queue, allowance, save):
             return 0
         number = len(state.get("history", [])) + 1
         name = "family_auto_" + spec["class_id"].replace("-", "_") + "_" + str(number).zfill(4)
-        directory = root / "groups" / (name + "_anchor")
-        require(not directory.exists(), "unreconciled anchor directory already exists")
-        copy_seed(spec["seed"], directory)
-        cycle = {"name": name, "bucket": bucket, "created_at": time.time(), "anchor": {
-            "directory": str(directory), "index": reserve_indices(root, name + ":anchor", 1), "status": "ready"}}
+        anchor=reusable_anchor_record(spec,state,root)
+        if anchor is None:
+            directory = root / "groups" / (name + "_anchor")
+            require(not directory.exists(), "unreconciled anchor directory already exists")
+            copy_seed(spec["seed"], directory)
+            anchor={"directory":str(directory),"index":reserve_indices(root,name+":anchor",1),"status":"ready"}
+        cycle = {"name": name, "bucket": bucket, "created_at": time.time(), "anchor": anchor}
         state.update(current=cycle, status="anchor")
         save()
     group = cycle.get("group")

@@ -8,6 +8,19 @@ def read(path,default):
     try:return json.loads(path.read_text())
     except (OSError,ValueError):return default
 
+def ledger_paths(root, explicit=None):
+    base=explicit or [root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv',
+        'goal_group_allocations.tsv','augmentation_allocations.tsv','shiyuc_allocations.tsv')]
+    candidates=list(base)+sorted((root/'manifests').glob('dispatch_*_allocations.tsv'))
+    seen=set();result=[]
+    for path in candidates:
+        resolved=path.resolve()
+        if not resolved.is_relative_to(root.resolve()/'manifests'):
+            raise ValueError('validation ledger outside owned campaign manifests')
+        if resolved not in seen:
+            seen.add(resolved);result.append(path)
+    return result
+
 def archive_metadata_race_gate(entry, request, root, active):
     """Preserve an explicitly diagnosed metadata race before a new strict replay.
 
@@ -106,7 +119,7 @@ def main():
         if not a.scene_helper.is_relative_to(a.root/'code') or not a.scene_helper.is_file():raise ValueError('replay scene helper must be frozen inside this campaign')
     statepath=a.root/'validation/controller.json';state=read(statepath,{'schema':1,'gates':{}})
     while True:
-        ledgers=a.ledger or [a.root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv','goal_group_allocations.tsv','augmentation_allocations.tsv','shiyuc_allocations.tsv')]
+        ledgers=ledger_paths(a.root,a.ledger)
         rows=[]
         for ledger in ledgers:
             if ledger.exists():

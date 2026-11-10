@@ -263,11 +263,12 @@ def record_runtime_failure(record, state):
     return failure
 
 
-def advance(spec, state, cfg, root, rows, queue, allowance, save):
+def advance(spec, state, cfg, root, rows, queue, allowance, save, *, adapter=None):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
     template = template_from(seed_config["template"])
-    require(template.task in RANGES and template.class_id == spec["class_id"], "unsupported held controller seed")
+    require((adapter.supports(template.task) if adapter else template.task in RANGES)
+            and template.class_id == spec["class_id"], "unsupported goal controller seed")
     source_gate = Path(spec["source_gate"])
     require(file_digest(source_gate) == spec["source_gate_sha256"] and read(source_gate).get("success") is True,
             "held source replay gate changed or failed")
@@ -343,9 +344,15 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         state["status"] = "needs_feasibility_diagnosis"
         return 0
     with atomic_directory_lock(root/'controllers/held_planning.lockdir'):
-        counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
-        reserved=reserve_pending_counts(counts,template,pending_held(root))
-        decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
+        if adapter is None:
+            counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
+            reserved=reserve_pending_counts(counts,template,pending_held(root))
+            decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
+        else:
+            counts = adapter.read_counts(root, template)
+            reserved = adapter.reserve_pending_counts(counts, template, adapter.pending(root))
+            decision = adapter.next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6),
+                training_validated="train" in gates, mode=spec.get("mode", "eval_then_train"))
         state.update(counts=counts,counts_after_pending_reservations=reserved)
         from scripts.campaign_20261110.controller_spool import candidate_budget_used
         remaining_budget = spec["max_candidates"] - candidate_budget_used(records)
@@ -356,7 +363,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                                  max(0, int((cfg["stop_at"]-time.time()-3600)//spec.get("group_budget_seconds", 900))))
         if allowance <= 0 or decision["groups"] <= 0:
             return 0
-        record = prepare_queue(spec, state, decision, cfg, root, template, save)
+        record = (adapter.prepare_queue if adapter else prepare_queue)(spec, state, decision, cfg, root, template, save)
     run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
     record["dry_run_passed"] = True
     save()
@@ -368,7 +375,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     return 1
 
 
-def main():
+def main(*, adapter=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--config", required=True)
     p.add_argument("--state", required=True)
@@ -391,7 +398,7 @@ def main():
     for argument,key in ((args.max_inflight_per_seed,'maximum_inflight_per_seed'),(args.max_new_jobs_per_pass,'maximum_new_jobs_per_pass')):
         if argument is not None:
             require(1<=argument<=32,'invalid operational concurrency limit');cfg[key]=argument
-    require(cfg["schema"] == "isg-held-controller-v1", "invalid held controller config")
+    require(cfg["schema"] == ("isg-group-controller-v1" if adapter else "isg-held-controller-v1"), "invalid goal controller config")
     require(len({s["id"] for s in cfg["seeds"]}) == len(cfg["seeds"]), "duplicate held seed ID")
     require(all(isinstance(s["max_candidates"], int) and s["max_candidates"] >= 3
                 and 1 <= s.get("groups_per_batch", 6) <= 6 for s in cfg["seeds"]), "invalid held candidate budgets")
@@ -413,7 +420,7 @@ def main():
             for spec in cfg["seeds"]:
                 current = state["seeds"].setdefault(spec["id"], {})
                 try:
-                    allowance -= advance(spec, current, cfg, root, rows, queue, allowance, save)
+                    allowance -= advance(spec, current, cfg, root, rows, queue, allowance, save, adapter=adapter)
                     current.pop("error", None)
                 except Exception as exc:
                     current.update(error=type(exc).__name__+": "+str(exc), error_at=time.time())

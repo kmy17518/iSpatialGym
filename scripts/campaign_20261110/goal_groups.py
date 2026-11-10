@@ -230,6 +230,15 @@ def with_alignment_buckets(template: Template, native_range_deg, *, source):
     policy = {"metric": "actual_magnitude_deg", "unit": "degrees", "method": "equal_thirds_of_applied_native_range",
               "edges": [lo, lo + (hi-lo)/3, lo + 2*(hi-lo)/3, hi],
               "native_range_deg": [lo, hi], "intervals": "first_closed_then_lower_open_upper_closed", "source": source}
+    existing = template.scene_setup.get("bucket_policy")
+    if existing is not None:
+        require({key: value for key, value in existing.items() if key != "source"}
+                == {key: value for key, value in policy.items() if key != "source"}, "native alignment bucket policy changed")
+        require(isinstance(existing.get("source"), dict) and existing["source"].get("field")
+                and existing["source"].get("sha256"), "existing alignment policy lacks source provenance")
+        # A fresh native observation confirms the frozen range without changing
+        # the already validated contract's original evidence identity.
+        return template
     return replace(template, scene_setup={**template.scene_setup, "bucket_policy": policy})
 
 

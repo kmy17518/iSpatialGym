@@ -603,9 +603,17 @@ class ArticulationSmall(SamplerV2):
     def _draw_pair(self, rng: np.random.Generator) -> Dict[str, Any]:
         """This attempt's (q_init, q_goal): uniform over the template's pairs from the attempt's ``rng`` (``articulation_large.draw_joint_targets``);
         kit counters ``artsmall_draw.drawn`` / ``.q_init.<q>`` / ``.q_goal.<q>``."""
+        pairs = self._pairs
         if os.environ.get(CJG.ENV):
-            self.campaign_group_remaining_s()
-        p = self._pairs[int(rng.integers(len(self._pairs)))]
+            plan = self.campaign_joint_plan()
+            self._campaign_joint_active = plan
+            try:
+                eligible = set(plan.eligible_pairs([(p["q_init"], p["q_goal"]) for p in pairs],
+                    direction=self.direction, lower=self.lower, upper=self.upper))
+                pairs = [p for p in pairs if (p["q_init"], p["q_goal"]) in eligible]
+            except CJG.GoalPlanError as exc:
+                raise Reject("campaign_joint_bucket", str(exc)) from exc
+        p = pairs[int(rng.integers(len(pairs)))]
         self._apply_pair(p)
         TT._count(self, "artsmall_draw.drawn")
         TT._count(self, f"artsmall_draw.q_init.{p['q_init']:.4f}")

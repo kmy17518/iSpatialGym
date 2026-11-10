@@ -10,6 +10,7 @@ import csv
 import getpass
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -20,6 +21,50 @@ from scripts.campaign_20261110.contracts import digest, file_digest, require
 from scripts.campaign_20261110.storage import atomic_directory_lock
 
 BACKENDS = ('shiyuc_svl', 'shiyuc_viscam', 'vast_5090', 'vast_4090', 'minyeong_svl', 'minyeong_viscam')
+LEDGER_COLS = ['submitted', 'key', 'alias', 'start', 'n', 'job_tag', 'job_dir', 'flow', 'code', 'jobid',
+               'acct', 'part', 'gres', 'time_s', 'sample_limit_s', 'max_attempts', 'demo_limit_s', 'kcollect', 'tag']
+
+
+def prepare_intent_ledger(root, token):
+    """An intent's ledger cannot inherit a later intent's next-index floor."""
+    require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe ledger token')
+    directory = root / 'manifests/dispatch_ledgers' / token
+    directory.mkdir(parents=True, exist_ok=True)
+    for path in (directory.parent, directory):
+        if path.stat().st_uid == os.getuid(): os.chmod(path, 0o2770)
+    ledger = directory / 'allocations.tsv'
+    if not ledger.exists():
+        fd, temporary = tempfile.mkstemp(prefix='.ledger.', dir=directory)
+        os.fchmod(fd, 0o660)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write('\t'.join(LEDGER_COLS) + '\n'); stream.flush(); os.fsync(stream.fileno())
+        try:
+            os.link(temporary, ledger)
+        except FileExistsError:
+            pass
+        finally:
+            os.unlink(temporary)
+    with ledger.open() as stream:
+        require(stream.readline().rstrip('\n').split('\t') == LEDGER_COLS, 'intent ledger schema differs')
+    alias = root / 'manifests' / ('dispatch_' + token + '_allocations.tsv')
+    if alias.is_symlink():
+        require(alias.resolve() == ledger.resolve(), 'intent ledger alias differs')
+    elif alias.exists():
+        raise ValueError('intent ledger alias is not a symlink')
+    else:
+        try:
+            alias.symlink_to(ledger)
+        except FileExistsError:
+            require(alias.is_symlink() and alias.resolve() == ledger.resolve(),
+                    'concurrent intent ledger alias differs')
+    return ledger
+
+
+def verify_dry_indices(stdout, identity):
+    values = {name: re.findall(r'^\s*' + name + r'=(\d+)\s*$', stdout, re.MULTILINE)
+              for name in ('START', 'N')}
+    require(values['START'] == [str(identity['start'])] and values['N'] == [str(identity['n'])],
+            'native dry-run shifted the globally reserved interval')
 
 
 def shared_json(path, value):
@@ -95,6 +140,7 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS):
     require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe dispatch token')
     require(backends and set(backends) <= set(BACKENDS), 'unknown dispatch backend')
     identity = input_identity(root, command)
+    prepare_intent_ledger(root, token)
     reservation_path = root / 'manifests/family_index_reservations.json'
     if reservation_path.stat().st_uid == os.getuid():
         os.chmod(reservation_path, reservation_path.stat().st_mode | 0o040)
@@ -136,6 +182,11 @@ def routed_command(root, payload, backend):
     require(backend in payload['backends'], 'backend not authorized for this intent')
     command = list(payload['command'])
     require(input_identity(root, command) == payload['identity'], 'immutable command inputs changed')
+    ledger = root / 'manifests/dispatch_ledgers' / payload['token'] / 'allocations.tsv'
+    alias = root / 'manifests' / ('dispatch_' + payload['token'] + '_allocations.tsv')
+    require(ledger.is_file() and alias.is_symlink() and alias.resolve() == ledger.resolve(),
+            'intent ledger needs preparation by the primary dispatcher')
+    set_option(command, '--ledger', ledger)
     environment = dict(os.environ)
     if backend.startswith('vast_'):
         command = [str(root / 'vast/tool/vsubmit')] + command
@@ -154,7 +205,6 @@ def routed_command(root, payload, backend):
             private = Path('/vision/u/shiyuc/minyeong/campaign_20261110')
             require(os.access(execution, os.W_OK), 'shared campaign execution root not writable')
             set_option(command, '--root', execution)
-            set_option(command, '--ledger', root / 'manifests/shiyuc/allocations.tsv')
             overrides = {'ISGF_ROOT': str(root), 'ISGF_SAMPLING_CACHE': str(private / 'cache/dispatch' / payload['token']),
                          'ISGF_ASSET_CACHE': str(private / 'asset_cache'), 'ISGF_JB_NFS': str(private / 'jobs'),
                          'KIT_TPL_NFS_ROOT': str(private / 'kit_templates'), 'KIT_TEX_STORE': str(private / 'kit_textures'),
@@ -227,6 +277,7 @@ def execute(root, path, backend):
                 log = receipt_path.with_suffix('.dry.log' if dry else '.submit.log')
                 log.write_text(result.stdout + result.stderr); os.chmod(log, 0o660)
                 require(result.returncode == 0, 'submission failed; inspect ' + str(log))
+                if dry: verify_dry_indices(result.stdout, payload['identity'])
             row = find_allocation(root, payload['identity'])
             require(row is not None, 'submit completed without ledger; reconcile before retry')
             receipt.update(status='submitted', allocation=row, completed_at=time.time())
@@ -264,6 +315,8 @@ def main():
         candidates = []
         for path in (a.root / 'dispatch/ready').glob('*.json'):
             payload = json.loads(path.read_text())
+            if getpass.getuser() == 'minyeong':
+                prepare_intent_ledger(a.root, payload['token'])
             receipt = a.root / 'dispatch/receipts' / path.name
             if a.backend in payload['backends'] and not receipt.exists():
                 candidates.append((payload['priority'], path.name, path))

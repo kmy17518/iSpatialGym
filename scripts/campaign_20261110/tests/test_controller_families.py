@@ -9,6 +9,24 @@ from scripts.campaign_20261110 import controller_families as c
 
 
 class FamilyControllerTests(unittest.TestCase):
+    def test_reuse_requires_opt_in_exact_runtime_and_genuine_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state,path=self.recovered_fixture(root)
+            state['history'][0]['name']='source_cycle'
+            state['history'][0]['anchor']['allocation']['code']='/snapshot'
+            spec={'class_id':'a','anchor_snapshot':'/snapshot'}
+            self.assertIsNone(c.reusable_anchor_record(spec,state,root))
+            spec['reuse_successful_anchor']=True
+            record=c.reusable_anchor_record(spec,state,root)
+            self.assertEqual(record['status'],'waiting')
+            self.assertEqual(record['reused_from_cycle'],'source_cycle')
+            self.assertEqual(state['history'][0]['anchor']['status'],'failed')
+            spec['anchor_snapshot']='/other'
+            self.assertIsNone(c.reusable_anchor_record(spec,state,root))
+            spec['anchor_snapshot']='/snapshot'
+            gate=json.loads(path.read_text());gate['replay_mode']='kinematic';path.write_text(json.dumps(gate))
+            self.assertIsNone(c.reusable_anchor_record(spec,state,root))
+
     def recovered_fixture(self, root, *, group=False, mode='physics_action_open_loop'):
         job = root / 'out/fresh'
         job.mkdir(parents=True)

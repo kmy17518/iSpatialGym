@@ -3,9 +3,25 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
-from scripts.campaign_20261110.controller_validation import apply_retry_request, publish_recovered_gate
+from scripts.campaign_20261110.controller_validation import apply_retry_request, publish_recovered_gate, ledger_paths
 
 class ReplayRecoveryTests(unittest.TestCase):
+    def test_dispatch_ledgers_are_discovered_once_with_explicit_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);target=root/'manifests/dispatch_ledgers/token/allocations.tsv'
+            target.parent.mkdir(parents=True);target.write_text('header\n')
+            link=root/'manifests/dispatch_token_allocations.tsv';link.symlink_to(target)
+            duplicate=root/'manifests/dispatch_other_allocations.tsv';duplicate.symlink_to(target)
+            paths=ledger_paths(root,[target])
+            self.assertEqual([p.resolve() for p in paths],[target])
+            self.assertIn(target,[p.resolve() for p in ledger_paths(root)])
+
+    def test_dispatch_ledger_must_stay_in_current_campaign(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'manifests').mkdir()
+            (root/'manifests/dispatch_bad_allocations.tsv').symlink_to('/outside/allocations.tsv')
+            with self.assertRaisesRegex(ValueError,'outside owned'):ledger_paths(root)
+
     def metadata_fixture(self, root):
         folder,entry,request=self.fixture(root)
         job=root/'out/fresh';job.mkdir(parents=True)

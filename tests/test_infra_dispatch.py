@@ -1,4 +1,5 @@
 import json
+import concurrent.futures
 from pathlib import Path
 import tempfile
 import unittest
@@ -50,8 +51,35 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(D.option(cmd, '--root'), str(self.root / 'out/shiyuc'))
         self.assertIn('ISGF_ROOT=' + str(self.root), cmd)
         self.assertIn('ISGF_SAMPLING_CACHE=/vision/u/shiyuc/minyeong/campaign_20261110/cache/dispatch/fresh', cmd)
-        self.assertEqual(D.option(cmd, '--ledger'), str(self.root / 'manifests/shiyuc/allocations.tsv'))
+        self.assertEqual(D.option(cmd, '--ledger'), str(self.root / 'manifests/dispatch_ledgers/fresh/allocations.tsv'))
         self.assertEqual(env['ISG_DISPATCH_CAMPAIGN_ROOT'], str(self.root))
+
+    def test_private_ledger_keeps_lower_reserved_range_after_later_intent(self):
+        first = D.prepare_intent_ledger(self.root, 'first')
+        second = D.prepare_intent_ledger(self.root, 'second')
+        with second.open('a') as stream:
+            stream.write('now\tobject_scaling-apple\talias\t50009900\t3\n')
+        self.assertNotEqual(first, second)
+        with first.open() as stream:
+            self.assertEqual(list(D.csv.DictReader(stream, delimiter='\t')), [])
+        self.assertEqual(D.prepare_intent_ledger(self.root, 'first'), first)
+        self.assertEqual((self.root/'manifests/dispatch_first_allocations.tsv').resolve(), first.resolve())
+        self.assertEqual(first.stat().st_mode & 0o777, 0o660)
+
+    def test_shifted_dry_run_cannot_reach_scheduler(self):
+        identity = {'start':50000000, 'n':3}
+        D.verify_dry_indices('  START=50000000\n  N=3\n', identity)
+        for text in ['START=50009903\nN=3\n', 'START=50000000\nN=4\n',
+                     'START=50000000\nSTART=50000000\nN=3\n']:
+            with self.assertRaisesRegex(ValueError, 'shifted'):
+                D.verify_dry_indices(text, identity)
+
+    def test_concurrent_ledger_preparation_publishes_one_complete_header(self):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            paths = list(pool.map(lambda _: D.prepare_intent_ledger(self.root, 'same'), range(32)))
+        self.assertEqual(len(set(paths)), 1)
+        self.assertEqual(paths[0].read_text(), '\t'.join(D.LEDGER_COLS) + '\n')
+        self.assertEqual((self.root/'manifests/dispatch_same_allocations.tsv').resolve(), paths[0].resolve())
 
     def test_capacity_counts_gpu_arrays_and_cpu_job_caps(self):
         rows = [['shiyuc', 'svl', 'RUNNING', 'gres/gpu:titanrtx:1']] * 46
