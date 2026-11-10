@@ -61,3 +61,13 @@ def test_mirror_job_refuses_the_same_board_and_an_asymmetric_object():
         LN.mirror_job(_job(), _src(), lopsided)
     with pytest.raises(ValueError, match="no source grasp"):
         LN.mirror_job(_job(), _src(), BOX, ["nope"])
+
+
+def test_twins_add_the_hand_turned_about_its_approach():
+    j = LN.mirror_job(_job(), _src(), BOX, ["side_9"], twins=True)
+    g = {x["name"]: x for x in j["cand_overrides"]["legacy_grasps"]}
+    assert set(g) == {"mirror_side_9", "mirror_side_9~r180"} and "twins" in j["mirror_of"]["method"]
+    A = Rot.from_quat(g["mirror_side_9"]["quat_xyzw"]).as_matrix()
+    T = Rot.from_quat(g["mirror_side_9~r180"]["quat_xyzw"]).as_matrix()
+    assert np.allclose(A[:, 2], T[:, 2], atol=1e-6) and np.allclose(A[:, 0], -T[:, 0], atol=1e-6)  # same approach, x / y turned
+    assert g["mirror_side_9"]["position"] == g["mirror_side_9~r180"]["position"]

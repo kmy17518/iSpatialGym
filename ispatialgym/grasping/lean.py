@@ -432,7 +432,7 @@ def mirror_grasp(T_object_eef: Dict[str, Any], B) -> Dict[str, Any]:
 
 
 def mirror_job(job: Dict[str, Any], src_library: Dict[str, Any], src_vertices, grasp_names: Optional[Sequence[str]] = None,
-               tol_m: float = MIRROR_SYMMETRY_TOL_M) -> Dict[str, Any]:
+               tol_m: float = MIRROR_SYMMETRY_TOL_M, twins: bool = False) -> Dict[str, Any]:
     """The lean job ``job`` (the destination board's rest) with the source library's grasps (``grasp_names``, default all) transferred by the
     arm mirror as its ONLY candidates (``cand_overrides``: no sampled mode, family "legacy" = the given poses) and the provenance in
     ``mirror_of``; its entry id gains ``__mirror_<source tag>``. ``ValueError`` when the source and destination lean to the same side or the
@@ -454,9 +454,18 @@ def mirror_job(job: Dict[str, Any], src_library: Dict[str, Any], src_vertices, g
     if not grasps:
         raise ValueError(f"no source grasp among {sorted(names) if names else 'all'}")
     given = [{"name": f"mirror_{g['name']}", **mirror_grasp(g["T_object_eef"], B)} for g in grasps]
+    if twins:
+        # the wrist cameras sit at the same gripper-frame offset on both arms, so the mirrored hand's camera does NOT land on the mirror of
+        # the source camera (acbrnv side_9 at the right board: the camera 10 mm into the board, the source's 27.5 mm clear); the twin (the
+        # same pinch, the hand turned 180 deg about its approach) carries it to the other side of the pinch
+        from scipy.spatial.transform import Rotation as Rot
+
+        for g in list(given):
+            Rg = Rot.from_quat(g["quat_xyzw"]).as_matrix() @ Rot.from_euler("z", 180.0, degrees=True).as_matrix()
+            given.append({"name": g["name"] + "~r180", "position": list(g["position"]), "quat_xyzw": [round(float(v), 7) for v in Rot.from_matrix(Rg).as_quat()]})
     out = dict(job)
     out["cand_overrides"] = {"modes": [], "families": ["legacy"], "legacy_grasps": given}
-    out["mirror_of"] = {"method": "arm mirror (lean.mirror_job)", "source_rest": rid, "source_arm": src_library.get("arm"),
+    out["mirror_of"] = {"method": "arm mirror (lean.mirror_job)" + (" + the 180 deg twins" if twins else ""), "source_rest": rid, "source_arm": src_library.get("arm"),
                         "grasps": [g["name"] for g in grasps], "body_map": [[round(float(v), 6) for v in row] for row in B],
                         "symmetry_error_m": round(err, 6), "design_rest_xyzw": [round(float(v), 7) for v in dst_rest]}
     out["id"] = f"{job['id']}__mirror_{rid}"
@@ -490,13 +499,14 @@ def main(argv=None):
     mm.add_argument("--grasp", nargs="*", default=None, help="source grasp names (default: all)")
     mm.add_argument("--validate-arm", default="right", choices=["right", "left"])
     mm.add_argument("--interior-goal", default=None)
+    mm.add_argument("--twins", action="store_true", help="also each mirrored pose turned 180 deg about its approach (the wrist camera's other side)")
     mm.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     if a.cmd == "mirror":
         src = S.load_json(os.path.join(a.src_entry, "library.json"))
         geo = S.load_json(os.path.join(a.src_entry, "geometry.json"))
         verts = [v for pc in geo.get("pieces") or [] for v in pc.get("vertices") or []]
-        jobs = [mirror_job(j, src, verts, a.grasp) for j in manifest([a.legacy_key], a.deg, a.side, Board(), 0.002, a.validate_arm, a.interior_goal)]
+        jobs = [mirror_job(j, src, verts, a.grasp, twins=a.twins) for j in manifest([a.legacy_key], a.deg, a.side, Board(), 0.002, a.validate_arm, a.interior_goal)]
         S.save_json(a.out, jobs)
         for j in jobs:
             print(j["id"], j["mirror_of"]["grasps"], "symmetry", j["mirror_of"]["symmetry_error_m"], [g["name"] for g in j["cand_overrides"]["legacy_grasps"]])
