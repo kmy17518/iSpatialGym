@@ -6341,6 +6341,28 @@ Only the customs starts had maps, so a drawn start would have rejected `missing_
 
 <!-- ARTSMALL_AB -->
 
+## Axial brace maps rebuilt finer: braces do not come back, push-only accepted (branch `i7-bracefine`, owner A9 #24, 2026-11-09)
+
+**Owner decision (2026-11-09, #24):** rebuild the axial brace maps finer (built tilt columns, 4 cm lattice); if braces still do not come back, accept push-only.
+
+- **How the maps were built before.** `contact_maps compute --kind axial_brace`, 8 cm lattice, trunk columns `reach_bands.trunk_grid` (tilts 0 / -0.3 / -0.6 / -0.9), from the #48 re-validated libraries (`brace_20261108/w53fix/F`: woken object, measured contact, fixed load geometry). Phase 2 stances use `tabletop.tilt_scan` tilts (7 per translate, e.g. -0.454 at translate 0.5) and read the nearest column.
+- **Switch (default OFF, builder only):** `ISPATIALGYM_AXIAL_BRACE_MAP_PHASE2_TILTS=1` adds a trunk column at every Phase 2 stance tilt (`contact_maps.trunk_columns`: 20 -> 50 trunks). `MapConfig.tilt_columns = "phase2"` enters the map key only when on. Columns off the 0.1 rad grid key four decimals (`trunk_key`), and `ContactMap.status` reads each trunk's recorded key. With the switch off, the builder reproduces all 6 int2 keys (status agreement 1.0000). The lattice is the CLI's `--lattice 0.04`.
+- **Maps:** `$OFH/bracefine_20261109/maps_fine` (4 cm + Phase 2 tilts) and `maps_finem` (+ `AXIAL_BRACE_MAP_JOINT_MARGIN=1`). The A/B root `$OFH/v2maps_int2_bracefine` is a copy of `v2maps_int2_bfold` (frozen int2 at INT2.txt line 61) plus the 6 fine maps.
+- **Offline check (synth world, 4000 random live stances per map, solved at the live xy and tilt with 64 seeds and the live 0.05 rad margin).** Precision: old 0.294, fine 0.299, finem 0.347. The finer lattice and built tilts do not raise precision; most failures are branch jumps on the map's own chain.
+- **A/B (N 4, int2 indices, svl titanrtx, own empty caches).** att / wr / ok, GPU-h per ok:
+
+| alias | old (int2 braceload) | new (fine) |
+|---|---|---|
+| axial_01 310000 | 14/4/4 0.092 | 10/4/4 0.062 |
+| axial_02 300500 | 25/3/3 0.112 | 22/3/3 0.091 |
+| axial_03 310000 | 13/4/3 0.096 | 12/4/3 0.087 |
+| axial_04 310000 | 19/4/3 0.065 | 19/4/3 0.066 |
+| axial_05 310000 | 29/4/4 0.102 | 31/4/1 0.446 |
+| total | 100/19/17 0.094 | 94/19/14 0.102 |
+
+- **Braces.** Map-feasible live braces solved: old 0/117, new 0/78. Braces in the demos: old 5, new 4. Every one came from a class the map did not call feasible. axial_05's failures were push-only demos in both arms (not where the maps acted).
+- **Verdict: accept push-only.** The layer is not handed for consolidation, and the switch stays off.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

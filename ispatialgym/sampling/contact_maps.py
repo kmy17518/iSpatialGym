@@ -83,6 +83,54 @@ STATUS_NAME[STATUS_IK_MARGIN] = "ik_margin"
 JOINT_MARGIN_KINDS = ("axial_brace",)
 
 
+#: i7-bracefine 2026-11-09 (owner A9 #24): the kinds the Phase 2 tilt-column switch applies to (axial_brace only)
+PHASE2_TILT_KINDS = ("axial_brace",)
+#: the trunk-column rules (``MapConfig.tilt_columns``; None = ``reach_bands.trunk_grid`` alone)
+TILT_COLUMN_RULES = ("phase2",)
+
+
+def phase2_tilts_on() -> bool:
+    """i7-bracefine (owner A9 #24, default OFF): the axial_brace map builder adds a trunk column at every Phase 2 stance tilt (``tabletop.tilt_scan``
+    per translate) to ``reach_bands.trunk_grid``'s, so the manipulation stance reads a column built at its own tilt instead of the nearest of
+    0 / -0.3 / -0.6 / -0.9 (``MapConfig.tilt_columns`` = "phase2": in the map identity only when on). ``ISPATIALGYM_AXIAL_BRACE_MAP_PHASE2_TILTS=1``."""
+    return os.environ.get("ISPATIALGYM_AXIAL_BRACE_MAP_PHASE2_TILTS", "0") == "1"
+
+
+def phase2_stance_tilts(translate: float) -> List[float]:
+    """Phase 2's trunk tilts at ``translate`` (``tabletop.tilt_scan``: ``N_TILT_SAMPLES`` from 0 to the torso_joint3 limit), the values the
+    sampler's stances carry."""
+    from ispatialgym.sampling.v2 import tabletop as TT
+
+    lim = float(TT.C.TORSO_JOINT_LIMITS[0][TT.C.M.TRUNK_TILT_JOINT_INDEX] - TT.C.translate_to_torso_q(float(translate))[TT.C.M.TRUNK_TILT_JOINT_INDEX])
+    return [float(v) for v in np.linspace(0.0, lim, int(TT.N_TILT_SAMPLES)).tolist()]
+
+
+def trunk_columns(height: float, rule: Optional[str] = None) -> List[Tuple[float, float]]:
+    """The map's trunks: ``reach_bands.trunk_grid(height)``; ``rule`` "phase2" adds per translate the Phase 2 stance tilts
+    (:func:`phase2_stance_tilts`) not within :data:`TILT_SNAP_RAD` of a grid tilt there (sorted per translate, tilt descending)."""
+    from ispatialgym.sampling.reach_bands import trunk_grid
+
+    grid = [(float(tr), float(ti)) for tr, ti in trunk_grid(height)]
+    if rule is None:
+        return grid
+    if rule not in TILT_COLUMN_RULES:
+        raise ValueError(f"tilt_columns {rule!r} is not one of {TILT_COLUMN_RULES}")
+    out = list(grid)
+    for tr in sorted({t[0] for t in grid}):
+        have = [ti for t0, ti in out if abs(t0 - tr) < 1e-9]
+        for ti in phase2_stance_tilts(tr):
+            if all(abs(ti - h) > TILT_SNAP_RAD for h in have):
+                out.append((tr, round(float(ti), 6)))
+                have.append(ti)
+    return sorted(out, key=lambda t: (t[0], -t[1]))
+
+
+def trunk_key(translate: float, tilt: float) -> str:
+    """A trunk's array key part: ``t<translate>_k<tilt>`` with one tilt decimal on the 0.1 rad grid (the former keys), four otherwise."""
+    on_grid = abs(round(float(tilt), 1) - float(tilt)) < 1e-9
+    return f"t{translate:.2f}_k{tilt:+.1f}" if on_grid else f"t{translate:.2f}_k{tilt:+.4f}"
+
+
 def joint_margin_on() -> bool:
     """i7-axialrest 5y fix (default OFF): the axial_brace map builder accepts a chain IK solution only with the live 0.05 rad joint-limit
     margin on every arm joint at every chain configuration (``MapConfig.joint_margin_rad``: in the map identity only when on).
@@ -258,6 +306,8 @@ def contact_config(kind: str, **kw) -> RM.MapConfig:
         kw.setdefault("arm", KINDS[kind]["arm"])
     if kind in JOINT_MARGIN_KINDS and joint_margin_on():
         kw.setdefault("joint_margin_rad", LIVE_JOINT_LIMIT_MARGIN)
+    if kind in PHASE2_TILT_KINDS and phase2_tilts_on():
+        kw.setdefault("tilt_columns", "phase2")
     if KINDS[kind]["plane"] == "wall":
         return wall_config(**kw)
     return RM.floor_config(**kw) if KINDS[kind]["plane"] == "floor" else RM.MapConfig(**kw)
@@ -349,7 +399,6 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
     """One contact map: ``(meta, arrays)`` (module docstring). ``geom``: the object's collision pieces (the support fit, the arm-vs-object
     check). Raises ``ValueError`` when the library has no entry of the kind under ``verdicts``. ``overlay`` (owner A6): the entries a merged
     overlay version confirmed join (:func:`overlay_entries`); the version enters the identity."""
-    from ispatialgym.sampling.reach_bands import trunk_grid
 
     cfg = cfg or world.cfg
     spec = KINDS[kind]
@@ -454,8 +503,8 @@ def compute_contact_map(world: RM.SynthWorld, lib_k: Dict[str, Any], kind: str, 
         st[pr["index"][:, 0], pr["index"][:, 1], pr["index"][:, 2]] = v
         return st
 
-    for tr, ti in trunk_grid(height):
-        key = f"t{tr:.2f}_k{ti:+.1f}"
+    for tr, ti in trunk_columns(height, getattr(cfg, "tilt_columns", None)):
+        key = trunk_key(tr, ti)
         rec: Dict[str, Any] = {"translate": tr, "tilt": ti, "key": key}
         posture, q_lock = None, None
         de_free: Dict[float, bool] = {}
@@ -760,7 +809,10 @@ class ContactMap:
 
     def status(self, edge_distance: float, translate: float, tilt: float) -> np.ndarray:
         d = min(self.meta["edge_distances"], key=lambda v: abs(v - edge_distance))
-        return self.arrays[f"s{d:.2f}_t{translate:.2f}_k{tilt:+.1f}"]
+        # i7-bracefine: the trunk's own recorded key (a Phase 2 tilt column keys four decimals); the former format for the rest
+        key = next((t["key"] for t in self.meta["trunks"] if t.get("key") and abs(float(t["translate"]) - float(translate)) < 1e-6
+                    and abs(float(t["tilt"]) - float(tilt)) < 1e-6), None) or f"t{translate:.2f}_k{tilt:+.1f}"
+        return self.arrays[f"s{d:.2f}_{key}"]
 
     def class_rows(self, yaw_index: int) -> List[Optional[Dict[str, Any]]]:
         nG = len(self.classes)
