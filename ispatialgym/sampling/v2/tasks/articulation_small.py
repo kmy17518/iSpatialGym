@@ -42,6 +42,7 @@ import torch as th
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import attempt_cap as AC
+from ispatialgym.sampling import campaign_joint_goals as CJG
 from ispatialgym.sampling import constraints as CN
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import reach_bands as RB
@@ -508,7 +509,7 @@ class ArticulationSmall(SamplerV2):
             # limit: the hinged jar's stable set was {2.618} in the 22:26 / 23:14 runs; the facing rule turns the hinge toward
             # the robot for close so that the open lid's handle is on the robot's side, see _facing_local)
             self.q_init, self.q_goal = float(min(self.stable)), self.lower
-        if draw_angles_on(self):
+        if draw_angles_on(self) or os.environ.get(CJG.ENV):
             self._template_with_drawn_angles(target)  # i7-artsmall: (q_init, q_goal) per attempt from the per-pair template work
             return
         self.required, self.passive_from = self._required_waypoints(target)
@@ -559,6 +560,13 @@ class ArticulationSmall(SamplerV2):
         attempt that draws it rejects ``missing_map``). Each attempt then draws its pair (:meth:`_draw_pair`)."""
         pairs = angle_pairs(self.direction, self.stable, self.lower, self.upper, self.close_push,
                             q_ajar=self.q_ajar if getattr(self, "v2", False) else None)
+        plan = self.campaign_joint_plan() if os.environ.get(CJG.ENV) else None
+        if plan is not None:
+            self._campaign_joint_active = plan
+            try:
+                pairs = plan.eligible_pairs(pairs, direction=self.direction, lower=self.lower, upper=self.upper)
+            except CJG.GoalPlanError as exc:
+                raise Reject("campaign_joint_bucket", str(exc)) from exc
         if not pairs:
             raise Reject("no_stable_state", f"{target.name}/{self.joint_name}: no (q_init, q_goal) pair from S {self.stable}")
         self._pairs = [self._pair_record(target, q0, q1) for q0, q1 in pairs]
@@ -592,6 +600,8 @@ class ArticulationSmall(SamplerV2):
     def _draw_pair(self, rng: np.random.Generator) -> Dict[str, Any]:
         """This attempt's (q_init, q_goal): uniform over the template's pairs from the attempt's ``rng`` (``articulation_large.draw_joint_targets``);
         kit counters ``artsmall_draw.drawn`` / ``.q_init.<q>`` / ``.q_goal.<q>``."""
+        if os.environ.get(CJG.ENV):
+            self.campaign_group_remaining_s()
         p = self._pairs[int(rng.integers(len(self._pairs)))]
         self._apply_pair(p)
         TT._count(self, "artsmall_draw.drawn")
@@ -1271,6 +1281,8 @@ class ArticulationSmall(SamplerV2):
     SECOND_STANCE_MAX = 10
 
     def _check_deadline(self):
+        if os.environ.get(CJG.ENV):
+            self.campaign_group_remaining_s()
         AC.check("articulation_small: the search")  # i7-stancememo 5x.3: the adaptive cap (ISPATIALGYM_ATTEMPT_CAP)
         if time.time() > getattr(self, "_deadline", math.inf):
             raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
@@ -1406,7 +1418,57 @@ class ArticulationSmall(SamplerV2):
 
     # ------------------------------------------------------------------ instance (§5.4 Phase 3)
 
+    def campaign_joint_plan(self):
+        if not os.environ.get(CJG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CJG.load_joint_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                       target=self.tname, joint=self.joint_name, activated_at=self._campaign_group_started_at,
+                                       expected_sha256=getattr(self, "_campaign_joint_plan_sha", None))
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "articulation goal-group member limit reached")
+            self._campaign_joint_plan_sha = plan.sha256
+            return plan
+        except CJG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CJG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_joint_plan()
+        return None if plan is None else max(0.0, plan.deadline_at-time.time())
+
+    def campaign_verify_articulation(self, draft):
+        plan = getattr(self, "_campaign_joint_active", None)
+        if plan is None:
+            return
+        from ispatialgym.sampling import geometry as G
+
+        self.campaign_group_remaining_s()
+        target = self.obj(self.role)
+        targets = draft.articulation_targets[self.tname]["joints"]
+        try:
+            plan.verify_joint_change(list(target.joints), draft.object_joints[self.tname], draft.goal_joints[self.tname],
+                                     {name: value["tolerance"] for name, value in targets.items()})
+        except CJG.GoalPlanError as exc:
+            raise Reject("campaign_joint_drift", str(exc)) from exc
+        pos, quat = target.get_position_orientation()
+        dp = float(th.linalg.norm(G.t(pos)-G.t(plan.pose[0])))
+        dq = float(G.quat_angle(quat, G.t(plan.pose[1])))
+        if dp > self.tol("position", .03) or dq > self.tol("orientation", .20):
+            raise Reject("campaign_root_drift", f"articulation root drifted {dp:.6f} m / {dq:.6f} rad")
+        if any(abs(targets[name]["position"]-value) > 1e-6 for name, value in plan.joints.items()):
+            raise Reject("campaign_joint_drift", "articulation goal changed during sampling")
+        # Preserve the exact shared goal after the native initial/goal stability checks.
+        draft.pose_targets[self.tname] = full_pose_target(th.tensor(plan.pose[0]), th.tensor(plan.pose[1]),
+                                                          self.tol("position", .03), self.tol("orientation", .20))
+        draft.summary["campaign_goal_group"]["root_residual"] = {"position_m": dp, "orientation_rad": dq}
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if os.environ.get(CJG.ENV):
+            self.campaign_group_remaining_s()
         pairs = getattr(self, "_pairs", None)
         if pairs:
             # i7-artsmall: without the per-attempt start draw (ISPATIALGYM_START_DRAW=0) the pair is drawn here, with the start search for it
@@ -1458,12 +1520,19 @@ class ArticulationSmall(SamplerV2):
         tname = self.tname
         target, support = self.obj(self.role), self._support()
         cam_init = self.camera_pose_at(init)
+        plan = getattr(self, "_campaign_joint_active", None)
         yaw = self.face_yaw + float(rng.uniform(-float(self.g("yaw_jitter_rad")), float(self.g("yaw_jitter_rad"))))
         pose = None
-        for _ in range(10):
-            r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
-            xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
-            cand = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw, self.top.z)
+        for _ in range(1 if plan is not None else 10):
+            if plan is not None:
+                cand = tuple(th.tensor(v, dtype=th.float32) for v in plan.pose)
+                self._campaign_latest_proposal = {"start_joints": {tname: {self.joint_name: self.q_init}},
+                                                  "goal_joints": {tname: plan.joints}, "goal_poses": {tname: plan.pose},
+                                                  "group_id": plan.group_id}
+            else:
+                r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
+                xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
+                cand = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw, self.top.z)
             if not self.top.polygon_supported(self.world.footprint(self.hull, cand), margin=TT.SUPPORT_MARGIN):
                 continue
             if not TT.in_frame(self, cam_init, C.transform_points(cand, self._hull_q_init), float(self.g("view_margin_m"))):
@@ -1709,6 +1778,17 @@ class ArticulationSmall(SamplerV2):
                           "handle_arm": self.handle_arm, "manipulation_candidate": k, "handle_reach": reach, "second_stance": bool(manip.extras.get("second_stance")),
                           "stage2": None if stage2_rec is None else stage2_rec["facts"], "joint_friction": self.template_facts.get("joint_friction"), **(summary_extra or {})})
         self.brace_missing = brace_state == "none"
+        plan = getattr(self, "_campaign_joint_active", None)
+        if plan is not None:
+            d.summary["campaign_goal_group"] = plan.summary()
+            d.summary["campaign_goal_group"]["requested_start"] = {
+                "joints": {name: float(q_init_vec[i]) for i, name in enumerate(joint_names)},
+                "grasps": [{key: data.get(key) for key in ("object", "arm", "grasp", "eef_in_object", "finger_q")}
+                           for data in (grasp.to_sidecar() for grasp in self.sidecar.grasps)],
+                "contacts": {key: {field: data.get(field) for field in ("object", "arm", "kind", "contact", "init")}
+                             for key, data in ((key, value.to_sidecar()) for key, value in self.sidecar.contacts.items())},
+            }
+            self.campaign_verify_articulation(d)
         return d
 
     # ------------------------------------------------------------------ push-close (owner 2026-09-19 22:59)
@@ -3587,6 +3667,15 @@ class ArticulationSmall(SamplerV2):
         q_now = self._joint_value(target)
         if abs(q_now - self.q_init) > 0.5 * self._joint_tol(self.q_goal - self.q_init):
             raise Reject("articulation_drift", f"init joint drifted from {self.q_init:.3f} to {q_now:.3f}")
+        plan = getattr(self, "_campaign_joint_active", None)
+        if plan is not None:
+            value = plan.joints[self.joint_name] if self.direction == "open" else q_now
+            fraction = (value-self.lower)/(self.upper-self.lower)
+            lo, hi = plan.fraction_range
+            if plan.split != "train" and not (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
+                raise Reject("campaign_joint_bucket", "settled articulation start/goal is outside strict eval bucket")
+            draft.summary["campaign_goal_group"]["actual_open_fraction"] = fraction
+            self.campaign_verify_articulation(draft)
 
     def refine_targets_from_goal(self, draft: Draft):
         tname = self.tname
@@ -3598,6 +3687,14 @@ class ArticulationSmall(SamplerV2):
             if abs(float(q[names.index(n)]) - tgt[n]["position"]) > 0.5 * tgt[n]["tolerance"]:
                 raise Reject("goal_unstable", f"joint {n} drifted to {float(q[names.index(n)]):.3f} (target {tgt[n]['position']:.3f})")
         super().refine_targets_from_goal(draft)
+        self.campaign_verify_articulation(draft)
+
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        self.campaign_verify_articulation(draft)
+        path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_joint_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
+        return path
 
 
 def _base_link_bbox(hull: th.Tensor, jinfo: Dict[str, Any]) -> Dict[str, Any]:

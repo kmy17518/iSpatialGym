@@ -81,6 +81,57 @@ def test_template_probes_each_pair_once_and_finds_a_start():
 
 
 @pytest.mark.usefixtures("fake_tt")
+def test_campaign_pins_goal_before_native_start_search(monkeypatch):
+    from ispatialgym.sampling.campaign_joint_goals import JointGoalPlan
+
+    monkeypatch.setenv("ISPATIALGYM_CAMPAIGN_GOAL_PLAN", "test-plan")
+    s, probes = _sampler(direction="open", close_push=False, stable=[.3, .4, .8], upper=1)
+    plan = JointGoalPlan("campaign", "group", "eval_standard", "template", "a"*64, "target", "j",
+                         ((0, 0, .8), (0, 0, 0, 1)), {"j": .4}, (0, .5), 100, 3, "b"*64)
+    s.campaign_joint_plan = lambda: plan
+    original = s._start_search
+    calls = []
+
+    def search(*args):
+        assert s._campaign_joint_active is plan and s.q_goal == .4
+        calls.append(s.q_goal)
+        return original(*args)
+
+    s._start_search = search
+    s._template_with_drawn_angles(target=type("O", (), {"name": "blender"})())
+    assert probes == [(0, .4)] and calls
+
+
+def test_campaign_root_tolerance_preserves_exact_shared_goal_and_other_joint():
+    from types import SimpleNamespace
+    from ispatialgym.sampling.campaign_joint_goals import JointGoalPlan
+
+    s = AS.ArticulationSmall.__new__(AS.ArticulationSmall)
+    plan = JointGoalPlan("campaign", "group", "eval_standard", "template", "a"*64, "target", "j",
+                         ((0, 0, .8), (0, 0, 0, 1)), {"j": .4, "flap": 0}, (0, .5), 100, 3, "b"*64)
+    s._campaign_joint_active, s.role = plan, "target"
+    s.bindings = SimpleNamespace(one=lambda role: SimpleNamespace(name="target"))
+    s.campaign_group_remaining_s = lambda: 100
+    s.tol = lambda name, default: default
+    pose = [th.tensor([.001, 0, .8]), th.tensor([0., 0, 0, 1])]
+    target = SimpleNamespace(joints={"j": None, "flap": None}, get_position_orientation=lambda: pose)
+    s.obj = lambda role: target
+    draft = SimpleNamespace(object_joints={"target": [0, .001]}, goal_joints={"target": [.4, 0]},
+                            articulation_targets={"target": {"joints": {
+                                "j": {"position": .4, "tolerance": .05}, "flap": {"position": 0, "tolerance": .05}}}},
+                            pose_targets={}, summary={"campaign_goal_group": plan.summary()})
+    s.campaign_verify_articulation(draft)
+    assert draft.pose_targets["target"]["position"] == pytest.approx([0, 0, .8])
+    draft.object_joints["target"][1] = .2
+    with pytest.raises(Reject, match="another joint"):
+        s.campaign_verify_articulation(draft)
+    draft.object_joints["target"][1] = 0
+    pose[0][0] = .04
+    with pytest.raises(Reject, match="root drifted"):
+        s.campaign_verify_articulation(draft)
+
+
+@pytest.mark.usefixtures("fake_tt")
 def test_template_passes_over_a_pair_without_map(monkeypatch):
     monkeypatch.setenv("ISPATIALGYM_V2_ONLY", "1")  # a prefix map miss rejects missing_map (artic_prefix under v2 only)
     s, _ = _sampler()

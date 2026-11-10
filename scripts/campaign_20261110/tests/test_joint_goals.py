@@ -37,6 +37,17 @@ def test_one_joint_rule_checks_only_initial_to_goal():
         p.verify_joint_change(["hinge","other"],[.4,.3],[.1,.3])
 
 
+def test_native_small_angle_pairs_keep_goal_and_soften_only_training_bucket():
+    p = plan()
+    native = [(.3, 0), (.5, 0), (.8, 0)]
+    assert p.eligible_pairs(native, direction="close", lower=0, upper=1) == native[:2]
+    assert replace(p, split="train").eligible_pairs(native, direction="close", lower=0, upper=1) == native
+    opening = replace(p, joints={"hinge": .4, "other": .3})
+    assert opening.eligible_pairs([(0, .2), (0, .4), (0, .8)], direction="open", lower=0, upper=1) == [(0, .4)]
+    with pytest.raises(j.GoalPlanError, match="no native angle"):
+        opening.eligible_pairs([(0, .2), (0, .8)], direction="open", lower=0, upper=1)
+
+
 def test_articulation_plan_rejects_wrong_identity_and_queue_time_does_not_consume_budget():
     raw={"schema":j.SCHEMA,"campaign_id":"fresh","group_id":"g","split":"train","template_id":"t",
          "contract_template_sha256":"a"*64,"scene":"scene","room":"room","target":"target","joint":"hinge",

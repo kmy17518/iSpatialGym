@@ -64,6 +64,25 @@ class JointGoalPlan:
                 tolerance = (tolerances or {}).get(name, 1e-6)
                 _require(abs(float(q0)-float(q1)) <= tolerance, f"another joint changes initial-to-goal: {name}")
 
+    def eligible_pairs(self, pairs, *, direction, lower, upper):
+        """Keep already physically probed angle pairs with this exact goal."""
+        _require(upper > lower and direction in ("open", "close"), "invalid articulation limits/direction")
+        lo, hi = self.fraction_range
+        goal = self.joints[self.joint]
+        result = []
+        for q0, q1 in pairs:
+            if abs(q1-goal) > 1e-6:
+                continue
+            if not (lower-1e-6 <= q0 <= upper+1e-6 and lower-1e-6 <= q1 <= upper+1e-6):
+                continue
+            if not (q1 > q0+1e-6 if direction == "open" else q0 > q1+1e-6):
+                continue
+            fraction = ((q1 if direction == "open" else q0)-lower)/(upper-lower)
+            if self.split == "train" or (lo <= fraction <= hi and (lo == 0 or fraction > lo)):
+                result.append((float(q0), float(goal)))
+        _require(bool(result), "no native angle pair satisfies the fixed goal and articulation bucket")
+        return result
+
 
 def validate_joint_plan(raw, *, template_id, scene, rooms, target, joint, activated_at, now=None):
     now = time.time() if now is None else now
