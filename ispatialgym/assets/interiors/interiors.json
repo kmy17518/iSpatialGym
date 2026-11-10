@@ -810,6 +810,56 @@
     "for": "i7-ft2 2026-11-08 (owner 7.2): the goal side of the plate-in-sink variants inside_large_scale-plate-drop_in_sink-bar / -countertop (plate luhkiz into drop_in_sink_awvzkn_0, house_single_floor kitchen_0; customs inside_surface_z_m 0.80 +- 0.25, inside_stance_side +y = the sampler's raster edge +u), as drop_in_sink_lkklqs_0@basin for inside_large_03",
     "job": "$OFH/ft2_20261108/measure_awvzkn.sh, slurm 18377335 (trunk_fcddc495, interiors measure --side=+y)"
    }
+  },
+  "bookcase_kmuacd_0@0.4486": {
+   "height_m": 0.4486,
+   "depth_m": 0.306,
+   "board_setback_m": 0.0,
+   "width_m": 0.348,
+   "headroom_m": 0.3514,
+   "board_thickness_m": 0.041,
+   "top_thickness_m": 0.0356,
+   "wall_thickness_m": 0.042,
+   "long_m": 1.2,
+   "back_thickness_m": null,
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_kmuacd_0"
+    ]
+   ],
+   "source": {
+    "asset": "behavior-1k-assets/objects/bookcase/kmuacd/misc/metadata.json bbox 0.300 x 1.201 x 1.225 m (collision 0.310 x 1.207 x 1.233)",
+    "assumed": "long_m 1.2: the support board and the board above as one span centred on the compartment (the case is 1.207 wide, three cubes: exact for the centre cube, the side cubes' outer side is 0.05 m); the cubes below / above the boards and the adjacent cubes are not modelled; the walls span board to board above",
+    "for": "touching_03 (i7-t03both 2026-11-09, owner decision A5: cover the bookcase's other compartments): the hardback acbrnv leaning on either side wall of a kmuacd cube of this row (the v2 lean rests of both boards)",
+    "measured": "$OFH/probe_shelf/out_shelf_18312748.json (SimWorld.support_interior + PhysX rays + collision-piece AABBs in the bookcase's front-edge frame, house_double_floor_upper): the middle row - level cluster z median 0.4487 (861 cells over the row, open edges +u / -u), board pieces __8 (centre cube, lat -0.164..+0.178) z 0.4078-0.4488 depth 0.0-0.306 and __11 (right cube) z 0.4078-0.4491, the board above = the top row's board __3 / __18 z 0.8001-0.8357 (underside 0.3514 above the board top); dividers __17 / __1 0.040-0.042 thick; interiors.measure $OFH/t03both_20261109/measure/km045c.json (bay 0: board 0.4486, wall rays 0.1666 / 0.1815 = width 0.348, headroom 0.3516, open front + back) and km045r.json (bay -0.37: width 0.3493, headroom 0.3516)",
+    "job": "$OFH/t03both_20261109/measure.sh km045c / km045r (trunk_157396bf, slurm 18407856 / 18407857)"
+   }
+  },
+  "bookcase_kmuacd_0@0.0715": {
+   "height_m": 0.0715,
+   "depth_m": 0.3105,
+   "board_setback_m": 0.0,
+   "width_m": 0.3415,
+   "headroom_m": 0.3363,
+   "board_thickness_m": 0.0518,
+   "top_thickness_m": 0.041,
+   "wall_thickness_m": 0.042,
+   "long_m": 1.2,
+   "back_thickness_m": null,
+   "supports": [
+    [
+     "house_double_floor_upper",
+     "bookcase_kmuacd_0"
+    ]
+   ],
+   "source": {
+    "asset": "behavior-1k-assets/objects/bookcase/kmuacd/misc/metadata.json bbox 0.300 x 1.201 x 1.225 m (collision 0.310 x 1.207 x 1.233)",
+    "assumed": "long_m 1.2: the support board and the board above as one span centred on the compartment (the case is 1.207 wide, three cubes: exact for the centre cube, the side cubes' outer side is 0.05 m); the cubes below / above the boards and the adjacent cubes are not modelled; the walls span board to board above",
+    "for": "touching_03 (i7-t03both 2026-11-09, owner decision A5: cover the bookcase's other compartments): the hardback acbrnv leaning on either side wall of a kmuacd cube of this row (the v2 lean rests of both boards)",
+    "measured": "$OFH/probe_shelf/out_shelf_18312748.json (SimWorld.support_interior + PhysX rays + collision-piece AABBs in the bookcase's front-edge frame, house_double_floor_upper): the bottom row - level cluster z median 0.0715 (809 cells, open edges +u / -u), board pieces __13 (centre cube) / __9 (right cube) z 0.0197-0.0715 depth 0.0-0.3105, the board above = the middle row's __8 / __11 z 0.4078-0.449 (underside 0.3363 above the board top); interiors.measure $OFH/t03both_20261109/measure/km007c.json (bay 0: board 0.0715, wall rays 0.1661 / 0.1754 = width 0.3415, headroom 0.3365, open front + back)",
+    "job": "$OFH/t03both_20261109/measure.sh km007c (trunk_157396bf, slurm 18407858)"
+   }
   }
  }
 }
