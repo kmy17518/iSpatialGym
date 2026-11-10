@@ -18,7 +18,7 @@ from scripts.campaign_20261110.contracts import (
 from scripts.campaign_20261110.controller_families import allocations, read, reconcile, reserve_indices, run_logged, slurm_status
 from scripts.campaign_20261110.controller_spool import enqueue_record
 from scripts.campaign_20261110.goal_groups import read_env, successful_anchor
-from scripts.campaign_20261110.group_lane import check_reservations, physical_template
+from scripts.campaign_20261110.group_lane import check_reservations, physical_template, conceptual_template
 from scripts.campaign_20261110.reservation_policy import active_policy
 from scripts.campaign_20261110.storage import atomic_directory_lock
 
@@ -128,9 +128,13 @@ def scoped_template(template, cfg):
                 and len(classes) == len(set(classes)), "invalid admission class ownership")
         require(template.class_id in classes, "class owned by another standard lane")
     split = cfg.get("admission_split", "train")
-    require(split in ("train", "eval_standard"), "invalid admission split")
-    if split == "eval_standard":
-        require(template.split == "eval_standard", "standard admission requires a standard evaluation source")
+    require(split in ("train", "eval_standard", "eval_model"), "invalid admission split")
+    if split in ("eval_standard", "eval_model"):
+        if split == "eval_model":
+            require(classes is not None, "model admission requires explicit class ownership")
+            require(template.split == split, "model admission requires a model evaluation source")
+        else:
+            require(template.split == split, "standard admission requires a standard evaluation source")
         return template
     require(template.split in ("train", "eval_standard"), "heldout source cannot train")
     return template if template.split == "train" else replace(template, split="train", template_id=template.template_id + "__train")
@@ -139,9 +143,37 @@ def scoped_template(template, cfg):
 def admission_decision(template, counts, cfg):
     split = cfg.get("admission_split", "train")
     decision = groups.next_work(template, counts, max_groups=1,
-                               mode="eval_then_train" if split == "eval_standard" else "train_only")
+                               mode="eval_then_train" if split.startswith("eval_") else "train_only")
     require(decision is not None and decision["phase"] == split, "class has no unreserved admission capacity")
     return decision
+
+
+def model_class_pin(template, state, cfg, *, commit=False):
+    """One held-model conceptual template per owned class; pool count variants may coexist."""
+    if cfg.get("admission_split") != "eval_model":
+        return
+    identity = conceptual_template(template)
+    pins = state.setdefault("model_class_pins", {})
+    require(pins.get(template.class_id, identity) == identity, "model class already pinned to another conceptual template")
+    if commit:
+        pins[template.class_id] = identity
+
+
+def group_budget(cfg, task):
+    value = cfg.get("group_budgets_by_task", {}).get(task, cfg.get("group_budget_seconds", 900))
+    require(isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value <= 18000, "invalid group budget")
+    return value
+
+
+def source_release(template, env, cfg):
+    if template.split != "eval_model":
+        return cfg["v2_root"]
+    require(all(env.get(key) for key in ("ISPATIALGYM_GRASP_LIBRARY_V2", "ISPATIALGYM_REACH_MAPS")),
+            "model source has no exact native grasp/map release")
+    library, maps = Path(env["ISPATIALGYM_GRASP_LIBRARY_V2"]).resolve(), Path(env["ISPATIALGYM_REACH_MAPS"]).resolve()
+    require(library.name == "glib" and maps.name == "maps" and library.parent == maps.parent
+            and library.is_dir() and maps.is_dir(), "model source has no exact native grasp/map release")
+    return str(library.parent)
 
 
 def append_seed(catalog, spec, campaign_id):
@@ -169,6 +201,8 @@ def prepare(proof, allocation, cfg, root):
             "target snapshot does not support this queue schema")
     require(all(proof["validation_key"][key] == cfg[key] for key in ("physics_sha256", "data_sha256")),
             "source anchor differs from pinned campaign physics/data")
+    env = read_env(Path(allocation["job_dir"]) / "job.env")
+    v2_root = source_release(template, env, cfg)
     identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
     name = "group_admit_" + identity[:20]
     anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
@@ -183,12 +217,11 @@ def prepare(proof, allocation, cfg, root):
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=1,
         magnitude_range=groups.ranges(template)[decision["bucket"]], seed=cfg["seed"], campaign_id=cfg["campaign_id"],
         code_sha256=file_digest(Path(cfg["snapshot"]) / ".snapshot_commit"), physics_sha256=proof["validation_key"]["physics_sha256"],
-        data_sha256=proof["validation_key"]["data_sha256"], budget_seconds=cfg.get("group_budget_seconds", 900))
+        data_sha256=proof["validation_key"]["data_sha256"], budget_seconds=group_budget(cfg, template.task))
     index = reserve_indices(root, name, 3)
-    env = read_env(Path(allocation["job_dir"]) / "job.env")
     keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
     extras = [k + "=" + env[k] for k in keys if env.get(k)] + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"]
-    command = submission_command(prepared["queue"], snapshot=cfg["snapshot"], campaign_root=root, v2_root=cfg["v2_root"],
+    command = submission_command(prepared["queue"], snapshot=cfg["snapshot"], campaign_root=root, v2_root=v2_root,
         base_index=index, extra_env=extras)
     if env.get("START_PER_ATTEMPT") == "0":
         command += ["--customs", "template"]
@@ -197,7 +230,7 @@ def prepare(proof, allocation, cfg, root):
     record = {"directory": str(directory), "queue": prepared["queue"], "prepared": prepared, "command": command,
         "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": template.split,
         "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": True,
-        "admission_id": identity, "source_proof": proof}
+        "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
     write_json_atomic(directory / "submission.json", record)
     return record
 
@@ -231,10 +264,10 @@ def refresh(record, cfg, root, rows, queue):
     spec = {"id": "admitted_" + record["admission_id"][:20], "class_id": template.class_id,
         "seed_config": record["prepared"]["config"], "seed_config_sha256": file_digest(record["prepared"]["config"]),
         "source_gate": str(gate), "source_gate_sha256": file_digest(gate), "anchor_job": allocation["job_dir"],
-        "anchor_ledger": allocation["ledger"], "snapshot": cfg["snapshot"], "v2_root": cfg["v2_root"],
+        "anchor_ledger": allocation["ledger"], "snapshot": cfg["snapshot"], "v2_root": record.get("v2_root", cfg["v2_root"]),
         "max_candidates": cfg.get("max_candidates_per_seed", 1500), "groups_per_batch": 6,
-        "mode": "eval_then_train" if cfg.get("admission_split") == "eval_standard" else "train_only",
-        "seed_offset": int(record["admission_id"][:8], 16), "group_budget_seconds": cfg.get("group_budget_seconds", 900),
+        "mode": "eval_then_train" if cfg.get("admission_split", "train").startswith("eval_") else "train_only",
+        "seed_offset": int(record["admission_id"][:8], 16), "group_budget_seconds": group_budget(cfg, template.task),
         "existing_queues": [record["queue"]], "admission_review": {"path": str(proof_path), "sha256": file_digest(proof_path)}}
     append_seed(cfg["seed_catalog"], spec, cfg["campaign_id"])
     if record.get("reason"):
@@ -297,6 +330,7 @@ def main():
             for source in cfg.get("existing_bootstraps", []):
                 record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
                 scoped_template(template, cfg)
+                model_class_pin(template, state, cfg, commit=True)
                 identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"], cfg.get("admission_split", "train"))
                 if identity not in state["records"]:
                     record["admission_id"] = identity
@@ -329,9 +363,11 @@ def main():
                     continue
                 examined += 1
                 try:
-                    proof = source_proof(gate, root=root, started_at=cfg["started_at"], campaign_id=cfg["campaign_id"])
+                    proof = source_proof(gate, root=root, started_at=cfg["started_at"], campaign_id=cfg["campaign_id"],
+                        permitted_split="eval_model" if cfg.get("admission_split") == "eval_model" else None)
                     template = held.template_from(proof["template"])
                     scoped_template(template, cfg)
+                    model_class_pin(template, state, cfg)
                     identity = admission_id(template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
                     found = [r for r in rows if Path(r["job_dir"]).resolve() == Path(proof["source_job"])]
                     require(len(found) == 1, "anchor allocation missing or ambiguous")
@@ -341,6 +377,7 @@ def main():
                         with atomic_directory_lock(root / "controllers/held_planning.lockdir"):
                             record = prepare(proof, found[0], cfg, root)
                             state["records"][identity] = record
+                            model_class_pin(template, state, cfg, commit=True)
                             save()
                         enqueue_record(root, record, save, priority=30)
                         allowance -= 1

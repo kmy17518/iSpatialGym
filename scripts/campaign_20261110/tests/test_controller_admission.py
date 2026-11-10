@@ -91,6 +91,38 @@ def test_new_attachment_runtime_can_be_scoped_without_rekeying_existing_families
         admission.task_allowed("alignment-axial", {"admitted_tasks": ["invented_task"]})
 
 
+def test_model_admission_never_converts_source_or_falls_back_to_training(tmp_path, monkeypatch):
+    _, template, _ = anchor_fixture(tmp_path, monkeypatch, split="eval_model")
+    cfg = {"admission_split": "eval_model", "admitted_classes": [template.class_id]}
+    assert admission.scoped_template(template, cfg) is template
+    with pytest.raises(c.ContractError, match="native grasp/map release"):
+        admission.source_release(template, {}, {"v2_root": "/default"})
+    release = tmp_path / "exact_native_release"
+    (release / "glib").mkdir(parents=True); (release / "maps").mkdir()
+    env = {"ISPATIALGYM_GRASP_LIBRARY_V2": str(release / "glib"), "ISPATIALGYM_REACH_MAPS": str(release / "maps")}
+    assert admission.source_release(template, env, {"v2_root": "/default"}) == str(release)
+    with pytest.raises(c.ContractError, match="native grasp/map release"):
+        admission.source_release(template, {**env, "ISPATIALGYM_REACH_MAPS": str(tmp_path / "maps")}, {"v2_root": "/default"})
+    for split in ("train", "eval_standard", "eval_category"):
+        with pytest.raises(c.ContractError, match="model evaluation source"):
+            admission.scoped_template(replace(template, split=split), cfg)
+    with pytest.raises(c.ContractError, match="explicit class ownership"):
+        admission.scoped_template(template, {"admission_split": "eval_model"})
+    counts = {"evaluation": {0: 6}, "train_buckets": {}, "class_remaining": 0, "task_remaining": 0}
+    decision = admission.admission_decision(template, counts, cfg)
+    assert decision["phase"] == "eval_model" and decision["groups"] == 1
+    with pytest.raises(c.ContractError, match="no unreserved admission capacity"):
+        admission.admission_decision(template, {**counts, "evaluation": {0: 9}}, cfg)
+    assert groups.next_work(template, {**counts, "evaluation": {0: 9}}, training_validated=True) is None
+    state = {}
+    admission.model_class_pin(template, state, cfg, commit=True)
+    changed = replace(template, objects=(replace(template.objects[0], model="another", asset_sha256=c.digest("another")),))
+    with pytest.raises(c.ContractError, match="another conceptual template"):
+        admission.model_class_pin(changed, state, cfg)
+    assert admission.group_budget({"group_budgets_by_task": {"configuration_matching-block_design": 9000}},
+                                  "configuration_matching-block_design") == 9000
+
+
 def test_author_upgrade_reopens_only_the_fixed_gap_and_retains_previous_evidence():
     previous = {"sha256": "a"*64, "reason": next(iter(admission.FIXED_AUTHOR_GAPS)), "observed_at": 123}
     state = {"checked_gates": {"tray": dict(previous), "other": {"sha256": "b"*64, "reason": "replay QA missing"}}}

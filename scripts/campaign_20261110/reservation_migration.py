@@ -91,7 +91,7 @@ def _durable_json(path,data):
         local=Path(tmp)/"record.json";write_json_atomic(local,data);durable_atomic_copy(local,path)
 
 
-def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit,state_path=None):
+def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit,state_path=None,additional_audit=None):
     root=Path(root).resolve()
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*",migration_id),"unsafe migration ID")
     paths=[Path(p).resolve() for p in (old_reservations,new_reservations,old_asset_hashes,new_asset_hashes,source_audit)]
@@ -140,8 +140,16 @@ def migrate(*,root,migration_id,old_reservations,new_reservations,old_asset_hash
             camera_states[path]=state
             records.extend(state["accepted"].values())
         needed={record["validation_key"]["template_sha256"] for record in records if not record.get("contract")}
-        audit=audit_records(records,config_contracts(root,needed),new,new_hashes)
+        templates=config_contracts(root,needed)
+        audit=audit_records(records,templates,new,new_hashes)
         audit["source_audit"]=source_refs["source_audit"]
+        if additional_audit is not None:
+            # Caller can bind fresh authored/queued input evidence to the same
+            # accepted-state snapshot, before any pending marker or publication.
+            extra=additional_audit(records,templates)
+            require(isinstance(extra,dict) and extra,"additional reservation audit returned no evidence")
+            canonical_json(extra)
+            audit["additional_use_audit"]=extra
         if previous is not None and previous.get("status")=="committed":
             require(current[0]==new_digest,"committed migration DB reverted")
             pointer=read(root/"manifests/active_reservations.json")

@@ -75,3 +75,19 @@ def test_monotonic_policy_rejects_removal_and_reserved_byte_change():
     new={**old,"model_holdout_models":["new/b"],"train_exclude_models":["new/b"]}
     with pytest.raises(c.ContractError,match="removed"):
         m.monotonic_extension(old,new,{}, {})
+
+
+def test_live_input_audit_runs_under_all_authority_locks_before_publication(tmp_path):
+    args,_,_,camera=setup(tmp_path)
+    before={path:c.file_digest(path) for path in (args["state_path"],camera)}
+    def reject_active_use(records,templates):
+        assert len(records)==2
+        assert args["state_path"].with_suffix(".lockdir").is_dir()
+        assert all((tmp_path/"dataset"/(name+".lockdir")).is_dir() for name in m.CAMERA_STATES)
+        raise c.ContractError("queued input uses proposed held model")
+    with pytest.raises(c.ContractError,match="queued input"):
+        m.migrate(**args,additional_audit=reject_active_use)
+    assert {path:c.file_digest(path) for path in before}==before
+    assert not (tmp_path/"dataset/reservation_migration_pending.json").exists()
+    result=m.migrate(**args,additional_audit=lambda records,templates:{"accepted":len(records),"queued_hits":[],"audit_sha256":"a"*64})
+    assert result["accepted_audit"]["additional_use_audit"]["accepted"]==2
