@@ -3,10 +3,19 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_actual_scene_overrides_historical_counted_alias(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); config = root / 'config.json'
+            config.write_text('{"template":{"scene":"Rs_int"}}')
+            env = {'ISPATIALGYM_CAMPAIGN_CONFIG':str(config), 'TEMPLATE':str(root/'Rs_int__room-living_room_0'), 'TEMPLATE_ID':'house_single_floor__old'}
+            self.assertEqual(runtime_scenes(env, root), ['Rs_int'])
+            config.write_text('{"template":{"scene":"hotel_suite_large"}}')
+            with self.assertRaisesRegex(ValueError, 'differs from actual source'):
+                runtime_scenes(env, root)
     def test_warm_store_routing_preserves_native_key_selection_and_source_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); job, _, _ = self.fixture(root)

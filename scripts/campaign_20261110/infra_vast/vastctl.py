@@ -36,9 +36,9 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -355,7 +355,7 @@ def stage(s3, rec, state):
         roots = [{"dir": os.path.join(code, "Behavior-1K"), "sha": sha, "porcelain": por if os.path.exists(por) else "-"},
                  {"dir": b1k, "sha": sha, "porcelain": por if os.path.exists(por) else "-"}]
     spec = {k: rec[k] for k in ("id", "name", "job_dir", "script", "time_s", "cpus", "mem", "log", "cwd", "acct", "part")}
-    spec.update({"code": [{"key": k} for k in code_keys], "jobdata": f"jobs/{rec['id']}/jobdata.tar.zst", "scenes": [tid.split("__")[0]],
+    spec.update({"code": [{"key": k} for k in code_keys], "jobdata": f"jobs/{rec['id']}/jobdata.tar.zst", "scenes": runtime_scenes(env, OFH),
                  "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre}})
     log(f"STAGED {rec['id']} {rec['name']} {len(L.items)} entries {L.bytes / 2**20:.1f} MB, {n_pre} prebuild candidates ({now() - t:.0f} s)")
     return spec

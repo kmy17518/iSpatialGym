@@ -92,6 +92,27 @@ def prepare_cache_environment(job_dir, root):
     return record
 
 
+def runtime_scenes(env, root):
+    """Use the actual annotated template, never the counted alias's old scene."""
+    root = Path(root).resolve()
+    config_path = env.get('ISPATIALGYM_CAMPAIGN_CONFIG')
+    if env.get(QUEUE_ENV):
+        queue = Path(env[QUEUE_ENV]).resolve()
+        require(queue.is_relative_to(root), 'scene queue outside owned root')
+        raw = json.loads(queue.read_text())
+        config_path = str(checked(raw['config_path'], root, raw['config_sha256']))
+    source_scene = Path(env['TEMPLATE']).name.split('__', 1)[0]
+    if config_path:
+        config_path = Path(config_path).resolve()
+        require(config_path.is_relative_to(root), 'scene config outside owned root')
+        scene = json.loads(config_path.read_text())['template']['scene']
+        require(scene == source_scene, 'annotated scene differs from actual source template')
+    else:
+        scene = source_scene
+    require(isinstance(scene, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*', scene), 'invalid texture scene')
+    return [scene]
+
+
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
