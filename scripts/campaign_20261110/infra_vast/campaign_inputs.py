@@ -10,6 +10,15 @@ import shutil
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 
 
+def dispatch_order(states, config):
+    allowed = config.get("dispatch_job_ids")
+    allowed = None if allowed is None else {str(jid) for jid in allowed}
+    priority = {str(jid): index for index, jid in enumerate(config.get("dispatch_priority_job_ids", []))}
+    return sorted((row for row in states if row["status"] == "queued" and
+                   (allowed is None or str(row["id"]) in allowed)),
+                  key=lambda row: (priority.get(str(row["id"]), len(priority)), int(row["id"])))
+
+
 def prepare_environment(job_dir, root):
     """Let the image's Isaac import select its existing apps directory.
 
@@ -56,6 +65,43 @@ def checked(path, root, expected):
     require(path.is_relative_to(root.resolve()) and path.is_file(), "queue input outside owned campaign")
     require(sha(path) == expected, "queue input digest differs")
     return path
+
+
+def prepare_pools(job_dir, env, root):
+    """Return exact pool files to ship at their contract-pinned absolute paths."""
+    root, job = Path(root).resolve(), Path(job_dir).resolve()
+    require(job.is_relative_to(root / "out"), "Vast pool job outside campaign output")
+    configs = []
+    if env.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+        configs.append(Path(env["ISPATIALGYM_CAMPAIGN_CONFIG"]))
+    if env.get(QUEUE_ENV):
+        queue = Path(env[QUEUE_ENV]).resolve()
+        require(queue.is_relative_to(root) and queue.is_file(), "pool queue outside owned campaign")
+        raw = json.loads(queue.read_text())
+        configs.append(checked(raw["config_path"], root, raw["config_sha256"]))
+    records = {}
+    for config in configs:
+        config = config.resolve()
+        require(config.is_relative_to(root) and config.is_file(), "pool config outside owned campaign")
+        raw = json.loads(config.read_text())
+        ref = raw.get("template", {}).get("scene_setup", {}).get("binding_pool")
+        if ref is None:
+            continue
+        require(ref.get("schema") == "isg-active-binding-pool-v1", "unsupported binding pool reference")
+        path = checked(ref["manifest"], root, ref["manifest_sha256"])
+        require(json.loads(path.read_text()).get("schema") == "isg-binding-pool-v1", "unsupported binding pool manifest")
+        record = {"manifest": str(path), "manifest_sha256": sha(path)}
+        require(str(path) not in records or records[str(path)] == record, "pool references disagree")
+        records[str(path)] = record
+    if records:
+        evidence = {"schema": "isg-vast-pool-inputs-v1", "files": list(records.values()),
+                    "resolution": "original_absolute_paths_contract_bytes_unchanged"}
+        target = job / "campaign_pool_inputs.json"
+        if target.exists():
+            require(json.loads(target.read_text()) == evidence, "previous pool input evidence differs")
+        else:
+            target.write_text(json.dumps(evidence, sort_keys=True, indent=2) + "\n")
+    return list(records)
 
 
 def prepare_queue(job_dir, env, root):

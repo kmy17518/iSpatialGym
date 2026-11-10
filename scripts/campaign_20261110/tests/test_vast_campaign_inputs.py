@@ -3,10 +3,56 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_queue, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_production_priority_never_bypasses_dispatch_allowlist(self):
+        rows=[{"id":str(n),"status":"queued"} for n in (4,2,3,1)] + [{"id":"5","status":"assigned"}]
+        self.assertEqual([r['id'] for r in dispatch_order(rows,{})],['1','2','3','4'])
+        config={'dispatch_job_ids':['1','2','4','5'],'dispatch_priority_job_ids':['5','3','4']}
+        self.assertEqual([r['id'] for r in dispatch_order(rows,config)],['4','1','2'])
+        self.assertEqual(dispatch_order(rows,{'dispatch_job_ids':[]}),[])
+
+    def test_pool_stays_at_exact_path_and_config_bytes_are_unchanged(self):
+        for queued in (False, True):
+            with self.subTest(queued=queued), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                job, queue, _ = self.fixture(root)
+                config = root / "groups/g1/campaign_config.json"
+                pool = root / "manifests/pool.json"
+                pool.parent.mkdir()
+                pool.write_text('{"schema":"isg-binding-pool-v1","candidate":"full_pool"}')
+                config.write_text(json.dumps({"template":{"scene_setup":{"binding_pool":{
+                    "schema":"isg-active-binding-pool-v1", "manifest":str(pool), "manifest_sha256":sha(pool)}}}}))
+                before = config.read_bytes()
+                env = {"ISPATIALGYM_CAMPAIGN_CONFIG":str(config)}
+                if queued:
+                    raw = json.loads(queue.read_text())
+                    raw["config_sha256"] = sha(config)
+                    queue.write_text(json.dumps(raw))
+                    record = prepare_queue(job, {QUEUE_ENV:str(queue)}, root)
+                    env = {QUEUE_ENV:record["staged_queue"]}
+                self.assertEqual(prepare_pools(job, env, root), [str(pool)])
+                self.assertEqual(config.read_bytes(), before)
+                self.assertEqual(prepare_pools(job, env, root), [str(pool)])
+                pool.write_text('{"schema":"isg-binding-pool-v1","candidate":"changed"}')
+                with self.assertRaisesRegex(ValueError, "digest differs"):
+                    prepare_pools(job, env, root)
+
+    def test_external_pool_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "campaign"
+            job, _, _ = self.fixture(root)
+            config = root / "groups/g1/campaign_config.json"
+            pool = Path(tmp) / "outside.json"
+            pool.write_text('{"schema":"isg-binding-pool-v1"}')
+            config.write_text(json.dumps({"template":{"scene_setup":{"binding_pool":{
+                "schema":"isg-active-binding-pool-v1", "manifest":str(pool), "manifest_sha256":sha(pool)}}}}))
+            with self.assertRaisesRegex(ValueError, "outside owned"):
+                prepare_pools(job, {"ISPATIALGYM_CAMPAIGN_CONFIG":str(config)}, root)
+            self.assertFalse((job / "campaign_pool_inputs.json").exists())
+
     def test_cluster_apps_override_removed_with_original_environment_retained(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

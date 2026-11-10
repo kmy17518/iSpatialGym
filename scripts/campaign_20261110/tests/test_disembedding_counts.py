@@ -1,0 +1,46 @@
+import pytest
+
+from scripts.campaign_20261110.materialize_disembedding_counts import count_tuples, solve_counts
+
+
+def profile(rows=None):
+    return {'schema': 'isg-native-tray-coverage-profile-v1', 'fixed_layout': False, 'source_floor_area_m2': .1,
+            'target': {'category': 'box_of_shampoo', 'model': 'target', 'area_m2': .01, 'scale': [1., 1., 1.]},
+            'distractors': rows or [{'category': 'box_of_shampoo', 'model': 'distractor', 'area_m2': .01, 'scale': [1., 1., 1.]}]}
+
+
+def test_exact_counts_cover_all_bins_without_scaling_or_packing_inference():
+    result = solve_counts(profile(), max_distractors=8)
+    assert [row['bucket'] for row in result] == [0, 1, 2]
+    for row in result:
+        assert row['predicted_native_coverage'] == pytest.approx((.01 + .01 * row['n_distractors']) / .1)
+        low, high = row['crowdedness_range']
+        assert low <= row['predicted_native_coverage'] < high
+
+
+def test_one_selected_model_per_category_allows_exact_native_whitelist():
+    rows = [{'category': 'box', 'model': 'a', 'area_m2': .008, 'scale': [1., 1., 1.]},
+            {'category': 'box', 'model': 'b', 'area_m2': .02, 'scale': [1., 1., 1.]}]
+    for row in solve_counts(profile(rows)):
+        assert len(row['counts']) == 1
+
+
+def test_duplicate_observed_copies_do_not_duplicate_maximum_pool_candidates():
+    row = profile()['distractors'][0]
+    assert solve_counts(profile([row, dict(row), dict(row)])) == solve_counts(profile([row]))
+
+
+def test_fixed_layout_and_inconsistent_native_measurements_fail_closed():
+    p = profile(); p['fixed_layout'] = True
+    with pytest.raises(ValueError):
+        solve_counts(p)
+    p = profile(); p['distractors'].append({**p['distractors'][0], 'area_m2': .02})
+    with pytest.raises(ValueError):
+        solve_counts(p)
+
+
+def test_area_budget_and_finite_maximum_are_enforced():
+    assert all(row['n_distractors'] <= 3 and row['predicted_native_coverage'] <= .4 for row in solve_counts(profile(), 3, .4))
+    tuples = list(count_tuples(4, 4))
+    assert len(tuples) == len(set(tuples)) == 70
+    assert all(sum(row) <= 4 for row in tuples)

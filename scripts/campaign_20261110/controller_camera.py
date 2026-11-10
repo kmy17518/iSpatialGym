@@ -98,6 +98,37 @@ def report_signature(job):
             for p in sorted((Path(job) / "demo").glob("*/meta.json"))]
 
 
+def sampling_infrastructure_failure(job):
+    path = Path(job) / "sample.log"
+    if not path.is_file():
+        return None
+    text = path.read_text(errors="replace")
+    if "fcntl.flock(" in text and "OSError: [Errno 5] Input/output error" in text:
+        return {"reason": "unsupported_nfs_failure_journal_lock", "log": str(path), "sha256": file_digest(path)}
+    return None
+
+
+def refresh_production(record, gate, template, cfg, root, directory, *, closed):
+    """An empty failed job must not be stuck forever in the release auditor."""
+    row = record["allocation"]
+    reports = report_signature(row["job_dir"])
+    signature = digest(reports)
+    if signature != record.get("report_signature"):
+        successful = any(read(Path(row["job_dir"]) / "demo" / iid / "meta.json").get("success") is True
+                         for iid, _, _ in reports)
+        if successful:
+            result, _ = review_and_claim(row, gate, template, cfg, root, directory)
+            record["last_claim"] = result
+        record["report_signature"] = signature
+        record["has_successful_reports"] = successful
+    if closed:
+        record["status"] = "complete"
+        failure = sampling_infrastructure_failure(row["job_dir"])
+        if failure is not None:
+            record["requires_new_runtime_gate"] = failure
+    return record.get("requires_new_runtime_gate")
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save):
     from scripts.campaign_20261110.goal_groups import load_template_contract
     from scripts.campaign_20261110.camera_lane import room_caps
@@ -136,6 +167,9 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             records.append({"allocation": row, "status": "waiting", "count": int(row["n"]), "adopted": True})
     for record in records:
         if record["status"] in ("ready", "submitting"):
+            if state.get("runtime_failure") is not None:
+                state["status"] = "runtime_revalidation_required"
+                return 0
             if allowance <= 0:
                 return 0
             if record["status"] == "ready" and not record.get("dry_run_passed"):
@@ -145,16 +179,18 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             perform_submit(record, record["command"], save, rows, spec, root, "camera_auto_production", source["code"], record["count"])
             return 1
         row = record["allocation"]
-        signature = digest(report_signature(row["job_dir"]))
-        if signature != record.get("report_signature"):
-            result, _ = review_and_claim(row, gate, template, cfg, root, directory)
-            record.update(report_signature=signature, last_claim=result)
-            save()
-        if record["status"] != "complete" and row["jobid"] not in queue and terminal(row["jobid"]):
-            record["status"] = "complete"
+        closed = record["status"] == "complete" or (row["jobid"] not in queue and terminal(row["jobid"]))
+        failure = refresh_production(record, gate, template, cfg, root, directory, closed=closed)
+        save()
+        if failure is not None:
+            state.update(status="runtime_revalidation_required", runtime_failure=failure)
+            continue  # Existing later jobs may still have valid members to claim.
         if record["status"] != "complete":
             state["status"] = "production_running"
             return 0
+    if state.get("runtime_failure") is not None:
+        state["status"] = "runtime_revalidation_required"
+        return 0
     caps = room_caps(read(cfg["room_plan"]), total=9000 if template.task.endswith("obstructed") else 1000, task=template.task)
     quota = next(q for q in task_quotas() if q.task == template.task)
     quotas = {s: dict(zip(("3", "5", "10"), values)) for s, values in

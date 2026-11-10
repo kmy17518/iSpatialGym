@@ -36,9 +36,9 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_queue
+    from .campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_queue
+    from campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -285,6 +285,7 @@ def stage(s3, rec, state):
     prepare_environment(jd, OFH)
     prepare_queue(jd, env, OFH)
     env = read_env(jd)
+    pool_inputs = prepare_pools(jd, env, OFH)
     code = os.path.abspath(env["ISGE_CODE"])
     b1k = os.path.dirname(os.path.realpath(os.path.join(code, "Behavior-1K", "OmniGibson")))
     # tools the job scripts call that the image lacks (rsync: kit_appdata.sh, job_fast.sh's collector app-data copies and prebuild dir)
@@ -294,6 +295,8 @@ def stage(s3, rec, state):
     shipped = [code, b1k] + list(STORES) + list(CACHES) + list(NOT_SHIPPED)
     L = Lister(shipped)
     L.add_tree(jd)
+    for path in pool_inputs:
+        L.add_file(path)
     scripts = env.get("ISGF_SCRIPTS") or os.path.join(F, "scripts")
     if not under(scripts, [code]):
         L.add_tree(scripts)
@@ -758,11 +761,8 @@ def tick(c, s3, state):
             if stale and iid in live:
                 destroy(c, iid, "heartbeat stale", live[iid].get("_key_name"))
 
-    # 3. assign queued jobs to ready instances with a free slot (FIFO), staging each right before
-    dispatch_ids = C.get("dispatch_job_ids")
-    allowed_ids = None if dispatch_ids is None else {str(jid) for jid in dispatch_ids}
-    queued = sorted((s for s in states.values() if s["status"] == "queued" and
-                     (allowed_ids is None or str(s["id"]) in allowed_ids)), key=lambda s: int(s["id"]))
+    # 3. Prefer explicitly prioritized ready production; otherwise preserve FIFO.
+    queued = dispatch_order(states.values(), C)
     assigned_to = {}
     for s in states.values():
         if s["status"] == "assigned":

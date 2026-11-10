@@ -4,8 +4,10 @@ import pytest
 
 from scripts.campaign_20261110.contracts import ContractError
 from scripts.campaign_20261110.controller_camera import (
-    allocation_for, authority, production_command, remaining_capacity,
+    allocation_for, authority, production_command, remaining_capacity, refresh_production,
 )
+from scripts.campaign_20261110 import controller_camera as controller
+from scripts.campaign_20261110.contracts import write_json_atomic
 
 
 def test_heldout_camera_overflow_cannot_turn_into_training():
@@ -57,3 +59,31 @@ def test_each_camera_split_has_one_authority_and_allocations_are_unambiguous(tmp
     assert authority(tmp_path, t) == tmp_path / "dataset/camera_obstructed_quota.json"
     with pytest.raises(ContractError, match="durable allocation"):
         allocation_for([{"jobid": "1"}, {"jobid": "1"}], "1")
+
+
+def test_empty_camera_job_reaches_terminal_without_claiming_nonexistent_members(tmp_path, monkeypatch):
+    def unexpected(*args):
+        pytest.fail("empty reports must not enter release auditor")
+    monkeypatch.setattr(controller,"review_and_claim",unexpected)
+    record={"allocation":{"job_dir":str(tmp_path)},"status":"waiting"}
+    assert refresh_production(record,None,None,None,tmp_path,tmp_path,closed=False) is None
+    assert record["status"] == "waiting" and record["has_successful_reports"] is False
+    write_json_atomic(tmp_path/"demo/failed/meta.json",{"success":False})
+    assert refresh_production(record,None,None,None,tmp_path,tmp_path,closed=True) is None
+    assert record["status"] == "complete" and "last_claim" not in record
+
+
+def test_nfs_lock_failure_keeps_successful_members_but_requires_new_runtime_gate(tmp_path, monkeypatch):
+    claimed=[]
+    def claim(*args):
+        claimed.append(True)
+        return {"accepted":{"success":"train"}},{}
+    monkeypatch.setattr(controller,"review_and_claim",claim)
+    write_json_atomic(tmp_path/"demo/success/meta.json",{"success":True})
+    (tmp_path/"sample.log").write_text("Traceback:\n fcntl.flock(stream.fileno(), fcntl.LOCK_EX)\nOSError: [Errno 5] Input/output error\n")
+    record={"allocation":{"job_dir":str(tmp_path)},"status":"waiting"}
+    failure=refresh_production(record,None,None,None,tmp_path,tmp_path,closed=True)
+    assert failure["reason"] == "unsupported_nfs_failure_journal_lock"
+    assert record["last_claim"]["accepted"] == {"success":"train"} and len(claimed) == 1
+    assert refresh_production(record,None,None,None,tmp_path,tmp_path,closed=True) == failure
+    assert len(claimed) == 1
