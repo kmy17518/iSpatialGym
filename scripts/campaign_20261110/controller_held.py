@@ -96,6 +96,48 @@ def next_work(template, counts, *, max_groups=6, training_validated=False):
     return {"phase": "train", "bucket": bucket, "groups": groups, "needs_new_gate": not training_validated}
 
 
+def reserve_pending_counts(counts, template, pending):
+    """Conservatively reserve unpublished slots, without treating them as accepted."""
+    result={**counts,'evaluation':Counter(counts['evaluation']),'train_buckets':Counter(counts['train_buckets'])}
+    for row in pending:
+        if row['task']!=template.task:continue
+        groups=row['groups'];phase=row['phase'];same_class=row['class_id']==template.class_id
+        if phase==template.split and (same_class or phase=='eval_category'):
+            result['evaluation'][row['bucket']]+=groups*(1 if phase=='eval_standard' else 3)
+        if phase in ('train','eval_standard'):
+            # A strict eval group can fall back to three training members when
+            # another accepted group filled its bucket while it was running.
+            if same_class:
+                result['class_remaining']=max(0,result['class_remaining']-3*groups)
+                result['train_buckets'][row['bucket']]+=3*groups
+            if row['room']==template.scene+'/'+template.room:
+                result['room_remaining']=max(0,result['room_remaining']-3*groups)
+    return result
+
+
+def pending_held(root):
+    """Read atomic controller states while the shared planning lock is held."""
+    result=[]
+    for path in sorted((root/'controllers').glob('*/state.json')):
+        for seed in read(path).get('seeds',{}).values():
+            for record in seed.get('queues',[]):
+                if record.get('status')=='complete':continue
+                gids=[gid for gid in record['prepared']['group_ids'] if gid not in record.get('groups',{})]
+                if not gids:continue
+                config=read(root/'groups'/gids[0]/'campaign_config.json');template=config['template']
+                if template['task'] not in RANGES:continue
+                decision=record.get('decision')
+                if decision is None:
+                    plan=read(root/'groups'/gids[0]/'goal_plan.json')
+                    span=tuple(plan['magnitude_range'])
+                    require(span in RANGES[template['task']],'cannot reserve unknown held magnitude range')
+                    bucket=RANGES[template['task']].index(span)
+                else:bucket=decision['bucket']
+                result.append({'task':template['task'],'class_id':template['class_id'],'room':template['scene']+'/'+template['room'],
+                    'phase':record['phase'],'bucket':bucket,'groups':len(gids),'state':str(path)})
+    return result
+
+
 def queue_closures(record, allocation, root):
     """Read the queue actually executed, including the job-local Vast copy."""
     from scripts.campaign_20261110.goal_groups import read_env
@@ -201,7 +243,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
                                  base_index=index, extra_env=["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"])
     record = {"queue": prepared["queue"], "prepared": prepared, "directory": str(Path(prepared["queue"]).parent),
               "validation_key": actual, "phase": phase, "index": index, "count": 3*count,
-              "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"]}
+              "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], 'decision':dict(decision)}
     state["queues"].append(record)
     save()
     write_json_atomic(Path(record["directory"]) / "submission.json", record)
@@ -251,11 +293,15 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                 return 0
             if record["status"] == "external_submission" or allowance <= 0:
                 state["status"] = "waiting_for_submission"
-                return 0
+                continue
             if record["status"] == "ready" and not record.get("dry_run_passed"):
                 run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
                 record["dry_run_passed"] = True
                 save()
+            if cfg.get('dispatch_spool'):
+                from scripts.campaign_20261110.controller_spool import enqueue_record
+                enqueue_record(root,record,save)
+                return 1
             perform_submit(record, record["command"], save, rows, spec, root, "goal_groups", spec["snapshot"], record["count"])
             return 1
         record["allocation"] = allocation
@@ -267,15 +313,22 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         claim_finished_groups(record, allocation, gates.get(record["phase"]), cfg, root, job_terminal=is_terminal)
         if not is_terminal:
             state["status"] = "queue_running"
-            return 0
+            continue
         closed = queue_closures(record, allocation, root)
         if any(gid not in record.get("groups", {}) for gid, event in closed.items() if event["written"]):
             state["status"] = "waiting_for_demo_or_replay"
-            return 0
+            continue
         record["status"] = "complete"
         record_runtime_failure(record, state)
     if state.get("runtime_failure") is not None:
         state["status"] = "runtime_revalidation_required"
+        return 0
+    save()
+    inflight=[record for record in records if record['status']!='complete']
+    if len(inflight)>=cfg.get('maximum_inflight_per_seed',1):
+        return 0
+    if any(record.get('needs_new_gate') and record['phase'] not in gates for record in inflight):
+        state['status']='waiting_for_new_phase_gate'
         return 0
     zero_tail = 0
     for record in reversed(records):
@@ -285,21 +338,27 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     if zero_tail >= cfg.get("maximum_empty_queues", 3):
         state["status"] = "needs_feasibility_diagnosis"
         return 0
-    counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
-    decision = next_work(template, counts, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
-    state["counts"] = counts
-    remaining_budget = spec["max_candidates"] - sum(r["count"] for r in records)
-    if decision is None or remaining_budget < 3:
-        state["status"] = "quota_or_room_capacity_complete" if decision is None else "candidate_budget_exhausted"
-        return 0
-    decision["groups"] = min(decision["groups"], remaining_budget//3,
-                             max(0, int((cfg["stop_at"]-time.time()-3600)//spec.get("group_budget_seconds", 900))))
-    if allowance <= 0 or decision["groups"] <= 0:
-        return 0
-    record = prepare_queue(spec, state, decision, cfg, root, template, save)
+    with atomic_directory_lock(root/'controllers/held_planning.lockdir'):
+        counts = read_counts(root, template, read(cfg["standard_contracts"])["templates"], read(cfg["room_plan"]))
+        reserved=reserve_pending_counts(counts,template,pending_held(root))
+        decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
+        state.update(counts=counts,counts_after_pending_reservations=reserved)
+        remaining_budget = spec["max_candidates"] - sum(r["count"] for r in records)
+        if decision is None or remaining_budget < 3:
+            state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_or_room_capacity_complete") if decision is None else "candidate_budget_exhausted"
+            return 0
+        decision["groups"] = min(decision["groups"], remaining_budget//3,
+                                 max(0, int((cfg["stop_at"]-time.time()-3600)//spec.get("group_budget_seconds", 900))))
+        if allowance <= 0 or decision["groups"] <= 0:
+            return 0
+        record = prepare_queue(spec, state, decision, cfg, root, template, save)
     run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
     record["dry_run_passed"] = True
     save()
+    if cfg.get('dispatch_spool'):
+        from scripts.campaign_20261110.controller_spool import enqueue_record
+        enqueue_record(root,record,save)
+        return 1
     perform_submit(record, record["command"], save, rows, spec, root, "goal_groups", spec["snapshot"], record["count"])
     return 1
 
@@ -309,8 +368,16 @@ def main():
     p.add_argument("--config", required=True)
     p.add_argument("--state", required=True)
     p.add_argument("--once", action="store_true")
+    p.add_argument('--max-inflight-per-seed',type=int)
+    p.add_argument('--max-new-jobs-per-pass',type=int)
+    p.add_argument('--dispatch-spool',action='store_true')
     args = p.parse_args()
     cfg = read(args.config)
+    original_config_hash=digest(cfg)
+    if args.dispatch_spool:cfg['dispatch_spool']=True
+    for argument,key in ((args.max_inflight_per_seed,'maximum_inflight_per_seed'),(args.max_new_jobs_per_pass,'maximum_new_jobs_per_pass')):
+        if argument is not None:
+            require(1<=argument<=32,'invalid operational concurrency limit');cfg[key]=argument
     require(cfg["schema"] == "isg-held-controller-v1", "invalid held controller config")
     require(len({s["id"] for s in cfg["seeds"]}) == len(cfg["seeds"]), "duplicate held seed ID")
     require(all(isinstance(s["max_candidates"], int) and s["max_candidates"] >= 3
@@ -320,11 +387,13 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     while time.time() < cfg["stop_at"]:
         with atomic_directory_lock(path.with_suffix(".lockdir")):
-            state = read(path, {"config_sha256": digest(cfg), "seeds": {}})
-            require(state["config_sha256"] == digest(cfg), "held controller config changed")
+            state = read(path, {"config_sha256": original_config_hash, "seeds": {}})
+            require(state["config_sha256"] == original_config_hash, "held controller config changed")
+            state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
+            state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
-            allowance = submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
+            allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
             for spec in cfg["seeds"]:
                 current = state["seeds"].setdefault(spec["id"], {})
                 try:

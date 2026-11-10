@@ -87,3 +87,31 @@ def test_nfs_lock_failure_keeps_successful_members_but_requires_new_runtime_gate
     assert record["last_claim"]["accepted"] == {"success":"train"} and len(claimed) == 1
     assert refresh_production(record,None,None,None,tmp_path,tmp_path,closed=True) == failure
     assert len(claimed) == 1
+
+
+def test_parallel_camera_reservations_share_room_and_class_caps():
+    from scripts.campaign_20261110.controller_camera import reserved_capacity
+    template=SimpleNamespace(task='camera_relocalization-obstructed',split='eval_standard',class_id='chair',scene='s',room='r')
+    quotas={'eval_standard':{'3':3,'5':4,'10':3}}
+    pending=[{'task':template.task,'class_id':'chair','split':'eval_standard','room':'s/other','count':8},
+             {'task':template.task,'class_id':'hamper','split':'train','room':'s/r','count':80}]
+    assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==22
+    template.split='eval_model'
+    quotas={'eval_model':{'3':3,'5':3,'10':3}}
+    assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==9
+    pending.append({'task':template.task,'class_id':'chair','split':'eval_model','room':'s/r','count':9})
+    assert reserved_capacity(template,{}, {'s/r':100},quotas,pending)==0
+
+
+def test_pending_camera_reserves_only_unclaimed_capacity(tmp_path):
+    from scripts.campaign_20261110.controller_camera import pending_camera
+    directory=tmp_path/'controllers/camera';inputs=tmp_path/'inputs/seed'
+    write_json_atomic(directory/'config.json',{'seeds':[{'id':'chair','inputs':str(inputs)}]})
+    write_json_atomic(inputs/'campaign_config.json',{'template':{'task':'camera_relocalization-obstructed',
+        'class_id':'chair','scene':'s','room':'r','split':'eval_standard'}})
+    write_json_atomic(directory/'state.json',{'seeds':{'chair':{'production':[
+        {'status':'waiting','count':10,'allocation':{'job_dir':'job'}},
+        {'status':'complete','count':100,'allocation':{'job_dir':'finished'}},
+        {'status':'external_submission','count':20}]}}})
+    pending=pending_camera(tmp_path,{'accepted':{'source_job':'job'}})
+    assert [row['count'] for row in pending]==[9,20]

@@ -7,6 +7,7 @@ import datetime
 import hashlib
 import json
 from pathlib import Path
+import shlex
 import time
 
 from scripts.campaign_20261110.contracts import digest, file_digest, require, task_quotas, task_for_alias, write_json_atomic
@@ -43,6 +44,24 @@ def epoch(value, fallback):
     if isinstance(value,(int,float)):return value
     try:return datetime.datetime.fromisoformat(value.replace('Z','+00:00')).timestamp()
     except (ValueError,TypeError,AttributeError):return fallback
+
+
+def config_scope(path, root, sources):
+    path=Path(path).resolve();require(path.is_relative_to(Path(root).resolve()),'reason config outside campaign')
+    raw,source=observed_json(path,'reason_campaign_config');sources.append(source)
+    template=template_from(raw['template'])
+    require(template.fingerprint==raw['validation_key']['template_sha256'] and template.split==raw['split'],
+            'reason config identity differs')
+    return {'task':template.task,'class_id':template.class_id,'split':template.split}
+
+
+def job_config(job,root):
+    job=Path(job).resolve();require(job.is_relative_to(Path(root).resolve()/'out'),'reason job outside campaign output')
+    for line in (job/'job.env').read_text().splitlines():
+        if line.startswith('ISPATIALGYM_CAMPAIGN_CONFIG='):
+            values=shlex.split(line.split('=',1)[1]);require(len(values)==1,'ambiguous reason config')
+            return values[0]
+    return None
 
 
 def standard_catalog(path):
@@ -85,10 +104,20 @@ def controller_reasons(root, catalog):
                     try:task=task_for_alias(class_id)
                     except ValueError:continue
                 current=state.get('seeds',state.get('families',{})).get(spec.get('id',class_id),{})
+                scope={}
+                candidate=spec.get('seed_config')
+                if not candidate:
+                    seed_directory=spec.get('inputs',spec.get('seed'))
+                    current_stage=current.get('current') or {}
+                    seed_directory=seed_directory or (current_stage.get('group') or current_stage.get('anchor') or {}).get('directory')
+                    if seed_directory:candidate=str(Path(seed_directory)/'campaign_config.json')
+                if candidate and Path(candidate).exists():
+                    scope=config_scope(candidate,root,sources)
+                    require(scope['class_id']==class_id,'controller reason class differs from config')
                 status=current.get("status") or current.get("phase") or "status not recorded"
                 message=current.get("error") or current.get("runtime_failure",{}).get("reason") or status
                 reasons[(task,class_id)].append({"controller":directory.name,"status":status,"reason":str(message),
-                    'split':spec.get('split'),'observed_at':epoch(state.get('updated_at',state.get('updated_at_unix')),source['mtime']),
+                    'split':scope.get('split',spec.get('split')),'observed_at':epoch(state.get('updated_at',state.get('updated_at_unix')),source['mtime']),
                     "state_source":str(state_path),"source_kind":"controller_observation"})
         except (ValueError,KeyError,TypeError,OSError) as exc:
             errors.append({"source":str(directory),"error":type(exc).__name__+": "+str(exc)})
@@ -103,11 +132,20 @@ def validation_reasons(root, catalog):
         state,source=observed_json(path,'validation_controller');sources.append(source)
         for job_id,row in state.get('gates',{}).items():
             class_id=row.get('key');task=catalog.get(class_id)
+            split=None
+            if row.get('source_job_dir'):
+                try:
+                    path_config=job_config(row['source_job_dir'],root)
+                    if path_config:
+                        scope=config_scope(path_config,root,sources)
+                        class_id,task,split=scope['class_id'],scope['task'],scope['split']
+                except (ValueError,KeyError,TypeError,OSError) as exc:
+                    errors.append({'source':row['source_job_dir'],'error':'validation reason scope: '+str(exc)})
             if task is None:
                 try:task=task_for_alias(class_id or '')
                 except ValueError:continue
             reasons[(task,class_id)].append({'source_kind':'validation_observation','job_id':job_id,
-                'state_source':str(path),'source_job_dir':row.get('source_job_dir'),'split':row.get('split'),
+                'state_source':str(path),'source_job_dir':row.get('source_job_dir'),'split':split,
                 'status':row.get('status'),'reason':str(row.get('reason') or row.get('error') or row.get('status')),
                 'observed_at':epoch(row.get('updated_at',state.get('updated_at')),source['mtime'])})
     except (ValueError,KeyError,TypeError,OSError) as exc:
@@ -136,6 +174,15 @@ def _identities(row, root, cache):
 def summarize(rows, catalog, *, root, observed_at, reasons=None, sources=(), errors=()):
     """Count committed IDs only; geometry candidates and demo logs are not input."""
     root=Path(root).resolve();reasons=reasons or {}
+    normalized=[]
+    for row in rows:
+        if not row.get('class_id'):
+            template=template_from(row['contract'])
+            require(template.fingerprint==row['validation_key']['template_sha256'] and template.task==row['task'],
+                    'legacy camera class contract differs from its accepted key')
+            row={**row,'class_id':template.class_id}
+        normalized.append(row)
+    rows=normalized
     require(len({row['instance_id'] for row in rows})==len(rows),"instance appears in multiple authoritative allocators")
     quotas={q.task:q for q in task_quotas()}
     require(all(row['task'] in quotas and row['split'] in SPLITS for row in rows),"unknown accepted task/split")
@@ -144,14 +191,18 @@ def summarize(rows, catalog, *, root, observed_at, reasons=None, sources=(), err
     by_task=Counter((row['task'],row['split']) for row in rows)
     class_rows=[]
     def append(task,class_id,split,target,accepted,scope):
-        evidence=[row for row in reasons.get((task,class_id),()) if row.get('split') in (None,split)]
+        evidence=[row for row in reasons.get((task,class_id),()) if row.get('split')==split]
         if split=='eval_category':
             evidence=[entry for (t,_),entries in reasons.items() if t==task for entry in entries if entry.get('split')==split]
-        latest=max(evidence,key=lambda row:row.get('observed_at') or 0) if evidence else None
+        controller=[row for row in evidence if row.get('source_kind')=='controller_observation']
+        latest=max(controller or evidence,key=lambda row:row.get('observed_at') or 0) if evidence else None
+        reason=latest['reason'] if latest else 'No controller evidence in this snapshot.'
+        if latest and latest.get('source_kind')=='validation_observation' and latest.get('status')=='validated':
+            reason='Demo and replay passed; awaiting production or committed acceptance.'
         complete=target is not None and accepted>=target
         class_rows.append({'class_id':class_id,'task':task,'split':split,'accepted':accepted,'target':target,
             'remaining':max(0,target-accepted) if target is not None else None,'scope':scope,
-            'reason':'target reached' if complete else (latest['reason'] if latest else 'No controller evidence in this snapshot.'),
+            'reason':'target reached' if complete else reason,
             'reason_evidence':evidence})
     for class_id,task in sorted(catalog.items()):
         q=quotas[task]
@@ -186,8 +237,14 @@ def summarize(rows, catalog, *, root, observed_at, reasons=None, sources=(), err
         'denominators':{'standard_classes':100,'model_holdout_classes':99,'category_holdout_tasks':23,'tasks':23},
         'classes':class_rows,'tasks':tasks,'templates':{'accepted_physical':len(physical),'accepted_conceptual':len(conceptual),
             'accepted_classes':len({(row['task'],row['class_id']) for row in rows}),
+            'accepted_contract_fingerprints':len({row['validation_key']['template_sha256'] for row in rows}),
+            'accepted_validation_keys':len({digest(row['validation_key']) for row in rows}),
+            'physical_definition':'Task, scene/rooms, bound object roles/models/asset hashes/default scales; excludes split, code and provenance.',
+            'configuration_definition':'Exact validation keys additionally distinguish code, physics, data and sampled scale state.',
             'identity_audit_complete':not any('template identity:' in row.get('error','') for row in identity_errors)},
-        'sources':list(sources),'errors':identity_errors}
+        'sources':list(sources),'errors':identity_errors,
+        'unassigned_reason_evidence':[{'task':task,'class_id':class_id,**entry} for (task,class_id),entries in reasons.items()
+                                      for entry in entries if entry.get('split') is None]}
 
 
 def accepted_throughput(history, now):
@@ -203,6 +260,14 @@ def accepted_throughput(history, now):
         result.append({'window_seconds':window,'measured_seconds':elapsed,'accepted_delta':delta,
             'accepted_per_hour':{split:value*3600/elapsed for split,value in delta.items()} if elapsed>=60 else None,
             'total_accepted_per_hour':sum(delta.values())*3600/elapsed if elapsed>=60 else None})
+        task_rows=[]
+        for task,counts in latest.get('tasks',{}).items():
+            if task not in first.get('tasks',{}):continue
+            change={split:counts[split]-first['tasks'][task][split] for split in SPLITS}
+            require(all(value>=0 for value in change.values()),'task accepted counter regressed')
+            task_rows.append({'task':task,'accepted_delta':change,
+                'accepted_per_hour':{split:value*3600/elapsed for split,value in change.items()} if elapsed>=60 else None})
+        result[-1]['tasks']=task_rows
     return result
 
 
@@ -224,6 +289,7 @@ def publish(report, output):
     with atomic_directory_lock(output.with_suffix('.lockdir')):
         history=read(history_path) if history_path.exists() else []
         sample={'observed_at_epoch':report['observed_at_epoch'],'counts':report['counts'],
+                'tasks':{row['task']:row['counts'] for row in report['tasks']},
                 'source_states_sha256':digest(report['sources'])}
         require(not history or sample['observed_at_epoch']>history[-1]['observed_at_epoch'],'dashboard sample time did not advance')
         history=(history+[sample])[-2880:]

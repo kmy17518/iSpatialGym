@@ -14,7 +14,7 @@ if __package__ in (None, ""):
 
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
 from scripts.campaign_20261110.controller_families import (
-    allocations, perform_submit, read, reserve_indices, run_logged, slurm_status,
+    allocations, perform_submit, read, reconcile, reserve_indices, run_logged, slurm_status,
     submission_capacity, terminal,
 )
 from scripts.campaign_20261110.storage import atomic_directory_lock
@@ -43,6 +43,40 @@ def remaining_capacity(template, accepted, caps, quotas):
     room_left = max(0, caps.get(room, 0) - sum(r["room"] == room for r in training))
     class_left = max(0, 1000 - sum(r.get("class_id", class_id) == class_id for r in training))
     return evaluation + min(room_left, class_left)
+
+
+def pending_camera(root,accepted):
+    result=[]
+    for path in sorted((root/'controllers').glob('*/state.json')):
+        config_path=path.with_name('config.json')
+        if not config_path.exists():continue
+        specs={row['id']:row for row in read(config_path).get('seeds',[])}
+        for seed,current in read(path).get('seeds',{}).items():
+            records=[row for row in current.get('production',[]) if row.get('status')!='complete']
+            if not records:continue
+            require(seed in specs,'pending camera seed has no immutable config')
+            template=read(Path(specs[seed]['inputs'])/'campaign_config.json')['template']
+            for record in records:
+                job=record.get('allocation',{}).get('job_dir')
+                committed=sum(row.get('source_job')==job for row in accepted.values()) if job else 0
+                result.append({'task':template['task'],'class_id':template['class_id'],
+                    'room':template['scene']+'/'+template['room'],'split':template['split'],
+                    'count':max(0,record['count']-committed)})
+    return result
+
+
+def reserved_capacity(template, accepted, caps, quotas, pending):
+    caps=dict(caps);same_scope=0
+    room=template.scene+'/'+template.room
+    for row in pending:
+        if row['task']!=template.task:continue
+        share_train=template.split in ('train','eval_standard') and row['split'] in ('train','eval_standard')
+        share_eval=template.split==row['split']
+        if (row['class_id']==template.class_id or template.split=='eval_category') and (share_train or share_eval):
+            same_scope+=row['count']
+        elif share_train and row['room']==room:
+            caps[room]=max(0,caps.get(room,0)-row['count'])
+    return max(0,remaining_capacity(template,accepted,caps,quotas)-same_scope)
 
 
 def production_command(seed_command, *, directory, index, count):
@@ -166,6 +200,11 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             require(row["code"] == source["code"] and row["key"] == source["key"], "adopted production runtime differs")
             records.append({"allocation": row, "status": "waiting", "count": int(row["n"]), "adopted": True})
     for record in records:
+        if record.get('status') in ('external_submission','submitting'):
+            allocation=reconcile(rows,key=spec['class_id'],index=record['index'],count=record['count'],
+                                 snapshot=source['code'],tag='camera_auto_production')
+            if allocation is not None:record.update(allocation=allocation,status='waiting')
+            elif record['status']=='external_submission':continue
         if record["status"] in ("ready", "submitting"):
             if state.get("runtime_failure") is not None:
                 state["status"] = "runtime_revalidation_required"
@@ -176,6 +215,10 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                 run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
                 record["dry_run_passed"] = True
                 save()
+            if cfg.get('dispatch_spool'):
+                from scripts.campaign_20261110.controller_spool import enqueue_record
+                enqueue_record(root,record,save)
+                return 1
             perform_submit(record, record["command"], save, rows, spec, root, "camera_auto_production", source["code"], record["count"])
             return 1
         row = record["allocation"]
@@ -187,42 +230,48 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             continue  # Existing later jobs may still have valid members to claim.
         if record["status"] != "complete":
             state["status"] = "production_running"
-            return 0
+            continue
     if state.get("runtime_failure") is not None:
         state["status"] = "runtime_revalidation_required"
         return 0
+    inflight=[record for record in records if record['status']!='complete']
+    if len(inflight)>=cfg.get('maximum_inflight_per_seed',1):return 0
     caps = room_caps(read(cfg["room_plan"]), total=9000 if template.task.endswith("obstructed") else 1000, task=template.task)
     quota = next(q for q in task_quotas() if q.task == template.task)
     quotas = {s: dict(zip(("3", "5", "10"), values)) for s, values in
               (("eval_standard", quota.standard_buckets), ("eval_model", quota.model_buckets), ("eval_category", quota.category_buckets))}
-    accepted = read(authority(root, template), {"accepted": {}})["accepted"]
-    remaining = remaining_capacity(template, accepted, caps, quotas)
-    budget = spec["max_candidates"] - sum(r["count"] for r in records)
-    state.update(remaining_capacity=remaining, remaining_candidate_budget=budget)
-    if remaining <= 0 or budget <= 0:
-        state["status"] = "quota_complete" if remaining <= 0 else "candidate_budget_exhausted"
-        return 0
-    if allowance <= 0:
-        return 0
-    count = min(remaining + min(3, remaining), budget, spec.get("batch_size", 80))
-    token = "camera_auto_" + spec["id"] + "_" + str(len(records) + 1).zfill(3)
-    require(re.fullmatch(r"[A-Za-z0-9_.-]+", token), "unsafe camera seed ID")
-    output = root / "production_inputs" / token
-    require(not output.exists(), "unreconciled camera production directory")
-    index = reserve_indices(root, token, count)
-    output.mkdir()
-    write_json_atomic(output / "campaign_config.json", {**config, "purpose": "production",
-        "release_gate": {"path": str(gate), "sha256": file_digest(gate)}})
-    write_json_atomic(output / "empty_eval_index.json", {"schema": "isg-instance-index-v1", "n": 0, "instances": []})
-    command = production_command(read(directory / "submission.json")["command"], directory=output, index=index, count=count)
-    require(command[command.index("--code") + 1] == source["code"], "production command changes validated code")
-    record = {"directory": str(output), "index": index, "count": count, "command": command, "status": "ready"}
-    records.append(record)
-    save()
-    write_json_atomic(output / "submission.json", {"command": command, "seed": str(directory), "validation_jobid": source["jobid"]})
+    with atomic_directory_lock(root/'controllers/camera_planning.lockdir'):
+        accepted = read(authority(root, template), {"accepted": {}})["accepted"]
+        remaining = reserved_capacity(template, accepted, caps, quotas,pending_camera(root,accepted))
+        budget = spec["max_candidates"] - sum(r["count"] for r in records)
+        state.update(remaining_capacity=remaining, remaining_candidate_budget=budget)
+        if remaining <= 0 or budget <= 0:
+            state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_complete") if remaining <= 0 else "candidate_budget_exhausted"
+            return 0
+        if allowance <= 0:return 0
+        count = min(remaining + min(3, remaining), budget, spec.get("batch_size", 80))
+        token = "camera_auto_" + spec["id"] + "_" + str(len(records) + 1).zfill(3)
+        require(re.fullmatch(r"[A-Za-z0-9_.-]+", token), "unsafe camera seed ID")
+        output = root / "production_inputs" / token
+        require(not output.exists(), "unreconciled camera production directory")
+        index = reserve_indices(root, token, count)
+        output.mkdir()
+        write_json_atomic(output / "campaign_config.json", {**config, "purpose": "production",
+            "release_gate": {"path": str(gate), "sha256": file_digest(gate)}})
+        write_json_atomic(output / "empty_eval_index.json", {"schema": "isg-instance-index-v1", "n": 0, "instances": []})
+        command = production_command(read(directory / "submission.json")["command"], directory=output, index=index, count=count)
+        require(command[command.index("--code") + 1] == source["code"], "production command changes validated code")
+        record = {"directory": str(output), "index": index, "count": count, "command": command, "status": "ready"}
+        records.append(record)
+        save()
+        write_json_atomic(output / "submission.json", {"command": command, "seed": str(directory), "validation_jobid": source["jobid"]})
     run_logged(command + ["--dry-run"], output / "dryrun.txt")
     record["dry_run_passed"] = True
     save()
+    if cfg.get('dispatch_spool'):
+        from scripts.campaign_20261110.controller_spool import enqueue_record
+        enqueue_record(root,record,save)
+        return 1
     perform_submit(record, command, save, rows, spec, root, "camera_auto_production", source["code"], count)
     return 1
 
@@ -232,8 +281,16 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--state", required=True)
     parser.add_argument("--once", action="store_true")
+    parser.add_argument('--max-inflight-per-seed',type=int)
+    parser.add_argument('--max-new-jobs-per-pass',type=int)
+    parser.add_argument('--dispatch-spool',action='store_true')
     args = parser.parse_args()
     cfg = read(args.config)
+    original_config_hash=digest(cfg)
+    if args.dispatch_spool:cfg['dispatch_spool']=True
+    for argument,key in ((args.max_inflight_per_seed,'maximum_inflight_per_seed'),(args.max_new_jobs_per_pass,'maximum_new_jobs_per_pass')):
+        if argument is not None:
+            require(1<=argument<=32,'invalid operational concurrency limit');cfg[key]=argument
     require(cfg["schema"] == "isg-camera-controller-v1", "invalid camera controller schema")
     require(len({s["id"] for s in cfg["seeds"]}) == len(cfg["seeds"]), "duplicated camera seed ID")
     require(all(isinstance(s["max_candidates"], int) and s["max_candidates"] > 0
@@ -244,11 +301,13 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     while time.time() < cfg["stop_at"]:
         with atomic_directory_lock(path.with_suffix(".lockdir")):
-            state = read(path, {"config_sha256": digest(cfg), "seeds": {}})
-            require(state["config_sha256"] == digest(cfg), "camera controller config changed")
+            state = read(path, {"config_sha256": original_config_hash, "seeds": {}})
+            require(state["config_sha256"] == original_config_hash, "camera controller config changed")
+            state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
+            state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
-            allowance = submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
+            allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
             for spec in cfg["seeds"]:
                 record = state["seeds"].setdefault(spec["id"], {})
                 try:

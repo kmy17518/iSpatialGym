@@ -79,3 +79,34 @@ def test_old_runtime_lock_failure_cannot_trigger_another_same_key_refill(tmp_pat
     failure=record_runtime_failure(record,state)
     assert state["runtime_failure"] == failure == record["requires_new_runtime_gate"]
     assert record["groups"]["good"]["accepted"] == {"iid":"train"}
+
+
+def test_pending_queues_reserve_distinct_strict_buckets_and_shared_room_capacity():
+    from scripts.campaign_20261110.controller_held import reserve_pending_counts
+    template=SimpleNamespace(task='object_scaling',class_id='apple',scene='s',room='r',split='eval_standard')
+    pending=[{'task':'object_scaling','class_id':'apple','room':'s/r','phase':'eval_standard','bucket':1,'groups':4},
+             {'task':'object_scaling','class_id':'tomato','room':'s/r','phase':'train','bucket':0,'groups':6}]
+    original=counts()
+    reserved=reserve_pending_counts(original,template,pending)
+    assert original['evaluation']=={}
+    assert reserved['evaluation']=={1:4}
+    assert reserved['class_remaining']==988 and reserved['room_remaining']==161
+    assert next_work(template,reserved)['bucket']==0
+    assert next_work(template,reserve_pending_counts(counts(room_remaining=3),template,pending)) is None
+
+
+def test_pending_completed_groups_do_not_reserve_again_and_legacy_ranges_are_exact(tmp_path):
+    from scripts.campaign_20261110.controller_held import pending_held
+    from scripts.campaign_20261110.contracts import write_json_atomic
+    gids=['done','pending']
+    state={'seeds':{'apple':{'queues':[{'status':'external_submission','phase':'eval_standard',
+        'prepared':{'group_ids':gids},'groups':{'done':{'accepted':{'id':'train'}}}}]}}}
+    write_json_atomic(tmp_path/'controllers/held/state.json',state)
+    write_json_atomic(tmp_path/'groups/pending/campaign_config.json',{'template':{
+        'task':'object_scaling','class_id':'apple','scene':'s','room':'r'}})
+    write_json_atomic(tmp_path/'groups/pending/goal_plan.json',{'magnitude_range':[.1,.15]})
+    row=pending_held(tmp_path)[0]
+    assert row['groups']==1 and row['bucket']==1
+    write_json_atomic(tmp_path/'groups/pending/goal_plan.json',{'magnitude_range':[.11,.15]})
+    with pytest.raises(ContractError,match='unknown held magnitude'):
+        pending_held(tmp_path)
