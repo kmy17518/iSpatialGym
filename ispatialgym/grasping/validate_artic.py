@@ -452,6 +452,34 @@ def library_path(model_dir: str, alias: str, arm: str = "right") -> str:
     return os.path.join(model_dir, f"artic_library__{alias_slug(alias)}{arm_suffix(arm)}.json")
 
 
+def q_start_tag(q: float) -> str:
+    """i7-artsmall: the file tag of a per-start validation (``--q-starts grid``): ``__q<q:.4f>`` before the arm suffix."""
+    return f"__q{float(q):.4f}"
+
+
+def library_path_q(model_dir: str, alias: str, q_start: float, arm: str = "right") -> str:
+    """``<model dir>/artic_library__<alias>__q<q>[__<arm>].json``: the library of one push-close START (``--q-starts grid``, i7-artsmall)."""
+    return os.path.join(model_dir, f"artic_library__{alias_slug(alias)}{q_start_tag(q_start)}{arm_suffix(arm)}.json")
+
+
+def grid_q_starts(motion: Dict[str, Any]) -> List[float]:
+    """i7-artsmall (``ISPATIALGYM_ARTSMALL_DRAW_ANGLES``): the push-close starts a drawn attempt can take - every candidate of the stable set S
+    (``open_fraction_range`` x ``stable_set_fractions`` + the upper limit, ``articulation_small._stable_angles``' grid, whichever of them the
+    sampler's probe keeps), clamped as the sampler clamps a push-close start (``articulation_small.close_start``)."""
+    from ispatialgym.sampling.v2.tasks.articulation_small import close_start
+
+    ps = motion["profile_spec"]
+    lo_f, hi_f = ps["open_fraction_range"]
+    fracs = [float(f) for f in np.linspace(float(lo_f), float(hi_f), int(ps["stable_set_fractions"])).tolist()] + [1.0]
+    lo, hi = float(motion["lower"]), float(motion["upper"])
+    out: List[float] = []
+    for f in fracs:
+        q = round(close_start(lo + f * (hi - lo), lo, hi), 6)
+        if all(abs(q - o) > 1e-6 for o in out):
+            out.append(q)
+    return out
+
+
 def mirrored_offsets(offsets: Sequence[Tuple[float, float]]) -> Tuple[Tuple[float, float], ...]:
     """``ValidateConfig.base_offsets`` (the object to the robot's RIGHT, for the right arm) mirrored to the robot's left for the left arm."""
     return tuple((float(x), -float(y)) for x, y in offsets)
@@ -890,9 +918,11 @@ class MotionWorld:
         return rec
 
 
-def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False, customs_path: Optional[str] = None) -> Dict[str, Any]:
+def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False, customs_path: Optional[str] = None, q_starts: str = "motion") -> Dict[str, Any]:
     """One alias: setup (motion, profile, rest), the trials (unless ``rest_only``), ``motions/<alias>[__<arm>].json`` and the library of the
-    validation world's arm (:func:`library_path`). An arm the task does not offer (``arms_offered``) runs no trial and writes no library."""
+    validation world's arm (:func:`library_path`). An arm the task does not offer (``arms_offered``) runs no trial and writes no library.
+    ``q_starts="grid"`` (i7-artsmall, push-close only): the trials and a library per start of :func:`grid_q_starts` instead
+    (``motions/<alias>__q<q>[__<arm>].json``, :func:`library_path_q`; ``out["per_q"]``)."""
     t0 = time.time()
     arm = mw.w.cfg.arm
     sfx = arm_suffix(arm)
@@ -913,6 +943,33 @@ def run_alias(mw: MotionWorld, alias: str, root: str, *, rest_only: bool = False
         if arm not in motion["arms_offered"]:
             out["error"] = f"the task offers {motion['arms_offered']}, not the {arm} arm: no trial is run, no library is written"
             out["wall_s"] = round(time.time() - t0, 2)
+            return out
+        if q_starts == "grid" and motion["motion"] == "push_close":
+            out["per_q"] = []
+            for q in grid_q_starts(motion):
+                mq = dict(motion, q_start=float(q))
+                oq: Dict[str, Any] = dict(out, motion=mq, trials=[], q_start_variant=True)
+                oq.pop("per_q", None)
+                if not rest.get("stable"):
+                    oq["error"] = "no stable rest (validate_artic rest): no trial is run"
+                else:
+                    for v in mq["variants"][: mw.mcfg.max_trials]:
+                        try:
+                            tr = mw.trial(obj, mq, v, state, rest_sim, ctx["geom"])
+                        except Exception as e:  # noqa: BLE001
+                            tr = {"candidate": f"{alias}:{v['name']}", "variant": v["name"], "stop": "error", "error": repr(e), "traceback": traceback.format_exc()[-1500:]}
+                        oq["trials"].append(tr)
+                vpath = os.path.join(mdir, f"{alias_slug(alias)}{q_start_tag(q)}{sfx}.json")
+                S.save_json(vpath, oq)
+                lib = build_motion_library(mq, {k: v for k, v in rest.items() if k not in ("physics_profile",)}, ctx["profile"], oq["trials"], mw.mcfg,
+                                           {"validator": f"{VALIDATOR_VERSION}+{MOTIONS_VERSION}", "validation": os.path.relpath(vpath, d)})
+                lib["q_start_variant"] = True
+                lib_path = library_path_q(d, alias, q, arm)
+                S.save_json(lib_path, lib)
+                out["per_q"].append({"q_start": float(q), "library": lib_path, "n_segments": lib["n_segments"], "trials": oq["trials"], "error": oq.get("error")})
+                out["trials"].extend(oq["trials"])
+            out["wall_s"] = round(time.time() - t0, 2)
+            out["n_segments"] = sum(int(x["n_segments"]) for x in out["per_q"])
             return out
         if not rest.get("stable"):
             out["error"] = "no stable rest (validate_artic rest): no trial is run"
@@ -949,6 +1006,9 @@ def _motions_main(argv) -> None:
     ap.add_argument("--any-yaw", action="store_true", help="the stance search over 8 base yaws (default: the task's face yaw only)")
     ap.add_argument("--arm", default="right", choices=["right", "left"],
                     help="the validation world's arm (owner 2026-11-07: a left-arm prefix map needs LEFT-arm validated segments); left: the object to the robot's left")
+    ap.add_argument("--q-starts", default="motion", choices=["motion", "grid"],
+                    help="push-close starts: motion = the customs start (close_init_*); grid = every stable-set candidate (i7-artsmall, "
+                         "ISPATIALGYM_ARTSMALL_DRAW_ANGLES: a library per start)")
     a = ap.parse_args(argv)
     from ispatialgym.grasping import validate_tabletop as VT
 
@@ -957,7 +1017,7 @@ def _motions_main(argv) -> None:
     mw = MotionWorld(ArticWorld(world, ArticConfig(max_segments=1)), MotionConfig(max_trials=a.max_trials))
     for alias in a.aliases:
         try:
-            r = run_alias(mw, alias, a.root, rest_only=a.cmd == "rest", customs_path=a.customs)
+            r = run_alias(mw, alias, a.root, rest_only=a.cmd == "rest", customs_path=a.customs, q_starts=a.q_starts)
             m = r["motion"]
             print("GB_ARTIC_MOTION " + json.dumps({"alias": alias, "cmd": a.cmd, "arm": a.arm, "motion": m["motion"], "joint": m["joint"], "q_start": m["q_start"],
                                                     "face_yaw_offset": m["face_yaw_offset"], "arms_offered": m["arms_offered"], "n_variants": len(m["variants"]),
@@ -967,7 +1027,10 @@ def _motions_main(argv) -> None:
                                                     "support_load_N": r["rest"].get("support_load_N"), "weight_N": r["rest"].get("weight_N"),
                                                     "stops": dict(Counter(str(t.get("stop")).split(":")[0] for t in r["trials"])),
                                                     "trials": [{k: t.get(k) for k in ("variant", "stop", "validated_travel_rad", "achieved_rad", "steps")} | {"start_at": (t.get("stance") or {}).get("start_at")} for t in r["trials"]],
-                                                    "n_segments": r.get("n_segments"), "library": r.get("library"), "wall_s": r.get("wall_s")}, default=str), flush=True)
+                                                    "n_segments": r.get("n_segments"), "library": r.get("library"), "wall_s": r.get("wall_s"),
+                                                    "per_q": [{"q_start": x["q_start"], "n_segments": x["n_segments"], "library": x["library"],
+                                                               "stops": dict(Counter(str(t.get("stop")).split(":")[0] for t in x["trials"]))} for x in r.get("per_q") or []] or None},
+                                                   default=str), flush=True)
         except Exception as e:  # noqa: BLE001
             print("GB_ARTIC_MOTION " + json.dumps({"alias": alias, "cmd": a.cmd, "error": repr(e), "tb": traceback.format_exc()[-1500:]}), flush=True)
     print("GB_ARTIC_DONE", flush=True)
