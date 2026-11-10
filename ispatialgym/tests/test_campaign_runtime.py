@@ -61,6 +61,13 @@ def test_eval_cannot_smuggle_changed_scale():
 
 
 def test_failed_draw_records_unavailable_proposal_without_stale_pose(tmp_path, monkeypatch):
+    import errno
+    import fcntl
+
+    def unsupported_lock(*args):
+        raise OSError(errno.EIO, "NFS does not implement flock")
+
+    monkeypatch.setattr(fcntl, "flock", unsupported_lock)
     template, p, key = fixture()
     config = {"campaign_id": "fresh", "template": asdict(template), "perturbations": asdict(p),
               "validation_key": asdict(key), "split": "train"}
@@ -75,6 +82,10 @@ def test_failed_draw_records_unavailable_proposal_without_stale_pose(tmp_path, m
     assert record["start_poses"] is record["goal_poses"] is None
     assert record["failure_kind"] == "sampling"
     assert record["diagnostics"] == {"tries": 2}
+    runtime.record_failure(sampler, None, index=3, attempt=5, seed=6, phase="sample", error=error)
+    rows = [json.loads(line) for line in (tmp_path / "campaign_sampling_failures.jsonl").read_text().splitlines()]
+    assert [row["attempt"] for row in rows] == [4, 5]
+    assert not (tmp_path / "campaign_sampling_failures.lockdir").exists()
 
 
 def test_unapplied_scene_or_light_metadata_is_rejected():

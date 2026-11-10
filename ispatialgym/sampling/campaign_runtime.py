@@ -8,7 +8,6 @@ checks and restored from its recorded settings for demo collection and replay.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import math
 import os
@@ -226,11 +225,13 @@ def record_failure(sampler, draft, *, index, attempt, seed, phase, error):
     }
     path = Path(sampler.ctx.out_dir) / "campaign_sampling_failures.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX)
-        stream.write(canonical_json(record) + "\n")
-        stream.flush()
-        fcntl.flock(stream, fcntl.LOCK_UN)
+    from scripts.campaign_20261110.storage import atomic_directory_lock
+
+    with atomic_directory_lock(path.with_suffix(".lockdir")):
+        with path.open("a") as stream:
+            stream.write(canonical_json(record) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
 
 def record_execution_failure(tro_path, output, result):
