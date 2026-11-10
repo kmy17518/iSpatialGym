@@ -1362,6 +1362,33 @@ class ArticulationLarge(SamplerV2):
         return {"joints": {n: float(v) for n, v in zip(self.target.joints, draft.object_joints[self.tname])},
                 "grasp": {"arm": self.arm, "pinch_sign": self.pinch_sign, "bar_offset_m": self.bar_offset}}
 
+    def campaign_complete_stable_bucket(self, plan):
+        """Probe the requested eval bucket with the existing physical stability test.
+
+        Some proven aliases deliberately restrict their legacy grid (the close
+        dishwasher uses18–21%). An empty intersection is not evidence that the
+        requested bucket is unstable; test it without changing joint physics.
+        """
+        if getattr(self, "_campaign_stable_probed_sha", None) == plan.sha256:
+            return
+        values = plan.closing_probe_values(direction=self.direction, lower=self.lower, upper=self.upper, stable=self.stable)
+        probes = []
+        for value in values:
+            self.campaign_group_remaining_s()
+            ok = self.holds_passively(value)
+            probes.append({"value": value, "fraction": (value-self.lower)/(self.upper-self.lower), "stable": ok})
+            log.info("%s: campaign requested-bucket passive probe %.6f (fraction %.4f): %s", self.gp.variant,
+                     value, probes[-1]["fraction"], "stable" if ok else "drifts")
+            if ok:
+                self.stable.append(value)
+        if probes:
+            self.template_facts["campaign_stable_probe"] = {"group_id": plan.group_id,
+                "requested_fraction_range": list(plan.fraction_range), "native_generation_range": self.gp.gen("open_fraction_range", [.5, .95]),
+                "joint_friction": self.joint_friction, "native_hold_steps": int(self.gp.gen("stable_hold_steps", 120)), "probes": probes}
+            self.template_facts["stable_set"] = list(self.stable)
+            self.template_facts["stable_fractions"] = [(v-self.lower)/(self.upper-self.lower) for v in self.stable]
+        self._campaign_stable_probed_sha = plan.sha256
+
     def campaign_verify_articulation(self, draft):
         plan = getattr(self, "_campaign_joint_active", None)
         if plan is None:
@@ -1388,6 +1415,7 @@ class ArticulationLarge(SamplerV2):
         campaign_plan = self.campaign_joint_plan() if os.environ.get(CJG.ENV) else None
         if campaign_plan is not None:
             self._campaign_joint_active = campaign_plan
+            self.campaign_complete_stable_bucket(campaign_plan)
             try:
                 q_init, q_goal = campaign_plan.initial(direction=self.direction, lower=self.lower, upper=self.upper,
                                                        stable=self.stable, rng=rng)

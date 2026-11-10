@@ -3,10 +3,33 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_queue, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_queue, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_cluster_apps_override_removed_with_original_environment_retained(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, _, _ = self.fixture(root)
+            env = job / "job.env"
+            env.write_text(env.read_text() + "ISGF_EXP_PATH=" + str(root / "isaacsim_overlay/apps") + "\n")
+            before = env.read_bytes()
+            record = prepare_environment(job, root)
+            self.assertEqual((job / "job.env.before_vast_apps").read_bytes(), before)
+            self.assertNotIn("ISGF_EXP_PATH", env.read_text())
+            self.assertEqual(record["after_sha256"], sha(env))
+            self.assertIsNone(prepare_environment(job, root))
+
+    def test_unexpected_apps_path_fails_before_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job, _, _ = self.fixture(root)
+            env = job / "job.env"
+            env.write_text("ISGF_EXP_PATH=/unreviewed/apps\n")
+            with self.assertRaisesRegex(ValueError, "unexpected Isaac"):
+                prepare_environment(job, root)
+            self.assertEqual(env.read_text(), "ISGF_EXP_PATH=/unreviewed/apps\n")
+
     def fixture(self, root, schema="isg-held-goal-queue-v1"):
         job = root / "out/queue/g1"
         group = root / "groups/g1"

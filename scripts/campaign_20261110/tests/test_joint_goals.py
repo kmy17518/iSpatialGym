@@ -71,3 +71,12 @@ def test_only_written_joint_starts_block_duplicates_and_other_grasps_remain_elig
     assert not start_was_written(sampler, {**first, "grasp": {**first["grasp"], "pinch_sign": -1}})
     assert not start_was_written(sampler, {**first, "joints": {"hinge": .25}})
 
+
+
+def test_missing_eval_bucket_proposes_values_for_native_physical_testing_only():
+    p = replace(plan(), fraction_range=(.5, 1.))
+    values = p.closing_probe_values(direction='close', lower=0, upper=2, stable=[.36, .42])
+    assert len(values) == 8 and all(1 < v <= 2 for v in values) and values[-1] == 2
+    assert p.closing_probe_values(direction='close', lower=0, upper=2, stable=[1.2]) == []
+    assert replace(p, split='train').closing_probe_values(direction='close', lower=0, upper=2, stable=[.4]) == []
+    assert p.closing_probe_values(direction='open', lower=0, upper=2, stable=[]) == []

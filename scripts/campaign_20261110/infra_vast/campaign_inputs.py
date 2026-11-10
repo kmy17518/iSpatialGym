@@ -10,6 +10,38 @@ import shutil
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 
 
+def prepare_environment(job_dir, root):
+    """Let the image's Isaac import select its existing apps directory.
+
+    Cluster account overlays are not transferred to Vast. They must not override
+    the image's working default, which the architecture canaries exercised.
+    Keep the exact pre-staging environment as evidence inside the new job.
+    """
+    job, root = Path(job_dir).resolve(), Path(root).resolve()
+    require(job.is_relative_to(root / "out"), "Vast environment outside campaign output")
+    path = job / "job.env"
+    removed = [line for line in path.read_text().splitlines()
+               if line.startswith(("ISGF_EXP_PATH=", "EXP_PATH="))]
+    if not removed:
+        return None
+    for line in removed:
+        values = shlex.split(line.split("=", 1)[1])
+        require(len(values) == 1 and Path(values[0]).resolve().is_relative_to(root / "isaacsim_overlay"),
+                "unexpected Isaac apps override")
+    before = job / "job.env.before_vast_apps"
+    require(not before.exists(), "Isaac apps normalization was already recorded")
+    shutil.copyfile(path, before)
+    lines = [line for line in path.read_text().splitlines() if line not in removed]
+    temporary = path.with_suffix(".env.apps_new")
+    temporary.write_text("\n".join(lines) + "\n")
+    temporary.replace(path)
+    record = {"schema": "isg-vast-apps-environment-v1", "before_sha256": sha(before),
+              "after_sha256": sha(path), "removed_overrides": removed,
+              "resolution": "native_image_isaac_import_default"}
+    (job / "vast_apps_environment.json").write_text(json.dumps(record, indent=2) + "\n")
+    return record
+
+
 def require(value, message):
     if not value:
         raise ValueError(message)

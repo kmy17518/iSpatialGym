@@ -36,9 +36,9 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_queue
+    from .campaign_inputs import prepare_environment, prepare_queue
 except ImportError:
-    from campaign_inputs import prepare_queue
+    from campaign_inputs import prepare_environment, prepare_queue
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -282,6 +282,7 @@ def stage(s3, rec, state):
     env = read_env(jd)
     if env.get("ISGF_JB_NFS", "").startswith(SY) or env.get("ISPATIALGYM_FAST_BAND_SHARE", "0") == "1":
         raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
+    prepare_environment(jd, OFH)
     prepare_queue(jd, env, OFH)
     env = read_env(jd)
     code = os.path.abspath(env["ISGE_CODE"])
@@ -758,7 +759,10 @@ def tick(c, s3, state):
                 destroy(c, iid, "heartbeat stale", live[iid].get("_key_name"))
 
     # 3. assign queued jobs to ready instances with a free slot (FIFO), staging each right before
-    queued = sorted((s for s in states.values() if s["status"] == "queued"), key=lambda s: int(s["id"]))
+    dispatch_ids = C.get("dispatch_job_ids")
+    allowed_ids = None if dispatch_ids is None else {str(jid) for jid in dispatch_ids}
+    queued = sorted((s for s in states.values() if s["status"] == "queued" and
+                     (allowed_ids is None or str(s["id"]) in allowed_ids)), key=lambda s: int(s["id"]))
     assigned_to = {}
     for s in states.values():
         if s["status"] == "assigned":

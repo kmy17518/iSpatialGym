@@ -1,0 +1,72 @@
+from types import SimpleNamespace
+
+import pytest
+
+from scripts.campaign_20261110.controller_held import job_terminal, next_work, queue_closures
+from scripts.campaign_20261110.contracts import ContractError
+
+
+def counts(**changes):
+    return {"evaluation": {}, "train_buckets": {}, "class_remaining": 1000,
+            "room_remaining": 191, "evaluation_sibling_reserve": 100, **changes}
+
+
+def test_strict_bucket_refill_uses_deficits_and_requires_sibling_capacity():
+    t = SimpleNamespace(task="mental_rotation", split="eval_standard")
+    assert next_work(t, counts(), max_groups=6) == {
+        "phase":"eval_standard", "bucket":1, "groups":4, "needs_new_gate":False}
+    assert next_work(t, counts(evaluation={0:3,1:4,2:1}), max_groups=6)["groups"] == 2
+    assert next_work(t, counts(room_remaining=0)) is None
+    assert next_work(t, counts(room_remaining=1))["groups"] == 1
+
+
+def test_training_reserves_room_capacity_for_other_eval_siblings_and_needs_its_own_gate():
+    t = SimpleNamespace(task="object_scaling", split="eval_standard")
+    completed = counts(evaluation={0:3,1:4,2:3})
+    proposal = next_work(t, completed)
+    assert proposal == {"phase":"train", "bucket":0, "groups":1, "needs_new_gate":True}
+    assert next_work(t, completed, training_validated=True)["groups"] == 6
+    assert next_work(t, counts(evaluation={0:3,1:4,2:3},room_remaining=10,evaluation_sibling_reserve=10)) is None
+    assert next_work(t, counts(evaluation={0:3,1:4,2:3},class_remaining=0)) is None
+
+
+def test_model_and_category_queues_never_become_training():
+    model = SimpleNamespace(task="mental_rotation", split="eval_model")
+    assert next_work(model, counts(evaluation={0:3,1:3,2:2}))["groups"] == 1
+    assert next_work(model, counts(evaluation={0:3,1:3,2:3})) is None
+    category = SimpleNamespace(task="mental_rotation", split="eval_category")
+    assert next_work(category, counts(evaluation={0:3,1:4,2:3})) is None
+
+
+def test_training_bucket_selection_remains_a_preference():
+    t = SimpleNamespace(task="mental_rotation", split="train")
+    proposal = next_work(t, counts(train_buckets={0:30,1:0,2:30}), training_validated=True)
+    assert proposal["phase"] == "train" and proposal["bucket"] == 1
+
+
+def test_closure_uses_job_local_queue_and_rejects_wrong_event_hash(tmp_path, monkeypatch):
+    import json
+    from ispatialgym.sampling import campaign_goal_queue as queue
+    from scripts.campaign_20261110.contracts import file_digest
+    job=tmp_path/"out/job";local=job/"campaign_inputs";local.mkdir(parents=True)
+    config=local/"config.json";config.write_text(json.dumps({"validation_key":{"key":"unchanged"}}))
+    path=local/"queue.json";path.write_text(json.dumps({"config_path":str(config)}))
+    (job/"job.env").write_text("ISPATIALGYM_CAMPAIGN_GOAL_QUEUE='/old/external/queue.json'\n")
+    monkeypatch.setattr(queue,"read_queue",lambda p,c:{"entries":[{"group_id":"g"}],"sha256":file_digest(p),"config_path":str(c)})
+    record={"prepared":{"group_ids":["g"]},"validation_key":{"key":"unchanged"}}
+    event={"queue_sha256":file_digest(path),"event":"closed","group_id":"g","written":3}
+    path.with_suffix(".events.jsonl").write_text(json.dumps(event)+"\n")
+    assert queue_closures(record,{"job_dir":str(job)},tmp_path)=={"g":event}
+    event["queue_sha256"]="wrong"
+    path.with_suffix(".events.jsonl").write_text(json.dumps(event)+"\n")
+    with pytest.raises(ContractError,match="different bytes"):
+        queue_closures(record,{"job_dir":str(job)},tmp_path)
+
+
+def test_vast_terminal_state_is_not_success_evidence(tmp_path):
+    import json
+    path=tmp_path/"vast/state/jobs/900000030.json";path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"status":"assigned"}))
+    assert not job_terminal({"jobid":"900000030"},tmp_path,{})
+    path.write_text(json.dumps({"status":"synced","done":{"successes":0}}))
+    assert job_terminal({"jobid":"900000030"},tmp_path,{})

@@ -78,6 +78,21 @@ class JointGoalPlan:
                 tolerance = (tolerances or {}).get(name, 1e-6)
                 _require(abs(float(q0)-float(q1)) <= tolerance, f"another joint changes initial-to-goal: {name}")
 
+    def closing_probe_values(self, *, direction, lower, upper, stable, count=7):
+        """Propose untested closing starts when the legacy stable grid misses an eval bucket.
+
+        Every returned value still needs the native passive-stability probe and
+        all later contact/reach/path checks. Training retains its soft bucket.
+        """
+        if direction != "close" or self.split == "train":
+            return []
+        _require(upper > lower and isinstance(count, int) and 1 <= count <= 31, "invalid stable probe range/count")
+        lo, hi = self.fraction_range
+        if any(v > lower+1e-6 and lo <= (v-lower)/(upper-lower) <= hi
+               and (lo == 0 or (v-lower)/(upper-lower) > lo) for v in stable):
+            return []
+        return [lower + (lo+(hi-lo)*k/(count+1))*(upper-lower) for k in range(1, count+2)]
+
     def eligible_pairs(self, pairs, *, direction, lower, upper):
         """Keep already physically probed angle pairs with this exact goal."""
         _require(upper > lower and direction in ("open", "close"), "invalid articulation limits/direction")

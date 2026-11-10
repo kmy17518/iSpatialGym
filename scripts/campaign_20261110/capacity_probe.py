@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Read-only cluster inventory; emits no credentials or unrelated user jobs."""
-import collections, datetime, json, pathlib, re, subprocess
+import collections, datetime, json, pathlib, re, shlex, subprocess
 
 def output(args):
     return subprocess.check_output(args, text=True, timeout=30)
@@ -89,6 +89,27 @@ for camera_path in [campaign_root/'dataset/camera_quota.json',campaign_root/'dat
         acceptance['sources'].append({'path':str(camera_path),'mtime':camera_path.stat().st_mtime})
     except (OSError,ValueError,KeyError,AssertionError) as exc:acceptance['errors'].append(str(exc))
 acceptance.update(counts=dict(counts),templates=len(template_keys))
+coverage={}
+coverage_errors=[]
+for gate in validation.get('gates',{}).values():
+    job=pathlib.Path(gate.get('source_job_dir',''))
+    if not job.is_relative_to(campaign_root/'out'):continue
+    try:
+        lines=(job/'job.env').read_text().splitlines()
+        bindings=[shlex.split(line.split('=',1)[1]) for line in lines if line.startswith('ISPATIALGYM_CAMPAIGN_CONFIG=')]
+        if len(bindings)!=1 or len(bindings[0])!=1:continue
+        config=json.loads(pathlib.Path(bindings[0][0]).read_text())
+        template=config['template'];key=config['validation_key']['template_sha256']
+        entry=coverage.setdefault(key,{'class_id':template['class_id'],'task':template['task'],'split':template['split'],
+                                      'demo_passed':False,'replay_passed':False,'accepted':key in template_keys})
+        entry['demo_passed'] |= gate.get('demo_successes',0)>0
+        entry['replay_passed'] |= gate.get('status')=='validated' and gate.get('gate',{}).get('success') is True
+    except (OSError,ValueError,KeyError) as exc:
+        coverage_errors.append({'job':str(job),'error':str(exc)[:180]})
+annotated_coverage={'templates':coverage,'errors':coverage_errors,
+                    'demo_passed':sum(x['demo_passed'] for x in coverage.values()),
+                    'replay_passed':sum(x['replay_passed'] for x in coverage.values()),
+                    'accepted':len(template_keys)}
 family_controller={}
 try:
     raw=json.loads((campaign_root/'controllers/families/state.json').read_text())
@@ -96,4 +117,4 @@ try:
 except (OSError,ValueError,KeyError):pass
 try:throughput=json.loads((campaign_root/'infra/throughput.json').read_text())
 except (OSError,ValueError):throughput={}
-print(json.dumps(dict(acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+print(json.dumps(dict(annotated_coverage=annotated_coverage,acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))

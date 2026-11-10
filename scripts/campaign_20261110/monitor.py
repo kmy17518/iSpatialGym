@@ -65,7 +65,9 @@ def refresh(output, host):
     accepted=cluster.get('acceptance',{})
     results=dict(runtime.get('results',{'templates_demo_validated':0,'templates_replay_validated':0,'fresh_standard_eval_instances':0,'fresh_model_holdout_instances':0,'fresh_category_holdout_instances':0,'fresh_train_instances':0}))
     if accepted.get('sources'):
-        results.update(templates_demo_validated=accepted['templates'],templates_replay_validated=accepted['templates'])
+        results.pop('templates_demo_validated',None)
+        results.pop('templates_replay_validated',None)
+        results['templates_with_accepted_instances']=accepted['templates']
         for split, field in [('eval_standard','fresh_standard_eval_instances'),('eval_model','fresh_model_holdout_instances'),('eval_category','fresh_category_holdout_instances'),('train','fresh_train_instances')]:
             results[field]=accepted.get('counts',{}).get(split,0)
     state={
@@ -89,7 +91,7 @@ def refresh(output, host):
         'baseline_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in baseline_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in baseline_gates),'gates':baseline_gates},
         'contract_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in contract_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in contract_gates),'gates':contract_gates},
         'vast_arch_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in vast_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in vast_gates),'gates':vast_gates},
-        'campaign_results':results,'acceptance_evidence':accepted,
+        'campaign_results':results,'acceptance_evidence':accepted,'annotated_coverage':cluster.get('annotated_coverage',{}),
         'family_controller':cluster.get('family_controller',{}),'throughput':cluster.get('throughput',{}),
         'pending':runtime.get('pending',['Freeze split/perturbation contracts','Launch fresh template demo and open-loop replay validation','Apply owner updates for five pending aliases']),
         'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',3000),
@@ -98,6 +100,8 @@ def refresh(output, host):
     atomic(output/'live.json',json.dumps(state,indent=2)+'\n')
     lines=['# Fresh dataset campaign — live state','',f"Updated: {state['updated_at']} (UTC). Cluster observed: {state['cluster_observed_at']}.",'',f"Current phase: **{state['phase']}**.",'','| GPU usage | Count |','|---|---:|',f"| This campaign: cluster running | {state['campaign_cluster_running_gpus']} |",f"| This campaign: cluster pending jobs | {state['campaign_cluster_pending_jobs']} |",f"| Other work: cluster running | {state['unrelated_cluster_running_gpus']} |",f"| This campaign: Vast running | {state['campaign_vast_running_gpus'] if state['campaign_vast_running_gpus'] is not None else 'not verified'} |",f"| All accounts: Vast running | {state['all_vast_running_gpus'] if state['all_vast_running_gpus'] is not None else 'not verified'} |",'',f"Vast observation: {state['vast_observed_at'] or 'not yet checked'}. New campaign cap: ${state['new_campaign_vast_budget_usd']}; prior campaign resources are separate.",'','| Fresh campaign result | Count |','|---|---:|']
     lines.extend([f"| Baseline canaries: demo passed | {state['baseline_validation']['demo_passed']} |",f"| Baseline canaries: open-loop passed | {state['baseline_validation']['open_loop_passed']} |"])
+    if state['annotated_coverage']:
+        lines.extend([f"| Annotated templates: demo passed | {state['annotated_coverage']['demo_passed']} |",f"| Annotated templates: true replay passed | {state['annotated_coverage']['replay_passed']} |"])
     for release in state['data_releases']:
         lines.extend([f"| Released exact-scale grasp libraries ({pathlib.Path(release['path']).name}) | {release.get('new_scale_libraries',0)} |",f"| Released exact-scale arm maps ({pathlib.Path(release['path']).name}) | {release.get('new_scale_maps',0)} |"])
     lines.extend(f"| {k.replace('_',' ')} | {v} |" for k,v in state['campaign_results'].items())
