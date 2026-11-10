@@ -75,6 +75,7 @@ import json
 import logging
 import math
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -951,17 +952,28 @@ class HeldObjectV2(SamplerV2):
     def campaign_goal_plan(self):
         """An opt-in immutable goal selected before drawing this group's starts."""
         try:
+            if not os.environ.get(CHG.ENV):
+                return None
+            if not hasattr(self, "_campaign_goal_started_at"):
+                self._campaign_goal_started_at = time.time()
             plan = CHG.load_goal_plan(task=self.activity, template_id=self.ctx.template_id, scene=self.scene,
-                                      rooms=self.choice.rooms, expected_sha256=getattr(self, "_campaign_goal_plan_sha", None))
+                                      rooms=self.choice.rooms, expected_sha256=getattr(self, "_campaign_goal_plan_sha", None),
+                                      activated_at=self._campaign_goal_started_at)
             if plan is not None:
                 if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
-                    raise CHG.GoalPlanError("goal-group candidate limit reached")
+                    raise Reject("campaign_group_complete", "goal-group candidate limit reached")
                 if not self.in_room(plan.base_pose2d[:2]):
                     raise CHG.GoalPlanError("pinned base is outside the task room")
                 self._campaign_goal_plan_sha = plan.sha256
             return plan
+        except CHG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
         except (CHG.GoalPlanError, OSError, ValueError) as exc:
             raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_goal_plan()
+        return None if plan is None else max(0.0, plan.deadline_at - time.time())
 
     def campaign_goal_waypoints(self, start: C.Pose, goal: C.Pose, eef_in_object: C.Pose) -> List[C.Pose]:
         """Interpolate the object's pose and recover the hand's pose at each step.
@@ -979,6 +991,7 @@ class HeldObjectV2(SamplerV2):
         and all collision, camera, grasp, goal and path checks remain in force.
         """
         tname, target, hc = self.target_name, self.obj("target"), self.hold
+        self._campaign_latest_proposal = None
         base2d = tuple(plan.base_pose2d)
         goal = (G.t(plan.position), G.t(plan.orientation))
         cam = self.camera_at(base2d)
@@ -1019,6 +1032,8 @@ class HeldObjectV2(SamplerV2):
                                                          "reference": "pinned_goal"}}, base2d)
                     hold = {**hold_json(hc, self.arm), "start_rotation": dict(info["start"])}
                 eef0 = C.compose(obj0, g.pose)
+                self._campaign_latest_proposal = {"start_poses": {tname: obj0}, "goal_poses": {tname: goal},
+                                                  "base_pose2d": base2d, "group_id": plan.group_id}
                 if not self.whole_in_frame(cam, obj0):
                     errors.append(f"{gname}: fixed-goal start out of frame")
                     continue
@@ -1093,6 +1108,7 @@ class HeldObjectV2(SamplerV2):
         pinned = draft.extras.get("campaign_fixed_goal")
         if pinned is None:
             return
+        self.campaign_group_remaining_s()
         tname, target = self.target_name, self.obj("target")
         goal = (G.t(pinned["position"]), G.t(pinned["orientation"]))
         start = tuple(x.float() for x in target.get_position_orientation())
@@ -1419,6 +1435,7 @@ class HeldObjectV2(SamplerV2):
             self.check_goal_feasible(draft)
             self.program_check(draft)
             self.check_witness_reach()
+            self.campaign_group_remaining_s()
         # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
         st = self.sidecar.stances.get("init")
         if st is not None:

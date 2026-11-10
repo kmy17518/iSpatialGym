@@ -397,6 +397,7 @@ class ISGTroMeta:
         "attachment_targets",
         "constraints",
         "initial_occlusion",
+        "campaign",
     }
 
     @classmethod
@@ -408,6 +409,13 @@ class ISGTroMeta:
         unknown = set(d) - cls.KNOWN_FIELDS
         if unknown:
             raise TROValidationError(f"Unknown '{TRO_KEY}' fields {sorted(unknown)}")
+        if "campaign" in d:
+            from scripts.campaign_20261110.contracts import validate_campaign_block
+
+            try:
+                validate_campaign_block(d["campaign"], object_bindings=d.get("object_bindings"))
+            except (ValueError, TypeError, KeyError) as error:
+                raise TROValidationError(f"Invalid campaign metadata: {error}") from error
         if not isinstance(d.get("activity"), str) or not d["activity"]:
             raise TROValidationError("activity is required")
         try:

@@ -25,6 +25,10 @@ class GoalPlanError(ValueError):
     pass
 
 
+class GoalGroupTimeout(GoalPlanError):
+    pass
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise GoalPlanError(message)
@@ -67,7 +71,8 @@ class HeldGoalPlan:
 
 
 def validate_goal_plan(raw: Mapping[str, Any], *, task: str, template_id: str, scene: str,
-                       rooms: Sequence[str], now: float | None = None) -> HeldGoalPlan:
+                       rooms: Sequence[str], now: float | None = None,
+                       activated_at: float | None = None) -> HeldGoalPlan:
     _require(isinstance(raw, Mapping) and raw.get("schema") == SCHEMA, "invalid held-goal plan schema")
     _require(task in ("object_scaling", "mental_rotation") and raw.get("task") == task, "held-goal plan task mismatch")
     _require(raw.get("template_id") == template_id and raw.get("scene") == scene, "held-goal plan template/scene mismatch")
@@ -84,11 +89,20 @@ def validate_goal_plan(raw: Mapping[str, Any], *, task: str, template_id: str, s
     bounds = _vector(raw.get("magnitude_range", ()), 2, "magnitude_range")
     limits = (0.05, 0.30) if task == "object_scaling" else (30.0, 120.0)
     _require(limits[0] <= bounds[0] < bounds[1] <= limits[1], "magnitude range outside campaign task bounds")
-    created = float(raw.get("created_at", 0))
-    deadline = float(raw.get("deadline_at", 0))
-    _require(math.isfinite(created) and math.isfinite(deadline) and 0 < created < deadline, "invalid group time budget")
     now = time.time() if now is None else float(now)
-    _require(created <= now < deadline, "goal group has not started or its time budget expired")
+    created = float(raw.get("created_at", 0))
+    if "deadline_at" in raw:
+        deadline = float(raw["deadline_at"])
+    else:
+        budget = float(raw.get("budget_seconds", 0))
+        _require(math.isfinite(budget) and budget > 0, "invalid group time budget")
+        activation = now if activated_at is None else float(activated_at)
+        _require(math.isfinite(activation) and created <= activation <= now, "invalid group activation time")
+        deadline = activation + budget
+    _require(math.isfinite(created) and math.isfinite(deadline) and 0 < created < deadline, "invalid group time budget")
+    _require(created <= now, "goal group has not started")
+    if now >= deadline:
+        raise GoalGroupTimeout("goal-group time budget expired")
     count = raw.get("max_members", 3)
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid goal-group member limit")
     if task == "object_scaling":
@@ -99,12 +113,13 @@ def validate_goal_plan(raw: Mapping[str, Any], *, task: str, template_id: str, s
 
 
 def load_goal_plan(*, task: str, template_id: str, scene: str, rooms: Sequence[str],
-                   expected_sha256: str | None = None) -> HeldGoalPlan | None:
+                   expected_sha256: str | None = None, activated_at: float | None = None) -> HeldGoalPlan | None:
     path = os.environ.get(ENV)
     if not path:
         return None
     with open(path) as stream:
-        plan = validate_goal_plan(json.load(stream), task=task, template_id=template_id, scene=scene, rooms=rooms)
+        plan = validate_goal_plan(json.load(stream), task=task, template_id=template_id, scene=scene, rooms=rooms,
+                                  activated_at=activated_at)
     _require(expected_sha256 is None or plan.sha256 == expected_sha256, "goal plan changed while worker was running")
     return plan
 

@@ -1766,6 +1766,8 @@ class SamplerV2(TaskSampler):
                 clock = _StageClock(self.kit)
                 phase = "reset"
                 draft = None  # A rejected draw must never journal the preceding attempt's poses.
+                if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+                    self._campaign_latest_proposal = None
                 self.attempt_begin(index, attempt)  # i7-stancememo: per-instance state of the task module (its counters in this attempt's kit line)
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
@@ -1786,6 +1788,13 @@ class SamplerV2(TaskSampler):
                     clock.mark("reset")
                     phase = "sample"
                     cap_s, cap_why = self.attempt_cap()
+                    remaining = getattr(self, "campaign_group_remaining_s", None)
+                    group_remaining_s = remaining() if callable(remaining) else None
+                    if group_remaining_s is not None:
+                        if group_remaining_s <= 0:
+                            raise Reject("campaign_group_timeout", "goal group's time budget exhausted")
+                        cap_s = min(cap_s, group_remaining_s) if cap_s and cap_s > 0 else group_remaining_s
+                        cap_why += "; bounded by campaign goal-group deadline"
                     AC.begin(t0, cap_s)  # i7-stancememo 5x.3 (ISPATIALGYM_ATTEMPT_CAP): the cap runs while the attempt samples
                     try:
                         draft = self.sample(rng)
@@ -1867,6 +1876,10 @@ class SamplerV2(TaskSampler):
                     self._cap_after_attempt(e.reason)
                     self.log_attempt_stages(index, attempt, clock)  # STAGE_TIMING: separate lines, the rejection line above keeps its format
                     self.on_reject(e)
+                    if e.reason in ("campaign_group_timeout", "campaign_group_complete"):
+                        out_of_time = True
+                        self.counters[e.reason] = self.counters.get(e.reason, 0) + 1
+                        break
                     if isinstance(e, TemplateExhausted) and not start_per_attempt(self):
                         exhausted = True
                         self.counters["template_exhausted"] = self.counters.get("template_exhausted", 0) + 1

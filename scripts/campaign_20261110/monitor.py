@@ -49,6 +49,7 @@ def refresh(output, host):
     fleet=[i for a in vast.get('accounts',[]) for i in a.get('instances',[])]
     own_vast_ids={str(i) for i in runtime.get('vast_instance_ids',[])}
     own_fleet=[i for i in fleet if str(i.get('id')) in own_vast_ids]
+    own_vast=cluster.get('vast_campaign',{})
     unknown_accounts=[a.get('account') for a in vast.get('accounts',[]) if a.get('error_type') or 'instances' not in a]
     def gpu_count(rows):
         return sum(j['gpus'] for j in rows if j['state']=='RUNNING')
@@ -63,7 +64,8 @@ def refresh(output, host):
         'campaign_cluster_pending_jobs':sum(j['state']=='PENDING' for j in campaign),
         'unrelated_cluster_running_gpus':gpu_count(unrelated),
         'cluster_by_user':cluster.get('summary',{}),'cluster_capacity':cluster.get('capacity',{}),
-        'campaign_vast_running_gpus':fleet_gpus(own_fleet) if not unknown_accounts else None,
+        'campaign_vast_running_gpus':own_vast.get('running_gpus') if own_vast else (fleet_gpus(own_fleet) if not unknown_accounts else None),
+        'campaign_vast_metrics':own_vast,
         'all_vast_running_gpus':fleet_gpus(fleet) if not unknown_accounts else None,
         'vast_accounts_unavailable':unknown_accounts,
         'campaign_submitted_jobs':runtime.get('jobs',[]),

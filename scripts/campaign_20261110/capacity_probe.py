@@ -43,4 +43,8 @@ try:
     validation=json.loads((campaign_root/'validation/controller.json').read_text())
 except (OSError,ValueError):
     validation={}
-print(json.dumps(dict(validation=validation,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+try:
+    vast_campaign=json.loads((campaign_root/'vast/metrics.json').read_text())
+except (OSError,ValueError):
+    vast_campaign={}
+print(json.dumps(dict(validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))

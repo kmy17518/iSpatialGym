@@ -14,6 +14,7 @@ import json
 import math
 import os
 import random
+import re
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -448,7 +449,63 @@ def attach_tro_metadata(tro: Mapping[str, Any], *, campaign_id: str, split: str,
         "restoration_order": ["scene_setup", "scales", "object_states", "removed_objects", "lighting"],
     }
     canonical_json(result)
+    validate_campaign_block(result["ispatialgym"]["campaign"], object_bindings=result["ispatialgym"].get("object_bindings"))
     return result
+
+
+def validate_campaign_block(block: Mapping[str, Any], *, object_bindings: Mapping[str, Any] | None = None) -> None:
+    """Validate namespaced TRO provenance without importing the simulator.
+
+    Called by the actual TRO parser as well as the campaign writer. Binding keys
+    are BDDL instance names, never scene-object names. The existing loader still
+    has to verify live state; valid provenance is not restoration evidence.
+    """
+    require(isinstance(block, Mapping), "campaign metadata must be an object")
+    require(block.get("schema") == SCHEMA, "unknown campaign metadata schema")
+    for name in ("campaign_id", "template_id", "class_id"):
+        require(isinstance(block.get(name), str) and bool(block[name].strip()), f"invalid campaign {name}")
+    require(block.get("task") in TASKS, "invalid campaign task")
+    require(block.get("split") in SPLITS, "invalid campaign split")
+    _sha(block.get("template_sha256"), "template_sha256")
+    created = block.get("created_at")
+    require(isinstance(created, (float, int)) and not isinstance(created, bool)
+            and math.isfinite(created) and created > 0, "invalid campaign creation time")
+    seed = block.get("seed")
+    require(isinstance(seed, int) and not isinstance(seed, bool) and seed >= 0, "invalid campaign seed")
+    group = block.get("goal_group_id")
+    require(group is None or (isinstance(group, str) and bool(group.strip())), "invalid goal group id")
+    require(isinstance(block.get("validation_key"), Mapping), "missing validation key")
+    require(set(block["validation_key"]) == set(ValidationKey.__dataclass_fields__), "invalid validation-key fields")
+    key = ValidationKey(**block["validation_key"])
+    require(key.template_sha256 == block["template_sha256"], "campaign template hash differs from validation key")
+    p = block.get("perturbations")
+    require(isinstance(p, Mapping) and set(p) == {"scales", "removed_objects", "lighting"}, "invalid perturbation fields")
+    require(isinstance(p["scales"], Mapping), "missing per-object scale states")
+    scales = {}
+    for name, state in p["scales"].items():
+        require(isinstance(name, str) and bool(name) and isinstance(state, Mapping), "invalid object scale record")
+        require(set(state) == {"default", "applied", "mode"}, f"incomplete scale record for {name}")
+        scales[name] = ScaleState(**state)
+    require(isinstance(p["removed_objects"], (list, tuple)) and all(isinstance(x, str) and x for x in p["removed_objects"]),
+            "invalid removed-object list")
+    require(isinstance(p["lighting"], Mapping), "invalid lighting record")
+    perturbations = Perturbations(scales, tuple(p["removed_objects"]), p["lighting"])
+    if object_bindings is not None:
+        require(isinstance(object_bindings, Mapping), "invalid TRO object bindings")
+        structural = {name for name, binding in object_bindings.items()
+                      if (isinstance(binding, Mapping) and binding.get("category") in ("floor", "floors", "wall", "walls"))
+                      or re.fullmatch(r"(?:floor|wall)\.n\.01_\d+", name)}
+        require(set(scales) <= set(object_bindings), "campaign scale names are not TRO object bindings")
+        require(set(object_bindings) - structural <= set(scales),
+                "campaign scales must cover every nonstructural TRO object binding")
+    perturbations.validate(block["split"], scales)
+    require(key.scale_sha256 == perturbations.scale_fingerprint, "campaign scales differ from validation key")
+    require(isinstance(block.get("scene_setup"), Mapping), "missing deterministic scene setup")
+    require(block.get("restoration_order") == ["scene_setup", "scales", "object_states", "removed_objects", "lighting"],
+            "invalid campaign restoration order")
+    if "runtime" in block:
+        require(isinstance(block["runtime"], Mapping), "invalid campaign runtime record")
+    canonical_json(block)
 
 
 def restoration_plan(tro: Mapping[str, Any]) -> dict[str, Any]:
@@ -459,6 +516,7 @@ def restoration_plan(tro: Mapping[str, Any]) -> dict[str, Any]:
     """
     meta = tro.get("ispatialgym", {}).get("campaign")
     require(isinstance(meta, dict) and meta.get("schema") == SCHEMA, "missing campaign restoration metadata")
+    validate_campaign_block(meta, object_bindings=tro["ispatialgym"].get("object_bindings"))
     p = meta["perturbations"]
     perturbations = Perturbations({k: ScaleState(**v) for k, v in p["scales"].items()},
                                  tuple(p["removed_objects"]), p["lighting"])

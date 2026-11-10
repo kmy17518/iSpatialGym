@@ -268,6 +268,35 @@ class TroTests(unittest.TestCase):
                 c.attach_tro_metadata(self.tro(), campaign_id="new", split="eval_standard", template=t,
                                       created_at=101, seed=2, perturbations=p, validation_key=k)
 
+    def test_parser_contract_rejects_forged_or_incomplete_campaign_block(self):
+        t = template()
+        p = c.Perturbations({"target": c.ScaleState((1, 1, 1), (1, 1, 1))})
+        tro = c.attach_tro_metadata(self.tro(), campaign_id="new", split="eval_standard", template=t,
+                                    created_at=101, seed=2, perturbations=p, validation_key=key(t))
+        valid = tro["ispatialgym"]["campaign"]
+        for path, value in [(("seed",), True), (("created_at",), float("nan")), (("split",), "evaluation"),
+                            (("template_sha256",), sha("wrong")), (("validation_key", "scale_sha256"), sha("wrong")),
+                            (("perturbations", "scales"), {}), (("restoration_order",), [])]:
+            bad = copy.deepcopy(valid)
+            target = bad
+            for part in path[:-1]:
+                target = target[part]
+            target[path[-1]] = value
+            with self.assertRaises(c.ContractError):
+                c.validate_campaign_block(bad, object_bindings=tro["ispatialgym"]["object_bindings"])
+
+    def test_parser_only_exempts_explicit_structural_bindings(self):
+        t = template()
+        p = c.Perturbations({"target": c.ScaleState((1, 1, 1), (1, 1, 1))})
+        tro = c.attach_tro_metadata(self.tro(), campaign_id="new", split="eval_standard", template=t,
+                                    created_at=101, seed=2, perturbations=p, validation_key=key(t))
+        block = tro["ispatialgym"]["campaign"]
+        c.validate_campaign_block(block, object_bindings={"target": {}, "floor.n.01_1": {}})
+        c.validate_campaign_block(block, object_bindings={"target": {}, "structural": {"category": "walls"}})
+        for misleading in ("floor_lamp.n.01_1", "wall_clock.n.01_1", "floor.n.01_1_extra"):
+            with self.assertRaises(c.ContractError):
+                c.validate_campaign_block(block, object_bindings={"target": {}, misleading: {}})
+
 
 if __name__ == "__main__":
     unittest.main()

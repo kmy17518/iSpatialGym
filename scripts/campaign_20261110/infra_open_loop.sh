@@ -6,8 +6,9 @@ SNAPSHOT=${2:?frozen snapshot}
 GATE_OUT=${3:?gate output directory}
 source "$JOBDIR/job.env"
 export ISGE_CODE="$SNAPSHOT"
-export KIT_TPL_NFS_ROOT KIT_TEX_STORE
-export EXP_PATH="$ISGF_EXP_PATH"
+export KIT_TPL_NFS_ROOT=${KIT_TPL_NFS_ROOT:-$ISGF_ROOT/kit_templates}
+export KIT_TEX_STORE=${KIT_TEX_STORE:-$ISGF_ROOT/kit_textures}
+export EXP_PATH=${ISGF_EXP_PATH:-$ISGF_ROOT/isaacsim_overlay/apps}
 source "$SNAPSHOT/scripts/trainfast/env_fast.sh"
 set -a
 source <(grep -E '^(ISPATIALGYM|ISG)_[A-Z0-9_]*=' "$JOBDIR/job.env")

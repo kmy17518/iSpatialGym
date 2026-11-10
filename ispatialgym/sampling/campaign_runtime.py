@@ -130,18 +130,19 @@ def _plain(value):
 def record_failure(sampler, draft, *, index, attempt, seed, phase, error):
     config, template, perturbations, _ = configuration()
     group = (draft.summary.get("campaign_goal_group") or {}) if draft is not None else {}
+    proposed = getattr(sampler, "_campaign_latest_proposal", None) or {}
     record = {
         "schema": "isg-campaign-failure-v1", "campaign_id": config["campaign_id"], "created_at": time.time(),
         "template_id": template.template_id, "class_id": template.class_id, "task": template.task,
         "index": index, "attempt": attempt, "seed": seed, "failure_kind": "sampling", "phase": phase,
         "reason": error.reason, "detail": str(error), "diagnostics": _plain(getattr(error, "details", {})),
-        "scale_sha256": perturbations.scale_fingerprint, "goal_group_id": group.get("group_id"),
-        "proposal_available": draft is not None,
-        "start_poses": _plain(draft.object_poses) if draft is not None else None,
-        "goal_poses": _plain(draft.goal_poses) if draft is not None else None,
+        "scale_sha256": perturbations.scale_fingerprint, "goal_group_id": group.get("group_id", proposed.get("group_id")),
+        "proposal_available": draft is not None or bool(proposed),
+        "start_poses": _plain(draft.object_poses if draft is not None else proposed.get("start_poses")),
+        "goal_poses": _plain(draft.goal_poses if draft is not None else proposed.get("goal_poses")),
         "start_joints": _plain(draft.object_joints) if draft is not None else None,
         "goal_joints": _plain(draft.goal_joints) if draft is not None else None,
-        "base_pose2d": _plain(draft.base_pose2d) if draft is not None else None,
+        "base_pose2d": _plain(draft.base_pose2d if draft is not None else proposed.get("base_pose2d")),
     }
     path = Path(sampler.ctx.out_dir) / "campaign_sampling_failures.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -34,6 +34,22 @@ def test_restored_scale_is_verified_and_mismatch_rejected():
         runtime.verify_loaded(meta, {})
 
 
+def test_campaign_metadata_passes_real_tro_parser_and_stays_strict():
+    from ispatialgym.eval.targets import ISGTroMeta, SCHEMA_VERSION, TROValidationError
+
+    template, p, key = fixture()
+    base = {"ispatialgym": {"schema_version": SCHEMA_VERSION, "activity": "object_scaling",
+                            "activity_definition_id": 0, "instance_id": "fresh-1",
+                            "object_bindings": {"target": {"scene_object_name": "target_book_abc_0"}}}}
+    tro = attach_tro_metadata(base, campaign_id="fresh", split="train", template=template,
+                              created_at=1, seed=1, perturbations=p, validation_key=key)
+    parsed = ISGTroMeta.from_dict(tro["ispatialgym"])
+    assert parsed.raw["campaign"]["campaign_id"] == "fresh"
+    tro["ispatialgym"]["campaign"]["validation_key"]["scale_sha256"] = digest("wrong")
+    with pytest.raises(TROValidationError, match="scale"):
+        ISGTroMeta.from_dict(tro["ispatialgym"])
+
+
 def test_eval_cannot_smuggle_changed_scale():
     template, p, key = fixture()
     tro = attach_tro_metadata({"ispatialgym": {}}, campaign_id="fresh", split="train", template=template,

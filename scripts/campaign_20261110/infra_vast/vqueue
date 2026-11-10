@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""i7-vast: the Vast backend's queue for agents (no credentials needed): every job's state, instance, GPU and result.
+    $OFH/vast/tool/vqueue [tag-or-substring]"""
+import glob
+import json
+import os
+import sys
+
+VJ = "/vision/u/minyeong/projects/isg_home/campaign_20261110/vast"
+pat = sys.argv[1] if len(sys.argv) > 1 else ""
+try:
+    print(open(os.path.join(VJ, "status.txt")).read().strip())
+except OSError:
+    print("no coordinator status yet")
+seen = set()
+for p in sorted(glob.glob(os.path.join(VJ, "state", "jobs", "*.json"))):
+    s = json.load(open(p))
+    seen.add(str(s["id"]))
+    if pat in s["job_dir"]:
+        d = s.get("done") or {}
+        print(f"{s['id']} {s['status']:8s} {s['job_dir'].split('/out/')[-1]:60s} gpu={s.get('gpu_actual') or s.get('gpu')} inst={s.get('instance')} "
+              f"tries={s.get('tries')}" + (f" att={d.get('attempts')} wr={d.get('written')} ok={d.get('successes')} run_s={d.get('elapsed_s')}" if d else ""))
+for p in sorted(glob.glob(os.path.join(VJ, "queue", "9*.json"))):
+    if p.endswith(".memory.json"):
+        continue
+    r = json.load(open(p))
+    if str(r["id"]) not in seen and pat in r["job_dir"]:
+        print(f"{r['id']} new      {r['job_dir'].split('/out/')[-1]}")

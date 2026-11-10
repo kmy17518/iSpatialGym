@@ -1,4 +1,3 @@
-import copy
 import json
 import os
 import random
@@ -39,6 +38,16 @@ class GoalPlanTests(unittest.TestCase):
         for raw in cases:
             with self.assertRaises(g.GoalPlanError):
                 validate(raw)
+
+    def test_budget_activates_after_queue_wait_and_does_not_extend(self):
+        raw = plan(budget_seconds=200)
+        raw.pop("deadline_at")
+        p = g.validate_goal_plan(raw, task="object_scaling", template_id="template", scene="scene", rooms=["room"],
+                                 now=2000, activated_at=1990)
+        self.assertEqual(p.deadline_at, 2190)
+        with self.assertRaises(g.GoalGroupTimeout):
+            g.validate_goal_plan(raw, task="object_scaling", template_id="template", scene="scene", rooms=["room"],
+                                 now=2191, activated_at=1990)
 
     def test_loader_is_opt_in_and_rejects_replaced_plan(self):
         with patch.dict(os.environ, {}, clear=True):
