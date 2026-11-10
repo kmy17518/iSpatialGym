@@ -191,3 +191,16 @@ def test_validation_grid_matches_the_sampler_pairs():
     assert len(grid) == 8 and all(abs(g - p[0]) < RM.PREFIX_Q_TOL_RAD for g, p in zip(grid, pairs))
     assert VA.library_path_q("/m", "a-b", 1.1781, "left") == "/m/artic_library__a-b__q1.1781__left.json"
     assert VA.library_path_q("/m", "a-b", 1.1781) == "/m/artic_library__a-b__q1.1781.json"
+
+
+def test_push_close_signature_reads_the_base_turn(monkeypatch):
+    from ispatialgym.grasping import artic_motions as AMO
+
+    base = {"contact": [0.1, 0.0, 0.2], "approach_dir": [0.0, 0.0, -1.0], "pinch_axis": [0.0, 1.0, 0.0]}
+    twin = dict(base, pinch_axis=[0.0, -1.0, 0.0])
+    s = type("S", (), {})()
+    s.close_push, s.v2, s._close_push_handle0, s.handle = True, False, base, twin  # the last attempt's flow ran with the twin turn
+    monkeypatch.setenv("ISPATIALGYM_ARTIC_PUSH_BASE_SIG", "0")
+    assert AMO.base_handles(s) == [twin]  # today: the twin's signature (the map miss)
+    monkeypatch.setenv("ISPATIALGYM_ARTIC_PUSH_BASE_SIG", "1")
+    assert AMO.base_handles(s) == [base]

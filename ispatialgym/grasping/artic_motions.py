@@ -152,7 +152,18 @@ def base_handles(s) -> List[Dict[str, Any]]:
     """The handles a sampler (or the shim) grasps / pushes for its motion: v2's ``handle_variants`` (else ``handle``), else ``handle``."""
     if getattr(s, "v2", False):
         return list(getattr(s, "handle_variants", None) or [s.handle])
+    if push_base_sig_on() and getattr(s, "close_push", False) and getattr(s, "_close_push_handle0", None) is not None:
+        # i7-artsmall: the push-close fist's BASE turn (the map was validated from it, both turns as variants) - an attempt that ran the
+        # flow with the twin turn leaves self.handle on the twin, and under START_DRAW the next attempt's prefix lookup read the twin's
+        # signature: missing_map on every later attempt (as_off / as_on close_01 361000: 45 of 46 attempts)
+        return [s._close_push_handle0]
     return [s.handle]
+
+
+def push_base_sig_on() -> bool:
+    """i7-artsmall (2026-11-10, a sampler-only bug fix, default off until the lead decides): ``ISPATIALGYM_ARTIC_PUSH_BASE_SIG=1`` - the
+    push-close prefix map lookup signs the fist's base turn (:func:`base_handles`), not the turn the previous attempt left in ``handle``."""
+    return os.environ.get("ISPATIALGYM_ARTIC_PUSH_BASE_SIG", "0") == "1"
 
 
 def build(alias: str, entry: Dict[str, Any], handle_doc: Dict[str, Any], hull, joint_limits: Tuple[float, float], scale=(1.0, 1.0, 1.0)) -> Dict[str, Any]:

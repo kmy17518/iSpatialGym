@@ -6160,6 +6160,35 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## Articulation small: both joint angles drawn per attempt (branch `i7-artsmall`, owner decision 2026-11-09)
+
+**Owner decision.** Articulation small draws both joint angles per attempt, as articulation_large does.
+- **Before:** open drew its goal once per template (`default_rng(base_seed).choice(S)`). Push-close started at the customs
+  `close_init_fraction` (0.9 blender, 0.7 carton; the owner's 2026-09-19 22:59 rule, which this decision replaces for the drawn start).
+  Training runs one template seed per alias, so every demo of an alias had the same angle.
+- **Switch:** `ISPATIALGYM_ARTSMALL_DRAW_ANGLES` (commits 6b8ff521, 0b30bded). Off = the old path, unchanged.
+  - Pairs (`angle_pairs`): open = (closed, s); close = (s, closed); s uniform over the stable set S per attempt. A push-close start is clamped
+    as the customs start is; a two-flap carton goal must lie past q_ajar.
+  - Once per pair in `sample_template`: the passive continuation probe (required waypoints, `passive_from`) and H_max / w_a at q_init.
+  - Per attempt: the draw, then the start search for the drawn pair (band, Phase 1, Phase 2). It runs in `spa_redraw_start` (START_DRAW on)
+    or `sample_instance` (START_DRAW=0). A failed search restores the previous pair and rejects the attempt.
+  - The template's own start search tries the pairs in a seed order until one finds a start (agent decision, no human available).
+  - Kit counters: `artsmall_draw.drawn`, `.q_init.<q>`, `.q_goal.<q>`, `.start_rejected.<reason>`; `summary.artsmall_draw`;
+    `template_facts.artsmall_draw.pairs`.
+
+**Per-start push-close prefix maps.** Under v2 only, the push-close band is the prefix map looked up by start angle (tolerance 0.03 rad).
+Only the customs starts had maps, so a drawn start would have rejected `missing_map`.
+- `validate_artic motions --q-starts grid` (`job_artic.sh GB_Q_STARTS=grid`) validates one library per candidate start in S.
+- `reach_maps prefix --skip-existing` matches a per-start library's own start.
+- `find_prefix` serves the nearest start within the tolerance. With a single match nothing changes; it matters because the blender grid start
+  0.7636 lies 22 mrad from the customs 0.7854.
+- Layer: `$OFH/artsmall_20261109/prefix/maps/_articulation`, 32 maps (right arm, h 0.8126 / 0.7853), jobs 18408016 / 18408017.
+  - Blender cwkvib: all 8 starts (0.436-0.872 rad) reach the closed goal on at least one fist turn; validated travel 0.41-0.84 rad.
+  - Carton cdmmwy: only 1.178 reaches the goal. The other 7 starts stop `body_moved` (the box slides) after 0.05-0.52 rad; the customs
+    1.649 map stops the same way at 0.13 rad.
+
+<!-- ARTSMALL_AB -->
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
