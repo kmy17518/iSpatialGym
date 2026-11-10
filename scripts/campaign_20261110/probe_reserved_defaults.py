@@ -20,6 +20,7 @@ def main():
     p.add_argument('--campaign-root', type=Path, required=True)
     p.add_argument('--reservations', type=Path, required=True)
     p.add_argument('--asset-hashes', type=Path, required=True)
+    p.add_argument('--category-proposal', type=Path)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     out = a.output.resolve()
@@ -31,7 +32,18 @@ def main():
         raise ValueError('reservation identity mismatch')
     families = {'mental_rotation', 'object_scaling', 'camera_relocalization-obstructed'}
     rows = []
-    for template in reservations['model_holdout_templates']:
+    proposals = reservations['model_holdout_templates']
+    if a.category_proposal:
+        proposals=[]
+        for template in json.loads(a.category_proposal.read_text())['templates']:
+            if template['task'] not in families:continue
+            target=template['target'];role='obstacles' if template['task']=='camera_relocalization-obstructed' else 'target'
+            class_id=template['task']+'-'+target['category']+('_1' if role=='obstacles' else '')
+            proposals.append({'class_id':class_id,'task':template['task'],'roles':[{**target,'role':role}]})
+        report_scope='category_rooms'
+    else:
+        report_scope='model_rooms'
+    for template in proposals:
         if template['task'] not in families:
             continue
         for role in template['roles']:
@@ -41,11 +53,11 @@ def main():
                 raise ValueError('unready or changed reserved object: ' + key)
             rows.append({**role, 'class_id': template['class_id'], 'task': template['task'],
                          'asset_sha256': evidence['asset_sha256'], 'asset_path': evidence['path']})
-    if len(rows) != 29:
-        raise ValueError('expected 29 frozen room-family reservations')
+    if len(rows) != (3 if a.category_proposal else 29):
+        raise ValueError('unexpected number of frozen room-family reservations')
     out.mkdir(parents=True)
     report = {'schema': 'campaign-native-defaults-v1', 'reservation_sha256': sha(a.reservations),
-              'status': 'started', 'objects': [], 'task_acceptance': 'pending geometry, demo and replay'}
+              'scope':report_scope,'status': 'started', 'objects': [], 'task_acceptance': 'pending geometry, demo and replay'}
     import numpy as np
     import torch as th
     from PIL import Image, ImageDraw

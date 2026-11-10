@@ -197,6 +197,32 @@ def with_alignment_buckets(template: Template, native_range_deg, *, source):
     return replace(template, scene_setup={**template.scene_setup, "bucket_policy": policy})
 
 
+def anchor_perturbations(anchor, template, campaign_id):
+    """Carry verified absolute training state into the fresh group's contract."""
+    source = anchor["tro"]["ispatialgym"].get("campaign")
+    if source is None:
+        return Perturbations({obj.instance: ScaleState(obj.default_scale, obj.default_scale, "fixed") for obj in template.objects})
+    require(source.get("campaign_id") == campaign_id and source.get("task") == template.task
+            and source.get("class_id") == template.class_id, "anchor augmentation belongs to another campaign/task/class")
+    raw = source["perturbations"]
+    result = Perturbations({name: ScaleState(**value) for name, value in raw["scales"].items()},
+                           tuple(raw.get("removed_objects", [])), raw.get("lighting", {}))
+    require(set(result.scales) == {obj.instance for obj in template.objects}, "anchor augmentation has different object bindings")
+    observed = source.get("runtime", {}).get("observed_scales", {})
+    for obj in template.objects:
+        state = result.scales[obj.instance]
+        require(state.default == obj.default_scale, "anchor default scale differs from the ready model contract")
+        actual = observed.get(obj.instance, [])
+        require(len(actual) == 3 and all(isinstance(a, (int, float)) and math.isfinite(a)
+                and abs(a-b) <= 1e-6*max(1, abs(b)) for a, b in zip(actual, state.applied)),
+                "anchor applied scale lacks matching live verification")
+    require(source["validation_key"]["scale_sha256"] == result.scale_fingerprint, "anchor scale key differs from exact applied state")
+    result.validate(template.split, result.scales)
+    if result.perturbed:
+        require(source["split"] == "train", "perturbed anchor did not originate in training")
+    return result
+
+
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
@@ -365,7 +391,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         validate_surface_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
     else:
         validate_goal_plan(plan, task=template.task, template_id=runtime_id, scene=template.scene, rooms=[template.room], now=now)
-    perturbations = Perturbations({obj.instance: ScaleState(obj.default_scale, obj.default_scale, "fixed") for obj in template.objects})
+    perturbations = anchor_perturbations(anchor, template, campaign_id)
     key = ValidationKey(template.fingerprint, code_sha256, physics_sha256, data_sha256, perturbations.scale_fingerprint)
     config = {"campaign_id": campaign_id, "split": template.split, "purpose": "validation",
               "template": asdict(template), "perturbations": asdict(perturbations), "validation_key": asdict(key)}

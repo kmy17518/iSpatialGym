@@ -25,6 +25,38 @@ from scripts.campaign_20261110.goal_groups import load_template_contract
 from scripts.campaign_20261110.storage import atomic_directory_lock, local_sqlite_transaction
 
 QUOTAS = {q.task: q for q in task_quotas()}
+ROOM_WEIGHTED_TASKS = {"object_scaling", "mental_rotation"}
+
+
+def training_room_policy(plan, task):
+    """Freeze ten actual room areas and integer caps by largest remainder."""
+    require(task in ROOM_WEIGHTED_TASKS, "room policy requires a held-object task")
+    rows = plan["tasks"][task]
+    require(plan.get("schema") == "isg-room-plan-v1" and plan["rooms_per_task"] == len(rows) == 10,
+            "held training requires the frozen ten-room plan")
+    weights = {f"{row['scene']}/{row['room']}": float(row["traversable_m2"]) for row in rows}
+    reserved = {f"{row['scene']}/{row['room']}" for row in plan.get("reserved_rooms", [])}
+    require(len(weights) == 10 and all(math.isfinite(v) and v > 0 for v in weights.values()), "invalid room traversal areas")
+    require(not set(weights) & reserved, "held training plan includes a reserved room")
+    total = QUOTAS[task].train_instances
+    real = {room: total*area/sum(weights.values()) for room,area in weights.items()}
+    caps = {room: math.floor(value) for room,value in real.items()}
+    for room in sorted(weights,key=lambda key: (-(real[key]-caps[key]),key))[:total-sum(caps.values())]:
+        caps[room] += 1
+    require(all(n > 0 for n in caps.values()), "training room received no capacity")
+    return {"method":"traversable_area_largest_remainder", "rooms_per_task":10,
+            "traversable_m2":weights,"caps":caps,"total":total}
+
+
+def accepted_room(record):
+    """Read old accepted records without rewriting their verified TRO/export."""
+    if record.get("room"):
+        return record["room"]
+    require(file_digest(record["tro"]) == record["tro_sha256"], "previously accepted TRO changed")
+    scene = read(record["tro"])["ispatialgym"].get("scene", {})
+    rooms = scene.get("task_rooms", [])
+    require(scene.get("model") and len(rooms) == 1, "legacy training record lacks an unambiguous room")
+    return f"{scene['model']}/{rooms[0]}"
 
 
 def physical_template(template):
@@ -148,7 +180,7 @@ def _quota(q, split):
     return q.category_instances, q.category_buckets
 
 
-def _allocate(rows, *, split, q, eval_counts, train_count):
+def _allocate(rows, *, split, q, eval_counts, train_count, train_capacity=None):
     """Whole standard groups preserve a train sibling; train buckets stay soft."""
     total, buckets = _quota(q, split) if split != "train" else (0, ())
     def space(row):
@@ -161,13 +193,23 @@ def _allocate(rows, *, split, q, eval_counts, train_count):
                 eval_counts[row["bucket"]] += 1
         return result
     selected = next((row for row in rows if space(row)), None) if split == "eval_standard" and len(rows) >= 2 else None
-    needed = len(rows) - int(selected is not None)
-    if q.train_instances-train_count < needed:
+    available = q.train_instances-train_count
+    if train_capacity is not None:
+        available = min(available,train_capacity)
+    if available <= 0:
         return {}  # Never publish an eval member without its training sibling.
-    return {row["instance_id"]: "eval_standard" if row is selected else "train" for row in rows}
+    result = {selected["instance_id"]:"eval_standard"} if selected is not None else {}
+    for row in rows:
+        if row is selected:
+            continue
+        if available <= 0:
+            break
+        result[row["instance_id"]] = "train"
+        available -= 1
+    return result
 
 
-def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path):
+def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path, training_room_plan=None):
     root, state_path = Path(root).resolve(), Path(state_path).resolve()
     require(state_path.is_relative_to(root), "quota database outside campaign")
     require(review.get("group_closed") is True, "cannot allocate an open goal group")
@@ -178,6 +220,15 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
     require(digest(fresh) == digest(review), "release evidence changed after review")
     require(review["validation_key"]["template_sha256"] == template.fingerprint, "release contract differs from validated template")
     check_reservations(template, reservations, reservation_hashes)
+    room = f"{template.scene}/{template.room}"
+    room_policy = None
+    if template.task in ROOM_WEIGHTED_TASKS and template.split in ("eval_standard", "train"):
+        if training_room_plan is None:
+            path = root/"manifests/train_room_plan_20261110.json"
+            require(path.is_file(), "held training release requires the frozen ten-room plan")
+            training_room_plan = read(path)
+        room_policy = training_room_policy(training_room_plan,template.task)
+        require(room in room_policy["caps"], "held training room outside frozen ten-room plan")
     gid = review["group_id"]
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", gid), "unsafe group id")
     rows, goals = [], []
@@ -205,6 +256,11 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                     previous = db.execute("SELECT value FROM metadata WHERE key=?", (key,)).fetchone()
                     require(previous is None or previous[0] == value, "campaign or holdout reservations changed after release")
                     db.execute("INSERT OR IGNORE INTO metadata VALUES (?,?)", (key, value))
+                if room_policy is not None:
+                    name = "training_rooms:"+template.task
+                    previous = db.execute("SELECT value FROM metadata WHERE key=?",(name,)).fetchone()
+                    require(previous is None or previous[0] == canonical_json(room_policy), "training room allocation policy changed")
+                    db.execute("INSERT OR IGNORE INTO metadata VALUES (?,?)",(name,canonical_json(room_policy)))
                 previous = db.execute("SELECT review,record FROM groups WHERE id=?", (gid,)).fetchone()
                 if previous:
                     require(previous[0] == digest(review), "accepted group changed")
@@ -216,7 +272,17 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
                                                   (split, task, scope))))
                 train_count = db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=?", (task,)).fetchone()[0]
-                allocation = _allocate(rows, split=split, q=QUOTAS[task], eval_counts=counts, train_count=train_count)
+                class_count = db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=? AND class_id=?",
+                                         (task,template.class_id)).fetchone()[0]
+                class_cap = QUOTAS[task].train_instances//QUOTAS[task].standard_classes
+                capacity = class_cap-class_count
+                if room_policy is not None:
+                    records = [json.loads(row[0]) for row in db.execute("SELECT record FROM members WHERE split='train' AND task=?",(task,))]
+                    room_counts = Counter(accepted_room(row) for row in records)
+                    require(set(room_counts) <= set(room_policy["caps"]), "accepted training data includes a room outside frozen plan")
+                    require(all(room_counts[key] <= cap for key,cap in room_policy["caps"].items()), "accepted training data already exceeds room cap")
+                    capacity = min(capacity,room_policy["caps"][room]-room_counts[room])
+                allocation = _allocate(rows, split=split, q=QUOTAS[task], eval_counts=counts, train_count=train_count,train_capacity=capacity)
                 if not allocation:
                     return {"accepted": {}, "deferred": [row["instance_id"] for row in rows], "reason": "quota full"}
                 physical = physical_template(template)
@@ -245,12 +311,13 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                                                             (final, task, scope))}
                         require(not templates or templates == {physical}, "evaluation class changed its pinned template")
                     record = {**row, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,
-                              "validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"]}
+                              "room":room,"validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"]}
                     db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",
                                (iid, gid, final, task, scope, row["bucket"], physical, canonical_json(record)))
                 record = {"schema": "isg-group-assignment-v1", "campaign_id": review["campaign_id"], "group_id": gid,
                           "accepted": allocation, "deferred": [row["instance_id"] for row in rows if row["instance_id"] not in allocation],
                           "canonical_goal_sha256": goals[0], "release_review_sha256": digest(review),
+                          "training_policy": {"per_class_cap":class_cap,"room_policy":room_policy},
                           "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
                 destination = root / "dataset/groups" / (gid + ".json")
                 if destination.exists():
@@ -269,7 +336,9 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
             try:
                 counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
                 summary = {"campaign_id": review["campaign_id"], "counts": counts,
-                           "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path)}
+                           "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path),
+                           "training_room_policies": {key.split(":",1)[1]:json.loads(value) for key,value in db.execute(
+                               "SELECT key,value FROM metadata WHERE key LIKE 'training_rooms:%'")}}
             finally:
                 db.close()
         # Counts cannot advertise a transaction until its database is durable.

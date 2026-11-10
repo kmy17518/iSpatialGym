@@ -188,6 +188,11 @@ def test_joint_author_uses_actual_root_target_and_all_joint_names(tmp_path):
     tro = g.read_json(tro_path)
     tro["ispatialgym"]["campaign"] = {"runtime": {"planned_goal_joints": {"apple.n.01_1": [.01, .2]},
         "joint_names": {"apple.n.01_1": ["hinge", "passive"]}, "bound_object_poses": {"apple.n.01_1": [[0, 0, 0], [0, 0, 0, 1]]}}}
+    from dataclasses import asdict
+    perturb = c.Perturbations({"apple.n.01_1": c.ScaleState((1, 1, 1), (1, 1, 1), "fixed")})
+    tro["ispatialgym"]["campaign"].update(campaign_id="new", task=template.task, class_id=template.class_id,
+        split=template.split, perturbations=asdict(perturb), validation_key={"scale_sha256": perturb.scale_fingerprint})
+    tro["ispatialgym"]["campaign"]["runtime"]["observed_scales"] = {"apple.n.01_1": [1, 1, 1]}
     tro["ispatialgym"]["pose_targets"] = {"apple.n.01_1": {"position": [1, 2, 3], "orientation": [0, 0, 0, 1], "frame": "world"}}
     c.write_json_atomic(tro_path, tro)
     side_path = tro_path.with_name("fresh_9000000.oracle.json")

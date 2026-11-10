@@ -30,12 +30,19 @@ def candidate(root, number, magnitude=.075, goal=None, split="eval_standard"):
     return f, audit(f)
 
 
-def claim(root, f, review, reserved=None):
+def room_plan(first_area=1000):
+    return {"schema":"isg-room-plan-v1","rooms_per_task":10,"reserved_rooms":[],"tasks":{
+        "object_scaling":[{"scene":"house_single_floor","room":"room","traversable_m2":first_area}]+
+        [{"scene":"house_single_floor","room":f"other{i}","traversable_m2":1111} for i in range(9)]}}
+
+
+def claim(root, f, review, reserved=None, plan=None):
     reserved = reservations() if reserved is None else reserved
     hashes = {"schema": "campaign-reserved-asset-hashes-v1", "reserved_model_keys": reserved["train_exclude_models"],
               "ready_assets": {}, "reserved_asset_hashes": [], "pending_unready_model_keys": reserved["train_exclude_models"]}
     return lane.claim_group(review, f.template, reserved, reservation_hashes=hashes,
-                            root=root, started_at=f.since, state_path=root / "dataset/quotas.sqlite3")
+                            root=root, started_at=f.since, state_path=root / "dataset/quotas.sqlite3",
+                            training_room_plan=room_plan() if plan is None else plan)
 
 
 def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_path):
@@ -99,3 +106,42 @@ def test_heldout_allocations_never_fall_back_to_training():
 def test_quaternion_sign_does_not_create_another_canonical_goal():
     assert lane._canonical_goal({"orientation": [0, 0, 0, 1]}) == lane._canonical_goal({"orientation": [0, 0, 0, -1]})
     assert lane._canonical_goal([[1, 2, 3], [0, 0, 0, 1]]) == lane._canonical_goal([[1, 2, 3], [0, 0, 0, -1]])
+
+
+def test_area_weighted_room_cap_counts_siblings_and_freezes_policy(tmp_path):
+    plan=room_plan(first_area=1)
+    policy=lane.training_room_policy(plan,"object_scaling")
+    assert policy["caps"]["house_single_floor/room"]==1
+    assert len(policy["caps"])==10 and sum(policy["caps"].values())==10000
+    f,review=candidate(tmp_path,0)
+    assert sorted(claim(tmp_path,f,review,plan=plan)["accepted"].values())==["eval_standard","train"]
+    f2,review2=candidate(tmp_path,1)
+    assert claim(tmp_path,f2,review2,plan=plan)["accepted"]=={}
+    with pytest.raises(c.ContractError,match="room allocation policy changed"):
+        claim(tmp_path,f2,review2,plan=room_plan())
+
+
+def test_per_class_training_cap_applies_before_task_total(tmp_path):
+    f,review=candidate(tmp_path,0)
+    path=tmp_path/"dataset/quotas.sqlite3";path.parent.mkdir()
+    db=lane._db(path)
+    with db:
+        for i in range(999):
+            record={"room":"house_single_floor/other0"}
+            db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",(f"old{i}","old","train","object_scaling","apple",0,"old",c.canonical_json(record)))
+    db.close()
+    assert sorted(claim(tmp_path,f,review)["accepted"].values())==["eval_standard","train"]
+    f2,review2=candidate(tmp_path,1)
+    assert claim(tmp_path,f2,review2)["accepted"]=={}
+
+
+def test_room_cap_migration_reads_verified_legacy_tro_without_changing_it(tmp_path):
+    tro=tmp_path/"old-tro.json"
+    c.write_json_atomic(tro,{"ispatialgym":{"scene":{"model":"house_single_floor","task_rooms":["living_room_0"]}}})
+    record={"tro":str(tro),"tro_sha256":c.file_digest(tro)}
+    assert lane.accepted_room(record)=="house_single_floor/living_room_0"
+    before=tro.read_bytes()
+    assert lane.accepted_room(record)=="house_single_floor/living_room_0" and tro.read_bytes()==before
+    tro.write_text("{}")
+    with pytest.raises(c.ContractError,match="accepted TRO changed"):
+        lane.accepted_room(record)
