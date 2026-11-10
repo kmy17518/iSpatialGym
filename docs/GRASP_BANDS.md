@@ -6240,6 +6240,19 @@ hand-back); otwukr T7d 83 / 4 / 4 -> 39 / 4 / 4 at 0.41 GPU-h both. Right board 
 flipped; the representative stays kmuacd single. Unblocking the right board needs an owner decision (an arm-mirror grasp transfer for the
 right rest, physics-validated, or the right arm's flipped branch). Layer split: `layer_right`, `layer_left15`, `layer_left20rows`.
 
+### r3: the arm-mirror transfer, the single A/B, lean_left_15 (lead #84c)
+
+- **Single A/B (draw off, N 4):** off 48 / 4 / 4 at 0.27 GPU-h; `SHELF_FREE_START_CONNECTED` 42 / 4 / 4 at 0.26 (refused 95);
+  `SHELF_MAP_STANCE` 56 / 4 / 4 at 0.29. FREE_START_CONNECTED is now a shelf-tip-family default (cf4311e9); MAP_STANCE stays off.
+- **Arm-mirror transfer (`lean.mirror_job`, `python -m ispatialgym.grasping.lean mirror`):** a left-board grasp is carried to the right
+  rest as T' = B T M (B = the book's own reflection plane, checked against the hull), as given candidates through every gate and the
+  right-arm validator. The exact mirror of lean_left_20 side_9 puts the right wrist camera 10 mm into the board (the source's camera
+  27.5 mm clear): both cameras sit at the same gripper-frame offset. Its 180 deg twin clears the board but pressed the book into the table in
+  physics; expanded neighbours give 2 valid grasps. With them, kmuacd drawn and otwukr T7d still write 0 on the right board: those grasps
+  need the flipped shoulder (3.2-3.8 rad > the 1.6 rad no-swing rule).
+- **lean_left_15:** the gripper body's hull clears the leaned-on divider (kmuacd piece __6 / __21) by 3-4 mm, which the map's hull rule
+  accepts; the live sphere model hits it. Not fixed (a shared gate / sphere model).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
