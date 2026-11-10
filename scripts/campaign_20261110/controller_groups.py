@@ -187,6 +187,10 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     record = {"queue": prepared["queue"], "prepared": prepared, "directory": str(Path(prepared["queue"]).parent),
         "validation_key": actual, "phase": phase, "index": index, "count": prepared["candidate_instances"],
         "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], "decision": dict(decision)}
+    if spec.get('dispatch_backends'):
+        record['dispatch_backends'] = spec['dispatch_backends']
+    elif template.task == 'alignment-world_vertical':
+        record['dispatch_backends'] = ['vast_5090', 'vast_4090']
     if state.get("next_dispatch_backends"):
         record["dispatch_backends"] = state.pop("next_dispatch_backends")
     state["queues"].append(record)

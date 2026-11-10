@@ -236,6 +236,13 @@ def prepare(proof, allocation, cfg, root):
         "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": template.split,
         "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": True,
         "admission_id": identity, "source_proof": proof, "v2_root": v2_root}
+    backends = cfg.get('dispatch_backends')
+    if backends is None and template.task == 'alignment-world_vertical':
+        # Native wall provenance includes provider JSON symlinks. Keep those
+        # provider permissions intact by staging private worker inputs on Vast.
+        backends = ['vast_5090', 'vast_4090']
+    if backends:
+        record['dispatch_backends'] = list(backends)
     write_json_atomic(directory / "submission.json", record)
     return record
 
@@ -274,6 +281,8 @@ def refresh(record, cfg, root, rows, queue):
         "mode": "eval_then_train" if cfg.get("admission_split", "train").startswith("eval_") else "train_only",
         "seed_offset": int(record["admission_id"][:8], 16), "group_budget_seconds": group_budget(cfg, template.task),
         "existing_queues": [record["queue"]], "admission_review": {"path": str(proof_path), "sha256": file_digest(proof_path)}}
+    if record.get('dispatch_backends'):
+        spec['dispatch_backends'] = record['dispatch_backends']
     append_seed(cfg["seed_catalog"], spec, cfg["campaign_id"])
     if record.get("reason"):
         record["recovered_failure"] = {"reason": record.pop("reason"), "failed_gate": record.get("failed_gate")}
