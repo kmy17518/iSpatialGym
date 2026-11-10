@@ -253,3 +253,33 @@ class VastQueueInputsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+def test_template_customs_dependency_keeps_original_cross_revision_bytes(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import template_customs_inputs
+    import hashlib
+    import json
+    template = tmp_path / 'out/old/inst/task/scene'
+    template.mkdir(parents=True)
+    customs = tmp_path / 'code/old/assets/isg_customs.json'
+    customs.parent.mkdir(parents=True)
+    customs.write_text('{"task": {"roles": {}}}\n')
+    metadata = template / 'template_meta.json'
+    metadata.write_text(json.dumps({'customs': str(customs), 'variant': 'task'}))
+    before = metadata.read_bytes()
+    assert template_customs_inputs({'TEMPLATE': str(template), 'ISGE_CODE': str(tmp_path / 'code/new')}, tmp_path) == [
+        {'path': str(customs), 'sha256': hashlib.sha256(customs.read_bytes()).hexdigest()}]
+    assert metadata.read_bytes() == before
+
+
+def test_template_customs_dependency_refuses_external_source(tmp_path):
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import template_customs_inputs
+    import json
+    import pytest
+    root = tmp_path / 'campaign'
+    template = root / 'out/template'
+    template.mkdir(parents=True)
+    outside = tmp_path / 'unowned.json'
+    outside.write_text('{}')
+    (template / 'template_meta.json').write_text(json.dumps({'customs': str(outside)}))
+    with pytest.raises(ValueError, match='outside owned campaign'):
+        template_customs_inputs({'TEMPLATE': str(template)}, root)
+

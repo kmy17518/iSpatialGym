@@ -42,7 +42,7 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -50,7 +50,7 @@ except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
@@ -337,6 +337,9 @@ def stage(s3, rec, state):
             L.add_tree(path, skip_runs=True)
     for path in pool_inputs:
         L.add_file(path)
+    customs_inputs = template_customs_inputs(env, OFH)
+    for dependency in customs_inputs:
+        L.add_file(dependency['path'])
     scripts = env.get("ISGF_SCRIPTS") or os.path.join(F, "scripts")
     if not under(scripts, [code]):
         L.add_tree(scripts)
@@ -395,7 +398,8 @@ def stage(s3, rec, state):
                  {"dir": b1k, "sha": sha, "porcelain": por if os.path.exists(por) else "-"}]
     spec = {k: rec[k] for k in ("id", "name", "job_dir", "script", "time_s", "cpus", "mem", "log", "cwd", "acct", "part")}
     spec.update({"code": [{"key": k} for k in code_keys], "jobdata": f"jobs/{rec['id']}/jobdata.tar.zst", "scenes": runtime_scenes(env, OFH),
-                 "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre}})
+                 "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre,
+                 "template_customs": customs_inputs}})
     log(f"STAGED {rec['id']} {rec['name']} {len(L.items)} entries {L.bytes / 2**20:.1f} MB, {n_pre} prebuild candidates ({now() - t:.0f} s)")
     return spec
 

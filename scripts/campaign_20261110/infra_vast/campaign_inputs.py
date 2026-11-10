@@ -136,6 +136,28 @@ def require(value, message):
         raise ValueError(message)
 
 
+def template_customs_inputs(env, root):
+    """Retain the template's original customs file across runtime revisions.
+
+    The native sampler consults template metadata before its adjacent customs
+    copy. Those dependencies are not necessarily named in job.env or contained
+    in the selected native code snapshot. Never rewrite the recorded path.
+    """
+    root = Path(root).resolve()
+    template = Path(env['TEMPLATE']).resolve()
+    metadata = json.loads((template / 'template_meta.json').read_text())
+    candidates = [metadata.get('customs'), str(template.parent.parent / 'task_custom_lists.json')]
+    result = []
+    for value in candidates:
+        if not value: continue
+        path = Path(value).resolve()
+        if not path.exists(): continue
+        require(path.is_relative_to(root), 'template customs dependency outside owned campaign')
+        require(path.is_file() and isinstance(json.loads(path.read_text()), dict), 'invalid template customs dependency')
+        result.append({'path': str(path), 'sha256': sha(path)})
+    return result
+
+
 def prepare_cache_environment(job_dir, root):
     """Route new Vast jobs to the exact-key templates restored by boot.sh.
 
