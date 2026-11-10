@@ -11,6 +11,7 @@ The entity exposes ``states`` keyed by the OmniGibson state classes so that the 
 
 from __future__ import annotations
 
+import itertools
 import os
 import struct
 import time
@@ -37,6 +38,33 @@ if os.environ.get("ISPATIALGYM_FAST_GEOMETRY") in ("1", "check"):
 #: every reused value and prints FAST_ASSIGN_CHECK counts
 FAST_ASSIGN = os.environ.get("ISPATIALGYM_FAST_ASSIGN", "")
 _ASSIGN_COUNTS = {"reused": 0, "mismatches": 0, "fresh_s": 0.0}
+
+#: ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK=1 (i7-blockdiag 2026-11-09, default off): the layout cost is invariant to a global
+#: rigid motion of the whole arrangement, so a target that is symmetric under one (block_design's 2 x 2 dice: a pi turn about
+#: the vertical or a pi flip about a horizontal axis maps the slot set onto itself) has two or more permutations whose layout
+#: costs differ only by the placement noise; the cheaper one wins at random and ``pose_reached`` (judged under the same shared
+#: assignment) then reads every member one slot off (4 cm / pi on the block_design board). When the layout-best permutation
+#: satisfies every relation, the switch picks, among the permutations that satisfy every relation too, the one with the
+#: smallest absolute slot error (``layout_reached`` keeps its truth value; only which equivalent permutation is reported and
+#: what ``pose_reached`` sees can change). Counted in ``_POSE_TIEBREAK_COUNTS`` (``acted`` = the choice differs).
+_POSE_TIEBREAK_COUNTS = {"evaluations": 0, "acted": 0, "last_acted": None}
+
+
+def pose_tiebreak_on() -> bool:
+    return os.environ.get("ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK", "0") not in ("", "0", "off", "false", "no")
+
+
+def pose_tiebreak_reset() -> None:
+    """Zero the switch's counters (a run_isg episode reports its own)."""
+    _POSE_TIEBREAK_COUNTS.update({"evaluations": 0, "acted": 0, "last_acted": None})
+
+
+def pose_tiebreak_report() -> Optional[Dict[str, object]]:
+    """The switch's counters for a demo / episode report (None when the switch is off)."""
+    if not pose_tiebreak_on():
+        return None
+    return {"evaluations": int(_POSE_TIEBREAK_COUNTS["evaluations"]), "acted": int(_POSE_TIEBREAK_COUNTS["acted"]),
+            "last_acted": _POSE_TIEBREAK_COUNTS["last_acted"]}
 
 
 @dataclass
@@ -306,4 +334,61 @@ class GroupEntity:
                 total_ori += ori_err
             return (round(total_pos, 6), round(total_ori, 6))
 
+        if pose_tiebreak_on() and target.target_slots and target.pose_tolerances and target.layout_tolerances:
+            return self._assign_pose_tiebreak(poses, memo, members, slot_ids, perm_cost)
         return dict(sorted({**assign_by_cost_fn(members, slot_ids, perm_cost), **pinned}.items()))
+
+    def _assign_pose_tiebreak(self, poses, memo, members, slot_ids, perm_cost) -> Dict[str, str]:
+        """``ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK``: the layout-best permutation (exactly ``assign_by_cost_fn``'s: the first
+        minimum in permutation order); if it satisfies every relation, the relation-satisfying permutation with the smallest
+        absolute slot error instead (normalized by the pose tolerances; ties keep the layout order)."""
+        target = self.target
+        pinned = target.pinned
+        eqs = target.orientation_equivalences or None
+        lpos_tol, lori_tol = target.layout_tolerances
+        ppos_tol, pori_tol = target.pose_tolerances
+
+        def layout_ok(perm) -> bool:
+            s2m = {slot_ids[j]: members[i] for i, j in enumerate(perm)}
+            s2m.update({s: m for m, s in pinned.items()})
+            for k, rel in enumerate(target.layout_relations):
+                pe, oe = self._relation_error(memo, poses, s2m[rel.from_slot], s2m[rel.to_slot], k, rel, eqs, lpos_tol, lori_tol)
+                if not ((lpos_tol is None or pe <= lpos_tol) and (lori_tol is None or oe <= lori_tol)):
+                    return False
+            return True
+
+        def pose_key(perm):
+            outside, total = 0, 0.0
+            for i, j in enumerate(perm):
+                slot = target.target_slots[slot_ids[j]]
+                p, q = poses[members[i]]
+                pe = float(th.norm(p - slot.position))
+                oe = orientation_error(q, slot.orientation, eqs)
+                if not ((ppos_tol is None or pe <= ppos_tol) and (pori_tol is None or oe <= pori_tol)):
+                    outside += 1
+                total += max(pe / ppos_tol if ppos_tol else pe, oe / pori_tol if pori_tol else oe)
+            return (outside, round(total, 6))
+
+        scored = [(perm_cost(perm), perm) for perm in itertools.permutations(range(len(slot_ids)))]
+        best_cost, best_perm = None, None
+        for c, perm in scored:  # assign_by_cost_fn's choice: the first strict minimum
+            if best_cost is None or c < best_cost:
+                best_cost, best_perm = c, perm
+        chosen = best_perm
+        _POSE_TIEBREAK_COUNTS["evaluations"] += 1
+        if layout_ok(best_perm):
+            best_key = pose_key(best_perm)
+            for _c, perm in sorted(scored, key=lambda t: t[0]):
+                if perm == best_perm:
+                    continue
+                key = pose_key(perm)
+                if key < best_key and layout_ok(perm):
+                    chosen, best_key = perm, key
+        if chosen != best_perm:
+            _POSE_TIEBREAK_COUNTS["acted"] += 1
+            _POSE_TIEBREAK_COUNTS["last_acted"] = {
+                "layout_choice": {members[i]: slot_ids[j] for i, j in enumerate(best_perm)},
+                "chosen": {members[i]: slot_ids[j] for i, j in enumerate(chosen)},
+            }
+        free = {members[i]: slot_ids[j] for i, j in enumerate(chosen)}
+        return dict(sorted({**free, **pinned}.items()))
