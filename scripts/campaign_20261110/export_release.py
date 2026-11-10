@@ -30,6 +30,7 @@ from scripts.campaign_20261110.group_lane import check_reservations, physical_te
 from scripts.campaign_20261110.binding_pools import audit_objects, load_pool_for_template
 from scripts.campaign_20261110.storage import atomic_directory_lock
 from scripts.campaign_20261110.reservation_policy import active_policy
+from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY, POLICY_KEY
 
 CAMERA_STATES = ("camera_quota.json", "camera_obstructed_quota.json", "camera_category_quota.json")
 
@@ -58,6 +59,10 @@ def snapshot_allocations(root, database=None):
             if source == database:
                 with closing(sqlite3.connect(f"file:{local}?mode=ro", uri=True)) as db:
                     require(db.execute("PRAGMA quick_check").fetchall() == [("ok",)], "quota database corrupt")
+                    stored = db.execute("SELECT value FROM metadata WHERE key=?", (POLICY_KEY,)).fetchone()
+                    policy = json.loads(stored[0]) if stored else {"version": 1, "cross_group_canonical_goal_unique": True}
+                    require(stored is None or policy == GOAL_REUSE_POLICY, "unknown allocation goal-reuse policy")
+                    inputs.append({"kind": "goal_reuse_policy", "database": str(source), "policy": policy})
                     groups = {gid: json.loads(record) for gid, record in db.execute("SELECT id,record FROM groups")}
                     for iid, gid, split, record in db.execute("SELECT id,group_id,split,record FROM members ORDER BY id"):
                         member = json.loads(record)
@@ -257,6 +262,7 @@ def publish(root, tag, rows, groups, inputs, *, shard_size=32):
         write_json_atomic(temporary / "groups.json", groups)
         summary = {"schema": "isg-dataset-release-v1", "campaign_id": ordered[0]["campaign_id"], "created_at": time.time(),
                    "source_states": inputs, "instances": len(rows), "counts": dict(Counter(row["split"] for row in rows)),
+                   "goal_reuse_policy": next((item["policy"] for item in inputs if item.get("kind") == "goal_reuse_policy"), None),
                    "tasks": {task: dict(Counter(row["split"] for row in rows if row["task"] == task)) for task in sorted({r["task"] for r in rows})},
                    "physical_templates": len({r["physical_template_sha256"] for r in rows}), "render_shards": len(shards),
                    "conceptual_templates": len({r["conceptual_template_sha256"] for r in rows}),

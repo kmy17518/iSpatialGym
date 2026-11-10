@@ -30,6 +30,8 @@ def test_export_reads_only_committed_state_and_preserves_source_tros(tmp_path):
     dest, result = ex.publish(tmp_path, "review01", rows, groups, inputs)
     assert result["counts"] == {"eval_standard": 1, "train": 1}
     assert result["render_shards"] == 1
+    assert result["goal_reuse_policy"] == ex.GOAL_REUSE_POLICY
+    assert next(row["policy"] for row in inputs if row.get("kind") == "goal_reuse_policy") == ex.GOAL_REUSE_POLICY
     assert all(Path(path).read_bytes() == data for path, data in before.items())
     persisted = [json.loads(line) for line in (dest / "instances.jsonl").read_text().splitlines()]
     assert persisted[1]["split"] == "train" and persisted[1]["sampling_split"] == "eval_standard"
