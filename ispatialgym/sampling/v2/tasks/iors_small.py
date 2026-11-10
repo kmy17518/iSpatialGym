@@ -278,6 +278,30 @@ def shelf_board_draw_on(s=None) -> bool:
     return _AS.switch_on(SHELF_BOARD_DRAW_ENV, s)
 
 
+#: i7-t03both r2 2026-11-09 (lead #84b, DEFAULT OFF): the shelf layout's free-floor start (``SHELF_FREE_START``) keeps only a base position in the
+#: same connected region of the eroded traversability map as the attempt's manipulation candidates - T03B_PATH_DIAG: every init -> drive-back
+#: ``no_path`` of the board draw (60 / 76) left from a free start in another region (1221 cells) than the bookcase front (472 cells)
+SHELF_FREE_START_CONNECTED_ENV = "ISPATIALGYM_SHELF_FREE_START_CONNECTED"
+
+
+def shelf_free_start_connected_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_FREE_START_CONNECTED_ENV, s)
+
+
+#: i7-t03both r2 2026-11-09 (lead #84b, DEFAULT OFF): at the fixed shelf start the working arm's interior reach map is read AT THE BOOK - a
+#: Phase-2 candidate whose trunk / stand-off cell under the book holds no feasible grasp row skips the exact checks and goes to the stance
+#: shift, which tries first the MAP stances: the base moved along the edge / to another map stand-off and trunk so the book lands on a cell the
+#: map calls feasible (T03B_GRASP_DIAG: the candidate's focus is any raster cell, the books are placed per attempt after it, so the selected
+#: candidate's map verdict says nothing about the book: 'exact IK failed at pose 1 of 2' with the map's cell ik_pre / the trunk not in the map)
+SHELF_MAP_STANCE_ENV = "ISPATIALGYM_SHELF_MAP_STANCE"
+#: map stances tried per candidate (each one a full fixed-start check)
+SHELF_MAP_STANCE_MAX = 6
+
+
+def shelf_map_stance_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_MAP_STANCE_ENV, s)
+
+
 def shelf_need_of(err: Reject) -> Optional[str]:
     """Why a candidate's fixed start failed, for the stance shift: ``"transit"`` (the transit / back-off checks), ``"grasp"`` (no library
     grasp reaches the fixed start pose), None for anything the base position cannot change (the shift is not tried)."""
@@ -4046,6 +4070,16 @@ class IORSSmall(SamplerV2):
                         with self.ikc.ignoring(ign_last):
                             pr["grasp_links_touching"] = [ln for ln in links if not bool(self.kit.links_clear(qg2, [ln], 0.0)[0])][:8]
                         pr["grasp_self_pairs"] = [f"{a} x {b}" for (a, b), _ in (self.ikc.self_collision_pairs(qg2) or [])[:3]]
+                        try:  # the support piece nearest each touching link's origin (the split-kept pieces' SDF)
+                            fk = self.kit.fk(list(pr["grasp_links_touching"]), qg2)
+                            near = {}
+                            for ln in pr["grasp_links_touching"]:
+                                p_ln = G.t(fk[ln][0]).float().reshape(1, 3)
+                                best = min(((float(geom.sdf(p_ln).min()), prim.rsplit("/", 1)[-1]) for prim, _cm, geom in self._kept_pieces()), default=None)
+                                near[ln] = None if best is None else [best[1], round(best[0], 4), [round(v, 3) for v in p_ln.reshape(-1).tolist()]]
+                            pr["grasp_nearest_piece"] = near
+                        except Exception as e:  # noqa: BLE001
+                            pr["grasp_nearest_piece"] = repr(e)[:120]
                 probes[getattr(g, "name", "?")] = pr
             rec["probes"] = probes
             log.info("T03B_GRASP_DIAG %s", json.dumps(rec, default=str))
@@ -4508,8 +4542,20 @@ class IORSSmall(SamplerV2):
 
         t_xy = G.t(self.shelf_pose[0])[:2].float()
         focus = 0.5 * (G.t(self.shelf_pose[0]).float() + G.t(self.shelf_partner_pose[0]).float())
+        view_ok = lambda st_, cam: self.books_in_frame(st_, cam)  # noqa: E731
+        if shelf_free_start_connected_on(self):  # i7-t03both r2: only a start the drive can leave from (the candidates' region)
+            ref = [c for c in (self.manip_candidates or []) if TRAVEL_DROPPED not in c.extras][:1] or [init]
+            comp = self.free_component(ref[0].base_xy)
+            if comp is not None:
+                inner = view_ok
+
+                def view_ok(st_, cam, _inner=inner, _comp=comp):
+                    if self.free_component(st_.base_xy) != _comp:
+                        TT._count(self, "free_start_connected.refused")
+                        return False
+                    return _inner(st_, cam)
         try:
-            st = free_floor_stance(self, t_xy, focus, lambda st_, cam: self.books_in_frame(st_, cam), rng, what="the partner")
+            st = free_floor_stance(self, t_xy, focus, view_ok, rng, what="the partner")
         except Reject as e:
             TT._count(self, "free_start.failed.no_stance")
             log.info("%s: free start (shelf): %s - the edge init stance stays", self.gp.variant, e)
@@ -4518,6 +4564,118 @@ class IORSSmall(SamplerV2):
         st.name = "init"
         st.extras["free_start_from_edge_lateral_m"] = round(float(init.lateral), 4)
         return st
+
+    def free_component(self, xy) -> Optional[int]:
+        """i7-t03both r2: the connected region (label) of the eroded traversability map the base position ``xy`` belongs to - its nearest free
+        cell within 20 cells, as ``navigation.plan_path`` snaps the ends of a global path; None without one. The labels are computed once."""
+        from ispatialgym.sampling.v2 import navigation as NAV
+
+        lab = self.__dict__.get("_free_labels")
+        if lab is None:
+            free = NAV.eroded_map(self.kit).cpu().numpy().astype(bool)
+            try:
+                from scipy import ndimage
+
+                lab = ndimage.label(free)[0]
+            except ImportError:  # 4-connected flood fill
+                lab = np.zeros(free.shape, dtype=np.int32)
+                n = 0
+                for i0, j0 in zip(*np.nonzero(free)):
+                    if lab[i0, j0]:
+                        continue
+                    n += 1
+                    stack = [(i0, j0)]
+                    lab[i0, j0] = n
+                    while stack:
+                        i, j = stack.pop()
+                        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                            if 0 <= a < free.shape[0] and 0 <= b < free.shape[1] and free[a, b] and not lab[a, b]:
+                                lab[a, b] = n
+                                stack.append((a, b))
+            self._free_labels = lab
+            self._free_map = th.as_tensor(lab > 0)
+        c = NAV.nearest_free_cell(self._free_map, NAV._to_map(self.kit, xy), 20)
+        return None if c is None else int(lab[c])
+
+    def _raw_map(self, arm: str) -> Optional[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
+        """The working arm's interior map behind its band view (json, npz arrays), cached; None for a band that is not a map view."""
+        band = self.band_of_arm(arm)
+        path = (getattr(band, "meta", None) or {}).get("map_path")
+        if not path:
+            return None
+        cache = self.__dict__.setdefault("_diag_maps", {})
+        if path not in cache:
+            js = path if str(path).endswith(".json") else str(path)[:-4] + ".json"
+            with open(js) as f:
+                m = json.load(f)
+            cache[path] = (m, dict(np.load(js[:-5] + ".npz")))
+        return cache[path]
+
+    @staticmethod
+    def _map_trunk_key(stand_off: float, translate: float, tilt: float) -> str:
+        return f"s{float(stand_off):.2f}_t{float(translate):.2f}_k{float(tilt):+.1f}"
+
+    def map_book_feasible(self, st: Stance, arm: str) -> Optional[bool]:
+        """i7-t03both r2 (:data:`SHELF_MAP_STANCE_ENV`): whether the arm's interior map holds a feasible grasp row at the cell under the
+        book (the cell nearest its base-frame position, within half the lattice) for ``st``'s trunk at the nearest map stand-off - False also
+        when that trunk is not in the map; None without a raw map (no verdict)."""
+        rm = self._raw_map(arm)
+        if rm is None or self.shelf_pose is None:
+            return None
+        m, z = rm
+        eds = [float(v) for v in m.get("edge_distances") or []]
+        so = float(st.stand_off if st.stand_off is not None else 0.0)
+        if not eds:
+            return None
+        de = min(eds, key=lambda v: abs(v - so))
+        key = self._map_trunk_key(de, st.translate, st.tilt)
+        if key not in z:
+            return False
+        x, y = self._diag_base_frame(st, G.t(self.shelf_pose[0]))  # the book's base-frame xy (the map's cell frame)
+        cells = np.asarray(z["cells"], dtype=float)
+        lat = float((m.get("config") or {}).get("lattice_m") or 0.08)
+        d = np.abs(cells - np.array([x + (de - so), y])[None, :]).max(axis=1)
+        i = int(np.argmin(d))
+        if d[i] > 0.5 * lat + 1e-6:
+            return False
+        return bool((np.asarray(z[key])[i] == 1).any())
+
+    def shelf_map_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
+        """i7-t03both r2 (:data:`SHELF_MAP_STANCE_ENV`): ``[("map", stance, shift_m)]`` - ``cand`` moved along the edge and to each map stand-off
+        so the fixed start's book lands on a cell of the arm's interior map with a feasible grasp row, at that map trunk: the book's depth fixes
+        the map row (x = its depth behind the front plane + the stand-off, the nearest lattice row within half a lattice), each feasible cell
+        of that row gives the lateral (the base moves by the book's offset from the cell). Ordered by the trunk's distance to ``cand``'s, then
+        the lateral move; at most :data:`SHELF_MAP_STANCE_MAX`. [] without a raw map."""
+        rm = self._raw_map(arm)
+        if rm is None or self.shelf_pose is None or cand.edge is None:
+            return []
+        m, z = rm
+        cells = np.asarray(z["cells"], dtype=float)
+        lat = float((m.get("config") or {}).get("lattice_m") or 0.08)
+        x, y = self._diag_base_frame(cand, G.t(self.shelf_pose[0]))  # the book's base-frame xy (the map's cell frame)
+        so0 = float(cand.stand_off if cand.stand_off is not None else 0.0)
+        out = []
+        for key, a in z.items():
+            mt = re.match(r"s([0-9.]+)_t([0-9.]+)_k([+-][0-9.]+)$", key)
+            if not mt:
+                continue
+            so, tr, ti = float(mt.group(1)), float(mt.group(2)), float(mt.group(3))
+            xb = x + (so - so0)  # the book's base-frame depth at that stand-off
+            feas = (np.asarray(a).reshape(len(cells), -1) == 1).any(axis=1)
+            for i in np.nonzero(feas & (np.abs(cells[:, 0] - xb) <= 0.5 * lat + 1e-6))[0]:
+                shift = y - float(cells[i, 1])  # moving the base +d along the tangent moves the book -d in the robot's frame
+                dt = abs(tr - float(cand.translate)) + abs(ti - float(cand.tilt))
+                out.append((dt, abs(shift) + abs(so - so0), so, tr, ti, shift, float(cells[i, 1])))
+        out.sort(key=lambda r: (r[0], r[1]))
+        res = []
+        for dt, _, so, tr, ti, shift, yc in out[:SHELF_MAP_STANCE_MAX]:
+            st = cand.shifted(stand_off=so, lateral=float(cand.lateral) + shift, name="manipulation").with_trunk(tr, ti, "manipulation")
+            st.extras["map_stance"] = {"cell_y": round(yc, 3), "stand_off": so, "trunk": [tr, ti]}
+            if dt > 1e-6:
+                st.extras["stance_shift_trunk"] = [tr, ti]
+            res.append(("map", st, round(shift, 4)))
+        TT._countn(self, "map_stance.generated", len(res))
+        return res
 
     def shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
         """``[(label, stance, shift_m), ...]`` the stance shift tries for the manipulation candidate ``cand`` (its trunk, the working ``arm``):
@@ -4531,6 +4689,13 @@ class IORSSmall(SamplerV2):
         computed position's other trunks before the scan; only ``cand``'s trunk at the computed position is labelled ``computed``."""
         if self.shelf_pose is None or cand.edge is None:
             return []
+        mapped = self.shelf_map_stances(cand, arm) if shelf_map_stance_on(self) else []
+        if mapped:
+            return mapped + self._shelf_shift_stances(cand, arm)
+        return self._shelf_shift_stances(cand, arm)
+
+    def _shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
+        """:meth:`shelf_shift_stances` without the map stances (the computed stance, then the scan)."""
         want = float(self.gen("shelf_stance_book_lateral_m", SHELF_STANCE_BOOK_LATERAL_M) or SHELF_STANCE_BOOK_LATERAL_M)
         want = want if arm == "left" else -want
         _, lat_book = cand.local(G.t(self.shelf_pose[0])[:2])
@@ -4645,6 +4810,12 @@ class IORSSmall(SamplerV2):
         (:data:`SHELF_STANCE_SHIFT_ENV`, i7-t03 item 1) a failure the base position can change (:func:`shelf_need_of`) tries the stances of
         :meth:`shelf_stance_shift` (the same ``try_fn``); a candidate that passes is never shifted. Returns ``(stance, grasp)``."""
         joint = shelf_joint_stance_on(self) and self.shelf_pose is not None
+        if shelf_map_stance_on(self) and shelf_stance_shift_on(self) and self.shelf_pose is not None:
+            ok = self.map_book_feasible(manip, arm)
+            TT._count(self, f"map_stance.candidate.{'none' if ok is None else ('feasible' if ok else 'infeasible')}")
+            if ok is False:  # i7-t03both r2: the map has no grasp at the book from this candidate - straight to the (map) stance shift
+                return self.shelf_stance_shift(init, cand, manip, arm, Reject("grasp_unreachable", "map: no feasible grasp row at the book's cell from this "
+                                                                                 "candidate's trunk / stand-off"), "grasp", try_fn)
         try:
             g0 = try_fn(manip)
         except Reject as e:
@@ -4692,6 +4863,8 @@ class IORSSmall(SamplerV2):
             joint = shelf_joint_stance_on(self)  # 5p.2: the budget counts the stances that reach the exact checks (the trunk set adds cheap rejects)
             if label == "scan" and budget["scan"] >= scan_max:
                 break
+            if label == "map" and budget.setdefault("map", 0) >= SHELF_MAP_STANCE_MAX:
+                continue
             budget["seen"].add(key)
             if label == "scan" and not joint:
                 budget["scan"] += 1
@@ -4712,6 +4885,8 @@ class IORSSmall(SamplerV2):
                 continue
             if label == "scan" and joint:
                 budget["scan"] += 1
+            if label == "map":
+                budget["map"] = budget.get("map", 0) + 1
             try:
                 grasp = try_fn(st_ok)
             except Reject as e2:
