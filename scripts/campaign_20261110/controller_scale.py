@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--first', type=int, required=True)
     parser.add_argument('--last', type=int, required=True)
     parser.add_argument('--once', action='store_true')
+    parser.add_argument('--max-active-maps', type=int, default=20)
     args = parser.parse_args()
     root = args.root
     output = root / 'scale_prebuild'
@@ -45,6 +46,7 @@ def main():
     while True:
         queue = subprocess.run(['squeue', '-h', '-r', '-u', os.environ['USER'], '-o', '%i|%j|%T'], capture_output=True, text=True, check=True)
         active = {line.split('|')[0] for line in queue.stdout.splitlines()}
+        map_active = sum('|isg261110_maps|' in line for line in queue.stdout.splitlines())
         for index in range(args.first, args.last + 1):
             job = jobs[index]
             entry = state['entries'].setdefault(job['id'], {'index': index, 'status': 'waiting_for_library'})
@@ -79,9 +81,12 @@ def main():
                     entry['map_ok_records'] = sum(row.get('ok') is True for row in records)
                     entry['status'] = 'maps_finished_unreleased' if records else 'maps_waiting_or_missing'
                 continue
+            if map_active >= args.max_active_maps:
+                entry['status'] = 'validated_waiting_for_map_capacity'
+                continue
             env = dict(os.environ)
             env.update(GBH=str(root), ISG_GB_ROOT=str(args.snapshot), GB_OUT=str(output), GB_MANIFEST=str(manifest), GB_NSHARD='54', GB_TAG='train_scales', GB_STAGES='maps', GB_HEIGHTS_BY_ID=str(heights), GB_ANCHORS=str(anchors), GB_ARMS='right left', GB_INCLUDE_DERIVED='0', KIT_TPL_NFS_ROOT=str(root / 'kit_templates'), KIT_TEX_STORE=str(root / 'kit_textures'), EXP_PATH=str(root / 'isaacsim_overlay/apps'), GIT_CONFIG_COUNT='1', GIT_CONFIG_KEY_0='safe.directory', GIT_CONFIG_VALUE_0='*')
-            command = ['sbatch', '--parsable', '-J', 'isg261110_maps', '-A', 'vision', '-p', 'svl', '--exclude=svl9', '--gres=gpu:titanrtx:1', '-c', '8', '--mem=40G', '--time=04:00:00', '--array=' + str(index), '-o', str(root / 'slurm/%x_%A_%a.log'), '--export=ALL', str(args.snapshot / 'scripts/grasp_bands/job_glib.sh')]
+            command = ['sbatch', '--parsable', '--nice=10000', '-J', 'isg261110_maps', '-A', 'vision', '-p', 'svl', '--exclude=svl9', '--gres=gpu:titanrtx:1', '-c', '8', '--mem=40G', '--time=04:00:00', '--array=' + str(index), '-o', str(root / 'slurm/%x_%A_%a.log'), '--export=ALL', str(args.snapshot / 'scripts/grasp_bands/job_glib.sh')]
             entry['status'] = 'submitting'
             save(state_path, state)
             result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=45)
@@ -89,6 +94,7 @@ def main():
                 entry.update(status='submission_failed', error=result.stderr[:300])
             else:
                 entry.update(status='maps_submitted', map_job_id=result.stdout.strip().split(';')[0], submitted_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
+                map_active += 1
                 print('MAP_SUBMITTED', job['id'], entry['map_job_id'], flush=True)
             save(state_path, state)
         state['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()

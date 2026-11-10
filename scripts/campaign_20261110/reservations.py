@@ -24,6 +24,11 @@ def main():
     ]
     # These exclusions are valid only after all mandatory rebindings are built.
     heldin_after = used - {("blender", "eyedvd"), ("bottle_of_soy_milk", "mcjlhs")}
+    # Concrete readiness repairs need these existing ready scene assets held in.
+    # Reserve different unused models before sampling any heldout templates.
+    ready_repair_heldin = {("desk", "aduafr"), ("fridge", "xyejdx"),
+                          ("bottom_cabinet", "slgzfc"), ("bookcase", "kmuacd")}
+    heldin_after |= ready_repair_heldin
     category_models = {}
     for t in proposals["templates"]:
         for value in t.values():
@@ -92,6 +97,7 @@ def main():
         unique = {json.dumps(a, sort_keys=True): a for a in assignments}
         heldout_templates.append({"class_id": key, "task": standard["task"], "status": "reserved_candidates_not_validated", "roles": list(unique.values())})
     data = {"status": "reservations_require_standard_rebindings_and_geometry_validation", "mandatory_standard_rebindings": mandatory,
+            "ready_repair_heldin_models": [f"{c}/{m}" for c,m in sorted(ready_repair_heldin)],
             "model_holdout_templates": heldout_templates, "model_holdout_models": [f"{c}/{m}" for c,m in sorted(model_refs)],
             "category_holdout_models": [f"{c}/{m}" for c,m in sorted(category_models)], "category_holdout_categories": sorted(category_set),
             "category_holdout_rooms": [{"scene": "office_cubicles_right", "room": "conference_hall_0"}],

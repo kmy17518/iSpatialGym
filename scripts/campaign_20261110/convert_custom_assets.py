@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Convert newly built campaign URDFs into a new private dataset, then smoke-load.
+
+Never deletes or replaces model directories. The dataset output must be a new
+directory beneath --campaign-root. Run in the established OmniGibson environment.
+Passing --models permits independent model batches in distinct dataset roots.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+
+
+def sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--build-index", type=Path, required=True)
+    ap.add_argument("--campaign-root", type=Path, required=True)
+    ap.add_argument("--dataset-root", type=Path, required=True)
+    ap.add_argument("--models", default="")
+    args = ap.parse_args()
+    campaign = args.campaign_root.resolve()
+    dataset = args.dataset_root.resolve()
+    if not dataset.is_relative_to(campaign) or dataset == campaign:
+        raise ValueError("dataset output must be inside the private campaign root")
+    if args.dataset_root.exists() or args.dataset_root.is_symlink():
+        raise FileExistsError(f"refusing to overwrite existing dataset {dataset}")
+    index_path = args.build_index.resolve()
+    index = json.loads(index_path.read_text())
+    wanted = set(filter(None, args.models.split(",")))
+    rows = [r for r in index["models"] if not wanted or r["model"] in wanted]
+    if not rows or wanted - {r["model"] for r in rows}:
+        raise ValueError("unknown model or empty selection")
+    # Relative location remains portable after staging the whole build directory.
+    for row in rows:
+        source = index_path.parent / row["model"] / "model" / row["model"]
+        for rel, digest in row["files"].items():
+            path = source / rel
+            if not path.is_relative_to(source) or sha256(path) != digest:
+                raise ValueError(f"source hash mismatch {path}")
+        row["source"] = source
+    dataset.mkdir(parents=True)
+    os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
+    os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
+    import omnigibson as og
+    from omnigibson.utils.asset_conversion_utils import convert_urdf_to_usd, import_obj_metadata, record_obj_metadata_from_urdf
+    import omnigibson.lazy as lazy
+
+    reports = []
+    og.launch()
+    try:
+        for row in rows:
+            category, model = row["category"], row["model"]
+            source = row["source"]
+            manifest = json.loads((source / "build_manifest.json").read_text())
+            urdf = source / f"{model}.urdf"
+            dest = dataset / "objects" / category / model
+            dest.mkdir(parents=True)
+            record_obj_metadata_from_urdf(urdf_path=str(urdf), obj_dir=str(dest), joint_setting="zero", overwrite=False)
+            if row["family"] in {"kohs_face_permutation", "wechsler_red_white"}:
+                (dest / "misc/isg_block_faces.json").write_text(json.dumps({k: manifest[k] for k in
+                    ("faces", "opposite_pairs", "tile_up_axis", "mass_kg", "edge_m")}, indent=2) + "\n")
+            elif row["family"] == "block_board":
+                (dest / "misc/isg_board.json").write_text(json.dumps({k: v for k, v in manifest.items() if k != "urdf"}, indent=2) + "\n")
+            processed, usd = convert_urdf_to_usd(urdf_path=str(urdf), obj_category=category, obj_model=model,
+                dataset_root=str(dataset), use_omni_convex_decomp=False, use_usda=False,
+                merge_fixed_joints=False, import_inertia_tensor=True)
+            import_obj_metadata(usd_path=usd, obj_category=category, obj_model=model, dataset_root=str(dataset))
+            stage = lazy.pxr.Usd.Stage.Open(str(usd))
+            collisions = [p for p in stage.Traverse() if p.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)]
+            if not collisions:
+                raise ValueError(f"no collision prims for {model}")
+            if row["family"] == "block_board":
+                UsdShade, UsdPhysics, PhysxSchema = lazy.pxr.UsdShade, lazy.pxr.UsdPhysics, lazy.pxr.PhysxSchema
+                looks = stage.DefinePrim(stage.GetDefaultPrim().GetPath().AppendChild("Looks"), "Scope")
+                material = UsdShade.Material.Define(stage, looks.GetPath().AppendChild("board_physics_mat"))
+                api = UsdPhysics.MaterialAPI.Apply(material.GetPrim())
+                api.CreateStaticFrictionAttr().Set(0.25)
+                api.CreateDynamicFrictionAttr().Set(0.25)
+                api.CreateRestitutionAttr().Set(0.0)
+                physics = PhysxSchema.PhysxMaterialAPI.Apply(material.GetPrim())
+                physics.CreateFrictionCombineModeAttr().Set("min")
+                physics.CreateRestitutionCombineModeAttr().Set("min")
+                for prim in collisions:
+                    UsdShade.MaterialBindingAPI.Apply(prim).Bind(material,
+                        bindingStrength=UsdShade.Tokens.strongerThanDescendants, materialPurpose="physics")
+                stage.GetRootLayer().Save()
+            report = {"category": category, "model": model, "family": row["family"],
+                      "split_reservation": row["split_reservation"], "conversion": "passed",
+                      "collision_prims": len(collisions), "usd": str(usd), "asset_sha256": sha256(usd),
+                      "source_urdf_sha256": sha256(urdf), "build_manifest_sha256": row["build_manifest_sha256"],
+                      "processed_urdf": str(processed), "ready": False}
+            (dest / "campaign_conversion.json").write_text(json.dumps(report, indent=2) + "\n")
+            reports.append(report)
+        # Use the actual DatasetObject path with an explicit absolute private
+        # dataset name; get_dataset_path preserves absolute dataset roots.
+        import torch as th
+        from omnigibson.objects import DatasetObject
+        env = og.Environment(configs={"env": {"action_frequency": 30, "physics_frequency": 120},
+                                      "scene": {"type": "Scene"}, "robots": []})
+        objects = []
+        og.sim.stop()
+        for i, report in enumerate(reports):
+            obj = DatasetObject(name="campaign_" + report["model"], category=report["category"],
+                                model=report["model"], dataset_name=str(dataset), scale=[1.0, 1.0, 1.0])
+            env.scene.add_object(obj)
+            objects.append(obj)
+        og.sim.play()
+        for i, obj in enumerate(objects):
+            obj.set_position_orientation(th.tensor([(i % 5) * 0.3, (i // 5) * 0.3, 0.06]), th.tensor([0., 0., 0., 1.]))
+            obj.keep_still()
+            obj.wake()
+        for _ in range(90):
+            with og.sim.render_on_step(True):
+                og.sim.step()
+        for report, obj in zip(reports, objects):
+            lo, hi = obj.aabb
+            position, orientation = obj.get_position_orientation()
+            if not th.isfinite(lo).all() or not th.isfinite(hi).all() or not th.all(hi > lo):
+                raise ValueError(f"invalid simulator bounds for {report['model']}")
+            if float(lo[2]) < -0.005 or float(lo[2]) > 0.015:
+                raise ValueError(f"object did not settle on the ground: {report['model']} {lo.tolist()}")
+            if float(th.linalg.norm(obj.get_linear_velocity())) > 0.05:
+                raise ValueError(f"object still moving after settle: {report['model']}")
+            report["smoke"] = {"status": "passed", "steps": 90, "aabb_lower": lo.tolist(),
+                               "aabb_upper": hi.tolist(), "position": position.tolist(), "orientation": orientation.tolist()}
+            report["ready"] = True
+            report["readiness_source"] = "project:exact converted USD SHA256 + fresh DatasetObject collision/bounds/settling smoke"
+            report["task_validation"] = "pending grasps, geometry, successful demo and open-loop replay"
+        (dataset / "campaign_readiness.json").write_text(json.dumps({"schema": "isg-project-readiness-v1",
+            "build_index_sha256": sha256(index_path), "objects": reports}, indent=2, sort_keys=True) + "\n")
+        print(f"CAMPAIGN_CUSTOM_READY models={len(reports)} dataset={dataset}", flush=True)
+    finally:
+        og.shutdown()
+
+
+if __name__ == "__main__":
+    main()
