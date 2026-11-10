@@ -259,6 +259,18 @@ class TroTests(unittest.TestCase):
         self.assertEqual(restored["scene_setup"], t.scene_setup)
         self.assertLess(restored["order"].index("scales"), restored["order"].index("object_states"))
 
+    def test_live_object_state_serialization_remains_the_tro_writers_job(self):
+        class TensorLike:
+            def tolist(self):
+                return [0, 0, 1]
+        original = self.tro()
+        original["target"]["root_link"]["pos"] = TensorLike()
+        t = template()
+        p = c.Perturbations({"target": c.ScaleState((1, 1, 1), (1, 1, 1))})
+        result = c.attach_tro_metadata(original, campaign_id="new", split="eval_standard", template=t,
+                                       created_at=101, seed=2, perturbations=p, validation_key=key(t))
+        self.assertEqual(result["target"]["root_link"]["pos"].tolist(), [0, 0, 1])
+
     def test_missing_scale_or_wrong_template_evidence_rejected(self):
         t = template()
         for p, k in [(c.Perturbations(), key(t)),

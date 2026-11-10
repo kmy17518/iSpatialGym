@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Author and submit fresh held-object goal-group validation candidates.
+
+An anchor is used only to choose a world goal and base. Its instance is never
+copied into the group. All group starts have a new allocation in a separate
+ledger. Preparation and submission do not promote candidates to final splits.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import re
+import shlex
+import subprocess
+import sys
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from scripts.campaign_20261110.contracts import (
+    ObjectRef, Perturbations, ScaleState, Template, ValidationKey,
+    digest, file_digest, require, write_json_atomic,
+)
+from ispatialgym.sampling.campaign_held_goals import SCHEMA, validate_goal_plan
+
+
+def read_json(path):
+    return json.loads(Path(path).read_text())
+
+
+def read_env(path):
+    result = {}
+    for line in Path(path).read_text().splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values = shlex.split(value)
+        require(len(values) <= 1, f"unexpected shell expression in {key}")
+        result[key] = values[0] if values else ""
+    return result
+
+
+def fresh_source(path: Path, *, job: Path, started_at: float):
+    path = path.resolve()
+    require(path.is_file() and path.is_relative_to(job), "anchor artifact must be in its fresh job directory")
+    require(path.stat().st_mtime >= started_at, f"anchor artifact predates campaign: {path.name}")
+    return {"path": str(path), "sha256": file_digest(path), "mtime": path.stat().st_mtime}
+
+
+def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: float):
+    root, job = Path(campaign_root).resolve(), Path(job_dir).resolve()
+    require(job.is_relative_to(root / "out"), "anchor job is outside campaign output")
+    ledger = Path(ledger).resolve()
+    require(ledger.is_relative_to(root / "manifests"), "anchor ledger is outside campaign manifests")
+    with ledger.open() as stream:
+        rows = list(csv.DictReader(stream, delimiter="\t"))
+    matches = [row for row in rows if Path(row["job_dir"]).resolve() == job]
+    require(len(matches) == 1, "anchor job must have exactly one fresh campaign allocation")
+    allocation = matches[0]
+    env = read_env(job / "job.env")
+    require(Path(env["ISGF_ROOT"]).resolve() == root, "anchor job root does not match campaign")
+    fresh_source(job / "job.env", job=job, started_at=campaign_started_at)
+    rows = []
+    for line in (job / "results.jsonl").read_text().splitlines():
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue  # a concurrent collector may still be writing the final line
+    successes = [row for row in rows if row.get("success") is True]
+    require(bool(successes), "anchor has no successful fresh demo")
+    result = successes[0]
+    iid = result["instance"]
+    paths = list((job / "inst").rglob(iid + "-tro_state.json"))
+    require(len(paths) == 1, "anchor TRO is missing or duplicated")
+    tro_path = paths[0]
+    sidecar_path = tro_path.with_name(iid + ".oracle.json")
+    summary_path = tro_path.with_name(iid + ".summary.json")
+    meta_path = job / "demo" / iid / "meta.json"
+    demo_path = job / "demo" / iid / "demo.hdf5"
+    sources = {name: fresh_source(path, job=job, started_at=campaign_started_at)
+               for name, path in (("tro", tro_path), ("sidecar", sidecar_path), ("summary", summary_path),
+                                  ("demo_meta", meta_path), ("demo", demo_path))}
+    tro, sidecar, summary, demo = map(read_json, (tro_path, sidecar_path, summary_path, meta_path))
+    require(tro["ispatialgym"]["instance_id"] == sidecar["instance_id"] == summary["instance_id"] == demo["instance_id"] == iid,
+            "anchor source instance identities differ")
+    require(sidecar["tro_sha256"] == sources["tro"]["sha256"], "anchor sidecar does not match TRO")
+    require(demo.get("success") is True and demo.get("status") == "success" and demo.get("mode") == "oracle",
+            "anchor is not a successful oracle demo")
+    qa = demo.get("qa") or {}
+    require(qa.get("enabled") is True and not qa.get("hard_triggered"), "anchor QA disabled or failed")
+    require(not any(x.get("triggered") for x in (qa.get("metrics") or {}).values() if x.get("mode") == "hard"),
+            "anchor has a hard QA failure")
+    require(summary.get("goal_realised") and summary.get("base_pose2d"), "anchor has no world goal/base proposal")
+    tmeta = read_json(tro_path.parent.parent / "template_meta.json")
+    return {"instance_id": iid, "allocation": allocation, "sources": sources, "tro": tro,
+            "summary": summary, "template_meta": tmeta, "template_dir": str(tro_path.parent.parent),
+            "goal_proposal_source": "fresh_sampler_goal_realised", "anchor_is_final_member": False}
+
+
+def load_template_contract(path, class_id):
+    raw = read_json(path)
+    rows = raw.get("templates", []) if isinstance(raw, dict) else raw
+    matches = [row for row in rows if row.get("class_id") == class_id]
+    require(len(matches) == 1, f"expected one ready contract for {class_id}")
+    row = dict(matches[0])
+    require(not row.pop("blockers", []), "template has unresolved blockers")
+    expected_hash = row.pop("fingerprint", None)
+    row["objects"] = tuple(ObjectRef(**obj) for obj in row["objects"])
+    template = Template(**row)
+    require(expected_hash is None or expected_hash == template.fingerprint, "template inventory fingerprint mismatch")
+    return template
+
+
+def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
+                  code_sha256: str, physics_sha256: str, data_sha256: str,
+                  magnitude_range, budget_seconds: float = 900, max_members: int = 3):
+    require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
+    require(template.task in ("object_scaling", "mental_rotation"), "goal author currently supports held-object tasks")
+    require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
+    bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
+    for ref in template.objects:
+        binding = bindings.get(ref.instance)
+        require(binding is not None and binding.get("category") == ref.category and binding.get("model") == ref.model,
+                f"anchor object identity mismatch: {ref.instance}")
+    tm = anchor["template_meta"]
+    require(tm["scene"] == template.scene, "anchor scene differs from contract")
+    require(template.room in anchor["tro"]["ispatialgym"]["scene"]["task_rooms"], "anchor room differs from contract")
+    runtime_id = tm["template_id"]
+    declared_runtime_id = template.scene_setup.get("runtime_template_id")
+    require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
+    now = time.time()
+    source_goal = anchor["summary"]["goal_realised"]
+    plan = {"schema": SCHEMA, "campaign_id": campaign_id, "group_id": group_id, "split": template.split,
+            "task": template.task, "template_id": runtime_id, "contract_template_sha256": template.fingerprint,
+            "scene": template.scene, "room": template.room,
+            "goal_pose": {"position": source_goal["position"], "orientation": source_goal["orientation"]},
+            "base_pose2d": anchor["summary"]["base_pose2d"], "magnitude_range": list(magnitude_range),
+            "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
+            "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
+            "anchor_sources": anchor["sources"]}
+    validate_goal_plan(plan, task=template.task, template_id=runtime_id, scene=template.scene, rooms=[template.room], now=now)
+    perturbations = Perturbations({obj.instance: ScaleState(obj.default_scale, obj.default_scale, "fixed") for obj in template.objects})
+    key = ValidationKey(template.fingerprint, code_sha256, physics_sha256, data_sha256, perturbations.scale_fingerprint)
+    config = {"campaign_id": campaign_id, "split": template.split, "purpose": "validation",
+              "template": asdict(template), "perturbations": asdict(perturbations), "validation_key": asdict(key)}
+    source = {"campaign_id": campaign_id, "group_id": group_id, "anchor_instance_id": anchor["instance_id"],
+              "anchor_allocation": anchor["allocation"], "anchor_sources": anchor["sources"],
+              "anchor_is_final_member": False, "goal_proposal_source": anchor["goal_proposal_source"],
+              "template_dir": anchor["template_dir"], "created_at": now, "status": "validation_candidates_only"}
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=False)
+    for name, data in (("goal_plan.json", plan), ("campaign_config.json", config), ("source.json", source),
+                       ("empty_eval_index.json", {"schema": "isg-instance-index-v1", "n": 0, "instances": []})):
+        write_json_atomic(output / name, data)
+    return {"group_id": group_id, "directory": str(output.resolve()), "plan_sha256": digest(plan),
+            "validation_key": asdict(key), "status": "ready_for_group_validation"}
+
+
+def submission_command(group_dir, *, snapshot, campaign_root, v2_root, base_index=10000000,
+                       account="vision", partition="svl", gres="titanrtx", extra_env=()):
+    group = Path(group_dir).resolve()
+    root, code = Path(campaign_root).resolve(), Path(snapshot).resolve()
+    require(group.is_relative_to(root), "group state must be inside campaign root")
+    plan, config, source = (read_json(group / name) for name in ("goal_plan.json", "campaign_config.json", "source.json"))
+    require(config["purpose"] == "validation", "this submitter only launches candidate validation")
+    require(base_index >= 10000000, "group indices must use a fresh range separate from baseline canaries")
+    require((code / "scripts/trainfast/submit_fast.py").is_file(), "snapshot missing trainfast submitter")
+    identity = code / ".snapshot_commit"
+    if not identity.exists():
+        identity = code / ".snapshot_isg"
+    require(identity.is_file() and file_digest(identity) == config["validation_key"]["code_sha256"],
+            "group code identity differs from requested frozen snapshot")
+    key = source["anchor_allocation"]["key"]
+    n = int(plan["max_members"])
+    budget = float(plan.get("budget_seconds", 900))
+    env = {"ISPATIALGYM_CAMPAIGN_GOAL_PLAN": str(group / "goal_plan.json"),
+           "ISPATIALGYM_CAMPAIGN_CONFIG": str(group / "campaign_config.json"),
+           "TEMPLATE": source["template_dir"], "EVAL_INDEX": str(group / "empty_eval_index.json"),
+           "ISGF_COLLECT_EXTRA": "--no-goal-override", "ISGF_SAMPLING_CACHE": str(root / "cache/groups" / plan["group_id"]),
+           "ISGF_ASSET_CACHE": str(root / "asset_cache"), "ISGF_JB_NFS": str(root / "jobs"),
+           "ISGF_PREDEMO_ROOT": str(root), "KIT_TPL_NFS_ROOT": str(root / "kit_templates"),
+           "KIT_TEX_STORE": str(root / "kit_textures"), "ISGF_EXP_PATH": str(root / "isaacsim_overlay/apps"),
+           "ISPATIALGYM_FAST_BAND_SHARE": "0", "ISPATIALGYM_FAST_COLLECTOR_PREBUILD": "0"}
+    protected = {"ISPATIALGYM_CAMPAIGN_GOAL_PLAN", "ISPATIALGYM_CAMPAIGN_CONFIG", "TEMPLATE", "EVAL_INDEX", "ISGF_COLLECT_EXTRA"}
+    for item in extra_env:
+        name, value = item.split("=", 1)
+        require(name not in protected, f"cannot override group invariant {name}")
+        env[name] = value
+    cmd = [sys.executable, str(code / "scripts/trainfast/submit_fast.py"), "submit", key, str(n), "--flow", "fast", "--code", str(code),
+           "--root", str(root), "--ledger", str(root / "manifests/goal_group_allocations.tsv"), "--base-index", str(base_index),
+           "--tag", "goal_groups", "--job-prefix", "isg261110_", "--grasps", "v2only", "--v2-root", str(v2_root),
+           "--alias-memory", "off", "--no-memory-aggregate", "--kcollect", "2", "--sample-limit-s", str(int(budget + 1800)),
+           "--time-s", str(int(budget + 3600)), "--acct", account, "--part", partition, "--gres", gres]
+    for name, value in env.items():
+        cmd += ["--extra-env", f"{name}={value}"]
+    return cmd
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    subs = parser.add_subparsers(dest="command", required=True)
+    prepare = subs.add_parser("prepare")
+    for name in ("anchor-job", "campaign-root", "anchor-ledger", "contracts", "class-id", "campaign-id", "group-id", "out",
+                 "code-identity-file", "physics-spec", "data-manifest"):
+        prepare.add_argument("--" + name, required=True)
+    prepare.add_argument("--campaign-started-at", required=True, type=float)
+    prepare.add_argument("--magnitude-range", nargs=2, required=True, type=float)
+    prepare.add_argument("--budget-seconds", type=float, default=900)
+    prepare.add_argument("--max-members", type=int, default=3)
+    submit = subs.add_parser("submit")
+    for name in ("group-dir", "snapshot", "campaign-root", "v2-root"):
+        submit.add_argument("--" + name, required=True)
+    submit.add_argument("--base-index", type=int, default=10000000)
+    submit.add_argument("--acct", default="vision")
+    submit.add_argument("--part", default="svl")
+    submit.add_argument("--gres", default="titanrtx")
+    submit.add_argument("--extra-env", action="append", default=[])
+    submit.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    if args.command == "prepare":
+        anchor = successful_anchor(args.anchor_job, campaign_root=args.campaign_root, ledger=args.anchor_ledger,
+                                   campaign_started_at=args.campaign_started_at)
+        result = prepare_group(anchor=anchor, template=load_template_contract(args.contracts, args.class_id),
+                               campaign_id=args.campaign_id, group_id=args.group_id, output=Path(args.out),
+                               code_sha256=file_digest(args.code_identity_file), physics_sha256=file_digest(args.physics_spec),
+                               data_sha256=file_digest(args.data_manifest), magnitude_range=args.magnitude_range,
+                               budget_seconds=args.budget_seconds, max_members=args.max_members)
+        print(json.dumps(result, indent=2))
+    else:
+        cmd = submission_command(args.group_dir, snapshot=args.snapshot, campaign_root=args.campaign_root,
+                                 v2_root=args.v2_root, base_index=args.base_index, account=args.acct,
+                                 partition=args.part, gres=args.gres, extra_env=args.extra_env)
+        record_path = Path(args.group_dir) / "submission.json"
+        require(not record_path.exists(), "group already has a submission record; reconcile before retrying")
+        if args.dry_run:
+            cmd.append("--dry-run")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        if not args.dry_run:
+            write_json_atomic(record_path, {"created_at": time.time(), "command": cmd, "returncode": result.returncode,
+                                            "stdout": result.stdout, "stderr": result.stderr,
+                                            "status": "submitted" if result.returncode == 0 else "submit_failed"})
+        print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        raise SystemExit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()

@@ -60,10 +60,12 @@ class HeldGoalPlan:
     created_at: float
     deadline_at: float
     max_members: int
+    contract_template_sha256: str | None
     sha256: str
 
     def summary(self) -> dict[str, Any]:
         return {"group_id": self.group_id, "campaign_id": self.campaign_id, "plan_sha256": self.sha256,
+                "runtime_template_id": self.template_id, "contract_template_sha256": self.contract_template_sha256,
                 "split": self.split, "bucket_strict": self.split != "train",
                 "requested_goal": {"position": list(self.position), "orientation": list(self.orientation)},
                 "base_pose2d": list(self.base_pose2d), "magnitude_range": list(self.magnitude_range),
@@ -107,9 +109,13 @@ def validate_goal_plan(raw: Mapping[str, Any], *, task: str, template_id: str, s
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid goal-group member limit")
     if task == "object_scaling":
         _require(count <= 3, "object scaling permits at most three group members")
+    contract_hash = raw.get("contract_template_sha256")
+    if contract_hash is not None:
+        _require(isinstance(contract_hash, str) and len(contract_hash) == 64
+                 and all(x in "0123456789abcdef" for x in contract_hash), "invalid contract template hash")
     encoded = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     return HeldGoalPlan(raw["campaign_id"], raw["group_id"], split, task, template_id, scene, raw["room"], position,
-                        orientation, base, bounds, created, deadline, count, hashlib.sha256(encoded).hexdigest())
+                        orientation, base, bounds, created, deadline, count, contract_hash, hashlib.sha256(encoded).hexdigest())
 
 
 def load_goal_plan(*, task: str, template_id: str, scene: str, rooms: Sequence[str],

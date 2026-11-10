@@ -1091,6 +1091,8 @@ class HeldObjectV2(SamplerV2):
         d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags), "spread": self.spread_record(order)},
                           "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"}, "hold": hold,
                           "arm": self.arm_summary(), "campaign_goal_group": plan.summary()})
+        d.summary["campaign_goal_group"]["requested_start"] = {
+            "position": obj0[0].tolist(), "orientation": obj0[1].tolist(), "grasp_key": g.key, "grasp_name": g.name}
         d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
         self.sidecar.add_stance(init)
         rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0,
@@ -1436,6 +1438,10 @@ class HeldObjectV2(SamplerV2):
             self.program_check(draft)
             self.check_witness_reach()
             self.campaign_group_remaining_s()
+            pinned = draft.extras["campaign_fixed_goal"]
+            goal = draft.goal_poses[self.target_name]
+            if not (th.equal(G.t(goal[0]), G.t(pinned["position"])) and th.equal(G.t(goal[1]), G.t(pinned["orientation"]))):
+                raise Reject("campaign_goal_drift", "a final validation changed the pinned goal before TRO write")
         # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
         st = self.sidecar.stances.get("init")
         if st is not None:

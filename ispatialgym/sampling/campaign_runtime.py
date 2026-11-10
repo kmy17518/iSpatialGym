@@ -49,6 +49,29 @@ def configuration():
     return _load(str(Path(os.environ["ISPATIALGYM_CAMPAIGN_CONFIG"]).resolve()))
 
 
+def training_soft_buckets() -> bool:
+    return active() and configuration()[0]["split"] == "train"
+
+
+def choose_soft_bucket(rng, buckets, counts):
+    """Favor underfilled train buckets while keeping every bucket eligible.
+
+    The sampler still checks the physical bounds of its chosen draw. Unlike eval,
+    an already-filled bucket stays available when another bucket has low yield.
+    """
+    require(bool(buckets), "training bucket list is empty")
+    maxima = [float(b["max_m"]) for b in buckets]
+    targets = [max(0, int(b.get("n", 0))) for b in buckets]
+    require(all(math.isfinite(v) and v > 0 for v in maxima), "invalid bucket bounds")
+    deficits = [max(0, n - int(counts.get(hi, 0))) for n, hi in zip(targets, maxima)]
+    # Reserve 20% of draws for uniform exploration even for large outstanding
+    # quotas. A fixed pseudocount would vanish beside a 10,000-instance deficit.
+    total = sum(deficits)
+    probabilities = ([0.2 / len(buckets) + 0.8 * deficit / total for deficit in deficits]
+                     if total else [1.0 / len(buckets)] * len(buckets))
+    return int(rng.choice(len(buckets), p=probabilities))
+
+
 def _require_supported(perturbations):
     require(not perturbations.removed_objects and not perturbations.lighting,
             "scene/light perturbations need an installed and verified runtime adapter")

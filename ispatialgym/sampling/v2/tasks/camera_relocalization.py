@@ -570,7 +570,13 @@ class CameraRelocalizationV2(SamplerV2):
         buckets = self.buckets()
         requested = self.requested_bucket_m if self.requested_bucket_m is not None else self.gen("requested_bucket_m")
         try:
-            bi = choose_bucket(rng, buckets, self.bucket_counts(), requested)
+            if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+                from ispatialgym.sampling.campaign_runtime import choose_soft_bucket, training_soft_buckets
+
+                bi = (choose_soft_bucket(rng, buckets, self.bucket_counts()) if training_soft_buckets()
+                      else choose_bucket(rng, buckets, self.bucket_counts(), requested))
+            else:
+                bi = choose_bucket(rng, buckets, self.bucket_counts(), requested)
         except ValueError as e:
             raise Reject("spec", str(e))
         lo, hi = bucket_bounds(buckets)[bi]

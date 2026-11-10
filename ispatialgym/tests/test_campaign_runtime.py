@@ -85,3 +85,15 @@ def test_unapplied_scene_or_light_metadata_is_rejected():
     meta["perturbations"]["lighting"] = {"fixture": 0.8}
     with pytest.raises(ContractError, match="runtime adapter"):
         runtime.verify_loaded(meta, {"target": SimpleNamespace(scale=[0.9, 0.9, 2.25])})
+
+
+def test_full_training_buckets_remain_eligible_when_another_is_underfilled():
+    class CaptureRNG:
+        def choice(self, count, p):
+            assert count == 3
+            assert all(probability > 0 for probability in p)
+            assert p[2] > p[0]
+            return 0
+
+    buckets = [{"max_m": 3, "n": 3}, {"max_m": 5, "n": 4}, {"max_m": 10, "n": 3}]
+    assert runtime.choose_soft_bucket(CaptureRNG(), buckets, {3.0: 10, 5.0: 4, 10.0: 0}) == 0

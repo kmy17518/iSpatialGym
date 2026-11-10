@@ -24,7 +24,7 @@ for line in output(['scontrol','show','nodes','-o']).splitlines():
     slots=min(free,cpus//9,memory//(48*1024)) if usable else 0
     nodes.append(dict(node=row['NodeName'],partitions=sorted(partitions),model=model,state=row.get('State'),free_gpus=free,free_cpus=cpus,free_mem_mb=memory,eligible=usable,slots_9cpu_48gb=slots))
 jobs=[]
-for line in output(['squeue','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q']).splitlines():
+for line in output(['squeue','-r','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q']).splitlines():
     user,jid,name,state,part,acct,gres,qos=line.split('|')
     count=sum(int(x) for x in re.findall(r'gres/gpu(?::[^:,]+)?:(\d+)',gres))
     jobs.append(dict(user=user,id=jid,name=name,state=state,partition=part,account=acct,gpus=count,qos=qos))

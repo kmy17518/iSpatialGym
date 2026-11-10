@@ -43,8 +43,8 @@ def refresh(output, host):
     campaign_ids={str(j['job_id']) for j in runtime.get('jobs',[]) if j.get('job_id')}
     campaign_ids.update(str(g[k]) for g in gates for k in ('source_job_id','replay_job_id') if g.get(k))
     jobs=cluster.get('jobs',[])
-    campaign=[j for j in jobs if j['id'] in campaign_ids]
-    unrelated=[j for j in jobs if j['id'] not in campaign_ids]
+    campaign=[j for j in jobs if j['id'] in campaign_ids or j['name'].startswith('isg261110_')]
+    unrelated=[j for j in jobs if j not in campaign]
     vast=read_json(infra/'vast_snapshot.json',{})
     fleet=[i for a in vast.get('accounts',[]) for i in a.get('instances',[])]
     own_vast_ids={str(i) for i in runtime.get('vast_instance_ids',[])}

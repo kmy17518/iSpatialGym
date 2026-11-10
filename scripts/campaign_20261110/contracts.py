@@ -448,7 +448,8 @@ def attach_tro_metadata(tro: Mapping[str, Any], *, campaign_id: str, split: str,
         "validation_key": asdict(validation_key),
         "restoration_order": ["scene_setup", "scales", "object_states", "removed_objects", "lighting"],
     }
-    canonical_json(result)
+    # The live sampler's object states contain tensors. The established TRO
+    # writer applies TorchEncoder to those; only our new metadata is JSON here.
     validate_campaign_block(result["ispatialgym"]["campaign"], object_bindings=result["ispatialgym"].get("object_bindings"))
     return result
 
