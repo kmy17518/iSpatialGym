@@ -236,6 +236,9 @@ LYING = "lying"
 LYING_TOP_MARGIN_M = 0.02
 LYING_NO_TIP_MU = 0.8
 LYING_NO_TIP_SAFETY = 0.75
+#: the lying drop's bottom heights above the floor, screened in turn per C (``generation.push_under_lying_drop_heights_m``): the handle is held
+#: with the hand horizontal, out of the arm's reach at the standing drop's 0.15 m (the oracle's drop then lowers it as far as the arm comes)
+LYING_DROP_HEIGHTS_M = (0.15, 0.25, 0.35)
 
 
 def briefcase_lying_on() -> bool:
@@ -1888,9 +1891,24 @@ class IORSLarge(SamplerV2):
         return True
 
     def drop_pose_at(self, xy, quat) -> G.Pose:
-        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy``."""
-        z = self.floor_z + self.world.bottom_offset(self.hull, quat) + float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
+        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy`` (:meth:`drop_height`)."""
+        z = self.floor_z + self.world.bottom_offset(self.hull, quat) + self.drop_height()
         return th.tensor([float(xy[0]), float(xy[1]), z]), quat
+
+    def drop_height(self) -> float:
+        """The drop's bottom height above the floor: ``generation.drop_height_m`` (:data:`PUSH_UNDER_DROP_HEIGHT_M`), or with :attr:`lying` the
+        rung of :data:`LYING_DROP_HEIGHTS_M` the C loop's F_goal screen is at (``_lying_drop_h``)."""
+        h = self.__dict__.get("_lying_drop_h")
+        if h is not None and getattr(self, "lying", False):
+            return float(h)
+        return float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
+
+    def lying_drop_heights(self) -> List[float]:
+        """i7-measure (A2): the lying drop's bottom heights screened in turn at a C (``generation.push_under_lying_drop_heights_m``, default
+        :data:`LYING_DROP_HEIGHTS_M`): the lying briefcase is held by its handle with the hand horizontal, which the arm cannot hold at the
+        standing drop's height (ms_ul02_on: every F_goal 0, the drop eef 0.18-0.19 m up 0.62-0.67 m ahead unreachable even world-free)."""
+        v = self.gp.gen("push_under_lying_drop_heights_m")
+        return [float(x) for x in (v if v is not None else LYING_DROP_HEIGHTS_M)]
 
     #: height of the blade above the fingertips that can meet the pushed object (the finger pads, PAD_Z_RANGE span)
     BLADE_SPAN_M = 0.05
@@ -6590,7 +6608,18 @@ class IORSLarge(SamplerV2):
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
-            F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+            if push and self.lying:
+                # i7-measure (A2): the lying drop's heights in turn, the first with a feasible pair is this C's (drop_height reads it)
+                for h_l in self.lying_drop_heights():
+                    self._lying_drop_h = h_l
+                    F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+                    if F_goal:
+                        TT._count(self, f"briefcase_lying.drop_h.{h_l:.2f}")
+                        break
+                else:
+                    TT._count(self, "briefcase_lying.drop_h.none")
+            else:
+                F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
             # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
             tilts_of: Dict[Tuple[int, Any], List[float]] = {}
@@ -6930,7 +6959,7 @@ class IORSLarge(SamplerV2):
                 if fallback is not None:
                     grasp.extras["segment_fallback"] = fallback
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
-                    grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
+                    grasp.extras.update({"place_kind": "drop", "drop_height_m": self.drop_height(),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
                 # carry-height ladder (0920-014945: with the hand frozen at a 12 cm lift over the table, the arrival sweep into the

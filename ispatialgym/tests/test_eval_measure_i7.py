@@ -179,3 +179,16 @@ def test_ul02_customs_scope():
         data = json.load(f)
     lying = [k for k, v in data.items() if isinstance(v, dict) and (v.get("generation") or {}).get(IL.PUSH_UNDER_GOAL_REST_KEY) == IL.LYING]
     assert lying == ["inter_object_relation_satisfaction-under_large_scale-briefcase-desk_mdhelw_0-floor_pitched"]
+
+
+def test_lying_drop_height_ladder(monkeypatch):
+    monkeypatch.setattr(IL.TT, "_count", lambda s, k: None)
+    s = _stub({"push_under_hand": "pitched_far", IL.PUSH_UNDER_GOAL_REST_KEY: IL.LYING}, monkeypatch)
+    s.num = lambda k, d: d
+    assert s.lying_drop_heights() == list(IL.LYING_DROP_HEIGHTS_M)
+    assert s.drop_height() == IL.PUSH_UNDER_DROP_HEIGHT_M  # before the C loop sets a rung
+    s._lying_drop_h = 0.35
+    assert s.drop_height() == 0.35
+    off = _stub({"push_under_hand": "pitched_far", IL.PUSH_UNDER_GOAL_REST_KEY: IL.LYING}, monkeypatch, on=False)
+    off.num, off._lying_drop_h = (lambda k, d: d), 0.35
+    assert off.drop_height() == IL.PUSH_UNDER_DROP_HEIGHT_M  # switch off: the rung is never read
