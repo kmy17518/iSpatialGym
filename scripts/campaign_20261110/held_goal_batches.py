@@ -252,7 +252,8 @@ def submission_command(queue_path, **kwargs):
     command[command.index("submit")+2]=str(sum(row["max_members"] for row in state["entries"]))
     budgets=sum(float(g.read_json(row["path"])["budget_seconds"]) for row in state["entries"])
     command[command.index("--sample-limit-s")+1]=str(int(budgets+1800))
-    command[command.index("--time-s")+1]=str(int(budgets+3600))
+    headroom = 7200 if state["task"] == "configuration_matching-block_design" else 3600
+    command[command.index("--time-s")+1]=str(int(budgets+headroom))
     index=next(i for i,value in enumerate(command) if value.startswith("ISPATIALGYM_CAMPAIGN_GOAL_PLAN="))
     del command[index-1:index+1]
     command.extend(["--extra-env",ENV+"="+str(Path(queue_path).resolve())])

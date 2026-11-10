@@ -370,6 +370,17 @@ def run_job(spec, replay_s3):
         up_err = repr(e)
     done = {**backend, "id": jid, "name": spec["name"], "job_dir": jd, "upload_error": up_err,
             "attempts": stats.get("attempts"), "written": stats.get("written"), "demos": stats.get("demos"), "successes": stats.get("successes")}
+    if done.get('attempt_id'):
+        # Preserve failed-attempt artifacts before a retry can replace the
+        # canonical latest-output keys. These are server-side copies.
+        prefix=f"attempts/{jid}/{done['attempt_id']}"
+        copied=[]
+        for name in ('jobdir.tar.zst','slurm.log','cache_new.tar.zst'):
+            if s3_exists(f'out/{jid}/{name}'):
+                result=s5('cp',f'{S3}/out/{jid}/{name}',f'{S3}/{prefix}/{name}',check=False)
+                if result.returncode==0:copied.append(name)
+        done['immutable_output_prefix']=prefix
+        done['immutable_output_files']=copied
     done['upload_finished_unix'] = time.time()
     done['upload_seconds'] = done['upload_finished_unix']-t_end
     if done.get('attempt_id'):

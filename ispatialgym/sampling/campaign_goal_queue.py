@@ -18,12 +18,14 @@ SURFACE_SCHEMA = "isg-surface-goal-queue-v1"
 TRAY_SCHEMA = "isg-tray-goal-queue-v1"
 JOINT_SCHEMA = "isg-joint-goal-queue-v1"
 ATTACHMENT_SCHEMA = "isg-attachment-goal-queue-v1"
+BLOCK_SCHEMA = "isg-block-goal-queue-v1"
 RESET_FIELDS = ("_campaign_goal_started_at", "_campaign_goal_plan_sha", "_campaign_group_written", "_campaign_latest_proposal",
                 "_campaign_group_started_at", "_campaign_pair_plan_sha", "_campaign_pair_active", "_campaign_native_goal",
                 "_campaign_surface_plan_sha", "_campaign_surface_active", "_campaign_tray_plan_sha", "_campaign_tray_active",
                 "_campaign_destination", "_campaign_joint_plan_sha", "_campaign_joint_active",
                 "_campaign_joint_written_starts", "_campaign_stable_probed_sha",
-                "_campaign_attachment_active", "_campaign_attachment_plan_sha")
+                "_campaign_attachment_active", "_campaign_attachment_plan_sha",
+                "_campaign_block_active", "_campaign_block_plan_sha")
 
 
 def canonical_goal(plan):
@@ -50,6 +52,8 @@ def schema_for_task(task):
         return TRAY_SCHEMA
     if task == "configuration_matching-attachment":
         return ATTACHMENT_SCHEMA
+    if task == "configuration_matching-block_design":
+        return BLOCK_SCHEMA
     if task.startswith("configuration_matching-articulation_"):
         return JOINT_SCHEMA
     if task.startswith("inter_object_relation_satisfaction-"):
@@ -61,6 +65,10 @@ def schema_for_task(task):
 
 
 def canonical_plan_goal(plan, schema):
+    if schema == BLOCK_SCHEMA:
+        return {"board": canonical_goal({"goal_pose": plan["board_pose"]}),
+                "slots": [canonical_goal({"goal_pose": value}) for value in plan["goal_slots"]],
+                "pattern": plan["pattern"]}
     if schema in (PAIR_SCHEMA, ATTACHMENT_SCHEMA):
         return canonical_pair_goal(plan)
     if schema == TRAY_SCHEMA:
@@ -74,7 +82,7 @@ def read_queue(path, config_path):
     path, config_path = Path(path).resolve(), Path(config_path).resolve()
     raw, config = json.loads(path.read_text()), json.loads(config_path.read_text())
     schema = raw.get("schema")
-    require(schema in (SCHEMA, PAIR_SCHEMA, SURFACE_SCHEMA, TRAY_SCHEMA, JOINT_SCHEMA, ATTACHMENT_SCHEMA), "invalid goal queue schema")
+    require(schema in (SCHEMA, PAIR_SCHEMA, SURFACE_SCHEMA, TRAY_SCHEMA, JOINT_SCHEMA, ATTACHMENT_SCHEMA, BLOCK_SCHEMA), "invalid goal queue schema")
     require(raw.get("config_sha256") == file_digest(config_path), "goal queue config changed")
     require(raw.get("campaign_id") == config.get("campaign_id"), "goal queue campaign differs from config")
     template = config["template"]
@@ -107,6 +115,13 @@ def read_queue(path, config_path):
             for role, name in (("target", parsed.target_name), ("partner", parsed.partner_name)):
                 require([obj["instance"] for obj in template["objects"] if obj["role"] == role] == [name],
                         "attachment queue role differs from declared binding")
+        elif schema == BLOCK_SCHEMA:
+            from ispatialgym.sampling.campaign_block_goals import validate_block_plan
+            parsed = validate_block_plan(plan, **identity)
+            targets = [obj["instance"] for obj in template["objects"] if obj["role"] == "target"]
+            boards = [obj["instance"] for obj in template["objects"] if obj.get("semantic_kind") == "board"]
+            require(len(targets) == 4 and set(targets) == set(parsed.target_names) and boards == [parsed.board_name],
+                    "block queue roles differ from declared bindings")
         else:
             from ispatialgym.sampling.campaign_joint_goals import validate_joint_plan
             targets = [obj for obj in template["objects"] if obj["role"] == "target"]

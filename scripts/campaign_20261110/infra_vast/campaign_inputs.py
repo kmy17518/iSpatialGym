@@ -9,7 +9,8 @@ import shutil
 
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 QUEUE_SCHEMAS = ('isg-held-goal-queue-v1','isg-pair-goal-queue-v1','isg-surface-goal-queue-v1',
-                 'isg-tray-goal-queue-v1','isg-joint-goal-queue-v1','isg-attachment-goal-queue-v1')
+                 'isg-tray-goal-queue-v1','isg-joint-goal-queue-v1','isg-attachment-goal-queue-v1',
+                 'isg-block-goal-queue-v1')
 
 
 def compatible_gpus(requested, config):

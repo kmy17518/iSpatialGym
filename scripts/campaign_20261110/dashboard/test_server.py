@@ -79,6 +79,20 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(data['evidence'], {})
         self.assertFalse(data['sources']['evidence']['available'])
 
+    def test_group_yield_isolated_read_only_and_full_evidence_route(self):
+        value={'campaign_id':'campaign_20261110','summary':{'standard_eval':{'completed_groups':4}},
+               'sources':[{'path':'proof','sha256':'abc'}],'groups':[{'group_id':'one'}],'api_key':'HIDDEN'}
+        self.write('dashboard/goal_group_yield.json',value)
+        before=self.hashes();data=json.loads(self.request('GET','/api/status')[1])
+        self.assertEqual(data['group_yield']['summary'],value['summary'])
+        self.assertNotIn('sources',data['group_yield'])
+        status,raw=self.request('GET','/reports/goal-yield')
+        self.assertEqual(status,200);self.assertEqual(json.loads(raw)['groups'],value['groups'])
+        self.assertNotIn(b'HIDDEN',raw);self.assertEqual(before,self.hashes())
+        self.write('dashboard/goal_group_yield.json',{'campaign_id':'older','summary':{}})
+        data=snapshot(self.root,self.root/'inventory')
+        self.assertEqual(data['group_yield'],{});self.assertFalse(data['sources']['group_yield']['available'])
+
     def test_resource_jobs_are_scoped_to_this_campaign(self):
         self.write('infra/cluster_snapshot.json', {'jobs': [
             {'id': '101', 'name': 'isg261110_production'},

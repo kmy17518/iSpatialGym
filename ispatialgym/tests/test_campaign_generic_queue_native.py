@@ -32,7 +32,7 @@ def test_small_queue_refreshes_goal_and_filters_native_pairs_before_start(monkey
 
 
 @pytest.mark.parametrize("task", ["alignment-world_vertical", "alignment-axial", "disembedding",
-    "configuration_matching-articulation_open_large_scale"])
+    "configuration_matching-articulation_open_large_scale", "configuration_matching-block_design"])
 def test_generic_groups_retain_core_checks(tmp_path, monkeypatch, task):
     from ispatialgym.tests import test_campaign_goal_queue as test
     monkeypatch.setattr(test.fixtures, "fixture", lambda path, patch: generic_fixture(path, patch, task))

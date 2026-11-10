@@ -19,7 +19,7 @@ QUOTAS = {q.task: q for q in task_quotas()}
 
 
 def supports(task):
-    return (task in ("alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment")
+    return (task in ("alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment", "configuration_matching-block_design")
             or task.startswith("configuration_matching-articulation_")
             or task.startswith("inter_object_relation_satisfaction-")) and task in QUOTAS
 
@@ -45,6 +45,8 @@ def ranges(template):
         edges = (0, .30, .45, 1)
     elif task.startswith("configuration_matching-articulation_"):
         edges = (0, .5, 1)
+    elif task == "configuration_matching-block_design":
+        edges = (.5, 1.5, 2.5, 3.5, 4.5)
     else:
         edges = (0, 1)
     return tuple(zip(edges, edges[1:]))

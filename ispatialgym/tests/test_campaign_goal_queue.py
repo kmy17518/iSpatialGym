@@ -43,7 +43,7 @@ def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_
         plan=json.load(open(os.environ[queue.PLAN_ENV]))
         attempt_rows = [json.loads(line) for line in (tmp_path / "campaign_attempts.jsonl").read_text().splitlines()]
         assert attempt_rows[-1]["event"] == "started" and attempt_rows[-1]["goal_group_id"] == plan["group_id"]
-        goals.append((plan["group_id"],plan["goal_pose"]))
+        goals.append((plan["group_id"],plan.get("goal_pose", plan.get("goal_slots"))))
         return SimpleNamespace(summary={})
     def write(draft,index,seed):
         sampler._campaign_group_written=getattr(sampler,"_campaign_group_written",0)+1

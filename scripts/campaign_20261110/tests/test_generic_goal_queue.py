@@ -15,6 +15,9 @@ def generic_fixture(tmp_path, monkeypatch, task):
     config["template"]["objects"] = [{"instance": "target", "role": "target", "joint": "hinge"}]
     if task == "configuration_matching-attachment":
         config["template"]["objects"].append({"instance": "partner", "role": "partner"})
+    if task == "configuration_matching-block_design":
+        config["template"]["objects"] = [{"instance": f"block{i}", "role": "target"} for i in range(4)]
+        config["template"]["objects"].append({"instance": "board", "role": "support", "semantic_kind": "board"})
     write_json_atomic(config_path, config)
     for row in entries:
         plan = json.loads(open(row["path"]).read())
@@ -28,6 +31,14 @@ def generic_fixture(tmp_path, monkeypatch, task):
         elif task == "configuration_matching-attachment":
             plan.update(schema="isg-attachment-goal-plan-v1", target_name="target", partner_name="partner",
                 partner_pose={"position": [1, 0, .8], "orientation": [0, 0, 0, 1]})
+        elif task == "configuration_matching-block_design":
+            goal = plan.pop("goal_pose")
+            plan.update(schema="isg-block-goal-plan-v1", target_names=[f"block{i}" for i in range(4)], board_name="board",
+                board_pose={"position": [.5, 0, .8], "orientation": [0, 0, 0, 1]},
+                goal_slots=[{**goal, "position": [goal["position"][0] + .03 * i, 0, .85]} for i in range(4)],
+                pattern_id="rbbr", pattern=["red", "blue", "blue", "red"],
+                initial_up_faces=["+x", "-x", "+y", "-y"], initial_orientations=[[0, 0, 0, 1]] * 4,
+                flip_directions=["right", None, None, "right"], budget_seconds=9000)
         else:
             plan.update(schema="isg-joint-goal-plan-v1", target="target", joint="hinge", goal_joints={"hinge": 0}, fraction_range=[0, .5])
         write_json_atomic(row["path"], plan)
@@ -39,16 +50,18 @@ def generic_fixture(tmp_path, monkeypatch, task):
 
 @pytest.mark.parametrize("task", ["alignment-world_vertical", "alignment-axial", "disembedding",
     "configuration_matching-articulation_close_small_scale", "configuration_matching-articulation_open_large_scale",
-    "configuration_matching-attachment"])
+    "configuration_matching-attachment", "configuration_matching-block_design"])
 def test_family_queue_clears_only_group_state_and_preserves_native_caches(tmp_path, monkeypatch, task):
     manifest, config, _ = generic_fixture(tmp_path, monkeypatch, task)
     sampler = SimpleNamespace(native_cache=object(), _pairs=[{"q_init": .4, "q_goal": 0}],
         _campaign_surface_active="old", _campaign_tray_active="old", _campaign_joint_active="old",
-        _campaign_joint_written_starts={"old-start"}, _campaign_attachment_active="old", _campaign_attachment_plan_sha="old")
+        _campaign_joint_written_starts={"old-start"}, _campaign_attachment_active="old", _campaign_attachment_plan_sha="old",
+        _campaign_block_active="old", _campaign_block_plan_sha="old")
     cache = sampler.native_cache
     assert q.activate_initial(sampler)
     assert not hasattr(sampler, "_campaign_joint_written_starts")
     assert not hasattr(sampler, "_campaign_attachment_active") and not hasattr(sampler, "_campaign_attachment_plan_sha")
+    assert not hasattr(sampler, "_campaign_block_active") and not hasattr(sampler, "_campaign_block_plan_sha")
     sampler._campaign_group_written = 3
     sampler._campaign_joint_plan_sha = "first"
     sampler._campaign_joint_written_starts = {"fresh-start"}
@@ -70,6 +83,27 @@ def test_attachment_queue_requires_both_actual_role_bindings(tmp_path, monkeypat
     queue["entries"][0]["sha256"] = file_digest(entries[0]["path"])
     write_json_atomic(manifest, queue)
     with pytest.raises(ContractError, match="declared binding"):
+        q.read_queue(manifest, config)
+
+
+def test_block_queue_requires_actual_four_targets_board_and_preserves_collection_window(tmp_path, monkeypatch):
+    from scripts.campaign_20261110 import held_goal_batches as batches
+    manifest, config, entries = generic_fixture(tmp_path, monkeypatch, "configuration_matching-block_design")
+    raw_queue = json.loads(manifest.read_text()); raw_queue["config_path"] = str(config)
+    write_json_atomic(manifest, raw_queue)
+    command = ["python", "submit", "block", "3", "--time-s", "1", "--sample-limit-s", "1",
+               "--extra-env", "ISPATIALGYM_CAMPAIGN_GOAL_PLAN=first", "--extra-env", "ISGF_COLLECT_EXTRA=--no-goal-override --max-steps 6000"]
+    monkeypatch.setattr(batches.g, "submission_command", lambda *args, **kwargs: list(command))
+    submitted = batches.submission_command(manifest)
+    assert submitted[3] == "6"
+    assert submitted[submitted.index("--time-s") + 1] == "25200"
+    assert submitted[submitted.index("--sample-limit-s") + 1] == "19800"
+    assert "ISGF_COLLECT_EXTRA=--no-goal-override --max-steps 6000" in submitted
+    raw = json.loads(open(entries[0]["path"]).read()); raw["board_name"] = "undeclared_board"
+    write_json_atomic(entries[0]["path"], raw)
+    raw_queue["entries"][0]["sha256"] = file_digest(entries[0]["path"])
+    write_json_atomic(manifest, raw_queue)
+    with pytest.raises(ContractError, match="declared bindings"):
         q.read_queue(manifest, config)
 
 

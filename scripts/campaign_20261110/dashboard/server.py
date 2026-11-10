@@ -44,6 +44,8 @@ def snapshot(root, inventory):
     live, ls = read_source(root / 'live.json')
     cluster, cs = read_source(root / 'infra/cluster_snapshot.json')
     evidence, es = read_source(root / 'dashboard/dashboard_evidence.json')
+    group_yield, ys = read_source(root / 'dashboard/goal_group_yield.json')
+    yield_error, yes = read_source(root / 'dashboard/goal_group_yield_error.json')
     audit_error, aes = read_source(root / 'dashboard/dashboard_evidence_error.json')
     sync, ss = read_source(root / 'dashboard/sync_status.json')
     candidates, ins = read_source(inventory / 'train_candidate_summary.json')
@@ -52,6 +54,8 @@ def snapshot(root, inventory):
         live = {}; ls = {'available': False, 'error': 'Campaign identity mismatch'}
     if evidence and evidence.get('campaign_id') != 'campaign_20261110':
         evidence = {}; es = {'available': False, 'error': 'Campaign identity mismatch'}
+    if group_yield and group_yield.get('campaign_id') != 'campaign_20261110':
+        group_yield = {}; ys = {'available': False, 'error': 'Campaign identity mismatch'}
     live_keys = ('updated_at', 'cluster_observed_at', 'cluster_probe_error', 'vast_observed_at',
         'campaign_vast_metrics', 'acceptance_evidence', 'annotated_coverage', 'campaign_results',
         'cluster_by_user_partition', 'cluster_capacity', 'family_controller', 'pending')
@@ -78,7 +82,9 @@ def snapshot(root, inventory):
     cluster_view['jobs'] = jobs
     return sanitize({'campaign_id': 'campaign_20261110', 'served_at': datetime.now(timezone.utc).isoformat(),
         'targets': TARGETS, 'deadline': '2026-11-12T19:00:00Z', 'refresh_seconds': 30,
-        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss},
+        'sources': {'live': ls, 'cluster': cs, 'evidence': es, 'inventory': ins, 'sync': ss, 'group_yield': ys},
+        'group_yield': {k:v for k,v in group_yield.items() if k not in ('sources','groups','jobs')},
+        'yield_error': yield_error if yes['available'] else {},
         'audit_error': audit_error if aes['available'] else {}, 'sync': sync,
         'live': live, 'evidence': evidence, 'gates': gates,
         'cluster': cluster_view,
@@ -94,16 +100,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/status':
             data = snapshot(self.server.data_root, self.server.inventory)
             return self.send_body(200, json.dumps(data, allow_nan=False).encode(), 'application/json')
-        if path in ('/reports/live', '/reports/return'):
+        if path in ('/reports/live', '/reports/return', '/reports/goal-yield-text'):
             try:
-                name = 'LIVE.md' if path == '/reports/live' else 'RETURN_REPORT.txt'
+                name = {'/reports/live':'LIVE.md','/reports/return':'RETURN_REPORT.txt','/reports/goal-yield-text':'GOAL_GROUP_YIELD.md'}[path]
                 return self.send_body(200, (self.server.data_root / name).read_bytes(), 'text/plain; charset=utf-8')
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
         audits = {'/reports/reconciliation': 'reconciliation.json',
+            '/reports/goal-yield': 'goal_group_yield.json',
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
+            if path == '/reports/goal-yield' and status['available'] and data.get('campaign_id') != 'campaign_20261110':
+                data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,
                 json.dumps(sanitize(data if status['available'] else status), indent=2).encode(), 'application/json')
         if path in ('/reports/evidence', '/reports/validation', '/reports/resources'):

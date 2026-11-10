@@ -11,7 +11,7 @@ not write `LIVE.md`, `live.json`, allocations, job state, or campaign manifests.
 The report routes expose selected evidence, not arbitrary local files or raw
 cluster logs. There is no public deployment or tunnel.
 
-The separately launched `sync.py` reads two campaign evidence files over the
+The separately launched `sync.py` reads allowlisted campaign evidence files over the
 existing `minyeong@svl11` SSH connection and atomically updates its local mirror.
 An independent CPU publisher runs `dashboard_evidence.py` on the cluster every
 60 seconds. Neither collector is triggered by a browser request. The mirror also refreshes
@@ -38,6 +38,21 @@ monitoring continues to own `LIVE.md`, `live.json`, and cluster observations.
 - Throughput uses changes in committed acceptance, with per-task rates. A
   benchmark ETA requires positive measured rates for every unfinished task and
   split; an easy task's rate is never applied to other families.
+- `dashboard/goal_group_yield.json`: executed queue events, individual TROs,
+  strict demo reports, committed SQL members and per-job GPU accounting.
+  Authored or unactivated groups never enter the completed denominator.
+  Successful starts use the acceptance fingerprint; duplicates do not inflate
+  the 0/1/2/3 histogram. Camera tasks are excluded. Task/class/runtime cohorts
+  and individual source hashes are accessible at `/reports/goal-yield`.
+  Older failed/TRO index unions are lower bounds of attempted slots, not exact
+  denominators; interrupted attempts were not durably logged. The new native
+  attempt journal records entered draws before sampling, including unfinished
+  attempts. New Vast worker lifecycle journals preserve zero-attempt retries.
+  Exact Slurm collection GPU time includes startup and failures. Historical
+  Vast startup/retry gaps and shared replay/bootstrap allocation keep the
+  all-backend/end-to-end rate explicitly unavailable where appropriate.
+  `goal_group_yield.py` is a separate read-only CPU observer; it refreshes this
+  live artifact and `infra/GOAL_GROUP_YIELD.md`, never the existing LIVE files.
 
 The deadline is November 12, 2026 at **19:00 UTC / 13:00 Chicago**. It is a
 handoff target, not an automatic shutdown. The campaign Vast cap is $3,000.

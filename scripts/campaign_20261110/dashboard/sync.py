@@ -10,7 +10,7 @@ import time
 from zoneinfo import ZoneInfo
 
 REMOTE = '/vision/u/minyeong/projects/isg_home/campaign_20261110/infra'
-FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json')
+FILES = ('dashboard_evidence.json', 'dashboard_evidence_error.json', 'goal_group_yield.json', 'goal_group_yield_error.json')
 
 
 def atomic(path, data):
@@ -20,8 +20,8 @@ def atomic(path, data):
 
 
 def sync(output):
-    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; print(json.dumps({n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}))" % (REMOTE, FILES)
-    # The fixed remote program reads only the two campaign audit files.
+    remote = "import json,pathlib; p=pathlib.Path(%r); names=%r; data={n:json.loads((p/n).read_text()) for n in names if (p/n).exists()}; report=p/'GOAL_GROUP_YIELD.md'; data['goal_yield_report']=report.read_text() if report.exists() else None; print(json.dumps(data))" % (REMOTE, FILES)
+    # The fixed remote program reads only the allowlisted campaign audit files.
     command = "python3 - <<'PY'\n" + remote + "\nPY"
     result = subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=15',
         'minyeong@svl11', command], text=True, capture_output=True, timeout=45, check=True)
@@ -32,6 +32,9 @@ def sync(output):
     for name in FILES:
         if name in bundle:
             atomic(output / name, bundle[name])
+    if bundle.get('goal_yield_report'):
+        target=output.parent/'GOAL_GROUP_YIELD.md';temporary=target.with_suffix('.tmp')
+        temporary.write_text(bundle['goal_yield_report']);temporary.replace(target)
     return evidence['observed_at']
 
 
@@ -62,6 +65,21 @@ def return_report(output):
     lines += ['', 'Resource observation: ' + chicago(live.get('cluster_observed_at')),
         f"Campaign cluster: {live.get('campaign_cluster_running_gpus', 'unavailable')} GPUs running; "
         f"{live.get('campaign_cluster_pending_gpus', 'unavailable')} GPUs pending."]
+    yield_path = output / 'goal_group_yield.json'
+    if yield_path.exists():
+        y = json.loads(yield_path.read_text())
+        lines += ['', 'GOAL-GROUP YIELD (camera tasks excluded)', 'Observed: ' + chicago(y['observed_at'])]
+        for mode, row in y['summary'].items():
+            h=row['success_histogram']; a=row['accepted']
+            percentage=row['at_least_two_percent']
+            lines += [f"{mode}: {row['completed_groups']} completed; 0/1/2/3 distinct successful members: "
+                + '/'.join(str(h[str(i)]) for i in range(4)) + f"; >=2: {percentage:.1f}%" if percentage is not None else f'{mode}: no completed groups']
+            lines += [f"  Accepted standard/model/category/train: {a['eval_standard']}/{a['eval_model']}/{a['eval_category']}/{a['train']}",
+                f"  Successful members {row['distinct_successful_members']}; observed attempted slots >= {row['observed_attempted_slots']}; exact denominator "
+                + ('available' if row['attempt_denominator_complete'] else 'unavailable for historical runs'),
+                '  Group states: '+json.dumps(row['pending_running_unstarted'])]
+        lines += ['All-backend GPU-hour yield is unavailable where historical startup/retry intervals are missing.',
+            'Exact collection-only Slurm rates, class/runtime breakdowns and evidence: http://127.0.0.1:8765/#goal-yield']
     vast = live.get('campaign_vast_metrics') or {}
     lines += ['Vast observation: ' + chicago(live.get('vast_observed_at')),
         f"Vast: {vast.get('running_gpus', 'unavailable')} provider GPUs running; "
