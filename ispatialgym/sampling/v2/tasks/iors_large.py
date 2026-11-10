@@ -248,6 +248,15 @@ LYING_DROP_RETREAT_UP_M = 0.10
 LYING_STROKE_M = 0.05
 LYING_REAIM_MAX_M = 0.08
 LYING_YAW_GAIN_M_PER_RAD = 0.30
+#: the lying push's final yaw stroke (lead #90 item 2; ``execute._push_strokes`` reads ``yaw_final_m`` from the plan): once more, ``LYING_YAW_FINAL_M``
+#: beyond the back, when the yaw is still beyond ``LYING_YAW_FINAL_MIN_DEG`` (ms_ul02_on4 360000 ended 11.2 deg off: 0.196 rad > 0.15)
+LYING_YAW_FINAL_M = 0.02
+LYING_YAW_FINAL_MIN_DEG = 3.0
+#: the lying drop's singularity screen (lead #90 item 1): the drop's attached IK witness must track LYING_SCREEN_LOWER_M straight down (the oracle's
+#: lower_drop) and the place's up-retreat (LYING_DROP_RETREAT_UP_M) with the oracle's dense differential IK (IKChecker.track_chain), else the draw
+#: is refused at C ('lying drop near the wrist singularity'): every lying demo's lower_drop failed on 0.20-0.29 rad joint jumps and on4 360001's
+#: up-retreat on a 0.31 rad one
+LYING_SCREEN_LOWER_M = 0.10
 
 
 def briefcase_lying_on() -> bool:
@@ -1834,6 +1843,27 @@ class IORSLarge(SamplerV2):
         """The target's orientation at stance C for the carried world ``yaw``: ``yaw * c_rest`` (``yaw * rest`` without :attr:`lying`)."""
         return G.qmul(G.quat_from_yaw(float(yaw)), self.c_rest())
 
+    def lying_drop_screen(self, q_drop: th.Tensor, place_eef: G.Pose, arm: str, target, eef_in_object) -> Optional[str]:
+        """i7-measure (lead #90 item 1): the lying drop's witness ``q_drop`` tracked as the oracle will move from it - the attached object
+        :data:`LYING_SCREEN_LOWER_M` straight down (``execute.lower_drop``) and the place's straight-up retreat (``Place.retreat_up_m``) - by
+        :meth:`IKChecker.track_chain` (the oracle's dense differential IK, joint step cap, half-spacing retry on a jump), the floor out of the
+        world. None when both track, else why. Kit ``briefcase_lying.screen.pass`` / ``.lower`` / ``.retreat``."""
+        p, q = G.t(place_eef[0]).float(), G.t(place_eef[1]).float()
+        down = (p - th.tensor([0.0, 0.0, float(self.num("push_under_lying_screen_lower_m", LYING_SCREEN_LOWER_M))]), q)
+        up = (p + th.tensor([0.0, 0.0, float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))]), q)
+        floor = [self.obj("floor")]
+        with attached(self.kit, arm, target, eef_in_object=eef_in_object):
+            q_end, why = self.ikc.track_chain(q_drop, [(p, q), down], arm, ignore=floor, refine_jumps=True)
+        if q_end is None:
+            TT._count(self, "briefcase_lying.screen.lower")
+            return f"the {LYING_SCREEN_LOWER_M:.2f} m lowering: {why}"
+        q_end, why = self.ikc.track_chain(q_drop, [(p, q), up], arm, ignore=floor, refine_jumps=True)
+        if q_end is None:
+            TT._count(self, "briefcase_lying.screen.retreat")
+            return f"the up-retreat: {why}"
+        TT._count(self, "briefcase_lying.screen.pass")
+        return None
+
     def push_contact_cap(self, quat, direction_xy) -> float:
         """The height (m above the target's bottom at ``quat``) the pitched hand's fingertip leading edge stays below: the centre of mass
         (today's rule), or with :attr:`lying` the lying rule :func:`lying_contact_cap` - the back face below the top, no tip about the front
@@ -2302,6 +2332,9 @@ class IORSLarge(SamplerV2):
                                 backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=reaim,
                                 yaw_gain_m_per_rad=gain,
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
+        if getattr(self, "lying", False):
+            plan.update({"yaw_final_m": float(self.num("push_under_lying_yaw_final_m", LYING_YAW_FINAL_M)),
+                         "yaw_final_min_rad": round(math.radians(float(self.num("push_under_lying_yaw_final_min_deg", LYING_YAW_FINAL_MIN_DEG))), 5)})
         if "stroke_m" in fp:
             TT._count(self, "floorpush.strokes.recorded")
         log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f): %d strokes over %.3f m, the object's progress after each %s m, back-off %.3f m, "
@@ -6890,6 +6923,11 @@ class IORSLarge(SamplerV2):
                     if not r2.ok:
                         c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached): {r2.reason[:200]}")
                         continue
+                    if push and self.lying and r2.q is not None:
+                        why_s = self.lying_drop_screen(r2.q, place_eef, arm, target, g.pose)
+                        if why_s is not None:
+                            c_fails.append(f"C: lying drop near the wrist singularity ({why_s[:160]})")
+                            continue
                     if q_lift_seed is not None and r2.q is not None:
                         # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
                         # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
