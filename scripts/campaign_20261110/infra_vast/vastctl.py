@@ -35,6 +35,10 @@ import botocore
 from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
+try:
+    from .campaign_inputs import prepare_queue
+except ImportError:
+    from campaign_inputs import prepare_queue
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -278,6 +282,8 @@ def stage(s3, rec, state):
     env = read_env(jd)
     if env.get("ISGF_JB_NFS", "").startswith(SY) or env.get("ISPATIALGYM_FAST_BAND_SHARE", "0") == "1":
         raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
+    prepare_queue(jd, env, OFH)
+    env = read_env(jd)
     code = os.path.abspath(env["ISGE_CODE"])
     b1k = os.path.dirname(os.path.realpath(os.path.join(code, "Behavior-1K", "OmniGibson")))
     # tools the job scripts call that the image lacks (rsync: kit_appdata.sh, job_fast.sh's collector app-data copies and prebuild dir)

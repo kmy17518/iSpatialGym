@@ -1,0 +1,81 @@
+"""Stage immutable held queues inside new Vast job directories, including journals."""
+import hashlib
+import json
+from pathlib import Path
+import re
+import shlex
+import shutil
+
+
+QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
+
+
+def require(value, message):
+    if not value:
+        raise ValueError(message)
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def checked(path, root, expected):
+    path = Path(path).resolve()
+    require(path.is_relative_to(root.resolve()) and path.is_file(), "queue input outside owned campaign")
+    require(sha(path) == expected, "queue input digest differs")
+    return path
+
+
+def prepare_queue(job_dir, env, root):
+    """Copy only reviewed inputs; runtime events then travel with normal job output."""
+    if not env.get(QUEUE_ENV):
+        return None
+    root, job = Path(root).resolve(), Path(job_dir).resolve()
+    require(job.is_relative_to(root / "out"), "Vast queue job outside campaign output")
+    source = Path(env[QUEUE_ENV]).resolve()
+    require(source.is_relative_to(root / "queues") or source.is_relative_to(job / "campaign_inputs"),
+            "queue path outside authored or staged queue roots")
+    raw = json.loads(source.read_text())
+    require(raw.get("schema") in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1") and raw.get("entries"), "invalid campaign goal queue")
+    inputs = [(checked(raw["config_path"], root, raw["config_sha256"]), "campaign_config.json")]
+    ids = set()
+    for entry in raw["entries"]:
+        path = checked(entry["path"], root, entry["sha256"])
+        plan = json.loads(path.read_text())
+        gid = plan["group_id"]
+        require(isinstance(gid, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", gid) and gid not in ids,
+                "unsafe or duplicate queue group")
+        require(plan["campaign_id"] == raw["campaign_id"] and 1 <= plan["max_members"] <= 3,
+                "queue campaign/member contract differs")
+        ids.add(gid)
+        inputs.append((path, "plans/" + gid + ".json"))
+    if source.is_relative_to(job / "campaign_inputs"):
+        record = json.loads((job / "campaign_queue_inputs.json").read_text())
+        require(record["staged_queue"] == str(source) and record["staged_queue_sha256"] == sha(source), "staged queue changed")
+        return record
+    destination = job / "campaign_inputs"
+    for path, relative in inputs:
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            require(sha(target) == sha(path), "previous partial input copy differs")
+        else:
+            shutil.copyfile(path, target)
+    staged = {**raw, "config_path": str(destination / inputs[0][1]),
+              "entries": [{**entry, "path": str(destination / relative)}
+                          for entry, (_, relative) in zip(raw["entries"], inputs[1:])]}
+    queue = destination / "queue.json"
+    queue.write_text(json.dumps(staged, sort_keys=True, indent=2) + "\n")
+    record = {"schema": "isg-vast-queue-inputs-v1", "original_queue": str(source), "original_queue_sha256": sha(source),
+              "staged_queue": str(queue), "staged_queue_sha256": sha(queue),
+              "journal": str(queue.with_suffix(".events.jsonl")),
+              "input_sha256": {relative: sha(path) for path, relative in inputs}}
+    (job / "campaign_queue_inputs.json").write_text(json.dumps(record, indent=2) + "\n")
+    env_path = job / "job.env"
+    lines = env_path.read_text().splitlines()
+    require(sum(line.startswith(QUEUE_ENV + "=") for line in lines) == 1, "missing/duplicate queue environment binding")
+    updated = [QUEUE_ENV + "=" + shlex.quote(str(queue)) if line.startswith(QUEUE_ENV + "=") else line for line in lines]
+    temporary = env_path.with_suffix(".env.queue_new")
+    temporary.write_text("\n".join(updated) + "\n")
+    temporary.replace(env_path)
+    return record

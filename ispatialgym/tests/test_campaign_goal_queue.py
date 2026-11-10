@@ -3,13 +3,17 @@ import json
 import os
 from types import SimpleNamespace
 
+import pytest
+
 from ispatialgym.sampling import campaign_goal_queue as queue
 from ispatialgym.sampling.v2 import core
 from scripts.campaign_20261110.tests import test_goal_queue as fixtures
 
 
-def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_path, monkeypatch):
-    manifest, _, _ = fixtures.fixture(tmp_path, monkeypatch)
+@pytest.mark.parametrize("family", ["held", "pair"])
+def test_two_groups_share_one_sampler_and_do_not_consume_attempts_when_full(tmp_path, monkeypatch, family):
+    from scripts.campaign_20261110.tests.test_pair_goal_batches import pair_fixture
+    manifest, _, _ = (fixtures.fixture if family == "held" else pair_fixture)(tmp_path, monkeypatch)
     monkeypatch.setattr(core, "fast_on", lambda *args: False)
     monkeypatch.setattr(core, "publish_instance", lambda path: True)
     calls = []

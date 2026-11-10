@@ -1,7 +1,8 @@
-"""Immutable held-goal queues: amortize one scene load across distinct goals."""
+"""Immutable goal queues: amortize one scene load across distinct audited goals."""
 from __future__ import annotations
 
 import json
+import copy
 import os
 import time
 from pathlib import Path
@@ -11,7 +12,9 @@ from scripts.campaign_20261110.contracts import digest, file_digest, require
 
 ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 SCHEMA = "isg-held-goal-queue-v1"
-RESET_FIELDS = ("_campaign_goal_started_at", "_campaign_goal_plan_sha", "_campaign_group_written", "_campaign_latest_proposal")
+PAIR_SCHEMA = "isg-pair-goal-queue-v1"
+RESET_FIELDS = ("_campaign_goal_started_at", "_campaign_goal_plan_sha", "_campaign_group_written", "_campaign_latest_proposal",
+                "_campaign_group_started_at", "_campaign_pair_plan_sha", "_campaign_pair_active", "_campaign_native_goal")
 
 
 def canonical_goal(plan):
@@ -25,14 +28,24 @@ def canonical_goal(plan):
             "orientation": [0.0 if v == 0 else v for v in q]}
 
 
+def canonical_pair_goal(plan):
+    return {"target": canonical_goal(plan), "partner": canonical_goal({"goal_pose": plan["partner_pose"]})}
+
+
 def read_queue(path, config_path):
     path, config_path = Path(path).resolve(), Path(config_path).resolve()
     raw, config = json.loads(path.read_text()), json.loads(config_path.read_text())
-    require(raw.get("schema") == SCHEMA, "invalid held-goal queue schema")
+    schema = raw.get("schema")
+    require(schema in (SCHEMA, PAIR_SCHEMA), "invalid goal queue schema")
     require(raw.get("config_sha256") == file_digest(config_path), "goal queue config changed")
     require(raw.get("campaign_id") == config.get("campaign_id"), "goal queue campaign differs from config")
     template = config["template"]
-    require(template["task"] in ("object_scaling", "mental_rotation"), "only held families support in-process queues")
+    if schema == SCHEMA:
+        require(template["task"] in ("object_scaling", "mental_rotation"), "held queue requires a held-object family")
+    else:
+        from ispatialgym.sampling.campaign_pair_goals import RELATIONS
+        require(template["task"] in {f"inter_object_relation_satisfaction-{relation}_{scale}_scale"
+                for scale in ("small", "large") for relation in RELATIONS}, "pair queue requires a pair task")
     require(raw.get("entries"), "empty held-goal queue")
     ids, goals, entries = set(), set(), []
     for row in raw["entries"]:
@@ -40,13 +53,19 @@ def read_queue(path, config_path):
         require(plan_path.is_file() and file_digest(plan_path) == row["sha256"], "queued goal plan changed")
         plan = json.loads(plan_path.read_text())
         stamp = time.time()
-        validate_goal_plan(plan, task=template["task"], template_id=template["scene_setup"]["runtime_template_id"],
-                           scene=template["scene"], rooms=[template["room"]], now=stamp, activated_at=stamp)
+        identity = dict(template_id=template["scene_setup"]["runtime_template_id"],
+                        scene=template["scene"], rooms=[template["room"]], now=stamp, activated_at=stamp)
+        if schema == SCHEMA:
+            validate_goal_plan(plan, task=template["task"], **identity)
+        else:
+            from ispatialgym.sampling.campaign_pair_goals import validate_pair_plan
+            relation, scale, _ = template["task"].split("-", 1)[1].split("_")
+            validate_pair_plan(plan, relation=relation, scale=scale, **identity)
         require(plan["campaign_id"] == config["campaign_id"] and plan["split"] == config["split"], "queue plan campaign/split mismatch")
         require(plan.get("contract_template_sha256") == config["validation_key"]["template_sha256"], "queue plan template differs from config")
         require(plan["max_members"] <= 3, "queued groups permit at most three members")
         require(plan["group_id"] not in ids, "duplicate queued goal-group ID")
-        goal = digest(canonical_goal(plan))
+        goal = digest(canonical_goal(plan) if schema == SCHEMA else canonical_pair_goal(plan))
         require(goal not in goals, "duplicate canonical goal in queue")
         ids.add(plan["group_id"])
         goals.add(goal)
@@ -75,6 +94,8 @@ def _activate(sampler, state):
     for name in RESET_FIELDS:
         if hasattr(sampler, name):
             delattr(sampler, name)
+    if "original_goal_cells" in state:
+        sampler.place["cells"] = copy.deepcopy(state["original_goal_cells"])
     state["published"] = 0
     os.environ[PLAN_ENV] = row["path"]
     _event(state, "activated", group_id=row["group_id"], goal_sha256=row["goal_sha256"], plan_sha256=row["sha256"])
@@ -92,6 +113,10 @@ def activate_initial(sampler):
     require(not os.environ.get(PLAN_ENV) or Path(os.environ[PLAN_ENV]).resolve() == Path(state["entries"][0]["path"]),
             "single goal plan conflicts with queue's first plan")
     sampler._campaign_goal_queue = state
+    # Large placement groups pin their native candidate cell array. Restore the
+    # original template array before activating a different goal in that scene.
+    if isinstance(getattr(sampler, "place", None), dict) and "cells" in sampler.place:
+        state["original_goal_cells"] = copy.deepcopy(sampler.place["cells"])
     _activate(sampler, state)
     return True
 
