@@ -43,6 +43,7 @@ import json
 import logging
 import math
 import os
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -52,6 +53,7 @@ from ispatialgym import REPO_ROOT
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import generation_defaults as GD
+from ispatialgym.sampling import campaign_tray_goals as CTG
 from ispatialgym.sampling.constraints import apply_mass
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
@@ -1089,13 +1091,18 @@ class Disembedding(SamplerV2):
         tname, src = self.tname, self.obj(self.src_role)
         options: Dict[float, Tuple[TT.Pose, TrayFloorWorld, Dict[str, TT.Pose], float]] = {}
         for yaw in self.layout_yaws:
-            s_pose = self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2], yaw if yaw in self.tray_turns else 0.0)
+            campaign_plan = getattr(self, "_campaign_tray_active", None)
+            s_pose = (self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2], yaw if yaw in self.tray_turns else 0.0)
+                      if campaign_plan is None else tuple(TT._t(v) for v in campaign_plan.source))
             if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], s_pose), margin=TT.SUPPORT_MARGIN):
                 continue
             src_w = self.src_floor.at(s_pose)
             try:
                 poses, fig_yaw = self._layout_poses(manip, src_w, yaw)
             except Reject:
+                continue
+            campaign_plan = getattr(self, "_campaign_tray_active", None)
+            if campaign_plan is not None and CTG.pose_error(poses[tname], campaign_plan.goal)[1] > 0.001:
                 continue
             options[yaw] = (s_pose, src_w, poses, fig_yaw)
         if options:
@@ -1148,7 +1155,98 @@ class Disembedding(SamplerV2):
 
     # ------------------------------------------------------------------ instance
 
+    def campaign_tray_plan(self):
+        if not os.environ.get(CTG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CTG.load_tray_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                     activated_at=self._campaign_group_started_at,
+                                     expected_sha256=getattr(self, "_campaign_tray_plan_sha", None))
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "tray goal-group member limit reached")
+            if (plan.target_name, plan.source_name, plan.destination_name) != (
+                    self.tname, self.bindings.one(self.src_role).name, self.bindings.one(self.dst_role).name):
+                raise Reject("campaign_goal_plan", "tray plan role bindings differ from the template")
+            self._campaign_tray_plan_sha = plan.sha256
+            return plan
+        except CTG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CTG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_tray_plan()
+        return None if plan is None else max(0.0, plan.deadline_at - time.time())
+
+    def campaign_tray_geometry(self, manip, cam, source, destination):
+        """Judge pinned trays directly; no random proposal must rediscover them."""
+        footprints = {}
+        for role, p in ((self.src_role, source), (self.dst_role, destination)):
+            fp = self.world.footprint(self.hull[role], p)
+            if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
+                raise Reject("campaign_tray_support", f"fixed {role} footprint leaves the support")
+            # Both tray axes follow the rectangular table edge; either 180-degree
+            # direction is equivalent for the tray, without imposing target yaw.
+            desired = self._tray_yaw(role, manip)
+            error = min(abs(C.wrap_angle(float(C.yaw_of(TT._t(p[1]))) - desired + turn)) for turn in (0, math.pi))
+            if error > .001:
+                raise Reject("campaign_tray_alignment", f"fixed {role} is not aligned to this table edge")
+            footprints[role] = fp
+        source_floor, destination_floor = self.src_floor.at(source), self.dst_floor.at(destination)
+        depth_s, lat_s = manip.local(source_floor.centre)
+        depth_d, lat_d = manip.local(destination_floor.centre)
+        if abs(depth_s - depth_d) > .005:
+            raise Reject("campaign_tray_alignment", "tray floor centres have different distances from the table edge")
+        side = 1.0 if lat_d > lat_s else -1.0
+        if side != self.dest_side:
+            raise Reject("campaign_tray_side", "fixed destination is on the opposite template side")
+        gap = TT.polygon_gap(footprints[self.src_role], footprints[self.dst_role])
+        if gap < float(self.g("destination_gap_min_m")):
+            raise Reject("campaign_tray_gap", "fixed trays are too close")
+        # Goal-first placement keeps at least the existing visible-width rule.
+        # The legacy bisection selected the limiting width after choosing start;
+        # here each proposed start camera is checked against the pinned tray.
+        fp = footprints[self.dst_role]
+        laterals = (fp - manip.base_xy) @ manip.tangent
+        width = float(self.g("destination_visible_width_m"))
+        inner = float(laterals.min()) if side > 0 else float(laterals.max())
+        xy = manip.world(depth_d, inner + side * width)
+        z = float(TT.hull_corners_world(self.hull[self.dst_role], destination)[:, 2].max())
+        cm = self.world.camera_model
+        uv, depth = cm.project(cam, th.tensor([[float(xy[0]), float(xy[1]), z]]))
+        if float(depth[0]) <= .05 or not 0 <= float(uv[0, 0]) <= cm.width or not 0 <= float(uv[0, 1]) <= cm.height:
+            raise Reject("campaign_destination_not_visible", "fixed destination does not expose the required width from this start")
+        return destination, side, {"source": "goal_plan", "gap_m": float(gap), "visible_width_min_m": width}
+
+    def campaign_verify_goal(self, draft, *, settled=False):
+        plan = getattr(self, "_campaign_tray_active", None)
+        if plan is None:
+            return
+        self.campaign_group_remaining_s()
+        destination = draft.object_poses[plan.destination_name]
+        dp, dq = CTG.pose_error(destination, plan.destination)
+        if dp > 0.001 or dq > 0.001:
+            raise Reject("campaign_destination_drift", f"destination drifted {dp:.6f} m / {dq:.6f} rad")
+        start = draft.object_poses[plan.target_name]
+        _, orientation_error = CTG.pose_error(start, plan.goal)
+        if orientation_error > 0.001:
+            raise Reject("campaign_orientation_drift", f"start/goal target orientation differs by {orientation_error:.6f} rad")
+        if settled:
+            actual = self.objects[plan.target_name].get_position_orientation()
+            dp, dq = CTG.pose_error(actual, plan.goal)
+            if dp > 0.001 or dq > 0.001:
+                raise Reject("campaign_goal_drift", f"settled tray goal drifted {dp:.6f} m / {dq:.6f} rad")
+        draft.goal_poses[plan.target_name] = tuple(TT._t(v) for v in plan.goal)
+        draft.pose_targets[plan.target_name] = full_pose_target(*plan.goal, self.tol("position", 0.03),
+                                                               self.tol("orientation", 0.20), equivalences=self.target_equivalences())
+        draft.summary["campaign_goal_group"]["phase"] = "settled_goal_verified" if settled else "settled_geometry_verified"
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if os.environ.get(CTG.ENV):
+            self._campaign_tray_active = self.campaign_tray_plan()
+            self._campaign_latest_proposal = None
         redraws = disemb_pos_redraws()
         if not redraws or getattr(self, "_split_cone_pools", None) is None:
             return Disembedding._sample_position(self, rng)  # (the class's own: stub tests call it with a namespace)
@@ -1209,16 +1307,29 @@ class Disembedding(SamplerV2):
     def _sample_with(self, rng, init: Stance, manip: Stance, tname: str, sname: str, dname: str, dnames: List[str], k: int) -> Draft:
         d = Draft()
         src, tgt = self.obj(self.src_role), self.obj("target")
+        campaign_plan = getattr(self, "_campaign_tray_active", None)
+        if campaign_plan is not None:
+            source = tuple(TT._t(v) for v in campaign_plan.source)
+            floor = self.src_floor.at(source)
+            manip.focus = th.tensor([float(floor.centre[0]), float(floor.centre[1]), floor.z])
         # §4.5 step 5: transition init -> manipulation
         self.record_stance_travel(init, manip)
         # source tray at the focus, aligned with the edge (§4.6 step 1, disembedding)
-        s_pose = self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2])
+        s_pose = (self._tray_pose_centred(self.src_role, self.src_floor, manip, manip.focus[:2]) if campaign_plan is None
+                  else tuple(TT._t(v) for v in campaign_plan.source))
         if not self.top.polygon_supported(self.world.footprint(self.hull[self.src_role], s_pose), margin=TT.SUPPORT_MARGIN):
             raise Reject("support", "source tray footprint not on the top at the focus")
         src.set_position_orientation(*s_pose)
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
+        if campaign_plan is not None:
+            cam_init = self.camera_pose_at(init)
+            self._campaign_destination = self.campaign_tray_geometry(
+                manip, cam_init, s_pose, tuple(TT._t(v) for v in campaign_plan.destination))
+            self._campaign_latest_proposal = {"start_poses": {sname: s_pose, dname: campaign_plan.destination},
+                                              "goal_poses": {tname: campaign_plan.goal}, "base_pose2d": init.base_pose2d,
+                                              "group_id": campaign_plan.group_id}
         # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray + distractors ignored for the
         # grasp (``grasp_ignore_list``); the other arm is tried only where its band covers the focus (owner 2026-09-27)
         default = self.segment_arms[0]
@@ -1229,9 +1340,11 @@ class Disembedding(SamplerV2):
             # turned by a yaw that keeps a reachable grasp (owner 2026-10-12); the pick ignores the parts (A2b: ``pick_world``)
             t_pose, grasp, layout, s_pose, src_w, layout_rec = self._layout_pick(rng, manip, arms_here)
         else:
-            t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.grasp_ignore_list(), top=src_w,
+            target_rest = self.rest["target"] if campaign_plan is None else TT._t(campaign_plan.goal[1])
+            goal_draw_kw = {} if campaign_plan is None else {"yaws": [0.0], "jitter": 0.0}
+            t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], target_rest, self.grasp_ignore_list(), top=src_w,
                                              support_z=src_w.z, margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale,
-                                             bands=self.bands, arms=arms_here, arm_bands=self.arm_bands or None)
+                                             bands=self.bands, arms=arms_here, arm_bands=self.arm_bands or None, **goal_draw_kw)
         if grasp.arm != default:
             self.sidecar.transitions.clear()
             self.record_stance_travel(init, manip)  # the other arm idles now
@@ -1272,7 +1385,12 @@ class Disembedding(SamplerV2):
         grasp.place_on = dname
         # destination tray: the template's side, exactly 4 cm inside the init image, >= 4 cm from the source tray, footprint on the top
         cam_init = self.camera_pose_at(init)
-        d_pose, side, dest_diag = self._place_destination(rng, init, manip, cam_init, s_pose)
+        campaign_plan = getattr(self, "_campaign_tray_active", None)
+        if campaign_plan is None:
+            d_pose, side, dest_diag = self._place_destination(rng, init, manip, cam_init, s_pose)
+        else:
+            d_pose, side, dest_diag = self.campaign_tray_geometry(
+                manip, cam_init, s_pose, tuple(TT._t(v) for v in campaign_plan.destination))
         dst_w = self.dst_floor.at(d_pose)
         row_name = C.split_twin(grasp.grasp_name or "")[0]  # a twin pinches the same width as its library row
         width = TT.grasp_pinch_width(next((g for g in self.grasps if g.name == row_name), None))
@@ -1287,6 +1405,18 @@ class Disembedding(SamplerV2):
             dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, margin=float(self.g("tray_footprint_margin_m")), gap=0.01,
                                               cam=cam_init, budget=self._tray_budget(), n_tries=int(self.g("distractor_place_tries") or 80))
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
+        if campaign_plan is not None:
+            self._campaign_latest_proposal = {"start_poses": objects, "goal_poses": {tname: campaign_plan.goal},
+                                              "base_pose2d": init.base_pose2d, "group_id": campaign_plan.group_id}
+            occupied = sum(CTG.polygon_area(self.world.footprint(self.hull["target" if n == tname else n], objects[n]))
+                           for n in [tname] + dnames)
+            coverage = occupied / src_w.area()
+            if not campaign_plan.accepts_coverage(coverage):
+                raise Reject("campaign_crowdedness_bucket", f"tray coverage {coverage:.6f} outside {campaign_plan.crowdedness_range}")
+            d.summary["campaign_goal_group"] = campaign_plan.summary()
+            d.summary["campaign_goal_group"].update({"phase": "geometry_pinned", "actual_crowdedness": coverage,
+                "requested_start": {"target": [v.tolist() for v in t_pose], "grasp": grasp.grasp_name,
+                                    "distractors": {n: [v.tolist() for v in dist_poses[n]] for n in dnames}}})
         # §4.6 step 4: every object in frame (5 %) in the init image except the destination tray
         items_all = [(tname, self.hull["target"], t_pose), (sname, self.hull[self.src_role], s_pose)] + [(n, self.hull[n], dist_poses[n]) for n in dnames]
         missing = TT.all_in_frame(self, cam_init, items_all, float(self.g("image_margin")))
@@ -1369,6 +1499,15 @@ class Disembedding(SamplerV2):
         ``release_above_surface_m`` (1 cm) above the **actual** surface under the footprint centre — a downward raycast
         (``SimWorld.surface_z_under``, core `2c59893`, the target ignored) from above the destination rim; the raster floor
         level + 3 mm when the ray misses or hits outside the tray's floor band (tray parked, ray through a slot)."""
+        campaign_plan = getattr(self, "_campaign_tray_active", None)
+        if campaign_plan is not None:
+            goal = tuple(TT._t(v) for v in campaign_plan.goal)
+            if CTG.pose_error(t_pose, goal)[1] > 0.001:
+                raise Reject("campaign_orientation_drift", "disembedding start and goal orientations must match")
+            if not dst_w.polygon_supported(self.world.footprint(self.hull["target"], goal), margin=float(self.g("tray_footprint_margin_m"))):
+                raise Reject("campaign_goal_support", "fixed target goal footprint leaves the destination floor")
+            self.release_surface_z = float(dst_w.z)
+            return goal
         quat = TT._t(t_pose[1])
         xy = th.tensor([float(dst_w.centre[0]), float(dst_w.centre[1])])
         surface = None
@@ -1505,7 +1644,9 @@ class Disembedding(SamplerV2):
         for name in trays:
             obj = self.objects[name]
             pos, quat = TT._t(draft.object_poses[name][0]).clone(), TT._t(draft.object_poses[name][1])
-            pos[2] -= max(0.0, TT.Z_OFFSET - float(self.gen("tray_release_gap_m", TRAY_RELEASE_GAP_M)))  # at contact, not dropped
+            pinned_destination = getattr(self, "_campaign_tray_active", None)
+            if pinned_destination is None:
+                pos[2] -= max(0.0, TT.Z_OFFSET - float(self.gen("tray_release_gap_m", TRAY_RELEASE_GAP_M)))  # at contact, not dropped
             obj.set_position_orientation(pos, quat)
             if obj.name in self.world.spawned:
                 self.world.activate(obj)
@@ -1573,6 +1714,12 @@ class Disembedding(SamplerV2):
         if g is not None:
             g.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
         draft.summary["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
+        if getattr(self, "_campaign_tray_active", None) is not None:
+            self.campaign_verify_goal(draft)
+
+    def refine_targets_from_goal(self, draft: Draft):
+        super().refine_targets_from_goal(draft)
+        self.campaign_verify_goal(draft, settled=True)
 
     def extra_checks(self, draft: Draft):
         """After settling: the occlusion measured again (the loader re-measures it after its deterministic settle)."""
@@ -1604,6 +1751,19 @@ class Disembedding(SamplerV2):
         if not res.ok:
             raise Reject("place_unreachable", f"settled goal: pre-place / place fail the exact IK from the placement stance: {res.reason}")
         grasp.pre_place, grasp.place = pre_place, place
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG") and getattr(self, "_campaign_tray_active", None) is None:
+            # A fresh successful anchor supplies an admissible surface region.
+            # The controller chooses a goal from it before drawing group starts.
+            dst_w = self.dst_floor.at(draft.object_poses[self.bindings.one(self.dst_role).name])
+            cells = dst_w.cells()
+            stride = max(1, math.ceil(len(cells) / 256))
+            candidates = []
+            for xy in cells[::stride]:
+                p = th.tensor([float(xy[0]), float(xy[1]), float(goal_pos[2])])
+                if dst_w.polygon_supported(self.world.footprint(self.hull["target"], (p, goal_quat)), margin=float(self.g("tray_footprint_margin_m"))):
+                    candidates.append({"position": p.tolist(), "orientation": goal_quat.tolist()})
+            draft.summary["campaign_goal_space"] = {"target_poses": candidates, "source": "fresh_destination_floor_raster",
+                                                     "target_height": "settled_anchor_goal", "max_candidates": 256}
 
     def turn_recheck(self, draft: Draft, grasp, q_first: Optional[th.Tensor] = None) -> Optional[str]:
         """``tabletop.held_turns``: this module's checks that depend on the wrist turn, for ``grasp`` just recorded as its other finger
@@ -1679,7 +1839,12 @@ class Disembedding(SamplerV2):
         return meta
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        if getattr(self, "_campaign_tray_active", None) is not None:
+            self.campaign_verify_goal(draft)
+            draft.summary["campaign_goal_group"]["phase"] = "settled_goal_verified"
         path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_tray_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
         if draft.extras.get("fixed_layout"):
             self.template_meta.setdefault("fixed_layout", {}).setdefault("per_instance", {})[self.instance_id(index)] = dict(draft.extras["fixed_layout"])
         return path

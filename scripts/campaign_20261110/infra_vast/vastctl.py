@@ -65,7 +65,8 @@ STORES = ("/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/reach_band
           "/vision/u/minyeong/projects/isg_home/.cache/ispatialgym-vecenv/reach_volume", os.path.join(T85, "bands_train"))
 #: job.env keys that are not inputs of job_fast.sh (or are shipped otherwise)
 SKIP_KEYS = {"ISGE_CODE", "ISGF_SCRIPTS", "ISGF_ROOT", "COUNTED_RUN", "COUNTED_SNAPSHOT", "ISGF_PREDEMO_ROOT", "ISGF_SAMPLING_CACHE",
-             "ISGF_ASSET_CACHE"}
+             "ISGF_ASSET_CACHE", "ISGF_JB_NFS", "KIT_TPL_NFS_ROOT", "KIT_TEX_STORE", "ISGF_EXP_PATH", "EXP_PATH",
+             "ISPATIALGYM_SAMPLING_CACHE", "ISPATIALGYM_CACHE_DIR", "ISPATIALGYM_HELD_HOLD_CACHE"}
 PATH_MAX_BYTES = 3 * 2**30
 DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instances": 1, "budget_usd": 300.0, "max_dph_gpu": 1.5,
                   "disk_gb": 280, "idle_destroy_s": 420, "boot_max_s": 3300, "launch_per_tick": 3, "min_inet_down": 500,
