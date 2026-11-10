@@ -97,7 +97,7 @@ def apply_retry_request(entry, request, root, active):
     entry.setdefault('attempt_history',[]).append(history)
     entry.setdefault('applied_retry_requests',[]).append(token)
     entry.update(status='waiting_for_demo',retry_output=str(output),retry_request=request)
-    for key in ('replay_job_id','seen_queue_absent','error','gate'):entry.pop(key,None)
+    for key in ('replay_job_id','seen_queue_absent','error','gate','vast_migration','replay_backend','vast_migration_error'):entry.pop(key,None)
     return True
 
 def publish_recovered_gate(entry, root):

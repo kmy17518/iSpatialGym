@@ -69,3 +69,14 @@ def test_existing_replay_evidence_blocks_any_cancellation(tmp_path,monkeypatch):
     with pytest.raises(ValueError,match='execution evidence'):
         rm.migrate(e,tmp_path,native,helper,300,lambda:None)
     assert not (tmp_path/'vast/queue').exists()
+
+
+def test_explicit_retry_archives_prior_transport_ownership(tmp_path):
+    from scripts.campaign_20261110.controller_validation import apply_retry_request
+    source,native,helper,out=fixture(tmp_path)
+    e=entry(source,out);e.update(status='replay_missing',key='task',replay_backend='vast',
+        vast_migration={'status':'active','original_replay_job_id':'old'})
+    request={'request_id':'explicit_retry','expected_replay_job_id':'123','reason':'proved launcher failure'}
+    assert apply_retry_request(e,request,tmp_path,{})
+    assert 'vast_migration' not in e and 'replay_backend' not in e
+    assert e['attempt_history'][0]['vast_migration']['original_replay_job_id']=='old'
