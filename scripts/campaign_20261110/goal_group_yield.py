@@ -361,7 +361,8 @@ def snapshot(root):
         elif g['job_ids']: g['status'] = 'unstarted_after_job_end'
         else: g['status'] = 'authored_unsubmitted'
         g['attempted'] = g['activated']; g['observed_attempted_slots'] = len(g.pop('attempt_slots'))
-        g['observed_native_draws'] = len(g.pop('native_attempts')) + len(g['members']) if not g['exact_started'] else len(g['exact_started'])
+        native_attempts = g.pop('native_attempts')
+        g['observed_native_draws'] = len(native_attempts) + len(g['members']) if not g['exact_started'] else len(g['exact_started'])
         g['attempt_denominator_complete'] = bool(g['executed_jobs']) and g['executed_jobs'] <= g['exact_instrumentation_jobs']
         if g['attempt_denominator_complete']:g['observed_attempted_slots']=len(g['exact_slots'])
         g['physics_gate'] = gates_by_key.get(digest(g['validation_key']))

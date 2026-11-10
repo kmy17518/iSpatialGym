@@ -120,6 +120,11 @@ class GoalYieldTest(unittest.TestCase):
             with patch('scripts.campaign_20261110.goal_group_yield.snapshot_allocations',return_value=([],{},[])),patch('scripts.campaign_20261110.goal_group_yield.allocations',return_value=rows):result=snapshot(root)
             r=result['summary']['standard_eval'];self.assertEqual(r['attempted_instances'],1)
             self.assertEqual(r['successful_members_per_attempted_instance'],0)
+            # The first live journal must remain publishable, including its
+            # interrupted draw; internal sets may not leak into the artifact.
+            published=json.loads(json.dumps(result))
+            self.assertEqual(published['summary']['standard_eval']['observed_native_draws'],1)
+            self.assertNotIn('native_attempts',published['groups'][0])
 
 
 if __name__=='__main__':unittest.main()
