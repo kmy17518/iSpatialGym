@@ -245,6 +245,46 @@ LYING90_YAW_LADDER_DEG = (0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0, 120.0, -12
 #: oracle's finishing bound: a witness farther than 0.6 rad is "in another IK branch")
 CARRY_TURN_BUCKETS_DEG = (100.0, 140.0)
 ATTACH_BRANCH_GAP_RAD = 0.6
+#: i7-attachmargin 2026-11-09 (owner decision A8d (b)): a joint-limit margin on the carry's tracked END configuration (the arm at the
+#: pre-attach, where the insertion starts). The attach witness ([pre-attach, attach], a fresh 32-seed exact IK) keeps
+#: ``IKChecker.JOINT_LIMIT_MARGIN``, the carry's tracked end keeps none: i7cork_ly_r2 620402 / 620403 ended the carry with
+#: right_arm_joint5 0.4-2.9 mrad from its lower limit, a 2 deg in-hand slip made the oracle re-aim, the differential IK could not leave
+#: the limit and the finish toward the witness (another IK branch) was refused. Over every recorded attachment demo ($OFH/out + the
+#: shiyuc i7-cork runs, 306 with an executed carry end) all 8 "place plan_failed" demos (the finishing motion refused: a joint swing /
+#: the witness 1.85-3.81 rad away) had the executed carry end within 17 mrad of a limit; none of the 197 demos >= 20 mrad failed that way.
+#: ``ISPATIALGYM_ATTACH_CARRY_END_MARGIN=<rad>`` (default "0" = off; "shadow:<rad>" counts only): a carry whose tracked end has any
+#: arm joint within that margin of its limit fails like an untrackable carry - the next carry of the ladder is tried, then the next
+#: partner cell. Kit ``attach_carry_end_margin.<route>.{checked, rejected, rejected.<joint>, rescued, would_reject}``; every carry that
+#: passes logs its end margin in kit ``carry_end_margin.<route>.<bucket>`` (diagnostic, every value of the switch) and the written
+#: instance's summary records ``carry_end_limit`` (margin, nearest joint, the arm's 7 joints at the carry end).
+ATTACH_CARRY_END_MARGIN_ENV = "ISPATIALGYM_ATTACH_CARRY_END_MARGIN"
+ATTACH_CARRY_END_MARGIN_DEFAULT = "0"
+#: the bucket edges (rad) of the diagnostic kit ``carry_end_margin.<route>.<bucket>``
+CARRY_END_MARGIN_BUCKETS_RAD = (0.005, 0.01, 0.02, 0.05)
+
+
+def attach_carry_end_margin() -> Tuple[float, bool]:
+    """``(margin rad, shadow)`` of :data:`ATTACH_CARRY_END_MARGIN_ENV`: ``(0.0, False)`` off; ``"<rad>"`` on; ``"shadow:<rad>"`` counts the
+    carries it would reject without rejecting them. A malformed value raises (a typo must not run the off arm silently)."""
+    v = (os.environ.get(ATTACH_CARRY_END_MARGIN_ENV) or ATTACH_CARRY_END_MARGIN_DEFAULT).strip().lower()
+    shadow = v.startswith("shadow")
+    if shadow:
+        v = v.split(":", 1)[1].strip() if ":" in v else ""
+    if v in ("", "0", "off", "false", "no"):
+        if shadow:
+            raise ValueError(f"{ATTACH_CARRY_END_MARGIN_ENV}=shadow needs a margin: shadow:<rad>")
+        return 0.0, False
+    m = float(v)
+    if not (0.0 <= m < 0.5):
+        raise ValueError(f"{ATTACH_CARRY_END_MARGIN_ENV}={v}: a margin in rad, 0 <= m < 0.5")
+    return m, shadow
+
+
+def carry_end_margin_bucket(m: float) -> str:
+    for e in CARRY_END_MARGIN_BUCKETS_RAD:
+        if m < e:
+            return f"lt{e * 1000:.0f}mrad"
+    return f"ge{CARRY_END_MARGIN_BUCKETS_RAD[-1] * 1000:.0f}mrad"
 
 
 def min_turn_yaw(q_lift, q_partner_eef) -> Tuple[float, float]:
@@ -279,6 +319,8 @@ class CarryPlan:
     carry: Optional[float]
     over: Optional[Dict[str, Any]]
     ladder: str
+    #: i7-attachmargin: the tracked end's joint-limit margin of the (last) passing carry: margin_rad, joint, q_arm
+    end_limit: Optional[Dict[str, Any]] = None
 
 
 def _support_margin(pts: th.Tensor, com: th.Tensor) -> Tuple[float, float, int]:
@@ -1260,6 +1302,7 @@ class Attachment(SamplerV2):
         self.brace_missing = brace_state == "none"
         d.summary["carry_turn_deg"] = None if att.get("turn_deg") is None else round(float(att["turn_deg"]), 1)
         d.summary["attach_branch_gap_rad"] = None if att.get("branch_gap_rad") is None else round(float(att["branch_gap_rad"]), 3)
+        d.summary["carry_end_limit"] = att.get("carry_end_limit")  # i7-attachmargin: the carry's tracked end vs the joint limits
         if self._early_rest_last is not None:
             d.summary["early_rest"] = dict(self._early_rest_last)
         if self.attach_route is not None:
@@ -2324,6 +2367,8 @@ class Attachment(SamplerV2):
                     log.info("%s: CARRY_CHECK route %s at %s turn %.1f deg ok %s: %s", self.gp.variant, self._route_label(), st.name, turn_deg, r_w.ok, str(r_w.reason)[:160])
                     if not r_w.ok:
                         fails["slerp"] += 1
+                        if str(r_w.reason).startswith("carry_end_limit"):
+                            fails["carry_end_limit"] = fails.get("carry_end_limit", 0) + 1
                         self._route_count("carry_failed")
                         seq = [lift] + wps
                         log.info("%s: SLERP_FAILURE at %s (%s, turn %.1f deg): %s | %s", self.gp.variant, st.name, plan.ladder, turn_deg, r_w.reason,
@@ -2351,7 +2396,8 @@ class Attachment(SamplerV2):
                             continue
             gap = self._attach_branch_gap(r_w.q, res.q)
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over, "turn_deg": turn_deg, "branch_gap_rad": gap}
+                    "point": point, "slerp_policy": r_w.reason, "brace_orient": brace_orient, "carry_over": plan.over, "turn_deg": turn_deg, "branch_gap_rad": gap,
+                    "carry_end_limit": plan.end_limit}
         return None
 
     def _attach_branch_gap(self, q_carry_end: Optional[th.Tensor], q_attach: Optional[th.Tensor]) -> Optional[float]:
@@ -2390,6 +2436,7 @@ class Attachment(SamplerV2):
         tries = [(max(CARRY_HEIGHTS), c) for c in ladder] if ladder else [(c, None) for c in CARRY_HEIGHTS]
         label = f"carry over the partner {list(ladder)} m" if ladder else f"carry ladder {CARRY_HEIGHTS}"
         plan = CarryPlan(None, None, [], None, None, label)
+        rejected_end = False  # i7-attachmargin: a carry of this ladder was rejected for its end's joint-limit margin
         for carry, clearance in tries:
             lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
             start, over = lift, None
@@ -2405,9 +2452,48 @@ class Attachment(SamplerV2):
                     plan.result = IK.IKResult(False, None, f"the carry {clearance:.2f} m over the partner leaves the image: {out}", len(wps))
                     continue
             plan.result = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support], track_dense=tracked)
+            if plan.result.ok and self._carry_end_within_margin(plan):
+                rejected_end = True
+                continue
             if plan.result.ok:
+                if rejected_end:
+                    self._carry_end_count("rescued")
                 break
         return plan
+
+    def _carry_end_within_margin(self, plan: CarryPlan) -> bool:
+        """i7-attachmargin (:data:`ATTACH_CARRY_END_MARGIN_ENV`): True when the passing carry's tracked end has an arm joint within the
+        switch's margin of its limit (``plan.result`` is then replaced by the failure); records the end margin on ``plan`` either way."""
+        q_end = plan.result.q
+        if q_end is None:
+            return False
+        try:
+            m, jn = self.ikc.joint_limit_margin(q_end, "right")
+            idx = self.kit.robot.arm_control_idx["right"]
+            q_arm = [round(float(v), 4) for v in TT._t(q_end)[idx].tolist()]
+        except Exception:  # noqa: BLE001 - a stub kit (tests) without limits: nothing to judge
+            return False
+        plan.end_limit = {"margin_rad": round(float(m), 4), "joint": jn, "q_arm": q_arm}
+        TT._countn(self, f"carry_end_margin.{self._route_label()}.{carry_end_margin_bucket(m)}")
+        margin, shadow = attach_carry_end_margin()
+        if margin <= 0.0:
+            return False
+        self._carry_end_count("checked")
+        if m >= margin:
+            return False
+        if shadow:
+            self._carry_end_count("would_reject")
+            return False
+        self._carry_end_count("rejected")
+        self._carry_end_count(f"rejected.{jn}")
+        log.info("%s: CARRY_END_MARGIN the carry (%s) ends with %s %.1f mrad from its limit (< %.0f mrad): rejected", self.gp.variant, plan.ladder, jn,
+                 m * 1000, margin * 1000)
+        plan.result = IK.IKResult(False, None, f"carry_end_limit: {jn} within {m * 1000:.1f} mrad of its limit at the carry's end (margin {margin * 1000:.0f} mrad)",
+                                  plan.result.n_checked)
+        return True
+
+    def _carry_end_count(self, what: str) -> None:
+        TT._countn(self, f"attach_carry_end_margin.{self._route_label()}.{what}")
 
     def _carry_rise_z(self, grasp, lift: TT.Pose, f_pose: TT.Pose, clearance: float) -> Tuple[float, Dict[str, Any]]:
         """``(eef z, facts)``: the height of the eef, held at ``lift``'s orientation, at which the male in the hand
