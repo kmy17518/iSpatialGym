@@ -1358,6 +1358,10 @@ class ArticulationLarge(SamplerV2):
         plan = self.campaign_joint_plan()
         return None if plan is None else max(0.0, plan.deadline_at-time.time())
 
+    def campaign_start_record(self, draft):
+        return {"joints": {n: float(v) for n, v in zip(self.target.joints, draft.object_joints[self.tname])},
+                "grasp": {"arm": self.arm, "pinch_sign": self.pinch_sign, "bar_offset_m": self.bar_offset}}
+
     def campaign_verify_articulation(self, draft):
         plan = getattr(self, "_campaign_joint_active", None)
         if plan is None:
@@ -1524,6 +1528,8 @@ class ArticulationLarge(SamplerV2):
                     if push:
                         required = finish_required(required, push["k_release"])
                     d = self._solve_from(manip, init, q_init, q_goal_s, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info, fractions=fr_s)
+                    if campaign_plan is not None and CJG.start_was_written(self, self.campaign_start_record(d)):
+                        raise Reject("campaign_duplicate_start", "joint start/grasp already written; try another native pinch or contact")
                 except Reject as e:
                     errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
                     # a stance that got as far as a full hybrid follow (5 min) and then fell at step 6 was invisible until the
@@ -1547,9 +1553,7 @@ class ArticulationLarge(SamplerV2):
                 d.summary["pinch_orient"] = decision
                 if campaign_plan is not None:
                     d.summary["campaign_goal_group"] = campaign_plan.summary()
-                    d.summary["campaign_goal_group"]["requested_start"] = {
-                        "joints": {n: float(v) for n,v in zip(self.target.joints, d.object_joints[self.tname])},
-                        "grasp": {"arm": self.arm, "pinch_sign": self.pinch_sign, "bar_offset_m": self.bar_offset}}
+                    d.summary["campaign_goal_group"]["requested_start"] = self.campaign_start_record(d)
                     self.campaign_verify_articulation(d)
                 return d
         self.pinch_sign = 1.0
@@ -2291,8 +2295,12 @@ class ArticulationLarge(SamplerV2):
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         self.campaign_verify_articulation(draft)
+        active = getattr(self, "_campaign_joint_active", None) is not None
+        if active and CJG.start_was_written(self, draft.summary["campaign_goal_group"]["requested_start"]):
+            raise Reject("campaign_duplicate_start", "joint start/grasp already written")
         path = super().write_instance(draft, index, seed)
-        if getattr(self, "_campaign_joint_active", None) is not None:
+        if active:
+            CJG.remember_written_start(self, draft.summary["campaign_goal_group"]["requested_start"])
             self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
         return path
 

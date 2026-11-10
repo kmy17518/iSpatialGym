@@ -90,7 +90,7 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
         evidence.append(ValidationEvidence(key, kind, True, True, created, str(path), file_digest(path),
                                            file_digest(source_demo), iid, True))
     require_validation(key, evidence, campaign_started_at=started_at)
-    members, artifacts = [], []
+    members, artifacts, duplicates, seen_starts = [], [], [], set()
     for path in sorted((job / "demo").glob("*/meta.json")):
         report = read(path)
         if report.get("success") is not True:
@@ -124,11 +124,17 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
         require(goal and start, "group member lacks intended goal/start provenance")
         p = block["perturbations"]
         perturbations = Perturbations({n: ScaleState(**v) for n, v in p["scales"].items()}, tuple(p["removed_objects"]), p["lighting"])
+        record = {"instance_id": member_id, "tro": str(tro_path), "tro_sha256": file_digest(tro_path),
+                          "demo": str(demo_path), "demo_sha256": file_digest(demo_path), "report": str(path),
+                          "report_sha256": file_digest(path), "sidecar": str(sidecar_path), "sidecar_sha256": file_digest(sidecar_path)}
+        start_key = (digest(goal), digest(start), perturbations.fingerprint)
+        if start_key in seen_starts:
+            duplicates.append({**record, "reason": "duplicate_start_grasp_configuration"})
+            continue
+        seen_starts.add(start_key)
         members.append(GroupMember(member_id, block["campaign_id"], key.template_sha256, digest(goal), digest(start),
                                    perturbations, block["created_at"], True))
-        artifacts.append({"instance_id": member_id, "tro": str(tro_path), "tro_sha256": file_digest(tro_path),
-                          "demo": str(demo_path), "demo_sha256": file_digest(demo_path), "report": str(path),
-                          "report_sha256": file_digest(path), "sidecar": str(sidecar_path), "sidecar_sha256": file_digest(sidecar_path)})
+        artifacts.append(record)
     require(members, "no successfully demonstrated goal-group members")
     allocation = None
     if group_closed:
@@ -140,12 +146,15 @@ def audit_job(job, gate_path, *, root, started_at, group_closed=False, group_id=
             allocate_goal_group(members, campaign_id=campaign["campaign_id"], campaign_started_at=started_at,
                                  standard_eval_requested=False, max_members=3)
             allocation = {m.instance_id: campaign["split"] for m in members}
-    return {"schema": "isg-release-review-v1", "campaign_id": campaign["campaign_id"], "class_id": campaign["class_id"],
+    result = {"schema": "isg-release-review-v1", "campaign_id": campaign["campaign_id"], "class_id": campaign["class_id"],
             "task": campaign["task"], "group_id": group_id, "validation_key": asdict(key),
             "template_validation_passed": True, "evidence": [asdict(e) for e in evidence], "members": artifacts,
             "gate": {"path": str(gate_path), "sha256": file_digest(gate_path)}, "source_job": str(job),
             "group_closed": group_closed, "proposed_allocation": allocation, "accepted": False,
             "pending": "quota claim and final dataset export" if allocation else "group completion"}
+    if duplicates:
+        result["excluded_duplicate_members"] = duplicates
+    return result
 
 
 def main():

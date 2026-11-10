@@ -23,6 +23,7 @@ from scripts.campaign_20261110.contracts import (
 )
 from scripts.campaign_20261110.goal_groups import load_template_contract
 from scripts.campaign_20261110.storage import atomic_directory_lock, local_sqlite_transaction
+from scripts.campaign_20261110.reservation_policy import require_active_policy
 
 QUOTAS = {q.task: q for q in task_quotas()}
 ROOM_WEIGHTED_TASKS = {"object_scaling", "mental_rotation"}
@@ -330,6 +331,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
             db.close()
 
     with atomic_directory_lock(state_path.with_suffix(".lockdir")):
+        require_active_policy(root,reservations)
         with local_sqlite_transaction(state_path) as local_path:
             record = transact(local_path)
             db = _db(local_path)

@@ -3694,8 +3694,12 @@ class ArticulationSmall(SamplerV2):
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         self.campaign_verify_articulation(draft)
+        active = getattr(self, "_campaign_joint_active", None) is not None
+        if active and CJG.start_was_written(self, draft.summary["campaign_goal_group"]["requested_start"]):
+            raise Reject("campaign_duplicate_start", "joint start/grasp already written")
         path = super().write_instance(draft, index, seed)
-        if getattr(self, "_campaign_joint_active", None) is not None:
+        if active:
+            CJG.remember_written_start(self, draft.summary["campaign_goal_group"]["requested_start"])
             self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
         return path
 

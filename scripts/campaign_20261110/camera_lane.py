@@ -20,6 +20,7 @@ from scripts.campaign_20261110.contracts import (
 )
 from scripts.campaign_20261110.goal_groups import load_template_contract
 from scripts.campaign_20261110.storage import atomic_directory_lock
+from scripts.campaign_20261110.reservation_policy import active_policy
 
 TASK = "camera_relocalization-standard"
 CAMERA_TASKS = (TASK, "camera_relocalization-obstructed")
@@ -178,10 +179,17 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
         require(file_digest(artifact(row.report_path, root, started_at)) == row.report_sha256, "camera evidence changed after review")
     state_path.parent.mkdir(parents=True, exist_ok=True)
     with atomic_directory_lock(state_path.with_suffix(state_path.suffix + ".lockdir")):
+        active=active_policy(root)
+        if active is not None:
+            from scripts.campaign_20261110.group_lane import check_reservations
+            check_reservations(Template(**raw_template),active[1],active[2])
         state = read(state_path) if state_path.exists() else {
             "schema": "isg-camera-quota-state-v1", "campaign_id": review["campaign_id"], "task": TASK,
             "eval_quotas": EVAL_QUOTAS, "training_room_caps": training_room_caps, "accepted": {}}
         require(state["campaign_id"] == review["campaign_id"] and state["task"] == TASK, "quota state belongs to another campaign/task")
+        if active is not None:
+            require(state.get("reservation_policy_sha256",active[0]["policy_sha256"])==active[0]["policy_sha256"], "camera quota state uses a superseded reservation policy")
+            state["reservation_policy_sha256"]=active[0]["policy_sha256"]
         require(state["eval_quotas"] == EVAL_QUOTAS and state["training_room_caps"] == training_room_caps, "quota policy changed")
         accepted = state["accepted"]
         eval_counts = Counter(row["bucket"] for row in accepted.values() if row["split"] == "eval_standard")

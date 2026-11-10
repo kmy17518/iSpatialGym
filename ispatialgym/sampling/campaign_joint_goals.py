@@ -16,6 +16,20 @@ __all__ = ["ENV", "GoalGroupTimeout", "GoalPlanError", "JointGoalPlan", "SCHEMA"
 SCHEMA = "isg-joint-goal-plan-v1"
 
 
+def start_key(start):
+    return hashlib.sha256(json.dumps(start, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+
+def start_was_written(sampler, start):
+    return start_key(start) in getattr(sampler, "_campaign_joint_written_starts", set())
+
+
+def remember_written_start(sampler, start):
+    if not hasattr(sampler, "_campaign_joint_written_starts"):
+        sampler._campaign_joint_written_starts = set()
+    sampler._campaign_joint_written_starts.add(start_key(start))
+
+
 @dataclass(frozen=True)
 class JointGoalPlan:
     campaign_id: str

@@ -90,8 +90,14 @@ def test_modified_demo_and_disabled_qa_cannot_pass_release(tmp_path):
 
 def test_same_intended_start_cannot_be_counted_as_two_instances(tmp_path):
     f = fixture(tmp_path, starts=(1, 1))
-    with pytest.raises(c.ContractError, match="duplicates a start"):
-        audit(f)
+    result = audit(f)
+    assert result["proposed_allocation"] == {"fresh_0": "train"}
+    assert [m["instance_id"] for m in result["excluded_duplicate_members"]] == ["fresh_1"]
+
+
+def test_duplicate_start_cannot_make_a_heldout_training_singleton(tmp_path):
+    f = fixture(tmp_path, starts=(1, 1), split="eval_model")
+    assert audit(f)["proposed_allocation"] == {"fresh_0": "eval_model"}
 
 
 def test_reuse_gate_requires_exact_template_key_and_campaign(tmp_path):

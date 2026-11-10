@@ -28,6 +28,7 @@ from scripts.campaign_20261110.contracts import (
 )
 from scripts.campaign_20261110.group_lane import check_reservations, physical_template
 from scripts.campaign_20261110.storage import atomic_directory_lock
+from scripts.campaign_20261110.reservation_policy import active_policy
 
 CAMERA_STATES = ("camera_quota.json", "camera_obstructed_quota.json", "camera_category_quota.json")
 
@@ -43,6 +44,9 @@ def snapshot_allocations(root, database=None):
     with ExitStack() as locks, tempfile.TemporaryDirectory(prefix="isg-release-snapshot-", dir="/tmp") as temporary:
         for _, lock in sorted(sources):
             locks.enter_context(atomic_directory_lock(lock))
+        active = active_policy(root)
+        if active is not None:
+            inputs.append({"kind": "active_reservation_policy", "pointer": active[0]})
         for source, _ in sources:
             if not source.exists():
                 inputs.append({"path": str(source), "present": False})
@@ -264,8 +268,10 @@ def main():
     a = p.parse_args()
     source, groups, inputs = snapshot_allocations(a.root)
     contracts = contract_index(a.root)
-    reservations, hashes = read(a.reservations), read(a.reservation_hashes)
-    inputs += [{"path": str(Path(path).resolve()), "sha256": file_digest(path)} for path in (a.reservations, a.reservation_hashes)]
+    active = next((item["pointer"] for item in inputs if item.get("kind") == "active_reservation_policy"), None)
+    paths = (active["reservations"]["path"], active["asset_hashes"]["path"]) if active else (a.reservations, a.reservation_hashes)
+    reservations, hashes = map(read, paths)
+    inputs += [{"path": str(Path(path).resolve()), "sha256": file_digest(path)} for path in paths]
     auditor = ArtifactAudit(a.root, a.started_at)
     rows, templates = [], []
     for row in source:

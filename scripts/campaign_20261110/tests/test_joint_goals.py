@@ -59,3 +59,15 @@ def test_articulation_plan_rejects_wrong_identity_and_queue_time_does_not_consum
         j.validate_joint_plan({**raw,"joint":"other"},**kwargs)
     with pytest.raises(j.GoalGroupTimeout):
         j.validate_joint_plan(raw,**{**kwargs,"now":131})
+def test_only_written_joint_starts_block_duplicates_and_other_grasps_remain_eligible():
+    from types import SimpleNamespace
+    from ispatialgym.sampling.campaign_joint_goals import start_was_written, remember_written_start
+
+    sampler = SimpleNamespace()
+    first = {"joints": {"hinge": 0.0}, "grasp": {"arm": "right", "pinch_sign": 1, "bar_offset_m": 0.0}}
+    assert not start_was_written(sampler, first)
+    remember_written_start(sampler, first)
+    assert start_was_written(sampler, first)
+    assert not start_was_written(sampler, {**first, "grasp": {**first["grasp"], "pinch_sign": -1}})
+    assert not start_was_written(sampler, {**first, "joints": {"hinge": .25}})
+

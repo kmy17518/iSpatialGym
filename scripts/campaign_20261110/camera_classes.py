@@ -9,6 +9,7 @@ from scripts.campaign_20261110.contracts import ObjectRef, Template, digest, req
 from scripts.campaign_20261110.acceptance import read
 from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.storage import atomic_directory_lock, durable_atomic_copy
+from scripts.campaign_20261110.reservation_policy import require_active_policy
 
 TASK = "camera_relocalization-obstructed"
 EVAL_QUOTAS = {"eval_standard": {"3": 3, "5": 4, "10": 3},
@@ -76,6 +77,7 @@ def claim_camera_classes(review, state_path, *, root, started_at, standard_class
               "training_per_class": 1000, "reservations_sha256": digest(reservation_policy)}
     state_path.parent.mkdir(parents=True, exist_ok=True)
     with atomic_directory_lock(state_path.with_suffix(state_path.suffix + ".lockdir")):
+        require_active_policy(root,reservations)
         state = read(state_path) if state_path.exists() else {
             "schema": "isg-camera-class-quota-state-v1", "campaign_id": review["campaign_id"],
             "task": task, "policy": policy, "accepted": {}}
