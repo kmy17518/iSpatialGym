@@ -42,6 +42,18 @@ def main():
             path=Path(image['path']).resolve()
             if not path.is_relative_to(dataset) or sha(path)!=image['sha256'] or sha(path)!=review['images_sha256'][path.name]:
                 raise ValueError('visual evidence hash mismatch')
+        additional=review.get('additional_capture')
+        if additional:
+            capture_path=Path(additional['path']).resolve()
+            if not capture_path.is_relative_to(root) or sha(capture_path)!=additional['sha256']:
+                raise ValueError('additional visual capture hash mismatch')
+            capture=json.loads(capture_path.read_text())
+            if capture['status']!='captured_for_visual_review' or capture['source_readiness_sha256']!=sha(readiness_path) or set(capture['models'])!={r['model'] for r in report['objects']}:
+                raise ValueError('additional visual capture lacks exact model/source coverage')
+            for image in capture['images']:
+                image_path=Path(image['path']).resolve()
+                if not image_path.is_relative_to(root) or sha(image_path)!=image['sha256'] or additional['images_sha256'].get(image_path.name)!=image['sha256']:
+                    raise ValueError('additional reviewed image differs')
         if (dataset/'campaign_conversion_failure.json').exists():
             raise ValueError('dataset has unresolved conversion failure')
         for item in report['objects']:

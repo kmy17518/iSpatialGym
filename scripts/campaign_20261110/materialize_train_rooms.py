@@ -41,6 +41,37 @@ def main():
     standards = json.loads((inv/'standard_contract_ready.json').read_text())['templates']
     customs_path = inv/'frozen_customs_f24ea424.json'
     originals = json.loads(customs_path.read_text())
+    generated_path=inv/'generated_project_readiness_r1.json'
+    floating_jobs=[]
+    if generated_path.is_file():
+        generated=json.loads(generated_path.read_text())['objects']
+        source_standard=next(t for t in standards if t['class_id']=='mental_rotation-classroom_mock_up')
+        source_record=records[source_standard['class_id']]
+        for key,asset in sorted(generated.items()):
+            if asset['family']!='mental_rotation' or asset['split_reservation']!='train':continue
+            if not asset['ready'] or key in excluded or asset['category'] in excluded_categories:
+                raise ValueError(f'unready/reserved generated train asset {key}')
+            category,model=asset['category'],asset['model'];grasp_key=f'{category}__{model}__f'
+            alias=f'mental_rotation-{category}_{model}'
+            entry=copy.deepcopy(originals[source_record['row']['alias']])
+            entry['roles']['target'].update(representative=model,dataset=asset['dataset'],
+                grasp_keys={key:grasp_key},scale={key:asset['default_scale']},orientation_equivalences={key:[]})
+            originals[alias]=entry
+            record=copy.deepcopy(source_record);record['row']['alias']=alias
+            for binding in record['metadata']['bindings']:
+                if binding['role']=='target':
+                    binding.update(category=category,model=model,dataset=asset['dataset'])
+                    record['object_init_args'][binding['scene_object_name']].update(category=category,model=model,dataset_name=asset['dataset'],scale=asset['default_scale'])
+            standard=copy.deepcopy(source_standard)
+            for obj in standard['objects']:
+                if obj['role']=='target':
+                    obj.update(category=category,model=model,asset_sha256=asset['asset_sha256'],default_scale=asset['default_scale'],ready=True,readiness_source=asset['readiness_source'])
+            standard['_record_override']=record;standard['_new_grasp_key']=grasp_key;standards.append(standard)
+            floating_jobs.append({'id':f'{category}__{model}__s1__floating','category':category,'model':model,
+                'scale':asset['default_scale'],'dataset':asset['dataset'],'constraint':'floating','rest_hint_wxyz':None,'rest_pose':None,
+                'legacy_key':grasp_key,'kind':'floating','source':'campaign_generated_asset','floating_mode':'C','held_tasks':['mental_rotation'],
+                'ready':True,'readiness_source':asset['readiness_source'],'asset_sha256':asset['asset_sha256'],
+                'legacy_key_note':'New routing alias only; no legacy grasps or model geometry are imported.'})
     readiness = ReadinessCatalog(B1K/'bddl3/bddl/generated_data')
     scene_cache = {}
     definitions, jobs, templates, blocked = {}, [], [], []
@@ -49,7 +80,7 @@ def main():
         task, class_id = standard['task'], standard['class_id']
         if task not in families:
             continue
-        record = records[class_id]
+        record = standard.get('_record_override') or records[class_id]
         alias = record['row']['alias']
         entry = copy.deepcopy(originals[alias])
         iddl = parse_file(str(ROOT/'ispatialgym/assets/iddl'/entry['iddl']))
@@ -133,7 +164,9 @@ def main():
                     'release_status':'candidate_only','fresh_metadata_binding_check':'required','fresh_demo':'pending','fresh_replay':'pending'})
             templates.append({**asdict(template),'fingerprint':template.fingerprint})
             jobs.append({'candidate_id':candidate_id,'class_id':class_id,'alias':alias,'scene':scene,'room':room,
-                'template_fingerprint':template.fingerprint,'production_released':False,'status':'ready_for_geometry_validation',
+                'template_fingerprint':template.fingerprint,'production_released':False,
+                'status':'awaiting_fresh_floating_grasp_library' if standard.get('_new_grasp_key') else 'ready_for_geometry_validation',
+                'required_new_grasp_key':standard.get('_new_grasp_key'),
                 'sample_argv':['python','-m','ispatialgym.sampling.sample_isg','--variant',alias,'--customs','${ROOM_MATERIALIZED}/candidate_customs.json',
                     '--bddl-root','${ROOM_MATERIALIZED}/bddl','--scene',scene,'--room',room,'--templates','1','--instances-per-template','1',
                     '--max-attempts','3','--seed','20261110','--no-write-back','--out','${CAMPAIGN_OUT}/room_validation/'+candidate_id]})
@@ -149,7 +182,8 @@ def main():
                 'room_plan_sha256':file_sha(plan_path),'customs_sha256':file_sha(path),'jobs':jobs,'blocked':blocked,'production_released':0}
     (out/'validation_jobs.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n')
     (out/'contract_candidates.json').write_text(json.dumps({'templates':templates},indent=2,sort_keys=True)+'\n')
-    print(json.dumps({'classes':len(definitions),'candidates':len(jobs),'blocked':blocked,'production_released':0}))
+    (out/'generated_mental_floating_jobs.json').write_text(json.dumps(floating_jobs,indent=2,sort_keys=True)+'\n')
+    print(json.dumps({'source_classes':len({j['class_id'] for j in jobs}),'native_variants':len(definitions),'candidates':len(jobs),'new_floating_jobs':len(floating_jobs),'blocked':blocked,'production_released':0}))
 
 
 if __name__ == '__main__':

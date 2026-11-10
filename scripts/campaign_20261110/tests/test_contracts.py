@@ -47,6 +47,13 @@ class QuotaTests(unittest.TestCase):
         balanced = c.task_quotas(articulation_category_count="balanced_four", block_category_instances=1)
         self.assertEqual(sum(x.category_instances for x in balanced), 115)
 
+    def test_block_model_uses_nine_instance_proportional_buckets(self):
+        quota = next(row for row in c.task_quotas() if row.task == "configuration_matching-block_design")
+        self.assertEqual(quota.model_buckets, (2, 3, 2, 2))
+        self.assertEqual(sum(quota.model_buckets), quota.model_instances_per_class)
+        self.assertEqual(quota.model_bucket_policy["source_counts"], [2, 3, 3, 2])
+        self.assertEqual(quota.category_buckets, ())
+
     def test_aliases_include_legacy_small_relation_names(self):
         for alias, expected in [
             ("object_scaling_01", "object_scaling"),

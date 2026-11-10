@@ -30,6 +30,7 @@ import json
 import logging
 import math
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -37,6 +38,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
+from ispatialgym.sampling import campaign_surface_goals as CSG
 from ispatialgym.sampling import contact_maps as CMAP
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import support_rules as SR
@@ -184,6 +186,8 @@ class AlignmentAxial(SamplerV2):
         margins = {"kind": "axial", "w_diag": w_diag, "safety": 0.02, "H_max": ez}
         self.extents = {"long": long_len, "short": short_len, "height": ez, "w_diag": w_diag}
         self._start_margins = margins
+        if os.environ.get(CSG.ENV):
+            self._campaign_surface_active = self.campaign_surface_plan()
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
         self._start_search(rng, margins, errors)
@@ -193,6 +197,8 @@ class AlignmentAxial(SamplerV2):
                                     "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
                                     "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
                                     "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            self.template_facts["deviation_range_applied_deg"] = list(self.g("deviation_range_deg"))
 
     def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
         """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2 survivors:
@@ -386,7 +392,57 @@ class AlignmentAxial(SamplerV2):
 
     # ------------------------------------------------------------------ instance
 
+    def campaign_surface_plan(self):
+        if not os.environ.get(CSG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CSG.load_surface_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                         activated_at=self._campaign_group_started_at,
+                                         expected_sha256=getattr(self, "_campaign_surface_plan_sha", None))
+            if plan.task != SUBTASK:
+                raise CSG.GoalPlanError("axial sampler received another task's goal plan")
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "axial goal-group member limit reached")
+            self._campaign_surface_plan_sha = plan.sha256
+            return plan
+        except CSG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CSG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_surface_plan()
+        return None if plan is None else max(0.0, plan.deadline_at-time.time())
+
+    def campaign_verify_goal(self, draft, *, settled_goal=False):
+        plan = getattr(self, "_campaign_surface_active", None)
+        if plan is None:
+            return
+        self.campaign_group_remaining_s()
+        from ispatialgym.sampling.campaign_tray_goals import pose_error
+
+        canonical = (th.tensor(plan.position, dtype=th.float32), th.tensor(plan.orientation, dtype=th.float32))
+        dp, dq = pose_error(draft.goal_poses[self.tname], canonical)
+        if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
+            raise Reject("campaign_goal_drift", f"native axial endpoint differs from shared goal by {dp:.6f} m / {dq:.6f} rad")
+        if settled_goal:
+            pos, quat = self.obj("target").get_position_orientation()
+            actual_dp, actual_dq = pose_error((pos, quat), canonical)
+            if actual_dp > self.ikc.WITNESS_POS_TOL or actual_dq > self.tol("orientation", .10):
+                raise Reject("campaign_goal_drift", "settled axial goal differs from shared goal")
+        magnitude = abs(math.degrees(C.wrap_angle(self._heading(canonical[1])-self._heading(draft.object_poses[self.tname][1]))))
+        if plan.split != "train" and not plan.magnitude_range_deg[0] <= magnitude <= plan.magnitude_range_deg[1]:
+            raise Reject("campaign_bucket_drift", "settled axial start left strict eval bucket")
+        draft.summary["campaign_goal_group"].update({"actual_magnitude_deg": magnitude,
+            "endpoint_residual": {"position_m": dp, "orientation_rad": dq}})
+        draft.goal_poses[self.tname] = canonical
+        draft.pose_targets[self.tname]["orientation"] = list(plan.orientation)
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if os.environ.get(CSG.ENV):
+            self._campaign_surface_active = self.campaign_surface_plan()
         init = self.init_stance
         errors = []
         order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
@@ -647,6 +703,15 @@ class AlignmentAxial(SamplerV2):
             self._note_contacts(draft, manip, pose, goal_pose, spin, abs(d_goal), push_end_sign, push_label, brace_found)
         self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
         self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
+        campaign_plan = getattr(self, "_campaign_surface_active", None)
+        if campaign_plan is not None:
+            draft.summary["campaign_goal_group"] = campaign_plan.summary()
+            draft.summary["campaign_goal_group"]["requested_start"] = {
+                "pose": [value.tolist() for value in pose],
+                "contacts": {key: {field: data.get(field) for field in ("object", "arm", "kind", "contact", "init")}
+                             for key, data in ((key, value.to_sidecar()) for key, value in self.sidecar.contacts.items())},
+            }
+            self.campaign_verify_goal(draft)
         return draft
 
     def _note_contacts(self, draft: Draft, manip: Stance, pose: TT.Pose, goal_pose: TT.Pose, spin: float, turn: float, end_sign: float,
@@ -685,11 +750,31 @@ class AlignmentAxial(SamplerV2):
         bands, left_bands = self.bands, self.left_bands
         fails = {"support": 0, "frame": 0, "work_off_band": 0, "brace_off_band": 0, "brace_class_failed": 0}
         draws: List[Tuple[Any, ...]] = []
-        for _ in range(n):
-            yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
-            r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
-            xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
-            pose = self._place(xy, yaw0)  # i7-axialrest: R_z(yaw0) * q_rest under the switch (upright identity otherwise)
+        campaign_plan = getattr(self, "_campaign_surface_active", None)
+        if campaign_plan is not None:
+            native = CPZ.axial_rest_pose(getattr(self, "rest_quat", None), yaw_goal)
+            if float(C.quat_angle(native, th.tensor(campaign_plan.orientation))) > self.ikc.WITNESS_ANG_TOL:
+                fails["campaign_alignment_direction"] = 1
+                return draws, fails
+        for draw_index in range(n):
+            deviation = self.g("deviation_range_deg")
+            if campaign_plan is not None:
+                self.campaign_group_remaining_s()
+                try:
+                    deviation = [math.degrees(v) for v in CSG.deviation_range(campaign_plan,
+                        [math.radians(v) for v in deviation], fallback=draw_index == n-1)]
+                except CSG.GoalPlanError as exc:
+                    raise Reject("campaign_goal_bucket", str(exc)) from exc
+            yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, deviation)
+            if campaign_plan is None:
+                r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
+                xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
+                pose = self._place(xy, yaw0)
+            else:
+                pose = initial_about_fixed_com(campaign_plan.position, campaign_plan.orientation, self.com_local,
+                                               C.wrap_angle(yaw0-yaw_goal))
+                self._campaign_latest_proposal = {"start_poses": {self.tname: pose},
+                    "goal_poses": {self.tname: (campaign_plan.position, campaign_plan.orientation)}, "group_id": campaign_plan.group_id}
             if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
                 continue
@@ -883,7 +968,12 @@ class AlignmentAxial(SamplerV2):
         library shares): the goal pose (COM fixed, yaw = aligned), the direction the end moves in at the goal and the points of the goal hull's
         face along it at the brace height - only the part of that face near the pushed end's arrival is free of the object before the goal,
         so the candidates run from that corner toward the far end."""
-        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace, rest_quat=getattr(self, "rest_quat", None))
+        rest = getattr(self, "rest_quat", None)
+        plan = getattr(self, "_campaign_surface_active", None)
+        if plan is not None:
+            return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace,
+                                           rest_quat=rest, goal_quat=plan.orientation)
+        return CPZ.axial_stop_geometry(self.hull, self.com_local, pose, end, com, spin, yaw_goal, z_brace, rest_quat=rest)
 
     def _stop_face_points(self, goal_pose: TT.Pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=(0.08, 0.2, 0.35, 0.5, 0.65, 0.8)) -> List[th.Tensor]:
         """``contact_poses.axial_stop_face_points``: the goal hull's stop face points at ``fractions`` of its span from the end nearest ``near``."""
@@ -1132,16 +1222,23 @@ class AlignmentAxial(SamplerV2):
                                                turn_rad=round(C.wrap_angle(self._heading(q_goal) - self._heading(q1.float())), 5))
         com = self._com_world((p1.float(), q1.float()))
         draft.goal_poses[tname] = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
+        if getattr(self, "_campaign_surface_active", None) is not None:
+            self.campaign_verify_goal(draft)
 
     def refine_targets_from_goal(self, draft: Draft):
-        pass  # orientation-only target: the goal orientation is exact by construction
+        if getattr(self, "_campaign_surface_active", None) is not None:
+            self.campaign_verify_goal(draft, settled_goal=True)
 
     def on_reject(self, err: Reject):
         self._clear_hinge()
         super().on_reject(err)
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        if getattr(self, "_campaign_surface_active", None) is not None:
+            self.campaign_verify_goal(draft)
         path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_surface_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
         self._clear_hinge()
         return path
 
@@ -1154,6 +1251,14 @@ class AlignmentAxial(SamplerV2):
         return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
                  "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
                  "brace": "stop_edge", "hard": False}]
+
+
+def initial_about_fixed_com(position, orientation, com_local, turn):
+    """Turn a start about the fixed goal COM, including noncentral object roots."""
+    goal_q = th.tensor(orientation, dtype=th.float32)
+    com = th.tensor(position, dtype=th.float32) + C.quat_rotate(goal_q, com_local)
+    start_q = C.qmul(C.quat_from_yaw(float(turn)), goal_q)
+    return com-C.quat_rotate(start_q, com_local), start_q
 
 
 def rest_extents(hull: th.Tensor, rest_quat, long_axis: th.Tensor) -> Tuple[float, float, float]:

@@ -1047,6 +1047,8 @@ class AlignmentWall(SamplerV2, WallGeometry):
             plan = CSG.load_surface_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
                                          activated_at=self._campaign_group_started_at,
                                          expected_sha256=getattr(self, "_campaign_surface_plan_sha", None))
+            if plan.task != "alignment-world_vertical":
+                raise CSG.GoalPlanError("wall sampler received another task's goal plan")
             if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
                 raise Reject("campaign_group_complete", "wall goal-group member limit reached")
             self._campaign_surface_plan_sha = plan.sha256

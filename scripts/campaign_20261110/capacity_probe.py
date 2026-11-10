@@ -59,4 +59,30 @@ for path in sorted(campaign_root.glob('v2_release_*/release_manifest.json')):
         if reader.exists() and 'ERRORS 0' in reader.read_text().splitlines():
             data_releases.append({k:v for k,v in release.items() if k!='files'} | {'path':str(path.parent),'reader_errors':0})
     except (OSError,ValueError):pass
-print(json.dumps(dict(data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+acceptance={'counts':{},'templates':0,'sources':[],'errors':[]}
+counts=collections.Counter()
+template_keys=set()
+group_path=campaign_root/'dataset/group_counts.json'
+if group_path.exists():
+    try:
+        committed=json.loads(group_path.read_text())
+        assert committed['campaign_id']=='campaign_20261110'
+        counts.update(committed['counts'])
+        exports=[json.loads(p.read_text()) for p in (campaign_root/'dataset/groups').glob('*.json')]
+        members=[m for group in exports for m in group['members']]
+        assert len(exports)==committed['groups'] and len(members)==sum(committed['counts'].values()), 'group export/count mismatch'
+        template_keys.update(m['validation_key']['template_sha256'] for m in members)
+        acceptance['sources'].append({'path':str(group_path),'mtime':group_path.stat().st_mtime})
+    except (OSError,ValueError,KeyError,AssertionError) as exc:acceptance['errors'].append(str(exc))
+camera_path=campaign_root/'dataset/camera_quota.json'
+if camera_path.exists():
+    try:
+        state=json.loads(camera_path.read_text())
+        assert state['campaign_id']=='campaign_20261110'
+        for member in state['accepted'].values():
+            counts[member['split']]+=1
+            template_keys.add(member['validation_key']['template_sha256'])
+        acceptance['sources'].append({'path':str(camera_path),'mtime':camera_path.stat().st_mtime})
+    except (OSError,ValueError,KeyError,AssertionError) as exc:acceptance['errors'].append(str(exc))
+acceptance.update(counts=dict(counts),templates=len(template_keys))
+print(json.dumps(dict(acceptance=acceptance,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))

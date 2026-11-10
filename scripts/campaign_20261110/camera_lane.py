@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import fcntl
 import math
 import sys
 from collections import Counter
@@ -16,12 +15,14 @@ if __package__ in (None, ""):
 
 from scripts.campaign_20261110.acceptance import artifact, read, report_passed
 from scripts.campaign_20261110.contracts import (
-    Perturbations, ScaleState, ValidationEvidence, ValidationKey, digest, file_digest,
+    ObjectRef, Template, Perturbations, ScaleState, ValidationEvidence, ValidationKey, digest, file_digest,
     require, require_validation, validate_campaign_block, write_json_atomic,
 )
 from scripts.campaign_20261110.goal_groups import load_template_contract
+from scripts.campaign_20261110.storage import atomic_directory_lock
 
 TASK = "camera_relocalization-standard"
+CAMERA_TASKS = (TASK, "camera_relocalization-obstructed")
 EVAL_QUOTAS = {"3": 3, "5": 4, "10": 3}
 
 
@@ -31,11 +32,14 @@ def path_bucket(distance):
     return next(str(hi) for hi in (3, 5, 10) if distance <= hi)
 
 
-def room_caps(plan, total=1000):
+def room_caps(plan, total=1000, *, task=TASK):
     """Largest remainder preserves the exact total while respecting area weights."""
-    rows = plan["tasks"][TASK]
+    require(task in CAMERA_TASKS, "invalid camera task")
+    rows = plan["tasks"][task]
     require(plan["rooms_per_task"] == 10 and len(rows) == 10, "camera training requires ten rooms")
     weights = {f"{row['scene']}/{row['room']}": float(row["traversable_m2"]) for row in rows}
+    reserved = {f"{row['scene']}/{row['room']}" for row in plan.get("reserved_rooms", [])}
+    require(not set(weights) & reserved, "camera training plan includes a held-out room")
     require(len(weights) == 10 and all(math.isfinite(v) and v > 0 for v in weights.values()), "invalid room areas")
     require(isinstance(total, int) and total >= 10, "invalid training total")
     scaled = {key: value / sum(weights.values()) * total for key, value in weights.items()}
@@ -51,11 +55,23 @@ def _block(tro, template, started_at):
     block = meta.get("campaign")
     require(block is not None, "unannotated baseline cannot release camera production")
     validate_campaign_block(block, object_bindings=meta["object_bindings"])
-    require(block["task"] == TASK and block["class_id"] == template.class_id, "not the requested camera class")
+    require(block["task"] == template.task and block["class_id"] == template.class_id, "not the requested camera class")
     require(block["template_sha256"] == template.fingerprint, "camera ready contract differs from instance")
     require(block["created_at"] >= started_at, "historical camera instance")
     require(block.get("goal_group_id") is None, "camera lane does not allocate manipulation groups")
-    require(block["split"] in ("eval_standard", "train"), "held-out instance cannot enter camera standard/train lane")
+    require(block["split"] == template.split or (template.split == "eval_standard" and block["split"] == "train"), "camera split differs from ready contract")
+    if template.task == "camera_relocalization-obstructed":
+        proof = template.scene_setup.get("runtime_bddl_adaptation", {})
+        require(proof.get("schema") == "isg-stationary-obstacle-definition-v1", "missing stationary-obstacle definition proof")
+        require(meta.get("bddl_sha256") == template.scene_setup.get("runtime_bddl_sha256"), "obstacle runtime definition differs from contract")
+        require(proof.get("measure") == [["pose_reached", "?agent.n.01_1"]], "obstacle measure must stay camera-only")
+        initial = block.get("runtime", {}).get("planned_start_poses", {})
+        targets = meta.get("pose_targets", {})
+        for name in proof["obstacle_bindings"]:
+            require(name in initial and name in targets, "stationary obstacle lacks initial/goal pose")
+            target = targets[name]
+            require(target.get("frame", "world") in (None, "world") and target.get("position_metric") == target.get("orientation_metric") == "full", "stationary obstacle must gate its world pose")
+            require(target.get("position") == initial[name][0] and target.get("orientation") == initial[name][1], "stationary obstacle goal differs from its initial pose")
     return meta, block, ValidationKey(**block["validation_key"])
 
 
@@ -73,7 +89,7 @@ def _report(path, mode, iid, snapshot, root, since):
 def audit_camera(job, gate_path, *, root, started_at, template):
     """The gate may come from a previous fresh job with the identical validation key."""
     root, job = Path(root).resolve(), Path(job).resolve()
-    require(template.task == TASK, "camera lane requires the standard camera task")
+    require(template.task in CAMERA_TASKS, "camera lane requires a camera task")
     require(job.is_relative_to(root / "out"), "camera job outside campaign output")
     gate_path = artifact(gate_path, root, started_at)
     gate = read(gate_path)
@@ -120,19 +136,23 @@ def audit_camera(job, gate_path, *, root, started_at, template):
         summary = read(summary_path)
         # Some writer versions wrap the sampler summary in a metadata record.
         summary = summary.get("summary", summary)
-        bucket = path_bucket(summary["geodesic_m"])
+        free_bucket = path_bucket(summary["geodesic_m"])
+        distance = summary["geodesic_blocked_m"] if template.task == "camera_relocalization-obstructed" else summary["geodesic_m"]
+        bucket = path_bucket(distance)
+        require(bucket == free_bucket, "obstructed path changed the strict camera bucket")
         require(float(summary["path_bucket_m"]) == float(bucket) == float(side["path_bucket_m"]), "camera bucket disagrees with geodesic/sidecar")
         p = block["perturbations"]
         perturbations = Perturbations({n: ScaleState(**v) for n, v in p["scales"].items()}, tuple(p["removed_objects"]), p["lighting"])
         demo = artifact(report_path.parent / "demo.hdf5", root, started_at)
         paths_by_kind = {"tro": tro_path, "sidecar": sidecar, "summary": summary_path, "demo": demo, "report": report_path}
         members.append({"instance_id": iid, "sampling_split": block["split"], "bucket": bucket,
-                        "geodesic_m": summary["geodesic_m"], "room": f"{template.scene}/{template.room}",
+                        "geodesic_m": distance, "room": f"{template.scene}/{template.room}",
                         "perturbed": perturbations.perturbed,
                         "artifacts": {name: {"path": str(path), "sha256": file_digest(path)} for name, path in paths_by_kind.items()}})
     require(members, "no successfully demonstrated camera members")
-    return {"schema": "isg-camera-release-review-v1", "campaign_id": campaign["campaign_id"], "task": TASK,
-            "class_id": template.class_id, "validation_key": asdict(key), "template_validation_passed": True,
+    return {"schema": "isg-camera-release-review-v1", "campaign_id": campaign["campaign_id"], "task": template.task,
+            "class_id": template.class_id, "source_job": str(job), "contract": asdict(template),
+            "validation_key": asdict(key), "template_validation_passed": True,
             "gate": {"path": str(gate_path), "sha256": file_digest(gate_path)}, "evidence": [asdict(e) for e in evidence],
             "members": members, "accepted": False}
 
@@ -142,7 +162,12 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
     root, state_path = Path(root).resolve(), Path(state_path).resolve()
     require(state_path.is_relative_to(root), "quota state must stay inside campaign root")
     require(review.get("schema") == "isg-camera-release-review-v1" and review.get("template_validation_passed") is True, "camera review not validated")
+    require(review["task"] == TASK and all(row["sampling_split"] in ("eval_standard", "train") for row in review["members"]), "use obstructed/heldout quota allocator for this camera review")
     require(len(training_room_caps) == 10 and sum(training_room_caps.values()) == 1000, "training requires the ten-room 1000-instance plan")
+    raw_template = dict(review["contract"])
+    raw_template["objects"] = tuple(ObjectRef(**value) for value in raw_template["objects"])
+    fresh = audit_camera(review["source_job"], review["gate"]["path"], root=root, started_at=started_at, template=Template(**raw_template))
+    require(digest(fresh) == digest(review), "camera release evidence changed after review")
     key = ValidationKey(**review["validation_key"])
     evidence = [ValidationEvidence(**{**row, "key": ValidationKey(**row["key"])}) for row in review["evidence"]]
     require_validation(key, evidence, campaign_started_at=started_at)
@@ -152,8 +177,7 @@ def claim_camera(review, state_path, *, root, started_at, training_room_caps):
     for row in evidence:
         require(file_digest(artifact(row.report_path, root, started_at)) == row.report_sha256, "camera evidence changed after review")
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    with state_path.with_suffix(state_path.suffix + ".lock").open("a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with atomic_directory_lock(state_path.with_suffix(state_path.suffix + ".lockdir")):
         state = read(state_path) if state_path.exists() else {
             "schema": "isg-camera-quota-state-v1", "campaign_id": review["campaign_id"], "task": TASK,
             "eval_quotas": EVAL_QUOTAS, "training_room_caps": training_room_caps, "accepted": {}}
@@ -191,11 +215,12 @@ def main():
     for name in ("job", "gate", "root", "contracts", "output"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--started-at", required=True, type=float)
+    parser.add_argument("--class-id", default=TASK)
     parser.add_argument("--claim-state")
     parser.add_argument("--room-plan")
     args = parser.parse_args()
     review = audit_camera(args.job, args.gate, root=args.root, started_at=args.started_at,
-                          template=load_template_contract(args.contracts, TASK))
+                          template=load_template_contract(args.contracts, args.class_id))
     write_json_atomic(args.output, review)
     if args.claim_state:
         require(args.room_plan is not None, "claim requires the ten-room plan")

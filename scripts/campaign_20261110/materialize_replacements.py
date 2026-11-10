@@ -7,6 +7,7 @@ Outputs are validation candidates, never released collection templates.
 from __future__ import annotations
 
 import copy
+import argparse
 from dataclasses import asdict
 import hashlib
 import json
@@ -32,8 +33,11 @@ def digest(path):
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--out',type=Path,default=ROOT/'tmp/campaign_20261110/materialized')
+    args=parser.parse_args()
     inv = ROOT / "tmp/campaign_20261110/inventory"
-    output = ROOT / "tmp/campaign_20261110/materialized"
+    output = args.out
     output.mkdir(parents=True, exist_ok=True)
     customs_path = inv / "frozen_customs_f24ea424.json"
     source_customs = json.loads(customs_path.read_text())
@@ -255,11 +259,24 @@ def main():
          support="desk_aduafr_0", support_z=0.773, partner="bookcase_kmuacd_0",
          remove_gen=("inside_goal_region",),
          gen_updates={"inside_surface_z_m": 0.8354, "inside_stance_side": "+y"})
+    fridge_probe_path=inv/'fridge_interior_probe.json'
+    fridge_plane=None
+    if fridge_probe_path.is_file():
+        fridge_probe=json.loads(fridge_probe_path.read_text())
+        if fridge_probe.get('status')!='measured_planes_require_target_geometry_and_maps' or fridge_probe.get('object')!='fridge_xyejdx_0':
+            raise ValueError('fridge probe is not a successful exact replacement measurement')
+        usable=[p for p in fridge_probe['planes'] if .65<=p['height_above_floor']<=1.1 and p['n_free_cells']>=100 and p['open_edges']]
+        if usable:fridge_plane=max(usable,key=lambda p:p['headroom_m']['min'])
     make("inter_object_relation_satisfaction-inside_large_scale_02", scene="Rs_int", room="kitchen_0",
          support="bottom_cabinet_slgzfc_1", support_z=0.874, partner="fridge_xyejdx_0",
-         gen_updates={"partner_joint_init": {"j_link_0": 1.55, "j_link_1": 1.55}, "inside_surface_z_m": None},
+         gen_updates={"partner_joint_init": {"j_link_0": 1.55, "j_link_1": 1.55}, "inside_surface_z_m": fridge_plane['height_above_floor'] if fridge_plane else None},
          remove_gen=("inside_stance_side", "inside_goal_region"),
-         blockers=("Measure the chosen open-fridge interior plane, floor-relative height, opening side and headroom; no source-fridge plane may be reused.",))
+         blockers=() if fridge_plane else ("Measure the chosen open-fridge interior plane, floor-relative height, opening side and headroom; no source-fridge plane may be reused.",))
+    if fridge_plane:
+        definitions[jobs[-1]['alias']]['campaign_provenance']['interior_probe']={
+            'path':str(fridge_probe_path),'sha256':digest(fridge_probe_path),'selected_plane':fridge_plane,
+            'selection':'Usable middle shelf with maximum measured minimum headroom; exact task geometry and maps still required.'}
+        jobs[-1]['required_map_dependencies']=['Native measured private interior spec','Positive jar_of_spaghetti_sauce/exmsmm tabletop initial map at support0.874m','Positive goal interior place maps for both offered arms']
     make("inter_object_relation_satisfaction-inside_large_scale_03", support="breakfast_table_xftrki_0", support_z=0.6789)
     make("inter_object_relation_satisfaction-ontop_large_scale_01", room="utility_room_0", partner="countertop_ikwqer_0")
     target_customs = output / "candidate_customs.json"

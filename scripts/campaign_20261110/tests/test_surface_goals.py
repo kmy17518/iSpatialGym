@@ -26,12 +26,13 @@ class SurfacePlanTests(unittest.TestCase):
         self.assertTrue(p.summary()["bucket_strict"])
 
     def test_identity_and_time_checks(self):
-        for p in (raw(template_id="different"), raw(room="different"), raw(task="alignment-axial"),
+        for p in (raw(template_id="different"), raw(room="different"), raw(task="unrelated"),
                   raw(contract_template_sha256=""), raw(max_members=6), raw(magnitude_range_deg=[20, 15])):
             with self.assertRaises(s.GoalPlanError):
                 validate(p)
         with self.assertRaises(s.GoalGroupTimeout):
             validate(raw(), now=501)
+        self.assertEqual(validate(raw(task="alignment-axial")).task, "alignment-axial")
 
     def test_training_buckets_do_not_relax_physical_bounds_or_block_sampling(self):
         allowed = tuple(math.radians(v) for v in [15, 25])

@@ -62,6 +62,12 @@ def refresh(output, host):
         return sum(j['gpus'] for j in rows if j['state']=='RUNNING')
     def fleet_gpus(rows):
         return sum(int(i.get('num_gpus') or 0) for i in rows if i.get('actual_status')=='running')
+    accepted=cluster.get('acceptance',{})
+    results=dict(runtime.get('results',{'templates_demo_validated':0,'templates_replay_validated':0,'fresh_standard_eval_instances':0,'fresh_model_holdout_instances':0,'fresh_category_holdout_instances':0,'fresh_train_instances':0}))
+    if accepted.get('sources'):
+        results.update(templates_demo_validated=accepted['templates'],templates_replay_validated=accepted['templates'])
+        for split, field in [('eval_standard','fresh_standard_eval_instances'),('eval_model','fresh_model_holdout_instances'),('eval_category','fresh_category_holdout_instances'),('train','fresh_train_instances')]:
+            results[field]=accepted.get('counts',{}).get(split,0)
     state={
         'updated_at':now(),'cluster_observed_at':cluster.get('checked_at'),
         'cluster_probe_error':error,'vast_observed_at':campaign_vast_observed_at,
@@ -83,7 +89,7 @@ def refresh(output, host):
         'baseline_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in baseline_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in baseline_gates),'gates':baseline_gates},
         'contract_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in contract_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in contract_gates),'gates':contract_gates},
         'vast_arch_validation':{'demo_passed':sum(g.get('demo_successes',0)>0 for g in vast_gates),'open_loop_passed':sum(g.get('status')=='validated' for g in vast_gates),'gates':vast_gates},
-        'campaign_results':runtime.get('results',{'templates_demo_validated':0,'templates_replay_validated':0,'fresh_standard_eval_instances':0,'fresh_model_holdout_instances':0,'fresh_category_holdout_instances':0,'fresh_train_instances':0}),
+        'campaign_results':results,'acceptance_evidence':accepted,
         'pending':runtime.get('pending',['Freeze split/perturbation contracts','Launch fresh template demo and open-loop replay validation','Apply owner updates for five pending aliases']),
         'new_campaign_vast_budget_usd':runtime.get('vast_budget_usd',3000),
         'automatically_stop_at_deadline':False,

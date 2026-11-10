@@ -81,6 +81,7 @@ class TaskQuota:
     model_buckets: tuple[int, ...] = ()
     category_buckets: tuple[int, ...] = ()
     goal_groups: bool = True
+    model_bucket_policy: Mapping[str, Any] = field(default_factory=dict)
 
     @property
     def model_classes(self) -> int:
@@ -107,7 +108,9 @@ def task_quotas(*, articulation_category_count: str | None = "stated_totals",
         TaskQuota("alignment-world_vertical", 5, 5000, 9, 5, (3, 4, 3), (3, 3, 3), (2, 2, 1)),
         TaskQuota("alignment-axial", 5, 5000, 9, 5, (3, 4, 3), (3, 3, 3), (2, 2, 1)),
         TaskQuota("configuration_matching-block_design", 1, 1000, 9, block_category_instances,
-                  (2, 3, 3, 2)),
+                  (2, 3, 3, 2), (2, 3, 2, 2), model_bucket_policy={
+                      "method": "proportional_largest_remainder", "source_counts": [2, 3, 3, 2],
+                      "target_total": 9, "tie_break": "lower_bucket_index"}),
         TaskQuota("configuration_matching-attachment", 4, 4000, 9, 4),
     ]
     for scale, count in (("small", 2), ("large", 3)):

@@ -202,7 +202,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
                   for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside"))) for relation in relations}
     joint_task = template.task.startswith("configuration_matching-articulation_")
-    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "disembedding") or template.task in pair_tasks,
+    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding") or template.task in pair_tasks,
             "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
@@ -218,7 +218,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
     if template.scene_setup.get("source_bddl_sha256"):
         template = bind_runtime_definition(template, anchor["template_dir"], runtime_metadata=tm)
-    if template.task == "alignment-world_vertical":
+    if template.task in ("alignment-world_vertical", "alignment-axial"):
         applied = tm.get("template_facts", {}).get("deviation_range_applied_deg")
         template = with_alignment_buckets(template, applied, source={"path": str(Path(anchor["template_dir"]) / "template_meta.json"),
             "sha256": digest(tm), "digest_kind": "canonical_json", "field": "template_facts.deviation_range_applied_deg"})
@@ -317,7 +317,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["crowdedness_range"] = plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
         validate_tray_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
-    elif template.task == "alignment-world_vertical":
+    elif template.task in ("alignment-world_vertical", "alignment-axial"):
         plan["schema"] = SURFACE_SCHEMA
         plan["magnitude_range_deg"] = plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")  # Robot starts vary within this goal group.

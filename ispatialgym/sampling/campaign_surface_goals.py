@@ -1,4 +1,4 @@
-"""Opt-in fixed surface-goal plans; currently wall alignment only.
+"""Opt-in fixed surface-goal plans for wall and axial alignment.
 
 The goal is selected before starts, while initial robot stances and contact
 programs may vary. No plan changes a legacy oracle or a physical acceptance rule.
@@ -46,7 +46,7 @@ class SurfaceGoalPlan:
 def validate_surface_plan(raw, *, template_id, scene, rooms, activated_at, now=None):
     now = time.time() if now is None else now
     _require(isinstance(raw, dict) and raw.get("schema") == SCHEMA, "invalid surface goal schema")
-    _require(raw.get("task") == "alignment-world_vertical", "unsupported surface goal task")
+    _require(raw.get("task") in ("alignment-world_vertical", "alignment-axial"), "unsupported surface goal task")
     _require(raw.get("template_id") == template_id and raw.get("scene") == scene and raw.get("room") in rooms,
              "surface goal template/scene/room mismatch")
     for name in ("campaign_id", "group_id"):

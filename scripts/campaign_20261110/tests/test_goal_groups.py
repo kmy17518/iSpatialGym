@@ -277,3 +277,17 @@ def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_pa
     template = replace(template, scene_setup={**template.scene_setup, "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
     with pytest.raises(c.ContractError, match="semantics differ"):
         g.bind_runtime_definition(template, runtime)
+
+
+def test_axial_author_uses_fresh_goal_and_native_range_policy(tmp_path):
+    job,ledger,_,template,code=GoalGroupControllerTests().fixture(tmp_path)
+    template=replace(template,task="alignment-axial")
+    anchor=g.successful_anchor(job,campaign_root=tmp_path,ledger=ledger,campaign_started_at=time.time()-10)
+    anchor["template_meta"]["template_facts"]={"deviation_range_applied_deg":[20,70]}
+    out=tmp_path/"groups/axial"
+    g.prepare_group(anchor=anchor,template=template,campaign_id="new",group_id="axial",output=out,
+        code_sha256=c.file_digest(code/".snapshot_commit"),physics_sha256=c.digest("physics"),data_sha256=c.digest("maps"),magnitude_range=[20,36.6666667])
+    plan=g.read_json(out/"goal_plan.json")
+    config=g.read_json(out/"campaign_config.json")
+    assert plan["schema"] == "isg-surface-goal-plan-v1" and plan["task"] == "alignment-axial"
+    assert config["template"]["scene_setup"]["bucket_policy"]["native_range_deg"] == [20,70]

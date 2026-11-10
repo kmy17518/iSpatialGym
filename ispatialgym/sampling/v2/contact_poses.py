@@ -1348,13 +1348,15 @@ def axial_stop_face_points(hull: th.Tensor, goal_pose, d_stop: th.Tensor, near: 
 
 
 def axial_stop_geometry(hull: th.Tensor, com_local: th.Tensor, pose, end: th.Tensor, com: th.Tensor, spin: float, yaw_goal: float, z_brace: float,
-                        rest_quat=None):
+                        rest_quat=None, goal_quat=None):
     """§6.10 stop edge of the pushed ``end`` (``AlignmentAxial._stop_geometry``): the goal pose (the centre of mass fixed, yaw = aligned), the
     direction the end moves in at the goal (``d_stop``) and the stop points on the goal hull's face along it at the brace height
     (:func:`axial_stop_face_points`, nearest the pushed end first). Returns ``(goal_pose, stop_pts, d_stop)``. ``rest_quat`` (i7-axialrest,
     :func:`axial_settled_rest_on`): the goal orientation is ``R_z(yaw_goal) * rest_quat`` (None: ``R_z(yaw_goal)``, the upright identity)."""
     z_axis = th.tensor([0.0, 0.0, 1.0])
     q_goal = C.quat_from_yaw(yaw_goal) if rest_quat is None else axial_rest_pose(rest_quat, yaw_goal)
+    if goal_quat is not None:
+        q_goal = TT._t(goal_quat).float()
     goal_pose = (com - C.quat_rotate(q_goal, com_local), q_goal)
     r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
     d_stop = spin * th.cross(z_axis, th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
