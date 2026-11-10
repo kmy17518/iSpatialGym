@@ -57,6 +57,25 @@ def test_admission_identity_keeps_applied_scale_and_light_separate(tmp_path, mon
     base = admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}})
     assert base != admission.admission_id(template, snapshot, {"scales": [1.1,1.1,1.1], "lighting": {}})
     assert base != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {"gain": 2}})
+    assert base == admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "train")
+    assert base != admission.admission_id(template, snapshot, {"scales": [1,1,1], "lighting": {}}, "eval_standard")
+
+
+def test_standard_admission_preserves_default_contract_ownership_and_sibling_capacity(tmp_path, monkeypatch):
+    _, template, _ = anchor_fixture(tmp_path, monkeypatch)
+    cfg = {"admission_split": "eval_standard", "admitted_classes": [template.class_id]}
+    assert admission.scoped_template(template, cfg) is template
+    with pytest.raises(c.ContractError, match="another standard lane"):
+        admission.scoped_template(template, {**cfg, "admitted_classes": ["owned_elsewhere"]})
+    with pytest.raises(c.ContractError, match="standard evaluation source"):
+        admission.scoped_template(replace(template, split="train"), cfg)
+    counts = {"evaluation": {}, "train_buckets": {}, "class_remaining": 1, "task_remaining": 10}
+    decision = admission.admission_decision(template, counts, cfg)
+    assert decision["phase"] == "eval_standard" and decision["groups"] == 1
+    with pytest.raises(c.ContractError, match="no unreserved admission capacity"):
+        admission.admission_decision(template, {**counts, "class_remaining": 0}, cfg)
+    with pytest.raises(c.ContractError, match="no unreserved admission capacity"):
+        admission.admission_decision(template, {**counts, "evaluation": {0: 10}}, cfg)
 
 
 def test_new_attachment_runtime_can_be_scoped_without_rekeying_existing_families():
@@ -106,6 +125,8 @@ def test_failed_replay_requires_changed_successful_gate_before_full_readmission(
     assert admission.refreshable(record, tmp_path)
     assert record["status"] == "failed"  # The existing full refresh/audit still decides admission.
     record["reason"] = "new_runtime_admission_has_no_successful_demo"
+    assert admission.refreshable(record, tmp_path)  # An externally repaired prelaunch job still needs full new proof.
+    path.unlink()
     assert not admission.refreshable(record, tmp_path)
 
 
@@ -134,10 +155,11 @@ def test_pending_admission_canary_reserves_class_capacity_before_catalog_admissi
     assert groups.pending(tmp_path) == []
 
 
-def test_catalog_consumer_reaudits_new_key_and_pins_existing_seed(tmp_path, monkeypatch):
+@pytest.mark.parametrize("split", ["train", "eval_standard"])
+def test_catalog_consumer_reaudits_new_key_and_pins_existing_seed(tmp_path, monkeypatch, split):
     from scripts.campaign_20261110.acceptance import audit_job
     from scripts.campaign_20261110 import group_lane, reservation_policy
-    f, template, config = anchor_fixture(tmp_path, monkeypatch, split="train")
+    f, template, config = anchor_fixture(tmp_path, monkeypatch, split=split)
     review = audit_job(f.job, f.gate, root=tmp_path, started_at=f.since, group_closed=True, group_id="group")
     proof = tmp_path / "groups/group/admission_review.json"; c.write_json_atomic(proof, review)
     snapshot = tmp_path / "code/snapshot"
@@ -147,7 +169,7 @@ def test_catalog_consumer_reaudits_new_key_and_pins_existing_seed(tmp_path, monk
     catalog = tmp_path / "controllers/groups/catalog.json"
     admission.append_seed(catalog, spec, "campaign")
     cfg = {"root": str(tmp_path), "seed_catalog": str(catalog), "campaign_id": "campaign", "admission_snapshot": str(snapshot),
-           "started_at": f.since, "seeds": []}
+           "started_at": f.since, "seeds": [], "admission_split": split, "admitted_classes": [template.class_id]}
     monkeypatch.setattr(group_lane, "check_reservations", lambda *args: None)
     monkeypatch.setattr(reservation_policy, "active_policy", lambda root: ({}, {}, {}))
     state = {}

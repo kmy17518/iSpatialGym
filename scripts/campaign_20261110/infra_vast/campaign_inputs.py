@@ -203,7 +203,7 @@ def prepare_queue(job_dir, env, root):
     require(source.is_relative_to(root / "queues") or source.is_relative_to(job / "campaign_inputs"),
             "queue path outside authored or staged queue roots")
     raw = json.loads(source.read_text())
-    require(raw.get("schema") in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1") and raw.get("entries"), "invalid campaign goal queue")
+    require(raw.get("schema") in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1", "isg-surface-goal-queue-v1") and raw.get("entries"), "invalid campaign goal queue")
     inputs = [(checked(raw["config_path"], root, raw["config_sha256"]), "campaign_config.json")]
     ids = set()
     for entry in raw["entries"]:

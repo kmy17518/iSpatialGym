@@ -24,6 +24,7 @@ def main():
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--vast-gpu', choices=['RTX 4090','RTX 5090'])
     p.add_argument('--dispatch-spool', action='store_true')
+    p.add_argument('--dispatch-backends', nargs='+', choices=['shiyuc_svl','shiyuc_viscam','minyeong_svl','minyeong_viscam','vast_4090','vast_5090'])
     p.add_argument('--time-s', type=int)
     a = p.parse_args()
     root, group, snapshot = (Path(x).resolve() for x in (a.root, a.group, a.snapshot))
@@ -79,7 +80,7 @@ def main():
         (group/'dry.txt').write_text(result.stdout + result.stderr)
         assert result.returncode == 0, 'validation dry-run failed; inspect dry.txt'
         record = {'directory': str(group), 'command': cmd, 'dry_run_passed': True}
-        enqueue_record(root, record, lambda: None, priority=25)
+        enqueue_record(root, record, lambda: None, priority=25, backends=a.dispatch_backends)
         (group/'dispatch_intent.json').write_text(json.dumps(record, indent=2) + '\n')
         print(json.dumps({'dispatch_intent': record['dispatch_intent'], 'dispatch_receipt': record['dispatch_receipt']}))
         return

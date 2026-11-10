@@ -30,6 +30,7 @@ import sys
 import tarfile
 import time
 import uuid
+from collections import Counter
 
 import boto3
 import botocore
@@ -39,9 +40,11 @@ from vastai.api.client import VastClient
 try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
+    from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
+    from worker.resource_policy import machine_reservation, duplicate_worker_gpus
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -78,7 +81,7 @@ PATH_MAX_BYTES = 3 * 2**30
 DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instances": 1, "budget_usd": 300.0, "max_dph_gpu": 1.5,
                   "disk_gb": 280, "idle_destroy_s": 420, "boot_max_s": 3300, "launch_per_tick": 3, "min_inet_down": 500,
                   "vram_per_job_gb": 20, "ram_per_job_gb": 40, "cpus_per_job": 9, "max_jobs_per_instance": 2, "retries": 2,
-                  "search_every_s": 300}
+                  "search_every_s": 300, "max_contracts_per_machine": 4, "market_limit": 1000}
 
 
 def now():
@@ -504,7 +507,7 @@ def search(c, C, gpu=None, force=False):
             if not os.environ.get(name):
                 continue
             try:
-                rows = vo.search_offers(c[name], query=dict(q), order=[["dph_total", "asc"]], limit=200, storage=C["disk_gb"], no_default=True)
+                rows = vo.search_offers(c[name], query=dict(q), order=[["dph_total", "asc"]], limit=int(C.get('market_limit',1000)), storage=C["disk_gb"], no_default=True)
                 break
             except Exception as e:  # noqa: BLE001
                 log(f"search ({SHORT[name]}) failed: {vast_error(e) or str(e)[:160]}")
@@ -551,6 +554,7 @@ def launch(c, o, C, live_by_acct):
            "NVIDIA_DRIVER_CAPABILITIES": "all", "ISG_IDLE_S": str(int(C["idle_destroy_s"]) + 900),
            "ISG_VRAM_PER_JOB_GB": str(C["vram_per_job_gb"]), "ISG_RAM_PER_JOB_GB": str(C["ram_per_job_gb"]),
            "ISG_CPUS_PER_JOB": str(C["cpus_per_job"]), "ISG_MAX_JOBS": str(C["max_jobs_per_instance"]), "ISG_MAX_LIFETIME_S": str(C.get("max_worker_lifetime_s", 21600))}
+    env['ISG_CPU_AFFINITY'] = ','.join(map(str, o.get('_reservation',{}).get('cpu_affinity',[])))
     login = f"-u {os.environ['GHCR_USERNAME']} -p {os.environ['GHCR_PULL_TOKEN']} ghcr.io"
     order = sorted((k for k in c), key=lambda k: (live_by_acct.get(k, 0), ACCOUNTS.index(k)))  # spread over the accounts
     for name in order:
@@ -572,6 +576,7 @@ def launch(c, o, C, live_by_acct):
         ledger("create", instance=iid, offer=o["id"], machine_id=o.get("machine_id"), gpu=o.get("gpu_name"), dph_total=o["dph_total"],
                disk=C["disk_gb"], max_lifetime_s=C.get("max_worker_lifetime_s",21600), inet_up_cost=o.get("inet_up_cost"), inet_down_cost=o.get("inet_down_cost"), tag=tag, label=f"{LABEL}-{tag}", account=name, driver=o.get("driver_version"),
                cpus=o.get("cpu_cores_effective"), ram_gb=round(float(o.get("cpu_ram") or 0) / 1024), slots=o["_slots"],
+               **o.get('_reservation', {}),
                geo=o.get("geolocation"), reliability=o.get("reliability2"), inet_down=o.get("inet_down"))
         log(f"LAUNCHED {iid} [{SHORT[name]}] {fmt_offer(o)}")
         live_by_acct[name] = live_by_acct.get(name, 0) + 1
@@ -836,7 +841,10 @@ def tick(c, s3, state):
     for s in states.values():
         if s["status"] == "assigned":
             assigned_to.setdefault(s["instance"], []).append(s["id"])
-    planned, queued = assignment_plan(queued, live, hbs, created, assigned_to, t)
+    resource_blocked = duplicate_worker_gpus(live, hbs)
+    if resource_blocked:
+        log('RESOURCE_GUARD blocked GPU identities: ' + ','.join(sorted(resource_blocked)))
+    planned, queued = assignment_plan(queued, {k:v for k,v in live.items() if k not in resource_blocked}, hbs, created, assigned_to, t)
     concurrency = min(8, max(1, int(C.get("staging_parallelism", 4))))
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
         futures = {pool.submit(stage_bounded, record, C): (iid, worker, record)
@@ -918,15 +926,19 @@ def tick(c, s3, state):
         for g in gpus_needed:
             offers += search(c, C, gpu=g)
         n_new = 0
-        used_m = {i.get("machine_id") for i in live.values()}
+        reserved_live, reserved_created = dict(live), dict(created)
+        market_reasons = Counter()
         for o in offers:
             if n_new >= C["launch_per_tick"] or need <= 0 or len(live) + n_new >= C["max_instances"]:
                 break
             offer_gpu = o.get("gpu_name")
             if needs_by_gpu.get(offer_gpu, 0) <= 0:
                 continue
-            if o.get("machine_id") in used_m:
+            reservation, reason = machine_reservation(o, reserved_live, hbs, reserved_created, C)
+            if reason:
+                market_reasons[reason] += 1
                 continue
+            o['_reservation'] = reservation
             reserve = float(o["dph_total"]) * float(C.get("max_worker_lifetime_s",21600)) / 3600
             if reserve > budget_left:
                 continue
@@ -936,7 +948,16 @@ def tick(c, s3, state):
                 budget_left -= reserve
                 needs_by_gpu[offer_gpu] = max(0, needs_by_gpu[offer_gpu] - o["_slots"])
                 need = sum(needs_by_gpu.values())
-                used_m.add(o.get("machine_id"))
+                reserved_live[str(iid)] = {'machine_id':o.get('machine_id'), 'gpu_ids':reservation['gpu_ids']}
+                reserved_created[str(iid)] = reservation
+        market_path = os.path.join(VJ, 'market_decision.json')
+        market_temporary = market_path + '.' + uuid.uuid4().hex + '.tmp'
+        with open(market_temporary, 'w') as stream:
+            json.dump({'observed_at_unix':now(), 'offers':len(offers), 'launched':n_new,
+                       'remaining_demand':needs_by_gpu, 'rejections':dict(market_reasons),
+                       'budget_remaining_after_commitments':budget_left,
+                       'max_contracts_per_machine':C.get('max_contracts_per_machine',4)}, stream, indent=2)
+        os.replace(market_temporary, market_path)
     elif need > 0 and budget_left <= max(10.0, 2 * hourly):
         log(f"BUDGET: ${tot:.2f} of ${C['budget_usd']:.0f} spent, ${hourly:.2f}/h live: no new rentals")
     memory_jobs(states)

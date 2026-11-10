@@ -94,11 +94,15 @@ def source_proof(gate_path, *, root, started_at, campaign_id):
         "active_policy_sha256": policy[0]["policy_sha256"], "source_is_final_member": False}
 
 
-def admission_id(template, snapshot, perturbations):
-    return digest({"task": template.task, "class_id": template.class_id, "physical": physical_template(template),
+def admission_id(template, snapshot, perturbations, split="train"):
+    require(split in ("train", "eval_standard"), "invalid admission split")
+    identity = {"task": template.task, "class_id": template.class_id, "physical": physical_template(template),
                    "definition": template.definition_sha256, "runtime_bddl": template.scene_setup.get("runtime_bddl_sha256"),
                    "binding_pool": template.scene_setup.get("binding_pool"),
-                   "code": file_digest(Path(snapshot) / ".snapshot_commit"), "perturbations": perturbations})
+                   "code": file_digest(Path(snapshot) / ".snapshot_commit"), "perturbations": perturbations}
+    if split != "train":  # Preserve every existing training admission identity.
+        identity["admission_split"] = split
+    return digest(identity)
 
 
 def task_allowed(task, cfg):
@@ -108,6 +112,30 @@ def task_allowed(task, cfg):
     require(isinstance(tasks, list) and tasks and len(tasks) == len(set(tasks))
             and all(groups.supports(value) for value in tasks), "invalid admission task scope")
     return task in tasks
+
+
+def scoped_template(template, cfg):
+    require(task_allowed(template.task, cfg), "task outside immutable admission scope")
+    classes = cfg.get("admitted_classes")
+    if classes is not None:
+        require(isinstance(classes, list) and classes and all(isinstance(value, str) and value for value in classes)
+                and len(classes) == len(set(classes)), "invalid admission class ownership")
+        require(template.class_id in classes, "class owned by another standard lane")
+    split = cfg.get("admission_split", "train")
+    require(split in ("train", "eval_standard"), "invalid admission split")
+    if split == "eval_standard":
+        require(template.split == "eval_standard", "standard admission requires a standard evaluation source")
+        return template
+    require(template.split in ("train", "eval_standard"), "heldout source cannot train")
+    return template if template.split == "train" else replace(template, split="train", template_id=template.template_id + "__train")
+
+
+def admission_decision(template, counts, cfg):
+    split = cfg.get("admission_split", "train")
+    decision = groups.next_work(template, counts, max_groups=1,
+                               mode="eval_then_train" if split == "eval_standard" else "train_only")
+    require(decision is not None and decision["phase"] == split, "class has no unreserved admission capacity")
+    return decision
 
 
 def append_seed(catalog, spec, campaign_id):
@@ -128,17 +156,15 @@ def append_seed(catalog, spec, campaign_id):
 def prepare(proof, allocation, cfg, root):
     from scripts.campaign_20261110.goal_batches import prepare_batch, submission_command
     from ispatialgym.sampling.campaign_goal_queue import schema_for_task
-    template = held.template_from(proof["template"])
-    require(task_allowed(template.task, cfg), "task outside immutable admission scope")
+    source_template = held.template_from(proof["template"])
+    template = scoped_template(source_template, cfg)
     runtime = Path(cfg["snapshot"]) / "ispatialgym/sampling/campaign_goal_queue.py"
     require(runtime.is_file() and schema_for_task(template.task) in runtime.read_text(),
             "target snapshot does not support this queue schema")
     require(all(proof["validation_key"][key] == cfg[key] for key in ("physics_sha256", "data_sha256")),
             "source anchor differs from pinned campaign physics/data")
-    identity = admission_id(template, cfg["snapshot"], proof["perturbations"])
+    identity = admission_id(source_template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
     name = "group_admit_" + identity[:20]
-    if template.split != "train":
-        template = replace(template, split="train", template_id=template.template_id + "__train")
     anchor = successful_anchor(allocation["job_dir"], campaign_root=root, ledger=allocation["ledger"], campaign_started_at=cfg["started_at"])
     if template.task.startswith("alignment-") and not template.scene_setup.get("bucket_policy"):
         from scripts.campaign_20261110.goal_groups import with_alignment_buckets
@@ -147,8 +173,7 @@ def prepare(proof, allocation, cfg, root):
                     "digest_kind": "canonical_json", "field": "template_facts.deviation_range_applied_deg"})
     counts = groups.read_counts(root, template)
     reserved = groups.reserve_pending_counts(counts, template, groups.pending(root))
-    decision = groups.next_work(template, reserved, max_groups=1, mode="train_only")
-    require(decision is not None, "class has no unreserved training admission capacity")
+    decision = admission_decision(template, reserved, cfg)
     prepared = prepare_batch(anchor=anchor, template=template, campaign_root=root, batch_id=name, count=1,
         magnitude_range=groups.ranges(template)[decision["bucket"]], seed=cfg["seed"], campaign_id=cfg["campaign_id"],
         code_sha256=file_digest(Path(cfg["snapshot"]) / ".snapshot_commit"), physics_sha256=proof["validation_key"]["physics_sha256"],
@@ -164,7 +189,7 @@ def prepare(proof, allocation, cfg, root):
     directory = Path(prepared["queue"]).parent
     run_logged(command + ["--dry-run"], directory / "dryrun.txt")
     record = {"directory": str(directory), "queue": prepared["queue"], "prepared": prepared, "command": command,
-        "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": "train",
+        "index": index, "count": 3, "validation_key": read(prepared["config"])["validation_key"], "phase": template.split,
         "decision": decision, "needs_new_gate": True, "status": "ready", "dry_run_passed": True,
         "admission_id": identity, "source_proof": proof}
     write_json_atomic(directory / "submission.json", record)
@@ -201,10 +226,13 @@ def refresh(record, cfg, root, rows, queue):
         "seed_config": record["prepared"]["config"], "seed_config_sha256": file_digest(record["prepared"]["config"]),
         "source_gate": str(gate), "source_gate_sha256": file_digest(gate), "anchor_job": allocation["job_dir"],
         "anchor_ledger": allocation["ledger"], "snapshot": cfg["snapshot"], "v2_root": cfg["v2_root"],
-        "max_candidates": cfg.get("max_candidates_per_seed", 1500), "groups_per_batch": 6, "mode": "train_only",
+        "max_candidates": cfg.get("max_candidates_per_seed", 1500), "groups_per_batch": 6,
+        "mode": "eval_then_train" if cfg.get("admission_split") == "eval_standard" else "train_only",
         "seed_offset": int(record["admission_id"][:8], 16), "group_budget_seconds": cfg.get("group_budget_seconds", 900),
         "existing_queues": [record["queue"]], "admission_review": {"path": str(proof_path), "sha256": file_digest(proof_path)}}
     append_seed(cfg["seed_catalog"], spec, cfg["campaign_id"])
+    if record.get("reason"):
+        record["recovered_failure"] = {"reason": record.pop("reason"), "failed_gate": record.get("failed_gate")}
     record.update(status="admitted", admitted_seed=spec["id"], admitted_at=time.time())
 
 
@@ -214,7 +242,7 @@ def refreshable(record, root):
         return False
     if record["status"] != "failed":
         return True
-    if record.get("reason") != "new_runtime_admission_physics_replay_failed":
+    if record.get("reason") not in ("new_runtime_admission_physics_replay_failed", "new_runtime_admission_has_no_successful_demo"):
         return False
     allocation = record.get("allocation")
     if not allocation:
@@ -261,8 +289,8 @@ def main():
             rows, queue = allocations(root), slurm_status()
             for source in cfg.get("existing_bootstraps", []):
                 record = read(source); template = held.template_from(read(record["prepared"]["config"])["template"])
-                require(task_allowed(template.task, cfg), "bootstrap task outside immutable admission scope")
-                identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"])
+                scoped_template(template, cfg)
+                identity = admission_id(template, cfg["snapshot"], read(record["prepared"]["config"])["perturbations"], cfg.get("admission_split", "train"))
                 if identity not in state["records"]:
                     record["admission_id"] = identity
                     record["status"] = "external_submission"
@@ -296,8 +324,8 @@ def main():
                 try:
                     proof = source_proof(gate, root=root, started_at=cfg["started_at"], campaign_id=cfg["campaign_id"])
                     template = held.template_from(proof["template"])
-                    require(task_allowed(template.task, cfg), "task outside immutable admission scope")
-                    identity = admission_id(template, cfg["snapshot"], proof["perturbations"])
+                    scoped_template(template, cfg)
+                    identity = admission_id(template, cfg["snapshot"], proof["perturbations"], cfg.get("admission_split", "train"))
                     found = [r for r in rows if Path(r["job_dir"]).resolve() == Path(proof["source_job"])]
                     require(len(found) == 1, "anchor allocation missing or ambiguous")
                     if not held.job_terminal(found[0], root, queue):

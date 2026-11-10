@@ -136,6 +136,7 @@ def controller_reasons(root, catalog):
                     'external_submission':'Fresh training canary queued or running; exact runtime demo and replay gate required.',
                     'admitted':'Exact runtime training gate passed; seed admitted to bounded refill.',
                 }.get(status,status)
+                if status=='admitted':message='Exact runtime training gate passed; seed admitted to bounded refill.'
                 reasons[(scope['task'],scope['class_id'])].append({
                     'controller':directory.name,'admission_id':identity,'status':status,'reason':str(message),
                     'split':scope['split'],'observed_at':epoch(state.get('updated_at'),source['mtime']),

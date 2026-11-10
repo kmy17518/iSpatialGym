@@ -21,6 +21,7 @@ import subprocess
 import sys
 import threading
 import time
+from resource_policy import select_cpus
 
 S3 = os.environ["ISG_S3"].rstrip("/")
 EP = os.environ["S3_ENDPOINT_URL"]
@@ -85,26 +86,28 @@ def fetch_extract(url, dest="/"):
 def effective_cpus():
     """The CPUs this container may use: its affinity, cut to the CFS quota (hosts advertise 128+ CPUs and allow ~20)."""
     cpus = sorted(os.sched_getaffinity(0))
+    quota = None
     try:
         q, p = open("/sys/fs/cgroup/cpu.max").read().split()
         if q != "max":
-            cpus = cpus[: max(1, int(int(q) // int(p)))]
+            quota = int(q) // int(p)
     except (OSError, ValueError):
         try:
             q = int(open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read())
             p = int(open("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read())
             if q > 0:
-                cpus = cpus[: max(1, q // p)]
+                quota = q // p
         except (OSError, ValueError):
             pass
-    return cpus
+    requested = [int(x) for x in os.environ.get('ISG_CPU_AFFINITY', '').split(',') if x]
+    return select_cpus(cpus, quota, requested)
 
 
 def gpu_info():
-    out = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total", "--format=csv,noheader,nounits"],
+    out = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total,uuid,pci.bus_id", "--format=csv,noheader,nounits"],
                          capture_output=True, text=True).stdout.strip().splitlines()
-    name, drv, mem = [x.strip() for x in out[0].split(",")]
-    return {"gpu": name, "driver": drv, "vram_gb": float(mem) / 1024, "n_gpus": len(out)}
+    name, drv, mem, gpu_uuid, bus = [x.strip() for x in out[0].split(",")]
+    return {"gpu": name, "driver": drv, "vram_gb": float(mem) / 1024, "n_gpus": len(out), 'gpu_uuid':gpu_uuid, 'gpu_pci_bus_id':bus}
 
 
 def ram_gb():
@@ -148,6 +151,7 @@ def heartbeat():
     except OSError:
         pass
     hb["allowed_cpu_affinity"] = sorted(os.sched_getaffinity(0))
+    hb['selected_cpu_affinity'] = CPUS
     try:
         hb["warm_kit_templates"] = [name for name in os.listdir(LC + "/kit_templates")
                                     if os.path.isfile(LC + "/kit_templates/" + name + "/.complete")]
@@ -372,10 +376,10 @@ def run_job(spec, replay_s3):
 def main():
     replay_s3 = os.environ.get("REPLAY_S3", "s3://isg-demos/isg-1020-b1k")
     log(f"WORKER {INST} gpu={GPU} cpus={len(CPUS)} ram={RAM:.0f} GB slots={SLOTS} (vram/{VRAM_PER_JOB_GB} GB, cpus/{CPUS_PER_JOB}, ram/{RAM_PER_JOB_GB} GB)")
-    if SLOTS < 1:
+    if SLOTS < 1 or GPU['n_gpus'] != 1:
         STATE["phase"] = "unusable"
         heartbeat()
-        log("UNUSABLE: no job fits")
+        log("UNUSABLE: exact single-GPU/CPU/RAM contract does not fit")
         return 3
     threading.Thread(target=hb_loop, daemon=True).start()
     started = set()

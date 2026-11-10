@@ -164,7 +164,7 @@ class VastQueueInputsTests(unittest.TestCase):
             self.assertEqual(prepare_queue(job, {QUEUE_ENV:record["staged_queue"]}, root), record)
 
     def test_both_native_queue_protocols_keep_exact_plan_bytes(self):
-        for schema in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1"):
+        for schema in ("isg-held-goal-queue-v1", "isg-pair-goal-queue-v1", "isg-surface-goal-queue-v1"):
             with self.subTest(schema=schema), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 job, queue, plan = self.fixture(root, schema)

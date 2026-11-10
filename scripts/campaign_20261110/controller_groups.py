@@ -218,7 +218,11 @@ def load_seeds(cfg, state):
         require(config_path.is_relative_to(root) and file_digest(config_path) == spec["seed_config_sha256"], "admission config changed")
         config = read(config_path)
         template = held.template_from(config["template"])
-        require(supports(template.task) and template.split == "train" and template.class_id == spec["class_id"], "invalid admitted training task")
+        phase = cfg.get("admission_split", "train")
+        require(phase in ("train", "eval_standard") and supports(template.task)
+                and template.split == phase and template.class_id == spec["class_id"], "invalid admitted task/split")
+        if cfg.get("admitted_classes") is not None:
+            require(template.class_id in cfg["admitted_classes"], "admitted class outside controller ownership")
         require(file_digest(Path(spec["snapshot"]) / ".snapshot_commit") == config["validation_key"]["code_sha256"], "admitted runtime key changed")
         check_reservations(template, policy[1], policy[2])
         proof = spec["admission_review"]
