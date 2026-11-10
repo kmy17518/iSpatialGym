@@ -6201,7 +6201,24 @@ steps, the up axis - at level / 30 / 45 deg x 4 directions and 4 offsets of 2 cm
   base sits at the basin's end (vekaaf: 5.6 cm past the drop centre, settled 18.8 deg).
 - xecfyh / lkklqs (held-out partner slots) and the bathroom sinks were not used.
 
-**Runs:** RESULTS_PLACEHOLDER
+**Runs** (svl titanrtx, v2only on `$OFH/v2maps_i7sink`, own empty sampling cache per tag; templates at an eval seed, registered with
+`register_alias.py` under `$OFH/sink_20261109/reg`, rows in `$OFH/sink_20261109/registry_sink.tsv` and this branch's registry):
+
+| variant | template | N 4 (tag) | att / wr / ok | GPU-h | GPU-h per ok | plate tilt, goal check | final plate tilt (demo) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| (b) luhkiz -> vekaaf, from countertop_ikwqer_0 | eval:0, 3 attempts (1 tipped 18.8 deg before the goal region) | i7sink_vek | 5 / 4 / 4 | 1.28 | 0.32 | 8.2-11.7 deg | 7.5 / 10.7 / 11.2 / 11.3 deg |
+| (a) luhkiz x0.8 -> awvzkn, from countertop_kelzer_0 | eval:1, written at attempt 0 (8.2 deg) | i7sink_ctr080 (18413611, still running at hand-off) | 2 / 0 / 0 so far | 1.51 so far | - (already > (b)'s 1.28 total) | 8.2 deg (template) | - |
+| (a) luhkiz x0.8 -> awvzkn, from bar_udatjt_0 | none: 6 attempts over 4 runs, all `[time_budget]` 3000 s at stance C | - | - | ~5.3 (templates) | - | - | - |
+
+**Why (a) is slow.** The plate now fits (F_goal 100-300 per stance C vs 0-15 for luhkiz s1; even the level release is feasible), but
+stance C at awvzkn fails the attached pre-place IK on joint limits (14 of 16 C failures in bar080's first attempt: right joint 3 / 7 within
+3-5 mrad) and spends the 3000 s attempt budget there - the stance-C problem i7-ft2 diagnosed, independent of the plate. The N 4 countertop
+run's first attempt failed `[place_unreachable]` (joint limit at the goal check) after 2000 s.
+
+**Decision (owner rule: the higher-yield variant becomes the representative).** (b) `..._03_sinkvekaaf` is the representative (4 / 4 at
+0.32 GPU-h per ok); (a) `..._03_sinkcounter080` is registered as the variant; (a)-bar has no template. The goal-tilt limit (15 deg) and
+the success measure are unchanged; every plate in (b) rests 7-12 deg tilted on the basin walls, within the rule. No defaults flipped (no new
+behaviour: customs, an interior spec, a v2 library entry and maps only).
 
 ## Limitations / not done
 
