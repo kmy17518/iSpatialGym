@@ -9,6 +9,47 @@ from scripts.campaign_20261110 import controller_families as c
 
 
 class FamilyControllerTests(unittest.TestCase):
+    def test_terminal_group_reuses_only_exact_source_key_and_keeps_runtime_failure_evidence(self):
+        from scripts.campaign_20261110.tests.test_acceptance import fixture
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=fixture(root,prefix='source_');target=fixture(root,prefix='target_')
+            directory=root/'groups/target_group';directory.mkdir(parents=True)
+            block=json.loads(next((target.job/'inst').rglob('*-tro_state.json')).read_text())['ispatialgym']['campaign']
+            config={key:block[key] for key in ('validation_key','campaign_id','split')}
+            c.write_json_atomic(directory/'campaign_config.json',config)
+            source_row={'key':'source','jobid':'1','job_dir':str(source.job)}
+            gate=c.gate_path(root,source_row);gate.parent.mkdir(parents=True)
+            # Keep the real fixture replay under the relocated gate's parent.
+            import shutil
+            shutil.copytree(source.gate.parent/'replay',gate.parent/'replay')
+            gate.write_bytes(source.gate.read_bytes())
+            row={'key':'target','jobid':'2','job_dir':str(target.job)}
+            record={'allocation':row,'directory':str(directory),'group_id':'target_group'}
+            anchor={'allocation':source_row};cfg={'started_at':source.since}
+            self.assertIsNone(c.reusable_group_gate(record,anchor,cfg,root,job_ended=False))
+            (target.job/'sample.log').write_text('CUDA error: an illegal memory access was encountered\n')
+            self.assertEqual(c.reusable_group_gate(record,anchor,cfg,root,job_ended=True),gate)
+            self.assertIn('terminal_runtime_failure',record)
+            self.assertEqual(record['release_gate']['sha256'],c.file_digest(gate))
+            from scripts.campaign_20261110.acceptance import audit_job
+            reviewed=audit_job(target.job,gate,root=root,started_at=source.since,group_closed=True,group_id='target_group')
+            c.write_json_atomic(directory/'release_review.json',reviewed)
+            record.pop('release_gate')
+            self.assertEqual(c.reusable_group_gate(record,anchor,cfg,root,job_ended=True),gate)
+            # Changed current member QA cannot be hidden by a valid source gate.
+            report=json.loads(target.reports[0].read_text());report['qa']['enabled']=False
+            c.write_json_atomic(target.reports[0],report)
+            with self.assertRaisesRegex(ValueError,'QA'):
+                c.reusable_group_gate(record,anchor,cfg,root,job_ended=True)
+            report['qa']['enabled']=True;c.write_json_atomic(target.reports[0],report)
+            (directory/'release_review.json').unlink()
+            record.pop('release_gate');original_physics=config['validation_key']['physics_sha256'];config['validation_key']['physics_sha256']='d'*64
+            c.write_json_atomic(directory/'campaign_config.json',config)
+            self.assertIsNone(c.reusable_group_gate(record,anchor,cfg,root,job_ended=True))
+            config['validation_key']['physics_sha256']=original_physics;c.write_json_atomic(directory/'campaign_config.json',config)
+            c.write_json_atomic(c.gate_path(root,row),{'success':False})
+            self.assertIsNone(c.reusable_group_gate(record,anchor,cfg,root,job_ended=True))
+
     def migration_fixture(self, root):
         old=root/'groups/old';new=root/'groups/new'
         for folder in (old,new):

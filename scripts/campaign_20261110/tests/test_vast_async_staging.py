@@ -73,5 +73,16 @@ class AsyncStagingTests(unittest.TestCase):
             self.assertEqual(len(errors),1);self.assertEqual(manager.reservations(),{})
             self.assertIn('preserved log',manager.records['1']['error'])
 
+    def test_reservation_keeps_only_reconciliation_worker_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager=self.manager(root)
+            worker={'id':12,'_key_name':'main','machine_id':34,'dph_total':.5,
+                    'gpu_name':'RTX 5090','num_gpus':1,'extra_env':{'PRIVATE_VALUE':'secret'}}
+            manager.submit({'id':'1'},'12',worker,{},lambda *args:{'id':'1'})
+            saved=json.loads((Path(root)/'1.json').read_text())
+            self.assertNotIn('extra_env',saved['worker'])
+            self.assertNotIn('secret',json.dumps(saved))
+            self.assertEqual(saved['worker'],{key:value for key,value in worker.items() if key!='extra_env'})
+
 
 if __name__=='__main__':unittest.main()

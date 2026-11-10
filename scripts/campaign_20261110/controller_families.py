@@ -304,13 +304,68 @@ def adopt_pending_replacement(stage, root):
     return 'adopted'
 
 
+def reusable_group_gate(record, anchor, cfg, root, *, job_ended):
+    """A terminal group may reuse its source's exact key after the full member audit."""
+    from scripts.campaign_20261110.acceptance import audit_job
+    if not job_ended:
+        return None
+    row = record["allocation"]
+    current_gate = read(gate_path(root, row), {})
+    # An observed failed current replay is a diagnosis requirement, not an
+    # excuse to select a different successful replay.
+    if current_gate.get("success") is False:
+        return None
+    pinned = record.get("release_gate")
+    prior_review = read(Path(record["directory"]) / "release_review.json", {})
+    if not pinned and prior_review:
+        require(prior_review.get("group_id") == record["group_id"] and prior_review.get("source_job") == row["job_dir"],
+                "existing family review belongs to another group/job")
+        pinned = prior_review["gate"]
+    if pinned:
+        candidate = Path(pinned["path"])
+        require(file_digest(candidate) == pinned["sha256"], "pinned family release gate changed")
+    else:
+        if current_gate.get("success") is True or not anchor or not anchor.get("allocation"):
+            return None
+        candidate = gate_path(root, anchor["allocation"])
+    gate = read(candidate, {})
+    if gate.get("success") is not True or gate.get("replay_mode") != "physics_action_open_loop":
+        return None
+    source = read(gate["instance"])["ispatialgym"].get("campaign", {})
+    config = read(Path(record["directory"]) / "campaign_config.json")
+    if (source.get("validation_key") != config["validation_key"] or source.get("campaign_id") != config["campaign_id"]
+            or source.get("split") != config["split"]):
+        return None
+    review = audit_job(row["job_dir"], candidate, root=root, started_at=cfg["started_at"],
+                       group_closed=True, group_id=record["group_id"])
+    require(review["validation_key"] == config["validation_key"], "family source gate differs from actual group key")
+    if prior_review:
+        require(digest(review) == digest(prior_review), "existing family review changed during idempotent adoption")
+    record["release_gate"] = {"path": str(candidate), "sha256": file_digest(candidate),
+                              "reuse_reason": "terminal_group_same_exact_validation_key"}
+    log = Path(row["job_dir"]) / "sample.log"
+    if log.exists():
+        with log.open("rb") as stream:
+            stream.seek(max(0, log.stat().st_size - 2_000_000))
+            tail = stream.read().decode(errors="replace")
+        failures = [line for line in tail.splitlines() if "illegal memory access" in line or "Traceback (most recent call last)" in line]
+        if failures:
+            record["terminal_runtime_failure"] = {"path": str(log), "sha256": file_digest(log),
+                "observed_errors": failures[-3:], "successful_members_audited_separately": True}
+    return candidate
+
+
 def claim(record, spec, cfg, root):
     from scripts.campaign_20261110.acceptance import audit_job
     from scripts.campaign_20261110.goal_groups import load_template_contract
     from scripts.campaign_20261110.group_lane import claim_group
     from scripts.campaign_20261110.reservation_policy import active_policy
     row = record["allocation"]
-    review = audit_job(row["job_dir"], gate_path(root, row), root=root, started_at=cfg["started_at"],
+    selected = record.get("release_gate")
+    gate = Path(selected["path"]) if selected else gate_path(root, row)
+    if selected:
+        require(file_digest(gate) == selected["sha256"], "pinned family release gate changed before claim")
+    review = audit_job(row["job_dir"], gate, root=root, started_at=cfg["started_at"],
                        group_closed=True, group_id=record["group_id"])
     directory = Path(record["directory"])
     write_json_atomic(directory / "release_review.json", review)
@@ -397,6 +452,10 @@ def advance(spec, state, cfg, root, queue, allowance, save):
     row = stage["allocation"]
     ended = job_terminal(row, root, queue)
     gate = read(gate_path(root, row))
+    if group and ended:
+        reused = reusable_group_gate(group, cycle.get("anchor"), cfg, root, job_ended=ended)
+        if reused is not None:
+            gate = read(reused)
     if gate and gate.get("success") is True:
         if group:
             if not ended:

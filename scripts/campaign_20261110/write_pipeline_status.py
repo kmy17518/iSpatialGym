@@ -19,9 +19,35 @@ def main():
     now = datetime.now(timezone.utc).isoformat()
     rows = {}
 
+    def evidence_file(path):
+        path = Path(path)
+        digest = sha(path)
+        if path.resolve().is_relative_to(root):
+            return dict(path=str(path.resolve()), sha256=digest)
+        secondary = a.secondary_root.resolve() if a.secondary_root else None
+        assert secondary and path.resolve().is_relative_to(secondary), 'evidence outside owned campaign roots'
+        # The dashboard only opens primary-root evidence. Preserve the exact
+        # source bytes in a content-addressed primary copy; never change the
+        # secondary source or its permissions.
+        target = root / 'manifests/pipeline_evidence' / digest / path.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            with target.open('xb') as stream:
+                stream.write(path.read_bytes())
+        assert sha(target) == digest and sha(path) == digest
+        provenance = target.with_name(target.name + '.source.json')
+        record = dict(source=str(path), source_resolved=str(path.resolve()), source_sha256=digest,
+                      copy=str(target), copy_sha256=digest, source_permissions_unchanged=True)
+        if not provenance.exists():
+            with provenance.open('x') as stream:
+                json.dump(record, stream, indent=2); stream.write('\n')
+        assert json.loads(provenance.read_text()) == record
+        return dict(path=str(target), sha256=digest, source_path=str(path),
+                    provenance_path=str(provenance), provenance_sha256=sha(provenance))
+
     def put(task, cls, split, stage, reason, evidence, rank):
         key = (split, cls)
-        files = [dict(path=str(path), sha256=sha(path)) for path in dict.fromkeys(evidence)]
+        files = [evidence_file(path) for path in dict.fromkeys(evidence)]
         previous = rows.get(key)
         if previous and previous[0] > rank:
             return

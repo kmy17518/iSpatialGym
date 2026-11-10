@@ -68,8 +68,12 @@ class StagingReservations:
         if jid in self.active():raise ValueError('job already has a staging reservation')
         if len(self.futures) >= self.limit:return False
         prior = self.records.get(jid)
+        # Provider responses include container environment variables. Retain only
+        # the resource identity needed to reconcile an assignment after restart.
+        identity = {key:worker[key] for key in ('id','_key_name','machine_id','dph_total','gpu_name','num_gpus')
+                    if key in worker}
         record = {'id':jid,'owner':self.owner,'status':'preparing','instance':str(instance),
-                  'worker':dict(worker),'job':dict(job),'started_at':time.time(),
+                  'worker':identity,'job':dict(job),'started_at':time.time(),
                   'timeout_seconds':min(900,max(30,int(config.get('stage_timeout_s',600))))}
         if prior:record['previous'] = self.archive(prior,'fresh_staging_attempt')
         self.save(record)  # reservation is durable before any subprocess starts
