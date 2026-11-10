@@ -239,8 +239,11 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
         require(state["phase_keys"][phase] == actual, "held phase changed its immutable key")
     state["phase_keys"][phase] = actual
     index = reserve_indices(root, name, 3*count)
+    extras, template_customs = source_environment(spec["anchor_job"], root=root)
     command = submission_command(prepared["queue"], snapshot=snapshot, campaign_root=root, v2_root=spec["v2_root"],
-                                 base_index=index, extra_env=["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"])
+                                 base_index=index, extra_env=extras + ["ISPATIALGYM_MAP_OVERLAY_RELEASE=3"])
+    if template_customs:
+        command += ["--customs", "template"]
     record = {"queue": prepared["queue"], "prepared": prepared, "directory": str(Path(prepared["queue"]).parent),
               "validation_key": actual, "phase": phase, "index": index, "count": 3*count,
               "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], 'decision':dict(decision)}
@@ -249,6 +252,18 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     save()
     write_json_atomic(Path(record["directory"]) / "submission.json", record)
     return record
+
+
+def source_environment(job, *, root):
+    """Preserve the exact private definitions already used by the gated anchor."""
+    from scripts.campaign_20261110.goal_groups import read_env
+    env = read_env(Path(job) / "job.env")
+    if env.get("ISG_CUSTOMS"):
+        path = Path(env["ISG_CUSTOMS"]).resolve()
+        require(path.is_relative_to(Path(root).resolve()) and path.is_file(), "held private customs outside campaign")
+        require(file_digest(path) == env.get("ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256"), "held native private customs changed")
+    keys = ("KEEP_SCENE", "START_PER_ATTEMPT", "ISG_CUSTOMS", "ISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256", "ISPATIALGYM_STABLE_SCENE_DIR")
+    return [key + "=" + env[key] for key in keys if env.get(key)], env.get("START_PER_ATTEMPT") == "0"
 
 
 def record_runtime_failure(record, state):

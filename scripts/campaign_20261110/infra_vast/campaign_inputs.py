@@ -10,6 +10,34 @@ import shutil
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 
 
+def compatible_gpus(requested, config):
+    proven = {'RTX 4090', 'RTX 5090'}
+    if (config.get('allow_proven_gpu_substitution') and requested in proven
+            and float(config['vram_per_job_gb']) <= 20 and int(config['max_jobs_per_instance']) == 1):
+        return sorted(proven.intersection(config['gpus']))
+    return [requested]
+
+
+def gpu_matches(job, gpu):
+    return not job.get('gpu') or gpu in job.get('compatible_gpus', [job['gpu']])
+
+
+def uncovered_jobs(queued, live, heartbeats, created, assigned_to, timestamp):
+    """Booting and ready compatible workers reserve future capacity once."""
+    remaining = list(queued)
+    for iid, worker in live.items():
+        hb, event = heartbeats.get(iid) or {}, created.get(iid) or {}
+        if hb.get('phase') in ('destroyed','unusable','stopped','idle_exit'): continue
+        lifetime = float(event.get('max_lifetime_s',21600)) - (timestamp-float(event.get('time',timestamp)))
+        slots = max(0,int(hb.get('slots') or event.get('slots') or 1)-len(assigned_to.get(iid,[])))
+        for job in list(remaining):
+            if not slots: break
+            if (gpu_matches(job,worker.get('gpu_name')) and job.get('avoid') != iid
+                    and lifetime >= float(job.get('time_s',0))+900):
+                remaining.remove(job);slots-=1
+    return remaining
+
+
 def staging_record(state_root, job_id):
     """Staging children read one coordinator-owned record and never ingest work."""
     if not str(job_id).isdigit(): raise ValueError('invalid staging job ID')
@@ -34,7 +62,7 @@ def assignment_plan(queued, live, heartbeats, created, assigned_to, timestamp):
                 break
             if lifetime < float(job.get('time_s', 0)) + 900:
                 continue
-            if (job.get('gpu') and job['gpu'] != worker.get('gpu_name')) or job.get('avoid') == instance:
+            if not gpu_matches(job, worker.get('gpu_name')) or job.get('avoid') == instance:
                 continue
             planned.append((instance, worker, job))
             remaining.remove(job)

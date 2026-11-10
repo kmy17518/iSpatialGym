@@ -38,6 +38,21 @@ def test_model_and_category_queues_never_become_training():
     assert next_work(category, counts(evaluation={0:3,1:4,2:3})) is None
 
 
+def test_private_native_customs_and_definition_are_preserved_and_hash_checked(tmp_path):
+    from scripts.campaign_20261110.controller_held import source_environment
+    from scripts.campaign_20261110.contracts import file_digest
+    customs=tmp_path/'customs.json';customs.write_text('{"native_alias": {}}')
+    job=tmp_path/'out/native';job.mkdir(parents=True)
+    (job/'job.env').write_text("START_PER_ATTEMPT=0\nKEEP_SCENE='--keep-template-scene --bddl-root /owned/bddl'\n"
+        +f"ISG_CUSTOMS={customs}\nISPATIALGYM_CAMPAIGN_CUSTOMS_SHA256={file_digest(customs)}\n")
+    values,template_mode=source_environment(job,root=tmp_path)
+    assert template_mode and 'KEEP_SCENE=--keep-template-scene --bddl-root /owned/bddl' in values
+    assert 'ISG_CUSTOMS='+str(customs) in values
+    customs.write_text('{"changed_alias": {}}')
+    with pytest.raises(ContractError,match='customs changed'):
+        source_environment(job,root=tmp_path)
+
+
 def test_training_bucket_selection_remains_a_preference():
     t = SimpleNamespace(task="mental_rotation", split="train")
     proposal = next_work(t, counts(train_buckets={0:30,1:0,2:30}), training_validated=True)

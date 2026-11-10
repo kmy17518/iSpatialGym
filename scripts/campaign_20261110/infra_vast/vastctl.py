@@ -41,10 +41,12 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -702,20 +704,9 @@ def memory_jobs(states):
 def rental_needs(queued, live, hbs, created, assigned_to, config, timestamp):
     """Uncovered queued job counts, separately for every requested GPU model."""
     needs = {}
-    for job in queued:
+    for job in uncovered_jobs(queued, live, hbs, created, assigned_to, timestamp):
         gpu = job.get("gpu") or config["default_gpu"]
         needs[gpu] = needs.get(gpu, 0) + 1
-    for iid, instance in live.items():
-        event = created.get(iid) or {}
-        heartbeat = hbs.get(iid) or {}
-        if heartbeat.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit"):
-            continue
-        remaining = float(event.get("max_lifetime_s", 21600)) - (timestamp - float(event.get("time", timestamp)))
-        gpu = instance.get("gpu_name")
-        eligible = [job for job in queued if (job.get("gpu") or config["default_gpu"]) == gpu
-                    and job.get("avoid") != iid and remaining >= float(job.get("time_s", 0)) + 900]
-        slots = max(0, int(heartbeat.get("slots") or event.get("slots") or 1) - len(assigned_to.get(iid, [])))
-        needs[gpu] = max(0, needs.get(gpu, 0) - min(slots, len(eligible)))
     return {gpu: count for gpu, count in needs.items() if count > 0}
 
 
@@ -850,6 +841,8 @@ def tick(c, s3, state):
                     sum(float(i.get("dph_total") or 0) for i in live.values()), "dispatching")
     # 3. Prefer explicitly prioritized ready production; otherwise preserve FIFO.
     queued = dispatch_order(states.values(), C)
+    for job in queued:
+        job['compatible_gpus'] = compatible_gpus(job.get('gpu') or C['default_gpu'], C)
     assigned_to = {}
     for s in states.values():
         if s["status"] == "assigned":
@@ -889,7 +882,7 @@ def tick(c, s3, state):
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")
         busy = bool(assigned_to.get(iid))
-        model_pending = any((job.get("gpu") or C["default_gpu"]) == i.get("gpu_name") for job in queued)
+        model_pending = any(gpu_matches(job, i.get('gpu_name')) for job in queued)
         reason = None
         if hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
             reason = f"worker {hb.get('phase')} {hb.get('detail', '')}"
@@ -934,7 +927,7 @@ def tick(c, s3, state):
         by_acct = {}
         for i in live.values():
             by_acct[i["_key_name"]] = by_acct.get(i["_key_name"], 0) + 1
-        gpus_needed = sorted(needs_by_gpu)
+        gpus_needed = sorted({gpu for requested in needs_by_gpu for gpu in compatible_gpus(requested,C)})
         offers = []
         for g in gpus_needed:
             offers += search(c, C, gpu=g)
@@ -945,7 +938,9 @@ def tick(c, s3, state):
             if n_new >= C["launch_per_tick"] or need <= 0 or len(live) + n_new >= C["max_instances"]:
                 break
             offer_gpu = o.get("gpu_name")
-            if needs_by_gpu.get(offer_gpu, 0) <= 0:
+            demand_gpu = next((requested for requested in sorted(needs_by_gpu,key=lambda x:x != offer_gpu)
+                               if needs_by_gpu[requested] > 0 and offer_gpu in compatible_gpus(requested,C)), None)
+            if demand_gpu is None:
                 continue
             reservation, reason = machine_reservation(o, reserved_live, hbs, reserved_created, C)
             if reason:
@@ -959,7 +954,7 @@ def tick(c, s3, state):
             if iid:
                 n_new += 1
                 budget_left -= reserve
-                needs_by_gpu[offer_gpu] = max(0, needs_by_gpu[offer_gpu] - o["_slots"])
+                needs_by_gpu[demand_gpu] = max(0, needs_by_gpu[demand_gpu] - o["_slots"])
                 need = sum(needs_by_gpu.values())
                 reserved_live[str(iid)] = {'machine_id':o.get('machine_id'), 'gpu_ids':reservation['gpu_ids']}
                 reserved_created[str(iid)] = reservation

@@ -4,9 +4,22 @@ import tempfile
 import unittest
 
 from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import compatible_gpus, uncovered_jobs
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_proven_gpu_substitution_uses_idle_worker_and_does_not_double_count_boot_capacity(self):
+        config = {'gpus':['RTX 4090','RTX 5090'],'allow_proven_gpu_substitution':True,'vram_per_job_gb':20,'max_jobs_per_instance':1}
+        jobs = [{'id':str(i),'gpu':'RTX 4090','time_s':1800,'compatible_gpus':compatible_gpus('RTX 4090',config)} for i in range(3)]
+        live={'one':{'gpu_name':'RTX 5090'},'two':{'gpu_name':'RTX 5090'}}
+        hb={'one':{'phase':'ready','slots':1},'two':{'phase':'boot'}}
+        planned,remaining=assignment_plan(jobs,live,hb,{}, {},1000)
+        self.assertEqual([j['id'] for _,_,j in planned],['0'])
+        self.assertEqual([j['id'] for j in uncovered_jobs(remaining,live,hb,{}, {'one':['0']},1000)],['2'])
+        self.assertEqual(jobs[0]['gpu'],'RTX 4090')
+        for changes in [{'vram_per_job_gb':24},{'max_jobs_per_instance':2},{'allow_proven_gpu_substitution':False}]:
+            self.assertEqual(compatible_gpus('RTX 4090',{**config,**changes}),['RTX 4090'])
+        self.assertEqual(compatible_gpus('L40S',config),['L40S'])
     def test_staging_reads_only_target_state_without_ingesting_or_mutating(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
