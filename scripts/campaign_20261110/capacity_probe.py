@@ -8,7 +8,7 @@ def kv(line):
     return dict(re.findall(r'(?:^|\s)(\w+)=(\S*)', line))
 def tres(value):
     return dict(item.split('=', 1) for item in value.split(',') if '=' in item)
-excluded={'svl9','viscam7','viscam11','viscam12','viscam14','viscam15','viscam16','viscam-hgx-1','viscam-hgx-2'}
+excluded={'svl9','viscam5','viscam7','viscam11','viscam12','viscam14','viscam15','viscam16','viscam-hgx-1','viscam-hgx-2'}
 allowed={'titanrtx','3090','a40','a5000','a6000','l40s'}
 nodes=[]
 for line in output(['scontrol','show','nodes','-o']).splitlines():
@@ -22,22 +22,36 @@ for line in output(['scontrol','show','nodes','-o']).splitlines():
     memory=max(0,int(row.get('RealMemory','0'))-int(row.get('AllocMem','0')))
     usable=model in allowed and row['NodeName'] not in excluded and not any(s in row.get('State','') for s in ['DRAIN','DOWN','FAIL'])
     slots=min(free,cpus//9,memory//(48*1024)) if usable else 0
-    nodes.append(dict(node=row['NodeName'],partitions=sorted(partitions),model=model,state=row.get('State'),free_gpus=free,free_cpus=cpus,free_mem_mb=memory,eligible=usable,slots_9cpu_48gb=slots))
+    nodes.append(dict(node=row['NodeName'],partitions=sorted(partitions),model=model,state=row.get('State'),free_gpus=free,free_cpus=cpus,free_mem_mb=memory,eligible=usable,slots_9cpu_48gb=slots,
+                      slots_8cpu_40gb=min(free,cpus//8,memory//(40*1024)) if usable else 0))
 jobs=[]
-for line in output(['squeue','-r','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q']).splitlines():
-    user,jid,name,state,part,acct,gres,qos=line.split('|')
+for line in output(['squeue','-r','-u','minyeong,shiyuc','-h','-o','%u|%i|%j|%T|%P|%a|%b|%q|%R']).splitlines():
+    user,jid,name,state,part,acct,gres,qos,reason=line.split('|')
     count=sum(int(x) for x in re.findall(r'gres/gpu(?::[^:,]+)?:(\d+)',gres))
-    jobs.append(dict(user=user,id=jid,name=name,state=state,partition=part,account=acct,gpus=count,qos=qos))
+    jobs.append(dict(user=user,id=jid,name=name,state=state,partition=part,account=acct,gpus=count,qos=qos,pending_reason=reason if state=='PENDING' else None))
 summary=collections.defaultdict(lambda:collections.Counter())
 for j in jobs:
     summary[j['user']][j['state']+'_gpus']+=j['gpus']
     summary[j['user']][j['state']+'_jobs']+=1
+by_user_partition={user:{part:{'running_gpus':0,'pending_gpus':0,'running_jobs':0,'pending_jobs':0,'pending_cpu_jobs':0,'pending_reasons':{},'configured_gpu_cap':cap}
+                         for part,cap in [('svl',48),('viscam',30)]} for user in ('minyeong','shiyuc')}
+for j in jobs:
+    if j['partition'] not in by_user_partition[j['user']]:continue
+    row=by_user_partition[j['user']][j['partition']]
+    if j['state']=='RUNNING':row['running_gpus']+=j['gpus'];row['running_jobs']+=1
+    if j['state']=='PENDING':
+        row['pending_gpus']+=j['gpus'];row['pending_jobs']+=1;row['pending_cpu_jobs']+=int(j['gpus']==0)
+        reason=row['pending_reasons'].setdefault(j['pending_reason'],{'jobs':0,'gpus':0})
+        reason['jobs']+=1;reason['gpus']+=j['gpus']
+for partitions in by_user_partition.values():
+    for row in partitions.values():row['gpu_cap_headroom']=max(0,row['configured_gpu_cap']-row['running_gpus'])
 capacity=collections.Counter()
 for n in nodes:
     if n['eligible']:
         for part in n['partitions']:
             capacity[part+'_free_gpus']+=n['free_gpus']
             capacity[part+'_slots_9cpu_48gb']+=n['slots_9cpu_48gb']
+            capacity[part+'_slots_8cpu_40gb']+=n['slots_8cpu_40gb']
 campaign_root=pathlib.Path('/vision/u/minyeong/projects/isg_home/campaign_20261110')
 try:
     validation=json.loads((campaign_root/'validation/controller.json').read_text())
@@ -117,4 +131,4 @@ try:
 except (OSError,ValueError,KeyError):pass
 try:throughput=json.loads((campaign_root/'infra/throughput.json').read_text())
 except (OSError,ValueError):throughput={}
-print(json.dumps(dict(annotated_coverage=annotated_coverage,acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))
+print(json.dumps(dict(annotated_coverage=annotated_coverage,acceptance=acceptance,family_controller=family_controller,throughput=throughput,data_releases=data_releases,scale_prebuild=scale_prebuild,validation=validation,vast_campaign=vast_campaign,checked_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),summary=summary,by_user_partition=by_user_partition,capacity=capacity,nodes=nodes,jobs=jobs,qos=output(['sacctmgr','-nP','show','qos','where','name=svl,viscam','format=Name,MaxTRESPU,MaxJobsPU,MaxSubmitPU']),associations=output(['sacctmgr','-nP','show','assoc','where','user=minyeong,shiyuc','format=User,Account,Partition,QOS,DefaultQOS,GrpTRES,MaxTRES,MaxJobs,MaxSubmit'])),indent=2))

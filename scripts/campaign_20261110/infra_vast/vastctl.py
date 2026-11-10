@@ -887,8 +887,18 @@ def tick(c, s3, state):
         log(line)
         state["last_line"], state["last_line_t"] = line, t
     open(os.path.join(VJ, "status.txt"), "w").write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
+    instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
+                         "account":SHORT.get(i.get('_key_name'),'unknown'),
+                         "worker_phase":(hbs.get(iid) or {}).get('phase'),
+                         "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
+                         "assigned_jobs":assigned_to.get(iid,[])} for iid,i in live.items()]
     metrics = {"observed_at_unix": t, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
-               "instances": [{k: i.get(k) for k in ("id", "label", "gpu_name", "num_gpus", "actual_status", "dph_total", "_key_name")} for i in live.values()],
+               "instances": instance_metrics,
+               "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
+               "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
+               "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
+               "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
+               "max_instances":C['max_instances'],
                "spend_estimate_usd": tot, "future_compute_commitment_usd": committed, "transfer_reserve_usd": C.get("transfer_reserve_usd",300), "budget_usd": min(C["budget_usd"],3000), "hourly_usd": hourly, "queue": n}
     mp = os.path.join(VJ, "metrics.json")
     with open(mp + ".tmp", "w") as handle:
