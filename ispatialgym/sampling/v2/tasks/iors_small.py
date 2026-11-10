@@ -545,7 +545,9 @@ PUSH_TIP_CAP_DEFAULT = "0"
 #: lateral" (the overlap does not depend on the stance): sym_t04_on (TIP_CAP=1) lost 17 attempts there, 1076 s, every one on the knuckle /
 #: gripper body 11-16 mm inside the hull. Rejected here the next candidate is drawn in the same attempt. "0" off (default), "shadow" (counted,
 #: nothing rejected), "1" on. Touching tabletop under the push height sweep only; not with ISPATIALGYM_HAND_OVERLAP_RANK (overlaps are then
-#: tried, not refused). Kit ``push_tip_screen.checked`` / ``.passed`` / ``.rejected`` / ``.shadow_would_reject`` / ``.uncertain``
+#: tried, not refused). r2 (tp_t04_capscr: the overlap alone checked 28, rejected 0 - the 5 / 6 cm tips cleared the hull and then failed the
+#: exact IK from every A1 push stance): the goal check's exact push chain + place from its A1 stances is screened too. Kit
+#: ``push_tip_screen.checked`` / ``.passed`` / ``.rejected`` (+ ``_overlap`` / ``_exact``) / ``.shadow_would_reject`` / ``.uncertain``
 PUSH_TIP_SCREEN_ENV = "ISPATIALGYM_PUSH_TIP_SCREEN"
 PUSH_TIP_SCREEN_DEFAULT = "0"
 #: i7-t04push 2026-11-09 (owner A7 (2): "try short strokes for the tabletop touching push"): ``ISPATIALGYM_TOUCH_PUSH_STROKE_M=<m>`` records a
@@ -2912,22 +2914,49 @@ class IORSSmall(SamplerV2):
         if self.relation == "touching" and touch_a1_screen_mode() != "off":
             self._touch_a1_screen(manip, grasp, t_pose, p_pose, int(k))
         if self.relation == "touching" and push_tip_screen_mode() != "off":
-            self._touch_tip_screen(manip, t_pose, p_pose, int(k))
+            self._touch_tip_screen(manip, grasp, t_pose, p_pose, int(k))
         return p_pose
 
-    def _touch_tip_screen(self, manip: Stance, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
-        """:data:`PUSH_TIP_SCREEN_ENV` (i7-t04push): ``Reject("contact_unreachable")`` at the draw when no push class the goal check would try
-        (:meth:`push_overlap_screen_why`) clears the target's hull; shadow counts. Not screened (``push_tip_screen.uncertain``): the shelf
-        layout / tip release, outside the push height sweep, or with ISPATIALGYM_HAND_OVERLAP_RANK."""
+    def _touch_tip_screen(self, manip: Stance, grasp: GraspRecord, t_pose: G.Pose, p_pose: G.Pose, k: int) -> None:
+        """:data:`PUSH_TIP_SCREEN_ENV` (i7-t04push): ``Reject("contact_unreachable")`` at the draw when the goal check's push stance search is
+        certain to fail - (a) no push class it would try clears the target's hull (:meth:`push_overlap_screen_why`, geometry), or (b) none of
+        its A1 push stances (:meth:`push_stance_candidates`, the first ``push_stance_max_exact``: the same call and inputs) has both a push
+        chain (:meth:`push_chain_feasible`: exact IK + retreat, capped under :data:`PUSH_TIP_CAP_ENV`) and the box's place
+        (:meth:`place_infeasible_why`) - the goal check's own acceptance; shadow counts. Not screened (``push_tip_screen.uncertain``): the
+        shelf layout / tip release, outside the push height sweep, with ISPATIALGYM_HAND_OVERLAP_RANK, and (b) without an A1 stance. Kit
+        ``push_tip_screen.rejected_overlap`` / ``.rejected_exact`` / ``.exact_stances``."""
         if self.shelf_start is not None or self.shelf_tip() or not self.push_height_sweep_on() or hand_overlap_rank_on():
             TT._count(self, "push_tip_screen.uncertain")
             return
         t_place = self.place_pose_for(t_pose, p_pose, manip)
         TT._count(self, "push_tip_screen.checked")
         why = self.push_overlap_screen_why(manip, t_place, p_pose)
+        kind = "overlap"
+        if why is None and TT.contact_maps_on():
+            laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+            rows, _f = self.push_stance_candidates(manip, t_place, laterals, p_pose=p_pose)
+            rows = rows[:int(self.gen("push_stance_max_exact", PUSH_STANCE_MAX_EXACT))]
+            if not rows:
+                TT._count(self, "push_tip_screen.uncertain")
+            else:
+                whys = []
+                for lat, cand, _x in rows:
+                    probe = cand if cand is not None else manip
+                    TT._count(self, "push_tip_screen.exact_stances")
+                    self._push_chain_fails = []
+                    push_kind = self.push_chain_feasible(probe, t_place, p_pose)
+                    place_why = self.place_infeasible_why(probe, t_place, grasp) if push_kind is not None else None
+                    if push_kind is not None and place_why is None:
+                        why = None
+                        break
+                    so = getattr(probe, "stand_off", None)
+                    whys.append(f"{lat:+.2f}{f' s{float(so):.2f}' if so is not None else ''}: " + (f"place: {place_why}" if push_kind else f"no class [{len(self._push_chain_fails)} cands]"))
+                else:
+                    why, kind = "no A1 push stance has a push chain and the place (exact): " + "; ".join(whys), "exact"
         if why is None:
             TT._count(self, "push_tip_screen.passed")
             return
+        TT._count(self, f"push_tip_screen.rejected_{kind}" if push_tip_screen_mode() == "on" else f"push_tip_screen.shadow_would_reject_{kind}")
         msg = f"push tip screen at the draw (candidate {k}, trunk {manip.translate}, {manip.tilt:.2f}): {why}"
         if push_tip_screen_mode() == "shadow":
             TT._count(self, "push_tip_screen.shadow_would_reject")
