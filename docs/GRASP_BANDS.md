@@ -6484,6 +6484,74 @@ Decision (standard rule): no default flipped. The cap + screen act but cost more
 turn (2 symbolic_only at 5 cm). The strokes run but leave touching_04's ok unchanged (4 vs 4 over 8 instances, the same sampling) at +2 %
 GPU-h per ok; the controls are unchanged (touching_02 4 / 4, touching_01 3 / 4).
 
+## under_large_03: the carried can in the floor, the late frame rules, the int2_14 gap (branch `i7-ul03`, round 4, 2026-11-09)
+
+Record `$OFH/ul03_20261109` (wob*.py, calib.py / calib_all.txt, att.py, abtab.py, submit_ab*.sh, suite/); DECISIONS lines "i7-ul03".
+
+### robot_wobble: the held can driven into the floor by the carried trunk sweep
+- What wobbles: the TORSO (QA `TorsoLoad`: trunk command vs torso joint > 1 deg, here torso_joint1), in the carried transition
+  `transition[](ashcan)`, at its last step (1.00-1.17 deg) - not the push, the retreat or the settle. 39 of 39 under_large_03 wobble demos
+  under `$OFH/out`: 36 the departure after the lift (B trunk -> travel trunk (2.0, 0)), 3 the arrival at C (drafts without a departure).
+- Why: a 12 cm lift from a B trunk of translate 0.75 (or 0.50) swept to translate 2.0 lowers the hand until the can stands on the floor; the
+  trunk command keeps ramping (~0.7 mrad / step), the joint cannot follow. The rigid torso_link4 move from the demo's own pose at the sweep
+  start predicts the can's centre to < 1 mm in all 124 non-wobble carried sweeps and 2.3-18 cm BELOW the observed minimum in all 39 wobbles
+  (calib.py: `conventions` torso FK only). B translate 0.95 leaves 0.9-2.6 cm: no wobble. No desk / base contact (support_disturbance 0).
+- Why the sampler misses it: the carry checks run with the floor mesh out (`_floor_relaxed`, for the deep crouches) and the attached can is a
+  sphere fit checked at 1 cm against the cuRobo ground slab.
+- Scope: over all 847 IORS large demos under `$OFH/out` only under_large_03 has a carried sweep stopped by the floor.
+- `ISPATIALGYM_CARRY_FLOOR_CLEARANCE` (0e0b4daf; default off, `shadow` counts only): `IORSLarge.record_carry_leg` checks, per travel trunk
+  before the departure is recorded (and before the fallback drive), the target hull's lowest point along the departure and the arrival sweeps
+  with the hand rigid on torso_link4 (`program_check.torso_link4_world`; no IK, no planner FK); below `floor_z +
+  ISPATIALGYM_CARRY_FLOOR_CLEARANCE_M` (0.0) -> `Reject("no_transition")`: the next travel trunk / carry option / lift height (0.25).
+  Kit `carry_floor.{checked,low,low.dep,low.arr,rejected,shadow_low}`; `CARRY_FLOOR final` log line per draft that reaches the program check.
+  DEFAULT ON since 5f3f0355 ("0" = off).
+
+### gripper_not_in_frame: the late frame rules judged at the draw
+- int2_20: 15 rejections, 7 in the goal check ("grasp eef pose outside the manipulation image", eef box at B's camera) + 8 in the program
+  check ("place.pre_place": fingertip point at C's camera, 5 % + 2 cm), ~80-150 s each after the whole search. No other IORS large alias has
+  these rejections in any int2 run.
+- Both rules read only B + the grasp eef, C + the pre-place / place - fixed at the F draw. `ISPATIALGYM_LARGE_EARLY_FRAME` (0e0b4daf;
+  default off; `shadow` = judge and compare only): the goal check's rule (now `IORSLarge.grasp_frame_verdict`, which the goal check itself
+  calls) and the program check's grasp (pre-grasp + approach) and place (pre-place + descent) fingertip rules (`fingertips_in_frame`, the same
+  keys, margin and slack) on each B / C option; on = a failing option is not taken (a pair whose every B option fails is skipped at later C
+  candidates before its push chain). Kit `early_frame.grasp.*`, `early_frame.preplace.*`, `early_frame.agree.<rule>.<early>_<late>`.
+  DEFAULT ON since 842e33e4 (owner #36; "0" = off).
+
+### A/Bs (svl titanrtx, v2maps_int2 v2only, alias memory off, own ledger + EMPTY sampling cache per arm)
+
+A/B 1 (trunk_03b4fd8c, under_large_03 360000 N 4; control under_large_01 360000):
+
+| arm | att / wr / ok | GPU-h | GPU-h / ok | gripper_not_in_frame | demo failures |
+|---|---|---|---|---|---|
+| ul03_r4_off (both shadow) | 40 / 3 / 2 | 4.40 | 2.199 | 13 | collision |
+| ul03_cf_on (CARRY_FLOOR=1) | 50 / 2 / 2 | 5.39 | 2.694 | 16 | - |
+| ul03_ef_on (LARGE_EARLY_FRAME=1) | 13 / 4 / 2 | 1.73 | 0.864 | 0 | collision, robot_wobble |
+| ul01_r4_shadow (control) | 11 / 4 / 2 | 2.93 | 1.466 | 0 | plan_failed, arm_stutter |
+
+Early vs late frame verdicts of the final drafts (shadow arms): grasp box 13 fail/fail + 22 pass/pass, pre-place 16 + 5, grasp fingertip 0 + 5 -
+no disagreement; all 13 gripper_not_in_frame of the off arm failed early. On arm: late checks all pass; acted on 106 grasp options, 53 draws, 211
+pairs before their push chain, 35 pre-place options. under_large_01: every verdict passes (never acts). -> 842e33e4 LARGE_EARLY_FRAME DEFAULT ON
+(owner #36). CARRY_FLOOR acted (22 refusals) but the off arm wrote no wobble this time: unclear -> A/B 2.
+
+A/B 2 (trunk_842e33e4 = early frame on, under_large_03 N 8 = 360000 + 360100):
+
+| arm | att / wr / ok | GPU-h | GPU-h / ok | robot_wobble | refusals |
+|---|---|---|---|---|---|
+| ul03_cf2_shadow | 20 / 8 / 4 | 2.47 | 0.619 | 3 (predicted hull -0.036 / -0.036 / -0.018 m) | (4 would) |
+| ul03_cf2_on | 20 / 8 / 7 | 2.62 | 0.375 | 0 (those instances at +0.012 / +0.013 / +0.036 m) | 4 |
+
+The same 20 attempts with the same outcomes in both arms. Over both A/Bs every written demo with predicted clearance >= +0.012 m had no wobble, every
+one below 0 wobbled. under_large_01: 0 of 1355 checks below the floor. -> 5f3f0355 CARRY_FLOOR_CLEARANCE DEFAULT ON.
+
+### int2_14 (f5b89921, 1.69 GPU-h / ok) vs int2_18 / int2_20 (4.65 / 4.44)
+- The three runs replay the SAME attempts (empty caches: deterministic; 31 of 40 identical outcomes int2_14 vs int2_20). +3.8 ks sampling =
+  +2.27 ks from 7 identical time_cap attempts cut at 975 s instead of 650 s, +1.66 ks where they part (360000 a4: int2_14 wrote it - demo
+  collision - int2_20 rejected its pre-place frame and needed 8 more attempts; the raised cap let 360001 a11 / 360002 a2 finish written and
+  360003 a9 run to 919 s).
+- The ok gap (2 vs 1) is which drafts got written: int2_20's 360000 / 360001 have B translate 0.75 -> the floor wobble above.
+- Responsible: `ISPATIALGYM_ATTEMPT_CAP_RAISE_AFTER` (default 2 since a1b48793, merge 35 50bb863e, in f5b89921..f1bb8e24; RAISE_MAX 1.5 in
+  a671f42b). Not START_DRAW (on in all three runs).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

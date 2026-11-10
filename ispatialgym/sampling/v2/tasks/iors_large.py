@@ -1122,6 +1122,63 @@ def hand_base_penetration(line_pos: th.Tensor, R_e: th.Tensor, hand_local: th.Te
     return pen.amax(dim=(1, 2))
 
 
+# ---------------------------------------------------------------------------------------------------- i7-ul03 2026-11-09 (round 4)
+#: i7-ul03 (under_large_03 robot_wobble): ``ISPATIALGYM_CARRY_FLOOR_CLEARANCE`` (default off; ``shadow`` = predict and count only, ``1`` = on) -
+#: the B -> C carry's held trunk sweeps (the departure at B to the travel trunk, the arrival at C to C's trunk; the fallback drive at B's trunk:
+#: the arrival only) keep the carried object's hull above the floor. The arm joints are held through a trunk sweep, so the hand is rigid on
+#: ``torso_link4``: the object pose at a sweep sample is ``torso_link4(sample) ∘ torso_link4(B)^-1 ∘ hand at B (the lift / carry pose) ∘
+#: T_obj->eef^-1`` (``program_check.torso_link4_world``, no IK, no FK of the planner). A sweep whose hull's lowest point goes below
+#: ``floor_z + ISPATIALGYM_CARRY_FLOOR_CLEARANCE_M`` (default 0.0) is refused: the travel trunk loop takes the next travel trunk, the carry
+#: options / carry heights the next option. Why: the attached-object sphere fit and the floor mesh out of the carry checks (``_floor_relaxed``)
+#: let a 12 cm lift from a B trunk of translate 0.75 sweep to the travel trunk (2.0, 0) with the trash can's rim 2-18 cm into the floor (39 of
+#: 39 under_large_03 robot_wobble demos: the floor stops the can, the torso joint 1 falls 1.0-1.2 deg behind its command at the end of that
+#: transition). Kit ``carry_floor.checked`` / ``.low`` (``.low.dep`` / ``.low.arr``) / ``.rejected`` / ``.shadow_low``.
+CARRY_FLOOR_CLEARANCE_ENV = "ISPATIALGYM_CARRY_FLOOR_CLEARANCE"
+CARRY_FLOOR_CLEARANCE_M_ENV = "ISPATIALGYM_CARRY_FLOOR_CLEARANCE_M"
+#: samples per held trunk sweep the clearance is evaluated at (the sweep is linear in (translate, tilt): ``motions.trunk_to``)
+CARRY_FLOOR_SWEEP_SAMPLES = 21
+
+
+def _mode_env(name: str, default: str = "0") -> str:
+    """"off" | "shadow" | "on" of a three-way switch (unset = ``default``; "0" = off)."""
+    v = (os.environ.get(name, "") or default).strip().lower()
+    if v == "shadow":
+        return "shadow"
+    return "on" if v in ("1", "on", "true", "yes") else "off"
+
+
+def carry_floor_mode() -> str:
+    # DEFAULT ON (i7-ul03 A/B 2, trunk_842e33e4, under_large_03 N 8: shadow 20 / 8 / 4 at 0.619 GPU-h per ok (3 robot_wobble, all predicted
+    # below the floor), on 20 / 8 / 7 at 0.375 - the same 20 attempts, 4 refusals; under_large_01 control: 0 of 1355 checks low); "0" = off
+    return _mode_env(CARRY_FLOOR_CLEARANCE_ENV, "1")
+
+
+def carry_floor_clearance_m() -> float:
+    try:
+        return float(os.environ.get(CARRY_FLOOR_CLEARANCE_M_ENV, "") or 0.0)
+    except ValueError:
+        return 0.0
+
+
+#: i7-ul03 (under_large_03 gripper_not_in_frame): ``ISPATIALGYM_LARGE_EARLY_FRAME`` (default off; ``shadow`` = judge and count only, ``1`` = on) -
+#: the frame rules that reject an IORS large draft AFTER the whole B / C search are applied to each F draw as soon as their inputs exist,
+#: unchanged (the same function, threshold and inputs): (a) the goal check's grasp rule (:meth:`IORSLarge.grasp_frame_ok`: the eef box at B's
+#: camera, 5 %, or ``generation.grasp_frame_rule = fingertip``) and the program check's grasp-action rule (``program_check.fingertips_in_frame``
+#: of pre-grasp + approach, QA's 5 % + 2 cm) on each B option, once its B exact IK passed; (b) the program check's place-action rule on
+#: pre-place + descent at C's camera (``fingertips_in_frame``, the per-action gate's keys but the carry leg, which needs the lift's end) on each
+#: C option, before its attached place / drop IK. On: an option failing (a) / (b) is not taken (its draw goes on with the next option; a pair
+#: whose every B option fails (a) is skipped at every later C before its push chain); shadow: the verdicts of the chosen options are kept and
+#: compared at the goal / program check. Kit ``early_frame.grasp.{checked,failed,skipped,pair_skipped}``, ``early_frame.preplace.{checked,
+#: failed}``, and per rule the early vs late verdict ``early_frame.agree.<rule>.<early>_<late>`` (pass / fail).
+LARGE_EARLY_FRAME_ENV = "ISPATIALGYM_LARGE_EARLY_FRAME"
+
+
+def large_early_frame_mode() -> str:
+    # DEFAULT ON (owner #36 via the lead, i7-ul03 A/B 1: early = late verdict in every compared case, under_large_03 ef_on 13 / 4 / 2 at
+    # 0.864 GPU-h per ok vs off 40 / 3 / 2 at 2.199); "0" = off, "shadow" = judge and compare only
+    return _mode_env(LARGE_EARLY_FRAME_ENV, "1")
+
+
 def carry_centred_on(gp: Any = None) -> bool:
     return _switch(CARRY_CENTRED_ENV, gp, "carry_centred")
 
@@ -4058,6 +4115,130 @@ class IORSLarge(SamplerV2):
                 out.append((t, 0.0))
         return out
 
+    # ------------------------------------------------------------------ i7-ul03 2026-11-09: the carry's floor clearance, the early frame rules
+
+    def carry_floor_clearance(self, st_b: Stance, legs: Sequence[Tuple[str, Any, Tuple[float, float], Tuple[float, float]]]) -> Optional[Dict[str, Any]]:
+        """The lowest point of the carried target's hull above the floor (m) along each held trunk sweep of ``legs`` (``(name, base_pose2d,
+        trunk_from, trunk_to)``): the hand ``self._cf_hand`` = (hand pose at ``st_b``, T_obj->eef) rigid on ``torso_link4`` (the arm joints
+        held), posed per sweep sample by ``program_check.torso_link4_world``. ``{"min_m", "leg", "per_leg": {name: min_m}}``; None without a
+        hand / hull."""
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        hand = getattr(self, "_cf_hand", None)
+        hull = getattr(self, "hull", None)
+        if hand is None or hull is None or not len(hull):
+            return None
+        (eef_b, eio) = hand
+        fz = float(getattr(self, "floor_z", 0.0) or 0.0)
+        A = PCK.torso_link4_world(st_b.base_pose2d, float(st_b.translate), float(st_b.tilt), floor_z=fz)
+        in_t4 = G.compose(G.invert(A), (G.t(eef_b[0]).float(), G.t(eef_b[1]).float()))
+        inv_eio = G.invert((G.t(eio[0]).float(), G.t(eio[1]).float()))
+        per: Dict[str, float] = {}
+        for name, base2d, tf, tt in legs:
+            lo = float("inf")
+            n = CARRY_FLOOR_SWEEP_SAMPLES
+            for k in range(n):
+                s = k / (n - 1)
+                tr = (float(tf[0]) + (float(tt[0]) - float(tf[0])) * s, float(tf[1]) + (float(tt[1]) - float(tf[1])) * s)
+                T4 = PCK.torso_link4_world(base2d, tr[0], tr[1], floor_z=fz)
+                obj = G.compose(G.compose(T4, in_t4), inv_eio)
+                lo = min(lo, float(G.local_points_world(hull.float(), obj)[:, 2].min()) - fz)
+            per[name] = round(lo, 4)
+        leg = min(per, key=per.get)
+        return {"min_m": per[leg], "leg": leg, "per_leg": per}
+
+    def carry_floor_gate(self, st_b: Stance, tname: str, legs: Sequence[Tuple[str, Any, Tuple[float, float], Tuple[float, float]]]) -> None:
+        """CARRY_FLOOR_CLEARANCE_ENV: count / log the held sweeps' floor clearance (:meth:`carry_floor_clearance`); on: ``Reject("no_transition")``
+        when it is below ``carry_floor_clearance_m()``."""
+        mode = carry_floor_mode()
+        if mode == "off":
+            return
+        try:
+            v = self.carry_floor_clearance(st_b, legs)
+        except Exception as e:  # noqa: BLE001 - a measurement only: never breaks the leg
+            log.warning("%s: carry floor clearance unavailable (%r)", self.gp.variant, e)
+            return
+        if v is None:
+            return
+        TT._count(self, "carry_floor.checked")
+        v["trunks"] = [[round(float(x), 3) for x in (tf[0], tf[1], tt[0], tt[1])] for _, _, tf, tt in legs]
+        self._cf_last = v
+        thr = carry_floor_clearance_m()
+        if v["min_m"] >= thr:
+            return
+        TT._count(self, "carry_floor.low")
+        TT._count(self, f"carry_floor.low.{v['leg']}")
+        log.info("%s: CARRY_FLOOR %s: the held %s's hull reaches %.3f m above the floor (< %.3f) in the %s sweep %s (per leg %s)", self.gp.variant,
+                 "refused" if mode == "on" else "shadow", tname, v["min_m"], thr, v["leg"], v["trunks"], v["per_leg"])
+        if mode != "on":
+            TT._count(self, "carry_floor.shadow_low")
+            return
+        TT._count(self, "carry_floor.rejected")
+        raise Reject("no_transition", f"carry floor clearance ({CARRY_FLOOR_CLEARANCE_ENV}): the held {tname}'s hull reaches {v['min_m']:+.3f} m above the "
+                                      f"floor (< {thr:.3f}) in the {v['leg']} trunk sweep {v['trunks']}")
+
+    def grasp_frame_verdict(self, st_b: Stance, eef) -> Tuple[bool, Optional[str]]:
+        """The goal check's grasp frame rule (:meth:`after_goal_check`): ``generation.grasp_frame_rule = fingertip`` - the fingertip point
+        5 % inside B's image (``program_check.fingertips_in_frame``, no slack); else the eef box (``IKChecker.eef_in_frame`` at
+        :meth:`camera_pose_at`). ``(ok, the goal check's Reject message or None)``."""
+        if str(self.gp.gen("grasp_frame_rule") or "box") == "fingertip":
+            from ispatialgym.sampling.v2 import program_check as PCK
+
+            out = PCK.fingertips_in_frame(self, st_b, "grasp_frame", [("grasp_frame", [eef])], slack_m=0.0)
+            return (True, None) if out is None else (False, f"grasp fingertip outside the manipulation image (5 %): {out}")
+        if not self.ikc.eef_in_frame(eef, self.camera_pose_at(st_b)):
+            return False, "grasp eef pose outside the manipulation image (5 %)"
+        return True, None
+
+    def early_grasp_frame(self, st_b: Stance, eef) -> Dict[str, bool]:
+        """LARGE_EARLY_FRAME_ENV (a): the late grasp frame rules on a B option's grasp eef - ``box`` the goal check's
+        (:meth:`grasp_frame_verdict`), ``tip`` the program check's grasp action (``fingertips_in_frame`` of its pre-grasp and approach:
+        ``actions.Grasp.targets`` - pre 10 cm back along -a, 3 waypoints to the grasp in its orientation; the grasp itself is a contact key)."""
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        e = (G.t(eef[0]).float(), G.t(eef[1]).float())
+        box, _ = self.grasp_frame_verdict(st_b, e)
+        pre = C.pre_pose(e, 0.10)
+        approach = [(p, e[1]) for p in C.line_waypoints(G.t(pre[0]).float(), e[0], 3)]
+        tip = PCK.fingertips_in_frame(self, st_b, "grasp", [("pre_grasp", [pre]), ("approach", approach)]) is None
+        TT._count(self, "early_frame.grasp.checked")
+        if not (box and tip):
+            TT._count(self, "early_frame.grasp.failed")
+        return {"box": bool(box), "tip": bool(tip), "ok": bool(box and tip)}
+
+    def early_preplace_frame(self, place: Stance, pre_place, place_eef) -> bool:
+        """LARGE_EARLY_FRAME_ENV (b): the program check's place frame rule on a C option - ``fingertips_in_frame`` of the pre-place and the
+        descent (``actions.Place.targets``: 3 waypoints pre-place -> place in the place's orientation; the place is a contact key, the carry
+        leg needs the lift's end) at the placement stance's camera."""
+        from ispatialgym.sampling.v2 import program_check as PCK
+
+        pp = (G.t(pre_place[0]).float(), G.t(pre_place[1]).float())
+        pl = (G.t(place_eef[0]).float(), G.t(place_eef[1]).float())
+        descent = [(p, pl[1]) for p in C.line_waypoints(pp[0], pl[0], 3)]
+        ok = PCK.fingertips_in_frame(self, place, "place", [("pre_place", [pp]), ("descent", descent)]) is None
+        TT._count(self, "early_frame.preplace.checked")
+        if not ok:
+            TT._count(self, "early_frame.preplace.failed")
+        return bool(ok)
+
+    def _ef_agree(self, rule: str, early: Optional[bool], late: Optional[bool]) -> None:
+        """Kit ``early_frame.agree.<rule>.<early>_<late>`` (pass / fail) for the final draft's chosen option."""
+        if early is None or late is None:
+            return
+        TT._count(self, f"early_frame.agree.{rule}.{'pass' if early else 'fail'}_{'pass' if late else 'fail'}")
+        if early != late:
+            log.info("%s: EARLY_FRAME disagreement on %s: early %s, late %s", self.gp.variant, rule, early, late)
+
+    def _ef_rec_final(self) -> Optional[Dict[str, bool]]:
+        """The early verdicts recorded for the final draft's grasp record (by identity; else the last record the draws made - the final draw is
+        the last one an attempt makes)."""
+        g = self.sidecar.grasp_of(self.tname) if getattr(self, "sidecar", None) is not None else None
+        rec = None if g is None else (self.__dict__.get("_ef_recs") or {}).get(id(g))
+        if rec is None and self.__dict__.get("_ef_last") is not None:
+            TT._count(self, "early_frame.rec_by_last")
+            rec = self.__dict__["_ef_last"]
+        return rec
+
     def record_carry_leg(self, init: Stance, manip: Stance, place: Stance, tname: str, q_lift_arm: Optional[th.Tensor], max_len: float) -> Any:
         """(iii') Grasp stance -> place stance with the object in hand. Primary: **straighten the torso, then navigate**
         — a departure transition at B (drive back along B's own axis to the first s_T where the sweep to the travel trunk
@@ -4143,10 +4324,16 @@ class IORSLarge(SamplerV2):
                     if redo is not None:
                         redo()
 
+        cf_mode = carry_floor_mode()  # i7-ul03 (CARRY_FLOOR_CLEARANCE_ENV): off = the leg exactly as before
+        trunk_b = (float(manip.translate), float(manip.tilt)) if cf_mode != "off" else None
+        trunk_c = (float(place.translate), float(place.tilt)) if cf_mode != "off" else None
         for tt in self.travel_trunks(init, manip):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
                 continue  # B already straight: the plain leg below is the same thing
             try:
+                # i7-ul03: the held object's hull over the floor through the departure (B -> travel trunk) and the arrival (travel -> C) sweeps
+                if cf_mode != "off":
+                    self.carry_floor_gate(manip, tname, [("dep", manip.base_pose2d, trunk_b, tuple(tt)), ("arr", place.base_pose2d, tuple(tt), trunk_c)])
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm=arm, **dep_kw)
                 start = NAV.departure_pose(manip, dep.stand_off)
                 drive_q = self.carry_drive_arms(place, tname, arm)
@@ -4176,6 +4363,8 @@ class IORSLarge(SamplerV2):
             raise Reject("no_transition", f"inside carry straightened only ({INSIDE_CARRY_STRAIGHT_ENV}): no travel trunk admits straighten-then-navigate "
                                           f"and B's trunk ({manip.translate:.2f}, {manip.tilt:.2f}) leans; " + "; ".join(errors)[:900])
         try:
+            if cf_mode != "off":  # i7-ul03: the arrival sweep from B's trunk
+                self.carry_floor_gate(manip, tname, [("arr", place.base_pose2d, trunk_b, trunk_c)])
             path = carried_path()
             self.record_transition(manip, place, carried=tname, arm=arm, extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.variant, "; ".join(errors),
@@ -6295,6 +6484,11 @@ class IORSLarge(SamplerV2):
         errors = []
         carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
         carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
+        # i7-ul03 (LARGE_EARLY_FRAME_ENV): per (pair key, arm) the late frame rules' verdict of each B option (computed once per coupling)
+        ef_mode = large_early_frame_mode()
+        ef_grasp: Dict[Any, List[Dict[str, bool]]] = {}
+        self.__dict__["_ef_recs"] = {}
+        self.__dict__["_ef_last"] = None
         skip_dead_b = bool(self.gp.gen("c_skip_dead_b", False))  # oracle-fix 2026-11-06 (speed): see _c_dead_at_b
         live_b = bool(self.push_under) and push_chain_live_b_on()  # i7-ul02 (speed, default on since #75e): see PUSH_CHAIN_LIVE_B_ENV
         n_dead_b = 0
@@ -6505,6 +6699,14 @@ class IORSLarge(SamplerV2):
                 y_init = yaw0 if y_end is None else float(y_end)
                 jit = self.init_yaw_jitter()
                 yaw = y_init + float(rng.uniform(-jit, jit))
+                if ef_mode == "on":
+                    # i7-ul03: a pair whose every B option failed the late grasp frame rules in this coupling: skipped before its push chain
+                    bk_e = (int(round(yaw0 / yaw_step)) if y_end is None else round(y_init, 4), getattr(g, "name", str(g)))
+                    vs_e = ef_grasp.get((bk_e, arm))
+                    if vs_e and not any(v["ok"] for v in vs_e):
+                        TT._count(self, "early_frame.grasp.pair_skipped")
+                        fails["B: grasp outside the manipulation image (early frame)"] = fails.get("B: grasp outside the manipulation image (early frame)", 0) + 1
+                        continue
                 if push:
                     # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
                     # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
@@ -6682,14 +6884,35 @@ class IORSLarge(SamplerV2):
                 # the release tilts the pair passed at F_goal in order (the level release alone without them); per tilt the recorded finger
                 # assignment first, the other one (its B chain passed as well) only when the first fails here
                 g_row = g
+                ef_vs: Optional[List[Dict[str, bool]]] = None
+                if ef_mode != "off":
+                    # i7-ul03: the goal check's / program check's grasp frame rules on each B option (they depend on B and the grasp only)
+                    if (bk, arm) not in ef_grasp:
+                        ef_grasp[(bk, arm)] = [self.early_grasp_frame(pick_st, o[1]) for o in b_opts]
+                    ef_vs = ef_grasp[(bk, arm)]
+                    if ef_mode == "on" and not any(v["ok"] for v in ef_vs):
+                        TT._count(self, "early_frame.grasp.skipped")
+                        fails["B: grasp outside the manipulation image (early frame)"] = fails.get("B: grasp outside the manipulation image (early frame)", 0) + 1
+                        seg.failed.setdefault(bk, "B: grasp outside the manipulation image (early frame)")
+                        continue
                 c_opts = [(tilt, j, o) for tilt in (tilts_of.get(pair_key(yaw0, g_row, yaw_step)) or [0.0]) for j, o in enumerate(b_opts)]
                 c_fails: List[str] = []
                 lift_seeds: Dict[int, Optional[th.Tensor]] = {}
+                pp_ok: Optional[bool] = None
                 for tilt, j_opt, (g, eef, pre, flip) in c_opts:
+                    if ef_mode == "on" and ef_vs is not None and not ef_vs[j_opt]["ok"]:
+                        c_fails.append("B: grasp outside the manipulation image (early frame)")
+                        continue
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
                     goal = release_pose(release_xy, goal_quat, g.pose)
                     place_eef = IK.grasp_pose(goal, g.pose)
                     pre_place = self.pre_place_of(place_eef, place)
+                    if ef_mode != "off":
+                        # i7-ul03: the program check's place frame rule (pre-place + descent at C's camera) on this option, before its place IK
+                        pp_ok = self.early_preplace_frame(place, pre_place, place_eef)
+                        if ef_mode == "on" and not pp_ok:
+                            c_fails.append("C: pre-place fingertip outside the placement image (early frame)")
+                            continue
                     # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
                     # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
                     # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
@@ -6787,6 +7010,9 @@ class IORSLarge(SamplerV2):
                 floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
                 grasp = GraspRecord(tname, arm, g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
                                     place_on=(floor_name or pname) if push else pname, stance=pick_st.name)
+                if ef_vs is not None:  # i7-ul03: the early verdicts of the chosen option, compared with the late ones (goal / program check)
+                    self.__dict__.setdefault("_ef_recs", {})[id(grasp)] = dict(ef_vs[j_opt], preplace=bool(pp_ok))
+                    self.__dict__["_ef_last"] = self.__dict__["_ef_recs"][id(grasp)]
                 if twin_facts is not None:
                     grasp.extras.update({"wrist_flip": bool(flip), "twin_choice": twin_facts})
                 if tilts_of:
@@ -6836,6 +7062,9 @@ class IORSLarge(SamplerV2):
                             grasp.waypoints = None
                             grasp.extras.pop("carry_pose", None)
                             q_arm = q_lift
+                        # i7-ul03 (CARRY_FLOOR_CLEARANCE_ENV): where the oracle holds the hand through the carry's trunk sweeps - the carry pose, else the lift
+                        self._cf_hand = ((G.t(carry_pose[0]).float(), G.t(carry_pose[1]).float()) if cp is not None
+                                         else (G.t(eef[0]).float() + th.tensor([0.0, 0.0, float(h)]), G.t(eef[1]).float()), g.pose)
                         try:
                             with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
                                 path_bc = self.record_carry_leg(init, pick_st, place, tname, q_arm, max_len)
@@ -7019,8 +7248,28 @@ class IORSLarge(SamplerV2):
         return []
 
     def program_check(self, draft: Draft) -> Dict[str, Any]:
-        with self._floor_relaxed():
-            return super().program_check(draft)
+        cf = getattr(self, "_cf_last", None)
+        if cf is not None and carry_floor_mode() != "off":  # i7-ul03: the final draft's carry floor clearance (calibration against the demo)
+            log.info("%s: CARRY_FLOOR final: min %.4f m (%s) per leg %s trunks %s", self.gp.variant, cf["min_m"], cf["leg"], cf["per_leg"], cf["trunks"])
+        rec = self._ef_rec_final() if large_early_frame_mode() != "off" else None
+        try:
+            with self._floor_relaxed():
+                rep = super().program_check(draft)
+        except Reject as e:
+            if rec is not None and e.reason == "gripper_not_in_frame":
+                # i7-ul03: the late verdicts of the rules the draws judged early (the per-action / early gate's message names action.key)
+                msg = str(e)
+                if "] place.pre_place[" in msg or "] place.descent[" in msg:
+                    self._ef_agree("preplace", rec.get("preplace"), False)
+                elif "] grasp.pre_grasp[" in msg or "] grasp.approach[" in msg:
+                    self._ef_agree("grasp_tip", rec.get("tip"), False)
+                else:
+                    TT._count(self, "early_frame.late_other_frame")
+            raise
+        if rec is not None:
+            self._ef_agree("preplace", rec.get("preplace"), True)
+            self._ef_agree("grasp_tip", rec.get("tip"), True)
+        return rep
 
     # ------------------------------------------------------------------ goal (§5.6 / §6.12)
 
@@ -7101,17 +7350,16 @@ class IORSLarge(SamplerV2):
                 raise Reject("place_unreachable", f"pre-place / place at the settled goal fail the exact IK from stance C: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place_eef
         st_b = self.sidecar.stance(getattr(grasp, "stance", None) or "manipulation")  # B, or the overhang pick's grasp stance
-        cam_b = self.camera_pose_at(st_b)
-        if str(self.gp.gen("grasp_frame_rule") or "box") == "fingertip":
-            # oracle-fix 2026-11-04 round 3 (under_large#02, opt-in): the grasp judged by QA's own criterion - the fingertip point 5 % inside the
-            # image (program_check.fingertips_in_frame) - instead of the +-6 cm eef box (brief6_pitched_s0: 5 / 5 attempts past the push re-solve
-            # rejected here, the box bottom at v 1000-1046 of the 1026 limit, the fingertip at v 930-985)
-            from ispatialgym.sampling.v2 import program_check as PCK
-            out = PCK.fingertips_in_frame(self, st_b, "grasp_frame", [("grasp_frame", [grasp.grasp])], slack_m=0.0)
-            if out is not None:
-                raise Reject("gripper_not_in_frame", f"grasp fingertip outside the manipulation image (5 %): {out}")
-        elif not self.ikc.eef_in_frame(grasp.grasp, cam_b):
-            raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
+        # oracle-fix 2026-11-04 round 3 (under_large#02, opt-in generation.grasp_frame_rule = fingertip): the grasp judged by QA's own criterion -
+        # the fingertip point 5 % inside the image (program_check.fingertips_in_frame) - instead of the +-6 cm eef box (brief6_pitched_s0: 5 / 5
+        # attempts past the push re-solve rejected here, the box bottom at v 1000-1046 of the 1026 limit, the fingertip at v 930-985). i7-ul03: the
+        # rule lives in grasp_frame_verdict, which the draws' early frame check (LARGE_EARLY_FRAME_ENV) calls as well
+        ok_f, why_f = self.grasp_frame_verdict(st_b, grasp.grasp)
+        rec_f = self._ef_rec_final() if large_early_frame_mode() != "off" else None
+        if rec_f is not None:
+            self._ef_agree("grasp_box", rec_f.get("box"), ok_f)
+        if not ok_f:
+            raise Reject("gripper_not_in_frame", why_f)
         if self.relation == "ontop" and not self.ikc.eef_in_frame(place_eef, self.camera_pose_at(place)):
             raise Reject("gripper_not_in_frame", "place eef pose outside the placement image (5 %)")
 
