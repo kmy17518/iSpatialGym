@@ -4,12 +4,12 @@ from pathlib import Path
 from scripts.campaign_20261110.contracts import file_digest, require
 
 
-def enqueue_record(root, record, save, *, priority=50):
+def enqueue_record(root, record, save, *, priority=50, backends=None):
     from scripts.campaign_20261110.infra_dispatch import BACKENDS, enqueue
     require(record.get('dry_run_passed') is True,'spooled work requires the exact command dry-run')
     token=Path(record['directory']).name
     options={'priority':priority}
-    backends=tuple(record.get('dispatch_backends',BACKENDS))
+    backends=tuple(backends or record.get('dispatch_backends',BACKENDS))
     command=record['command']
     if '--code' in command:
         runtime=Path(command[command.index('--code')+1])/'ispatialgym/sampling/campaign_runtime.py'

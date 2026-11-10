@@ -219,7 +219,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                 save()
             if cfg.get('dispatch_spool'):
                 from scripts.campaign_20261110.controller_spool import enqueue_record
-                enqueue_record(root,record,save)
+                enqueue_record(root,record,save,backends=cfg.get('dispatch_backends'))
                 return 1
             perform_submit(record, record["command"], save, rows, spec, root, "camera_auto_production", source["code"], record["count"])
             return 1
@@ -276,7 +276,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     save()
     if cfg.get('dispatch_spool'):
         from scripts.campaign_20261110.controller_spool import enqueue_record
-        enqueue_record(root,record,save)
+        enqueue_record(root,record,save,backends=cfg.get('dispatch_backends'))
         return 1
     perform_submit(record, command, save, rows, spec, root, "camera_auto_production", source["code"], count)
     return 1
@@ -290,10 +290,15 @@ def main():
     parser.add_argument('--max-inflight-per-seed',type=int)
     parser.add_argument('--max-new-jobs-per-pass',type=int)
     parser.add_argument('--dispatch-spool',action='store_true')
+    parser.add_argument('--dispatch-backends',help='Optional comma-separated authorized routing subset.')
     args = parser.parse_args()
     cfg = read(args.config)
     original_config_hash=digest(cfg)
     if args.dispatch_spool:cfg['dispatch_spool']=True
+    if args.dispatch_backends:
+        from scripts.campaign_20261110.infra_dispatch import BACKENDS
+        cfg['dispatch_backends']=args.dispatch_backends.split(',')
+        require(set(cfg['dispatch_backends'])<=set(BACKENDS),'unknown dispatch backend')
     for argument,key in ((args.max_inflight_per_seed,'maximum_inflight_per_seed'),(args.max_new_jobs_per_pass,'maximum_new_jobs_per_pass')):
         if argument is not None:
             require(1<=argument<=32,'invalid operational concurrency limit');cfg[key]=argument
@@ -311,6 +316,7 @@ def main():
             require(state["config_sha256"] == original_config_hash, "camera controller config changed")
             state['operational_limits']={key:cfg.get(key,default) for key,default in (('maximum_inflight_per_seed',1),('maximum_new_jobs_per_pass',3))}
             state['operational_limits']['dispatch_spool']=bool(cfg.get('dispatch_spool'))
+            state['operational_limits']['dispatch_backends']=cfg.get('dispatch_backends')
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
