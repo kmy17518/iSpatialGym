@@ -108,6 +108,15 @@ class ReadOnlyDashboardTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(raw), [{'cpu_affinity': '1-9'}])
 
+    def test_accepted_release_is_read_only_and_rejects_wrong_campaign(self):
+        self.write('dashboard/accepted_release.json',{'campaign_id':'campaign_20261110','release':{'instances':3704}})
+        before=self.hashes();status,raw=self.request('GET','/reports/accepted-release')
+        self.assertEqual(status,200);self.assertEqual(json.loads(raw)['release']['instances'],3704)
+        self.assertEqual(before,self.hashes())
+        for invalid in ({'campaign_id':'old','release':{}},[]):
+            self.write('dashboard/accepted_release.json',invalid)
+            self.assertEqual(self.request('GET','/reports/accepted-release')[0],404)
+
     def test_missing_or_invalid_sources_are_explicit(self):
         (self.root / 'dashboard/dashboard_evidence.json').write_text('{broken')
         (self.root / 'infra/cluster_snapshot.json').unlink()

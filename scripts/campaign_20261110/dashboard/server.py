@@ -107,11 +107,13 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self.send_body(404, b'Report unavailable', 'text/plain')
         audits = {'/reports/reconciliation': 'reconciliation.json',
+            '/reports/accepted-release': 'accepted_release.json',
             '/reports/goal-yield': 'goal_group_yield.json',
             '/reports/vast-runtime': 'vast_runtime_resources.json', '/reports/browser-qa': 'browser_check.json'}
         if path in audits:
             data, status = read_source(self.server.data_root / 'dashboard' / audits[path], mapping=False)
-            if path == '/reports/goal-yield' and status['available'] and data.get('campaign_id') != 'campaign_20261110':
+            if path in ('/reports/goal-yield', '/reports/accepted-release') and status['available'] and (
+                    not isinstance(data, dict) or data.get('campaign_id') != 'campaign_20261110'):
                 data = {}; status = {'available': False, 'error': 'Campaign identity mismatch'}
             return self.send_body(200 if status['available'] else 404,
                 json.dumps(sanitize(data if status['available'] else status), indent=2).encode(), 'application/json')
