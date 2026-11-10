@@ -1112,7 +1112,9 @@ def _mode_env(name: str, default: str = "0") -> str:
 
 
 def carry_floor_mode() -> str:
-    return _mode_env(CARRY_FLOOR_CLEARANCE_ENV)
+    # DEFAULT ON (i7-ul03 A/B 2, trunk_842e33e4, under_large_03 N 8: shadow 20 / 8 / 4 at 0.619 GPU-h per ok (3 robot_wobble, all predicted
+    # below the floor), on 20 / 8 / 7 at 0.375 - the same 20 attempts, 4 refusals; under_large_01 control: 0 of 1355 checks low); "0" = off
+    return _mode_env(CARRY_FLOOR_CLEARANCE_ENV, "1")
 
 
 def carry_floor_clearance_m() -> float:

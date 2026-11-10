@@ -34,11 +34,11 @@ def _box(half):
     return th.tensor([[sx * half, sy * half, sz * half] for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)], dtype=th.float32)
 
 
-def test_carry_floor_off_and_early_frame_on_by_default(monkeypatch):
+def test_both_switches_are_on_by_default(monkeypatch):
     monkeypatch.delenv(IL.CARRY_FLOOR_CLEARANCE_ENV, raising=False)
     monkeypatch.delenv(IL.LARGE_EARLY_FRAME_ENV, raising=False)
     monkeypatch.delenv(IL.CARRY_FLOOR_CLEARANCE_M_ENV, raising=False)
-    assert IL.carry_floor_mode() == "off" and IL.large_early_frame_mode() == "on"
+    assert IL.carry_floor_mode() == "on" and IL.large_early_frame_mode() == "on"
     assert IL.carry_floor_clearance_m() == 0.0
     for v, m in (("shadow", "shadow"), ("1", "on"), ("on", "on"), ("0", "off")):
         monkeypatch.setenv(IL.CARRY_FLOOR_CLEARANCE_ENV, v)

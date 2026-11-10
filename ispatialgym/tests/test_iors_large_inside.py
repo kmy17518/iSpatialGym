@@ -974,7 +974,9 @@ class _CarryLegStub:
         pass
 
 
-def test_record_carry_leg_drives_after_the_departure_with_the_carry_drive_arms():
+def test_record_carry_leg_drives_after_the_departure_with_the_carry_drive_arms(monkeypatch):
+    # i7-ul03: the carry floor clearance (default on) is not this test's subject - the stub has no hand / hull: pinned off
+    monkeypatch.setenv("ISPATIALGYM_CARRY_FLOOR_CLEARANCE", "0")
     manip = Stance("manipulation", (2.0, 1.0, 0.0), 0.75, -0.3, 0.45, None, None, 0.0, None, ["right"])
     place = Stance("placement", (5.68, -1.2, -1.57), 0.5, -0.3, 0.45, None, None, 0.0, None, ["right"])
     drive_q = {"right": th.zeros(7), "left": th.ones(7)}
