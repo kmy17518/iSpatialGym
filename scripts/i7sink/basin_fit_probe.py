@@ -5,11 +5,11 @@ A Kit job (one scene per run); writes ``--out`` (JSON: measured numbers only, no
 Sink (``--res`` raster, default 5 mm, over the sink's AABB; every body but the robot counts - the counter around a drop-in sink too):
   * the basin FLOOR: downward rays from above the AABB; among the hits on the sink, the LOWEST 2 mm height bin holding at least
     ``max(30, 2 %)`` of them (a drain hole is smaller; the counter flange / faucet are higher);
-  * the OCCUPANCY at height ``h`` above the floor (``HEIGHTS``, 2 mm steps to 4 cm, then 6 / 8 / 10 / 15 cm): a downward ray starting at
-    ``floor + h`` meets something above ``floor + 3 mm`` (a ray that starts inside a wall hits at ~0 m) - rays below the faucet / the
-    rim, so an arching spout is no wall; ``surf_h`` per cell = the HIGHEST occupied ``h`` (0: the floor itself; a wall's material
-    fills its column from below, so the plate's underside at that cell must be above it);
-  * the flat floor's inscribed radius (the free cells at ``h`` = 4 mm) and the basin's half width ``half_width(h)`` about that centre.
+  * the SURFACE height ``surf_h`` per cell above the floor: a downward ray from ``SURF_START_M`` (10 cm) above the floor - under an
+    arching faucet spout; a ray starting inside a wall counts 10 cm; a ceiling within ``CEILING_M`` over that surface (the counter over
+    the cabinet beside a drop-in basin, a lip over the wall) counts 10 cm too; only the connected region under ``BASIN_LINK_M`` holding
+    the cells open from above onto the floor is the basin (the rest counts 10 cm);
+  * the flat floor's inscribed radius (the cells with ``surf_h`` < 4 mm) and the basin's half width ``half_width(h)`` about that centre.
 Plate (spawned and parked: gravity off, nothing under it): an upward 2 mm raster of its underside -> the outline radius ``R`` about the
 hits' centroid and the underside height above its lowest point ``u(r)`` (minimum per 2 mm radius bin).
 Fit (level plate, foot on the floor): for each centre on the floor cells, every cell within ``R`` must have ``surf_h <= u(r)``;
@@ -31,6 +31,7 @@ import numpy as np
 
 HEIGHTS = [0.002 * k for k in range(1, 21)] + [0.06, 0.08, 0.10]
 CEILING_M = 0.15
+SURF_START_M = 0.10
 BASIN_LINK_M = 0.03
 
 
@@ -137,15 +138,16 @@ def main(argv=None):
         k = int(np.nonzero(hist >= need)[0][0])
         sel = zs[(zs >= edges[k]) & (zs < edges[k + 1])]
         zf = float(np.median(sel))
-        wall_h = np.zeros(len(X))
-        for h in HEIGHTS:  # the highest occupied height wins
-            P = [[float(x), float(y), zf + h] for x, y in zip(X, Y)]
-            hh = rays(P, [[float(x), float(y), zf - 0.1] for x, y in zip(X, Y)], robot_paths)
-            # ... or a ceiling within CEILING_M over that point (under the counter beside a drop-in basin, a lip over the wall); a faucet
-            # spout over the basin is higher
-            hu = rays(P, [[float(x), float(y), zf + CEILING_M] for x, y in zip(X, Y)], robot_paths)
-            occ = np.array([(bool(r.get("hit")) and float(r["position"][2]) > zf + 0.003) or bool(q.get("hit")) for r, q in zip(hh, hu)])
-            wall_h[occ] = h
+        # the surface under each cell below the faucet: a downward ray from SURF_START_M above the floor (starting inside a wall = a
+        # surface at least that high); then a ceiling within CEILING_M over that surface (the counter over the cabinet beside a drop-in
+        # basin, a lip over the wall) blocks the cell
+        S0 = [[float(x), float(y), zf + SURF_START_M] for x, y in zip(X, Y)]
+        hd = rays(S0, [[float(x), float(y), zf - 0.1] for x, y in zip(X, Y)], robot_paths)
+        wall_h = np.array([(SURF_START_M if float(r.get("distance", 1.0)) < 1e-4 else float(r["position"][2]) - zf) if r.get("hit") else -0.1 for r in hd])
+        hu = rays([[float(x), float(y), zf + max(float(v), 0.0) + 0.002] for x, y, v in zip(X, Y, wall_h)],
+                  [[float(x), float(y), zf + CEILING_M] for x, y in zip(X, Y)], robot_paths)
+        wall_h[np.array([bool(q.get("hit")) for q in hu])] = SURF_START_M
+        wall_h = np.maximum(wall_h, 0.0)
         # the basin: the connected region under BASIN_LINK_M (4-neighbours) holding the most cells open from above onto the floor
         open_floor = (np.abs(ztop - zf) <= 0.003).reshape(gx.shape)
         wall_h = wall_h.reshape(gx.shape)
@@ -154,7 +156,7 @@ def main(argv=None):
         if lab.max() > 0:
             counts = np.bincount(lab[open_floor & (lab > 0)].ravel(), minlength=lab.max() + 1)
             keep = int(counts.argmax()) if counts.max() > 0 else 0
-            wall_h[(lab != keep) & low] = HEIGHTS[-1]  # low cells outside the basin (in the cabinet below the counter) count as walls
+            wall_h[(lab != keep) & low] = SURF_START_M  # low cells outside the basin (in the cabinet below the counter) count as walls
         free = wall_h < 0.004
         bx, by = gx[~free], gy[~free]
         best = (0.0, None)
