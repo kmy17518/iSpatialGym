@@ -369,6 +369,127 @@ def manifest(keys: Sequence[str], degs: Sequence[float], side: str, board: Board
     return out
 
 
+# ------------------------------------------------------------------------------------------------ the arm-mirror transfer (i7-t03both r3)
+#
+# Lead #84c (owner A5, touching_03's right board): the robot's two arms are mirror images (r1pro.urdf: the joints' y offsets and the x / z
+# axes' limits mirror; a right-arm configuration of the mirrored joint values puts its eef at M R_l M, M = diag(1, -1, 1) in the robot
+# frame, and the wrist cameras at the same gripper-frame offset then sit mirrored too). A grasp that works for the LEFT arm at a left-board
+# lean rest is transferred to the RIGHT-board rest as the mirror of its hand: world hand M (R_l T) M; in the right rest's object frame
+# T' = R_r^T M R_l T M = B T M with B = R_r^T M R_l - a reflection of the OBJECT's body frame, valid only when the object is symmetric
+# under it (``mirror_symmetry_error``: the hull's vertices reflected by B onto the hull, max nearest distance). The transferred poses go
+# to the candidate generator as given poses (``candidates`` family "legacy": every gate unchanged) and through the physics validation of the
+# validator arm - the method adds candidates, it relaxes nothing.
+
+MIRROR = np.diag([1.0, -1.0, 1.0])
+#: the largest hull asymmetry (m: a reflected vertex's distance to the nearest hull vertex) the transfer accepts
+MIRROR_SYMMETRY_TOL_M = 0.002
+#: a reflection plane within this of a body-frame plane is that plane (deg; the settle's residual lean tilts it by half the residual)
+MIRROR_AXIS_SNAP_DEG = 3.0
+
+
+def mirror_body_map(src_rest_xyzw, dst_rest_xyzw) -> np.ndarray:
+    """``B = R_dst^T M R_src``: the body-frame map that carries the source rest's object onto the destination rest's mirror, projected onto
+    the nearest pure reflection ``I - 2 n n^T`` (n = its eigenvector of eigenvalue -1): the destination's design rest differs from the
+    source's measured one by the settle's fraction of a degree (20.55 measured vs 20 requested), which is no part of the mirror; a normal
+    within :data:`MIRROR_AXIS_SNAP_DEG` of a body axis is snapped to it."""
+    from scipy.spatial.transform import Rotation as Rot
+
+    Rs, Rd = Rot.from_quat(np.asarray(src_rest_xyzw, dtype=float)).as_matrix(), Rot.from_quat(np.asarray(dst_rest_xyzw, dtype=float)).as_matrix()
+    B = Rd.T @ MIRROR @ Rs
+    w, v = np.linalg.eig(B)
+    k = int(np.argmin(np.abs(w - (-1.0))))
+    n = np.real(v[:, k])
+    n = n / np.linalg.norm(n)
+    i = int(np.argmax(np.abs(n)))
+    if math.degrees(math.acos(min(1.0, abs(float(n[i]))))) <= MIRROR_AXIS_SNAP_DEG:
+        n = np.eye(3)[i]  # the object's own symmetry plane (its body axes are the export's principal frame)
+    return np.eye(3) - 2.0 * np.outer(n, n)
+
+
+def mirror_symmetry_error(vertices, B) -> float:
+    """Max over the hull vertices of how far ``B v`` lies OUTSIDE the convex hull of the vertices (m; its face planes): 0 for an object
+    symmetric under ``B`` (a vertex-to-vertex distance would count the hull's own vertex sampling on a rounded corner)."""
+    from scipy.spatial import ConvexHull
+
+    V = np.asarray(vertices, dtype=float).reshape(-1, 3)
+    if len(V) < 4:
+        return 0.0
+    W = V @ np.asarray(B, dtype=float).T
+    eq = ConvexHull(V).equations  # (F, 4): n . x + d <= 0 inside
+    out = (W @ eq[:, :3].T + eq[:, 3]).max(axis=1)
+    return float(max(0.0, out.max()))
+
+
+def mirror_grasp(T_object_eef: Dict[str, Any], B) -> Dict[str, Any]:
+    """One grasp's ``T_object_eef`` (position, orientation_xyzw) transferred by the body reflection ``B``: position ``B t``, rotation
+    ``B R M`` (a proper rotation: two reflections)."""
+    from scipy.spatial.transform import Rotation as Rot
+
+    t = np.asarray(T_object_eef["position"], dtype=float)
+    R = Rot.from_quat(np.asarray(T_object_eef["orientation_xyzw"], dtype=float)).as_matrix()
+    R2 = np.asarray(B) @ R @ MIRROR
+    return {"position": [round(float(v), 6) for v in (np.asarray(B) @ t)], "quat_xyzw": [round(float(v), 7) for v in Rot.from_matrix(R2).as_quat()]}
+
+
+def mirror_job(job: Dict[str, Any], src_library: Dict[str, Any], src_vertices, grasp_names: Optional[Sequence[str]] = None,
+               tol_m: float = MIRROR_SYMMETRY_TOL_M, twins: bool = False, expand: bool = False) -> Dict[str, Any]:
+    """The lean job ``job`` (the destination board's rest) with the source library's grasps (``grasp_names``, default all) transferred by the
+    arm mirror as its ONLY candidates (``cand_overrides``: no sampled mode, family "legacy" = the given poses) and the provenance in
+    ``mirror_of``; its entry id gains ``__mirror_<source tag>``. ``ValueError`` when the source and destination lean to the same side or the
+    object is not symmetric under the body map (> ``tol_m``)."""
+    src_lean = src_library.get("lean") or {}
+    if src_lean.get("side") == job["lean"]["side"]:
+        raise ValueError(f"the mirror transfer needs the other board: source {src_lean.get('side')} vs {job['lean']['side']}")
+    rid = src_lean.get("tag")
+    src_rest = ((src_library.get("rests") or {}).get(rid) or {}).get("quat_xyzw")
+    if src_rest is None:
+        raise ValueError(f"source library has no rest {rid!r}")
+    dst_rest = lean_quat(base_quat(job), spec_of(job))
+    B = mirror_body_map(src_rest, dst_rest)
+    err = mirror_symmetry_error(src_vertices, B)
+    if err > tol_m:
+        raise ValueError(f"the object is not symmetric under the mirror's body map ({err * 1000:.2f} mm > {tol_m * 1000:.1f} mm)")
+    names = set(grasp_names) if grasp_names else None
+    grasps = [g for g in src_library.get("grasps") or [] if names is None or g.get("name") in names]
+    if not grasps:
+        raise ValueError(f"no source grasp among {sorted(names) if names else 'all'}")
+    given = [{"name": f"mirror_{g['name']}", **mirror_grasp(g["T_object_eef"], B)} for g in grasps]
+    if twins:
+        # the wrist cameras sit at the same gripper-frame offset on both arms, so the mirrored hand's camera does NOT land on the mirror of
+        # the source camera (acbrnv side_9 at the right board: the camera 10 mm into the board, the source's 27.5 mm clear); the twin (the
+        # same pinch, the hand turned 180 deg about its approach) carries it to the other side of the pinch
+        from scipy.spatial.transform import Rotation as Rot
+
+        for g in list(given):
+            Rg = Rot.from_quat(g["quat_xyzw"]).as_matrix() @ Rot.from_euler("z", 180.0, degrees=True).as_matrix()
+            given.append({"name": g["name"] + "~r180", "position": list(g["position"]), "quat_xyzw": [round(float(v), 7) for v in Rot.from_matrix(Rg).as_quat()]})
+    out = dict(job)
+    out["cand_overrides"] = {"modes": [], "families": ["legacy"], "legacy_grasps": given}
+    if expand:
+        # i7-t03both r3: each transferred pose also as a proposal of the given-pose family "agent" (its pinch centre, closing axis and
+        # approach in the destination's design rest frame), expanded by candidates.AGENT_EXPAND_DEFAULT (tilt / yaw / slide) - the gates and
+        # the physics pick among the neighbours of the mirror (the exact mirror's twin closes the book into the table: obj_slab_ratio 3.3 > 2)
+        from scipy.spatial.transform import Rotation as Rot
+
+        from ispatialgym.grasping import candidates as CA
+
+        Rd = Rot.from_quat(np.asarray(dst_rest, dtype=float)).as_matrix()
+        props = []
+        for g in given:
+            Rg = Rd @ Rot.from_quat(g["quat_xyzw"]).as_matrix()
+            p = Rd @ np.asarray(g["position"], dtype=float)
+            c = p + Rg[:, 2] * CA.CONTACT_Z
+            props.append({"name": g["name"], "contact_mm": [round(float(v) * 1000.0, 3) for v in c], "closing_axis": [round(float(v), 6) for v in Rg[:, 1]],
+                          "approach": [round(float(v), 6) for v in Rg[:, 2]], "pad_offset_mm": 0.0})
+        out["cand_overrides"]["families"] = ["legacy", "agent"]
+        out["cand_overrides"]["agent_proposals"] = props
+    out["mirror_of"] = {"method": "arm mirror (lean.mirror_job)" + (" + the 180 deg twins" if twins else ""), "source_rest": rid, "source_arm": src_library.get("arm"),
+                        "grasps": [g["name"] for g in grasps], "body_map": [[round(float(v), 6) for v in row] for row in B],
+                        "symmetry_error_m": round(err, 6), "design_rest_xyzw": [round(float(v), 7) for v in dst_rest]}
+    out["id"] = f"{job['id']}__mirror_{rid}"
+    return out
+
+
 def job_arm(job: Dict[str, Any]) -> str:
     """The arm a lean job is validated with (``validate_arm``; right when absent)."""
     return str(job.get("validate_arm") or "right")
@@ -388,7 +509,28 @@ def main(argv=None):
     m.add_argument("--validate-arm", default="right", choices=["right", "left"], help="the arm the lean rest is validated with (pipeline lean --arm)")
     m.add_argument("--interior-goal", default=None, help="the interior spec (registry name) the entry is used at: its accessible region (access_region.py)")
     m.add_argument("--out", required=True)
+    mm = sub.add_parser("mirror", help="i7-t03both: lean jobs of the OTHER board whose candidates are a library's grasps arm-mirrored (mirror_job)")
+    mm.add_argument("--legacy-key", required=True)
+    mm.add_argument("--deg", nargs="+", type=float, required=True)
+    mm.add_argument("--side", required=True, choices=sorted(SIDES))
+    mm.add_argument("--src-entry", required=True, help="the source entry dir (library.json + geometry.json of the other board's lean rest)")
+    mm.add_argument("--grasp", nargs="*", default=None, help="source grasp names (default: all)")
+    mm.add_argument("--validate-arm", default="right", choices=["right", "left"])
+    mm.add_argument("--interior-goal", default=None)
+    mm.add_argument("--twins", action="store_true", help="also each mirrored pose turned 180 deg about its approach (the wrist camera's other side)")
+    mm.add_argument("--expand", action="store_true", help="also each transferred pose as an expanded agent proposal (tilt / yaw / slide neighbours)")
+    mm.add_argument("--out", required=True)
     a = ap.parse_args(argv)
+    if a.cmd == "mirror":
+        src = S.load_json(os.path.join(a.src_entry, "library.json"))
+        geo = S.load_json(os.path.join(a.src_entry, "geometry.json"))
+        verts = [v for pc in geo.get("pieces") or [] for v in pc.get("vertices") or []]
+        jobs = [mirror_job(j, src, verts, a.grasp, twins=a.twins, expand=a.expand) for j in manifest([a.legacy_key], a.deg, a.side, Board(), 0.002, a.validate_arm, a.interior_goal)]
+        S.save_json(a.out, jobs)
+        for j in jobs:
+            print(j["id"], j["mirror_of"]["grasps"], "symmetry", j["mirror_of"]["symmetry_error_m"], [g["name"] for g in j["cand_overrides"]["legacy_grasps"]])
+        print(f"{len(jobs)} mirror lean jobs -> {a.out}")
+        return
     jobs = manifest(a.legacy_key, a.deg, a.side, Board(a.board_thickness, a.board_height, a.board_depth), a.gap, a.validate_arm, a.interior_goal)
     S.save_json(a.out, jobs)
     for j in jobs:

@@ -278,6 +278,30 @@ def shelf_board_draw_on(s=None) -> bool:
     return _AS.switch_on(SHELF_BOARD_DRAW_ENV, s)
 
 
+#: i7-t03both r2 2026-11-09 (lead #84b, DEFAULT OFF): the shelf layout's free-floor start (``SHELF_FREE_START``) keeps only a base position in the
+#: same connected region of the eroded traversability map as the attempt's manipulation candidates - T03B_PATH_DIAG: every init -> drive-back
+#: ``no_path`` of the board draw (60 / 76) left from a free start in another region (1221 cells) than the bookcase front (472 cells)
+SHELF_FREE_START_CONNECTED_ENV = "ISPATIALGYM_SHELF_FREE_START_CONNECTED"
+
+
+def shelf_free_start_connected_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_FREE_START_CONNECTED_ENV, s)
+
+
+#: i7-t03both r2 2026-11-09 (lead #84b, DEFAULT OFF): at the fixed shelf start the working arm's interior reach map is read AT THE BOOK - a
+#: Phase-2 candidate whose trunk / stand-off cell under the book holds no feasible grasp row skips the exact checks and goes to the stance
+#: shift, which tries first the MAP stances: the base moved along the edge / to another map stand-off and trunk so the book lands on a cell the
+#: map calls feasible (T03B_GRASP_DIAG: the candidate's focus is any raster cell, the books are placed per attempt after it, so the selected
+#: candidate's map verdict says nothing about the book: 'exact IK failed at pose 1 of 2' with the map's cell ik_pre / the trunk not in the map)
+SHELF_MAP_STANCE_ENV = "ISPATIALGYM_SHELF_MAP_STANCE"
+#: map stances tried per candidate (each one a full fixed-start check)
+SHELF_MAP_STANCE_MAX = 6
+
+
+def shelf_map_stance_on(s=None) -> bool:
+    return _AS.switch_on(SHELF_MAP_STANCE_ENV, s)
+
+
 def shelf_need_of(err: Reject) -> Optional[str]:
     """Why a candidate's fixed start failed, for the stance shift: ``"transit"`` (the transit / back-off checks), ``"grasp"`` (no library
     grasp reaches the fixed start pose), None for anything the base position cannot change (the shift is not tried)."""
@@ -3943,6 +3967,171 @@ class IORSSmall(SamplerV2):
         self._shelf_row_z = z
         TT._count(self, "shelf_board_draw.row_switch")
 
+    # -- i7-t03both diagnostics (ISPATIALGYM_SHELF_DRAW_DIAG=1, LOG ONLY: no verdict changes) --
+
+    def _diag_map_status(self, arm: str, stance: Stance, xy_base: Tuple[float, float]) -> Dict[str, Any]:
+        """The arm's band (an interior map view) at ``stance``'s trunk / stand-off: the raw map's status per grasp row at the cell nearest the
+        object's base-frame xy, that cell's offset, and the nearest cell any row calls feasible."""
+        band = self.band_of_arm(arm)
+        meta = dict(getattr(band, "meta", None) or {})
+        path = meta.get("map_path")
+        out: Dict[str, Any] = {"map": os.path.basename(str(path)) if path else None, "band_arm": getattr(band, "arm", None)}
+        if not path:
+            return out
+        cache = self.__dict__.setdefault("_diag_maps", {})
+        if path not in cache:
+            js = path if str(path).endswith(".json") else str(path)[:-4] + ".json"
+            with open(js) as f:
+                m = json.load(f)
+            cache[path] = (m, dict(np.load(js[:-5] + ".npz")))
+        m, z = cache[path]
+        codes = {int(v): k for k, v in (m.get("status_codes") or {}).items()}
+        cells = np.asarray(z["cells"], dtype=float)
+        so = float(stance.stand_off if stance.stand_off is not None else 0.0)
+        eds = [float(v) for v in m.get("edge_distances") or []]
+        de = min(eds, key=lambda v: abs(v - so)) if eds else so
+        key = f"s{de:.2f}_t{float(stance.translate):.2f}_k{float(stance.tilt):+.1f}"
+        out.update({"trunk_key": key, "stand_off": round(so, 3)})
+        if key not in z:
+            tks = sorted(k for k in z if k.startswith(f"s{de:.2f}_"))
+            out["trunk_missing"] = tks[:12]
+            return out
+        a = np.asarray(z[key])
+        d = np.linalg.norm(cells - np.asarray(xy_base)[None, :], axis=1)
+        i = int(np.argmin(d))
+        names = [g.get("name") for g in m.get("grasps") or []]
+        row = a[i].reshape(-1)
+        out.update({"cell": [round(float(v), 3) for v in cells[i]], "cell_off_m": round(float(d[i]), 3),
+                    "status": {f"{names[j] if j < len(names) else j}#{j}": codes.get(int(v), int(v)) for j, v in enumerate(row)}})
+        feas = np.where((a.reshape(len(cells), -1) == 1).any(axis=1))[0]
+        if len(feas):
+            j = int(feas[np.argmin(d[feas])])
+            out.update({"nearest_feasible_cell": [round(float(v), 3) for v in cells[j]], "nearest_feasible_m": round(float(d[j]), 3), "n_feasible_cells": int(len(feas))})
+        else:
+            out["n_feasible_cells"] = 0
+        return out
+
+    def _diag_base_frame(self, stance: Stance, xyz) -> Tuple[float, float]:
+        x0, y0, yaw = (float(v) for v in stance.base_pose2d)
+        dx, dy = float(xyz[0]) - x0, float(xyz[1]) - y0
+        return (math.cos(yaw) * dx + math.sin(yaw) * dy, -math.sin(yaw) * dx + math.cos(yaw) * dy)
+
+    def shelf_grasp_diag(self, manip: Stance, pose, grasps, arm: str, reasons, exact_kw) -> None:
+        """LOG ONLY (``T03B_GRASP_DIAG {json}``): the fixed start's failed grasp at ``manip`` - the stance, the book in the base frame, the map's
+        status at that cell (:meth:`_diag_map_status`) against the live verdicts, and per grasp a probe of the pre-grasp IK with the support
+        ignored whole (reach vs collision) plus the links of that solution that touch the support."""
+        try:
+            from ispatialgym.oracle import r1pro_model as M
+
+            xy = self._diag_base_frame(manip, G.t(pose[0]))
+            rec: Dict[str, Any] = {"variant": self.gp.variant, "stance": manip.name, "base_pose2d": [round(float(v), 4) for v in manip.base_pose2d],
+                                   "trunk": [round(float(manip.translate), 3), round(float(manip.tilt), 3)], "stand_off": manip.stand_off,
+                                   "lateral": round(float(manip.lateral), 4), "arm": arm, "grasp_key": self.grasp_key,
+                                   "row_z": getattr(self, "_shelf_row_z", None), "board": TT.side_name(float(self.shelf_start["lean_side"])) if self.shelf_start else None,
+                                   "bay": (getattr(self, "_shelf_draw", None) or {}).get("bay_m"), "book_base_xy": [round(v, 4) for v in xy],
+                                   "book_z": round(float(G.t(pose[0])[2]) - float(getattr(self.world, "floor_z", 0.0)), 4),
+                                   "stance_extras": {k: manip.extras.get(k) for k in ("stance_shift_trunk", "init_view_angle", "lateral_shift_m") if k in manip.extras},
+                                   "live": list(reasons)[:6]}
+            rec["map"] = self._diag_map_status(arm, manip, xy)
+            probes = {}
+            links = [ln for ln in self.ikc._non_finger_links(arm) if "attached" not in ln] + list(M.FINGER_LINKS[arm])
+            for g in list(grasps)[:4]:
+                eef = IK.grasp_pose(pose, g.pose)
+                pre = IK.pre_pose(eef)
+                pr: Dict[str, Any] = {}
+                with self.ikc.ignoring(self.support_objects(), split=False):
+                    q = self.ikc._solve_exact(pre, self.ikc.q_locked(manip), arm)
+                pr["pre_ik_support_ignored"] = q is not None
+                if q is not None:
+                    clear = self.kit.links_clear(q, links, 0.0)
+                    pr["all_links_clear_with_support"] = bool(clear[0])
+                    if not bool(clear[0]):
+                        bad = [ln for ln in links if not bool(self.kit.links_clear(q, [ln], 0.0)[0])]
+                        pr["links_touching"] = bad[:8]
+                    eef_b = self._diag_base_frame(manip, G.t(pre[0]))
+                    pr["pre_base_xy"] = [round(v, 3) for v in eef_b]
+                    pr["pre_z"] = round(float(G.t(pre[0])[2]) - float(getattr(self.world, "floor_z", 0.0)), 3)
+                else:
+                    with self.ikc.ignoring(self.support_objects() + list(getattr(self.world, "spawned", {}).values()), split=False):
+                        q2 = self.ikc._solve_exact(pre, self.ikc.q_locked(manip), arm)
+                    pr["pre_ik_all_spawned_ignored"] = q2 is not None
+                # the GRASP pose: solved with everything the exact chain ignores at its last pose, then with the support ignored whole too; the
+                # blame of that solution in the live world (what the grasp configuration collides with) and the touching links
+                ign_last = list(exact_kw.get("ignore_for_last") or [])
+                with self.ikc.ignoring(ign_last):
+                    qg = self.ikc._solve_exact(eef, self.ikc.q_locked(manip), arm)
+                pr["grasp_ik_live"] = qg is not None
+                if qg is None:
+                    with self.ikc.ignoring(ign_last + list(self.support_objects()), split=False):
+                        qg2 = self.ikc._solve_exact(eef, self.ikc.q_locked(manip), arm)
+                    pr["grasp_ik_support_ignored"] = qg2 is not None
+                    if qg2 is not None:
+                        pr["grasp_blame"] = self.ikc._collision_blame(qg2, ign_last)[:200]
+                        with self.ikc.ignoring(ign_last):
+                            pr["grasp_links_touching"] = [ln for ln in links if not bool(self.kit.links_clear(qg2, [ln], 0.0)[0])][:8]
+                        pr["grasp_self_pairs"] = [f"{a} x {b}" for (a, b), _ in (self.ikc.self_collision_pairs(qg2) or [])[:3]]
+                        try:  # the gripper body's box behind the eef (eef frame: x +-0.045, y +-0.06, z -0.13..0) vs each split-kept support piece (SDF)
+                            gx, gy, gz = np.meshgrid(np.linspace(-0.045, 0.045, 4), np.linspace(-0.06, 0.06, 5), np.linspace(-0.13, 0.0, 8), indexing="ij")
+                            pts = th.tensor(np.stack([gx.ravel(), gy.ravel(), gz.ravel()], axis=1), dtype=th.float32)
+                            pts_w = G.local_points_world(pts, (G.t(eef[0]).float(), G.t(eef[1]).float()))
+                            rows = []
+                            for prim, _cm, geom in self._kept_pieces():
+                                d = geom.sdf(pts_w)
+                                j = int(th.argmin(d))
+                                rows.append((float(d[j]), prim.rsplit("/", 1)[-1], [round(float(v), 3) for v in pts[j].tolist()], [round(float(v), 4) for v in pts_w[j].tolist()]))
+                            rows.sort(key=lambda r: r[0])
+                            pr["grasp_gripper_box_pieces"] = rows[:3]  # (sdf m, piece, the eef-frame point, its world point)
+                        except Exception as e:  # noqa: BLE001
+                            pr["grasp_gripper_box_pieces"] = repr(e)[:120]
+                probes[getattr(g, "name", "?")] = pr
+            rec["probes"] = probes
+            log.info("T03B_GRASP_DIAG %s", json.dumps(rec, default=str))
+        except Exception as e:  # noqa: BLE001 - a diagnostic never changes the attempt
+            log.info("T03B_GRASP_DIAG error %r", e)
+
+    def shelf_path_diag(self, init: Stance, back: Stance, s_T: float, err: str) -> None:
+        """LOG ONLY (``T03B_PATH_DIAG {json}``): an init -> drive-back path failure - both base poses, the init's kind (free start or the
+        edge), the nearest eroded-free cells and the sizes of their connected components (a pocket vs the room)."""
+        try:
+            from ispatialgym.sampling.v2 import navigation as NAV
+
+            free = NAV.eroded_map(self.kit).cpu().numpy().astype(bool)
+            out: Dict[str, Any] = {"variant": self.gp.variant, "s_T": round(float(s_T), 3), "err": err[:200], "init": [round(float(v), 3) for v in init.base_pose2d],
+                                   "init_free_start": "free_start_from_edge_lateral_m" in (init.extras or {}), "back": [round(float(v), 3) for v in back.base_pose2d],
+                                   "row_z": getattr(self, "_shelf_row_z", None), "board": TT.side_name(float(self.shelf_start["lean_side"])) if self.shelf_start else None,
+                                   "bay": (getattr(self, "_shelf_draw", None) or {}).get("bay_m"), "arm": (self.segment_arms or [None])[0]}
+            try:
+                from scipy import ndimage
+
+                lab, n = ndimage.label(free)
+                for nm, st in (("init", init), ("back", back)):
+                    ij = NAV._to_map(self.kit, st.base_xy)
+                    c = NAV.nearest_free_cell(th.as_tensor(free), ij, 20)
+                    out[f"{nm}_cell"] = list(ij)
+                    out[f"{nm}_free_cell_off"] = None if c is None else int(max(abs(c[0] - ij[0]), abs(c[1] - ij[1])))
+                    out[f"{nm}_component_cells"] = None if c is None else int((lab == lab[c]).sum())
+                    out[f"{nm}_trav_free"] = bool(self.kit.trav_free(st.base_xy))
+                out["n_components"] = int(n)
+            except Exception as e:  # noqa: BLE001
+                out["label_error"] = repr(e)[:120]
+            log.info("T03B_PATH_DIAG %s", json.dumps(out, default=str))
+        except Exception as e:  # noqa: BLE001
+            log.info("T03B_PATH_DIAG error %r", e)
+
+    def shelf_sweep_diag(self, qs: th.Tensor, back_xyyaw, s_T: float, manip: Stance) -> None:
+        """LOG ONLY (``T03B_SWEEP_DIAG {json}``): the first colliding configuration of a transition's trunk sweep at s_T and what it collides with."""
+        try:
+            ok = self.kit.collision_free(qs, margin=0.01)
+            k = int((~ok).nonzero()[0][0]) if bool((~ok).any()) else -1
+            blame = self.ikc._collision_blame(qs[k], [], margin=0.01) if k >= 0 else "free"
+            log.info("T03B_SWEEP_DIAG %s", json.dumps({"variant": self.gp.variant, "s_T": round(float(s_T), 3), "back": [round(float(v), 3) for v in back_xyyaw],
+                                                       "manip": [round(float(v), 3) for v in manip.base_pose2d], "trunk_to": [manip.translate, round(float(manip.tilt), 3)],
+                                                       "sample": k, "n": int(len(qs)), "blame": blame, "row_z": getattr(self, "_shelf_row_z", None),
+                                                       "board": TT.side_name(float(self.shelf_start["lean_side"])) if self.shelf_start else None,
+                                                       "arm": (self.segment_arms or [None])[0]}, default=str))
+        except Exception as e:  # noqa: BLE001
+            log.info("T03B_SWEEP_DIAG error %r", e)
+
     def shelf_board_pool(self) -> Optional[Dict[float, List[Dict[str, Any]]]]:
         """i7-t03both 2026-11-09 (owner A5, :data:`SHELF_BOARD_DRAW_ENV`), once per template: ``{+1 (left board) / -1: [rest states]}`` - every
         lean rest of the target's model within ``shelf_start_draw.lean_deg`` (``tabletop.shelf_lean_pool``) whose grasp set builds, with the
@@ -4356,8 +4545,20 @@ class IORSSmall(SamplerV2):
 
         t_xy = G.t(self.shelf_pose[0])[:2].float()
         focus = 0.5 * (G.t(self.shelf_pose[0]).float() + G.t(self.shelf_partner_pose[0]).float())
+        view_ok = lambda st_, cam: self.books_in_frame(st_, cam)  # noqa: E731
+        if shelf_free_start_connected_on(self):  # i7-t03both r2: only a start the drive can leave from (the candidates' region)
+            ref = [c for c in (self.manip_candidates or []) if TRAVEL_DROPPED not in c.extras][:1] or [init]
+            comp = self.free_component(ref[0].base_xy)
+            if comp is not None:
+                inner = view_ok
+
+                def view_ok(st_, cam, _inner=inner, _comp=comp):
+                    if self.free_component(st_.base_xy) != _comp:
+                        TT._count(self, "free_start_connected.refused")
+                        return False
+                    return _inner(st_, cam)
         try:
-            st = free_floor_stance(self, t_xy, focus, lambda st_, cam: self.books_in_frame(st_, cam), rng, what="the partner")
+            st = free_floor_stance(self, t_xy, focus, view_ok, rng, what="the partner")
         except Reject as e:
             TT._count(self, "free_start.failed.no_stance")
             log.info("%s: free start (shelf): %s - the edge init stance stays", self.gp.variant, e)
@@ -4366,6 +4567,118 @@ class IORSSmall(SamplerV2):
         st.name = "init"
         st.extras["free_start_from_edge_lateral_m"] = round(float(init.lateral), 4)
         return st
+
+    def free_component(self, xy) -> Optional[int]:
+        """i7-t03both r2: the connected region (label) of the eroded traversability map the base position ``xy`` belongs to - its nearest free
+        cell within 20 cells, as ``navigation.plan_path`` snaps the ends of a global path; None without one. The labels are computed once."""
+        from ispatialgym.sampling.v2 import navigation as NAV
+
+        lab = self.__dict__.get("_free_labels")
+        if lab is None:
+            free = NAV.eroded_map(self.kit).cpu().numpy().astype(bool)
+            try:
+                from scipy import ndimage
+
+                lab = ndimage.label(free)[0]
+            except ImportError:  # 4-connected flood fill
+                lab = np.zeros(free.shape, dtype=np.int32)
+                n = 0
+                for i0, j0 in zip(*np.nonzero(free)):
+                    if lab[i0, j0]:
+                        continue
+                    n += 1
+                    stack = [(i0, j0)]
+                    lab[i0, j0] = n
+                    while stack:
+                        i, j = stack.pop()
+                        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                            if 0 <= a < free.shape[0] and 0 <= b < free.shape[1] and free[a, b] and not lab[a, b]:
+                                lab[a, b] = n
+                                stack.append((a, b))
+            self._free_labels = lab
+            self._free_map = th.as_tensor(lab > 0)
+        c = NAV.nearest_free_cell(self._free_map, NAV._to_map(self.kit, xy), 20)
+        return None if c is None else int(lab[c])
+
+    def _raw_map(self, arm: str) -> Optional[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
+        """The working arm's interior map behind its band view (json, npz arrays), cached; None for a band that is not a map view."""
+        band = self.band_of_arm(arm)
+        path = (getattr(band, "meta", None) or {}).get("map_path")
+        if not path:
+            return None
+        cache = self.__dict__.setdefault("_diag_maps", {})
+        if path not in cache:
+            js = path if str(path).endswith(".json") else str(path)[:-4] + ".json"
+            with open(js) as f:
+                m = json.load(f)
+            cache[path] = (m, dict(np.load(js[:-5] + ".npz")))
+        return cache[path]
+
+    @staticmethod
+    def _map_trunk_key(stand_off: float, translate: float, tilt: float) -> str:
+        return f"s{float(stand_off):.2f}_t{float(translate):.2f}_k{float(tilt):+.1f}"
+
+    def map_book_feasible(self, st: Stance, arm: str) -> Optional[bool]:
+        """i7-t03both r2 (:data:`SHELF_MAP_STANCE_ENV`): whether the arm's interior map holds a feasible grasp row at the cell under the
+        book (the cell nearest its base-frame position, within half the lattice) for ``st``'s trunk at the nearest map stand-off - False also
+        when that trunk is not in the map; None without a raw map (no verdict)."""
+        rm = self._raw_map(arm)
+        if rm is None or self.shelf_pose is None:
+            return None
+        m, z = rm
+        eds = [float(v) for v in m.get("edge_distances") or []]
+        so = float(st.stand_off if st.stand_off is not None else 0.0)
+        if not eds:
+            return None
+        de = min(eds, key=lambda v: abs(v - so))
+        key = self._map_trunk_key(de, st.translate, st.tilt)
+        if key not in z:
+            return False
+        x, y = self._diag_base_frame(st, G.t(self.shelf_pose[0]))  # the book's base-frame xy (the map's cell frame)
+        cells = np.asarray(z["cells"], dtype=float)
+        lat = float((m.get("config") or {}).get("lattice_m") or 0.08)
+        d = np.abs(cells - np.array([x + (de - so), y])[None, :]).max(axis=1)
+        i = int(np.argmin(d))
+        if d[i] > 0.5 * lat + 1e-6:
+            return False
+        return bool((np.asarray(z[key])[i] == 1).any())
+
+    def shelf_map_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
+        """i7-t03both r2 (:data:`SHELF_MAP_STANCE_ENV`): ``[("map", stance, shift_m)]`` - ``cand`` moved along the edge and to each map stand-off
+        so the fixed start's book lands on a cell of the arm's interior map with a feasible grasp row, at that map trunk: the book's depth fixes
+        the map row (x = its depth behind the front plane + the stand-off, the nearest lattice row within half a lattice), each feasible cell
+        of that row gives the lateral (the base moves by the book's offset from the cell). Ordered by the trunk's distance to ``cand``'s, then
+        the lateral move; at most :data:`SHELF_MAP_STANCE_MAX`. [] without a raw map."""
+        rm = self._raw_map(arm)
+        if rm is None or self.shelf_pose is None or cand.edge is None:
+            return []
+        m, z = rm
+        cells = np.asarray(z["cells"], dtype=float)
+        lat = float((m.get("config") or {}).get("lattice_m") or 0.08)
+        x, y = self._diag_base_frame(cand, G.t(self.shelf_pose[0]))  # the book's base-frame xy (the map's cell frame)
+        so0 = float(cand.stand_off if cand.stand_off is not None else 0.0)
+        out = []
+        for key, a in z.items():
+            mt = re.match(r"s([0-9.]+)_t([0-9.]+)_k([+-][0-9.]+)$", key)
+            if not mt:
+                continue
+            so, tr, ti = float(mt.group(1)), float(mt.group(2)), float(mt.group(3))
+            xb = x + (so - so0)  # the book's base-frame depth at that stand-off
+            feas = (np.asarray(a).reshape(len(cells), -1) == 1).any(axis=1)
+            for i in np.nonzero(feas & (np.abs(cells[:, 0] - xb) <= 0.5 * lat + 1e-6))[0]:
+                shift = y - float(cells[i, 1])  # moving the base +d along the tangent moves the book -d in the robot's frame
+                dt = abs(tr - float(cand.translate)) + abs(ti - float(cand.tilt))
+                out.append((dt, abs(shift) + abs(so - so0), so, tr, ti, shift, float(cells[i, 1])))
+        out.sort(key=lambda r: (r[0], r[1]))
+        res = []
+        for dt, _, so, tr, ti, shift, yc in out[:SHELF_MAP_STANCE_MAX]:
+            st = cand.shifted(stand_off=so, lateral=float(cand.lateral) + shift, name="manipulation").with_trunk(tr, ti, "manipulation")
+            st.extras["map_stance"] = {"cell_y": round(yc, 3), "stand_off": so, "trunk": [tr, ti]}
+            if dt > 1e-6:
+                st.extras["stance_shift_trunk"] = [tr, ti]
+            res.append(("map", st, round(shift, 4)))
+        TT._countn(self, "map_stance.generated", len(res))
+        return res
 
     def shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
         """``[(label, stance, shift_m), ...]`` the stance shift tries for the manipulation candidate ``cand`` (its trunk, the working ``arm``):
@@ -4379,6 +4692,13 @@ class IORSSmall(SamplerV2):
         computed position's other trunks before the scan; only ``cand``'s trunk at the computed position is labelled ``computed``."""
         if self.shelf_pose is None or cand.edge is None:
             return []
+        mapped = self.shelf_map_stances(cand, arm) if shelf_map_stance_on(self) else []
+        if mapped:
+            return mapped + self._shelf_shift_stances(cand, arm)
+        return self._shelf_shift_stances(cand, arm)
+
+    def _shelf_shift_stances(self, cand: Stance, arm: str) -> List[Tuple[str, Stance, float]]:
+        """:meth:`shelf_shift_stances` without the map stances (the computed stance, then the scan)."""
         want = float(self.gen("shelf_stance_book_lateral_m", SHELF_STANCE_BOOK_LATERAL_M) or SHELF_STANCE_BOOK_LATERAL_M)
         want = want if arm == "left" else -want
         _, lat_book = cand.local(G.t(self.shelf_pose[0])[:2])
@@ -4493,6 +4813,12 @@ class IORSSmall(SamplerV2):
         (:data:`SHELF_STANCE_SHIFT_ENV`, i7-t03 item 1) a failure the base position can change (:func:`shelf_need_of`) tries the stances of
         :meth:`shelf_stance_shift` (the same ``try_fn``); a candidate that passes is never shifted. Returns ``(stance, grasp)``."""
         joint = shelf_joint_stance_on(self) and self.shelf_pose is not None
+        if shelf_map_stance_on(self) and shelf_stance_shift_on(self) and self.shelf_pose is not None:
+            ok = self.map_book_feasible(manip, arm)
+            TT._count(self, f"map_stance.candidate.{'none' if ok is None else ('feasible' if ok else 'infeasible')}")
+            if ok is False:  # i7-t03both r2: the map has no grasp at the book from this candidate - straight to the (map) stance shift
+                return self.shelf_stance_shift(init, cand, manip, arm, Reject("grasp_unreachable", "map: no feasible grasp row at the book's cell from this "
+                                                                                 "candidate's trunk / stand-off"), "grasp", try_fn)
         try:
             g0 = try_fn(manip)
         except Reject as e:
@@ -4540,6 +4866,8 @@ class IORSSmall(SamplerV2):
             joint = shelf_joint_stance_on(self)  # 5p.2: the budget counts the stances that reach the exact checks (the trunk set adds cheap rejects)
             if label == "scan" and budget["scan"] >= scan_max:
                 break
+            if label == "map" and budget.setdefault("map", 0) >= SHELF_MAP_STANCE_MAX:
+                continue
             budget["seen"].add(key)
             if label == "scan" and not joint:
                 budget["scan"] += 1
@@ -4560,6 +4888,8 @@ class IORSSmall(SamplerV2):
                 continue
             if label == "scan" and joint:
                 budget["scan"] += 1
+            if label == "map":
+                budget["map"] = budget.get("map", 0) + 1
             try:
                 grasp = try_fn(st_ok)
             except Reject as e2:
