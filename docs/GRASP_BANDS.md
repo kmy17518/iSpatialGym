@@ -6160,6 +6160,34 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## touching_04, owner A7: the push tip cap at the draw and short strokes (branch `i7-t04push`, 2026-11-09)
+
+Record `$OFH/t04push_20261109`; DECISIONS lines "i7-t04push". svl titanrtx, v2maps_int2, v2only N 4, memory off, own ledger + empty cache per arm.
+
+- `ISPATIALGYM_PUSH_TIP_SCREEN` (e2a74b27 + 69069e29, default OFF): at the candidate draw, (a) the goal check's push class stream (capped
+  under `ISPATIALGYM_PUSH_TIP_CAP`) against the hand-overlap test, then (b) the goal check's exact push chain + place from its A1 push stances.
+  r1 had only (a): 28 checked, 0 rejected - the 5 / 6 cm tips clear the hull and fail the exact chain from every A1 stance (the goal check's
+  "no class [40 cands: ...]" lists only the 4 commonest reasons). With (b) the screen acts.
+- `ISPATIALGYM_TOUCH_PUSH_STROKE_M=<m>` (e2a74b27, d7af4216, 35f7343e, default OFF): a closed fingertip touching push recorded as strokes for
+  `execute._push_strokes` (hold still, re-aim at the root line + yaw term <= 15 mm, back off 2 cm), with the tips' face / stand-off / strips,
+  a +-3 cm contact band about the tips (`contact_band_m`, read by execute) and `half_extent_m`. r1 / r2 ran 1 of 3 strokes (the +-1 cm band
+  held < 3 hull vertices; the unwatched re-aim shoved the bottle); r3 runs 3 of 3 (~19 mm each).
+
+| arm | att / wr / ok | GPU-h | GPU-h / ok | s / att | where it acted |
+|---|---|---|---|---|---|
+| t04 320300 base | 23 / 4 / 2 | 0.90 | 0.449 | 118.8 | - |
+| t04 320300 CAP + overlap screen (r1) | 74 / 4 / 3 | 1.60 | 0.534 | 69.3 | cap dropped 4709; screen 28 / 0 rejected |
+| t04 320300 CAP + exact screen (r2) | 93 / 4 / 2 | 1.91 | 0.955 | 66.5 | screen rejected 21 (goal-check push 17 -> 1); 2 symbolic_only at 5 cm |
+| t04 320300 strokes 0.03 (r3) | 23 / 4 / 2 | 0.92 | 0.458 | 120.3 | 3 / 3 strokes in 3 pushed demos |
+| t04 320310 base | 36 / 4 / 2 | 1.13 | 0.565 | 96.0 | - |
+| t04 320310 strokes 0.03 (r3) | 36 / 4 / 2 | 1.15 | 0.577 | 96.8 | 3 / 3 strokes in 2 pushed demos |
+| t02 320300 base / strokes (r3) | 48 / 4 / 4 both | 0.50 / 0.46 | 0.124 / 0.116 | 26.1 / 24.1 | 2 / 3 strokes |
+| t01 300150 base / all three on (r1) | 6 / 4 / 3 both | 0.39 / 0.38 | 0.131 / 0.127 | 143 / 141 | blades: strokes skipped, screen passed 4 |
+
+Decision (standard rule): no default flipped. The cap + screen act but cost more GPU-h per ok than today, and the cap does not stop every
+turn (2 symbolic_only at 5 cm). The strokes run but leave touching_04's ok unchanged (4 vs 4 over 8 instances, the same sampling) at +2 %
+GPU-h per ok; the controls are unchanged (touching_02 4 / 4, touching_01 3 / 4).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
