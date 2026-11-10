@@ -40,13 +40,18 @@ def _book_xy(s, st):
     return s._diag_base_frame(st, BOOK[0])
 
 
-def test_the_switches_are_off_by_default(monkeypatch):
-    for env, fn in ((IS.SHELF_MAP_STANCE_ENV, IS.shelf_map_stance_on), (IS.SHELF_FREE_START_CONNECTED_ENV, IS.shelf_free_start_connected_on)):
+def test_the_switch_defaults(monkeypatch):
+    """MAP_STANCE off everywhere; FREE_START_CONNECTED (default flip, lead #84c) on for the shelf tip family only; =0 restores."""
+    tip = type("T", (), {"shelf_tip": lambda self: True})()
+    other = type("O", (), {"shelf_tip": lambda self: False})()
+    for env, fn, tip_default in ((IS.SHELF_MAP_STANCE_ENV, IS.shelf_map_stance_on, False),
+                                 (IS.SHELF_FREE_START_CONNECTED_ENV, IS.shelf_free_start_connected_on, True)):
         monkeypatch.delenv(env, raising=False)
-        tip = type("T", (), {"shelf_tip": lambda self: True})()
-        assert fn(tip) is False
+        assert fn(tip) is tip_default and fn(other) is False and fn() is False
         monkeypatch.setenv(env, "1")
         assert fn(tip) is True
+        monkeypatch.setenv(env, "0")
+        assert fn(tip) is False
 
 
 def test_the_map_is_read_at_the_book(monkeypatch):
