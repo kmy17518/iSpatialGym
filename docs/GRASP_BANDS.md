@@ -6160,6 +6160,49 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## Plate-in-sink templates: a smaller plate and a wider basin (branch `i7-sink`, owner decision A3, 2026-11-09)
+
+**Owner decision A3.** The bar / countertop plate-in-sink templates (plate luhkiz into `drop_in_sink_awvzkn_0`, house_single_floor) failed
+the goal check as `goal_tipped` (24.9 / 28.7 deg, i7-ft2 round E). Try (a) a smaller plate or a plate-like object and (b) a sink with a wider
+basin, in parallel. The 15 deg goal-tilt limit and the success measure do not change. If both succeed, the higher-yield variant becomes the
+representative and the other a variant.
+
+**Root cause** (`scripts/i7sink/basin_fit_probe.py`, a Kit probe: the basin's collision surface by vertical rays from 10 cm above its floor
+plus a ceiling test, the plate's underside raster, the level fit, and the goal check's drop - teleport to the release, `world.settle` 120 + 10
+steps, the up axis - at level / 30 / 45 deg x 4 directions and 4 offsets of 2 cm):
+- awvzkn's collision basin is ~0.19-0.20 m flat across x (the stance axis) by ~0.30 m along y, with a 4-8 mm drain cover in the middle and
+  walls rising ~7 cm within 3 cm. The spec's 0.2466 m is the wall-ray width at mid-rim (~8 cm up), not the floor.
+- luhkiz is 0.240 m across (rim 2.4 cm above its foot ring). Its rim lands on the walls: 13 drops settle at 14.5-34.8 deg (1 of 13 within 15).
+
+**Probe table** (drops within 15 deg / 13; max tilt):
+
+| plate -> sink | within 15 deg | max | note |
+| --- | --- | --- | --- |
+| luhkiz -> awvzkn | 1 | 34.8 | the failing templates |
+| luhkiz x0.8 (0.192 m) -> awvzkn | 13 | 14.0 | typ. 3 deg (rests on the drain cover) |
+| luhkiz x0.75 / x0.7 -> awvzkn | 13 / 13 | 14.2 / 13.8 | |
+| uakqei / xtdcau / nikfgd / ypdfrp -> awvzkn | 13 each | 9.9 / 7.0 / 14.5 / 14.3 | other B1K plates (0.15-0.20 m) |
+| eixyyn / vjqzwa / iawoof / akfjxx -> awvzkn | 11 / 11 / 10 / 12 | 16-116 | |
+| luhkiz -> tabletop_sink_vekaaf_0 (utility room) | 13 | 12.3 | 7.1-12.3 deg |
+| luhkiz -> tabletop_sink_qnequy_0 (bathroom) | 13 | 9.5 | |
+| luhkiz -> commercial_kitchen_sink_xecfyh_0 | 13 | 3.1 | held-out partner slot |
+| luhkiz -> drop_in_sink_lkklqs_0 | 9 | 22.4 | held-out slot (inside_large_03's sink) |
+| luhkiz -> drop_in_sink_hecjnt_0 / upwldu / kqnonf | 11 / 1 / 0 | | bathroom sinks |
+
+**What was built** (data only: no new behaviour, so no switch):
+- (a) `...-plate_s080-drop_in_sink-bar` / `-countertop`: the awvzkn templates with plate luhkiz scaled 0.8 (`roles.target.scale`), v2 entry
+  `plate__luhkiz__s0.8` (legacy key `plate__luhkiz__ts080`; 78 candidates -> 73 geometry-ok -> 29 valid with the new-build default
+  switches) and its maps (tabletop 1.0505 / 0.8874, awvzkn interior PLACE with i7-ft2's round-b rule).
+- (b) `...-plate-tabletop_sink_vekaaf_0-countertop`: plate luhkiz into the utility room's tabletop sink from `countertop_ikwqer_0` (1.25 m
+  along the same counter row), the interior spec `tabletop_sink_vekaaf_0@basin` (0.9559 m, open top, digest 0f063c1c46a9; the measure found
+  no side wall at mid-rim, so the spec has none), luhkiz's interior PLACE map there and tabletop 0.9275 maps. No `init_support_max_geodesic_m`
+  (the near-side geodesic between two pieces of one counter row found no path).
+- All three: `generation.inside_goal_region` (a world box +-3 cm about the probe-validated drop centre). Without it the goal cell nearest the
+  base sits at the basin's end (vekaaf: 5.6 cm past the drop centre, settled 18.8 deg).
+- xecfyh / lkklqs (held-out partner slots) and the bathroom sinks were not used.
+
+**Runs:** RESULTS_PLACEHOLDER
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
