@@ -1147,7 +1147,9 @@ class HeldObjectV2(SamplerV2):
         predicted = C.compose(self.kit.eef_pose(res.q, self.arm), rel)
         pos_error = float(th.linalg.norm(predicted[0] - goal[0]))
         rot_error = float(C.quat_angle(predicted[1], goal[1]))
-        if pos_error > 0.001 or rot_error > 0.001:
+        # IK endpoints are approximate under the existing solver acceptance;
+        # the requested world goal remains exact in TRO and pose targets.
+        if pos_error > self.ikc.WITNESS_POS_TOL or rot_error > self.ikc.WITNESS_ANG_TOL:
             raise Reject("campaign_goal_drift", f"{phase}: fixed-goal IK error {pos_error:.6f} m / {rot_error:.6f} rad")
         draft.object_poses[tname], draft.goal_poses[tname], draft.robot_q = start, goal, q_start
         draft.extras["goal_robot_q"] = res.q
@@ -1157,7 +1159,9 @@ class HeldObjectV2(SamplerV2):
         self.sidecar.goal.update({f"{self.arm}_arm_q": res.q[self.robot.arm_control_idx[self.arm]].tolist(),
                                   "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}})
         draft.summary["campaign_goal_group"].update({"phase": phase, "predicted_goal_error_m": pos_error,
-                                                     "predicted_goal_error_rad": rot_error})
+                                                     "predicted_goal_error_rad": rot_error,
+                                                     "endpoint_tolerance_m": self.ikc.WITNESS_POS_TOL,
+                                                     "endpoint_tolerance_rad": self.ikc.WITNESS_ANG_TOL})
         draft.summary["goal_realised"] = {"position": goal[0].tolist(), "orientation": goal[1].tolist(),
                                            "fixed_campaign_goal": True}
 

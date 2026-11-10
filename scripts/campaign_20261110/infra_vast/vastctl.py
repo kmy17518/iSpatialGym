@@ -698,6 +698,10 @@ def tick(c, s3, state):
     if list_ok:  # an instance that destroyed itself: its rental ends now in the ledger (no later than the truth)
         for iid in live_ids:
             if iid not in live and t - created[iid]["time"] > 120:
+                prior_heartbeat = hbs.get(iid) or {}
+                detail = str(prior_heartbeat.get("detail") or "")
+                if prior_heartbeat.get("phase") in ("unusable", "destroyed") and ("no NVIDIA" in detail or "GLX/EGL" in detail):
+                    ledger("bad_machine", machine_id=created[iid].get("machine_id"), instance=iid, reason=detail)
                 ledger("destroy", instance=iid, reason="gone (self-destroyed or removed)", ok=True, account=created[iid].get("account"))
                 log(f"GONE {iid} [{SHORT.get(created[iid].get('account'), '?')}]")
         tot, live_ids, created = spend()

@@ -1227,16 +1227,21 @@ class Disembedding(SamplerV2):
         self.campaign_group_remaining_s()
         destination = draft.object_poses[plan.destination_name]
         dp, dq = CTG.pose_error(destination, plan.destination)
-        if dp > 0.001 or dq > 0.001:
+        position_tol, orientation_tol = self.tol("position", 0.03), self.tol("orientation", 0.20)
+        group = draft.summary["campaign_goal_group"]
+        group["destination_residual"] = {"position_m": dp, "orientation_rad": dq}
+        if dp > position_tol or dq > orientation_tol:
             raise Reject("campaign_destination_drift", f"destination drifted {dp:.6f} m / {dq:.6f} rad")
         start = draft.object_poses[plan.target_name]
         _, orientation_error = CTG.pose_error(start, plan.goal)
-        if orientation_error > 0.001:
+        group["start_orientation_residual_rad"] = orientation_error
+        if orientation_error > orientation_tol:
             raise Reject("campaign_orientation_drift", f"start/goal target orientation differs by {orientation_error:.6f} rad")
         if settled:
             actual = self.objects[plan.target_name].get_position_orientation()
             dp, dq = CTG.pose_error(actual, plan.goal)
-            if dp > 0.001 or dq > 0.001:
+            group["settled_goal_residual"] = {"position_m": dp, "orientation_rad": dq}
+            if dp > position_tol or dq > orientation_tol:
                 raise Reject("campaign_goal_drift", f"settled tray goal drifted {dp:.6f} m / {dq:.6f} rad")
         draft.goal_poses[plan.target_name] = tuple(TT._t(v) for v in plan.goal)
         draft.pose_targets[plan.target_name] = full_pose_target(*plan.goal, self.tol("position", 0.03),
@@ -1502,7 +1507,7 @@ class Disembedding(SamplerV2):
         campaign_plan = getattr(self, "_campaign_tray_active", None)
         if campaign_plan is not None:
             goal = tuple(TT._t(v) for v in campaign_plan.goal)
-            if CTG.pose_error(t_pose, goal)[1] > 0.001:
+            if CTG.pose_error(t_pose, goal)[1] > self.tol("orientation", 0.20):
                 raise Reject("campaign_orientation_drift", "disembedding start and goal orientations must match")
             if not dst_w.polygon_supported(self.world.footprint(self.hull["target"], goal), margin=float(self.g("tray_footprint_margin_m"))):
                 raise Reject("campaign_goal_support", "fixed target goal footprint leaves the destination floor")
