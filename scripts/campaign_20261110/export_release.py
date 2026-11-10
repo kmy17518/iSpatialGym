@@ -26,7 +26,8 @@ from scripts.campaign_20261110.contracts import (
     canonical_json, digest, file_digest, require, require_validation,
     task_quotas, validate_campaign_block, write_json_atomic,
 )
-from scripts.campaign_20261110.group_lane import check_reservations, physical_template
+from scripts.campaign_20261110.group_lane import check_reservations, physical_template, conceptual_template
+from scripts.campaign_20261110.binding_pools import audit_objects, load_pool_for_template
 from scripts.campaign_20261110.storage import atomic_directory_lock
 from scripts.campaign_20261110.reservation_policy import active_policy
 
@@ -123,6 +124,10 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
     template = template_from(row["contract"]) if row.get("contract") else templates.get(block["template_sha256"])
     require(template is not None and template.fingerprint == block["template_sha256"], "missing exact ready template contract")
     require(template.task == block["task"] == row["task"] and template.class_id == block["class_id"], "accepted task/class mismatch")
+    pool = load_pool_for_template(template, root=root)
+    if pool is not None:
+        reference = template.scene_setup["binding_pool"]
+        auditor.check({"path": reference["manifest"], "sha256": reference["manifest_sha256"]})
     check_reservations(template, reservations, reservation_hashes)
     require(read(artifacts["sidecar"]["path"])["tro_sha256"] == artifacts["tro"]["sha256"], "sidecar/TRO hash mismatch")
     report = read(artifacts["report"]["path"])
@@ -157,6 +162,8 @@ def normalize_record(row, *, root, started_at, templates, reservations, reservat
     result = {"instance_id": row["instance_id"], "campaign_id": block["campaign_id"], "split": row["split"],
               "sampling_split": row["sampling_split"], "task": template.task, "class_id": template.class_id,
               "template": asdict(template), "physical_template_sha256": physical_template(template),
+              "conceptual_template_sha256": conceptual_template(template),
+              "binding_pool": template.scene_setup.get("binding_pool"),
               "group_id": row.get("group_id"), "bucket": row.get("bucket"),
               "room": f"{template.scene}/{template.room}", "variant": report_variant,
               "artifacts": artifacts, "validation_key": row["validation_key"], "gate": row["gate"],
@@ -172,6 +179,9 @@ def audit_assignments(rows, groups, templates):
     require(len({row["campaign_id"] for row in rows}) == 1, "mixed campaigns in export")
     grouped = defaultdict(list)
     for row in rows:
+        template = template_from(row["template"])
+        require(row["physical_template_sha256"] == physical_template(template), "export physical template identity changed")
+        require(row["conceptual_template_sha256"] == conceptual_template(template), "export conceptual template identity changed")
         if row["group_id"]:
             grouped[row["group_id"]].append(row)
         else:
@@ -185,7 +195,7 @@ def audit_assignments(rows, groups, templates):
         require(len({canonical_json(m["perturbations"]) for m in members}) == 1, "group perturbations differ")
     # The same physical contract can be rebound to a new snapshot; use its hash
     # as identity for the independent cross-role split-leakage audit.
-    errors = audit_splits(replace(t, template_id=t.fingerprint) for t in templates)
+    errors = audit_splits(replace(t, template_id=t.fingerprint, objects=audit_objects(t)) for t in templates)
     require(not errors, "global split leakage: " + "; ".join(errors))
     quotas = {q.task: q for q in task_quotas()}
     counts = Counter((m["split"], m["task"], m["task"] if m["split"] == "eval_category" else m["class_id"]) for m in rows)
@@ -201,7 +211,7 @@ def audit_assignments(rows, groups, templates):
     for row in rows:
         if row["split"] != "train":
             scope = row["task"] if row["split"] == "eval_category" else row["class_id"]
-            pinned[row["split"], row["task"], scope].add(row["physical_template_sha256"])
+            pinned[row["split"], row["task"], scope].add(row["conceptual_template_sha256"])
             q = quotas[row["task"]]
             limits = getattr(q, {"eval_standard": "standard_buckets", "eval_model": "model_buckets",
                                  "eval_category": "category_buckets"}[row["split"]])
@@ -214,7 +224,7 @@ def audit_assignments(rows, groups, templates):
                 key = (row["split"], row["task"], scope, bucket)
                 buckets[key] += 1
                 require(buckets[key] <= limits[bucket], "accepted evaluation bucket exceeds quota")
-    require(all(len(values) == 1 for values in pinned.values()), "evaluation class changed physical template")
+    require(all(len(values) == 1 for values in pinned.values()), "evaluation class changed conceptual template")
 
 
 def publish(root, tag, rows, groups, inputs, *, shard_size=32):
@@ -249,6 +259,7 @@ def publish(root, tag, rows, groups, inputs, *, shard_size=32):
                    "source_states": inputs, "instances": len(rows), "counts": dict(Counter(row["split"] for row in rows)),
                    "tasks": {task: dict(Counter(row["split"] for row in rows if row["task"] == task)) for task in sorted({r["task"] for r in rows})},
                    "physical_templates": len({r["physical_template_sha256"] for r in rows}), "render_shards": len(shards),
+                   "conceptual_templates": len({r["conceptual_template_sha256"] for r in rows}),
                    "files": {name: file_digest(temporary / name) for name in ("instances.jsonl", "shards.json", "groups.json")},
                    "rendered": False, "split_authority": "instances.jsonl split; source TRO sampling_split remains unchanged"}
         write_json_atomic(temporary / "release.json", summary)

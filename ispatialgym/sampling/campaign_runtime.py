@@ -33,6 +33,8 @@ def _load(path: str):
     data = dict(config["template"])
     data["objects"] = tuple(ObjectRef(**obj) for obj in data["objects"])
     template = Template(**data)
+    from scripts.campaign_20261110.binding_pools import load_pool_for_template
+    load_pool_for_template(template, root=os.environ.get("ISGF_ROOT"))
     p = config["perturbations"]
     perturbations = Perturbations({key: ScaleState(**value) for key, value in p["scales"].items()},
                                  tuple(p.get("removed_objects", [])), p.get("lighting", {}))

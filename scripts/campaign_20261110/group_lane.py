@@ -24,6 +24,9 @@ from scripts.campaign_20261110.contracts import (
 from scripts.campaign_20261110.goal_groups import load_template_contract
 from scripts.campaign_20261110.storage import atomic_directory_lock, local_sqlite_transaction
 from scripts.campaign_20261110.reservation_policy import require_active_policy
+from scripts.campaign_20261110.binding_pools import (
+    audit_objects, canonical_pool_perturbations, conceptual_identity, load_pool_for_template,
+)
 
 QUOTAS = {q.task: q for q in task_quotas()}
 ROOM_WEIGHTED_TASKS = {"object_scaling", "mental_rotation"}
@@ -70,7 +73,16 @@ def physical_template(template):
                    "bindings": template.scene_setup.get("inst_to_name", {})})
 
 
+def conceptual_template(template):
+    """Count a maximum pool once; never use this identity for physics gating."""
+    return conceptual_identity(template) or physical_template(template)
+
+
 def check_reservations(template, reservations, hashes):
+    pool = load_pool_for_template(template)
+    if pool is not None:
+        # Inactive preloaded candidates must also respect every exclusion.
+        check_reservations(pool.audit_template(), reservations, hashes)
     require(hashes.get("schema") == "campaign-reserved-asset-hashes-v1", "missing reserved asset-byte audit")
     require(set(hashes["reserved_model_keys"]) == set(reservations["train_exclude_models"]), "reserved asset audit has different model identities")
     ready = hashes["ready_assets"]
@@ -220,7 +232,9 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                       group_closed=True, group_id=review["group_id"])
     require(digest(fresh) == digest(review), "release evidence changed after review")
     require(review["validation_key"]["template_sha256"] == template.fingerprint, "release contract differs from validated template")
+    pool = load_pool_for_template(template, root=root)
     check_reservations(template, reservations, reservation_hashes)
+    conceptual = conceptual_template(template)
     room = f"{template.scene}/{template.room}"
     room_policy = None
     if template.task in ROOM_WEIGHTED_TASKS and template.split in ("eval_standard", "train"):
@@ -242,8 +256,10 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
         perturb = Perturbations({n: ScaleState(**v) for n, v in p["scales"].items()}, tuple(p["removed_objects"]), p["lighting"])
         perturb.validate(template.split, p["scales"])
         bucket = bucket_index(template, group, strict=template.split != "train")
-        goals.append(digest({"template": physical_template(template), "goal": _canonical_goal(group["requested_goal"]),
-                             "base": _canonical_goal(group.get("base_pose2d")), "perturbations": asdict(perturb)}))
+        goals.append(digest({"template": conceptual if pool else physical_template(template),
+                             "goal": _canonical_goal(group["requested_goal"]),
+                             "base": _canonical_goal(group.get("base_pose2d")),
+                             "perturbations": canonical_pool_perturbations(template, perturb) if pool else asdict(perturb)}))
         rows.append({**member, "bucket": bucket, "sampling_split": template.split})
     require(len(set(goals)) == 1, "goal group changes goal/base/template/perturbations")
     policy = {key: reservations[key] for key in ("model_holdout_models", "category_holdout_models", "category_holdout_categories",
@@ -287,7 +303,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 if not allocation:
                     return {"accepted": {}, "deferred": [row["instance_id"] for row in rows], "reason": "quota full"}
                 physical = physical_template(template)
-                for obj in template.objects:
+                for obj in audit_objects(template, root=root):
                     if obj.semantic_kind in ("wall", "floor"):
                         continue
                     for old_split, model, sha, category, kind in db.execute(
@@ -310,14 +326,18 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                     if final.startswith("eval_"):
                         templates = {v[0] for v in db.execute("SELECT DISTINCT template FROM members WHERE split=? AND task=? AND class_id=?",
                                                             (final, task, scope))}
-                        require(not templates or templates == {physical}, "evaluation class changed its pinned template")
+                        require(not templates or templates == {conceptual}, "evaluation class changed its pinned conceptual template")
                     record = {**row, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,
-                              "room":room,"validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"]}
+                              "room":room,"validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"],
+                              "physical_template_sha256": physical, "conceptual_template_sha256": conceptual,
+                              "binding_pool": template.scene_setup.get("binding_pool")}
                     db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",
-                               (iid, gid, final, task, scope, row["bucket"], physical, canonical_json(record)))
+                               (iid, gid, final, task, scope, row["bucket"], conceptual, canonical_json(record)))
                 record = {"schema": "isg-group-assignment-v1", "campaign_id": review["campaign_id"], "group_id": gid,
                           "accepted": allocation, "deferred": [row["instance_id"] for row in rows if row["instance_id"] not in allocation],
                           "canonical_goal_sha256": goals[0], "release_review_sha256": digest(review),
+                          "conceptual_template_sha256": conceptual, "physical_template_sha256": physical,
+                          "pool_sha256": pool.fingerprint if pool else None,
                           "training_policy": {"per_class_cap":class_cap,"room_policy":room_policy},
                           "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
                 destination = root / "dataset/groups" / (gid + ".json")
@@ -339,6 +359,9 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
                 summary = {"campaign_id": review["campaign_id"], "counts": counts,
                            "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path),
+                           "conceptual_templates": db.execute("SELECT COUNT(DISTINCT template) FROM members").fetchone()[0],
+                           "physically_validated_variants": len({json.loads(record).get("physical_template_sha256", identity)
+                               for identity,record in db.execute("SELECT template,record FROM members")}),
                            "training_room_policies": {key.split(":",1)[1]:json.loads(value) for key,value in db.execute(
                                "SELECT key,value FROM metadata WHERE key LIKE 'training_rooms:%'")}}
             finally:
