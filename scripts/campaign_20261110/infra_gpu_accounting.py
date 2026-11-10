@@ -11,6 +11,8 @@ import subprocess
 import time
 import uuid
 
+from scripts.campaign_20261110.infra_vast.fleet_accounting import snapshot as fleet_snapshot
+
 
 def read(path):
     return json.loads(Path(path).read_text())
@@ -126,7 +128,7 @@ def snapshot(root):
     return {'schema':'isg-job-gpu-accounting-v1','started_at_unix':started,'observed_at_unix':time.time(),
         'duration_seconds':time.time()-started,'records':records,'sacct_probes':probes,'ledger_errors':ledger_errors,
         'scope':'allocation ledgers only; excludes unledgered dependency/bootstrap jobs; accepted counts must be joined by immutable artifact identity',
-        'vast_rental_ledger':str(root/'vast/ledger/events.jsonl'),
+        'vast_rental_ledger':str(root/'vast/ledger/events.jsonl'), 'vast_fleet':fleet_snapshot(root),
         'warning':'Native successes are not accepted instances. Running elapsed and live artifact counts are snapshots; no estimated attempt denominators.'}
 
 

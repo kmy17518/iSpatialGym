@@ -283,3 +283,24 @@ def test_template_customs_dependency_refuses_external_source(tmp_path):
     with pytest.raises(ValueError, match='outside owned campaign'):
         template_customs_inputs({'TEMPLATE': str(template)}, root)
 
+
+def test_camera_context_stages_checked_source_proof_and_review_image_closure(tmp_path):
+    from dataclasses import asdict
+    import json
+    import pytest
+    from scripts.campaign_20261110.tests.test_camera_context import fixture
+    from scripts.campaign_20261110.camera_context import bind_camera_context
+    from scripts.campaign_20261110.infra_vast.campaign_inputs import camera_context_inputs
+    template, args = fixture(tmp_path)
+    bound = bind_camera_context(template, **args)
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps({'template': asdict(bound)}))
+    env = {'ISPATIALGYM_CAMPAIGN_CONFIG': str(config)}
+    rows = camera_context_inputs(env, tmp_path)
+    assert {Path(row['path']).name for row in rows} == {
+        'full_scene.json', 'context_probe.json', 'table_scene.json', 'view.png', 'support_probe.json', 'visual.json'}
+    assert not any('.encrypted.usd' in row['path'] for row in rows)
+    (tmp_path / 'proofs/view.png').write_bytes(b'changed')
+    with pytest.raises(ValueError, match='bytes changed'):
+        camera_context_inputs(env, tmp_path)
+

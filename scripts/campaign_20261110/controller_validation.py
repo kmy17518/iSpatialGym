@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Durable watcher: submit one true open-loop gate per successful canary job."""
-import argparse,csv,datetime,hashlib,json,os,pathlib,re,subprocess,time
+import argparse,csv,datetime,fcntl,hashlib,json,os,pathlib,re,subprocess,time
 
 def atomic(path,data):
     tmp=path.with_suffix(path.suffix+'.new');tmp.write_text(json.dumps(data,indent=2)+'\n');tmp.replace(path)
@@ -123,7 +123,14 @@ def publish_recovered_gate(entry, root):
     staged.unlink()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');ap.add_argument('--scene-helper',type=pathlib.Path);ap.add_argument('--dual-partition-replays',action='store_true');a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--root',type=pathlib.Path,required=True);ap.add_argument('--snapshot',required=True);ap.add_argument('--interval',type=float,default=30);ap.add_argument('--once',action='store_true');ap.add_argument('--ledger',type=pathlib.Path,action='append');ap.add_argument('--scene-helper',type=pathlib.Path);ap.add_argument('--dual-partition-replays',action='store_true');ap.add_argument('--vast-pending-seconds',type=float);ap.add_argument('--vast-helper-snapshot',type=pathlib.Path);a=ap.parse_args()
+    a.root=a.root.resolve()
+    if a.vast_pending_seconds is not None:
+        if a.vast_pending_seconds<300 or not a.vast_helper_snapshot:raise ValueError('Vast replay migration requires a frozen helper and >=300 seconds pending')
+        a.vast_helper_snapshot=a.vast_helper_snapshot.resolve()
+        if not a.vast_helper_snapshot.is_relative_to(a.root/'code'):raise ValueError('Vast replay helper outside campaign')
+    lease=(a.root/'validation/controller.service.lock').open('a')
+    fcntl.flock(lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
     if a.scene_helper:
         a.scene_helper=a.scene_helper.resolve()
         if not a.scene_helper.is_relative_to(a.root/'code') or not a.scene_helper.is_file():raise ValueError('replay scene helper must be frozen inside this campaign')
@@ -137,6 +144,18 @@ def main():
         queue=subprocess.run(['squeue','-u','minyeong,shiyuc','-h','-o','%i|%T'],capture_output=True,text=True,timeout=30)
         if queue.returncode:time.sleep(a.interval);continue
         active=dict(x.split('|') for x in queue.stdout.splitlines() if '|' in x)
+        replay_active=dict(active)
+        for path in (a.root/'vast/state/jobs').glob('9*.json'):
+            value=read(path,{})
+            if value.get('job_kind')=='physics_replay' and value.get('status') in ('queued','assigned'):
+                replay_active[str(value['id'])]=value['status']
+        migration_candidates=[]
+        for source_id,entry in state['gates'].items():
+            phase=entry.get('vast_migration',{}).get('status')
+            if entry.get('status')=='replay_queued' and (active.get(entry.get('replay_job_id'))=='PENDING'
+                    or phase in ('prepared','cancel_requested','cancelled_never_started','ready_to_activate')):
+                migration_candidates.append((entry.get('vast_migration_last_checked',0),source_id))
+        migration_selected={source_id for _,source_id in sorted(migration_candidates)[:3]}
         resources=['-A','vision','-p','svl','--exclude=svl9','--gres=gpu:titanrtx:1']
         if a.dual_partition_replays:
             try:
@@ -152,7 +171,7 @@ def main():
         for row in rows:
             jid=row['jobid'];job=pathlib.Path(row['job_dir']);entry=state['gates'].setdefault(jid,{'source_job_id':jid,'key':row['key'],'source_job_dir':str(job),'status':'waiting_for_demo'})
             try:
-                if apply_retry_request(entry,retry_requests.get(jid),a.root,active):atomic(statepath,state)
+                if apply_retry_request(entry,retry_requests.get(jid),a.root,replay_active):atomic(statepath,state)
             except ValueError as error:
                 entry['retry_request_error']=str(error)
             source_results=[]
@@ -194,11 +213,26 @@ def main():
                     vast_queued=(a.root/'vast/queue'/f'{jid}.json').exists() and vast_state.get('status','queued') in ('queued','assigned')
                     if not vast_queued:entry['status']='demo_failed' if source_results else 'demo_missing'
             if entry.get('replay_job_id'):
+                intent=entry.get('vast_migration',{})
+                candidate=(active.get(entry['replay_job_id'])=='PENDING' or intent.get('status') in
+                           ('prepared','cancel_requested','cancelled_never_started','ready_to_activate'))
+                if a.vast_pending_seconds is not None and jid in migration_selected and entry['status']=='replay_queued' and candidate:
+                    entry['vast_migration_last_checked']=time.time()
+                    try:
+                        from scripts.campaign_20261110.replay_migration import migrate
+                        moved=migrate(entry,a.root,row.get('code') or a.snapshot,a.vast_helper_snapshot,
+                                      a.vast_pending_seconds,lambda:atomic(statepath,state))
+                        if moved:
+                            replay_active[entry['replay_job_id']]='queued'
+                            print('REPLAY_MIGRATED',jid,entry['replay_job_id'],row['key'],flush=True)
+                        entry.pop('vast_migration_error',None)
+                    except (ValueError,OSError,subprocess.SubprocessError) as error:
+                        entry['vast_migration_error']={'at':time.time(),'reason':str(error)}
                 gate=read(pathlib.Path(entry['output'])/'gate.json',None)
                 if gate:
                     entry.update(status='validated' if gate.get('success') else 'replay_failed',gate=gate)
                     publish_recovered_gate(entry,a.root)
-                elif entry['replay_job_id'] not in active and entry['status']=='replay_queued':
+                elif entry['replay_job_id'] not in replay_active and entry['status']=='replay_queued':
                     # sbatch can complete between queue snapshot and this point; wait one full tick before concluding absent.
                     if entry.get('seen_queue_absent'):entry['status']='replay_missing'
                     else:entry['seen_queue_absent']=True

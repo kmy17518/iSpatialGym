@@ -42,18 +42,20 @@ try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs
+    from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
     from .funding import read_snapshot as read_credit_snapshot, remaining_credit
+    from .fleet_accounting import observe as observe_rentals
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
-    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs
+    from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run, template_customs_inputs, camera_context_inputs
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
     from funding import read_snapshot as read_credit_snapshot, remaining_credit
+    from fleet_accounting import observe as observe_rentals
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -338,7 +340,8 @@ def stage(s3, rec, state):
     for path in pool_inputs:
         L.add_file(path)
     customs_inputs = template_customs_inputs(env, OFH)
-    for dependency in customs_inputs:
+    camera_inputs = camera_context_inputs(env, OFH)
+    for dependency in customs_inputs + camera_inputs:
         L.add_file(dependency['path'])
     scripts = env.get("ISGF_SCRIPTS") or os.path.join(F, "scripts")
     if not under(scripts, [code]):
@@ -399,7 +402,7 @@ def stage(s3, rec, state):
     spec = {k: rec[k] for k in ("id", "name", "job_dir", "script", "time_s", "cpus", "mem", "log", "cwd", "acct", "part")}
     spec.update({"code": [{"key": k} for k in code_keys], "jobdata": f"jobs/{rec['id']}/jobdata.tar.zst", "scenes": runtime_scenes(env, OFH),
                  "git_roots": roots, "staged": now(), "inputs": {"entries": len(L.items), "bytes": L.bytes, "prebuild_candidates": n_pre,
-                 "template_customs": customs_inputs}})
+                 "template_customs": customs_inputs, "camera_context": camera_inputs}})
     log(f"STAGED {rec['id']} {rec['name']} {len(L.items)} entries {L.bytes / 2**20:.1f} MB, {n_pre} prebuild candidates ({now() - t:.0f} s)")
     return spec
 
@@ -504,6 +507,7 @@ def destroy(c, iid, reason, key_name=None):
     owner = key_name or owner_of(iid)
     order = ([owner] if owner in c else []) + [k for k in c if k != owner]
     ok, used = False, None
+    request_started = now()
     for name in order:
         try:
             r = vi.destroy_instance(c[name], iid)
@@ -513,7 +517,8 @@ def destroy(c, iid, reason, key_name=None):
             break
         except Exception as e:  # noqa: BLE001
             log(f"destroy {iid} with {SHORT[name]} failed: {vast_error(e) or str(e)[:160]}")
-    ledger("destroy", instance=iid, reason=reason, ok=ok, account=used)
+    ledger("destroy", instance=iid, reason=reason, ok=ok, account=used,
+           request_started_unix=request_started, response_completed_unix=now())
     log(f"DESTROY {iid} [{SHORT.get(used, used)}]: {reason} ({'ok' if ok else 'FAILED'})")
     return ok
 
@@ -597,6 +602,7 @@ def launch(c, o, C, live_by_acct):
         lease_cost = float(o['dph_total']) * float(C.get('max_worker_lifetime_s',21600)) / 3600
         if C.get('_rental_credit_remaining', {}).get(name, 0) < lease_cost:
             continue
+        request_started = now()
         try:
             r = vi.create_instance(c[name], o["id"], image=IMAGE, disk=C["disk_gb"], env=env, label=f"{LABEL}-{tag}", login=login,
                                    runtype="args", args=[], cancel_unavail=True)
@@ -613,6 +619,7 @@ def launch(c, o, C, live_by_acct):
             ledger("tried", offer=o["id"], error=str(r)[:80], account=name)
             return None
         ledger("create", instance=iid, offer=o["id"], machine_id=o.get("machine_id"), gpu=o.get("gpu_name"), dph_total=o["dph_total"],
+               num_gpus=int(o['num_gpus']),request_started_unix=request_started,response_completed_unix=now(),
                disk=C["disk_gb"], max_lifetime_s=C.get("max_worker_lifetime_s",21600), inet_up_cost=o.get("inet_up_cost"), inet_down_cost=o.get("inet_down_cost"), tag=tag, label=f"{LABEL}-{tag}", account=name, driver=o.get("driver_version"),
                cpus=o.get("cpu_cores_effective"), ram_gb=round(float(o.get("cpu_ram") or 0) / 1024), slots=o["_slots"],
                **o.get('_reservation', {}),
@@ -798,7 +805,9 @@ def tick(c, s3, state):
     C = cfg()
     states = load_states()
     ingest(states, C)
+    presence_started = now()
     inst, list_ok = my_instances(c)
+    observe_rentals(VJ, inst, list_ok, presence_started, now())
     live = {str(i["id"]): i for i in inst}
     _, previously_live, _ = spend()
     hbs = read_heartbeats(s3, set(live) | set(previously_live))

@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import sys
 
 
 QUEUE_ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
@@ -156,6 +157,51 @@ def template_customs_inputs(env, root):
         require(path.is_file() and isinstance(json.loads(path.read_text()), dict), 'invalid template customs dependency')
         result.append({'path': str(path), 'sha256': sha(path)})
     return result
+
+
+def camera_context_inputs(env, root):
+    """Stage the exact hash-checked private camera proof closure.
+
+    Encrypted asset references are checked by the native contract and remain in
+    the existing asset bundle; source scenes, proofs and reviewed images travel
+    privately at their unchanged campaign paths.
+    """
+    if not env.get('ISPATIALGYM_CAMPAIGN_CONFIG'): return []
+    root = Path(root).resolve()
+    config = json.loads(Path(env['ISPATIALGYM_CAMPAIGN_CONFIG']).read_text())
+    template = config['template']
+    context = template.get('scene_setup', {}).get('camera_context')
+    if not context: return []
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from scripts.campaign_20261110.contracts import ObjectRef, Template
+    from scripts.campaign_20261110.camera_context import load_camera_context
+    native = dict(template); native['objects'] = tuple(ObjectRef(**row) for row in native['objects'])
+    load_camera_context(Template(**native), root=root)
+    assets = {(row['path'], row['sha256']) for row in context['asset_files'].values()}
+    result = {}
+
+    def visit(value):
+        if isinstance(value, list):
+            for row in value: visit(row)
+        elif isinstance(value, dict):
+            if 'path' in value and 'sha256' in value:
+                reference(value['path'], value['sha256'])
+            if 'source_scene' in value and 'source_scene_sha256' in value:
+                reference(value['source_scene'], value['source_scene_sha256'])
+            for row in value.values(): visit(row)
+
+    def reference(name, expected):
+        if (name, expected) in assets: return
+        path = Path(name).resolve()
+        require(path.is_relative_to(root), 'camera proof dependency outside owned campaign')
+        require(path.is_file() and sha(path) == expected, 'camera proof dependency bytes changed')
+        if str(path) in result: return
+        require(len(result) < 1000, 'camera proof dependency closure exceeds bound')
+        result[str(path)] = {'path': str(path), 'sha256': expected}
+        if path.suffix == '.json': visit(json.loads(path.read_text()))
+
+    visit(context)
+    return list(result.values())
 
 
 def prepare_cache_environment(job_dir, root):
