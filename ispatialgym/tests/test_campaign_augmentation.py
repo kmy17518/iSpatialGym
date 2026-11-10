@@ -1,6 +1,6 @@
 """Prevent training augmentation leaks and replay state drift."""
 
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 
 import pytest
@@ -72,6 +72,46 @@ def test_lighting_rejects_different_defaults_and_out_of_bounds_request():
         aug.apply_lighting(fresh, fresh_sim, request, record)
     with pytest.raises(ContractError, match="bounds"):
         aug.validate_lighting({**request, "intensity_factor": 1.4})
+
+
+def test_skybox_properties_open_their_own_usd_edit_context():
+    scene, sim, _ = light_world()
+    active = False
+
+    @contextmanager
+    def editing():
+        nonlocal active
+        assert not active, "Cannot nest editing_usd() contexts"
+        active = True
+        try:
+            yield
+        finally:
+            active = False
+
+    class Sky:
+        _intensity, _color = 2500, (1.07, .85, .61)
+
+        @property
+        def intensity(self):
+            return self._intensity
+
+        @intensity.setter
+        def intensity(self, value):
+            with editing():
+                self._intensity = value
+
+        @property
+        def color(self):
+            return self._color
+
+        @color.setter
+        def color(self, value):
+            with editing():
+                self._color = value
+
+    sim.editing_usd, sim.skybox = editing, Sky()
+    aug.apply_lighting(scene, sim, {"schema": aug.LIGHT_SCHEMA, "intensity_factor": .8, "skybox_color_factors": [1, 1, 1]})
+    assert sim.skybox.intensity == 2000
 
 
 def test_scene_removals_protect_bound_and_structural_objects():

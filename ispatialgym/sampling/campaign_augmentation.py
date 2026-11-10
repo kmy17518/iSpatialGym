@@ -140,8 +140,10 @@ def apply_lighting(scene, sim, request, expected=None):
     with sim.editing_usd():
         for name, attr in attrs.items():
             attr.Set(record["fixtures"][name]["applied"])
-        sky.intensity = record["skybox"]["applied"]["intensity"]
-        sky.color = tuple(record["skybox"]["applied"]["color"])
+    # LightObject setters enter editing_usd themselves; nesting that context is
+    # rejected by the real simulator even though direct USD attributes need it.
+    sky.intensity = record["skybox"]["applied"]["intensity"]
+    sky.color = tuple(record["skybox"]["applied"]["color"])
     verify_lighting(scene, sim, record)
     return record if request else {}
 
