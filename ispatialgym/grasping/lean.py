@@ -407,11 +407,17 @@ def mirror_body_map(src_rest_xyzw, dst_rest_xyzw) -> np.ndarray:
 
 
 def mirror_symmetry_error(vertices, B) -> float:
-    """Max over the hull vertices of the distance from ``B v`` to the nearest vertex (m): 0 for an object symmetric under ``B``."""
+    """Max over the hull vertices of how far ``B v`` lies OUTSIDE the convex hull of the vertices (m; its face planes): 0 for an object
+    symmetric under ``B`` (a vertex-to-vertex distance would count the hull's own vertex sampling on a rounded corner)."""
+    from scipy.spatial import ConvexHull
+
     V = np.asarray(vertices, dtype=float).reshape(-1, 3)
+    if len(V) < 4:
+        return 0.0
     W = V @ np.asarray(B, dtype=float).T
-    d = np.sqrt(((W[:, None, :] - V[None, :, :]) ** 2).sum(-1)).min(axis=1)
-    return float(d.max()) if len(d) else 0.0
+    eq = ConvexHull(V).equations  # (F, 4): n . x + d <= 0 inside
+    out = (W @ eq[:, :3].T + eq[:, 3]).max(axis=1)
+    return float(max(0.0, out.max()))
 
 
 def mirror_grasp(T_object_eef: Dict[str, Any], B) -> Dict[str, Any]:
