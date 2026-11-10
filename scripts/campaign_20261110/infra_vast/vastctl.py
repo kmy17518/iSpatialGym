@@ -42,11 +42,13 @@ try:
     from .bounded_process import run_bounded
     from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
+    from .async_staging import StagingReservations
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
     from worker.resource_policy import machine_reservation, duplicate_worker_gpus
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs
+    from async_staging import StagingReservations
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -84,6 +86,7 @@ DEFAULT_CONFIG = {"gpus": ["RTX 4090"], "default_gpu": "RTX 4090", "max_instance
                   "disk_gb": 280, "idle_destroy_s": 420, "boot_max_s": 3300, "launch_per_tick": 3, "min_inet_down": 500,
                   "vram_per_job_gb": 20, "ram_per_job_gb": 40, "cpus_per_job": 9, "max_jobs_per_instance": 2, "retries": 2,
                   "search_every_s": 300, "max_contracts_per_machine": 4, "market_limit": 1000}
+STAGER = None
 
 
 def now():
@@ -737,18 +740,20 @@ def stage_bounded(rec, C):
 
 
 def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed, hourly, phase):
+    staging = STAGER.reservations() if STAGER else {}
     n = {k: sum(1 for s in states.values() if s["status"] == k) for k in ("queued", "assigned", "synced", "failed")}
     instance_metrics = [{**{k:i.get(k) for k in ("id","label","gpu_name","num_gpus","actual_status","dph_total")},
                          "account":SHORT.get(i.get('_key_name'),'unknown'),
                          "worker_phase":(hbs.get(iid) or {}).get('phase'),
                          "heartbeat_age_seconds":t-hbs[iid]['time'] if (hbs.get(iid) or {}).get('time') else None,
-                         "assigned_jobs":assigned_to.get(iid,[])} for iid,i in live.items()]
+                         "assigned_jobs":assigned_to.get(iid,[]), 'staging_jobs':staging.get(iid,[])} for iid,i in live.items()]
     metrics = {"observed_at_unix": t, "assignments_observed_at_unix": now(), "coordinator_phase": phase, "account_listing_complete": list_ok, "running_gpus": sum(int(i.get("num_gpus") or 1) for i in live.values() if i.get("actual_status") == "running") if list_ok else None,
                "instances": instance_metrics,
                "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
                "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
                "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs']) if list_ok else None,
-               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs']) if list_ok else None,
+               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs'] and not i['staging_jobs']) if list_ok else None,
+               'worker_staging_gpus':sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['staging_jobs']) if list_ok else None,
                "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
                "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
                "max_instances":C['max_instances'],
@@ -762,6 +767,7 @@ def publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committe
 
 
 def tick(c, s3, state):
+    global STAGER
     C = cfg()
     states = load_states()
     ingest(states, C)
@@ -772,6 +778,38 @@ def tick(c, s3, state):
     dones = set(k[:-5] for k in r2_list(s3, "done/"))
     t = now()
     tot, live_ids, created = spend()
+    if STAGER is None:
+        STAGER = StagingReservations(os.path.join(VJ,'state','staging'),os.environ.get('SLURM_JOB_ID','pid'+str(os.getpid())),
+                                    min(8,max(1,int(C.get('staging_parallelism',4)))))
+    def owner_alive(owner):
+        if not str(owner).isdigit():return True  # unknown former local owner requires explicit reconciliation
+        result=subprocess.run(['squeue','-h','-j',str(owner),'-o','%T'],capture_output=True,text=True,timeout=30,check=True)
+        return bool(result.stdout.strip())
+    def assignment(iid,jid):
+        try:return json.loads(s3.get_object(Bucket=BUCKET,Key=f'{PREFIX}/assign/{iid}/{jid}.json')['Body'].read())
+        except botocore.exceptions.ClientError as error:
+            if str(error.response.get('Error',{}).get('Code')) in ('NoSuchKey','404','NotFound'):return None
+            raise
+    def reconcile_assignment(reservation):
+        job=states[reservation['id']];worker=reservation['worker'];iid=reservation['instance']
+        if job['status']=='assigned':
+            if str(job['instance']) != iid:raise ValueError('assigned worker conflicts with staging reservation')
+            return
+        job.update(status='assigned',instance=iid,account=worker.get('_key_name'),machine_id=worker.get('machine_id'),
+                   dph=worker.get('dph_total'),tries=int(reservation['job']['tries'])+1,
+                   assigned=reservation.get('assignment_started_at',now()),gpu_actual=worker.get('gpu_name'),inputs=reservation['spec']['inputs'])
+        save_state(job)
+    STAGER.recover(owner_alive,assignment,reconcile_assignment)
+    for reservation in list(STAGER.active().values()):
+        if reservation['status']=='assigning' and reservation['instance'] in live:
+            # Recovery retries the same job/worker/object only. Never free a
+            # reservation while a previous remote PUT could still complete.
+            r2_put(s3,f"assign/{reservation['instance']}/{reservation['id']}.json",json.dumps(reservation['spec']))
+            reconcile_assignment(reservation);STAGER.assigned(reservation['id'])
+    for failed in STAGER.poll():
+        job=states[failed['id']]
+        job.update(status='failed',error='stage: '+failed['error']);save_state(job)
+        log(f"STAGE_FAILED {job['id']}: {failed['error']}")
     if list_ok:  # an instance that destroyed itself: its rental ends now in the ledger (no later than the truth)
         for iid in live_ids:
             if iid not in live and t - created[iid]["time"] > 120:
@@ -850,30 +888,29 @@ def tick(c, s3, state):
     resource_blocked = duplicate_worker_gpus(live, hbs)
     if resource_blocked:
         log('RESOURCE_GUARD blocked GPU identities: ' + ','.join(sorted(resource_blocked)))
-    planned, queued = assignment_plan(queued, {k:v for k,v in live.items() if k not in resource_blocked}, hbs, created, assigned_to, t)
-    concurrency = min(8, max(1, int(C.get("staging_parallelism", 4))))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:
-        futures = {pool.submit(stage_bounded, record, C): (iid, worker, record)
-                   for iid, worker, record in planned}
-        for future in concurrent.futures.as_completed(futures):
-            iid, i, s = futures[future]
-            try:
-                spec = future.result()
-            except Exception as e:  # noqa: BLE001
-                log(f"STAGE_FAILED {s['id']}: {e!r}")
-                s.update(status="failed", error=f"stage: {e!r}")
-                save_state(s)
-                continue
-            ev = created.get(iid) or {}
-            spec.update({"label": i.get("label"), "machine_id": i.get("machine_id"), "account": i.get("_key_name"), "dph": i.get("dph_total")})
-            r2_put(s3, f"assign/{iid}/{s['id']}.json", json.dumps(spec))
-            s.update(status="assigned", instance=iid, account=i.get("_key_name"), machine_id=i.get("machine_id"), dph=i.get("dph_total"),
-                     tries=s["tries"] + 1, assigned=now(), gpu_actual=i.get("gpu_name"), inputs=spec["inputs"])
-            save_state(s)
-            assigned_to.setdefault(iid, []).append(s["id"])
-            log(f"ASSIGN {s['id']} {s['name']} -> {iid} ({i.get('gpu_name')}, {SHORT.get(ev.get('account'), '?')})")
-            publish_metrics(C, states, live, hbs, assigned_to, t, list_ok, tot, committed_observed,
-                            sum(float(i.get("dph_total") or 0) for i in live.values()), "dispatching")
+    allowed = {job['id'] for job in queued}
+    for reservation in STAGER.ready():
+        jid,iid=reservation['id'],reservation['instance'];s=states[jid]
+        if jid not in allowed or iid not in live or iid in resource_blocked:
+            STAGER.release(jid,'job no longer eligible or worker unavailable');continue
+        i=live[iid];spec=dict(reservation['spec'])
+        candidate,_=assignment_plan([s],{iid:i},hbs,created,assigned_to,t)
+        if not candidate:
+            STAGER.release(jid,'worker no longer has a compatible free slot');continue
+        spec.update({'label':i.get('label'),'machine_id':i.get('machine_id'),'account':i.get('_key_name'),'dph':i.get('dph_total')})
+        STAGER.assigning(jid,spec)  # durable write-ahead, then exact remote assignment
+        r2_put(s3,f'assign/{iid}/{jid}.json',json.dumps(spec))
+        reconcile_assignment(STAGER.records[jid]);STAGER.assigned(jid)
+        assigned_to.setdefault(iid,[]).append(jid)
+        log(f"ASSIGN {jid} {s['name']} -> {iid} ({i.get('gpu_name')}, {SHORT.get(i.get('_key_name'),'?')})")
+    reserved_to={iid:list(jobs) for iid,jobs in assigned_to.items()}
+    for iid,jobs in STAGER.reservations().items():reserved_to.setdefault(iid,[]).extend(jobs)
+    queued=[job for job in queued if job['status']=='queued' and job['id'] not in STAGER.active()]
+    planned,_=assignment_plan(queued,{k:v for k,v in live.items() if k not in resource_blocked},hbs,created,reserved_to,t)
+    for iid,worker,job in planned:
+        if STAGER.submit(job,iid,worker,C,stage_bounded):
+            queued.remove(job);reserved_to.setdefault(iid,[]).append(job['id'])
+        else:break
 
     # 4. destroy: failed / stuck / idle instances, any instance over the price limit
     pending = len(queued)
@@ -881,7 +918,7 @@ def tick(c, s3, state):
         hb = hbs.get(iid) or {}
         up = t - float(i.get("start_date") or t)
         st = i.get("actual_status")
-        busy = bool(assigned_to.get(iid))
+        busy = bool(reserved_to.get(iid))
         model_pending = any(gpu_matches(job, i.get('gpu_name')) for job in queued)
         reason = None
         if hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
@@ -904,7 +941,7 @@ def tick(c, s3, state):
             state.setdefault("idle_since", {}).pop(iid, None)
         if reason:
             if busy:
-                for jid in assigned_to[iid]:
+                for jid in assigned_to.get(iid,[]):
                     s = states[jid]
                     if s["status"] == "assigned":
                         s["history"].append({"instance": iid, "lost": reason, "time": t})
@@ -917,7 +954,7 @@ def tick(c, s3, state):
         state["last_pending"] = t
 
     # 5. rent for the queued jobs that no instance (ready or booting) will take
-    needs_by_gpu = rental_needs(queued, live, hbs, created, assigned_to, C, t)
+    needs_by_gpu = rental_needs(queued, {k:v for k,v in live.items() if k not in resource_blocked}, hbs, created, reserved_to, C, t)
     need = sum(needs_by_gpu.values())
     stop = os.path.exists(os.path.join(VJ, "STOP_LAUNCH"))
     committed = sum(float(created[iid]["dph_total"]) * max(0.0, float(created[iid].get("max_lifetime_s",21600)) - (t-created[iid]["time"])) / 3600 for iid in live_ids)

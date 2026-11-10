@@ -97,6 +97,15 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(D.backend_capacity('minyeong_viscam', rows), 7)
         self.assertEqual(D.backend_capacity('shiyuc_viscam', rows), 8)
 
+    def test_submission_retry_preserves_prior_readonly_logs(self):
+        receipt = self.root / 'receipt.json'; prior = self.root/'receipt.dry.log'
+        prior.write_text('prior account evidence');prior.chmod(0o440)
+        log = D.submission_log(receipt,'.dry.log','fresh dry-run')
+        self.assertNotEqual(log,prior)
+        self.assertEqual(prior.read_text(),'prior account evidence')
+        self.assertEqual(log.read_text(),'fresh dry-run')
+        self.assertEqual(log.stat().st_mode & 0o777,0o660)
+
     def test_shared_ledger_symlink_reconciles_exact_new_allocation(self):
         target = self.root / 'manifests/shiyuc/allocations.tsv'; target.parent.mkdir()
         target.write_text('key\tstart\tn\tcode\ttag\tjobid\tjob_dir\nobject_scaling-apple\t50000000\t3\t' + str(self.code) + '\theld_queue\t123\t' + str(self.root / 'out/shiyuc/out/held_queue/job') + '\n')

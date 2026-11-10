@@ -25,6 +25,7 @@ def main():
     p.add_argument('--reserved-candidate-manifest', type=Path)
     p.add_argument('--bottom-view', action='store_true', help='Include the opposite face when canonical views hide semantic detail')
     p.add_argument('--axis-views', action='store_true', help='Render all six cardinal faces for semantic frame review')
+    p.add_argument('--render-size', type=int, default=256, choices=(256, 512, 1024), help='Diagnostic image resolution; physics and object scale remain unchanged')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     out = a.output.resolve()
@@ -107,7 +108,7 @@ def main():
         report['runtime_flags'] = {'ENABLE_OBJECT_STATES': True, 'USE_GPU_DYNAMICS': False,
                                    'ENABLE_TRANSITION_RULES': False, 'source': 'sampling.sim_utils.SimWorld'}
         env = og.Environment(configs={'env': {'action_frequency': 30, 'physics_frequency': 120, 'rendering_frequency': 30},
-            'render': {'viewer_width': 256, 'viewer_height': 256}, 'scene': {'type': 'Scene'}, 'robots': []})
+            'render': {'viewer_width': a.render_size, 'viewer_height': a.render_size}, 'scene': {'type': 'Scene'}, 'robots': []})
         og.sim.stop()
         objects = []
         for row in rows:
@@ -170,7 +171,7 @@ def main():
                 for i, row in enumerate(page):
                     draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')
                     for j, frame in enumerate(row['images']):
-                        sheet.paste(Image.open(frame['path']), (j*256, i*280+24))
+                        sheet.paste(Image.open(frame['path']).resize((256, 256)), (j*256, i*280+24))
                 suffix='' if len(subset)<=10 else '_'+str(start//10).zfill(2)
                 path = out / (task + '_review'+suffix+'.png'); sheet.save(path)
         report['status'] = 'native_defaults_and_geometry_recorded'

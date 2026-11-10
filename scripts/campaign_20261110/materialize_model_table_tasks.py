@@ -2,6 +2,7 @@
 """Freeze ready model-held axial and attachment candidates on a measured table."""
 import argparse
 import copy
+import csv
 from dataclasses import asdict
 import json
 from pathlib import Path
@@ -40,6 +41,11 @@ def main():
     measured = {row['category'] + '/' + row['model']: row for row in defaults['objects']}
     source = a.inventory / 'frozen_customs_f24ea424.json'
     originals = json.loads(source.read_text())
+    frame_path = a.snapshot / 'ispatialgym/assets/icl/roles/candidates.csv'
+    with frame_path.open() as stream:
+        frames = {(row['category'], row['model']): {'front': row['frame_front'], 'long': row['frame_long']}
+                  for row in csv.DictReader(stream) if row.get('subtask') == 'alignment-axial' and row.get('role') == 'target'
+                  and row.get('frame_front') and row.get('frame_long')}
     records = {row['key']: row for row in json.loads((a.inventory / 'cluster_templates_with_scales.json').read_text())['records']}
     from ispatialgym.grasping.schema import entry_id
     from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
@@ -68,6 +74,10 @@ def main():
             for name in ('grasp_keys', 'orientation_equivalences', 'rest_pose', 'rest_hint_wxyz'):
                 entry['roles'][role].pop(name, None)
         entry['roles']['support']['category'] = support['category']
+        if task == 'alignment-axial':
+            frame = frames.get((target['category'], target['model']))
+            require(frame is not None, 'new axial target lacks a reviewed native ICL frame')
+            entry['roles']['target']['frame'] = {target['category'] + '/' + target['model']: frame}
         gkey = entry_id(target['category'], target['model'], target['default_scale'], 'attachment_free') if 'partner' in roles else None
         if gkey:
             entry['roles']['target']['grasp_keys'] = {target['category'] + '/' + target['model']: gkey}
@@ -101,6 +111,8 @@ def main():
                      native_scene_sha256=file_digest(scene_path), source_customs_sha256=file_digest(source), source_class_id=cls,
                      source_support_adaptation='Existing globally reserved functional table with native measured height and exact scene default scale',
                      reservation_sha256=file_digest(a.reservations), production_released=False)
+        if task == 'alignment-axial':
+            proof.update(reviewed_frame=frame, reviewed_frame_source=str(frame_path), reviewed_frame_source_sha256=file_digest(frame_path))
         entry['campaign_provenance'] = proof
         customs = directory / 'candidate_customs.json'; write_json_atomic(customs, {alias: entry})
         template = Template('held_model__' + cls, task, cls, 'eval_model', scene, room, tuple(refs), digest(dict(entry=entry, bddl_sha256=file_digest(bddl))),

@@ -16,6 +16,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import uuid
 
 from scripts.campaign_20261110.contracts import digest, file_digest, require
 from scripts.campaign_20261110.storage import atomic_directory_lock
@@ -79,6 +80,17 @@ def shared_json(path, value):
         os.replace(temporary, path)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def submission_log(receipt_path, suffix, content):
+    """Retries never replace another account's existing submission evidence."""
+    target = receipt_path.with_suffix(suffix)
+    if target.exists():
+        target = target.with_name(receipt_path.stem + '.attempt_' + uuid.uuid4().hex[:12] + suffix)
+    with target.open('x') as stream:
+        os.fchmod(stream.fileno(), 0o660)
+        stream.write(content); stream.flush(); os.fsync(stream.fileno())
+    return target
 
 
 def option(command, name, default=None):
@@ -297,13 +309,17 @@ def execute(root, path, backend):
         receipt = {'schema': 'isg-dispatch-receipt-v1', 'token': payload['token'], 'status': 'submitting',
                    'backend': backend, 'started_at': time.time(), 'command_sha256': payload['command_sha256'],
                    'routed_command': command, 'identity': payload['identity']}
+        if prior:
+            archived = receipt_path.with_name(receipt_path.stem + '.attempt_' + uuid.uuid4().hex[:12] + '.receipt.json')
+            shared_json(archived, prior)
+            receipt['previous_attempt'] = {'path':str(archived), 'sha256':file_digest(archived)}
         shared_json(receipt_path, receipt)
         try:
             for dry in (True, False):
                 result = subprocess.run(command + (['--dry-run'] if dry else []), env=environment,
                                         capture_output=True, text=True, timeout=300)
-                log = receipt_path.with_suffix('.dry.log' if dry else '.submit.log')
-                log.write_text(result.stdout + result.stderr); os.chmod(log, 0o660)
+                log = submission_log(receipt_path, '.dry.log' if dry else '.submit.log', result.stdout + result.stderr)
+                receipt.setdefault('submission_logs', {})['dry' if dry else 'submit'] = str(log)
                 require(result.returncode == 0, 'submission failed; inspect ' + str(log))
                 if dry: verify_dry_indices(result.stdout, payload['identity'])
             row = find_allocation(root, payload['identity'])

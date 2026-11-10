@@ -433,7 +433,14 @@ def main(*, adapter=None):
             save = lambda: write_json_atomic(path, state)
             rows, queue = allocations(root), slurm_status()
             allowance = cfg.get('maximum_new_jobs_per_pass',3) if cfg.get('dispatch_spool') else submission_capacity(queue, cfg.get("maximum_new_jobs_per_pass", 3))
-            specs = adapter.load_seeds(cfg, state) if adapter is not None and cfg.get("seed_catalog") else cfg["seeds"]
+            if cfg.get("seed_catalog"):
+                if adapter is None:
+                    from scripts.campaign_20261110 import controller_held_sources
+                    specs = controller_held_sources.load_seeds(cfg, state)
+                else:
+                    specs = adapter.load_seeds(cfg, state)
+            else:
+                specs = cfg["seeds"]
             for spec in specs:
                 current = state["seeds"].setdefault(spec["id"], {})
                 try:

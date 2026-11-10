@@ -143,6 +143,17 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
         'fresh_geometry_tros': [{'path': str(path), 'sha256': sha(path)} for path in tros], 'production_released': False}
     if relocation:
         setup['native_source_relocation'] = relocation
+    scene_dir = job.get('environment', {}).get('ISPATIALGYM_STABLE_SCENE_DIR')
+    if scene_dir:
+        private = Path(scene_dir).resolve() / (template.scene + '_stable.json')
+        require(sha(private) == template.scene_setup['native_scene_sha256'], 'private stable scene differs from candidate')
+        private_info = json.loads(private.read_text())['objects_info']['init_info']
+        for name in names.values():
+            if name in private_info:
+                before, after = private_info[name]['args'], init_info[name]['args']
+                require(all(before.get(k) == after.get(k) for k in ('category', 'model', 'scale')),
+                        'native scene binding differs from private source')
+        setup['private_scene'] = dict(schema='isg-native-private-scene-v1', path=str(private), sha256=sha(private))
     result = Template(template_id=template.template_id, task=template.task, class_id=template.class_id, split=template.split,
         scene=template.scene, room=template.room, objects=tuple(refs),
         definition_sha256=digest(dict(candidate_definition_sha256=template.definition_sha256, fresh_template_sha256=sha(full),

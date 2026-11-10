@@ -66,6 +66,8 @@ def main():
         bddl = a.bddl_root.resolve()
         assert bddl.is_dir() and bddl.is_relative_to(root) and not any(c.isspace() for c in str(bddl)), 'private BDDL must be an owned whitespace-free directory'
         env['KEEP_SCENE'] = '--keep-template-scene --bddl-root ' + str(bddl)
+    from scripts.campaign_20261110.private_scene import private_scene_environment
+    env.update(private_scene_environment(config['template'], root))
     cmd = ['python3',str(snapshot/'scripts/trainfast/submit_fast.py'),'submit',a.key,'1','--flow','fast',
            '--code',str(snapshot),'--root',str(root),'--ledger',str(root/'manifests'/a.ledger),
            '--base-index',str(a.index),'--tag',a.tag,'--job-prefix','isg261110_','--grasps','v2only',
