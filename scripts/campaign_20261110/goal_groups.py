@@ -9,6 +9,7 @@ ledger. Preparation and submission do not promote candidates to final splits.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 import math
@@ -251,6 +252,43 @@ def anchor_perturbations(anchor, template, campaign_id):
     return result
 
 
+def bind_scaled_runtime_identity(anchor, template, perturbations):
+    """Rebind only the native choice ID implied by verified training scales."""
+    runtime_id = anchor["template_meta"]["template_id"]
+    declared = template.scene_setup.get("runtime_template_id")
+    if declared is None or declared == runtime_id:
+        return template
+    require(template.split == "train" and any(s.default != s.applied for s in perturbations.scales.values()),
+            "runtime template ID mismatch without verified training scale change")
+    from ispatialgym.sampling.v2.problem import TemplateChoice
+
+    source_path = Path(template.scene_setup["source_template"]) / "template_meta.json"
+    original = read_json(source_path)["choice"]
+    current = anchor["template_meta"]["choice"]
+    require(TemplateChoice.from_json(original).template_id == declared,
+            "source choices do not reproduce the declared runtime template ID")
+    require(TemplateChoice.from_json(current).template_id == runtime_id,
+            "fresh choices do not reproduce the actual runtime template ID")
+    expected = copy.deepcopy(original)
+    expected["template_id"] = runtime_id
+    rows = list(expected["models"].values()) + [m for members in expected.get("groups", {}).values() for m in members]
+    for model in rows:
+        refs = [obj for obj in template.objects if (obj.category, obj.model) == (model["category"], model["model"])]
+        require(refs, "scaled native choice has no matching ready object binding")
+        states = {perturbations.scales[obj.instance] for obj in refs}
+        require(len(states) == 1, "scaled native choice has ambiguous instance scales")
+        state = states.pop()
+        if state.default != state.applied:
+            model["scale"] = list(state.applied)
+    require(expected == current, "runtime choices differ beyond verified training scales")
+    proof = {"source_runtime_template_id": declared, "source_metadata": str(source_path),
+             "source_choice_sha256": digest(original), "runtime_choice_sha256": digest(current),
+             "scale_sha256": perturbations.scale_fingerprint,
+             "comparison": "native template choices unchanged except live-verified training scales"}
+    return replace(template, scene_setup={**template.scene_setup, "runtime_template_id": runtime_id,
+                                         "scaled_runtime_identity": proof})
+
+
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
                   code_sha256: str, physics_sha256: str, data_sha256: str,
                   magnitude_range, budget_seconds: float = 900, max_members: int = 3):
@@ -271,8 +309,8 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     require(tm["scene"] == template.scene, "anchor scene differs from contract")
     require(template.room in anchor["tro"]["ispatialgym"]["scene"]["task_rooms"], "anchor room differs from contract")
     runtime_id = tm["template_id"]
-    declared_runtime_id = template.scene_setup.get("runtime_template_id")
-    require(declared_runtime_id is None or declared_runtime_id == runtime_id, "runtime template ID mismatch")
+    perturbations = anchor_perturbations(anchor, template, campaign_id)
+    template = bind_scaled_runtime_identity(anchor, template, perturbations)
     if template.scene_setup.get("source_bddl_sha256"):
         template = bind_runtime_definition(template, anchor["template_dir"], runtime_metadata=tm)
     if template.task in ("alignment-world_vertical", "alignment-axial"):
@@ -355,6 +393,16 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             limits = facts.get("limits")
             require(limits and len(limits) == 2 and limits[0] < limits[1], "closing anchor lacks authoritative joint limits")
             joints[joint] = float(limits[0])
+        elif template.task.endswith("_large_scale"):
+            limits = facts.get("limits")
+            require(limits and len(limits) == 2 and limits[0] < limits[1], "opening anchor lacks authoritative joint limits")
+            lo, hi = plan["magnitude_range"]
+            require(0 <= lo < hi <= 1, "opening goal bucket is invalid")
+            uniform = (int(digest({"group": group_id, "anchor": anchor["instance_id"], "joint": joint})[:16], 16)+.5)/(2**64)
+            fraction = lo+(hi-lo)*uniform
+            plan["goal_joint_proposal"] = {"method": "uniform_requested_fraction_before_starts",
+                "anchor_value": joints[joint], "fraction": fraction, "requires_native_passive_stability": True}
+            joints[joint] = float(limits[0])+fraction*(float(limits[1])-float(limits[0]))
         plan.update(schema=JOINT_SCHEMA, target=target, joint=joint, goal_joints=joints, fraction_range=plan.pop("magnitude_range"))
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
         validate_joint_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room],
@@ -471,7 +519,6 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         validate_surface_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
     else:
         validate_goal_plan(plan, task=template.task, template_id=runtime_id, scene=template.scene, rooms=[template.room], now=now)
-    perturbations = anchor_perturbations(anchor, template, campaign_id)
     key = ValidationKey(template.fingerprint, code_sha256, physics_sha256, data_sha256, perturbations.scale_fingerprint)
     config = {"campaign_id": campaign_id, "split": template.split, "purpose": "validation",
               "template": asdict(template), "perturbations": asdict(perturbations), "validation_key": asdict(key)}

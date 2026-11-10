@@ -1371,7 +1371,11 @@ class ArticulationLarge(SamplerV2):
         """
         if getattr(self, "_campaign_stable_probed_sha", None) == plan.sha256:
             return
-        values = plan.closing_probe_values(direction=self.direction, lower=self.lower, upper=self.upper, stable=self.stable)
+        if self.direction == "open":
+            _, wanted = plan.initial(direction=self.direction, lower=self.lower, upper=self.upper, stable=self.stable, rng=None)
+            values = [] if any(abs(wanted-v) <= 1e-6 for v in self.stable) else [wanted]
+        else:
+            values = plan.closing_probe_values(direction=self.direction, lower=self.lower, upper=self.upper, stable=self.stable)
         probes = []
         for value in values:
             self.campaign_group_remaining_s()
@@ -1415,10 +1419,12 @@ class ArticulationLarge(SamplerV2):
         campaign_plan = self.campaign_joint_plan() if os.environ.get(CJG.ENV) else None
         if campaign_plan is not None:
             self._campaign_joint_active = campaign_plan
-            self.campaign_complete_stable_bucket(campaign_plan)
             try:
+                self.campaign_complete_stable_bucket(campaign_plan)
                 q_init, q_goal = campaign_plan.initial(direction=self.direction, lower=self.lower, upper=self.upper,
                                                        stable=self.stable, rng=rng)
+                if self.direction == "open" and not any(abs(q_goal-v) <= 1e-6 for v in self.stable):
+                    raise CJG.GoalPlanError("fixed opening goal failed the native passive-stability probe")
             except CJG.GoalPlanError as exc:
                 raise Reject("campaign_joint_bucket", str(exc)) from exc
             self._campaign_latest_proposal = {"start_joints": {self.tname: {self.joint_name: q_init}},

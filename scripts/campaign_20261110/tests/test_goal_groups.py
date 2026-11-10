@@ -309,3 +309,26 @@ def test_axial_author_uses_fresh_goal_and_native_range_policy(tmp_path):
     config=g.read_json(out/"campaign_config.json")
     assert plan["schema"] == "isg-surface-goal-plan-v1" and plan["task"] == "alignment-axial"
     assert config["template"]["scene_setup"]["bucket_policy"]["native_range_deg"] == [20,70]
+
+
+def test_large_opening_author_selects_fixed_joint_goal_in_requested_bucket_before_starts(tmp_path):
+    job, ledger, _, template, code = GoalGroupControllerTests().fixture(tmp_path)
+    template = replace(template, task='configuration_matching-articulation_open_large_scale',
+                       objects=(replace(template.objects[0], joint='hinge'),))
+    anchor = g.successful_anchor(job, campaign_root=tmp_path, ledger=ledger, campaign_started_at=time.time()-10)
+    target = template.objects[0].instance
+    anchor['summary'].update(joint='hinge', direction='open')
+    anchor['joint_names'] = {target: ['hinge', 'other']}
+    anchor['planned_goal_joints'] = {target: [.4, .3]}
+    anchor['template_meta']['template_facts'] = {'limits': [0., 2.]}
+    goals = []
+    for group in ('opening_a', 'opening_b'):
+        out = tmp_path / 'groups' / group
+        g.prepare_group(anchor=anchor, template=template, campaign_id='new', group_id=group, output=out,
+            code_sha256=c.file_digest(code / '.snapshot_commit'), physics_sha256=c.digest('physics'),
+            data_sha256=c.digest('maps'), magnitude_range=[.5, 1.])
+        plan = g.read_json(out / 'goal_plan.json')
+        goals.append(plan['goal_joints']['hinge'])
+        assert 1 < goals[-1] <= 2 and plan['goal_joints']['other'] == .3
+        assert plan['goal_joint_proposal']['requires_native_passive_stability']
+    assert goals[0] != goals[1]

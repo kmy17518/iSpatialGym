@@ -39,3 +39,37 @@ def test_scale_carryover_requires_matching_live_measurement_and_key():
     wrong_default = replace(template, objects=(replace(template.objects[0], default_scale=(2, 2, 2)),))
     with pytest.raises(c.ContractError, match="default scale"):
         g.anchor_perturbations(anchor, wrong_default, "new")
+
+
+def test_scale_changes_rebind_only_the_native_choice_suffix(tmp_path):
+    from ispatialgym.sampling.spec import ModelChoice
+    from ispatialgym.sampling.v2.problem import TemplateChoice
+
+    template, perturb, anchor = fixture()
+    source = TemplateChoice(template.scene, {'target': ModelChoice('apple', 'ready_model')}, rooms=[template.room])
+    current = copy.deepcopy(source)
+    current.models['target'].scale = [.965]*3
+    g.write_json_atomic(tmp_path / 'template_meta.json', {'choice': source.to_json()})
+    template = replace(template, scene_setup={'runtime_template_id': source.template_id, 'source_template': str(tmp_path)})
+    anchor['template_meta'] = {'template_id': current.template_id, 'choice': current.to_json()}
+    verified = g.anchor_perturbations(anchor, template, 'new')
+    bound = g.bind_scaled_runtime_identity(anchor, template, verified)
+    assert bound.scene_setup['runtime_template_id'] == current.template_id
+    assert bound.fingerprint != template.fingerprint
+    assert bound.scene_setup['scaled_runtime_identity']['scale_sha256'] == perturb.scale_fingerprint
+    assert g.bind_scaled_runtime_identity(anchor, bound, verified) == bound
+    # Neither a different room nor an extra grasp-key change is explained by scaling.
+    for field, value in [('rooms', ['another_room']), ('support_tag', 'another_support')]:
+        changed = copy.deepcopy(anchor)
+        changed['template_meta']['choice'][field] = value
+        choice = TemplateChoice.from_json(changed['template_meta']['choice'])
+        changed['template_meta']['template_id'] = choice.template_id
+        with pytest.raises(c.ContractError, match='beyond verified'):
+            g.bind_scaled_runtime_identity(changed, template, verified)
+    changed = copy.deepcopy(anchor)
+    changed['template_meta']['choice']['models']['target']['grasp_key'] = 'different'
+    with pytest.raises(c.ContractError, match='beyond verified'):
+        g.bind_scaled_runtime_identity(changed, template, verified)
+    default = c.Perturbations({'target': c.ScaleState((1, 1, 1), (1, 1, 1), 'fixed')})
+    with pytest.raises(c.ContractError, match='without verified training scale'):
+        g.bind_scaled_runtime_identity(anchor, template, default)

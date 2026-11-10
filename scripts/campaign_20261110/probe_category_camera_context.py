@@ -79,7 +79,14 @@ def main():
         for index, row in enumerate(rows):
             name = 'campaign_context_' + row['category'] + '_' + row['model'] + '_0'
             require(name not in source['objects_info']['init_info'], 'context name already exists')
+            prior_poses = [(prior, prior.get_position_orientation()) for prior in added]
             obj = world.spawn(name, row['category'], row['model'], scale=row['default_scale'])
+            # SimWorld.spawn parks every previously spawned object while it
+            # rebuilds PhysX views. These completed context objects must return
+            # to their validated poses before placement/collision checks.
+            for prior, pose in prior_poses:
+                world.activate(prior)
+                prior.set_position_orientation(*pose)
             yaw = math.pi / 2 if index == 0 else -math.pi / 2
             orientation = th.tensor([0., 0., math.sin(yaw / 2), math.cos(yaw / 2)])
             obj.set_position_orientation(th.tensor([0., 0., 5.]), orientation)
