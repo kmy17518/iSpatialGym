@@ -2090,6 +2090,7 @@ def find_prefix(maps_root: str, spec: Dict[str, Any], *, anchors=None, policy_ke
             return None
         target = float(a["height"])
     rq = np.asarray(spec.get("rest_quat") or [0.0, 0.0, 0.0, 1.0], dtype=float)
+    best = None
     for fn in sorted(os.listdir(maps_root)) if os.path.isdir(maps_root) else []:
         if not fn.endswith(".json") or not fn.startswith("prefix__"):
             continue
@@ -2135,10 +2136,16 @@ def find_prefix(maps_root: str, spec: Dict[str, Any], *, anchors=None, policy_ke
             continue
         if abs(float(m["height"]["value"]) - target) > 1e-6:
             continue
-        pm = PrefixMap(p)
-        pm.lookup = {"how": how, "query_h": round(float(spec["height"]), 4), "map_h": float(m["height"]["value"])}
-        return pm
-    return None
+        dq = abs(float(m["q_start"]) - float(spec["q_start"]))
+        if best is None or dq < best[0] - 1e-9:
+            best = (dq, p, float(m["height"]["value"]))
+    if best is None:
+        return None
+    # i7-artsmall: several maps of one motion at different starts (the push-close grid of ISPATIALGYM_ARTSMALL_DRAW_ANGLES next to the
+    # customs start) can both lie within q_tol - the nearest start serves; with one match (every map set before) it is that one
+    pm = PrefixMap(best[1])
+    pm.lookup = {"how": how, "query_h": round(float(spec["height"]), 4), "map_h": best[2]}
+    return pm
 
 
 def nearest_yaw_index(pm: PrefixMap, face_yaw_offset: float) -> int:
@@ -2205,8 +2212,10 @@ def _prefix_cli(a) -> None:
                 continue
             h = float(anchors[hk]["height"])
             o = os.path.join(a.out, f"prefix__{alib.get('category')}__{alib.get('model')}__{alib.get('motion')}__{a.arm}__h{h:.4f}__*.json")
-            if a.skip_existing and any(list((S.load_json(x) or {}).get("arm_validated") or []) == [a.arm] for x in glob.glob(o)):
-                continue  # only a map of this arm's own validated segments counts as existing
+            if a.skip_existing and any(list((S.load_json(x) or {}).get("arm_validated") or []) == [a.arm]
+                                       and (not alib.get("q_start_variant") or abs(float((S.load_json(x) or {}).get("q_start", 1e9)) - float(alib["q_start"])) <= 1e-4)
+                                       for x in glob.glob(o)):
+                continue  # only a map of this arm's own validated segments counts as existing (i7-artsmall: a per-start library's own start)
             try:
                 if w is None:
                     w = SynthWorld(cfg)

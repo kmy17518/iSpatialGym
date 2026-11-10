@@ -4,7 +4,7 @@
 #   motions  validate_artic motions (the oracle's motion per handle variant in physics -> artic_library__<alias>.json)
 #   prefix   reach_maps prefix      (one map per library x GB_HEIGHTS x arm the task offers; a non-offered arm is skipped and logged)
 #
-#   GB_ALIASES="<customs alias> ..." GB_OUT=<dir> GB_ANCHORS=<anchors.json> GB_HEIGHTS="0.8126 0.7853" [GB_STAGES="rest motions prefix"] \
+#   GB_ALIASES="<customs alias> ..." GB_OUT=<dir> GB_ANCHORS=<anchors.json> GB_HEIGHTS="0.8126 0.7853" [GB_STAGES="rest motions prefix"] [GB_Q_STARTS=grid] \
 #   [GB_ARMS="right left"] [GB_VAL_ARM=right|left] ISG_GB_ROOT=<frozen snapshot> GBH=<campaign home> sbatch -o <log> job_artic.sh
 #
 # Owner 2026-11-07: an arm's prefix map is built ONLY from segments validated with that arm. GB_VAL_ARM (default right) = the arm of the
@@ -35,7 +35,7 @@ echo "GB_ARTIC_JOB host $(hostname) gpu $(nvidia-smi --query-gpu=name --format=c
 for ST in rest motions; do
   if [[ " $STAGES " == *" $ST "* ]]; then
     t0=$(date +%s)
-    python -u -m ispatialgym.grasping.validate_artic $ST --aliases $ALIASES --root $OUT/alib --arm ${GB_VAL_ARM:-right} >> $OUT/logs/${ST}_$JID.log 2>&1
+    python -u -m ispatialgym.grasping.validate_artic $ST --aliases $ALIASES --root $OUT/alib --arm ${GB_VAL_ARM:-right} --q-starts ${GB_Q_STARTS:-motion} >> $OUT/logs/${ST}_$JID.log 2>&1
     rc=$?; grep -q "GB_ARTIC_DONE" $OUT/logs/${ST}_$JID.log || rc=${rc/#0/1}
     [ $RC = 0 ] && RC=$rc
     echo "GB_STAGE $ST rc=$rc s=$(( $(date +%s) - t0 ))"
@@ -47,6 +47,12 @@ if [[ " $STAGES " == *" prefix "* ]]; then
     LIBS=()
     for A in $ALIASES; do
       for f in $OUT/alib/models/*/artic_library__$A$SFX.json; do [ -e "$f" ] && LIBS+=("$f"); done
+      # i7-artsmall (GB_Q_STARTS=grid): the per-start push-close libraries artic_library__<alias>__q<q>[__<arm>].json of this arm
+      for f in $OUT/alib/models/*/artic_library__${A}__q*$SFX.json; do
+        [ -e "$f" ] || continue
+        [ $ARM = right ] && [[ "$f" == *__left.json ]] && continue
+        LIBS+=("$f")
+      done
     done
     if [ ${#LIBS[@]} = 0 ]; then
       echo "GB_STAGE prefix arm=$ARM: no artic_library__<alias>$SFX.json under $OUT/alib (validate_artic motions --arm $ARM first) - nothing to map"

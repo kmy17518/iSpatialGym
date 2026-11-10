@@ -63,6 +63,44 @@ SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configurati
 
 ATTEMPT_BUDGET_S = 300.0  # per instance attempt (brace search over the manipulation + second stances)
 
+#: i7-artsmall: the seed stream of the template's pair order (``_template_with_drawn_angles``), apart from the start search's own stream
+PAIR_ORDER_STREAM = 0xA5A1
+
+
+def draw_angles_on() -> bool:
+    """i7-artsmall (owner 2026-11-09, "draw both joint angles per attempt, as articulation_large does"): ``ISPATIALGYM_ARTSMALL_DRAW_ANGLES=1``
+    makes each attempt draw its (q_init, q_goal) uniformly over the stable set S - open: closed -> s, close: s -> closed - instead of the
+    template's one pair (open: ``default_rng(base_seed).choice(S)``; push-close: ``close_init_fraction`` of the range, the owner's 2026-09-19
+    22:59 start, which this replaces for the drawn start; free close: min(S)). Every value the template computed from its pair is per pair:
+    the required waypoints / ``passive_from`` (probed once per pair in the template), H_max / w_a at q_init, the band (the prefix map of the
+    pair's q_start / travel) and the start search (rerun per attempt for the drawn pair). Default off = the template's pair."""
+    return os.environ.get("ISPATIALGYM_ARTSMALL_DRAW_ANGLES", "0") == "1"
+
+
+def close_start(q: float, lower: float, upper: float) -> float:
+    """A push-close start inside the joint range (``sample_template``'s clamp of the ``close_init_*`` start; ``artic_motions.build``)."""
+    return float(min(max(float(q), lower + 0.05), upper - 1e-3))
+
+
+def angle_pairs(direction: str, stable: Sequence[float], lower: float, upper: float, close_push: bool, q_ajar: Optional[float] = None) -> List[Tuple[float, float]]:
+    """The (q_init, q_goal) pairs a drawn attempt chooses from (:func:`draw_angles_on`): open = (lower, s) per s of S (a two-flap v2 / v4
+    goal must lie past ``q_ajar``); close = (s, lower) per s of S, a push-close start clamped by :func:`close_start`. Sorted, no duplicates."""
+    out: List[Tuple[float, float]] = []
+    for s in sorted(float(v) for v in stable):
+        if direction == "open":
+            if q_ajar is not None and not s > float(q_ajar) + 1e-6:
+                continue
+            p = (float(lower), s)
+        else:
+            p = (close_start(s, lower, upper) if close_push else s, float(lower))
+        if all(abs(p[0] - o[0]) > 1e-6 or abs(p[1] - o[1]) > 1e-6 for o in out):
+            out.append(p)
+    return out
+
+
+def pair_key(q0: float, q1: float) -> str:
+    return f"{float(q0):.4f}->{float(q1):.4f}"
+
 
 def wide_stop_positions(a_pos: float, s_line: float, opening: float, ends: Sequence[float], step: float = 0.01) -> List[float]:
     """Pad positions along the face (m) to try for a push-close brace's open stop on the far face. An open stop reacts the push only
@@ -465,6 +503,9 @@ class ArticulationSmall(SamplerV2):
             # limit: the hinged jar's stable set was {2.618} in the 22:26 / 23:14 runs; the facing rule turns the hinge toward
             # the robot for close so that the open lid's handle is on the robot's side, see _facing_local)
             self.q_init, self.q_goal = float(min(self.stable)), self.lower
+        if draw_angles_on():
+            self._template_with_drawn_angles(target)  # i7-artsmall: (q_init, q_goal) per attempt from the per-pair template work
+            return
         self.required, self.passive_from = self._required_waypoints(target)
         # H_max at q_init, half extent at q_init
         pts_init = self._hull_at_q(target, self.q_init)
@@ -482,6 +523,96 @@ class ArticulationSmall(SamplerV2):
                                     "n_manipulation_candidates": len(self.manip_candidates), "stable_set": self.stable, "q_init": self.q_init, "q_goal": self.q_goal,
                                     "required_waypoints": self.required, "passive_from": self.passive_from, "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
                                     "face_yaw": self.face_yaw, "H_max": H_max, "w_a": w_a})
+
+    # -- i7-artsmall (owner 2026-11-09): both joint angles drawn per attempt (ISPATIALGYM_ARTSMALL_DRAW_ANGLES) -------------------------
+
+    def _pair_record(self, target, q0: float, q1: float) -> Dict[str, Any]:
+        """One (q_init, q_goal) pair's template work, done once in ``sample_template``: the required waypoints and ``passive_from`` (the
+        §5.3 passive continuation probe), H_max / w_a at q_init (the Phase-1 margins)."""
+        required, passive = self._required_waypoints(target, q0, q1)
+        pts = self._hull_at_q(target, q0)
+        ext = pts.max(dim=0).values - pts.min(dim=0).values
+        H_max, w_a = float(ext[2]), 0.5 * float(max(ext[0], ext[1]))
+        return {"q_init": float(q0), "q_goal": float(q1), "key": pair_key(q0, q1), "required": required, "passive_from": passive,
+                "margins": {"kind": "articulation_small", "w_a": w_a, "safety": 0.02, "H_max": H_max}}
+
+    def _apply_pair(self, p: Dict[str, Any]) -> None:
+        """Make ``p`` this sampler's joint values: every check of the attempt reads ``q_init`` / ``q_goal`` / ``required`` / ``passive_from``
+        / ``_start_margins`` and the hull at q_init (cached per pair)."""
+        self.q_init, self.q_goal = float(p["q_init"]), float(p["q_goal"])
+        self.required, self.passive_from = list(p["required"]), p["passive_from"]
+        self._start_margins = p["margins"]
+        self._pair = p
+        if getattr(self, "_hull_qi_key", None) != p["key"] and hasattr(self, "_hull_qi"):
+            del self._hull_qi
+        self._hull_qi_key = p["key"]
+
+    def _template_with_drawn_angles(self, target) -> None:
+        """``ISPATIALGYM_ARTSMALL_DRAW_ANGLES=1``: the pairs of :func:`angle_pairs` (open: closed -> each of S; close: each of S -> closed),
+        each probed once (:meth:`_pair_record`, as ``articulation_large`` probes its passive continuation per pair); the template's start
+        search runs with the pairs in a seed order until one finds a start (a pair whose prefix map is missing is passed over here; an
+        attempt that draws it rejects ``missing_map``). Each attempt then draws its pair (:meth:`_draw_pair`)."""
+        pairs = angle_pairs(self.direction, self.stable, self.lower, self.upper, self.close_push,
+                            q_ajar=self.q_ajar if getattr(self, "v2", False) else None)
+        if not pairs:
+            raise Reject("no_stable_state", f"{target.name}/{self.joint_name}: no (q_init, q_goal) pair from S {self.stable}")
+        self._pairs = [self._pair_record(target, q0, q1) for q0, q1 in pairs]
+        order = [int(i) for i in np.random.default_rng([int(self.ctx.base_seed), PAIR_ORDER_STREAM]).permutation(len(self._pairs))]
+        rng = np.random.default_rng(self.ctx.base_seed)
+        errors: List[str] = []
+        missing = 0
+        for i in order:
+            self._apply_pair(self._pairs[i])
+            try:
+                if self._start_search(rng, self._start_margins, errors):
+                    break
+            except Reject as e:
+                if e.reason != "missing_map":
+                    raise
+                missing += 1
+                errors.append(f"pair {self._pairs[i]['key']}: {e}")
+        if self.init_stance is None:
+            raise Reject("missing_map" if missing == len(order) else "no_stance", "artsmall_draw: " + "; ".join(errors)[:1500])
+        self._template_pair = self._pair
+        m = self._start_margins
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "stable_set": self.stable, "q_init": self.q_init, "q_goal": self.q_goal,
+                                    "required_waypoints": self.required, "passive_from": self.passive_from, "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
+                                    "face_yaw": self.face_yaw, "H_max": m["H_max"], "w_a": m["w_a"],
+                                    "artsmall_draw": {"pairs": [{k: p[k] for k in ("key", "q_init", "q_goal", "required", "passive_from")} | {"H_max": round(p["margins"]["H_max"], 4)}
+                                                                for p in self._pairs], "template_pair": self._pair["key"]}})
+        log.info("%s: ARTSMALL_DRAW_ANGLES: %d pairs %s; the template's start found with %s", self.gp.variant, len(self._pairs),
+                 [p["key"] for p in self._pairs], self._pair["key"])
+
+    def _draw_pair(self, rng: np.random.Generator) -> Dict[str, Any]:
+        """This attempt's (q_init, q_goal): uniform over the template's pairs from the attempt's ``rng`` (``articulation_large.draw_joint_targets``);
+        kit counters ``artsmall_draw.drawn`` / ``.q_init.<q>`` / ``.q_goal.<q>``."""
+        p = self._pairs[int(rng.integers(len(self._pairs)))]
+        self._apply_pair(p)
+        TT._count(self, "artsmall_draw.drawn")
+        TT._count(self, f"artsmall_draw.q_init.{p['q_init']:.4f}")
+        TT._count(self, f"artsmall_draw.q_goal.{p['q_goal']:.4f}")
+        self._pair_drawn = True
+        log.info("%s: ARTSMALL_DRAW_ANGLES: attempt pair %s (required %s, passive from %s)", self.gp.variant, p["key"], p["required"], p["passive_from"])
+        return p
+
+    def _redraw_with_pair(self, rng: np.random.Generator, what: str) -> None:
+        """The attempt's pair and the start search for it; a failed search puts the previous pair and start back and rejects."""
+        keep = (self.edge_frame, self.init_stance, self.manip_candidates, self.face_yaw, self.bands, self.left_bands, getattr(self, "_pair", None))
+        p = self._draw_pair(rng)
+        errors: List[str] = []
+        try:
+            found = self._start_search(rng, self._start_margins, errors)
+        except Reject as e:
+            found, why = False, e
+        else:
+            why = Reject("no_stance", f"{what} (pair {p['key']}): " + "; ".join(errors)[:1500])
+        if not found:
+            self.edge_frame, self.init_stance, self.manip_candidates, self.face_yaw, self.bands, self.left_bands, prev = keep
+            if prev is not None:
+                self._apply_pair(prev)
+            TT._count(self, f"artsmall_draw.start_rejected.{why.reason}")
+            raise why
 
     def _start_search(self, rng: np.random.Generator, margins: Dict[str, Any], errors: List[str]) -> bool:
         """The start search of the template (factored out 2026-11-08, i7-startdraw; the code as it was): edges in ``rng`` order (§4.2
@@ -534,6 +665,12 @@ class ArticulationSmall(SamplerV2):
         makes; a search that finds none restores the template's facing yaw / bands. The joint values stay the template's. Off: the
         template's start."""
         if not start_draw_active(self):
+            return
+        if getattr(self, "_pairs", None):
+            # i7-artsmall: the attempt's joint values first - the start search below depends on them (the band, H_max, the frame rule)
+            self._redraw_with_pair(rng, "start_draw")
+            self._spa_facts = start_facts(self.edge_frame, self.init_stance, self.manip_candidates, face_yaw=round(float(self.face_yaw), 4),
+                                          artsmall_pair=self._pair["key"])
             return
         errors: List[str] = []
         keep = (self.edge_frame, self.init_stance, self.manip_candidates, self.face_yaw, self.bands, self.left_bands)
@@ -593,21 +730,24 @@ class ArticulationSmall(SamplerV2):
             self.world.park(obj, list(self.world.spawned).index(obj.name))
         return sorted(set(round(v, 4) for v in out))
 
-    def _required_waypoints(self, obj) -> Tuple[List[float], Optional[float]]:
+    def _required_waypoints(self, obj, q_init: Optional[float] = None, q_goal: Optional[float] = None) -> Tuple[List[float], Optional[float]]:
         """§5.3 required handle poses: q_init plus every q_k up to and including the first k from which the link reaches
-        q_goal passively (set q_k, 120 steps); all when none passes; ``require_goal_handle`` true / false force q_goal in / out."""
+        q_goal passively (set q_k, 120 steps); all when none passes; ``require_goal_handle`` true / false force q_goal in / out.
+        ``q_init`` / ``q_goal``: the pair probed (default the sampler's; i7-artsmall probes every drawn pair)."""
+        q0 = float(self.q_init if q_init is None else q_init)
+        q1 = float(self.q_goal if q_goal is None else q_goal)
         fr = [float(k) for k in self.g("waypoint_fractions")]
         mode = self.g("require_goal_handle")
-        tol = self._joint_tol(self.q_goal - self.q_init)
+        tol = self._joint_tol(q1 - q0)
         passive = None
         if mode == "auto":
             state = self.world.snapshot()
             try:
                 self._on_top_for_probe(obj)
                 for k in fr:
-                    self._set_joint(obj, self.q_init + k * (self.q_goal - self.q_init))
+                    self._set_joint(obj, q0 + k * (q1 - q0))
                     self.world.step_physics(int(self.g("stable_hold_steps")), still=[self.robot])
-                    if abs(self._joint_value(obj) - self.q_goal) <= tol:
+                    if abs(self._joint_value(obj) - q1) <= tol:
                         passive = k
                         break
             finally:
@@ -1262,6 +1402,17 @@ class ArticulationSmall(SamplerV2):
     # ------------------------------------------------------------------ instance (§5.4 Phase 3)
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        if getattr(self, "_pairs", None):
+            # i7-artsmall: without the per-attempt start draw (ISPATIALGYM_START_DRAW=0) the pair is drawn here, with the start search for it
+            if not getattr(self, "_pair_drawn", False):
+                self._redraw_with_pair(rng, "sample_instance")
+            self._pair_drawn = False
+            d = self._sample_instance(rng)
+            d.summary["artsmall_draw"] = {k: self._pair[k] for k in ("key", "q_init", "q_goal", "required", "passive_from")}
+            return d
+        return self._sample_instance(rng)
+
+    def _sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
         # per-attempt budget (0916-205838: one attempt took 2356 s in the second-stance search + diagnostics)
