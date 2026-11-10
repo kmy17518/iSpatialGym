@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Stage per-job queue journals, then call the real scheduler exactly once."""
+import os
+from pathlib import Path
+import shlex
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_queue
+
+root = Path(os.environ['ISG_DISPATCH_CAMPAIGN_ROOT']).resolve()
+job = Path(sys.argv[-1]).resolve()
+assert job.is_relative_to(root / 'out') and (job / 'job.env').is_file()
+env = {}
+for line in (job / 'job.env').read_text().splitlines():
+    key, value = line.split('=', 1)
+    parsed = shlex.split(value)
+    assert len(parsed) == 1
+    env[key] = parsed[0]
+prepare_queue(job, env, root)
+args = [item for item in sys.argv[1:] if not item.startswith('--exclude=')]
+excluded = {'visionlab-dgx1', 'viscam1', 'viscam5', 'viscam7', 'viscam11', 'viscam12',
+            'viscam14', 'viscam15', 'viscam16', 'viscam-hgx-1', 'viscam-hgx-2', 'svl9'}
+for item in sys.argv[1:]:
+    if item.startswith('--exclude='): excluded.update(item.split('=', 1)[1].split(','))
+real = os.environ['ISG_DISPATCH_REAL_SBATCH']
+assert Path(real).resolve() != Path(__file__).resolve()
+os.execv(real, [real, '--exclude=' + ','.join(sorted(excluded))] + args)

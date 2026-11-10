@@ -57,7 +57,7 @@ def main():
         if not a.scene_helper.is_relative_to(a.root/'code') or not a.scene_helper.is_file():raise ValueError('replay scene helper must be frozen inside this campaign')
     statepath=a.root/'validation/controller.json';state=read(statepath,{'schema':1,'gates':{}})
     while True:
-        ledgers=a.ledger or [a.root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv','goal_group_allocations.tsv','augmentation_allocations.tsv')]
+        ledgers=a.ledger or [a.root/'manifests'/name for name in ('canary_allocations.tsv','vast_canary_allocations.tsv','goal_group_allocations.tsv','augmentation_allocations.tsv','shiyuc_allocations.tsv')]
         rows=[]
         for ledger in ledgers:
             if ledger.exists():

@@ -22,7 +22,7 @@ for bddl in (ROOT / 'Behavior-1K/bddl3', Path('/home/minyeongk/Desktop/projects/
         sys.path.insert(0, str(bddl))
         break
 from scripts.campaign_20261110.contracts import Template, digest, require
-from scripts.campaign_20261110.binding_pools import BindingPool, PoolCandidate, bind_variant, write_pool
+from scripts.campaign_20261110.binding_pools import BindingPool, PoolCandidate, bind_variant, write_pool, load_pool_for_template
 from scripts.campaign_20261110.bind_fresh_candidates import asset_path
 from scripts.campaign_20261110.goal_groups import bind_runtime_definition, load_template_contract
 from scripts.campaign_20261110.group_lane import check_reservations
@@ -48,7 +48,7 @@ def solve_counts(profile, max_distractors=12, budget=.85):
     """One model per active category, repeated copies, exact native area sums."""
     require(profile.get('schema') == 'isg-native-tray-coverage-profile-v1', 'native coverage profile required')
     require(not profile.get('fixed_layout'), 'fixed puzzle layout cannot use variable counts')
-    require(type(max_distractors) is int and 1 <= max_distractors <= 24, 'finite maximum count must be1..24')
+    require(type(max_distractors) is int and 1 <= max_distractors <= 48, 'finite maximum count must be1..48')
     floor, target = float(profile['source_floor_area_m2']), float(profile['target']['area_m2'])
     require(math.isfinite(floor) and floor > 0 and math.isfinite(target) and target > 0, 'invalid native areas')
     models = {}
@@ -63,6 +63,8 @@ def solve_counts(profile, max_distractors=12, budget=.85):
     categories = sorted({r['category'] for r in models.values()})
     require(len(categories) <= 6, 'count solver requires a bounded category pool')
     alternatives = [[key for key in sorted(models) if models[key]['category'] == category] for category in categories]
+    require(math.comb(max_distractors + len(categories), len(categories)) * math.prod(map(len, alternatives)) <= 2_000_000,
+            'finite count search exceeds bounded enumeration budget')
     best = {}
     for chosen in itertools.product(*alternatives):
         for counts in count_tuples(len(chosen), max_distractors):
@@ -82,6 +84,22 @@ def solve_counts(profile, max_distractors=12, budget=.85):
                 best[bucket] = (rank, dict(bucket=bucket, crowdedness_range=list(BUCKETS[bucket]), counts=selected,
                     n_distractors=n, predicted_native_coverage=coverage, occupied_hull_area_m2=occupied))
     return [best[i][1] for i in sorted(best)]
+
+
+def existing_pool_for_counts(template, maximum, root):
+    """Keep the original maximum pool, including inactive model candidates."""
+    pool = load_pool_for_template(template, root=root)
+    if pool is None:
+        return None
+    require(not pool.fixed_layout and pool.role_limits['distractor'][0] <= 1 and maximum <= pool.role_limits['distractor'][1],
+            'requested counts exceed the immutable maximum pool')
+    choices = {(row.object.role, row.object.category, row.object.model): row for row in pool.candidates}
+    require(len(choices) == len(pool.candidates), 'count compiler needs one default-scale choice per role/model')
+    for obj in template.objects:
+        if obj.role in ('target', 'distractor'):
+            choice = choices[(obj.role, obj.category, obj.model)]
+            require(obj.role == 'target' or choice.max_count >= maximum, 'requested count exceeds candidate copy cap')
+    return pool, {key: choice.candidate_id for key, choice in choices.items()}, Path(template.scene_setup['binding_pool']['manifest'])
 
 
 def main():
@@ -123,19 +141,26 @@ def main():
     variants = solve_counts(profile, a.max_distractors, budget)
     require(bool(variants), 'no count candidate fits any native coverage bucket')
     fixed = tuple(o for o in template.objects if o.role == 'support')
-    candidate_ids = {key: 'model_' + digest({'role': obj.role, 'category': obj.category, 'model': obj.model,
-        'asset_sha256': obj.asset_sha256, 'scale': obj.default_scale})[:20] for key, obj in unique.items()}
-    pool = BindingPool(conceptual_template_id='disembedding_pool__' + digest({'class': template.class_id, 'split': template.split,
-        'scene': template.scene, 'room': template.room, 'fixed': [asdict(o) for o in fixed], 'models': sorted(candidate_ids.values())})[:20],
-        class_id=template.class_id, split=template.split, scene=template.scene, room=template.room, fixed_objects=fixed,
-        candidates=tuple(PoolCandidate(candidate_ids[key], obj, 1 if obj.role == 'target' else a.max_distractors) for key, obj in sorted(unique.items())),
-        role_limits={'target': (1, 1), 'distractor': (1, a.max_distractors)}, source_definition_sha256=template.definition_sha256,
-        task_rooms=tuple(template.scene_setup.get('task_rooms', [template.room])), provenance={'source_contract_sha256': sha(a.contracts),
-            'source_customs_sha256': sha(a.customs), 'native_coverage_profile_sha256': sha(a.coverage_profile),
-            'runtime_bddl_equivalence': template.scene_setup['runtime_bddl_equivalence'], 'reservation_policy_sha256': pointer['policy_sha256']})
+    existing = existing_pool_for_counts(template, a.max_distractors, a.campaign_root)
+    if existing:
+        pool, candidate_ids, pool_path = existing
+    else:
+        candidate_ids = {key: 'model_' + digest({'role': obj.role, 'category': obj.category, 'model': obj.model,
+            'asset_sha256': obj.asset_sha256, 'scale': obj.default_scale})[:20] for key, obj in unique.items()}
+        pool = BindingPool(conceptual_template_id='disembedding_pool__' + digest({'class': template.class_id, 'split': template.split,
+            'scene': template.scene, 'room': template.room, 'fixed': [asdict(o) for o in fixed], 'models': sorted(candidate_ids.values())})[:20],
+            class_id=template.class_id, split=template.split, scene=template.scene, room=template.room, fixed_objects=fixed,
+            candidates=tuple(PoolCandidate(candidate_ids[key], obj, 1 if obj.role == 'target' else a.max_distractors) for key, obj in sorted(unique.items())),
+            role_limits={'target': (1, 1), 'distractor': (1, a.max_distractors)}, source_definition_sha256=template.definition_sha256,
+            task_rooms=tuple(template.scene_setup.get('task_rooms', [template.room])), provenance={'source_contract_sha256': sha(a.contracts),
+                'source_customs_sha256': sha(a.customs), 'native_coverage_profile_sha256': sha(a.coverage_profile),
+                'runtime_bddl_equivalence': template.scene_setup['runtime_bddl_equivalence'], 'reservation_policy_sha256': pointer['policy_sha256']})
     check_reservations(pool.audit_template(), reservations, hashes)
     a.out.mkdir(parents=True)
-    pool_path = write_pool(a.out / 'binding_pool.json', pool)
+    if existing:
+        (a.out / 'binding_pool_reference.json').write_text(json.dumps(dict(manifest=str(pool_path), manifest_sha256=sha(pool_path), pool_sha256=pool.fingerprint), indent=2) + '\n')
+    else:
+        pool_path = write_pool(a.out / 'binding_pool.json', pool)
     from ispatialgym.sampling.bddl_from_iddl import RoleGrounding, render
     from ispatialgym.sampling.iddl import parse_file
     from ispatialgym.sampling.knowledge import synset_of_category

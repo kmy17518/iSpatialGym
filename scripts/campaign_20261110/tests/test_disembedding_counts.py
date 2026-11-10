@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.campaign_20261110.materialize_disembedding_counts import count_tuples, solve_counts
+from scripts.campaign_20261110.materialize_disembedding_counts import count_tuples, solve_counts, existing_pool_for_counts
 
 
 def profile(rows=None):
@@ -44,3 +44,23 @@ def test_area_budget_and_finite_maximum_are_enforced():
     tuples = list(count_tuples(4, 4))
     assert len(tuples) == len(set(tuples)) == 70
     assert all(sum(row) <= 4 for row in tuples)
+
+
+def test_large_single_category_pool_is_bounded_without_cartesian_explosion():
+    p = profile(); p['target']['area_m2'] = .001; p['distractors'][0]['area_m2'] = .001
+    result = solve_counts(p, max_distractors=48)
+    assert result[-1]['bucket'] == 2 and result[-1]['n_distractors'] > 24
+    p['distractors'] = [{**p['distractors'][0], 'category': str(i)} for i in range(6)]
+    with pytest.raises(ValueError, match='enumeration budget'):
+        solve_counts(p, max_distractors=48)
+
+
+def test_existing_pool_keeps_inactive_candidates_and_rejects_capacity_extension(tmp_path):
+    from scripts.campaign_20261110.tests.test_binding_pools import variant, pool
+    template = variant(tmp_path, count=3)
+    maximum, choices, path = existing_pool_for_counts(template, 9, tmp_path)
+    assert maximum.fingerprint == pool().fingerprint
+    assert ('distractor', 'tissue', 't') in choices
+    assert path.name == 'pool.json'
+    with pytest.raises(ValueError, match='immutable maximum pool'):
+        existing_pool_for_counts(template, 10, tmp_path)
