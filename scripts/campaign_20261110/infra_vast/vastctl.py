@@ -36,9 +36,9 @@ from vastai.api import instances as vi
 from vastai.api import offers as vo
 from vastai.api.client import VastClient
 try:
-    from .campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order
+    from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order
 except ImportError:
-    from campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order
+    from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order
 
 OFH = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
 F = "/vision/u/minyeong/projects/isg_home/campaign_20261110"
@@ -283,6 +283,7 @@ def stage(s3, rec, state):
     if env.get("ISGF_JB_NFS", "").startswith(SY) or env.get("ISPATIALGYM_FAST_BAND_SHARE", "0") == "1":
         raise RuntimeError("shiyuc-mode / band-sharing jobs stay on the cluster")
     prepare_environment(jd, OFH)
+    prepare_cache_environment(jd, OFH)
     prepare_queue(jd, env, OFH)
     env = read_env(jd)
     pool_inputs = prepare_pools(jd, env, OFH)

@@ -56,6 +56,42 @@ def require(value, message):
         raise ValueError(message)
 
 
+def prepare_cache_environment(job_dir, root):
+    """Route new Vast jobs to the exact-key templates restored by boot.sh.
+
+    Native kit_appdata.sh still selects GPU/driver/Behavior identity, requires
+    .complete, and clones into private per-process app data. A missing exact key
+    remains a logged cold start. No mutable process cache is shared.
+    """
+    job, root = Path(job_dir).resolve(), Path(root).resolve()
+    require(job.is_relative_to(root / 'out'), 'Vast cache job outside campaign output')
+    path = job / 'job.env'
+    routes = {'KIT_TPL_NFS_ROOT': ('kit_templates', '/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/kit_templates'),
+              'KIT_TEX_STORE': ('kit_textures', '/vision/u/minyeong/projects/ispatialgym-lab-vec-eval-cache/kit_textures')}
+    lines = path.read_text().splitlines(); changes = []
+    for index, line in enumerate(lines):
+        key, _, value = line.partition('=')
+        if key not in routes: continue
+        values = shlex.split(value)
+        require(len(values) == 1, 'invalid cache environment path')
+        suffix, target = routes[key]
+        if values[0] == target: continue
+        require(Path(values[0]).resolve() == root / suffix, 'unexpected cluster cache override')
+        changes.append({'key': key, 'before': values[0], 'after': target})
+        lines[index] = key + '=' + shlex.quote(target)
+    if not changes: return None
+    before = job / 'job.env.before_vast_caches'
+    require(not before.exists(), 'cache normalization was already recorded')
+    shutil.copyfile(path, before)
+    temporary = path.with_suffix('.env.caches_new')
+    temporary.write_text('\n'.join(lines) + '\n'); temporary.replace(path)
+    record = {'schema': 'isg-vast-cache-environment-v1', 'before_sha256': sha(before), 'after_sha256': sha(path),
+              'changes': changes, 'selection': 'native_exact_gpu_driver_behavior_complete_template',
+              'runtime_appdata': 'private_clone_per_process', 'texture_store': 'local_preconverted_links'}
+    (job / 'vast_cache_environment.json').write_text(json.dumps(record, indent=2) + '\n')
+    return record
+
+
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 

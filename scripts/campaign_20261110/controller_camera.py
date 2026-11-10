@@ -211,6 +211,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                 state["status"] = "runtime_revalidation_required"
                 return 0
             if allowance <= 0:
+                state['status']='validated_waiting_for_dispatch_capacity'
                 return 0
             if record["status"] == "ready" and not record.get("dry_run_passed"):
                 run_logged(record["command"] + ["--dry-run"], Path(record["directory"]) / "dryrun.txt")
@@ -250,7 +251,9 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         if remaining <= 0 or budget <= 0:
             state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_complete") if remaining <= 0 else "candidate_budget_exhausted"
             return 0
-        if allowance <= 0:return 0
+        if allowance <= 0:
+            state['status']='validated_waiting_for_dispatch_capacity'
+            return 0
         count = min(remaining + min(3, remaining), budget, spec.get("batch_size", 80))
         token = "camera_auto_" + spec["id"] + "_" + str(len(records) + 1).zfill(3)
         require(re.fullmatch(r"[A-Za-z0-9_.-]+", token), "unsafe camera seed ID")

@@ -3,10 +3,30 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_queue, prepare_pools, dispatch_order, sha, QUEUE_ENV
+from scripts.campaign_20261110.infra_vast.campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, sha, QUEUE_ENV
 
 
 class VastQueueInputsTests(unittest.TestCase):
+    def test_warm_store_routing_preserves_native_key_selection_and_source_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); job, _, _ = self.fixture(root)
+            env = job / 'job.env'
+            env.write_text(env.read_text() + 'KIT_TPL_NFS_ROOT=' + str(root / 'kit_templates') + '\nKIT_TEX_STORE=' + str(root / 'kit_textures') + '\n')
+            before = env.read_bytes()
+            result = prepare_cache_environment(job, root)
+            self.assertEqual((job / 'job.env.before_vast_caches').read_bytes(), before)
+            self.assertIn('ispatialgym-lab-vec-eval-cache/kit_templates', env.read_text())
+            self.assertEqual(result['selection'], 'native_exact_gpu_driver_behavior_complete_template')
+            self.assertIsNone(prepare_cache_environment(job, root))
+
+    def test_unexpected_cache_path_is_rejected_without_mutation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); job, _, _ = self.fixture(root)
+            env = job / 'job.env'; env.write_text('KIT_TPL_NFS_ROOT=/unreviewed/cache\n')
+            before = env.read_bytes()
+            with self.assertRaisesRegex(ValueError, 'unexpected cluster cache'):
+                prepare_cache_environment(job, root)
+            self.assertEqual(env.read_bytes(), before)
     def test_production_priority_never_bypasses_dispatch_allowlist(self):
         rows=[{"id":str(n),"status":"queued"} for n in (4,2,3,1)] + [{"id":"5","status":"assigned"}]
         self.assertEqual([r['id'] for r in dispatch_order(rows,{})],['1','2','3','4'])
