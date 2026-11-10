@@ -874,6 +874,8 @@ class Disembedding(SamplerV2):
         it. Sets ``edge`` / ``init_stance`` / ``manip_candidates`` and returns True on the first edge that passes; failures go to
         ``errors``. ``sample_template`` runs it with the template seed, :meth:`spa_redraw_start` with the attempt's rng."""
         H_max = float(margins["H_max"])
+        if os.environ.get(CTG.ENV):
+            self._campaign_tray_active = self.campaign_tray_plan()
         # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
         # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
         # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
@@ -954,8 +956,12 @@ class Disembedding(SamplerV2):
             key = (round(float(c.focus[0]), 3), round(float(c.focus[1]), 3))
             if key not in verdict:
                 try:
+                    campaign_plan = getattr(self, "_campaign_tray_active", None)
                     for s_pose in self._source_tray_poses(c, c.focus[:2]):
-                        self._place_destination(None, init, c, cam, s_pose)
+                        if campaign_plan is None:
+                            self._place_destination(None, init, c, cam, s_pose)
+                        else:
+                            self.campaign_tray_geometry(c, cam, s_pose, tuple(TT._t(v) for v in campaign_plan.destination))
                     verdict[key] = None
                 except Reject as e:
                     verdict[key] = str(e)
@@ -989,6 +995,9 @@ class Disembedding(SamplerV2):
     def _source_tray_poses(self, stance: Stance, centre_xy) -> List[TT.Pose]:
         """The source tray centred on ``centre_xy``: edge-aligned, and turned by each of the fixed layout's ``tray_turns`` - every pose
         an instance may give it, which the Phase-2 frame check and the destination fit hold for all."""
+        campaign_plan = getattr(self, "_campaign_tray_active", None)
+        if campaign_plan is not None:
+            return [tuple(TT._t(v) for v in campaign_plan.source)]
         return [self._tray_pose_centred(self.src_role, self.src_floor, stance, centre_xy, t) for t in [0.0] + list(self.tray_turns)]
 
     def _source_half_length(self) -> float:

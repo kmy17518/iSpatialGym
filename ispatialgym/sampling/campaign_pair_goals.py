@@ -37,6 +37,7 @@ class PairGoalPlan:
     place: tuple | None = None
     base_push: dict | None = None
     placement_mode: str | None = None
+    release_policy: str = "fixed"
 
     @property
     def orientation_required(self):
@@ -51,6 +52,7 @@ class PairGoalPlan:
                 "target_name": self.target_name, "partner_name": self.partner_name,
                 "plan_sha256": self.sha256, "deadline_at": self.deadline_at, "max_members": self.max_members,
                 "phase": "planned_before_start", "target_orientation_required": self.orientation_required, "scale": self.scale}
+        result["release_policy"] = self.release_policy
         if self.place is not None:
             result["requested_place"] = as_pose(self.place)
         if self.base_push is not None:
@@ -115,6 +117,9 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
              and raw.get("task") == f"inter_object_relation_satisfaction-{relation}_{scale}_scale", "unsupported pair goal task")
     base_push = raw.get("base_push")
     placement_mode = raw.get("placement_mode")
+    release_policy = raw.get("release_policy", "fixed")
+    _require(release_policy == "fixed" or (release_policy == "native_grasp_height" and scale == "small" and relation == "inside"),
+             "unsupported pair release policy")
     if placement_mode is not None:
         _require(scale == "large" and relation == "touching" and placement_mode in ("surface", "drop_push") and base_push is None,
                  "unsupported pair placement mode")
@@ -164,7 +169,7 @@ def validate_pair_plan(raw, *, template_id, scene, rooms, relation, activated_at
     _require(isinstance(count, int) and not isinstance(count, bool) and 2 <= count <= 5, "invalid group size")
     fingerprint = hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     return PairGoalPlan(raw["campaign_id"], raw["group_id"], raw["split"], template_id, sha, relation,
-                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode)
+                        raw["target_name"], raw["partner_name"], release, goal, partner, activated_at + budget, count, fingerprint, scale, goal_cell, place, base_push, placement_mode, release_policy)
 
 
 def load_pair_plan(*, template_id, scene, rooms, relation, activated_at, expected_sha256=None, scale="small"):

@@ -90,3 +90,29 @@ def test_pinned_trays_are_validated_directly_without_random_destination_search()
     camera.project = lambda cam, pts: (th.tensor([[700., 240.]]), th.tensor([1.]))
     with pytest.raises(Reject, match="required width"):
         s.campaign_tray_geometry(manip, None, source, destination)
+
+
+def test_stance_search_filters_actual_fixed_trays_before_attempting_grasps():
+    s = Disembedding.__new__(Disembedding)
+    p = plan()
+    s._campaign_tray_active = p
+    s._place_destination = lambda *args: pytest.fail('native random destination must not select a fixed-tray start')
+    s._tray_pose_centred = lambda *args: pytest.fail('fixed source must not follow a newly drawn focus')
+    s.camera_pose_at = lambda init: 'actual_start_camera'
+    s.template_facts = {}
+    s.dest_side = 1.
+    s.gp = SimpleNamespace(variant='fixed_tray_test')
+    seen = []
+    def geometry(candidate, camera, source, destination):
+        seen.append((camera, source, destination))
+        assert th.allclose(source[0], th.tensor(p.source[0]))
+        assert th.allclose(destination[0], th.tensor(p.destination[0]))
+        if not candidate.visible:
+            raise Reject('campaign_destination_not_visible', 'required width')
+    s.campaign_tray_geometry = geometry
+    bad = SimpleNamespace(focus=th.tensor([5., 5., 0.]), visible=False)
+    good = SimpleNamespace(focus=th.tensor([6., 5., 0.]), visible=True)
+    init = SimpleNamespace(edge=SimpleNamespace(name='+x'))
+    assert s._destination_fit(init, [bad, good]) == [good]
+    assert len(seen) == 2 and seen[0][0] == 'actual_start_camera'
+    assert s.template_facts['destination_fit'][0]['candidates_after'] == 1

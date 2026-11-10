@@ -230,10 +230,13 @@ def job_env(spec, cpus):
 
 
 def live_logs(jid, jd, logp, p):
-    """While the job runs: its job.txt and slurm log -> out/<id>/live/ every 5 min (progress for the coordinator / agents)."""
+    """Keep current sampling/collection diagnostics available while jobs run."""
     while p.poll() is None:
-        time.sleep(300)
-        for f, name in ((os.path.join(jd, "job.txt"), "job.txt"), (logp, "slurm.log")):
+        time.sleep(60)
+        logs = [(os.path.join(jd, name), name) for name in
+                ("job.txt", "sample.log", "results.jsonl", "sample.rc")]
+        logs += [(logp, "slurm.log")]
+        for f, name in logs:
             if os.path.exists(f):
                 s5("cp", f, f"{S3}/out/{jid}/live/{name}", check=False, timeout=300)
 

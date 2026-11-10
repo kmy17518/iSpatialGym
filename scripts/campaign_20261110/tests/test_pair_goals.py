@@ -52,6 +52,16 @@ class PairPlanTests(unittest.TestCase):
         p.verify_settled((p.goal[0], [1, 0, 0, 0]), p.partner)
         self.assertFalse(p.summary()["target_orientation_required"])
 
+    def test_native_grasp_height_is_explicit_and_only_for_small_inside(self):
+        raw = self.fixture('inside')
+        kw = dict(template_id='t', scene='s', rooms=['r'], relation='inside', activated_at=999, now=1000)
+        self.assertEqual(g.validate_pair_plan(raw, **kw).release_policy, 'fixed')
+        raw['release_policy'] = 'native_grasp_height'
+        self.assertEqual(g.validate_pair_plan(raw, **kw).release_policy, 'native_grasp_height')
+        raw['task'] = 'inter_object_relation_satisfaction-ontop_small_scale'
+        with self.assertRaises(g.GoalPlanError):
+            g.validate_pair_plan(raw, **{**kw, 'relation': 'ontop'})
+
     def test_nextto_gap_varies_in_middle_eighty_percent_before_start_draw(self):
         goal = ([0, .2, .7], [0, 0, 0, 1])
         partner = ([0, 0, .7], [0, 0, 0, 1])

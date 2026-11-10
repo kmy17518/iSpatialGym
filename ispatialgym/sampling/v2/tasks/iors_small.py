@@ -2647,7 +2647,16 @@ class IORSSmall(SamplerV2):
                 plan.verify_settled(actual, partner, position_tol=position_tol, orientation_tol=orientation_tol, partner_position_tol=partner_tol)
             except CPG.GoalPlanError as exc:
                 raise Reject("campaign_goal_drift", str(exc)) from exc
-        draft.goal_poses[plan.target_name] = tuple(G.t(v) for v in plan.release)
+        if plan.release_policy == "native_grasp_height":
+            # This is the per-grasp execution release, not the fixed settled
+            # goal. Keep the native rim-clearance pose already checked by IK.
+            release = draft.goal_poses.get(plan.target_name)
+            if release is None:
+                raise Reject("campaign_release_missing", "native inside release was not recorded")
+            group["actual_release"] = {"position": [float(v) for v in release[0]], "orientation": [float(v) for v in release[1]]}
+            group["release_geometry"] = dict(self.release)
+        else:
+            draft.goal_poses[plan.target_name] = tuple(G.t(v) for v in plan.release)
         target = draft.pose_targets[plan.target_name]
         target["position"] = list(plan.goal[0])
         if plan.relation == "inside":
@@ -5734,6 +5743,11 @@ class IORSSmall(SamplerV2):
             finally:
                 self._campaign_native_goal = False
             dp, dq = CPG.pose_error(native, campaign_plan.release)
+            if campaign_plan.release_policy == "native_grasp_height":
+                # The open jaw's lowest point depends on eef_in_object. The
+                # unchanged native release_pose computes and checks its needed
+                # clearance; a different grasp must be allowed a different z.
+                dp = float(th.linalg.norm(G.t(native[0])[:2] - G.t(campaign_plan.release[0])[:2]))
             if self.relation == "nextto":
                 # The goal's gap is independently sampled from the middle 80%
                 # of the predicate range; native goal generation picks one gap.
@@ -5743,6 +5757,8 @@ class IORSSmall(SamplerV2):
                     raise Reject("campaign_goal_support", "fixed nextto goal leaves the support")
             if dp > self.ikc.WITNESS_POS_TOL or dq > self.ikc.WITNESS_ANG_TOL:
                 raise Reject("campaign_release_drift", f"release differs from native pair geometry by {dp:.6f} m / {dq:.6f} rad")
+            if campaign_plan.release_policy == "native_grasp_height":
+                return native
             return tuple(G.t(v) for v in campaign_plan.release)
         st = self.sidecar.stance("manipulation")
         t_quat = self.target_goal_quat(t_pose, st, p_pose if self.relation in ("nextto", "touching") else None)

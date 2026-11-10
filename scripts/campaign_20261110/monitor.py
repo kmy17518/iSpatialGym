@@ -104,6 +104,8 @@ def refresh(output, host):
         lines.extend([f"| Annotated templates: demo passed | {state['annotated_coverage']['demo_passed']} |",f"| Annotated templates: true replay passed | {state['annotated_coverage']['replay_passed']} |"])
     for release in state['data_releases']:
         lines.extend([f"| Released exact-scale grasp libraries ({pathlib.Path(release['path']).name}) | {release.get('new_scale_libraries',0)} |",f"| Released exact-scale arm maps ({pathlib.Path(release['path']).name}) | {release.get('new_scale_maps',0)} |"])
+        if release.get('new_floating_libraries'):
+            lines.append(f"| Fresh positive floating libraries ({pathlib.Path(release['path']).name}) | {release['new_floating_libraries']} |")
     lines.extend(f"| {k.replace('_',' ')} | {v} |" for k,v in state['campaign_results'].items())
     if state['throughput']:
         forecast=state['throughput']

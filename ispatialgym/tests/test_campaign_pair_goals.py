@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -58,6 +59,61 @@ def test_inside_goal_orientation_is_unconstrained_and_metadata_goal_exact():
     assert d.pose_targets["target"]["orientation_metric"] is None
     assert d.pose_targets["target"]["position"] == list(p.goal[0])
     assert d.summary["campaign_goal_group"]["settled_goal_residual"]["position_m"] > 0
+
+
+def test_inside_release_uses_native_open_jaw_clearance_for_each_grasp(monkeypatch):
+    p = replace(plan('inside'), release_policy='native_grasp_height',
+                release=((0., 0., .77), (0., 0., 0., 1.)))
+    hull = th.tensor([[x, y, z] for x in (-.01, .01) for y in (-.01, .01) for z in (-.01, .01)])
+    partner_hull = th.tensor([[x, y, z] for x in (-.2, .2) for y in (-.2, .2) for z in (0., .7)])
+    grasp = SimpleNamespace(eef_in_object=(th.tensor([0., 0., 0.]), th.tensor([0., 0., 0., 1.])))
+    monkeypatch.setattr(I, 'gripper_corners_world', lambda eef, **kw: th.stack([eef[0]-th.tensor([0., 0., .05])]))
+    s = SimpleNamespace(_campaign_pair_active=p, relation='inside',
+        sidecar=SimpleNamespace(stance=lambda name: None, grasp_of=lambda name: grasp),
+        target_goal_quat=lambda pose, *args: I.G.t(pose[1]),
+        hull={'target': hull, 'partner': partner_hull},
+        world=SimpleNamespace(hull_at=lambda h, pose: I.G.local_points_world(h, pose)),
+        bindings=SimpleNamespace(one=lambda role: SimpleNamespace(name=role)),
+        obj=lambda name: None, _container_volume=lambda *args: (th.zeros(3), .7),
+        gen=lambda key, default=None: default, up_axis=lambda: None, standing=None,
+        ikc=SimpleNamespace(WITNESS_POS_TOL=.005, WITNESS_ANG_TOL=.05))
+    s.release_pose = lambda *args: I.IORSSmall.release_pose(s, *args)
+    first = I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    assert float(first[0][2]) == pytest.approx(.77)
+    assert s.release['finger_clearance_m'] == pytest.approx(.02)
+    grasp.eef_in_object = (th.tensor([0., 0., -.03]), grasp.eef_in_object[1])
+    second = I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    assert float(second[0][2]) == pytest.approx(.80)
+    assert s.release['finger_clearance_m'] == pytest.approx(.02)
+    # The previous fixed-release policy rejects this legitimate per-grasp height.
+    s._campaign_pair_active = replace(p, release_policy='fixed')
+    with pytest.raises(Reject, match='release differs'):
+        I.IORSSmall.goal_pose(s, p.goal, p.partner)
+    # A different horizontal endpoint is still rejected with the new policy.
+    s._campaign_pair_active = p
+    s._container_volume = lambda *args: (th.tensor([.02, 0., 0.]), .7)
+    with pytest.raises(Reject, match='release differs'):
+        I.IORSSmall.goal_pose(s, p.goal, p.partner)
+
+
+def test_verified_native_inside_release_is_preserved_but_settled_goal_remains_fixed():
+    p = replace(plan('inside'), release_policy='native_grasp_height')
+    s = I.IORSSmall.__new__(I.IORSSmall)
+    s._campaign_pair_active = p
+    s.campaign_group_remaining_s = lambda: 100
+    s.tol = lambda key, default: default
+    s.gen = lambda key, default=None: default
+    s.release = {'finger_clearance_m': .02, 'place_kind': 'drop'}
+    s.objects = {'partner': SimpleNamespace(get_position_orientation=lambda: p.partner),
+                 'target': SimpleNamespace(get_position_orientation=lambda: p.goal)}
+    d = Draft()
+    d.summary['campaign_goal_group'] = p.summary()
+    d.pose_targets = {'target': {}, 'partner': {}}
+    d.goal_poses = {'target': (th.tensor([0., 0., .9]), th.tensor([0., 0., 0., 1.]))}
+    s.campaign_verify_pair(d, settled=True)
+    assert float(d.goal_poses['target'][0][2]) == pytest.approx(.9)
+    assert d.pose_targets['target']['position'] == list(p.goal[0])
+    assert d.summary['campaign_goal_group']['release_geometry']['finger_clearance_m'] == .02
 
 
 def test_large_goal_is_pinned_to_supported_cell_before_starts(monkeypatch):

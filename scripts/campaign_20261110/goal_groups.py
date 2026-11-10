@@ -105,6 +105,7 @@ def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: fl
     sources = {name: fresh_source(path, job=job, started_at=campaign_started_at)
                for name, path in (("tro", tro_path), ("sidecar", sidecar_path), ("summary", summary_path),
                                   ("demo_meta", meta_path), ("demo", demo_path))}
+    sources["job_env"] = fresh_source(job / "job.env", job=job, started_at=campaign_started_at)
     tro, sidecar, summary, demo = map(read_json, (tro_path, sidecar_path, summary_path, meta_path))
     require(tro["ispatialgym"]["instance_id"] == sidecar["instance_id"] == summary["instance_id"] == demo["instance_id"] == iid,
             "anchor source instance identities differ")
@@ -127,6 +128,7 @@ def successful_anchor(job_dir, *, campaign_root, ledger, campaign_started_at: fl
             "bound_object_poses": runtime.get("bound_object_poses") or {},
             "planned_goal_joints": runtime.get("planned_goal_joints") or {},
             "joint_names": runtime.get("joint_names") or {},
+            "grasp_library_root": env.get("ISPATIALGYM_GRASP_LIBRARY_V2"),
             "goal_proposal_source": "fresh_sampler_goal_realised", "anchor_is_final_member": False}
 
 
@@ -271,8 +273,13 @@ def bind_scaled_runtime_identity(anchor, template, perturbations):
             "fresh choices do not reproduce the actual runtime template ID")
     expected = copy.deepcopy(original)
     expected["template_id"] = runtime_id
-    rows = list(expected["models"].values()) + [m for members in expected.get("groups", {}).values() for m in members]
-    for model in rows:
+    rows = [(model, current["models"].get(role, {})) for role, model in expected["models"].items()]
+    for role, members in expected.get("groups", {}).items():
+        actual = current.get("groups", {}).get(role, [])
+        require(len(members) == len(actual), "scaled native group changes its members")
+        rows.extend(zip(members, actual))
+    routes = []
+    for model, actual in rows:
         refs = [obj for obj in template.objects if (obj.category, obj.model) == (model["category"], model["model"])]
         require(refs, "scaled native choice has no matching ready object binding")
         states = {perturbations.scales[obj.instance] for obj in refs}
@@ -280,13 +287,48 @@ def bind_scaled_runtime_identity(anchor, template, perturbations):
         state = states.pop()
         if state.default != state.applied:
             model["scale"] = list(state.applied)
+            if model.get("grasp_key") != actual.get("grasp_key"):
+                routes.append(verify_scaled_grasp_route(anchor, model, actual, state))
+                model["grasp_key"] = actual["grasp_key"]
     require(expected == current, "runtime choices differ beyond verified training scales")
     proof = {"source_runtime_template_id": declared, "source_metadata": str(source_path),
              "source_choice_sha256": digest(original), "runtime_choice_sha256": digest(current),
              "scale_sha256": perturbations.scale_fingerprint,
              "comparison": "native template choices unchanged except live-verified training scales"}
+    if routes:
+        proof["grasp_routes"] = routes
     return replace(template, scene_setup={**template.scene_setup, "runtime_template_id": runtime_id,
                                          "scaled_runtime_identity": proof})
+
+
+def verify_scaled_grasp_route(anchor, original, current, state):
+    """Require the actual native alias reader to resolve both physical scales."""
+    from ispatialgym.sampling import grasp_library as G
+    from ispatialgym.grasping import schema as S
+
+    root = anchor.get("grasp_library_root")
+    require(root and Path(root).is_dir(), "scaled grasp route lacks its fresh anchor library root")
+    result = {}
+    for label, model, scale in (("source", original, state.default), ("scaled", current, state.applied)):
+        key = model.get("grasp_key")
+        require(isinstance(key, str) and "@" not in key, "scaled grasp route requires a plain native alias")
+        path = G._v2_index(root).get(key)
+        require(path is not None, "scaled grasp route is absent from the native alias index")
+        data = read_json(path)
+        require((data["category"], data["model"], data["dataset"]) ==
+                (model["category"], model["model"], model.get("dataset", "behavior-1k-assets")),
+                "scaled grasp alias resolves to a different model")
+        lib = S.load_model(data["category"], data["model"], data.get("scale"), root,
+            constraint=data.get("constraint") or "tabletop",
+            rest_hint_wxyz=data.get("rest_hint_wxyz") if "rest_hint_wxyz" in data else G._v2_hint(path))
+        require(lib is not None and Path(lib.path).resolve() == Path(path).resolve(), "native grasp loader resolved different bytes")
+        S.check_compatible(lib, scale=scale)
+        G._check_v2_policy(lib, data)
+        require(bool(G.grasps_from_v2(lib, key)), "scaled grasp alias has no positive native grasps")
+        result[label] = {"key": key, "library": str(Path(path).resolve()), "sha256": file_digest(path),
+                         "scale": list(scale), "constraint": lib.data.get("constraint") or "tabletop"}
+    require(result["source"]["constraint"] == result["scaled"]["constraint"], "scaled grasp route changes its constraint")
+    return result
 
 
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
@@ -421,6 +463,8 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         plan["release_pose"] = plan["goal_pose"]
         plan["goal_pose"] = {"position": target[0], "orientation": target[1]}
         plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
+        if relation == "inside" and scale == "small":
+            plan["release_policy"] = "native_grasp_height"
         if relation == "touching" and scale == "small":
             from ispatialgym.sampling.campaign_pair_goals import object_pose_from_grasp
 

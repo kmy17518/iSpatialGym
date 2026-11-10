@@ -68,8 +68,38 @@ def test_scale_changes_rebind_only_the_native_choice_suffix(tmp_path):
             g.bind_scaled_runtime_identity(changed, template, verified)
     changed = copy.deepcopy(anchor)
     changed['template_meta']['choice']['models']['target']['grasp_key'] = 'different'
-    with pytest.raises(c.ContractError, match='beyond verified'):
+    with pytest.raises(c.ContractError, match='library root'):
         g.bind_scaled_runtime_identity(changed, template, verified)
     default = c.Perturbations({'target': c.ScaleState((1, 1, 1), (1, 1, 1), 'fixed')})
     with pytest.raises(c.ContractError, match='without verified training scale'):
         g.bind_scaled_runtime_identity(anchor, template, default)
+
+
+def test_scaled_alias_change_requires_native_model_scale_and_positive_library(tmp_path):
+    from pathlib import Path
+    from ispatialgym.grasping import schema as S
+    from ispatialgym.sampling import grasp_library as G
+
+    source = {'category': 'apple', 'model': 'ready_model', 'grasp_key': 'apple_default'}
+    current = {**source, 'grasp_key': 'apple_scaled'}
+    state = c.ScaleState((1, 1, 1), (.965, .965, .965))
+    paths = []
+    for row, scale in ((source, state.default), (current, state.applied)):
+        path = Path(S.model_dir('apple', 'ready_model', scale, str(tmp_path))) / 'library.json'
+        data = {'schema': S.LIBRARY, 'category': 'apple', 'model': 'ready_model', 'dataset': 'behavior-1k-assets',
+                'legacy_key': row['grasp_key'], 'scale': list(scale), 'constraint': 'tabletop',
+                'rests': {'r0': {'schema': S.REST, 'rest_id': 'r0', 'quat_xyzw': [0, 0, 0, 1], 'h_root': .03, 'stable': True}},
+                'grasps': [{'name': 'top_0', 'rest_id': 'r0', 'T_object_eef': {'position': [0, 0, .05], 'orientation_xyzw': [1, 0, 0, 0]}}]}
+        g.write_json_atomic(path, data)
+        paths.append(path)
+    anchor = {'grasp_library_root': str(tmp_path)}
+    proof = g.verify_scaled_grasp_route(anchor, source, current, state)
+    assert proof['scaled']['sha256'] == c.file_digest(paths[1])
+    with pytest.raises(S.IncompatibleRecord, match='scale'):
+        g.verify_scaled_grasp_route(anchor, source, current, c.ScaleState((1, 1, 1), (.9, .9, .9)))
+    data = g.read_json(paths[1])
+    data['grasps'] = []
+    g.write_json_atomic(paths[1], data)
+    G._v2_index.cache_clear()
+    with pytest.raises(c.ContractError, match='no positive native grasps'):
+        g.verify_scaled_grasp_route(anchor, source, current, state)
