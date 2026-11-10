@@ -246,12 +246,18 @@ LYING_DROP_RETREAT_UP_M = 0.10
 #: it turned 6 -> 19 -> 55 -> 72 deg (symbolic_only on the yaw, position 0.049 m); lying, its back face is 0.27-0.33 m wide, so the hand can
 #: re-aim farther: 0.05 m strokes, a re-aim within 0.08 m, yaw term 0.30 m/rad
 LYING_STROKE_M = 0.05
-LYING_REAIM_MAX_M = 0.08
+LYING_REAIM_MAX_M = 0.10
 LYING_YAW_GAIN_M_PER_RAD = 0.30
 #: the lying push's final yaw stroke (lead #90 item 2; ``execute._push_strokes`` reads ``yaw_final_m`` from the plan): once more, ``LYING_YAW_FINAL_M``
 #: beyond the back, when the yaw is still beyond ``LYING_YAW_FINAL_MIN_DEG`` (ms_ul02_on4 360000 ended 11.2 deg off: 0.196 rad > 0.15)
 LYING_YAW_FINAL_M = 0.02
 LYING_YAW_FINAL_MIN_DEG = 3.0
+#: the lying push's integral re-aim (lead 2026-11-10; ``execute._push_strokes`` reads ``yaw_integral_m_per_rad``): r3_lying_a / _b settled 7-17 deg
+#: off, the miss pure yaw (tilt <= 0.2 deg) - the pitched hand turns the lying briefcase ~+11 deg per 5 cm pushed through its mass centre (47
+#: strokes: dyaw = 11.2 deg - 1.95 deg per cm of contact offset), which the proportional term (0.30 m/rad) balances only at ~11 deg; the
+#: final yaw stroke failed at the arm's reach (4 of 7) or turned it < 1.2 deg. A stroke model with the fitted bias: proportional only -> 23 %
+#: of pushes end within 8 deg, + 0.10 m/rad integral and a 0.10 m re-aim -> 85 %
+LYING_YAW_INTEGRAL_M_PER_RAD = 0.10
 #: the lying drop's singularity screen (lead #90 item 1): the drop's attached IK witness must track LYING_SCREEN_LOWER_M straight down (the oracle's
 #: lower_drop) and the place's up-retreat (LYING_DROP_RETREAT_UP_M) with the oracle's dense differential IK (IKChecker.track_chain), else the draw
 #: is refused at C ('lying drop near the wrist singularity'): every lying demo's lower_drop failed on 0.20-0.29 rad joint jumps and on4 360001's
@@ -2394,7 +2400,8 @@ class IORSLarge(SamplerV2):
                                 yaw_gain_m_per_rad=gain,
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
         if getattr(self, "lying", False):
-            plan.update({"yaw_final_m": float(self.num("push_under_lying_yaw_final_m", LYING_YAW_FINAL_M)),
+            plan.update({"yaw_integral_m_per_rad": float(self.num("push_under_lying_yaw_integral", LYING_YAW_INTEGRAL_M_PER_RAD)),
+                         "yaw_final_m": float(self.num("push_under_lying_yaw_final_m", LYING_YAW_FINAL_M)),
                          "yaw_final_min_rad": round(math.radians(float(self.num("push_under_lying_yaw_final_min_deg", LYING_YAW_FINAL_MIN_DEG))), 5)})
         if "stroke_m" in fp:
             TT._count(self, "floorpush.strokes.recorded")

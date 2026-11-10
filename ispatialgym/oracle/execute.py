@@ -5025,7 +5025,7 @@ def push_stroke_plan(extra: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
         r = raw.get(k)
         out[k] = float(r) if isinstance(r, (int, float)) and not isinstance(r, bool) and math.isfinite(float(r)) else v
     # i7-measure (lead #90 item 2): the optional final yaw stroke of the lying briefcase's record (absent everywhere else: no final stroke)
-    for k in ("yaw_final_m", "yaw_final_min_rad", "yaw_final_gain_m_per_rad"):
+    for k in ("yaw_final_m", "yaw_final_min_rad", "yaw_final_gain_m_per_rad", "yaw_integral_m_per_rad"):
         r = raw.get(k)
         if isinstance(r, (int, float)) and not isinstance(r, bool) and math.isfinite(float(r)):
             out[k] = float(r)
@@ -5176,6 +5176,11 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
     ctx["push_strokes"] = rep
     e0, ref = push_yaw_error(state, obj, pose0)
     rep.update({"yaw_reference": ref, "yaw_start_deg": round(math.degrees(e0), 2)})
+    # i7-measure (lead 2026-11-10, the lying briefcase; only a plan carrying ``yaw_integral_m_per_rad``): an integral term on the yaw errors of the
+    # strokes so far - the pitched hand turns the lying briefcase ~+11 deg per 5 cm pushed through its mass centre (47 recorded strokes:
+    # dyaw = 11.2 deg - 1.95 deg per cm of contact offset), so the proportional re-aim alone settled 10-17 deg off (r3_lying_a / _b)
+    ki = float(plan.get("yaw_integral_m_per_rad", 0.0) or 0.0)
+    e_sum = 0.0
     for k in range(1, int(plan["n"]) + 1):
         if k > 1:
             p_e, q_e = (C.as_tensor(x).float() for x in motions.eef_pose(arm))
@@ -5184,6 +5189,11 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
         p_o = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float()
         e, _ = push_yaw_error(state, obj, pose0)
         target, off, term = push_stroke_aim(p_o[:2], p_init[:2], d3[:2], e, plan)
+        integ = 0.0
+        if ki:
+            e_sum += float(e)
+            integ = ki * e_sum
+            target += integ
         pts = _object_points_world(state, obj)
         hit = push_contact_aim(pts, p_init[:2], d3[:2], target, strips, *band) if pts is not None else None
         cap = abs(float(plan["reaim_max_m"]))
@@ -5209,6 +5219,8 @@ def _push_strokes(motions: Motions, state, arm: str, obj: str, targets, contact,
         rec: Dict[str, Any] = {"stroke": k, "yaw_before_deg": round(math.degrees(e), 2), "root_off_line_m": round(off, 4), "yaw_term_m": round(term, 4),
                                "target_m": round(target, 4), "aim_m": round(aim, 4), "contact_lateral_m": round(contact_lat, 4), "contact": source,
                                "start_along_m": round(start_along, 4), "end_along_m": round(end_along, 4)}
+        if ki:
+            rec["yaw_integral_m"] = round(integ, 4)
         try:
             yield from motions.arm_along(arm, [pose_at(start_along, aim)], loaded=False)
         except SkillError as err:
