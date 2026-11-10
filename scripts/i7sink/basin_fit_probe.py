@@ -211,15 +211,22 @@ def main(argv=None):
 
     # ---- fits and drops
     up = th.tensor([0.0, 0.0, 1.0])
+    fits = {}
+    for sn, srec in out["sinks"].items():  # every fit first (cheap), then the drops
+        if "error" in srec:
+            continue
+        for spec in plates:
+            marg, c = fit_plate(srec, out["plates"][spec])
+            fits[(sn, spec)] = (marg, c)
+            out["fits"].append({"sink": sn, "plate": spec, "margin_mm": round(marg * 1000, 1), "centre": c, "fits_flat": bool(marg > 0.0)})
+            print(f"FIT {sn} {spec} R {out['plates'][spec]['R']:.4f} margin {marg * 1000:+.1f} mm centre {c} -> {'FLAT' if marg > 0 else 'BLOCKED'}", flush=True)
     for sn, srec in out["sinks"].items():
         if "error" in srec:
             continue
         s = world.obj(sn)
         zf = srec["floor_z"]
         for spec, (o, idx) in plates.items():
-            marg, c = fit_plate(srec, out["plates"][spec])
-            out["fits"].append({"sink": sn, "plate": spec, "margin_mm": round(marg * 1000, 1), "centre": c, "fits_flat": bool(marg > 0.0)})
-            print(f"FIT {sn} {spec} R {out['plates'][spec]['R']:.4f} margin {marg * 1000:+.1f} mm centre {c} -> {'FLAT' if marg > 0 else 'BLOCKED'}", flush=True)
+            marg, c = fits[(sn, spec)]
             if c is None or (a.drops_for is not None and spec not in a.drops_for):
                 continue
             hull = world.local_hull(o)
