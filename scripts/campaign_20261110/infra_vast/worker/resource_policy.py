@@ -2,6 +2,21 @@
 import json
 
 
+def bad_machines(events):
+    """Account retirement is not evidence of a host failure.
+
+    Older coordinator code matched the word 'heartbeat' in this exact drain
+    description. Preserve those ledger events but correct their classification.
+    """
+    misclassified = 'account funding drain; no assigned/staging or heartbeat-running jobs'
+    return {event.get('machine_id') for event in events
+            if event.get('ev') == 'bad_machine' and event.get('reason') != misclassified}
+
+
+def host_startup_failure(reason):
+    return reason.startswith(('no heartbeat after ', 'boot not finished after '))
+
+
 def gpu_ids(value):
     if isinstance(value, str):
         try:

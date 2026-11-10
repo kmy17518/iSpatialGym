@@ -1,8 +1,20 @@
 import unittest
-from scripts.campaign_20261110.infra_vast.worker.resource_policy import machine_reservation, select_cpus, duplicate_worker_gpus
+from scripts.campaign_20261110.infra_vast.worker.resource_policy import machine_reservation, select_cpus, duplicate_worker_gpus, bad_machines, host_startup_failure
 
 
 class ResourcePolicyTests(unittest.TestCase):
+    def test_account_draining_does_not_poison_healthy_host_eligibility(self):
+        historical = 'account funding drain; no assigned/staging or heartbeat-running jobs'
+        events=[{'ev':'bad_machine','machine_id':1,'reason':historical},
+                {'ev':'bad_machine','machine_id':2,'reason':'no heartbeat after 55 min (running)'},
+                {'ev':'bad_machine','machine_id':3,'reason':historical},
+                {'ev':'bad_machine','machine_id':3,'reason':'no NVIDIA graphics device'}]
+        self.assertEqual(bad_machines(events),{2,3})
+        self.assertFalse(host_startup_failure(historical))
+        self.assertFalse(host_startup_failure('booting with an empty queue for 15 min'))
+        self.assertTrue(host_startup_failure('boot not finished after 55 min'))
+        self.assertTrue(host_startup_failure('no heartbeat after 55 min (running)'))
+
     def setUp(self):
         self.config = {'cpus_per_job':9, 'ram_per_job_gb':40, 'max_contracts_per_machine':4}
         self.offer = {'machine_id':1, 'num_gpus':1, 'gpu_ids':[22], 'cpu_cores_effective':16, 'cpu_ram':64000}

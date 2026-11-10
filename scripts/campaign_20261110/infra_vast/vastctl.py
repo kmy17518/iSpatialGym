@@ -40,7 +40,7 @@ from vastai.api.client import VastClient
 try:
     from .campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from .bounded_process import run_bounded
-    from .worker.resource_policy import machine_reservation, duplicate_worker_gpus
+    from .worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from .campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
     from .async_staging import StagingReservations
     from .lifecycle import retain_attempt
@@ -48,7 +48,7 @@ try:
 except ImportError:
     from campaign_inputs import prepare_environment, prepare_cache_environment, prepare_queue, prepare_pools, dispatch_order, runtime_scenes, assignment_plan, staging_record
     from bounded_process import run_bounded
-    from worker.resource_policy import machine_reservation, duplicate_worker_gpus
+    from worker.resource_policy import machine_reservation, duplicate_worker_gpus, bad_machines, host_startup_failure
     from campaign_inputs import compatible_gpus, gpu_matches, uncovered_jobs, drained_workers, rental_accounts, drained_worker_finished, worker_can_run
     from async_staging import StagingReservations
     from lifecycle import retain_attempt
@@ -532,7 +532,7 @@ def search(c, C, gpu=None, force=False):
             return []
         p = os.path.join(VJ, "market", f"fresh_{time.strftime('%Y%m%d_%H%M%S')}.json")
         json.dump({"time": now(), "query": q, "offers": rows}, open(p, "w"))
-    bad = {e.get("machine_id") for e in events() if e["ev"] == "bad_machine"}
+    bad = bad_machines(events())
     tried = {e.get("offer") for e in events() if e["ev"] == "tried" and now() - e["time"] < 3600}
     out = []
     for o in rows:
@@ -936,7 +936,7 @@ def tick(c, s3, state):
         model_pending = any(worker_can_run(job, iid, i, created.get(iid) or {}, t) for job in queued)
         reason = None
         if drained_worker_finished(iid, draining, reserved_to, hb):
-            reason = 'account funding drain; no assigned/staging or heartbeat-running jobs'
+            reason = 'account funding drain; worker has no active or reserved jobs'
         elif hb.get("phase") in ("destroyed", "unusable", "stopped", "idle_exit") and t - hb.get("time", t) > 120:
             reason = f"worker {hb.get('phase')} {hb.get('detail', '')}"
         elif not hb and up > C["boot_max_s"]:
@@ -964,7 +964,7 @@ def tick(c, s3, state):
                         s.update(status="queued" if s["tries"] < C["retries"] else "failed", instance=None)
                         save_state(s)
             destroy(c, iid, reason, i.get("_key_name"))
-            if "heartbeat" in reason or "boot" in reason:
+            if host_startup_failure(reason):
                 ledger("bad_machine", machine_id=i.get("machine_id"), instance=iid, reason=reason)
     if pending:
         state["last_pending"] = t
