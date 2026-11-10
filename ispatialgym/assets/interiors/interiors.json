@@ -810,6 +810,48 @@
     "for": "i7-ft2 2026-11-08 (owner 7.2): the goal side of the plate-in-sink variants inside_large_scale-plate-drop_in_sink-bar / -countertop (plate luhkiz into drop_in_sink_awvzkn_0, house_single_floor kitchen_0; customs inside_surface_z_m 0.80 +- 0.25, inside_stance_side +y = the sampler's raster edge +u), as drop_in_sink_lkklqs_0@basin for inside_large_03",
     "job": "$OFH/ft2_20261108/measure_awvzkn.sh, slurm 18377335 (trunk_fcddc495, interiors measure --side=+y)"
    }
+  },
+  "tabletop_sink_vekaaf_0@basin": {
+   "height_m": 0.9559,
+   "depth_m": 0.4412,
+   "width_m": 0.4805,
+   "headroom_m": 1.505,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.5205,
+   "board_setback_m": 0.0803,
+   "back_thickness_m": null,
+   "centre_y_m": 0.0,
+   "open_sides": [
+    "top",
+    "front",
+    "back"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "rim_m": 0.28,
+   "open_top": true,
+   "supports": [
+    [
+     "house_single_floor",
+     "tabletop_sink_vekaaf_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_single_floor/tabletop_sink_vekaaf_0 raster edge +u at 0.9558 (requested 0.950 +- 0.05), 250 board cells, open edges ['+u', '-u', '+v', '-v'], front plane 0.0903 m out (static AABB overhang), wall rays None / None, back ray 0.28244364798069, moved links [], wall rim 0.28 vs headroom 1.5050 (open top True)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
+   },
+   "for": "i7-sink 2026-11-09 (owner A3b): the goal side of the plate-in-sink variant inside_large_scale-plate-tabletop_sink_vekaaf_0-countertop (plate luhkiz into tabletop_sink_vekaaf_0, house_single_floor utility_room_0; customs inside_surface_z_m 0.95 +- 0.05, inside_stance_side -x). The measure found no side wall at mid-rim (wall rays None: the rim search's 0.28 m is above the shallow basin), so the spec has no side / front walls; the sampler's live checks see the real basin",
+   "job": "$OFH/sink_20261109/measure_vekaaf.sh, slurm 18409919 (trunk_612331b3, interiors measure --side=-x)"
   }
  }
 }
