@@ -156,11 +156,26 @@ def bind_runtime_definition(template: Template, runtime_template_dir, *, runtime
         semantic = {"activity": parsed.activity, "domain": parsed.domain, "variant": parsed.variant,
                     "objects": parsed.objects, "groups": parsed.groups, "init": parsed.init,
                     "goal": parsed.goal, "measure": parsed.measure}
-        snapshots.append({"path": str(path), "sha256": actual, "semantics": semantic})
-    require(snapshots[0]["semantics"] == snapshots[1]["semantics"], "runtime BDDL semantics differ from ready contract")
+        snapshots.append({"path": str(path), "sha256": actual, "semantics": semantic,
+                          "has_explicit_measure": bool(re.search(r"\(:measure\b", re.sub(r";[^\n]*", "", path.read_text())))})
+    equivalent = snapshots[0]["semantics"] == snapshots[1]["semantics"]
+    migration = None
+    if not equivalent and template.task.startswith("configuration_matching-articulation_") and not snapshots[0]["has_explicit_measure"]:
+        before, after = snapshots[0]["semantics"], snapshots[1]["semantics"]
+        moved = [atom for atom in before["goal"] if isinstance(atom, list) and atom[:1] == ["layout_reached"]]
+        remaining = [atom for atom in before["goal"] if atom not in moved]
+        same_sections = {k: v for k, v in before.items() if k != "goal"} == {k: v for k, v in after.items() if k != "goal"}
+        if (moved and same_sections and remaining == after["goal"]
+                and all(atom in before["measure"] and atom in after["measure"] for atom in moved)):
+            migration = {"id": "2026-10-14_articulation_measure_migration", "semantic_equivalence": False,
+                         "removed_gating_atoms": moved, "measurement_atoms_unchanged": True,
+                         "policy_source": "ispatialgym/activity/problem.py:LEGACY_MEASURE_TASK_RULES",
+                         "authorization": "campaign owner preserves the working current runtime scoring migration"}
+    require(equivalent or migration is not None, "runtime BDDL semantics differ from ready contract")
     proof = {"source": {k: v for k, v in snapshots[0].items() if k != "semantics"},
              "runtime": {k: v for k, v in snapshots[1].items() if k != "semantics"},
              "semantic_sha256": digest(snapshots[0]["semantics"]),
+             "runtime_semantic_sha256": digest(snapshots[1]["semantics"]), "semantic_equivalence": equivalent, "migration": migration,
              "comparison": "parsed activity/domain/variant/objects/groups/init/goal/measure; goal and measure remain separate"}
     return replace(template, scene_setup={**template.scene_setup,
         "runtime_bddl_sha256": snapshots[1]["sha256"], "runtime_bddl_equivalence": proof})

@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""Claim audited goal groups and publish immutable final split assignments.
+
+TROs and demos retain their verified collection hashes. Dataset consumers use
+the exported assignment's `split`; `sampling_split` records the collection lane.
+SQLite uses DELETE journaling under an external process lock (no NFS WAL).
+"""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import math
+import re
+import sqlite3
+from collections import Counter
+from dataclasses import asdict
+from pathlib import Path
+
+from scripts.campaign_20261110.acceptance import audit_job, read
+from scripts.campaign_20261110.contracts import (
+    Perturbations, ScaleState, canonical_json, digest, file_digest, require,
+    task_quotas, write_json_atomic,
+)
+from scripts.campaign_20261110.goal_groups import load_template_contract
+
+QUOTAS = {q.task: q for q in task_quotas()}
+
+
+def physical_template(template):
+    """Task template identity excludes code paths and provenance timestamps."""
+    return digest({"task": template.task, "scene": template.scene, "room": template.room,
+                   "rooms": sorted(set(template.scene_setup.get("task_rooms", ())) | {template.room}),
+                   "objects": [{key: value for key, value in asdict(obj).items()
+                                if key not in ("readiness_source", "ready")}
+                               for obj in sorted(template.objects, key=lambda obj: obj.instance)],
+                   "bindings": template.scene_setup.get("inst_to_name", {})})
+
+
+def check_reservations(template, reservations, hashes):
+    require(hashes.get("schema") == "campaign-reserved-asset-hashes-v1", "missing reserved asset-byte audit")
+    require(set(hashes["reserved_model_keys"]) == set(reservations["train_exclude_models"]), "reserved asset audit has different model identities")
+    ready = hashes["ready_assets"]
+    require(set(ready) | set(hashes["pending_unready_model_keys"]) == set(hashes["reserved_model_keys"]), "reserved asset audit is incomplete")
+    require(all(value.get("ready") is True for value in ready.values()), "reserved ready-asset audit contains an unready asset")
+    require(set(hashes["reserved_asset_hashes"]) == {value["asset_sha256"] for value in ready.values()}, "reserved byte hashes are incomplete")
+    rooms = {(template.scene, room) for room in set(template.scene_setup.get("task_rooms", ())) | {template.room}}
+    held_rooms = {(row["scene"], row["room"]) for row in reservations["category_holdout_rooms"]}
+    pending = reservations.get("pending_custom_hard_reservations_not_ready", [])
+    model_pool = set(reservations["model_holdout_models"]) | {
+        row["category"]+"/"+row["model"] for row in pending if row["split"] == "eval_model"}
+    category_pool = set(reservations["category_holdout_models"]) | {
+        row["category"]+"/"+row["model"] for row in pending if row["split"] == "eval_category"}
+    categories = set(reservations["category_holdout_categories"])
+    require(bool(rooms & held_rooms) if template.split == "eval_category" else not rooms & held_rooms,
+            "template violates held-out room reservation")
+    for obj in template.objects:
+        require(obj.ready and obj.readiness_source, "unready model in release")
+        if obj.semantic_kind in ("wall", "floor"):
+            continue
+        if template.split in ("train", "eval_standard"):
+            require(obj.model_key not in reservations["train_exclude_models"], "held-out model in held-in release")
+            require(obj.asset_sha256 not in hashes["reserved_asset_hashes"], "held-out asset bytes in held-in release")
+            require(obj.category not in categories or obj.semantic_kind in ("tray", "board"), "held-out category in held-in release")
+        elif template.split == "eval_model":
+            require(obj.model_key in model_pool and obj.model_key not in category_pool, "unreserved model in model holdout")
+            require(obj.category not in categories or obj.semantic_kind in ("tray", "board"), "category holdout in model holdout")
+        else:
+            require(obj.model_key in category_pool, "unreserved model in category holdout")
+            require(obj.category in categories or obj.semantic_kind in ("tray", "board"), "held-in category in category holdout")
+        if template.split in ("eval_model", "eval_category"):
+            require(obj.model_key in ready and ready[obj.model_key]["asset_sha256"] == obj.asset_sha256,
+                    "held-out model bytes differ from its ready reservation audit")
+
+
+def bucket_index(template, group, *, strict):
+    task = template.task
+    if task == "object_scaling":
+        value, edges = group.get("actual_magnitude"), (.05, .10, .15, .30)
+    elif task == "mental_rotation":
+        value, edges = group.get("actual_magnitude"), (30, 45, 75, 120)
+    elif task == "disembedding":
+        value, edges = group.get("actual_crowdedness"), (0, .30, .45, 1)
+    elif task.startswith("configuration_matching-articulation_"):
+        value, edges = group.get("actual_open_fraction"), (0, .5, 1)
+    elif task.startswith("alignment-"):
+        value = group.get("actual_magnitude_deg")
+        edges = template.scene_setup.get("bucket_policy", {}).get("edges", ())
+        require(len(edges) == 4, "alignment needs three pinned native-range buckets")
+    elif task == "configuration_matching-block_design":
+        value = group.get("actual_flips")
+        require(isinstance(value, int) and 1 <= value <= 4, "block group lacks verified flip count")
+        return value - 1
+    else:
+        require(not QUOTAS[task].standard_buckets, "missing strict bucket adapter")
+        return 0
+    require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value), "missing actual bucket metric")
+    require(all(math.isfinite(x) for x in edges) and all(a < b for a, b in zip(edges, edges[1:])), "invalid bucket edges")
+    if not edges[0] <= value <= edges[-1]:
+        require(not strict, "eval metric lies outside task buckets")
+        return None
+    # Crowdedness explicitly assigns .30/.45 to the upper bucket; other tasks
+    # assign a shared boundary to the lower bucket, including exactly50% open.
+    return min(sum(value >= edge if task == "disembedding" else value > edge for edge in edges[1:-1]), len(edges)-2)
+
+
+def _canonical_goal(value):
+    if isinstance(value, dict):
+        return {key: _canonical_quat(item) if key == "orientation" else _canonical_goal(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2 and all(isinstance(item, (tuple, list)) for item in value) and len(value[0]) == 3 and len(value[1]) == 4:
+            return [_canonical_goal(value[0]), _canonical_quat(value[1])]
+        return [_canonical_goal(item) for item in value]
+    return round(value, 6) if isinstance(value, float) else value
+
+
+def _canonical_quat(value):
+    require(len(value) == 4 and all(isinstance(v, (int, float)) and math.isfinite(v) for v in value), "invalid goal quaternion")
+    norm = math.sqrt(sum(v*v for v in value))
+    require(norm > 0, "zero goal quaternion")
+    sign = next((1 if v > 0 else -1 for v in reversed(value) if abs(v) > 1e-12), 1)
+    return [round(sign*v/norm, 6) for v in value]
+
+
+def _db(path):
+    db = sqlite3.connect(path)
+    db.execute("PRAGMA journal_mode=DELETE")
+    db.execute("PRAGMA synchronous=FULL")
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, goal TEXT UNIQUE NOT NULL, review TEXT NOT NULL, record TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, split TEXT NOT NULL,
+            task TEXT NOT NULL, class_id TEXT NOT NULL, bucket INTEGER, template TEXT NOT NULL, record TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS quotas ON members (split, task, class_id, bucket);
+        CREATE TABLE IF NOT EXISTS assets (split TEXT NOT NULL, model TEXT NOT NULL, sha TEXT NOT NULL,
+            category TEXT NOT NULL, kind TEXT NOT NULL, PRIMARY KEY(split,model,sha,kind));
+    """)
+    return db
+
+
+def _quota(q, split):
+    if split == "eval_standard":
+        return 10, q.standard_buckets
+    if split == "eval_model":
+        return q.model_instances_per_class, q.model_buckets
+    return q.category_instances, q.category_buckets
+
+
+def _allocate(rows, *, split, q, eval_counts, train_count):
+    """Whole standard groups preserve a train sibling; train buckets stay soft."""
+    total, buckets = _quota(q, split) if split != "train" else (0, ())
+    def space(row):
+        return sum(eval_counts.values()) < total and (not buckets or eval_counts[row["bucket"]] < buckets[row["bucket"]])
+    result = {}
+    if split in ("eval_model", "eval_category"):
+        for row in rows:
+            if space(row):
+                result[row["instance_id"]] = split
+                eval_counts[row["bucket"]] += 1
+        return result
+    selected = next((row for row in rows if space(row)), None) if split == "eval_standard" and len(rows) >= 2 else None
+    needed = len(rows) - int(selected is not None)
+    if q.train_instances-train_count < needed:
+        return {}  # Never publish an eval member without its training sibling.
+    return {row["instance_id"]: "eval_standard" if row is selected else "train" for row in rows}
+
+
+def claim_group(review, template, reservations, *, reservation_hashes, root, started_at, state_path):
+    root, state_path = Path(root).resolve(), Path(state_path).resolve()
+    require(state_path.is_relative_to(root), "quota database outside campaign")
+    require(review.get("group_closed") is True, "cannot allocate an open goal group")
+    # Re-read the actual reports, source hashes and gate rather than trusting a
+    # previously generated review file or a controller's claimed success.
+    fresh = audit_job(review["source_job"], review["gate"]["path"], root=root, started_at=started_at,
+                      group_closed=True, group_id=review["group_id"])
+    require(digest(fresh) == digest(review), "release evidence changed after review")
+    require(review["validation_key"]["template_sha256"] == template.fingerprint, "release contract differs from validated template")
+    check_reservations(template, reservations, reservation_hashes)
+    gid = review["group_id"]
+    require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", gid), "unsafe group id")
+    rows, goals = [], []
+    for member in review["members"]:
+        raw = read(member["tro"])["ispatialgym"]
+        block = raw["campaign"]
+        require(block["split"] == template.split, "release split differs from contract")
+        group = block["runtime"]["goal_group"]
+        p = block["perturbations"]
+        perturb = Perturbations({n: ScaleState(**v) for n, v in p["scales"].items()}, tuple(p["removed_objects"]), p["lighting"])
+        perturb.validate(template.split, p["scales"])
+        bucket = bucket_index(template, group, strict=template.split != "train")
+        goals.append(digest({"template": physical_template(template), "goal": _canonical_goal(group["requested_goal"]),
+                             "base": _canonical_goal(group.get("base_pose2d")), "perturbations": asdict(perturb)}))
+        rows.append({**member, "bucket": bucket, "sampling_split": template.split})
+    require(len(set(goals)) == 1, "goal group changes goal/base/template/perturbations")
+    policy = {key: reservations[key] for key in ("model_holdout_models", "category_holdout_models", "category_holdout_categories",
+              "category_holdout_rooms", "train_exclude_models", "pending_custom_hard_reservations_not_ready")}
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    with state_path.with_suffix(".lock").open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        db = _db(state_path)
+        try:
+            with db:
+                for key, value in (("campaign", review["campaign_id"]), ("reservations", digest(policy))):
+                    previous = db.execute("SELECT value FROM metadata WHERE key=?", (key,)).fetchone()
+                    require(previous is None or previous[0] == value, "campaign or holdout reservations changed after release")
+                    db.execute("INSERT OR IGNORE INTO metadata VALUES (?,?)", (key, value))
+                previous = db.execute("SELECT review,record FROM groups WHERE id=?", (gid,)).fetchone()
+                if previous:
+                    require(previous[0] == digest(review), "accepted group changed")
+                    return json.loads(previous[1])
+                require(db.execute("SELECT id FROM groups WHERE goal=?", (goals[0],)).fetchone() is None,
+                        "same canonical goal already allocated under another group")
+                split, task = template.split, template.task
+                scope = task if split == "eval_category" else template.class_id
+                counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
+                                                  (split, task, scope))))
+                train_count = db.execute("SELECT COUNT(*) FROM members WHERE split='train' AND task=?", (task,)).fetchone()[0]
+                allocation = _allocate(rows, split=split, q=QUOTAS[task], eval_counts=counts, train_count=train_count)
+                if not allocation:
+                    return {"accepted": {}, "deferred": [row["instance_id"] for row in rows], "reason": "quota full"}
+                physical = physical_template(template)
+                for obj in template.objects:
+                    if obj.semantic_kind in ("wall", "floor"):
+                        continue
+                    for old_split, model, sha, category, kind in db.execute(
+                            "SELECT split,model,sha,category,kind FROM assets WHERE model=? OR sha=? OR category=?",
+                            (obj.model_key, obj.asset_sha256, obj.category)):
+                        if old_split == split or {old_split, split} <= {"train", "eval_standard"}:
+                            continue
+                        require(model != obj.model_key and sha != obj.asset_sha256, "asset model/hash leaked across held-out splits")
+                        if "eval_category" in (old_split, split):
+                            require(category != obj.category or obj.semantic_kind in ("tray", "board") or kind in ("tray", "board"),
+                                    "asset category leaked across held-out splits")
+                    db.execute("INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?)",
+                               (split, obj.model_key, obj.asset_sha256, obj.category, obj.semantic_kind))
+                for row in rows:
+                    iid = row["instance_id"]
+                    require(db.execute("SELECT id FROM members WHERE id=?", (iid,)).fetchone() is None, "instance already allocated")
+                    if iid not in allocation:
+                        continue
+                    final = allocation[iid]
+                    if final.startswith("eval_"):
+                        templates = {v[0] for v in db.execute("SELECT DISTINCT template FROM members WHERE split=? AND task=? AND class_id=?",
+                                                            (final, task, scope))}
+                        require(not templates or templates == {physical}, "evaluation class changed its pinned template")
+                    record = {**row, "split": final, "group_id": gid, "task": task, "class_id": template.class_id,
+                              "validation_key": review["validation_key"], "gate": review["gate"], "evidence": review["evidence"]}
+                    db.execute("INSERT INTO members VALUES (?,?,?,?,?,?,?,?)",
+                               (iid, gid, final, task, scope, row["bucket"], physical, canonical_json(record)))
+                record = {"schema": "isg-group-assignment-v1", "campaign_id": review["campaign_id"], "group_id": gid,
+                          "accepted": allocation, "deferred": [row["instance_id"] for row in rows if row["instance_id"] not in allocation],
+                          "canonical_goal_sha256": goals[0], "release_review_sha256": digest(review),
+                          "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
+                destination = root / "dataset/groups" / (gid + ".json")
+                if destination.exists():
+                    require(read(destination) == record, "orphan group export has different content")
+                else:
+                    write_json_atomic(destination, record)
+                db.execute("INSERT INTO groups VALUES (?,?,?,?)", (gid, goals[0], digest(review), canonical_json(record)))
+            counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
+            write_json_atomic(root / "dataset/group_counts.json", {"campaign_id": review["campaign_id"], "counts": counts,
+                              "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path)})
+            return record
+        finally:
+            db.close()
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    for name in ("review", "contracts", "reservations", "reservation-hashes", "root", "state"):
+        p.add_argument("--"+name, required=True)
+    p.add_argument("--started-at", type=float, required=True)
+    a = p.parse_args()
+    review = read(a.review)
+    hashes = read(a.reservation_hashes)
+    require(hashes["reservation_sha256"] == file_digest(a.reservations), "reservation file changed after asset audit")
+    result = claim_group(review, load_template_contract(a.contracts, review["class_id"]), read(a.reservations),
+                         reservation_hashes=hashes, root=a.root, started_at=a.started_at, state_path=a.state)
+    print(json.dumps({key: result[key] for key in ("accepted", "deferred")}))
+
+
+if __name__ == "__main__":
+    main()

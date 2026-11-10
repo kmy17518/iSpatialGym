@@ -245,3 +245,35 @@ def test_alignment_buckets_use_applied_native_range_without_widening(tmp_path):
     assert bound.fingerprint != template.fingerprint
     with pytest.raises(c.ContractError, match="native alignment range"):
         g.with_alignment_buckets(template, [25, 25], source={"sha256": c.digest("meta"), "field": "applied_range"})
+
+
+def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_path):
+    import pytest
+    source, runtime = tmp_path / "source", tmp_path / "runtime"
+    source.mkdir()
+    runtime.mkdir()
+    atom = "(layout_reached ?apple.n.01_1)"
+    old = """(define (problem configuration_matching-1) (:domain ispatialgym)
+    (:alias configuration_matching-articulation_open_small_scale-test)
+    (:objects apple.n.01_1 - apple.n.01 agent.n.01_1 - agent.n.01)
+    (:init (grasped agent.n.01_1 apple.n.01_1))
+    (:goal (and (not (grasped ?agent.n.01_1 ?apple.n.01_1)) (pose_settled ?apple.n.01_1) (layout_reached ?apple.n.01_1))))"""
+    new = old.replace(":alias", ":variant").replace(" " + atom, "")[:-1] + "(:measure " + atom + "))"
+    def write(directory, text):
+        (directory / "problem.bddl").write_text(text)
+        c.write_json_atomic(directory / "template_meta.json", {"activity_definition": "problem.bddl", "problem": "configuration_matching-1",
+                                                               "bddl_sha256": c.file_digest(directory / "problem.bddl")})
+    write(source, old)
+    write(runtime, new)
+    obj = c.ObjectRef("apple.n.01_1", "target", "apple", "a", c.digest("asset"), ready=True, readiness_source="test")
+    template = c.Template("t", "configuration_matching-articulation_open_small_scale", "x", "eval_standard", "house_single_floor", "living_room_0", (obj,), c.digest("definition"),
+                          {"source_template": str(source), "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
+    bound = g.bind_runtime_definition(template, runtime)
+    proof = bound.scene_setup["runtime_bddl_equivalence"]
+    assert proof["semantic_equivalence"] is False
+    assert proof["migration"]["id"] == "2026-10-14_articulation_measure_migration"
+    assert proof["migration"]["removed_gating_atoms"] == [["layout_reached", "?apple.n.01_1"]]
+    write(source, old[:-1] + "(:measure " + atom + "))")
+    template = replace(template, scene_setup={**template.scene_setup, "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
+    with pytest.raises(c.ContractError, match="semantics differ"):
+        g.bind_runtime_definition(template, runtime)

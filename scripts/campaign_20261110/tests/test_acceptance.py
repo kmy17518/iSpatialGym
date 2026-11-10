@@ -9,26 +9,26 @@ import pytest
 from scripts.campaign_20261110 import acceptance as a, contracts as c
 
 
-def fixture(root, split="eval_standard", starts=(1, 2)):
+def fixture(root, split="eval_standard", starts=(1, 2), prefix=""):
     since = time.time() - 60
     snapshot = root / "code/snapshot"
-    snapshot.mkdir(parents=True)
+    snapshot.mkdir(parents=True, exist_ok=True)
     (snapshot / ".snapshot_commit").write_text("test-frozen-code\n")
     obj = c.ObjectRef("apple.n.01_1", "target", "apple", "abc", c.digest("asset"), ready=True, readiness_source="test")
     template = c.Template("template", "object_scaling", "apple", split, "house_single_floor", "room", (obj,), c.digest("definition"))
     perturb = c.Perturbations({obj.instance: c.ScaleState((1, 1, 1), (1, 1, 1))})
     key = c.ValidationKey(template.fingerprint, c.file_digest(snapshot / ".snapshot_commit"), c.digest("physics"), c.digest("data"), perturb.scale_fingerprint)
-    job = root / "out/group/job"
+    job = root / "out" / (prefix+"group") / "job"
     inst = job / "inst/template/instances"
     inst.mkdir(parents=True)
-    gate_dir = root / "validation/gate"
+    gate_dir = root / "validation" / (prefix+"gate")
     gate_dir.mkdir(parents=True)
     reports = []
     for n, start in enumerate(starts):
-        iid = f"fresh_{n}"
+        iid = f"{prefix}fresh_{n}"
         tro = c.attach_tro_metadata({"ispatialgym": {"instance_id": iid, "object_bindings": {obj.instance: {"category": "apple", "model": "abc"}}}},
             campaign_id="campaign", split=split, template=template, created_at=time.time(), seed=n, perturbations=perturb,
-            validation_key=key, goal_group_id="group")
+            validation_key=key, goal_group_id=f"{prefix}group")
         tro["ispatialgym"]["campaign"]["runtime"] = {"goal_group": {"requested_goal": [0, 1, 2], "requested_start": [start, 3, 4]}}
         tro_path = inst / f"{iid}-tro_state.json"
         c.write_json_atomic(tro_path, tro)
@@ -51,7 +51,7 @@ def fixture(root, split="eval_standard", starts=(1, 2)):
                 "instance": str(tro_path), "demo": str(demo), "tro_sha256": c.file_digest(tro_path), "demo_sha256": c.file_digest(demo)}
     gate_path = gate_dir / "gate.json"
     c.write_json_atomic(gate_path, gate)
-    return SimpleNamespace(root=root, job=job, gate=gate_path, since=since, reports=reports)
+    return SimpleNamespace(root=root, job=job, gate=gate_path, since=since, reports=reports, template=template)
 
 
 def audit(f, closed=True):
