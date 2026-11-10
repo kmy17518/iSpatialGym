@@ -31137,7 +31137,19 @@
     "max_penetration_m": 0.005,
     "preshape": true
    },
-   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)",
+   "inside_goal_region": {
+    "frame": "world",
+    "x": [
+     5.645,
+     5.705
+    ],
+    "y": [
+     -1.874,
+     -1.814
+    ]
+   },
+   "_inside_goal_region_note": "i7-sink 2026-11-09 (owner A3): the goal cells within 3 cm of the basin_fit_probe drop centre [5.675, -1.844] of drop_in_sink_awvzkn_0 (world xy; its goal-check drops there and 2 cm off settled within 15 deg, 13/13); without it the awvzkn goal cells of i7-ft2 reached (5.63-5.73, -1.87 / -1.89), up to 5 cm off the probe's drop centre"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: plate/luhkiz into drop_in_sink_awvzkn_0 from bar_udatjt_0 (1.3 m, the 1.05 m kitchen island, sheet ~T2); hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone || i7-sink 2026-11-09 (owner A3a, a smaller plate): the awvzkn template with plate luhkiz scaled 0.8 (0.192 m across; v2 entry plate__luhkiz__s0.8, legacy key plate__luhkiz__ts080). basin_fit_probe (trunk_612331b3): awvzkn's collision basin is ~0.19-0.20 m flat across x with walls rising ~7 cm in 3 cm; the full-size plate settles 14.5-34.8 deg (1/13 goal-check drops <= 15), the 0.8 plate 2.9-14.0 deg (13/13; typically ~3 deg on the drain cover). Goal tilt limit and success measure unchanged."
@@ -31416,7 +31428,19 @@
     "max_penetration_m": 0.005,
     "preshape": true
    },
-   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)"
+   "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)",
+   "inside_goal_region": {
+    "frame": "world",
+    "x": [
+     5.645,
+     5.705
+    ],
+    "y": [
+     -1.874,
+     -1.814
+    ]
+   },
+   "_inside_goal_region_note": "i7-sink 2026-11-09 (owner A3): the goal cells within 3 cm of the basin_fit_probe drop centre [5.675, -1.844] of drop_in_sink_awvzkn_0 (world xy; its goal-check drops there and 2 cm off settled within 15 deg, 13/13); without it the awvzkn goal cells of i7-ft2 reached (5.63-5.73, -1.87 / -1.89), up to 5 cm off the probe's drop centre"
   },
   "constraints": [],
   "_note": "owner 2026-10-12 ~16:05 iorsl3 inside inter_object_relation_satisfaction-inside_large_scale#03: plate/luhkiz into drop_in_sink_awvzkn_0 from countertop_kelzer_0 (0.6 m, sheet ~T1) / countertop_kelker_0 (1.6 m, ~T3); the order pins one per step; hand-made (no candidates rows for the subtask: the grounder skips it) as the ontop / under aliases of 360ad456, BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test, so a re-ground leaves it alone || i7-sink 2026-11-09 (owner A3a, a smaller plate): the awvzkn template with plate luhkiz scaled 0.8 (0.192 m across; v2 entry plate__luhkiz__s0.8, legacy key plate__luhkiz__ts080). basin_fit_probe (trunk_612331b3): awvzkn's collision basin is ~0.19-0.20 m flat across x with walls rising ~7 cm in 3 cm; the full-size plate settles 14.5-34.8 deg (1/13 goal-check drops <= 15), the 0.8 plate 2.9-14.0 deg (13/13; typically ~3 deg on the drain cover). Goal tilt limit and success measure unchanged."
@@ -31545,7 +31569,19 @@
     "preshape": true
    },
    "_approach_finger_support_touch_note": "owner 2026-10-13 ~03:15 item 3: the B pick's approach (grasp_5, 28 deg down) failed approach_untrackable 37-2164 times per step - the sampler's fully open lower finger 3.5-12.8 mm in the counter 4-6 cm before the grasp; the finger links may touch the init support lightly (<= 5 mm) at the oracle's pre-shaped opening (pinch / 2 + 10 mm = 13.9 mm), the palm / wrist / arm at margin 0; demo guard: robot_wobble (torso <= 1.0 deg)",
-   "_init_support_note": "i7-sink 2026-11-09: no init_support_max_geodesic_m (the awvzkn entry's 10 m cap): the named support is taken as bound - the cap's geodesic between the near-side anchors of vekaaf and countertop_ikwqer_0 (the same counter row, 1.25 m apart) found no path (template s0_i7sink: init_support_dropped 'no geodesic to the partner'); the stances' own navigation checks stay"
+   "_init_support_note": "i7-sink 2026-11-09: no init_support_max_geodesic_m (the awvzkn entry's 10 m cap): the named support is taken as bound - the cap's geodesic between the near-side anchors of vekaaf and countertop_ikwqer_0 (the same counter row, 1.25 m apart) found no path (template s0_i7sink: init_support_dropped 'no geodesic to the partner'); the stances' own navigation checks stay",
+   "inside_goal_region": {
+    "frame": "world",
+    "x": [
+     24.459,
+     24.519
+    ],
+    "y": [
+     -1.374,
+     -1.314
+    ]
+   },
+   "_inside_goal_region_note": "i7-sink 2026-11-09 (owner A3): the goal cells within 3 cm of the basin_fit_probe drop centre [24.489, -1.344] of tabletop_sink_vekaaf_0 (world xy; its goal-check drops there and 2 cm off settled within 15 deg, 13/13); without it template s0_i7sink2 (trunk_e05c9273): the goal cell nearest the base, (24.51, -1.40), 5.6 cm past the probe's drop centre along the basin, settled 18.8 deg [goal_tipped]"
   },
   "constraints": [],
   "_note": "i7-sink 2026-11-09 (owner A3b): plate/luhkiz into tabletop_sink_vekaaf_0 (house_single_floor utility_room_0, the sink on the counter row at x 24.5) from countertop_ikwqer_0 (top 0.93, 1.25 m along the same row); generation = the awvzkn countertop variant's with the vekaaf inside keys; BDDL rendered from inside_large_scale.iddl; target orientation zinf (round class); registry mode test"
