@@ -6625,6 +6625,68 @@ behaviour: customs, an interior spec, a v2 library entry and maps only).
   (0.098); the fallback passes 169 hand judgements and moves ~14 lean_left_15 attempts past the grasp, which then fail the tip release's
   place (descent IK, joint 2 at its limit); lean_left_15 still writes 0. Not a default (the owner's call).
 
+## The eval-measure change: the lying briefcase and free yaw for round objects (branch `i7-measure`, owner A2 + A4, 2026-11-09)
+
+The owner decided two success-measure changes on 2026-11-09 (`tmp/outputs/owner_review_20261109.md` A2 option (b), A4) and asked for them
+to ship together, so that scores change once. Both are behind switches that are default OFF, and **they are flipped together in one
+commit** (the eval-measure commit). The success measure is the one the demo QA, replay and policy eval all read (`pose_reached` through
+`eval.tro.apply_targets_to_scope`).
+
+**A2: `ISPATIALGYM_BRIEFCASE_LYING` (iors_large).** under_large_02's briefcase (lwbctq) stands on its 0.12 x 0.33 edge, 0.27 m tall. In the
+floor push its yaw grows within a stroke, the hand meets the end face's corner and it topples (84-93 deg; DECISIONS #60 / #72), so 1 demo
+in 4 is kept. The switch acts only where the customs set `generation.push_under_goal_rest = "lying"` (under_large_02's
+`...briefcase-desk_mdhelw_0-floor_pitched` alone) and the push is the pitched hand's. There it builds the three parts the owner named:
+- **the 90 deg tilt in the hand**: at stance C the carried object is turned onto its largest face (`lying_rest`: the thinnest object axis
+  to the vertical). The F_goal screen at the drop cell, the attached drop IK, the carry leg tracked to the tilted pre-place, the push chain
+  and the drop record all use `IORSLarge.c_quat`. The pick at B is unchanged: the briefcase still starts standing;
+- **the lying goal orientation**: `summary.goal_quat`, which becomes the TRO pose target, is the lying orientation at the carried yaw
+  (`summary.goal_rest = "lying"`). The task therefore asks for the briefcase lying flat under the desk;
+- **the contact rule of the pitched hand**: lying, the centre of mass is 0.06 m up and the fingertips 0.08 m, so today's rule (the leading
+  edge below the centre of mass) refuses every turn. The lying rule (`push_contact_cap`) keeps the edge on the back face (2 cm below the
+  top) and below the no-tip bound 0.75 x (centre of mass to the front bottom edge along the push) / 0.8. For the lying briefcase the back
+  face binds (0.10 m).
+
+Kit counters: `briefcase_lying.rest` / `.release` / `.contact_cap` / `.coupled`.
+
+**A4: `ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC` (eval.round_symmetry).** The measure gated a round object's yaw: under_large_03's trash can
+(trash_can/jlawet) ended `symbolic_only` after turning 0.22 rad in the push. The QA's `placed_orientation` already called that yaw free, but
+through its push-under rule (any pushed object, round or not), not through a symmetry notion. Its only symmetry notion is the cylinder table
+`assets/icl/revolution_axes.json` (the ICL symmetry survey's body-of-revolution tags about the long axis), and that table lacks the can
+(0.28 x 0.28 x 0.28: no long axis). One notion now serves both, and both read it only with the switch on:
+- the table `assets/icl/round_axes.json` (`scripts/symmetry/revolution_axes.py --rule round`): every model whose ICL `symmetry` column holds
+  a body-of-revolution tag. That column is the reviewed notion "geometry and texture identical", and the customs roles' equivalences already
+  come from it. It has 166 models: round cans, plates, bowls, glasses, lids, caps and plain cylinders. The survey's geometry-only lists, which
+  the cylinder table also reads, are left out, because a wall clock's face (jerval) or a printed marker turns visibly;
+- the measure: a pose target whose object is in the table gets the continuous rotation about that axis added to its
+  `orientation_equivalences`. This is the survey's own enumeration, 72 rotations at 5 deg, so a pure turn leaves at most 0.044 rad. It is
+  composed with the target's recorded equivalences. The TRO file is not changed;
+- the QA: `Executor.revolution_axis_of` reads the same table for a model the cylinder table lacks. Where both tables hold a model they
+  have the same axis.
+
+Kit counts `round_symmetry.COUNTS`; `meta.success_yaw_free` per demo.
+
+**Results (2026-11-09 / 11-10; index 360000, N 4, svl titanrtx, own ledger + empty cache per arm).**
+- **A4, offline re-score of every recorded under_large_03 demo** (`$OFH/measure_20261109/rescore_ul03.py`, 113 unique demos):
+  - Recomputing with the full error reproduces the recorded per-step error and `geometric_within` at every step.
+  - 27 of 29 symbolic_only demos become success (full error 0.10-0.40 rad, yaw-free <= 0.014 rad); 2 stay symbolic_only on position.
+  - ok goes from 31 to 58 of 113.
+- **A4, where it acts** (`affected.py`): 4 targets in 4 aliases - under_large_03's can, inside_large_03's plate luhkiz, disembedding_05's
+  beaker, disembedding_07's tape. 7 more round targets are already free through customs `zinf`.
+- **A4, under_large_03 A/B:** OFF 42 att / 3 wr / 1 ok (4.08 GPU-h per ok), ON 35 / 3 / 0. The switch acted but decided no verdict: every
+  failure was a hard one (robot_wobble, collision).
+- **A2, under_large_02 OFF** (standing): 12 / 4 / 1, 6.60 GPU-h per ok.
+- **A2, the lying arms built up in four steps, 2 lying demos each:**
+  1. No drop was reachable at 0.15 m (fixed by cf37dc01).
+  2. Backing off the drop along -a hit the torso or a joint jump (fixed by cf8c0375).
+  3. All actions were ok, but the yaw drifted to 72-78 deg in 0.10 m strokes (fixed by b13771ab, which held the yaw within +-13 deg).
+  4. The remaining failures:
+     - the push's arm-locked base nudge trips the QA pause (pre-existing: fpr2_base, ul02_lb_sd0);
+     - the place's up-retreat hits a joint jump at the near-singular horizontal-hand drop configuration (lower_drop never lowers a lying
+       drop for the same reason);
+     - 0.046 rad of yaw over tolerance.
+  - The lying briefcase always landed flat (tilt <= 0.1 deg) and never toppled. 0 ok in 4 lying demos, so **no default is flipped**; the
+    lead cancelled the arms. The proposed fixes wait for the owner (DECISIONS 2026-11-10 i7-measure).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation

@@ -1053,6 +1053,12 @@ class Place(Action):
     #: instances the action must not touch (QA: forbidden contacts beyond the drop container), e.g. the partner a
     #: push-under drop lands in front of
     avoid: Tuple[str, ...] = ()
+    #: i7-measure (owner A2 (b), ``ISPATIALGYM_BRIEFCASE_LYING``; the sampler records ``grasps[0].drop_retreat_up_m``): a drop whose hand
+    #: holds the object turned onto its side retreats this far straight UP instead of ``RETREAT_DIST`` back along -a. The lying briefcase is
+    #: held by its handle with the hand horizontal close to the crouched torso: backing off along -a pulled the wrist into torso_link2
+    #: (ms_ul02_on2 360000 robot_touching_itself) or through a joint jump (360001 plan_failed, both place attempts). The dropped object
+    #: falls away at the release, so nothing is under the lower finger. None = the retreat along -a (every other place)
+    retreat_up_m: Optional[float] = None
     TARGET_KEYS = ("pre_place", "place", "descent", "retreat", "carry", "carry_via")
     KINDS: ClassVar[Tuple[str, ...]] = ("support", "drop", "attach")
 
@@ -1066,7 +1072,7 @@ class Place(Action):
     def targets(self, sidecar, state):
         C = _conventions()
         pre = self.pre_place if self.pre_place is not None else _pre(C, self.place, PRE_DIST)
-        back = _pre(C, self.place, RETREAT_DIST)
+        back = self._back(C)
         carry, via = self._carry_leg(C, sidecar, state, pre)
         return {"pre_place": pre, "place": self.place, "descent": _line(C, pre, self.place), "retreat": _line(C, self.place, back),
                 "carry": carry, "carry_via": via}
@@ -1101,8 +1107,15 @@ class Place(Action):
             a = b
         return legs, via
 
+    def _back(self, C) -> Pose:
+        """Where the place's retreat ends: ``pre_pose(place, RETREAT_DIST)``, or :attr:`retreat_up_m` straight up from the place."""
+        if self.retreat_up_m is None:
+            return _pre(C, self.place, RETREAT_DIST)
+        p = _tensor(self.place.position).reshape(-1)[:3].float() + _tensor([0.0, 0.0, float(self.retreat_up_m)])
+        return Pose([float(v) for v in p.tolist()], list(self.place.orientation))
+
     def end_pose(self, sidecar, state):
-        return _pre(_conventions(), self.place, RETREAT_DIST)
+        return self._back(_conventions())
 
     def annotate(self, sidecar):
         lang = sidecar.language

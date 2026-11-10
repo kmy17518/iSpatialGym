@@ -209,6 +209,146 @@ def push_chain_live_b_on() -> bool:
     return os.environ.get(PUSH_CHAIN_LIVE_B_ENV, "1").strip().lower() not in ("0", "off", "false", "no", "")
 
 
+#: i7-measure 2026-11-09 (owner decision A2, option (b); one eval-measure change with A4, ``ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC``): the
+#: push-under target DROPPED LYING FLAT instead of standing as it was picked. under_large_02's briefcase (lwbctq, 0.27 tall on its 0.12 x
+#: 0.33 edge) topples in the floor push: the yaw grows within a stroke, the hand meets the end face's corner and it falls over (84-93 deg;
+#: i7-floorpush D / r2, DECISIONS #60 / #72) - 1 kept demo in 4. Lying on its 0.33 x 0.27 face (0.12 tall, the centre of mass 0.06 m up)
+#: it cannot tip at the pitched hand's contact. With ``ISPATIALGYM_BRIEFCASE_LYING=1`` (default OFF) a variant whose customs set
+#: ``generation.push_under_goal_rest`` = ``"lying"`` (only under_large_02's ``...briefcase-desk_mdhelw_0-floor_pitched``; the switch acts
+#: nowhere else) and that pushes with the pitched hand:
+#:   (1) the 90 deg TILT IN THE HAND: at stance C the carried object is turned onto its largest face (:func:`lying_rest`: its thinnest
+#:       axis to the vertical, about the horizontal axis square to it) - the F_goal screen at the drop cell, the attached drop IK, the carry
+#:       leg tracked to the tilted pre-place (the oracle's carry leg SLERPs the hand's orientation, as the inside mode's tilted releases),
+#:       the push chain and the drop record all at :meth:`IORSLarge.c_quat`; the pick at B is unchanged (the object stands as it was set);
+#:   (2) the LYING GOAL ORIENTATION: ``summary.goal_quat`` (the TRO pose target the success measure gates, ``goal_quat_of``) is the lying
+#:       orientation at the carried yaw, so the task asks for the briefcase lying flat under the desk (``summary.goal_rest`` = "lying");
+#:   (3) the CONTACT RULE of the pitched hand: the fingertips' leading edge no longer has to stay below the centre of mass (0.06 m lying,
+#:       the tips 0.08 m up) - it has to stay on the object's back face (:data:`LYING_TOP_MARGIN_M` below its top) and low enough that the
+#:       push cannot tip it about its front bottom edge (contact height <= :data:`LYING_NO_TIP_SAFETY` x the centre of mass's distance to
+#:       that edge along the push / :data:`LYING_NO_TIP_MU`; :meth:`IORSLarge.push_contact_cap`).
+#: Kit counters ``briefcase_lying.rest`` (template), ``.release`` (a drop IK at the lying orientation), ``.contact_cap`` (a pitched chain
+#: under the lying rule), ``.coupled`` (a draft written lying). "0" = today's standing drop and goal.
+BRIEFCASE_LYING_ENV = "ISPATIALGYM_BRIEFCASE_LYING"
+#: the customs key that scopes the switch (``generation.push_under_goal_rest``) and its one value that acts
+PUSH_UNDER_GOAL_REST_KEY = "push_under_goal_rest"
+LYING = "lying"
+#: the lying contact rule: the fingertips' leading edge this far below the lying object's top, the no-tip bound's friction and safety
+LYING_TOP_MARGIN_M = 0.02
+LYING_NO_TIP_MU = 0.8
+LYING_NO_TIP_SAFETY = 0.75
+#: the lying drop's bottom heights above the floor, screened in turn per C (``generation.push_under_lying_drop_heights_m``): the handle is held
+#: with the hand horizontal, out of the arm's reach at the standing drop's 0.15 m (the oracle's drop then lowers it as far as the arm comes)
+LYING_DROP_HEIGHTS_M = (0.15, 0.25, 0.35)
+#: the lying drop's retreat straight up (``grasps[0].drop_retreat_up_m`` -> ``oracle.actions.Place.retreat_up_m``), the Retreat after it up too
+LYING_DROP_RETREAT_UP_M = 0.10
+#: the lying push's strokes (``generation.push_under_lying_stroke_m`` / ``_reaim_max_m`` / ``_yaw_gain``): ms_ul02_on3 360000 pushed the lying
+#: briefcase in today's 0.10 m strokes with the 3 cm re-aim cap (sized for the standing briefcase's 0.12 m end face) - it did not tip, but
+#: it turned 6 -> 19 -> 55 -> 72 deg (symbolic_only on the yaw, position 0.049 m); lying, its back face is 0.27-0.33 m wide, so the hand can
+#: re-aim farther: 0.05 m strokes, a re-aim within 0.08 m, yaw term 0.30 m/rad
+LYING_STROKE_M = 0.05
+LYING_REAIM_MAX_M = 0.08
+LYING_YAW_GAIN_M_PER_RAD = 0.30
+#: the lying push's final yaw stroke (lead #90 item 2; ``execute._push_strokes`` reads ``yaw_final_m`` from the plan): once more, ``LYING_YAW_FINAL_M``
+#: beyond the back, when the yaw is still beyond ``LYING_YAW_FINAL_MIN_DEG`` (ms_ul02_on4 360000 ended 11.2 deg off: 0.196 rad > 0.15)
+LYING_YAW_FINAL_M = 0.02
+LYING_YAW_FINAL_MIN_DEG = 3.0
+#: the lying drop's singularity screen (lead #90 item 1): the drop's attached IK witness must track LYING_SCREEN_LOWER_M straight down (the oracle's
+#: lower_drop) and the place's up-retreat (LYING_DROP_RETREAT_UP_M) with the oracle's dense differential IK (IKChecker.track_chain), else the draw
+#: is refused at C ('lying drop near the wrist singularity'): every lying demo's lower_drop failed on 0.20-0.29 rad joint jumps and on4 360001's
+#: up-retreat on a 0.31 rad one
+LYING_SCREEN_LOWER_M = 0.10
+#: lead #92d (owner, option (b)): the lowering check is OFF by default (``generation.push_under_lying_screen_lower`` true turns it on) - over the
+#: cancelled r2_ul02_lying jobs it removed every one of 270 drops that reached it (0 passed: a horizontal-hand drop never tracks a lowering) while
+#: every lying demo landed flat from 0.22-0.25 m without one; the up-retreat check (on4 360001's failure) stays
+LYING_SCREEN_LOWER_DEFAULT = False
+#: lead #92d (owner, option (a)): the PARTIAL-TILT release of the lying briefcase - ``ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG`` (e.g. "70,60,75"; unset =
+#: the full 90 deg lying release; acts only where :attr:`IORSLarge.lying` acts): the carried briefcase is turned only this far (deg from standing
+#: toward lying) at the drop, its lowest edge :data:`LYING_PARTIAL_CLEAR_M` above the floor, and falls the rest of the way onto its large face. The
+#: hand holding the handle is then pitched instead of horizontal (the horizontal hand sits on the wrist's singular branch: its lowering never
+#: tracks, its retreat jumped). The release xy is moved so the briefcase LANDS (the remaining turn about its lowest edge, :func:`partial_landing`)
+#: at the drop cell the push chain starts from; the goal / push orientation stays the lying one. The tilts are screened in turn per C.
+BRIEFCASE_LYING_TILT_ENV = "ISPATIALGYM_BRIEFCASE_LYING_TILT_DEG"
+LYING_PARTIAL_CLEAR_M = 0.03
+
+
+def briefcase_lying_tilts() -> List[float]:
+    """:data:`BRIEFCASE_LYING_TILT_ENV` as a list of tilts (deg, 0 < t < 90), [] when unset / malformed (the full lying release)."""
+    out: List[float] = []
+    for v in (os.environ.get(BRIEFCASE_LYING_TILT_ENV) or "").replace(";", ",").split(","):
+        try:
+            f = float(v)
+        except ValueError:
+            continue
+        if 0.0 < f < 90.0:
+            out.append(f)
+    return out
+
+
+def partial_landing(hull: th.Tensor, q_lying, axis_world, tilt_deg: float) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    """The partial-tilt release of a lying target: ``(q_release, release_offset, landing_shift)``. ``q_release`` = ``q_lying`` turned back by
+    (90 - ``tilt_deg``) about ``axis_world`` (the lying turn's horizontal axis at this yaw); ``release_offset`` = the root's position relative to the
+    released hull's lowest point (z: the root above it); ``landing_shift`` = the root's horizontal move when the target falls the remaining
+    (90 - tilt) about the pivot through that lowest point onto ``q_lying`` (rigid rotation, no slide)."""
+    a = G.t(axis_world).float()
+    a = a / max(float(th.linalg.norm(a)), 1e-9)
+    back = math.radians(90.0 - float(tilt_deg))
+    q_l = G.t(q_lying).float()
+    q_r = G.qmul(G.quat_about_axis(a, -back), q_l)
+    q_r = q_r / th.linalg.norm(q_r)
+    pts = G.local_points_world(hull, (th.zeros(3), q_r))
+    z = pts[:, 2]
+    low = pts[z <= float(z.min()) + 0.005].mean(dim=0)  # the lowest edge's centre (points within 5 mm of the lowest)
+    rel = -low  # root minus pivot, root at the origin
+    rot = G.quat_about_axis(a, back)
+    rel_l = G.rotate(rot, rel)
+    shift = (rel_l - rel)
+    return q_r, -low, th.tensor([float(shift[0]), float(shift[1])])
+
+
+def briefcase_lying_on() -> bool:
+    # default OFF (i7-measure, owner A2 option (b) - the default flips only in the eval-measure commit, with A4); "1" on
+    return os.environ.get(BRIEFCASE_LYING_ENV, "0").strip().lower() in _ON
+
+
+def lying_rest(hull: th.Tensor, rest, flip: bool = False) -> Tuple[th.Tensor, Dict[str, Any]]:
+    """The lying rest of a target standing at ``rest`` (world orientation at yaw 0): ``rest`` turned about the horizontal axis square to its
+    thinnest object-frame axis (the hull's smallest box extent) until that axis points up (``flip``: down - the other large face up), 90 deg
+    for an axis lying horizontal. Returns ``(quat, facts)``; ``quat`` is ``rest`` itself when that axis already stands within 25 deg of the
+    vertical (nothing to tilt)."""
+    lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
+    ext = (hi - lo).float()
+    k = int(th.argmin(ext))
+    e = th.zeros(3)
+    e[k] = -1.0 if flip else 1.0
+    v = G.rotate(G.t(rest).float(), e)
+    facts = {"thin_axis": "xyz"[k], "extents_m": [round(float(x), 4) for x in ext], "flip": bool(flip), "thin_world_at_rest": [round(float(x), 4) for x in v]}
+    if abs(float(v[2])) >= math.cos(math.radians(25.0)):
+        facts["tilt_deg"] = 0.0
+        return G.t(rest).float(), facts
+    vh = th.tensor([float(v[0]), float(v[1]), 0.0])
+    vh = vh / max(float(th.linalg.norm(vh)), 1e-9)
+    axis = th.linalg.cross(vh, th.tensor([0.0, 0.0, 1.0]))  # about (v x z) a positive turn brings v up toward +z
+    ang = math.pi / 2 - math.asin(max(-1.0, min(1.0, float(v[2]))))  # v slightly off the horizontal: the remainder to the vertical
+    q = G.qmul(G.quat_about_axis(axis / max(float(th.linalg.norm(axis)), 1e-9), ang), G.t(rest).float())
+    facts["tilt_deg"] = round(math.degrees(ang), 2)
+    facts["tilt_axis_world"] = [round(float(x), 4) for x in axis]
+    return q / th.linalg.norm(q), facts
+
+
+def c_quat_of(s, yaw: float) -> th.Tensor:
+    """``s.c_quat(yaw)`` (:meth:`IORSLarge.c_quat`), ``yaw * s.rest`` for a stand-in without it (the module's unbound-method tests)."""
+    fn = getattr(s, "c_quat", None)
+    return fn(yaw) if callable(fn) else G.qmul(G.quat_from_yaw(float(yaw)), s.rest)
+
+
+def lying_contact_cap(top_h: float, front_m: float) -> float:
+    """The lying contact rule's highest fingertip leading edge (m above the object's bottom): on the back face (``top_h`` -
+    :data:`LYING_TOP_MARGIN_M`) and below the no-tip bound - a box pushed at height h by the sliding force mu m g tips about its front bottom
+    edge only when mu h > ``front_m`` (the centre of mass's horizontal distance to that edge along the push): h <= :data:`LYING_NO_TIP_SAFETY`
+    x front / :data:`LYING_NO_TIP_MU`."""
+    return min(float(top_h) - LYING_TOP_MARGIN_M, LYING_NO_TIP_SAFETY * float(front_m) / LYING_NO_TIP_MU)
+
+
 def count_pick_preshape(s, g, where: str) -> None:
     """i7-interior2 (owner 6.1): one kit counter per IORS large pick whose support policy measures the fingers at the grasp's pre-shape
     (``tabletop.policy_opening_of``: pinch width / 2 + the preshape margin) - ``pick_preshape.<where>`` - or at the configuration's
@@ -1769,6 +1909,78 @@ class IORSLarge(SamplerV2):
             raise Reject("spec", f"generation.push_under_hand {v!r} is not one of {PUSH_UNDER_HANDS}")
         return v
 
+    # ------------------------------------------------------------------ i7-measure (owner A2 (b)): the push-under target dropped lying flat
+
+    @property
+    def lying(self) -> bool:
+        """:data:`BRIEFCASE_LYING_ENV` acts here: the switch on, the variant's ``generation.push_under_goal_rest`` = ``"lying"``, a push-under
+        goal pushed with the pitched hand (under_large_02's briefcase). ``Reject("spec")`` for another value of the key."""
+        v = self.gp.gen(PUSH_UNDER_GOAL_REST_KEY)
+        if v is None or str(v) == "standing":
+            return False
+        if str(v) != LYING:
+            raise Reject("spec", f"generation.{PUSH_UNDER_GOAL_REST_KEY} {v!r} is not 'standing' or {LYING!r}")
+        return (briefcase_lying_on() and getattr(self, "relation", None) == "under" and bool(self.push_under) and self.push_hand == "pitched_far")
+
+    def c_rest(self) -> th.Tensor:
+        """The target's orientation at yaw 0 at stance C (the drop, the push, the goal): the pick's rest, or with :attr:`lying` the
+        :func:`lying_rest` of it (``generation.push_under_lying_flip`` turns the other large face up), computed once per bound target."""
+        if not self.lying:
+            return self.rest
+        key = (getattr(self.target, "name", None), tuple(round(float(v), 6) for v in G.t(self.rest).tolist()))
+        cached = self.__dict__.get("_c_rest")
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        q, facts = lying_rest(self.hull, self.rest, flip=bool(self.gp.gen("push_under_lying_flip", False)))
+        if not facts.get("tilt_deg"):
+            raise Reject("spec", f"{self.gp.variant}: {PUSH_UNDER_GOAL_REST_KEY} 'lying' but the target already lies on its thinnest axis at its rest ({facts})")
+        self._c_rest = (key, q)
+        self.template_facts["briefcase_lying"] = {**facts, "rest": [round(float(v), 6) for v in G.t(self.rest).tolist()],
+                                                  "lying_rest": [round(float(v), 6) for v in q.tolist()]}
+        TT._count(self, "briefcase_lying.rest")
+        log.info("%s: BRIEFCASE_LYING: the target is dropped and pushed lying flat - rest %s -> lying %s (%s)", self.gp.variant,
+                 [round(float(v), 4) for v in G.t(self.rest).tolist()], [round(float(v), 4) for v in q.tolist()], facts)
+        return q
+
+    def c_quat(self, yaw: float) -> th.Tensor:
+        """The target's orientation at stance C for the carried world ``yaw``: ``yaw * c_rest`` (``yaw * rest`` without :attr:`lying`)."""
+        return G.qmul(G.quat_from_yaw(float(yaw)), self.c_rest())
+
+    def lying_drop_screen(self, q_drop: th.Tensor, place_eef: G.Pose, arm: str, target, eef_in_object) -> Optional[str]:
+        """i7-measure (lead #90 item 1): the lying drop's witness ``q_drop`` tracked as the oracle will move from it - the attached object
+        :data:`LYING_SCREEN_LOWER_M` straight down (``execute.lower_drop``) and the place's straight-up retreat (``Place.retreat_up_m``) - by
+        :meth:`IKChecker.track_chain` (the oracle's dense differential IK, joint step cap, half-spacing retry on a jump), the floor out of the
+        world. None when both track, else why. Kit ``briefcase_lying.screen.pass`` / ``.lower`` / ``.retreat``."""
+        p, q = G.t(place_eef[0]).float(), G.t(place_eef[1]).float()
+        up = (p + th.tensor([0.0, 0.0, float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))]), q)
+        floor = [self.obj("floor")]
+        if bool(self.gp.gen("push_under_lying_screen_lower", LYING_SCREEN_LOWER_DEFAULT)):
+            down = (p - th.tensor([0.0, 0.0, float(self.num("push_under_lying_screen_lower_m", LYING_SCREEN_LOWER_M))]), q)
+            with attached(self.kit, arm, target, eef_in_object=eef_in_object):
+                q_end, why = self.ikc.track_chain(q_drop, [(p, q), down], arm, ignore=floor, refine_jumps=True)
+            if q_end is None:
+                TT._count(self, "briefcase_lying.screen.lower")
+                return f"the {LYING_SCREEN_LOWER_M:.2f} m lowering: {why}"
+        q_end, why = self.ikc.track_chain(q_drop, [(p, q), up], arm, ignore=floor, refine_jumps=True)
+        if q_end is None:
+            TT._count(self, "briefcase_lying.screen.retreat")
+            return f"the up-retreat: {why}"
+        TT._count(self, "briefcase_lying.screen.pass")
+        return None
+
+    def push_contact_cap(self, quat, direction_xy) -> float:
+        """The height (m above the target's bottom at ``quat``) the pitched hand's fingertip leading edge stays below: the centre of mass
+        (today's rule), or with :attr:`lying` the lying rule :func:`lying_contact_cap` - the back face below the top, no tip about the front
+        bottom edge for the push along ``direction_xy``."""
+        if not self.lying:
+            return self.com_height(quat)
+        pts = G.local_points_world(self.hull, (th.zeros(3), G.t(quat)))
+        com = G.local_points_world(self.target_com_local().reshape(1, 3), (th.zeros(3), G.t(quat)))[0]
+        d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1])], dtype=th.float32)
+        d = d / max(float(th.linalg.norm(d)), 1e-9)
+        front = float((pts[:, :2] @ d).max() - com[:2] @ d)
+        return lying_contact_cap(float(pts[:, 2].max() - pts[:, 2].min()), front)
+
     def floorpush(self) -> Dict[str, Any]:
         """The i7-floorpush switches (:func:`floorpush_switches`) that act here: all of them for the under relation's pitched-hand floor push
         (``push_under_hand`` = ``"pitched_far"``: under_large_02 / 03), none anywhere else. ``Reject("spec")`` for a malformed length."""
@@ -1822,9 +2034,38 @@ class IORSLarge(SamplerV2):
         return True
 
     def drop_pose_at(self, xy, quat) -> G.Pose:
-        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy``."""
-        z = self.floor_z + self.world.bottom_offset(self.hull, quat) + float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
+        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy`` (:meth:`drop_height`).
+        With the lying partial tilt (``_lying_tilt``, :data:`BRIEFCASE_LYING_TILT_ENV`): ``quat`` (the lying orientation) turned back to the tilt, the
+        lowest edge :data:`LYING_PARTIAL_CLEAR_M` up, placed so that it lands at ``xy`` (:func:`partial_landing`)."""
+        t = self.__dict__.get("_lying_tilt")
+        if t is not None and getattr(self, "lying", False):
+            q_r, off, shift = partial_landing(self.hull, quat, self.lying_axis_world(quat), float(t))
+            z = self.floor_z + LYING_PARTIAL_CLEAR_M + float(off[2])
+            return th.tensor([float(xy[0]) - float(shift[0]), float(xy[1]) - float(shift[1]), z]), q_r
+        z = self.floor_z + self.world.bottom_offset(self.hull, quat) + self.drop_height()
         return th.tensor([float(xy[0]), float(xy[1]), z]), quat
+
+    def lying_axis_world(self, q_lying) -> th.Tensor:
+        """The lying turn's horizontal axis at the yaw of ``q_lying``: the template's ``tilt_axis_world`` (yaw 0) turned by the yaw between
+        ``c_rest`` and ``q_lying``."""
+        a0 = th.tensor([float(v) for v in (self.template_facts.get("briefcase_lying") or {}).get("tilt_axis_world") or [0.0, 1.0, 0.0]])
+        dq = G.qmul(G.t(q_lying).float(), G.qinv(self.c_rest()))
+        return G.rotate(dq, a0)
+
+    def drop_height(self) -> float:
+        """The drop's bottom height above the floor: ``generation.drop_height_m`` (:data:`PUSH_UNDER_DROP_HEIGHT_M`), or with :attr:`lying` the
+        rung of :data:`LYING_DROP_HEIGHTS_M` the C loop's F_goal screen is at (``_lying_drop_h``)."""
+        h = self.__dict__.get("_lying_drop_h")
+        if h is not None and getattr(self, "lying", False):
+            return float(h)
+        return float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
+
+    def lying_drop_heights(self) -> List[float]:
+        """i7-measure (A2): the lying drop's bottom heights screened in turn at a C (``generation.push_under_lying_drop_heights_m``, default
+        :data:`LYING_DROP_HEIGHTS_M`): the lying briefcase is held by its handle with the hand horizontal, which the arm cannot hold at the
+        standing drop's height (ms_ul02_on: every F_goal 0, the drop eef 0.18-0.19 m up 0.62-0.67 m ahead unreachable even world-free)."""
+        v = self.gp.gen("push_under_lying_drop_heights_m")
+        return [float(x) for x in (v if v is not None else LYING_DROP_HEIGHTS_M)]
 
     #: height of the blade above the fingertips that can meet the pushed object (the finger pads, PAD_Z_RANGE span)
     BLADE_SPAN_M = 0.05
@@ -1991,7 +2232,7 @@ class IORSLarge(SamplerV2):
             return self.contact_offset_along(quat, direction_xy, tip - band, tip + band, section=True)
         if self.push_hand == "pitched_far":
             pitch = self.far_pitches()[0]
-            tip, _, _, q = self.pitched_turns(pitch, (1.0, 0.0), self.com_height(quat))[0]
+            tip, _, _, q = self.pitched_turns(pitch, (1.0, 0.0), self.push_contact_cap(quat, direction_xy))[0]
             if tip is None:
                 return None
             band = TT.flat_tip_half_height(q) * math.sin(math.radians(pitch))
@@ -2131,7 +2372,7 @@ class IORSLarge(SamplerV2):
         lock = self.push_yaw_lock()
         if lock is None:
             return list(yaws)
-        kept = [y for y in yaws if self.push_yaw_kept(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d2, offs.get(y))]
+        kept = [y for y in yaws if self.push_yaw_kept(c_quat_of(self, y + d_yaw), d2, offs.get(y))]
         if len(kept) < len(yaws):
             TT._count(self, "push_yaw_lock.removed")
             log.info("%s: push-under yaw lock %s: kept %d of %d yaws at C (d %.2f λ %+.2f, carry yaw offset %+.2f): %s, offsets %s m", self.gp.variant, lock, len(kept),
@@ -2155,7 +2396,7 @@ class IORSLarge(SamplerV2):
         yaws = sorted({float(y) for y, _ in F_live})
         kept = []
         for y in yaws:
-            q = G.qmul(G.quat_from_yaw(y + d_yaw), self.rest)
+            q = c_quat_of(self, y + d_yaw)
             o = self.push_contact_offset(q, d_push)
             if self.push_yaw_kept(q, d_push, -1.0 if o is None else o):
                 kept.append(y)
@@ -2197,10 +2438,21 @@ class IORSLarge(SamplerV2):
             return {}
         n_max = int(fp["strokes_max"]) if "stroke_m" in fp else int(self.num("push_under_strokes_max", PUSH_STROKES_MAX))
         gain = float(fp["yaw_gain"]) if "stroke_m" in fp else float(self.num("push_under_reaim_yaw_gain", 0.0))
+        reaim = float(self.num("push_under_reaim_max_m", 0.03))
+        if getattr(self, "lying", False):
+            # i7-measure (A2): the lying push's strokes (LYING_STROKE_M; the wide lying back face takes a farther re-aim)
+            v = float(self.num("push_under_lying_stroke_m", LYING_STROKE_M))
+            reaim = float(self.num("push_under_lying_reaim_max_m", LYING_REAIM_MAX_M))
+            gain = float(self.num("push_under_lying_yaw_gain", LYING_YAW_GAIN_M_PER_RAD))
+            n_max = max(n_max, int(math.ceil(float(distance_m) / float(v))) + 1)
+            TT._count(self, "briefcase_lying.strokes")
         plan = push_stroke_plan(distance_m, float(v), n_max,
-                                backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=float(self.num("push_under_reaim_max_m", 0.03)),
+                                backoff_m=float(self.num("push_under_stroke_backoff_m", 0.03)), reaim_max_m=reaim,
                                 yaw_gain_m_per_rad=gain,
                                 yaw_deadband_rad=math.radians(float(self.num("push_under_reaim_yaw_deadband_deg", 2.0))))
+        if getattr(self, "lying", False):
+            plan.update({"yaw_final_m": float(self.num("push_under_lying_yaw_final_m", LYING_YAW_FINAL_M)),
+                         "yaw_final_min_rad": round(math.radians(float(self.num("push_under_lying_yaw_final_min_deg", LYING_YAW_FINAL_MIN_DEG))), 5)})
         if "stroke_m" in fp:
             TT._count(self, "floorpush.strokes.recorded")
         log.info("%s: push-under strokes (generation.push_under_stroke_m %.3f): %d strokes over %.3f m, the object's progress after each %s m, back-off %.3f m, "
@@ -2522,6 +2774,10 @@ class IORSLarge(SamplerV2):
         distance = float(th.linalg.norm(gc - cd))
         extra = float(self.num("push_goal_extra_m", 0.03))
         com_h = self.com_height(quat)
+        # i7-measure (A2 (3)): the lying target's contact rule (back face, no tip) in place of the below-centre-of-mass rule
+        cap_h = self.push_contact_cap(quat, d2)
+        if self.lying:
+            TT._count(self, "briefcase_lying.contact_cap")
         pts = G.local_points_world(self.hull, (th.zeros(3), G.t(quat)))
         off_cfg = self.gp.gen("push_contact_offset_m")
         pre_back, pre_up = (float(v) for v in (self.gp.gen("push_far_pre_m") or PUSH_FAR_PRE_M))
@@ -2530,11 +2786,12 @@ class IORSLarge(SamplerV2):
         for pitch in self.far_pitches():
             rise_p = math.sin(math.radians(pitch))
             props: List[O.Proposal] = []
-            for tip, drop, label, q in self.pitched_turns(pitch, d2, com_h, tip_m=tip_m):
+            for tip, drop, label, q in self.pitched_turns(pitch, d2, cap_h, tip_m=tip_m):
                 if open_hand and not label.startswith("lateral"):
                     continue  # i7-floorpush (a): only a lateral closing axis spreads the open fingertips across the push
                 if tip is None:
-                    why.append(f"pitch {pitch:.0f} {label}: the hand's lowest sphere {drop:.3f} m below the tips keeps their edge above the centre of mass ({com_h:.3f} m)")
+                    why.append(f"pitch {pitch:.0f} {label}: the hand's lowest sphere {drop:.3f} m below the tips keeps their edge above the "
+                               + (f"lying contact cap ({cap_h:.3f} m)" if self.lying else f"centre of mass ({com_h:.3f} m)"))
                     continue
                 standoff, rise, h = TT.pitched_tip_offsets(pitch, q, PUSH_UNDER_CLEARANCE_M)
                 band = (tip - h * rise_p, tip + h * rise_p)
@@ -2589,6 +2846,7 @@ class IORSLarge(SamplerV2):
                         "fingertip_z_m": f["fingertip_z_m"], "ground_ignored": False, "orient": decision, "seed": push_chain_seed(self.kit, chosen, arm),
                         "record": {"push_hand": "pitched_far", "palm_clear": True, "wrist_turn": f["wrist_turn"], "contact_height_m": f["contact_height_m"],
                                    "target_com_height_m": float(com_h), "palm_gap_m": f["palm_gap_m"], "hand_low_m": f["hand_low_m"],
+                                   **({"contact_rule": "lying_no_tip", "contact_cap_m": float(cap_h)} if self.lying else {}),
                                    "fingertip_band_m": f["fingertip_band_m"], **self._floorpush_hand_record(f, strokes)}}
             why.extend(f"{o['label']}: {o.get('why', '')}" for o in decision["options"] if not o.get("ok"))
         ends = (f"start {[round(float(v), 2) for v in P0.to_base_frame(first.chain[1][0], place.base_pose2d, P0.base_z(self)).tolist()]}, goal "
@@ -3766,7 +4024,7 @@ class IORSLarge(SamplerV2):
             floor = self.obj("floor")
             others = [o for o in self.world.scene.objects if o.name in self.world.scene_object_names]
             yaw = float(yaws[0]) if len(yaws) else 0.0
-            quat = G.qmul(G.quat_from_yaw(yaw), self.rest)
+            quat = c_quat_of(self, yaw)
             pose = self.drop_pose_at(release_xy, quat)
             parts = []
             for g in self.grasps[:3]:
@@ -3800,7 +4058,10 @@ class IORSLarge(SamplerV2):
         return F_goal, {}
 
     def release_quat(self, level_quat, grasp, tilt_deg: float):
-        """The release orientation of ``grasp`` at ``tilt_deg`` (the inside mode's tilt); here the level orientation."""
+        """The release orientation of ``grasp`` at ``tilt_deg`` (the inside mode's tilt); here the level orientation - with :attr:`lying`
+        (i7-measure, A2 (1)) the level orientation turned onto the lying rest: ``level * rest^-1 * c_rest`` (the carried yaw kept)."""
+        if getattr(self, "lying", False):
+            return G.qmul(G.t(level_quat).float(), G.qmul(G.qinv(G.t(self.rest).float()), self.c_rest()))
         return level_quat
 
     def release_lift_per_grasp(self) -> bool:
@@ -3837,7 +4098,7 @@ class IORSLarge(SamplerV2):
         """F_goal at the release cell for the C yaws ``yaws``: the (yaw, library row) pairs whose [pre-place, place] pass the screening IK
         with the target at ``release_pose(release_xy, yaw * rest)``; with :meth:`release_lift_per_grasp` each row at its own release
         (``release_pose(xy, quat, row.pose)``) in the same batch."""
-        q_yaw = lambda yaw: G.qmul(G.quat_from_yaw(yaw), self.rest)  # noqa: E731
+        q_yaw = lambda yaw: c_quat_of(self, yaw)  # noqa: E731
         tag = getattr(self, "pre_place_tag", lambda _p: None)(place)
         pre_kw = {"pre_of": (lambda eef: self.pre_place_of(eef, place)), "pre_tag": tag} if tag else {}
         if self.release_lift_per_grasp():
@@ -4743,7 +5004,7 @@ class IORSLarge(SamplerV2):
                         for c_yaw, pd in _faces(a):
                             d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(c_yaw - m.yaw)
                             for y in sorted({float(yy) for yy, _ in F_a}):
-                                q = G.qmul(G.quat_from_yaw(y + d_yaw), self.rest)
+                                q = c_quat_of(self, y + d_yaw)
                                 o = self.push_contact_offset(q, th.as_tensor(pd))
                                 if o is not None and self.push_yaw_kept(q, pd, o):  # generation.push_under_yaw: the yaws it keeps
                                     best = max(best, o)
@@ -6603,7 +6864,7 @@ class IORSLarge(SamplerV2):
                 d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
                 offs = {}
                 for y in yaws:
-                    o = self.push_contact_offset(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d_push)
+                    o = self.push_contact_offset(c_quat_of(self, y + d_yaw), d_push)
                     offs[y] = -1.0 if o is None else o
                 # generation.push_under_yaw (owner 2026-10-13 ~02:55): only the yaws it keeps are chained and drawn at this C
                 yaws_c = self.push_yaws_locked(yaws, d_yaw, d_push, offs, place)
@@ -6623,12 +6884,12 @@ class IORSLarge(SamplerV2):
                                       f"yaws failed its exact IK at B (PUSH_CHAIN_LIVE_B)")
                         continue
                 pst0 = push_st if push_st is not None else place
-                best = sorted(yaws_p, key=lambda y: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), offs[y]))[:2]
+                best = sorted(yaws_p, key=lambda y: self.push_yaw_rank(pst0, c_quat_of(self, y + d_yaw), offs[y]))[:2]
                 found = False
                 for y in best:
                     ck = (int(kc), int(round(y / yaw_step)))
                     if ck not in chain_cache:
-                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), cd, gc, place.extras["push_dir"])
+                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, c_quat_of(self, y + d_yaw), cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is not None:
                         found = True
                         ch = chain_cache[ck]
@@ -6652,7 +6913,28 @@ class IORSLarge(SamplerV2):
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
-            F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+            if push and self.lying and briefcase_lying_tilts():
+                # i7-measure (lead #92d (a)): the partial-tilt releases in turn, the first with a feasible pair is this C's (drop_pose_at reads it)
+                for t_l in briefcase_lying_tilts():
+                    self._lying_tilt = t_l
+                    F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+                    if F_goal:
+                        TT._count(self, f"briefcase_lying.tilt.{t_l:g}")
+                        break
+                else:
+                    TT._count(self, "briefcase_lying.tilt.none")
+            elif push and self.lying:
+                # i7-measure (A2): the lying drop's heights in turn, the first with a feasible pair is this C's (drop_height reads it)
+                for h_l in self.lying_drop_heights():
+                    self._lying_drop_h = h_l
+                    F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
+                    if F_goal:
+                        TT._count(self, f"briefcase_lying.drop_h.{h_l:.2f}")
+                        break
+                else:
+                    TT._count(self, "briefcase_lying.drop_h.none")
+            else:
+                F_goal = self.release_feasible(release_xy, [y + d_yaw for y in yaws], release_pose, place, arm, ignore_place)
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
             # owner 2026-10-12 ~22:35 (inside): tilted releases as alternatives to the level one; per pair the tilts (deg, 0 = level) it passed
             tilts_of: Dict[Tuple[int, Any], List[float]] = {}
@@ -6678,7 +6960,7 @@ class IORSLarge(SamplerV2):
                 # closer to the base (sandal: 0.72 vs 0.78-0.80 m ahead - the chain solved only at the long-axis yaws, 0919-211642;
                 # every short-axis chain of 0920-052659 had no IK at its goal) - longest extent first, random within a bucket
                 # (2026-09-20 19:20: ordered by the blade's CONTACT offset at its height band - a sandal toe-first before its strap)
-                rank = {i: self.push_yaw_rank(pst0, G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), offs.get(float(F[i][0]), -1.0)) for i in range(len(F))}
+                rank = {i: self.push_yaw_rank(pst0, c_quat_of(self, float(F[i][0]) + d_yaw), offs.get(float(F[i][0]), -1.0)) for i in range(len(F))}
                 draw_order.sort(key=lambda i: round(rank[i], 2))
                 if len(yaws_c) < len(yaws):  # the push-under yaw lock: the pairs at the yaws it keeps
                     kept_b = {int(round(y / yaw_step)) for y in yaws_c}
@@ -6718,7 +7000,7 @@ class IORSLarge(SamplerV2):
                         fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
                         continue
                     if ck not in chain_cache:
-                        q_chain = G.qmul(G.quat_from_yaw(y_init + d_yaw), self.rest)
+                        q_chain = c_quat_of(self, y_init + d_yaw)
                         chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, q_chain, cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is None:
                         fails["C: push chain unreachable at this yaw"] = fails.get("C: push chain unreachable at this yaw", 0) + 1
@@ -6904,6 +7186,8 @@ class IORSLarge(SamplerV2):
                         c_fails.append("B: grasp outside the manipulation image (early frame)")
                         continue
                     goal_quat = self.release_quat(level_quat, g_row, tilt)
+                    if push and self.lying:
+                        TT._count(self, "briefcase_lying.release")
                     goal = release_pose(release_xy, goal_quat, g.pose)
                     place_eef = IK.grasp_pose(goal, g.pose)
                     pre_place = self.pre_place_of(place_eef, place)
@@ -6933,6 +7217,11 @@ class IORSLarge(SamplerV2):
                     if not r2.ok:
                         c_fails.append(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached): {r2.reason[:200]}")
                         continue
+                    if push and self.lying and r2.q is not None:
+                        why_s = self.lying_drop_screen(r2.q, place_eef, arm, target, g.pose)
+                        if why_s is not None:
+                            c_fails.append(f"C: lying drop near the wrist singularity ({why_s[:160]})")
+                            continue
                     if q_lift_seed is not None and r2.q is not None:
                         # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
                         # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
@@ -7022,7 +7311,11 @@ class IORSLarge(SamplerV2):
                 if fallback is not None:
                     grasp.extras["segment_fallback"] = fallback
                 if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
-                    grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
+                    if self.lying:
+                        grasp.extras["drop_retreat_up_m"] = float(self.num("push_under_lying_retreat_up_m", LYING_DROP_RETREAT_UP_M))
+                        if self.__dict__.get("_lying_tilt") is not None and briefcase_lying_tilts():
+                            grasp.extras["lying_release_tilt_deg"] = float(self._lying_tilt)
+                    grasp.extras.update({"place_kind": "drop", "drop_height_m": self.drop_height(),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
                 # carry-height ladder (0920-014945: with the hand frozen at a 12 cm lift over the table, the arrival sweep into the
@@ -7166,6 +7459,13 @@ class IORSLarge(SamplerV2):
                                   "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F),
                                   # the carried object's yaw follows the base: goal orientation = init orientation rotated by C.yaw - B.yaw
                                   "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
+                if self.lying:
+                    # i7-measure (A2 (2)): the goal orientation the TRO gates is the lying one (goal_quat above); the standing carry kept beside it
+                    d.summary.update({"goal_rest": LYING, "carry_level_quat": [float(v) for v in level_quat],
+                                      "briefcase_lying": dict(self.template_facts.get("briefcase_lying") or {})})
+                    TT._count(self, "briefcase_lying.coupled")
+                    log.info("%s: BRIEFCASE_LYING coupled: dropped and pushed lying flat (yaw %.2f, grasp %s, C d %.2f λ %+.2f), goal quat %s", self.gp.variant, yaw,
+                             g.name, place.stand_off or 0.0, place.lateral, [round(float(v), 4) for v in goal_quat])
                 if tilts_of:
                     d.summary.update({"release_tilt_deg": float(tilt), "release_level_quat": [float(v) for v in level_quat]})
                     log.info("%s: inside release tilt %g deg coupled (yaw %.2f, grasp %s, C d %.2f λ %+.2f)", self.gp.variant, tilt, yaw, g.name, place.stand_off or 0.0, place.lateral)

@@ -1,0 +1,3303 @@
+{
+ "_meta": {
+  "built": "2026-11-09 17:07",
+  "survey": "ispatialgym/assets/icl/roles/candidates.csv",
+  "rule": "a body-of-revolution tag (xinf / yinf / zinf) in the ICL's reviewed symmetry column (ispatialgym/assets/icl/roles/candidates.csv: geometry and texture identical; no long-axis rule; the axis: the long axis - largest native extent >= 1.5 x the middle one - when tagged, else the tagged one); with ISPATIALGYM_SUCCESS_YAW_FREE_SYMMETRIC the success measure (every pose_reached target of such a model: demo QA, replay, policy eval) and the placed_orientation demo gate compare it modulo rotation about that axis - the yaw of a round object standing upright (owner 2026-11-09 A4)",
+  "n_models": 166,
+  "categories": {
+   "bar_soap": 1,
+   "beaker": 7,
+   "beer_glass": 3,
+   "beeswax_candle": 5,
+   "bottle_of_beer": 2,
+   "bottle_of_catsup": 1,
+   "bottle_of_fennel": 1,
+   "bottle_of_ground_cloves": 1,
+   "bottle_of_lotion": 1,
+   "bottle_of_mustard_seeds": 1,
+   "bottle_of_paprika": 1,
+   "bottle_of_poppy_seeds": 1,
+   "bottle_of_salsa": 2,
+   "bottle_of_seasoning": 1,
+   "bottle_of_sesame_seeds": 1,
+   "bottle_of_supplements": 1,
+   "bottle_of_tea_leaves": 1,
+   "bottle_of_tequila": 1,
+   "bottle_of_water": 5,
+   "bottle_of_wine": 4,
+   "bowl": 7,
+   "butter_cookie": 1,
+   "can_of_soda": 3,
+   "candle_holder": 2,
+   "cap": 15,
+   "carrot": 2,
+   "cellulose_tape": 2,
+   "coaster": 1,
+   "colored_pencil": 12,
+   "conditioner_dispenser": 1,
+   "cork": 3,
+   "deodorant_stick": 1,
+   "dip_candle": 1,
+   "half_lime": 1,
+   "hamburger_bun": 1,
+   "hamper": 1,
+   "hingeless_jar": 5,
+   "jar_of_curry_powder": 1,
+   "jar_of_dill_seed": 1,
+   "lemon": 5,
+   "lid": 10,
+   "marker": 1,
+   "paper_liners": 1,
+   "pen": 3,
+   "pencil": 1,
+   "pepper_shaker": 2,
+   "plate": 6,
+   "public_trash_can": 1,
+   "salt_shaker": 2,
+   "saucer": 3,
+   "soda_cup": 3,
+   "sugar_cookie": 2,
+   "teacup": 2,
+   "trash_can": 3,
+   "vase": 1,
+   "vidalia_onion": 2,
+   "wall_nail": 1,
+   "water_glass": 2,
+   "wine_bottle": 1,
+   "wineglass": 12
+  }
+ },
+ "bar_soap/ozifwa": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0929,
+   0.0929,
+   0.0365
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/effbnc": {
+  "axis": "z",
+  "ratio": 1.185,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1229,
+   0.1229,
+   0.1456
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/exzsal": {
+  "axis": "z",
+  "ratio": 1.067,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0953,
+   0.0953,
+   0.1017
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/fyrkzs": {
+  "axis": "z",
+  "ratio": 1.04,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0778,
+   0.0778,
+   0.0809
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/jdijek": {
+  "axis": "z",
+  "ratio": 1.04,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0778,
+   0.0778,
+   0.0809
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/rhohgs": {
+  "axis": "z",
+  "ratio": 1.04,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0778,
+   0.0778,
+   0.0809
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/uobdoq": {
+  "axis": "z",
+  "ratio": 1.04,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0778,
+   0.0778,
+   0.0809
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beaker/zycgen": {
+  "axis": "z",
+  "ratio": 1.04,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0778,
+   0.0778,
+   0.0809
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "beer_glass/lymciz": {
+  "axis": "z",
+  "ratio": 1.976,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1056,
+   0.1056,
+   0.2087
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-inside_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "beer_glass/mxsliu": {
+  "axis": "z",
+  "ratio": 1.932,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0602,
+   0.0605,
+   0.1169
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-inside_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "beer_glass/rxscji": {
+  "axis": "z",
+  "ratio": 1.459,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0601,
+   0.0601,
+   0.0877
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-inside_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": false
+ },
+ "beeswax_candle/nhdnje": {
+  "axis": "z",
+  "ratio": 1.521,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0704,
+   0.0704,
+   0.1071
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "beeswax_candle/nxewyk": {
+  "axis": "z",
+  "ratio": 2.942,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0704,
+   0.0704,
+   0.2071
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "beeswax_candle/oimgmh": {
+  "axis": "z",
+  "ratio": 3.654,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0563,
+   0.0563,
+   0.2057
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "beeswax_candle/ouzkdj": {
+  "axis": "z",
+  "ratio": 2.233,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0704,
+   0.0704,
+   0.1572
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "beeswax_candle/pfewit": {
+  "axis": "z",
+  "ratio": 4.361,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0563,
+   0.0563,
+   0.2455
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_beer/phdimo": {
+  "axis": "z",
+  "ratio": 3.594,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0682,
+   0.0678,
+   0.2451
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_beer/saslsh": {
+  "axis": "z",
+  "ratio": 3.984,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0636,
+   0.0637,
+   0.2538
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_catsup/ahoiqe": {
+  "axis": "z",
+  "ratio": 3.049,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0529,
+   0.0529,
+   0.1613
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_fennel/ihlkfu": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.06,
+   0.0719
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_ground_cloves/vzamzb": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.06,
+   0.0719
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_lotion/tkryrh": {
+  "axis": "z",
+  "ratio": 2.481,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0729,
+   0.0729,
+   0.1809
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_mustard_seeds/grryaf": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.06,
+   0.0719
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_paprika/nrdgrp": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.06,
+   0.0719
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_poppy_seeds/xdtrgi": {
+  "axis": "z",
+  "ratio": 1.197,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.066,
+   0.066,
+   0.079
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_salsa/dvxotd": {
+  "axis": "z",
+  "ratio": 3.465,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0722,
+   0.0722,
+   0.2502
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_salsa/mavope": {
+  "axis": "z",
+  "ratio": 3.465,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0722,
+   0.0722,
+   0.2502
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_seasoning/vqwqqv": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0601,
+   0.0602,
+   0.0721
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_sesame_seeds/lzndie": {
+  "axis": "z",
+  "ratio": 1.196,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0602,
+   0.0601,
+   0.072
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_supplements/oqakev": {
+  "axis": "z",
+  "ratio": 1.82,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0638,
+   0.0638,
+   0.1161
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_tea_leaves/pfbtus": {
+  "axis": "z",
+  "ratio": 1.198,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.06,
+   0.0719
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "bottle_of_tequila/gbozpr": {
+  "axis": "z",
+  "ratio": 2.296,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0743,
+   0.0742,
+   0.1706
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_water/atvnqy": {
+  "axis": "z",
+  "ratio": 2.986,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0649,
+   0.0649,
+   0.1938
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_water/emquat": {
+  "axis": "z",
+  "ratio": 2.711,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0817,
+   0.0789,
+   0.2215
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_water/lkpaas": {
+  "axis": "z",
+  "ratio": 3.286,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1102,
+   0.1065,
+   0.3621
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_water/rrkhva": {
+  "axis": "z",
+  "ratio": 2.304,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0647,
+   0.0654,
+   0.1507
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_water/suytyi": {
+  "axis": "z",
+  "ratio": 2.7,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0611,
+   0.0611,
+   0.165
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_wine/fzuiwy": {
+  "axis": "z",
+  "ratio": 3.669,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0762,
+   0.0762,
+   0.2796
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_wine/klbwkf": {
+  "axis": "z",
+  "ratio": 3.013,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0836,
+   0.0783,
+   0.2519
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_wine/wzdrcl": {
+  "axis": "z",
+  "ratio": 3.81,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0733,
+   0.0753,
+   0.2869
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bottle_of_wine/xzipsi": {
+  "axis": "z",
+  "ratio": 3.196,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0745,
+   0.0698,
+   0.2381
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "bowl/belcml": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1676,
+   0.1676,
+   0.1025
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/bexgtn": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2758,
+   0.2758,
+   0.1517
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/cypjlv": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2474,
+   0.2474,
+   0.1594
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/hpqjug": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1619,
+   0.1619,
+   0.0792
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/kasebx": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1434,
+   0.1434,
+   0.0825
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/pihjqa": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.254,
+   0.254,
+   0.0799
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "bowl/szgdpc": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1569,
+   0.1569,
+   0.0565
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "butter_cookie/kukrla": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0498,
+   0.0498,
+   0.0068
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "can_of_soda/bfrzvk": {
+  "axis": "z",
+  "ratio": 1.789,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0656,
+   0.07,
+   0.1252
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "can_of_soda/itolcg": {
+  "axis": "z",
+  "ratio": 1.789,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0753,
+   0.0753,
+   0.1347
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "can_of_soda/wbrrad": {
+  "axis": "z",
+  "ratio": 1.987,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0753,
+   0.0753,
+   0.1496
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "candle_holder/nygnlp": {
+  "axis": "z",
+  "ratio": 3.276,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0929,
+   0.0929,
+   0.3043
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "candle_holder/wiufnv": {
+  "axis": "z",
+  "ratio": 2.624,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0918,
+   0.0918,
+   0.2409
+  ],
+  "uses": [
+   "configuration_matching-attachment/partner"
+  ],
+  "long_axis": true
+ },
+ "cap/ciopwh": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0758,
+   0.0758,
+   0.0131
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "cap/clhquh": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0758,
+   0.0758,
+   0.0131
+  ],
+  "uses": [
+   "configuration_matching-attachment/target",
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "cap/eukcfr": {
+  "axis": "z",
+  "ratio": 1.285,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0137,
+   0.0137,
+   0.0176
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/ghwjwe": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0257,
+   0.0257,
+   0.0256
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/gmdwwe": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0309,
+   0.0309,
+   0.0207
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/gxkbcd": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0304,
+   0.0304,
+   0.02
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/iqeyba": {
+  "axis": "z",
+  "ratio": 1.052,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0772,
+   0.0734,
+   0.0063
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "cap/mgirzi": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0333,
+   0.0333,
+   0.0167
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/pwsngg": {
+  "axis": "z",
+  "ratio": 1.012,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.051,
+   0.0504,
+   0.0399
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/qscujv": {
+  "axis": "z",
+  "ratio": 1.004,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0507,
+   0.0509,
+   0.0399
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/rgtedj": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0359,
+   0.0359,
+   0.0192
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/vnpjfn": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0758,
+   0.0758,
+   0.0131
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "cap/xxqyrt": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0523,
+   0.0523,
+   0.0112
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "cap/ygsmgm": {
+  "axis": "z",
+  "ratio": 1.002,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0459,
+   0.046,
+   0.0184
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "cap/yqvild": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0758,
+   0.0758,
+   0.0131
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "carrot/aucrah": {
+  "axis": "x",
+  "ratio": 5.94,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2489,
+   0.0409,
+   0.0419
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "carrot/qhmmmx": {
+  "axis": "x",
+  "ratio": 6.074,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1804,
+   0.0296,
+   0.0297
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "cellulose_tape/kavsnx": {
+  "axis": "z",
+  "ratio": 1.002,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0618,
+   0.0617,
+   0.0221
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target"
+  ],
+  "long_axis": false
+ },
+ "cellulose_tape/sklkyc": {
+  "axis": "z",
+  "ratio": 1.008,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0504,
+   0.05,
+   0.0093
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target"
+  ],
+  "long_axis": false
+ },
+ "coaster/arjpcz": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1036,
+   0.1036,
+   0.0009
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-under_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "colored_pencil/acumgp": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/bkdqwb": {
+  "axis": "x",
+  "ratio": 19.215,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0079,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/bnsqcn": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf",
+   "z2"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/deuvcx": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/egvqng": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/jdqvdl": {
+  "axis": "x",
+  "ratio": 19.462,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0078,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/jnccuz": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/kadvlg": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/kgmapz": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/kjwoqm": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0049
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/nssris": {
+  "axis": "x",
+  "ratio": 19.714,
+  "tags": [
+   "xinf",
+   "z2"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0077,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "colored_pencil/qrxemk": {
+  "axis": "x",
+  "ratio": 19.462,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1518,
+   0.0078,
+   0.0048
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "conditioner_dispenser/uncljo": {
+  "axis": "z",
+  "ratio": 2.937,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0648,
+   0.0648,
+   0.1903
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "disembedding/target"
+  ],
+  "long_axis": true
+ },
+ "cork/lseuwf": {
+  "axis": "z",
+  "ratio": 1.629,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0186,
+   0.0184,
+   0.0303
+  ],
+  "uses": [
+   "configuration_matching-attachment/target",
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "cork/ncxgpe": {
+  "axis": "z",
+  "ratio": 1.96,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0176,
+   0.0176,
+   0.0345
+  ],
+  "uses": [
+   "configuration_matching-attachment/target",
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "cork/uyceta": {
+  "axis": "z",
+  "ratio": 1.272,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0356,
+   0.0356,
+   0.0453
+  ],
+  "uses": [
+   "configuration_matching-attachment/target",
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "deodorant_stick/albeyc": {
+  "axis": "z",
+  "ratio": 2.679,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0502,
+   0.0502,
+   0.1345
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "dip_candle/gbaons": {
+  "axis": "z",
+  "ratio": 3.41,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0373,
+   0.0373,
+   0.1272
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": true
+ },
+ "half_lime/mxmmcp": {
+  "axis": "z",
+  "ratio": 1.008,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0596,
+   0.0601,
+   0.0381
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target"
+  ],
+  "long_axis": false
+ },
+ "hamburger_bun/fqxumh": {
+  "axis": "z",
+  "ratio": 1.02,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0866,
+   0.0849,
+   0.0264
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "hamper/xhdtjn": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.4364,
+   0.4364,
+   0.3459
+  ],
+  "uses": [
+   "camera_relocalization-obstructed/obstacles"
+  ],
+  "long_axis": false
+ },
+ "hingeless_jar/bqpmsv": {
+  "axis": "z",
+  "ratio": 1.308,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1569,
+   0.1569,
+   0.2053
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "hingeless_jar/crlhmi": {
+  "axis": "z",
+  "ratio": 1.107,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1011,
+   0.1027,
+   0.1137
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "hingeless_jar/lvuvbf": {
+  "axis": "z",
+  "ratio": 1.16,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1446,
+   0.1442,
+   0.1678
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "hingeless_jar/mefezc": {
+  "axis": "z",
+  "ratio": 1.405,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1779,
+   0.1779,
+   0.25
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "hingeless_jar/wcqjew": {
+  "axis": "z",
+  "ratio": 1.308,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1569,
+   0.1569,
+   0.2053
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "jar_of_curry_powder/ozhftu": {
+  "axis": "z",
+  "ratio": 1.2,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.06,
+   0.0599,
+   0.072
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "jar_of_dill_seed/reavkt": {
+  "axis": "z",
+  "ratio": 1.189,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0624,
+   0.0615,
+   0.0742
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "lemon/bmvxas": {
+  "axis": "x",
+  "ratio": 1.408,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0908,
+   0.0644,
+   0.0645
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lemon/gkrfha": {
+  "axis": "x",
+  "ratio": 1.4,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0864,
+   0.0617,
+   0.0617
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lemon/kvgfdl": {
+  "axis": "x",
+  "ratio": 1.416,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0868,
+   0.0613,
+   0.0612
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lemon/peqwoa": {
+  "axis": "x",
+  "ratio": 1.407,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0999,
+   0.0709,
+   0.071
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lemon/pffkae": {
+  "axis": "x",
+  "ratio": 1.405,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1026,
+   0.073,
+   0.0729
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-inside_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lid/bemtjd": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1787,
+   0.1787,
+   0.0213
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lid/dkncbi": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2,
+   0.2,
+   0.0322
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lid/egfobe": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2432,
+   0.2432,
+   0.0406
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lid/gerjlh": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2957,
+   0.2957,
+   0.0702
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "lid/niarsj": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2,
+   0.2,
+   0.0275
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "lid/pbmsji": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.3388,
+   0.3388,
+   0.1097
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "lid/ppkjuy": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2319,
+   0.2319,
+   0.0624
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "lid/pwgbsb": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0897,
+   0.0897,
+   0.0225
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "lid/tnwisp": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0949,
+   0.0949,
+   0.0274
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "lid/zkderg": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0761,
+   0.0761,
+   0.033
+  ],
+  "uses": [
+   "configuration_matching-attachment/target"
+  ],
+  "long_axis": false
+ },
+ "marker/kjxpdi": {
+  "axis": "x",
+  "ratio": 7.275,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1084,
+   0.0149,
+   0.0128
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/target",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "paper_liners/yvuilk": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0806,
+   0.0806,
+   0.0421
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "pen/gqwdor": {
+  "axis": "x",
+  "ratio": 18.107,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1865,
+   0.0103,
+   0.0091
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-ontop_large_scale/target"
+  ],
+  "long_axis": true
+ },
+ "pen/gzrbrx": {
+  "axis": "x",
+  "ratio": 13.886,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1583,
+   0.0114,
+   0.011
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-ontop_large_scale/target"
+  ],
+  "long_axis": true
+ },
+ "pen/hiyeki": {
+  "axis": "x",
+  "ratio": 12.33,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1418,
+   0.0115,
+   0.0114
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_large_scale/target"
+  ],
+  "long_axis": true
+ },
+ "pencil/bfkwhb": {
+  "axis": "x",
+  "ratio": 24.421,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1856,
+   0.0076,
+   0.0073
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": true
+ },
+ "pepper_shaker/tgcwtr": {
+  "axis": "z",
+  "ratio": 2.368,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0673,
+   0.0674,
+   0.1596
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner",
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "pepper_shaker/ykujyn": {
+  "axis": "z",
+  "ratio": 2.368,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0673,
+   0.0674,
+   0.1596
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner",
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "plate/aynjhg": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.241,
+   0.241,
+   0.0262
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "plate/bgxzec": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2313,
+   0.2313,
+   0.0081
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "plate/luhkiz": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.241,
+   0.241,
+   0.0262
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "plate/ntedfx": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2381,
+   0.2381,
+   0.0331
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "plate/vtjwof": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2298,
+   0.2299,
+   0.0073
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "plate/zpddxu": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.226,
+   0.226,
+   0.0276
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "public_trash_can/leazin": {
+  "axis": "z",
+  "ratio": 1.651,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.4303,
+   0.4303,
+   0.7106
+  ],
+  "uses": [
+   "camera_relocalization-obstructed/obstacles"
+  ],
+  "long_axis": true
+ },
+ "salt_shaker/iomwtn": {
+  "axis": "z",
+  "ratio": 2.736,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.051,
+   0.0511,
+   0.1398
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner",
+   "inter_object_relation_satisfaction-nextto_small_scale/target"
+  ],
+  "long_axis": true
+ },
+ "salt_shaker/qowouj": {
+  "axis": "z",
+  "ratio": 1.586,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0459,
+   0.0459,
+   0.0728
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-nextto_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "saucer/mgbeah": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1568,
+   0.1568,
+   0.0211
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "saucer/oxivmf": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2674,
+   0.2674,
+   0.018
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "saucer/vghfkh": {
+  "axis": "z",
+  "ratio": 1.001,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1443,
+   0.1442,
+   0.0113
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-ontop_small_scale/partner",
+   "inter_object_relation_satisfaction-under_small_scale/partner"
+  ],
+  "long_axis": false
+ },
+ "soda_cup/fsfsas": {
+  "axis": "z",
+  "ratio": 1.145,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.092,
+   0.0921,
+   0.1055
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "soda_cup/gnzegv": {
+  "axis": "z",
+  "ratio": 1.916,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0821,
+   0.0821,
+   0.1573
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "soda_cup/lpanoc": {
+  "axis": "z",
+  "ratio": 1.144,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0922,
+   0.0922,
+   0.1055
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "sugar_cookie/cgkiti": {
+  "axis": "z",
+  "ratio": 1.051,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0729,
+   0.0766,
+   0.0058
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "sugar_cookie/hlyeaq": {
+  "axis": "z",
+  "ratio": 1.051,
+  "tags": [
+   "x2",
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.073,
+   0.0767,
+   0.0058
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "teacup/tfzfam": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0727,
+   0.0727,
+   0.0521
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": false
+ },
+ "teacup/zdvgol": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0748,
+   0.0748,
+   0.0582
+  ],
+  "uses": [
+   "inter_object_relation_satisfaction-under_small_scale/target"
+  ],
+  "long_axis": false
+ },
+ "trash_can/hqdnjz": {
+  "axis": "z",
+  "ratio": 1.152,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.3556,
+   0.3556,
+   0.4097
+  ],
+  "uses": [
+   "camera_relocalization-obstructed/obstacles"
+  ],
+  "long_axis": false
+ },
+ "trash_can/jlawet": {
+  "axis": "z",
+  "ratio": 1.0,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.2801,
+   0.2793,
+   0.28
+  ],
+  "uses": [
+   "camera_relocalization-obstructed/obstacles"
+  ],
+  "long_axis": false
+ },
+ "trash_can/rbqckd": {
+  "axis": "z",
+  "ratio": 1.129,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.4458,
+   0.4458,
+   0.5032
+  ],
+  "uses": [
+   "camera_relocalization-obstructed/obstacles"
+  ],
+  "long_axis": false
+ },
+ "vase/aegxpb": {
+  "axis": "z",
+  "ratio": 1.502,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1794,
+   0.1793,
+   0.2694
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "inter_object_relation_satisfaction-inside_small_scale/partner"
+  ],
+  "long_axis": true
+ },
+ "vidalia_onion/buyxll": {
+  "axis": "x",
+  "ratio": 1.41,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1,
+   0.0704,
+   0.0709
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "vidalia_onion/dejqhf": {
+  "axis": "x",
+  "ratio": 1.1,
+  "tags": [
+   "xinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0817,
+   0.0743,
+   0.0742
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "wall_nail/wlnail": {
+  "axis": "z",
+  "ratio": 1.512,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0079,
+   0.008,
+   0.0121
+  ],
+  "uses": [
+   "configuration_matching-attachment/partner"
+  ],
+  "long_axis": true
+ },
+ "water_glass/edfzlt": {
+  "axis": "z",
+  "ratio": 1.249,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0956,
+   0.0956,
+   0.1194
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "water_glass/elwfms": {
+  "axis": "z",
+  "ratio": 1.364,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0902,
+   0.0902,
+   0.123
+  ],
+  "uses": [
+   "disembedding/distractors"
+  ],
+  "long_axis": false
+ },
+ "wine_bottle/inkqch": {
+  "axis": "z",
+  "ratio": 3.273,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0671,
+   0.0671,
+   0.2196
+  ],
+  "uses": [
+   "configuration_matching-attachment/partner"
+  ],
+  "long_axis": true
+ },
+ "wineglass/aakcyj": {
+  "axis": "z",
+  "ratio": 1.867,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0865,
+   0.0865,
+   0.1615
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/akusda": {
+  "axis": "z",
+  "ratio": 2.395,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0643,
+   0.0643,
+   0.154
+  ],
+  "uses": [
+   "disembedding/distractors",
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/bovcqx": {
+  "axis": "z",
+  "ratio": 3.165,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.052,
+   0.052,
+   0.1646
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/euzudc": {
+  "axis": "z",
+  "ratio": 2.132,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0968,
+   0.0968,
+   0.2064
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/exasdr": {
+  "axis": "z",
+  "ratio": 2.466,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1031,
+   0.1031,
+   0.2542
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/ezsdil": {
+  "axis": "z",
+  "ratio": 1.306,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.113,
+   0.1129,
+   0.1476
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "wineglass/hxccge": {
+  "axis": "z",
+  "ratio": 1.891,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0843,
+   0.0841,
+   0.1594
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/kxovsj": {
+  "axis": "z",
+  "ratio": 1.261,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.1168,
+   0.1167,
+   0.1473
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": false
+ },
+ "wineglass/oadvet": {
+  "axis": "z",
+  "ratio": 3.556,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.063,
+   0.063,
+   0.224
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/ovoceo": {
+  "axis": "z",
+  "ratio": 2.634,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0799,
+   0.0803,
+   0.2115
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/vxmzmq": {
+  "axis": "z",
+  "ratio": 2.393,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0643,
+   0.0643,
+   0.1539
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ },
+ "wineglass/yfzibn": {
+  "axis": "z",
+  "ratio": 2.486,
+  "tags": [
+   "zinf"
+  ],
+  "sources": [
+   "icl symmetry"
+  ],
+  "bbox": [
+   0.0555,
+   0.0556,
+   0.1382
+  ],
+  "uses": [
+   "object_scaling/target"
+  ],
+  "long_axis": true
+ }
+}
