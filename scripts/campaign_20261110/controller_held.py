@@ -244,6 +244,7 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     record = {"queue": prepared["queue"], "prepared": prepared, "directory": str(Path(prepared["queue"]).parent),
               "validation_key": actual, "phase": phase, "index": index, "count": 3*count,
               "command": command, "status": "ready", "needs_new_gate": decision["needs_new_gate"], 'decision':dict(decision)}
+    if state.get('next_dispatch_backends'):record['dispatch_backends']=state.pop('next_dispatch_backends')
     state["queues"].append(record)
     save()
     write_json_atomic(Path(record["directory"]) / "submission.json", record)
@@ -332,6 +333,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         return 0
     zero_tail = 0
     for record in reversed(records):
+        if record.get('migration',{}).get('never_started'):continue
         if any(v.get("accepted") for v in record.get("groups", {}).values()):
             break
         zero_tail += 1
@@ -343,7 +345,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         reserved=reserve_pending_counts(counts,template,pending_held(root))
         decision = next_work(template, reserved, max_groups=spec.get("groups_per_batch", 6), training_validated="train" in gates)
         state.update(counts=counts,counts_after_pending_reservations=reserved)
-        remaining_budget = spec["max_candidates"] - sum(r["count"] for r in records)
+        from scripts.campaign_20261110.controller_spool import candidate_budget_used
+        remaining_budget = spec["max_candidates"] - candidate_budget_used(records)
         if decision is None or remaining_budget < 3:
             state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_or_room_capacity_complete") if decision is None else "candidate_budget_exhausted"
             return 0

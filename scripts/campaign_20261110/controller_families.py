@@ -11,6 +11,7 @@ import argparse
 from collections import Counter
 import csv
 import json
+import os
 from pathlib import Path
 import shutil
 import signal
@@ -58,20 +59,24 @@ def reconcile(rows, *, key, index, count, snapshot, tag):
 
 def reserve_indices(root, token, count):
     """One campaign-wide disjoint namespace, checked against all existing ledgers."""
+    require(isinstance(count, int) and count > 0, "reservation count must be positive")
     path = root / "manifests/family_index_reservations.json"
     with atomic_directory_lock(path.with_suffix(".lockdir")):
         state = read(path, {"next": 50000000, "reservations": {}})
         if token in state["reservations"]:
             prior = state["reservations"][token]
             require(prior["n"] == count, "index reservation changed")
+            os.chmod(path, path.stat().st_mode | 0o040)
             return prior["start"]
         start = state["next"]
-        intervals = [(int(row["start"]), int(row["start"]) + int(row["n"])) for row in allocations(root)]
+        intervals = [(int(row["start"]), int(row["start"]) + int(row["n"]))
+                     for row in [*allocations(root), *state["reservations"].values()]]
         while any(start < hi and lo < start + count for lo, hi in intervals):
             start += 100
         state["reservations"][token] = {"start": start, "n": count, "created_at": time.time()}
-        state["next"] = start + 100
+        state["next"] = start + max(100, ((count + 99) // 100) * 100)
         write_json_atomic(path, state)
+        os.chmod(path, path.stat().st_mode | 0o040)
         return start
 
 

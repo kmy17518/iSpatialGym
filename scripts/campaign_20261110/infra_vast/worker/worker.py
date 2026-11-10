@@ -134,6 +134,25 @@ def heartbeat():
         hb = {"instance": INST, "phase": STATE["phase"], "time": int(time.time()), "slots": SLOTS, "running": run, "done": STATE["done"],
               "failed": STATE["failed"], "free_cpus": len(FREE_CPUS), **GPU, "cpus": len(CPUS), "ram_gb": round(RAM, 1),
               "disk_free_gb": round(shutil.disk_usage("/work").free / 2**30, 1), "up_s": int(time.time() - STATE["started"])}
+    # Read-only infrastructure telemetry; simulator settings stay unchanged.
+    for path in ("/sys/fs/cgroup/cpu.stat", "/sys/fs/cgroup/cpu/cpu.stat"):
+        try:
+            with open(path) as stream:
+                hb["cpu_cgroup_stat"] = {key: int(value) for key, value in (line.split() for line in stream)}
+            hb["cpu_cgroup_stat_source"] = path
+            break
+        except (OSError, ValueError):
+            continue
+    try:
+        hb["cpu_cgroup_max"] = open("/sys/fs/cgroup/cpu.max").read().strip()
+    except OSError:
+        pass
+    hb["allowed_cpu_affinity"] = sorted(os.sched_getaffinity(0))
+    try:
+        hb["warm_kit_templates"] = [name for name in os.listdir(LC + "/kit_templates")
+                                    if os.path.isfile(LC + "/kit_templates/" + name + "/.complete")]
+    except OSError:
+        hb["warm_kit_templates"] = []
     try:
         hb["gpu_used_mb"] = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits"],
                                            capture_output=True, text=True, timeout=30).stdout.strip()

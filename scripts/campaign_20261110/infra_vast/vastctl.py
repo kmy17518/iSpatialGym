@@ -896,6 +896,8 @@ def tick(c, s3, state):
                "instances": instance_metrics,
                "worker_booting_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='boot') if list_ok else None,
                "worker_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] in ('ready','run')) if list_ok else None,
+               "worker_running_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['assigned_jobs']) if list_ok else None,
+               "worker_idle_ready_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase']=='ready' and not i['assigned_jobs']) if list_ok else None,
                "worker_unknown_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['worker_phase'] is None) if list_ok else None,
                "rental_pending_gpus":sum(int(i.get('num_gpus') or 1) for i in instance_metrics if i['actual_status']!='running') if list_ok else None,
                "max_instances":C['max_instances'],

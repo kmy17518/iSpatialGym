@@ -32,6 +32,7 @@ def main():
     for name in ('inventory', 'defaults', 'visual-review', 'support-scene-probe', 'reservations',
                  'measurement-reservations', 'reserved-asset-hashes', 'out'):
         p.add_argument('--' + name, type=Path, required=True)
+    p.add_argument('--relations', nargs='+', choices=['ontop', 'nextto', 'under'], default=['ontop', 'nextto'])
     a = p.parse_args()
     require(not a.out.exists(), 'new immutable output required')
     policy, previous, hashes = [json.loads(path.read_text()) for path in (a.reservations, a.measurement_reservations, a.reserved_asset_hashes)]
@@ -55,16 +56,18 @@ def main():
     ready = ReadinessCatalog(B1K / 'bddl3/bddl/generated_data')
     definitions, templates, jobs, grasp_jobs, dependencies = {}, [], [], [], []
     a.out.mkdir(parents=True)
-    for relation, model_key in [('ontop', 'alarm_clock/vqwovi'), ('nextto', 'armchair/pmrcex')]:
+    require(len(a.relations) == len(set(a.relations)), 'duplicate requested relation')
+    for relation in a.relations:
+        model_key = {'ontop': 'alarm_clock/vqwovi', 'nextto': 'armchair/pmrcex', 'under': 'shoe_box/pitwey'}[relation]
         target = rows[model_key]; require(target['ready'] and review['objects'][model_key]['status'] == 'passed', 'target visual/default evidence incomplete')
-        task = 'inter_object_relation_satisfaction-' + relation + '_large_scale'; source_class = task + '_01'
+        task = 'inter_object_relation_satisfaction-' + relation + '_large_scale'; source_class = task + ('_03' if relation == 'under' else '_01')
         cls = task + '-' + target['category'] + '-' + partner['category']
         entry = copy.deepcopy(originals[records[source_class]['row']['alias']]); iddl = parse_file(str(ROOT / 'ispatialgym/assets/iddl' / entry['iddl']))
         entry['roles']['target'].update(category=target['category'], representative=target['model'], dataset=target['dataset'], scale={model_key: target['default_scale']})
         for key in ('orientation_equivalences', 'grasp_keys', 'rest_pose', 'rest_hint_wxyz'):
             entry['roles']['target'].pop(key, None)
         entry['roles']['partner']['category'] = partner['category']
-        gkey = entry_id(target['category'], target['model'], target['default_scale'], 'tabletop') if relation == 'ontop' else None
+        gkey = entry_id(target['category'], target['model'], target['default_scale'], 'tabletop') if relation in ('ontop', 'under') else None
         if gkey:
             entry['roles']['target']['grasp_keys'] = {model_key: gkey}
         entry['scenes'] = {scene: dict(rooms=[room], bindings={'floor': {'room': room}, 'support': {'room': room}, 'partner': [name]},
@@ -118,7 +121,7 @@ def main():
             grasp_jobs.append(dict(id=gkey, legacy_key=gkey, category=target['category'], model=target['model'], scale=target['default_scale'], dataset=target['dataset'],
                 constraint='tabletop', rest_pose='canonical', rest_hint_wxyz=None, kind='tabletop', asset_sha256=target['asset_sha256'], ready=True,
                 readiness_source=target['readiness_source'], campaign_classes=[cls], source='campaign_category_floor_pair'))
-            dependencies.append(dict(class_id=cls, grasp_key=gkey, tabletop_height_key=support['actual_height_key'], floor_height_key='0.0000', arms=['right', 'left'],
+            dependencies.append(dict(class_id=cls, grasp_key=gkey, tabletop_height_key=support['actual_height_key'] if relation == 'ontop' else None, floor_height_key='0.0000', arms=['right', 'left'],
                 native_rest_geometry='pending', map_validation='pending'))
     custom = a.out / 'candidate_customs.json'; custom.write_text(json.dumps(definitions, indent=2) + '\n')
     for job in jobs:

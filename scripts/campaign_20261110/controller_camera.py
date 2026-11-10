@@ -200,6 +200,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             require(row["code"] == source["code"] and row["key"] == source["key"], "adopted production runtime differs")
             records.append({"allocation": row, "status": "waiting", "count": int(row["n"]), "adopted": True})
     for record in records:
+        if record.get('migration',{}).get('never_started'):continue
         if record.get('status') in ('external_submission','submitting'):
             allocation=reconcile(rows,key=spec['class_id'],index=record['index'],count=record['count'],
                                  snapshot=source['code'],tag='camera_auto_production')
@@ -243,7 +244,8 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
     with atomic_directory_lock(root/'controllers/camera_planning.lockdir'):
         accepted = read(authority(root, template), {"accepted": {}})["accepted"]
         remaining = reserved_capacity(template, accepted, caps, quotas,pending_camera(root,accepted))
-        budget = spec["max_candidates"] - sum(r["count"] for r in records)
+        from scripts.campaign_20261110.controller_spool import candidate_budget_used
+        budget = spec["max_candidates"] - candidate_budget_used(records)
         state.update(remaining_capacity=remaining, remaining_candidate_budget=budget)
         if remaining <= 0 or budget <= 0:
             state["status"] = ("pending_work_reserves_remaining_capacity" if inflight else "quota_complete") if remaining <= 0 else "candidate_budget_exhausted"
@@ -262,6 +264,7 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
         command = production_command(read(directory / "submission.json")["command"], directory=output, index=index, count=count)
         require(command[command.index("--code") + 1] == source["code"], "production command changes validated code")
         record = {"directory": str(output), "index": index, "count": count, "command": command, "status": "ready"}
+        if state.get('next_dispatch_backends'):record['dispatch_backends']=state.pop('next_dispatch_backends')
         records.append(record)
         save()
         write_json_atomic(output / "submission.json", {"command": command, "seed": str(directory), "validation_jobid": source["jobid"]})

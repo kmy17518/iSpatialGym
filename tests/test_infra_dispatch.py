@@ -60,5 +60,12 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(D.backend_capacity('minyeong_svl', rows), 8)
         self.assertEqual(D.backend_capacity('vast_5090', rows), 8)
 
+    def test_shared_ledger_symlink_reconciles_exact_new_allocation(self):
+        target = self.root / 'manifests/shiyuc/allocations.tsv'; target.parent.mkdir()
+        target.write_text('key\tstart\tn\tcode\ttag\tjobid\tjob_dir\nobject_scaling-apple\t50000000\t3\t' + str(self.code) + '\theld_queue\t123\t' + str(self.root / 'out/shiyuc/out/held_queue/job') + '\n')
+        (self.root / 'manifests/shiyuc_allocations.tsv').symlink_to(target)
+        row = D.find_allocation(self.root, D.input_identity(self.root, self.command))
+        self.assertEqual(row['jobid'], '123')
+
 
 if __name__ == '__main__': unittest.main()

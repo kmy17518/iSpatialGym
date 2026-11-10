@@ -83,6 +83,9 @@ def enqueue(root, token, command, priority=50, backends=BACKENDS):
     require(token and token.replace('_', '').replace('-', '').isalnum(), 'unsafe dispatch token')
     require(backends and set(backends) <= set(BACKENDS), 'unknown dispatch backend')
     identity = input_identity(root, command)
+    reservation_path = root / 'manifests/family_index_reservations.json'
+    if reservation_path.stat().st_uid == os.getuid():
+        os.chmod(reservation_path, reservation_path.stat().st_mode | 0o040)
     # These are new campaign inputs, never provider assets or historical data.
     # Grant the already-authorized private lab group read access without changing
     # bytes. The queue's writable event journal is staged inside the fresh job.
@@ -161,6 +164,19 @@ def backend_capacity(backend, rows):
     return max(0, min(8, (48 if partition == 'svl' else 30) - gpus, 100 - len(own), 56 - running))
 
 
+def publish_owned_outputs(root):
+    """Give the authorized lab group read access to newly written job outputs."""
+    directory = root / 'out/shiyuc/out'
+    if not directory.is_dir() or getpass.getuser() != 'shiyuc': return
+    for current, dirs, files in os.walk(directory, followlinks=False):
+        for path in [Path(current)] + [Path(current) / name for name in files]:
+            if path.is_symlink(): continue
+            stat = path.stat()
+            if stat.st_uid != os.getuid(): continue
+            target = stat.st_mode | (0o050 if path.is_dir() else 0o040)
+            if target != stat.st_mode: os.chmod(path, target)
+
+
 def find_allocation(root, identity):
     matches = []
     for path in (root / 'manifests').glob('*allocations.tsv'):
@@ -225,6 +241,7 @@ def main():
     p.add_argument('--interval', type=float, default=20)
     a = p.parse_args(); os.umask(0o007)
     while True:
+        publish_owned_outputs(a.root)
         rows = []
         if not a.backend.startswith('vast_'):
             query = subprocess.run(['squeue', '-r', '-u', 'minyeong,shiyuc', '-h', '-o', '%u|%P|%T|%b'],
