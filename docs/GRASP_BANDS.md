@@ -6211,6 +6211,48 @@ i7-cork lying90 entry; check ERRORS 0).
   tracked from the grasp's own branch (proposal (a)'s continuity), not only a check at its end.
 - **Default:** NOT flipped. It acts and ok is equal, but GPU-h per ok is slightly worse (0.146 -> 0.148 current, 0.175 -> 0.187 lying, 0.152 -> 0.156 all).
 
+## block_design_01's two failed validation demos (branch `i7-blockdiag`, owner A9 #17, 2026-11-09)
+
+Owner decision: diagnose the two failed bdv_grid demos (trunk_f1fc4ac1, 6000 steps); fix a bug behind a default-off switch, A/B N 8.
+
+**320101 symbolic_only: an evaluator bug.** Every die was seated within 1.3 mm / 0.03 rad of its own slot. The 2 x 2 slot set maps
+onto itself under a global pi motion (a flip about the board's y axis: slots 0<->2, 1<->3; a turn about z: 0<->3, 1<->2). The
+layout-cost assignment (`group_entity._assign`) is invariant to a global rigid motion, so three permutations satisfy every relation and
+their costs differ only by placement noise. At the final step the flipped one (2301, 0.007399 m) beat the identity (0.0079 m). The
+`pose_reached` measure uses the same shared assignment, so it read every die one slot off: 4.0 cm (3.14 cm pitch plus the 2.54 cm root-z
+offset of the face-origin dice) and pi. The record shows the same signature 4 more times (bd5o_base 300502, bd5o_ef 300502, bd5o_e
+300503, int2_5 320200), so 5 of about 41 written 6000-step demos were lost this way.
+
+**Fix: `ISPATIALGYM_GROUP_ASSIGN_POSE_TIEBREAK`** (a1bd231c, off; default ON in 7ca0942e, `=0` restores). When the layout-best
+permutation satisfies every relation, the switch takes the relation-satisfying permutation with the smallest normalized absolute slot
+error. `layout_reached` keeps its truth value. Counters: `meta.group_assign_pose_tiebreak` {evaluations, acted, last_acted}, present
+only when the switch is on. It acts only on exchangeable layout-cost groups with absolute slots, which today means block_design only
+(attachment groups use a fixed assignment). Offline, over the 45-step settle window, the 5 recorded symbolic_only demos become pose and
+layout 45/45, and 320201 is unchanged.
+
+A/B (trunk_a1bd231c, 320100-103 + 320200-203, svl titanrtx, v2maps_int2 v2only, alias memory off, own empty sampling caches):
+
+| arm | att | written | ok | GPU-h | GPU-h / ok | where the switch acted |
+|---|---|---|---|---|---|---|
+| bdg_off | 9 | 8 | 7 | 2.63 | 0.375 | - (320202 symbolic_only, permutation 1032, 4.1 cm / pi) |
+| bdg_on | 9 | 8 | 8 | 2.54 | 0.318 | 320202 (26 evaluations, ok), 320203 (24, ok) |
+
+The default was flipped by the standard rule: the switch acted, ok is no worse, and GPU-h per ok is lower.
+
+**320201 not_reached: physical (a release push), with no clear fix.** Die 1 (slot 0, the first place) ends 0.050 rad off its slot.
+Its relations to the other dice are 0.054 / 0.058 rad, above the 0.05 layout tolerance. Positions (<= 3.9 mm) pass. The review's
+"3.9 mm" is the maximum position error; the failing quantity is orientation. From the replay:
+- The carry held the die 0.016 rad off.
+- The hand reached the planned place pose exactly (eef z 0.8619 = the sidecar's), so the controller converged.
+- At the first opening step (633) the die was dragged 2.55 mm along the finger axis and turned 0.041 rad. It was still 22.7 mm over the
+  pocket floor, as designed (`release_above_surface_m` 0.023, 5 mm over the rim), so there was no contact.
+- It then fell into the pocket (0.057 -> 0.050).
+
+The opening twist appears at every release (0.01-0.06 rad) and usually turns the die toward its slot. The pocket's yaw play (+-0.08
+rad: 27.4 mm seat, 25.4 mm cube) is wider than the 0.05 tolerance, so nothing corrects a wrong turn. It is not grasp slip, collision or
+the controller. Changing it would touch the shared AG release (weld delay / pads_clear) or the micro layout tolerance, so it is left
+for the owner.
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
