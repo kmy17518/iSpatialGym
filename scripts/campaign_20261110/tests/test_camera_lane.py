@@ -9,14 +9,20 @@ import pytest
 from scripts.campaign_20261110 import camera_lane as lane, contracts as c
 
 
-def fixture(root, distances=(1, 2, 3, 3.1, 4, 4.5, 5, 6, 7, 10, 1.5, 5.5)):
+def fixture(root, distances=(1, 2, 3, 3.1, 4, 4.5, 5, 6, 7, 10, 1.5, 5.5), *, obstructed=False):
     since = time.time() - 60
     snapshot = root / "code/snapshot"
     snapshot.mkdir(parents=True)
     (snapshot / ".snapshot_commit").write_text("camera-code\n")
     obj = c.ObjectRef("floor.n.01_1", "support", "floors", "abc", c.digest("asset"), semantic_kind="floor", ready=True, readiness_source="test")
-    template = c.Template("template", lane.TASK, lane.TASK, "eval_standard", "house_single_floor", "room", (obj,), c.digest("definition"))
-    perturb = c.Perturbations({obj.instance: c.ScaleState((1, 1, 1), (1, 1, 1))})
+    task = "camera_relocalization-obstructed" if obstructed else lane.TASK
+    obstacle = c.ObjectRef("hamper.n.02_1", "target", "hamper", "abc", c.digest("obstacle"), ready=True, readiness_source="test")
+    objects = (obj, obstacle) if obstructed else (obj,)
+    setup = {"runtime_bddl_sha256": c.digest("bddl"), "runtime_bddl_adaptation": {
+        "schema": "isg-stationary-obstacle-definition-v1", "measure": [["pose_reached", "?agent.n.01_1"]],
+        "obstacle_bindings": [obstacle.instance]}} if obstructed else {}
+    template = c.Template("template", task, task+"-hamper_1" if obstructed else task, "eval_standard", "house_single_floor", "room", objects, c.digest("definition"), setup)
+    perturb = c.Perturbations({o.instance: c.ScaleState((1, 1, 1), (1, 1, 1)) for o in objects})
     key = c.ValidationKey(template.fingerprint, c.file_digest(snapshot / ".snapshot_commit"), c.digest("physics"), c.digest("data"), perturb.scale_fingerprint)
     job = root / "out/camera/job"
     inst = job / "inst/template/instances"
@@ -25,12 +31,17 @@ def fixture(root, distances=(1, 2, 3, 3.1, 4, 4.5, 5, 6, 7, 10, 1.5, 5.5)):
     gate_dir.mkdir(parents=True)
     for n, distance in enumerate(distances):
         iid = f"camera_{n:02d}"
-        tro = c.attach_tro_metadata({"ispatialgym": {"instance_id": iid, "object_bindings": {obj.instance: {"category": "floors", "model": "abc"}}}},
+        tro = c.attach_tro_metadata({"ispatialgym": {"instance_id": iid, "object_bindings": {o.instance: {"category": o.category, "model": o.model} for o in objects}}},
             campaign_id="campaign", split="eval_standard", template=template, created_at=time.time(), seed=n, perturbations=perturb, validation_key=key)
+        if obstructed:
+            pose = [[1, 2, 3], [0, 0, 0, 1]]
+            tro["ispatialgym"].update({"bddl_sha256": c.digest("bddl"), "pose_targets": {obstacle.instance: {
+                "frame": "world", "position_metric": "full", "orientation_metric": "full", "position": pose[0], "orientation": pose[1]}}})
+            tro["ispatialgym"]["campaign"]["runtime"] = {"planned_start_poses": {obstacle.instance: pose}}
         tro_path = inst / f"{iid}-tro_state.json"
         c.write_json_atomic(tro_path, tro)
         c.write_json_atomic(inst / f"{iid}.oracle.json", {"tro_sha256": c.file_digest(tro_path), "path_bucket_m": float(lane.path_bucket(distance))})
-        c.write_json_atomic(inst / f"{iid}.summary.json", {"geodesic_m": distance, "path_bucket_m": float(lane.path_bucket(distance))})
+        c.write_json_atomic(inst / f"{iid}.summary.json", {"geodesic_m": distance, "geodesic_blocked_m": distance, "path_bucket_m": float(lane.path_bucket(distance))})
         demo_dir = job / "demo" / iid
         demo_dir.mkdir(parents=True)
         demo = demo_dir / "demo.hdf5"

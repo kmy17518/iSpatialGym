@@ -40,6 +40,7 @@ import torch as th
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import alias_memory as AM
 from ispatialgym.sampling import attempt_cap as AC
+from ispatialgym.sampling import campaign_attachment_goals as CAG
 from ispatialgym.sampling import generation_defaults as GD
 from ispatialgym.sampling import predicates as PRED
 from ispatialgym.sampling.sim_utils import Reject
@@ -580,9 +581,13 @@ class Attachment(SamplerV2):
     def sample_template(self):
         """The template of the current route, or of the route a switch asks for; with :data:`ATTACH_FALLBACK_SWITCH` also each fallback
         route's (:meth:`_sample_template_fallback`)."""
-        if attach_fallback_on():
-            return self._sample_template_fallback()
-        return self._sample_template_route(attach_route_requested())
+        if os.environ.get(CAG.ENV):
+            self._campaign_attachment_active = self.campaign_attachment_plan()
+        result = self._sample_template_fallback() if attach_fallback_on() else self._sample_template_route(attach_route_requested())
+        plan = getattr(self, "_campaign_attachment_active", None)
+        if plan is not None:
+            self.campaign_verify_mating(plan)
+        return result
 
     def _sample_template_fallback(self) -> None:
         """i7-cork 5n.1: the current route's template (the primary; its failure is the template's), then each of :data:`ATTACH_FALLBACK_ORDER`
@@ -1096,6 +1101,8 @@ class Attachment(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         """The attempt's draw on the template's route; with :data:`ATTACH_FALLBACK_SWITCH` the current route first and, after its drawn
         rest failed the nudge test, each available fallback route in turn (:data:`ATTACH_FALLBACK_ORDER`)."""
+        if os.environ.get(CAG.ENV):
+            self._campaign_attachment_active = self.campaign_attachment_plan()
         states = getattr(self, "_route_states", None)
         if not states:
             return self._sample_instance_route(rng)
@@ -1155,8 +1162,12 @@ class Attachment(SamplerV2):
             self.kit.sync_world()
             try:
                 if self.attach_route == "handover":
-                    return self._sample_with_handover(rng, init, manip, int(k))
-                return self._sample_with(rng, init, manip, int(k))
+                    draft = self._sample_with_handover(rng, init, manip, int(k))
+                else:
+                    draft = self._sample_with(rng, init, manip, int(k))
+                if getattr(self, "_campaign_attachment_active", None) is not None:
+                    self.campaign_finish_draft(draft)
+                return draft
             except EarlyRestUnstable:
                 raise  # i7-cork 5n.2: the drawn rest fails the nudge test - the attempt ends there, as the late test ends it
             except Reject as e:
@@ -1166,9 +1177,89 @@ class Attachment(SamplerV2):
                 log.info("%s: %s", self.gp.variant, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
+    def campaign_attachment_plan(self):
+        if not os.environ.get(CAG.ENV):
+            return None
+        if not hasattr(self, "_campaign_group_started_at"):
+            self._campaign_group_started_at = time.time()
+        try:
+            plan = CAG.load_attachment_plan(template_id=self.ctx.template_id, scene=self.scene, rooms=self.choice.rooms,
+                                            activated_at=self._campaign_group_started_at,
+                                            expected_sha256=getattr(self, "_campaign_attachment_plan_sha", None))
+            if (plan.target_name, plan.partner_name) != (self.tname, self.pname):
+                raise CAG.GoalPlanError("attachment goal bindings differ from live task")
+            if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                raise Reject("campaign_group_complete", "attachment group member limit reached")
+            self._campaign_attachment_plan_sha = plan.sha256
+            return plan
+        except CAG.GoalGroupTimeout as exc:
+            raise Reject("campaign_group_timeout", str(exc)) from exc
+        except (CAG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_group_remaining_s(self):
+        plan = self.campaign_attachment_plan()
+        return None if plan is None else max(0.0, plan.deadline_at-time.time())
+
+    @staticmethod
+    def campaign_tensor_pose(value):
+        return tuple(th.tensor(part, dtype=th.float32) for part in value)
+
+    def campaign_verify_mating(self, plan):
+        """Reject a foreign goal before drawing a target start or grasp."""
+        try:
+            plan.verify(self._attached_pose(self.campaign_tensor_pose(plan.partner)), plan.partner,
+                        position_tol=self.ikc.WITNESS_POS_TOL, orientation_tol=self.ikc.WITNESS_ANG_TOL)
+        except CAG.GoalPlanError as exc:
+            raise Reject("campaign_goal_mating", str(exc)) from exc
+
+    def campaign_partner_cells(self, stance):
+        plan = self._campaign_attachment_active
+        self.campaign_group_remaining_s()
+        xy = th.tensor(plan.partner[0][:2], dtype=th.float32)
+        # Retain the native map-membership tolerance before any exact IK. The
+        # planned pose is never projected onto a different reachable cell.
+        ok, _ = TT.in_band(self.attach_bands, stance, xy, TT.CELL_TOLERANCE)
+        return xy.reshape(1, 2) if ok else th.zeros(0, 2)
+
+    def campaign_finish_draft(self, draft):
+        plan = self._campaign_attachment_active
+        draft.summary["campaign_goal_group"] = plan.summary()
+        draft.summary["campaign_goal_group"]["requested_start"] = {
+            "target_pose": [value.tolist() for value in draft.object_poses[self.tname]],
+            "grasps": [{key: value.to_sidecar().get(key) for key in ("object", "arm", "grasp_key", "grasp_name", "eef_in_object")}
+                       for value in self.sidecar.grasps],
+        }
+        self._campaign_latest_proposal = {"start_poses": draft.object_poses,
+            "goal_poses": {self.tname: plan.goal, self.pname: plan.partner}, "group_id": plan.group_id}
+        self.campaign_verify_goal(draft)
+
+    def campaign_verify_goal(self, draft, *, settled=None):
+        plan = self._campaign_attachment_active
+        self.campaign_group_remaining_s()
+        target, partner = settled or (draft.goal_poses[self.tname], draft.object_poses[self.pname])
+        try:
+            plan.verify(target, partner, position_tol=self.tol("position", .01), orientation_tol=self.tol("orientation", .15),
+                        partner_position_tol=float(self.gen("partner_moved_max_m", .005)))
+        except CAG.GoalPlanError as exc:
+            raise Reject("campaign_goal_drift", str(exc)) from exc
+        goal, partner = self.campaign_tensor_pose(plan.goal), self.campaign_tensor_pose(plan.partner)
+        draft.goal_poses[self.tname] = goal
+        draft.groups[self._group_name([self.tname, self.pname])] = self._group_target(partner, goal, self.tname, self.pname)
+
+    def write_instance(self, draft, index, seed):
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            self.campaign_verify_goal(draft)
+        path = super().write_instance(draft, index, seed)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0)+1
+        return path
+
     def _check_deadline(self):
         """Per-attempt time budget (owner 2026-09-16 10:47 item 3: an attempt stays under ~5 min): the current candidate
         stops with ``Reject("time_budget")`` once it is spent."""
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            self.campaign_group_remaining_s()
         AC.check("attachment: the search")  # i7-stancememo 5x.3: the adaptive cap (ISPATIALGYM_ATTEMPT_CAP)
         if time.time() > getattr(self, "_deadline", math.inf):
             raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
@@ -1531,6 +1622,8 @@ class Attachment(SamplerV2):
         fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "screen": 0, "ik": 0, "fingers": 0, "carry": 0, "attach_frame": 0}
         self._att_fails[f"handover:{st.name}@lat{st.lateral:+.2f}/s{float(st.stand_off or 0.0):.2f}"] = fails
         cells = TT.band_cells_world(self.attach_bands, st)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            cells = self.campaign_partner_cells(st)
         if len(cells) == 0:
             fails["no_cells"] = 1
             return None
@@ -1544,7 +1637,9 @@ class Attachment(SamplerV2):
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
                 continue
-            pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
+            plan = getattr(self, "_campaign_attachment_active", None)
+            pose = self.campaign_tensor_pose(plan.partner) if plan is not None else TT.object_pose_on(
+                self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, float(rng.uniform(-math.pi, math.pi)), self.top.z)
             fp = self.world.footprint(self.hull[self.p_role], pose)
             if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
                 fails["support"] += 1
@@ -2257,6 +2352,8 @@ class Attachment(SamplerV2):
         tag = "" if require_joint else ("/brace-optional" if brace else "/no-brace")
         self._att_fails[f"{st.name}@lat{st.lateral:+.2f}/trunk({st.translate:.2f},{st.tilt:+.2f}){tag}"] = fails
         cells = TT.band_cells_world(self.attach_bands, st)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            cells = self.campaign_partner_cells(st)
         if len(cells) == 0:
             fails["no_cells"] = 1
             return None
@@ -2285,9 +2382,13 @@ class Attachment(SamplerV2):
             # i7-cork 5n.3 (ISG_LYING90_MIN_TURN): the ladder of partner yaws in the order of the carry's turn - the min-turn yaw first (one
             # jittered draw), then the LYING90_YAW_LADDER_DEG offsets around it; the screen below keeps per cell the smallest-turn yaw it reaches
             yaws = [yaw] if yaw_c is None else [yaw_c + math.radians(LYING90_YAW_JITTER_DEG) * yaw / math.pi + math.radians(o) for o in LYING90_YAW_LADDER_DEG]
+            plan = getattr(self, "_campaign_attachment_active", None)
+            if plan is not None:
+                yaws = [0.0]  # The complete partner pose, including orientation, is already fixed.
             geo_cells.append(i)
             for yaw in yaws:
-                pose = TT.object_pose_on(self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
+                pose = self.campaign_tensor_pose(plan.partner) if plan is not None else TT.object_pose_on(
+                    self, self.hull[self.p_role], C.IDENTITY_QUAT, xy, yaw, self.top.z)
                 fp = self.world.footprint(self.hull[self.p_role], pose)
                 if not self.top.polygon_supported(fp, margin=TT.SUPPORT_MARGIN):
                     fails["support"] += 1
@@ -2777,6 +2878,8 @@ class Attachment(SamplerV2):
         goal = self._attached_pose(f_pose)
         draft.goal_poses[tname] = goal
         draft.groups[self._group_name([tname, pname])] = self._group_target(f_pose, goal, tname, pname)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            self.campaign_verify_goal(draft)
 
     def apply_goal(self, draft: Draft):
         male, female = self.obj(self.t_role), self.obj(self.p_role)
@@ -2795,6 +2898,8 @@ class Attachment(SamplerV2):
         if float(th.linalg.norm(f_pose[0] - draft.object_poses[pname][0])) > float(self.gen("partner_moved_max_m", 0.005)):
             raise Reject("goal_partner_moved", "the partner moved while attaching")
         draft.groups[self._group_name([tname, pname])] = self._group_target(f_pose, m_pose, tname, pname)
+        if getattr(self, "_campaign_attachment_active", None) is not None:
+            self.campaign_verify_goal(draft, settled=(m_pose, f_pose))
 
     def check_goal_feasible(self, draft: Draft):
         try:

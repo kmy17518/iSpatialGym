@@ -32,6 +32,7 @@ from ispatialgym.sampling.campaign_surface_goals import SCHEMA as SURFACE_SCHEMA
 from ispatialgym.sampling.campaign_tray_goals import SCHEMA as TRAY_SCHEMA, validate_tray_plan
 from ispatialgym.sampling.campaign_pair_goals import SCHEMA as PAIR_SCHEMA, RELATIONS as PAIR_RELATIONS, validate_pair_plan, vary_nextto_gap
 from ispatialgym.sampling.campaign_joint_goals import SCHEMA as JOINT_SCHEMA, validate_joint_plan
+from ispatialgym.sampling.campaign_attachment_goals import SCHEMA as ATTACHMENT_SCHEMA, validate_attachment_plan
 
 
 def read_json(path):
@@ -202,7 +203,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
                   for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside"))) for relation in relations}
     joint_task = template.task.startswith("configuration_matching-articulation_")
-    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding") or template.task in pair_tasks,
+    require(joint_task or template.task in ("object_scaling", "mental_rotation", "alignment-world_vertical", "alignment-axial", "disembedding", "configuration_matching-attachment") or template.task in pair_tasks,
             "unsupported goal author task")
     require(template.split in ("train", "eval_standard", "eval_model", "eval_category"), "invalid group split")
     bindings = anchor["tro"]["ispatialgym"]["object_bindings"]
@@ -245,7 +246,18 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             "created_at": now, "budget_seconds": budget_seconds, "max_members": max_members,
             "source_instance_id": anchor["instance_id"], "source_instance_is_member": False,
             "anchor_sources": anchor["sources"]}
-    if joint_task:
+    if template.task == "configuration_matching-attachment":
+        roles = {role: [ref.instance for ref in template.objects if ref.role == role] for role in ("target", "partner")}
+        require(all(len(names) == 1 for names in roles.values()), "ambiguous attachment target/partner binding")
+        plan["target_name"], plan["partner_name"] = roles["target"][0], roles["partner"][0]
+        partner = anchor["planned_start_poses"].get(plan["partner_name"]) or anchor.get("bound_object_poses", {}).get(plan["partner_name"])
+        require(partner is not None, "attachment anchor lacks recorded partner pose")
+        plan["partner_pose"] = {"position": partner[0], "orientation": partner[1]}
+        plan["schema"] = ATTACHMENT_SCHEMA
+        plan.pop("magnitude_range")
+        plan["anchor_base_pose2d"] = plan.pop("base_pose2d")
+        validate_attachment_plan(plan, template_id=runtime_id, scene=template.scene, rooms=[template.room], activated_at=now, now=now)
+    elif joint_task:
         targets = [ref for ref in template.objects if ref.role == "target"]
         require(len(targets) == 1 and targets[0].joint, "articulation contract lacks one target joint")
         target, joint = targets[0].instance, targets[0].joint
