@@ -449,6 +449,18 @@ class CameraRelocalizationV2(SamplerV2):
     def obstacle_names(self) -> List[str]:
         return [b.name for b in self.bindings.many("obstacles")] if self.bindings.roles.get("obstacles") else []
 
+    def build_bddl(self):
+        problem = super().build_bddl()
+        from ispatialgym.sampling import campaign_obstacles
+
+        if self.obstructed and campaign_obstacles.enabled():
+            from ispatialgym.activity.problem import parse_problem_string
+
+            text = campaign_obstacles.with_stationary_goals(problem.text, self.obstacle_names)
+            problem = parse_problem_string(text, self.activity, self.definition_id)
+            problem.text = text
+        return problem
+
     def obstacle_params(self) -> Dict[str, Any]:
         return dict(self.g("obstacle"))
 
@@ -1277,6 +1289,14 @@ class CameraRelocalizationV2(SamplerV2):
         if not draft.object_poses:
             return
         P = self.obstacle_params()
+        from ispatialgym.sampling import campaign_obstacles
+
+        if campaign_obstacles.enabled():
+            draft.pose_targets.update(campaign_obstacles.initial_pose_targets(
+                draft.object_poses, self.obstacle_names,
+                position_tolerance=float(P["settle_drift_max_m"]),
+                orientation_tolerance=OBSTACLE_MAX_TILT_RAD,
+            ))
         margin = float(P.get("footprint_margin_m", FOOTPRINT_MARGIN_M))
         planned = draft.extras["obstacle_planned_poses"]
         for name, (p0, r0) in planned.items():

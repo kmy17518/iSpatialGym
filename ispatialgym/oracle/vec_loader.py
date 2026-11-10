@@ -675,6 +675,10 @@ class VecInstanceLoader:
             scene = env.scenes[i]
             try:
                 physical = {k: v for k, v in task.physical_scope_of(i).items() if v is not None and not isinstance(v, GroupEntity)}
+                if tro.meta.raw.get("campaign"):
+                    from ispatialgym.sampling.campaign_runtime import verify_loaded
+
+                    rep["campaign_restoration"] = verify_loaded(tro.meta.raw["campaign"], physical)
                 rep["rigid_sleep_threshold"] = self._apply_rigid_sleep_threshold(physical.values())
                 sl = SlotLoader(SceneView(env, i), self.robots[i], tro, physical, scene_translation(scene))
                 self.slots[i] = sl

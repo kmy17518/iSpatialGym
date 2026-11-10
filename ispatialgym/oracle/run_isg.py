@@ -641,6 +641,10 @@ class InstanceLoader:
         self.report["floor_collision_filter"] = self._apply_floor_filters()
         task.load_tro_instance(env, tro=self.tro, settle_steps=0)
         self.physical = {k: v for k, v in task.object_scope.items() if v is not None and not isinstance(v, GroupEntity)}
+        if self.tro.meta.raw.get("campaign"):
+            from ispatialgym.sampling.campaign_runtime import verify_loaded
+
+            self.report["campaign_restoration"] = verify_loaded(self.tro.meta.raw["campaign"], self.physical)
         # the rigid-body overrides of the task objects the TRO placed (the build's pass reaches the scene's own objects only), before
         # the constraints and the settle, as VecInstanceLoader.restore
         self.report["rigid_sleep_threshold"] = SA.apply_to_objects(self.physical.values(), self.physics_overrides)

@@ -1446,6 +1446,10 @@ class SamplerV2(TaskSampler):
         p, q = self.robot.get_position_orientation()
         tro["robot_poses"] = {"robot": [{"position": p.tolist(), "orientation": q.tolist()}]}
         tro["ispatialgym"] = meta
+        if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+            from ispatialgym.sampling.campaign_runtime import annotate
+
+            tro = annotate(self, tro, draft, seed)
         inst_dir = os.path.join(self.ctx.out_dir, "instances")
         path = os.path.join(inst_dir, f"{iid}-tro_state.json")
         validate_and_write(tro, self.compiled, path)
@@ -1761,6 +1765,7 @@ class SamplerV2(TaskSampler):
                 # train-fast STAGE_TIMING (2026-10-31): seconds and kit counters per stage, logged after every attempt (success or rejection)
                 clock = _StageClock(self.kit)
                 phase = "reset"
+                draft = None  # A rejected draw must never journal the preceding attempt's poses.
                 self.attempt_begin(index, attempt)  # i7-stancememo: per-instance state of the task module (its counters in this attempt's kit line)
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()],
@@ -1849,6 +1854,10 @@ class SamplerV2(TaskSampler):
                     ok = True
                     break
                 except Reject as e:
+                    if os.environ.get("ISPATIALGYM_CAMPAIGN_CONFIG"):
+                        from ispatialgym.sampling.campaign_runtime import record_failure
+
+                        record_failure(self, draft, index=index, attempt=attempt, seed=seed, phase=phase, error=e)
                     clock.mark(phase)
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
                     log.debug("rejection traceback", exc_info=True)

@@ -86,6 +86,7 @@ from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import grasp_library as GL
 from ispatialgym.sampling import reach_bands as RB
+from ispatialgym.sampling import campaign_held_goals as CHG
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
@@ -947,6 +948,201 @@ class HeldObjectV2(SamplerV2):
     def pose_target_for(self, cam: C.Pose, goal: C.Pose, info: Dict[str, Any]) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def campaign_goal_plan(self):
+        """An opt-in immutable goal selected before drawing this group's starts."""
+        try:
+            plan = CHG.load_goal_plan(task=self.activity, template_id=self.ctx.template_id, scene=self.scene,
+                                      rooms=self.choice.rooms, expected_sha256=getattr(self, "_campaign_goal_plan_sha", None))
+            if plan is not None:
+                if getattr(self, "_campaign_group_written", 0) >= plan.max_members:
+                    raise CHG.GoalPlanError("goal-group candidate limit reached")
+                if not self.in_room(plan.base_pose2d[:2]):
+                    raise CHG.GoalPlanError("pinned base is outside the task room")
+                self._campaign_goal_plan_sha = plan.sha256
+            return plan
+        except (CHG.GoalPlanError, OSError, ValueError) as exc:
+            raise Reject("campaign_goal_plan", str(exc)) from exc
+
+    def campaign_goal_waypoints(self, start: C.Pose, goal: C.Pose, eef_in_object: C.Pose) -> List[C.Pose]:
+        """Interpolate the object's pose and recover the hand's pose at each step.
+
+        Unlike an orbit about a nominal root, this also corrects the small root
+        displacement caused by grasp realization while preserving the pinned goal.
+        Every resulting waypoint goes through the existing exact path checks.
+        """
+        return [C.compose(pose, eef_in_object) for pose in C.line_waypoints(start, goal, int(self.g("waypoints")) + 1)]
+
+    def sample_campaign_goal(self, rng: np.random.Generator, plan: CHG.HeldGoalPlan) -> Draft:
+        """Draw a fresh grasp/start against one preselected world goal and base.
+
+        This branch changes sampler draws only. The existing oracle action program
+        and all collision, camera, grasp, goal and path checks remain in force.
+        """
+        tname, target, hc = self.target_name, self.obj("target"), self.hold
+        base2d = tuple(plan.base_pose2d)
+        goal = (G.t(plan.position), G.t(plan.orientation))
+        cam = self.camera_at(base2d)
+        axis = self.world.camera_model.optical_axis(cam)
+        if not self.whole_in_frame(cam, goal):
+            raise Reject("campaign_goal_out_of_view", "pinned target goal is not wholly in frame")
+        order, errors, chosen = self.grasp_order(rng), [], None
+        for gname in order[:4]:
+            g = next(x for x in self.grasps if x.name == gname)
+            for start_attempt in range(3):
+                # Owner 2026-11-10: train buckets are balancing preferences. The
+                # final draw can use the full task range; eval buckets stay strict.
+                magnitude_range = plan.magnitude_range
+                if plan.split == "train" and start_attempt == 2:
+                    magnitude_range = (0.05, 0.30) if self.activity == "object_scaling" else (30.0, 120.0)
+                if self.activity == "object_scaling":
+                    opt = self.options[gname]
+                    d1 = float(th.dot(goal[0] - G.t(cam[0]), axis))
+                    try:
+                        d0 = CHG.draw_start_depth(rng, d1, opt["window"], magnitude_range,
+                                                  min_change=float(self.g("min_depth_change_m")),
+                                                  direction=self.g("requested_direction"), start_band=self.g("start_depth_band"))
+                    except CHG.GoalPlanError as exc:
+                        errors.append(f"{gname}: {exc}")
+                        if plan.split != "train":
+                            break
+                        continue
+                    obj0 = (goal[0] + axis * (d0 - d1), goal[1].clone())
+                    info = {"init_depth_m": d0, "goal_depth_m": d1, "depth_change_m": d1 - d0,
+                            "direction": "away" if d1 > d0 else "toward", "window_m": list(opt["window"])}
+                    hold = {**hold_json(hc, self.arm), "depth_m": round(hc.depth_m + d0 - float(opt["reference_depth"]), 6),
+                            "start_depth_m": d0, "reference_depth_m": hc.depth_m}
+                else:
+                    axis_b, angle = draw_rotation_goals(rng, magnitude_range, 1)[0]
+                    obj0 = turned_about_root(goal, base2d[2], axis_b, -angle)
+                    info = self.describe_goal({"axis_base": axis_b.tolist(), "angle_deg": float(angle),
+                                               "start": {"axis_base": axis_b.tolist(), "angle_deg": float(-angle),
+                                                         "reference": "pinned_goal"}}, base2d)
+                    hold = {**hold_json(hc, self.arm), "start_rotation": dict(info["start"])}
+                eef0 = C.compose(obj0, g.pose)
+                if not self.whole_in_frame(cam, obj0):
+                    errors.append(f"{gname}: fixed-goal start out of frame")
+                    continue
+                with self.kit.ignoring(self.scene_obstacles()):
+                    q_init = self.kit.ik(eef0, self.default_q_at(base2d), arm=self.arm)
+                if q_init is None:
+                    errors.append(f"{gname}: no fixed-goal start IK")
+                    continue
+                self.kit.apply(q_init, base2d)
+                target.set_position_orientation(obj0[0], obj0[1])
+                target.keep_still()
+                self.kit.sync_world()
+                init = Stance("init", base2d, hc.translate, hc.tilt, arms=[self.arm], carried=tname)
+                init.q = q_init
+                margin = self.gen("orbit_limit_margin_rad") if self.activity == "mental_rotation" else None
+                if margin is not None and self.ikc.joint_limit_margin(q_init, self.arm)[0] < float(margin):
+                    errors.append(f"{gname}: fixed-goal start joint margin")
+                    continue
+                wps = self.campaign_goal_waypoints(obj0, goal, g.pose)
+                with attached(self.kit, self.arm, target):
+                    if not bool(self.kit.collision_free(q_init, margin=0.01)[0]):
+                        errors.append(f"{gname}: fixed-goal start collision")
+                        continue
+                    res = self.ikc.waypoints_ok([eef0] + wps, init, self.arm, q_seed=q_init,
+                                               scale_key=self.choice.models["target"].scale)
+                    if not res.ok:
+                        errors.append(f"{gname}: fixed-goal path {res.reason}")
+                        continue
+                    if margin is not None:
+                        tracked, why = self.ikc.track_chain(q_init, [eef0] + wps, self.arm,
+                                                           soft_pos_tol=self.ikc.ORACLE_SOFT_POS_TOL,
+                                                           soft_rot_tol=self.ikc.ORACLE_SOFT_ROT_TOL,
+                                                           max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS,
+                                                           refine_jumps=True, min_limit_margin=float(margin))
+                        if tracked is None:
+                            errors.append(f"{gname}: fixed-goal tracking {why}")
+                            continue
+                chosen = g, obj0, eef0, init, wps, res.q, info, hold
+                break
+            if chosen is not None:
+                break
+        if chosen is None:
+            raise Reject("campaign_goal_infeasible", "; ".join(errors[-6:]))
+        g, obj0, eef0, init, wps, q_goal, info, hold = chosen
+        self._start_q = init.q.clone()
+        init.extras.update({"posture": hold_posture(self.arm), "hold": hold})
+        d = Draft()
+        d.object_poses[tname], d.goal_poses[tname] = obj0, goal
+        d.robot_q, d.base_pose2d, d.settle_free = init.q, base2d, []
+        rel = C.invert(g.pose)
+        d.extras["grasps"] = [{"agent": AGENT_INSTANCE, "arm": self.arm, "object": tname, "grasp_key": g.key, "grasp_name": g.name,
+                               "object_pose_in_eef_frame": {"position": rel[0].tolist(), "orientation": rel[1].tolist()}}]
+        d.extras["goal_robot_q"] = q_goal
+        d.extras["campaign_fixed_goal"] = {"position": list(plan.position), "orientation": list(plan.orientation)}
+        d.summary.update({"grasp": {"key": g.key, "name": g.name, "flags": list(g.flags), "spread": self.spread_record(order)},
+                          "goal": info, "feasibility": {"embodiment": f"{self.arm}_arm"}, "hold": hold,
+                          "arm": self.arm_summary(), "campaign_goal_group": plan.summary()})
+        d.pose_targets[tname] = self.pose_target_for(cam, goal, info)
+        self.sidecar.add_stance(init)
+        rec = GraspRecord(tname, self.arm, g.key, g.name, 0.0, pre_grasp=IK.pre_pose(eef0), grasp=eef0, carry_height=0.0,
+                          finger_q=list(g.finger_q), eef_in_object=g.pose, stance="init", waypoints=wps)
+        rec.extras["arm_offer"] = self.arm_offer_record()
+        self.sidecar.add_grasp(rec)
+        block = self.sidecar.set_goal(base2d, hc.translate, hc.tilt, arms="same")
+        block.update({f"{self.arm}_arm_q": q_goal[self.robot.arm_control_idx[self.arm]].tolist(), "embodiment": f"{self.arm}_arm",
+                      "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}, "hold": hold})
+        self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "), **self.goal_numbers(info))
+        return d
+
+    def restore_campaign_goal(self, draft: Draft, *, phase: str) -> None:
+        """Recheck the full path after the in-hand transform changes; never shift the goal."""
+        pinned = draft.extras.get("campaign_fixed_goal")
+        if pinned is None:
+            return
+        tname, target = self.target_name, self.obj("target")
+        goal = (G.t(pinned["position"]), G.t(pinned["orientation"]))
+        start = tuple(x.float() for x in target.get_position_orientation())
+        eef = tuple(x.float() for x in self.robot.eef_links[self.arm].get_position_orientation())
+        rel = C.relative(start, eef)
+        group = draft.summary["campaign_goal_group"]
+        if self.activity == "object_scaling":
+            axis = self.world.camera_model.optical_axis(self.camera_at(draft.base_pose2d))
+            magnitude = abs(float(th.dot(goal[0] - start[0], axis)))
+        else:
+            magnitude = math.degrees(float(C.quat_angle(start[1], goal[1])))
+        if group["bucket_strict"] and not group["magnitude_range"][0] <= magnitude <= group["magnitude_range"][1]:
+            raise Reject("campaign_bucket_drift", f"{phase}: settled magnitude {magnitude} left eval bucket {group['magnitude_range']}")
+        group["actual_magnitude"] = magnitude
+        wps = self.campaign_goal_waypoints(start, goal, C.invert(rel))
+        q_start = self.kit.q_current()
+        init = self.sidecar.stance("init")
+        init.q = q_start
+        self.kit.sync_world()
+        with attached(self.kit, self.arm, target):
+            res = self.ikc.waypoints_ok([eef] + wps, init, self.arm, q_seed=q_start,
+                                       scale_key=self.choice.models["target"].scale)
+            if not res.ok:
+                raise Reject("campaign_realized_goal_path", f"{phase}: {res.reason}")
+            margin = self.gen("orbit_limit_margin_rad") if self.activity == "mental_rotation" else None
+            if margin is not None:
+                tracked, why = self.ikc.track_chain(q_start, [eef] + wps, self.arm,
+                                                   soft_pos_tol=self.ikc.ORACLE_SOFT_POS_TOL,
+                                                   soft_rot_tol=self.ikc.ORACLE_SOFT_ROT_TOL,
+                                                   max_iters=self.ikc.ORACLE_DIFF_IK_MAX_ITERS,
+                                                   refine_jumps=True, min_limit_margin=float(margin))
+                if tracked is None:
+                    raise Reject("campaign_realized_goal_path", f"{phase}: {why}")
+        predicted = C.compose(self.kit.eef_pose(res.q, self.arm), rel)
+        pos_error = float(th.linalg.norm(predicted[0] - goal[0]))
+        rot_error = float(C.quat_angle(predicted[1], goal[1]))
+        if pos_error > 0.001 or rot_error > 0.001:
+            raise Reject("campaign_goal_drift", f"{phase}: fixed-goal IK error {pos_error:.6f} m / {rot_error:.6f} rad")
+        draft.object_poses[tname], draft.goal_poses[tname], draft.robot_q = start, goal, q_start
+        draft.extras["goal_robot_q"] = res.q
+        draft.pose_targets[tname] = self.pose_target_for(self.camera_at(draft.base_pose2d), goal, draft.summary["goal"])
+        rec = self.sidecar.grasp_of(tname)
+        rec.waypoints, rec.grasp, rec.pre_grasp, rec.eef_in_object = wps, eef, IK.pre_pose(eef), C.invert(rel)
+        self.sidecar.goal.update({f"{self.arm}_arm_q": res.q[self.robot.arm_control_idx[self.arm]].tolist(),
+                                  "eef": {"position": wps[-1][0].tolist(), "orientation": wps[-1][1].tolist()}})
+        draft.summary["campaign_goal_group"].update({"phase": phase, "predicted_goal_error_m": pos_error,
+                                                     "predicted_goal_error_rad": rot_error})
+        draft.summary["goal_realised"] = {"position": goal[0].tolist(), "orientation": goal[1].tolist(),
+                                           "fixed_campaign_goal": True}
+
     # ------------------------------------------------------------------ grasp realisation (v1 §5.2)
 
     def apply_draft(self, draft: Draft):
@@ -992,6 +1188,7 @@ class HeldObjectV2(SamplerV2):
             st.q = draft.robot_q
         draft.summary["goal_realised"] = {"position": goal[0].tolist(), "orientation": goal[1].tolist(),
                                           "eef_offset_deg": math.degrees(C.quat_angle(rel[1], C.invert(self.grasp_of_draft(draft).pose)[1]))}
+        self.restore_campaign_goal(draft, phase="grasp_realization_rechecked")
 
     def grasp_of_draft(self, draft: Draft) -> GL.Grasp:
         name = draft.extras["grasps"][0]["grasp_name"]
@@ -1217,11 +1414,18 @@ class HeldObjectV2(SamplerV2):
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         self.settle_start(draft)
+        if draft.extras.get("campaign_fixed_goal") is not None:
+            self.restore_campaign_goal(draft, phase="settled_path_rechecked")
+            self.check_goal_feasible(draft)
+            self.program_check(draft)
+            self.check_witness_reach()
         # the sidecar's init configuration is the state the TRO records: demo and evaluator start from one pose
         st = self.sidecar.stances.get("init")
         if st is not None:
             st.q = self.kit.q_current()
         path = super().write_instance(draft, index, seed)
+        if draft.extras.get("campaign_fixed_goal") is not None:
+            self._campaign_group_written = getattr(self, "_campaign_group_written", 0) + 1
         self.release()
         target = self.obj("target")
         self.world.park(target, list(self.world.spawned).index(target.name))
@@ -1421,6 +1625,9 @@ class ObjectScalingV2(HeldObjectV2):
         self.sidecar.language["goal_numbers"].update(self.goal_numbers(info))
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        campaign_plan = self.campaign_goal_plan()
+        if campaign_plan is not None:
+            return self.sample_campaign_goal(rng, campaign_plan)
         d = Draft()
         tname = self.target_name
         target = self.obj("target")
@@ -1622,6 +1829,9 @@ class MentalRotationV2(HeldObjectV2):
         log.info("%s: %d grasps with start options (%s)", self.gp.variant, len(self.options), stats)
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
+        campaign_plan = self.campaign_goal_plan()
+        if campaign_plan is not None:
+            return self.sample_campaign_goal(rng, campaign_plan)
         d = Draft()
         tname = self.target_name
         target = self.obj("target")
