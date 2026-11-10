@@ -2194,7 +2194,7 @@ class IORSLarge(SamplerV2):
     def push_yaw_lock(self) -> Optional[str]:
         """``generation.push_under_yaw`` (:data:`PUSH_UNDER_YAW_LOCKS`; default None or ``"none"`` = every carried yaw)."""
         v = self.gp.gen("push_under_yaw")
-        if v is None and self.guide_wall_active():
+        if v is None and push_guide_wall_on() and self.guide_wall_active():
             return "endwise"  # i7-ul02guide: ISPATIALGYM_PUSH_GUIDE_WALL - the broad faces along the push, one against the guide wall
         if v is None and self.floorpush().get("broadside"):
             return "broadside"  # i7-floorpush r2 (lead #60 (i)): ISPATIALGYM_FLOORPUSH_BROADSIDE on the pitched push
@@ -3885,7 +3885,7 @@ class IORSLarge(SamplerV2):
         # i7-ul02guide (ISPATIALGYM_PUSH_GUIDE_WALL): only the lanes beside a guide wall, each with its drops (just outside the edge /
         # alongside the panel), the goal the target's length along the flat wall, the frontal stand-offs that keep the push in reach
         lanes_g: Dict[float, Dict[str, Any]] = {}
-        if self.guide_wall_active():
+        if push_guide_wall_on() and self.guide_wall_active():
             _, _, long_half, w_half = self.guide_footprint()
             lanes_g = {round(float(ln["lat"]), 4): ln for ln in guide_lanes(self.guide_walls(edge), w_half, PUSH_GUIDE_GAP_M, edge.length / 2 - w_half)}
             stats.update(guide_lanes=sorted(lanes_g), guide_goal_blocked=0)
@@ -4277,14 +4277,14 @@ class IORSLarge(SamplerV2):
     def init_yaw_jitter(self) -> float:
         """The init yaw's draw around the screened yaw (± this, rad; the B exact IK's retries too): :data:`TARGET_JITTER`; none with the
         guide wall (i7-ul02guide: the carried goal yaw is snapped onto the wall, :meth:`end_aligned_init_yaw`)."""
-        return 0.0 if self.guide_wall_active() else TARGET_JITTER
+        return 0.0 if push_guide_wall_on() and self.guide_wall_active() else TARGET_JITTER
 
     def end_aligned_init_yaw(self, yaw0: float, d_yaw: float):
         """The init yaw near the screened ``yaw0`` whose carried goal yaw (``+ d_yaw``) a mode aligns (the touching mode's
         ``goal_align_partner``); None here (the drawn yaw as screened), False for a pair the alignment cannot use. i7-ul02guide
         (:data:`PUSH_GUIDE_WALL_ENV`): the target's long axis on the partner's axes (:func:`guide_snap_yaw`, within half a screening step) -
         parallel to the guide wall, which is the goal orientation the carried yaw writes."""
-        if self.guide_wall_active():
+        if push_guide_wall_on() and self.guide_wall_active():
             y = guide_snap_yaw(yaw0, d_yaw, self.guide_axis_phi0(), G.yaw_of(self.partner.get_position_orientation()[1]), math.pi / max(1, len(self.yaws())))
             return False if y is None else y
         return None
