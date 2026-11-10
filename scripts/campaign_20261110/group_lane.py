@@ -3,12 +3,11 @@
 
 TROs and demos retain their verified collection hashes. Dataset consumers use
 the exported assignment's `split`; `sampling_split` records the collection lane.
-SQLite uses DELETE journaling under an external process lock (no NFS WAL).
+SQLite runs locally under an atomic directory lock, then publishes by replacement.
 """
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import math
 import re
@@ -23,6 +22,7 @@ from scripts.campaign_20261110.contracts import (
     task_quotas, write_json_atomic,
 )
 from scripts.campaign_20261110.goal_groups import load_template_contract
+from scripts.campaign_20261110.storage import atomic_directory_lock, local_sqlite_transaction
 
 QUOTAS = {q.task: q for q in task_quotas()}
 
@@ -195,9 +195,8 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
     policy = {key: reservations[key] for key in ("model_holdout_models", "category_holdout_models", "category_holdout_categories",
               "category_holdout_rooms", "train_exclude_models", "pending_custom_hard_reservations_not_ready")}
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    with state_path.with_suffix(".lock").open("a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        db = _db(state_path)
+    def transact(local_path):
+        db = _db(local_path)
         try:
             with db:
                 for key, value in (("campaign", review["campaign_id"]), ("reservations", digest(policy))):
@@ -257,12 +256,23 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 else:
                     write_json_atomic(destination, record)
                 db.execute("INSERT INTO groups VALUES (?,?,?,?)", (gid, goals[0], digest(review), canonical_json(record)))
-            counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
-            write_json_atomic(root / "dataset/group_counts.json", {"campaign_id": review["campaign_id"], "counts": counts,
-                              "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path)})
             return record
         finally:
             db.close()
+
+    with atomic_directory_lock(state_path.with_suffix(".lockdir")):
+        with local_sqlite_transaction(state_path) as local_path:
+            record = transact(local_path)
+            db = _db(local_path)
+            try:
+                counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
+                summary = {"campaign_id": review["campaign_id"], "counts": counts,
+                           "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path)}
+            finally:
+                db.close()
+        # Counts cannot advertise a transaction until its database is durable.
+        write_json_atomic(root / "dataset/group_counts.json", summary)
+        return record
 
 
 def main():
