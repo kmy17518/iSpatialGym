@@ -71,7 +71,9 @@ def test_the_hall_tree_board_is_found_at_the_touching_goal_height(monkeypatch):
 ALL_KNOWN_DIGESTS = {**INT1_INTERIOR_DIGESTS, **GOAL_INTERIOR_DIGESTS, "bookcase_kmuacd_0@0.8354": "b58d4e5c790e", **T03_INTERIOR_DIGESTS,
                      "drop_in_sink_awvzkn_0@basin": "4571693d44c4",
                      # i7-t03both 2026-11-09 (owner A5): kmuacd_0's middle and bottom rows (the shelf board draw's other compartments)
-                     "bookcase_kmuacd_0@0.4486": "f581827abd0c", "bookcase_kmuacd_0@0.0715": "3b6de0af6ac4"}
+                     "bookcase_kmuacd_0@0.4486": "f581827abd0c", "bookcase_kmuacd_0@0.0715": "3b6de0af6ac4",
+                     # i7-sink 2026-11-09 (owner A3b): the utility room tabletop sink basin
+                     "tabletop_sink_vekaaf_0@basin": "0f063c1c46a9"}
 
 
 class _Raster:
@@ -155,3 +157,15 @@ def test_the_plate_in_sink_variants_basin_is_registered():
     assert sink.open_top and "top" in sink.open_sides and abs(sink.height_m - 0.7316) < 1e-6
     assert sink.digest() == "4571693d44c4"
     assert IN.spec_for_support("house_single_floor", "drop_in_sink_awvzkn_0", 0.7316) is not None
+
+
+def test_the_vekaaf_plate_in_sink_basin_is_registered():
+    """i7-sink 2026-11-09 (owner A3b): tabletop_sink_vekaaf_0's basin (house_single_floor utility_room_0; the plate-in-sink variant
+    plate-tabletop_sink_vekaaf_0-countertop), measured by interiors.measure (slurm 18409919): an open-top basin at 0.9559 m, open front and
+    back (the live raster's four open edges), the digest its interior maps are built with."""
+    reg = IN.load_registry(IN.REGISTRY)
+    sink = reg["tabletop_sink_vekaaf_0@basin"]
+    assert sink.open_top and "top" in sink.open_sides and abs(sink.height_m - 0.9559) < 1e-6 and sink.back_thickness_m is None
+    assert sink.digest() == "0f063c1c46a9"
+    assert IN.spec_for_support("house_single_floor", "tabletop_sink_vekaaf_0", 0.9559) is not None
+    assert IN.live_mismatch(sink, _Raster(0.9559, ["+u", "-u", "+v", "-v"])) is None

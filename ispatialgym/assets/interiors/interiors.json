@@ -860,6 +860,48 @@
     "measured": "$OFH/probe_shelf/out_shelf_18312748.json (SimWorld.support_interior + PhysX rays + collision-piece AABBs in the bookcase's front-edge frame, house_double_floor_upper): the bottom row - level cluster z median 0.0715 (809 cells, open edges +u / -u), board pieces __13 (centre cube) / __9 (right cube) z 0.0197-0.0715 depth 0.0-0.3105, the board above = the middle row's __8 / __11 z 0.4078-0.449 (underside 0.3363 above the board top); interiors.measure $OFH/t03both_20261109/measure/km007c.json (bay 0: board 0.0715, wall rays 0.1661 / 0.1754 = width 0.3415, headroom 0.3365, open front + back)",
     "job": "$OFH/t03both_20261109/measure.sh km007c (trunk_157396bf, slurm 18407858)"
    }
+  },
+  "tabletop_sink_vekaaf_0@basin": {
+   "height_m": 0.9559,
+   "depth_m": 0.4412,
+   "width_m": 0.4805,
+   "headroom_m": 1.505,
+   "board_thickness_m": 0.02,
+   "top_thickness_m": 0.02,
+   "wall_thickness_m": 0.02,
+   "long_m": 0.5205,
+   "board_setback_m": 0.0803,
+   "back_thickness_m": null,
+   "centre_y_m": 0.0,
+   "open_sides": [
+    "top",
+    "front",
+    "back"
+   ],
+   "edge_distances": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+   ],
+   "joints": {},
+   "extra_boxes": [],
+   "rim_m": 0.28,
+   "open_top": true,
+   "supports": [
+    [
+     "house_single_floor",
+     "tabletop_sink_vekaaf_0"
+    ]
+   ],
+   "source": {
+    "measured": "interiors.measure: house_single_floor/tabletop_sink_vekaaf_0 raster edge +u at 0.9558 (requested 0.950 +- 0.05), 250 board cells, open edges ['+u', '-u', '+v', '-v'], front plane 0.0903 m out (static AABB overhang), wall rays None / None, back ray 0.28244364798069, moved links [], wall rim 0.28 vs headroom 1.5050 (open top True)",
+    "joints_settled": {},
+    "door_boxes": "pieces",
+    "assumed": "board / board above / walls / back thickness 0.02 m; long_m = the walls' outer span"
+   },
+   "for": "i7-sink 2026-11-09 (owner A3b): the goal side of the plate-in-sink variant inside_large_scale-plate-tabletop_sink_vekaaf_0-countertop (plate luhkiz into tabletop_sink_vekaaf_0, house_single_floor utility_room_0; customs inside_surface_z_m 0.95 +- 0.05, inside_stance_side -x). The measure found no side wall at mid-rim (wall rays None: the rim search's 0.28 m is above the shallow basin), so the spec has no side / front walls; the sampler's live checks see the real basin",
+   "job": "$OFH/sink_20261109/measure_vekaaf.sh, slurm 18409919 (trunk_612331b3, interiors measure --side=-x)"
   }
  }
 }
