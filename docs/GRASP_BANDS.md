@@ -3481,6 +3481,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 50 | i7-artsmall up to 92fe8d9f (lead #80c) | 08e7f768 | DEFAULT ARTIC_PUSH_BASE_SIG 1 (bug fix) + ARTSMALL_DRAW_ANGLES 1; layer artsmall_prefix (32 per-start prefix maps) into v2maps_int2 |
 | 51 | i7-bracefine up to 3f4ae16c (lead #88c) | 4db60997 | AXIAL_BRACE_MAP_PHASE2_TILTS off (builder only); maps_fine / maps_finem NOT consolidated (axial push-only) |
 | 52 | i7-sleep up to 42ffa417 (lead #86b) | 7d990d96 | SLEEP_ASSIST_RESTART_ON_WAKE off; FINAL-COLLECTION PHYSICS FREEZE POINT ($OFH/physics_freeze_20261109.md) |
+| 53 | i7-t03both r2/r3 up to d26c2c01 (lead #84d) | 2aa34022 | DEFAULT SHELF_FREE_START_CONNECTED for the shelf tip family; MAP_STANCE / BOARD_DRAW / lean.mirror off; no t03both layer consolidated |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
