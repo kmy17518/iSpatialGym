@@ -3478,6 +3478,7 @@ its report. Nothing new is decided at a merge. Record: `$OFH/int2_20261108`, `$O
 | 47 | i7-attachmargin up to 1df495e6 (lead #87b) | c512420d | ATTACH_CARRY_END_MARGIN off + diagnostics; lying90 root not consolidated |
 | 48 | i7-blockdiag a1bd231c + docs d49abb2b (lead #88b) | 598c243c | GROUP_ASSIGN_POSE_TIEBREAK off; its flip 7ca0942e held for the eval-measure bundle |
 | 49 | i7-t03both up to d0b3644c (lead #84b) | 6f973a10 | SHELF_BOARD_DRAW off; registry variants touching_03_t7otwukr / _t8otwukr / _drawn; layer NOT in v2maps_int2 |
+| 50 | i7-artsmall up to 92fe8d9f (lead #80c) | 08e7f768 | DEFAULT ARTIC_PUSH_BASE_SIG 1 (bug fix) + ARTSMALL_DRAW_ANGLES 1; layer artsmall_prefix (32 per-start prefix maps) into v2maps_int2 |
 
 i7-inside04 was cherry-picked, not merged and reverted: the far-arm switch never enters the trunk's history, so a later merge of a branch
 that contains 6d9445a9 would show it as new.
