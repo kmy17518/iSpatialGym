@@ -173,7 +173,8 @@ def prepare_from_anchor(spec, anchor_record, group_id, output, magnitude_range, 
     prepare_group(anchor=anchor, template=template, campaign_id="campaign_20261110", group_id=group_id,
                   output=output, code_sha256=file_digest(Path(spec["group_snapshot"]) / ".snapshot_commit"),
                   physics_sha256=key["physics_sha256"], data_sha256=key["data_sha256"], magnitude_range=magnitude_range,
-                  budget_seconds=spec.get("group_budget_seconds", 900), max_members=3)
+                  budget_seconds=spec.get("group_budget_seconds", 900), max_members=3,
+                  reuse_anchor_goal=spec.get("pair_goal_mode", "anchor") == "anchor")
     config = read(output / "campaign_config.json")
     write_json_atomic(output / "contracts.json", {"templates": [{**config["template"], "fingerprint": config["validation_key"]["template_sha256"]}]})
 
@@ -182,15 +183,16 @@ def claim(record, spec, cfg, root):
     from scripts.campaign_20261110.acceptance import audit_job
     from scripts.campaign_20261110.goal_groups import load_template_contract
     from scripts.campaign_20261110.group_lane import claim_group
+    from scripts.campaign_20261110.reservation_policy import active_policy
     row = record["allocation"]
     review = audit_job(row["job_dir"], gate_path(root, row), root=root, started_at=cfg["started_at"],
                        group_closed=True, group_id=record["group_id"])
     directory = Path(record["directory"])
     write_json_atomic(directory / "release_review.json", review)
-    hashes = read(cfg["reservation_hashes"])
-    require(hashes["reservation_sha256"] == file_digest(cfg["reservations"]), "reservation hash binding differs")
+    policy = active_policy(root)
+    require(policy is not None, "family controller requires active reservations")
     result = claim_group(review, load_template_contract(directory / "contracts.json", spec["class_id"]),
-                         read(cfg["reservations"]), reservation_hashes=hashes, root=root,
+                         policy[1], reservation_hashes=policy[2], root=root,
                          started_at=cfg["started_at"], state_path=root / "dataset/allocations.sqlite")
     record.update(status="claimed", accepted=result["accepted"], closed_at=time.time())
 

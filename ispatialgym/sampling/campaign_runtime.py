@@ -14,6 +14,7 @@ import os
 import time
 from functools import lru_cache
 from pathlib import Path
+from types import SimpleNamespace
 
 from scripts.campaign_20261110.contracts import (
     ObjectRef, Perturbations, ScaleState, Template, ValidationKey,
@@ -34,7 +35,9 @@ def _load(path: str):
     data["objects"] = tuple(ObjectRef(**obj) for obj in data["objects"])
     template = Template(**data)
     from scripts.campaign_20261110.binding_pools import load_pool_for_template
+    from scripts.campaign_20261110.camera_context import load_camera_context
     load_pool_for_template(template, root=os.environ.get("ISGF_ROOT"))
+    load_camera_context(template, root=os.environ.get("ISGF_ROOT"))
     p = config["perturbations"]
     perturbations = Perturbations({key: ScaleState(**value) for key, value in p["scales"].items()},
                                  tuple(p.get("removed_objects", [])), p.get("lighting", {}))
@@ -89,7 +92,9 @@ def scene_removals(scene, stable):
 
 def prepare(sampler, sim):
     """Run after bindings exist, before any template geometry/visibility checks."""
-    _, _, perturbations, _ = configuration()
+    _, template, perturbations, _ = configuration()
+    from scripts.campaign_20261110.camera_context import verify_live_context
+    verify_live_context(template, sampler.world.scene)
     verify_scales(sampler.objects, perturbations.scales)
     relevant = {obj.name for obj in sampler.objects.values()}
     moved = sampler.world.scene_variant.get("moved_objects") or {}
@@ -145,6 +150,8 @@ def annotate(sampler, tro, draft, seed):
                 f"campaign asset identity mismatch: {ref.instance}")
     observed = verify_scales(sampler.objects, perturbations.scales)
     augmentation_state = verify_prepared(sampler, perturbations)
+    from scripts.campaign_20261110.camera_context import verify_live_context
+    context_objects = verify_live_context(template, sampler.world.scene)
     expected_bddl = template.scene_setup.get("runtime_bddl_sha256", template.scene_setup.get("source_bddl_sha256"))
     if expected_bddl:
         require(sampler.template_meta.get("bddl_sha256") == expected_bddl, "campaign BDDL differs from its pinned definition")
@@ -168,6 +175,12 @@ def annotate(sampler, tro, draft, seed):
                      "scene": "scene_variant_parking" if perturbations.removed_objects else "none",
                      "lighting": "usd_lights_v1" if perturbations.lighting else "none"},
     }
+    if context_objects:
+        result["ispatialgym"]["campaign"]["runtime"]["camera_context"] = {
+            "scene": template.scene, "room": template.room,
+            "scene_sha256": template.scene_setup["camera_context"]["scene"]["sha256"],
+            "observed_objects": context_objects,
+        }
     return result
 
 
@@ -192,7 +205,20 @@ def verify_loaded(meta, physical, *, scene=None, sim=None):
         augmentation.apply_lighting(scene, sim, perturbations.lighting, state["lighting"])
     elif scene is not None and sim is not None:
         augmentation.apply_lighting(scene, sim, {})
+    context = meta.get("scene_setup", {}).get("camera_context")
+    context_observed = {}
+    if context is not None:
+        from scripts.campaign_20261110.camera_context import verify_live_context
+        recorded = meta.get("runtime", {}).get("camera_context")
+        require(scene is not None and isinstance(recorded, dict), "camera context replay evidence missing")
+        require(recorded.get("scene_sha256") == context["scene"]["sha256"], "camera context replay scene hash changed")
+        template = SimpleNamespace(task=meta["task"], split=meta["split"], scene=recorded["scene"],
+            room=recorded["room"], scene_setup=meta["scene_setup"],
+            objects=tuple(SimpleNamespace(instance=name) for name in physical))
+        context_observed = verify_live_context(template, scene)
+        require(context_observed == recorded.get("observed_objects"), "camera context replay differs from sampling")
     return {"observed_scales": verify_scales(physical, perturbations.scales), "scale_verified": True,
+            "camera_context": context_observed,
             "scene_augmentation": bool(perturbations.removed_objects), "lighting_augmentation": bool(perturbations.lighting)}
 
 

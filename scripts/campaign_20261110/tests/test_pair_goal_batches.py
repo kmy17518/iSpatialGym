@@ -56,7 +56,7 @@ def test_author_pins_three_distinct_goals_without_changing_relative_pair_geometr
     anchor['planned_start_poses'][partner.instance] = [[1, 2, 2.8], [0, 0, 0, 1]]
     anchor['summary']['goal_check'] = {'settled_poses': {'apple_a_0': [[1, 2, 3], [0, 0, 0, 1]]}}
     result = batches.prepare_batch(anchor=anchor, template=template, campaign_root=tmp_path, batch_id='pairs', count=3, seed=42,
-        campaign_id='new', code_sha256=c.file_digest(code / '.snapshot_commit'), physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'))
+        campaign_id='new', code_sha256=c.file_digest(code / '.snapshot_commit'), physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'),goal_mode='native_region')
     state = q.read_queue(result['queue'], result['config'])
     assert len(state['entries']) == 3 and result['candidate_instances'] == 9
     assert len({row['goal_sha256'] for row in state['entries']}) == 3
@@ -68,3 +68,12 @@ def test_author_pins_three_distinct_goals_without_changing_relative_pair_geometr
     assert command[command.index('submit')+2] == '9'
     assert any(value.startswith(q.ENV+'=') for value in command)
     assert not any(value.startswith(q.PLAN_ENV+'=') for value in command)
+    repeated = batches.prepare_batch(anchor=anchor, template=template, campaign_root=tmp_path, batch_id='anchor_pairs', count=3, seed=43,
+        campaign_id='new', code_sha256=c.file_digest(code / '.snapshot_commit'), physics_sha256=c.digest('physics'), data_sha256=c.digest('maps'))
+    repeated_state=q.read_queue(repeated['queue'],repeated['config'])
+    assert len({row['goal_sha256'] for row in repeated_state['entries']}) == 1
+    for row in repeated_state['entries']:
+        plan=batches.g.read_json(row['path'])
+        assert plan['partner_pose']['position'] == [1,2,2.8]
+        assert plan['goal_pose']['position'] == [1,2,3]
+        assert plan['source_instance_is_member'] is False and plan['max_members'] == 3

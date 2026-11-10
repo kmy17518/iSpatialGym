@@ -152,11 +152,11 @@ def test_pool_provenance_must_remain_inside_campaign(tmp_path):
         p.load_pool_for_template(active,root=tmp_path/"unrelated")
 
 
-def test_count_change_cannot_bypass_canonical_goal_group_limit(tmp_path):
+def test_owner_policy_permits_same_goal_in_separate_exactly_gated_count_groups(tmp_path):
     small,large=pooled_fixture(tmp_path,1,3,goal=7),pooled_fixture(tmp_path,2,6,goal=7)
     claim(tmp_path,small)
-    with pytest.raises(c.ContractError,match="same canonical goal"):
-        claim(tmp_path,large)
+    result=claim(tmp_path,large)
+    assert sorted(result["accepted"].values()) == ["eval_standard","train"]
 
 
 def test_pool_goal_identity_preserves_actual_scale_and_scene_changes(tmp_path):

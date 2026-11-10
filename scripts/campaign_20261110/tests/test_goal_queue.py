@@ -58,7 +58,7 @@ def test_changed_lighting_or_plan_cannot_cross_queue_transition(tmp_path, monkey
         q.advance(sampler, "campaign_group_timeout")
 
 
-def test_quaternion_sign_duplicate_goal_rejected(tmp_path, monkeypatch):
+def test_owner_policy_allows_repeated_goal_but_still_requires_distinct_group_ids(tmp_path, monkeypatch):
     queue, config, entries = fixture(tmp_path, monkeypatch)
     first = json.loads(open(entries[0]["path"]).read())
     second = json.loads(open(entries[1]["path"]).read())
@@ -68,8 +68,15 @@ def test_quaternion_sign_duplicate_goal_rejected(tmp_path, monkeypatch):
     raw = json.loads(queue.read_text())
     raw["entries"] = entries
     write_json_atomic(queue, raw)
-    with pytest.raises(ContractError, match="duplicate canonical"):
-        q.read_queue(queue, config)
+    state=q.read_queue(queue, config)
+    assert state['entries'][0]['goal_sha256'] == state['entries'][1]['goal_sha256']
+    assert state['goal_reuse_policy']['version'] == 2
+    second['group_id']=first['group_id']
+    write_json_atomic(entries[1]['path'],second)
+    raw['entries'][1]['sha256']=file_digest(entries[1]['path'])
+    write_json_atomic(queue,raw)
+    with pytest.raises(ContractError, match="duplicate queued goal-group ID"):
+        q.read_queue(queue,config)
 
 
 def test_queue_disabled_never_reads_sampler_context(monkeypatch):

@@ -1,10 +1,11 @@
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pytest
 
-from scripts.campaign_20261110.bind_fresh_candidates import bind_one, load_contract
+from scripts.campaign_20261110.bind_fresh_candidates import bind_one, load_contract, finished_geometry_failure
+from scripts.campaign_20261110.binding_pools import BindingPool, PoolCandidate, bind_variant, write_pool
 from scripts.campaign_20261110.contracts import ObjectRef, Template
 
 
@@ -81,3 +82,51 @@ def test_candidate_fingerprint_cannot_be_relabelled(tmp_path):
     row['class_id'] = 'object_scaling-bottle_of_pop'
     with pytest.raises(ValueError):
         load_contract(row)
+
+
+def test_finished_native_failure_is_distinct_from_pending(tmp_path):
+    template, job, *_ = fixture(tmp_path)
+    runs = tmp_path / 'runs'
+    job = {**job, 'sample_argv': ['python', '--out', '${CAMPAIGN_OUT}/validation/apple']}
+    assert finished_geometry_failure(template, job, runs) is None
+    path = runs / 'validation/apple/summary.json'
+    report = {'args': {'variant': job['alias'], 'scene': template.scene}, 'n_written': 0,
+        'problems': {job['alias']: {'native': {'rejections': {'missing_grasps:floating': 1}}}}}
+    write(path, report)
+    assert finished_geometry_failure(template, job, runs) is None
+    write(path, {**report, 'finished': '2026-11-10T10:00:00'})
+    result = finished_geometry_failure(template, job, runs)
+    assert result['rejections'] == {'missing_grasps:floating': 1}
+    assert result['summary_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+    write(path, {**report, 'finished': '2026-11-10T10:00:00', 'n_written': 1})
+    assert finished_geometry_failure(template, job, runs) is None
+
+
+def test_geometry_summary_cannot_escape_or_change_identity(tmp_path):
+    template, job, *_ = fixture(tmp_path)
+    runs = tmp_path / 'runs'
+    job = {**job, 'sample_argv': ['python', '--out', '${CAMPAIGN_OUT}/../other']}
+    with pytest.raises(ValueError, match='outside'):
+        finished_geometry_failure(template, job, runs)
+    job['sample_argv'][-1] = '${CAMPAIGN_OUT}/validation/apple'
+    write(runs / 'validation/apple/summary.json', {'args': {'variant': 'other', 'scene': template.scene}, 'finished': 'done'})
+    with pytest.raises(ValueError, match='alias'):
+        finished_geometry_failure(template, job, runs)
+
+
+def test_fresh_binding_keeps_immutable_pool_and_rejects_renamed_active_binding(tmp_path):
+    template, job, metadata, code, policy, hashes, pointer = fixture(tmp_path)
+    template = replace(template, task='disembedding', class_id='disembedding_02')
+    target = template.objects[0]
+    inactive = replace(target, instance='choice', role='distractor', category='pear', model='test', asset_sha256='f'*64)
+    pool = BindingPool('pool02', template.class_id, template.split, template.scene, template.room, (),
+        (PoolCandidate('target', target), PoolCandidate('inactive', inactive)),
+        {'target': (1, 1), 'distractor': (0, 1)}, template.definition_sha256)
+    path = write_pool(tmp_path / 'pool.json', pool)
+    template = bind_variant(template, path, {target.instance: 'target'})
+    bound = bind_one(template, job, metadata, code, policy, hashes, pointer)
+    assert bound.scene_setup['binding_pool'] == template.scene_setup['binding_pool']
+    meta = json.loads(metadata.read_text()); meta['bindings'][0]['name'] = 'apple.n.01_2'
+    write(metadata, meta)
+    with pytest.raises(ValueError, match='active bindings'):
+        bind_one(template, job, metadata, code, policy, hashes, pointer)

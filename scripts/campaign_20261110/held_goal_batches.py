@@ -15,8 +15,9 @@ if __package__ in (None, ""):
 
 from scripts.campaign_20261110 import goal_groups as g
 from scripts.campaign_20261110.contracts import digest, file_digest, require, write_json_atomic
-from ispatialgym.sampling.campaign_goal_queue import ENV, SCHEMA, canonical_goal, read_queue
+from ispatialgym.sampling.campaign_goal_queue import ENV, SCHEMA, read_queue
 from ispatialgym.sampling.campaign_held_goals import GoalPlanError, draw_start_depth
+from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY
 
 
 def rotate(q, v):
@@ -214,15 +215,8 @@ def prepare_batch(*, anchor, template, campaign_root, batch_id, count, magnitude
                  else rotation_goal_proposals(anchor,count,seed=seed))
     if base_region is not None:
         proposals = apply_base_region(proposals,anchor,base_region,seed=seed)
-    # Existing group plans are also excluded, including diagnostic/superseded ones.
-    prior_goals = set()
-    for path in (root/"groups").glob("*/goal_plan.json"):
-        old = g.read_json(path)
-        if old.get("task") == template.task and old.get("scene") == template.scene:
-            prior_goals.add(digest(canonical_goal(old)))
     entries, groups = [], []
     for i, proposal in enumerate(proposals):
-        require(digest(canonical_goal(proposal)) not in prior_goals, "proposed goal duplicates a previous group")
         group_id = f"{batch_id}_{i:04d}"
         derived = copy.deepcopy(anchor)
         derived["summary"]["goal_realised"] = proposal["goal_pose"]
@@ -244,6 +238,7 @@ def prepare_batch(*, anchor, template, campaign_root, batch_id, count, magnitude
     queue_path=queue_dir/"queue.json"
     write_json_atomic(queue_path,{"schema":SCHEMA,"campaign_id":campaign_id,"config_sha256":file_digest(config_path),
                                 "config_path":str(config_path),"entries":entries,"group_ids":groups,"seed":seed,
+                                "goal_reuse_policy":GOAL_REUSE_POLICY,
                                 "base_region_sha256": digest(base_region) if base_region is not None else None})
     read_queue(queue_path,config_path)
     return {"queue":str(queue_path),"config":str(config_path),"group_ids":groups,"candidate_instances":3*len(groups)}

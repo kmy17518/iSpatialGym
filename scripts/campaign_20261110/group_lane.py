@@ -24,6 +24,7 @@ from scripts.campaign_20261110.contracts import (
 from scripts.campaign_20261110.goal_groups import load_template_contract
 from scripts.campaign_20261110.storage import atomic_directory_lock, local_sqlite_transaction
 from scripts.campaign_20261110.reservation_policy import require_active_policy
+from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY, require_database_policy
 from scripts.campaign_20261110.binding_pools import (
     audit_objects, canonical_pool_perturbations, conceptual_identity, load_pool_for_template,
 )
@@ -65,12 +66,19 @@ def accepted_room(record):
 
 def physical_template(template):
     """Task template identity excludes code paths and provenance timestamps."""
-    return digest({"task": template.task, "scene": template.scene, "room": template.room,
+    value = {"task": template.task, "scene": template.scene, "room": template.room,
                    "rooms": sorted(set(template.scene_setup.get("task_rooms", ())) | {template.room}),
                    "objects": [{key: value for key, value in asdict(obj).items()
                                 if key not in ("readiness_source", "ready")}
                                for obj in sorted(template.objects, key=lambda obj: obj.instance)],
-                   "bindings": template.scene_setup.get("inst_to_name", {})})
+                   "bindings": template.scene_setup.get("inst_to_name", {})}
+    if template.scene_setup.get("camera_context") is not None:
+        from scripts.campaign_20261110.camera_context import load_camera_context
+        refs = load_camera_context(template)
+        value["camera_context"] = {"scene_sha256": template.scene_setup["camera_context"]["scene"]["sha256"],
+            "objects": [{key:item for key,item in asdict(obj).items() if key not in ("readiness_source","ready")}
+                        for obj in sorted(refs,key=lambda obj:obj.instance)]}
+    return digest(value)
 
 
 def conceptual_template(template):
@@ -99,7 +107,7 @@ def check_reservations(template, reservations, hashes):
     categories = set(reservations["category_holdout_categories"])
     require(bool(rooms & held_rooms) if template.split == "eval_category" else not rooms & held_rooms,
             "template violates held-out room reservation")
-    for obj in template.objects:
+    for obj in audit_objects(template):
         require(obj.ready and obj.readiness_source, "unready model in release")
         if obj.semantic_kind in ("wall", "floor"):
             continue
@@ -175,13 +183,18 @@ def _db(path):
     db.execute("PRAGMA synchronous=FULL")
     db.executescript("""
         CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, goal TEXT UNIQUE NOT NULL, review TEXT NOT NULL, record TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, goal TEXT NOT NULL, review TEXT NOT NULL, record TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, split TEXT NOT NULL,
             task TEXT NOT NULL, class_id TEXT NOT NULL, bucket INTEGER, template TEXT NOT NULL, record TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS quotas ON members (split, task, class_id, bucket);
         CREATE TABLE IF NOT EXISTS assets (split TEXT NOT NULL, model TEXT NOT NULL, sha TEXT NOT NULL,
             category TEXT NOT NULL, kind TEXT NOT NULL, PRIMARY KEY(split,model,sha,kind));
     """)
+    try:
+        require_database_policy(db)
+    except BaseException:
+        db.close()
+        raise
     return db
 
 
@@ -282,8 +295,6 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                 if previous:
                     require(previous[0] == digest(review), "accepted group changed")
                     return json.loads(previous[1])
-                require(db.execute("SELECT id FROM groups WHERE goal=?", (goals[0],)).fetchone() is None,
-                        "same canonical goal already allocated under another group")
                 split, task = template.split, template.task
                 scope = task if split == "eval_category" else template.class_id
                 counts = Counter(dict(db.execute("SELECT bucket,COUNT(*) FROM members WHERE split=? AND task=? AND class_id=? GROUP BY bucket",
@@ -338,6 +349,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
                           "canonical_goal_sha256": goals[0], "release_review_sha256": digest(review),
                           "conceptual_template_sha256": conceptual, "physical_template_sha256": physical,
                           "pool_sha256": pool.fingerprint if pool else None,
+                          "goal_reuse_policy": GOAL_REUSE_POLICY,
                           "training_policy": {"per_class_cap":class_cap,"room_policy":room_policy},
                           "members": [json.loads(value[0]) for value in db.execute("SELECT record FROM members WHERE group_id=? ORDER BY id", (gid,))]}
                 destination = root / "dataset/groups" / (gid + ".json")
@@ -358,6 +370,7 @@ def claim_group(review, template, reservations, *, reservation_hashes, root, sta
             try:
                 counts = {split: count for split, count in db.execute("SELECT split,COUNT(*) FROM members GROUP BY split")}
                 summary = {"campaign_id": review["campaign_id"], "counts": counts,
+                           "goal_reuse_policy": GOAL_REUSE_POLICY,
                            "groups": db.execute("SELECT COUNT(*) FROM groups").fetchone()[0], "database": str(state_path),
                            "conceptual_templates": db.execute("SELECT COUNT(DISTINCT template) FROM members").fetchone()[0],
                            "physically_validated_variants": len({json.loads(record).get("physical_template_sha256", identity)

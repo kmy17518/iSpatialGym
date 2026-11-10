@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from scripts.campaign_20261110.contracts import ObjectRef, Template, digest, require
 from scripts.campaign_20261110.group_lane import check_reservations
 from scripts.campaign_20261110.reservation_policy import active_policy
+from scripts.campaign_20261110.binding_pools import load_pool_for_template
 
 
 def sha(path):
@@ -45,6 +46,9 @@ def asset_path(code, init):
 
 
 def bind_one(template, job, metadata_path, code, reservations, hashes, policy_pointer):
+    # This also verifies immutable maximum-pool bytes and exact active binding
+    # names before native metadata can replace any candidate fields.
+    load_pool_for_template(template)
     meta = json.loads(metadata_path.read_text())
     directory = metadata_path.parent
     full = directory / 'template.json'
@@ -109,6 +113,33 @@ def bind_one(template, job, metadata_path, code, reservations, hashes, policy_po
     return result
 
 
+def finished_geometry_failure(template, job, runs):
+    """Return a finished zero-output native run; an absent report stays pending."""
+    argv = job['sample_argv']
+    require(argv.count('--out') == 1, 'consumer must name exactly one native output directory')
+    directory = Path(argv[argv.index('--out') + 1].replace('${CAMPAIGN_OUT}', str(runs)))
+    require(directory.resolve().is_relative_to(runs.resolve()), 'native output directory outside supplied runs')
+    path = directory / 'summary.json'
+    if not path.is_file():
+        return None
+    summary = json.loads(path.read_text())
+    require(summary.get('args', {}).get('variant') == job['alias'], 'native summary alias differs from consumer')
+    require(summary.get('args', {}).get('scene') == template.scene, 'native summary scene differs from consumer')
+    if not summary.get('finished') or summary.get('n_written', 0) > 0:
+        return None
+    records = summary.get('problems', {}).get(job['alias'], {})
+    reasons = Counter()
+    examples = {}
+    for value in records.values():
+        reasons.update(value.get('rejections', {}))
+        for reason, rows in value.get('rejection_examples', {}).items():
+            examples.setdefault(reason, []).extend(rows[:2])
+    return dict(candidate_id=template.template_id, class_id=template.class_id,
+        summary=str(path), summary_sha256=sha(path), finished=summary['finished'],
+        rejections=dict(reasons), rejection_examples=examples,
+        errors=summary.get('errors', []), variants=summary.get('variants', {}))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ('campaign-root', 'jobs', 'runs', 'code', 'output'):
@@ -131,7 +162,7 @@ def main():
         candidates.append((template, job))
         key = (template.scene, template.room, job['alias'], template.scene_setup['runtime_bddl_sha256'])
         index.setdefault(key, []).append((template, job))
-    output, failures, pending = [], [], []
+    output, failures, pending, geometry_failures = [], [], [], []
     for path in sorted(a.runs.rglob('template_meta.json')):
         try:
             meta = json.loads(path.read_text())
@@ -149,11 +180,20 @@ def main():
     completed = {t['template_id'] for t in output}
     for template, job in candidates:
         if template.template_id not in completed:
-            pending.append(dict(candidate_id=template.template_id, class_id=template.class_id, reason='no successfully bound fresh geometry yet'))
+            try:
+                failed = finished_geometry_failure(template, job, a.runs)
+            except (ValueError, KeyError, OSError) as error:
+                failures.append(dict(candidate_id=template.template_id, error=str(error)))
+                continue
+            if failed:
+                geometry_failures.append(failed)
+            else:
+                pending.append(dict(candidate_id=template.template_id, class_id=template.class_id, reason='no successfully bound fresh geometry yet'))
     a.output.parent.mkdir(parents=True, exist_ok=True)
-    a.output.write_text(json.dumps(dict(templates=output, failures=failures, pending=pending, production_released=0,
+    a.output.write_text(json.dumps(dict(templates=output, failures=failures, geometry_failures=geometry_failures, pending=pending, production_released=0,
         jobs_manifest_sha256=sha(a.jobs), active_policy_sha256=pointer['policy_sha256']), indent=2, sort_keys=True) + '\n')
-    print(json.dumps(dict(bound=len(output), failures=failures, pending_candidates=len(candidates)-len(completed), output=str(a.output), sha256=sha(a.output))))
+    print(json.dumps(dict(bound=len(output), failures=failures, geometry_failures=len(geometry_failures),
+        pending_candidates=len(candidates)-len(completed)-len(geometry_failures), output=str(a.output), sha256=sha(a.output))))
 
 
 if __name__ == '__main__':

@@ -23,6 +23,7 @@ def main():
     p.add_argument('--category-proposal', type=Path)
     p.add_argument('--candidate-manifest', type=Path)
     p.add_argument('--reserved-candidate-manifest', type=Path)
+    p.add_argument('--bottom-view', action='store_true', help='Include the opposite face when canonical views hide semantic detail')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     out = a.output.resolve()
@@ -135,7 +136,10 @@ def main():
                       'images': []}
             centre = ((hi + lo) * .5).cpu().numpy()
             radius = float(th.max(hi - lo)) * 1.7 + .1
-            for name, direction in [('front', [1., -1., .55]), ('back', [-1., 1., .55]), ('top', [.01, 0., 1.])]:
+            views = [('front', [1., -1., .55]), ('back', [-1., 1., .55]), ('top', [.01, 0., 1.])]
+            if a.bottom_view:
+                views.append(('bottom', [.01, 0., -1.]))
+            for name, direction in views:
                 direction = np.array(direction); direction /= np.linalg.norm(direction)
                 eye = centre + radius * direction
                 back = direction; right = np.cross([0., 1., 0.], back); right /= np.linalg.norm(right)
@@ -155,7 +159,7 @@ def main():
             subset = [r for r in report['objects'] if r['task'] == task]
             for start in range(0,len(subset),10):
                 page=subset[start:start+10]
-                sheet = Image.new('RGB', (3 * 256, len(page) * 280), 'white')
+                sheet = Image.new('RGB', ((4 if a.bottom_view else 3) * 256, len(page) * 280), 'white')
                 draw = ImageDraw.Draw(sheet)
                 for i, row in enumerate(page):
                     draw.text((3, i*280+3), row['category'] + '/' + row['model'], fill='black')

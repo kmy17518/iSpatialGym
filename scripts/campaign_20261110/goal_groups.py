@@ -37,15 +37,20 @@ from ispatialgym.sampling.campaign_attachment_goals import SCHEMA as ATTACHMENT_
 from ispatialgym.sampling.campaign_block_goals import SCHEMA as BLOCK_SCHEMA, validate_block_plan
 
 
-# This archived carton template already had an explicit measure but retained
-# the pre-migration gating atom. The current frozen oracle's definition passed
-# fresh baseline demo/replay job 18420653. No other explicit-measure source is
+# These archived templates already had an explicit measure but retained
+# the pre-migration gating atom. Each exact current definition below passed
+# a fresh baseline demo and true action replay. No other explicit-measure source is
 # eligible for this compatibility repair; every other semantic section is still
-# compared below, and the measured atom must remain identical.
+# compared below, and parsed measurement atoms must remain identical.
 EXPLICIT_ARTICULATION_MEASURE_REPAIRS = {
     ("configuration_matching-articulation_close_small_scale_02",
      "40c3592afdc39494609881559eea7558fe570678d62f7ea9d7e3695d72e21f09",
      "137524dc9be630524b4df0a38c7674d6eca94fe7bcad006fc8b5eec2f19acb2b"): "fresh_baseline_18420653",
+    ("configuration_matching-articulation_close_small_scale_01",
+     "ba0f59d069a7dfc89a9718c1c5dfe2fef046ab62c85cb80f9cdbfac201da9ba5",
+     "64e4d3c17b913377e021586a25258051317c03882cccfa81ca2a7bafb7ae3f09"): {
+        "fresh_baseline": "18423162", "physics_replay": "18423435",
+        "gate_sha256": "bd30c1824a19aac1ecb6692e7a1b9495df494a65a977fee72c8c7b9eb2cc7b7d"},
 }
 
 
@@ -333,7 +338,8 @@ def verify_scaled_grasp_route(anchor, original, current, state):
 
 def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str, output: Path,
                   code_sha256: str, physics_sha256: str, data_sha256: str,
-                  magnitude_range, budget_seconds: float = 900, max_members: int = 3):
+                  magnitude_range, budget_seconds: float = 900, max_members: int = 3,
+                  reuse_anchor_goal: bool = False):
     require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", group_id), "group id must be a safe path component")
     pair_tasks = {f"inter_object_relation_satisfaction-{relation}_{scale}_scale": (relation, scale)
                   for scale, relations in (("small", PAIR_RELATIONS), ("large", ("ontop", "inside", "nextto", "touching"))) for relation in relations}
@@ -476,7 +482,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
                     "touching anchor lacks one verified pre-push grasp/place")
             placed = object_pose_from_grasp(grasps[0]["place"], grasps[0]["eef_in_object"])
             plan["place_pose"] = {"position": placed[0], "orientation": placed[1]}
-        if relation == "nextto" and scale == "small":
+        if relation == "nextto" and scale == "small" and not reuse_anchor_goal:
             summary = anchor["summary"]
             require("nextto_gap_m" in summary and "g_NT" in summary.get("pair", {}), "nextto anchor lacks measured gap range")
             base = summary.get("manipulation_stance", {}).get("base_pose2d")
@@ -520,7 +526,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
             plan["release_pose"] = {"position": push["goal_pose"][0], "orientation": push["goal_pose"][1]}
             plan["base_push"] = {key: push[key] for key in ("side", "face", "direction", "goal_gap_m", "nextto_bound_m")}
             plan["base_push"]["side_inward"] = matching[0]["inward"]
-            if relation == "nextto":
+            if relation == "nextto" and not reuse_anchor_goal:
                 changed_goal, changed_release, gap = vary_base_push_gap(target,
                     push["goal_pose"], inward=matching[0]["inward"],
                     gap_max=push["nextto_bound_m"], observed_gap=push["goal_gap_m"],
@@ -531,6 +537,7 @@ def prepare_group(*, anchor, template: Template, campaign_id: str, group_id: str
         elif scale == "large":
             require(anchor["summary"].get("goal_cell") is not None, "large pair anchor lacks fixed goal cell")
             plan["goal_cell"] = anchor["summary"]["goal_cell"]
+        plan["goal_selection"] = "fresh_anchor" if reuse_anchor_goal else "native_region"
         plan["schema"] = PAIR_SCHEMA
         plan.pop("magnitude_range")
         plan["anchor_base_pose2d"] = plan.pop("base_pose2d")

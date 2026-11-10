@@ -194,8 +194,10 @@ def conceptual_identity(template, *, root=None):
 
 def audit_objects(template, *, root=None):
     """The entire admitted maximum pool participates in cross-role exclusion."""
+    from scripts.campaign_20261110.camera_context import load_camera_context
     pool = load_pool_for_template(template, root=root)
-    return pool.audit_template().objects if pool else template.objects
+    objects = pool.audit_template().objects if pool else template.objects
+    return objects + load_camera_context(template, root=root)
 
 
 def canonical_pool_perturbations(template, perturbations):

@@ -61,6 +61,21 @@ class FamilyControllerTests(unittest.TestCase):
                 db.executemany("INSERT INTO members VALUES (?,?,?)", [("a", "eval_standard", 1), ("b", "eval_standard", 1)])
             self.assertEqual(c.accepted_counts(root, "a"), {("eval_standard", 1): 1})
 
+    def test_claim_uses_current_audited_policy_after_reservation_extension(self):
+        record = {"allocation": {"job_dir": "/campaign/job", "key": "a", "jobid": "1"},
+                  "directory": "/campaign/group", "group_id": "group"}
+        cfg = {"started_at": 1, "reservations": "/superseded", "reservation_hashes": "/superseded-hashes"}
+        current, hashes = {"revision": 5}, {"audit": "current"}
+        with patch("scripts.campaign_20261110.acceptance.audit_job", return_value={}), \
+             patch("scripts.campaign_20261110.goal_groups.load_template_contract", return_value="template"), \
+             patch("scripts.campaign_20261110.group_lane.claim_group", return_value={"accepted": 2}) as claim, \
+             patch("scripts.campaign_20261110.reservation_policy.active_policy", return_value=({}, current, hashes)), \
+             patch.object(c, "write_json_atomic"):
+            c.claim(record, {"class_id": "a"}, cfg, Path("/campaign"))
+        self.assertEqual(claim.call_args.args[2], current)
+        self.assertEqual(claim.call_args.kwargs["reservation_hashes"], hashes)
+        self.assertEqual(record["status"], "claimed")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.campaign_20261110.controller_held import job_terminal, next_work, queue_closures
+from scripts.campaign_20261110.controller_held import job_terminal, next_work, queue_closures, record_runtime_failure
 from scripts.campaign_20261110.contracts import ContractError
 
 
@@ -70,3 +70,12 @@ def test_vast_terminal_state_is_not_success_evidence(tmp_path):
     assert not job_terminal({"jobid":"900000030"},tmp_path,{})
     path.write_text(json.dumps({"status":"synced","done":{"successes":0}}))
     assert job_terminal({"jobid":"900000030"},tmp_path,{})
+
+
+def test_old_runtime_lock_failure_cannot_trigger_another_same_key_refill(tmp_path):
+    (tmp_path/"sample.log").write_text("fcntl.flock(stream.fileno(), fcntl.LOCK_EX)\nOSError: [Errno 5] Input/output error\n")
+    record={"allocation":{"job_dir":str(tmp_path)},"status":"complete","groups":{"good":{"accepted":{"iid":"train"}}}}
+    state={}
+    failure=record_runtime_failure(record,state)
+    assert state["runtime_failure"] == failure == record["requires_new_runtime_gate"]
+    assert record["groups"]["good"]["accepted"] == {"iid":"train"}

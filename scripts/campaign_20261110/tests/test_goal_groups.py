@@ -144,6 +144,17 @@ class GoalGroupControllerTests(unittest.TestCase):
             self.assertTrue(.01 <= plan["nextto_gap_proposal_m"] <= .09)
             self.assertEqual(plan["partner_pose"]["position"], [0, 0, .7])
             self.assertAlmostEqual(plan["goal_pose"]["position"][1], .2 + plan["nextto_gap_proposal_m"] - .08)
+            reused = root / "groups/pair_reused"
+            g.prepare_group(anchor=anchor, template=template, campaign_id="new", group_id="pair_reused", output=reused,
+                            code_sha256=c.file_digest(code / ".snapshot_commit"), physics_sha256=c.digest("physics"),
+                            data_sha256=c.digest("maps"), magnitude_range=[0, 1], reuse_anchor_goal=True)
+            exact = g.read_json(reused / "goal_plan.json")
+            self.assertEqual(exact["goal_pose"]["position"], [0, .2, .8])
+            self.assertEqual(exact["release_pose"]["position"], [0, .2, .81])
+            self.assertEqual(exact["partner_pose"]["position"], [0, 0, .7])
+            self.assertNotIn("nextto_gap_proposal_m", exact)
+            self.assertEqual(exact["goal_selection"], "fresh_anchor")
+
 
 
 if __name__ == "__main__":
@@ -295,6 +306,45 @@ def test_only_documented_legacy_articulation_measure_migration_is_allowed(tmp_pa
     write(runtime, new.replace("(pose_settled ?apple.n.01_1)", ""))
     with pytest.raises(c.ContractError, match="semantics differ"):
         g.bind_runtime_definition(template, runtime)
+
+
+def test_exact_articulation_repair_preserves_parsed_legacy_measurement(tmp_path, monkeypatch):
+    import pytest
+    source, runtime = tmp_path / "source", tmp_path / "runtime"
+    source.mkdir(); runtime.mkdir()
+    layout = "(layout_reached ?apple.n.01_1)"
+    pose_atom = "(pose_reached ?apple.n.01_1)"
+    old = """(define (problem configuration_matching-1) (:domain ispatialgym)
+    (:variant configuration_matching-articulation_close_small_scale-test)
+    (:objects apple.n.01_1 - apple.n.01 agent.n.01_1 - agent.n.01)
+    (:init (grasped agent.n.01_1 apple.n.01_1))
+    (:goal (and (not (grasped ?agent.n.01_1 ?apple.n.01_1)) (pose_settled ?apple.n.01_1) (layout_reached ?apple.n.01_1)))
+    (:measure (pose_reached ?apple.n.01_1)))"""
+    new = old.replace(" " + layout, "").replace("(:measure " + pose_atom + ")", "(:measure " + pose_atom + " " + layout + ")")
+    def write(directory, text):
+        (directory / "problem.bddl").write_text(text)
+        c.write_json_atomic(directory / "template_meta.json", {"activity_definition": "problem.bddl", "problem": "configuration_matching-1",
+            "bddl_sha256": c.file_digest(directory / "problem.bddl")})
+    write(source, old); write(runtime, new)
+    obj = c.ObjectRef("apple.n.01_1", "target", "apple", "a", c.digest("asset"), ready=True, readiness_source="test")
+    template = c.Template("t", "configuration_matching-articulation_close_small_scale", "x", "eval_standard",
+        "house_single_floor", "living_room_0", (obj,), c.digest("definition"),
+        {"source_template": str(source), "source_bddl_sha256": c.file_digest(source / "problem.bddl")})
+    with pytest.raises(c.ContractError, match="semantics differ"):
+        g.bind_runtime_definition(template, runtime)
+    def allow_current():
+        exact = (template.class_id, c.file_digest(source / "problem.bddl"), c.file_digest(runtime / "problem.bddl"))
+        monkeypatch.setattr(g, "EXPLICIT_ARTICULATION_MEASURE_REPAIRS", {exact: "fresh-demo-and-physics-replay"})
+    allow_current()
+    migration = g.bind_runtime_definition(template, runtime).scene_setup["runtime_bddl_equivalence"]["migration"]
+    assert migration["measurement_atoms_unchanged"] is True
+    assert migration["removed_gating_atoms"] == [["layout_reached", "?apple.n.01_1"]]
+    # Even an accidentally added allowlist entry cannot remove another measure
+    # or weaken an unrelated goal clause.
+    for invalid in (new.replace(pose_atom, ""), new.replace("(pose_settled ?apple.n.01_1)", "")):
+        write(runtime, invalid); allow_current()
+        with pytest.raises(c.ContractError, match="semantics differ"):
+            g.bind_runtime_definition(template, runtime)
 
 
 def test_axial_author_uses_fresh_goal_and_native_range_policy(tmp_path):

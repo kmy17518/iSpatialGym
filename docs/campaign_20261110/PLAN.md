@@ -38,6 +38,7 @@ Progress is measured separately as attempts, sampled instances, successful demos
 - Every candidate model in every role must have verified `ready` status from the asset catalog. File existence or a successful prior demo does not replace the readiness gate. New generated assets enter candidate manifests only after readiness validation.
 - Training buckets are soft balancing targets (owner follow-up). Prefer underfilled buckets, but do not reject an otherwise valid training instance solely for missing a bucket allocation. Eval bucket quotas remain strict.
 - Goal groups target at most three distinct successful starts/grasps, with at least two needed to promote a standard-eval member. Timed-out singletons are training-only. Camera relocalization is exempt.
+- Owner policy v2 permits repeated canonical goal states across independently generated groups and train/eval splits. Group IDs and instances remain fresh; within-group distinct starts/grasps, maximum three members, successful training siblings, exact physics gates, and model/category/room holdouts remain enforced. A different viewpoint is not required merely to create another group. See [OWNER_DECISIONS.md](OWNER_DECISIONS.md).
 - All sampling-time perturbations are shared within a group. Lighting is selected and recorded at collection time and restored at replay; applying a random light only during replay would break reproducibility. Visibility-sensitive scene removals occur before sampling checks.
 - Use the maximum feasible layout envelope at supported scales when screening supports. Count usable robot standoff areas without imposing an untucked arm pose; detailed IK still decides feasibility.
 - Preloaded candidate pools must be bounded by measured memory. Inactive objects must not collide, affect visibility, or appear in the selected template/TRO. Large pools may be sharded.
@@ -60,6 +61,7 @@ Progress is measured separately as attempts, sampled instances, successful demos
 - Tray/board categories are exempt from category holdout; model holdout still requires unused tray/board models.
 - Final eval quotas: standard 1,000; model holdout 891; category/room holdout 109. Total eval 2,000; target training 100,000.
 - Distractors are a category pool: a model-holdout template may select any available globally unseen models from the pool. No unused model is required for every distractor category. disembedding_06 can use the unused soy-milk bottle model without requiring unseen coconut-bottle or soy-carton models.
+- Repeated goals: “Don't care about repeats between train and eval when generating for the whole benchmark.” The allocator's prior global canonical-goal uniqueness rule is removed through an audited policy migration. Exact native pair anchor goals may be reused with newly sampled starts/grasps; translation or gap changes are optional proposals, not release requirements.
 
 ## Live state
 

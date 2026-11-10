@@ -1,4 +1,4 @@
-"""Immutable goal queues: amortize one scene load across distinct audited goals."""
+"""Immutable goal queues: amortize one scene load across audited goal groups."""
 from __future__ import annotations
 
 import json
@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ispatialgym.sampling.campaign_held_goals import ENV as PLAN_ENV, validate_goal_plan
 from scripts.campaign_20261110.contracts import digest, file_digest, require
+from scripts.campaign_20261110.goal_reuse_policy import POLICY as GOAL_REUSE_POLICY
 
 ENV = "ISPATIALGYM_CAMPAIGN_GOAL_QUEUE"
 SCHEMA = "isg-held-goal-queue-v1"
@@ -47,7 +48,8 @@ def read_queue(path, config_path):
         require(template["task"] in {f"inter_object_relation_satisfaction-{relation}_{scale}_scale"
                 for scale in ("small", "large") for relation in RELATIONS}, "pair queue requires a pair task")
     require(raw.get("entries"), "empty held-goal queue")
-    ids, goals, entries = set(), set(), []
+    require(raw.get("goal_reuse_policy",GOAL_REUSE_POLICY) == GOAL_REUSE_POLICY, "unknown queued goal-reuse policy")
+    ids, entries = set(), []
     for row in raw["entries"]:
         plan_path = Path(row["path"]).resolve()
         require(plan_path.is_file() and file_digest(plan_path) == row["sha256"], "queued goal plan changed")
@@ -66,17 +68,16 @@ def read_queue(path, config_path):
         require(plan["max_members"] <= 3, "queued groups permit at most three members")
         require(plan["group_id"] not in ids, "duplicate queued goal-group ID")
         goal = digest(canonical_goal(plan) if schema == SCHEMA else canonical_pair_goal(plan))
-        require(goal not in goals, "duplicate canonical goal in queue")
         ids.add(plan["group_id"])
-        goals.add(goal)
         entries.append({**row, "path": str(plan_path), "group_id": plan["group_id"], "goal_sha256": goal, "max_members": plan["max_members"]})
     return {"path": str(path), "sha256": file_digest(path), "config_path": str(config_path),
-            "config_sha256": file_digest(config_path), "entries": entries, "index": 0}
+            "config_sha256": file_digest(config_path), "entries": entries, "index": 0,"goal_reuse_policy":GOAL_REUSE_POLICY}
 
 
 def _event(state, event, **details):
     record = {"schema": "isg-goal-queue-event-v1", "created_at": time.time(), "pid": os.getpid(),
-              "queue_sha256": state["sha256"], "index": state["index"], "event": event, **details}
+              "queue_sha256": state["sha256"], "index": state["index"], "event": event,
+              "goal_reuse_policy_version":GOAL_REUSE_POLICY["version"], **details}
     path = Path(state["path"]).with_suffix(".events.jsonl")
     # One sampler owns one queue submission. Append preserves closed groups if
     # the worker exits while preparing its next goal.

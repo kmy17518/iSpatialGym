@@ -57,13 +57,14 @@ def test_strict_eval_bucket_caps_with_train_siblings_and_idempotent_export(tmp_p
     assert read(tmp_path / "dataset/group_counts.json")["counts"] == {"eval_standard": 3, "train": 5}
 
 
-def test_duplicate_canonical_goal_cannot_bypass_group_cap(tmp_path):
+def test_repeated_canonical_goal_can_form_another_fresh_group_under_owner_policy(tmp_path):
     f, review = candidate(tmp_path, 0, goal=7)
     claim(tmp_path, f, review)
     f2, review2 = candidate(tmp_path, 1, goal=7)
-    with pytest.raises(c.ContractError, match="canonical goal"):
-        claim(tmp_path, f2, review2)
-    assert not (tmp_path / "dataset/groups/g1_group.json").exists()
+    second=claim(tmp_path, f2, review2)
+    assert sorted(second["accepted"].values()) == ["eval_standard","train"]
+    assert second["goal_reuse_policy"]["version"] == 2
+    assert (tmp_path / "dataset/groups/g1_group.json").exists()
 
 
 def test_changed_artifacts_and_reserved_models_fail_before_claim(tmp_path):

@@ -208,6 +208,18 @@ def prepare_queue(spec, state, decision, cfg, root, template, save):
     return record
 
 
+def record_runtime_failure(record, state):
+    from scripts.campaign_20261110.controller_camera import sampling_infrastructure_failure
+    allocation = record.get("allocation")
+    if allocation is None:
+        return None
+    failure = sampling_infrastructure_failure(allocation["job_dir"])
+    if failure is not None:
+        record["requires_new_runtime_gate"] = failure
+        state["runtime_failure"] = failure
+    return failure
+
+
 def advance(spec, state, cfg, root, rows, queue, allowance, save):
     require(file_digest(spec["seed_config"]) == spec["seed_config_sha256"], "held seed config changed")
     seed_config = read(spec["seed_config"])
@@ -229,10 +241,14 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
                         "index": submission["index"], "count": prepared["candidate_instances"], "status": "external_submission"})
     for record in records:
         if record["status"] == "complete":
+            record_runtime_failure(record, state)
             continue
         allocation = record.get("allocation") or reconcile(rows, key=spec["class_id"], index=record["index"],
             count=record["count"], snapshot=spec["snapshot"], tag="goal_groups")
         if allocation is None:
+            if state.get("runtime_failure") is not None:
+                state["status"] = "runtime_revalidation_required"
+                return 0
             if record["status"] == "external_submission" or allowance <= 0:
                 state["status"] = "waiting_for_submission"
                 return 0
@@ -257,6 +273,10 @@ def advance(spec, state, cfg, root, rows, queue, allowance, save):
             state["status"] = "waiting_for_demo_or_replay"
             return 0
         record["status"] = "complete"
+        record_runtime_failure(record, state)
+    if state.get("runtime_failure") is not None:
+        state["status"] = "runtime_revalidation_required"
+        return 0
     zero_tail = 0
     for record in reversed(records):
         if any(v.get("accepted") for v in record.get("groups", {}).values()):
