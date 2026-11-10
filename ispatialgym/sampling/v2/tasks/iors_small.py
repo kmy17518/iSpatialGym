@@ -4031,6 +4031,21 @@ class IORSSmall(SamplerV2):
                     with self.ikc.ignoring(self.support_objects() + list(getattr(self.world, "spawned", {}).values()), split=False):
                         q2 = self.ikc._solve_exact(pre, self.ikc.q_locked(manip), arm)
                     pr["pre_ik_all_spawned_ignored"] = q2 is not None
+                # the GRASP pose: solved with everything the exact chain ignores at its last pose, then with the support ignored whole too; the
+                # blame of that solution in the live world (what the grasp configuration collides with) and the touching links
+                ign_last = list(exact_kw.get("ignore_for_last") or [])
+                with self.ikc.ignoring(ign_last):
+                    qg = self.ikc._solve_exact(eef, self.ikc.q_locked(manip), arm)
+                pr["grasp_ik_live"] = qg is not None
+                if qg is None:
+                    with self.ikc.ignoring(ign_last + list(self.support_objects()), split=False):
+                        qg2 = self.ikc._solve_exact(eef, self.ikc.q_locked(manip), arm)
+                    pr["grasp_ik_support_ignored"] = qg2 is not None
+                    if qg2 is not None:
+                        pr["grasp_blame"] = self.ikc._collision_blame(qg2, ign_last)[:200]
+                        with self.ikc.ignoring(ign_last):
+                            pr["grasp_links_touching"] = [ln for ln in links if not bool(self.kit.links_clear(qg2, [ln], 0.0)[0])][:8]
+                        pr["grasp_self_pairs"] = [f"{a} x {b}" for (a, b), _ in (self.ikc.self_collision_pairs(qg2) or [])[:3]]
                 probes[getattr(g, "name", "?")] = pr
             rec["probes"] = probes
             log.info("T03B_GRASP_DIAG %s", json.dumps(rec, default=str))
