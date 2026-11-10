@@ -6160,6 +6160,56 @@ cost gap between int2_14 and fp_def therefore comes from the per-attempt start d
 from the v2 root (the briefcase glib and maps are byte-identical) or from other code. The demo failures (not_reached, pause, plan_failed,
 symbolic_only, arm_stutter) are the briefcase's own push problem (#72, owner).
 
+## Attach after the in-hand turn: a joint-limit margin on the carry's end (branch `i7-attachmargin`, owner A8d (b), 2026-11-09)
+
+**Owner decision (2026-11-09, A8d):** "try (b), a joint-limit margin on the carry's end configuration, behind a switch; A/B on the attachment
+aliases (yield, GPU-h per ok)". Record `$OFH/attachmargin_20261109`.
+
+**Switch** `ISPATIALGYM_ATTACH_CARRY_END_MARGIN` (a90ca76b; default `"0"` = off, `"<rad>"` on, `"shadow:<rad>"` counts only, a malformed
+value raises). In `Attachment._carry_to_pre_attach` a passing carry whose tracked end (`waypoints_ok(track_dense=True)`, the arm at the
+pre-attach) has a right-arm joint within the margin of its limit fails like an untrackable carry (`carry_end_limit: ...`): the next carry of
+the ladder is tried, then the next partner cell (`partner_fails[..].carry_end_limit`). Covers the current and the lying90 routes; the
+hand-over route's own carries are not covered. Kit `attach_carry_end_margin.<route>.{checked, rejected, rejected.<joint>, rescued,
+would_reject}`; on every value of the switch the diagnostic kit `carry_end_margin.<route>.<lt5mrad|lt10mrad|lt20mrad|lt50mrad|ge50mrad>` per
+passing carry and `summary.carry_end_limit` (margin, joint, the 7 arm joints of the tracked end). Tests `test_attach_carry_end_margin.py`.
+
+**Census (CPU, `carry_end_census.py`, every attachment demo in `$OFH/out` and the shiyuc i7-cork runs).**
+- The recorded reorient `end` witness in `<iid>.oracle.json` is the attach witness (= the place's `pre_place` q in every demo), not the
+  carry's tracked end. It keeps >= 50 mrad in 438 / 439 demos and predicts nothing. The sampler recorded its tracked end nowhere (now
+  `summary.carry_end_limit`).
+- The EXECUTED carry end (`demo.hdf5` joint positions at the last step of the reorient), 306 demos: ok rate by the smallest joint-to-limit
+  distance <2 mrad 0.61 (n 23), 2-5 0.80 (20), 5-10 0.89 (36), 10-20 0.83 (30), 20-50 0.93 (15), 50-100 0.83 (30), >=100 0.89 (152).
+- The class A8d targets, "place plan_failed" (the finishing motion refused: a joint swing of 1.85-2.98 rad or the witness 3.00-3.81 rad
+  away): 8 demos, all with the executed end within 17 mrad of a limit (0.4-17.0 mrad: j5 lo x2 = i7cork_ly_r2 620402 / 620403, j6 x3,
+  j7 x2, j5 hi). None of the 197 demos >= 20 mrad failed that way. 36 % of executed ends are below 20 mrad, most of them ok.
+- Margin chosen: **0.02 rad**, the smallest that covers the whole class.
+
+**A/B** (trunk_a90ca76b, N 4, v2only, alias memory off, svl titanrtx, one empty sampling cache per alias and arm; off = unset, on = 0.02).
+attachment_01..04 at their int2 indices on v2maps_int2, plus the cork's lying route (`ISG_ATTACH_LYING90=1`, where the two limit failures
+were seen) on attachment_03 620400 (i7cork_ly_r2's indices) with the staged copy `attachmargin_20261109/v2maps_int2_ly` (v2maps_int2 + the
+i7-cork lying90 entry; check ERRORS 0).
+
+| alias (index) | off att / wr / ok, GPU-h/ok, s/att | on att / wr / ok, GPU-h/ok, s/att | on: carries rejected / checked (rescued) |
+|---|---|---|---|
+| attachment_01 (300500) | 11 / 4 / 4, 0.147, 69 | 10 / 4 / 4, 0.117, 73 | 24 / 31 (1) |
+| attachment_02 (321000) | 7 / 4 / 4, 0.121, 110 | 6 / 4 / 4, 0.140, 130 | 15 / 24 |
+| attachment_03 (300046) | 7 / 4 / 4, 0.101, 85 | 12 / 4 / 4, 0.123, 88 | 13 / 24 |
+| attachment_04 (300118) | 17 / 4 / 4, 0.213, 139 | 13 / 4 / 4, 0.210, 175 | 2 / 13 |
+| current route total | 42 / 16 / 16, 2.33 GPU-h = 0.146 | 41 / 16 / 16, 2.36 = 0.148 | 54 / 92 (1) |
+| attachment_03 lying90 (620400) | 26 / 4 / 4, 0.175, 67 | 16 / 4 / 4, 0.187, 101 | 36 / 41 (1) |
+| all five | 68 / 20 / 20, 3.03 = 0.152, 92 | 57 / 20 / 20, 3.11 = 0.156, 113 | 90 / 133 (2) |
+
+- **Where it acts:** 90 of 133 checked carries (lying 36 / 41; joints: j7 36, j3 25, j6 13, j2 11, j5 5). In the off arm, 18 of the 50
+  passing carries ended < 20 mrad (the same 36 % as the census). Exact IK per attempt 133.6 -> 156.9 on the current route, 102 -> 167 on
+  the lying route.
+- **Yield:** 20 / 20 demos ok in both arms. The targeted failure did not occur in the off arm, so the A/B cannot show the fix working.
+- **The tracked end is a weak proxy for the executed end.** The oracle tracks the carry from the arm after the executed grasp / lift. The
+  sampler tracks it from a fresh lift IK. The executed end was < 20 mrad in 9 / 20 off-arm demos and still in 5 / 20 on-arm demos (on:
+  tracked 30.2 -> executed 0.1 mrad at 620403, 47.8 -> 2.1 at 620401, 249.2 -> 2.1 at attachment_04 300121). Off: tracked and executed
+  agree < 20 mrad 6 times, tracked only 2 (300501: 0.4 -> 193 mrad), executed only 3. A margin that holds at execution needs the carry
+  tracked from the grasp's own branch (proposal (a)'s continuity), not only a check at its end.
+- **Default:** NOT flipped. It acts and ok is equal, but GPU-h per ok is slightly worse (0.146 -> 0.148 current, 0.175 -> 0.187 lying, 0.152 -> 0.156 all).
+
 ## Limitations / not done
 
 - Scene articulation (dishwasher, doors: swept-volume neighbourhoods, partial scene loads) is not implemented; the tabletop articulation
